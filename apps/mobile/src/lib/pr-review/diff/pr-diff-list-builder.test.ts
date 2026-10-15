@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  buildFileItems,
-  buildItems,
-  buildPaginationItem,
-} from '@/lib/pr-review/diff/pr-diff-list-builder';
+import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { type BuildItemsArgs, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { parsePatch } from '@/lib/pr-review/diff/parse-patch';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
@@ -303,27 +299,13 @@ describe('buildItems trailing gap totalLines', () => {
   });
 });
 
-describe('buildItems composition', () => {
-  it('deep-equals [...buildFileItems(args), buildPaginationItem(args)]', () => {
-    const args = baseArgs({
-      files: [makeFile(singleHunkPatch)],
-      expanded: { 'a.ts': true },
-      hasNextPage: true,
-      isFetchingNextPage: false,
-    });
-    const composed = [...buildFileItems(args), buildPaginationItem(args)];
-    const direct = buildItems(args);
-    expect(composed).toEqual(direct);
-  });
-});
-
 describe('buildFileItems parsed patch cache', () => {
   it('parses each file object once across two builds that differ only in viewed', () => {
     const spy = vi.mocked(parsePatch);
     spy.mockClear();
     const args = baseArgs({ files: [makeFile(singleHunkPatch)], expanded: { 'a.ts': true } });
     const build = (next: BuildItemsArgs) =>
-      buildFileItems(next).find((i): i is DiffLineListItem => i.kind === 'diff-line');
+      buildItems(next).find((i): i is DiffLineListItem => i.kind === 'diff-line');
     expect(build(args)?.parsed).toBe(build({ ...args, viewed: () => true })?.parsed);
     expect(spy).toHaveBeenCalledTimes(1);
   });

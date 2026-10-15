@@ -67,6 +67,9 @@ vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'a0000000-0000-4000-8000-000000000001' }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => 'online',
+}));
 
 const { chatPlaceOf, forgetChatPlaces } = await import('./scope');
 const { forgetKiloMcp, forgetMcpEnabled } = await import('./kilo-mcp');
@@ -142,11 +145,13 @@ describe('remembered question targets', () => {
     await rememberAsked('gone', {
       text: 'unsent custom question',
       model: 'backend:private:1:model',
+      effort: null,
       images: [],
     });
     await rememberAsked('kept', {
       text: 'another account question',
       model: 'kilo/one',
+      effort: null,
       images: [],
     });
 
@@ -156,6 +161,7 @@ describe('remembered question targets', () => {
     expect(await askedIn('kept')).toEqual({
       text: 'another account question',
       model: 'kilo/one',
+      effort: null,
       images: [],
     });
   });
@@ -164,6 +170,7 @@ describe('remembered question targets', () => {
     await rememberAsked('gone', {
       text: 'unsent custom question',
       model: 'backend:private:1:model',
+      effort: null,
       images: [],
     });
 
@@ -172,6 +179,7 @@ describe('remembered question targets', () => {
     expect(await askedIn('gone')).toEqual({
       text: 'unsent custom question',
       model: 'backend:private:1:model',
+      effort: null,
       images: [],
     });
   });
@@ -225,7 +233,7 @@ describe('custom backend credentials at account boundaries', () => {
       apiKind: 'chat_completions',
       apiKey: 'test-account-key',
       headers: { 'x-private-header': 'test-account-header' },
-      models: [{ id: 'model', name: 'Model', tools: false, images: false }],
+      models: [{ id: 'model', name: 'Model', tools: false, images: false, reasoning: false }],
       allowLocalHttp: false,
     });
     expect(listChatBackends()).toEqual([backend]);

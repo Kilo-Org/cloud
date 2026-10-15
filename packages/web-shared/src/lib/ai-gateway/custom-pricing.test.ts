@@ -1,12 +1,11 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
-import { MISTRAL_LARGE_4_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral.constants';
 import {
-  QWEN37_MAX_MODEL_ID,
-  QWEN37_PLUS_MODEL_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
+  GEMINI_4_ARGON_MODEL_ID,
+  GEMINI_FLASH_CURRENT_MODEL_ID,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { MISTRAL_LARGE_4_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral.constants';
 import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,
@@ -69,6 +68,33 @@ describe('custom model pricing', () => {
     ).toBe(Math.round(100 * 0.75));
   });
 
+  test('replaces upstream Gemini 4 Argon pricing with the promotional rates', () => {
+    const model = applyCustomPricingToModel({
+      ...makeModel(GEMINI_4_ARGON_MODEL_ID),
+      name: 'Google: Gemini 4 Argon',
+    });
+
+    expect(model.name).toBe('Google: Gemini 4 Argon (50% off)');
+    expect(model.pricing).toEqual({
+      prompt: '0.000002000000',
+      completion: '0.000010000000',
+      input_cache_read: '0.000000100000',
+      input_cache_write: '0.000000187500',
+    });
+    expect(
+      calculateCustomCost_mUsd(
+        GEMINI_4_ARGON_MODEL_ID,
+        makeUsage({
+          inputTokens: 1_000,
+          outputTokens: 100,
+          cacheHitTokens: 200,
+          cacheWriteTokens: 300,
+          cost_mUsd: 999,
+        })
+      )
+    ).toBe(Math.round(500 * 2 + 100 * 10 + 200 * 0.1 + 300 * 0.1875));
+  });
+
   test('replaces upstream Mistral Large 4 pricing with the discounted OpenRouter rates', () => {
     const model = applyCustomPricingToModel({
       ...makeModel(MISTRAL_LARGE_4_MODEL_ID),
@@ -95,7 +121,7 @@ describe('custom model pricing', () => {
     ).toBe(Math.round(800 * 0.68 + 100 * 2.09 + 200 * 0.07));
   });
 
-  test.each([QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID])(
+  test.each(['qwen/qwen3.7-max', 'qwen/qwen3.7-plus'])(
     'does not apply custom pricing to %s',
     modelId => {
       const model = makeModel(modelId);

@@ -55,6 +55,10 @@ import {
   baseResizeTerminalNextOutputSchema,
   baseCloseTerminalNextSchema,
   baseCloseTerminalNextOutputSchema,
+  baseCreatePreviewNextSchema,
+  baseCreatePreviewNextOutputSchema,
+  basePreviewOptionsNextOutputSchema,
+  basePreviewOptionsNextSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
@@ -69,7 +73,8 @@ import {
 import { linkPendingUploads, releasePendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { buildPreviewOpenUrl, buildPreviewUrlTemplate } from '@/lib/cloud-agent/preview-open-url';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
@@ -167,11 +172,20 @@ async function createCloudAgentControlToken(user: User, headersList?: Headers): 
  */
 export const cloudAgentNextRouter = createTRPCRouter({
   getSandboxSelectionOptions: baseProcedure
-    .input(z.object({ devcontainer: z.boolean().optional() }))
+    .input(
+      z.object({
+        devcontainer: z.boolean().optional(),
+        repositoryType: z.enum(['github', 'gitlab', 'bitbucket', 'git']).optional(),
+        repositoryFullName: z.string().min(1).max(500).optional(),
+      })
+    )
     .output(sandboxSelectionCapabilitiesSchema)
-    .query(async ({ ctx }) => {
+    .query(async ({ ctx, input }) => {
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
-      return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({});
+      return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
+        ...(input.repositoryType ? { repositoryType: input.repositoryType } : {}),
+        ...(input.repositoryFullName ? { repositoryFullName: input.repositoryFullName } : {}),
+      });
     }),
 
   /**
@@ -422,6 +436,45 @@ export const cloudAgentNextRouter = createTRPCRouter({
       } catch (error) {
         rethrowAsTerminalError(error);
       }
+    }),
+
+  createPreview: baseProcedure
+    .input(baseCreatePreviewNextSchema)
+    .output(baseCreatePreviewNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+
+      const { ticket, expiresAt } = signPreviewTicket({
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        port: input.port,
+      });
+      return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
+    }),
+
+  /**
+   * Whether the Worker shows preview for this session, and the preview URL with
+   * a `{port}` placeholder. The Worker owns both preview switches. This is only
+   * a UI gate, so a Worker failure hides preview instead of failing the query.
+   */
+  getPreviewOptions: baseProcedure
+    .input(basePreviewOptionsNextSchema)
+    .output(basePreviewOptionsNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const options = await createCloudAgentNextClient(authToken)
+        .getPreviewOptions({
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          organizationId: input.organizationId,
+        })
+        .catch((error: unknown) => {
+          console.warn('[cloud-agent-next.getPreviewOptions] Worker call failed:', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return { enabled: false } as const;
+        });
+      if (!options.enabled) return { enabled: false };
+      return { enabled: true, urlTemplate: buildPreviewUrlTemplate(options.hostTemplate) };
     }),
 
   refreshTerminalTicket: baseProcedure

@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import {
   ChevronDown,
   FileDiff,
+  Globe,
   LoaderCircle,
   MessageSquare,
   Plus,
@@ -32,6 +33,7 @@ import { toast } from 'sonner';
 import { CHAT_TAB_ID, fileTabId, terminalTabId } from './workspace-tabs';
 import type { FileWorkspaceTab, TerminalWorkspaceTab, WorkspaceTabId } from './workspace-tabs';
 import type { StoredSession } from './types';
+import type { PendingWorktreeChat } from './worktree-chat-pending';
 
 type TerminalStatusSummary = {
   status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'exited' | 'error';
@@ -65,6 +67,7 @@ export function CloudAgentWorkspaceTabs({
   activeTabRef,
   chatSessions,
   currentChatProgress,
+  currentChatLoadingLabel,
   currentSessionId,
   worktreeId,
   openChatSessionIds,
@@ -80,11 +83,15 @@ export function CloudAgentWorkspaceTabs({
   onCloseFile,
   terminalStatuses,
   canCreateTerminal,
+  canOpenPreview = false,
   onSelectTab,
   onCreateTerminal,
+  onOpenPreview,
   onCloseTerminal,
   onActivateTab,
   selectionSuppressed = false,
+  pendingChat,
+  onDismissPendingChat,
   className,
 }: {
   activeTabId: WorkspaceTabId;
@@ -93,6 +100,7 @@ export function CloudAgentWorkspaceTabs({
   onCloseFile: (path: string) => void;
   chatSessions: StoredSession[];
   currentChatProgress?: { sessionId: string; message: string } | null;
+  currentChatLoadingLabel?: string | null;
   currentSessionId: string | null;
   worktreeId?: string | null;
   openChatSessionIds?: readonly string[];
@@ -106,11 +114,17 @@ export function CloudAgentWorkspaceTabs({
   terminals: TerminalWorkspaceTab[];
   terminalStatuses: Record<string, TerminalStatusSummary | undefined>;
   canCreateTerminal: boolean;
+  canOpenPreview?: boolean;
   onSelectTab: (tabId: WorkspaceTabId) => void;
   onCreateTerminal: () => void;
+  onOpenPreview?: () => void;
   onCloseTerminal: (terminalId: string) => void;
   onActivateTab?: () => void;
   selectionSuppressed?: boolean;
+  /** Local UI-only new-chat tab shown while its real session is created. */
+  pendingChat?: PendingWorktreeChat | null;
+  /** Remove the pending tab; the background creation keeps running. */
+  onDismissPendingChat?: () => void;
   className?: string;
 }) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -156,6 +170,27 @@ export function CloudAgentWorkspaceTabs({
   const suppressedSelectionProps = selectionSuppressed
     ? { 'aria-selected': false, 'data-state': 'inactive' }
     : {};
+
+  const loadingIndicator = currentChatLoadingLabel ? (
+    <span role="status" aria-label={currentChatLoadingLabel}>
+      <LoaderCircle
+        className="text-muted-foreground h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+        aria-hidden="true"
+      />
+      <span className="sr-only">{currentChatLoadingLabel}</span>
+    </span>
+  ) : null;
+
+  type DisplayChatTab = { pending: true } | { pending: false; session: StoredSession };
+  const pendingChatSessionId =
+    pendingChat?.resolvedKiloSessionId ??
+    (pendingChat?.placement === 'replace' ? pendingChat.sourceKiloSessionId : null);
+  const displayChatTabs = visibleChatSessions.map<DisplayChatTab>(session =>
+    session.sessionId === pendingChatSessionId ? { pending: true } : { pending: false, session }
+  );
+  if (pendingChat && !displayChatTabs.some(tab => tab.pending)) {
+    displayChatTabs.push({ pending: true });
+  }
 
   useEffect(() => {
     if (!editingSessionId) return;
@@ -242,7 +277,48 @@ export function CloudAgentWorkspaceTabs({
         }}
       >
         {selectedWorktreeId ? (
-          visibleChatSessions.map(session => {
+          displayChatTabs.map(entry => {
+            if (entry.pending) {
+              const pendingSelected = Boolean(pendingChat?.owned) && !selectionSuppressed;
+              return (
+                <div
+                  key={pendingChat?.tabId ?? 'pending-chat'}
+                  className={cn(tabClassName, pendingSelected && activeTabClassName)}
+                >
+                  <TabsTrigger
+                    {...suppressedSelectionProps}
+                    value={pendingChat?.tabId ?? 'pending-chat'}
+                    aria-busy="true"
+                    title="Creating chat…"
+                    className={cn(
+                      tabTriggerClassName,
+                      'max-w-52',
+                      onDismissPendingChat && 'rounded-r-none'
+                    )}
+                  >
+                    <LoaderCircle
+                      className="h-3.5 w-3.5 shrink-0 animate-spin motion-reduce:animate-none"
+                      aria-hidden="true"
+                    />
+                    <span className="max-w-48 truncate">New chat</span>
+                  </TabsTrigger>
+                  {onDismissPendingChat && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-label="Dismiss new chat"
+                      title="Dismiss. The chat is still being created."
+                      className={cn(tabActionClassName, 'rounded-r-md')}
+                      onClick={onDismissPendingChat}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                  )}
+                </div>
+              );
+            }
+            const session = entry.session;
             const active = activeTabId === CHAT_TAB_ID && session.sessionId === currentSessionId;
             const selected = active && !selectionSuppressed;
             const isDeleting = deletingSessionIds.includes(session.sessionId);
@@ -352,7 +428,9 @@ export function CloudAgentWorkspaceTabs({
                   >
                     <TooltipTrigger>
                       <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                        {activityKind ? (
+                        {selected && !isEditing && loadingIndicator ? (
+                          loadingIndicator
+                        ) : activityKind ? (
                           <SessionStatusIndicator
                             status={session.sessionStatus ?? null}
                             statusUpdatedAt={session.sessionStatusUpdatedAt ?? null}
@@ -454,7 +532,13 @@ export function CloudAgentWorkspaceTabs({
               value={CHAT_TAB_ID}
               className={tabTriggerClassName}
             >
-              <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                {activeTabId === CHAT_TAB_ID && !selectionSuppressed && loadingIndicator ? (
+                  loadingIndicator
+                ) : (
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                )}
+              </span>
               <span className="min-w-0 truncate">Chat</span>
             </TabsTrigger>
           </div>
@@ -674,6 +758,19 @@ export function CloudAgentWorkspaceTabs({
             <Terminal className="h-4 w-4" aria-hidden="true" />
           </Button>
         ) : null}
+        {canOpenPreview && onOpenPreview && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            aria-label="Open preview"
+            title="Open preview"
+            className="text-muted-foreground h-8 w-8 shrink-0 px-0 focus-visible:ring-inset [@media(any-pointer:coarse)]:h-11 [@media(any-pointer:coarse)]:w-11"
+            onClick={onOpenPreview}
+          >
+            <Globe className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        )}
       </div>
     </div>
   );

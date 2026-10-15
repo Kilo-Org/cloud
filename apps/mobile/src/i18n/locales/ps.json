@@ -133,10 +133,14 @@
     "status": "حالت",
     "truncated": "پرې شوی",
     "updated": "تازه شوی",
+    "generating": "جوړېږي…",
     "working": "په کار بوخت",
     "yourOwnRepositories": "ستاسو خپل زېرمتونونه",
     "dismissed": "له پامه غورځول شوی",
-    "agent": "اجنټ"
+    "agent": "اجنټ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "بدلونونه"
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -325,6 +329,7 @@
       "collapseFile": "د فایل منځپانګه پټه کړئ",
       "expandFile": "د فایل منځپانګه ښکاره کړئ",
       "diffTooLarge": "توپیر دومره لوی دی چې نه شي ښودل کېدای.",
+      "noPreview": "د دې فایل لپاره مخکتنه نشته",
       "openOnGitHub": "په GitHub کې پرانیزئ",
       "openDiffOnGitHub": "د دې فایل توپیر په GitHub کې پرانیزئ",
       "githubDiff": "د GitHub توپیر"
@@ -831,7 +836,8 @@
       "kiloclaw": "د KiloClaw فعالیت",
       "balance": "د بیلانس خبرتیاوې",
       "security": "امنیتي موندنې",
-      "spend": "د لګښت خبرتیاوې"
+      "spend": "د لګښت خبرتیاوې",
+      "followedSessions": "تعقیب شوې ناستې"
     },
     "category": {
       "chatMessagesSubtitle": "ستاسو په خبرو اترو کې ځوابونه",
@@ -1254,7 +1260,7 @@
         "stoppedTitle": "چمتو کول ودرېدل",
         "stoppedBody": "د {{name}} انسټنس د چمتو کولو پر مهال ناڅاپه ودرېد.",
         "stalledTitle": "کار په ټپه درېدلی",
-        "stalledBody": "موږ ونه شو کړای د {{name}} چمتو کول بشپړ کړو. بیا هڅه وکړئ، یا که ستونزه تکرارېږي، hi@kilo.ai ته برېښنالیک واستوئ.",
+        "stalledBody": "موږ ونه شو کړای د {{name}} چمتو کول بشپړ کړو. بیا هڅه وکړئ، یا که ستونزه تکرارېږي، {{supportEmail}} ته برېښنالیک واستوئ.",
         "timeoutTitle": "له اټکل ډېر وخت نیسي",
         "timeoutBody": "د {{name}} چمتو کول تر معمول ډېر وخت نیسي (له {{displayMinutes}} دقیقو ډېر).",
         "continueInBackground": "په شالید کې دوام ورکړئ",
@@ -1312,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "ستاسو د لومړني لاسرسي پلان په موبایل کې له کارولو مخکې لاسي بیاکتنې ته اړتیا لري.",
       "iosTitle": "KiloClaw په iOS کې نشته",
       "iosBody": "د دې حساب لپاره KiloClaw ته لاسرسی د iOS له اپلیکیشن څخه بهر اداره کېږي.",
-      "iosContact": "پوښتنې لرئ؟ له hi@kilo.ai سره اړیکه ونیسئ.",
+      "iosContact": "پوښتنې لرئ؟ له {{supportEmail}} سره اړیکه ونیسئ.",
       "quarantinedCta": "زموږ ټیم ته ایمیل واستوئ",
       "nonCanonicalEarlybirdCta": "خپل پلان په kilo.ai کې وڅېړئ"
     },
@@ -1547,7 +1553,7 @@
         "recoveryLabel": "د GitHub اپ تازه کړئ"
       },
       "githubIpAllowList": {
-        "description": "د کوډ بیاکتونکی غیرفعال شو، ځکه چې د GitHub د دې سازمان د مجازو IP پتو لړلیک د Kilo لاسرسی بندوي. د مرستې لپاره له hi@kilocode.ai سره اړیکه ونیسئ، بیا د کوډ بیاکتونکی بېرته فعال کړئ."
+        "description": "د کوډ بیاکتونکی غیرفعال شو، ځکه چې د GitHub د دې سازمان د مجازو IP پتو لړلیک د Kilo لاسرسی بندوي. د مرستې لپاره له {{supportEmail}} سره اړیکه ونیسئ، بیا د کوډ بیاکتونکی بېرته فعال کړئ."
       },
       "gitlabProjectAccessRequired": {
         "description": "د کوډ بیاکتونکی غیرفعال شو، ځکه چې Kilo په GitLab کې د دې پروژې لپاره د لاسرسي ټوکن نه شي جوړولی. د ساتونکي د کچې لاسرسی ورکړئ یا د پروژې د لاسرسي ټوکنونه فعال کړئ، بیا د کوډ بیاکتونکی بېرته فعال کړئ.",
@@ -1562,7 +1568,7 @@
         "recoveryLabel": "د کوډ بیاکتونکي ترتیبات تازه کړئ"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "د کوډ بیاکتونکی غیرفعال شو، ځکه چې نن د ذخیرې د کلون کولو وخت درې ځله پای ته ورسېد. د مرستې لپاره له hi@kilocode.ai سره اړیکه ونیسئ، بیا د کوډ بیاکتونکی بېرته فعال کړئ."
+        "description": "د کوډ بیاکتونکی غیرفعال شو، ځکه چې نن د ذخیرې د کلون کولو وخت درې ځله پای ته ورسېد. د مرستې لپاره له {{supportEmail}} سره اړیکه ونیسئ، بیا د کوډ بیاکتونکی بېرته فعال کړئ."
       },
       "title": "د کوډ بیاکتونکی پاملرنې ته اړتیا لري.",
       "recoveryLabel": "له ملاتړ سره اړیکه ونیسئ"
@@ -2086,6 +2092,8 @@
       "title": "ناسته",
       "copyErrorDetails": "د تېروتنې جزیات کاپي کړئ",
       "backToSessions": "بېرته ناستو ته ورشئ",
+      "follow": "د قلف پر سکرین تعقیب کړئ",
+      "unfollow": "د قلف پر سکرین تعقیب بند کړئ",
       "couldNotLoad": "ناسته بار نه شوه.",
       "failedToLoadDetails": "د ناستې جزیات بار نه شول.",
       "failedToStopExecution": "اجرا ونه درول شوه.",
@@ -2152,6 +2160,11 @@
       "collapse": "هدف پټ کړئ",
       "expand": "هدف ښکاره کړئ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "دندې، له {{total}} څخه {{completed}} بشپړې شوې",
+      "rowAccessibility": "دندې، له {{total}} څخه {{completed}} بشپړې شوې. اوسنۍ دنده: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "په دې وروستیو کې کارول شوي",
       "couldNotLoadGithubRepositories": "د GitHub زېرمتونونه بار نه شول.",
@@ -2184,7 +2197,6 @@
       "retryLoadingEnvironment": "د چاپېریال بارولو بیا هڅه کړئ",
       "defaultEnvironment": "تلواله چاپېریال",
       "environmentSummary": "{{commands}} کمانډونه · {{mcp}} MCP · {{skills}} مهارتونه · {{agents}} ایجنټونه",
-      "changes": "بدلونونه",
       "leaveChanges": "بدلونونه پرېږدئ",
       "commitAndPush": "کمیټ او پش کړئ",
       "startSession": "ناسته پیل کړئ",
@@ -2207,6 +2219,10 @@
       "importingSession": "ناسته واردېږي",
       "cliCannotContinue": "دا CLI ناستې ته دوام نه شي ورکولی. Cloud Agent یا بل CLI غوره کړئ.",
       "importFailed": "دا ناسته وارده نه شوه.",
+      "cliCannotFork": "د پیغام څخه د څانګې جوړولو لپاره Kilo CLI تازه کړئ.",
+      "forkCutNotSynced": "دا پیغام لا نه دی خوندي شوی. یو شیبه وروسته بیا هڅه وکړئ.",
+      "forkFilesFromBaseBranch": "فایلونه د اصلي څانګې څخه پیلېږي.",
+      "forkFilesUnchangedOnComputer": "په دې کمپیوټر کې فایلونه نه بدلېږي.",
       "pickProfile": "یو پروفایل غوره کړئ",
       "noProfile": "هیڅ پروفایل نشته",
       "manageProfiles": "پروفایلونه اداره کړئ",
@@ -2251,8 +2267,8 @@
       "toolList": "لېست کول",
       "toolPatch": "سمون پلي کول",
       "toolTask": "دنده",
-      "readTodos": "د دندو لېست ولولئ",
-      "updateTodos": "د دندو لېست تازه کړئ",
+      "readTodos": "پلان ولولئ",
+      "updateTodos": "پلان تازه کړئ",
       "linesBadge": "{{displayCount}} کرښې",
       "filesBadge": "{{displayCount}} فایلونه",
       "matchesBadge": "{{displayCount}} پایلې",
@@ -2322,6 +2338,7 @@
       "copyMessage": "پیغام کاپي کړئ",
       "copyText": "متن کاپي کړئ",
       "selectText": "متن غوره کړئ",
+      "forkFromHere": "له دې ځایه څانګه جوړه کړئ",
       "reportAiResponse": "د AI ځواب راپور ورکړئ",
       "reportAiResponseConfirm": "د بیاکتنې لپاره د دې ځواب راپور ورکړم؟",
       "report": "راپور ورکړئ",
@@ -2641,6 +2658,12 @@
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
       "modelsCount_one": "ماډل ({{displayCount}})",
       "modelsCount_other": "ماډلونه ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "بدلونونه وګورئ",
+      "asOf": "تر {{time}} پورې",
+      "tooLarge": "دا توپیر دومره لوی دی چې په موبایل کې نه شي ښودل کېدای.",
+      "empty": "په دې ناسته کې تر اوسه په فایلونو کې هېڅ بدلون نه دی راغلی."
     },
     "autoApprove": {
       "title": "اتوماتیک تصویب",
@@ -3153,6 +3176,8 @@
     "channelName": "فعال اجنټان",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
     "openSession": "پرانیستل",
+    "finished": "پای ته ورسېد",
+    "followFailed": "دا اجنټ د قلف پر سکرین ونه ښودل شو.",
     "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ.",
     "checked": "تایید شوی",
     "lastKnown": "وروستی معلوم حالت",
@@ -3161,7 +3186,26 @@
     "waitingForYou": "ستاسو په تمه",
     "nextScheduled": "راتلونکی مهال ویش",
     "answerNeeded": "ځواب ته اړتیا لري",
-    "waitingToRetry": "د بیا هڅې په تمه"
+    "waitingToRetry": "د بیا هڅې په تمه",
+    "step": {
+      "editing": "سمون",
+      "reading": "لوستل",
+      "running": "چلول",
+      "searching": "وېب پلټنه",
+      "thinking": "فکر کول"
+    },
+    "planOf": "له",
+    "filesChanged": "فایلونه بدل شول",
+    "finishedIn": "بشپړ شو",
+    "noActivityFor": "هیڅ فعالیت نشته",
+    "prOpened": "د پل غوښتنه پرانیستل شوه",
+    "permissionWants": "چلول غواړي",
+    "failure": {
+      "provider": "ودرېد: د برابرونکي تېروتنه",
+      "tool": "ودرېد: د وسیلې تېروتنه",
+      "cancelled": "ودرېد: لغوه شو",
+      "other": "درېدلی"
+    }
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",
@@ -3189,6 +3233,7 @@
     "tutorialLabel": "زده کړه"
   },
   "modelChat": {
+    "offlineFailure": "دا ماډل انټرنیټ اړیکې ته اړتیا لري. وصل شئ او بیا هڅه وکړئ، یا پدې وسیله کې یو ماډل ته واوړئ.",
     "empty": {
       "title": "چټ پیل کړئ",
       "description": "د ماډل سره د خبرو کولو لپاره پیغام ولېږئ."
@@ -3196,10 +3241,32 @@
     "list": {
       "loadFailed": "د چټ تاریخ بار کیدلای نه شو.",
       "new": "نوې خبرې اترې",
-      "openHint": "خبرې اترې پرانیزي. د حذف لپاره اوږده کېکاږئ.",
       "deleteTitle": "دا خبرې اترې حذف کړئ؟"
     },
+    "rename": {
+      "title": "د خبرو اترو نوم بدل کړئ",
+      "accessibility": "د خبرو اترو نوم بدل کړئ: {{title}}",
+      "openHint": "خبرې اترې پرانیزي. د نوم بدلولو یا حذف لپاره اوږده کېکاږئ."
+    },
     "beta": "بیټا",
+    "details": {
+      "title": "د چټ جزئیات",
+      "backend": "شالید خدمت",
+      "effortDefault": "د ماډل اصلي ترتیب",
+      "noCost": "هیڅ لګښت نشته",
+      "costUnknown": "نامعلوم",
+      "costEstimatedNote": "د هغو ځوابونو لګښت چې بیه یې نه وه ښودلې، د لیست له بیو اټکل شوی دی.",
+      "costUnknownNote": "د دې ماډل لپاره کومه بیه نه ده معلومه.",
+      "costPartialNote": "په دې ټولګه کې هغه ماډلونه نه دي شامل چې بیه یې نه ده معلومه.",
+      "localNote": "په وسیله کې ماډلونه په همدې وسیله چلېږي. هېڅ لګښت او د پرامپټ زېرمه نه لري، او د ټوکنونو شمېر یې ښايي اټکل وي.",
+      "countedSinceNote": "دا چټ مخکې له دې پیل شو چې کارونه ثبت شي. ټولګې یوازې له هغې وروسته ځوابونه ښيي.",
+      "remoteServersOn": "فعال لرې MCP سرورونه"
+    },
+    "webSearch": {
+      "title": "په وېب کې لټون",
+      "description": "دې چټ ته اجازه ورکړئ چې ستاسو د Kilo حساب له لارې تازه معلومات ولټوي. لټونونه ستاسو د میاشتني لټون برخه کاروي.",
+      "allowanceExhausted": "د دې میاشتې لپاره ستاسو وړیا وېب لټونونه ختم شول. د بیا لټون لپاره کریډیټ زیات کړئ."
+    },
     "mcp": {
       "title": "د Kilo وسیلې",
       "use": "د Kilo وسیلې وکاروئ",
@@ -3222,7 +3289,6 @@
       "fieldName": "ښکارېدونکی نوم",
       "fieldUrl": "د سرور URL",
       "fieldUrlInvalid": "د سرور سم URL ولیکئ.",
-      "fieldToken": "Bearer ټوکن (اختیاري)",
       "enableServer": "دا سرور فعال کړئ: {{name}}",
       "editServer": "سرور سم کړئ",
       "deleteServer": "سرور ړنګ کړئ",
@@ -3243,8 +3309,24 @@
       "serverUnreachable": "دې سرور ته رسېدل ممکن نه شول",
       "serverOff": "دا سرور بند دی"
     },
+    "mcpOAuth": {
+      "authMethod": "تصدیق",
+      "authNone": "بې ننوتلو",
+      "authBearer": "Bearer ټوکن",
+      "authOAuth": "د OAuth له لارې ننوتل",
+      "fieldToken": "ټوکن",
+      "oauthHint": "له خوندي کولو وروسته، په سرور باندې $t(modelChat.mcpOAuth.signIn) ټک کړئ ترڅو د خپل براوزر له لارې ننوځئ.",
+      "serverNeedsSignIn": "د دې سرور کارولو لپاره ننوځئ",
+      "signIn": "ننوتل",
+      "signInA11y": "دې سرور ته ننوځئ: {{name}}",
+      "signInFailed": "{{name}} ته ننوتل ممکن نه شول. بیا هڅه وکړئ."
+    },
     "backends": {
       "title": "د چټ شالید خدمتونه",
+      "providersTitle": "د چټ وړاندې کوونکي",
+      "cloud": "په کلاوډ کې",
+      "cloudModel": "ماډل: {{model}}",
+      "cloudUnavailable": "د Kilo ماډلونه اوس مهال شتون نلري. خپله اړیکه وګورئ.",
       "manage": "شالید خدمتونه اداره کړئ",
       "defaultKilo": "$t(consent.kilo) (ډیفالټ)",
       "kiloHelp": "جوړ شوی شالید خدمت ستاسو د Kilo حساب کاروي او د سمولو یا ړنګولو وړ نه دی.",
@@ -3304,7 +3386,6 @@
     "gguf": {
       "title": "د ډاونلوډ وړ ماډلونه",
       "help": "یو خلاص ماډل ډاونلوډ کړئ او په همدې تلیفون کې یې د llama.cpp سره چل کړئ. ستاسو پوښتنې او ځوابونه په وسیله کې پاتې کېږي. ماډلونه لوی دي، نو Wi-Fi وکاروئ.",
-      "details": "{{size}} · جواز: {{license}}",
       "download": "ماډل ډاونلوډ کړئ",
       "pause": "ډاونلوډ ودروئ",
       "resume": "ډاونلوډ ته دوام ورکړئ",
@@ -3316,6 +3397,8 @@
       "url": "د ډاونلوډ مستقیم لینک",
       "urlHelp": "د .gguf فایل لپاره د HTTPS لینک پیسټ کړئ، لکه د Hugging Face resolve لینک. یوازې د هغو سرچینو څخه ماډلونه ډاونلوډ کړئ چې تاسو ورباندې باور لرئ.",
       "downloadUrl": "له لینک څخه ډاونلوډ کړئ",
+      "advanced": "پرمختللی",
+      "localPurpose": "د llama.cpp سره په دې وسیله چلیږي. پوښتنې او ځوابونه په وسیله کې پاتې کیږي.",
       "deleteTitle": "دا ماډل ړنګ کړو؟",
       "deleteMessage": "{{name}} له دې وسیلې څخه ړنګ کړو؟ هغه خبرې اترې چې دا ماډل کاروي، د دوام لپاره بل ماډل ته اړتیا لري.",
       "errors": {
@@ -3325,12 +3408,62 @@
         "notGguf": "لینک باید د .gguf فایل ته اشاره وکړي.",
         "space": "د دې ماډل لپاره کافي خالي ځای نشته. ځای خالي کړئ او بیا هڅه وکړئ.",
         "network": "ډاونلوډ بشپړ نشو. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
-        "invalidFile": "ډاونلوډ شوی فایل هغه ماډل نه دی چې دا اپلیکیشن یې چلولی شي، نو لرې کړل شو."
+        "invalidFile": "ډاونلوډ شوی فایل هغه ماډل نه دی چې دا اپلیکیشن یې چلولی شي، نو لرې کړل شو.",
+        "checksum": "ډاونلوډ شوی فایل د خپاره شوي چیکسم سره سمون نه لري، نو لرې کړل شو. بیا یې ډاونلوډ کړئ."
       }
+    },
+    "catalog": {
+      "browse": "ماډلونه وګورئ",
+      "title": "د ماډلونو کتلاګ",
+      "search": "د Hugging Face ماډلونه ولټوئ",
+      "tabs": "د ماډل فلټر",
+      "fitsTab": "له دې وسیلې سره برابر",
+      "fromHuggingFace": "له Hugging Face څخه",
+      "loading": "ماډلونه پورته کېږي",
+      "noResults": "هېڅ ماډل ونه موندل شو",
+      "noFits": "هېڅ ماډل له دې وسیلې سره برابر نه دی",
+      "noFitsDescription": "لوی ماډلونه د $t(common.all) ټب کې دي.",
+      "fit": {
+        "fits": "برابر دی",
+        "tight": "په سختۍ برابر",
+        "tooLarge": "ډېر لوی",
+        "noStorage": "کافي ځای نشته",
+        "unknown": "مناسبت نامعلوم"
+      },
+      "recommendationsHelp": "یو لنډ لیست چې دا اپ ټاکلی: هره ماډل لپاره یو فایل، له هغه خپرونکي چې جواز اعلانوي. نور هېڅ درجه‌بندي نه کیږي.",
+      "compatibilityHelp": "مناسبت د ماډل فایل د دې وسیلې حافظې او وړیا ذخیرې سره پرتله کوي. د حافظې شمېره اټکل ده، نه اندازه.",
+      "text": "متن",
+      "listTextPurpose": "یوازې متن پوښتنې.",
+      "listImagePurpose": "متن سربېره انځورونه هم لولي.",
+      "smallestDownload": "تر ټولو کوچنی ډاونلوډ: {{size}} · شاوخوا {{memory}} حافظه",
+      "fullFileName": "فایل: {{name}}",
+      "memoryEstimateNote": "د حافظې شمېرې اټکل دي، نه اندازه.",
+      "parameters": "پاراميټرونه: {{value}}",
+      "downloads": "ډاونلوډونه: {{value}}",
+      "likes": "خوښې: {{value}}",
+      "context": "د متن کړکۍ: {{value}}",
+      "license": "جواز: {{license}}",
+      "licenseUnknown": "جواز نه دی ښودل شوی",
+      "tools": "د وسیلو کارول",
+      "vision": "د انځور ورکړه",
+      "hintsHelp": "له Hugging Face څخه لارښوونې. اپ ماډل له ډاونلوډ وروسته ګوري.",
+      "gated": "دا ماډل د Hugging Face حساب ته اړتیا لري، نو اپ یې نه شي ډاونلوډولی.",
+      "quantizations": "کوانټیزېشنونه",
+      "quantizationsHelp": "کوچنۍ فایلونه لږ حافظه او ځای کاروي. لوی فایلونه معمولاً ښه ځوابونه ورکوي.",
+      "quantDetail": "{{size}} ډاونلوډ · شاوخوا {{memory}} حافظه",
+      "downloadQuant": "{{quant}} ډاونلوډ کړئ",
+      "loadingModel": "د ماډل جزئیات پورته کېږي",
+      "couldNotLoadModel": "دا ماډل پورته نه شو",
+      "noFiles": "هېڅ داسې فایل نشته چې دا اپ یې چلولی شي",
+      "noFilesDescription": "دا اپ هغه ماډلونه چلوي چې یو GGUF فایل وي.",
+      "tooLargeTitle": "کېدای شي دا ماډل ونه چلېږي",
+      "tooLargeMessage": "{{name}} شاید د دې وسیلې تر حافظې ډېرې حافظې ته اړتیا ولري. کېدای شي اپ د ماډل د ځواب پر مهال وتړل شي. بیا هم یې ډاونلوډ کړئ؟",
+      "downloadAnyway": "بیا هم ډاونلوډ کړئ"
     },
     "localModels": {
       "title": "په وسیله کې ماډلونه",
-      "help": "په وسیله کې ماډلونه په همدې تلیفون چلېږي. ستاسو پوښتنې او ځوابونه په وسیله کې پاتې کېږي، او دا ماډلونه وسیلې نشي کارولی.",
+      "help": "په وسیله کې ماډلونه په همدې تلیفون چلېږي. ستاسو پوښتنې او ځوابونه په وسیله کې پاتې کېږي.",
+      "systemPurpose": "هغه ماډل چې د دې وسیلې په سیسټم کې جوړ شوی دی. دا په وسیله کې چلېږي.",
       "apple": "Apple Intelligence (په وسیله کې)",
       "checking": "د شتون کتنه روانه ده…",
       "ready": "د کارونې لپاره چمتو",
@@ -3356,6 +3489,9 @@
       "downloading": "ښکته کېږي…",
       "downloadProgress": "ښکته کېږي… {{percent}}%",
       "downloadFailed": "ښکته کول بشپړ نه شول. خپل اتصال او خالي ځای وګورئ، بیا هڅه وکړئ."
+    },
+    "reasoningEffort": {
+      "modelFlag": "دا ماډل د فکر کچه ملاتړ کوي"
     }
   },
   "settingsTools": {
@@ -3578,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play د سمون خور کریډیټ بنډلونه بیرته را نه کړل.",
     "purchaseOwnedByAnotherAccount": "په دې Apple Account کې کریډیټونه د Kilo په بل حساب پورې اړه لري. د کارولو لپاره یې د Kilo هماغه حساب ته ننوځئ.",
     "purchaseOwnedByAnotherAccountPlay": "دا Google Play حساب باندې کریډیټونه د بل Kilo حساب پورې اړه لري. د کارولو لپاره هغه Kilo حساب ته ننوځئ."
+  },
+  "todos": {
+    "saveAsTodo": "د دندې په توګه خوندي کړئ",
+    "segment": {
+      "label": "د اجنټانو کتنه",
+      "sessions": "ناستې",
+      "todos": "دندې"
+    },
+    "lists": {
+      "newList": "نوی لېست",
+      "empty": "تر اوسه هېڅ لېست نشته",
+      "couldNotLoad": "لېستونه بار نه شول",
+      "noRepository": "زېرمتون نشته",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} پرانیستي",
+      "openCount_other": "{{count}} پرانیستي",
+      "archived_one": "آرشیف شوي ({{count}})",
+      "archived_other": "آرشیف شوي ({{count}})",
+      "archive": "آرشیف کړئ",
+      "unarchive": "له آرشیف راوباسئ",
+      "deleteTitle": "{{name}} ړنګ شي؟",
+      "deleteMessage": "د هغې دندې هم ړنګېږي. ناستې یې پاتې کېږي."
+    },
+    "listSettings": {
+      "title": "د لېست تنظیمات",
+      "name": "نوم",
+      "namePlaceholder": "بګونه، نظرونه، خپرونه…",
+      "emoji": "ایموجي",
+      "mode": "حالت",
+      "defaultsHint": "له دې لېست پیل شوې ناستې همدا اصلي تنظیمات کاروي."
+    },
+    "list": {
+      "addPlaceholder": "دنده اضافه کړئ",
+      "add": "دنده اضافه کړئ",
+      "empty": "تر اوسه هېڅ دنده نشته",
+      "setDefaults": "زېرمتون، حالت او ماډل وټاکئ",
+      "completed_one": "بشپړې شوې ({{count}})",
+      "completed_other": "بشپړې شوې ({{count}})"
+    },
+    "item": {
+      "markDone": "بشپړه په نښه کړئ",
+      "markOpen": "نابشپړه په نښه کړئ",
+      "markDonePrompt": "بشپړه په نښه کړئ؟",
+      "deleted": "دنده ړنګه شوه",
+      "undo": "بېرته راوګرځوئ",
+      "runCount_one": "{{count}} اجرا",
+      "runCount_other": "{{count}} اجرا",
+      "startNow": "بې له بیاکتنې پیل کړئ",
+      "startNowHint": "د بیاکتنې پرته د پیل لپاره اوږده کېکاږئ",
+      "titleLabel": "د دندې سرلیک",
+      "renameTitle": "دنده بیا نومول",
+      "notes": "یادښتونه",
+      "addNotes": "یادښتونه زیاد کړئ",
+      "notesPrompt": "شالید، اړتیاوې، یا د منلو معیارونه زیاد کړئ.",
+      "markdownSupported": "Markdown ملاتړ شوی",
+      "sessions": "تړل شوې ناستې",
+      "noSessions": "تر اوسه هېڅ ناسته نشته",
+      "untitledLinkedSession": "نښلول شوی سیشن",
+      "sessionNeedsInput": "سیشن انپټ ته اړتیا لري",
+      "sessionRunning": "سیشن روان دی",
+      "sessionFinished": "سیشن بشپړ شو",
+      "sessionPullRequest": "د سیشن پل غوښتنه",
+      "sessionPullRequestNumber": "د سیشن PR #{{number}}",
+      "openSessionHint": "سیشن پرانیزي.",
+      "unlinkSessionAction": "سیشن جلا کړئ",
+      "unlinkConfirmTitle": "{{title}} جلا کړئ؟",
+      "unlinkConfirmMessage": "سیشن پخپله نه ړنګیږي. یوازې دې دندې سره یې تړاو لریږي.",
+      "startNewSession": "نوی سیشن پیل کړئ",
+      "startNewSessionHint": "د نوي سیشن پیل لپاره اوږد کېک کړئ.",
+      "linkSession": "ناسته ونښلوئ",
+      "linkFailed": "ناسته له دندې سره ونښلول نه شوه"
+    },
+    "linkSession": {
+      "title": "یوه ناسته ونښلوئ",
+      "empty": "وروستې ناستې نشته",
+      "emptyInRepository": "په {{repository}} کې وروستې ناستې نشته"
+    },
+    "upNext": "بل",
+    "sessionTodo": "دنده: {{title}}",
+    "linkToTodo": "له دندې سره ونښلوئ",
+    "candidates": {
+      "empty": "هېڅ پرانیستې دنده نشته"
+    },
+    "saveSheet": {
+      "title": "په لېست کې خوندي کړئ",
+      "saved": "په {{list}} کې خوندي شو"
+    }
   }
 }

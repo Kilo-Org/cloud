@@ -152,7 +152,7 @@ These changes will allow you to do local testing with a fake account.
 
 #### c. Add or rotate shared web environment variables
 
-Use the repository workflow instead of editing Vercel projects independently. It updates `kilocode-app`, `kilocode-global-app`, and `kilocode-ai-gateway` together for Development, Staging, and Production. A project that does not exist in Vercel yet is skipped and listed in the plan:
+Use the repository workflow instead of editing Vercel projects independently. It updates `kilocode-app` and `kilocode-ai-gateway` together for Development, Staging, and Production. A project that does not exist in Vercel yet is skipped and listed in the plan:
 
 ```bash
 pnpm web:env set EXAMPLE_API_TOKEN
@@ -177,7 +177,7 @@ Remote updates are sequential rather than transactional. If a provider fails par
 To fill a new project with an existing project's variables, copy them:
 
 ```bash
-pnpm web:env copy --from kilocode-global-app --to kilocode-ai-gateway --dry-run
+pnpm web:env copy --from kilocode-app --to kilocode-ai-gateway --dry-run
 ```
 
 The command reads every Development, Staging, and Production variable of the source project and writes it to the destination with the same sensitivity. Vercel decrypts non-sensitive values, but never returns sensitive ones, so those are read from the `Kilo Web ENV Production` items that `pnpm web:env set` maintains. That requires read access to the vault. The plan lists every variable it does not copy, with the reason: ones managed by an integration such as Sentry or Axiom, sensitive ones without a 1Password value, ones Vercel did not decrypt, empty ones, branch-specific ones, unsupported Vercel types, and any passed with `--exclude VARIABLE`. Add the destination project to those integrations instead; they manage their variables per project. Add the missing ones with `pnpm web:env set`. Use `--only ENVIRONMENT` to copy one environment. Staging needs a `staging` custom environment in both projects. The copy does not redeploy; the destination's next deployment picks up the values.
@@ -248,7 +248,7 @@ should pass against the local PostgreSQL database.
 |---|---|
 | `KILO_PORT_OFFSET=auto pnpm dev:start` | Start all local services in a tmux dashboard with worktree-safe ports |
 | `pnpm dev:start agents cloud-agent-public-tunnels` | Same as `dev:start agents`, plus Cloudflare quick tunnels for sandbox-facing Worker/Next/session-ingest URLs |
-| `pnpm dev:start ai-gateway` | Also start the standalone AI gateway app (`apps/ai-gateway`) on port 3010 plus the port offset |
+| `pnpm dev:restart ai-gateway` | Restart the AI gateway app (`apps/ai-gateway`, port 3010 plus the port offset). Every `dev:start` runs it, because the web app rewrites its AI gateway routes to it |
 | `pnpm dev:stop` | Stop the tmux session and all services |
 | `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
 | `pnpm dev:env --missing-secrets-only` | Sync env files and create missing local Secrets Store entries without refreshing existing secrets |

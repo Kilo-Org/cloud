@@ -204,6 +204,36 @@ describe('classifyWithSystemOne', () => {
 });
 
 describe('buildClassifierRequest', () => {
+  it('does not split surrogate pairs at any classifier prompt-prefix boundary', () => {
+    const state = buildClassifierRequest(
+      {
+        ...input,
+        systemPromptPrefix: `${'s'.repeat(199)}😀suffix`,
+        userPromptPrefix: `${'u'.repeat(799)}😀suffix`,
+        latestUserPromptPrefix: `${'l'.repeat(799)}😀suffix`,
+      },
+      'm'
+    ).state;
+    expect(state.systemPromptPrefix).toBe('s'.repeat(199));
+    expect(state.initialUserPromptPrefix).toBe('u'.repeat(799));
+    expect(state.latestUserPromptPrefix).toBe('l'.repeat(799));
+  });
+
+  it('retains complete surrogate pairs and unchanged shorter prefixes', () => {
+    const state = buildClassifierRequest(
+      {
+        ...input,
+        systemPromptPrefix: `${'s'.repeat(198)}😀suffix`,
+        userPromptPrefix: `${'u'.repeat(798)}😀suffix`,
+        latestUserPromptPrefix: 'short 😀 prompt',
+      },
+      'm'
+    ).state;
+    expect(state.systemPromptPrefix).toBe(`${'s'.repeat(198)}😀`);
+    expect(state.initialUserPromptPrefix).toBe(`${'u'.repeat(798)}😀`);
+    expect(state.latestUserPromptPrefix).toBe('short 😀 prompt');
+  });
+
   it('sends the latest user turn only when it differs from the first turn', () => {
     expect(buildClassifierRequest(input, 'm').state.latestUserPromptPrefix).toBe(
       'Actually, first fix the failing login test.'

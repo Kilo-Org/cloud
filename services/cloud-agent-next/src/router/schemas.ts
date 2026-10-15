@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   getKiloSandboxAllocation,
   sandboxAllocationInputSchema,
@@ -610,6 +611,7 @@ const PrepareSessionNonCloneVariant = z.object({
    * the fallback only after old clients and prepared sessions expire.
    */
   cloneFromKiloSessionId: z.undefined().optional(),
+  cloneUpToMessageId: z.undefined().optional(),
   /**
    * When `true`, `prepareSession` also enqueues the initial user message
    * (mirroring the unified `start` endpoint) so callers that navigate
@@ -651,6 +653,9 @@ const PrepareSessionCloneVariant = z.object({
   cloneFromKiloSessionId: kiloSessionIdSchema.describe(
     'Source Kilo session ID to clone into this Cloud Agent session'
   ),
+  cloneUpToMessageId: MessageIdSchema.optional().describe(
+    'Inclusive cut: copy source messages up to and including this message ID; omit to copy the whole session'
+  ),
   autoInitiate: z.literal(true),
   operationKey: z
     .string()
@@ -663,6 +668,7 @@ const PrepareSessionCloneVariant = z.object({
 
 export const PrepareSessionInput = z
   .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
+  .and(egressPolicySchema)
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',
     path: ['githubRepo'],
@@ -921,8 +927,10 @@ export const StartSessionInput = z
       .optional(),
     repository: RepositoryInputSchema,
     profile: ProfileInputSchema,
-    runtime: z
-      .object({ sandboxAllocation: ManagedSandboxAllocationInput.optional() })
+    runtime: egressPolicySchema
+      .safeExtend({
+        sandboxAllocation: ManagedSandboxAllocationInput.optional(),
+      })
       .strict()
       .optional(),
     options: z
@@ -1155,6 +1163,7 @@ export const GetSessionOutput = z.object({
   variant: z.string().optional().describe('Thinking effort variant'),
   autoCommit: z.boolean().optional().describe('Auto-commit setting'),
   upstreamBranch: z.string().optional().describe('Upstream branch name'),
+  branchName: z.string().optional().describe('Assigned workspace branch name'),
 
   runtimeAgents: z
     .array(

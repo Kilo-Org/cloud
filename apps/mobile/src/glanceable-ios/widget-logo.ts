@@ -32,7 +32,7 @@ const GLYPH_PLACEHOLDER = '__KILO_WIDGET_GLYPH_URI__';
 const LOGO_FILES = [
   {
     token: LOGO_PLACEHOLDER,
-    fileName: 'kilo-logo.png',
+    fileName: 'kilo-logo-ffdd00.png',
     // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- the Metro asset registry needs a static require
     asset: () => require('../../assets/images/logo-widget.png') as number,
   },

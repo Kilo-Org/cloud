@@ -19,7 +19,7 @@ import { AlertTriangle, Coins } from 'lucide-react';
 import { SurveyCredits } from '@/components/SurveyCredits';
 import { RedeemPromoCode } from '@/components/profile/RedeemPromoCode';
 import { AutoTopUpToggle } from '@/components/payment/AutoTopUpToggle';
-import { IntegrationsCard } from '@/components/profile/IntegrationsCard';
+import { SupportCard } from '@/components/support/SupportCard';
 import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
 import { PageLayout } from '@/components/PageLayout';
 import { ProfileOrganizationsSection } from '@/components/profile/ProfileOrganizationsSection';
@@ -115,12 +115,7 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
       <AutoRoutingModeCard />
 
       {params.source && (
-        <IntegrationsCard
-          kiloToken={kiloToken}
-          ideName={ideName}
-          logoSrc={logoSrc}
-          isProminent={true}
-        />
+        <SupportCard kiloToken={kiloToken} ideName={ideName} logoSrc={logoSrc} isProminent={true} />
       )}
 
       <SurveyCredits {...customerInfo} />
@@ -128,7 +123,7 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
       <RedeemPromoCode />
 
       {!params.source && (
-        <IntegrationsCard
+        <SupportCard
           kiloToken={kiloToken}
           ideName={ideName}
           logoSrc={logoSrc}

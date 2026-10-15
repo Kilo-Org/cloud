@@ -4,16 +4,19 @@ import { kiloMcpToolNames, kiloMcpTools, mcpEnabledFor } from './kilo-mcp';
 import { remoteServerToolNames, remoteServerTools } from './remote-mcp';
 import { isSettingsToolsEnabled } from './settings-tools-switch';
 import { chatToolsFor, toolNamesFor } from './tool-set';
+import { webSearchEnabledFor } from './web-search-setting';
 
 /**
  * What a chat can do besides talk.
  *
- * One tool of its own: the clock. A model does not have one — it answers "what
+ * Two tools of its own. The clock: a model does not have one — it answers "what
  * day is it" from the date it was trained on, confidently and wrong — and a
- * phone is where that question gets asked. The rest of the SDK's tools are for
- * a harness driving work: asking the person something is what the composer is
- * already for, delegating to a second session costs a second session, and a
- * to-do list is working memory for a long run that a chat does not have.
+ * phone is where that question gets asked. Web search, for the same reason
+ * about the world: what happened since the training date is not in the model.
+ * The rest of the SDK's tools are for a harness driving work: asking the person
+ * something is what the composer is already for, delegating to a second
+ * session costs a second session, and a to-do list is working memory for a
+ * long run that a chat does not have.
  *
  * On top of that set sit the app-settings tools, the tools of the Kilo MCP
  * server, and the tools of the remote servers the person added — each behind
@@ -25,11 +28,12 @@ import { chatToolsFor, toolNamesFor } from './tool-set';
  * with and the tools the registry holds are decided in one place.
  */
 
-/** The tools every chat offers: the clock, plus the settings tools when the group switch is on. */
+/** The tools every chat may name: the clock, web search, and the settings tools when the group switch is on. */
 export function chatTools(organizationId?: string): readonly Tool[] {
   return chatToolsFor({
     organizationId,
     settingsEnabled: isSettingsToolsEnabled(),
+    webSearchEnabled: false,
     kiloEnabled: false,
     kiloNames: [],
     remoteNames: [],
@@ -50,37 +54,49 @@ export function chatToolsWithMcp(organizationId?: string): readonly Tool[] {
 }
 
 /**
- * The names a chat is opened with, from the group switch and the chat's own
- * server flags.
+ * The names a chat is opened with, from the group switch, the chat's own server
+ * and web search flags, and the model its next question goes to.
  *
  * The settings names are absent — not merely unresolved — when the switch is
  * off, so the model is never offered a tool that would refuse it. A chat with
  * the Kilo MCP off names no Kilo tool, and one that has it on but has discovered
  * nothing yet names none either: a session is never opened with a name the
- * registry cannot resolve.
+ * registry cannot resolve. The model decides web search only for a chat whose
+ * person never chose: it is on for a Kilo model and off for every other.
  */
 export async function chatToolNames(
   organizationId: string | undefined,
-  sessionId: string
+  sessionId: string,
+  model: string
 ): Promise<readonly string[]> {
-  return chatToolNamesStarting(organizationId, await mcpEnabledFor(sessionId));
+  return chatToolNamesStarting(organizationId, {
+    kiloEnabled: await mcpEnabledFor(sessionId),
+    webSearchEnabled: await webSearchEnabledFor(sessionId, model),
+  });
 }
+
+/** The per-chat flags a tool set is computed from. */
+type ChatToolFlags = {
+  readonly kiloEnabled: boolean;
+  readonly webSearchEnabled: boolean;
+};
 
 /**
  * The same, for a chat that does not exist yet.
  *
  * Starting a chat opens a session before there is an id to read a setting from,
- * so the caller says whether it opens with the Kilo server. Every later open
- * and move reads the stored setting through `chatToolNames`.
+ * so the caller says whether it opens with the Kilo server and web search.
+ * Every later open and move reads the stored settings through `chatToolNames`.
  */
 export function chatToolNamesStarting(
   organizationId: string | undefined,
-  kiloEnabled: boolean
+  flags: ChatToolFlags
 ): readonly string[] {
   return toolNamesFor({
     organizationId,
     settingsEnabled: isSettingsToolsEnabled(),
-    kiloEnabled,
+    webSearchEnabled: flags.webSearchEnabled,
+    kiloEnabled: flags.kiloEnabled,
     kiloNames: kiloMcpToolNames(),
     remoteNames: remoteServerToolNames(),
     remoteTools: [],

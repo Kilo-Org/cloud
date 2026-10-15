@@ -18,6 +18,7 @@ import {
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { logToFile } from './utils.js';
+import { kiloClientConfig, type KiloServer } from './kilo-server-auth.js';
 import {
   boundSlashCommandCatalog,
   toSlashCommandInfo,
@@ -359,16 +360,19 @@ export type WrapperKiloClient = {
   }>;
   /** The in-process server URL — for diagnostics */
   readonly serverUrl: string;
+  /** The server and its credential; raw requests and sockets must use both. */
+  readonly server: KiloServer;
 };
 
 export function createWrapperKiloClient(
   sdkClient: SDKClient,
-  serverUrl: string,
+  server: KiloServer,
   workspacePath: string
 ): WrapperKiloClient {
+  const serverUrl = server.url;
   logToFile(`creating wrapper kilo client for ${serverUrl}`);
-  const v2Client = createV2Client({ baseUrl: serverUrl, directory: workspacePath });
-  const globalClient = createV2Client({ baseUrl: serverUrl });
+  const v2Client = createV2Client(kiloClientConfig(server, workspacePath));
+  const globalClient = createV2Client(kiloClientConfig(server));
 
   function promptParameters(opts: PromptOptions) {
     const rawParts =
@@ -399,6 +403,7 @@ export function createWrapperKiloClient(
 
   return {
     serverUrl,
+    server,
 
     subscribeEvents: async opts => {
       const result = await v2Client.global.event({ signal: opts.signal });

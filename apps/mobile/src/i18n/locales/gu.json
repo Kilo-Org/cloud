@@ -133,10 +133,14 @@
     "status": "સ્થિતિ",
     "truncated": "અંશમાત્ર",
     "updated": "અપડેટ થયું",
+    "generating": "બનાવી રહ્યું છે…",
     "working": "કામ ચાલુ છે",
     "yourOwnRepositories": "તમારી પોતાની રિપોઝિટરીઓ",
     "dismissed": "ખારિજ કરેલું",
-    "agent": "એજન્ટ"
+    "agent": "એજન્ટ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "ફેરફારો"
   },
   "language": {
     "restarting": "ભાષા લાગુ કરવા ઍપ ફરી શરૂ થઈ રહી છે",
@@ -325,6 +329,7 @@
       "collapseFile": "ફાઇલની વિગતો છુપાવો",
       "expandFile": "ફાઇલની વિગતો બતાવો",
       "diffTooLarge": "તફાવત એટલો મોટો છે કે તેને બતાવી શકાતો નથી.",
+      "noPreview": "આ ફાઇલનું પૂર્વાવલોકન ઉપલબ્ધ નથી",
       "openOnGitHub": "GitHub પર ખોલો",
       "openDiffOnGitHub": "આ ફાઇલનો તફાવત GitHub પર ખોલો",
       "githubDiff": "GitHub પરનો તફાવત"
@@ -831,7 +836,8 @@
       "kiloclaw": "KiloClawની પ્રવૃત્તિ",
       "balance": "બેલેન્સ અંગેની ચેતવણીઓ",
       "security": "સુરક્ષા તપાસનાં તારણો",
-      "spend": "ખર્ચની ચેતવણીઓ"
+      "spend": "ખર્ચની ચેતવણીઓ",
+      "followedSessions": "ફોલો કરેલ સેશન્સ"
     },
     "category": {
       "chatMessagesSubtitle": "તમારી વાતચીતમાં જવાબો",
@@ -1254,7 +1260,7 @@
         "stoppedTitle": "સેટઅપ રોકાયું",
         "stoppedBody": "સેટઅપ દરમિયાન {{name}}નું ઇન્સ્ટન્સ અચાનક બંધ થઈ ગયું.",
         "stalledTitle": "કંઈક અટકી ગયું",
-        "stalledBody": "{{name}}નું સેટઅપ પૂરું કરી શકાયું નહીં. ફરી પ્રયત્ન કરો. જો આવું વારંવાર થાય, તો hi@kilo.ai પર ઇમેઇલ કરો.",
+        "stalledBody": "{{name}}નું સેટઅપ પૂરું કરી શકાયું નહીં. ફરી પ્રયત્ન કરો. જો આવું વારંવાર થાય, તો {{supportEmail}} પર ઇમેઇલ કરો.",
         "timeoutTitle": "અપેક્ષા કરતાં વધુ સમય લાગી રહ્યો છે",
         "timeoutBody": "{{name}}ના સેટઅપમાં સામાન્ય કરતાં વધુ સમય લાગી રહ્યો છે ({{displayMinutes}} મિનિટથી વધુ).",
         "continueInBackground": "પૃષ્ઠભૂમિમાં ચાલુ રાખો",
@@ -1312,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "તમારો પ્રારંભિક ઍક્સેસનો પ્લાન મોબાઇલ પર વાપરી શકાય તે પહેલાં તેની સમીક્ષા જાતે કરવી જરૂરી છે.",
       "iosTitle": "IOSમાં KiloClaw ઉપલબ્ધ નથી",
       "iosBody": "આ એકાઉન્ટ માટે KiloClawના ઍક્સેસનું સંચાલન iOS એપની બહાર થાય છે.",
-      "iosContact": "પ્રશ્નો છે? hi@kilo.ai પર સંપર્ક કરો.",
+      "iosContact": "પ્રશ્નો છે? {{supportEmail}} પર સંપર્ક કરો.",
       "quarantinedCta": "અમારી ટીમને ઈમેલ કરો",
       "nonCanonicalEarlybirdCta": "તમારો પ્લાન Kilo.ai પર સમીક્ષા કરો"
     },
@@ -1547,7 +1553,7 @@
         "recoveryLabel": "GitHub ઍપ અપડેટ કરો"
       },
       "githubIpAllowList": {
-        "description": "આ GitHub સંસ્થાની મંજૂર IP સરનામાંની યાદી Kilo ને અવરોધે છે, તેથી કોડ સમીક્ષક બંધ કરાયો. મદદ માટે hi@kilocode.ai પર સંપર્ક કરો, પછી કોડ સમીક્ષક ફરી ચાલુ કરો."
+        "description": "આ GitHub સંસ્થાની મંજૂર IP સરનામાંની યાદી Kilo ને અવરોધે છે, તેથી કોડ સમીક્ષક બંધ કરાયો. મદદ માટે {{supportEmail}} પર સંપર્ક કરો, પછી કોડ સમીક્ષક ફરી ચાલુ કરો."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo આ પ્રોજેક્ટ માટે GitLab પ્રોજેક્ટ ઍક્સેસ ટોકન બનાવી શકતું નથી, તેથી કોડ સમીક્ષક બંધ કરાયો. મેન્ટેનર સ્તરની ઍક્સેસ આપો અથવા પ્રોજેક્ટ ઍક્સેસ ટોકન ચાલુ કરો, પછી કોડ સમીક્ષક ફરી ચાલુ કરો.",
@@ -1562,7 +1568,7 @@
         "recoveryLabel": "કોડ સમીક્ષકની સેટિંગ્સ અપડેટ કરો"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "આજે રિપોઝિટરી ક્લોન કરવાના ત્રણ પ્રયાસોમાં સમયમર્યાદા વટાવી ગઈ, તેથી કોડ સમીક્ષક બંધ કરાયો. મદદ માટે hi@kilocode.ai પર સંપર્ક કરો, પછી કોડ સમીક્ષક ફરી ચાલુ કરો."
+        "description": "આજે રિપોઝિટરી ક્લોન કરવાના ત્રણ પ્રયાસોમાં સમયમર્યાદા વટાવી ગઈ, તેથી કોડ સમીક્ષક બંધ કરાયો. મદદ માટે {{supportEmail}} પર સંપર્ક કરો, પછી કોડ સમીક્ષક ફરી ચાલુ કરો."
       },
       "title": "કોડ સમીક્ષક પર ધ્યાન આપવું જરૂરી છે.",
       "recoveryLabel": "સહાય ટીમનો સંપર્ક કરો"
@@ -2086,6 +2092,8 @@
       "title": "સત્ર",
       "copyErrorDetails": "ભૂલની વિગતોની નકલ કરો",
       "backToSessions": "સત્રો પર પાછા જાઓ",
+      "follow": "લૉક સ્ક્રીન પર ફૉલો કરો",
+      "unfollow": "લૉક સ્ક્રીન પર ફૉલો કરવાનું બંધ કરો",
       "couldNotLoad": "સત્ર લોડ કરી શકાયું નહીં.",
       "failedToLoadDetails": "સત્રની વિગતો લોડ કરી શકાઈ નહીં.",
       "failedToStopExecution": "ચાલી રહેલું કાર્ય રોકી શકાયું નહીં.",
@@ -2152,6 +2160,11 @@
       "collapse": "ધ્યેય છુપાવો",
       "expand": "ધ્યેય બતાવો"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "કાર્યો, {{total}}માંથી {{completed}} પૂર્ણ",
+      "rowAccessibility": "કાર્યો, {{total}}માંથી {{completed}} પૂર્ણ. વર્તમાન કાર્ય: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું",
       "couldNotLoadGithubRepositories": "GitHub રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
@@ -2184,7 +2197,6 @@
       "retryLoadingEnvironment": "કાર્યપરિસર લોડ કરવા ફરી પ્રયાસ કરો",
       "defaultEnvironment": "ડિફોલ્ટ કાર્યપરિસર",
       "environmentSummary": "{{commands}} કમાન્ડ · {{mcp}} MCP · {{skills}} સ્કિલ · {{agents}} એજન્ટ",
-      "changes": "ફેરફારો",
       "leaveChanges": "ફેરફારો રાખો",
       "commitAndPush": "કમિટ અને પુશ કરો",
       "startSession": "સત્ર શરૂ કરો",
@@ -2207,6 +2219,10 @@
       "importingSession": "સત્ર આયાત થઈ રહ્યું છે",
       "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
       "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં.",
+      "cliCannotFork": "સંદેશમાંથી ફોર્ક કરવા માટે Kilo CLI અપડેટ કરો.",
+      "forkCutNotSynced": "આ સંદેશ હજી સાચવાયો નથી. થોડી વારમાં ફરી પ્રયાસ કરો.",
+      "forkFilesFromBaseBranch": "ફાઇલો બેઝ બ્રાન્ચથી શરૂ થાય છે.",
+      "forkFilesUnchangedOnComputer": "આ કમ્પ્યુટર પરની ફાઇલોમાં કોઈ ફેરફાર થતો નથી.",
       "pickProfile": "પ્રોફાઇલ ચૂંટો",
       "noProfile": "કોઈ પ્રોફાઇલ નથી",
       "manageProfiles": "પ્રોફાઇલ મેનેજ કરો",
@@ -2251,8 +2267,8 @@
       "toolList": "યાદી બનાવો",
       "toolPatch": "પૅચ લાગુ કરો",
       "toolTask": "કાર્ય",
-      "readTodos": "કરવાનાં કાર્યો વાંચો",
-      "updateTodos": "કરવાનાં કાર્યો અપડેટ કરો",
+      "readTodos": "યોજના વાંચો",
+      "updateTodos": "યોજના અપડેટ કરો",
       "linesBadge": "{{displayCount}} પંક્તિઓ",
       "filesBadge": "{{displayCount}} ફાઇલો",
       "matchesBadge": "{{displayCount}} મેળ",
@@ -2326,6 +2342,7 @@
       "copyMessage": "સંદેશની નકલ કરો",
       "copyText": "લખાણની નકલ કરો",
       "selectText": "લખાણ પસંદ કરો",
+      "forkFromHere": "અહીંથી ફોર્ક કરો",
       "reportAiResponse": "AIના જવાબ વિશે જાણ કરો",
       "reportAiResponseConfirm": "આ જવાબની સમીક્ષા માટે જાણ કરવી છે?",
       "report": "જાણ કરો",
@@ -2641,6 +2658,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "મોડલ ({{displayCount}})",
       "modelsCount_other": "મોડલ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ફેરફારો જુઓ",
+      "asOf": "{{time}} મુજબ",
+      "tooLarge": "આ તફાવત એટલો મોટો છે કે તેને મોબાઇલ પર બતાવી શકાતો નથી.",
+      "empty": "આ સત્રમાં હજી સુધી કોઈ ફાઇલમાં ફેરફાર થયો નથી."
     },
     "autoApprove": {
       "title": "સ્વતઃ મંજૂરી",
@@ -3153,6 +3176,8 @@
     "channelName": "સક્રિય એજન્ટો",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો.",
     "openSession": "ખોલો",
+    "finished": "સમાપ્ત",
+    "followFailed": "આ એજન્ટને લૉક સ્ક્રીન પર બતાવી શકાયો નથી.",
     "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો.",
     "checked": "ચકાસ્યું",
     "lastKnown": "છેલ્લે જાણીતું",
@@ -3161,7 +3186,26 @@
     "waitingForYou": "તમારી રાહમાં",
     "nextScheduled": "આગામી નિર્ધારિત",
     "answerNeeded": "જવાબ જરૂરી",
-    "waitingToRetry": "ફરી પ્રયાસની રાહમાં"
+    "waitingToRetry": "ફરી પ્રયાસની રાહમાં",
+    "step": {
+      "editing": "સંપાદન",
+      "reading": "વાંચન",
+      "running": "ચલાવો",
+      "searching": "વેબ શોધ",
+      "thinking": "વિચારી રહ્યું છે"
+    },
+    "planOf": "માંથી",
+    "filesChanged": "ફાઇલો બદલાઈ",
+    "finishedIn": "માં પૂર્ણ",
+    "noActivityFor": "કોઈ પ્રવૃત્તિ નથી",
+    "prOpened": "પુલ રિક્વેસ્ટ ખૂલી",
+    "permissionWants": "ચલાવવા માંગે છે",
+    "failure": {
+      "provider": "બંધ થયું: પ્રદાતા ભૂલ",
+      "tool": "બંધ થયું: સાધન ભૂલ",
+      "cancelled": "બંધ થયું: રદ કર્યું",
+      "other": "રોકાયેલું"
+    }
   },
   "transcriptionModel": {
     "title": "અવાજને લખાણમાં ફેરવવાનું મોડેલ",
@@ -3189,6 +3233,7 @@
     "tutorialLabel": "ટ્યુટોરિયલ"
   },
   "modelChat": {
+    "offlineFailure": "આ મોડેલને ઇન્ટરનેટ કનેક્શનની જરૂર છે. કનેક્ટ કરો અને ફરી પ્રયાસ કરો, અથવા આ ઉપકરણ પરના મોડેલ પર સ્વિચ કરો.",
     "empty": {
       "title": "વાતચીત શરૂ કરો",
       "description": "મોડેલ સાથે વાત કરવા સંદેશ મોકલો."
@@ -3196,10 +3241,32 @@
     "list": {
       "loadFailed": "વાતચીત ઇતિહાસ લોડ કરી શકાયો નહીં.",
       "new": "નવી ચેટ",
-      "openHint": "ચેટ ખોલે છે. કાઢી નાખવા માટે લાંબું દબાવો.",
       "deleteTitle": "આ ચેટ કાઢી નાખવી?"
     },
+    "rename": {
+      "title": "ચેટનું નામ બદલો",
+      "accessibility": "ચેટનું નામ બદલો: {{title}}",
+      "openHint": "ચેટ ખોલે છે. નામ બદલવા કે કાઢી નાખવા માટે લાંબું દબાવો."
+    },
     "beta": "બીટા",
+    "details": {
+      "title": "ચેટની વિગતો",
+      "backend": "બૅકએન્ડ",
+      "effortDefault": "મોડેલનું ડિફૉલ્ટ",
+      "noCost": "કોઈ ખર્ચ નથી",
+      "costUnknown": "જાણીતું નથી",
+      "costEstimatedNote": "જે જવાબોએ કિંમત જણાવી નથી, તેમનો ખર્ચ યાદી કિંમતો પરથી અંદાજવામાં આવે છે.",
+      "costUnknownNote": "આ મોડેલ માટે કોઈ કિંમત જાણીતી નથી.",
+      "costPartialNote": "આ કુલમાં એવા મોડેલ્સ શામેલ નથી જેમની કિંમત જાણીતી નથી.",
+      "localNote": "ઉપકરણ પરના મોડેલ્સ આ ઉપકરણ પર ચાલે છે. તેમનો કોઈ ખર્ચ નથી અને કોઈ પ્રોમ્પ્ટ કેશ નથી, અને તેમની ટોકન ગણતરી અંદાજિત હોઈ શકે છે.",
+      "countedSinceNote": "આ ચેટ વપરાશ નોંધાવાનું શરૂ થયું તે પહેલાં શરૂ થઈ હતી. કુલમાં ફક્ત તે પછીના જવાબો જ દેખાય છે.",
+      "remoteServersOn": "ચાલુ રિમોટ MCP સર્વર"
+    },
+    "webSearch": {
+      "title": "વેબ પર શોધો",
+      "description": "આ ચેટને તમારા Kilo એકાઉન્ટ દ્વારા વર્તમાન માહિતી શોધવા દો. શોધ તમારી માસિક શોધ મર્યાદાનો ઉપયોગ કરે છે.",
+      "allowanceExhausted": "આ મહિના માટેની તમારી મફત વેબ શોધ પૂરી થઈ ગઈ છે. ફરીથી શોધવા માટે ક્રેડિટ ઉમેરો."
+    },
     "mcp": {
       "title": "Kilo સાધનો",
       "use": "Kilo સાધનો વાપરો",
@@ -3222,7 +3289,6 @@
       "fieldName": "દર્શાવેલ નામ",
       "fieldUrl": "સર્વર URL",
       "fieldUrlInvalid": "માન્ય સર્વર URL દાખલ કરો.",
-      "fieldToken": "Bearer ટોકન (વૈકલ્પિક)",
       "enableServer": "આ સર્વર સક્ષમ કરો: {{name}}",
       "editServer": "સર્વર સંપાદિત કરો",
       "deleteServer": "સર્વર કાઢી નાખો",
@@ -3243,8 +3309,24 @@
       "serverUnreachable": "આ સર્વર સુધી પહોંચી શકાયું નથી",
       "serverOff": "આ સર્વર બંધ છે"
     },
+    "mcpOAuth": {
+      "authMethod": "પ્રમાણીકરણ",
+      "authNone": "સાઇન ઇન વિના",
+      "authBearer": "Bearer ટોકન",
+      "authOAuth": "OAuth સાઇન ઇન",
+      "fieldToken": "ટોકન",
+      "oauthHint": "સાચવ્યા પછી, તમારા બ્રાઉઝર વડે સાઇન ઇન કરવા માટે સર્વર પર $t(modelChat.mcpOAuth.signIn) ટૅપ કરો.",
+      "serverNeedsSignIn": "આ સર્વર વાપરવા માટે સાઇન ઇન કરો",
+      "signIn": "સાઇન ઇન કરો",
+      "signInA11y": "આ સર્વરમાં સાઇન ઇન કરો: {{name}}",
+      "signInFailed": "{{name}} માં સાઇન ઇન કરી શકાયું નથી. ફરી પ્રયાસ કરો."
+    },
     "backends": {
       "title": "ચેટ બૅકએન્ડ્સ",
+      "providersTitle": "ચેટ પ્રદાતાઓ",
+      "cloud": "ક્લાઉડમાં",
+      "cloudModel": "મોડેલ: {{model}}",
+      "cloudUnavailable": "Kilo મોડેલ હાલ ઉપલબ્ધ નથી. તમારું કનેક્શન તપાસો.",
       "manage": "બૅકએન્ડ્સનું સંચાલન કરો",
       "defaultKilo": "$t(consent.kilo) (ડિફૉલ્ટ)",
       "kiloHelp": "બિલ્ટ-ઇન બૅકએન્ડ તમારા Kilo ખાતાનો ઉપયોગ કરે છે અને તેને સંપાદિત કે કાઢી શકાતું નથી.",
@@ -3304,7 +3386,6 @@
     "gguf": {
       "title": "ડાઉનલોડ કરી શકાય તેવા મોડેલ્સ",
       "help": "એક ઓપન મોડેલ ડાઉનલોડ કરો અને llama.cpp સાથે આ ફોન પર ચલાવો. તમારા પ્રૉમ્પ્ટ અને જવાબો ઉપકરણ પર જ રહે છે. મોડેલ્સ મોટા હોય છે, તેથી Wi-Fi નો ઉપયોગ કરો.",
-      "details": "{{size}} · લાઇસન્સ: {{license}}",
       "download": "મોડેલ ડાઉનલોડ કરો",
       "pause": "ડાઉનલોડ થોભાવો",
       "resume": "ડાઉનલોડ ફરી શરૂ કરો",
@@ -3316,6 +3397,8 @@
       "url": "સીધી ડાઉનલોડ લિંક",
       "urlHelp": ".gguf ફાઇલની HTTPS લિંક પેસ્ટ કરો, જેમ કે Hugging Face resolve લિંક. ફક્ત તમે વિશ્વાસ કરો તેવા સ્રોતોમાંથી જ મોડેલ્સ ડાઉનલોડ કરો.",
       "downloadUrl": "લિંક પરથી ડાઉનલોડ કરો",
+      "advanced": "અદ્યતન",
+      "localPurpose": "llama.cpp સાથે આ ઉપકરણ પર ચાલે છે. પ્રોમ્પ્ટ અને જવાબો ઉપકરણ પર જ રહે છે.",
       "deleteTitle": "આ મોડેલ ડિલીટ કરવું છે?",
       "deleteMessage": "આ ઉપકરણ પરથી {{name}} ડિલીટ કરવું છે? જે ચેટ્સ તેનો ઉપયોગ કરે છે તેમને ચાલુ રાખતા પહેલાં બીજા મોડેલની જરૂર પડશે.",
       "errors": {
@@ -3325,12 +3408,62 @@
         "notGguf": "લિંક .gguf ફાઇલ તરફ નિર્દેશ કરવી જોઈએ.",
         "space": "આ મોડેલ માટે પૂરતી ખાલી સ્ટોરેજ નથી. જગ્યા ખાલી કરો અને ફરી પ્રયાસ કરો.",
         "network": "ડાઉનલોડ પૂર્ણ થયું નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
-        "invalidFile": "ડાઉનલોડ કરેલ ફાઇલ એ મોડેલ નથી જે આ એપ ચલાવી શકે, તેથી તેને દૂર કરવામાં આવી છે."
+        "invalidFile": "ડાઉનલોડ કરેલ ફાઇલ એ મોડેલ નથી જે આ એપ ચલાવી શકે, તેથી તેને દૂર કરવામાં આવી છે.",
+        "checksum": "ડાઉનલોડ કરેલ ફાઇલ તેના પ્રકાશિત ચેકસમ સાથે મેળ ખાતી નથી, તેથી તેને દૂર કરવામાં આવી છે. ફરીથી ડાઉનલોડ કરવાનો પ્રયાસ કરો."
       }
+    },
+    "catalog": {
+      "browse": "મોડેલ્સ બ્રાઉઝ કરો",
+      "title": "મોડેલ કેટલોગ",
+      "search": "Hugging Face મોડેલ્સ શોધો",
+      "tabs": "મોડેલ ફિલ્ટર",
+      "fitsTab": "આ ડિવાઇસમાં બંધબેસે",
+      "fromHuggingFace": "Hugging Face પરથી",
+      "loading": "મોડેલ્સ લોડ થઈ રહ્યા છે",
+      "noResults": "કોઈ મોડેલ મળ્યું નહીં",
+      "noFits": "આ ડિવાઇસમાં કોઈ મોડેલ બંધબેસતું નથી",
+      "noFitsDescription": "મોટા મોડેલ્સ $t(common.all) ટૅબમાં છે.",
+      "fit": {
+        "fits": "બંધબેસે છે",
+        "tight": "માંડ બંધબેસે છે",
+        "tooLarge": "ખૂબ મોટું",
+        "noStorage": "પૂરતો સ્ટોરેજ નથી",
+        "unknown": "અનુકૂળતા અજ્ઞાત"
+      },
+      "recommendationsHelp": "આ એપ દ્વારા નક્કી કરેલી ટૂંકી યાદી: દરેક મોડેલ માટે એક ફાઇલ, એવા પ્રકાશક તરફથી જે લાઇસન્સ જણાવે છે. બીજું કંઈ ક્રમાંકિત થતું નથી.",
+      "compatibilityHelp": "અનુકૂળતા મોડેલ ફાઇલની આ ઉપકરણની મેમરી અને ખાલી સ્ટોરેજ સાથે તુલના કરે છે. મેમરીનો આંકડો અંદાજ છે, માપ નહીં.",
+      "text": "ટેક્સ્ટ",
+      "listTextPurpose": "ફક્ત ટેક્સ્ટ પ્રોમ્પ્ટ.",
+      "listImagePurpose": "ટેક્સ્ટની સાથે ચિત્રો પણ વાંચે છે.",
+      "smallestDownload": "સૌથી નાનું ડાઉનલોડ: {{size}} · આશરે {{memory}} મેમરી",
+      "fullFileName": "ફાઇલ: {{name}}",
+      "memoryEstimateNote": "મેમરીના આંકડા અંદાજ છે, માપ નહીં.",
+      "parameters": "પેરામીટર્સ: {{value}}",
+      "downloads": "ડાઉનલોડ્સ: {{value}}",
+      "likes": "લાઇક્સ: {{value}}",
+      "context": "કોન્ટેક્સ્ટ વિન્ડો: {{value}}",
+      "license": "લાઇસન્સ: {{license}}",
+      "licenseUnknown": "લાઇસન્સ દર્શાવેલ નથી",
+      "tools": "ટૂલ કૉલિંગ",
+      "vision": "છબી ઇનપુટ",
+      "hintsHelp": "Hugging Face તરફથી સંકેતો. ઍપ ડાઉનલોડ પછી મોડેલ તપાસે છે.",
+      "gated": "આ મોડેલ માટે Hugging Face એકાઉન્ટ જરૂરી છે, તેથી ઍપ તેને ડાઉનલોડ કરી શકતી નથી.",
+      "quantizations": "ક્વૉન્ટાઇઝેશન્સ",
+      "quantizationsHelp": "નાની ફાઇલો ઓછી મેમરી અને સ્ટોરેજ વાપરે છે. મોટી ફાઇલો સામાન્ય રીતે વધુ સારા જવાબો આપે છે.",
+      "quantDetail": "{{size}} ડાઉનલોડ · આશરે {{memory}} મેમરી",
+      "downloadQuant": "{{quant}} ડાઉનલોડ કરો",
+      "loadingModel": "મોડેલની વિગતો લોડ થઈ રહી છે",
+      "couldNotLoadModel": "આ મોડેલ લોડ કરી શકાયું નહીં",
+      "noFiles": "આ ઍપ ચલાવી શકે એવી કોઈ ફાઇલ નથી",
+      "noFilesDescription": "આ ઍપ એવા મોડેલ્સ ચલાવે છે જે એક જ GGUF ફાઇલ હોય.",
+      "tooLargeTitle": "આ મોડેલ કદાચ નહીં ચાલે",
+      "tooLargeMessage": "{{name}} ને કદાચ આ ડિવાઇસમાં છે તેના કરતાં વધુ મેમરીની જરૂર પડશે. મોડેલ જવાબ આપતું હોય ત્યારે ઍપ બંધ થઈ શકે છે. છતાં ડાઉનલોડ કરવું છે?",
+      "downloadAnyway": "છતાં ડાઉનલોડ કરો"
     },
     "localModels": {
       "title": "ઉપકરણ પરના મોડેલ્સ",
-      "help": "ઉપકરણ પરના મોડેલ્સ આ ફોન પર ચાલે છે. તમારા પ્રૉમ્પ્ટ અને જવાબો ઉપકરણ પર જ રહે છે, અને આ મોડેલ્સ સાધનોનો ઉપયોગ કરી શકતા નથી.",
+      "help": "ઉપકરણ પરના મોડેલ્સ આ ફોન પર ચાલે છે. તમારા પ્રૉમ્પ્ટ અને જવાબો ઉપકરણ પર જ રહે છે.",
+      "systemPurpose": "આ ઉપકરણની સિસ્ટમમાં બિલ્ટ-ઇન મોડેલ. તે ઉપકરણ પર ચાલે છે.",
       "apple": "Apple Intelligence (ઉપકરણ પર)",
       "checking": "ઉપલબ્ધતા તપાસી રહ્યાં છીએ…",
       "ready": "ઉપયોગ માટે તૈયાર",
@@ -3356,6 +3489,9 @@
       "downloading": "ડાઉનલોડ થઈ રહ્યું છે…",
       "downloadProgress": "ડાઉનલોડ થઈ રહ્યું છે… {{percent}}%",
       "downloadFailed": "ડાઉનલોડ પૂરું થયું નથી. તમારું કનેક્શન અને ખાલી સ્ટોરેજ તપાસો, પછી ફરી પ્રયાસ કરો."
+    },
+    "reasoningEffort": {
+      "modelFlag": "આ મોડેલ વિચારના સ્તરને સપોર્ટ કરે છે"
     }
   },
   "settingsTools": {
@@ -3578,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
     "purchaseOwnedByAnotherAccount": "આ Apple Account પરની ક્રેડિટ બીજા Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો.",
     "purchaseOwnedByAnotherAccountPlay": "આ Google Play ખાતા પરની ક્રેડિટ અલગ Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો."
+  },
+  "todos": {
+    "saveAsTodo": "કાર્ય તરીકે સાચવો",
+    "segment": {
+      "label": "એજન્ટ દૃશ્ય",
+      "sessions": "સત્રો",
+      "todos": "કાર્યો"
+    },
+    "lists": {
+      "newList": "નવી યાદી",
+      "empty": "હજુ કોઈ યાદી નથી",
+      "couldNotLoad": "યાદીઓ લોડ કરી શકાઈ નહીં",
+      "noRepository": "કોઈ રિપોઝિટરી નથી",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ખુલ્લાં",
+      "openCount_other": "{{count}} ખુલ્લાં",
+      "archived_one": "આર્કાઇવ કરેલ ({{count}})",
+      "archived_other": "આર્કાઇવ કરેલ ({{count}})",
+      "archive": "આર્કાઇવ કરો",
+      "unarchive": "આર્કાઇવમાંથી કાઢો",
+      "deleteTitle": "{{name}} કાઢી નાખવી?",
+      "deleteMessage": "તેનાં કાર્યો પણ કાઢી નાખવામાં આવશે. તેનાં સત્રો રહેશે."
+    },
+    "listSettings": {
+      "title": "યાદીની સેટિંગ્સ",
+      "name": "નામ",
+      "namePlaceholder": "બગ્સ, વિચારો, રિલીઝ…",
+      "emoji": "ઇમોજી",
+      "mode": "મોડ",
+      "defaultsHint": "આ યાદીમાંથી શરૂ થતાં સત્રો આ મૂળભૂત સેટિંગ્સ વાપરે છે."
+    },
+    "list": {
+      "addPlaceholder": "કાર્ય ઉમેરો",
+      "add": "કાર્ય ઉમેરો",
+      "empty": "હજુ કોઈ કાર્ય નથી",
+      "setDefaults": "રિપોઝિટરી, મોડ અને મોડલ સેટ કરો",
+      "completed_one": "પૂર્ણ ({{count}})",
+      "completed_other": "પૂર્ણ ({{count}})"
+    },
+    "item": {
+      "markDone": "પૂર્ણ તરીકે ચિહ્નિત કરો",
+      "markOpen": "અપૂર્ણ તરીકે ચિહ્નિત કરો",
+      "markDonePrompt": "પૂર્ણ તરીકે ચિહ્નિત કરવું?",
+      "deleted": "કાર્ય કાઢી નાખ્યું",
+      "undo": "પૂર્વવત્ કરો",
+      "runCount_one": "{{count}} વાર ચલાવ્યું",
+      "runCount_other": "{{count}} વાર ચલાવ્યું",
+      "startNow": "સમીક્ષા વિના શરૂ કરો",
+      "startNowHint": "સમીક્ષા વિના શરૂ કરવા લાંબું દબાવો",
+      "titleLabel": "કાર્યનું શીર્ષક",
+      "renameTitle": "કાર્યનું નામ બદલો",
+      "notes": "નોંધો",
+      "addNotes": "નોંધ ઉમેરો",
+      "notesPrompt": "સંદર્ભ, જરૂરિયાતો અથવા સ્વીકૃતિ માપદંડ ઉમેરો.",
+      "markdownSupported": "Markdown સપોર્ટેડ છે",
+      "sessions": "સત્રો જોડાયેલાં",
+      "noSessions": "હજુ કોઈ સત્ર નથી",
+      "untitledLinkedSession": "લિંક કરેલું સેશન",
+      "sessionNeedsInput": "સેશનને ઇનપુટ જોઈએ",
+      "sessionRunning": "સેશન ચાલી રહ્યું છે",
+      "sessionFinished": "સેશન પૂર્ણ થયું",
+      "sessionPullRequest": "સેશન PR",
+      "sessionPullRequestNumber": "સેશન PR #{{number}}",
+      "openSessionHint": "સેશન ખોલે છે.",
+      "unlinkSessionAction": "સેશન અનલિંક કરો",
+      "unlinkConfirmTitle": "{{title}} અનલિંક કરીએ?",
+      "unlinkConfirmMessage": "સેશન પોતે ડિલીટ થતું નથી. ફક્ત આ કાર્ય સાથેની તેની લિંક દૂર થાય છે.",
+      "startNewSession": "નવું સેશન શરૂ કરો",
+      "startNewSessionHint": "નવું સેશન શરૂ કરવા લાંબુ દબાવો.",
+      "linkSession": "સત્ર જોડો",
+      "linkFailed": "સત્રને કાર્ય સાથે જોડી શકાયું નહીં"
+    },
+    "linkSession": {
+      "title": "સત્ર જોડો",
+      "empty": "કોઈ તાજેતરનું સત્ર નથી",
+      "emptyInRepository": "{{repository}} માં કોઈ તાજેતરનું સત્ર નથી"
+    },
+    "upNext": "આગળ",
+    "sessionTodo": "કાર્ય: {{title}}",
+    "linkToTodo": "કાર્ય સાથે જોડો",
+    "candidates": {
+      "empty": "કોઈ ખુલ્લું કાર્ય નથી"
+    },
+    "saveSheet": {
+      "title": "યાદીમાં સાચવો",
+      "saved": "{{list}} માં સાચવ્યું"
+    }
   }
 }

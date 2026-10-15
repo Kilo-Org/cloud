@@ -64,6 +64,8 @@ import {
   baseResizeTerminalNextOutputSchema,
   baseCloseTerminalNextSchema,
   baseCloseTerminalNextOutputSchema,
+  baseCreatePreviewNextSchema,
+  baseCreatePreviewNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
   cloudAgentLinkPendingUploadsSchema,
@@ -90,7 +92,8 @@ async function createCloudAgentControlToken(
     })
   ).token;
 }
-import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { buildPreviewOpenUrl } from '@/lib/cloud-agent/preview-open-url';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
@@ -231,6 +234,10 @@ const CreateTerminalInput = baseCreateTerminalNextSchema.extend({
   organizationId: z.uuid(),
 });
 
+const CreatePreviewInput = baseCreatePreviewNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
 const RefreshTerminalTicketInput = baseRefreshTerminalTicketNextSchema.extend({
   organizationId: z.uuid(),
 });
@@ -283,7 +290,13 @@ const ListBitbucketRepositoriesInput = z.object({
  */
 export const organizationCloudAgentNextRouter = createTRPCRouter({
   getSandboxSelectionOptions: organizationMemberProcedure
-    .input(z.object({ devcontainer: z.boolean().optional() }))
+    .input(
+      z.object({
+        devcontainer: z.boolean().optional(),
+        repositoryType: z.enum(['github', 'gitlab', 'bitbucket', 'git']).optional(),
+        repositoryFullName: z.string().min(1).max(500).optional(),
+      })
+    )
     .output(sandboxSelectionCapabilitiesSchema)
     .query(async ({ ctx, input }) => {
       const authToken = await createCloudAgentControlToken(
@@ -293,6 +306,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       );
       return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
         kilocodeOrganizationId: input.organizationId,
+        ...(input.repositoryType ? { repositoryType: input.repositoryType } : {}),
+        ...(input.repositoryFullName ? { repositoryFullName: input.repositoryFullName } : {}),
       });
     }),
 
@@ -633,6 +648,25 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       } catch (error) {
         rethrowAsTerminalError(error);
       }
+    }),
+
+  createPreview: organizationMemberMutationProcedure
+    .input(CreatePreviewInput)
+    .output(baseCreatePreviewNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+
+      const { ticket, expiresAt } = signPreviewTicket({
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        port: input.port,
+        organizationId: input.organizationId,
+      });
+      return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
     }),
 
   refreshTerminalTicket: organizationMemberMutationProcedure

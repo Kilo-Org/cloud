@@ -133,10 +133,14 @@
     "status": "Estado",
     "truncated": "Truncado",
     "updated": "Actualizado",
+    "generating": "Xerando…",
     "working": "Traballando",
     "yourOwnRepositories": "Os teus propios repositorios",
     "dismissed": "Descartado",
-    "agent": "Axente"
+    "agent": "Axente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Cambios"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -325,6 +329,7 @@
       "collapseFile": "Contraer ficheiro",
       "expandFile": "Expandir ficheiro",
       "diffTooLarge": "Hai demasiadas diferenzas para amosalas.",
+      "noPreview": "Non hai vista previa dispoñible para este ficheiro",
       "openOnGitHub": "Abrir en GitHub",
       "openDiffOnGitHub": "Abrir as diferenzas deste ficheiro en GitHub",
       "githubDiff": "Diferenzas en GitHub"
@@ -831,7 +836,8 @@
       "kiloclaw": "Actividade de KiloClaw",
       "balance": "Alertas de saldo",
       "security": "Problemas de seguridade",
-      "spend": "Alertas de gasto"
+      "spend": "Alertas de gasto",
+      "followedSessions": "Sesións seguidas"
     },
     "category": {
       "chatMessagesSubtitle": "respostas nas túas conversas",
@@ -1254,7 +1260,7 @@
         "stoppedTitle": "Configuración detida",
         "stoppedBody": "A instancia de {{name}} detívose inesperadamente durante a configuración.",
         "stalledTitle": "Algo quedou bloqueado",
-        "stalledBody": "Non puidemos rematar a configuración de {{name}}. Téntao de novo ou escribe a hi@kilo.ai se o problema continúa.",
+        "stalledBody": "Non puidemos rematar a configuración de {{name}}. Téntao de novo ou escribe a {{supportEmail}} se o problema continúa.",
         "timeoutTitle": "Está tardando máis do esperado",
         "timeoutBody": "A configuración de {{name}} está tardando máis do normal (máis de {{displayMinutes}} minutos).",
         "continueInBackground": "Continuar en segundo plano",
@@ -1312,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "O teu plan de acceso anticipado precisa unha revisión manual antes de poder usarse no móbil.",
       "iosTitle": "KiloClaw non dispoñible en iOS",
       "iosBody": "O acceso a KiloClaw para esta conta xestiónase fóra da aplicación de iOS.",
-      "iosContact": "Tes dúbidas? Escribe a hi@kilo.ai.",
+      "iosContact": "Tes dúbidas? Escribe a {{supportEmail}}.",
       "quarantinedCta": "Escribir ao noso equipo",
       "nonCanonicalEarlybirdCta": "Revisar o teu plan en kilo.ai"
     },
@@ -1547,7 +1553,7 @@
         "recoveryLabel": "Actualizar a aplicación de GitHub"
       },
       "githubIpAllowList": {
-        "description": "O revisor de código desactivouse porque esta organización de GitHub usa unha lista de enderezos IP permitidos que bloquea Kilo. Contacta con hi@kilocode.ai para obter axuda e volve activar o revisor de código."
+        "description": "O revisor de código desactivouse porque esta organización de GitHub usa unha lista de enderezos IP permitidos que bloquea Kilo. Contacta con {{supportEmail}} para obter axuda e volve activar o revisor de código."
       },
       "gitlabProjectAccessRequired": {
         "description": "O revisor de código desactivouse porque Kilo non pode crear un token de acceso para este proxecto de GitLab. Concede permisos de mantemento ou activa os tokens de acceso ao proxecto e volve activar o revisor de código.",
@@ -1562,7 +1568,7 @@
         "recoveryLabel": "Actualizar a configuración do revisor de código"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "O revisor de código desactivouse porque hoxe se superou tres veces o tempo límite para clonar o repositorio. Contacta con hi@kilocode.ai para obter axuda e volve activar o revisor de código."
+        "description": "O revisor de código desactivouse porque hoxe se superou tres veces o tempo límite para clonar o repositorio. Contacta con {{supportEmail}} para obter axuda e volve activar o revisor de código."
       },
       "title": "O revisor de código precisa a túa atención.",
       "recoveryLabel": "Contactar coa asistencia"
@@ -2086,6 +2092,8 @@
       "title": "Sesión",
       "copyErrorDetails": "Copiar detalles do erro",
       "backToSessions": "Volver ás sesións",
+      "follow": "Seguir na pantalla de bloqueo",
+      "unfollow": "Deixar de seguir na pantalla de bloqueo",
       "couldNotLoad": "Non se puido cargar a sesión.",
       "failedToLoadDetails": "Non se puideron cargar os detalles da sesión.",
       "failedToStopExecution": "Non se puido deter a execución.",
@@ -2152,6 +2160,11 @@
       "collapse": "Contraer o obxectivo",
       "expand": "Expandir o obxectivo"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tarefas, {{completed}} de {{total}} completadas",
+      "rowAccessibility": "Tarefas, {{completed}} de {{total}} completadas. Tarefa actual: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Usados recentemente",
       "couldNotLoadGithubRepositories": "Non se puideron cargar os repositorios de GitHub.",
@@ -2184,7 +2197,6 @@
       "retryLoadingEnvironment": "Volver tentar cargar o contorno",
       "defaultEnvironment": "Contorno predeterminado",
       "environmentSummary": "{{commands}} comandos · {{mcp}} MCP · {{skills}} habilidades · {{agents}} axentes",
-      "changes": "Cambios",
       "leaveChanges": "Manter cambios",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sesión",
@@ -2207,6 +2219,10 @@
       "importingSession": "Importando a sesión",
       "cliCannotContinue": "Este CLI non pode continuar unha sesión. Escolle Cloud Agent ou outro CLI.",
       "importFailed": "Non se puido importar esta sesión.",
+      "cliCannotFork": "Actualiza o Kilo CLI para bifurcar desde unha mensaxe.",
+      "forkCutNotSynced": "Esta mensaxe aínda non está gardada. Téntao de novo nun momento.",
+      "forkFilesFromBaseBranch": "Os ficheiros parten da rama base.",
+      "forkFilesUnchangedOnComputer": "Os ficheiros deste ordenador non se modifican.",
       "pickProfile": "Escolle un perfil",
       "noProfile": "Sen perfil",
       "manageProfiles": "Xestionar perfís",
@@ -2251,8 +2267,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar parche",
       "toolTask": "tarefa",
-      "readTodos": "Ler tarefas",
-      "updateTodos": "Actualizar tarefas",
+      "readTodos": "Ler o plan",
+      "updateTodos": "Actualizar o plan",
       "linesBadge": "{{displayCount}} liñas",
       "filesBadge": "{{displayCount}} ficheiros",
       "matchesBadge": "{{displayCount}} coincidencias",
@@ -2326,6 +2342,7 @@
       "copyMessage": "Copiar mensaxe",
       "copyText": "Copiar texto",
       "selectText": "Seleccionar texto",
+      "forkFromHere": "Bifurcar desde aquí",
       "reportAiResponse": "Denunciar a resposta da IA",
       "reportAiResponseConfirm": "Queres denunciar esta resposta para que se revise?",
       "report": "Denunciar",
@@ -2641,6 +2658,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Modelos ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Ver cambios",
+      "asOf": "Ás {{time}}",
+      "tooLarge": "Hai demasiadas diferenzas para amosalas no móbil.",
+      "empty": "Aínda non hai cambios en ficheiros nesta sesión."
     },
     "autoApprove": {
       "title": "Aprobación automática",
@@ -3153,6 +3176,8 @@
     "channelName": "Axentes activos",
     "activityKitDisabledBody": "Activa as actividades en directo nos axustes para ver os axentes activos na pantalla de bloqueo.",
     "openSession": "Abrir",
+    "finished": "Rematado",
+    "followFailed": "Non se puido mostrar este axente na pantalla de bloqueo.",
     "approveFailed": "Non se puido aprobar. Toca $t(common.approve) para tentalo de novo.",
     "checked": "Comprobado",
     "lastKnown": "Último estado coñecido",
@@ -3161,7 +3186,26 @@
     "waitingForYou": "Agardando por ti",
     "nextScheduled": "Próximas tarefas programadas",
     "answerNeeded": "Agardando resposta",
-    "waitingToRetry": "Agardando para reintentar"
+    "waitingToRetry": "Agardando para reintentar",
+    "step": {
+      "editing": "Edición",
+      "reading": "Lectura",
+      "running": "Execución",
+      "searching": "Busca web",
+      "thinking": "Pensando"
+    },
+    "planOf": "de",
+    "filesChanged": "ficheiros modificados",
+    "finishedIn": "Rematado en",
+    "noActivityFor": "Sen actividade durante",
+    "prOpened": "Solicitude de extracción aberta",
+    "permissionWants": "Quere executar",
+    "failure": {
+      "provider": "Detido: erro do provedor",
+      "tool": "Detido: erro da ferramenta",
+      "cancelled": "Detido: cancelado",
+      "other": "PARADO"
+    }
   },
   "transcriptionModel": {
     "title": "Modelo de transcrición",
@@ -3189,6 +3233,7 @@
     "tutorialLabel": "Titorial"
   },
   "modelChat": {
+    "offlineFailure": "Este modelo necesita conexión a internet. Conéctate e téntao de novo, ou cambia a un modelo deste dispositivo.",
     "empty": {
       "title": "Inicia un chat",
       "description": "Envía unha mensaxe para falar cun modelo."
@@ -3196,10 +3241,32 @@
     "list": {
       "loadFailed": "Non se puido cargar o historial do chat.",
       "new": "Chat novo",
-      "openHint": "Abre o chat. Mantén premido para eliminar.",
       "deleteTitle": "Eliminar este chat?"
     },
+    "rename": {
+      "title": "Renomear o chat",
+      "accessibility": "Renomear o chat: {{title}}",
+      "openHint": "Abre o chat. Mantén premido para renomear ou eliminar."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Detalles do chat",
+      "backend": "Servizo",
+      "effortDefault": "Predeterminado do modelo",
+      "noCost": "Sen custo",
+      "costUnknown": "Descoñecido",
+      "costEstimatedNote": "O custo das respostas que non informaron dun prezo estímase a partir dos prezos de tarifa.",
+      "costUnknownNote": "Non se coñece ningún prezo para este modelo.",
+      "costPartialNote": "Este total non inclúe os modelos sen prezo coñecido.",
+      "localNote": "Os modelos no dispositivo execútanse neste dispositivo. Non teñen custo nin caché de instrucións, e o seu reconto de unidades de texto pode ser estimado.",
+      "countedSinceNote": "Este chat comezou antes de que se rexistrase o uso. Os totais só mostran as respostas posteriores.",
+      "remoteServersOn": "Servidores MCP remotos activados"
+    },
+    "webSearch": {
+      "title": "Buscar na web",
+      "description": "Permite que este chat busque información actual a través da túa conta de Kilo. As buscas usan a túa cota mensual de buscas.",
+      "allowanceExhausted": "Esgotaches as buscas web gratuítas deste mes. Engade créditos para volver buscar."
+    },
     "mcp": {
       "title": "Ferramentas de Kilo",
       "use": "Usar as ferramentas de Kilo",
@@ -3222,7 +3289,6 @@
       "fieldName": "Nome mostrado",
       "fieldUrl": "URL do servidor",
       "fieldUrlInvalid": "Introduce un URL de servidor válido.",
-      "fieldToken": "Token Bearer (opcional)",
       "enableServer": "Activar este servidor: {{name}}",
       "editServer": "Editar o servidor",
       "deleteServer": "Eliminar o servidor",
@@ -3243,8 +3309,24 @@
       "serverUnreachable": "Non se puido contactar con este servidor",
       "serverOff": "Este servidor está desactivado"
     },
+    "mcpOAuth": {
+      "authMethod": "Autenticación",
+      "authNone": "Sen inicio de sesión",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Inicio de sesión OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Despois de gardar, toca $t(modelChat.mcpOAuth.signIn) no servidor para iniciar sesión co navegador.",
+      "serverNeedsSignIn": "Inicia sesión para usar este servidor",
+      "signIn": "Iniciar sesión",
+      "signInA11y": "Iniciar sesión neste servidor: {{name}}",
+      "signInFailed": "Non se puido iniciar sesión en {{name}}. Téntao de novo."
+    },
     "backends": {
       "title": "Servizos de chat",
+      "providersTitle": "Provedores de chat",
+      "cloud": "Na nube",
+      "cloudModel": "Modelo: {{model}}",
+      "cloudUnavailable": "Os modelos Kilo non están dispoñibles agora mesmo. Comproba a túa conexión.",
       "manage": "Xestionar servizos",
       "defaultKilo": "$t(consent.kilo) (predeterminado)",
       "kiloHelp": "O servizo integrado usa a túa conta de Kilo e non se pode editar nin eliminar.",
@@ -3304,7 +3386,6 @@
     "gguf": {
       "title": "Modelos descargables",
       "help": "Descarga un modelo aberto e execútao neste teléfono con llama.cpp. As túas solicitudes e respostas quedan no dispositivo. Os modelos son grandes, así que usa Wi-Fi.",
-      "details": "{{size}} · Licenza: {{license}}",
       "download": "Descargar modelo",
       "pause": "Pausar a descarga",
       "resume": "Retomar a descarga",
@@ -3316,6 +3397,8 @@
       "url": "Ligazón de descarga directa",
       "urlHelp": "Pega unha ligazón HTTPS a un ficheiro .gguf, como unha ligazón de resolución de Hugging Face. Descarga modelos só de fontes nas que confíes.",
       "downloadUrl": "Descargar desde a ligazón",
+      "advanced": "Avanzado",
+      "localPurpose": "Execútase neste dispositivo con llama.cpp. As indicacións e as respostas quedan no dispositivo.",
       "deleteTitle": "Eliminar este modelo?",
       "deleteMessage": "Eliminar {{name}} deste dispositivo? As conversas que o usan necesitan outro modelo antes de poder continuar.",
       "errors": {
@@ -3325,12 +3408,62 @@
         "notGguf": "A ligazón debe apuntar a un ficheiro .gguf.",
         "space": "Non hai suficiente espazo libre para este modelo. Libera espazo e téntao de novo.",
         "network": "A descarga non rematou. Comproba a túa conexión e téntao de novo.",
-        "invalidFile": "O ficheiro descargado non é un modelo que esta aplicación poida executar, así que se eliminou."
+        "invalidFile": "O ficheiro descargado non é un modelo que esta aplicación poida executar, así que se eliminou.",
+        "checksum": "O ficheiro descargado non coincide coa súa suma de verificación publicada, así que se eliminou. Tenta descargalo de novo."
       }
+    },
+    "catalog": {
+      "browse": "Explorar modelos",
+      "title": "Catálogo de modelos",
+      "search": "Buscar modelos de Hugging Face",
+      "tabs": "Filtro de modelos",
+      "fitsTab": "Compatibles con este dispositivo",
+      "fromHuggingFace": "De Hugging Face",
+      "loading": "Cargando modelos",
+      "noResults": "Non se atoparon modelos",
+      "noFits": "Ningún modelo cabe neste dispositivo",
+      "noFitsDescription": "Os modelos máis grandes están na lapela $t(common.all).",
+      "fit": {
+        "fits": "Cabe",
+        "tight": "Cabe xusto",
+        "tooLarge": "Demasiado grande",
+        "noStorage": "Non hai espazo suficiente",
+        "unknown": "Adaptación descoñecida"
+      },
+      "recommendationsHelp": "Unha lista preseleccionada por esta aplicación: un ficheiro por modelo, dun editor que indica unha licenza. Non se clasifica nada máis.",
+      "compatibilityHelp": "A adaptación compara o ficheiro do modelo coa memoria e o espazo libre deste dispositivo. A cifra de memoria é unha estimación, non unha medición.",
+      "text": "Texto",
+      "listTextPurpose": "Só indicacións de texto.",
+      "listImagePurpose": "Le imaxes ademais de texto.",
+      "smallestDownload": "Descarga máis pequena: {{size}} · uns {{memory}} de memoria",
+      "fullFileName": "Ficheiro: {{name}}",
+      "memoryEstimateNote": "As cifras de memoria son estimacións, non medicións.",
+      "parameters": "Parámetros: {{value}}",
+      "downloads": "Descargas: {{value}}",
+      "likes": "Gústames: {{value}}",
+      "context": "Xanela de contexto: {{value}}",
+      "license": "Licenza: {{license}}",
+      "licenseUnknown": "Non se indica a licenza",
+      "tools": "Chamada de ferramentas",
+      "vision": "Entrada de imaxes",
+      "hintsHelp": "Indicacións de Hugging Face. A app comproba o modelo despois de descargalo.",
+      "gated": "Este modelo require unha conta de Hugging Face, polo que a app non o pode descargar.",
+      "quantizations": "Cuantizacións",
+      "quantizationsHelp": "Os ficheiros máis pequenos usan menos memoria e almacenamento. Os máis grandes adoitan dar mellores respostas.",
+      "quantDetail": "Descarga de {{size}} · uns {{memory}} de memoria",
+      "downloadQuant": "Descargar {{quant}}",
+      "loadingModel": "Cargando os detalles do modelo",
+      "couldNotLoadModel": "Non se puido cargar este modelo",
+      "noFiles": "Non hai ficheiros que esta app poida executar",
+      "noFilesDescription": "Esta app executa modelos que son un único ficheiro GGUF.",
+      "tooLargeTitle": "Pode que este modelo non funcione",
+      "tooLargeMessage": "Probablemente {{name}} necesita máis memoria da que ten este dispositivo. A app pode pecharse mentres o modelo responde. Queres descargalo igualmente?",
+      "downloadAnyway": "Descargar igualmente"
     },
     "localModels": {
       "title": "Modelos no dispositivo",
-      "help": "Os modelos no dispositivo execútanse neste teléfono. As túas solicitudes e respostas quedan no dispositivo, e estes modelos non poden usar ferramentas.",
+      "help": "Os modelos no dispositivo execútanse neste teléfono. As túas solicitudes e respostas quedan no dispositivo.",
+      "systemPurpose": "O modelo integrado no sistema deste dispositivo. Execútase no dispositivo.",
       "apple": "Apple Intelligence (no dispositivo)",
       "checking": "Comprobando a dispoñibilidade…",
       "ready": "Listo para usar",
@@ -3356,6 +3489,9 @@
       "downloading": "Descargando…",
       "downloadProgress": "Descargando… {{percent}}%",
       "downloadFailed": "A descarga non rematou. Comproba a conexión e o espazo libre e téntao de novo."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Este modelo admite esforzo de razoamento"
     }
   },
   "settingsTools": {
@@ -3578,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play non devolveu ningún paquete de créditos coincidente.",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta de Google Play pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos."
+  },
+  "todos": {
+    "saveAsTodo": "Gardar como tarefa",
+    "segment": {
+      "label": "Vista de axentes",
+      "sessions": "Sesións",
+      "todos": "Tarefas"
+    },
+    "lists": {
+      "newList": "Nova lista",
+      "empty": "Aínda non hai listas",
+      "couldNotLoad": "Non se puideron cargar as listas",
+      "noRepository": "Sen repositorio",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} abertas",
+      "openCount_other": "{{count}} abertas",
+      "archived_one": "Arquivadas ({{count}})",
+      "archived_other": "Arquivadas ({{count}})",
+      "archive": "Arquivar",
+      "unarchive": "Desarquivar",
+      "deleteTitle": "Eliminar {{name}}?",
+      "deleteMessage": "As súas tarefas tamén se eliminan. As sesións mantéñense."
+    },
+    "listSettings": {
+      "title": "Axustes da lista",
+      "name": "Nome",
+      "namePlaceholder": "Erros, Ideas, Lanzamento…",
+      "emoji": "Emoji",
+      "mode": "Modo",
+      "defaultsHint": "As sesións iniciadas desde esta lista usan estes valores predeterminados."
+    },
+    "list": {
+      "addPlaceholder": "Engadir unha tarefa",
+      "add": "Engadir tarefa",
+      "empty": "Aínda non hai tarefas",
+      "setDefaults": "Define repositorio, modo e modelo",
+      "completed_one": "Rematadas ({{count}})",
+      "completed_other": "Rematadas ({{count}})"
+    },
+    "item": {
+      "markDone": "Marcar como feita",
+      "markOpen": "Marcar como non feita",
+      "markDonePrompt": "Marcar como feita?",
+      "deleted": "Tarefa eliminada",
+      "undo": "Desfacer",
+      "runCount_one": "{{count}} execución",
+      "runCount_other": "{{count}} execucións",
+      "startNow": "Iniciar sen revisión",
+      "startNowHint": "Mantén premido para iniciar sen revisión",
+      "titleLabel": "Título da tarefa",
+      "renameTitle": "Renomear a tarefa",
+      "notes": "Notas",
+      "addNotes": "Engadir notas",
+      "notesPrompt": "Engade contexto, requisitos ou criterios de aceptación.",
+      "markdownSupported": "Markdown compatible",
+      "sessions": "Sesións vinculadas",
+      "noSessions": "Aínda non hai sesións",
+      "untitledLinkedSession": "Sesión vinculada",
+      "sessionNeedsInput": "A sesión precisa entrada",
+      "sessionRunning": "Sesión en execución",
+      "sessionFinished": "Sesión rematada",
+      "sessionPullRequest": "PR da sesión",
+      "sessionPullRequestNumber": "PR da sesión #{{number}}",
+      "openSessionHint": "Abre a sesión.",
+      "unlinkSessionAction": "Desvincular a sesión",
+      "unlinkConfirmTitle": "Desvincular {{title}}?",
+      "unlinkConfirmMessage": "A sesión en si non se elimina. Só se elimina a súa vinculación con esta tarefa.",
+      "startNewSession": "Iniciar nova sesión",
+      "startNewSessionHint": "Mantén premido para iniciar unha nova sesión.",
+      "linkSession": "Vincular sesión",
+      "linkFailed": "Non se puido vincular a sesión á tarefa"
+    },
+    "linkSession": {
+      "title": "Vincular unha sesión",
+      "empty": "Non hai sesións recentes",
+      "emptyInRepository": "Non hai sesións recentes en {{repository}}"
+    },
+    "upNext": "A continuación",
+    "sessionTodo": "Tarefa: {{title}}",
+    "linkToTodo": "Vincular á tarefa",
+    "candidates": {
+      "empty": "Non hai tarefas abertas"
+    },
+    "saveSheet": {
+      "title": "Gardar na lista",
+      "saved": "Gardada en {{list}}"
+    }
   }
 }

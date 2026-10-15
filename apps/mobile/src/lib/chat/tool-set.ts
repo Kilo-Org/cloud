@@ -6,6 +6,7 @@ import { confirmSettingChange } from '@/lib/settings/confirm';
 import { settingsService } from '@/lib/settings/registry';
 
 import { isSettingsToolsEnabled } from './settings-tools-switch';
+import { WEB_SEARCH_TOOL_NAME, webSearchTool } from './web-search';
 
 /**
  * The tool set a chat offers, and the names it is opened with.
@@ -35,10 +36,12 @@ export const SETTINGS_TOOL_NAMES: readonly string[] = [SETTINGS_LIST_TOOL, SETTI
 
 /** Everything that decides one chat's tool set. */
 export type ChatToolSetInput = {
-  /** The organization whose defaults the settings tools read and write, when there is one. */
+  /** The organization whose settings defaults the tools use, and whose account pays for a search. */
   readonly organizationId?: string;
   /** The one group switch for the settings tools. */
   readonly settingsEnabled: boolean;
+  /** Whether web search is on for this chat. */
+  readonly webSearchEnabled: boolean;
   /** Whether the Kilo MCP server is on for this chat. */
   readonly kiloEnabled: boolean;
   /** The names the Kilo MCP server's discovered tools are called by. */
@@ -83,15 +86,17 @@ function settingsToolsFor(organizationId?: string): readonly Tool[] {
 /**
  * The names a chat is opened with, in the order the model sees them.
  *
- * The settings names are present only when the group switch is on, the Kilo
- * names only when the server is on for the chat, and the remote names only for
- * the servers that are enabled — each list arrives already filtered. The base
- * name is always first, so the same gates give the same order and the cached
- * prefix does not move under a chat that changed nothing.
+ * The web search name is present only when it is on for the chat, the settings
+ * names only when the group switch is on, the Kilo names only when the server
+ * is on for the chat, and the remote names only for the servers that are
+ * enabled — each list arrives already filtered. The base name is always first,
+ * so the same gates give the same order and the cached prefix does not move
+ * under a chat that changed nothing.
  */
 export function toolNamesFor(input: ChatToolSetInput): readonly string[] {
   return [
     BASE_TOOL_NAME,
+    ...(input.webSearchEnabled ? [WEB_SEARCH_TOOL_NAME] : []),
     ...(input.settingsEnabled ? SETTINGS_TOOL_NAMES : []),
     ...(input.kiloEnabled ? input.kiloNames : []),
     ...input.remoteNames,
@@ -99,16 +104,19 @@ export function toolNamesFor(input: ChatToolSetInput): readonly string[] {
 }
 
 /**
- * The tools behind those names: the clock, the settings tools when the group
- * switch is on, and the remote servers' tools the caller passes.
+ * The tools behind those names: the clock, web search, the settings tools when
+ * the group switch is on, and the remote servers' tools the caller passes.
  *
- * The Kilo server's tools are not part of the input: they are discovered as
- * tool objects rather than named, so `chatToolsWithMcp` composes the whole set
- * and places them where the Kilo names sit in the list.
+ * Web search is held whatever one chat chose, because the choice is per chat
+ * and the registry serves them all. The Kilo server's tools are not part of the
+ * input: they are discovered as tool objects rather than named, so
+ * `chatToolsWithMcp` composes the whole set and places them where the Kilo
+ * names sit in the list.
  */
 export function chatToolsFor(input: ChatToolSetInput): readonly Tool[] {
   return [
     ...baseTools(),
+    webSearchTool(input.organizationId),
     ...(input.settingsEnabled ? settingsToolsFor(input.organizationId) : []),
     ...input.remoteTools,
   ];

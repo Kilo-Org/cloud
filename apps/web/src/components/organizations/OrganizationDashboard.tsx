@@ -22,15 +22,11 @@ import {
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageCircleQuestion, Terminal } from 'lucide-react';
 import { OrganizationProvidersAndModelsConfigurationCard } from '@/components/organizations/OrganizationProvidersAndModelsConfigurationCard';
 import { OrganizationChildOrganizationsCard } from '@/components/organizations/OrganizationChildOrganizationsCard';
 import { OrganizationEmailPreferencesCard } from '@/components/organizations/OrganizationEmailPreferencesCard';
 import { OrgActiveKiloclawsCard } from '@/components/organizations/OrgActiveKiloclawsCard';
-import { OpenInExtensionButton } from '@/components/auth/OpenInExtensionButton';
-import Image from 'next/image';
-import Link from 'next/link';
+import { SupportCard } from '@/components/support/SupportCard';
 
 const DISMISSED_BANNERS_KEY = 'org-welcome-banner-dismissed';
 
@@ -202,70 +198,7 @@ export function OrganizationDashboard({
             {(canManageOrganization(currentRole) || isKiloAdmin) && (
               <OrganizationEmailPreferencesCard organizationId={organizationId} />
             )}
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  <MessageCircleQuestion className="mr-2 inline h-5 w-5" />
-                  Support
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-muted-foreground text-sm">
-                  Need help? Have a feature request? Want to chat? Contact us at{' '}
-                  <a
-                    href="mailto:teams@kilocode.ai"
-                    className="text-primary font-medium hover:underline"
-                  >
-                    teams@kilocode.ai
-                  </a>
-                </p>
-                <div className="border-muted-foreground/20 space-y-3 border-t pt-4">
-                  <p className="text-muted-foreground text-sm">
-                    Ready to start coding? Get started with Kilo Code for your organization:
-                  </p>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                    <OpenInExtensionButton
-                      className="flex h-9 items-center gap-2 px-3 py-2 text-sm"
-                      ideName="VS Code"
-                      source="vscode"
-                    >
-                      <Image
-                        src="/logos/vscode.svg"
-                        alt="VS Code"
-                        width={16}
-                        height={16}
-                        className="shrink-0"
-                      />
-                      <span>VS Code</span>
-                    </OpenInExtensionButton>
-                    <Link
-                      href="https://plugins.jetbrains.com/plugin/28350-kilo-code"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="focus-visible:ring-ring border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium whitespace-nowrap shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-                    >
-                      <Image
-                        src="/logos/idea.svg"
-                        alt="JetBrains"
-                        width={16}
-                        height={16}
-                        className="shrink-0"
-                      />
-                      <span>JetBrains</span>
-                    </Link>
-                    <Link
-                      href="https://kilo.ai/install#cli"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="focus-visible:ring-ring border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium whitespace-nowrap shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-                    >
-                      <Terminal className="h-4 w-4 shrink-0" />
-                      <span>CLI</span>
-                    </Link>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <SupportCard forOrganization />
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk/v2';
 import { z } from 'zod';
+import { kiloClientConfig, type KiloServer } from '../kilo-server-auth.js';
 import {
   worktreeDeletePayloadSchema,
   type WorktreeDeletePayload,
@@ -49,8 +50,8 @@ function requireTrue(result: { data?: boolean; error?: unknown; response?: Respo
   if (requireData(result) !== true) throw new Error('Kilo worktree cleanup was not confirmed');
 }
 
-export function createWorktreeKiloCleanupClient(serverUrl: string): WorktreeKiloCleanupClient {
-  const client = createKiloClient({ baseUrl: serverUrl });
+export function createWorktreeKiloCleanupClient(server: KiloServer): WorktreeKiloCleanupClient {
+  const client = createKiloClient(kiloClientConfig(server));
   const options = () => ({ signal: AbortSignal.timeout(60_000) });
   return {
     async listSessionIds(directory) {

@@ -134,9 +134,13 @@
     "status": "Status",
     "truncated": "Truncated",
     "updated": "Updated",
+    "generating": "Generating…",
     "working": "Working",
     "yourOwnRepositories": "Your own repositories",
-    "dismissed": "Dismissed"
+    "dismissed": "Dismissed",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Changes"
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -325,6 +329,7 @@
       "collapseFile": "Collapse file",
       "expandFile": "Expand file",
       "diffTooLarge": "Diff too large to display",
+      "noPreview": "No preview available for this file",
       "openOnGitHub": "Open on GitHub",
       "openDiffOnGitHub": "Open this file's diff on GitHub",
       "githubDiff": "GitHub diff"
@@ -831,7 +836,8 @@
       "kiloclaw": "KiloClaw activity",
       "balance": "Balance alerts",
       "security": "Security findings",
-      "spend": "Spend alerts"
+      "spend": "Spend alerts",
+      "followedSessions": "Followed sessions"
     },
     "category": {
       "chatMessagesSubtitle": "replies in your conversations",
@@ -1254,7 +1260,7 @@
         "stoppedTitle": "Setup stopped",
         "stoppedBody": "{{name}}'s instance stopped unexpectedly during setup.",
         "stalledTitle": "Something stalled",
-        "stalledBody": "We couldn't finish setting up {{name}}. Try again, or email hi@kilo.ai if this keeps happening.",
+        "stalledBody": "We couldn't finish setting up {{name}}. Try again, or email {{supportEmail}} if this keeps happening.",
         "timeoutTitle": "Taking longer than expected",
         "timeoutBody": "Setup for {{name}} is taking longer than usual (over {{displayMinutes}} minutes).",
         "continueInBackground": "Continue in background",
@@ -1312,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Your early-access plan needs a manual review before it can be used on mobile.",
       "iosTitle": "KiloClaw unavailable in iOS",
       "iosBody": "KiloClaw access is managed outside the iOS app for this account.",
-      "iosContact": "Questions? Contact hi@kilo.ai.",
+      "iosContact": "Questions? Contact {{supportEmail}}.",
       "quarantinedCta": "Email our team",
       "nonCanonicalEarlybirdCta": "Review your plan on kilo.ai"
     },
@@ -1547,7 +1553,7 @@
         "recoveryLabel": "Update GitHub App"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact hi@kilocode.ai for help, then enable Code Reviewer again."
+        "description": "Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact {{supportEmail}} for help, then enable Code Reviewer again."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer was disabled because Kilo cannot create a GitLab Project Access Token for this project. Grant Maintainer access or enable Project Access Tokens, then enable Code Reviewer again.",
@@ -1562,7 +1568,7 @@
         "recoveryLabel": "Update Code Reviewer settings"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again."
+        "description": "Code Reviewer was disabled after three repository clone timeouts today. Contact {{supportEmail}} for help, then enable Code Reviewer again."
       },
       "title": "Code Reviewer needs attention",
       "recoveryLabel": "Contact support"
@@ -2086,6 +2092,8 @@
       "title": "Session",
       "copyErrorDetails": "Copy error details",
       "backToSessions": "Back to sessions",
+      "follow": "Follow on Lock Screen",
+      "unfollow": "Stop following on Lock Screen",
       "couldNotLoad": "Could not load session",
       "failedToLoadDetails": "Failed to load session details",
       "failedToStopExecution": "Failed to stop execution",
@@ -2152,6 +2160,11 @@
       "collapse": "Collapse goal",
       "expand": "Expand goal"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tasks, {{completed}} of {{total}} done",
+      "rowAccessibility": "Tasks, {{completed}} of {{total}} done. Current task: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Recently used",
       "couldNotLoadGithubRepositories": "Couldn't load GitHub repositories",
@@ -2184,7 +2197,6 @@
       "retryLoadingEnvironment": "Retry loading environment",
       "defaultEnvironment": "Default environment",
       "environmentSummary": "{{commands}} commands · {{mcp}} MCP · {{skills}} skills · {{agents}} agents",
-      "changes": "Changes",
       "leaveChanges": "Leave changes",
       "commitAndPush": "Commit and push",
       "startSession": "Start session",
@@ -2207,6 +2219,10 @@
       "importingSession": "Importing session",
       "cliCannotContinue": "This CLI cannot continue a session. Pick Cloud Agent or another CLI.",
       "importFailed": "Couldn't import this session.",
+      "cliCannotFork": "Update the Kilo CLI to fork from a message.",
+      "forkCutNotSynced": "This message is not saved yet. Try again in a moment.",
+      "forkFilesFromBaseBranch": "Files start from the base branch.",
+      "forkFilesUnchangedOnComputer": "Files on this computer are not changed.",
       "pickProfile": "Pick a profile",
       "noProfile": "No profile",
       "manageProfiles": "Manage profiles",
@@ -2251,8 +2267,8 @@
       "toolList": "list",
       "toolPatch": "patch",
       "toolTask": "task",
-      "readTodos": "Read todos",
-      "updateTodos": "Update todos",
+      "readTodos": "Read plan",
+      "updateTodos": "Update plan",
       "linesBadge_one": "{{displayCount}} line",
       "linesBadge": "{{displayCount}} lines",
       "linesBadge_other": "{{displayCount}} lines",
@@ -2333,6 +2349,7 @@
       "copyMessage": "Copy message",
       "copyText": "Copy Text",
       "selectText": "Select text",
+      "forkFromHere": "Fork from here",
       "reportAiResponse": "Report AI response",
       "reportAiResponseConfirm": "Report this response for review?",
       "report": "Report",
@@ -2667,6 +2684,12 @@
       "stepsCount": "{{steps}} steps",
       "stepsCount_other": "{{steps}} steps",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "sessionChanges": {
+      "viewChanges": "View changes",
+      "asOf": "As of {{time}}",
+      "tooLarge": "This diff is too large to show on mobile.",
+      "empty": "No file changes in this session yet."
     },
     "autoApprove": {
       "title": "Auto-approve",
@@ -3153,6 +3176,8 @@
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
     "openSession": "Open",
+    "finished": "Finished",
+    "followFailed": "Couldn't show this agent on the Lock Screen.",
     "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again.",
     "checked": "Checked",
     "lastKnown": "Last known",
@@ -3161,7 +3186,26 @@
     "waitingForYou": "Waiting for you",
     "nextScheduled": "Next scheduled",
     "answerNeeded": "Answer needed",
-    "waitingToRetry": "Waiting to retry"
+    "waitingToRetry": "Waiting to retry",
+    "step": {
+      "editing": "Editing",
+      "reading": "Reading",
+      "running": "Run",
+      "searching": "Web search",
+      "thinking": "Thinking it through"
+    },
+    "planOf": "of",
+    "filesChanged": "files changed",
+    "finishedIn": "Finished in",
+    "noActivityFor": "No activity for",
+    "prOpened": "Pull request opened",
+    "permissionWants": "Wants to run",
+    "failure": {
+      "provider": "Stopped: provider error",
+      "tool": "Stopped: tool error",
+      "cancelled": "Stopped: cancelled",
+      "other": "Stopped"
+    }
   },
   "transcriptionModel": {
     "title": "Transcription model",
@@ -3189,6 +3233,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "This model needs an internet connection. Connect and try again, or switch to a model on this device.",
     "empty": {
       "title": "Start a chat",
       "description": "Send a message to talk to a model."
@@ -3196,12 +3241,33 @@
     "list": {
       "loadFailed": "Could not load chat history.",
       "new": "New chat",
-      "openHint": "Opens the chat. Long press to delete.",
       "deleteTitle": "Delete this chat?"
     },
+    "rename": {
+      "title": "Rename chat",
+      "accessibility": "Rename chat: {{title}}",
+      "openHint": "Opens the chat. Long press to rename or delete."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Chat details",
+      "backend": "Backend",
+      "effortDefault": "Model default",
+      "noCost": "No cost",
+      "costUnknown": "Not known",
+      "costEstimatedNote": "Answers that did not report a price are estimated from list prices.",
+      "costUnknownNote": "No price is known for this model.",
+      "costPartialNote": "This total does not include models that have no known price.",
+      "localNote": "On-device models run on this device. They have no cost and no prompt cache, and their token counts can be estimates.",
+      "countedSinceNote": "This chat started before usage was recorded. The totals show only the answers after that.",
+      "remoteServersOn": "Remote MCP servers on"
+    },
     "backends": {
       "title": "Chat backends",
+      "providersTitle": "Chat providers",
+      "cloud": "In the cloud",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo models aren't available right now. Check your connection.",
       "manage": "Manage backends",
       "defaultKilo": "$t(consent.kilo) (default)",
       "kiloHelp": "The built-in backend uses your Kilo account and cannot be edited or deleted.",
@@ -3261,7 +3327,6 @@
     "gguf": {
       "title": "Downloadable models",
       "help": "Download an open model and run it on this phone with llama.cpp. Your prompts and replies stay on the device. Models are large, so use Wi-Fi.",
-      "details": "{{size}} · License: {{license}}",
       "download": "Download model",
       "pause": "Pause download",
       "resume": "Resume download",
@@ -3273,6 +3338,8 @@
       "url": "Direct download link",
       "urlHelp": "Paste an HTTPS link to a .gguf file, such as a Hugging Face resolve link. Only download models from sources you trust.",
       "downloadUrl": "Download from link",
+      "advanced": "Advanced",
+      "localPurpose": "Runs on this device with llama.cpp. Prompts and replies stay on the device.",
       "deleteTitle": "Delete this model?",
       "deleteMessage": "Delete {{name}} from this device? Chats that use it need another model before they can continue.",
       "errors": {
@@ -3282,12 +3349,62 @@
         "notGguf": "The link must point to a .gguf file.",
         "space": "There isn't enough free storage for this model. Free up space and try again.",
         "network": "The download didn't finish. Check your connection and try again.",
-        "invalidFile": "The downloaded file isn't a model this app can run, so it was removed."
+        "invalidFile": "The downloaded file isn't a model this app can run, so it was removed.",
+        "checksum": "The downloaded file doesn't match its published checksum, so it was removed. Try the download again."
       }
+    },
+    "catalog": {
+      "browse": "Browse models",
+      "title": "Model catalog",
+      "search": "Search Hugging Face models",
+      "tabs": "Model filter",
+      "fitsTab": "Fits this device",
+      "fromHuggingFace": "From Hugging Face",
+      "loading": "Loading models",
+      "noResults": "No models found",
+      "noFits": "No models fit this device",
+      "noFitsDescription": "Larger models are on the $t(common.all) tab.",
+      "fit": {
+        "fits": "Fits",
+        "tight": "Tight fit",
+        "tooLarge": "Too large",
+        "noStorage": "Not enough storage",
+        "unknown": "Fit unknown"
+      },
+      "recommendationsHelp": "A shortlist this app pins: one file per model, from a publisher that states a license. Nothing else is ranked.",
+      "compatibilityHelp": "Fit compares the model file with this device's memory and free storage. The memory figure is an estimate, not a measurement.",
+      "text": "Text",
+      "listTextPurpose": "Text prompts only.",
+      "listImagePurpose": "Reads images as well as text.",
+      "smallestDownload": "Smallest download: {{size}} · about {{memory}} of memory",
+      "fullFileName": "File: {{name}}",
+      "memoryEstimateNote": "Memory figures are estimates, not measurements.",
+      "parameters": "Parameters: {{value}}",
+      "downloads": "Downloads: {{value}}",
+      "likes": "Likes: {{value}}",
+      "context": "Context window: {{value}}",
+      "license": "License: {{license}}",
+      "licenseUnknown": "The license isn't stated",
+      "tools": "Tool calling",
+      "vision": "Image input",
+      "hintsHelp": "Hints from Hugging Face. The app checks the model after it downloads.",
+      "gated": "This model requires a Hugging Face account, so the app can't download it.",
+      "quantizations": "Quantizations",
+      "quantizationsHelp": "Smaller files use less memory and storage. Larger files usually give better answers.",
+      "quantDetail": "{{size}} download · about {{memory}} of memory",
+      "downloadQuant": "Download {{quant}}",
+      "loadingModel": "Loading model details",
+      "couldNotLoadModel": "Couldn't load this model",
+      "noFiles": "No files this app can run",
+      "noFilesDescription": "This app runs models that are one GGUF file.",
+      "tooLargeTitle": "This model may not run",
+      "tooLargeMessage": "{{name}} likely needs more memory than this device has. The app can close while the model answers. Download it anyway?",
+      "downloadAnyway": "Download anyway"
     },
     "localModels": {
       "title": "On-device models",
-      "help": "On-device models run on this phone. Your prompts and replies stay on the device, and these models can't use tools.",
+      "help": "On-device models run on this phone. Your prompts and replies stay on the device.",
+      "systemPurpose": "The model built into this device's system. It runs on the device.",
       "apple": "Apple Intelligence (on device)",
       "checking": "Checking availability…",
       "ready": "Ready to use",
@@ -3314,6 +3431,11 @@
       "downloadProgress": "Downloading… {{percent}}%",
       "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again."
     },
+    "webSearch": {
+      "title": "Search the web",
+      "description": "Let this chat look up current information through your Kilo account. Searches use your monthly search allowance.",
+      "allowanceExhausted": "Your free web searches for this month are used up. Add credits to search again."
+    },
     "mcp": {
       "title": "Kilo tools",
       "use": "Use Kilo tools",
@@ -3336,7 +3458,6 @@
       "fieldName": "Display name",
       "fieldUrl": "Server URL",
       "fieldUrlInvalid": "Enter a valid server URL.",
-      "fieldToken": "Bearer token (optional)",
       "enableServer": "Enable this server: {{name}}",
       "editServer": "Edit server",
       "deleteServer": "Delete server",
@@ -3356,6 +3477,21 @@
       "serverToolCount": "{{count}} tools",
       "serverUnreachable": "Couldn't reach this server",
       "serverOff": "This server is off"
+    },
+    "reasoningEffort": {
+      "modelFlag": "This model supports thinking effort"
+    },
+    "mcpOAuth": {
+      "authMethod": "Authentication",
+      "authNone": "No sign-in",
+      "authBearer": "Bearer token",
+      "authOAuth": "OAuth sign-in",
+      "fieldToken": "Token",
+      "oauthHint": "After you save, tap $t(modelChat.mcpOAuth.signIn) on the server to sign in with your browser.",
+      "serverNeedsSignIn": "Sign in to use this server",
+      "signIn": "Sign in",
+      "signInA11y": "Sign in to this server: {{name}}",
+      "signInFailed": "Couldn't sign in to {{name}}. Try again."
     }
   },
   "settingsTools": {
@@ -3578,5 +3714,92 @@
     "noMatchingProductsPlay": "No matching credit packs were returned by Google Play.",
     "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
     "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."
+  },
+  "todos": {
+    "saveAsTodo": "Save as to-do",
+    "segment": {
+      "label": "Agents view",
+      "sessions": "Sessions",
+      "todos": "To-dos"
+    },
+    "lists": {
+      "newList": "New list",
+      "empty": "No lists yet",
+      "couldNotLoad": "Couldn’t load lists",
+      "noRepository": "No repository",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} open",
+      "openCount_other": "{{count}} open",
+      "archived_one": "Archived ({{count}})",
+      "archived_other": "Archived ({{count}})",
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "deleteTitle": "Delete {{name}}?",
+      "deleteMessage": "Its to-dos are deleted too. Their sessions stay."
+    },
+    "listSettings": {
+      "title": "List settings",
+      "name": "Name",
+      "namePlaceholder": "Bugs, Ideas, Release…",
+      "emoji": "Emoji",
+      "mode": "Mode",
+      "defaultsHint": "Sessions started from this list use these defaults."
+    },
+    "list": {
+      "addPlaceholder": "Add a to-do",
+      "add": "Add to-do",
+      "empty": "No to-dos yet",
+      "setDefaults": "Set repository, mode and model",
+      "completed_one": "Completed ({{count}})",
+      "completed_other": "Completed ({{count}})"
+    },
+    "item": {
+      "markDone": "Mark done",
+      "markOpen": "Mark not done",
+      "markDonePrompt": "Mark done?",
+      "deleted": "To-do deleted",
+      "undo": "Undo",
+      "runCount_one": "{{count}} run",
+      "runCount_other": "{{count}} runs",
+      "startNow": "Start without review",
+      "startNowHint": "Long-press to start without review",
+      "titleLabel": "To-do title",
+      "renameTitle": "Rename task",
+      "notes": "Notes",
+      "addNotes": "Add notes",
+      "notesPrompt": "Add context, requirements, or acceptance criteria.",
+      "markdownSupported": "Markdown supported",
+      "sessions": "Sessions linked",
+      "noSessions": "No sessions yet",
+      "untitledLinkedSession": "Linked session",
+      "sessionNeedsInput": "Session needs input",
+      "sessionRunning": "Session running",
+      "sessionFinished": "Session finished",
+      "sessionPullRequest": "Session pull request",
+      "sessionPullRequestNumber": "Session PR #{{number}}",
+      "openSessionHint": "Opens the session.",
+      "unlinkSessionAction": "Unlink session",
+      "unlinkConfirmTitle": "Unlink {{title}}?",
+      "unlinkConfirmMessage": "The session itself is not deleted. Only its link to this to-do is removed.",
+      "startNewSession": "Start new session",
+      "startNewSessionHint": "Long-press to start a new session.",
+      "linkSession": "Link session",
+      "linkFailed": "Couldn’t link the session to the to-do"
+    },
+    "linkSession": {
+      "title": "Link a session",
+      "empty": "No recent sessions",
+      "emptyInRepository": "No recent sessions in {{repository}}"
+    },
+    "upNext": "Up next",
+    "sessionTodo": "To-do: {{title}}",
+    "linkToTodo": "Link to to-do",
+    "candidates": {
+      "empty": "No open to-dos"
+    },
+    "saveSheet": {
+      "title": "Save to list",
+      "saved": "Saved to {{list}}"
+    }
   }
 }

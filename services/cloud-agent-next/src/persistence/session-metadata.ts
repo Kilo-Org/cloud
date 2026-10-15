@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
@@ -272,7 +273,8 @@ function sandboxIdentityMatchesAllocation(
   if (workspace.sandboxKind !== undefined) {
     return shared
       ? workspace.sandboxKind === 'shared'
-      : allocation !== 'isolated-standard' && workspace.sandboxKind === 'isolated';
+      : workspace.sandboxKind ===
+          (allocation === 'isolated-standard' ? 'isolated-standard' : 'isolated');
   }
   return shared
     ? isGeneratedSharedSandboxId(sandboxId) && workspace.sandboxRoute !== undefined
@@ -289,8 +291,8 @@ function isIsolatedProviderWorkspace(workspace: {
     : workspace.sandboxId?.startsWith('ses-') === true;
 }
 
-const MetadataWorkspaceSchema = z
-  .object({
+const MetadataWorkspaceSchema = egressPolicySchema
+  .safeExtend({
     sandboxId: SandboxIdSchema.optional(),
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
     sandboxKind: sandboxKindSchema.optional(),
@@ -365,6 +367,14 @@ const MetadataWorkspaceSchema = z
     }
   })
   .refine(
+    workspace =>
+      workspace.egressMode !== 'allowlist' ||
+      (workspace.sandboxProvider === 'cloudflare-containers' &&
+        isIsolatedProviderWorkspace(workspace) &&
+        workspace.sandboxRoute === undefined),
+    'allowlist egress requires an isolated Cloudflare containers sandbox'
+  )
+  .refine(
     workspace => workspace.sandboxProvider !== 'vercel' || isIsolatedProviderWorkspace(workspace),
     'Vercel sandbox metadata requires an isolated sandbox'
   )
@@ -409,6 +419,8 @@ const MetadataLifecycleSchema = z
 const MetadataCloneSchema = z
   .object({
     cloneFromKiloSessionId: kiloSessionIdSchema,
+    // Inclusive cut ("Fork from here"); absent for a full-session clone.
+    cloneUpToMessageId: MessageIdSchema.optional(),
     reportingCreatedAt: z.string().datetime({ offset: true }).optional(),
   })
   .strip();
@@ -437,12 +449,8 @@ export const CurrentSessionMetadataSchema = z
     'Sandbox provider metadata cannot contain a devcontainer runtime'
   )
   .refine(
-    metadata =>
-      metadata.workspace?.sandboxAllocation === undefined ||
-      (!metadata.devcontainer &&
-        metadata.identity.billingOrigin !== 'code-review' &&
-        metadata.identity.createdOnPlatform !== 'code-review'),
-    'Sandbox allocations cannot be combined with specialized routing'
+    metadata => metadata.workspace?.sandboxAllocation === undefined || !metadata.devcontainer,
+    'Sandbox allocations cannot be combined with a devcontainer runtime'
   )
   .refine(
     metadata =>

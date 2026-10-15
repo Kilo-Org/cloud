@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SandboxStatusSnapshotSchema } from '../../shared/sandbox-status.js';
+import type { SandboxProviderConfiguration } from '../../sandbox-control/provider.js';
 import { initialAllocationState, type AllocationState } from './allocation.js';
 import { projectAllocationStatusSnapshot } from './status-snapshot.js';
 
@@ -23,18 +24,21 @@ describe('projectAllocationStatusSnapshot', () => {
   it.each([
     ['standard-3', 'containers-standard-3'],
     ['standard-4', 'containers-standard-4'],
-    [undefined, 'containers-standard-4'],
+    [undefined, 'containers-standard-3'],
+    [null, 'containers-standard-3'],
     ['PRIVATE_SENTINEL', null],
   ] as const)(
-    'reports bounded Containers runtime metadata for instance %s',
+    'reports bounded Containers runtime metadata from the persisted instance %s',
     (instance, sandboxType) => {
       const snapshot = projectAllocationStatusSnapshot({
         allocation: {
           ...allocation({ kind: 'connected' }),
           provider: 'cloudflare-containers',
-          configuration: null,
+          configuration:
+            instance === null
+              ? null
+              : ({ provider: 'cloudflare-containers', instance } as SandboxProviderConfiguration),
         },
-        containersInstance: instance,
         observedAt: OBSERVED_AT,
         inactivityTimeoutMs: IDLE_MS,
       });
@@ -62,7 +66,6 @@ describe('projectAllocationStatusSnapshot', () => {
           provider === null
             ? null
             : { ...allocation({ kind: 'connected' }), provider, configuration: null },
-        containersInstance: 'standard-3',
         observedAt: OBSERVED_AT,
         inactivityTimeoutMs: IDLE_MS,
       });

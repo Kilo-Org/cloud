@@ -2,7 +2,9 @@ import {
   CLOUD_AGENT_ASSISTANT_FAILURE_REASONS,
   CLOUD_AGENT_FAILURE_CODES,
   CLOUD_AGENT_PROVIDER_OWNERSHIPS,
+  CloudAgentCallbackFailureSchema,
   CloudAgentSafeFailureSchema,
+  classifyCloudAgentFailure,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { describe, expect, it } from 'vitest';
 import { assistantErrorDetail } from '../shared/assistant-failure.js';
@@ -93,12 +95,14 @@ describe('projectSafeAssistantError', () => {
       for (const prefix of ['', '[BYOK] ']) {
         const safeError = projectSafeAssistantError(`${prefix}${message}`);
 
-        expect(safeError).toBe(`${prefix}${message}`);
+        expect(safeError).toBe(
+          `${prefix}${assistantFailureMessage(reason, prefix ? 'byok' : undefined)}`
+        );
         expect(projectSafeAssistantError(safeError)).toBe(safeError);
         for (const providerOwnership of CLOUD_AGENT_PROVIDER_OWNERSHIPS) {
           expect(classifyAssistantFailure(safeError, providerOwnership)).toMatchObject({
             reason,
-            safeMessage: message,
+            safeMessage: assistantFailureMessage(reason, prefix ? 'byok' : providerOwnership),
             providerOwnership: prefix ? 'byok' : providerOwnership,
           });
         }
@@ -451,6 +455,208 @@ describe('classifyAssistantFailureMessage', () => {
 });
 
 describe('classifyAssistantFailure', () => {
+  it.each([
+    [
+      400,
+      'invalid_request',
+      'Your provider rejected the request. Check your provider account and settings.',
+      '[BYOK] Provider rejected the request: token=poison-token',
+      'user',
+    ],
+    [
+      402,
+      'insufficient_credits',
+      'Assistant request failed: insufficient credits',
+      '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.',
+      'user',
+    ],
+    [
+      403,
+      'provider_authentication',
+      'Assistant request was not authorized',
+      '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.',
+      'user',
+    ],
+    [
+      408,
+      'timeout',
+      'Assistant request timed out',
+      '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+      'provider',
+    ],
+  ] as const)(
+    'carries BYOK APIError %s through safe projection, callback facts and responsibility',
+    (statusCode, reason, safeMessage, gatewayMessage, responsibility) => {
+      for (const sdkMessage of [gatewayMessage, 'Opaque SDK failure: poison-sdk-message']) {
+        const error = {
+          name: 'APIError',
+          data: {
+            statusCode,
+            message: sdkMessage,
+            responseBody: JSON.stringify({
+              error: gatewayMessage,
+              error_type: 'byok_error',
+              message: gatewayMessage,
+            }),
+          },
+        };
+        const failure = classifyAssistantFailure(error, 'managed');
+        expect(failure).toMatchObject({ reason, providerOwnership: 'byok', safeMessage });
+        expect(projectSafeAssistantError(error)).toBe(`[BYOK] ${safeMessage}`);
+        expect(projectSafeAssistantError(error)).not.toContain(
+          gatewayMessage.slice('[BYOK] '.length)
+        );
+        expect(classifyAssistantFailure(projectSafeAssistantError(error), 'managed')).toEqual(
+          failure
+        );
+
+        const callbackFailure = projectSafeFailure({
+          failureStage: 'agent_activity',
+          failureCode: failure.terminalCode ?? 'assistant_error',
+          assistantFailureReason: failure.reason,
+          providerOwnership: failure.providerOwnership,
+          safeFailureMessage: failure.safeMessage,
+        });
+        expect(CloudAgentCallbackFailureSchema.parse(callbackFailure)).toEqual(callbackFailure);
+        expect(callbackFailure).toMatchObject({
+          assistantReason: reason,
+          providerOwnership: 'byok',
+          message: safeMessage,
+        });
+        expect(
+          classifyCloudAgentFailure({
+            source: 'run',
+            stage: 'agent_activity',
+            code: failure.terminalCode ?? 'assistant_error',
+            assistantReason: failure.reason,
+            providerOwnership: failure.providerOwnership,
+          })
+        ).toMatchObject({ responsibility });
+        expect(JSON.stringify(callbackFailure)).not.toContain('poison');
+        expect(JSON.stringify(callbackFailure)).not.toContain(
+          gatewayMessage.slice('[BYOK] '.length)
+        );
+      }
+    }
+  );
+
+  it('preserves legacy marker-only BYOK ownership without a structured gateway tag', () => {
+    const failure = classifyAssistantFailure(
+      {
+        name: 'APIError',
+        data: { statusCode: 400, message: '[BYOK] Provider rejected the request: poison-message' },
+      },
+      'managed'
+    );
+
+    expect(failure).toEqual({
+      reason: 'invalid_request',
+      providerOwnership: 'byok',
+      safeMessage: 'Your provider rejected the request. Check your provider account and settings.',
+    });
+  });
+
+  it.each([
+    ['[BYOK] Assistant request was invalid', 'invalid_request'],
+    ['[BYOK] Assistant service is unavailable', 'provider_unavailable'],
+  ] as const)(
+    'uses status over nonspecific BYOK wording only with the gateway tag: %s',
+    (message, legacyReason) => {
+      expect(
+        classifyAssistantFailure({
+          name: 'APIError',
+          data: { statusCode: 408, message },
+        })
+      ).toMatchObject({ reason: legacyReason, providerOwnership: 'byok' });
+      expect(
+        classifyAssistantFailure({
+          name: 'APIError',
+          data: { statusCode: 408, message, responseBody: '{"error_type":"byok_error"}' },
+        })
+      ).toEqual({
+        reason: 'timeout',
+        providerOwnership: 'byok',
+        safeMessage: 'Assistant request timed out',
+      });
+    }
+  );
+
+  it.each(['managed', 'unknown'] as const)(
+    'keeps %s invalid requests generic without a BYOK marker or tag',
+    providerOwnership => {
+      expect(
+        classifyAssistantFailure({ name: 'APIError', data: { statusCode: 400 } }, providerOwnership)
+      ).toEqual({
+        reason: 'invalid_request',
+        safeMessage: 'Assistant request was invalid',
+        providerOwnership,
+      });
+    }
+  );
+
+  it.each([
+    'not json',
+    'null',
+    '[]',
+    '{"error_type":42}',
+    '{"error_type":"constructor"}',
+    '{"error_type":"BYOK_ERROR"}',
+    '{"metadata":{"error_type":"byok_error"}}',
+    JSON.stringify({ error_type: 'byok_error', message: 'x'.repeat(4096) }),
+  ])(
+    'does not infer BYOK ownership from an unusable or unrecognized gateway body: %s',
+    responseBody => {
+      expect(
+        classifyAssistantFailure(
+          {
+            name: 'APIError',
+            data: { statusCode: 400, responseBody },
+          },
+          'managed'
+        )
+      ).toEqual({
+        reason: 'invalid_request',
+        providerOwnership: 'managed',
+        safeMessage: 'Assistant request was invalid',
+      });
+    }
+  );
+
+  it.each([400, 408])('keeps a specific assistant cause ahead of BYOK status %s', statusCode => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          statusCode,
+          message: 'The prompt is too long',
+          responseBody: '{"error_type":"byok_error"}',
+        },
+      })
+    ).toEqual({
+      reason: 'context_limit',
+      providerOwnership: 'byok',
+      safeMessage: 'The model context limit was exceeded',
+    });
+  });
+
+  it('keeps an SDK error name ahead of a generic BYOK timeout response', () => {
+    expect(
+      classifyAssistantFailure({
+        name: 'ContextOverflowError',
+        data: {
+          statusCode: 408,
+          message:
+            '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+          responseBody: '{"error_type":"byok_error"}',
+        },
+      })
+    ).toEqual({
+      reason: 'context_limit',
+      providerOwnership: 'byok',
+      safeMessage: 'The model context limit was exceeded',
+    });
+  });
+
   it.each([
     ['ContextOverflowError', 'context_limit', 'The model context limit was exceeded'],
     ['MessageOutputLengthError', 'output_limit', 'The model output limit was reached'],

@@ -133,10 +133,14 @@
     "status": "Stato",
     "truncated": "Troncato",
     "updated": "Aggiornato",
+    "generating": "Generazione…",
     "working": "In corso",
     "yourOwnRepositories": "I tuoi repository",
     "dismissed": "Ignorato",
-    "agent": "Agente"
+    "agent": "Agente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Modifiche"
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -262,7 +266,8 @@
       "kiloclaw": "Attività di KiloClaw",
       "balance": "Avvisi sul saldo",
       "security": "Problemi di sicurezza",
-      "spend": "Avvisi di spesa"
+      "spend": "Avvisi di spesa",
+      "followedSessions": "Sessioni seguite"
     },
     "category": {
       "chatMessagesSubtitle": "risposte nelle tue conversazioni",
@@ -617,7 +622,7 @@
     "redeployTitle": "Ridistribuire l'istanza?",
     "accessRequired": {
       "iosBody": "L'accesso a KiloClaw per questo account è gestito al di fuori dell'app iOS.",
-      "iosContact": "Hai domande? Scrivi a hi@kilo.ai.",
+      "iosContact": "Hai domande? Scrivi a {{supportEmail}}.",
       "iosTitle": "KiloClaw non disponibile su iOS",
       "multipleCurrentConflictBody": "Abbiamo trovato più di un abbonamento attivo sul tuo account, quindi abbiamo sospeso tutto per evitare doppi addebiti.",
       "multipleCurrentConflictCta": "Continua su kilo.ai",
@@ -751,7 +756,7 @@
         "queryErrorBody": "La connessione si è interrotta durante la verifica della configurazione di {{name}}. La configurazione potrebbe essere ancora in corso. Riprova o ricontrolla tra poco.",
         "queryErrorTitle": "Verifica della configurazione non riuscita",
         "settingUp": "Configurazione di {{name}}",
-        "stalledBody": "Non siamo riusciti a completare la configurazione di {{name}}. Riprova oppure scrivi a hi@kilo.ai se il problema persiste.",
+        "stalledBody": "Non siamo riusciti a completare la configurazione di {{name}}. Riprova oppure scrivi a {{supportEmail}} se il problema persiste.",
         "stalledTitle": "Qualcosa si è bloccato",
         "startingSandbox": "Avvio della sandbox",
         "stoppedBody": "L'istanza di {{name}} si è arrestata in modo imprevisto durante la configurazione.",
@@ -1008,7 +1013,7 @@
         "recoveryLabel": "Aggiorna l'app GitHub"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer è stato disattivato perché l'elenco degli indirizzi IP consentiti di questa organizzazione GitHub blocca Kilo. Contatta hi@kilocode.ai per assistenza, poi riattiva Code Reviewer."
+        "description": "Code Reviewer è stato disattivato perché l'elenco degli indirizzi IP consentiti di questa organizzazione GitHub blocca Kilo. Contatta {{supportEmail}} per assistenza, poi riattiva Code Reviewer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer è stato disattivato perché Kilo non può creare un token di accesso per questo progetto GitLab. Concedi il ruolo Maintainer o attiva i token di accesso al progetto, poi riattiva Code Reviewer.",
@@ -1023,7 +1028,7 @@
         "recoveryLabel": "Aggiorna le impostazioni di Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer è stato disattivato perché oggi la clonazione del repository ha superato il tempo limite tre volte. Contatta hi@kilocode.ai per assistenza, poi riattiva Code Reviewer."
+        "description": "Code Reviewer è stato disattivato perché oggi la clonazione del repository ha superato il tempo limite tre volte. Contatta {{supportEmail}} per assistenza, poi riattiva Code Reviewer."
       },
       "title": "Il revisore di codice richiede un intervento.",
       "recoveryLabel": "Contatta l'assistenza"
@@ -1556,6 +1561,8 @@
       "title": "Sessione",
       "copyErrorDetails": "Copia i dettagli dell'errore",
       "backToSessions": "Torna alle sessioni",
+      "follow": "Segui nella schermata di blocco",
+      "unfollow": "Smetti di seguire nella schermata di blocco",
       "couldNotLoad": "Impossibile caricare la sessione.",
       "failedToLoadDetails": "Impossibile caricare i dettagli della sessione.",
       "failedToStopExecution": "Impossibile interrompere l'esecuzione.",
@@ -1622,6 +1629,11 @@
       "collapse": "Comprimi obiettivo",
       "expand": "Espandi obiettivo"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Attività, {{completed}} di {{total}} completate",
+      "rowAccessibility": "Attività, {{completed}} di {{total}} completate. Attività corrente: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Usati di recente",
       "couldNotLoadGithubRepositories": "Impossibile caricare i repository GitHub.",
@@ -1654,7 +1666,6 @@
       "retryLoadingEnvironment": "Riprova a caricare l'ambiente",
       "defaultEnvironment": "Ambiente predefinito",
       "environmentSummary": "{{commands}} comandi · {{mcp}} MCP · {{skills}} competenze · {{agents}} agenti",
-      "changes": "Modifiche",
       "leaveChanges": "Mantieni modifiche",
       "commitAndPush": "Commit e push",
       "startSession": "Avvia sessione",
@@ -1677,6 +1688,10 @@
       "importingSession": "Importazione in corso…",
       "cliCannotContinue": "Questa CLI non può continuare una sessione. Scegli Cloud Agent o un'altra CLI.",
       "importFailed": "Impossibile importare questa sessione.",
+      "cliCannotFork": "Aggiorna la CLI di Kilo per creare un fork da un messaggio.",
+      "forkCutNotSynced": "Questo messaggio non è ancora stato salvato. Riprova tra un momento.",
+      "forkFilesFromBaseBranch": "I file partono dal branch di base.",
+      "forkFilesUnchangedOnComputer": "I file su questo computer non vengono modificati.",
       "pickProfile": "Scegli un profilo",
       "noProfile": "Nessun profilo",
       "manageProfiles": "Gestisci i profili",
@@ -1722,8 +1737,8 @@
       "toolList": "elenca",
       "toolPatch": "applica patch",
       "toolTask": "attività",
-      "readTodos": "Leggi le attività",
-      "updateTodos": "Aggiorna le attività",
+      "readTodos": "Leggi il piano",
+      "updateTodos": "Aggiorna il piano",
       "linesBadge": "{{displayCount}} righe",
       "filesBadge": "{{displayCount}} file",
       "matchesBadge": "{{displayCount}} corrispondenze",
@@ -1796,6 +1811,7 @@
       "copyMessage": "Copia il messaggio",
       "copyText": "Copia il testo",
       "selectText": "Seleziona il testo",
+      "forkFromHere": "Crea un fork da qui",
       "reportAiResponse": "Segnala la risposta dell'AI",
       "reportAiResponseConfirm": "Vuoi segnalare questa risposta per farla verificare?",
       "report": "Segnala",
@@ -2121,6 +2137,12 @@
       "modelsCount_one": "Modello ({{displayCount}})",
       "modelsCount_other": "Modelli ({{displayCount}})",
       "modelsCount_many": "Modelli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Visualizza modifiche",
+      "asOf": "Aggiornato alle {{time}}",
+      "tooLarge": "Questo confronto è troppo esteso per essere visualizzato su dispositivi mobili.",
+      "empty": "Ancora nessuna modifica ai file in questa sessione."
     },
     "autoApprove": {
       "title": "Approvazione automatica",
@@ -2662,6 +2684,7 @@
     "fileRows": {
       "collapseFile": "Comprimi il file",
       "diffTooLarge": "Il confronto è troppo esteso per essere visualizzato.",
+      "noPreview": "Nessuna anteprima disponibile per questo file",
       "expandFile": "Espandi il file",
       "markViewed": "Segna {{path}} come visualizzato",
       "openDiffOnGitHub": "Apri il confronto delle modifiche a questo file su GitHub",
@@ -3194,6 +3217,8 @@
     "channelName": "Agenti attivi",
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco.",
     "openSession": "Apri",
+    "finished": "Completato",
+    "followFailed": "Impossibile mostrare questo agente nella schermata di blocco.",
     "approveFailed": "Impossibile approvare. Tocca $t(common.approve) per riprovare.",
     "checked": "Verificato",
     "lastKnown": "Ultimo stato noto",
@@ -3202,7 +3227,26 @@
     "waitingForYou": "In attesa di te",
     "nextScheduled": "Prossime pianificate",
     "answerNeeded": "In attesa di risposta",
-    "waitingToRetry": "In attesa di riprovare"
+    "waitingToRetry": "In attesa di riprovare",
+    "step": {
+      "editing": "Modifica",
+      "reading": "Lettura",
+      "running": "Esecuzione",
+      "searching": "Ricerca web",
+      "thinking": "Riflessione"
+    },
+    "planOf": "di",
+    "filesChanged": "file modificati",
+    "finishedIn": "Terminato in",
+    "noActivityFor": "Nessuna attività da",
+    "prOpened": "Pull request aperta",
+    "permissionWants": "Vuole eseguire",
+    "failure": {
+      "provider": "Interrotto: errore provider",
+      "tool": "Interrotto: errore strumento",
+      "cancelled": "Interrotto: annullato",
+      "other": "ARRESTATO"
+    }
   },
   "transcriptionModel": {
     "title": "Modello di trascrizione",
@@ -3230,6 +3274,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Questo modello richiede una connessione a Internet. Connettiti e riprova, oppure passa a un modello su questo dispositivo.",
     "empty": {
       "title": "Avvia una chat",
       "description": "Invia un messaggio per parlare con un modello."
@@ -3237,10 +3282,32 @@
     "list": {
       "loadFailed": "Impossibile caricare la cronologia della chat.",
       "new": "Nuova chat",
-      "openHint": "Apre la chat. Tieni premuto per eliminare.",
       "deleteTitle": "Eliminare questa chat?"
     },
+    "rename": {
+      "title": "Rinomina la chat",
+      "accessibility": "Rinomina la chat: {{title}}",
+      "openHint": "Apre la chat. Tieni premuto per rinominare o eliminare."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Dettagli della chat",
+      "backend": "Servizio",
+      "effortDefault": "Predefinito del modello",
+      "noCost": "Nessun costo",
+      "costUnknown": "Non noto",
+      "costEstimatedNote": "Il costo delle risposte che non hanno indicato un prezzo è stimato in base ai prezzi di listino.",
+      "costUnknownNote": "Nessun prezzo noto per questo modello.",
+      "costPartialNote": "Questo totale non include i modelli senza un prezzo noto.",
+      "localNote": "I modelli sul dispositivo vengono eseguiti su questo dispositivo. Non hanno costi né cache dei prompt e il loro conteggio dei token può essere una stima.",
+      "countedSinceNote": "Questa chat è iniziata prima che l'utilizzo venisse registrato. I totali mostrano solo le risposte successive.",
+      "remoteServersOn": "Server MCP remoti attivi"
+    },
+    "webSearch": {
+      "title": "Cerca sul web",
+      "description": "Consenti a questa chat di cercare informazioni aggiornate tramite il tuo account Kilo. Le ricerche usano la tua quota mensile di ricerche.",
+      "allowanceExhausted": "Le ricerche web gratuite di questo mese sono esaurite. Aggiungi crediti per cercare di nuovo."
+    },
     "mcp": {
       "title": "Strumenti Kilo",
       "use": "Usa gli strumenti Kilo",
@@ -3263,7 +3330,6 @@
       "fieldName": "Nome visualizzato",
       "fieldUrl": "URL del server",
       "fieldUrlInvalid": "Inserisci un URL del server valido.",
-      "fieldToken": "Token Bearer (facoltativo)",
       "enableServer": "Attiva questo server: {{name}}",
       "editServer": "Modifica server",
       "deleteServer": "Elimina server",
@@ -3284,8 +3350,24 @@
       "serverUnreachable": "Impossibile raggiungere questo server",
       "serverOff": "Questo server è disattivato"
     },
+    "mcpOAuth": {
+      "authMethod": "Autenticazione",
+      "authNone": "Nessun accesso",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Accesso OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Dopo il salvataggio, tocca $t(modelChat.mcpOAuth.signIn) sul server per accedere con il browser.",
+      "serverNeedsSignIn": "Accedi per usare questo server",
+      "signIn": "Accedi",
+      "signInA11y": "Accedi a questo server: {{name}}",
+      "signInFailed": "Impossibile accedere a {{name}}. Riprova."
+    },
     "backends": {
       "title": "Servizi di chat",
+      "providersTitle": "Provider di chat",
+      "cloud": "Nel cloud",
+      "cloudModel": "Modello: {{model}}",
+      "cloudUnavailable": "I modelli Kilo non sono disponibili al momento. Controlla la connessione.",
       "manage": "Gestisci i servizi",
       "defaultKilo": "$t(consent.kilo) (predefinito)",
       "kiloHelp": "Il servizio integrato usa il tuo account Kilo e non può essere modificato né eliminato.",
@@ -3345,7 +3427,6 @@
     "gguf": {
       "title": "Modelli scaricabili",
       "help": "Scarica un modello aperto e eseguilo su questo telefono con llama.cpp. I tuoi prompt e le risposte restano sul dispositivo. I modelli sono di grandi dimensioni, quindi usa il Wi-Fi.",
-      "details": "{{size}} · Licenza: {{license}}",
       "download": "Scarica modello",
       "pause": "Metti in pausa il download",
       "resume": "Riprendi il download",
@@ -3357,6 +3438,8 @@
       "url": "Link di download diretto",
       "urlHelp": "Incolla un link HTTPS a un file .gguf, ad esempio un link resolve di Hugging Face. Scarica i modelli solo da fonti affidabili.",
       "downloadUrl": "Scarica dal link",
+      "advanced": "Avanzate",
+      "localPurpose": "Funziona su questo dispositivo con llama.cpp. I prompt e le risposte restano sul dispositivo.",
       "deleteTitle": "Eliminare questo modello?",
       "deleteMessage": "Eliminare {{name}} da questo dispositivo? Le chat che lo usano necessitano di un altro modello prima di poter continuare.",
       "errors": {
@@ -3366,12 +3449,62 @@
         "notGguf": "Il link deve puntare a un file .gguf.",
         "space": "Non c'è abbastanza spazio di archiviazione libero per questo modello. Libera spazio e riprova.",
         "network": "Il download non è terminato. Controlla la connessione e riprova.",
-        "invalidFile": "Il file scaricato non è un modello che questa app può eseguire, quindi è stato rimosso."
+        "invalidFile": "Il file scaricato non è un modello che questa app può eseguire, quindi è stato rimosso.",
+        "checksum": "Il file scaricato non corrisponde al checksum pubblicato, quindi è stato rimosso. Riprova a scaricarlo."
       }
+    },
+    "catalog": {
+      "browse": "Sfoglia modelli",
+      "title": "Catalogo modelli",
+      "search": "Cerca modelli su Hugging Face",
+      "tabs": "Filtro modelli",
+      "fitsTab": "Adatti a questo dispositivo",
+      "fromHuggingFace": "Da Hugging Face",
+      "loading": "Caricamento modelli",
+      "noResults": "Nessun modello trovato",
+      "noFits": "Nessun modello adatto a questo dispositivo",
+      "noFitsDescription": "I modelli più grandi sono nella scheda $t(common.all).",
+      "fit": {
+        "fits": "Adatto",
+        "tight": "Al limite",
+        "tooLarge": "Troppo grande",
+        "noStorage": "Spazio insufficiente",
+        "unknown": "Compatibilità sconosciuta"
+      },
+      "recommendationsHelp": "Una selezione fissata da questa app: un file per modello, da un editore che dichiara una licenza. Nient'altro è classificato.",
+      "compatibilityHelp": "La compatibilità confronta il file del modello con la memoria e lo spazio libero di questo dispositivo. Il valore di memoria è una stima, non una misurazione.",
+      "text": "Testo",
+      "listTextPurpose": "Solo prompt di testo.",
+      "listImagePurpose": "Legge immagini oltre al testo.",
+      "smallestDownload": "Download più piccolo: {{size}} · circa {{memory}} di memoria",
+      "fullFileName": "File: {{name}}",
+      "memoryEstimateNote": "I valori di memoria sono stime, non misurazioni.",
+      "parameters": "Parametri: {{value}}",
+      "downloads": "Download: {{value}}",
+      "likes": "Mi piace: {{value}}",
+      "context": "Finestra di contesto: {{value}}",
+      "license": "Licenza: {{license}}",
+      "licenseUnknown": "La licenza non è indicata",
+      "tools": "Chiamata di strumenti",
+      "vision": "Input di immagini",
+      "hintsHelp": "Indicazioni da Hugging Face. L'app verifica il modello dopo il download.",
+      "gated": "Questo modello richiede un account Hugging Face, quindi l'app non può scaricarlo.",
+      "quantizations": "Quantizzazioni",
+      "quantizationsHelp": "I file più piccoli usano meno memoria e spazio. I file più grandi di solito danno risposte migliori.",
+      "quantDetail": "Download di {{size}} · circa {{memory}} di memoria",
+      "downloadQuant": "Scarica {{quant}}",
+      "loadingModel": "Caricamento dettagli del modello",
+      "couldNotLoadModel": "Impossibile caricare questo modello",
+      "noFiles": "Nessun file eseguibile da questa app",
+      "noFilesDescription": "Questa app esegue modelli costituiti da un unico file GGUF.",
+      "tooLargeTitle": "Questo modello potrebbe non funzionare",
+      "tooLargeMessage": "{{name}} probabilmente richiede più memoria di quella disponibile su questo dispositivo. L'app potrebbe chiudersi mentre il modello risponde. Scaricarlo comunque?",
+      "downloadAnyway": "Scarica comunque"
     },
     "localModels": {
       "title": "Modelli sul dispositivo",
-      "help": "I modelli sul dispositivo vengono eseguiti su questo telefono. I tuoi prompt e le risposte restano sul dispositivo e questi modelli non possono usare strumenti.",
+      "help": "I modelli sul dispositivo vengono eseguiti su questo telefono. I tuoi prompt e le risposte restano sul dispositivo.",
+      "systemPurpose": "Il modello integrato nel sistema di questo dispositivo. Viene eseguito sul dispositivo.",
       "apple": "Apple Intelligence (sul dispositivo)",
       "checking": "Verifica disponibilità…",
       "ready": "Pronto all'uso",
@@ -3397,6 +3530,9 @@
       "downloading": "Download in corso…",
       "downloadProgress": "Download in corso… {{percent}}%",
       "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Questo modello supporta il livello di ragionamento"
     }
   },
   "settingsTools": {
@@ -3619,5 +3755,96 @@
     "noMatchingProductsPlay": "Google Play non ha restituito pacchetti di crediti corrispondenti.",
     "purchaseOwnedByAnotherAccount": "I crediti associati a questo Apple Account appartengono a un altro account Kilo. Accedi a quell'account Kilo per usarli.",
     "purchaseOwnedByAnotherAccountPlay": "I crediti su questo account Google Play appartengono a un account Kilo diverso. Accedi a quell'account Kilo per usarli."
+  },
+  "todos": {
+    "saveAsTodo": "Salva come attività",
+    "segment": {
+      "label": "Vista agenti",
+      "sessions": "Sessioni",
+      "todos": "Attività"
+    },
+    "lists": {
+      "newList": "Nuovo elenco",
+      "empty": "Ancora nessun elenco",
+      "couldNotLoad": "Impossibile caricare gli elenchi",
+      "noRepository": "Nessun repository",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} aperte",
+      "openCount_many": "{{count}} aperte",
+      "openCount_other": "{{count}} aperte",
+      "archived_one": "Archiviate ({{count}})",
+      "archived_many": "Archiviate ({{count}})",
+      "archived_other": "Archiviate ({{count}})",
+      "archive": "Archivia",
+      "unarchive": "Rimuovi dall'archivio",
+      "deleteTitle": "Eliminare {{name}}?",
+      "deleteMessage": "Anche le sue attività vengono eliminate. Le sessioni restano."
+    },
+    "listSettings": {
+      "title": "Impostazioni elenco",
+      "name": "Nome",
+      "namePlaceholder": "Bug, Idee, Release…",
+      "emoji": "Emoji",
+      "mode": "Modalità",
+      "defaultsHint": "Le sessioni avviate da questo elenco usano questi valori predefiniti."
+    },
+    "list": {
+      "addPlaceholder": "Aggiungi un'attività",
+      "add": "Aggiungi attività",
+      "empty": "Ancora nessuna attività",
+      "setDefaults": "Imposta repository, modalità e modello",
+      "completed_one": "Completate ({{count}})",
+      "completed_many": "Completate ({{count}})",
+      "completed_other": "Completate ({{count}})"
+    },
+    "item": {
+      "markDone": "Segna come fatta",
+      "markOpen": "Segna come non fatta",
+      "markDonePrompt": "Segnare come fatta?",
+      "deleted": "Attività eliminata",
+      "undo": "Annulla eliminazione",
+      "runCount_one": "{{count}} esecuzione",
+      "runCount_many": "{{count}} esecuzioni",
+      "runCount_other": "{{count}} esecuzioni",
+      "startNow": "Avvia senza revisione",
+      "startNowHint": "Tieni premuto per avviare senza revisione",
+      "titleLabel": "Titolo dell'attività",
+      "renameTitle": "Rinomina attività",
+      "notes": "Note",
+      "addNotes": "Aggiungi note",
+      "notesPrompt": "Aggiungi contesto, requisiti o criteri di accettazione.",
+      "markdownSupported": "Markdown supportato",
+      "sessions": "Sessioni collegate",
+      "noSessions": "Ancora nessuna sessione",
+      "untitledLinkedSession": "Sessione collegata",
+      "sessionNeedsInput": "La sessione richiede input",
+      "sessionRunning": "Sessione in corso",
+      "sessionFinished": "Sessione terminata",
+      "sessionPullRequest": "Pull request della sessione",
+      "sessionPullRequestNumber": "PR della sessione #{{number}}",
+      "openSessionHint": "Apre la sessione.",
+      "unlinkSessionAction": "Scollega sessione",
+      "unlinkConfirmTitle": "Scollegare {{title}}?",
+      "unlinkConfirmMessage": "La sessione in sé non viene eliminata. Viene rimosso solo il suo collegamento a questa attività.",
+      "startNewSession": "Avvia nuova sessione",
+      "startNewSessionHint": "Tieni premuto per avviare una nuova sessione.",
+      "linkSession": "Collega sessione",
+      "linkFailed": "Impossibile collegare la sessione all'attività"
+    },
+    "linkSession": {
+      "title": "Collega una sessione",
+      "empty": "Nessuna sessione recente",
+      "emptyInRepository": "Nessuna sessione recente in {{repository}}"
+    },
+    "upNext": "Prossimo",
+    "sessionTodo": "Attività: {{title}}",
+    "linkToTodo": "Collega all'attività",
+    "candidates": {
+      "empty": "Nessuna attività aperta"
+    },
+    "saveSheet": {
+      "title": "Salva nell'elenco",
+      "saved": "Salvato in {{list}}"
+    }
   }
 }

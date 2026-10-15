@@ -14,10 +14,15 @@ vi.mock('./db', async importOriginal => {
     ...actual,
     listReadyCurrentProfilesForEntries: vi.fn(),
     getSummariesForRuns: vi.fn(),
+    getRoutingCaseResultsForEntries: vi.fn(),
   };
 });
 
-import { getSummariesForRuns, listReadyCurrentProfilesForEntries } from './db';
+import {
+  getRoutingCaseResultsForEntries,
+  getSummariesForRuns,
+  listReadyCurrentProfilesForEntries,
+} from './db';
 import { assembleCustomRoutingTable } from './custom-routing-table';
 import { computeEngineIdentity } from './run';
 
@@ -53,6 +58,27 @@ describe('buildCustomRoutingTable', () => {
     switchCostFactor: 3,
     bestAccuracySwitchThreshold: 0.05,
   };
+
+  it('publishes sample-size ranking and confidence settings for sparse custom tables', () => {
+    const routeKey = 'implementation/code_generation';
+    const table = buildCustomRoutingTable({
+      ...base,
+      lowConfidenceThreshold: 0.8,
+      readyEntries: [
+        { entry: { model: 'vendor/small', variant: null }, runId: 'run-small' },
+        { entry: { model: 'vendor/large', variant: null }, runId: 'run-large' },
+      ],
+      summaries: [
+        { ...summary('vendor/small', null, routeKey, 1, 0.001, 'run-small'), cases: 10 },
+        { ...summary('vendor/large', null, routeKey, 1, 0.001, 'run-large'), cases: 100 },
+      ],
+    });
+    expect(table?.lowConfidenceThreshold).toBe(0.8);
+    expect(table?.routes[routeKey]?.map(c => [c.model, c.cases])).toEqual([
+      ['vendor/large', 100],
+      ['vendor/small', 10],
+    ]);
+  });
 
   it('assembles two variants of one model as distinct candidates with variant', () => {
     const readyEntries = [
@@ -134,7 +160,6 @@ describe('buildCustomRoutingTable', () => {
       accuracy: 0.8,
       avgCostUsd: 0.003,
     });
-    // Deterministic version shape unchanged
     expect(table!.version).toMatch(/^registry-[0-9a-f]{8}$/);
     expect(table!.version).toBe(
       computeRegistryRoutingTableVersion(
@@ -142,7 +167,7 @@ describe('buildCustomRoutingTable', () => {
           { runId: 'run-r1', model: 'vendor/a', variant: 'high' },
           { runId: 'run-r2', model: 'vendor/b', variant: 'max' },
         ],
-        base
+        { ...base, summaries: [summaries[0], summaries[2]] }
       )
     );
   });
@@ -203,10 +228,12 @@ describe('assembleCustomRoutingTable', () => {
     minAccuracy: 0.7,
     switchCostFactor: 3,
     bestAccuracySwitchThreshold: 0.05,
+    lowConfidenceThreshold: 0.8,
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getRoutingCaseResultsForEntries).mockResolvedValue([]);
   });
 
   it('returns table null when no ready current profiles', async () => {
@@ -216,6 +243,17 @@ describe('assembleCustomRoutingTable', () => {
     ]);
     expect(result).toEqual({ table: null });
     expect(getSummariesForRuns).not.toHaveBeenCalled();
+  });
+
+  it('allows every effort when expanded pairs exceed the model admission limit', async () => {
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
+    const pairs = Array.from({ length: 12 }, (_, index) => ({
+      model: 'vendor/m',
+      variant: `effort-${index}`,
+    }));
+    await expect(assembleCustomRoutingTable({} as D1Database, config, pairs)).resolves.toEqual({
+      table: null,
+    });
   });
 
   it('loads provenance summaries and assembles with current engine filter', async () => {
@@ -238,6 +276,11 @@ describe('assembleCustomRoutingTable', () => {
       expect.any(Array)
     );
     expect(result.table).not.toBeNull();
+    expect(getRoutingCaseResultsForEntries).toHaveBeenCalledWith(expect.anything(), [
+      { entry: { model: 'vendor/m', variant: 'xhigh' }, runId: 'run-x' },
+      { entry: { model: 'vendor/m', variant: 'max' }, runId: 'run-m' },
+    ]);
+    expect(result.table?.lowConfidenceThreshold).toBe(0.8);
     expect(result.table!.routes['implementation/code_generation']).toHaveLength(2);
   });
 });

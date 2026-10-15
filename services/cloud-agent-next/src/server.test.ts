@@ -10,6 +10,8 @@ import type { Env } from './types.js';
 import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
 import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
 import { mintSandboxLaunchCredential } from './sandbox-control/credential.js';
+import { previewLabel } from './preview/host.js';
+import { PREVIEW_SESSION_MISSING_TEXT } from './preview/container-port-fetch.js';
 import {
   createRuntimeProxyGrant,
   issueRuntimeCredentialProxyHandle,
@@ -674,7 +676,7 @@ describe('server /terminal', () => {
     const request = new Request(
       `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
       {
-        headers: { Upgrade: 'websocket' },
+        headers: { Upgrade: 'websocket', 'x-kilo-preview-port': '5173' },
       }
     );
 
@@ -686,10 +688,13 @@ describe('server /terminal', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(getRunningTerminalClientMock).toHaveBeenCalledOnce();
     expect(connectTerminal).toHaveBeenCalledTimes(1);
-    const connectRequest = connectTerminal.mock.calls[0]?.[1];
+    const connectRequest = connectTerminal.mock.calls[0]?.[1] as Request;
     expect(connectRequest).toBeInstanceOf(Request);
-    expect(new URL((connectRequest as Request).url).pathname).toBe('/terminal');
-    expect(connectTerminal).toHaveBeenCalledWith('pty_123', request);
+    expect(new URL(connectRequest.url).pathname).toBe('/terminal');
+    expect(connectRequest.method).toBe('GET');
+    expect(connectRequest.headers.get('Upgrade')).toBe('websocket');
+    expect(connectRequest.headers.get('x-kilo-preview-port')).toBeNull();
+    expect(connectTerminal.mock.calls[0]?.[0]).toBe('pty_123');
   });
 
   it('rejects removed session access before Durable Object lookup', async () => {
@@ -2794,7 +2799,12 @@ describe('server /internal/widgets/approval-key', () => {
   it('binds the oldest pending permission of an owned control-plane session', async () => {
     const { env, getPendingInteractions } = envWithPending([
       { id: '' },
-      { id: 'per_widget_1', permission: 'edit', patterns: ['private/path'] },
+      {
+        id: 'per_widget_1',
+        permission: 'bash',
+        patterns: ['private/path'],
+        metadata: { command: 'rm -rf build' },
+      },
       { id: 'per_widget_2' },
     ]);
     const response = await fetchWorker(approvalKeyRequest(body), env);
@@ -2802,7 +2812,7 @@ describe('server /internal/widgets/approval-key', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
     const text = await response.text();
-    expect(JSON.parse(text)).toEqual({ approvalKey: KEY_PER_WIDGET_1 });
+    expect(JSON.parse(text)).toEqual({ approvalKey: KEY_PER_WIDGET_1, command: 'rm -rf build' });
     expect(text).not.toContain('per_widget');
     expect(text).not.toContain('private/path');
     expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
@@ -2820,15 +2830,39 @@ describe('server /internal/widgets/approval-key', () => {
     const { env } = envWithPending([{ id: 'per_widget_2' }]);
     const response = await fetchWorker(approvalKeyRequest(body), env);
 
-    await expect(response.json()).resolves.toEqual({ approvalKey: KEY_PER_WIDGET_2 });
+    await expect(response.json()).resolves.toEqual({
+      approvalKey: KEY_PER_WIDGET_2,
+      command: null,
+    });
     expect(KEY_PER_WIDGET_2).not.toBe(KEY_PER_WIDGET_1);
   });
 
-  it('returns a null key when nothing is pending', async () => {
+  it('returns a null key and command when nothing is pending', async () => {
     const { env } = envWithPending([]);
     const response = await fetchWorker(approvalKeyRequest(body), env);
 
-    await expect(response.json()).resolves.toEqual({ approvalKey: null });
+    await expect(response.json()).resolves.toEqual({ approvalKey: null, command: null });
+  });
+
+  it('returns a null command when the permission carries none', async () => {
+    const { env } = envWithPending([{ id: 'per_widget_1', metadata: { command: 42 } }]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    await expect(response.json()).resolves.toEqual({
+      approvalKey: KEY_PER_WIDGET_1,
+      command: null,
+    });
+  });
+
+  it('trims the command to the session card limit', async () => {
+    const { env } = envWithPending([
+      { id: 'per_widget_1', metadata: { command: `${'a'.repeat(80)}\nsecond line` } },
+    ]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    const parsed = (await response.json()) as { command: string | null };
+    expect(parsed.command?.length).toBeLessThanOrEqual(60);
+    expect(parsed.command?.endsWith('…')).toBe(true);
   });
 
   it('refuses a session outside the exact user, organization, and session pairing', async () => {
@@ -2855,7 +2889,7 @@ describe('server /internal/widgets/approval-key', () => {
       env
     );
 
-    await expect(response.json()).resolves.toEqual({ approvalKey: null });
+    await expect(response.json()).resolves.toEqual({ approvalKey: null, command: null });
     expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
     expect(getPendingInteractions).not.toHaveBeenCalled();
     expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
@@ -3126,5 +3160,76 @@ describe('server /sandbox-control', () => {
     expect(env.SANDBOX_CONTROL.getByName).toHaveBeenCalledWith('sbx_test');
     expect(fetch).toHaveBeenCalledOnce();
     expect(response).toBe(stubResponse);
+  });
+});
+
+describe('server preview host dispatch', () => {
+  const PREVIEW_SESSION_ID = 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const LABEL = previewLabel(PREVIEW_SESSION_ID, 5173) as string;
+  const HOST = `${LABEL}.preview.test`;
+
+  function previewEnv(suffix?: string): MockEnv {
+    const env = createEnv();
+    if (suffix !== undefined) (env as Record<string, unknown>).PREVIEW_HOST_SUFFIX = suffix;
+    return env;
+  }
+
+  it('routes a preview hostname away from /health, /trpc and /terminal', async () => {
+    const env = previewEnv('preview.test');
+    for (const path of ['/health', '/trpc/anything', '/terminal']) {
+      const response = await fetchWorker(new Request(`http://${HOST}${path}`), env);
+      expect(response.status).toBe(401);
+    }
+  });
+
+  it('serves a preview-host /terminal WebSocket upgrade from the preview path', async () => {
+    const env = previewEnv('preview.test');
+    const response = await fetchWorker(
+      new Request(`http://${HOST}/terminal`, {
+        headers: { Upgrade: 'websocket', Connection: 'Upgrade' },
+      }),
+      env
+    );
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Cross-origin preview request rejected');
+  });
+
+  it('serves a preview-host /stream request from the preview path', async () => {
+    const env = previewEnv('preview.test');
+    const response = await fetchWorker(
+      new Request(`http://${HOST}/stream?cloudAgentSessionId=${PREVIEW_SESSION_ID}`),
+      env
+    );
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe(PREVIEW_SESSION_MISSING_TEXT);
+  });
+
+  it('serves the preview reserved path from the preview route', async () => {
+    const env = previewEnv('preview.test');
+    const response = await fetchWorker(new Request(`http://${HOST}/.kilo-preview/other`), env);
+    expect(response.status).toBe(404);
+  });
+
+  it('keeps the worker host on its own handlers', async () => {
+    const env = previewEnv('preview.test');
+    const response = await fetchWorker(new Request('http://worker.test/health'), env);
+    expect(response.status).toBe(200);
+  });
+
+  it('matches nothing when the preview suffix is unset', async () => {
+    const env = previewEnv();
+    const response = await fetchWorker(new Request(`http://${HOST}/health`), env);
+    expect(response.status).toBe(200);
+  });
+
+  it('serves the open hop on the worker host and proxies the same path on a preview host', async () => {
+    const env = previewEnv('preview.test');
+    const workerHost = await fetchWorker(new Request('http://worker.test/preview/open'), env);
+    expect(workerHost.status).toBe(401);
+    expect(workerHost.headers.get('cache-control')).toBe('no-store');
+
+    const previewHost = await fetchWorker(new Request(`http://${HOST}/preview/open`), env);
+    expect(previewHost.status).toBe(401);
+    expect(previewHost.headers.get('cache-control')).toBeNull();
   });
 });

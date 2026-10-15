@@ -7,6 +7,11 @@
 // `require`, not `import`: ESM hoisting would run `expo-router/entry` first.
 const { AppRegistry, LogBox, Platform } = require('react-native');
 
+// A push or a background task can start this bundle while the device is
+// locked. Record the iOS protected-data state before any module reads the
+// keychain: the auth preload runs at import time (src/lib/protected-data.ts).
+require('./src/lib/protected-data-native').installProtectedDataSource();
+
 // Drop expo-iap's developer copy for a failed available-purchases query before
 // the first store query can log it. The Kilo Pass screen renders its own
 // translated message for the same failure, so the library's English string must

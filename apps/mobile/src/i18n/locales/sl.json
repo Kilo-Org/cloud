@@ -133,10 +133,14 @@
     "status": "Stanje",
     "truncated": "Skrajšano",
     "updated": "Posodobljeno",
+    "generating": "Ustvarjanje…",
     "working": "V teku",
     "yourOwnRepositories": "Tvoji repozitoriji",
     "dismissed": "Zavrženo",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Spremembe"
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -325,6 +329,7 @@
       "collapseFile": "Strni datoteko",
       "expandFile": "Razširi datoteko",
       "diffTooLarge": "Razlike so preobsežne za prikaz.",
+      "noPreview": "Predogled te datoteke ni na voljo",
       "openOnGitHub": "Odpri na GitHubu",
       "openDiffOnGitHub": "Odpri prikaz razlik te datoteke na GitHubu",
       "githubDiff": "Prikaz razlik na GitHubu"
@@ -863,7 +868,8 @@
       "kiloclaw": "Dejavnost v KiloClaw",
       "balance": "Opozorila o stanju dobroimetja",
       "security": "Varnostne ugotovitve",
-      "spend": "Opozorila o porabi"
+      "spend": "Opozorila o porabi",
+      "followedSessions": "Sledene seje"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori v tvojih pogovorih",
@@ -1290,7 +1296,7 @@
         "stoppedTitle": "Nastavitev je ustavljena",
         "stoppedBody": "Primerek {{name}} se je med nastavljanjem nepričakovano ustavil.",
         "stalledTitle": "Nekaj se je zataknilo",
-        "stalledBody": "Nastavitve za {{name}} ni bilo mogoče dokončati. Poskusi znova. Če se težava ponavlja, piši na hi@kilo.ai.",
+        "stalledBody": "Nastavitve za {{name}} ni bilo mogoče dokončati. Poskusi znova. Če se težava ponavlja, piši na {{supportEmail}}.",
         "timeoutTitle": "Traja dlje od pričakovanega",
         "timeoutBody": "Nastavitev za {{name}} traja dlje kot običajno (več kot {{displayMinutes}} minut).",
         "continueInBackground": "Nadaljuj v ozadju",
@@ -1348,7 +1354,7 @@
       "nonCanonicalEarlybirdBody": "Pred uporabo v mobilni aplikaciji je treba ročno pregledati tvoj paket za zgodnji dostop.",
       "iosTitle": "KiloClaw ni na voljo v sistemu iOS",
       "iosBody": "Dostop do KiloClaw za ta račun se upravlja zunaj aplikacije za iOS.",
-      "iosContact": "Imaš vprašanja? Piši na hi@kilo.ai.",
+      "iosContact": "Imaš vprašanja? Piši na {{supportEmail}}.",
       "quarantinedCta": "Pošlji e-pošto naši ekipi",
       "nonCanonicalEarlybirdCta": "Preglej svoj paket na kilo.ai"
     },
@@ -1585,7 +1591,7 @@
         "recoveryLabel": "Posodobi aplikacijo GitHub"
       },
       "githubIpAllowList": {
-        "description": "Pregledovalnik kode je bil onemogočen, ker ta organizacija na platformi GitHub uporablja seznam dovoljenih naslovov IP, ki blokira Kilo. Za pomoč piši na hi@kilocode.ai in nato znova omogoči pregledovalnik kode."
+        "description": "Pregledovalnik kode je bil onemogočen, ker ta organizacija na platformi GitHub uporablja seznam dovoljenih naslovov IP, ki blokira Kilo. Za pomoč piši na {{supportEmail}} in nato znova omogoči pregledovalnik kode."
       },
       "gitlabProjectAccessRequired": {
         "description": "Pregledovalnik kode je bil onemogočen, ker Kilo za ta projekt na platformi GitLab ne more ustvariti žetona za dostop do projekta. Dodeli dostop vzdrževalca ali omogoči žetone za dostop do projektov in nato znova omogoči pregledovalnik kode.",
@@ -1600,7 +1606,7 @@
         "recoveryLabel": "Posodobi nastavitve pregledovalnika kode"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Pregledovalnik kode je bil onemogočen, ker je kloniranje skladišča danes trikrat preseglo časovno omejitev. Za pomoč piši na hi@kilocode.ai in nato znova omogoči pregledovalnik kode."
+        "description": "Pregledovalnik kode je bil onemogočen, ker je kloniranje skladišča danes trikrat preseglo časovno omejitev. Za pomoč piši na {{supportEmail}} in nato znova omogoči pregledovalnik kode."
       },
       "title": "Pri pregledovalcu kode je potrebno ukrepanje.",
       "recoveryLabel": "Obrni se na podporo"
@@ -2142,6 +2148,8 @@
       "title": "Seja",
       "copyErrorDetails": "Kopiraj podrobnosti napake",
       "backToSessions": "Nazaj na seje",
+      "follow": "Spremljaj na zaklenjenem zaslonu",
+      "unfollow": "Prenehaj spremljati na zaklenjenem zaslonu",
       "couldNotLoad": "Seje ni bilo mogoče naložiti.",
       "failedToLoadDetails": "Podrobnosti seje ni bilo mogoče naložiti.",
       "failedToStopExecution": "Izvajanja ni bilo mogoče ustaviti.",
@@ -2208,6 +2216,11 @@
       "collapse": "Strni cilj",
       "expand": "Razširi cilj"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Opravila, {{completed}} od {{total}} dokončanih",
+      "rowAccessibility": "Opravila, {{completed}} od {{total}} dokončanih. Trenutno opravilo: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nedavno uporabljeno",
       "couldNotLoadGithubRepositories": "Skladišč na GitHub ni bilo mogoče naložiti.",
@@ -2240,7 +2253,6 @@
       "retryLoadingEnvironment": "Poskusi znova naložiti okolje",
       "defaultEnvironment": "Privzeto okolje",
       "environmentSummary": "Ukazi: {{commands}} · MCP: {{mcp}} · Veščine: {{skills}} · Agenti: {{agents}}",
-      "changes": "Spremembe",
       "leaveChanges": "Pusti spremembe",
       "commitAndPush": "Uveljavi in potisni",
       "startSession": "Začni sejo",
@@ -2263,6 +2275,10 @@
       "importingSession": "Uvažanje seje",
       "cliCannotContinue": "Ta CLI ne podpira nadaljevanja seje. Izberi Cloud Agent ali drug CLI.",
       "importFailed": "Te seje ni bilo mogoče uvoziti.",
+      "cliCannotFork": "Posodobi Kilo CLI, če želiš razcepiti sejo od sporočila.",
+      "forkCutNotSynced": "To sporočilo še ni shranjeno. Poskusi znova čez trenutek.",
+      "forkFilesFromBaseBranch": "Datoteke izhajajo iz osnovne veje.",
+      "forkFilesUnchangedOnComputer": "Datoteke na tem računalniku se ne spremenijo.",
       "pickProfile": "Izberite profil",
       "noProfile": "Brez profila",
       "manageProfiles": "Upravljanje profilov",
@@ -2309,8 +2325,8 @@
       "toolList": "izpiši seznam",
       "toolPatch": "uporabi popravek",
       "toolTask": "naloga",
-      "readTodos": "Preberi naloge",
-      "updateTodos": "Posodobi naloge",
+      "readTodos": "Preberi načrt",
+      "updateTodos": "Posodobi načrt",
       "linesBadge": "{{displayCount}} vrstic",
       "filesBadge": "{{displayCount}} datotek",
       "matchesBadge": "{{displayCount}} zadetkov",
@@ -2386,6 +2402,7 @@
       "copyMessage": "Kopiraj sporočilo",
       "copyText": "Kopiraj besedilo",
       "selectText": "Izberi besedilo",
+      "forkFromHere": "Razcepi od tu",
       "reportAiResponse": "Prijavi odgovor AI",
       "reportAiResponseConfirm": "Želiš prijaviti ta odgovor, da ga pregledamo?",
       "report": "Prijavi",
@@ -2717,6 +2734,12 @@
       "modelsCount_other": "Modeli ({{displayCount}})",
       "modelsCount_two": "Modeli ({{displayCount}})",
       "modelsCount_few": "Modeli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Prikaži spremembe",
+      "asOf": "Stanje ob {{time}}",
+      "tooLarge": "Razlike so preobsežne za prikaz na mobilni napravi.",
+      "empty": "V tej seji še ni sprememb datotek."
     },
     "autoApprove": {
       "title": "Samodejna odobritev",
@@ -3235,6 +3258,8 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
     "openSession": "Odpri",
+    "finished": "Zaključeno",
+    "followFailed": "Tega agenta ni bilo mogoče prikazati na zaklenjenem zaslonu.",
     "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus.",
     "checked": "Preverjeno",
     "lastKnown": "Nazadnje znano",
@@ -3243,7 +3268,26 @@
     "waitingForYou": "Čaka na vas",
     "nextScheduled": "Naslednje načrtovano",
     "answerNeeded": "Potreben odgovor",
-    "waitingToRetry": "Čaka na ponovni poskus"
+    "waitingToRetry": "Čaka na ponovni poskus",
+    "step": {
+      "editing": "Urejanje",
+      "reading": "Branje",
+      "running": "Zagon",
+      "searching": "Spletno iskanje",
+      "thinking": "Premišljevanje"
+    },
+    "planOf": "od",
+    "filesChanged": "spremenjenih datotek",
+    "finishedIn": "Dokončano v",
+    "noActivityFor": "Ni dejavnosti že",
+    "prOpened": "Pull request odprt",
+    "permissionWants": "Želi zagnati",
+    "failure": {
+      "provider": "Ustavljeno: napaka ponudnika",
+      "tool": "Ustavljeno: napaka orodja",
+      "cancelled": "Ustavljeno: preklicano",
+      "other": "USTAVLJENO"
+    }
   },
   "transcriptionModel": {
     "title": "Model za prepisovanje",
@@ -3271,6 +3315,7 @@
     "tutorialLabel": "Vodič"
   },
   "modelChat": {
+    "offlineFailure": "Ta model potrebuje internetno povezavo. Poveži se in poskusi znova ali preklopi na model v tej napravi.",
     "empty": {
       "title": "Začni klepet",
       "description": "Pošlji sporočilo za pogovor z modelom."
@@ -3278,10 +3323,32 @@
     "list": {
       "loadFailed": "Zgodovine klepeta ni bilo mogoče naložiti.",
       "new": "Nov klepet",
-      "openHint": "Odpre klepet. Pridržite za brisanje.",
       "deleteTitle": "Izbrišem ta klepet?"
     },
+    "rename": {
+      "title": "Preimenuj klepet",
+      "accessibility": "Preimenuj klepet: {{title}}",
+      "openHint": "Odpre klepet. Pridržite za preimenovanje ali brisanje."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Podrobnosti klepeta",
+      "backend": "Zaledje",
+      "effortDefault": "Privzeto za model",
+      "noCost": "Brez stroškov",
+      "costUnknown": "Ni znano",
+      "costEstimatedNote": "Strošek odgovorov, ki niso sporočili cene, je ocenjen po ceniku.",
+      "costUnknownNote": "Cena tega modela ni znana.",
+      "costPartialNote": "Ta skupni znesek ne vključuje modelov, katerih cena ni znana.",
+      "localNote": "Modeli v napravi se izvajajo v tej napravi. Nimajo stroškov in predpomnilnika pozivov, njihovo število žetonov pa je lahko ocenjeno.",
+      "countedSinceNote": "Ta klepet se je začel, preden se je začela beležiti poraba. Skupni zneski vključujejo samo odgovore po tem.",
+      "remoteServersOn": "Vklopljeni oddaljeni strežniki MCP"
+    },
+    "webSearch": {
+      "title": "Išči po spletu",
+      "description": "Dovolite temu klepetu, da poišče aktualne informacije prek vašega računa Kilo. Iskanja porabljajo vašo mesečno kvoto iskanj.",
+      "allowanceExhausted": "Vaša brezplačna spletna iskanja za ta mesec so porabljena. Dodajte dobroimetje, da boste lahko znova iskali."
+    },
     "mcp": {
       "title": "Orodja Kilo",
       "use": "Uporabi orodja Kilo",
@@ -3304,7 +3371,6 @@
       "fieldName": "Prikazano ime",
       "fieldUrl": "URL strežnika",
       "fieldUrlInvalid": "Vnesi veljaven URL strežnika.",
-      "fieldToken": "Žeton Bearer (neobvezno)",
       "enableServer": "Omogoči ta strežnik: {{name}}",
       "editServer": "Uredi strežnik",
       "deleteServer": "Izbriši strežnik",
@@ -3325,8 +3391,24 @@
       "serverUnreachable": "Ni bilo mogoče doseči tega strežnika",
       "serverOff": "Ta strežnik je izklopljen"
     },
+    "mcpOAuth": {
+      "authMethod": "Preverjanje pristnosti",
+      "authNone": "Brez prijave",
+      "authBearer": "Žeton Bearer",
+      "authOAuth": "Prijava OAuth",
+      "fieldToken": "Žeton",
+      "oauthHint": "Ko shraniš, tapni $t(modelChat.mcpOAuth.signIn) pri strežniku, da se prijaviš prek brskalnika.",
+      "serverNeedsSignIn": "Prijavi se, da boš lahko uporabljal ta strežnik",
+      "signIn": "Prijava",
+      "signInA11y": "Prijava v ta strežnik: {{name}}",
+      "signInFailed": "Prijava v {{name}} ni uspela. Poskusi znova."
+    },
     "backends": {
       "title": "Zaledja za klepet",
+      "providersTitle": "Ponudniki klepeta",
+      "cloud": "V oblaku",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Modeli Kilo trenutno niso na voljo. Preverite povezavo.",
       "manage": "Upravljaj zaledja",
       "defaultKilo": "$t(consent.kilo) (privzeto)",
       "kiloHelp": "Vgrajeno zaledje uporablja tvoj račun Kilo in ga ni mogoče urejati ali izbrisati.",
@@ -3386,7 +3468,6 @@
     "gguf": {
       "title": "Modeli za prenos",
       "help": "Prenesite odprt model in ga zaženite v tem telefonu z llama.cpp. Vaši pozivi in odgovori ostanejo v napravi. Modeli so veliki, zato uporabite Wi-Fi.",
-      "details": "{{size}} · Licenca: {{license}}",
       "download": "Prenesi model",
       "pause": "Začasno ustavi prenos",
       "resume": "Nadaljuj prenos",
@@ -3398,6 +3479,8 @@
       "url": "Neposredna povezava za prenos",
       "urlHelp": "Prilepite povezavo HTTPS do datoteke .gguf, na primer povezavo resolve s Hugging Face. Modele prenašajte samo iz virov, ki jim zaupate.",
       "downloadUrl": "Prenesi s povezave",
+      "advanced": "Napredno",
+      "localPurpose": "Deluje na tej napravi z llama.cpp. Pozivi in odgovori ostanejo na napravi.",
       "deleteTitle": "Ali želite izbrisati ta model?",
       "deleteMessage": "Ali želite izbrisati {{name}} iz te naprave? Klepeti, ki ga uporabljajo, potrebujejo drug model, preden se lahko nadaljujejo.",
       "errors": {
@@ -3407,12 +3490,62 @@
         "notGguf": "Povezava mora kazati na datoteko .gguf.",
         "space": "Na voljo ni dovolj prostora za shranjevanje tega modela. Sprostite prostor in poskusite znova.",
         "network": "Prenos se ni dokončal. Preverite povezavo in poskusite znova.",
-        "invalidFile": "Prenesena datoteka ni model, ki bi ga ta aplikacija lahko izvajala, zato je bila odstranjena."
+        "invalidFile": "Prenesena datoteka ni model, ki bi ga ta aplikacija lahko izvajala, zato je bila odstranjena.",
+        "checksum": "Prenesena datoteka se ne ujema z objavljeno kontrolno vsoto, zato je bila odstranjena. Poskusite znova prenesti."
       }
+    },
+    "catalog": {
+      "browse": "Prebrskaj modele",
+      "title": "Katalog modelov",
+      "search": "Išči modele na Hugging Face",
+      "tabs": "Filter modelov",
+      "fitsTab": "Primerni za to napravo",
+      "fromHuggingFace": "Iz Hugging Face",
+      "loading": "Nalaganje modelov",
+      "noResults": "Ni najdenih modelov",
+      "noFits": "Noben model ni primeren za to napravo",
+      "noFitsDescription": "Večji modeli so na zavihku $t(common.all).",
+      "fit": {
+        "fits": "Primeren",
+        "tight": "Komaj primeren",
+        "tooLarge": "Prevelik",
+        "noStorage": "Premalo prostora",
+        "unknown": "Ujemanje neznano"
+      },
+      "recommendationsHelp": "Kratek seznam, ki ga ta aplikacija pripne: ena datoteka na model, od založnika, ki navaja licenco. Nič drugega ni razvrščeno.",
+      "compatibilityHelp": "Ujemanje primerja datoteko modela s pomnilnikom in prosto shrambo te naprave. Podatek o pomnilniku je ocena, ne meritev.",
+      "text": "Besedilo",
+      "listTextPurpose": "Samo besedilni pozivi.",
+      "listImagePurpose": "Prebere slike in besedilo.",
+      "smallestDownload": "Najmanjši prenos: {{size}} · približno {{memory}} pomnilnika",
+      "fullFileName": "Datoteka: {{name}}",
+      "memoryEstimateNote": "Podatki o pomnilniku so ocene, ne meritve.",
+      "parameters": "Parametri: {{value}}",
+      "downloads": "Prenosi: {{value}}",
+      "likes": "Všečki: {{value}}",
+      "context": "Kontekstno okno: {{value}}",
+      "license": "Licenca: {{license}}",
+      "licenseUnknown": "Licenca ni navedena",
+      "tools": "Klicanje orodij",
+      "vision": "Vnos slik",
+      "hintsHelp": "Namigi iz Hugging Face. Aplikacija model preveri po prenosu.",
+      "gated": "Ta model zahteva račun Hugging Face, zato ga aplikacija ne more prenesti.",
+      "quantizations": "Kvantizacije",
+      "quantizationsHelp": "Manjše datoteke porabijo manj pomnilnika in prostora. Večje datoteke običajno dajejo boljše odgovore.",
+      "quantDetail": "Prenos {{size}} · približno {{memory}} pomnilnika",
+      "downloadQuant": "Prenesi {{quant}}",
+      "loadingModel": "Nalaganje podrobnosti modela",
+      "couldNotLoadModel": "Tega modela ni bilo mogoče naložiti",
+      "noFiles": "Ni datotek, ki bi jih ta aplikacija lahko zagnala",
+      "noFilesDescription": "Ta aplikacija zaganja modele, ki so ena datoteka GGUF.",
+      "tooLargeTitle": "Ta model morda ne bo deloval",
+      "tooLargeMessage": "{{name}} verjetno potrebuje več pomnilnika, kot ga ima ta naprava. Aplikacija se lahko zapre, medtem ko model odgovarja. Ga vseeno prenesem?",
+      "downloadAnyway": "Vseeno prenesi"
     },
     "localModels": {
       "title": "Modeli v napravi",
-      "help": "Modeli v napravi se izvajajo v tem telefonu. Vaši pozivi in odgovori ostanejo v napravi, ti modeli pa ne morejo uporabljati orodij.",
+      "help": "Modeli v napravi se izvajajo v tem telefonu. Vaši pozivi in odgovori ostanejo v napravi.",
+      "systemPurpose": "Model, vgrajen v sistem te naprave. Izvaja se v napravi.",
       "apple": "Apple Intelligence (v napravi)",
       "checking": "Preverjanje razpoložljivosti …",
       "ready": "Pripravljeno za uporabo",
@@ -3438,6 +3571,9 @@
       "downloading": "Prenašanje …",
       "downloadProgress": "Prenašanje … {{percent}} %",
       "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ta model podpira stopnjo razmišljanja"
     }
   },
   "settingsTools": {
@@ -3660,5 +3796,100 @@
     "noMatchingProductsPlay": "Google Play ni vrnil ustreznih paketov kreditov.",
     "purchaseOwnedByAnotherAccount": "Krediti v tem računu Apple Account pripadajo drugemu računu Kilo. Za uporabo se prijavi v ta račun Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na tem Google Play računu pripadajo drugemu Kilo računu. Za uporabo se prijavite v ta Kilo račun."
+  },
+  "todos": {
+    "saveAsTodo": "Shrani kot nalogo",
+    "segment": {
+      "label": "Pogled agentov",
+      "sessions": "Seje",
+      "todos": "Naloge"
+    },
+    "lists": {
+      "newList": "Nov seznam",
+      "empty": "Ni še seznamov",
+      "couldNotLoad": "Seznamov ni bilo mogoče naložiti",
+      "noRepository": "Brez repozitorija",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} odprtih",
+      "openCount_two": "{{count}} odprta",
+      "openCount_few": "{{count}} odprti",
+      "openCount_other": "{{count}} odprtih",
+      "archived_one": "Arhivirano ({{count}})",
+      "archived_two": "Arhivirano ({{count}})",
+      "archived_few": "Arhivirano ({{count}})",
+      "archived_other": "Arhivirano ({{count}})",
+      "archive": "Arhiviraj",
+      "unarchive": "Odstrani iz arhiva",
+      "deleteTitle": "Izbrišem {{name}}?",
+      "deleteMessage": "Tudi njene naloge se izbrišejo. Seje ostanejo."
+    },
+    "listSettings": {
+      "title": "Nastavitve seznama",
+      "name": "Ime",
+      "namePlaceholder": "Hrošči, ideje, izdaje…",
+      "emoji": "Emoji",
+      "mode": "Način",
+      "defaultsHint": "Seje, začete s tega seznama, uporabijo te privzete vrednosti."
+    },
+    "list": {
+      "addPlaceholder": "Dodaj novo nalogo",
+      "add": "Dodaj nalogo",
+      "empty": "Ni še nalog",
+      "setDefaults": "Nastavi repozitorij, način in model",
+      "completed_one": "Dokončano ({{count}})",
+      "completed_two": "Dokončano ({{count}})",
+      "completed_few": "Dokončano ({{count}})",
+      "completed_other": "Dokončano ({{count}})"
+    },
+    "item": {
+      "markDone": "Označi kot opravljeno",
+      "markOpen": "Označi kot neopravljeno",
+      "markDonePrompt": "Označim kot opravljeno?",
+      "deleted": "Naloga je izbrisana",
+      "undo": "Razveljavi",
+      "runCount_one": "{{count}} zagon",
+      "runCount_two": "{{count}} zagona",
+      "runCount_few": "{{count}} zagoni",
+      "runCount_other": "{{count}} zagonov",
+      "startNow": "Začni brez pregleda",
+      "startNowHint": "Pritisni in drži za začetek brez pregleda",
+      "titleLabel": "Naslov naloge",
+      "renameTitle": "Preimenuj opravilo",
+      "notes": "Opombe",
+      "addNotes": "Dodaj opombe",
+      "notesPrompt": "Dodajte kontekst, zahteve ali merila sprejemljivosti.",
+      "markdownSupported": "Podprt Markdown",
+      "sessions": "Povezane seje",
+      "noSessions": "Ni še sej",
+      "untitledLinkedSession": "Povezana seja",
+      "sessionNeedsInput": "Seja potrebuje vnos",
+      "sessionRunning": "Seja se izvaja",
+      "sessionFinished": "Seja končana",
+      "sessionPullRequest": "PR seje",
+      "sessionPullRequestNumber": "PR seje #{{number}}",
+      "openSessionHint": "Odpre sejo.",
+      "unlinkSessionAction": "Prekini povezavo seje",
+      "unlinkConfirmTitle": "Prekiniti povezavo {{title}}?",
+      "unlinkConfirmMessage": "Sama seja se ne izbriše. Odstrani se le njena povezava s tem opravilom.",
+      "startNewSession": "Začni novo sejo",
+      "startNewSessionHint": "Za novo sejo pridržite.",
+      "linkSession": "Poveži sejo",
+      "linkFailed": "Seje ni bilo mogoče povezati z nalogo"
+    },
+    "linkSession": {
+      "title": "Povezava seje",
+      "empty": "Ni nedavnih sej",
+      "emptyInRepository": "Ni nedavnih sej v {{repository}}"
+    },
+    "upNext": "Naslednje",
+    "sessionTodo": "Naloga: {{title}}",
+    "linkToTodo": "Poveži z nalogo",
+    "candidates": {
+      "empty": "Ni odprtih nalog"
+    },
+    "saveSheet": {
+      "title": "Shrani na seznam",
+      "saved": "Shranjeno na seznam {{list}}"
+    }
   }
 }

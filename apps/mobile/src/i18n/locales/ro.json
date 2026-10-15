@@ -133,10 +133,14 @@
     "status": "Stare",
     "truncated": "Trunchiat",
     "updated": "Actualizat",
+    "generating": "Se generează…",
     "working": "În lucru",
     "yourOwnRepositories": "Depozitele tale de cod",
     "dismissed": "Ignorată",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Modificări"
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -325,6 +329,7 @@
       "collapseFile": "Restrânge fișierul",
       "expandFile": "Extinde fișierul",
       "diffTooLarge": "Diferențele sunt prea mari pentru a fi afișate.",
+      "noPreview": "Nu există previzualizare pentru acest fișier",
       "openOnGitHub": "Deschide pe GitHub",
       "openDiffOnGitHub": "Deschide comparația acestui fișier pe GitHub",
       "githubDiff": "Comparația de pe GitHub"
@@ -847,7 +852,8 @@
       "kiloclaw": "Activitate KiloClaw",
       "balance": "Alerte privind soldul",
       "security": "Probleme de securitate detectate",
-      "spend": "Alerte de cheltuieli"
+      "spend": "Alerte de cheltuieli",
+      "followedSessions": "Sesiuni urmărite"
     },
     "category": {
       "chatMessagesSubtitle": "răspunsuri în conversațiile tale",
@@ -1272,7 +1278,7 @@
         "stoppedTitle": "Configurare oprită",
         "stoppedBody": "Instanța lui {{name}} s-a oprit neașteptat în timpul configurării.",
         "stalledTitle": "Ceva s-a blocat",
-        "stalledBody": "Nu am putut finaliza configurarea lui {{name}}. Încearcă din nou sau trimite un e-mail la hi@kilo.ai dacă acest lucru se întâmplă în continuare.",
+        "stalledBody": "Nu am putut finaliza configurarea lui {{name}}. Încearcă din nou sau trimite un e-mail la {{supportEmail}} dacă acest lucru se întâmplă în continuare.",
         "timeoutTitle": "Durează mai mult decât era de așteptat",
         "timeoutBody": "Configurarea pentru {{name}} durează mai mult decât de obicei (peste {{displayMinutes}} minute).",
         "continueInBackground": "Continuă în fundal",
@@ -1330,7 +1336,7 @@
       "nonCanonicalEarlybirdBody": "Planul tău de acces timpuriu necesită o revizuire manuală înainte de a putea fi folosit pe mobil.",
       "iosTitle": "KiloClaw indisponibil pe iOS",
       "iosBody": "Pentru acest cont, accesul la KiloClaw este gestionat în afara aplicației iOS.",
-      "iosContact": "Ai întrebări? Scrie-ne la hi@kilo.ai.",
+      "iosContact": "Ai întrebări? Scrie-ne la {{supportEmail}}.",
       "quarantinedCta": "Trimite un e-mail echipei noastre",
       "nonCanonicalEarlybirdCta": "Verifică-ți planul pe kilo.ai"
     },
@@ -1566,7 +1572,7 @@
         "recoveryLabel": "Actualizează aplicația GitHub"
       },
       "githubIpAllowList": {
-        "description": "Agentul de revizuire a codului a fost dezactivat deoarece lista de adrese IP permise a acestei organizații GitHub blochează Kilo. Cere ajutor la hi@kilocode.ai, apoi activează din nou agentul de revizuire a codului."
+        "description": "Agentul de revizuire a codului a fost dezactivat deoarece lista de adrese IP permise a acestei organizații GitHub blochează Kilo. Cere ajutor la {{supportEmail}}, apoi activează din nou agentul de revizuire a codului."
       },
       "gitlabProjectAccessRequired": {
         "description": "Agentul de revizuire a codului a fost dezactivat deoarece Kilo nu poate crea un token de acces pentru acest proiect GitLab. Acordă acces de responsabil de proiect sau activează tokenurile de acces la proiect, apoi activează din nou agentul de revizuire a codului.",
@@ -1581,7 +1587,7 @@
         "recoveryLabel": "Actualizează setările agentului de revizuire a codului"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Agentul de revizuire a codului a fost dezactivat după ce clonarea depozitului a depășit timpul alocat de trei ori astăzi. Cere ajutor la hi@kilocode.ai, apoi activează din nou agentul de revizuire a codului."
+        "description": "Agentul de revizuire a codului a fost dezactivat după ce clonarea depozitului a depășit timpul alocat de trei ori astăzi. Cere ajutor la {{supportEmail}}, apoi activează din nou agentul de revizuire a codului."
       },
       "title": "Agentul de revizuire a codului necesită intervenția ta.",
       "recoveryLabel": "Contactează asistența"
@@ -2114,6 +2120,8 @@
       "title": "Sesiune",
       "copyErrorDetails": "Copiază detaliile erorii",
       "backToSessions": "Înapoi la sesiuni",
+      "follow": "Urmărește pe ecranul de blocare",
+      "unfollow": "Nu mai urmări pe ecranul de blocare",
       "couldNotLoad": "Nu s-a putut încărca sesiunea.",
       "failedToLoadDetails": "Nu s-au putut încărca detaliile sesiunii.",
       "failedToStopExecution": "Nu s-a putut opri execuția.",
@@ -2180,6 +2188,11 @@
       "collapse": "Restrânge obiectivul",
       "expand": "Extinde obiectivul"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Obiective, {{completed}} din {{total}} finalizate",
+      "rowAccessibility": "Obiective, {{completed}} din {{total}} finalizate. Obiectiv curent: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Folosite recent",
       "couldNotLoadGithubRepositories": "Nu s-au putut încărca depozitele GitHub.",
@@ -2212,7 +2225,6 @@
       "retryLoadingEnvironment": "Reîncearcă încărcarea mediului",
       "defaultEnvironment": "Mediu implicit",
       "environmentSummary": "{{commands}} comenzi · {{mcp}} MCP · {{skills}} competențe · {{agents}} agenți",
-      "changes": "Modificări",
       "leaveChanges": "Păstrează modificările",
       "commitAndPush": "Fă commit și trimite",
       "startSession": "Începe sesiunea",
@@ -2235,6 +2247,10 @@
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
       "importFailed": "Nu s-a putut importa această sesiune.",
+      "cliCannotFork": "Actualizează Kilo CLI pentru a ramifica de la un mesaj.",
+      "forkCutNotSynced": "Acest mesaj nu este salvat încă. Încearcă din nou peste câteva momente.",
+      "forkFilesFromBaseBranch": "Fișierele pornesc de la ramura de bază.",
+      "forkFilesUnchangedOnComputer": "Fișierele de pe acest computer nu sunt modificate.",
       "pickProfile": "Alegeți un profil",
       "noProfile": "Nici un profil",
       "manageProfiles": "Gestionați profilurile",
@@ -2280,8 +2296,8 @@
       "toolList": "listare",
       "toolPatch": "aplicare de modificări",
       "toolTask": "sarcină",
-      "readTodos": "Citește sarcinile",
-      "updateTodos": "Actualizează sarcinile",
+      "readTodos": "Citește planul",
+      "updateTodos": "Actualizează planul",
       "linesBadge": "{{displayCount}} linii",
       "filesBadge": "{{displayCount}} fișiere",
       "matchesBadge": "{{displayCount}} potriviri",
@@ -2354,6 +2370,7 @@
       "copyMessage": "Copiază mesajul",
       "copyText": "Copiază textul",
       "selectText": "Selectează textul",
+      "forkFromHere": "Ramifică de aici",
       "reportAiResponse": "Raportează răspunsul AI",
       "reportAiResponseConfirm": "Raportezi acest răspuns pentru verificare?",
       "report": "Raportează",
@@ -2679,6 +2696,12 @@
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modele ({{displayCount}})",
       "modelsCount_few": "Modele ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Vezi modificările",
+      "asOf": "La {{time}}",
+      "tooLarge": "Diferențele sunt prea mari pentru a fi afișate pe mobil.",
+      "empty": "Nicio modificare de fișiere în această sesiune încă."
     },
     "autoApprove": {
       "title": "Aprobare automată",
@@ -3194,6 +3217,8 @@
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
     "openSession": "Deschide",
+    "finished": "Terminat",
+    "followFailed": "Agentul nu a putut fi afișat pe ecranul de blocare.",
     "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou.",
     "checked": "Verificat",
     "lastKnown": "Ultima stare cunoscută",
@@ -3202,7 +3227,26 @@
     "waitingForYou": "Te așteaptă",
     "nextScheduled": "Următoarele programate",
     "answerNeeded": "Așteaptă un răspuns",
-    "waitingToRetry": "Așteaptă reîncercarea"
+    "waitingToRetry": "Așteaptă reîncercarea",
+    "step": {
+      "editing": "Editare",
+      "reading": "Citire",
+      "running": "Rulare",
+      "searching": "Căutare web",
+      "thinking": "Analizează"
+    },
+    "planOf": "din",
+    "filesChanged": "fișiere modificate",
+    "finishedIn": "Finalizat în",
+    "noActivityFor": "Fără activitate de",
+    "prOpened": "Pull request deschis",
+    "permissionWants": "Vrea să ruleze",
+    "failure": {
+      "provider": "Oprit: eroare furnizor",
+      "tool": "Oprit: eroare instrument",
+      "cancelled": "Oprit: anulat",
+      "other": "OPRIT"
+    }
   },
   "transcriptionModel": {
     "title": "Model de transcriere",
@@ -3230,6 +3274,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Acest model necesită o conexiune la internet. Conectează-te și încearcă din nou sau comută la un model de pe acest dispozitiv.",
     "empty": {
       "title": "Începe un chat",
       "description": "Trimite un mesaj pentru a vorbi cu un model."
@@ -3237,10 +3282,32 @@
     "list": {
       "loadFailed": "Nu s-a putut încărca istoricul de chat.",
       "new": "Chat nou",
-      "openHint": "Deschide chatul. Apasă lung pentru a șterge.",
       "deleteTitle": "Ștergi acest chat?"
     },
+    "rename": {
+      "title": "Redenumește chatul",
+      "accessibility": "Redenumește chatul: {{title}}",
+      "openHint": "Deschide chatul. Apasă lung pentru a redenumi sau a șterge."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Detaliile chatului",
+      "backend": "Backend",
+      "effortDefault": "Implicit pentru model",
+      "noCost": "Fără cost",
+      "costUnknown": "Necunoscut",
+      "costEstimatedNote": "Răspunsurile care nu au raportat un preț sunt estimate după prețurile de listă.",
+      "costUnknownNote": "Nu se cunoaște niciun preț pentru acest model.",
+      "costPartialNote": "Acest total nu include modelele fără preț cunoscut.",
+      "localNote": "Modelele pe dispozitiv rulează pe acest dispozitiv. Nu au cost și nici cache de prompturi, iar numărul lor de tokenuri poate fi estimat.",
+      "countedSinceNote": "Acest chat a început înainte ca utilizarea să fie înregistrată. Totalurile arată doar răspunsurile de după.",
+      "remoteServersOn": "Servere MCP la distanță active"
+    },
+    "webSearch": {
+      "title": "Caută pe web",
+      "description": "Permite acestui chat să caute informații actuale prin contul tău Kilo. Căutările folosesc cota ta lunară de căutări.",
+      "allowanceExhausted": "Căutările web gratuite din această lună s-au epuizat. Adaugă credite pentru a căuta din nou."
+    },
     "mcp": {
       "title": "Instrumentele Kilo",
       "use": "Folosește instrumentele Kilo",
@@ -3263,7 +3330,6 @@
       "fieldName": "Nume afișat",
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Introdu un URL de server valid.",
-      "fieldToken": "Token Bearer (opțional)",
       "enableServer": "Activează acest server: {{name}}",
       "editServer": "Editează serverul",
       "deleteServer": "Șterge serverul",
@@ -3284,8 +3350,24 @@
       "serverUnreachable": "Nu s-a putut contacta acest server",
       "serverOff": "Acest server este oprit"
     },
+    "mcpOAuth": {
+      "authMethod": "Autentificare",
+      "authNone": "Fără autentificare",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Autentificare OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "După ce salvezi, atinge $t(modelChat.mcpOAuth.signIn) pe server pentru a te autentifica în browser.",
+      "serverNeedsSignIn": "Autentifică-te pentru a folosi acest server",
+      "signIn": "Autentifică-te",
+      "signInA11y": "Autentifică-te la acest server: {{name}}",
+      "signInFailed": "Nu s-a putut realiza autentificarea la {{name}}. Încearcă din nou."
+    },
     "backends": {
       "title": "Backenduri de chat",
+      "providersTitle": "Furnizori de chat",
+      "cloud": "În cloud",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Modelele Kilo nu sunt disponibile chiar acum. Verifică conexiunea.",
       "manage": "Gestionează backendurile",
       "defaultKilo": "$t(consent.kilo) (implicit)",
       "kiloHelp": "Backendul integrat folosește contul tău Kilo și nu poate fi editat sau șters.",
@@ -3345,7 +3427,6 @@
     "gguf": {
       "title": "Modele descărcabile",
       "help": "Descarcă un model deschis și rulează-l pe acest telefon cu llama.cpp. Solicitările și răspunsurile tale rămân pe dispozitiv. Modelele sunt mari, așa că folosește Wi-Fi.",
-      "details": "{{size}} · Licență: {{license}}",
       "download": "Descarcă modelul",
       "pause": "Întrerupe descărcarea",
       "resume": "Reia descărcarea",
@@ -3357,6 +3438,8 @@
       "url": "Link de descărcare directă",
       "urlHelp": "Lipește un link HTTPS către un fișier .gguf, cum ar fi un link resolve de pe Hugging Face. Descarcă modele doar din surse în care ai încredere.",
       "downloadUrl": "Descarcă de la link",
+      "advanced": "Avansat",
+      "localPurpose": "Rulează pe acest dispozitiv cu llama.cpp. Solicitările și răspunsurile rămân pe dispozitiv.",
       "deleteTitle": "Ștergi acest model?",
       "deleteMessage": "Ștergi {{name}} de pe acest dispozitiv? Conversațiile care îl folosesc au nevoie de un alt model înainte de a putea continua.",
       "errors": {
@@ -3366,12 +3449,62 @@
         "notGguf": "Linkul trebuie să trimită la un fișier .gguf.",
         "space": "Nu există suficient spațiu liber pentru acest model. Eliberează spațiu și încearcă din nou.",
         "network": "Descărcarea nu s-a finalizat. Verifică conexiunea și încearcă din nou.",
-        "invalidFile": "Fișierul descărcat nu este un model pe care această aplicație îl poate rula, așa că a fost eliminat."
+        "invalidFile": "Fișierul descărcat nu este un model pe care această aplicație îl poate rula, așa că a fost eliminat.",
+        "checksum": "Fișierul descărcat nu corespunde sumei de control publicate, așa că a fost eliminat. Încercați din nou descărcarea."
       }
+    },
+    "catalog": {
+      "browse": "Explorează modelele",
+      "title": "Catalog de modele",
+      "search": "Caută modele pe Hugging Face",
+      "tabs": "Filtru modele",
+      "fitsTab": "Potrivite pentru dispozitiv",
+      "fromHuggingFace": "De pe Hugging Face",
+      "loading": "Se încarcă modelele",
+      "noResults": "Nu s-au găsit modele",
+      "noFits": "Niciun model nu se potrivește acestui dispozitiv",
+      "noFitsDescription": "Modelele mai mari se află în fila $t(common.all).",
+      "fit": {
+        "fits": "Se potrivește",
+        "tight": "La limită",
+        "tooLarge": "Prea mare",
+        "noStorage": "Spațiu de stocare insuficient",
+        "unknown": "Compatibilitate necunoscută"
+      },
+      "recommendationsHelp": "O listă scurtă fixată de această aplicație: un fișier per model, de la un editor care declară o licență. Nimic altceva nu este clasat.",
+      "compatibilityHelp": "Compatibilitatea compară fișierul modelului cu memoria și spațiul liber de stocare ale acestui dispozitiv. Valoarea memoriei este o estimare, nu o măsurătoare.",
+      "text": "Text",
+      "listTextPurpose": "Doar solicitări text.",
+      "listImagePurpose": "Citește imagini, precum și text.",
+      "smallestDownload": "Cea mai mică descărcare: {{size}} · aproximativ {{memory}} de memorie",
+      "fullFileName": "Fișier: {{name}}",
+      "memoryEstimateNote": "Valorile memoriei sunt estimări, nu măsurători.",
+      "parameters": "Parametri: {{value}}",
+      "downloads": "Descărcări: {{value}}",
+      "likes": "Aprecieri: {{value}}",
+      "context": "Fereastră de context: {{value}}",
+      "license": "Licență: {{license}}",
+      "licenseUnknown": "Licența nu este specificată",
+      "tools": "Apelare de instrumente",
+      "vision": "Intrare imagine",
+      "hintsHelp": "Indicații de la Hugging Face. Aplicația verifică modelul după descărcare.",
+      "gated": "Acest model necesită un cont Hugging Face, așa că aplicația nu îl poate descărca.",
+      "quantizations": "Cuantizări",
+      "quantizationsHelp": "Fișierele mai mici folosesc mai puțină memorie și spațiu de stocare. Fișierele mai mari oferă de obicei răspunsuri mai bune.",
+      "quantDetail": "Descărcare de {{size}} · aproximativ {{memory}} de memorie",
+      "downloadQuant": "Descarcă {{quant}}",
+      "loadingModel": "Se încarcă detaliile modelului",
+      "couldNotLoadModel": "Acest model nu a putut fi încărcat",
+      "noFiles": "Niciun fișier pe care aplicația îl poate rula",
+      "noFilesDescription": "Această aplicație rulează modele formate dintr-un singur fișier GGUF.",
+      "tooLargeTitle": "Este posibil ca acest model să nu ruleze",
+      "tooLargeMessage": "Probabil {{name}} necesită mai multă memorie decât are acest dispozitiv. Aplicația se poate închide în timp ce modelul răspunde. Îl descarci oricum?",
+      "downloadAnyway": "Descarcă oricum"
     },
     "localModels": {
       "title": "Modele pe dispozitiv",
-      "help": "Modelele pe dispozitiv rulează pe acest telefon. Solicitările și răspunsurile tale rămân pe dispozitiv, iar aceste modele nu pot folosi instrumente.",
+      "help": "Modelele pe dispozitiv rulează pe acest telefon. Solicitările și răspunsurile tale rămân pe dispozitiv.",
+      "systemPurpose": "Modelul integrat în sistemul acestui dispozitiv. Rulează pe dispozitiv.",
       "apple": "Apple Intelligence (pe dispozitiv)",
       "checking": "Se verifică disponibilitatea…",
       "ready": "Gata de utilizare",
@@ -3397,6 +3530,9 @@
       "downloading": "Se descarcă…",
       "downloadProgress": "Se descarcă… {{percent}}%",
       "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Acest model acceptă efort de raționament"
     }
   },
   "settingsTools": {
@@ -3619,5 +3755,96 @@
     "noMatchingProductsPlay": "Google Play nu a returnat pachete de credite corespunzătoare.",
     "purchaseOwnedByAnotherAccount": "Creditele asociate acestui Apple Account aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi.",
     "purchaseOwnedByAnotherAccountPlay": "Creditele de pe acest cont Google Play aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi."
+  },
+  "todos": {
+    "saveAsTodo": "Salvează ca sarcină",
+    "segment": {
+      "label": "Vizualizare agenți",
+      "sessions": "Sesiuni",
+      "todos": "Sarcini"
+    },
+    "lists": {
+      "newList": "Listă nouă",
+      "empty": "Încă nu există liste",
+      "couldNotLoad": "Nu s-au putut încărca listele",
+      "noRepository": "Niciun depozit",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} deschise",
+      "openCount_other": "{{count}} deschise",
+      "openCount_few": "{{count}} deschise",
+      "archived_one": "Arhivate ({{count}})",
+      "archived_other": "Arhivate ({{count}})",
+      "archived_few": "Arhivate ({{count}})",
+      "archive": "Arhivează",
+      "unarchive": "Scoate din arhivă",
+      "deleteTitle": "Ștergi {{name}}?",
+      "deleteMessage": "Sarcinile ei se șterg și ele. Sesiunile rămân."
+    },
+    "listSettings": {
+      "title": "Setările listei",
+      "name": "Nume",
+      "namePlaceholder": "Erori, Idei, Lansare…",
+      "emoji": "Emoji",
+      "mode": "Mod",
+      "defaultsHint": "Sesiunile pornite din această listă folosesc aceste valori implicite."
+    },
+    "list": {
+      "addPlaceholder": "Sarcină nouă",
+      "add": "Adaugă sarcină",
+      "empty": "Încă nu există sarcini",
+      "setDefaults": "Setează depozitul, modul și modelul",
+      "completed_one": "Finalizat ({{count}})",
+      "completed_other": "Finalizat ({{count}})",
+      "completed_few": "Finalizate ({{count}})"
+    },
+    "item": {
+      "markDone": "Marchează ca finalizat",
+      "markOpen": "Marchează ca nefinalizat",
+      "markDonePrompt": "Marchezi ca finalizat?",
+      "deleted": "Sarcină ștearsă",
+      "undo": "Restabilește",
+      "runCount_one": "{{count}} rulare",
+      "runCount_other": "{{count}} rulare",
+      "runCount_few": "{{count}} rulări",
+      "startNow": "Pornește fără revizuire",
+      "startNowHint": "Ține apăsat pentru a porni fără revizuire",
+      "titleLabel": "Titlul sarcinii",
+      "renameTitle": "Redenumește activitatea",
+      "notes": "Notițe",
+      "addNotes": "Adaugă notițe",
+      "notesPrompt": "Adaugă context, cerințe sau criterii de acceptare.",
+      "markdownSupported": "Markdown acceptat",
+      "sessions": "Sesiuni asociate",
+      "noSessions": "Încă nu există sesiuni",
+      "untitledLinkedSession": "Sesiune asociată",
+      "sessionNeedsInput": "Sesiunea necesită date",
+      "sessionRunning": "Sesiune în curs",
+      "sessionFinished": "Sesiune finalizată",
+      "sessionPullRequest": "Pull request de sesiune",
+      "sessionPullRequestNumber": "PR de sesiune #{{number}}",
+      "openSessionHint": "Deschide sesiunea.",
+      "unlinkSessionAction": "Dezleagă sesiunea",
+      "unlinkConfirmTitle": "Dezlegi {{title}}?",
+      "unlinkConfirmMessage": "Sesiunea în sine nu este ștearsă. Doar legătura acesteia cu această sarcină este eliminată.",
+      "startNewSession": "Începe o sesiune nouă",
+      "startNewSessionHint": "Ține apăsat pentru a începe o sesiune nouă.",
+      "linkSession": "Asociază sesiunea",
+      "linkFailed": "Nu s-a putut asocia sesiunea cu sarcina"
+    },
+    "linkSession": {
+      "title": "Asociază o sesiune",
+      "empty": "Nicio sesiune recentă",
+      "emptyInRepository": "Nicio sesiune recentă în {{repository}}"
+    },
+    "upNext": "Urmează",
+    "sessionTodo": "Sarcină: {{title}}",
+    "linkToTodo": "Asociază cu sarcina",
+    "candidates": {
+      "empty": "Nicio sarcină deschisă"
+    },
+    "saveSheet": {
+      "title": "Salvează în listă",
+      "saved": "Salvat în {{list}}"
+    }
   }
 }

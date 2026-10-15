@@ -133,10 +133,14 @@
     "status": "Durum",
     "truncated": "Kısaltıldı",
     "updated": "Güncellendi",
+    "generating": "Oluşturuluyor…",
     "working": "Çalışıyor",
     "yourOwnRepositories": "Kendi depoların",
     "dismissed": "Yok sayıldı",
-    "agent": "Ajan"
+    "agent": "Ajan",
+    "durationMinuteShort": "dk",
+    "durationHourShort": "sa",
+    "changes": "Değişiklikler"
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -320,7 +324,8 @@
       "kiloclaw": "KiloClaw etkinliği",
       "balance": "Bakiye uyarıları",
       "security": "Güvenlik bulguları",
-      "spend": "Harcama uyarıları"
+      "spend": "Harcama uyarıları",
+      "followedSessions": "Takip edilen oturumlar"
     },
     "category": {
       "chatMessagesSubtitle": "konuşmalarındaki yanıtlar",
@@ -646,7 +651,7 @@
     "redeployTitle": "Örneği yeniden dağıt",
     "accessRequired": {
       "iosBody": "Bu hesap için KiloClaw erişimi iOS uygulamasının dışında yönetilir.",
-      "iosContact": "Sorun mu var? hi@kilo.ai adresine yaz.",
+      "iosContact": "Sorun mu var? {{supportEmail}} adresine yaz.",
       "iosTitle": "KiloClaw iOS'ta kullanılamıyor",
       "multipleCurrentConflictBody": "Hesabında birden fazla etkin abonelik bulduk. Senden iki kez ücret almamak için işlemleri duraklattık.",
       "multipleCurrentConflictCta": "Kilo.ai sitesinde devam et",
@@ -779,7 +784,7 @@
         "queryErrorBody": "{{name}} için kurulum durumunu kontrol ederken bağlantımız kesildi. Kurulum hâlâ devam ediyor olabilir. Tekrar dene veya biraz sonra kontrol et.",
         "queryErrorTitle": "Kurulum durumu kontrol edilemedi",
         "settingUp": "{{name}} kuruluyor",
-        "stalledBody": "{{name}} için kurulumu tamamlayamadık. Tekrar dene. Sorun devam ederse hi@kilo.ai adresine e-posta gönder.",
+        "stalledBody": "{{name}} için kurulumu tamamlayamadık. Tekrar dene. Sorun devam ederse {{supportEmail}} adresine e-posta gönder.",
         "stalledTitle": "Kurulum ilerlemiyor",
         "startingSandbox": "Korumalı alan başlatılıyor",
         "stoppedBody": "{{name}} adlı örnek kurulum sırasında beklenmedik şekilde durdu.",
@@ -1036,7 +1041,7 @@
         "recoveryLabel": "GitHub uygulamasını güncelle"
       },
       "githubIpAllowList": {
-        "description": "Bu GitHub kuruluşunun IP izin listesi Kilo'yu engellediği için Kod inceleyici devre dışı bırakıldı. Yardım için hi@kilocode.ai adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
+        "description": "Bu GitHub kuruluşunun IP izin listesi Kilo'yu engellediği için Kod inceleyici devre dışı bırakıldı. Yardım için {{supportEmail}} adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo bu proje için GitLab proje erişim belirteci oluşturamadığından Kod inceleyici devre dışı bırakıldı. Proje sorumlusu yetkisi ver veya proje erişim belirteçlerini etkinleştir, ardından Kod inceleyiciyi tekrar etkinleştir.",
@@ -1051,7 +1056,7 @@
         "recoveryLabel": "Kod inceleyici ayarlarını güncelle"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Depo klonlama işlemi bugün üç kez zaman aşımına uğradığı için Kod inceleyici devre dışı bırakıldı. Yardım için hi@kilocode.ai adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
+        "description": "Depo klonlama işlemi bugün üç kez zaman aşımına uğradığı için Kod inceleyici devre dışı bırakıldı. Yardım için {{supportEmail}} adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
       },
       "title": "Kod inceleyici için işlem yapman gerekiyor.",
       "recoveryLabel": "Destekle iletişime geç"
@@ -1575,6 +1580,8 @@
       "title": "Oturum",
       "copyErrorDetails": "Hata ayrıntılarını kopyala",
       "backToSessions": "Oturumlara geri dön",
+      "follow": "Kilit ekranında takip et",
+      "unfollow": "Kilit ekranında takibi bırak",
       "couldNotLoad": "Oturum yüklenemedi.",
       "failedToLoadDetails": "Oturum ayrıntıları yüklenemedi.",
       "failedToStopExecution": "Çalışan işlem durdurulamadı.",
@@ -1641,6 +1648,11 @@
       "collapse": "Hedefi daralt",
       "expand": "Hedefi genişlet"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Görevler, {{total}} görevin {{completed}} tanesi tamamlandı",
+      "rowAccessibility": "Görevler, {{total}} görevin {{completed}} tanesi tamamlandı. Geçerli görev: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Son kullanılanlar",
       "couldNotLoadGithubRepositories": "GitHub depoları yüklenemedi.",
@@ -1673,7 +1685,6 @@
       "retryLoadingEnvironment": "Ortamı yüklemeyi tekrar dene",
       "defaultEnvironment": "Varsayılan ortam",
       "environmentSummary": "{{commands}} komut · {{mcp}} MCP · {{skills}} beceri · {{agents}} ajan",
-      "changes": "Değişiklikler",
       "leaveChanges": "Değişiklikleri koru",
       "commitAndPush": "İşle ve gönder",
       "startSession": "Oturumu başlat",
@@ -1696,6 +1707,10 @@
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",
       "importFailed": "Bu oturum içe aktarılamadı.",
+      "cliCannotFork": "Bir mesajdan dallandırmak için Kilo CLI'ı güncelle.",
+      "forkCutNotSynced": "Bu mesaj henüz kaydedilmedi. Birazdan tekrar dene.",
+      "forkFilesFromBaseBranch": "Dosyalar temel daldan başlar.",
+      "forkFilesUnchangedOnComputer": "Bu bilgisayardaki dosyalar değiştirilmez.",
       "pickProfile": "Bir profil seç",
       "noProfile": "Profil yok",
       "manageProfiles": "Profilleri yönet",
@@ -1740,8 +1755,8 @@
       "toolList": "listele",
       "toolPatch": "yama uygula",
       "toolTask": "görev",
-      "readTodos": "Görevleri oku",
-      "updateTodos": "Görevleri güncelle",
+      "readTodos": "Planı oku",
+      "updateTodos": "Planı güncelle",
       "linesBadge": "{{displayCount}} satır",
       "filesBadge": "{{displayCount}} dosya",
       "matchesBadge": "{{displayCount}} eşleşme",
@@ -1811,6 +1826,7 @@
       "copyMessage": "Mesajı kopyala",
       "copyText": "Metni kopyala",
       "selectText": "Metni seç",
+      "forkFromHere": "Buradan dallandır",
       "reportAiResponse": "AI yanıtını bildir",
       "reportAiResponseConfirm": "Bu yanıt inceleme için bildirilsin mi?",
       "report": "Bildir",
@@ -2130,6 +2146,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Değişiklikleri görüntüle",
+      "asOf": "{{time}} itibarıyla",
+      "tooLarge": "Bu fark, mobilde gösterilemeyecek kadar büyük.",
+      "empty": "Bu oturumda henüz dosya değişikliği yok."
     },
     "autoApprove": {
       "title": "Otomatik onayla",
@@ -2634,6 +2656,7 @@
     "fileRows": {
       "collapseFile": "Dosyayı daralt",
       "diffTooLarge": "Fark, görüntülenemeyecek kadar büyük.",
+      "noPreview": "Bu dosya için önizleme yok",
       "expandFile": "Dosyayı genişlet",
       "markViewed": "{{path}} dosyasını görüntülenmiş olarak işaretle",
       "openDiffOnGitHub": "Bu dosyanın farkını GitHub'da aç",
@@ -3153,6 +3176,8 @@
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
     "openSession": "Aç",
+    "finished": "Tamamlandı",
+    "followFailed": "Bu ajan kilit ekranında gösterilemedi.",
     "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun.",
     "checked": "Kontrol edildi",
     "lastKnown": "Son bilinen",
@@ -3161,7 +3186,26 @@
     "waitingForYou": "Sizi bekliyor",
     "nextScheduled": "Sıradaki zamanlananlar",
     "answerNeeded": "Yanıt bekliyor",
-    "waitingToRetry": "Yeniden deneme bekleniyor"
+    "waitingToRetry": "Yeniden deneme bekleniyor",
+    "step": {
+      "editing": "Düzenleniyor",
+      "reading": "Okunuyor",
+      "running": "Çalıştır",
+      "searching": "Web araması",
+      "thinking": "İyice düşünüyor"
+    },
+    "planOf": "/",
+    "filesChanged": "dosya değişti",
+    "finishedIn": "Tamamlanma süresi",
+    "noActivityFor": "Etkinlik yok",
+    "prOpened": "Pull request açıldı",
+    "permissionWants": "Çalıştırmak istiyor",
+    "failure": {
+      "provider": "Durduruldu: sağlayıcı hatası",
+      "tool": "Durduruldu: araç hatası",
+      "cancelled": "Durduruldu: iptal edildi",
+      "other": "DURDURULDU"
+    }
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",
@@ -3189,6 +3233,7 @@
     "tutorialLabel": "Eğitim"
   },
   "modelChat": {
+    "offlineFailure": "Bu model internet bağlantısı gerektiriyor. Bağlan ve tekrar dene ya da bu cihazdaki bir modele geç.",
     "empty": {
       "title": "Bir sohbet başlat",
       "description": "Bir modelle konuşmak için mesaj gönder."
@@ -3196,10 +3241,32 @@
     "list": {
       "loadFailed": "Sohbet geçmişi yüklenemedi.",
       "new": "Yeni sohbet",
-      "openHint": "Sohbeti açar. Silmek için uzun basın.",
       "deleteTitle": "Bu sohbet silinsin mi?"
     },
+    "rename": {
+      "title": "Sohbeti yeniden adlandır",
+      "accessibility": "Sohbeti yeniden adlandır: {{title}}",
+      "openHint": "Sohbeti açar. Yeniden adlandırmak veya silmek için uzun basın."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Sohbet ayrıntıları",
+      "backend": "Arka uç",
+      "effortDefault": "Model varsayılanı",
+      "noCost": "Maliyet yok",
+      "costUnknown": "Bilinmiyor",
+      "costEstimatedNote": "Fiyat bildirmeyen yanıtlar liste fiyatlarına göre tahmin edilmiştir.",
+      "costUnknownNote": "Bu model için bilinen bir fiyat yok.",
+      "costPartialNote": "Bu toplam, fiyatı bilinmeyen modelleri içermez.",
+      "localNote": "Cihazdaki modeller bu cihazda çalışır. Maliyetleri ve istem önbellekleri yoktur; belirteç sayıları tahmini olabilir.",
+      "countedSinceNote": "Bu sohbet, kullanım kaydedilmeye başlanmadan önce başladı. Toplamlar yalnızca bundan sonraki yanıtları gösterir.",
+      "remoteServersOn": "Açık uzak MCP sunucuları"
+    },
+    "webSearch": {
+      "title": "Web'de ara",
+      "description": "Bu sohbetin Kilo hesabın üzerinden güncel bilgi aramasına izin ver. Aramalar aylık arama hakkını kullanır.",
+      "allowanceExhausted": "Bu ayki ücretsiz web aramaların bitti. Yeniden aramak için kredi ekle."
+    },
     "mcp": {
       "title": "Kilo araçları",
       "use": "Kilo araçlarını kullan",
@@ -3222,7 +3289,6 @@
       "fieldName": "Görünen ad",
       "fieldUrl": "Sunucu URL'si",
       "fieldUrlInvalid": "Geçerli bir sunucu URL'si girin.",
-      "fieldToken": "Bearer belirteci (isteğe bağlı)",
       "enableServer": "Bu sunucuyu etkinleştir: {{name}}",
       "editServer": "Sunucuyu düzenle",
       "deleteServer": "Sunucuyu sil",
@@ -3243,8 +3309,24 @@
       "serverUnreachable": "Bu sunucuya ulaşılamadı",
       "serverOff": "Bu sunucu kapalı"
     },
+    "mcpOAuth": {
+      "authMethod": "Kimlik doğrulama",
+      "authNone": "Oturum açma yok",
+      "authBearer": "Bearer belirteci",
+      "authOAuth": "OAuth ile oturum açma",
+      "fieldToken": "Belirteç",
+      "oauthHint": "Kaydettikten sonra tarayıcınla oturum açmak için sunucuda $t(modelChat.mcpOAuth.signIn) seçeneğine dokun.",
+      "serverNeedsSignIn": "Bu sunucuyu kullanmak için oturum aç",
+      "signIn": "Oturum aç",
+      "signInA11y": "Bu sunucuda oturum aç: {{name}}",
+      "signInFailed": "{{name}} sunucusunda oturum açılamadı. Tekrar dene."
+    },
     "backends": {
       "title": "Sohbet arka uçları",
+      "providersTitle": "Sohbet sağlayıcıları",
+      "cloud": "Bulutta",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo modelleri şu anda kullanılamıyor. Bağlantını kontrol et.",
       "manage": "Arka uçları yönet",
       "defaultKilo": "$t(consent.kilo) (varsayılan)",
       "kiloHelp": "Yerleşik arka uç Kilo hesabını kullanır ve düzenlenemez veya silinemez.",
@@ -3304,7 +3386,6 @@
     "gguf": {
       "title": "İndirilebilir modeller",
       "help": "Açık bir model indirin ve llama.cpp ile bu telefonda çalıştırın. İstemleriniz ve yanıtlarınız cihazda kalır. Modeller büyüktür, bu yüzden Wi-Fi kullanın.",
-      "details": "{{size}} · Lisans: {{license}}",
       "download": "Modeli indir",
       "pause": "İndirmeyi duraklat",
       "resume": "İndirmeyi sürdür",
@@ -3316,6 +3397,8 @@
       "url": "Doğrudan indirme bağlantısı",
       "urlHelp": "Bir .gguf dosyasına ait HTTPS bağlantısını (örneğin bir Hugging Face resolve bağlantısı) yapıştırın. Modelleri yalnızca güvendiğiniz kaynaklardan indirin.",
       "downloadUrl": "Bağlantıdan indir",
+      "advanced": "Gelişmiş",
+      "localPurpose": "Bu cihazda llama.cpp ile çalışır. İstemler ve yanıtlar cihazda kalır.",
       "deleteTitle": "Bu model silinsin mi?",
       "deleteMessage": "{{name}} bu cihazdan silinsin mi? Bu modeli kullanan sohbetlerin devam edebilmesi için başka bir modele ihtiyacı olur.",
       "errors": {
@@ -3325,12 +3408,62 @@
         "notGguf": "Bağlantı bir .gguf dosyasını göstermelidir.",
         "space": "Bu model için yeterli boş depolama alanı yok. Yer açıp yeniden deneyin.",
         "network": "İndirme tamamlanamadı. Bağlantınızı denetleyip yeniden deneyin.",
-        "invalidFile": "İndirilen dosya bu uygulamanın çalıştırabileceği bir model değil, bu yüzden kaldırıldı."
+        "invalidFile": "İndirilen dosya bu uygulamanın çalıştırabileceği bir model değil, bu yüzden kaldırıldı.",
+        "checksum": "İndirilen dosya yayımlanan sağlama toplamıyla eşleşmiyor, bu yüzden kaldırıldı. İndirmeyi yeniden deneyin."
       }
+    },
+    "catalog": {
+      "browse": "Modellere göz at",
+      "title": "Model kataloğu",
+      "search": "Hugging Face modellerinde ara",
+      "tabs": "Model filtresi",
+      "fitsTab": "Bu cihaza uygun",
+      "fromHuggingFace": "Hugging Face'ten",
+      "loading": "Modeller yükleniyor",
+      "noResults": "Model bulunamadı",
+      "noFits": "Bu cihaza uygun model yok",
+      "noFitsDescription": "Daha büyük modeller $t(common.all) sekmesinde.",
+      "fit": {
+        "fits": "Uygun",
+        "tight": "Sınırda",
+        "tooLarge": "Çok büyük",
+        "noStorage": "Yetersiz depolama alanı",
+        "unknown": "Sığma durumu bilinmiyor"
+      },
+      "recommendationsHelp": "Bu uygulamanın sabitlediği kısa liste: model başına bir dosya, lisans belirten bir yayıncıdan. Başka hiçbir şey sıralanmaz.",
+      "compatibilityHelp": "Sığma, model dosyasını bu cihazın belleği ve boş depolamasıyla karşılaştırır. Bellek rakamı bir tahmindir, ölçüm değil.",
+      "text": "Metin",
+      "listTextPurpose": "Yalnızca metin istemleri.",
+      "listImagePurpose": "Metnin yanı sıra görselleri de okur.",
+      "smallestDownload": "En küçük indirme: {{size}} · yaklaşık {{memory}} bellek",
+      "fullFileName": "Dosya: {{name}}",
+      "memoryEstimateNote": "Bellek rakamları tahminidir, ölçüm değil.",
+      "parameters": "Parametre: {{value}}",
+      "downloads": "İndirme: {{value}}",
+      "likes": "Beğeni: {{value}}",
+      "context": "Bağlam penceresi: {{value}}",
+      "license": "Lisans: {{license}}",
+      "licenseUnknown": "Lisans belirtilmemiş",
+      "tools": "Araç çağırma",
+      "vision": "Görsel girişi",
+      "hintsHelp": "Bilgiler Hugging Face'ten alınır. Uygulama, modeli indirdikten sonra kontrol eder.",
+      "gated": "Bu model bir Hugging Face hesabı gerektirdiğinden uygulama onu indiremez.",
+      "quantizations": "Nicemlemeler",
+      "quantizationsHelp": "Küçük dosyalar daha az bellek ve depolama alanı kullanır. Büyük dosyalar genellikle daha iyi yanıtlar verir.",
+      "quantDetail": "{{size}} indirme · yaklaşık {{memory}} bellek",
+      "downloadQuant": "{{quant}} indir",
+      "loadingModel": "Model ayrıntıları yükleniyor",
+      "couldNotLoadModel": "Bu model yüklenemedi",
+      "noFiles": "Bu uygulamanın çalıştırabileceği dosya yok",
+      "noFilesDescription": "Bu uygulama tek bir GGUF dosyasından oluşan modelleri çalıştırır.",
+      "tooLargeTitle": "Bu model çalışmayabilir",
+      "tooLargeMessage": "{{name}} muhtemelen bu cihazdakinden daha fazla bellek gerektiriyor. Model yanıt verirken uygulama kapanabilir. Yine de indirilsin mi?",
+      "downloadAnyway": "Yine de indir"
     },
     "localModels": {
       "title": "Cihazdaki modeller",
-      "help": "Cihazdaki modeller bu telefonda çalışır. İstemleriniz ve yanıtlarınız cihazda kalır ve bu modeller araç kullanamaz.",
+      "help": "Cihazdaki modeller bu telefonda çalışır. İstemleriniz ve yanıtlarınız cihazda kalır.",
+      "systemPurpose": "Bu cihazın sistemine yerleşik model. Cihazda çalışır.",
       "apple": "Apple Intelligence (cihazda)",
       "checking": "Kullanılabilirlik denetleniyor…",
       "ready": "Kullanıma hazır",
@@ -3356,6 +3489,9 @@
       "downloading": "İndiriliyor…",
       "downloadProgress": "İndiriliyor… %{{percent}}",
       "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model düşünme düzeyini destekler"
     }
   },
   "settingsTools": {
@@ -3578,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play eşleşen kredi paketi döndürmedi.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account üzerindeki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum aç.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındaki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum açın."
+  },
+  "todos": {
+    "saveAsTodo": "Görev olarak kaydet",
+    "segment": {
+      "label": "Ajanlar görünümü",
+      "sessions": "Oturumlar",
+      "todos": "Görevler"
+    },
+    "lists": {
+      "newList": "Yeni liste",
+      "empty": "Henüz liste yok",
+      "couldNotLoad": "Listeler yüklenemedi",
+      "noRepository": "Depo yok",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "{{count}} açık",
+      "openCount_other": "{{count}} açık",
+      "archived_one": "Arşivlenenler ({{count}})",
+      "archived_other": "Arşivlenenler ({{count}})",
+      "archive": "Arşivle",
+      "unarchive": "Arşivden çıkar",
+      "deleteTitle": "{{name}} silinsin mi?",
+      "deleteMessage": "Görevleri de silinir. Oturumları kalır."
+    },
+    "listSettings": {
+      "title": "Liste ayarları",
+      "name": "Ad",
+      "namePlaceholder": "Hatalar, fikirler, sürüm…",
+      "emoji": "Emoji",
+      "mode": "Mod",
+      "defaultsHint": "Bu listeden başlatılan oturumlar bu varsayılanları kullanır."
+    },
+    "list": {
+      "addPlaceholder": "Bir görev ekle",
+      "add": "Görev ekle",
+      "empty": "Henüz görev yok",
+      "setDefaults": "Depo, mod ve model ayarla",
+      "completed_one": "Tamamlandı ({{count}})",
+      "completed_other": "Tamamlandı ({{count}})"
+    },
+    "item": {
+      "markDone": "Tamamlandı olarak işaretle",
+      "markOpen": "Tamamlanmadı olarak işaretle",
+      "markDonePrompt": "Tamamlandı olarak işaretlensin mi?",
+      "deleted": "Görev silindi",
+      "undo": "Geri al",
+      "runCount_one": "{{count}} çalıştırma",
+      "runCount_other": "{{count}} çalıştırma",
+      "startNow": "İncelemeden başlat",
+      "startNowHint": "İncelemeden başlatmak için basılı tut",
+      "titleLabel": "Görev başlığı",
+      "renameTitle": "Görevi yeniden adlandır",
+      "notes": "Notlar",
+      "addNotes": "Not ekle",
+      "notesPrompt": "Bağlam, gereksinimler veya kabul ölçütleri ekle.",
+      "markdownSupported": "Markdown desteklenir",
+      "sessions": "Bağlı oturumlar",
+      "noSessions": "Henüz oturum yok",
+      "untitledLinkedSession": "Bağlı oturum",
+      "sessionNeedsInput": "Oturum girdi bekliyor",
+      "sessionRunning": "Oturum çalışıyor",
+      "sessionFinished": "Oturum tamamlandı",
+      "sessionPullRequest": "Oturum PR'ı",
+      "sessionPullRequestNumber": "Oturum PR #{{number}}",
+      "openSessionHint": "Oturumu açar.",
+      "unlinkSessionAction": "Oturumun bağlantısını kaldır",
+      "unlinkConfirmTitle": "{{title}} bağlantısı kaldırılsın mı?",
+      "unlinkConfirmMessage": "Oturumun kendisi silinmez. Yalnızca bu yapılacaklar öğesine olan bağlantısı kaldırılır.",
+      "startNewSession": "Yeni oturum başlat",
+      "startNewSessionHint": "Yeni bir oturum başlatmak için uzun bas.",
+      "linkSession": "Oturum bağla",
+      "linkFailed": "Oturum göreve bağlanamadı"
+    },
+    "linkSession": {
+      "title": "Bir oturum bağla",
+      "empty": "Son oturum yok",
+      "emptyInRepository": "{{repository}} deposunda son oturum yok"
+    },
+    "upNext": "Sıradaki",
+    "sessionTodo": "Görev: {{title}}",
+    "linkToTodo": "Göreve bağla",
+    "candidates": {
+      "empty": "Açık görev yok"
+    },
+    "saveSheet": {
+      "title": "Listeye kaydet",
+      "saved": "{{list}} listesine kaydedildi"
+    }
   }
 }

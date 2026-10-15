@@ -10,9 +10,9 @@ import { UsageRecordResponseSchema, type UsageRecordRequest } from '@kilocode/us
  * Client for handing the AI-gateway usage write to a Frankfurt-local endpoint.
  *
  * `APP_URL` resolves to the Frankfurt-only `kilocode-app` deployment in
- * production. Its `next.config.mjs` rewrites divert only the six listed gateway
- * paths to `global-api.kilo.ai`, so `/api/internal/*` executes locally there,
- * next to the PostgreSQL primary.
+ * production. Its `next.config.mjs` rewrites divert only the legacy gateway
+ * paths to `apps/ai-gateway`, so `/api/internal/*` executes locally there, next
+ * to the PostgreSQL primary.
  */
 
 const USAGE_RECORD_PATH = '/api/internal/usage/record';

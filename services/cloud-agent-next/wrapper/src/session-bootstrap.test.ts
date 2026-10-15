@@ -202,7 +202,11 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         path.join(request.workspace.sessionHome, '.kilocode/rules/cloud-agent.md'),
         'utf8'
       )
-    ).toBe(buildCloudAgentRules(process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS));
+    ).toBe(
+      buildCloudAgentRules({
+        bashDefaultTimeoutMs: process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
+      })
+    );
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
     ).toBe(true);
@@ -2495,7 +2499,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(progress).toHaveBeenCalledWith('kilo_server', 'Starting Kilo...');
     expect(gitCalls).toEqual([['remote', 'set-url', 'origin', 'https://gitlab.com/acme/repo.git']]);
     expect(await fsp.readFile(rulesPath, 'utf8')).toBe(
-      buildCloudAgentRules(process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS)
+      buildCloudAgentRules({
+        bashDefaultTimeoutMs: process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
+      })
     );
   });
 

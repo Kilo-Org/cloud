@@ -133,10 +133,14 @@
     "status": "Vəziyyət",
     "truncated": "Qısaldılıb",
     "updated": "Yenilənib",
+    "generating": "Yaradılır…",
     "working": "İşləyir",
     "yourOwnRepositories": "Öz repozitoriyaların",
     "dismissed": "Rədd edilib",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Dəyişikliklər"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -325,6 +329,7 @@
       "collapseFile": "Faylın məzmununu gizlət",
       "expandFile": "Faylın məzmununu göstər",
       "diffTooLarge": "Dəyişikliklərin həcmi göstərilmək üçün çox böyükdür.",
+      "noPreview": "Bu fayl üçün önizləmə mövcud deyil",
       "openOnGitHub": "GitHub-da aç",
       "openDiffOnGitHub": "Bu faylın dəyişikliklərini GitHub-da aç",
       "githubDiff": "GitHub-dakı dəyişikliklər"
@@ -831,7 +836,8 @@
       "kiloclaw": "KiloClaw fəaliyyəti",
       "balance": "Balans bildirişləri",
       "security": "Təhlükəsizlik problemləri",
-      "spend": "Xərc bildirişləri"
+      "spend": "Xərc bildirişləri",
+      "followedSessions": "İzlənilən sessiyalar"
     },
     "category": {
       "chatMessagesSubtitle": "söhbətlərindəki cavablar",
@@ -1254,7 +1260,7 @@
         "stoppedTitle": "Quraşdırma dayandı",
         "stoppedBody": "{{name}} üçün instans quraşdırma zamanı gözlənilmədən dayandı.",
         "stalledTitle": "Quraşdırma irəliləmir",
-        "stalledBody": "{{name}} üçün quraşdırmanı tamamlamaq mümkün olmadı. Yenidən cəhd et. Problem təkrarlanarsa, hi@kilo.ai ünvanına yaz.",
+        "stalledBody": "{{name}} üçün quraşdırmanı tamamlamaq mümkün olmadı. Yenidən cəhd et. Problem təkrarlanarsa, {{supportEmail}} ünvanına yaz.",
         "timeoutTitle": "Gözləniləndən çox çəkir",
         "timeoutBody": "{{name}} üçün quraşdırma həmişəkindən çox vaxt aparır ({{displayMinutes}} dəqiqədən çox).",
         "continueInBackground": "Fonda davam et",
@@ -1312,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Erkən giriş planından mobil cihazda istifadə etməzdən əvvəl plan mütəxəssis tərəfindən yoxlanmalıdır.",
       "iosTitle": "KiloClaw iOS-da əlçatan deyil",
       "iosBody": "Bu hesab üçün KiloClaw girişi iOS tətbiqindən kənarda idarə olunur.",
-      "iosContact": "Sualın var? hi@kilo.ai ünvanına yaz.",
+      "iosContact": "Sualın var? {{supportEmail}} ünvanına yaz.",
       "quarantinedCta": "Komandamıza e-poçt göndər",
       "nonCanonicalEarlybirdCta": "Planını kilo.ai saytında nəzərdən keçir"
     },
@@ -1547,7 +1553,7 @@
         "recoveryLabel": "GitHub tətbiqini yenilə"
       },
       "githubIpAllowList": {
-        "description": "Bu GitHub təşkilatının icazə verilən IP ünvanları siyahısı Kilo-nun girişini blokladığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün hi@kilocode.ai ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
+        "description": "Bu GitHub təşkilatının icazə verilən IP ünvanları siyahısı Kilo-nun girişini blokladığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün {{supportEmail}} ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo bu layihə üçün GitLab layihə giriş tokeni yarada bilmədiyi üçün kod yoxlayıcısı deaktiv edildi. Layihə idarəçisi icazəsi ver və ya layihə giriş tokenlərini aktivləşdir, sonra kod yoxlayıcısını yenidən aktivləşdir.",
@@ -1562,7 +1568,7 @@
         "recoveryLabel": "Kod yoxlayıcısının parametrlərini yenilə"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Bu gün repozitoriyanın klonlanması üç dəfə vaxt həddini aşdığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün hi@kilocode.ai ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
+        "description": "Bu gün repozitoriyanın klonlanması üç dəfə vaxt həddini aşdığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün {{supportEmail}} ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
       },
       "title": "Kod yoxlayıcısında müdaxilə tələb olunur.",
       "recoveryLabel": "Dəstək xidməti ilə əlaqə saxla"
@@ -2086,6 +2092,8 @@
       "title": "Sessiya",
       "copyErrorDetails": "Xətanın təfərrüatlarını kopyala",
       "backToSessions": "Sessiyalara qayıt",
+      "follow": "Kilid ekranında izlə",
+      "unfollow": "Kilid ekranında izləməni dayandır",
       "couldNotLoad": "Sessiyanı yükləmək mümkün olmadı.",
       "failedToLoadDetails": "Sessiyanın təfərrüatlarını yükləmək mümkün olmadı.",
       "failedToStopExecution": "İcranı dayandırmaq mümkün olmadı.",
@@ -2152,6 +2160,11 @@
       "collapse": "Məqsədi yığ",
       "expand": "Məqsədi göstər"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tapşırıqlar, {{total}} tapşırıqdan {{completed}} tamamlandı",
+      "rowAccessibility": "Tapşırıqlar, {{total}} tapşırıqdan {{completed}} tamamlandı. Cari tapşırıq: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Son istifadə edilənlər",
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarını yükləmək mümkün olmadı.",
@@ -2184,7 +2197,6 @@
       "retryLoadingEnvironment": "Mühiti yenidən yüklə",
       "defaultEnvironment": "Standart mühit",
       "environmentSummary": "{{commands}} əmr · {{mcp}} MCP · {{skills}} bacarıq · {{agents}} agent",
-      "changes": "Dəyişikliklər",
       "leaveChanges": "Dəyişiklikləri saxla",
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",
@@ -2207,6 +2219,10 @@
       "importingSession": "Sessiya idxal olunur",
       "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seç.",
       "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı.",
+      "cliCannotFork": "Mesajdan ayırmaq üçün Kilo CLI-ı yenilə.",
+      "forkCutNotSynced": "Bu mesaj hələ saxlanmayıb. Bir azdan yenidən cəhd et.",
+      "forkFilesFromBaseBranch": "Fayllar əsas branch-dən başlayır.",
+      "forkFilesUnchangedOnComputer": "Bu kompüterdəki fayllar dəyişdirilmir.",
       "pickProfile": "Profil seçin",
       "noProfile": "Profil yoxdur",
       "manageProfiles": "Profilləri idarə edin",
@@ -2251,8 +2267,8 @@
       "toolList": "siyahıla",
       "toolPatch": "düzəliş et",
       "toolTask": "tapşırıq",
-      "readTodos": "Tapşırıqları oxu",
-      "updateTodos": "Tapşırıqları yenilə",
+      "readTodos": "Planı oxu",
+      "updateTodos": "Planı yenilə",
       "linesBadge": "{{displayCount}} sətir",
       "filesBadge": "{{displayCount}} fayl",
       "matchesBadge": "{{displayCount}} uyğunluq",
@@ -2322,6 +2338,7 @@
       "copyMessage": "Mesajı kopyala",
       "copyText": "Mətni kopyala",
       "selectText": "Mətni seç",
+      "forkFromHere": "Buradan ayır",
       "reportAiResponse": "AI cavabından şikayət et",
       "reportAiResponseConfirm": "Yoxlanılması üçün bu cavabdan şikayət göndərilsin?",
       "report": "Şikayət et",
@@ -2641,6 +2658,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modellər ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Dəyişikliklərə bax",
+      "asOf": "{{time}} vəziyyətinə",
+      "tooLarge": "Dəyişikliklərin həcmi mobil cihazda göstərmək üçün çox böyükdür.",
+      "empty": "Bu sessiyada hələ fayl dəyişikliyi yoxdur."
     },
     "autoApprove": {
       "title": "Avtomatik təsdiq",
@@ -3153,6 +3176,8 @@
     "channelName": "Aktiv agentlər",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
     "openSession": "Aç",
+    "finished": "Bitdi",
+    "followFailed": "Bu agenti kilid ekranında göstərmək mümkün olmadı.",
     "approveFailed": "Təsdiqləmək mümkün olmadı. Yenidən cəhd etmək üçün $t(common.approve) üzərinə toxun.",
     "checked": "Yoxlanılıb",
     "lastKnown": "Son məlum vəziyyət",
@@ -3161,7 +3186,26 @@
     "waitingForYou": "Sizi gözləyir",
     "nextScheduled": "Növbəti planlaşdırılanlar",
     "answerNeeded": "Cavab gözləyir",
-    "waitingToRetry": "Təkrar cəhd gözlənilir"
+    "waitingToRetry": "Təkrar cəhd gözlənilir",
+    "step": {
+      "editing": "Redaktə",
+      "reading": "Oxu",
+      "running": "İşləyir",
+      "searching": "Veb axtarış",
+      "thinking": "Dərindən düşünür"
+    },
+    "planOf": "dən",
+    "filesChanged": "fayl dəyişdi",
+    "finishedIn": "Tamamlandı",
+    "noActivityFor": "Fəaliyyət yoxdur",
+    "prOpened": "Çəkmə sorğusu açıldı",
+    "permissionWants": "İşlətmək istəyir",
+    "failure": {
+      "provider": "Dayandı: provayder xətası",
+      "tool": "Dayandı: alət xətası",
+      "cancelled": "Dayandı: ləğv edildi",
+      "other": "DAYANDIRILIB"
+    }
   },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",
@@ -3189,6 +3233,7 @@
     "tutorialLabel": "Təlimat"
   },
   "modelChat": {
+    "offlineFailure": "Bu model internet bağlantısı tələb edir. Qoşulun və yenidən cəhd edin və ya bu cihazdakı modelə keçin.",
     "empty": {
       "title": "Söhbətə başlayın",
       "description": "Bir modellə danışmaq üçün mesaj göndərin."
@@ -3196,10 +3241,32 @@
     "list": {
       "loadFailed": "Söhbət tarixçəsi yüklənə bilmədi.",
       "new": "Yeni söhbət",
-      "openHint": "Söhbəti açır. Silmək üçün basıb saxlayın.",
       "deleteTitle": "Bu söhbət silinsin?"
     },
+    "rename": {
+      "title": "Söhbətin adını dəyiş",
+      "accessibility": "Söhbətin adını dəyiş: {{title}}",
+      "openHint": "Söhbəti açır. Adını dəyişmək və ya silmək üçün basıb saxlayın."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Söhbətin təfərrüatları",
+      "backend": "Arxa xidmət",
+      "effortDefault": "Modelin standart dəyəri",
+      "noCost": "Xərc yoxdur",
+      "costUnknown": "Məlum deyil",
+      "costEstimatedNote": "Qiymət bildirməyən cavabların xərci siyahı qiymətlərinə əsasən təxmin edilib.",
+      "costUnknownNote": "Bu model üçün məlum qiymət yoxdur.",
+      "costPartialNote": "Bu cəmə qiyməti məlum olmayan modellər daxil deyil.",
+      "localNote": "Cihazdakı modellər bu cihazda işləyir. Onların xərci və sorğu keşi yoxdur, token sayları isə təxmini ola bilər.",
+      "countedSinceNote": "Bu söhbət istifadə qeydə alınmazdan əvvəl başlayıb. Cəmlər yalnız ondan sonrakı cavabları göstərir.",
+      "remoteServersOn": "Aktiv uzaq MCP serverləri"
+    },
+    "webSearch": {
+      "title": "Vebdə axtar",
+      "description": "Bu söhbətə Kilo hesabınız vasitəsilə aktual məlumat axtarmağa icazə verin. Axtarışlar aylıq axtarış limitinizdən istifadə edir.",
+      "allowanceExhausted": "Bu ay üçün pulsuz veb axtarışlarınız bitdi. Yenidən axtarmaq üçün kredit əlavə edin."
+    },
     "mcp": {
       "title": "Kilo alətləri",
       "use": "Kilo alətlərindən istifadə et",
@@ -3222,7 +3289,6 @@
       "fieldName": "Göstərilən ad",
       "fieldUrl": "Server URL-i",
       "fieldUrlInvalid": "Etibarlı server URL-i daxil edin.",
-      "fieldToken": "Bearer token (istəyə bağlı)",
       "enableServer": "Bu serveri aktiv et: {{name}}",
       "editServer": "Serveri redaktə et",
       "deleteServer": "Serveri sil",
@@ -3243,8 +3309,24 @@
       "serverUnreachable": "Bu serverə çatmaq mümkün olmadı",
       "serverOff": "Bu server söndürülüb"
     },
+    "mcpOAuth": {
+      "authMethod": "Autentifikasiya",
+      "authNone": "Girişsiz",
+      "authBearer": "Bearer token",
+      "authOAuth": "OAuth ilə giriş",
+      "fieldToken": "Token",
+      "oauthHint": "Yadda saxladıqdan sonra brauzerlə daxil olmaq üçün serverdə $t(modelChat.mcpOAuth.signIn) düyməsinə toxun.",
+      "serverNeedsSignIn": "Bu serverdən istifadə etmək üçün daxil ol",
+      "signIn": "Daxil ol",
+      "signInA11y": "Bu serverə daxil ol: {{name}}",
+      "signInFailed": "{{name}} serverinə daxil olmaq mümkün olmadı. Yenidən cəhd et."
+    },
     "backends": {
       "title": "Söhbətin arxa xidmətləri",
+      "providersTitle": "Söhbət provayderləri",
+      "cloud": "Buludda",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo modelləri hazırda əlçatan deyil. Bağlantını yoxla.",
       "manage": "Arxa xidmətləri idarə et",
       "defaultKilo": "$t(consent.kilo) (defolt)",
       "kiloHelp": "Daxili arxa xidmət Kilo hesabınızdan istifadə edir və onu redaktə etmək və ya silmək mümkün deyil.",
@@ -3304,7 +3386,6 @@
     "gguf": {
       "title": "Yüklənə bilən modellər",
       "help": "Açıq model yükləyin və onu bu telefonda llama.cpp ilə işlədin. Sorğularınız və cavablarınız cihazda qalır. Modellər böyükdür, ona görə Wi-Fi-dan istifadə edin.",
-      "details": "{{size}} · Lisenziya: {{license}}",
       "download": "Modeli yüklə",
       "pause": "Yükləməni dayandır",
       "resume": "Yükləməni davam etdir",
@@ -3316,6 +3397,8 @@
       "url": "Birbaşa yükləmə linki",
       "urlHelp": ".gguf faylına HTTPS linki yapışdırın, məsələn Hugging Face resolve linki. Modelləri yalnız etibarlı hesab etdiyiniz mənbələrdən yükləyin.",
       "downloadUrl": "Linkdən yüklə",
+      "advanced": "Ətraflı",
+      "localPurpose": "Bu cihazda llama.cpp ilə işləyir. Sorğular və cavablar cihazda qalır.",
       "deleteTitle": "Bu model silinsin?",
       "deleteMessage": "{{name}} bu cihazdan silinsin? Ondan istifadə edən söhbətlərin davam etməsi üçün başqa model lazımdır.",
       "errors": {
@@ -3325,12 +3408,62 @@
         "notGguf": "Link .gguf faylına yönəlməlidir.",
         "space": "Bu model üçün kifayət qədər boş yaddaş yoxdur. Yer boşaldın və yenidən cəhd edin.",
         "network": "Yükləmə tamamlanmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
-        "invalidFile": "Yüklənmiş fayl bu tətbiqin işlədə biləcəyi model deyil, ona görə silindi."
+        "invalidFile": "Yüklənmiş fayl bu tətbiqin işlədə biləcəyi model deyil, ona görə silindi.",
+        "checksum": "Yüklənmiş fayl dərc olunmuş yoxlama cəmi ilə uyğun gəlmir, ona görə silindi. Yükləməni yenidən cəhd edin."
       }
+    },
+    "catalog": {
+      "browse": "Modellərə bax",
+      "title": "Model kataloqu",
+      "search": "Hugging Face modellərində axtar",
+      "tabs": "Model filtri",
+      "fitsTab": "Bu cihaza uyğun",
+      "fromHuggingFace": "Hugging Face-dən",
+      "loading": "Modellər yüklənir",
+      "noResults": "Model tapılmadı",
+      "noFits": "Bu cihaza uyğun model yoxdur",
+      "noFitsDescription": "Daha böyük modellər $t(common.all) bölməsindədir.",
+      "fit": {
+        "fits": "Uyğundur",
+        "tight": "Çətinliklə sığır",
+        "tooLarge": "Çox böyükdür",
+        "noStorage": "Yaddaş kifayət etmir",
+        "unknown": "Uyğunluq bilinmir"
+      },
+      "recommendationsHelp": "Bu tətbiqin sabitlədiyi qısa siyahı: hər model üçün bir fayl, lisenziya bildirən nəşriyyatdan. Başqa heç nə sıralanmır.",
+      "compatibilityHelp": "Uyğunluq model faylını bu cihazın yaddaşı və boş yaddaşı ilə müqayisə edir. Yaddaş rəqəmi təxmindir, ölçmə deyil.",
+      "text": "Mətn",
+      "listTextPurpose": "Yalnız mətn sorğuları.",
+      "listImagePurpose": "Mətni olduğu kimi şəkilləri də oxuyur.",
+      "smallestDownload": "Ən kiçik yükləmə: {{size}} · təxminən {{memory}} yaddaş",
+      "fullFileName": "Fayl: {{name}}",
+      "memoryEstimateNote": "Yaddaş rəqəmləri təxminlərdir, ölçmələr deyil.",
+      "parameters": "Parametrlər: {{value}}",
+      "downloads": "Yükləmələr: {{value}}",
+      "likes": "Bəyənmələr: {{value}}",
+      "context": "Kontekst pəncərəsi: {{value}}",
+      "license": "Lisenziya: {{license}}",
+      "licenseUnknown": "Lisenziya göstərilməyib",
+      "tools": "Alət çağırışı",
+      "vision": "Şəkil girişi",
+      "hintsHelp": "Hugging Face-dən göstərişlər. Tətbiq modeli yükləndikdən sonra yoxlayır.",
+      "gated": "Bu model Hugging Face hesabı tələb edir, ona görə də tətbiq onu yükləyə bilmir.",
+      "quantizations": "Kvantlaşdırmalar",
+      "quantizationsHelp": "Kiçik fayllar daha az yaddaş və yer tutur. Böyük fayllar adətən daha yaxşı cavablar verir.",
+      "quantDetail": "{{size}} yükləmə · təxminən {{memory}} yaddaş",
+      "downloadQuant": "{{quant}} yüklə",
+      "loadingModel": "Model məlumatları yüklənir",
+      "couldNotLoadModel": "Bu modeli yükləmək mümkün olmadı",
+      "noFiles": "Bu tətbiqin işlədə biləcəyi fayl yoxdur",
+      "noFilesDescription": "Bu tətbiq tək GGUF faylından ibarət modelləri işlədir.",
+      "tooLargeTitle": "Bu model işləməyə bilər",
+      "tooLargeMessage": "{{name}} çox güman ki, bu cihazda olandan daha çox yaddaş tələb edir. Model cavab verərkən tətbiq bağlana bilər. Yenə də yüklənsin?",
+      "downloadAnyway": "Yenə də yüklə"
     },
     "localModels": {
       "title": "Cihazdakı modellər",
-      "help": "Cihazdakı modellər bu telefonda işləyir. Sorğularınız və cavablar cihazda qalır, bu modellər isə alətlərdən istifadə edə bilmir.",
+      "help": "Cihazdakı modellər bu telefonda işləyir. Sorğularınız və cavablar cihazda qalır.",
+      "systemPurpose": "Bu cihazın sisteminə daxil edilmiş model. O, cihazda işləyir.",
       "apple": "Apple Intelligence (cihazda)",
       "checking": "Əlçatanlıq yoxlanılır…",
       "ready": "İstifadəyə hazırdır",
@@ -3356,6 +3489,9 @@
       "downloading": "Endirilir…",
       "downloadProgress": "Endirilir… {{percent}}%",
       "downloadFailed": "Endirmə tamamlanmadı. İnternet bağlantınızı və boş yaddaşı yoxlayın, sonra yenidən cəhd edin."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
     }
   },
   "settingsTools": {
@@ -3578,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play tərəfindən uyğun kredit paketi qaytarılmadı.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil ol.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil olun."
+  },
+  "todos": {
+    "saveAsTodo": "Tapşırıq kimi yadda saxla",
+    "segment": {
+      "label": "Agentlər görünüşü",
+      "sessions": "Sessiyalar",
+      "todos": "Tapşırıqlar"
+    },
+    "lists": {
+      "newList": "Yeni siyahı",
+      "empty": "Hələ siyahı yoxdur",
+      "couldNotLoad": "Siyahıları yükləmək mümkün olmadı",
+      "noRepository": "Repozitoriya yoxdur",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} açıq",
+      "openCount_other": "{{count}} açıq",
+      "archived_one": "Arxivlənib ({{count}})",
+      "archived_other": "Arxivlənib ({{count}})",
+      "archive": "Arxivləşdir",
+      "unarchive": "Arxivdən çıxar",
+      "deleteTitle": "{{name}} silinsin?",
+      "deleteMessage": "Onun tapşırıqları da silinir. Sessiyaları qalır."
+    },
+    "listSettings": {
+      "title": "Siyahı parametrləri",
+      "name": "Ad",
+      "namePlaceholder": "Xətalar, İdeyalar, Buraxılış…",
+      "emoji": "Emoji",
+      "mode": "Rejim",
+      "defaultsHint": "Bu siyahıdan başladılan sessiyalar bu standart dəyərlərdən istifadə edir."
+    },
+    "list": {
+      "addPlaceholder": "Yeni tapşırıq əlavə et",
+      "add": "Tapşırıq əlavə et",
+      "empty": "Hələ tapşırıq yoxdur",
+      "setDefaults": "Repozitoriya, rejim və model təyin et",
+      "completed_one": "Tamamlanıb ({{count}})",
+      "completed_other": "Tamamlanıb ({{count}})"
+    },
+    "item": {
+      "markDone": "Tamamlanıb kimi işarələ",
+      "markOpen": "Tamamlanmayıb kimi işarələ",
+      "markDonePrompt": "Tamamlanıb kimi işarələnsin?",
+      "deleted": "Tapşırıq silindi",
+      "undo": "Geri al",
+      "runCount_one": "{{count}} işə düşmə",
+      "runCount_other": "{{count}} işə düşmə",
+      "startNow": "Yoxlamasız başlat",
+      "startNowHint": "Yoxlamasız başlatmaq üçün basıb saxla",
+      "titleLabel": "Tapşırığın başlığı",
+      "renameTitle": "Tapşırığın adını dəyiş",
+      "notes": "Qeydlər",
+      "addNotes": "Qeyd əlavə et",
+      "notesPrompt": "Kontekst, tələblər və ya qəbul meyarları əlavə et.",
+      "markdownSupported": "Markdown dəstəklənir",
+      "sessions": "Əlaqəli sessiyalar",
+      "noSessions": "Hələ sessiya yoxdur",
+      "untitledLinkedSession": "Bağlı sessiya",
+      "sessionNeedsInput": "Sessiya giriş tələb edir",
+      "sessionRunning": "Sessiya işləyir",
+      "sessionFinished": "Sessiya bitdi",
+      "sessionPullRequest": "Sessiya pull sorğusu",
+      "sessionPullRequestNumber": "Sessiya PR #{{number}}",
+      "openSessionHint": "Sessiyanı açır.",
+      "unlinkSessionAction": "Sessiyanın bağlantısını kəs",
+      "unlinkConfirmTitle": "{{title}} bağlantısı kəsilsin?",
+      "unlinkConfirmMessage": "Sessiyanın özü silinmir. Yalnız bu tapşırıqla bağlantısı silinir.",
+      "startNewSession": "Yeni sessiya başlat",
+      "startNewSessionHint": "Yeni sessiya başlatmaq üçün uzun bas.",
+      "linkSession": "Sessiyanı əlaqələndir",
+      "linkFailed": "Sessiyanı tapşırıqla əlaqələndirmək mümkün olmadı"
+    },
+    "linkSession": {
+      "title": "Sessiya əlaqələndir",
+      "empty": "Son sessiya yoxdur",
+      "emptyInRepository": "{{repository}} repozitoriyasında son sessiya yoxdur"
+    },
+    "upNext": "Sıradakı",
+    "sessionTodo": "Tapşırıq: {{title}}",
+    "linkToTodo": "Tapşırığa əlaqələndir",
+    "candidates": {
+      "empty": "Açıq tapşırıq yoxdur"
+    },
+    "saveSheet": {
+      "title": "Siyahıya yadda saxla",
+      "saved": "{{list}} siyahısına yadda saxlanıldı"
+    }
   }
 }

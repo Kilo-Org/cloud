@@ -110,6 +110,27 @@ export function isCodeReviewSession(origin?: SessionCreateOrigin): boolean {
   return origin?.billingOrigin === CODE_REVIEW_PLATFORM;
 }
 
+/**
+ * Provider tool capability a session needs from its sandbox image, from the two
+ * independent trusted origin signals. The code-review publisher is identified by
+ * the trusted `billingOrigin`; security remediation by the runtime
+ * `createdOnPlatform`. A public `start` stamps `billingOrigin: 'cloud-agent'`,
+ * which must not mask a remediation runtime origin, so the two checks stay
+ * separate.
+ */
+export function requiredProviderCapability(
+  origin?: SessionCreateOrigin
+): 'review' | 'remediation' | undefined {
+  if (origin?.createdOnPlatform === 'security-remediation') return 'remediation';
+  if (
+    origin?.billingOrigin === CODE_REVIEW_PLATFORM ||
+    origin?.createdOnPlatform === CODE_REVIEW_PLATFORM
+  ) {
+    return 'review';
+  }
+  return undefined;
+}
+
 export function isCodeReviewControlPlaneOwner(
   env: ControlPlaneOwnerEnv,
   owner: { userId: string; orgId?: string }
@@ -117,6 +138,17 @@ export function isCodeReviewControlPlaneOwner(
   return (
     ownerIdInList(env.CODE_REVIEW_CONTROL_PLANE_IDS, owner.userId) ||
     ownerIdInList(env.CODE_REVIEW_CONTROL_PLANE_IDS, owner.orgId)
+  );
+}
+
+/** UI gate only: hides the preview button and links; entry still checks session access. */
+export function isPreviewOwner(
+  env: { PREVIEW_ENABLED_IDS?: string },
+  owner: { userId: string; orgId?: string }
+): boolean {
+  return (
+    ownerIdInList(env.PREVIEW_ENABLED_IDS, owner.userId) ||
+    ownerIdInList(env.PREVIEW_ENABLED_IDS, owner.orgId)
   );
 }
 

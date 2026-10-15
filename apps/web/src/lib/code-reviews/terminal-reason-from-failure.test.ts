@@ -91,6 +91,17 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     expect(terminalReasonFromCloudAgentFailure(unauthenticated)).toBe('assistant_unauthorized');
   });
 
+  it('keeps a BYOK timeout in the existing timeout category rather than invalid-request rejection', () => {
+    expect(
+      terminalReasonFromCloudAgentFailure({
+        code: 'assistant_error',
+        assistantReason: 'timeout',
+        providerOwnership: 'byok',
+        message: 'Assistant request timed out',
+      })
+    ).toBe('assistant_timeout');
+  });
+
   it('prefers the structured assistant reason over the safe message', () => {
     // A message that would map elsewhere via the legacy text path must not win.
     expect(
@@ -101,6 +112,25 @@ describe('terminalReasonFromCloudAgentFailure', () => {
       })
     ).toBe('assistant_unavailable');
   });
+
+  it.each([
+    ['byok', 'assistant_invalid_request_byok'],
+    ['managed', 'assistant_invalid_request'],
+    ['unknown', 'assistant_invalid_request'],
+    [undefined, 'assistant_invalid_request'],
+  ] as const)(
+    'splits invalid requests with %s ownership into %s',
+    (providerOwnership, expected) => {
+      expect(
+        terminalReasonFromCloudAgentFailure({
+          code: 'assistant_error',
+          assistantReason: 'invalid_request',
+          providerOwnership,
+          message: 'Assistant request was rate limited',
+        })
+      ).toBe(expected);
+    }
+  );
 
   it.each(CLOUD_AGENT_ASSISTANT_FAILURE_REASONS)(
     'resolves assistant reason %s to a defined, valid terminal reason',

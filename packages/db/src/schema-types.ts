@@ -195,6 +195,14 @@ export const WorkspaceFolderColor = {
 
 export type WorkspaceFolderColor = (typeof WorkspaceFolderColor)[keyof typeof WorkspaceFolderColor];
 
+export const TodoItemSessionOrigin = {
+  Started: 'started',
+  Linked: 'linked',
+} as const;
+
+export type TodoItemSessionOrigin =
+  (typeof TodoItemSessionOrigin)[keyof typeof TodoItemSessionOrigin];
+
 // --- SecurityAuditLogAction ---
 
 /**
@@ -2115,6 +2123,18 @@ export const OpenCodeVariantSchema = z.object({
 
 export type OpenCodeVariant = z.infer<typeof OpenCodeVariantSchema>;
 
+// models.dev `reasoning_options` format, consumed by Kilo CLI v2 to build its own
+// per-protocol reasoning variants.
+export const ReasoningOptionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('toggle') }),
+  z.object({
+    type: z.literal('effort'),
+    values: z.array(z.union([z.null(), ReasoningEffortSchema, z.literal('default')])),
+  }),
+]);
+
+export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
+
 export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
 
 export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
@@ -2125,7 +2145,7 @@ export const DirectByokModelSchema = z.object({
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
-  variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
+  reasoning_options: z.array(ReasoningOptionSchema).optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
@@ -2137,6 +2157,7 @@ export const OpenCodeSettingsSchema = z.object({
   family: OpenCodeFamilySchema.optional(),
   prompt: OpenCodePromptSchema.optional(),
   variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
+  reasoning_options: z.array(ReasoningOptionSchema).optional(),
 });
 
 export type OpenCodeSettings = z.infer<typeof OpenCodeSettingsSchema>;
@@ -2436,6 +2457,7 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'assistant_timeout',
   'assistant_unauthorized',
   'assistant_invalid_request',
+  'assistant_invalid_request_byok',
   'assistant_context_limit',
   'assistant_output_limit',
   'assistant_content_filter',
@@ -2492,6 +2514,7 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   // unqualified 'assistant_rate_limited' also stays non-benign, since unknown
   // ownership could be either.
   'assistant_rate_limited_byok',
+  'assistant_invalid_request_byok',
   // Set only by the stale review reaper, which measures cleanup rather than the
   // fault that stranded the review, so alerting on it would count janitorial work
   // as incidents. Every stranded pending review measured on 2026-08-04 traced to

@@ -135,6 +135,39 @@ const doneUsage = (events: readonly ModelEvent[]) => {
   return last?.kind === 'done' ? last.usage : undefined;
 };
 
+it('reads the cost the gateway reports for a completions reply', async () => {
+  /* The gateway passes on what the provider billed. A caller showing what a
+     chat cost reads this rather than multiplying a price list it cannot see
+     the discounts of. */
+  const { events } = await collect(
+    ['chat_completions'],
+    sse(
+      { choices: [{ delta: { content: 'hi' } }] },
+      { choices: [], usage: { prompt_tokens: 10, completion_tokens: 2, cost: 0.000_42 } }
+    )
+  );
+  expect(doneUsage(events)).toEqual({
+    inputTokens: 10,
+    outputTokens: 2,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    cost: 0.000_42,
+  });
+});
+
+it('keeps the token counts when the reported cost is not a number', async () => {
+  const { events } = await collect(
+    ['chat_completions'],
+    sse({ choices: [], usage: { prompt_tokens: 10, completion_tokens: 2, cost: '0.1' } })
+  );
+  expect(doneUsage(events)).toEqual({
+    inputTokens: 10,
+    outputTokens: 2,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+  });
+});
+
 it('keeps the input counts when a later frame echoes zeros', async () => {
   const { events } = await collect(
     ['messages'],

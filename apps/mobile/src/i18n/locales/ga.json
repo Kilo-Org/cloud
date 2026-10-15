@@ -133,10 +133,14 @@
     "status": "Stádas",
     "truncated": "Teasctha",
     "updated": "Nuashonraithe",
+    "generating": "Ag giniúint…",
     "working": "Ag obair",
     "yourOwnRepositories": "Do stóir féin",
     "dismissed": "Curtha as an áireamh",
-    "agent": "Gníomhaire"
+    "agent": "Gníomhaire",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Athruithe"
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -325,6 +329,7 @@
       "collapseFile": "Fill an comhad",
       "expandFile": "Leathnaigh an comhad",
       "diffTooLarge": "Tá an chomparáid athruithe rómhór le taispeáint.",
+      "noPreview": "Níl réamhamharc ar fáil don chomhad seo",
       "openOnGitHub": "Oscail ar GitHub",
       "openDiffOnGitHub": "Oscail comparáid athruithe an chomhaid seo ar GitHub",
       "githubDiff": "Comparáid athruithe GitHub"
@@ -879,7 +884,8 @@
       "kiloclaw": "Gníomhaíocht KiloClaw",
       "balance": "Foláirimh iarmhéid",
       "security": "Torthaí slándála",
-      "spend": "Foláirimh chaiteachais"
+      "spend": "Foláirimh chaiteachais",
+      "followedSessions": "Seisiúin leanta"
     },
     "category": {
       "chatMessagesSubtitle": "freagraí i do chomhráite",
@@ -1308,7 +1314,7 @@
         "stoppedTitle": "Stadadh an socrú",
         "stoppedBody": "Stad ásc {{name}} gan choinne le linn an tsocraithe.",
         "stalledTitle": "Chuaigh rud éigin i bhfostú",
-        "stalledBody": "Níorbh fhéidir linn socrú {{name}} a chríochnú. Bain triail as arís, nó seol ríomhphost chuig hi@kilo.ai má tharlaíonn sé seo arís agus arís eile.",
+        "stalledBody": "Níorbh fhéidir linn socrú {{name}} a chríochnú. Bain triail as arís, nó seol ríomhphost chuig {{supportEmail}} má tharlaíonn sé seo arís agus arís eile.",
         "timeoutTitle": "Ag tógáil níos faide ná mar a bhíothas ag súil leis",
         "timeoutBody": "Tá socrú {{name}} ag tógáil níos faide ná mar is gnách (breis agus {{displayMinutes}} nóiméad).",
         "continueInBackground": "Lean ar aghaidh sa chúlra",
@@ -1366,7 +1372,7 @@
       "nonCanonicalEarlybirdBody": "Tá athbhreithniú daonna de dhíth ar do phlean luathrochtana sular féidir é a úsáid ar do ghuthán.",
       "iosTitle": "Níl KiloClaw ar fáil in iOS",
       "iosBody": "Bainistítear rochtain ar KiloClaw don chuntas seo taobh amuigh den aip iOS.",
-      "iosContact": "Ceisteanna? Déan teagmháil le hi@kilo.ai.",
+      "iosContact": "Ceisteanna? Déan teagmháil le {{supportEmail}}.",
       "quarantinedCta": "Seol ríomhphost chuig ár bhfoireann",
       "nonCanonicalEarlybirdCta": "Athbhreithnigh do phlean ar kilo.ai"
     },
@@ -1604,7 +1610,7 @@
         "recoveryLabel": "Nuashonraigh an aip GitHub"
       },
       "githubIpAllowList": {
-        "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc go n-úsáideann an eagraíocht GitHub seo liosta seoltaí IP ceadaithe a chuireann bac ar Kilo. Déan teagmháil le hi@kilocode.ai chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís."
+        "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc go n-úsáideann an eagraíocht GitHub seo liosta seoltaí IP ceadaithe a chuireann bac ar Kilo. Déan teagmháil le {{supportEmail}} chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís."
       },
       "gitlabProjectAccessRequired": {
         "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc nach féidir le Kilo comhartha rochtana tionscadail GitLab a chruthú don tionscadal seo. Tabhair rochtain cothaitheora nó cumasaigh comharthaí rochtana tionscadail, ansin cumasaigh an tAthbhreithneoir cóid arís.",
@@ -1619,7 +1625,7 @@
         "recoveryLabel": "Nuashonraigh socruithe an Athbhreithneora cóid"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Díchumasaíodh an tAthbhreithneoir cóid tar éis do thrí iarracht ar an stór a chlónáil dul thar an teorainn ama inniu. Déan teagmháil le hi@kilocode.ai chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís."
+        "description": "Díchumasaíodh an tAthbhreithneoir cóid tar éis do thrí iarracht ar an stór a chlónáil dul thar an teorainn ama inniu. Déan teagmháil le {{supportEmail}} chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís."
       },
       "title": "Ní mór aird a thabhairt ar an athbhreithneoir cóid.",
       "recoveryLabel": "Déan teagmháil leis an bhfoireann tacaíochta"
@@ -2170,6 +2176,8 @@
       "title": "Seisiún",
       "copyErrorDetails": "Cóipeáil sonraí na hearráide",
       "backToSessions": "Ar ais chuig na seisiúin",
+      "follow": "Lean ar an scáileán glasála",
+      "unfollow": "Stop ag leanúint ar an scáileán glasála",
       "couldNotLoad": "Níorbh fhéidir an seisiún a lódáil.",
       "failedToLoadDetails": "Níorbh fhéidir sonraí an tseisiúin a lódáil.",
       "failedToStopExecution": "Níorbh fhéidir an forghníomhú a stopadh.",
@@ -2236,6 +2244,11 @@
       "collapse": "Fill an sprioc",
       "expand": "Leathnaigh an sprioc"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Spriocanna, {{completed}} as {{total}} déanta",
+      "rowAccessibility": "Spriocanna, {{completed}} as {{total}} déanta. Sprioc reatha: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "A úsáideadh le déanaí",
       "couldNotLoadGithubRepositories": "Níorbh fhéidir stórtha GitHub a lódáil.",
@@ -2268,7 +2281,6 @@
       "retryLoadingEnvironment": "Bain triail as an timpeallacht a lódáil arís",
       "defaultEnvironment": "Timpeallacht réamhshocraithe",
       "environmentSummary": "orduithe: {{commands}} · {{mcp}} MCP · scileanna: {{skills}} · gníomhairí: {{agents}}",
-      "changes": "Athruithe",
       "leaveChanges": "Fág athruithe",
       "commitAndPush": "Taifead agus brúigh",
       "startSession": "Tosaigh seisiún",
@@ -2291,6 +2303,10 @@
       "importingSession": "Ag iompórtáil an tseisiúin",
       "cliCannotContinue": "Ní féidir leis an CLI seo leanúint ar aghaidh le seisiún. Roghnaigh Cloud Agent nó CLI eile.",
       "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
+      "cliCannotFork": "Nuashonraigh an Kilo CLI chun craobhú as teachtaireacht.",
+      "forkCutNotSynced": "Níl an teachtaireacht seo sábháilte fós. Bain triail eile as i gceann nóiméid.",
+      "forkFilesFromBaseBranch": "Tosaíonn na comhaid ón mbunchraobh.",
+      "forkFilesUnchangedOnComputer": "Ní athraítear na comhaid ar an ríomhaire seo.",
       "pickProfile": "Roghnaigh próifíl",
       "noProfile": "Gan próifíl",
       "manageProfiles": "Bainistigh próifílí",
@@ -2338,8 +2354,8 @@
       "toolList": "liostaigh",
       "toolPatch": "cuir paiste i bhfeidhm",
       "toolTask": "tasc",
-      "readTodos": "Léigh tascanna",
-      "updateTodos": "Nuashonraigh tascanna",
+      "readTodos": "Léigh an plean",
+      "updateTodos": "Nuashonraigh an plean",
       "linesBadge": "{{displayCount}} líne",
       "filesBadge": "{{displayCount}} comhad",
       "matchesBadge": "{{displayCount}} toradh",
@@ -2422,6 +2438,7 @@
       "copyMessage": "Cóipeáil teachtaireacht",
       "copyText": "Cóipeáil téacs",
       "selectText": "Roghnaigh téacs",
+      "forkFromHere": "Craobhaigh as seo",
       "reportAiResponse": "Tuairiscigh freagra AI",
       "reportAiResponseConfirm": "An dtuairisceofar an freagra seo le haghaidh athbhreithnithe?",
       "report": "Tuairiscigh",
@@ -2755,6 +2772,12 @@
       "modelsCount_two": "Samhlacha ({{displayCount}})",
       "modelsCount_few": "Samhlacha ({{displayCount}})",
       "modelsCount_many": "Samhlacha ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Féach ar athruithe",
+      "asOf": "Amhail {{time}}",
+      "tooLarge": "Tá an chomparáid athruithe seo rómhór le taispeáint ar fhón póca.",
+      "empty": "Níl aon athruithe ar chomhaid sa seisiún seo fós."
     },
     "autoApprove": {
       "title": "Ceadaigh go huathoibríoch",
@@ -3276,6 +3299,8 @@
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
     "openSession": "Oscail",
+    "finished": "Críochnaithe",
+    "followFailed": "Níorbh fhéidir an gníomhaire seo a thaispeáint ar an scáileán glasála.",
     "approveFailed": "Níorbh fhéidir ceadú. Tapáil $t(common.approve) chun triail eile a bhaint as.",
     "checked": "Seiceáilte",
     "lastKnown": "Stádas deireanach ar eolas",
@@ -3284,7 +3309,26 @@
     "waitingForYou": "Ag fanacht leat",
     "nextScheduled": "Sceidealaithe amach romhainn",
     "answerNeeded": "Freagra de dhíth",
-    "waitingToRetry": "Ag fanacht le hatriail"
+    "waitingToRetry": "Ag fanacht le hatriail",
+    "step": {
+      "editing": "Eagarthóireacht",
+      "reading": "Léamh",
+      "running": "Rith",
+      "searching": "Cuardach gréasáin",
+      "thinking": "Ag smaoineamh"
+    },
+    "planOf": "as",
+    "filesChanged": "comhaid athraithe",
+    "finishedIn": "Críochnaithe i",
+    "noActivityFor": "Níl aon ghníomhaíocht le",
+    "prOpened": "Iarratas tarraingthe oscailte",
+    "permissionWants": "Teastaíonn uaidh rith",
+    "failure": {
+      "provider": "Stoptha: earráid soláthraí",
+      "tool": "Stoptha: earráid uirlise",
+      "cancelled": "Stoptha: cealaithe",
+      "other": "STADTA"
+    }
   },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",
@@ -3312,6 +3356,7 @@
     "tutorialLabel": "Treoir"
   },
   "modelChat": {
+    "offlineFailure": "Teastaíonn nasc idirlín ón tsamhail seo. Ceangail agus bain triail eile as, nó athraigh go samhail ar an ngléas seo.",
     "empty": {
       "title": "Tosaigh comhrá",
       "description": "Seol teachtaireacht chun labhairt le samhail."
@@ -3319,10 +3364,32 @@
     "list": {
       "loadFailed": "Níorbh fhéidir stair an chomhrá a lódáil.",
       "new": "Comhrá nua",
-      "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun scriosadh.",
       "deleteTitle": "An comhrá seo a scriosadh?"
     },
+    "rename": {
+      "title": "Athainmnigh an comhrá",
+      "accessibility": "Athainmnigh an comhrá: {{title}}",
+      "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun athainmniú nó scriosadh."
+    },
     "beta": "Béite",
+    "details": {
+      "title": "Sonraí an chomhrá",
+      "backend": "Cúlchóras",
+      "effortDefault": "Réamhshocrú an tsamhla",
+      "noCost": "Gan chostas",
+      "costUnknown": "Níl sé ar eolas",
+      "costEstimatedNote": "Meastar costas na bhfreagraí nár thuairiscigh praghas ó phraghsanna liosta.",
+      "costUnknownNote": "Níl aon phraghas ar eolas don tsamhail seo.",
+      "costPartialNote": "Ní áirítear san iomlán seo samhlacha nach bhfuil praghas ar eolas dóibh.",
+      "localNote": "Ritheann samhlacha ar an ngléas ar an ngléas seo. Níl aon chostas orthu ná aon taisce leideanna, agus d'fhéadfadh gur meastacháin iad a gcomhaireamh comharthaí.",
+      "countedSinceNote": "Thosaigh an comhrá seo sular taifeadadh úsáid. Ní thaispeánann na hiomláin ach na freagraí ina dhiaidh sin.",
+      "remoteServersOn": "Freastalaithe MCP cianda ar siúl"
+    },
+    "webSearch": {
+      "title": "Cuardaigh an gréasán",
+      "description": "Lig don chomhrá seo faisnéis reatha a lorg trí do chuntas Kilo. Úsáideann cuardaigh do liúntas cuardaigh míosúil.",
+      "allowanceExhausted": "Tá do chuardaigh ghréasáin saor in aisce don mhí seo ídithe. Cuir creidmheasanna leis chun cuardach arís."
+    },
     "mcp": {
       "title": "Uirlisí Kilo",
       "use": "Úsáid uirlisí Kilo",
@@ -3345,7 +3412,6 @@
       "fieldName": "Ainm taispeána",
       "fieldUrl": "URL an fhreastalaí",
       "fieldUrlInvalid": "Cuir URL bailí freastalaí isteach.",
-      "fieldToken": "Comhartha Bearer (roghnach)",
       "enableServer": "Cumasaigh an freastalaí seo: {{name}}",
       "editServer": "Cuir an freastalaí in eagar",
       "deleteServer": "Scrios an freastalaí",
@@ -3366,8 +3432,24 @@
       "serverUnreachable": "Níorbh fhéidir an freastalaí seo a shroicheadh",
       "serverOff": "Tá an freastalaí seo múchta"
     },
+    "mcpOAuth": {
+      "authMethod": "Fíordheimhniú",
+      "authNone": "Gan síniú isteach",
+      "authBearer": "Comhartha Bearer",
+      "authOAuth": "Síniú isteach OAuth",
+      "fieldToken": "Comhartha",
+      "oauthHint": "Tar éis duit sábháil, tapáil $t(modelChat.mcpOAuth.signIn) ar an bhfreastalaí chun síniú isteach le do bhrabhsálaí.",
+      "serverNeedsSignIn": "Sínigh isteach chun an freastalaí seo a úsáid",
+      "signIn": "Sínigh isteach",
+      "signInA11y": "Sínigh isteach ar an bhfreastalaí seo: {{name}}",
+      "signInFailed": "Níorbh fhéidir síniú isteach ar {{name}}. Bain triail eile as."
+    },
     "backends": {
       "title": "Cúlchórais chomhrá",
+      "providersTitle": "Soláthraithe comhrá",
+      "cloud": "Sa scamall",
+      "cloudModel": "Samhail: {{model}}",
+      "cloudUnavailable": "Níl samhlacha Kilo ar fáil faoi láthair. Seiceáil do nasc.",
       "manage": "Bainistigh cúlchórais",
       "defaultKilo": "$t(consent.kilo) (réamhshocrú)",
       "kiloHelp": "Úsáideann an cúlchóras ionsuite do chuntas Kilo agus ní féidir é a chur in eagar ná a scriosadh.",
@@ -3427,7 +3509,6 @@
     "gguf": {
       "title": "Samhlacha is féidir a íoslódáil",
       "help": "Íoslódáil samhail oscailte agus rith í ar an bhfón seo le llama.cpp. Fanann do leideanna agus na freagraí ar an ngléas. Tá na samhlacha móra, mar sin bain úsáid as Wi-Fi.",
-      "details": "{{size}} · Ceadúnas: {{license}}",
       "download": "Íoslódáil an tsamhail",
       "pause": "Cuir an íoslódáil ar sos",
       "resume": "Atosaigh an íoslódáil",
@@ -3439,6 +3520,8 @@
       "url": "Nasc íoslódála díreach",
       "urlHelp": "Greamaigh nasc HTTPS le comhad .gguf, mar nasc resolve ó Hugging Face. Ná híoslódáil samhlacha ach ó fhoinsí a bhfuil muinín agat astu.",
       "downloadUrl": "Íoslódáil ón nasc",
+      "advanced": "Ardleibhéal",
+      "localPurpose": "Ritheann sé ar an ngléas seo le llama.cpp. Fanann leideanna agus freagraí ar an ngléas.",
       "deleteTitle": "Scrios an tsamhail seo?",
       "deleteMessage": "Scrios {{name}} ón ngléas seo? Teastaíonn samhail eile ó na comhráite a úsáideann í sular féidir leo leanúint ar aghaidh.",
       "errors": {
@@ -3448,12 +3531,62 @@
         "notGguf": "Caithfidh an nasc díriú ar chomhad .gguf.",
         "space": "Níl go leor stórála saor don tsamhail seo. Saor roinnt spáis agus triail arís.",
         "network": "Níor críochnaíodh an íoslódáil. Seiceáil do cheangal agus triail arís.",
-        "invalidFile": "Ní samhail é an comhad íoslódáilte ar féidir leis an aip seo a rith, mar sin baineadh é."
+        "invalidFile": "Ní samhail é an comhad íoslódáilte ar féidir leis an aip seo a rith, mar sin baineadh é.",
+        "checksum": "Ní mheaitseálann an comhad íoslódáilte a shuim seiceála foilsithe, mar sin baineadh é. Bain triail as an íoslódáil arís."
       }
+    },
+    "catalog": {
+      "browse": "Brabhsáil samhlacha",
+      "title": "Catalóg samhlacha",
+      "search": "Cuardaigh samhlacha Hugging Face",
+      "tabs": "Scagaire samhlacha",
+      "fitsTab": "Oireann don ghléas seo",
+      "fromHuggingFace": "Ó Hugging Face",
+      "loading": "Samhlacha á lódáil",
+      "noResults": "Níor aimsíodh aon samhail",
+      "noFits": "Ní oireann aon samhail don ghléas seo",
+      "noFitsDescription": "Tá samhlacha níos mó ar an gcluaisín $t(common.all).",
+      "fit": {
+        "fits": "Oireann",
+        "tight": "Ar éigean a oireann",
+        "tooLarge": "Rómhór",
+        "noStorage": "Níl dóthain stórais ann",
+        "unknown": "Oiriúnacht anaithnid"
+      },
+      "recommendationsHelp": "Gearrliosta a shocraíonn an aip seo: comhad amháin in aghaidh an tsamhail, ó fhoilsitheoir a luann ceadúnas. Ní rangaitear aon rud eile.",
+      "compatibilityHelp": "Cuireann oiriúnacht comhad an tsamhail i gcomparáid le cuimhne agus stóras saor an ghléis seo. Is meastachán é an figiúr cuimhne, ní tomhas.",
+      "text": "Téacs",
+      "listTextPurpose": "Leideanna téacs amháin.",
+      "listImagePurpose": "Léann sé íomhánna chomh maith le téacs.",
+      "smallestDownload": "An íoslódáil is lú: {{size}} · thart ar {{memory}} de chuimhne",
+      "fullFileName": "Comhad: {{name}}",
+      "memoryEstimateNote": "Is meastacháin iad figiúirí cuimhne, ní tomhais.",
+      "parameters": "Paraiméadair: {{value}}",
+      "downloads": "Íoslódálacha: {{value}}",
+      "likes": "Moltaí: {{value}}",
+      "context": "Fuinneog chomhthéacs: {{value}}",
+      "license": "Ceadúnas: {{license}}",
+      "licenseUnknown": "Níl an ceadúnas luaite",
+      "tools": "Glaonna ar uirlisí",
+      "vision": "Ionchur íomhánna",
+      "hintsHelp": "Leideanna ó Hugging Face. Seiceálann an aip an tsamhail tar éis í a íoslódáil.",
+      "gated": "Teastaíonn cuntas Hugging Face don tsamhail seo, mar sin ní féidir leis an aip í a íoslódáil.",
+      "quantizations": "Cainníochtuithe",
+      "quantizationsHelp": "Úsáideann comhaid níos lú níos lú cuimhne agus stórais. De ghnáth tugann comhaid níos mó freagraí níos fearr.",
+      "quantDetail": "Íoslódáil {{size}} · thart ar {{memory}} cuimhne",
+      "downloadQuant": "Íoslódáil {{quant}}",
+      "loadingModel": "Sonraí na samhla á lódáil",
+      "couldNotLoadModel": "Níorbh fhéidir an tsamhail seo a lódáil",
+      "noFiles": "Níl aon chomhaid ann is féidir leis an aip seo a rith",
+      "noFilesDescription": "Ritheann an aip seo samhlacha atá ina gcomhad GGUF amháin.",
+      "tooLargeTitle": "Seans nach rithfidh an tsamhail seo",
+      "tooLargeMessage": "Is dócha go dteastaíonn níos mó cuimhne ó {{name}} ná mar atá ag an ngléas seo. D'fhéadfadh an aip dúnadh agus an tsamhail ag freagairt. An bhfuil fonn ort í a íoslódáil mar sin féin?",
+      "downloadAnyway": "Íoslódáil mar sin féin"
     },
     "localModels": {
       "title": "Samhlacha ar an ngléas",
-      "help": "Ritheann samhlacha ar an ngléas ar an bhfón seo. Fanann do leideanna agus na freagraí ar an ngléas, agus ní féidir leis na samhlacha seo uirlisí a úsáid.",
+      "help": "Ritheann samhlacha ar an ngléas ar an bhfón seo. Fanann do leideanna agus na freagraí ar an ngléas.",
+      "systemPurpose": "An tsamhail atá ionsuite i gcóras an ghléis seo. Ritheann sí ar an ngléas.",
       "apple": "Apple Intelligence (ar an ngléas)",
       "checking": "Infhaighteacht á seiceáil…",
       "ready": "Réidh le húsáid",
@@ -3479,6 +3612,9 @@
       "downloading": "Á híoslódáil…",
       "downloadProgress": "Á híoslódáil… {{percent}}%",
       "downloadFailed": "Níor críochnaíodh an íoslódáil. Seiceáil do nasc agus an spás stórála atá saor, agus bain triail eile as."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tacaíonn an tsamhail seo le leibhéal machnaimh"
     }
   },
   "settingsTools": {
@@ -3701,5 +3837,104 @@
     "noMatchingProductsPlay": "Níor thug Google Play aon phacáistí creidmheasa comhoiriúnacha ar ais.",
     "purchaseOwnedByAnotherAccount": "Baineann na creidmheasanna ar an Apple Account seo le cuntas Kilo eile. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid.",
     "purchaseOwnedByAnotherAccountPlay": "Baineann na creidmheasanna ar an gcuntas Google Play seo le cuntas Kilo éagsúil. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid."
+  },
+  "todos": {
+    "saveAsTodo": "Sábháil mar thasc",
+    "segment": {
+      "label": "Amharc na ngníomhairí",
+      "sessions": "Seisiúin",
+      "todos": "Tascanna"
+    },
+    "lists": {
+      "newList": "Liosta nua",
+      "empty": "Níl aon liosta ann fós",
+      "couldNotLoad": "Níorbh fhéidir liostaí a lódáil",
+      "noRepository": "Gan stór",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} oscailte",
+      "openCount_two": "{{count}} oscailte",
+      "openCount_few": "{{count}} oscailte",
+      "openCount_many": "{{count}} oscailte",
+      "openCount_other": "{{count}} oscailte",
+      "archived_one": "Cartlannaithe ({{count}})",
+      "archived_two": "Cartlannaithe ({{count}})",
+      "archived_few": "Cartlannaithe ({{count}})",
+      "archived_many": "Cartlannaithe ({{count}})",
+      "archived_other": "Cartlannaithe ({{count}})",
+      "archive": "Cartlannaigh",
+      "unarchive": "Díchartlannaigh",
+      "deleteTitle": "Scrios {{name}}?",
+      "deleteMessage": "Scriostar a thascanna freisin. Fanann a seisiúin."
+    },
+    "listSettings": {
+      "title": "Socruithe liosta",
+      "name": "Ainm",
+      "namePlaceholder": "Fabhtanna, Smaointe, Eisiúintí…",
+      "emoji": "Emoji",
+      "mode": "Mód",
+      "defaultsHint": "Úsáideann seisiúin a thosaítear ón liosta seo na réamhshocruithe seo."
+    },
+    "list": {
+      "addPlaceholder": "Cuir tasc leis",
+      "add": "Cuir leis",
+      "empty": "Níl aon tasc ann fós",
+      "setDefaults": "Socraigh stór, mód agus samhail",
+      "completed_one": "Críochnaithe ({{count}})",
+      "completed_two": "Críochnaithe ({{count}})",
+      "completed_few": "Críochnaithe ({{count}})",
+      "completed_many": "Críochnaithe ({{count}})",
+      "completed_other": "Críochnaithe ({{count}})"
+    },
+    "item": {
+      "markDone": "Marcáil mar dhéanta",
+      "markOpen": "Marcáil mar neamhdhéanta",
+      "markDonePrompt": "Marcáil mar dhéanta?",
+      "deleted": "Scriosadh an tasc",
+      "undo": "Cuir ar ais",
+      "runCount_one": "{{count}} rith",
+      "runCount_two": "{{count}} rith",
+      "runCount_few": "{{count}} rith",
+      "runCount_many": "{{count}} rith",
+      "runCount_other": "{{count}} rith",
+      "startNow": "Tosaigh gan athbhreithniú",
+      "startNowHint": "Brúigh go fada chun tosú gan athbhreithniú",
+      "titleLabel": "Teideal an taisc",
+      "renameTitle": "Athainmnigh tasc",
+      "notes": "Nótaí",
+      "addNotes": "Cuir nótaí leis",
+      "notesPrompt": "Cuir comhthéacs, riachtanais, nó critéir ghlactha leis.",
+      "markdownSupported": "Tacaíocht Markdown",
+      "sessions": "Seisiúin nasctha",
+      "noSessions": "Níl aon seisiún ann fós",
+      "untitledLinkedSession": "Seisiún nasctha",
+      "sessionNeedsInput": "Teastaíonn ionchur ón seisiún",
+      "sessionRunning": "Seisiún ag rith",
+      "sessionFinished": "Seisiún críochnaithe",
+      "sessionPullRequest": "Iarratas tarraingthe an tseisiúin",
+      "sessionPullRequestNumber": "PR an tseisiúin #{{number}}",
+      "openSessionHint": "Osclaíonn sé an seisiún.",
+      "unlinkSessionAction": "Dínasc seisiún",
+      "unlinkConfirmTitle": "Dínasc {{title}}?",
+      "unlinkConfirmMessage": "Ní scriostar an seisiún féin. Ní dhéantar ach a nasc leis an rud le déanamh seo a bhaint.",
+      "startNewSession": "Tosaigh seisiún nua",
+      "startNewSessionHint": "Brúigh go fada chun seisiún nua a thosú.",
+      "linkSession": "Nasc seisiún",
+      "linkFailed": "Níorbh fhéidir an seisiún a nascadh leis an tasc"
+    },
+    "linkSession": {
+      "title": "Nasc le seisiún",
+      "empty": "Gan aon seisiún le déanaí",
+      "emptyInRepository": "Gan aon seisiún le déanaí i {{repository}}"
+    },
+    "upNext": "An chéad rud eile",
+    "sessionTodo": "Tasc: {{title}}",
+    "linkToTodo": "Nasc le tasc",
+    "candidates": {
+      "empty": "Gan aon tasc oscailte"
+    },
+    "saveSheet": {
+      "title": "Sábháil le liosta",
+      "saved": "Sábháilte i {{list}}"
+    }
   }
 }

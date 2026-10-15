@@ -66,6 +66,7 @@ interface Wire {
   readonly toParts?: (event: unknown) => readonly WirePart[] | undefined;
   readonly isFailure?: (event: unknown) => boolean;
   readonly toUsage: (event: unknown) => Partial<ModelUsage> | undefined;
+  readonly toModel?: (event: unknown) => string | undefined;
   /** Absent until the event that says why the model stopped. */
   readonly toStop: (event: unknown) => StopReason | undefined;
 }

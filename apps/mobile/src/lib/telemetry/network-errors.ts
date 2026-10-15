@@ -24,6 +24,7 @@
 
 import { z } from 'zod';
 
+import { classifyAuthResponse, isAuthTerminalRoute } from '@/lib/auth/auth-response-class';
 import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-sink';
 import { isAbortError, isRequestDeadlineError } from '@/lib/telemetry/abort-classification';
 import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
@@ -94,6 +95,32 @@ export type TrpcResponseError = z.infer<typeof TrpcResponseErrorSchema>;
 
 const TRPC_PATH = '/api/trpc/';
 const HTTP_URL_PATTERN = /^https?:\/\//iu;
+
+/**
+ * Statuses the app handles as an answer, so a report would name no defect:
+ * - 401: the auth layer refreshes or signs out, and reports a terminal refusal
+ *   itself (`reportAuthTerminalFailure`).
+ * - 402: no credits; the paywall owns it.
+ * - 404: a stale ID for a deleted object; screens show "not found".
+ * - 409: a duplicate of an operation already in progress.
+ * - 429: a rate limit the caller backs off from.
+ */
+const EXPECTED_HTTP_STATUSES: ReadonlySet<number> = new Set([401, 402, 404, 409, 429]);
+
+const FORBIDDEN_STATUS = 403;
+
+/**
+ * True when a status is an expected answer: one of
+ * {@link EXPECTED_HTTP_STATUSES}, or a 403 with no tRPC error code. Production
+ * 403s come from the edge firewall (OFAC-sanctioned regions, IP blocks), whose
+ * body is not a tRPC error. A 403 from a tRPC procedure carries its code
+ * (`FORBIDDEN`) and names app code, so it is still reported.
+ */
+function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
+  return (
+    EXPECTED_HTTP_STATUSES.has(status) || (status === FORBIDDEN_STATUS && trpc.code === undefined)
+  );
+}
 
 /** Strip the query string from a URL. Returns empty string on a non-string. */
 export function stripQueryString(url: string): string {
@@ -175,8 +202,10 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
  * Read the tRPC error out of a batch response body without consuming the
  * original: the clone is parsed, so the caller still owns `response`. A
  * batched (HTTP 207) body is an array of `{ result } | { error }`; a plain
- * failure body is `{ error }`. Total: a success-only, non-JSON, or otherwise
- * unreadable body yields `undefined` and never throws.
+ * failure body is `{ error }`. A batch yields its first error whose status is
+ * not expected ({@link isExpectedStatus}), else its first error, so an
+ * expected 404 ahead of a 500 cannot hide the 500. Total: a success-only,
+ * non-JSON, or otherwise unreadable body yields `undefined` and never throws.
  */
 export async function readTrpcResponseError(
   response: Response
@@ -184,13 +213,14 @@ export async function readTrpcResponseError(
   try {
     const body: unknown = await response.clone().json();
     if (Array.isArray(body)) {
-      for (const item of body) {
-        const error = errorPropertyOf(item);
-        if (error !== undefined) {
-          return error;
-        }
-      }
-      return undefined;
+      const errors = body
+        .map(item => errorPropertyOf(item))
+        .filter((error): error is TrpcResponseError => error !== undefined);
+      const reportable = errors.find(error => {
+        const trpc = readTrpcErrorContext(error);
+        return trpc.httpStatus === undefined || !isExpectedStatus(trpc.httpStatus, trpc);
+      });
+      return reportable ?? errors[0];
     }
     return errorPropertyOf(body);
   } catch {
@@ -347,6 +377,51 @@ export function reportNetworkError(context: NetworkErrorContext): void {
 }
 
 /**
+ * True when a failed response is an expected answer ({@link isExpectedStatus};
+ * for a tRPC batch, the inner status), or a terminal refusal on a sign-in
+ * route, which the auth layer reports once.
+ */
+function isExpectedResponse(context: NetworkErrorContext): boolean {
+  const trpc = readTrpcErrorContext(context.error);
+  const status = effectiveHttpStatus(context, trpc);
+  if (status === undefined) {
+    return false;
+  }
+  if (isExpectedStatus(status, trpc)) {
+    return true;
+  }
+  const path = normalizeUrlPath(context.url);
+  return isAuthTerminalRoute(path) && classifyAuthResponse({ path, status }).kind === 'terminal';
+}
+
+/**
+ * Record an expected failed response as a breadcrumb, so the next real event
+ * still shows it. Same message and tags as a report; no query string.
+ */
+function recordExpectedResponse(context: NetworkErrorContext): void {
+  try {
+    const trpc = readTrpcErrorContext(context.error);
+    const path = normalizeUrlPath(context.url);
+    const procedure = trpcProcedureFromUrl(context.url);
+    addTelemetryBreadcrumb({
+      category: 'network',
+      level: 'warning',
+      message: buildSyntheticError(context, path, trpc).message,
+      data: {
+        'error.source': context.source,
+        'network.outcome': networkOutcome(context),
+        durationMs: context.durationMs,
+        ...(context.status === undefined ? {} : { 'http.status': context.status }),
+        ...(procedure === undefined ? {} : { 'trpc.procedure': procedure }),
+        ...(trpc.code === undefined ? {} : { 'trpc.code': trpc.code }),
+      },
+    });
+  } catch {
+    // Telemetry must never throw into app code.
+  }
+}
+
+/**
  * Record a request that got no HTTP response (no network, DNS, TLS, reset, or
  * the request deadline) as a breadcrumb. Never an event: see Family 3 in the
  * header. Never throws; never includes the host, headers, bodies, or query
@@ -369,7 +444,6 @@ function recordTransportFailure(
     // Telemetry must never throw into app code.
   }
 }
-
 function requestUrlString(input: RequestInfo | URL): string {
   if (input instanceof URL) {
     return input.href;
@@ -407,9 +481,10 @@ function safeShouldReport(url: string, shouldReport: (url: string) => boolean): 
  * reported once at warning level and every transport failure (a rejection
  * that is not an abort) leaves one breadcrumb. `isResponseError` chooses the
  * statuses that count as errors (default `>= 400`; tRPC adds 207 so a mixed
- * batch is reported). `readResponseError` may parse the body via a clone to
- * enrich the report. The original rejection is re-thrown and the original
- * Response is returned unchanged; the original body is never read.
+ * batch is reported). An expected answer (`isExpectedResponse`) is a
+ * breadcrumb instead of a report. `readResponseError` may parse the body via a
+ * clone to enrich the report. The original rejection is re-thrown and the
+ * original Response is returned unchanged; the original body is never read.
  */
 export function createNetworkErrorFetch(
   baseFetch: typeof fetch,
@@ -434,7 +509,7 @@ export function createNetworkErrorFetch(
             error = undefined;
           }
         }
-        reportNetworkError({
+        const context: NetworkErrorContext = {
           source,
           url,
           method,
@@ -442,7 +517,12 @@ export function createNetworkErrorFetch(
           statusText: response.statusText,
           durationMs: Date.now() - startedAt,
           ...(error === undefined ? {} : { error }),
-        });
+        };
+        if (isExpectedResponse(context)) {
+          recordExpectedResponse(context);
+        } else {
+          reportNetworkError(context);
+        }
       }
       return response;
     } catch (error) {

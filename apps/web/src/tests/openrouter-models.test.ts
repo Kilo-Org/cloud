@@ -3,9 +3,8 @@ import {
   mockOpenRouterModels,
   createMockResponse,
 } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
-import { GET } from '../app/api/openrouter/models/route';
-import { GET as gatewayV1ModelsGET } from '../app/api/gateway/v1/models/route';
-import { GET as transcriptionModelsGET } from '../app/api/gateway/transcription-models/route';
+import { GET } from '../../../ai-gateway/src/app/api/v1/models/route';
+import { GET as transcriptionModelsGET } from '../../../ai-gateway/src/app/api/v1/transcription-models/route';
 import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
@@ -77,6 +76,21 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     }),
   },
   readDb: {},
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/unavailable-models') as Record<
+    string,
+    unknown
+  >),
+  getUnavailableModelIds: jest.fn(
+    async () =>
+      new Set([
+        'google/gemma-4-26b-a4b-it:free',
+        'google/gemma-4-31b-it:free',
+        'thinkingmachines/inkling:free',
+      ])
+  ),
 }));
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -231,42 +245,42 @@ beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
-describe('GET /api/openrouter/models', () => {
-  test.each([
-    ['/api/openrouter/models', GET],
-    ['/api/gateway/v1/models', gatewayV1ModelsGET],
-  ] as const)('%s never serializes exclusive provider credentials', async (path, handler) => {
-    mockAuth = { user: null, organizationId: null };
-    jest.replaceProperty(qwen36_plus_stealth_model, 'provider', {
-      ...qwen36_plus_stealth_model.provider,
-      apiKey: 'exclusive-catalog-secret',
-      apiUrl: 'https://private-exclusive-provider.example/v1',
-    });
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+describe('GET /api/v1/models', () => {
+  test.each([['/api/v1/models', GET]] as const)(
+    '%s never serializes exclusive provider credentials',
+    async (path, handler) => {
+      mockAuth = { user: null, organizationId: null };
+      jest.replaceProperty(qwen36_plus_stealth_model, 'provider', {
+        ...qwen36_plus_stealth_model.provider,
+        apiKey: 'exclusive-catalog-secret',
+        apiUrl: 'https://private-exclusive-provider.example/v1',
+      });
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
 
-    const catalog = await getEnhancedOpenRouterModels();
-    const publicModel = catalog.data.find(
-      model => model.id === qwen36_plus_stealth_model.public_id
-    );
-    expect(publicModel).toBeDefined();
-    expect(publicModel).not.toHaveProperty('provider');
-    expect(publicModel).not.toHaveProperty('apiKey');
-    expect(JSON.stringify(catalog)).not.toContain('exclusive-catalog-secret');
+      const catalog = await getEnhancedOpenRouterModels();
+      const publicModel = catalog.data.find(
+        model => model.id === qwen36_plus_stealth_model.public_id
+      );
+      expect(publicModel).toBeDefined();
+      expect(publicModel).not.toHaveProperty('provider');
+      expect(publicModel).not.toHaveProperty('apiKey');
+      expect(JSON.stringify(catalog)).not.toContain('exclusive-catalog-secret');
 
-    const response = await handler(createTestRequest(path));
-    expect(response.status).toBe(200);
-    const rawBody = await response.text();
-    expect(rawBody).toContain(qwen36_plus_stealth_model.public_id);
-    expect(rawBody).not.toContain('exclusive-catalog-secret');
-    expect(rawBody).not.toContain('private-exclusive-provider.example');
-    expect(rawBody).not.toContain('"apiKey"');
-    expect(rawBody).not.toContain('"provider"');
-  });
+      const response = await handler(createTestRequest(path));
+      expect(response.status).toBe(200);
+      const rawBody = await response.text();
+      expect(rawBody).toContain(qwen36_plus_stealth_model.public_id);
+      expect(rawBody).not.toContain('exclusive-catalog-secret');
+      expect(rawBody).not.toContain('private-exclusive-provider.example');
+      expect(rawBody).not.toContain('"apiKey"');
+      expect(rawBody).not.toContain('"provider"');
+    }
+  );
 
   test('should handle OpenRouter API errors', async () => {
-    const request = createTestRequest('/api/openrouter/models');
+    const request = createTestRequest('/api/v1/models');
 
     global.fetch = jest.fn(() => {
       return Promise.resolve(
@@ -288,7 +302,7 @@ describe('GET /api/openrouter/models', () => {
   });
 
   test('should handle unexpected response format', async () => {
-    const request = createTestRequest('/api/openrouter/models');
+    const request = createTestRequest('/api/v1/models');
 
     global.fetch = jest.fn(() => {
       return Promise.resolve(
@@ -309,7 +323,7 @@ describe('GET /api/openrouter/models', () => {
   });
 
   test('should include defaultModel field in response', async () => {
-    const request = createTestRequest('/api/openrouter/models');
+    const request = createTestRequest('/api/v1/models');
 
     global.fetch = jest.fn(() => {
       return Promise.resolve(
@@ -354,7 +368,7 @@ describe('GET /api/openrouter/models', () => {
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: upstream }));
 
-    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const response = await GET(createTestRequest('/api/v1/models'));
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
     const modelIds = responseData.data.map(model => model.id);
 
@@ -367,7 +381,7 @@ describe('GET /api/openrouter/models', () => {
   });
 
   test('should include publishable Terminal Bench summaries for canonical models', async () => {
-    const request = createTestRequest('/api/openrouter/models');
+    const request = createTestRequest('/api/v1/models');
 
     global.fetch = jest.fn(() => {
       return Promise.resolve(
@@ -394,7 +408,7 @@ describe('GET /api/openrouter/models', () => {
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
 
-    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const response = await GET(createTestRequest('/api/v1/models'));
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
     const model = responseData.data.find(item => item.id === 'some-other-model');
 
@@ -411,7 +425,7 @@ describe('GET /api/openrouter/models', () => {
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
 
-    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const response = await GET(createTestRequest('/api/v1/models'));
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
     const model = responseData.data.find(item => item.id === 'some-other-model');
 
@@ -438,7 +452,7 @@ describe('GET /api/openrouter/models', () => {
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
 
-    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const response = await GET(createTestRequest('/api/v1/models'));
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
     const model = responseData.data.find(item => item.id === exclusiveModel.public_id);
     const virtualModels = responseData.data.filter(item => item.id.startsWith('kilo-auto/'));
@@ -461,7 +475,7 @@ describe('GET /api/openrouter/models', () => {
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
 
-    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const response = await GET(createTestRequest('/api/v1/models'));
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
 
     expect(response.status).toBe(200);
@@ -472,22 +486,14 @@ describe('GET /api/openrouter/models', () => {
   });
 });
 
-describe('GET /api/gateway/v1/models', () => {
-  test('re-wraps the OpenRouter models handler with its own timing pattern', () => {
-    // The alias wraps the already timed handler so a gateway pathname logs the
-    // gateway pattern; the inner `/api/openrouter/models` wrapper stays silent
-    // by prefix. A bare re-export would emit no `api_timing` line at all.
-    expect(typeof gatewayV1ModelsGET).toBe('function');
-    expect(gatewayV1ModelsGET).not.toBe(GET);
-  });
-
+describe('gateway catalog response', () => {
   test('retains Enkrypt and Terminal Bench in the gateway catalog response', async () => {
     jest.mocked(mockRows).mockResolvedValueOnce(new Map([['some-other-model', enkryptBenchmark]]));
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
 
-    const response = await gatewayV1ModelsGET(createTestRequest('/api/gateway/v1/models'));
+    const response = await GET(createTestRequest('/api/v1/models'));
 
     expect(captureException).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
@@ -500,10 +506,7 @@ describe('GET /api/gateway/v1/models', () => {
 });
 
 describe('Enkrypt catalog publication boundaries', () => {
-  test.each([
-    ['/api/openrouter/models', GET],
-    ['/api/gateway/v1/models', gatewayV1ModelsGET],
-  ])(
+  test.each([['/api/v1/models', GET]])(
     'withholds cached and raw upstream scores at %s when publication is disabled',
     async (path, handler) => {
       mockPublicationEnabled = false;
@@ -550,9 +553,9 @@ describe('Enkrypt catalog publication boundaries', () => {
         .mockResolvedValue(createMockResponse({ jsonData: upstream }));
 
       const raw = await getRawOpenRouterModels();
-      const catalog = await GET(createTestRequest('/api/openrouter/models'));
+      const catalog = await GET(createTestRequest('/api/v1/models'));
       const transcription = await transcriptionModelsGET(
-        createTestRequest('/api/gateway/transcription-models')
+        createTestRequest('/api/v1/transcription-models')
       );
       expect(catalog.status).toBe(200);
       expect(transcription.status).toBe(200);
@@ -576,7 +579,7 @@ describe('Enkrypt catalog publication boundaries', () => {
       data: [{ id: 'provider/invalid', unrelated: 'retained' }],
     });
     const transcription = await transcriptionModelsGET(
-      createTestRequest('/api/gateway/transcription-models')
+      createTestRequest('/api/v1/transcription-models')
     );
     expect(transcription.status).toBe(200);
     expect(await transcription.json()).toEqual({
@@ -593,14 +596,14 @@ describe('Enkrypt catalog publication boundaries', () => {
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
     const staleAfter = Date.parse(publishedEnkryptBenchmark.staleAfter);
     jest.mocked(Date.now).mockReturnValue(staleAfter - 1);
-    const freshResponse = await GET(createTestRequest('/api/openrouter/models'));
+    const freshResponse = await GET(createTestRequest('/api/v1/models'));
     const fresh = OpenRouterModelsResponseSchema.parse(await freshResponse.json());
     expect(fresh.data.find(model => model.id === 'some-other-model')?.enkrypt).toEqual(
       publishedEnkryptBenchmark
     );
 
     jest.mocked(Date.now).mockReturnValue(staleAfter);
-    const staleResponse = await gatewayV1ModelsGET(createTestRequest('/api/gateway/v1/models'));
+    const staleResponse = await GET(createTestRequest('/api/v1/models'));
     const stale = OpenRouterModelsResponseSchema.parse(await staleResponse.json());
     expect(stale.data.find(model => model.id === 'some-other-model')?.enkrypt).toEqual({
       ...publishedEnkryptBenchmark,
@@ -608,16 +611,13 @@ describe('Enkrypt catalog publication boundaries', () => {
     });
 
     mockPublicationEnabled = false;
-    const disabledResponse = await GET(createTestRequest('/api/openrouter/models'));
+    const disabledResponse = await GET(createTestRequest('/api/v1/models'));
     const disabled = OpenRouterModelsResponseSchema.parse(await disabledResponse.json());
     for (const model of disabled.data) expect(model).not.toHaveProperty('enkrypt');
     expect(cached.get('some-other-model')).toEqual(enkryptBenchmark);
   });
 
-  test.each([
-    ['/api/openrouter/models', GET],
-    ['/api/gateway/v1/models', gatewayV1ModelsGET],
-  ])(
+  test.each([['/api/v1/models', GET]])(
     'retains verified lastCheckedAt in the %s schema without leaking server metadata',
     async (path, handler) => {
       const checkedAt = '2026-08-30T00:00:00.000Z';
@@ -671,14 +671,14 @@ describe('Enkrypt catalog publication boundaries', () => {
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
-    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const response = await GET(createTestRequest('/api/v1/models'));
     const data = OpenRouterModelsResponseSchema.parse(await response.json());
     const published = data.data.find(model => model.id === 'some-other-model')?.enkrypt;
     expect(published).toBeDefined();
     expect(published).not.toHaveProperty('source');
 
     jest.mocked(Date.now).mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt) - 1);
-    const futureResponse = await GET(createTestRequest('/api/openrouter/models'));
+    const futureResponse = await GET(createTestRequest('/api/v1/models'));
     const future = OpenRouterModelsResponseSchema.parse(await futureResponse.json());
     for (const model of future.data) expect(model).not.toHaveProperty('enkrypt');
   });
@@ -696,7 +696,7 @@ describe('shared stats and catalog snapshot', () => {
   }
 
   function catalog() {
-    return GET(createTestRequest('/api/openrouter/models'));
+    return GET(createTestRequest('/api/v1/models'));
   }
 
   beforeEach(() => {
@@ -854,7 +854,7 @@ describe('final Enkrypt serialization boundaries', () => {
 
   async function responseFor(branch: Branch) {
     if (branch === 'direct') return getEnhancedOpenRouterModels();
-    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const response = await GET(createTestRequest('/api/v1/models'));
     expect(response.status).toBe(200);
     return OpenRouterModelsResponseSchema.parse(await response.json());
   }

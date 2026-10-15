@@ -34,7 +34,7 @@ import {
 } from '@/lib/providers/openrouter/free-endpoint-data-policy';
 import { injectExtraProviderModels } from '@/lib/providers/openrouter/inject-extra-provider-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
-import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { injectVirtualModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -47,7 +47,7 @@ import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/o
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
-async function fetchGatewayModels(gateway: Provider, modelsPath: string) {
+export async function fetchGatewayModels(gateway: Provider, modelsPath: string) {
   const headers = {
     ...ATTRIBUTION_HEADERS,
     authorization: `Bearer ${gateway.apiKey}`,
@@ -64,6 +64,7 @@ async function fetchGatewayModels(gateway: Provider, modelsPath: string) {
 
   const limit = pLimit(8);
   const result: Record<string, StoredModel> = {};
+  const modelsWithoutEndpoints: string[] = [];
   await Promise.all(
     models.data.map(model =>
       limit(async () => {
@@ -71,6 +72,11 @@ async function fetchGatewayModels(gateway: Provider, modelsPath: string) {
           method: 'GET',
           headers,
         });
+        // Gateways list some models (e.g. Vercel's `*-batch` variants) that have no endpoints resource.
+        if (endpointsResponse.status === 404) {
+          modelsWithoutEndpoints.push(model.id);
+          return;
+        }
         if (!endpointsResponse.ok) {
           throw new Error(
             `Fetching model endpoints for ${gateway.id}/${model.id} failed: ${endpointsResponse.status}`
@@ -93,6 +99,12 @@ async function fetchGatewayModels(gateway: Provider, modelsPath: string) {
       })
     )
   );
+
+  if (modelsWithoutEndpoints.length > 0) {
+    console.warn(
+      `[fetchGatewayModels] skipped ${modelsWithoutEndpoints.length} ${gateway.id} models without endpoints: ${modelsWithoutEndpoints.sort().join(', ')}`
+    );
+  }
 
   const count = Object.keys(result).length;
   if (count < 100) {
@@ -167,7 +179,11 @@ async function syncProviders(params: {
       })
     )
   );
-  const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(providerModelData);
+  const unavailableModelIds = await getUnavailableModelIds();
+  const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(
+    providerModelData,
+    unavailableModelIds
+  );
 
   injectExtraProviderModels(vercelModels, providerModelData);
 
@@ -199,7 +215,7 @@ async function syncProviders(params: {
               completion: model.pricing.completion,
             },
             ...((!kfm.pricing || kfm.flags.includes('requires-data-collection')) &&
-              !isUnavailableModel(kfm.public_id) && {
+              !unavailableModelIds.has(kfm.public_id) && {
                 data_policy: { training: true, retainsPrompts: true },
               }),
           },
@@ -226,12 +242,14 @@ async function syncProviders(params: {
     providerModelData,
     openRouterFreeEndpoints,
     kiloExclusiveModels,
+    unavailableModelIds,
   });
 
   injectVirtualModels({
     providerModelData,
     catalogModels: openRouterCatalogModels,
     storedModels: openRouterModels,
+    unavailableModelIds,
   });
 
   // Filter out providers with no models

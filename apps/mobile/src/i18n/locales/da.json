@@ -133,10 +133,14 @@
     "status": "Tilstand",
     "truncated": "Afkortet",
     "updated": "Opdateret",
+    "generating": "Genererer…",
     "working": "I gang",
     "yourOwnRepositories": "Dine egne kodelagre",
     "dismissed": "Afvist",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Ændringer"
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -325,6 +329,7 @@
       "collapseFile": "Fold filen sammen",
       "expandFile": "Fold filen ud",
       "diffTooLarge": "Ændringerne er for omfattende til at blive vist.",
+      "noPreview": "Ingen forhåndsvisning tilgængelig for denne fil",
       "openOnGitHub": "Åbn på GitHub",
       "openDiffOnGitHub": "Åbn filens ændringsvisning på GitHub",
       "githubDiff": "Ændringsvisning på GitHub"
@@ -831,7 +836,8 @@
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Advarsler om saldo",
       "security": "Sikkerhedsfund",
-      "spend": "Forbrugsadvarsler"
+      "spend": "Forbrugsadvarsler",
+      "followedSessions": "Fulgte sessioner"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dine samtaler",
@@ -1254,7 +1260,7 @@
         "stoppedTitle": "Opsætning stoppet",
         "stoppedBody": "Instansen for {{name}} stoppede uventet under opsætningen.",
         "stalledTitle": "Noget gik i stå",
-        "stalledBody": "Vi kunne ikke færdiggøre opsætningen af {{name}}. Prøv igen, eller skriv til hi@kilo.ai, hvis problemet fortsætter.",
+        "stalledBody": "Vi kunne ikke færdiggøre opsætningen af {{name}}. Prøv igen, eller skriv til {{supportEmail}}, hvis problemet fortsætter.",
         "timeoutTitle": "Tager længere tid end forventet",
         "timeoutBody": "Opsætningen af {{name}} tager længere tid end normalt (over {{displayMinutes}} minutter).",
         "continueInBackground": "Fortsæt i baggrunden",
@@ -1312,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Dit abonnement med tidlig adgang kræver en manuel gennemgang, før det kan bruges på mobilen.",
       "iosTitle": "KiloClaw er ikke tilgængelig på iOS",
       "iosBody": "Adgangen til KiloClaw for denne konto administreres uden for iOS-appen.",
-      "iosContact": "Spørgsmål? Kontakt hi@kilo.ai.",
+      "iosContact": "Spørgsmål? Kontakt {{supportEmail}}.",
       "quarantinedCta": "Send en e-mail til vores team",
       "nonCanonicalEarlybirdCta": "Se din plan igennem på kilo.ai"
     },
@@ -1547,7 +1553,7 @@
         "recoveryLabel": "Opdatér GitHub-appen"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer blev deaktiveret, fordi denne GitHub-organisation bruger en liste over tilladte IP-adresser, som blokerer Kilo. Kontakt hi@kilocode.ai for at få hjælp, og aktivér derefter Code Reviewer igen."
+        "description": "Code Reviewer blev deaktiveret, fordi denne GitHub-organisation bruger en liste over tilladte IP-adresser, som blokerer Kilo. Kontakt {{supportEmail}} for at få hjælp, og aktivér derefter Code Reviewer igen."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer blev deaktiveret, fordi Kilo ikke kan oprette et adgangstoken til dette GitLab-projekt. Giv adgang med rollen Maintainer, eller aktivér adgangstokens til projekter, og aktivér derefter Code Reviewer igen.",
@@ -1562,7 +1568,7 @@
         "recoveryLabel": "Opdatér indstillingerne for Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer blev deaktiveret, fordi kloning af kodelageret overskred tidsgrænsen tre gange i dag. Kontakt hi@kilocode.ai for at få hjælp, og aktivér derefter Code Reviewer igen."
+        "description": "Code Reviewer blev deaktiveret, fordi kloning af kodelageret overskred tidsgrænsen tre gange i dag. Kontakt {{supportEmail}} for at få hjælp, og aktivér derefter Code Reviewer igen."
       },
       "title": "Kodegennemgangen kræver din opmærksomhed.",
       "recoveryLabel": "Kontakt support"
@@ -2086,6 +2092,8 @@
       "title": "Sessionen",
       "copyErrorDetails": "Kopiér fejloplysninger",
       "backToSessions": "Tilbage til sessioner",
+      "follow": "Følg på låseskærmen",
+      "unfollow": "Stop med at følge på låseskærmen",
       "couldNotLoad": "Kunne ikke indlæse sessionen.",
       "failedToLoadDetails": "Kunne ikke indlæse oplysninger om sessionen.",
       "failedToStopExecution": "Kunne ikke stoppe kørslen.",
@@ -2152,6 +2160,11 @@
       "collapse": "Fold målet sammen",
       "expand": "Fold målet ud"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Opgaver, {{completed}} af {{total}} fuldført",
+      "rowAccessibility": "Opgaver, {{completed}} af {{total}} fuldført. Aktuel opgave: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Senest brugt",
       "couldNotLoadGithubRepositories": "Kunne ikke indlæse kodelagre fra GitHub.",
@@ -2184,7 +2197,6 @@
       "retryLoadingEnvironment": "Prøv at indlæse miljøet igen",
       "defaultEnvironment": "Standardmiljø",
       "environmentSummary": "{{commands}} kommandoer · {{mcp}} MCP · {{skills}} færdigheder · {{agents}} agenter",
-      "changes": "Ændringer",
       "leaveChanges": "Behold ændringer",
       "commitAndPush": "Commit og push",
       "startSession": "Start en session",
@@ -2207,6 +2219,10 @@
       "importingSession": "Importerer session",
       "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
       "importFailed": "Kunne ikke importere denne session.",
+      "cliCannotFork": "Opdater Kilo CLI for at forgrene fra en besked.",
+      "forkCutNotSynced": "Denne besked er ikke gemt endnu. Prøv igen om lidt.",
+      "forkFilesFromBaseBranch": "Filerne starter fra basisbranchen.",
+      "forkFilesUnchangedOnComputer": "Filerne på denne computer ændres ikke.",
       "pickProfile": "Vælg en profil",
       "noProfile": "Ingen profil",
       "manageProfiles": "Administrer profiler",
@@ -2251,8 +2267,8 @@
       "toolList": "vis liste",
       "toolPatch": "anvend rettelse",
       "toolTask": "opgave",
-      "readTodos": "Læs opgavelisten",
-      "updateTodos": "Opdatér opgavelisten",
+      "readTodos": "Læs planen",
+      "updateTodos": "Opdatér planen",
       "linesBadge": "{{displayCount}} linjer",
       "filesBadge": "{{displayCount}} filer",
       "matchesBadge": "{{displayCount}} resultater",
@@ -2322,6 +2338,7 @@
       "copyMessage": "Kopiér besked",
       "copyText": "Kopiér tekst",
       "selectText": "Markér tekst",
+      "forkFromHere": "Forgren herfra",
       "reportAiResponse": "Indberet AI-svar",
       "reportAiResponseConfirm": "Vil du indberette dette svar, så det kan blive gennemgået?",
       "report": "Indberet",
@@ -2641,6 +2658,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Vis ændringer",
+      "asOf": "Pr. {{time}}",
+      "tooLarge": "Ændringerne er for omfattende til at blive vist på mobil.",
+      "empty": "Ingen filændringer i denne session endnu."
     },
     "autoApprove": {
       "title": "Automatisk godkendelse",
@@ -3153,6 +3176,8 @@
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
+    "finished": "Afsluttet",
+    "followFailed": "Kunne ikke vise denne agent på låseskærmen.",
     "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
     "checked": "Kontrolleret",
     "lastKnown": "Sidst kendt",
@@ -3161,7 +3186,26 @@
     "waitingForYou": "Afventer dig",
     "nextScheduled": "Næste planlagte",
     "answerNeeded": "Afventer svar",
-    "waitingToRetry": "Afventer nyt forsøg"
+    "waitingToRetry": "Afventer nyt forsøg",
+    "step": {
+      "editing": "Redigerer",
+      "reading": "Læser",
+      "running": "Kører",
+      "searching": "Websøgning",
+      "thinking": "Tænker igennem"
+    },
+    "planOf": "af",
+    "filesChanged": "filer ændret",
+    "finishedIn": "Færdig på",
+    "noActivityFor": "Ingen aktivitet i",
+    "prOpened": "Pull request åbnet",
+    "permissionWants": "Vil køre",
+    "failure": {
+      "provider": "Stoppet: udbyderfejl",
+      "tool": "Stoppet: værktøjsfejl",
+      "cancelled": "Stoppet: annulleret",
+      "other": "STOPPET"
+    }
   },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",
@@ -3189,6 +3233,7 @@
     "tutorialLabel": "Vejledning"
   },
   "modelChat": {
+    "offlineFailure": "Denne model kræver en internetforbindelse. Opret forbindelse, og prøv igen, eller skift til en model på denne enhed.",
     "empty": {
       "title": "Start en chat",
       "description": "Send en besked for at tale med en model."
@@ -3196,10 +3241,32 @@
     "list": {
       "loadFailed": "Kunne ikke indlæse chathistorik.",
       "new": "Ny chat",
-      "openHint": "Åbner chatten. Tryk og hold for at slette.",
       "deleteTitle": "Slet denne chat?"
     },
+    "rename": {
+      "title": "Omdøb chat",
+      "accessibility": "Omdøb chat: {{title}}",
+      "openHint": "Åbner chatten. Tryk og hold for at omdøbe eller slette."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Chatoplysninger",
+      "backend": "Server",
+      "effortDefault": "Modellens standard",
+      "noCost": "Ingen pris",
+      "costUnknown": "Ukendt",
+      "costEstimatedNote": "Prisen for svar, der ikke angav en pris, er anslået ud fra listepriser.",
+      "costUnknownNote": "Der kendes ingen pris for denne model.",
+      "costPartialNote": "Denne samlede pris omfatter ikke modeller uden en kendt pris.",
+      "localNote": "Modeller på enheden kører på denne enhed. De har ingen pris og ingen prompt-cache, og deres tokenantal kan være anslået.",
+      "countedSinceNote": "Denne chat startede, før forbruget blev registreret. De samlede tal viser kun svarene efter det tidspunkt.",
+      "remoteServersOn": "Aktive eksterne MCP-servere"
+    },
+    "webSearch": {
+      "title": "Søg på nettet",
+      "description": "Lad denne chat slå aktuelle oplysninger op via din Kilo-konto. Søgninger bruger din månedlige søgekvote.",
+      "allowanceExhausted": "Dine gratis websøgninger for denne måned er brugt op. Tilføj kreditter for at søge igen."
+    },
     "mcp": {
       "title": "Kilo-værktøjer",
       "use": "Brug Kilo-værktøjer",
@@ -3222,7 +3289,6 @@
       "fieldName": "Vist navn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Indtast en gyldig server-URL.",
-      "fieldToken": "Bearer-token (valgfrit)",
       "enableServer": "Aktivér denne server: {{name}}",
       "editServer": "Rediger server",
       "deleteServer": "Slet server",
@@ -3243,8 +3309,24 @@
       "serverUnreachable": "Kunne ikke nå denne server",
       "serverOff": "Denne server er slået fra"
     },
+    "mcpOAuth": {
+      "authMethod": "Godkendelse",
+      "authNone": "Ingen login",
+      "authBearer": "Bearer-token",
+      "authOAuth": "OAuth-login",
+      "fieldToken": "Token",
+      "oauthHint": "Når du har gemt, skal du trykke på $t(modelChat.mcpOAuth.signIn) på serveren for at logge ind med din browser.",
+      "serverNeedsSignIn": "Log ind for at bruge denne server",
+      "signIn": "Log ind",
+      "signInA11y": "Log ind på denne server: {{name}}",
+      "signInFailed": "Kunne ikke logge ind på {{name}}. Prøv igen."
+    },
     "backends": {
       "title": "Chatservere",
+      "providersTitle": "Chatudbydere",
+      "cloud": "I skyen",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo-modeller er ikke tilgængelige lige nu. Tjek din forbindelse.",
       "manage": "Administrer chatservere",
       "defaultKilo": "$t(consent.kilo) (standard)",
       "kiloHelp": "Den indbyggede chatserver bruger din Kilo-konto og kan ikke redigeres eller slettes.",
@@ -3304,7 +3386,6 @@
     "gguf": {
       "title": "Downloadbare modeller",
       "help": "Download en åben model, og kør den på denne telefon med llama.cpp. Dine prompter og svar bliver på enheden. Modeller er store, så brug Wi-Fi.",
-      "details": "{{size}} · Licens: {{license}}",
       "download": "Download model",
       "pause": "Sæt download på pause",
       "resume": "Genoptag download",
@@ -3316,6 +3397,8 @@
       "url": "Direkte downloadlink",
       "urlHelp": "Indsæt et HTTPS-link til en .gguf-fil, f.eks. et Hugging Face-resolve-link. Download kun modeller fra kilder, du har tillid til.",
       "downloadUrl": "Download fra link",
+      "advanced": "Avanceret",
+      "localPurpose": "Kører på denne enhed med llama.cpp. Prompter og svar bliver på enheden.",
       "deleteTitle": "Slet denne model?",
       "deleteMessage": "Slet {{name}} fra denne enhed? Chats, der bruger den, har brug for en anden model, før de kan fortsætte.",
       "errors": {
@@ -3325,12 +3408,62 @@
         "notGguf": "Linket skal pege på en .gguf-fil.",
         "space": "Der er ikke nok ledig lagerplads til denne model. Frigør plads, og prøv igen.",
         "network": "Downloadet blev ikke færdigt. Tjek din forbindelse, og prøv igen.",
-        "invalidFile": "Den downloadede fil er ikke en model, som denne app kan køre, så den blev fjernet."
+        "invalidFile": "Den downloadede fil er ikke en model, som denne app kan køre, så den blev fjernet.",
+        "checksum": "Den downloadede fil matcher ikke sin offentliggjorte kontrolsum, så den blev fjernet. Prøv at downloade igen."
       }
+    },
+    "catalog": {
+      "browse": "Gennemse modeller",
+      "title": "Modelkatalog",
+      "search": "Søg i Hugging Face-modeller",
+      "tabs": "Modelfilter",
+      "fitsTab": "Passer til denne enhed",
+      "fromHuggingFace": "Fra Hugging Face",
+      "loading": "Indlæser modeller",
+      "noResults": "Ingen modeller fundet",
+      "noFits": "Ingen modeller passer til denne enhed",
+      "noFitsDescription": "Større modeller findes under fanen $t(common.all).",
+      "fit": {
+        "fits": "Passer",
+        "tight": "Passer lige akkurat",
+        "tooLarge": "For stor",
+        "noStorage": "Ikke nok lagerplads",
+        "unknown": "Pasform ukendt"
+      },
+      "recommendationsHelp": "En liste, som denne app fastlåser: én fil pr. model fra en udgiver, der angiver en licens. Intet andet rangeres.",
+      "compatibilityHelp": "Pasform sammenligner modelfilen med denne enheds hukommelse og ledige lagerplads. Hukommelsestallet er et skøn, ikke en måling.",
+      "text": "Tekst",
+      "listTextPurpose": "Kun tekstprompter.",
+      "listImagePurpose": "Læser billeder såvel som tekst.",
+      "smallestDownload": "Mindste download: {{size}} · ca. {{memory}} hukommelse",
+      "fullFileName": "Fil: {{name}}",
+      "memoryEstimateNote": "Hukommelsestal er skøn, ikke målinger.",
+      "parameters": "Parametre: {{value}}",
+      "downloads": "Downloads: {{value}}",
+      "likes": "Likes: {{value}}",
+      "context": "Kontekstvindue: {{value}}",
+      "license": "Licens: {{license}}",
+      "licenseUnknown": "Licensen er ikke angivet",
+      "tools": "Værktøjskald",
+      "vision": "Billedinput",
+      "hintsHelp": "Oplysninger fra Hugging Face. Appen tjekker modellen, når den er downloadet.",
+      "gated": "Denne model kræver en Hugging Face-konto, så appen kan ikke downloade den.",
+      "quantizations": "Kvantiseringer",
+      "quantizationsHelp": "Mindre filer bruger mindre hukommelse og lagerplads. Større filer giver som regel bedre svar.",
+      "quantDetail": "{{size}} download · cirka {{memory}} hukommelse",
+      "downloadQuant": "Download {{quant}}",
+      "loadingModel": "Indlæser modeldetaljer",
+      "couldNotLoadModel": "Kunne ikke indlæse denne model",
+      "noFiles": "Ingen filer, som denne app kan køre",
+      "noFilesDescription": "Denne app kører modeller, der består af én GGUF-fil.",
+      "tooLargeTitle": "Denne model kører muligvis ikke",
+      "tooLargeMessage": "{{name}} kræver sandsynligvis mere hukommelse, end denne enhed har. Appen kan lukke, mens modellen svarer. Vil du downloade den alligevel?",
+      "downloadAnyway": "Download alligevel"
     },
     "localModels": {
       "title": "Modeller på enheden",
-      "help": "Modeller på enheden kører på denne telefon. Dine prompter og svar bliver på enheden, og disse modeller kan ikke bruge værktøjer.",
+      "help": "Modeller på enheden kører på denne telefon. Dine prompter og svar bliver på enheden.",
+      "systemPurpose": "Modellen, der er indbygget i denne enheds system. Den kører på enheden.",
       "apple": "Apple Intelligence (på enheden)",
       "checking": "Tjekker tilgængelighed…",
       "ready": "Klar til brug",
@@ -3356,6 +3489,9 @@
       "downloading": "Downloader…",
       "downloadProgress": "Downloader… {{percent}}%",
       "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Denne model understøtter ræsonnementsniveau"
     }
   },
   "settingsTools": {
@@ -3578,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play returnerede ingen matchende kreditpakker.",
     "purchaseOwnedByAnotherAccount": "Kreditterne på denne Apple-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditterne på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem."
+  },
+  "todos": {
+    "saveAsTodo": "Gem som opgave",
+    "segment": {
+      "label": "Agentvisning",
+      "sessions": "Sessioner",
+      "todos": "Opgaver"
+    },
+    "lists": {
+      "newList": "Ny liste",
+      "empty": "Ingen lister endnu",
+      "couldNotLoad": "Kunne ikke indlæse lister",
+      "noRepository": "Intet kodelager",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} åbne",
+      "openCount_other": "{{count}} åbne",
+      "archived_one": "Arkiveret ({{count}})",
+      "archived_other": "Arkiveret ({{count}})",
+      "archive": "Arkivér",
+      "unarchive": "Fjern fra arkiv",
+      "deleteTitle": "Slet {{name}}?",
+      "deleteMessage": "Dens opgaver slettes også. Sessionerne bevares."
+    },
+    "listSettings": {
+      "title": "Listeindstillinger",
+      "name": "Navn",
+      "namePlaceholder": "Fejl, Idéer, Udgivelse…",
+      "emoji": "Emoji",
+      "mode": "Tilstand",
+      "defaultsHint": "Sessioner, der startes fra denne liste, bruger disse standardindstillinger."
+    },
+    "list": {
+      "addPlaceholder": "Tilføj en opgave",
+      "add": "Tilføj opgave",
+      "empty": "Ingen opgaver endnu",
+      "setDefaults": "Angiv kodelager, tilstand og model",
+      "completed_one": "Afsluttet ({{count}})",
+      "completed_other": "Afsluttet ({{count}})"
+    },
+    "item": {
+      "markDone": "Markér som færdig",
+      "markOpen": "Markér som ikke færdig",
+      "markDonePrompt": "Markér som færdig?",
+      "deleted": "Opgave slettet",
+      "undo": "Fortryd",
+      "runCount_one": "{{count}} kørsel",
+      "runCount_other": "{{count}} kørsler",
+      "startNow": "Start uden gennemgang",
+      "startNowHint": "Hold nede for at starte uden gennemgang",
+      "titleLabel": "Opgavetitel",
+      "renameTitle": "Omdøb opgave",
+      "notes": "Noter",
+      "addNotes": "Tilføj noter",
+      "notesPrompt": "Tilføj kontekst, krav eller acceptkriterier.",
+      "markdownSupported": "Markdown understøttet",
+      "sessions": "Sessioner tilknyttet",
+      "noSessions": "Ingen sessioner endnu",
+      "untitledLinkedSession": "Linket session",
+      "sessionNeedsInput": "Sessionen kræver input",
+      "sessionRunning": "Sessionen kører",
+      "sessionFinished": "Sessionen afsluttet",
+      "sessionPullRequest": "Sessionens PR",
+      "sessionPullRequestNumber": "Sessionens PR #{{number}}",
+      "openSessionHint": "Åbner sessionen.",
+      "unlinkSessionAction": "Fjern link til session",
+      "unlinkConfirmTitle": "Fjern link til {{title}}?",
+      "unlinkConfirmMessage": "Selve sessionen slettes ikke. Kun dens link til denne opgave fjernes.",
+      "startNewSession": "Start ny session",
+      "startNewSessionHint": "Langt tryk for at starte en ny session.",
+      "linkSession": "Tilknyt session",
+      "linkFailed": "Kunne ikke tilknytte sessionen til opgaven"
+    },
+    "linkSession": {
+      "title": "Tilknyt en session",
+      "empty": "Ingen seneste sessioner",
+      "emptyInRepository": "Ingen seneste sessioner i {{repository}}"
+    },
+    "upNext": "Næste",
+    "sessionTodo": "Opgave: {{title}}",
+    "linkToTodo": "Tilknyt til opgave",
+    "candidates": {
+      "empty": "Ingen åbne opgaver"
+    },
+    "saveSheet": {
+      "title": "Gem på liste",
+      "saved": "Gemt på {{list}}"
+    }
   }
 }

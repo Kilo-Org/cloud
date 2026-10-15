@@ -41,6 +41,11 @@ import {
 } from '../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import type { MessageResultRPCResponse } from '../../src/session/message-result.js';
+import {
+  readPreparationAttempt,
+  readPreparationSteps,
+} from '../../src/session/preparation-history.js';
+import { createPreparationProgressRecorder } from '../../src/session/preparation-progress.js';
 import { sessionDoName } from '../../src/session-plane.js';
 import {
   createFakeCredentialBroker,
@@ -310,6 +315,8 @@ type PreparingRowData = {
   triggerMessageId?: string;
   revision?: number;
   step?: string;
+  stepId?: string;
+  parentStepId?: string;
   safeError?: string;
   attempt?: { id?: string; status?: string; triggerMessageId?: string };
   stepSnapshot?: { id?: string; key?: string; status?: string };
@@ -833,6 +840,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
       { step: 'sandbox_create', key: 'sandbox_provision', detail: 'Creating sandbox' },
       { step: 'sandbox_start', key: 'sandbox_boot', detail: 'Starting sandbox' },
       { step: 'clone', key: 'cloning', detail: 'Cloning repository' },
+      { step: 'restore', key: 'workspace_restore', detail: 'Updating repository' },
       { step: 'checkout', key: 'branch', detail: 'Checking out branch' },
       { step: 'setup', key: 'setup_commands', detail: 'Running setup commands' },
       { step: 'kilo_runtime', key: 'kilo_server', detail: 'Starting Kilo runtime' },
@@ -850,6 +858,152 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
           ?.stepSnapshot
       ).toMatchObject({ latestDetail: phase.detail });
     }
+    stream.close();
+  });
+
+  it('preserves ordered phase occurrences and original starts across retries in one attempt', async () => {
+    const { sessionId, stub, peer } = await setup();
+    const stream = await connectStream(sessionId);
+    await runInDurableObject(stub, instance => {
+      let timestamp = Date.now();
+      instance['preparationRecorders'].set(
+        peer.attemptId,
+        createPreparationProgressRecorder({
+          attemptId: peer.attemptId,
+          triggerMessageId: 'm1',
+          sessionId,
+          eventQueries: instance['eventQueries'],
+          broadcast: event => instance['broadcast'](event),
+          now: () => timestamp--,
+        })
+      );
+    });
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    for (const step of ['restore', 'sandbox_create', 'sandbox_start'] as const) {
+      await stub.onRoute({ state: 'preparing', step, attemptId: peer.attemptId });
+    }
+    const original = await runInDurableObject(stub, instance => ({
+      attempt: readPreparationAttempt(instance['eventQueries'], peer.attemptId),
+      steps: readPreparationSteps(instance['eventQueries'], peer.attemptId),
+    }));
+    await stub.onRoute({ state: 'preparing', step: 'sandbox_start', attemptId: peer.attemptId });
+    await stub.onRoute({ state: 'preparing', step: 'sandbox_create', attemptId: peer.attemptId });
+    await stub.onRoute({
+      state: 'preparing',
+      step: 'sandbox_create',
+      detail: 'Creating replacement sandbox',
+      attemptId: peer.attemptId,
+    });
+    for (const step of ['snapshot_fallback', 'sandbox_start', 'clone', 'setup'] as const) {
+      await stub.onRoute({ state: 'preparing', step, attemptId: peer.attemptId });
+    }
+
+    const steps = await runInDurableObject(stub, instance => {
+      expect(readPreparationAttempt(instance['eventQueries'], peer.attemptId)).toMatchObject({
+        id: peer.attemptId,
+        triggerMessageId: 'm1',
+        status: 'running',
+        startedAt: original.attempt?.startedAt,
+      });
+      return readPreparationSteps(instance['eventQueries'], peer.attemptId);
+    });
+    expect(steps.map(step => step.key)).toEqual([
+      'workspace_setup',
+      'workspace_restore',
+      'sandbox_provision',
+      'sandbox_boot',
+      'sandbox_provision',
+      'snapshot_fallback',
+      'sandbox_boot',
+      'cloning',
+      'setup_commands',
+    ]);
+    expect(new Set(steps.map(step => step.id)).size).toBe(steps.length);
+    expect(steps.map(step => step.status)).toEqual([
+      ...Array(steps.length - 1).fill('completed'),
+      'running',
+    ]);
+    for (const [index, step] of steps.entries()) {
+      expect(step.startedRevision).toEqual(expect.any(Number));
+      expect(step.startedRevision).toBeGreaterThan(steps[index - 1]?.startedRevision ?? 0);
+      if (index > 0) expect(step.startedAt).toBeLessThan(steps[index - 1]?.startedAt ?? 0);
+    }
+    for (const step of original.steps) {
+      expect(steps.find(current => current.id === step.id)).toMatchObject({
+        startedAt: step.startedAt,
+        startedRevision: step.startedRevision,
+        ...(step.completedAt === undefined ? {} : { completedAt: step.completedAt }),
+        latestDetail: step.latestDetail,
+      });
+    }
+    for (const key of ['sandbox_provision', 'sandbox_boot'] as const) {
+      const occurrences = steps.filter(step => step.key === key);
+      expect(occurrences.map(step => step.id)).toEqual([
+        `phase:${key}`,
+        `phase:${key}:${occurrences[1]?.startedRevision}`,
+      ]);
+    }
+    expect(
+      steps.filter(step => step.key === 'sandbox_boot').map(step => step.latestDetail)
+    ).toEqual(['Starting sandbox', 'Starting sandbox']);
+    expect(steps.filter(step => step.key === 'sandbox_provision')[1]?.latestDetail).toBe(
+      'Creating replacement sandbox'
+    );
+    await expect(stub.getSession()).resolves.toMatchObject({
+      route: { state: 'preparing', attemptId: peer.attemptId, step: 'setup' },
+    });
+    expect(await messageStatus(stub, 'm1')).toBe('queued');
+    expect(peer.deliverCalls).toEqual([]);
+
+    const live = preparingRows(await drainStream(stream));
+    expect(live.filter(row => row.action === 'attempt_started')).toHaveLength(1);
+    for (const step of steps) {
+      expect(
+        live.find(row => row.action === 'step_started' && row.stepId === step.id)
+      ).toMatchObject({
+        revision: step.startedRevision,
+      });
+    }
+    stream.close();
+
+    const replay = await connectStream(sessionId);
+    const rows = preparingRows(await drainStream(replay));
+    expect(
+      new Set(rows.filter(row => row.action === 'attempt_snapshot').map(row => row.attempt?.id))
+    ).toEqual(new Set([peer.attemptId]));
+    expect(rows.flatMap(row => (row.stepSnapshot ? [row.stepSnapshot] : []))).toEqual(
+      expect.arrayContaining(steps)
+    );
+    replay.close();
+  });
+
+  it('persists and replays the snapshot fallback preparation step', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({
+      state: 'preparing',
+      step: 'snapshot_fallback',
+      detail: 'Snapshot startup failed. Retrying without a snapshot.',
+      attemptId: peer.attemptId,
+    });
+
+    const stream = await connectStream(sessionId);
+    const connected = await waitForStreamEvent(stream, 'connected');
+    expect(connected.data).toMatchObject({
+      cloudStatus: { type: 'preparing', step: 'snapshot_fallback' },
+    });
+    const replayed = preparingRows(await drainStream(stream));
+    expect(
+      replayed.find(
+        row => row.action === 'step_snapshot' && row.stepSnapshot?.key === 'snapshot_fallback'
+      )?.stepSnapshot
+    ).toMatchObject({
+      key: 'snapshot_fallback',
+      status: 'running',
+      latestDetail: 'Snapshot startup failed. Retrying without a snapshot.',
+    });
     stream.close();
   });
 
@@ -1021,6 +1175,130 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     expect(messages.some(message => message.streamEventType === 'kilocode')).toBe(false);
     stream.close();
   });
+
+  it.each([
+    { exitCode: 0, secondSetupNotification: true },
+    { exitCode: 1, secondSetupNotification: true },
+    { exitCode: 0, secondSetupNotification: false },
+    { exitCode: 1, secondSetupNotification: false },
+  ])(
+    'keeps repeated setup commands separate after first exit $exitCode with second setup notification $secondSetupNotification in one attempt',
+    async ({ exitCode, secondSetupNotification }) => {
+      const { sessionId, stub, peer } = await setup();
+      const stream = await connectStream(sessionId);
+      peer.prepareView = peer.view('preparing');
+      await stub.send(promptPayload('m1'));
+      await stub.onEvents({
+        events: [
+          {
+            type: 'session.setup.started',
+            properties: {
+              command: 1,
+              commandCount: 1,
+              text: 'curl -u user:repeated-setup-secret-canary',
+            },
+          },
+          {
+            type: 'session.setup.output',
+            properties: { command: 1, output: 'first run output\n' },
+          },
+          {
+            type: 'session.setup.finished',
+            properties: {
+              command: 1,
+              exitCode,
+              ...(exitCode === 0 ? {} : { safeError: 'First setup run failed' }),
+            },
+          },
+        ],
+      });
+      const original = await runInDurableObject(stub, instance =>
+        readPreparationSteps(instance['eventQueries'], peer.attemptId).find(
+          step => step.kind === 'setup_command'
+        )
+      );
+      expect(original).toMatchObject({
+        id: 'setup_command:0',
+        parentStepId: 'phase:setup_commands',
+        status: exitCode === 0 ? 'completed' : 'failed',
+        outputTail: 'first run output\n',
+        exitCode,
+      });
+      for (const step of ['snapshot_fallback', 'sandbox_start'] as const) {
+        await stub.onRoute({ state: 'preparing', step, attemptId: peer.attemptId });
+      }
+      if (secondSetupNotification) {
+        await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
+      }
+      await stub.onEvents({
+        events: [
+          {
+            type: 'session.setup.output',
+            properties: { command: 1, output: 'second run output\n' },
+          },
+          { type: 'session.setup.finished', properties: { command: 1, exitCode: 0 } },
+        ],
+      });
+
+      const steps = await runInDurableObject(stub, instance =>
+        readPreparationSteps(instance['eventQueries'], peer.attemptId)
+      );
+      const phases = steps.filter(step => step.kind === 'phase' && step.key === 'setup_commands');
+      const commands = steps.filter(step => step.kind === 'setup_command');
+      expect(phases).toHaveLength(2);
+      expect(commands).toHaveLength(2);
+      expect(commands[0]).toEqual(original);
+      expect(commands[1]).toMatchObject({
+        id: `${phases[1]?.id}:setup_command:0`,
+        parentStepId: phases[1]?.id,
+        commandIndex: 0,
+        status: 'completed',
+        outputTail: 'second run output\n',
+        exitCode: 0,
+      });
+      expect(commands[0]?.parentStepId).not.toBe(commands[1]?.parentStepId);
+      expect(commands[0]?.safeError).toBe(exitCode === 0 ? undefined : 'First setup run failed');
+      expect(commands[1]?.safeError).toBeUndefined();
+      expect(commands.every(command => command.command === undefined)).toBe(true);
+      expect(steps.map(step => step.key)).toEqual([
+        'workspace_setup',
+        'setup_commands',
+        'setup_commands',
+        'snapshot_fallback',
+        'sandbox_boot',
+        'setup_commands',
+        'setup_commands',
+      ]);
+      expect(await messageStatus(stub, 'm1')).toBe('queued');
+      await expect(stub.getSession()).resolves.toMatchObject({
+        route: {
+          state: 'preparing',
+          attemptId: peer.attemptId,
+          step: secondSetupNotification ? 'setup' : 'sandbox_start',
+        },
+      });
+
+      const live = await drainStream(stream);
+      const commandRows = preparingRows(live).filter(row => row.stepId === commands[1]?.id);
+      expect(commandRows.map(row => row.action)).toEqual([
+        'step_started',
+        'step_output',
+        'step_completed',
+      ]);
+      expect(commandRows[0]).toMatchObject({ parentStepId: phases[1]?.id });
+      expect(JSON.stringify(live)).not.toContain('repeated-setup-secret-canary');
+      expect(live.some(message => message.streamEventType === 'kilocode')).toBe(false);
+      stream.close();
+
+      const replay = await connectStream(sessionId);
+      const replayed = await drainStream(replay);
+      expect(
+        preparingRows(replayed).flatMap(row => (row.stepSnapshot ? [row.stepSnapshot] : []))
+      ).toEqual(expect.arrayContaining(commands));
+      expect(JSON.stringify(replayed)).not.toContain('repeated-setup-secret-canary');
+      replay.close();
+    }
+  );
 
   it.each(['preparing', 'unknown'] as const)(
     'never persists or broadcasts setup command text with route %s',

@@ -205,8 +205,8 @@ function consentDocument(params: {
         --border: oklch(1 0 0 / 12%);
         --foreground: oklch(0.985 0 0);
         --muted: oklch(0.708 0 0);
-        --primary: oklch(0.95 0.15 108);
-        --primary-hover: oklch(0.9 0.14 108);
+        --primary: #ffdd00;
+        --primary-hover: #edcd00;
         --primary-foreground: oklch(0.145 0 0);
         --warning: oklch(0.78 0.14 75);
         --warning-surface: oklch(0.3 0.04 75);

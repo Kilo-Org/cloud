@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import {
+  buildAutoModelCatalogEntry,
   formatName,
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
+  getRawOpenRouterModels,
   shouldSuppressOpenRouterModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import type { StoredModel } from '@kilocode/db/schema-types';
 import {
   createMockResponse,
   mockOpenRouterModels,
@@ -18,9 +21,14 @@ import {
   kiloExclusiveModels,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
-import { isFableModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
-import { KILO_AUTO_EFFICIENT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import {
+  AUTO_MODELS,
+  KILO_AUTO_EFFICIENT_MODEL,
+  ORG_AUTO_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -188,13 +196,6 @@ describe('shouldSuppressOpenRouterModel', () => {
   });
 });
 
-describe('isFableModel', () => {
-  it('only matches Claude Fable model IDs', () => {
-    expect(isFableModel('anthropic/claude-fable-5')).toBe(true);
-    expect(isFableModel('vendor/fable-model')).toBe(false);
-  });
-});
-
 describe('auto models', () => {
   beforeEach(() => {
     global.fetch = jest.fn(() =>
@@ -207,6 +208,7 @@ describe('auto models', () => {
   });
 
   afterEach(() => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
     global.fetch = originalFetch;
   });
 
@@ -223,6 +225,86 @@ describe('auto models', () => {
       'https://openrouter.ai/api/v1/models',
       expect.objectContaining({ cache: 'force-cache', next: { revalidate: 60 } })
     );
+  });
+
+  it.each([undefined, { name: 'Current model', slug: 'vendor/current' }])(
+    'validates raw upstream models with alias_target %j without falling back to unparsed data',
+    async aliasTarget => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve(
+          createMockResponse({
+            jsonData: {
+              data: [
+                {
+                  ...buildModel({ id: '~vendor/latest' }),
+                  alias_target: aliasTarget,
+                  canonical_slug: '~vendor/latest',
+                },
+              ],
+            },
+          })
+        )
+      ) as typeof fetch;
+
+      const response = await getRawOpenRouterModels();
+      expect(response.data[0]?.id).toBe('~vendor/latest');
+      expect(response.data[0]?.alias_target).toBeUndefined();
+      expect(response.data[0]).not.toHaveProperty('canonical_slug');
+    }
+  );
+
+  it.each(['~vendor/latest', 'vendor/concrete'])(
+    'does not publish an upstream alias target for %s without database alias metadata',
+    async modelId => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve(
+          createMockResponse({
+            jsonData: {
+              data: [buildModel({ id: modelId, alias_target: 'vendor/upstream-only' })],
+            },
+          })
+        )
+      ) as typeof fetch;
+
+      const response = await getEnhancedOpenRouterModels();
+      const model = response.data.find(entry => entry.id === modelId);
+      expect(model).toBeDefined();
+      expect(model?.alias_target).toBeUndefined();
+      expect(JSON.parse(JSON.stringify(model))).not.toHaveProperty('alias_target');
+    }
+  );
+
+  it('publishes database alias targets only for alias entries and preserves them through validation', async () => {
+    const alias = buildModel({ id: '~vendor/latest' });
+    const target = buildModel({ id: 'vendor/current' });
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValueOnce({
+      [alias.id]: {
+        ...alias,
+        endpoints: [],
+        alias_target: { slug: target.id },
+      },
+      [target.id]: {
+        ...target,
+        endpoints: [],
+        alias_target: { slug: 'vendor/ignored' },
+      },
+    });
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [
+              { ...alias, alias_target: { name: 'Upstream model', slug: 'vendor/upstream' } },
+              { ...target, alias_target: 'vendor/upstream' },
+            ],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const response = OpenRouterModelsResponseSchema.parse(await getEnhancedOpenRouterModels());
+    expect(response.data.find(model => model.id === alias.id)?.alias_target).toBe(target.id);
+    expect(response.data.find(model => model.id === target.id)?.alias_target).toBeUndefined();
   });
 
   it('excludes OpenRouter batch variants from the public model list', async () => {
@@ -314,6 +396,130 @@ describe('reasoning variants', () => {
       models.data.find(model => model.id === unsupportedId)?.opencode?.variants
     ).toBeUndefined();
     expect(models.data.find(model => model.id === supportedId)?.opencode?.variants).toBeDefined();
+  });
+});
+
+describe('reasoning options', () => {
+  const reasoningSupported = ['max_tokens', 'tools', 'reasoning', 'include_reasoning'];
+  const openRouterReasoning: Record<string, StoredModel['reasoning']> = {
+    'anthropic/claude-sonnet-4.6': {
+      mandatory: false,
+      supported_efforts: ['max', 'high', 'medium', 'low'],
+    },
+    'openai/gpt-5.5': {
+      mandatory: false,
+      supported_efforts: ['xhigh', 'high', 'medium', 'low', 'none'],
+    },
+    'google/gemini-3.1-pro-preview': {
+      mandatory: true,
+      supported_efforts: ['high', 'medium', 'low'],
+    },
+    'xiaomi/mimo-v2.5': { mandatory: false },
+    'vendor/no-reasoning': undefined,
+  };
+
+  async function getCatalog() {
+    jest
+      .mocked(getOpenRouterModelsMetadataFromDatabase)
+      .mockResolvedValue(
+        Object.fromEntries(
+          Object.entries(openRouterReasoning).map(([id, reasoning]) => [
+            id,
+            { id, name: id, reasoning, endpoints: [] },
+          ])
+        )
+      );
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: Object.entries(openRouterReasoning).map(([id, reasoning]) =>
+              buildModel({
+                id,
+                supported_parameters: reasoning ? reasoningSupported : ['max_tokens', 'tools'],
+              })
+            ),
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+    const models = await getEnhancedOpenRouterModels();
+    return (id: string) => models.data.find(model => model.id === id)?.opencode;
+  }
+
+  afterEach(() => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    global.fetch = originalFetch;
+  });
+
+  it('serves Anthropic efforts next to unchanged variants', async () => {
+    const opencode = await getCatalog();
+
+    expect(JSON.stringify(opencode('anthropic/claude-sonnet-4.6'))).toBe(
+      JSON.stringify({
+        ai_sdk_provider: 'anthropic',
+        variants: {
+          none: { reasoning: { enabled: false, effort: 'none' } },
+          low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+          medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+          high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+          max: { reasoning: { enabled: true, effort: 'max' }, verbosity: 'max' },
+        },
+        reasoning_options: [{ type: 'effort', values: ['none', 'low', 'medium', 'high', 'max'] }],
+      })
+    );
+  });
+
+  it('serves OpenAI efforts', async () => {
+    const opencode = await getCatalog();
+
+    expect(opencode('openai/gpt-5.5')?.reasoning_options).toEqual([
+      { type: 'effort', values: ['none', 'low', 'medium', 'high', 'xhigh'] },
+    ]);
+  });
+
+  it('serves Gemini efforts without none when reasoning is mandatory', async () => {
+    const opencode = await getCatalog();
+
+    expect(opencode('google/gemini-3.1-pro-preview')?.reasoning_options).toEqual([
+      { type: 'effort', values: ['low', 'medium', 'high'] },
+    ]);
+  });
+
+  it('serves a toggle for models with on/off reasoning only', async () => {
+    const opencode = await getCatalog();
+
+    expect(Object.keys(opencode('xiaomi/mimo-v2.5')?.variants ?? {})).toEqual([
+      'instant',
+      'thinking',
+    ]);
+    expect(opencode('xiaomi/mimo-v2.5')?.reasoning_options).toEqual([{ type: 'toggle' }]);
+  });
+
+  it('omits reasoning options for models without variants', async () => {
+    const opencode = await getCatalog();
+
+    expect(opencode('vendor/no-reasoning')?.variants).toBeUndefined();
+    expect(opencode('vendor/no-reasoning')?.reasoning_options).toBeUndefined();
+  });
+
+  it('omits reasoning options for kilo-auto models', async () => {
+    const opencode = await getCatalog();
+
+    for (const autoModel of AUTO_MODELS) {
+      expect(opencode(autoModel.id)).toBeDefined();
+      expect(opencode(autoModel.id)?.reasoning_options).toBeUndefined();
+    }
+    expect(buildAutoModelCatalogEntry(ORG_AUTO_MODEL).opencode?.reasoning_options).toBeUndefined();
+  });
+
+  it('pairs every non-auto model that has variants with reasoning options', async () => {
+    const opencode = await getCatalog();
+
+    for (const id of Object.keys(openRouterReasoning)) {
+      const settings = opencode(id);
+      expect(settings?.reasoning_options !== undefined).toBe(settings?.variants !== undefined);
+    }
   });
 });
 

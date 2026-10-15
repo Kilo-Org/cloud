@@ -80,6 +80,13 @@ const SAFE_FAILURE_MESSAGES = new Set([
 ]);
 
 export function isSafeFailureMessage(message: string): boolean {
+  if (
+    message === 'Your provider rejected the request. Check your provider account and settings.' ||
+    message ===
+      '[BYOK] Your provider rejected the request. Check your provider account and settings.'
+  ) {
+    return true;
+  }
   if (SAFE_FAILURE_MESSAGES.has(message)) {
     return true;
   }

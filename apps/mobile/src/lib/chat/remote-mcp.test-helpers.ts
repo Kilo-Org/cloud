@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 
 import { type Tool } from '@kilocode/harness-sdk';
 
-import { type RemoteMcpServerState } from './remote-mcp';
+import { type RemoteMcpServerState } from './remote-mcp-state';
 import { type StoredRemoteMcpServer } from './remote-mcp-store';
 import { type ChatPlace } from './scope';
 

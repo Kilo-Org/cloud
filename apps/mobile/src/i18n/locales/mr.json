@@ -133,10 +133,14 @@
     "status": "स्थिती",
     "truncated": "अंशतः दाखवलेले",
     "updated": "अद्ययावत केले",
+    "generating": "व्युत्पन्न करत आहे…",
     "working": "काम सुरू आहे",
     "yourOwnRepositories": "तुमच्या स्वतःच्या रिपॉझिटरी",
     "dismissed": "दुर्लक्षित",
-    "agent": "एजंट"
+    "agent": "एजंट",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "बदल"
   },
   "language": {
     "restarting": "निवडलेली भाषा लागू करण्यासाठी पुन्हा सुरू होत आहे",
@@ -325,6 +329,7 @@
       "collapseFile": "फाइलमधील तपशील लपवा",
       "expandFile": "फाइलमधील तपशील दाखवा",
       "diffTooLarge": "बदल इतके मोठे आहेत की त्यांची तुलना दाखवता येत नाही.",
+      "noPreview": "या फाइलचे पूर्वावलोकन उपलब्ध नाही",
       "openOnGitHub": "GitHub वर उघडा",
       "openDiffOnGitHub": "या फाइलमधील बदलांची तुलना GitHub वर उघडा",
       "githubDiff": "GitHub वरील बदलांची तुलना"
@@ -831,7 +836,8 @@
       "kiloclaw": "KiloClaw मधील घडामोडी",
       "balance": "शिल्लक रकमेच्या सूचना",
       "security": "सुरक्षा निष्कर्ष",
-      "spend": "खर्चाच्या सूचना"
+      "spend": "खर्चाच्या सूचना",
+      "followedSessions": "फॉलो केलेली सत्रे"
     },
     "category": {
       "chatMessagesSubtitle": "तुमच्या संभाषणांमधील उत्तरे",
@@ -1254,7 +1260,7 @@
         "stoppedTitle": "सेटअप थांबला",
         "stoppedBody": "{{name}} चा इन्स्टन्स सेटअपदरम्यान अनपेक्षितपणे थांबला.",
         "stalledTitle": "काहीतरी अडकले",
-        "stalledBody": "{{name}} चा सेटअप पूर्ण करता आला नाही. पुन्हा प्रयत्न करा किंवा असे वारंवार होत असल्यास hi@kilo.ai वर ईमेल करा.",
+        "stalledBody": "{{name}} चा सेटअप पूर्ण करता आला नाही. पुन्हा प्रयत्न करा किंवा असे वारंवार होत असल्यास {{supportEmail}} वर ईमेल करा.",
         "timeoutTitle": "अपेक्षेपेक्षा जास्त वेळ लागत आहे",
         "timeoutBody": "{{name}} च्या सेटअपला नेहमीपेक्षा जास्त वेळ लागत आहे ({{displayMinutes}} मिनिटांहून अधिक).",
         "continueInBackground": "पार्श्वभूमीत सुरू ठेवा",
@@ -1312,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "तुमची लवकर प्रवेश देणारी योजना मोबाइलवर वापरण्यापूर्वी आमच्या टीमने तपासणे आवश्यक आहे.",
       "iosTitle": "IOS वर KiloClaw अनुपलब्ध",
       "iosBody": "या खात्यासाठी KiloClaw वापरण्याची परवानगी iOS अॅपच्या बाहेर व्यवस्थापित केली जाते.",
-      "iosContact": "काही प्रश्न आहेत? hi@kilo.ai वर संपर्क साधा.",
+      "iosContact": "काही प्रश्न आहेत? {{supportEmail}} वर संपर्क साधा.",
       "quarantinedCta": "आमच्या टीमला ईमेल करा",
       "nonCanonicalEarlybirdCta": "तुमची योजना Kilo.ai वर तपासा"
     },
@@ -1547,7 +1553,7 @@
         "recoveryLabel": "GitHub ॲप अद्ययावत करा"
       },
       "githubIpAllowList": {
-        "description": "या GitHub संस्थेची परवानगी असलेल्या IP पत्त्यांची यादी Kilo ला प्रवेश देत नसल्याने कोड पुनरावलोकक बंद केला आहे. मदतीसाठी hi@kilocode.ai वर संपर्क करा आणि मग कोड पुनरावलोकक पुन्हा चालू करा."
+        "description": "या GitHub संस्थेची परवानगी असलेल्या IP पत्त्यांची यादी Kilo ला प्रवेश देत नसल्याने कोड पुनरावलोकक बंद केला आहे. मदतीसाठी {{supportEmail}} वर संपर्क करा आणि मग कोड पुनरावलोकक पुन्हा चालू करा."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo ला या प्रकल्पासाठी GitLab प्रकल्पाचे प्रवेश टोकन तयार करता येत नसल्याने कोड पुनरावलोकक बंद केला आहे. देखभालकर्त्याची परवानगी द्या किंवा प्रकल्पाची प्रवेश टोकन सुविधा चालू करा आणि मग कोड पुनरावलोकक पुन्हा चालू करा.",
@@ -1562,7 +1568,7 @@
         "recoveryLabel": "कोड पुनरावलोककाच्या सेटिंग्ज अद्ययावत करा"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "आज रिपॉझिटरी क्लोन करताना तीनदा वेळमर्यादा ओलांडल्यामुळे कोड पुनरावलोकक बंद केला आहे. मदतीसाठी hi@kilocode.ai वर संपर्क करा आणि मग कोड पुनरावलोकक पुन्हा चालू करा."
+        "description": "आज रिपॉझिटरी क्लोन करताना तीनदा वेळमर्यादा ओलांडल्यामुळे कोड पुनरावलोकक बंद केला आहे. मदतीसाठी {{supportEmail}} वर संपर्क करा आणि मग कोड पुनरावलोकक पुन्हा चालू करा."
       },
       "title": "कोड समीक्षकाकडे लक्ष देणे आवश्यक आहे.",
       "recoveryLabel": "मदत पथकाशी संपर्क साधा"
@@ -2086,6 +2092,8 @@
       "title": "सत्र",
       "copyErrorDetails": "त्रुटीचे तपशील कॉपी करा",
       "backToSessions": "सत्रांवर परत जा",
+      "follow": "लॉक स्क्रीनवर फॉलो करा",
+      "unfollow": "लॉक स्क्रीनवर फॉलो करणे थांबवा",
       "couldNotLoad": "सत्र लोड करता आले नाही.",
       "failedToLoadDetails": "सत्राचे तपशील लोड करता आले नाहीत.",
       "failedToStopExecution": "चालू काम थांबवता आले नाही.",
@@ -2152,6 +2160,11 @@
       "collapse": "ध्येय लपवा",
       "expand": "ध्येय दाखवा"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ध्येये, {{total}} पैकी {{completed}} पूर्ण",
+      "rowAccessibility": "ध्येये, {{total}} पैकी {{completed}} पूर्ण. सध्याचे ध्येय: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "अलीकडे वापरलेले",
       "couldNotLoadGithubRepositories": "GitHub रिपॉझिटरी लोड करता आल्या नाहीत.",
@@ -2184,7 +2197,6 @@
       "retryLoadingEnvironment": "कार्यपरिसर लोड करण्याचा पुन्हा प्रयत्न करा",
       "defaultEnvironment": "डीफॉल्ट कार्यपरिसर",
       "environmentSummary": "{{commands}} कमांड · {{mcp}} MCP · {{skills}} कौशल्ये · {{agents}} एजंट",
-      "changes": "बदल",
       "leaveChanges": "बदल ठेवा",
       "commitAndPush": "कमिट आणि पुश करा",
       "startSession": "सत्र सुरू करा",
@@ -2207,6 +2219,10 @@
       "importingSession": "सत्र आयात होत आहे",
       "cliCannotContinue": "हे CLI सत्र सुरू ठेवू शकत नाही. Cloud Agent किंवा दुसरे CLI निवडा.",
       "importFailed": "हे सत्र आयात करता आले नाही.",
+      "cliCannotFork": "संदेशापासून फोर्क करण्यासाठी Kilo CLI अपडेट करा.",
+      "forkCutNotSynced": "हा संदेश अद्याप सेव्ह झालेला नाही. थोड्या वेळाने पुन्हा प्रयत्न करा.",
+      "forkFilesFromBaseBranch": "फाइल्स बेस ब्रँचपासून सुरू होतात.",
+      "forkFilesUnchangedOnComputer": "या संगणकावरील फाइल्स बदलल्या जात नाहीत.",
       "pickProfile": "प्रोफाइल निवडा",
       "noProfile": "प्रोफाइल नाही",
       "manageProfiles": "प्रोफाइल व्यवस्थापित करा",
@@ -2251,8 +2267,8 @@
       "toolList": "यादी दाखवा",
       "toolPatch": "पॅच लागू करा",
       "toolTask": "काम",
-      "readTodos": "कामांची यादी वाचा",
-      "updateTodos": "कामांची यादी अद्ययावत करा",
+      "readTodos": "योजना वाचा",
+      "updateTodos": "योजना अद्ययावत करा",
       "linesBadge": "{{displayCount}} ओळी",
       "filesBadge": "{{displayCount}} फाइल्स",
       "matchesBadge": "{{displayCount}} जुळणारे परिणाम",
@@ -2322,6 +2338,7 @@
       "copyMessage": "संदेश कॉपी करा",
       "copyText": "मजकूर कॉपी करा",
       "selectText": "मजकूर निवडा",
+      "forkFromHere": "येथून फोर्क करा",
       "reportAiResponse": "AI प्रतिसादाबद्दल तक्रार करा",
       "reportAiResponseConfirm": "हा प्रतिसाद तपासण्यासाठी त्याबद्दल तक्रार करायची?",
       "report": "तक्रार करा",
@@ -2641,6 +2658,12 @@
       "modelAccessibilityLabel": "मॉडेल: {{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "मॉडेल ({{displayCount}})",
       "modelsCount_other": "मॉडेल ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "बदल पाहा",
+      "asOf": "{{time}} पर्यंत",
+      "tooLarge": "हे बदल इतके मोठे आहेत की ते मोबाइलवर दाखवता येत नाहीत.",
+      "empty": "या सत्रात अद्याप कोणत्याही फाइलमध्ये बदल झालेले नाहीत."
     },
     "autoApprove": {
       "title": "स्वयं-मंजूरी",
@@ -3153,6 +3176,8 @@
     "channelName": "सक्रिय एजंट्स",
     "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा.",
     "openSession": "उघडा",
+    "finished": "पूर्ण झाले",
+    "followFailed": "हा एजंट लॉक स्क्रीनवर दाखवता आला नाही.",
     "approveFailed": "मंजूर करता आले नाही. पुन्हा प्रयत्न करण्यासाठी $t(common.approve) वर टॅप करा.",
     "checked": "तपासले",
     "lastKnown": "शेवटची ज्ञात स्थिती",
@@ -3161,7 +3186,26 @@
     "waitingForYou": "तुमची प्रतीक्षा",
     "nextScheduled": "पुढील नियोजित",
     "answerNeeded": "उत्तर आवश्यक",
-    "waitingToRetry": "पुन्हा प्रयत्नाची प्रतीक्षा"
+    "waitingToRetry": "पुन्हा प्रयत्नाची प्रतीक्षा",
+    "step": {
+      "editing": "संपादन",
+      "reading": "वाचन",
+      "running": "चालवा",
+      "searching": "वेब शोध",
+      "thinking": "विचार करत आहे"
+    },
+    "planOf": "पैकी",
+    "filesChanged": "फाइल्स बदलल्या",
+    "finishedIn": "पूर्ण झाले",
+    "noActivityFor": "हालचाल नाही",
+    "prOpened": "पुल रिक्वेस्ट उघडली",
+    "permissionWants": "चालवायचे आहे",
+    "failure": {
+      "provider": "थांबले: प्रदाता त्रुटी",
+      "tool": "थांबले: साधन त्रुटी",
+      "cancelled": "थांबले: रद्द केले",
+      "other": "थांबले"
+    }
   },
   "transcriptionModel": {
     "title": "लिप्यंतरण मॉडेल",
@@ -3189,6 +3233,7 @@
     "tutorialLabel": "शिकवणी"
   },
   "modelChat": {
+    "offlineFailure": "या मॉडेलसाठी इंटरनेट कनेक्शन आवश्यक आहे. कनेक्ट करा आणि पुन्हा प्रयत्न करा, किंवा या डिव्हाइसवरील मॉडेलवर स्विच करा.",
     "empty": {
       "title": "चॅट सुरू करा",
       "description": "मॉडेलशी बोलण्यासाठी संदेश पाठवा."
@@ -3196,10 +3241,32 @@
     "list": {
       "loadFailed": "चॅट इतिहास लोड करता आला नाही.",
       "new": "नवीन चॅट",
-      "openHint": "चॅट उघडते. हटवण्यासाठी दाबून धरा.",
       "deleteTitle": "ही चॅट हटवायची?"
     },
+    "rename": {
+      "title": "चॅटचे नाव बदला",
+      "accessibility": "{{title}} या चॅटचे नाव बदला",
+      "openHint": "चॅट उघडते. नाव बदलण्यासाठी किंवा हटवण्यासाठी दाबून धरा."
+    },
     "beta": "बीटा",
+    "details": {
+      "title": "चॅटचे तपशील",
+      "backend": "बॅकएंड",
+      "effortDefault": "मॉडेलचे डीफॉल्ट",
+      "noCost": "खर्च नाही",
+      "costUnknown": "माहीत नाही",
+      "costEstimatedNote": "ज्या उत्तरांनी किंमत कळवली नाही, त्यांचा खर्च सूचीतील किमतींवरून अंदाजित केला आहे.",
+      "costUnknownNote": "या मॉडेलची कोणतीही किंमत माहीत नाही.",
+      "costPartialNote": "ज्या मॉडेलची किंमत माहीत नाही, ती मॉडेल या एकूण रकमेत समाविष्ट नाहीत.",
+      "localNote": "डिव्हाइसवरील मॉडेल याच डिव्हाइसवर चालतात. त्यांना खर्च नाही आणि प्रॉम्प्ट कॅशे नाही, आणि त्यांच्या टोकनची संख्या अंदाजे असू शकते.",
+      "countedSinceNote": "वापराची नोंद सुरू होण्यापूर्वी हे चॅट सुरू झाले. एकूण आकडेवारीत फक्त त्यानंतरची उत्तरे दिसतात.",
+      "remoteServersOn": "चालू असलेले दूरस्थ MCP सर्व्हर"
+    },
+    "webSearch": {
+      "title": "वेबवर शोधा",
+      "description": "या चॅटला तुमच्या Kilo खात्याद्वारे सध्याची माहिती शोधू द्या. शोध तुमची मासिक शोध मर्यादा वापरतात.",
+      "allowanceExhausted": "या महिन्याचे तुमचे मोफत वेब शोध संपले आहेत. पुन्हा शोधण्यासाठी क्रेडिट जोडा."
+    },
     "mcp": {
       "title": "Kilo साधने",
       "use": "Kilo साधने वापरा",
@@ -3222,7 +3289,6 @@
       "fieldName": "दर्शवलेले नाव",
       "fieldUrl": "सर्व्हर URL",
       "fieldUrlInvalid": "वैध सर्व्हर URL प्रविष्ट करा.",
-      "fieldToken": "Bearer टोकन (ऐच्छिक)",
       "enableServer": "हा सर्व्हर सक्षम करा: {{name}}",
       "editServer": "सर्व्हर संपादित करा",
       "deleteServer": "सर्व्हर हटवा",
@@ -3243,8 +3309,24 @@
       "serverUnreachable": "या सर्व्हरपर्यंत पोहोचता आले नाही",
       "serverOff": "हा सर्व्हर बंद आहे"
     },
+    "mcpOAuth": {
+      "authMethod": "प्रमाणीकरण",
+      "authNone": "साइन इन नाही",
+      "authBearer": "Bearer टोकन",
+      "authOAuth": "OAuth साइन इन",
+      "fieldToken": "टोकन",
+      "oauthHint": "सेव्ह केल्यानंतर, तुमच्या ब्राउझरद्वारे साइन इन करण्यासाठी सर्व्हरवरील $t(modelChat.mcpOAuth.signIn) वर टॅप करा.",
+      "serverNeedsSignIn": "हा सर्व्हर वापरण्यासाठी साइन इन करा",
+      "signIn": "साइन इन करा",
+      "signInA11y": "या सर्व्हरवर साइन इन करा: {{name}}",
+      "signInFailed": "{{name}} वर साइन इन करता आले नाही. पुन्हा प्रयत्न करा."
+    },
     "backends": {
       "title": "चॅट बॅकएंड",
+      "providersTitle": "चॅट प्रदाते",
+      "cloud": "क्लाउडमध्ये",
+      "cloudModel": "मॉडेल: {{model}}",
+      "cloudUnavailable": "Kilo मॉडेल्स सध्या उपलब्ध नाहीत. तुमचे कनेक्शन तपासा.",
       "manage": "बॅकएंड व्यवस्थापित करा",
       "defaultKilo": "$t(consent.kilo) (डीफॉल्ट)",
       "kiloHelp": "अंगभूत बॅकएंड तुमचे Kilo खाते वापरतो आणि तो संपादित किंवा हटवता येत नाही.",
@@ -3304,7 +3386,6 @@
     "gguf": {
       "title": "डाउनलोड करण्यायोग्य मॉडेल",
       "help": "एक ओपन मॉडेल डाउनलोड करा आणि llama.cpp वापरून ते या फोनवर चालवा. तुमचे प्रॉम्प्ट आणि उत्तरे डिव्हाइसवरच राहतात. मॉडेल मोठी असतात, म्हणून Wi-Fi वापरा.",
-      "details": "{{size}} · परवाना: {{license}}",
       "download": "मॉडेल डाउनलोड करा",
       "pause": "डाउनलोड थांबवा",
       "resume": "डाउनलोड पुन्हा सुरू करा",
@@ -3316,6 +3397,8 @@
       "url": "थेट डाउनलोड लिंक",
       "urlHelp": ".gguf फाइलची HTTPS लिंक पेस्ट करा, जसे Hugging Face resolve लिंक. फक्त तुम्ही विश्वास ठेवता अशा स्रोतांकडूनच मॉडेल डाउनलोड करा.",
       "downloadUrl": "लिंकवरून डाउनलोड करा",
+      "advanced": "प्रगत",
+      "localPurpose": "llama.cpp सह या डिव्हाइसवर चालते. प्रॉम्प्ट आणि उत्तरे डिव्हाइसवरच राहतात.",
       "deleteTitle": "हे मॉडेल हटवायचे?",
       "deleteMessage": "{{name}} या डिव्हाइसवरून हटवायचे? याचा वापर करणाऱ्या चॅट्सना पुढे चालू ठेवण्यासाठी दुसरे मॉडेल लागेल.",
       "errors": {
@@ -3325,12 +3408,62 @@
         "notGguf": "लिंक .gguf फाइलकडे निर्देश करणे आवश्यक आहे.",
         "space": "या मॉडेलसाठी पुरेशी मोकळी जागा नाही. जागा मोकळी करा आणि पुन्हा प्रयत्न करा.",
         "network": "डाउनलोड पूर्ण झाले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
-        "invalidFile": "डाउनलोड केलेली फाइल हे अ‍ॅप चालवू शकते असे मॉडेल नाही, म्हणून ती हटवली गेली."
+        "invalidFile": "डाउनलोड केलेली फाइल हे अ‍ॅप चालवू शकते असे मॉडेल नाही, म्हणून ती हटवली गेली.",
+        "checksum": "डाउनलोड केलेली फाइल तिच्या प्रकाशित चेकसमशी जुळत नाही, म्हणून ती हटवली गेली. पुन्हा डाउनलोड करून पहा."
       }
+    },
+    "catalog": {
+      "browse": "मॉडेल ब्राउझ करा",
+      "title": "मॉडेल कॅटलॉग",
+      "search": "Hugging Face मॉडेल शोधा",
+      "tabs": "मॉडेल फिल्टर",
+      "fitsTab": "या डिव्हाइसवर बसणारे",
+      "fromHuggingFace": "Hugging Face वरून",
+      "loading": "मॉडेल लोड होत आहेत",
+      "noResults": "कोणतेही मॉडेल सापडले नाही",
+      "noFits": "कोणतेही मॉडेल या डिव्हाइसवर बसत नाही",
+      "noFitsDescription": "मोठी मॉडेल $t(common.all) टॅबवर आहेत.",
+      "fit": {
+        "fits": "बसते",
+        "tight": "जेमतेम बसते",
+        "tooLarge": "खूप मोठे",
+        "noStorage": "पुरेसे स्टोरेज नाही",
+        "unknown": "अनुरूपता अज्ञात"
+      },
+      "recommendationsHelp": "हे अ‍ॅप निश्चित करत असलेली लहान यादी: प्रत्येक मॉडेलसाठी एक फाइल, परवाना नमूद करणाऱ्या प्रकाशकाकडून. दुसरे काहीही क्रमवारीत नाही.",
+      "compatibilityHelp": "अनुरूपता मॉडेल फाइलची या डिव्हाइसच्या मेमरी आणि मोकळ्या स्टोरेजशी तुलना करते. मेमरीचा आकडा अंदाज आहे, मोजमाप नाही.",
+      "text": "मजकूर",
+      "listTextPurpose": "फक्त मजकूर प्रॉम्प्ट.",
+      "listImagePurpose": "मजकुरासोबत प्रतिमाही वाचते.",
+      "smallestDownload": "सर्वात लहान डाउनलोड: {{size}} · सुमारे {{memory}} मेमरी",
+      "fullFileName": "फाइल: {{name}}",
+      "memoryEstimateNote": "मेमरीचे आकडे अंदाज आहेत, मोजमाप नाहीत.",
+      "parameters": "पॅरामीटर: {{value}}",
+      "downloads": "डाउनलोड: {{value}}",
+      "likes": "लाइक: {{value}}",
+      "context": "कॉन्टेक्स्ट विंडो: {{value}}",
+      "license": "परवाना: {{license}}",
+      "licenseUnknown": "परवाना नमूद केलेला नाही",
+      "tools": "टूल कॉलिंग",
+      "vision": "प्रतिमा इनपुट",
+      "hintsHelp": "Hugging Face कडील सूचना. मॉडेल डाउनलोड झाल्यानंतर अ‍ॅप ते तपासते.",
+      "gated": "या मॉडेलसाठी Hugging Face खाते आवश्यक आहे, त्यामुळे अ‍ॅप ते डाउनलोड करू शकत नाही.",
+      "quantizations": "क्वांटायझेशन",
+      "quantizationsHelp": "लहान फायली कमी मेमरी आणि स्टोरेज वापरतात. मोठ्या फायली सहसा चांगली उत्तरे देतात.",
+      "quantDetail": "{{size}} डाउनलोड · सुमारे {{memory}} मेमरी",
+      "downloadQuant": "{{quant}} डाउनलोड करा",
+      "loadingModel": "मॉडेल तपशील लोड होत आहेत",
+      "couldNotLoadModel": "हे मॉडेल लोड करता आले नाही",
+      "noFiles": "हे अ‍ॅप चालवू शकेल अशा फायली नाहीत",
+      "noFilesDescription": "हे अ‍ॅप एकाच GGUF फाईलमधील मॉडेल चालवते.",
+      "tooLargeTitle": "हे मॉडेल कदाचित चालणार नाही",
+      "tooLargeMessage": "{{name}} ला या डिव्हाइसकडे असलेल्यापेक्षा जास्त मेमरी लागण्याची शक्यता आहे. मॉडेल उत्तर देत असताना अ‍ॅप बंद होऊ शकते. तरीही डाउनलोड करायचे?",
+      "downloadAnyway": "तरीही डाउनलोड करा"
     },
     "localModels": {
       "title": "डिव्हाइसवरील मॉडेल",
-      "help": "डिव्हाइसवरील मॉडेल या फोनवरच चालतात. तुमचे प्रॉम्प्ट आणि उत्तरे डिव्हाइसवरच राहतात आणि ही मॉडेल साधने वापरू शकत नाहीत.",
+      "help": "डिव्हाइसवरील मॉडेल या फोनवरच चालतात. तुमचे प्रॉम्प्ट आणि उत्तरे डिव्हाइसवरच राहतात.",
+      "systemPurpose": "या डिव्हाइसच्या सिस्टममध्ये अंगभूत असलेले मॉडेल. ते डिव्हाइसवरच चालते.",
       "apple": "Apple Intelligence (डिव्हाइसवर)",
       "checking": "उपलब्धता तपासत आहे…",
       "ready": "वापरण्यासाठी तयार",
@@ -3356,6 +3489,9 @@
       "downloading": "डाउनलोड होत आहे…",
       "downloadProgress": "डाउनलोड होत आहे… {{percent}}%",
       "downloadFailed": "डाउनलोड पूर्ण झाले नाही. तुमचे कनेक्शन आणि मोकळी स्टोरेज जागा तपासा, मग पुन्हा प्रयत्न करा."
+    },
+    "reasoningEffort": {
+      "modelFlag": "हे मॉडेल विचारांची पातळी समर्थित करते"
     }
   },
   "settingsTools": {
@@ -3578,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play ने जुळणारे क्रेडिट्स पॅक परत केले नाहीत.",
     "purchaseOwnedByAnotherAccount": "या Apple Account वरील क्रेडिट्स दुसऱ्या Kilo खात्याशी जोडलेली आहेत. ती वापरण्यासाठी त्या Kilo खात्यात साइन इन करा.",
     "purchaseOwnedByAnotherAccountPlay": "या Google Play खात्यावरील क्रेडिट्स वेगळ्या Kilo खात्याची आहेत. ती वापरण्यासाठी त्या Kilo खात्यावर साइन इन करा."
+  },
+  "todos": {
+    "saveAsTodo": "काम म्हणून जतन करा",
+    "segment": {
+      "label": "एजंट दृश्य",
+      "sessions": "सत्रे",
+      "todos": "कामे"
+    },
+    "lists": {
+      "newList": "नवीन यादी",
+      "empty": "अजून याद्या नाहीत",
+      "couldNotLoad": "याद्या लोड करता आल्या नाहीत",
+      "noRepository": "रिपॉझिटरी नाही",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} खुले",
+      "openCount_other": "{{count}} खुले",
+      "archived_one": "संग्रहित ({{count}})",
+      "archived_other": "संग्रहित ({{count}})",
+      "archive": "संग्रहित करा",
+      "unarchive": "संग्रहातून काढा",
+      "deleteTitle": "{{name}} हटवायचे?",
+      "deleteMessage": "त्यातील कामेही हटवली जातील. त्यांची सत्रे राहतील."
+    },
+    "listSettings": {
+      "title": "यादी सेटिंग्ज",
+      "name": "नाव",
+      "namePlaceholder": "बग, कल्पना, प्रकाशन…",
+      "emoji": "इमोजी",
+      "mode": "मोड",
+      "defaultsHint": "या यादीतून सुरू होणारी सत्रे ही डीफॉल्ट मूल्ये वापरतात."
+    },
+    "list": {
+      "addPlaceholder": "नवीन काम",
+      "add": "काम जोडा",
+      "empty": "अजून कामे नाहीत",
+      "setDefaults": "रिपॉझिटरी, मोड आणि मॉडेल सेट करा",
+      "completed_one": "पूर्ण ({{count}})",
+      "completed_other": "पूर्ण ({{count}})"
+    },
+    "item": {
+      "markDone": "पूर्ण म्हणून चिन्हांकित करा",
+      "markOpen": "पूर्ण नाही म्हणून चिन्हांकित करा",
+      "markDonePrompt": "पूर्ण म्हणून चिन्हांकित करायचे?",
+      "deleted": "काम हटवले",
+      "undo": "पूर्ववत करा",
+      "runCount_one": "{{count}} वेळ",
+      "runCount_other": "{{count}} वेळा",
+      "startNow": "समीक्षेशिवाय सुरू करा",
+      "startNowHint": "समीक्षेशिवाय सुरू करण्यासाठी दाबून ठेवा",
+      "titleLabel": "कामाचे शीर्षक",
+      "renameTitle": "कार्याचे नाव बदला",
+      "notes": "टिपा",
+      "addNotes": "टिपा जोडा",
+      "notesPrompt": "संदर्भ, आवश्यकता किंवा स्वीकृती निकष जोडा.",
+      "markdownSupported": "Markdown समर्थित",
+      "sessions": "लिंक केलेली सत्रे",
+      "noSessions": "अजून सत्रे नाहीत",
+      "untitledLinkedSession": "जोडलेले सत्र",
+      "sessionNeedsInput": "सत्राला इनपुट हवे",
+      "sessionRunning": "सत्र चालू आहे",
+      "sessionFinished": "सत्र पूर्ण झाले",
+      "sessionPullRequest": "सत्र पुल विनंती",
+      "sessionPullRequestNumber": "सत्र PR #{{number}}",
+      "openSessionHint": "सत्र उघडते.",
+      "unlinkSessionAction": "सत्र अनलिंक करा",
+      "unlinkConfirmTitle": "{{title}} अनलिंक करायचे?",
+      "unlinkConfirmMessage": "सत्र स्वतः हटवले जात नाही. फक्त या कामाशी असलेली त्याची लिंक काढली जाते.",
+      "startNewSession": "नवीन सत्र सुरू करा",
+      "startNewSessionHint": "नवीन सत्र सुरू करण्यासाठी दीर्घ दाबा.",
+      "linkSession": "सत्र लिंक करा",
+      "linkFailed": "सत्र कामाशी लिंक करता आले नाही"
+    },
+    "linkSession": {
+      "title": "सत्राशी लिंक करा",
+      "empty": "अलीकडील सत्रे नाहीत",
+      "emptyInRepository": "{{repository}} मध्ये अलीकडील सत्रे नाहीत"
+    },
+    "upNext": "पुढे",
+    "sessionTodo": "काम: {{title}}",
+    "linkToTodo": "कामाशी लिंक करा",
+    "candidates": {
+      "empty": "खुली कामे नाहीत"
+    },
+    "saveSheet": {
+      "title": "यादीत जतन करा",
+      "saved": "{{list}} मध्ये जतन केले"
+    }
   }
 }

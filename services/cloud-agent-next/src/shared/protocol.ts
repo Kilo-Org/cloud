@@ -140,6 +140,7 @@ export type PreparingStep =
   | 'workspace_backup'
   | 'sandbox_provision'
   | 'sandbox_boot'
+  | 'snapshot_fallback'
   | 'kilo_server'
   | 'kilo_session'
   | 'restore_incomplete'
@@ -157,6 +158,7 @@ export type PreparationStepSnapshot = {
   label: string;
   status: PreparationStepStatus;
   startedAt: number;
+  startedRevision?: number;
   completedAt?: number;
   revision: number;
   latestDetail?: string;
@@ -164,6 +166,7 @@ export type PreparationStepSnapshot = {
   command?: string;
   commandIndex?: number;
   commandCount?: number;
+  parentStepId?: string;
   outputTail?: string;
   outputTruncated?: boolean;
   exitCode?: number;
@@ -201,6 +204,7 @@ export type PreparingEventDataV2 = PreparingEventDataV2Base &
         command?: string;
         commandIndex?: number;
         commandCount?: number;
+        parentStepId?: string;
       }
     | { action: 'step_progress'; stepId: string; detail: string }
     | { action: 'step_output'; stepId: string; output: string }

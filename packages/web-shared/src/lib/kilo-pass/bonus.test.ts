@@ -82,7 +82,7 @@ describe('kilo pass bonus utilities', () => {
               ? [0.05, 0.1, 0.15]
               : getMonthlyWelcomePromoMonth(subscriptionStartedAtIso) === 1
                 ? [0.5, 0.1, 0.15]
-                : [0.05, 0.5, 0.15];
+                : [0.1, 0.5, 0.15];
             bonuses.forEach((bonus, index) => expect(bonus).toBeCloseTo(expected[index]));
           }
         }

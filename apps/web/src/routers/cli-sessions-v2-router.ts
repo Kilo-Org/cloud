@@ -34,6 +34,7 @@ import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import {
   fetchSessionSnapshot,
   fetchSessionMessagesPage,
+  fetchSessionDiff,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
   unshareSession as unshareSessionIngest,
@@ -45,6 +46,7 @@ import {
   isDefaultSessionTitle,
   projectPrivateWorktreePaths,
   validateKiloSdkMessagesCursor,
+  type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
@@ -1654,6 +1656,42 @@ export const cliSessionsV2Router = createTRPCRouter({
     }),
 
   /**
+   * The cumulative file diff for a V2 Kilo session, from session start to its
+   * latest step, as stored by session ingest. File paths are workspace
+   * relative. Read failures surface as INTERNAL_SERVER_ERROR (retryable on the
+   * client); an oversized diff is a typed `too_large` result.
+   */
+  getSessionDiff: baseProcedure
+    .input(z.object({ session_id: sessionIdField }))
+    .query(async ({ ctx, input }) => {
+      await getSessionWithAccessCheck(input.session_id, ctx);
+
+      let diff: SessionDiffRead | null;
+      try {
+        diff = await fetchSessionDiff(input.session_id, ctx.user.id);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session diff',
+          cause: error,
+        });
+      }
+      if (diff === null) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+      }
+      if (diff.kind === 'value') {
+        return { kind: 'files' as const, files: diff.files };
+      }
+      if (diff.kind === 'too_large') {
+        return { kind: 'too_large' as const };
+      }
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: `Session diff read failed: ${diff.kind}`,
+      });
+    }),
+
+  /**
    * Get a session by session_id with runtime state from the Durable Object.
    *
    * This combines the DB fetch (ownership check + metadata) with the DO fetch
@@ -1780,7 +1818,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         organization_id: session.organization_id ?? null,
         profile_id: session.profile_id ?? null,
         git_url: session.git_url ?? null,
-        git_branch: session.git_branch ?? null,
+        git_branch: session.git_branch ?? runtimeState?.branchName ?? null,
         created_on_platform: session.created_on_platform,
         created_at: session.created_at,
         updated_at: session.updated_at,

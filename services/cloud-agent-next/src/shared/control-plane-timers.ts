@@ -37,6 +37,7 @@ export type ControlPlaneTimers = {
     heartbeatIntervalMs: number;
     heartbeatAckTimeoutMs: number;
     heartbeatNegotiationMs: number;
+    handshakeMs: number;
     cloneMs: number;
     /** Budget to adopt a repository snapshot before falling back to a clone. */
     restoreMs: number;
@@ -96,6 +97,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     heartbeatIntervalMs: ms(5_000),
     heartbeatAckTimeoutMs: ms(15_000),
     heartbeatNegotiationMs: ms(1_000),
+    // Scales with the reconnect window it must stay inside.
+    handshakeMs: ms(30_000),
     cloneMs: 6 * MINUTE_MS,
     restoreMs: 2 * MINUTE_MS,
     captureMs: 5 * MINUTE_MS + 10_000,
@@ -107,8 +110,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     sseReconnectWindowMs: 2 * MINUTE_MS,
     kiloRestartLimit: 3,
     kiloRestartWindowMs: ms(10 * MINUTE_MS),
-    // Scales with the no-progress clock it pauses and the restart window it defers.
-    kiloMemoryHoldMs: ms(10 * MINUTE_MS),
+    // Allow transient reclaim to clear while bounding a sustained memory stall.
+    kiloMemoryHoldMs: ms(2 * MINUTE_MS),
     noProgressMs: ms(20 * MINUTE_MS),
     turnHardCapMs: ms(120 * MINUTE_MS),
     reconnectBackoffMinMs: ms(1_000),

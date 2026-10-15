@@ -18,8 +18,9 @@ import {
   convertFromKiloExclusiveModel,
   type KiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
-import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { AUTO_MODELS, type AutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -85,7 +86,7 @@ export function buildAutoModelCatalogEntry(m: AutoModel): OpenRouterModel {
     },
     context_length: m.context_length,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
-    opencode: m.opencode_settings,
+    opencode: m.opencode_settings && withLegacyVariants(m.opencode_settings),
   };
 }
 
@@ -125,11 +126,13 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
 
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
-  const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels] = await Promise.all([
-    getOpenRouterModelsMetadataFromDatabase(),
-    getDataCollectionRequiredModelIds(),
-    getPreferredModels(),
-  ]);
+  const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels, unavailableModelIds] =
+    await Promise.all([
+      getOpenRouterModelsMetadataFromDatabase(),
+      getDataCollectionRequiredModelIds(),
+      getPreferredModels(),
+      getUnavailableModelIds(),
+    ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
   const enhancedModels = await Promise.all(
@@ -140,10 +143,10 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           !kiloExclusiveModels.some(
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
-          !isUnavailableModel(model.id) &&
+          !unavailableModelIds.has(model.id) &&
           !model.id.endsWith(':batch')
       )
-      .map(model => {
+      .map((model): OpenRouterModel => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);
         const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
         const rawPricing = !preferredProvider
@@ -156,10 +159,14 @@ async function enhancedModelList(models: OpenRouterModel[]) {
             )?.pricing);
         const pricing = getModelDisplayPricing(rawPricing);
         const terminalBench = terminalBenchFor(summaries, model.id);
+        const aliasTarget = model.id.startsWith('~')
+          ? endpointsMetadata[model.id]?.alias_target?.slug
+          : undefined;
         return {
           ...model,
           ...(pricing && { pricing }),
           ...(terminalBench && { terminalBench }),
+          alias_target: aliasTarget,
         };
       })
       .concat(

@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
@@ -25,14 +25,21 @@ import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session
 import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { useNewSessionModelState } from '@/components/agents/new-session-model-provider';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
-import { useNewSessionPrefillTargets } from '@/components/agents/use-new-session-prefill';
+import {
+  useNewSessionPrefill,
+  useNewSessionPrefillTargets,
+} from '@/components/agents/use-new-session-prefill';
 import {
   readCloneFromKiloSessionId,
   readCloneSourceTitle,
+  readCloneUpToMessageId,
+  readForkPrefillText,
+  readForkSourceIsCloudAgent,
 } from '@/components/agents/new-session-prefill';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { ScreenHeader } from '@/components/screen-header';
+import { SaveDraftAsTodoSheet } from '@/components/todos/save-draft-as-todo-sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useNewSessionDiscardGuard } from '@/components/agents/use-new-session-discard-guard';
@@ -51,6 +58,10 @@ import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { usePersistedRunOnDestination } from '@/lib/hooks/use-persisted-run-on-destination';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
+import {
+  FORK_CUT_NOT_SYNCED_KEY,
+  resolveCloneCapabilityRefusal,
+} from '@/lib/hooks/remote-instance-spawn-classifier';
 import {
   resolveContinueStartDisabled,
   resolveNewSessionStartBlockedReason,
@@ -79,8 +90,12 @@ import { peekSharePayload } from '@/lib/share-payload';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
+import { linkStartedTodoSession } from '@/lib/hooks/todo-session-link';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
+
+/** The ingest rejection code for a fork cut missing from the cloud source. */
+const CLONE_CUT_NOT_FOUND_CODE = 'clone_cut_not_found';
 
 /**
  * Mounted only for the ordinary new-session entry (not the Continue clone
@@ -113,6 +128,9 @@ export function NewSessionScreenBody() {
     shareId?: string;
     cloneFromKiloSessionId?: string;
     cloneSourceTitle?: string;
+    cloneUpToMessageId?: string;
+    forkPrefillText?: string;
+    forkSourceIsCloudAgent?: string;
     preselectRunOn?: string;
   }>();
   const organizationId = searchParams.organizationId;
@@ -121,6 +139,12 @@ export function NewSessionScreenBody() {
   const cloneFromKiloSessionId = readCloneFromKiloSessionId(searchParams);
   const cloneSourceTitle = readCloneSourceTitle(searchParams);
   const isCloneEntry = cloneFromKiloSessionId !== '';
+  // "Fork from here": the inclusive cut, and a forked user message's text for
+  // the new session's composer. Both empty for a full Continue.
+  const cloneUpToMessageId = isCloneEntry ? readCloneUpToMessageId(searchParams) : '';
+  const forkPrefillText = cloneUpToMessageId ? readForkPrefillText(searchParams) : '';
+  const forkSourceIsCloudAgent =
+    cloneUpToMessageId !== '' && readForkSourceIsCloudAgent(searchParams);
   // The route's explicit Run-on preselection: the tour's cloud path names the
   // Cloud Agent sentinel, the computer path names the tapped connection id.
   const preselectRunOn = readPreselectRunOn(searchParams.preselectRunOn);
@@ -177,9 +201,11 @@ export function NewSessionScreenBody() {
 
   // Share-prefill precedence, resolved once before the prompt mounts. The
   // prompt's own `useSharePrefill` still delivers the shared files and
-  // re-applies the same text idempotently.
+  // re-applies the same text idempotently. A to-do's Start carries its prompt
+  // the same way, so it also beats a stored draft.
+  const { prompt: routePrefillPrompt, todoId, todoTitle } = useNewSessionPrefill();
   const [sharePrefillText] = useState<string | null>(() =>
-    shareId ? (peekSharePayload(shareId)?.text ?? null) : null
+    shareId ? (peekSharePayload(shareId)?.text ?? null) : (routePrefillPrompt ?? null)
   );
   // The share prefill is known synchronously and always beats a stored draft,
   // so it seeds the first render; the stored draft only exists once the load
@@ -423,10 +449,27 @@ export function NewSessionScreenBody() {
   const handleCloneImportFailure = useCallback((key: string) => {
     setCloneImportFailureKey(key);
   }, []);
-
   const armCloneNavigateBypass = useCallback(() => {
     cloneNavigateBypassRef.current = true;
   }, []);
+
+  // A to-do start can target a remote instance instead of Cloud Agent; the
+  // spawned session links to the to-do the same way the cloud path links it.
+  const queryClient = useQueryClient();
+  const handleSpawnSucceeded = useCallback(
+    (sessionId: string) => {
+      if (todoId) {
+        void linkStartedTodoSession({
+          queryClient,
+          trpc,
+          todoId,
+          sessionId,
+          ...(todoTitle ? { title: todoTitle } : {}),
+        });
+      }
+    },
+    [queryClient, todoId, todoTitle, trpc]
+  );
 
   // The manual draft as the create body carries it: one plaintext value per key
   // (the editor already refuses a key that cleans onto an existing one) and the
@@ -454,6 +497,8 @@ export function NewSessionScreenBody() {
     profileId,
     manualEnvVars,
     setupCommands,
+    todoId,
+    todoTitle,
   });
 
   // Seed the route-owned prompt state from the restored draft once the load
@@ -524,14 +569,13 @@ export function NewSessionScreenBody() {
     onSpawnFailed: () => {
       skipDiscardGuardRef.current = false;
     },
-    // Clone entry: the dispatch sends the source id only when the selected
-    // CLI advertises `sessionClone`, and surfaces delivered clone/import
-    // failures through this inline-reason callback.
     cloneFromKiloSessionId: isCloneEntry ? cloneFromKiloSessionId : null,
+    cloneUpToMessageId: cloneUpToMessageId || null,
+    forkPrefillText: forkPrefillText || null,
     onCloneImportFailure: handleCloneImportFailure,
     onSpawnReady: armCloneNavigateBypass,
+    onSpawnSucceeded: handleSpawnSucceeded,
   });
-
   const runCloudCreate = useContinueCloudCreate(organizationId, armCloneNavigateBypass);
 
   const handleModelSelect = useCallback(
@@ -611,10 +655,18 @@ export function NewSessionScreenBody() {
     attachments.releaseUnclaimedUploads();
   }, [userId, promptRef, attachments]);
 
+  // "Save as to-do" keeps the leave the confirm intercepted until a list is
+  // picked; saving then discards the draft and replays that leave.
+  const [saveAsTodoLeave, setSaveAsTodoLeave] = useState<(() => void) | null>(null);
+  const handleSaveAsTodo = useCallback((leave: () => void) => {
+    setSaveAsTodoLeave(() => leave);
+  }, []);
+
   const { discardConfirm } = useNewSessionDiscardGuard({
     dirty: (isCloneEntry ? false : hasPrompt) || attachments.hasUnclaimedAttachments,
     hasUnclaimedAttachments: attachments.hasUnclaimedAttachments,
     onDiscard: handleDiscardDraft,
+    onSaveAsTodo: !isCloneEntry && hasPrompt ? handleSaveAsTodo : undefined,
     skipNextGuardRef: skipDiscardGuardRef,
   });
 
@@ -679,22 +731,29 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null;
-  // Optimistic CLI-capability gate: an instance that has not advertised
-  // `sessionClone` is treated as capable; only an explicit
-  // `sessionClone: false` marks it incapable.
-  const instanceHasSessionClone =
-    runOnInstance !== null && runOnInstance.capabilities?.sessionClone !== false;
-  // Clone entry: a CLI the picker reported as incapable shows the inline
-  // "cannot continue" reason immediately; a delivered clone/import failure
-  // overrides it after a Start attempt. Both clear when Run-on changes (see
-  // handleRunOnChange).
-  const incapableCliSelected = isCloneEntry && runOnInstance !== null && !instanceHasSessionClone;
+  // Clone CLI-capability gate: a full clone is optimistic (only an explicit
+  // `sessionClone: false` refuses it); a fork cut needs
+  // `sessionCloneAtMessage: true`. A refused CLI shows its inline reason
+  // immediately; a delivered clone/import failure overrides it after a Start
+  // attempt. Both clear when Run-on changes (see handleRunOnChange).
+  const cloneCapabilityRefusal =
+    runOnInstance === null
+      ? null
+      : resolveCloneCapabilityRefusal(
+          { cloneFromKiloSessionId, cloneUpToMessageId },
+          runOnInstance
+        );
+  const instanceHasSessionClone = runOnInstance !== null && cloneCapabilityRefusal === null;
   let runOnInlineNote: string | null = null;
-  if (incapableCliSelected) {
-    runOnInlineNote = t('agentChat.newSession.cliCannotContinue');
+  if (isCloneEntry && cloneCapabilityRefusal !== null) {
+    runOnInlineNote = t(cloneCapabilityRefusal);
   } else if (cloneImportFailureKey !== null) {
     runOnInlineNote = t(cloneImportFailureKey);
   }
+  // A cut the CLI could not find yet is shown inline but keeps Start enabled:
+  // the source syncs in a moment, so a retry can succeed.
+  const blockingCloneImportFailureKey =
+    cloneImportFailureKey === FORK_CUT_NOT_SYNCED_KEY ? null : cloneImportFailureKey;
 
   function resolveStartDisabled(): boolean {
     if (isCloneEntry) {
@@ -708,7 +767,7 @@ export function NewSessionScreenBody() {
         isRemoteTargetSelected,
         instanceCatalogLoading: instanceCatalog.isLoading,
         instanceHasSessionClone,
-        cloneImportFailureKey,
+        cloneImportFailureKey: blockingCloneImportFailureKey,
         isModelUnavailable: modelView.isSelectionUnavailable,
       });
     }
@@ -761,7 +820,7 @@ export function NewSessionScreenBody() {
             isRemoteTargetSelected,
             instanceCatalogLoading: instanceCatalog.isLoading,
             instanceHasSessionClone,
-            cloneImportFailureKey,
+            cloneImportFailureKey: blockingCloneImportFailureKey,
             isModelUnavailable: modelView.isSelectionUnavailable,
           },
         }
@@ -797,9 +856,10 @@ export function NewSessionScreenBody() {
   const handleStartSession = useCallback(() => {
     if (isCloneEntry) {
       if (runOnInstance !== null) {
-        // Live CLI import: the dispatch carries the clone source id unless the
-        // instance explicitly reported `sessionClone: false` (unknown is
-        // treated as capable).
+        // Live CLI import: the dispatch carries the clone source id (and the
+        // cut) unless the capability gate refuses the instance. A fresh
+        // attempt clears a retryable "not saved yet" note.
+        setCloneImportFailureKey(current => (current === FORK_CUT_NOT_SYNCED_KEY ? null : current));
         remoteSpawn.onStart();
         return;
       }
@@ -810,14 +870,27 @@ export function NewSessionScreenBody() {
         try {
           await runCloudCreate(
             cloneFromKiloSessionId as KiloSessionId,
-            { repository: selectedRepository, model: displayModel, variant: displayVariant },
+            {
+              repository: selectedRepository,
+              model: displayModel,
+              variant: displayVariant,
+              ...(cloneUpToMessageId ? { cloneUpToMessageId } : {}),
+              ...(forkPrefillText ? { forkPrefillText } : {}),
+            },
             mode
           );
         } catch (error) {
-          const message =
-            isCloudPrepareRetryableError(error) || !(error instanceof Error) || !error.message
-              ? i18n.t('agentChat.session.cloneFailedRetry')
-              : error.message;
+          let message = i18n.t('agentChat.session.cloneFailedRetry');
+          if (error instanceof Error && error.message === CLONE_CUT_NOT_FOUND_CODE) {
+            // The cut message is not in the saved source yet: say so, Start stays enabled.
+            message = i18n.t(FORK_CUT_NOT_SYNCED_KEY);
+          } else if (
+            error instanceof Error &&
+            error.message &&
+            !isCloudPrepareRetryableError(error)
+          ) {
+            message = error.message;
+          }
           toast.error(message);
         } finally {
           setIsCreating(false);
@@ -840,6 +913,8 @@ export function NewSessionScreenBody() {
     isCloneEntry,
     runOnInstance,
     cloneFromKiloSessionId,
+    cloneUpToMessageId,
+    forkPrefillText,
     selectedRepository,
     displayModel,
     displayVariant,
@@ -861,6 +936,16 @@ export function NewSessionScreenBody() {
               title: sessionDisplayTitle(cloneSourceTitle) ?? t('agentChat.session.title'),
             })}
           </Text>
+          {/* A Cloud Agent source has no per-message file edits, so a cut fork
+              carries none on any destination. A remote CLI source has its
+              files rebuilt at the cut and needs no note. */}
+          {forkSourceIsCloudAgent ? (
+            <Text className="pt-1 text-sm text-muted-foreground">
+              {runOnInstance === null
+                ? t('agentChat.newSession.forkFilesFromBaseBranch')
+                : t('agentChat.newSession.forkFilesUnchangedOnComputer')}
+            </Text>
+          ) : null}
         </View>
       ) : null}
       <NewSessionConfigureForm
@@ -936,6 +1021,18 @@ export function NewSessionScreenBody() {
       {/* The discard confirm: a Modal overlay, so the composer behind it keeps
           its layout while the destructive choice keeps its red fill. */}
       {discardConfirm}
+      <SaveDraftAsTodoSheet
+        visible={saveAsTodoLeave !== null}
+        organizationId={organizationId ?? null}
+        getDraft={() => promptRef.current}
+        onSaved={() => {
+          saveAsTodoLeave?.();
+          setSaveAsTodoLeave(null);
+        }}
+        onClose={() => {
+          setSaveAsTodoLeave(null);
+        }}
+      />
     </View>
   );
 }

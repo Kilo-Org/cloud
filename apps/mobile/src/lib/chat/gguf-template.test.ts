@@ -1,4 +1,6 @@
 import { type ModelRequest } from '@kilocode/harness-sdk';
+import { asOffered } from '@kilocode/harness-sdk/core';
+import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -7,6 +9,7 @@ import {
   paramsOf,
   readCompletion,
   stopOf,
+  templateSupportsThinking,
   templateSupportsTools,
 } from './gguf-template';
 
@@ -69,6 +72,20 @@ describe('the tool rule', () => {
   });
 });
 
+describe('the thinking rule', () => {
+  it('offers the switch only for a template that reads enable_thinking', () => {
+    expect(
+      templateSupportsThinking({
+        'tokenizer.chat_template':
+          '{%- if enable_thinking is defined and enable_thinking is false %}',
+      })
+    ).toBe(true);
+    expect(templateSupportsThinking({ 'tokenizer.chat_template': '{{ messages }}' })).toBe(false);
+    expect(templateSupportsThinking({})).toBe(false);
+    expect(templateSupportsThinking(undefined)).toBe(false);
+  });
+});
+
 const request: ModelRequest = {
   model: 'file-a',
   maxTokens: 8192,
@@ -109,6 +126,14 @@ describe('the llama.rn call', () => {
     ]);
   });
 
+  it('thinks only when the chat asks with an effort other than none', () => {
+    const file = { path: '/m/a.gguf', contextWindow: 2048, tools: false, projector: undefined };
+    const thinking = paramsOf({ ...request, effort: 'high' }, file);
+    expect(thinking.enable_thinking).toBe(true);
+    expect(thinking.reasoning_format).toBe('auto');
+    expect(paramsOf({ ...request, effort: 'none' }, file).enable_thinking).toBe(false);
+  });
+
   it('sends the tool list and keeps calls and results for a model that supports tools', () => {
     const params = paramsOf(request, {
       path: '/m/a.gguf',
@@ -128,6 +153,26 @@ describe('the llama.rn call', () => {
       },
       { role: 'tool', tool_call_id: 'c1', content: 'noon' },
     ]);
+  });
+
+  it('sends the tool list without the harness wait field, so no call goes to the background', () => {
+    const offered = asOffered({
+      definition: {
+        name: 'time',
+        description: 'now',
+        parameters: { type: 'object', properties: {} },
+      },
+      run: () => Effect.succeed('now'),
+    });
+    expect(Object.keys(offered.parameters.properties)).toEqual(['wait']);
+    const params = paramsOf(
+      { ...request, tools: [offered] },
+      { path: '/m/a.gguf', contextWindow: 4096, tools: true, projector: undefined }
+    );
+    const sent = params.tools as unknown as readonly {
+      function: { parameters: Record<string, unknown> };
+    }[];
+    expect(sent.at(0)?.function.parameters).toEqual({ type: 'object', properties: {} });
   });
 
   const imageRequest: ModelRequest = {

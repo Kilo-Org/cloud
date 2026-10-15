@@ -244,6 +244,83 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 routes and forwarding', () => {
+  it.each(['throw', 'invalid'] as const)(
+    'keeps preparation and delivery healthy when runtime metadata projection is %s',
+    async failure => {
+      const provider = createFakeProvider();
+      provider.adapter.describeRuntime = () => {
+        if (failure === 'throw') throw new Error('metadata projection failed');
+        return { provider: 'cloudflare', sandboxId: '' };
+      };
+      const { stub, peer } = await setup(provider);
+      await stub.prepare(prepareInput(SESSION));
+      const { wrapper } = await connectAndHello(provider);
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+          expect.objectContaining({ state: 'ready' })
+        )
+      );
+      const status = await stub.status({ sessionId: SESSION });
+      expect(status.view.state).toBe('ready');
+      expect(status.view).not.toHaveProperty('container');
+      expect(await stub.prepare(prepareInput(SESSION))).toMatchObject({ state: 'ready' });
+      expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+        'sent'
+      );
+      expect(await wrapper.next()).toMatchObject({ type: 'session.prompt' });
+      wrapper.close();
+    }
+  );
+
+  it.each(['image', 'repository'] as const)(
+    'publishes %s allocation metadata and rejects stale delivery',
+    async startSource => {
+      const provider = createFakeProvider();
+      provider.adapter.launch = async (_ref, launchEnv) => {
+        provider.launchEnvs.push({ ...launchEnv });
+        return { startSource };
+      };
+      provider.adapter.describeRuntime = ref => ({
+        provider: 'cloudflare-containers',
+        sandboxId: SANDBOX_ID,
+        instanceId: ref.slice('mem_'.length),
+      });
+      const { stub, peer } = await setup(provider);
+      await stub.prepare(prepareInput(SESSION));
+      const { wrapper, allocationId } = await connectAndHello(provider);
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      const container = {
+        provider: 'cloudflare-containers',
+        sandboxId: SANDBOX_ID,
+        allocationId,
+        instanceId: allocationId,
+        startSource: startSource === 'repository' ? 'snapshot' : 'image',
+      };
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+          expect.objectContaining({ state: 'ready', container })
+        )
+      );
+      expect((await stub.status({ sessionId: SESSION })).view).toMatchObject({ container });
+      expect(await stub.prepare(prepareInput(SESSION))).toMatchObject({ container });
+      expect(
+        await stub.deliver({
+          sessionId: SESSION,
+          allocationId: 'old-allocation',
+          messages: [promptPayload('m1')],
+        })
+      ).toBe('not_ready');
+      expect(
+        await stub.deliver({ sessionId: SESSION, allocationId, messages: [promptPayload('m1')] })
+      ).toBe('sent');
+      expect(await wrapper.next()).toMatchObject({ type: 'session.prompt' });
+      wrapper.close();
+    }
+  );
+
   it('reconstruction restores no notification backlog or replay and leaves durable route state unchanged', async () => {
     const provider = createFakeProvider();
     const { stub, peer } = await setup(provider);
@@ -1089,6 +1166,67 @@ describe('SandboxControlV2 routes and forwarding', () => {
         .filter(update => update.state === 'ready').length;
       expect(readyCount).toBeGreaterThanOrEqual(2);
     });
+  });
+
+  it('preserves delivered work and the ready route across disconnect, eviction and same-wrapper reconnect', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_1');
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    const messageId = 'message-before-reset';
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload(messageId)] })).toBe(
+      'sent'
+    );
+    expect(await wrapper.next()).toMatchObject({ type: 'session.prompt', payload: { messageId } });
+    const routeBefore = await readRouteRow(stub, SESSION);
+
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    const allocationBefore = await readState(stub);
+    const alarmBefore = await readAlarm(stub);
+    await evictAllDurableObjects();
+    expect(await readState(stub)).toEqual(allocationBefore);
+    expect(await readRouteRow(stub, SESSION)).toEqual(routeBefore);
+    expect(await readAlarm(stub)).toBe(alarmBefore);
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        provider: provider.adapter,
+        sessionPeerFor: (_ownerId: string, sessionId: string) => peer.forSession(sessionId),
+      });
+    });
+
+    const reconnected = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await reconnected.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('connected'));
+    expect(await readRouteRow(stub, SESSION)).toEqual(routeBefore);
+    expect((await readState(stub)).lastActivityAt).toBe(allocationBefore.lastActivityAt);
+    expect(await reconnected.next(50)).toBeNull();
+    reconnected.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: messageId,
+    });
+    await waitFor(() =>
+      expect(peer.outcomes).toContainEqual(
+        expect.objectContaining({
+          sessionId: SESSION,
+          status: 'completed',
+          lastMessageId: messageId,
+        })
+      )
+    );
+    expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'lost')).toBe(false);
+    expect(provider.createCalls).toBe(1);
+    expect(provider.launchEnvs).toHaveLength(1);
+    expect(provider.stopCalls).toEqual([]);
+    reconnected.close();
   });
 
   it('returns the current view from prepare so a lost notification cannot wedge the session', async () => {

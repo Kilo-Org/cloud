@@ -133,10 +133,14 @@
     "status": "Statws",
     "truncated": "Wedi'i gwtogi",
     "updated": "Diweddarwyd",
+    "generating": "Yn cynhyrchu…",
     "working": "Yn gweithio",
     "yourOwnRepositories": "Dy ystorfeydd dy hun",
     "dismissed": "Wedi'i ddiystyru",
-    "agent": "Asiant"
+    "agent": "Asiant",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Newidiadau"
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -325,6 +329,7 @@
       "collapseFile": "Cwympo'r ffeil",
       "expandFile": "Ehangu'r ffeil",
       "diffTooLarge": "Mae gormod o wahaniaethau i'w dangos.",
+      "noPreview": "Does dim rhagolwg ar gael ar gyfer y ffeil hon",
       "openOnGitHub": "Agor ar GitHub",
       "openDiffOnGitHub": "Agor gwahaniaethau'r ffeil hon ar GitHub",
       "githubDiff": "Gwahaniaethau ar GitHub"
@@ -895,7 +900,8 @@
       "kiloclaw": "Gweithgaredd KiloClaw",
       "balance": "Rhybuddion balans",
       "security": "Canfyddiadau diogelwch",
-      "spend": "Rhybuddion gwariant"
+      "spend": "Rhybuddion gwariant",
+      "followedSessions": "Sesiynau a ddilynir"
     },
     "category": {
       "chatMessagesSubtitle": "atebion yn eich sgyrsiau",
@@ -1326,7 +1332,7 @@
         "stoppedTitle": "Daeth y gosod i ben",
         "stoppedBody": "Stopiodd instans {{name}} yn annisgwyl wrth ei osod.",
         "stalledTitle": "Aeth rhywbeth yn sownd",
-        "stalledBody": "Ni lwyddwyd i orffen gosod {{name}}. Rhowch gynnig eto, neu anfonwch e-bost at hi@kilo.ai os bydd hyn yn dal i ddigwydd.",
+        "stalledBody": "Ni lwyddwyd i orffen gosod {{name}}. Rhowch gynnig eto, neu anfonwch e-bost at {{supportEmail}} os bydd hyn yn dal i ddigwydd.",
         "timeoutTitle": "Yn cymryd yn hirach na'r disgwyl",
         "timeoutBody": "Mae gosod {{name}} yn cymryd yn hirach nag arfer (dros {{displayMinutes}} munud).",
         "continueInBackground": "Parhau yn y cefndir",
@@ -1384,7 +1390,7 @@
       "nonCanonicalEarlybirdBody": "Rhaid i berson adolygu'ch cynllun mynediad cynnar cyn y gallwch ei ddefnyddio ar eich ffôn.",
       "iosTitle": "KiloClaw ddim ar gael ar iOS",
       "iosBody": "Ar gyfer y cyfrif hwn, rheolir mynediad at KiloClaw y tu allan i'r ap iOS.",
-      "iosContact": "Cwestiynau? Cysylltwch â hi@kilo.ai.",
+      "iosContact": "Cwestiynau? Cysylltwch â {{supportEmail}}.",
       "quarantinedCta": "Anfon e-bost i'n tîm",
       "nonCanonicalEarlybirdCta": "Adolygu eich cynllun ar kilo.ai"
     },
@@ -1623,7 +1629,7 @@
         "recoveryLabel": "Diweddaru ap GitHub"
       },
       "githubIpAllowList": {
-        "description": "Analluogwyd yr Adolygydd cod oherwydd bod y sefydliad GitHub hwn yn defnyddio rhestr cyfeiriadau IP a ganiateir sy'n rhwystro Kilo. Cysylltwch â hi@kilocode.ai am gymorth, yna galluogwch yr Adolygydd cod eto."
+        "description": "Analluogwyd yr Adolygydd cod oherwydd bod y sefydliad GitHub hwn yn defnyddio rhestr cyfeiriadau IP a ganiateir sy'n rhwystro Kilo. Cysylltwch â {{supportEmail}} am gymorth, yna galluogwch yr Adolygydd cod eto."
       },
       "gitlabProjectAccessRequired": {
         "description": "Analluogwyd yr Adolygydd cod oherwydd na all Kilo greu tocyn mynediad prosiect GitLab ar gyfer y prosiect hwn. Rhowch fynediad cynhaliwr neu alluogwch docynnau mynediad prosiect, yna galluogwch yr Adolygydd cod eto.",
@@ -1638,7 +1644,7 @@
         "recoveryLabel": "Diweddaru gosodiadau'r Adolygydd cod"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Analluogwyd yr Adolygydd cod ar ôl i dair ymgais i glonio'r ystorfa fynd dros y terfyn amser heddiw. Cysylltwch â hi@kilocode.ai am gymorth, yna galluogwch yr Adolygydd cod eto."
+        "description": "Analluogwyd yr Adolygydd cod ar ôl i dair ymgais i glonio'r ystorfa fynd dros y terfyn amser heddiw. Cysylltwch â {{supportEmail}} am gymorth, yna galluogwch yr Adolygydd cod eto."
       },
       "title": "Mae angen sylw ar yr adolygydd cod.",
       "recoveryLabel": "Cysylltu â'r tîm cymorth"
@@ -2198,6 +2204,8 @@
       "title": "Sesiwn",
       "copyErrorDetails": "Copïo manylion gwall",
       "backToSessions": "Yn ôl i sesiynau",
+      "follow": "Dilyn ar y sgrin glo",
+      "unfollow": "Peidio â dilyn ar y sgrin glo",
       "couldNotLoad": "Methu llwytho'r sesiwn.",
       "failedToLoadDetails": "Methu llwytho manylion y sesiwn.",
       "failedToStopExecution": "Methu atal y gweithrediad.",
@@ -2264,6 +2272,11 @@
       "collapse": "Cwympo'r nod",
       "expand": "Ehangu'r nod"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Nodau, {{completed}} o {{total}} wedi'u cwblhau",
+      "rowAccessibility": "Nodau, {{completed}} o {{total}} wedi'u cwblhau. Y nod cyfredol: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Defnyddiwyd yn ddiweddar",
       "couldNotLoadGithubRepositories": "Methu llwytho ystorfeydd GitHub.",
@@ -2296,7 +2309,6 @@
       "retryLoadingEnvironment": "Ceisio llwytho'r amgylchedd eto",
       "defaultEnvironment": "Amgylchedd diofyn",
       "environmentSummary": "Gorchmynion: {{commands}} · MCP: {{mcp}} · Sgiliau: {{skills}} · Asiantau: {{agents}}",
-      "changes": "Newidiadau",
       "leaveChanges": "Gadael newidiadau",
       "commitAndPush": "Cyflwyno a gwthio",
       "startSession": "Dechrau sesiwn",
@@ -2319,6 +2331,10 @@
       "importingSession": "Yn mewnforio sesiwn",
       "cliCannotContinue": "Ni all y CLI hwn barhau â sesiwn. Dewiswch Cloud Agent neu CLI arall.",
       "importFailed": "Methu mewnforio'r sesiwn hon.",
+      "cliCannotFork": "Diweddarwch y Kilo CLI i fforchio o neges.",
+      "forkCutNotSynced": "Nid yw'r neges hon wedi'i chadw eto. Rhowch gynnig arall arni mewn munud.",
+      "forkFilesFromBaseBranch": "Mae'r ffeiliau'n dechrau o'r gangen sylfaen.",
+      "forkFilesUnchangedOnComputer": "Nid yw'r ffeiliau ar y cyfrifiadur hwn yn cael eu newid.",
       "pickProfile": "Dewiswch broffil",
       "noProfile": "Dim proffil",
       "manageProfiles": "Rheoli proffiliau",
@@ -2367,8 +2383,8 @@
       "toolList": "rhestru",
       "toolPatch": "clytio",
       "toolTask": "tasg",
-      "readTodos": "Darllen y rhestr dasgau",
-      "updateTodos": "Diweddaru'r rhestr dasgau",
+      "readTodos": "Darllen y cynllun",
+      "updateTodos": "Diweddaru'r cynllun",
       "linesBadge": "{{displayCount}} llinell",
       "filesBadge": "{{displayCount}} ffeil",
       "matchesBadge": "{{displayCount}} cyfatebiaeth",
@@ -2450,6 +2466,7 @@
       "copyMessage": "Copïo neges",
       "copyText": "Copïo testun",
       "selectText": "Dewis testun",
+      "forkFromHere": "Fforchio o fan hyn",
       "reportAiResponse": "Adrodd ar ymateb AI",
       "reportAiResponseConfirm": "Hoffech chi roi gwybod am yr ymateb hwn er mwyn ei adolygu?",
       "report": "Adrodd",
@@ -2793,6 +2810,12 @@
       "modelsCount_two": "Modelau ({{displayCount}})",
       "modelsCount_few": "Modelau ({{displayCount}})",
       "modelsCount_many": "Modelau ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Gweld newidiadau",
+      "asOf": "Fel ar {{time}}",
+      "tooLarge": "Mae'r gwahaniaethau hyn yn rhy fawr i'w dangos ar ffôn symudol.",
+      "empty": "Dim newidiadau i ffeiliau yn y sesiwn hon eto."
     },
     "autoApprove": {
       "title": "Cymeradwyo'n awtomatig",
@@ -3317,6 +3340,8 @@
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
     "openSession": "Agor",
+    "finished": "Wedi gorffen",
+    "followFailed": "Methu dangos yr asiant hwn ar y sgrin glo.",
     "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto.",
     "checked": "Gwiriwyd",
     "lastKnown": "Hysbys diwethaf",
@@ -3325,7 +3350,26 @@
     "waitingForYou": "Yn aros amdanoch",
     "nextScheduled": "Nesaf ar yr amserlen",
     "answerNeeded": "Angen ateb",
-    "waitingToRetry": "Yn aros i ailgeisio"
+    "waitingToRetry": "Yn aros i ailgeisio",
+    "step": {
+      "editing": "Golygu",
+      "reading": "Darllen",
+      "running": "Rhedeg",
+      "searching": "Chwilio'r we",
+      "thinking": "Meddwl drwyddo"
+    },
+    "planOf": "o",
+    "filesChanged": "ffeiliau wedi newid",
+    "finishedIn": "Gorffen mewn",
+    "noActivityFor": "Dim gweithgaredd am",
+    "prOpened": "Cais tynnu wedi agor",
+    "permissionWants": "Eisiau rhedeg",
+    "failure": {
+      "provider": "Wedi stopio: gwall darparwr",
+      "tool": "Wedi stopio: gwall offeryn",
+      "cancelled": "Wedi stopio: wedi canslo",
+      "other": "WEDI STOPIO"
+    }
   },
   "transcriptionModel": {
     "title": "Model trawsgrifio",
@@ -3353,6 +3397,7 @@
     "tutorialLabel": "Tiwtorial"
   },
   "modelChat": {
+    "offlineFailure": "Mae angen cysylltiad rhyngrwyd ar y model hwn. Cysylltwch a rhowch gynnig arall arni, neu newidiwch i fodel ar y ddyfais hon.",
     "empty": {
       "title": "Dechrau sgwrs",
       "description": "Anfonwch neges i siarad â model."
@@ -3360,10 +3405,32 @@
     "list": {
       "loadFailed": "Ni ellid llwytho hanes y sgwrs.",
       "new": "Sgwrs newydd",
-      "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ddileu.",
       "deleteTitle": "Dileu'r sgwrs hon?"
     },
+    "rename": {
+      "title": "Ailenwi sgwrs",
+      "accessibility": "Ailenwi sgwrs: {{title}}",
+      "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ailenwi neu ddileu."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Manylion sgwrs",
+      "backend": "Ôl-ben",
+      "effortDefault": "Rhagosodiad y model",
+      "noCost": "Dim cost",
+      "costUnknown": "Anhysbys",
+      "costEstimatedNote": "Mae cost atebion na wnaeth nodi pris wedi'i amcangyfrif o'r prisiau rhestr.",
+      "costUnknownNote": "Does dim pris yn hysbys ar gyfer y model hwn.",
+      "costPartialNote": "Nid yw'r cyfanswm hwn yn cynnwys modelau heb bris hysbys.",
+      "localNote": "Mae modelau ar y ddyfais yn rhedeg ar y ddyfais hon. Does dim cost na storfa anogwyr iddyn nhw, a gall eu cyfrif tocynnau fod yn amcangyfrifon.",
+      "countedSinceNote": "Dechreuodd y sgwrs hon cyn i'r defnydd gael ei gofnodi. Mae'r cyfansymiau'n dangos yr atebion ar ôl hynny yn unig.",
+      "remoteServersOn": "Gweinyddwyr MCP anghysbell ymlaen"
+    },
+    "webSearch": {
+      "title": "Chwilio'r we",
+      "description": "Gadewch i'r sgwrs hon chwilio am wybodaeth gyfredol drwy eich cyfrif Kilo. Mae chwiliadau'n defnyddio'ch lwfans chwilio misol.",
+      "allowanceExhausted": "Mae eich chwiliadau gwe am ddim ar gyfer y mis hwn wedi'u defnyddio. Ychwanegwch gredydau i chwilio eto."
+    },
     "mcp": {
       "title": "Offer Kilo",
       "use": "Defnyddio offer Kilo",
@@ -3386,7 +3453,6 @@
       "fieldName": "Enw dangos",
       "fieldUrl": "URL gweinydd",
       "fieldUrlInvalid": "Rhowch URL gweinydd dilys.",
-      "fieldToken": "Tocyn Bearer (dewisol)",
       "enableServer": "Galluogi'r gweinydd hwn: {{name}}",
       "editServer": "Golygu gweinydd",
       "deleteServer": "Dileu gweinydd",
@@ -3407,8 +3473,24 @@
       "serverUnreachable": "Ni ellid cyrraedd y gweinydd hwn",
       "serverOff": "Mae'r gweinydd hwn i ffwrdd"
     },
+    "mcpOAuth": {
+      "authMethod": "Dilysu",
+      "authNone": "Dim mewngofnodi",
+      "authBearer": "Tocyn Bearer",
+      "authOAuth": "Mewngofnodi OAuth",
+      "fieldToken": "Tocyn",
+      "oauthHint": "Ar ôl i chi gadw, tapiwch $t(modelChat.mcpOAuth.signIn) ar y gweinydd i fewngofnodi gyda'ch porwr.",
+      "serverNeedsSignIn": "Mewngofnodwch i ddefnyddio'r gweinydd hwn",
+      "signIn": "Mewngofnodi",
+      "signInA11y": "Mewngofnodi i'r gweinydd hwn: {{name}}",
+      "signInFailed": "Ni ellid mewngofnodi i {{name}}. Rhowch gynnig arall arni."
+    },
     "backends": {
       "title": "Ôl-bennau sgwrs",
+      "providersTitle": "Darparwyr sgwrs",
+      "cloud": "Yn y cwmwl",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Nid yw modelau Kilo ar gael ar hyn o bryd. Gwiria dy gysylltiad.",
       "manage": "Rheoli ôl-bennau",
       "defaultKilo": "$t(consent.kilo) (rhagosodedig)",
       "kiloHelp": "Mae'r ôl-ben adeiledig yn defnyddio eich cyfrif Kilo ac ni ellir ei olygu na'i ddileu.",
@@ -3468,7 +3550,6 @@
     "gguf": {
       "title": "Modelau y gellir eu lawrlwytho",
       "help": "Lawrlwythwch fodel agored a'i redeg ar y ffôn hwn gyda llama.cpp. Mae eich anogwyr a'ch atebion yn aros ar y ddyfais. Mae modelau'n fawr, felly defnyddiwch Wi-Fi.",
-      "details": "{{size}} · Trwydded: {{license}}",
       "download": "Lawrlwytho model",
       "pause": "Seibio'r lawrlwythiad",
       "resume": "Ailddechrau'r lawrlwythiad",
@@ -3480,6 +3561,8 @@
       "url": "Dolen lawrlwytho uniongyrchol",
       "urlHelp": "Gludwch ddolen HTTPS i ffeil .gguf, fel dolen resolve Hugging Face. Dim ond o ffynonellau rydych yn ymddiried ynddynt y dylech lawrlwytho modelau.",
       "downloadUrl": "Lawrlwytho o ddolen",
+      "advanced": "Uwch",
+      "localPurpose": "Yn rhedeg ar y ddyfais hon gyda llama.cpp. Mae anogau ac atebion yn aros ar y ddyfais.",
       "deleteTitle": "Dileu'r model hwn?",
       "deleteMessage": "Dileu {{name}} o'r ddyfais hon? Mae sgyrsiau sy'n ei ddefnyddio angen model arall cyn y gallant barhau.",
       "errors": {
@@ -3489,12 +3572,62 @@
         "notGguf": "Rhaid i'r ddolen bwyntio at ffeil .gguf.",
         "space": "Nid oes digon o storfa rydd ar gyfer y model hwn. Rhyddhewch le a rhowch gynnig arall arni.",
         "network": "Ni orffennodd y lawrlwythiad. Gwiriwch eich cysylltiad a rhowch gynnig arall arni.",
-        "invalidFile": "Nid yw'r ffeil a lawrlwythwyd yn fodel y gall yr ap hwn ei redeg, felly cafodd ei dileu."
+        "invalidFile": "Nid yw'r ffeil a lawrlwythwyd yn fodel y gall yr ap hwn ei redeg, felly cafodd ei dileu.",
+        "checksum": "Nid yw'r ffeil a lawrlwythwyd yn cyfateb i'w siecswm cyhoeddedig, felly cafodd ei dileu. Rhowch gynnig ar y lawrlwythiad eto."
       }
+    },
+    "catalog": {
+      "browse": "Pori modelau",
+      "title": "Catalog modelau",
+      "search": "Chwilio modelau Hugging Face",
+      "tabs": "Hidlydd modelau",
+      "fitsTab": "Yn ffitio'r ddyfais hon",
+      "fromHuggingFace": "O Hugging Face",
+      "loading": "Wrthi'n llwytho modelau",
+      "noResults": "Dim modelau wedi'u canfod",
+      "noFits": "Does dim modelau'n ffitio'r ddyfais hon",
+      "noFitsDescription": "Mae modelau mwy ar y tab $t(common.all).",
+      "fit": {
+        "fits": "Yn ffitio",
+        "tight": "Prin yn ffitio",
+        "tooLarge": "Rhy fawr",
+        "noStorage": "Dim digon o storfa",
+        "unknown": "Addasrwydd yn anhysbys"
+      },
+      "recommendationsHelp": "Rhestr fer y mae'r ap hwn yn ei phinio: un ffeil fesul model, gan gyhoeddwr sy'n nodi trwydded. Nid oes dim arall yn cael ei raddio.",
+      "compatibilityHelp": "Mae addasrwydd yn cymharu ffeil y model â chof y ddyfais hon a'r storfa rydd. Amcangyfrif yw'r ffigur cof, nid mesuriad.",
+      "text": "Testun",
+      "listTextPurpose": "Anogau testun yn unig.",
+      "listImagePurpose": "Yn darllen delweddau yn ogystal â thestun.",
+      "smallestDownload": "Llwythiad lleiaf: {{size}} · tua {{memory}} o gof",
+      "fullFileName": "Ffeil: {{name}}",
+      "memoryEstimateNote": "Amcangyfrifon yw ffigurau cof, nid mesuriadau.",
+      "parameters": "Paramedrau: {{value}}",
+      "downloads": "Lawrlwythiadau: {{value}}",
+      "likes": "Hoffiadau: {{value}}",
+      "context": "Ffenestr gyd-destun: {{value}}",
+      "license": "Trwydded: {{license}}",
+      "licenseUnknown": "Dydy'r drwydded ddim wedi'i nodi",
+      "tools": "Galw offer",
+      "vision": "Mewnbwn delwedd",
+      "hintsHelp": "Awgrymiadau gan Hugging Face. Mae'r ap yn gwirio'r model ar ôl iddo lawrlwytho.",
+      "gated": "Mae angen cyfrif Hugging Face ar gyfer y model hwn, felly does dim modd i'r ap ei lawrlwytho.",
+      "quantizations": "Cwanteiddiadau",
+      "quantizationsHelp": "Mae ffeiliau llai yn defnyddio llai o gof a storfa. Mae ffeiliau mwy fel arfer yn rhoi atebion gwell.",
+      "quantDetail": "Lawrlwythiad {{size}} · tua {{memory}} o gof",
+      "downloadQuant": "Lawrlwytho {{quant}}",
+      "loadingModel": "Wrthi'n llwytho manylion y model",
+      "couldNotLoadModel": "Methu llwytho'r model hwn",
+      "noFiles": "Dim ffeiliau y gall yr ap hwn eu rhedeg",
+      "noFilesDescription": "Mae'r ap hwn yn rhedeg modelau sy'n un ffeil GGUF.",
+      "tooLargeTitle": "Efallai na fydd y model hwn yn rhedeg",
+      "tooLargeMessage": "Mae'n debyg bod angen mwy o gof ar {{name}} nag sydd gan y ddyfais hon. Gall yr ap gau tra bo'r model yn ateb. Lawrlwytho beth bynnag?",
+      "downloadAnyway": "Lawrlwytho beth bynnag"
     },
     "localModels": {
       "title": "Modelau ar y ddyfais",
-      "help": "Mae modelau ar y ddyfais yn rhedeg ar y ffôn hwn. Mae eich anogwyr a'r atebion yn aros ar y ddyfais, ac ni all y modelau hyn ddefnyddio offer.",
+      "help": "Mae modelau ar y ddyfais yn rhedeg ar y ffôn hwn. Mae eich anogwyr a'r atebion yn aros ar y ddyfais.",
+      "systemPurpose": "Y model sydd wedi'i adeiladu i mewn i system y ddyfais hon. Mae'n rhedeg ar y ddyfais.",
       "apple": "Apple Intelligence (ar y ddyfais)",
       "checking": "Yn gwirio argaeledd…",
       "ready": "Yn barod i'w ddefnyddio",
@@ -3520,6 +3653,9 @@
       "downloading": "Wrthi'n llwytho i lawr…",
       "downloadProgress": "Wrthi'n llwytho i lawr… {{percent}}%",
       "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
     }
   },
   "settingsTools": {
@@ -3742,5 +3878,108 @@
     "noMatchingProductsPlay": "Ni ddychwelodd Google Play unrhyw becynnau credydau cyfatebol.",
     "purchaseOwnedByAnotherAccount": "Mae'r credydau ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio.",
     "purchaseOwnedByAnotherAccountPlay": "Mae'r credydau ar y cyfrif Google Play hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio."
+  },
+  "todos": {
+    "saveAsTodo": "Cadw fel tasg",
+    "segment": {
+      "label": "Golwg asiantau",
+      "sessions": "Sesiynau",
+      "todos": "Tasgau"
+    },
+    "lists": {
+      "newList": "Rhestr newydd",
+      "empty": "Dim rhestrau eto",
+      "couldNotLoad": "Ni lwyddwyd i lwytho'r rhestrau",
+      "noRepository": "Dim ystorfa",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_zero": "{{count}} ar agor",
+      "openCount_one": "{{count}} ar agor",
+      "openCount_two": "{{count}} ar agor",
+      "openCount_few": "{{count}} ar agor",
+      "openCount_many": "{{count}} ar agor",
+      "openCount_other": "{{count}} ar agor",
+      "archived_zero": "Wedi'u harchifo ({{count}})",
+      "archived_one": "Wedi'u harchifo ({{count}})",
+      "archived_two": "Wedi'u harchifo ({{count}})",
+      "archived_few": "Wedi'u harchifo ({{count}})",
+      "archived_many": "Wedi'u harchifo ({{count}})",
+      "archived_other": "Wedi'u harchifo ({{count}})",
+      "archive": "Archifio",
+      "unarchive": "Dadarchifio",
+      "deleteTitle": "Dileu {{name}}?",
+      "deleteMessage": "Caiff ei thasgau eu dileu hefyd. Mae ei sesiynau'n aros."
+    },
+    "listSettings": {
+      "title": "Gosodiadau'r rhestr",
+      "name": "Enw",
+      "namePlaceholder": "Bygiau, Syniadau, Rhyddhau…",
+      "emoji": "Emoji",
+      "mode": "Modd",
+      "defaultsHint": "Mae sesiynau sy'n dechrau o'r rhestr hon yn defnyddio'r rhagosodiadau hyn."
+    },
+    "list": {
+      "addPlaceholder": "Ychwanegu tasg",
+      "add": "Ychwanegu tasg",
+      "empty": "Dim tasgau eto",
+      "setDefaults": "Gosod ystorfa, modd a model",
+      "completed_zero": "Wedi'u cwblhau ({{count}})",
+      "completed_one": "Wedi'u cwblhau ({{count}})",
+      "completed_two": "Wedi'u cwblhau ({{count}})",
+      "completed_few": "Wedi'u cwblhau ({{count}})",
+      "completed_many": "Wedi'u cwblhau ({{count}})",
+      "completed_other": "Wedi'u cwblhau ({{count}})"
+    },
+    "item": {
+      "markDone": "Nodi fel wedi'i wneud",
+      "markOpen": "Nodi fel heb ei wneud",
+      "markDonePrompt": "Nodi fel wedi'i wneud?",
+      "deleted": "Tasg wedi'i dileu",
+      "undo": "Dadwneud",
+      "runCount_zero": "{{count}} rhediad",
+      "runCount_one": "{{count}} rhediad",
+      "runCount_two": "{{count}} rhediad",
+      "runCount_few": "{{count}} rhediad",
+      "runCount_many": "{{count}} rhediad",
+      "runCount_other": "{{count}} rhediad",
+      "startNow": "Dechrau heb adolygiad",
+      "startNowHint": "Pwyswch yn hir i ddechrau heb adolygiad",
+      "titleLabel": "Teitl y dasg",
+      "renameTitle": "Ailenwi tasg",
+      "notes": "Nodiadau",
+      "addNotes": "Ychwanegu nodiadau",
+      "notesPrompt": "Ychwanega gyd-destun, gofynion, neu feini prawf derbyn.",
+      "markdownSupported": "Markdown yn cael ei gefnogi",
+      "sessions": "Sesiynau wedi'u cysylltu",
+      "noSessions": "Dim sesiynau eto",
+      "untitledLinkedSession": "Sesiwn gysylltiedig",
+      "sessionNeedsInput": "Angen mewnbwn ar y sesiwn",
+      "sessionRunning": "Sesiwn yn rhedeg",
+      "sessionFinished": "Sesiwn wedi gorffen",
+      "sessionPullRequest": "PR y sesiwn",
+      "sessionPullRequestNumber": "PR y sesiwn #{{number}}",
+      "openSessionHint": "Yn agor y sesiwn.",
+      "unlinkSessionAction": "Datgysylltu sesiwn",
+      "unlinkConfirmTitle": "Datgysylltu {{title}}?",
+      "unlinkConfirmMessage": "Nid yw'r sesiwn ei hun yn cael ei dileu. Dim ond ei chysylltiad â'r dasg hon sy'n cael ei dynnu.",
+      "startNewSession": "Dechrau sesiwn newydd",
+      "startNewSessionHint": "Gwasga'n hir i ddechrau sesiwn newydd.",
+      "linkSession": "Cysylltu sesiwn",
+      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg"
+    },
+    "linkSession": {
+      "title": "Cysylltu sesiwn",
+      "empty": "Dim sesiynau diweddar",
+      "emptyInRepository": "Dim sesiynau diweddar yn {{repository}}"
+    },
+    "upNext": "Nesaf",
+    "sessionTodo": "Tasg: {{title}}",
+    "linkToTodo": "Cysylltu â thasg",
+    "candidates": {
+      "empty": "Dim tasgau ar agor"
+    },
+    "saveSheet": {
+      "title": "Cadw i'r rhestr",
+      "saved": "Wedi'i gadw i {{list}}"
+    }
   }
 }

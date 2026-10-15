@@ -54,6 +54,23 @@ export const DIAGNOSTIC_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const IsoTimestampSchema = z.string().datetime({ offset: true });
 const OperationalIdentifierSchema = z.string().min(1).max(MAX_OPERATIONAL_IDENTIFIER_LENGTH);
+export const CloudAgentRunContainerSchema = z
+  .object({
+    provider: z.enum(['cloudflare', 'vercel', 'cloudflare-containers']),
+    sandboxId: OperationalIdentifierSchema,
+    allocationId: OperationalIdentifierSchema.optional(),
+    instanceId: OperationalIdentifierSchema.optional(),
+    instanceType: OperationalIdentifierSchema.optional(),
+    region: OperationalIdentifierSchema.optional(),
+    imageRef: z.string().min(1).max(1024).optional(),
+    snapshotId: OperationalIdentifierSchema.optional(),
+    runtimeBuildId: OperationalIdentifierSchema.optional(),
+    startSource: z.enum(['image', 'snapshot']).optional(),
+  })
+  .strict();
+
+export type CloudAgentRunContainer = z.infer<typeof CloudAgentRunContainerSchema>;
+
 const WrapperRunIdentifierSchema = OperationalIdentifierSchema.regex(/^wr_[A-Za-z0-9_-]+$/);
 const validFailureClassifications = new Set(
   CloudAgentRunFailureClassifications.map(
@@ -96,6 +113,7 @@ const CloudAgentRunStateSchema = z
     messageId: OperationalIdentifierSchema,
     status: z.enum(CloudAgentRunStatuses),
     wrapperRunId: WrapperRunIdentifierSchema.optional(),
+    container: CloudAgentRunContainerSchema.optional(),
     queuedAt: IsoTimestampSchema.optional(),
     dispatchAcceptedAt: IsoTimestampSchema.optional(),
     agentActivityObservedAt: IsoTimestampSchema.optional(),

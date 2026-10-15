@@ -7,47 +7,98 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   configToFormState,
-  effectiveDeciderModels,
   effortCoverageForModel,
   formStateToConfig,
+  formatRunProgress,
   RoutingTableView,
 } from './BenchmarksSection';
 
 const baseConfig: BenchmarkConfig = {
   ...formStateToConfig(configToFormState(null), null),
   classifierModels: ['classifier'],
-  deciderModels: [{ id: 'manual' }, { id: 'auto' }],
-  manualDeciderModels: [{ id: 'manual' }],
-  autoDeciderModels: [
-    { id: 'auto', avgAttemptCostUsd: 21 },
-    { id: 'excluded', avgAttemptCostUsd: 18 },
-  ],
-  excludedAutoDeciderModels: ['excluded'],
+  deciderModels: [{ id: 'selected-model' }],
 };
 
 describe('platform model selection', () => {
-  it('round-trips model-level selections without adding an effort', () => {
-    const state = configToFormState(baseConfig);
-    expect(state.deciderModels).toEqual([{ id: 'manual' }]);
-    const result = formStateToConfig(state, baseConfig);
-    expect(result.manualDeciderModels).toEqual([{ id: 'manual' }]);
-    expect(result.deciderModels).toEqual([{ id: 'manual' }, { id: 'auto' }]);
-    expect(result.autoDeciderModels).toEqual(baseConfig.autoDeciderModels);
-    expect(result.excludedAutoDeciderModels).toEqual(['excluded']);
+  it('defaults to efficient and preserves router-specific accuracy settings', () => {
+    expect(formStateToConfig(configToFormState(null), null)).toMatchObject({
+      router: 'efficient',
+      accuracyNoiseBand: 0.05,
+      frontierMinAccuracyDelta: 0,
+    });
+    const config: BenchmarkConfig = {
+      ...baseConfig,
+      router: 'frontier',
+      accuracyNoiseBand: 0.02,
+      frontierMinAccuracyDelta: 0.1,
+    };
+    expect(formStateToConfig(configToFormState(config), config)).toMatchObject({
+      router: 'frontier',
+      accuracyNoiseBand: 0.02,
+      frontierMinAccuracyDelta: 0.1,
+      minAccuracy: config.minAccuracy,
+    });
   });
 
-  it('drops blank selections, trims ids, and preserves manual precedence over auto exclusions', () => {
+  it('round-trips the token profile, switch horizon, and confidence threshold', () => {
+    const config: BenchmarkConfig = {
+      ...baseConfig,
+      productionTokenProfile: { uncachedInputTokens: 7900, cachedInputTokens: 122900 },
+      switchHorizonTurns: 10,
+      lowConfidenceThreshold: 0.8,
+    };
+    const state = configToFormState(config);
+    expect(formStateToConfig({ ...state, minAccuracy: 0.9 }, config)).toMatchObject({
+      productionTokenProfile: { uncachedInputTokens: 7900, cachedInputTokens: 122900 },
+      switchHorizonTurns: 10,
+      lowConfidenceThreshold: 0.8,
+    });
+  });
+
+  it('clears optional ranking settings when their fields are empty', () => {
+    const config: BenchmarkConfig = {
+      ...baseConfig,
+      productionTokenProfile: { uncachedInputTokens: 7900, cachedInputTokens: 122900 },
+      switchHorizonTurns: 10,
+      lowConfidenceThreshold: 0.8,
+    };
+    const state = {
+      ...configToFormState(config),
+      uncachedInputTokens: '',
+      cachedInputTokens: ' ',
+      switchHorizonTurns: '',
+      lowConfidenceThreshold: '',
+    };
+    expect(formStateToConfig(state, config)).toMatchObject({
+      productionTokenProfile: null,
+      switchHorizonTurns: null,
+      lowConfidenceThreshold: null,
+    });
+  });
+
+  it('treats one empty token field as zero tokens', () => {
+    const state = { ...configToFormState(baseConfig), cachedInputTokens: '122900' };
+    expect(formStateToConfig(state, baseConfig).productionTokenProfile).toEqual({
+      uncachedInputTokens: 0,
+      cachedInputTokens: 122900,
+    });
+  });
+
+  it('round-trips model-level selections without adding an effort', () => {
+    const state = configToFormState(baseConfig);
+    expect(state.deciderModels).toEqual([{ id: 'selected-model' }]);
+    const result = formStateToConfig(state, baseConfig);
+    expect(result.deciderModels).toEqual([{ id: 'selected-model' }]);
+  });
+
+  it('drops blank selections and trims ids', () => {
+    const state = configToFormState(baseConfig);
     expect(
-      effectiveDeciderModels({
-        manualDeciderModels: [{ id: '  manual  ' }, { id: 'duplicate' }, { id: ' ' }],
-        autoDeciderModels: [
-          { id: 'duplicate', avgAttemptCostUsd: 20 },
-          { id: 'included', avgAttemptCostUsd: 22 },
-          { id: 'excluded', avgAttemptCostUsd: 23 },
-        ],
-        excludedAutoDeciderModels: ['duplicate', 'excluded'],
-      })
-    ).toEqual([{ id: 'manual' }, { id: 'duplicate' }, { id: 'included' }]);
+      formStateToConfig(
+        { ...state, deciderModels: [{ id: '  selected-model  ' }, { id: ' ' }] },
+        baseConfig
+      ).deciderModels
+    ).toEqual([{ id: 'selected-model' }]);
   });
 
   it('does not infer reasoning coverage from arbitrary catalog presets or missing models', () => {
@@ -164,5 +215,87 @@ describe('compact route rankings', () => {
     const html = renderToStaticMarkup(React.createElement(RoutingTableView, { data }));
     expect(html).toContain('legacy · low');
     expect(html).toContain('Below threshold');
+  });
+});
+
+describe('benchmark run progress', () => {
+  const startedAt = '2026-06-15T00:00:00.000Z';
+  const tenMinutesLater = Date.parse('2026-06-15T00:10:00.000Z');
+
+  it('shows counts without a percentage when the expected total is unknown', () => {
+    expect(
+      formatRunProgress({ completedCases: 12, totalCases: null, failedCases: 0 }, startedAt)
+    ).toEqual({ percent: null, counts: '12 / ? cases', eta: null });
+  });
+
+  it('reports the completed share, failed cases, and a finish estimate', () => {
+    expect(
+      formatRunProgress(
+        { completedCases: 40, totalCases: 200, failedCases: 3 },
+        startedAt,
+        tenMinutesLater
+      )
+    ).toEqual({ percent: 20, counts: '40 / 200 cases · 3 failed', eta: '40 min' });
+  });
+
+  it('projects a finish time as soon as 5% is done', () => {
+    expect(
+      formatRunProgress(
+        { completedCases: 10, totalCases: 200, failedCases: 0 },
+        startedAt,
+        tenMinutesLater
+      )
+    ).toEqual({ percent: 5, counts: '10 / 200 cases', eta: '3 h 10 min' });
+  });
+
+  it('withholds a finish estimate below 5% done and before the run has started', () => {
+    expect(
+      formatRunProgress(
+        { completedCases: 9, totalCases: 200, failedCases: 0 },
+        startedAt,
+        tenMinutesLater
+      ).eta
+    ).toBeNull();
+    expect(
+      formatRunProgress(
+        { completedCases: 0, totalCases: 200, failedCases: 0 },
+        startedAt,
+        tenMinutesLater
+      )
+    ).toEqual({ percent: 0, counts: '0 / 200 cases', eta: null });
+    expect(
+      formatRunProgress(
+        { completedCases: 50, totalCases: 100, failedCases: 0 },
+        startedAt,
+        Date.parse('2026-06-14T23:00:00.000Z')
+      ).eta
+    ).toBeNull();
+  });
+
+  it('clamps a run whose completed cases already cover the expected total', () => {
+    expect(
+      formatRunProgress(
+        { completedCases: 200, totalCases: 200, failedCases: 0 },
+        startedAt,
+        tenMinutesLater
+      )
+    ).toEqual({ percent: 100, counts: '200 / 200 cases', eta: null });
+    expect(
+      formatRunProgress(
+        { completedCases: 225, totalCases: 200, failedCases: 0 },
+        startedAt,
+        tenMinutesLater
+      )
+    ).toEqual({ percent: 100, counts: '225 / 200 cases', eta: null });
+  });
+
+  it('rounds a sub-minute finish estimate instead of reporting zero', () => {
+    expect(
+      formatRunProgress(
+        { completedCases: 199, totalCases: 200, failedCases: 0 },
+        startedAt,
+        Date.parse('2026-06-15T00:00:30.000Z')
+      ).eta
+    ).toBe('<1 min');
   });
 });

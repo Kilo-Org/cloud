@@ -30,5 +30,31 @@ const readCached = (input: number, output: number, cached: number): Partial<Mode
   cacheReadTokens: cached,
 });
 
-export type { Counts, TokenCount };
-export { readCached, set };
+/**
+ * The cost fields the Kilo gateway and OpenRouter add to a usage frame. They
+ * are read apart from the check, so a provider that sends them in another form
+ * loses the cost and keeps its token counts.
+ */
+interface CostFields {
+  cost?: unknown;
+  is_byok?: unknown;
+  cost_details?: unknown;
+}
+
+const upstreamOf = (details: unknown): unknown =>
+  typeof details === 'object' && details !== null && 'upstream_inference_cost' in details
+    ? details.upstream_inference_cost
+    : undefined;
+
+/**
+ * What the call cost in US dollars. A call OpenRouter served on a provider key
+ * (`is_byok`) reports only OpenRouter's fee in `cost`; the inference itself is
+ * `cost_details.upstream_inference_cost`, which is what the gateway bills.
+ */
+const costOf = (usage: CostFields): { readonly cost?: number } => {
+  const cost = usage.is_byok === true ? upstreamOf(usage.cost_details) : usage.cost;
+  return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? { cost } : {};
+};
+
+export type { CostFields, Counts, TokenCount };
+export { costOf, readCached, set };

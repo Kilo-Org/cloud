@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 
+import { formatCurrency } from '@/lib/format';
+
 import { glanceableLayoutCopy, withGlanceableCopy } from './layout-copy';
 
 const PLACEHOLDER = '__KILO_GLANCEABLE_COPY__';
@@ -57,6 +59,33 @@ describe('withGlanceableCopy', () => {
     // English is `latn`, so the layout's own `String` is already right and the
     // empty table tells it to skip the mapping.
     expect(glanceableLayoutCopy().digits).toBe('');
+  });
+
+  it('bakes the session cost template and decimal separator from the app cost format', async () => {
+    const english = glanceableLayoutCopy();
+    expect(english).toMatchObject({ costTemplate: '$#', costDecimal: '.', group: ',' });
+    // The baked parts rebuild the app's own label for a four-figure cost.
+    expect(
+      english.costTemplate.split('#').join(`1${english.group}234${english.costDecimal}50`)
+    ).toBe(formatCurrency(1234.5, 'en', 2));
+    const previous = i18n.language;
+    try {
+      await i18n.changeLanguage('de');
+      // German writes the amount first and a decimal comma.
+      const german = glanceableLayoutCopy();
+      expect(german.costDecimal).toBe(',');
+      expect(german.costTemplate).toContain('#');
+      expect(german.costTemplate).toContain('$');
+      expect(german.costTemplate.indexOf('#')).toBeLessThan(german.costTemplate.indexOf('$'));
+      await i18n.changeLanguage('ar');
+      // The decimal separator and the template come from the same formatter
+      // that writes the app's cost labels in this language.
+      const arabic = glanceableLayoutCopy();
+      expect(arabic.costDecimal).toHaveLength(1);
+      expect(arabic.costTemplate).toContain('#');
+    } finally {
+      await i18n.changeLanguage(previous);
+    }
   });
 
   it('bakes the locale in the form the SwiftUI modifier accepts', () => {

@@ -35,10 +35,7 @@ vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   I18nManager: { isRTL: false },
-  Keyboard: {
-    addListener: vi.fn(() => ({ remove: vi.fn() })),
-    dismiss: vi.fn(),
-  },
+  Keyboard: { dismiss: vi.fn() },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   Text: 'Text',
@@ -49,6 +46,11 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+}));
+
+// The composer reads the keyboard from the provider, not from a listener of its own.
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: <T,>(selector: (state: { height: number }) => T) => selector({ height: 0 }),
 }));
 
 vi.mock('react-native-gesture-handler', () => ({

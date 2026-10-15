@@ -39,6 +39,7 @@ import {
   remoteSessionEyebrowLabel,
   selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
+import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';
 import { type RowVariant } from './session-row';
@@ -306,10 +307,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
 
   const handlePressIn = canManage
     ? () => {
-        void prefetchSessionTranscript(
-          queryClient,
-          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.id })
-        );
+        void prefetchSessionTranscript(queryClient, sessionTranscriptQueryOptions(session.id));
       }
     : undefined;
 

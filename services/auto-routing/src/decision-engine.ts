@@ -4,6 +4,7 @@ import {
   isVirtualAutoModelId,
   type AutoRoutingDecision,
   type AutoRoutingMode,
+  type BenchmarkPair,
   type ClassifierOutput,
   type RankedCandidate,
   type ReasoningEffort,
@@ -22,15 +23,7 @@ import type { ModelCapabilities, ModelCapabilitiesMap } from './model-capabiliti
 // `model_stats.inputModalities` (`apps/web/src/lib/model-stats/sync-openrouter.ts:77,95,124`).
 export const ENFORCED_MODALITIES: ReadonlyArray<string> = ['image', 'file'];
 
-export type DecisionIncumbent = {
-  model: string;
-  variant: string | null;
-};
-
-// Single source of the constraint policy shared by benchmark routing
-// (`applyCapabilityFilters`) and the coding-plan short-circuit in `decide.ts`.
-// Keeping these in one place stops the two paths from silently diverging when
-// the policy changes.
+export type DecisionIncumbent = BenchmarkPair;
 
 // A required+enforced modality the model does not (or might not) support fails
 // closed: unknown capability data is treated as unsupported.
@@ -58,18 +51,6 @@ export function contextProvablyTooSmall(
     !!caps &&
     typeof caps.contextLength === 'number' &&
     caps.contextLength < estimate
-  );
-}
-
-// Combined fitness used by the coding-plan short-circuit, which needs a single
-// yes/no. Benchmark routing calls the two predicates separately because a
-// modality miss drops the candidate while a too-small context only demotes it.
-export function modelSatisfiesConstraints(
-  caps: ModelCapabilities | undefined,
-  constraints: RoutingConstraints
-): boolean {
-  return (
-    satisfiesRequiredModalities(caps, constraints) && !contextProvablyTooSmall(caps, constraints)
   );
 }
 
@@ -237,11 +218,19 @@ function applyActiveFilter(
 // the single largest group, which sits at 27/30 and is unaffected).
 const STICKY_ACCURACY_TOLERANCE = 0.1;
 
-function sameExactPair(
-  a: DecisionIncumbent,
-  b: { model: string; variant: string | null }
-): boolean {
+function sameExactPair(a: DecisionIncumbent, b: BenchmarkPair): boolean {
   return a.model === b.model && a.variant === b.variant;
+}
+
+export function isLowConfidence(
+  table: RoutingTable | null,
+  confidence: number | undefined
+): boolean {
+  return (
+    typeof table?.lowConfidenceThreshold === 'number' &&
+    confidence !== undefined &&
+    confidence < table.lowConfidenceThreshold
+  );
 }
 
 export function computeDecision(
@@ -251,8 +240,11 @@ export function computeDecision(
   deniedModelIds: ReadonlySet<string> = new Set(),
   mode: AutoRoutingMode = DEFAULT_AUTO_ROUTING_MODE,
   options: {
+    confidence?: number;
     constraints?: RoutingConstraints | undefined;
+    contextTokens?: number | undefined;
     capabilityMap?: ModelCapabilitiesMap | undefined;
+    preserveIncumbentVariant?: boolean;
     // True only for custom-pool tables: drop candidates whose capability row
     // is missing or isActive !== true. Platform tables leave this unset.
     failClosedOnInactive?: boolean;
@@ -283,19 +275,25 @@ export function computeDecision(
     return null;
   }
 
-  const freshPick = pickFreshCandidate(candidates, mode);
-  const freshPair = { model: freshPick.model, variant: candidateVariant(freshPick) };
+  const freshPick = pickFreshCandidate(
+    candidates,
+    isLowConfidence(table, options.confidence) ? 'best_accuracy' : mode
+  );
+  const applyComplexityEffort = (candidate: RankedCandidate): RankedCandidate => {
+    if (options.preserveIncumbentVariant || !classification.reasoningComplexity) return candidate;
+    const variant =
+      table.effortByComplexity?.[routeKey]?.[candidate.model]?.[classification.reasoningComplexity];
+    if (variant === undefined) return candidate;
+    return (
+      candidates.find(c => c.model === candidate.model && candidateVariant(c) === variant) ??
+      candidate
+    );
+  };
+  const picked = applyComplexityEffort(freshPick);
+  const freshPair = { model: picked.model, variant: candidateVariant(picked) };
 
-  // Keep the session on its incumbent model when it is still good enough for
-  // the current taxonomy route. A model switch discards the provider's prompt cache,
-  // and rebuilding it costs full-price input tokens (4-10x cache-read rates)
-  // on a context that dominates agent-session spend — so a switch is only
-  // worth it when the fresh pick's recurring per-turn savings clearly exceed
-  // that one-time penalty, i.e. it is cheaper by more than switchCostFactor.
-  // Sticky lookup is performed against the filtered candidate set so an
-  // incumbent that is modality-incapable or provably too small is replaced
-  // by a fresh pick from the eligible set, not kept.
   const incumbentCandidate = findIncumbentCandidate(candidates, incumbent);
+  const incumbentPick = incumbentCandidate ? applyComplexityEffort(incumbentCandidate) : undefined;
   // Sticky eligibility, shared by the keep decision and the switchReason
   // telemetry below so the two can never disagree. best_accuracy keeps the
   // strict bar (that mode exists to buy accuracy); cost_per_accuracy keeps
@@ -304,46 +302,72 @@ export function computeDecision(
     mode === 'best_accuracy'
       ? candidate.meetsThreshold
       : candidate.accuracy >= table.minAccuracy - STICKY_ACCURACY_TOLERANCE;
+  const costSwitchWorthwhile = (candidate: RankedCandidate): boolean => {
+    if (
+      table.switchHorizonTurns != null &&
+      options.contextTokens != null &&
+      candidate.estimatedRequestCostUsd != null &&
+      picked.estimatedRequestCostUsd != null &&
+      candidate.pricing != null &&
+      picked.pricing != null
+    ) {
+      const expectedSavings =
+        (candidate.estimatedRequestCostUsd - picked.estimatedRequestCostUsd) *
+        table.switchHorizonTurns;
+      const cacheLossCost =
+        options.contextTokens *
+        (picked.pricing.promptUsdPerToken -
+          (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken));
+      return expectedSavings > cacheLossCost;
+    }
+    return picked.avgCostUsd * table.switchCostFactor < candidate.avgCostUsd;
+  };
   const stickyIncumbent =
     incumbentCandidate &&
+    incumbentPick &&
     incumbentStickyEligible(incumbentCandidate) &&
-    !sameExactPair(
-      { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
-      freshPair
-    ) &&
-    ((mode === 'cost_per_accuracy' &&
-      !(freshPick.avgCostUsd * table.switchCostFactor < incumbentCandidate.avgCostUsd)) ||
-      (mode === 'best_accuracy' &&
-        !(freshPick.accuracy - incumbentCandidate.accuracy > table.bestAccuracySwitchThreshold)));
+    ((incumbentCandidate.model === freshPick.model &&
+      ((options.preserveIncumbentVariant &&
+        !sameExactPair(
+          { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
+          freshPair
+        )) ||
+        incumbentPick !== incumbentCandidate ||
+        picked !== freshPick)) ||
+      (!sameExactPair(
+        { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
+        freshPair
+      ) &&
+        ((mode === 'cost_per_accuracy' && !costSwitchWorthwhile(incumbentPick)) ||
+          (mode === 'best_accuracy' &&
+            !(picked.accuracy - incumbentPick.accuracy > table.bestAccuracySwitchThreshold)))));
 
-  if (stickyIncumbent && incumbentCandidate) {
+  if (stickyIncumbent && incumbentCandidate && incumbentPick) {
     return {
       model: incumbentCandidate.model,
       taskType: classification.taskType,
       subtaskType: classification.subtaskType,
       source: table.source,
       tableVersion: table.version,
-      ...decisionFieldsFromCandidate(incumbentCandidate),
+      ...decisionFieldsFromCandidate(incumbentPick),
       sticky: true,
       switchReason: null,
     };
   }
 
-  // Legacy model-only sticky compares model only; exact-pair sticky compares
-  // both fields so two variants of the same model count as a switch.
   const switched =
     incumbent !== null &&
-    (incumbent.variant === null
-      ? incumbent.model !== freshPick.model
+    (picked !== freshPick || incumbent.variant === null
+      ? incumbent.model !== picked.model
       : !sameExactPair(incumbent, freshPair));
 
   return {
-    model: freshPick.model,
+    model: picked.model,
     taskType: classification.taskType,
     subtaskType: classification.subtaskType,
     source: table.source,
     tableVersion: table.version,
-    ...decisionFieldsFromCandidate(freshPick),
+    ...decisionFieldsFromCandidate(picked),
     sticky: false,
     // 'cost': the incumbent was eligible but the mode's switch condition
     // (cost factor / accuracy gap) made the fresh pick worth it;
@@ -365,4 +389,34 @@ export function computeDecision(
       return stillOnRoute ? 'capability' : 'threshold';
     })(),
   };
+}
+
+export type ShadowDecision = {
+  shadowModel: string | null;
+  shadowVariant: string | null;
+  shadowDiffers: boolean;
+};
+
+export function computeShadowDecision(
+  liveDecision: AutoRoutingDecision | null,
+  ...inputs: Parameters<typeof computeDecision>
+): ShadowDecision | null {
+  if (inputs[1] === null) return null;
+  try {
+    const shadow = computeDecision(...inputs);
+    const shadowModel = shadow?.model ?? null;
+    const shadowVariant =
+      shadow?.source === 'benchmark' ? (shadow.variant ?? shadow.reasoningEffort ?? null) : null;
+    const liveVariant =
+      liveDecision?.source === 'benchmark'
+        ? (liveDecision.variant ?? liveDecision.reasoningEffort ?? null)
+        : null;
+    return {
+      shadowModel,
+      shadowVariant,
+      shadowDiffers: shadowModel !== (liveDecision?.model ?? null) || shadowVariant !== liveVariant,
+    };
+  } catch {
+    return null;
+  }
 }

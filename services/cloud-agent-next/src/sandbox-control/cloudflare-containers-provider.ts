@@ -50,6 +50,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
   logicalSandboxId: string;
   allocationName: string;
   instance?: ContainerInstanceSize;
+  egressAllowlist?: string[];
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
 }): ProviderAdapter {
   const instance = deps.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
@@ -116,6 +117,16 @@ export function createCloudflareContainersProviderAdapter(deps: {
 
   return {
     ensureBillingAdmission,
+    describeRuntime(ref) {
+      const parsed = decodeOwnedProviderRef(ref);
+      if (parsed === null) return undefined;
+      return {
+        provider: 'cloudflare-containers',
+        sandboxId: deps.logicalSandboxId,
+        instanceId: parsed.instanceId,
+        instanceType: instance,
+      };
+    },
     async create(intent: ProviderCreateIntent) {
       const providerRef = encodeIntentProviderRef(intent);
       await ensureBillingAdmission(providerRef, intent.billing);
@@ -134,6 +145,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
         allocationRef: ref,
         instance,
         containment: owned.containment,
+        ...(deps.egressAllowlist === undefined ? {} : { egressAllowlist: deps.egressAllowlist }),
         ...(options?.repoKey === undefined ? {} : { repoKey: options.repoKey }),
         ...(options?.skipRepository === true ? { skipRepository: true as const } : {}),
         ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
@@ -148,7 +160,17 @@ export function createCloudflareContainersProviderAdapter(deps: {
       // Lease renewal only starts once the wrapper reports ready, which the
       // recovery admission gate can delay. Establish the initial lease here so
       // the container is not reaped by its inactivity timeout before then.
-      await container.ensureLeaseAtLeast(ref, leaseAtLeastMs());
+      await container.ensureLeaseAtLeast(ref, leaseAtLeastMs()).catch(() => {
+        logControlDiagnostic(
+          'lease_renewal_failed',
+          {
+            allocationName: deps.allocationName,
+            provider: 'cloudflare-containers',
+            stage: 'launch',
+          },
+          'warn'
+        );
+      });
       return { startSource };
     },
     async captureRepository(ref, repoKey, commit) {

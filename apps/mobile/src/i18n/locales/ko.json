@@ -133,10 +133,14 @@
     "status": "상태",
     "truncated": "일부 생략됨",
     "updated": "업데이트됨",
+    "generating": "생성 중…",
     "working": "작업 중",
     "yourOwnRepositories": "내 저장소",
     "dismissed": "무시됨",
-    "agent": "대리인"
+    "agent": "대리인",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "변경 사항"
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -320,7 +324,8 @@
       "kiloclaw": "KiloClaw 활동",
       "balance": "잔액 알림",
       "security": "보안 진단 결과",
-      "spend": "지출 알림"
+      "spend": "지출 알림",
+      "followedSessions": "팔로우한 세션"
     },
     "category": {
       "chatMessagesSubtitle": "대화에 달린 답장",
@@ -646,7 +651,7 @@
     "redeployTitle": "인스턴스 다시 배포",
     "accessRequired": {
       "iosBody": "이 계정의 KiloClaw 이용 권한은 iOS 앱 외부에서 관리됩니다.",
-      "iosContact": "질문이 있으신가요? hi@kilo.ai로 문의하세요.",
+      "iosContact": "질문이 있으신가요? {{supportEmail}}로 문의하세요.",
       "iosTitle": "IOS에서 KiloClaw를 사용할 수 없음",
       "multipleCurrentConflictBody": "계정에서 이용 중인 구독이 두 개 이상 확인되었습니다. 중복 청구를 방지하기 위해 이용을 일시 중지했습니다.",
       "multipleCurrentConflictCta": "Kilo.ai에서 계속하기",
@@ -779,7 +784,7 @@
         "queryErrorBody": "{{name}}의 설정 진행 상황을 확인하다가 연결이 끊겼습니다. 설정은 계속 진행 중일 수 있습니다. 다시 시도하거나 잠시 후 확인하세요.",
         "queryErrorTitle": "설정 진행 상황 확인 불가",
         "settingUp": "{{name}} 설정 중",
-        "stalledBody": "{{name}} 설정을 완료하지 못했습니다. 다시 시도하세요. 문제가 계속되면 hi@kilo.ai로 이메일을 보내세요.",
+        "stalledBody": "{{name}} 설정을 완료하지 못했습니다. 다시 시도하세요. 문제가 계속되면 {{supportEmail}}로 이메일을 보내세요.",
         "stalledTitle": "설정 진행이 멈춤",
         "startingSandbox": "샌드박스 시작 중",
         "stoppedBody": "설정 중 {{name}}의 인스턴스가 예기치 않게 중지되었습니다.",
@@ -1036,7 +1041,7 @@
         "recoveryLabel": "GitHub 앱 업데이트"
       },
       "githubIpAllowList": {
-        "description": "이 GitHub 조직의 IP 허용 목록이 Kilo를 차단하여 코드 리뷰어가 비활성화되었습니다. hi@kilocode.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
+        "description": "이 GitHub 조직의 IP 허용 목록이 Kilo를 차단하여 코드 리뷰어가 비활성화되었습니다. {{supportEmail}}에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo가 이 프로젝트의 GitLab 프로젝트 액세스 토큰을 생성할 수 없어 코드 리뷰어가 비활성화되었습니다. 유지보수 담당자 권한을 부여하거나 프로젝트 액세스 토큰을 활성화한 후 코드 리뷰어를 다시 활성화하세요.",
@@ -1051,7 +1056,7 @@
         "recoveryLabel": "코드 리뷰어 설정 업데이트"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "오늘 저장소 복제 중 시간 초과가 세 번 발생하여 코드 리뷰어가 비활성화되었습니다. hi@kilocode.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
+        "description": "오늘 저장소 복제 중 시간 초과가 세 번 발생하여 코드 리뷰어가 비활성화되었습니다. {{supportEmail}}에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
       },
       "title": "코드 리뷰어에 조치가 필요합니다.",
       "recoveryLabel": "지원팀에 문의"
@@ -1575,6 +1580,8 @@
       "title": "세션",
       "copyErrorDetails": "오류 세부 정보 복사",
       "backToSessions": "세션으로 돌아가기",
+      "follow": "잠금 화면에서 팔로우",
+      "unfollow": "잠금 화면에서 팔로우 중지",
       "couldNotLoad": "세션을 불러올 수 없습니다.",
       "failedToLoadDetails": "세션 세부 정보를 불러오지 못했습니다.",
       "failedToStopExecution": "실행을 중지하지 못했습니다.",
@@ -1641,6 +1648,11 @@
       "collapse": "목표 접기",
       "expand": "목표 펼치기"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "작업, {{total}}개 중 {{completed}}개 완료",
+      "rowAccessibility": "작업, {{total}}개 중 {{completed}}개 완료. 현재 작업: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "최근 사용",
       "couldNotLoadGithubRepositories": "GitHub 저장소를 불러올 수 없습니다.",
@@ -1673,7 +1685,6 @@
       "retryLoadingEnvironment": "환경 불러오기 다시 시도",
       "defaultEnvironment": "기본 환경",
       "environmentSummary": "명령 {{commands}}개 · MCP {{mcp}}개 · 스킬 {{skills}}개 · 에이전트 {{agents}}개",
-      "changes": "변경 사항",
       "leaveChanges": "변경 사항 유지",
       "commitAndPush": "커밋 및 푸시",
       "startSession": "세션 시작",
@@ -1696,6 +1707,10 @@
       "importingSession": "세션 가져오는 중",
       "cliCannotContinue": "이 CLI에서는 세션을 이어서 진행할 수 없습니다. Cloud Agent 또는 다른 CLI를 선택하세요.",
       "importFailed": "이 세션을 가져올 수 없습니다.",
+      "cliCannotFork": "메시지에서 포크하려면 Kilo CLI를 업데이트하세요.",
+      "forkCutNotSynced": "이 메시지는 아직 저장되지 않았습니다. 잠시 후 다시 시도하세요.",
+      "forkFilesFromBaseBranch": "파일은 기본 브랜치에서 시작합니다.",
+      "forkFilesUnchangedOnComputer": "이 컴퓨터의 파일은 변경되지 않습니다.",
       "pickProfile": "프로필을 선택하세요",
       "noProfile": "프로필 없음",
       "manageProfiles": "프로필 관리",
@@ -1740,8 +1755,8 @@
       "toolList": "목록 보기",
       "toolPatch": "패치",
       "toolTask": "작업",
-      "readTodos": "할 일 읽기",
-      "updateTodos": "할 일 업데이트",
+      "readTodos": "플랜 읽기",
+      "updateTodos": "플랜 업데이트",
       "linesBadge": "{{displayCount}}줄",
       "filesBadge": "파일 {{displayCount}}개",
       "matchesBadge": "{{displayCount}}건 일치",
@@ -1811,6 +1826,7 @@
       "copyMessage": "메시지 복사",
       "copyText": "텍스트 복사",
       "selectText": "텍스트 선택",
+      "forkFromHere": "여기서 포크",
       "reportAiResponse": "AI 응답 신고",
       "reportAiResponseConfirm": "이 응답을 신고하여 검토를 요청할까요?",
       "report": "신고",
@@ -2130,6 +2146,12 @@
       "modelAccessibilityLabel": "{{name}}, 제공업체: {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "모델 ({{displayCount}})",
       "modelsCount_other": "모델 ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "변경 사항 보기",
+      "asOf": "{{time}} 기준",
+      "tooLarge": "변경 내용이 너무 커서 모바일에서 표시할 수 없습니다.",
+      "empty": "이 세션에서 아직 변경된 파일이 없습니다."
     },
     "autoApprove": {
       "title": "자동 승인",
@@ -2634,6 +2656,7 @@
     "fileRows": {
       "collapseFile": "파일 접기",
       "diffTooLarge": "변경 내용이 너무 커서 표시할 수 없습니다.",
+      "noPreview": "이 파일은 미리 보기를 사용할 수 없습니다",
       "expandFile": "파일 펼치기",
       "markViewed": "{{path}} 확인함으로 표시",
       "openDiffOnGitHub": "GitHub에서 이 파일의 변경 내용 열기",
@@ -3153,6 +3176,8 @@
     "channelName": "활성 에이전트",
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요.",
     "openSession": "열기",
+    "finished": "완료됨",
+    "followFailed": "이 에이전트를 잠금 화면에 표시할 수 없습니다.",
     "approveFailed": "승인하지 못했습니다. 다시 시도하려면 $t(common.approve)을 탭하세요.",
     "checked": "마지막 확인",
     "lastKnown": "마지막 알려진 상태",
@@ -3161,7 +3186,26 @@
     "waitingForYou": "사용자 응답 대기",
     "nextScheduled": "다음 예약",
     "answerNeeded": "답변 필요",
-    "waitingToRetry": "재시도 대기"
+    "waitingToRetry": "재시도 대기",
+    "step": {
+      "editing": "편집 중",
+      "reading": "읽는 중",
+      "running": "실행",
+      "searching": "웹 검색",
+      "thinking": "생각 중"
+    },
+    "planOf": "중",
+    "filesChanged": "파일 변경됨",
+    "finishedIn": "완료 시간",
+    "noActivityFor": "활동 없음",
+    "prOpened": "풀 리퀘스트 열림",
+    "permissionWants": "실행하려 함",
+    "failure": {
+      "provider": "중지됨: 공급자 오류",
+      "tool": "중지됨: 도구 오류",
+      "cancelled": "중지됨: 취소됨",
+      "other": "중지됨"
+    }
   },
   "transcriptionModel": {
     "title": "음성 텍스트 변환 모델",
@@ -3189,6 +3233,7 @@
     "tutorialLabel": "튜토리얼"
   },
   "modelChat": {
+    "offlineFailure": "이 모델은 인터넷 연결이 필요합니다. 연결한 후 다시 시도하거나 이 기기의 모델로 전환하세요.",
     "empty": {
       "title": "채팅 시작하기",
       "description": "모델과 대화하려면 메시지를 보내세요."
@@ -3196,10 +3241,32 @@
     "list": {
       "loadFailed": "채팅 기록을 불러올 수 없습니다.",
       "new": "새 채팅",
-      "openHint": "채팅을 엽니다. 길게 눌러 삭제합니다.",
       "deleteTitle": "이 채팅을 삭제할까요?"
     },
+    "rename": {
+      "title": "채팅 이름 변경",
+      "accessibility": "채팅 이름 변경: {{title}}",
+      "openHint": "채팅을 엽니다. 길게 눌러 이름을 변경하거나 삭제합니다."
+    },
     "beta": "베타",
+    "details": {
+      "title": "채팅 세부 정보",
+      "backend": "백엔드",
+      "effortDefault": "모델 기본값",
+      "noCost": "비용 없음",
+      "costUnknown": "알 수 없음",
+      "costEstimatedNote": "가격을 보고하지 않은 답변은 정가를 기준으로 추정했습니다.",
+      "costUnknownNote": "이 모델의 가격을 알 수 없습니다.",
+      "costPartialNote": "이 합계에는 가격을 알 수 없는 모델이 포함되지 않습니다.",
+      "localNote": "기기 내 모델은 이 기기에서 실행됩니다. 비용과 프롬프트 캐시가 없으며, 토큰 수는 추정치일 수 있습니다.",
+      "countedSinceNote": "이 채팅은 사용량 기록이 시작되기 전에 시작되었습니다. 합계에는 그 이후의 답변만 표시됩니다.",
+      "remoteServersOn": "켜진 원격 MCP 서버"
+    },
+    "webSearch": {
+      "title": "웹 검색",
+      "description": "이 채팅이 Kilo 계정을 통해 최신 정보를 찾아보도록 허용합니다. 검색에는 월간 검색 한도가 사용됩니다.",
+      "allowanceExhausted": "이번 달 무료 웹 검색을 모두 사용했습니다. 다시 검색하려면 크레딧을 추가하세요."
+    },
     "mcp": {
       "title": "Kilo 도구",
       "use": "Kilo 도구 사용",
@@ -3222,7 +3289,6 @@
       "fieldName": "표시 이름",
       "fieldUrl": "서버 URL",
       "fieldUrlInvalid": "유효한 서버 URL을 입력하세요.",
-      "fieldToken": "Bearer 토큰(선택 사항)",
       "enableServer": "이 서버 사용: {{name}}",
       "editServer": "서버 편집",
       "deleteServer": "서버 삭제",
@@ -3243,8 +3309,24 @@
       "serverUnreachable": "이 서버에 연결할 수 없습니다",
       "serverOff": "이 서버는 꺼져 있습니다"
     },
+    "mcpOAuth": {
+      "authMethod": "인증",
+      "authNone": "로그인 안 함",
+      "authBearer": "Bearer 토큰",
+      "authOAuth": "OAuth 로그인",
+      "fieldToken": "토큰",
+      "oauthHint": "저장한 후 서버에서 $t(modelChat.mcpOAuth.signIn)을(를) 탭하여 브라우저로 로그인하세요.",
+      "serverNeedsSignIn": "이 서버를 사용하려면 로그인하세요",
+      "signIn": "로그인",
+      "signInA11y": "이 서버에 로그인: {{name}}",
+      "signInFailed": "{{name}}에 로그인할 수 없습니다. 다시 시도하세요."
+    },
     "backends": {
       "title": "채팅 백엔드",
+      "providersTitle": "채팅 제공자",
+      "cloud": "클라우드에서",
+      "cloudModel": "모델: {{model}}",
+      "cloudUnavailable": "Kilo 모델을 지금 사용할 수 없습니다. 연결을 확인하세요.",
       "manage": "백엔드 관리",
       "defaultKilo": "$t(consent.kilo) (기본값)",
       "kiloHelp": "내장 백엔드는 Kilo 계정을 사용하며 편집하거나 삭제할 수 없습니다.",
@@ -3304,7 +3386,6 @@
     "gguf": {
       "title": "다운로드 가능한 모델",
       "help": "공개 모델을 다운로드하여 이 휴대폰에서 llama.cpp로 실행하세요. 프롬프트와 답변은 기기에만 저장됩니다. 모델은 크기가 크므로 Wi-Fi를 사용하세요.",
-      "details": "{{size}} · 라이선스: {{license}}",
       "download": "모델 다운로드",
       "pause": "다운로드 일시 중지",
       "resume": "다운로드 재개",
@@ -3316,6 +3397,8 @@
       "url": "직접 다운로드 링크",
       "urlHelp": ".gguf 파일의 HTTPS 링크를 붙여넣으세요(예: Hugging Face resolve 링크). 신뢰할 수 있는 출처의 모델만 다운로드하세요.",
       "downloadUrl": "링크에서 다운로드",
+      "advanced": "고급",
+      "localPurpose": "llama.cpp로 이 기기에서 실행됩니다. 프롬프트와 답변은 기기에 남습니다.",
       "deleteTitle": "이 모델을 삭제할까요?",
       "deleteMessage": "이 기기에서 {{name}}을(를) 삭제할까요? 이 모델을 사용하는 채팅은 계속하려면 다른 모델이 필요합니다.",
       "errors": {
@@ -3325,12 +3408,62 @@
         "notGguf": "링크는 .gguf 파일을 가리켜야 합니다.",
         "space": "이 모델을 저장할 공간이 부족합니다. 공간을 확보한 후 다시 시도하세요.",
         "network": "다운로드가 완료되지 않았습니다. 연결을 확인한 후 다시 시도하세요.",
-        "invalidFile": "다운로드한 파일은 이 앱에서 실행할 수 있는 모델이 아니므로 삭제되었습니다."
+        "invalidFile": "다운로드한 파일은 이 앱에서 실행할 수 있는 모델이 아니므로 삭제되었습니다.",
+        "checksum": "다운로드한 파일이 게시된 체크섬과 일치하지 않으므로 삭제되었습니다. 다시 다운로드해 보세요."
       }
+    },
+    "catalog": {
+      "browse": "모델 둘러보기",
+      "title": "모델 카탈로그",
+      "search": "Hugging Face 모델 검색",
+      "tabs": "모델 필터",
+      "fitsTab": "이 기기에 적합",
+      "fromHuggingFace": "Hugging Face 제공",
+      "loading": "모델을 불러오는 중",
+      "noResults": "모델을 찾을 수 없습니다",
+      "noFits": "이 기기에 적합한 모델이 없습니다",
+      "noFitsDescription": "더 큰 모델은 $t(common.all) 탭에 있습니다.",
+      "fit": {
+        "fits": "적합",
+        "tight": "빠듯함",
+        "tooLarge": "너무 큼",
+        "noStorage": "저장 공간 부족",
+        "unknown": "적합성 알 수 없음"
+      },
+      "recommendationsHelp": "이 앱이 고정한 후보 목록입니다. 모델당 파일 하나, 라이선스를 명시한 배포처의 것입니다. 그 외에는 순위가 매겨지지 않습니다.",
+      "compatibilityHelp": "적합성은 모델 파일을 이 기기의 메모리와 여유 저장 공간과 비교합니다. 메모리 수치는 추정치이며 측정값이 아닙니다.",
+      "text": "텍스트",
+      "listTextPurpose": "텍스트 프롬프트만.",
+      "listImagePurpose": "텍스트뿐 아니라 이미지도 읽습니다.",
+      "smallestDownload": "최소 다운로드: {{size}} · 메모리 약 {{memory}}",
+      "fullFileName": "파일: {{name}}",
+      "memoryEstimateNote": "메모리 수치는 추정치이며 측정값이 아닙니다.",
+      "parameters": "매개변수: {{value}}",
+      "downloads": "다운로드: {{value}}",
+      "likes": "좋아요: {{value}}",
+      "context": "컨텍스트 창: {{value}}",
+      "license": "라이선스: {{license}}",
+      "licenseUnknown": "라이선스가 명시되지 않았습니다",
+      "tools": "도구 호출",
+      "vision": "이미지 입력",
+      "hintsHelp": "Hugging Face에서 제공한 정보입니다. 앱은 다운로드 후 모델을 확인합니다.",
+      "gated": "이 모델은 Hugging Face 계정이 필요하므로 앱에서 다운로드할 수 없습니다.",
+      "quantizations": "양자화",
+      "quantizationsHelp": "파일이 작을수록 메모리와 저장 공간을 적게 사용합니다. 파일이 클수록 대체로 더 나은 답변을 제공합니다.",
+      "quantDetail": "다운로드 {{size}} · 메모리 약 {{memory}}",
+      "downloadQuant": "{{quant}} 다운로드",
+      "loadingModel": "모델 세부 정보를 불러오는 중",
+      "couldNotLoadModel": "이 모델을 불러올 수 없습니다",
+      "noFiles": "이 앱에서 실행할 수 있는 파일이 없습니다",
+      "noFilesDescription": "이 앱은 단일 GGUF 파일로 된 모델을 실행합니다.",
+      "tooLargeTitle": "이 모델은 실행되지 않을 수 있습니다",
+      "tooLargeMessage": "{{name}}에는 이 기기보다 더 많은 메모리가 필요할 수 있습니다. 모델이 답변하는 동안 앱이 종료될 수 있습니다. 그래도 다운로드하시겠습니까?",
+      "downloadAnyway": "그래도 다운로드"
     },
     "localModels": {
       "title": "기기 내 모델",
-      "help": "기기 내 모델은 이 휴대폰에서 실행됩니다. 프롬프트와 답변은 기기에만 저장되며, 이 모델은 도구를 사용할 수 없습니다.",
+      "help": "기기 내 모델은 이 휴대폰에서 실행됩니다. 프롬프트와 답변은 기기에만 저장됩니다.",
+      "systemPurpose": "이 기기의 시스템에 내장된 모델입니다. 기기에서 실행됩니다.",
       "apple": "Apple Intelligence(기기 내)",
       "checking": "사용 가능 여부 확인 중…",
       "ready": "사용 가능",
@@ -3356,6 +3489,9 @@
       "downloading": "다운로드 중…",
       "downloadProgress": "다운로드 중… {{percent}}%",
       "downloadFailed": "다운로드를 완료하지 못했습니다. 네트워크 연결과 저장 공간을 확인한 후 다시 시도하세요."
+    },
+    "reasoningEffort": {
+      "modelFlag": "이 모델은 추론 강도를 지원합니다"
     }
   },
   "settingsTools": {
@@ -3578,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play에서 일치하는 크레딧 팩을 반환하지 않았습니다.",
     "purchaseOwnedByAnotherAccount": "이 Apple Account의 크레딧은 다른 Kilo 계정에 속해 있습니다. 사용하려면 해당 Kilo 계정에 로그인하세요.",
     "purchaseOwnedByAnotherAccountPlay": "이 Google Play 계정의 크레딧은 다른 Kilo 계정에 속합니다. 사용하려면 해당 Kilo 계정으로 로그인하세요."
+  },
+  "todos": {
+    "saveAsTodo": "할 일로 저장",
+    "segment": {
+      "label": "에이전트 보기",
+      "sessions": "세션",
+      "todos": "할 일"
+    },
+    "lists": {
+      "newList": "새 목록",
+      "empty": "아직 목록이 없습니다",
+      "couldNotLoad": "목록을 불러올 수 없습니다",
+      "noRepository": "저장소 없음",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "{{count}}개 열림",
+      "openCount_other": "{{count}}개 열림",
+      "archived_one": "보관됨 ({{count}})",
+      "archived_other": "보관됨 ({{count}})",
+      "archive": "보관",
+      "unarchive": "보관 해제",
+      "deleteTitle": "{{name}} 삭제할까요?",
+      "deleteMessage": "할 일도 함께 삭제됩니다. 세션은 유지됩니다."
+    },
+    "listSettings": {
+      "title": "목록 설정",
+      "name": "이름",
+      "namePlaceholder": "버그, 아이디어, 릴리스…",
+      "emoji": "이모지",
+      "mode": "모드",
+      "defaultsHint": "이 목록에서 시작한 세션은 이 기본값을 사용합니다."
+    },
+    "list": {
+      "addPlaceholder": "할 일 추가",
+      "add": "할 일 추가하기",
+      "empty": "아직 할 일이 없습니다",
+      "setDefaults": "저장소, 모드 및 모델 설정",
+      "completed_one": "완료 ({{count}})",
+      "completed_other": "완료 ({{count}})"
+    },
+    "item": {
+      "markDone": "완료로 표시",
+      "markOpen": "미완료로 표시",
+      "markDonePrompt": "완료로 표시할까요?",
+      "deleted": "할 일이 삭제되었습니다",
+      "undo": "실행 취소",
+      "runCount_one": "실행 {{count}}회",
+      "runCount_other": "실행 {{count}}회",
+      "startNow": "리뷰 없이 시작",
+      "startNowHint": "길게 눌러 리뷰 없이 시작",
+      "titleLabel": "할 일 제목",
+      "renameTitle": "작업 이름 바꾸기",
+      "notes": "메모",
+      "addNotes": "메모 추가",
+      "notesPrompt": "컨텍스트, 요구 사항 또는 수락 기준을 추가하세요.",
+      "markdownSupported": "Markdown 지원",
+      "sessions": "연결된 세션",
+      "noSessions": "아직 세션이 없습니다",
+      "untitledLinkedSession": "연결된 세션",
+      "sessionNeedsInput": "세션에 입력이 필요함",
+      "sessionRunning": "세션 실행 중",
+      "sessionFinished": "세션 종료됨",
+      "sessionPullRequest": "세션 풀 리퀘스트",
+      "sessionPullRequestNumber": "세션 PR #{{number}}",
+      "openSessionHint": "세션을 엽니다.",
+      "unlinkSessionAction": "세션 연결 해제",
+      "unlinkConfirmTitle": "{{title}} 연결을 해제할까요?",
+      "unlinkConfirmMessage": "세션 자체는 삭제되지 않습니다. 이 할 일에 대한 연결만 제거됩니다.",
+      "startNewSession": "새 세션 시작",
+      "startNewSessionHint": "길게 눌러 새 세션을 시작하세요.",
+      "linkSession": "세션 연결",
+      "linkFailed": "세션을 할 일에 연결할 수 없습니다"
+    },
+    "linkSession": {
+      "title": "세션 연결하기",
+      "empty": "최근 세션 없음",
+      "emptyInRepository": "{{repository}}의 최근 세션 없음"
+    },
+    "upNext": "다음",
+    "sessionTodo": "할 일: {{title}}",
+    "linkToTodo": "할 일에 연결",
+    "candidates": {
+      "empty": "열린 할 일 없음"
+    },
+    "saveSheet": {
+      "title": "목록에 저장",
+      "saved": "{{list}}에 저장됨"
+    }
   }
 }

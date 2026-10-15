@@ -133,10 +133,14 @@
     "status": "الحالة",
     "truncated": "مقتطع",
     "updated": "تم التحديث",
+    "generating": "جارٍ الإنشاء…",
     "working": "جارٍ العمل",
     "yourOwnRepositories": "مستودعاتك الخاصة",
     "dismissed": "مستبعدة",
-    "agent": "عامل"
+    "agent": "عامل",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "التغييرات"
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -320,7 +324,8 @@
       "kiloclaw": "نشاط KiloClaw",
       "balance": "تنبيهات الرصيد",
       "security": "ملاحظات الأمان",
-      "spend": "تنبيهات الإنفاق"
+      "spend": "تنبيهات الإنفاق",
+      "followedSessions": "الجلسات المتابَعة"
     },
     "category": {
       "chatMessagesSubtitle": "الردود في محادثاتك",
@@ -654,7 +659,7 @@
     "redeployTitle": "إعادة نشر المثيل",
     "accessRequired": {
       "iosBody": "تُدار صلاحية الوصول إلى KiloClaw خارج تطبيق iOS لهذا الحساب.",
-      "iosContact": "لديك أسئلة؟ تواصل مع hi@kilo.ai.",
+      "iosContact": "لديك أسئلة؟ تواصل مع {{supportEmail}}.",
       "iosTitle": "KiloClaw غير متاح في iOS",
       "multipleCurrentConflictBody": "وجدنا أكثر من اشتراك نشط في حسابك، لذا أوقفنا الخدمة مؤقتًا لتجنب تحصيل الرسوم مرتين.",
       "multipleCurrentConflictCta": "متابعة على kilo.ai",
@@ -791,7 +796,7 @@
         "queryErrorBody": "انقطع الاتصال أثناء التحقق من تقدّم إعداد {{name}}. ربما لا يزال الإعداد جاريًا. حاول مرة أخرى أو عُد بعد قليل.",
         "queryErrorTitle": "تعذّر التحقق من تقدّم الإعداد",
         "settingUp": "جارٍ إعداد {{name}}",
-        "stalledBody": "لم نتمكن من إنهاء إعداد {{name}}. حاول مرة أخرى، أو راسل hi@kilo.ai إذا استمر حدوث ذلك.",
+        "stalledBody": "لم نتمكن من إنهاء إعداد {{name}}. حاول مرة أخرى، أو راسل {{supportEmail}} إذا استمر حدوث ذلك.",
         "stalledTitle": "تعثّر الإعداد",
         "startingSandbox": "جارٍ تشغيل البيئة المعزولة",
         "stoppedBody": "توقف مثيل {{name}} بشكل غير متوقع أثناء الإعداد.",
@@ -1048,7 +1053,7 @@
         "recoveryLabel": "تحديث تطبيق GitHub"
       },
       "githubIpAllowList": {
-        "description": "تم تعطيل مراجع الشفرة لأن قائمة عناوين IP المسموح بها في هذه المؤسسة على GitHub تمنع وصول Kilo. تواصل مع hi@kilocode.ai للمساعدة، ثم أعد تفعيل مراجع الشفرة."
+        "description": "تم تعطيل مراجع الشفرة لأن قائمة عناوين IP المسموح بها في هذه المؤسسة على GitHub تمنع وصول Kilo. تواصل مع {{supportEmail}} للمساعدة، ثم أعد تفعيل مراجع الشفرة."
       },
       "gitlabProjectAccessRequired": {
         "description": "تم تعطيل مراجع الشفرة لأن Kilo لا يستطيع إنشاء رمز وصول لهذا المشروع في GitLab. امنح صلاحيات المشرف أو فعّل رموز وصول المشاريع، ثم أعد تفعيل مراجع الشفرة.",
@@ -1063,7 +1068,7 @@
         "recoveryLabel": "تحديث إعدادات مراجع الشفرة"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "تم تعطيل مراجع الشفرة بعد انتهاء مهلة استنساخ المستودع ثلاث مرات اليوم. تواصل مع hi@kilocode.ai للمساعدة، ثم أعد تفعيل مراجع الشفرة."
+        "description": "تم تعطيل مراجع الشفرة بعد انتهاء مهلة استنساخ المستودع ثلاث مرات اليوم. تواصل مع {{supportEmail}} للمساعدة، ثم أعد تفعيل مراجع الشفرة."
       },
       "title": "يتطلب مراجع الشيفرة تدخلك.",
       "recoveryLabel": "التواصل مع الدعم"
@@ -1623,6 +1628,8 @@
       "title": "الجلسة",
       "copyErrorDetails": "نسخ تفاصيل الخطأ",
       "backToSessions": "العودة إلى الجلسات",
+      "follow": "المتابعة على شاشة القفل",
+      "unfollow": "إيقاف المتابعة على شاشة القفل",
       "couldNotLoad": "تعذّر تحميل الجلسة.",
       "failedToLoadDetails": "تعذّر تحميل تفاصيل الجلسة.",
       "failedToStopExecution": "تعذّر إيقاف التنفيذ.",
@@ -1689,6 +1696,11 @@
       "collapse": "طي الهدف",
       "expand": "توسيع الهدف"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "المهام، اكتمل {{completed}} من {{total}}",
+      "rowAccessibility": "المهام، اكتمل {{completed}} من {{total}}. المهمة الحالية: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "المستخدمة مؤخرًا",
       "couldNotLoadGithubRepositories": "تعذّر تحميل مستودعات GitHub.",
@@ -1721,7 +1733,6 @@
       "retryLoadingEnvironment": "إعادة محاولة تحميل البيئة",
       "defaultEnvironment": "البيئة الافتراضية",
       "environmentSummary": "الأوامر: {{commands}} · MCP: {{mcp}} · المهارات: {{skills}} · الوكلاء: {{agents}}",
-      "changes": "التغييرات",
       "leaveChanges": "إبقاء التغييرات",
       "commitAndPush": "إيداع ودفع",
       "startSession": "بدء الجلسة",
@@ -1744,6 +1755,10 @@
       "importingSession": "جارٍ استيراد الجلسة",
       "cliCannotContinue": "إصدار CLI هذا لا يدعم متابعة الجلسات. اختر Cloud Agent أو CLI آخر.",
       "importFailed": "تعذر استيراد هذه الجلسة.",
+      "cliCannotFork": "حدّث Kilo CLI لتتمكن من التفريع من رسالة.",
+      "forkCutNotSynced": "لم تُحفظ هذه الرسالة بعد. حاول مرة أخرى بعد قليل.",
+      "forkFilesFromBaseBranch": "تبدأ الملفات من الفرع الأساسي.",
+      "forkFilesUnchangedOnComputer": "لن تتغير الملفات على هذا الكمبيوتر.",
       "pickProfile": "اختر ملفًا شخصيًا",
       "noProfile": "لا يوجد ملف شخصي",
       "manageProfiles": "إدارة الملفات الشخصية",
@@ -1792,8 +1807,8 @@
       "toolList": "عرض قائمة",
       "toolPatch": "تطبيق تصحيح",
       "toolTask": "المهمة",
-      "readTodos": "قراءة المهام",
-      "updateTodos": "تحديث المهام",
+      "readTodos": "قراءة الخطة",
+      "updateTodos": "تحديث الخطة",
       "linesBadge": "الأسطر: {{displayCount}}",
       "filesBadge": "الملفات: {{displayCount}}",
       "matchesBadge": "التطابقات: {{displayCount}}",
@@ -1875,6 +1890,7 @@
       "copyMessage": "نسخ الرسالة",
       "copyText": "نسخ النص",
       "selectText": "تحديد النص",
+      "forkFromHere": "تفريع من هنا",
       "reportAiResponse": "الإبلاغ عن رد AI",
       "reportAiResponseConfirm": "هل تريد الإبلاغ عن هذا الرد لمراجعته؟",
       "report": "إبلاغ",
@@ -2218,6 +2234,12 @@
       "modelsCount_two": "نموذجان ({{displayCount}})",
       "modelsCount_few": "نماذج ({{displayCount}})",
       "modelsCount_many": "نموذجًا ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "عرض التغييرات",
+      "asOf": "حتى {{time}}",
+      "tooLarge": "الفروق كبيرة جدًا ولا يمكن عرضها على الهاتف.",
+      "empty": "لا توجد تغييرات على الملفات في هذه الجلسة بعد."
     },
     "autoApprove": {
       "title": "الموافقة التلقائية",
@@ -2746,6 +2768,7 @@
     "fileRows": {
       "collapseFile": "طي الملف",
       "diffTooLarge": "لا يمكن عرض الفروق لكبر حجمها.",
+      "noPreview": "لا تتوفر معاينة لهذا الملف",
       "expandFile": "توسيع الملف",
       "markViewed": "تحديد {{path}} كملف تم الاطلاع عليه",
       "openDiffOnGitHub": "فتح فروق هذا الملف على GitHub",
@@ -3317,6 +3340,8 @@
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
     "openSession": "افتح",
+    "finished": "انتهى",
+    "followFailed": "تعذّر عرض هذا الوكيل على شاشة القفل.",
     "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى.",
     "checked": "آخر تحقق",
     "lastKnown": "آخر حالة معروفة",
@@ -3325,7 +3350,26 @@
     "waitingForYou": "بانتظارك",
     "nextScheduled": "المواعيد المجدولة القادمة",
     "answerNeeded": "بانتظار إجابتك",
-    "waitingToRetry": "بانتظار إعادة المحاولة"
+    "waitingToRetry": "بانتظار إعادة المحاولة",
+    "step": {
+      "editing": "التحرير",
+      "reading": "القراءة",
+      "running": "التشغيل",
+      "searching": "بحث في الويب",
+      "thinking": "التفكير بعمق"
+    },
+    "planOf": "من",
+    "filesChanged": "ملفات متغيّرة",
+    "finishedIn": "اكتمل في",
+    "noActivityFor": "لا نشاط لمدة",
+    "prOpened": "تم فتح طلب سحب",
+    "permissionWants": "يريد التشغيل",
+    "failure": {
+      "provider": "توقف: خطأ في المزوِّد",
+      "tool": "توقف: خطأ في الأداة",
+      "cancelled": "توقف: أُلغي",
+      "other": "متوقف"
+    }
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",
@@ -3353,6 +3397,7 @@
     "tutorialLabel": "برنامج تعليمي"
   },
   "modelChat": {
+    "offlineFailure": "يحتاج هذا النموذج إلى اتصال بالإنترنت. اتصل وحاول مرة أخرى، أو انتقل إلى نموذج على هذا الجهاز.",
     "empty": {
       "title": "بدء محادثة",
       "description": "أرسل رسالة للتحدث مع نموذج."
@@ -3360,10 +3405,32 @@
     "list": {
       "loadFailed": "تعذّر تحميل سجل المحادثة.",
       "new": "محادثة جديدة",
-      "openHint": "يفتح المحادثة. اضغط مطولاً للحذف.",
       "deleteTitle": "حذف هذه المحادثة؟"
     },
+    "rename": {
+      "title": "إعادة تسمية الدردشة",
+      "accessibility": "إعادة تسمية الدردشة: {{title}}",
+      "openHint": "يفتح المحادثة. اضغط مطولاً لإعادة التسمية أو الحذف."
+    },
     "beta": "بيتا",
+    "details": {
+      "title": "تفاصيل الدردشة",
+      "backend": "الخادم",
+      "effortDefault": "الإعداد الافتراضي للنموذج",
+      "noCost": "بلا تكلفة",
+      "costUnknown": "غير معروفة",
+      "costEstimatedNote": "قُدّرت تكلفة الإجابات التي لم تُبلغ عن سعر وفق أسعار القائمة.",
+      "costUnknownNote": "لا يُعرف سعر لهذا النموذج.",
+      "costPartialNote": "لا يشمل هذا الإجمالي النماذج التي ليس لها سعر معروف.",
+      "localNote": "تعمل النماذج على الجهاز على هذا الجهاز نفسه. ليست لها تكلفة ولا ذاكرة تخزين مؤقت للمطالبات، وقد تكون أعداد الرموز فيها تقديرية.",
+      "countedSinceNote": "بدأت هذه الدردشة قبل بدء تسجيل الاستخدام. تعرض الإجماليات الإجابات التي تلت ذلك فقط.",
+      "remoteServersOn": "خوادم MCP البعيدة المفعّلة"
+    },
+    "webSearch": {
+      "title": "البحث في الويب",
+      "description": "اسمح لهذه الدردشة بالبحث عن معلومات حديثة عبر حسابك في Kilo. تستهلك عمليات البحث حصتك الشهرية من البحث.",
+      "allowanceExhausted": "نفدت عمليات البحث المجانية في الويب لهذا الشهر. أضف رصيدًا للبحث مرة أخرى."
+    },
     "mcp": {
       "title": "أدوات Kilo",
       "use": "استخدام أدوات Kilo",
@@ -3386,7 +3453,6 @@
       "fieldName": "الاسم المعروض",
       "fieldUrl": "عنوان URL للخادم",
       "fieldUrlInvalid": "أدخل عنوان URL صالحًا للخادم.",
-      "fieldToken": "رمز Bearer (اختياري)",
       "enableServer": "تفعيل هذا الخادم: {{name}}",
       "editServer": "تعديل الخادم",
       "deleteServer": "حذف الخادم",
@@ -3407,8 +3473,24 @@
       "serverUnreachable": "تعذّر الوصول إلى هذا الخادم",
       "serverOff": "هذا الخادم متوقف"
     },
+    "mcpOAuth": {
+      "authMethod": "المصادقة",
+      "authNone": "بدون تسجيل دخول",
+      "authBearer": "رمز Bearer",
+      "authOAuth": "تسجيل الدخول عبر OAuth",
+      "fieldToken": "الرمز",
+      "oauthHint": "بعد الحفظ، اضغط على $t(modelChat.mcpOAuth.signIn) في الخادم لتسجيل الدخول عبر المتصفح.",
+      "serverNeedsSignIn": "سجّل الدخول لاستخدام هذا الخادم",
+      "signIn": "تسجيل الدخول",
+      "signInA11y": "تسجيل الدخول إلى هذا الخادم: {{name}}",
+      "signInFailed": "تعذّر تسجيل الدخول إلى {{name}}. حاول مرة أخرى."
+    },
     "backends": {
       "title": "خوادم الدردشة",
+      "providersTitle": "مزوّدو الدردشة",
+      "cloud": "في السحابة",
+      "cloudModel": "النموذج: {{model}}",
+      "cloudUnavailable": "نماذج Kilo غير متاحة الآن. تحقق من اتصالك.",
       "manage": "إدارة الخوادم",
       "defaultKilo": "$t(consent.kilo) (الافتراضي)",
       "kiloHelp": "يستخدم الخادم المضمّن حسابك في Kilo ولا يمكن تعديله أو حذفه.",
@@ -3468,7 +3550,6 @@
     "gguf": {
       "title": "النماذج القابلة للتنزيل",
       "help": "نزّل نموذجًا مفتوحًا وشغّله على هذا الهاتف باستخدام llama.cpp. تبقى طلباتك وردودك على الجهاز. النماذج كبيرة الحجم، لذا استخدم Wi-Fi.",
-      "details": "{{size}} · الترخيص: {{license}}",
       "download": "تنزيل النموذج",
       "pause": "إيقاف التنزيل مؤقتًا",
       "resume": "استئناف التنزيل",
@@ -3480,6 +3561,8 @@
       "url": "رابط تنزيل مباشر",
       "urlHelp": "الصق رابط HTTPS لملف .gguf، مثل رابط resolve من Hugging Face. نزّل النماذج فقط من مصادر تثق بها.",
       "downloadUrl": "التنزيل من الرابط",
+      "advanced": "متقدم",
+      "localPurpose": "يعمل على هذا الجهاز باستخدام llama.cpp. تبقى الطلبات والردود على الجهاز.",
       "deleteTitle": "حذف هذا النموذج؟",
       "deleteMessage": "حذف {{name}} من هذا الجهاز؟ تحتاج المحادثات التي تستخدمه إلى نموذج آخر قبل أن تتمكن من المتابعة.",
       "errors": {
@@ -3489,12 +3572,62 @@
         "notGguf": "يجب أن يشير الرابط إلى ملف .gguf.",
         "space": "لا توجد مساحة تخزين كافية لهذا النموذج. حرّر مساحة وحاول مرة أخرى.",
         "network": "لم يكتمل التنزيل. تحقق من اتصالك وحاول مرة أخرى.",
-        "invalidFile": "الملف الذي تم تنزيله ليس نموذجًا يمكن لهذا التطبيق تشغيله، لذا تمت إزالته."
+        "invalidFile": "الملف الذي تم تنزيله ليس نموذجًا يمكن لهذا التطبيق تشغيله، لذا تمت إزالته.",
+        "checksum": "الملف الذي تم تنزيله لا يطابق المجموع الاختباري المنشور له، لذا تمت إزالته. حاول التنزيل مرة أخرى."
       }
+    },
+    "catalog": {
+      "browse": "تصفّح النماذج",
+      "title": "كتالوج النماذج",
+      "search": "ابحث في نماذج Hugging Face",
+      "tabs": "تصفية النماذج",
+      "fitsTab": "مناسبة لهذا الجهاز",
+      "fromHuggingFace": "من Hugging Face",
+      "loading": "جارٍ تحميل النماذج",
+      "noResults": "لم يتم العثور على نماذج",
+      "noFits": "لا توجد نماذج مناسبة لهذا الجهاز",
+      "noFitsDescription": "النماذج الأكبر موجودة في علامة التبويب $t(common.all).",
+      "fit": {
+        "fits": "مناسب",
+        "tight": "مناسب بالكاد",
+        "tooLarge": "كبير جدًا",
+        "noStorage": "مساحة التخزين غير كافية",
+        "unknown": "الملاءمة غير معروفة"
+      },
+      "recommendationsHelp": "قائمة مختصرة يثبّتها هذا التطبيق: ملف واحد لكل نموذج، من ناشر يذكر ترخيصًا. لا يُرتَّب أي شيء آخر.",
+      "compatibilityHelp": "تقارن الملاءمة ملف النموذج بذاكرة هذا الجهاز ومساحته الحرة. رقم الذاكرة تقدير وليس قياسًا.",
+      "text": "نص",
+      "listTextPurpose": "طلبات نصية فقط.",
+      "listImagePurpose": "يقرأ الصور وكذلك النص.",
+      "smallestDownload": "أصغر تنزيل: {{size}} · نحو {{memory}} من الذاكرة",
+      "fullFileName": "الملف: {{name}}",
+      "memoryEstimateNote": "أرقام الذاكرة تقديرات وليست قياسات.",
+      "parameters": "المعلمات: {{value}}",
+      "downloads": "التنزيلات: {{value}}",
+      "likes": "الإعجابات: {{value}}",
+      "context": "نافذة السياق: {{value}}",
+      "license": "الترخيص: {{license}}",
+      "licenseUnknown": "الترخيص غير مذكور",
+      "tools": "استدعاء الأدوات",
+      "vision": "إدخال الصور",
+      "hintsHelp": "تلميحات من Hugging Face. يتحقق التطبيق من النموذج بعد تنزيله.",
+      "gated": "يتطلب هذا النموذج حسابًا على Hugging Face، لذا لا يمكن للتطبيق تنزيله.",
+      "quantizations": "إصدارات التكميم",
+      "quantizationsHelp": "تستهلك الملفات الأصغر ذاكرة ومساحة تخزين أقل. وتقدّم الملفات الأكبر عادةً إجابات أفضل.",
+      "quantDetail": "تنزيل بحجم {{size}} · نحو {{memory}} من الذاكرة",
+      "downloadQuant": "تنزيل {{quant}}",
+      "loadingModel": "جارٍ تحميل تفاصيل النموذج",
+      "couldNotLoadModel": "تعذّر تحميل هذا النموذج",
+      "noFiles": "لا توجد ملفات يمكن لهذا التطبيق تشغيلها",
+      "noFilesDescription": "يشغّل هذا التطبيق النماذج المكوّنة من ملف GGUF واحد.",
+      "tooLargeTitle": "قد لا يعمل هذا النموذج",
+      "tooLargeMessage": "يحتاج {{name}} على الأرجح إلى ذاكرة أكبر مما يتوفر في هذا الجهاز. قد يُغلق التطبيق أثناء إجابة النموذج. هل تريد تنزيله على أي حال؟",
+      "downloadAnyway": "التنزيل على أي حال"
     },
     "localModels": {
       "title": "النماذج على الجهاز",
-      "help": "تعمل النماذج على الجهاز على هذا الهاتف. تبقى طلباتك والردود على الجهاز، ولا يمكن لهذه النماذج استخدام الأدوات.",
+      "help": "تعمل النماذج على الجهاز على هذا الهاتف. تبقى طلباتك والردود على الجهاز.",
+      "systemPurpose": "النموذج المدمج في نظام هذا الجهاز. يعمل على الجهاز.",
       "apple": "Apple Intelligence (على الجهاز)",
       "checking": "جارٍ التحقق من التوفر…",
       "ready": "جاهز للاستخدام",
@@ -3520,6 +3653,9 @@
       "downloading": "جارٍ التنزيل…",
       "downloadProgress": "جارٍ التنزيل… {{percent}}%",
       "downloadFailed": "لم يكتمل التنزيل. تحقّق من اتصالك ومن توفر مساحة تخزين كافية، ثم حاول مرة أخرى."
+    },
+    "reasoningEffort": {
+      "modelFlag": "يدعم هذا النموذج جهد التفكير"
     }
   },
   "settingsTools": {
@@ -3742,5 +3878,108 @@
     "noMatchingProductsPlay": "لم يُرجِع Google Play أي حزم رصيد مطابقة.",
     "purchaseOwnedByAnotherAccount": "الرصيد على حساب Apple Account هذا يخص حساب Kilo آخر. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه.",
     "purchaseOwnedByAnotherAccountPlay": "الرصيد على حساب Google Play هذا يخص حساب Kilo مختلف. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه."
+  },
+  "todos": {
+    "saveAsTodo": "حفظ كمهمة",
+    "segment": {
+      "label": "عرض الوكلاء",
+      "sessions": "الجلسات",
+      "todos": "المهام"
+    },
+    "lists": {
+      "newList": "قائمة جديدة",
+      "empty": "لا توجد قوائم بعد",
+      "couldNotLoad": "تعذّر تحميل القوائم",
+      "noRepository": "بلا مستودع",
+      "rowA11y": "{{name}}، {{openCount}}",
+      "openCount_one": "{{count}} مفتوحة",
+      "openCount_other": "{{count}} مفتوحة",
+      "openCount_zero": "{{count}} مفتوحة",
+      "openCount_two": "{{count}} مفتوحتان",
+      "openCount_few": "{{count}} مفتوحة",
+      "openCount_many": "{{count}} مفتوحة",
+      "archived_one": "المؤرشفة ({{count}})",
+      "archived_other": "المؤرشفة ({{count}})",
+      "archived_zero": "المؤرشفة ({{count}})",
+      "archived_two": "المؤرشفة ({{count}})",
+      "archived_few": "المؤرشفة ({{count}})",
+      "archived_many": "المؤرشفة ({{count}})",
+      "archive": "أرشفة",
+      "unarchive": "إلغاء الأرشفة",
+      "deleteTitle": "حذف {{name}}؟",
+      "deleteMessage": "ستُحذف مهامها أيضًا. أما جلساتها فتبقى."
+    },
+    "listSettings": {
+      "title": "إعدادات القائمة",
+      "name": "الاسم",
+      "namePlaceholder": "أخطاء، أفكار، إصدار…",
+      "emoji": "الرموز التعبيرية",
+      "mode": "الوضع",
+      "defaultsHint": "الجلسات التي تبدأ من هذه القائمة تستخدم هذه الإعدادات الافتراضية."
+    },
+    "list": {
+      "addPlaceholder": "أضف مهمة",
+      "add": "إضافة مهمة",
+      "empty": "لا توجد مهام بعد",
+      "setDefaults": "تعيين المستودع والوضع والنموذج",
+      "completed_one": "المكتملة ({{count}})",
+      "completed_other": "المكتملة ({{count}})",
+      "completed_zero": "المكتملة ({{count}})",
+      "completed_two": "المكتملة ({{count}})",
+      "completed_few": "المكتملة ({{count}})",
+      "completed_many": "المكتملة ({{count}})"
+    },
+    "item": {
+      "markDone": "تحديد كمكتملة",
+      "markOpen": "تحديد كغير مكتملة",
+      "markDonePrompt": "تحديد كمكتملة؟",
+      "deleted": "تم حذف المهمة",
+      "undo": "تراجع",
+      "runCount_one": "{{count}} تشغيل",
+      "runCount_other": "{{count}} عمليات تشغيل",
+      "runCount_zero": "{{count}} تشغيل",
+      "runCount_two": "{{count}} تشغيلان",
+      "runCount_few": "{{count}} عمليات تشغيل",
+      "runCount_many": "{{count}} تشغيل",
+      "startNow": "بدء دون مراجعة",
+      "startNowHint": "اضغط مطولًا للبدء دون مراجعة",
+      "titleLabel": "عنوان المهمة",
+      "renameTitle": "إعادة تسمية المهمة",
+      "notes": "ملاحظات",
+      "addNotes": "إضافة ملاحظات",
+      "notesPrompt": "أضف سياقًا أو متطلبات أو معايير قبول.",
+      "markdownSupported": "Markdown مدعوم",
+      "sessions": "الجلسات المرتبطة",
+      "noSessions": "لا توجد جلسات بعد",
+      "untitledLinkedSession": "جلسة مرتبطة",
+      "sessionNeedsInput": "الجلسة تحتاج مدخلات",
+      "sessionRunning": "الجلسة قيد التشغيل",
+      "sessionFinished": "انتهت الجلسة",
+      "sessionPullRequest": "طلب سحب الجلسة",
+      "sessionPullRequestNumber": "PR الجلسة #{{number}}",
+      "openSessionHint": "يفتح الجلسة.",
+      "unlinkSessionAction": "إلغاء ربط الجلسة",
+      "unlinkConfirmTitle": "إلغاء ربط {{title}}؟",
+      "unlinkConfirmMessage": "لا تُحذف الجلسة نفسها. يُزال فقط ارتباطها بهذه المهمة.",
+      "startNewSession": "بدء جلسة جديدة",
+      "startNewSessionHint": "اضغط مطولًا لبدء جلسة جديدة.",
+      "linkSession": "ربط جلسة",
+      "linkFailed": "تعذّر ربط الجلسة بالمهمة"
+    },
+    "linkSession": {
+      "title": "الربط بجلسة",
+      "empty": "لا توجد جلسات حديثة",
+      "emptyInRepository": "لا توجد جلسات حديثة في {{repository}}"
+    },
+    "upNext": "التالي",
+    "sessionTodo": "المهمة: {{title}}",
+    "linkToTodo": "ربط بمهمة",
+    "candidates": {
+      "empty": "لا توجد مهام مفتوحة"
+    },
+    "saveSheet": {
+      "title": "حفظ في قائمة",
+      "saved": "تم الحفظ في {{list}}"
+    }
   }
 }

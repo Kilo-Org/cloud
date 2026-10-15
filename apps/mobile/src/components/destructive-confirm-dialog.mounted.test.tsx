@@ -14,11 +14,6 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
-// The dialog reads the bottom inset for its padding; the native module cannot
-// load under this project's partial `react-native` mock.
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 24, left: 0, right: 0, top: 0 }),
-}));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
@@ -77,6 +72,21 @@ function pressableWith(root: TestRenderer.ReactTestInstance, token: string) {
   return root.find(node => isType(node, 'Pressable') && classNameOf(node).includes(token));
 }
 
+/**
+ * Calls one of a mounted element's own props inside `act`. The test renderer
+ * leaves `props` untyped, and this suite only ever calls the handlers it would
+ * otherwise press by hand, so the signature is stated here.
+ */
+function callProp(node: TestRenderer.ReactTestInstance, name: string): void {
+  const prop = node.props[name] as (() => void) | undefined;
+  if (typeof prop !== 'function') {
+    throw new TypeError(`The element has no callable ${name}`);
+  }
+  act(() => {
+    prop();
+  });
+}
+
 beforeEach(() => {
   onConfirm.mockReset();
   onCancel.mockReset();
@@ -122,19 +132,44 @@ describe('DestructiveConfirmDialog', () => {
     ).toHaveLength(1);
   });
 
+  it('keeps the request on screen through dismissal, then runs the action', () => {
+    const root = mount();
+
+    callProp(pressableWith(root, 'bg-destructive'), 'onPress');
+
+    // The sheet is dismissing, not empty: the title and the message are still
+    // drawn while the native dismissal runs, and the destructive action has not
+    // fired yet — it runs only once the sheet has gone.
+    const sheet = root.find(node => isType(node, 'BottomSheet'));
+    expect(sheet.props.index).toBe(-1);
+    expect(
+      root.findAll(node => isType(node, 'Text') && node.children.includes('Sign out?'))
+    ).toHaveLength(1);
+    expect(
+      root.findAll(
+        node =>
+          isType(node, 'Text') &&
+          node.children.includes('You will need to sign in again to access your workspace.')
+      )
+    ).toHaveLength(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    callProp(sheet, 'onDismiss');
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
   it('runs the destructive action only when the destructive control is pressed', () => {
     const root = mount();
 
-    act(() => {
-      (pressableWith(root, 'bg-destructive').props as { onPress?: () => void }).onPress?.();
-    });
-    expect(onConfirm).toHaveBeenCalledTimes(1);
+    callProp(pressableWith(root, 'border-border'), 'onPress');
+    expect(onConfirm).not.toHaveBeenCalled();
 
-    act(() => {
-      (pressableWith(root, 'border-border').props as { onPress?: () => void }).onPress?.();
-    });
+    callProp(
+      root.find(node => isType(node, 'BottomSheet')),
+      'onDismiss'
+    );
     expect(onCancel).toHaveBeenCalledTimes(1);
-    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   // The confirm is a native sheet, not a portal dialog, so it stacks above the
@@ -149,14 +184,16 @@ describe('DestructiveConfirmDialog', () => {
     expect(sheet.props.snapPoints).toBeUndefined();
   });
 
-  it('dismisses without confirming when the native sheet closes', () => {
+  it('cancels when the native sheet is closed by its own dismissal', () => {
     const root = mount();
 
-    // The sheet wires its own `onClose` to the caller's cancel.
-    const onClose = root.find(node => isType(node, 'BottomSheet')).props.onClose as () => void;
-    act(() => {
-      onClose();
-    });
+    // A backdrop tap, a swipe and Android Back all reach the sheet's own
+    // `onClose`; the cancel action runs once the sheet has finished dismissing.
+    const sheet = root.find(node => isType(node, 'BottomSheet'));
+    callProp(sheet, 'onClose');
+    expect(onCancel).not.toHaveBeenCalled();
+
+    callProp(sheet, 'onDismiss');
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();
   });

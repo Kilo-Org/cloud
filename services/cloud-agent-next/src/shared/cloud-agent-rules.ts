@@ -1,4 +1,6 @@
 import { resolveKiloBashDefaultTimeoutMs } from './kilo-bash-timeout.js';
+import { reservedPreviewPorts } from './reserved-ports.js';
+import type { AgentSandboxProvider } from './sandbox-provider.js';
 
 const COMMAND_TIMEOUT_BUFFER_MS = 30_000;
 
@@ -12,9 +14,25 @@ function formatDuration(ms: number): string {
   return parts.join(' ');
 }
 
-export function buildCloudAgentRules(bashDefaultTimeoutMs?: string | number | null): string {
+export type CloudAgentRulesInput = {
+  bashDefaultTimeoutMs?: string | number | null;
+  /** Unknown on the legacy wrapper path; the reserved-port rule is then left out. */
+  sandboxProvider?: AgentSandboxProvider;
+};
+
+function reservedPortsRule(provider: AgentSandboxProvider | undefined): string[] {
+  const ports = provider ? reservedPreviewPorts(provider) : [];
+  if (ports.length === 0) return [];
+  const subject = ports.length === 1 ? `Port ${ports[0]} is` : `Ports ${ports.join(', ')} are`;
+  const object = ports.length === 1 ? 'it' : 'them';
+  return [
+    `${subject} used by the sandbox itself. Do not start servers on ${object}. A response from ${object} does not come from your server.`,
+  ];
+}
+
+export function buildCloudAgentRules(input: CloudAgentRulesInput = {}): string {
   const commandTimeoutMs = Math.max(
-    resolveKiloBashDefaultTimeoutMs(bashDefaultTimeoutMs) - COMMAND_TIMEOUT_BUFFER_MS,
+    resolveKiloBashDefaultTimeoutMs(input.bashDefaultTimeoutMs) - COMMAND_TIMEOUT_BUFFER_MS,
     0
   );
   return [
@@ -31,6 +49,12 @@ export function buildCloudAgentRules(bashDefaultTimeoutMs?: string | number | nu
     'Avoid commands that are likely to exceed this limit, especially repository-wide lint, typecheck, or type-generation commands in large repositories. Prefer focused commands scoped to the changed files or relevant package.',
     'If a command cannot finish within this limit or its failure cannot be fixed quickly, stop retrying the command and continue without it.',
     'Report any validation that you could not run or complete.',
+    '',
+    '## Dev Servers',
+    '',
+    ...reservedPortsRule(input.sandboxProvider),
+    'A server can move to another port when its default port is busy. After you start a server, read its output to find the port that it uses, and use that port to check it.',
+    'When you tell the user about a running server, give its exact URL as plain text, for example http://localhost:5173.',
     '',
   ].join('\n');
 }

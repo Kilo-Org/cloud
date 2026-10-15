@@ -1,8 +1,8 @@
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Info, Search, SearchX, X } from '@/components/ui/icons';
-import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -46,6 +46,7 @@ export function ModelPickerContent() {
   // The input remains uncontrolled (iOS TextInput rules), so the in-field X
   // clears the native text imperatively and `search` stays the rows' source.
   const searchInputRef = useRef<TextInput>(null);
+  const listRef = useRef<FlashListRef<ModelPickerRow>>(null);
   const [bridge, setBridge] = useState(() => modelPickerSlot.get(routeKey));
   const [selectedModel, setSelectedModel] = useState(bridge?.currentValue ?? '');
   const [selectedVariant, setSelectedVariant] = useState(bridge?.currentVariant ?? '');
@@ -100,6 +101,10 @@ export function ModelPickerContent() {
       buildModelPickerRows({ models: bridge?.options ?? [], search: deferredSearch, favoriteIds }),
     [bridge, deferredSearch, favoriteIds]
   );
+
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [deferredSearch]);
 
   // Shared by the in-field X and the "No matches" empty state's CTA: drops the
   // query and the input's visible text in one step, so the full list returns
@@ -172,7 +177,11 @@ export function ModelPickerContent() {
   // differs between the group header and a model row, so `getItemType` lets
   // FlashList recycle the two apart.
   const renderItem = useCallback(
-    ({ item }: { item: ModelPickerRow }) => {
+    ({ item }: { item: ModelPickerRow | undefined }) => {
+      // A stale index past the end of the rows (see `keyExtractor` below).
+      if (!item) {
+        return null;
+      }
       if (item.type === 'header') {
         return (
           <View className="bg-secondary px-4 py-2">
@@ -308,10 +317,19 @@ export function ModelPickerContent() {
         // bar. Ending the viewport above the bar is the same frame inset
         // `session-list-screen` uses for its FAB band.
         <FlashList<ModelPickerRow>
+          ref={listRef}
+          maintainVisibleContentPosition={{ disabled: true }}
           style={[listStyle, { backgroundColor: colors.background, marginBottom: bottom }]}
           data={rows}
-          keyExtractor={item => item.key}
-          getItemType={item => item.type}
+          // FlashList stores its props during render. When React discards a
+          // deferred search render, FlashList can keep that render's shorter
+          // rows and then ask for a row past their end, so the row can be
+          // undefined (Sentry KILO-APP-3K0). It indexes `data` without a bounds
+          // check for `renderItem` too, which renders nothing for such a row.
+          // The key and type fallbacks are the ones FlashList uses when these
+          // callbacks are absent.
+          keyExtractor={(item: ModelPickerRow | undefined, index) => item?.key ?? String(index)}
+          getItemType={(item: ModelPickerRow | undefined) => item?.type}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           renderItem={renderItem}

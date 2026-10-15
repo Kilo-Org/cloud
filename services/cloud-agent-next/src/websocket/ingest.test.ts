@@ -1184,7 +1184,12 @@ describe('createIngestHandler', () => {
         'The model response did not match the required format',
       ],
       ['APIError', 504, 'timeout', 'Assistant request timed out'],
-      ['APIError', 400, 'invalid_request', 'Assistant request was invalid'],
+      [
+        'APIError',
+        400,
+        'invalid_request',
+        'Your provider rejected the request. Check your provider account and settings.',
+      ],
     ] as const)(
       'classifies %s/%s transiently before and after compaction',
       async (name, statusCode, assistantFailureReason, safeFailureMessage) => {

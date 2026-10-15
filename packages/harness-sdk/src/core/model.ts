@@ -3,14 +3,15 @@ import type { Prompt } from './prompt.js';
 import type { ToolCall, ToolDefinition, ToolResult } from './tool.js';
 
 /**
- * How hard the model should think. Both model SDKs spell the levels this way.
+ * How hard the model should think. The model SDKs and the gateway spell the
+ * levels this way; `none` asks a reasoning model not to think at all.
  *
  * This is not `maxTokens`. `maxTokens` is a wall the server enforces and the
  * model cannot see; effort is a dial the model itself follows. A reasoning
  * model spends its thinking out of `maxTokens`, so a low wall and a high effort
  * together produce no answer at all.
  */
-type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+type Effort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 /**
  * What the model was asked. `model` and `effort` are part of the cache key.
@@ -36,12 +37,18 @@ interface ModelRequest {
 /**
  * Token counts for one reply. `cacheReadTokens / (cacheReadTokens + inputTokens)`
  * is the cache hit ratio, which must stay above 95 percent.
+ *
+ * `cost` is what the provider says the reply cost, in US dollars. It is absent
+ * when the provider said nothing, which is not the same as free: the Kilo
+ * gateway sends it for a paid model and leaves it out for a free one, and most
+ * other providers never send it. Nothing here estimates it from a price list.
  */
 interface ModelUsage {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly cacheReadTokens: number;
   readonly cacheWriteTokens: number;
+  readonly cost?: number;
 }
 
 /**
@@ -102,7 +109,13 @@ type ModelEvent =
    * every round to find out is worse than being told.
    */
   | { readonly kind: 'toolResult'; readonly result: ToolResult }
-  | { readonly kind: 'done'; readonly usage: ModelUsage; readonly stop: StopReason };
+  | {
+      readonly kind: 'done';
+      readonly usage: ModelUsage;
+      readonly stop: StopReason;
+      /** The model the provider served, when reported; not the next request's target. */
+      readonly model?: string;
+    };
 
 const zeroUsage: ModelUsage = {
   inputTokens: 0,

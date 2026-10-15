@@ -4,9 +4,10 @@ import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { McpSettingsSheet, useMcpSettings } from '@/components/chat/mcp-settings-sheet';
+import { useWebSearchSetting } from '@/components/chat/web-search-row';
 import { i18n } from '@/i18n';
 import { type KiloMcpState } from '@/lib/chat/kilo-mcp';
-import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp';
+import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp-state';
 import {
   type RemoteMcpServerDraft,
   type RemoteMcpServerPatch,
@@ -76,6 +77,8 @@ const h = vi.hoisted(() => {
     setMcpEnabled: vi.fn(),
     retryKiloMcp: vi.fn(),
     mcpEnabledFor: vi.fn(),
+    setWebSearchEnabled: vi.fn(),
+    webSearchEnabledFor: vi.fn(),
     watchKiloMcp: vi.fn(() => () => undefined),
   };
 });
@@ -106,6 +109,7 @@ vi.mock('@/lib/chat/remote-mcp-store', () => ({
   deleteRemoteMcpServer: h.deleteRemoteMcpServer,
 }));
 
+vi.mock('@/lib/chat/remote-mcp-oauth', () => ({ signInRemoteMcpServer: vi.fn() }));
 vi.mock('@/lib/chat/remote-mcp', () => ({
   remoteMcpState: () => h.discovered.value,
   subscribeRemoteMcp: (listener: () => void) => {
@@ -127,6 +131,12 @@ vi.mock('@/lib/chat/registry', () => ({
   refreshChatTools: h.refreshChatTools,
   retryKiloMcp: h.retryKiloMcp,
   setMcpEnabled: h.setMcpEnabled,
+  setWebSearchEnabled: h.setWebSearchEnabled,
+}));
+
+vi.mock('@/lib/chat/web-search-setting', () => ({
+  webSearchDefault: (model: string) => !model.startsWith('local:'),
+  webSearchEnabledFor: h.webSearchEnabledFor,
 }));
 
 vi.mock('react-native', () => ({
@@ -150,6 +160,7 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({
+  Globe: 'Globe',
   Server: 'Server',
   SlidersHorizontal: 'SlidersHorizontal',
   Wrench: 'Wrench',
@@ -170,10 +181,11 @@ function noop(): void {
   // The sheet's close is not what these checks are about.
 }
 
-function Harness({ sessionId }: { sessionId: string }) {
+function Harness({ sessionId, model = 'kilo/one' }: { sessionId: string; model?: string }) {
   const settings = useMcpSettings(place, sessionId);
+  const webSearch = useWebSearchSetting(sessionId, model);
   held.settings = settings;
-  return createElement(McpSettingsSheet, { visible: true, onClose: noop, settings });
+  return createElement(McpSettingsSheet, { visible: true, onClose: noop, settings, webSearch });
 }
 
 function server(id: string, overrides: Partial<StoredRemoteMcpServer> = {}): StoredRemoteMcpServer {
@@ -205,8 +217,8 @@ function serverState(
 
 let renderer: ReturnType<typeof TestRenderer.create> | undefined = undefined;
 
-async function mount(): Promise<void> {
-  renderer = TestRenderer.create(createElement(Harness, { sessionId: 's1' }));
+async function mount(model?: string): Promise<void> {
+  renderer = TestRenderer.create(createElement(Harness, { sessionId: 's1', model }));
   // The stored setting is read in an effect; let that read land before a tap.
   await flush();
 }
@@ -280,6 +292,8 @@ beforeEach(() => {
   h.kilo.value = { status: 'ready', tools: [] };
   h.mcpEnabledFor.mockResolvedValue(true);
   h.setMcpEnabled.mockResolvedValue(undefined);
+  h.webSearchEnabledFor.mockResolvedValue(true);
+  h.setWebSearchEnabled.mockResolvedValue(undefined);
   h.retryKiloMcp.mockResolvedValue(undefined);
   h.refreshChatTools.mockResolvedValue(undefined);
   h.ensureRemoteMcp.mockResolvedValue([]);
@@ -290,6 +304,32 @@ afterEach(() => {
   renderer = undefined;
   held.settings = undefined;
   vi.clearAllMocks();
+});
+
+describe('the web search switch', () => {
+  it('shows the chat choice and keeps a new position once the chat moved', async () => {
+    h.webSearchEnabledFor.mockResolvedValue(false);
+    await mount('local:gguf:qwen.gguf');
+
+    expect(preferenceRow('Search the web')?.props.value).toBe(false);
+
+    await tapRow('Search the web', true);
+    await flush();
+
+    expect(h.setWebSearchEnabled).toHaveBeenCalledWith('s1', true);
+    expect(preferenceRow('Search the web')?.props.value).toBe(true);
+  });
+
+  it('goes back and says why when the chat cannot be moved', async () => {
+    h.setWebSearchEnabled.mockRejectedValue(new Error('the chat could not be moved'));
+    await mount();
+
+    await tapRow('Search the web', false);
+    await flush();
+
+    expect(preferenceRow('Search the web')?.props.value).toBe(true);
+    expect(h.toastError).toHaveBeenCalledWith('the chat could not be moved');
+  });
 });
 
 describe('the Kilo MCP switch', () => {
@@ -485,6 +525,30 @@ describe('the chat-tools sheet', () => {
     expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(false);
     // The chat's tool list has to move onto what the Retry just found.
     expect(h.refreshChatTools).toHaveBeenCalled();
+  });
+
+  it('asks the servers as it opens, so a restart never leaves a server unasked', async () => {
+    h.servers.value = [server('alpha')];
+    await mount();
+    await flush();
+
+    // The open is not a person's Retry, so it gets the automatic deadline.
+    expect(h.ensureRemoteMcp).toHaveBeenCalledWith(place);
+    expect(h.refreshChatTools).toHaveBeenCalled();
+  });
+
+  it('offers a Retry on a server that answered with no tools', async () => {
+    h.servers.value = [server('alpha')];
+    h.discovered.value = [serverState('alpha', { status: 'ready', retryable: true })];
+    await mount();
+
+    // The Kilo row also reads "No tools available", so the remote row is read by its own fields.
+    expect(held.settings?.servers[0]).toMatchObject({
+      statusKey: 'modelChat.mcp.none',
+      retry: true,
+    });
+    const label = i18n.t('modelChat.mcp.retryServerA11y', { name: 'Server alpha' });
+    expect(required(buttonFor('Retry'), 'Retry').props.accessibilityLabel).toBe(label);
   });
 
   it('turns a server off for the chats and tells the registry', async () => {

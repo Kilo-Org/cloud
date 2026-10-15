@@ -1,6 +1,55 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifier';
-import { AutoRoutingDecisionCacheDO, getStickyDecision, putStickyDecision } from './decision-cache';
+import {
+  AutoRoutingDecisionCacheDO,
+  clearClassificationHotCache,
+  putCachedClassification,
+  putStickyDecision,
+  readConversationState,
+} from './decision-cache';
+import { MirrorPayloadSchema } from '@kilocode/auto-routing-contracts';
+import { buildClassifierUsage } from './classifier-usage';
+
+const fetchMock = vi.fn<typeof fetch>();
+const writerEnv = {
+  KILO_WEB_API_BASE_URL: 'https://web.example.test',
+  INTERNAL_API_SECRET_PROD: { get: async () => 'test-secret' },
+};
+
+async function classifierUsage() {
+  return buildClassifierUsage(
+    MirrorPayloadSchema.parse({
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: 'session-1',
+      machineId: null,
+      clientRequestId: null,
+      mode: null,
+      userAgent: null,
+      bodyBytes: 10,
+      input: {
+        apiKind: 'chat_completions',
+        requestedModel: 'kilo-auto/efficient',
+        systemPromptPrefix: null,
+        userPromptPrefix: 'Test request',
+        latestUserPromptPrefix: null,
+        messageCount: 1,
+        hasTools: false,
+        stream: false,
+        providerHints: { provider: null, providerOptions: null },
+      },
+    }),
+    {
+      conversationKey: 'conversation-1',
+      classifierModel: 'test/classifier',
+      contentHash: 'hash',
+      kind: 'sync',
+      requestStart: 'request-start',
+    },
+    0.000013,
+    new Date().toISOString()
+  );
+}
 
 const classification = {
   taskType: 'implementation',
@@ -26,15 +75,20 @@ function createFakeStorage() {
     clearAlarmForTest: () => {
       alarm = null;
     },
-    get: async (key: string) => entries.get(key),
-    put: async (key: string, value: unknown) => {
+    get: vi.fn(async (key: string | string[]) => {
+      if (Array.isArray(key)) {
+        return new Map(key.filter(k => entries.has(k)).map(k => [k, entries.get(k)]));
+      }
+      return entries.get(key);
+    }),
+    put: vi.fn(async (key: string, value: unknown) => {
       entries.set(key, value);
-    },
-    delete: async (keys: string | string[]) => {
+    }),
+    delete: vi.fn(async (keys: string | string[]) => {
       for (const key of Array.isArray(keys) ? keys : [keys]) {
         entries.delete(key);
       }
-    },
+    }),
     list: async () => new Map(entries),
   };
 }
@@ -43,39 +97,113 @@ function createCacheDO() {
   const storage = createFakeStorage();
   const cacheDO = new AutoRoutingDecisionCacheDO(
     { storage } as unknown as DurableObjectState,
-    {} as Env
+    writerEnv as Env
   );
   return { cacheDO, storage };
 }
 
+function createCacheEnv() {
+  const { cacheDO, storage } = createCacheDO();
+  let inputGate = Promise.resolve();
+  // Node's DurableObject stub has no input gates; serialize storage-only RPCs as the runtime does.
+  function invoke<T>(call: () => Promise<T>): Promise<T> {
+    const result = inputGate.then(call);
+    inputGate = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  }
+  const readRpc = vi.fn((key: string) => invoke(() => cacheDO.readConversationState(key)));
+  const stub = {
+    readConversationState: readRpc,
+    putStickyDecision: (
+      value: Parameters<AutoRoutingDecisionCacheDO['putStickyDecision']>[0],
+      generation: number
+    ) => invoke(() => cacheDO.putStickyDecision(value, generation)),
+    putEntry: (key: string, value: Parameters<AutoRoutingDecisionCacheDO['putEntry']>[1]) =>
+      invoke(() => cacheDO.putEntry(key, value)),
+  };
+  const env = {
+    AUTO_ROUTING_DECISION_CACHE: {
+      idFromName: (name: string) => name,
+      get: () => stub,
+    },
+  } as unknown as Pick<Env, 'AUTO_ROUTING_DECISION_CACHE'>;
+  const readState = () => readConversationState(env, 'conversation-1', 'hash', 'model');
+  return { env, cacheDO, storage, readRpc, readState };
+}
+
+beforeEach(() => {
+  clearClassificationHotCache();
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-06-11T12:00:00Z'));
+  fetchMock.mockReset();
+  vi.stubGlobal('fetch', fetchMock);
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'info').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
 describe('AutoRoutingDecisionCacheDO', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-06-11T12:00:00Z'));
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('serves stored entries until they expire', async () => {
-    const { cacheDO } = createCacheDO();
+  it('reads classification and sticky in one storage batch', async () => {
+    const { cacheDO, storage } = createCacheDO();
     await cacheDO.putEntry('model:hash', classification);
+    await cacheDO.putEntry('sticky', { model: 'mid/chat', variant: null, routeKey: null });
+    storage.get.mockClear();
+    storage.put.mockClear();
+    storage.delete.mockClear();
 
-    await expect(cacheDO.getEntry('model:hash')).resolves.toEqual(classification);
+    const state = await cacheDO.readConversationState('model:hash');
+
+    expect(state.classification?.value).toEqual(classification);
+    expect(state.sticky).toEqual({ model: 'mid/chat', variant: null, routeKey: null });
+    expect(storage.get).toHaveBeenCalledExactlyOnceWith(['model:hash', 'sticky']);
+    expect(storage.put).not.toHaveBeenCalled();
+    expect(storage.delete).not.toHaveBeenCalled();
+  });
+
+  it('expires cached decisions after the cache TTL', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    await cacheDO.putEntry('model:hash', classification);
+    await cacheDO.putEntry('sticky', { model: 'mid/chat', variant: null, routeKey: null });
 
     vi.advanceTimersByTime(31 * 60 * 1000);
-    await expect(cacheDO.getEntry('model:hash')).resolves.toBeNull();
+
+    await expect(cacheDO.readConversationState('model:hash')).resolves.toEqual({
+      classification: null,
+      sticky: null,
+    });
+    expect([...storage.entries.keys()]).toEqual(['model:hash', 'sticky']);
+  });
+
+  it('ignores expired entries without writing or dropping fresh sticky state', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    await cacheDO.putEntry('model:hash', classification);
+    vi.advanceTimersByTime(29 * 60 * 1000);
+    await cacheDO.putEntry('sticky', { model: 'mid/chat', variant: null, routeKey: null });
+    vi.advanceTimersByTime(2 * 60 * 1000);
+
+    await expect(cacheDO.readConversationState('model:hash')).resolves.toEqual({
+      classification: null,
+      sticky: { model: 'mid/chat', variant: null, routeKey: null },
+    });
+    expect([...storage.entries.keys()]).toEqual(['model:hash', 'sticky']);
   });
 
   it('schedules a sweep alarm only when none is pending', async () => {
     const { cacheDO, storage } = createCacheDO();
-    await cacheDO.putEntry('model:hash-1', classification);
+    await cacheDO.putEntry('model:old', classification);
     const firstAlarm = await storage.getAlarm();
     expect(firstAlarm).not.toBeNull();
 
     vi.advanceTimersByTime(60 * 1000);
-    await cacheDO.putEntry('model:hash-2', classification);
+    await cacheDO.putEntry('model:hash', classification);
     await expect(storage.getAlarm()).resolves.toBe(firstAlarm);
   });
 
@@ -105,90 +233,374 @@ describe('AutoRoutingDecisionCacheDO', () => {
   });
 });
 
-describe('sticky decision storage', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-06-11T12:00:00Z'));
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  function createStickyEnv() {
+describe('classifier usage retries', () => {
+  it('persists before delivery and retries failures with the same event until recorded', async () => {
     const { cacheDO, storage } = createCacheDO();
-    const env = {
-      AUTO_ROUTING_DECISION_CACHE: {
-        idFromName: (name: string) => name,
-        get: () => cacheDO,
-      },
-    } as unknown as Pick<Env, 'AUTO_ROUTING_DECISION_CACHE'>;
-    return { env, cacheDO, storage };
-  }
+    const usage = await classifierUsage();
+    const key = `usage:${usage.core.id}`;
+    fetchMock.mockRejectedValueOnce(new Error('connection lost'));
+    await cacheDO.recordClassifierUsage(usage);
+    expect(storage.put.mock.calls[0]).toEqual([key, expect.objectContaining({ usage })]);
+    expect(storage.put.mock.invocationCallOrder[0]).toBeLessThan(
+      fetchMock.mock.invocationCallOrder[0]
+    );
+    expect(storage.entries.get(key)).toMatchObject({ usage, attempts: 1 });
+    await expect(storage.getAlarm()).resolves.toBe(Date.now() + 1000);
 
-  it('round-trips the sticky model, variant, and route for a conversation', async () => {
-    const { env } = createStickyEnv();
-    await expect(getStickyDecision(env, 'conversation-1')).resolves.toBeNull();
+    fetchMock.mockResolvedValueOnce(Response.json({ status: 'not_recorded', result: null }));
+    vi.advanceTimersByTime(1000);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(storage.entries.get(key)).toMatchObject({ attempts: 2 });
+    await expect(storage.getAlarm()).resolves.toBe(Date.now() + 2000);
 
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        status: 'recorded',
+        result: {
+          usageId: usage.core.id,
+          createdAt: usage.core.created_at,
+          newMicrodollarsUsed: usage.core.cost,
+        },
+      })
+    );
+    vi.advanceTimersByTime(2000);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(storage.entries.has(key)).toBe(false);
+    await expect(storage.getAlarm()).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const [, init] of fetchMock.mock.calls) {
+      const body = init?.body;
+      if (typeof body !== 'string') throw new Error('Expected serialized usage body');
+      expect(JSON.parse(body)).toEqual(usage);
+    }
+  });
+
+  it('accepts duplicate acknowledgement after a lost recorded response and stops retries', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    const usage = await classifierUsage();
+    fetchMock.mockRejectedValueOnce(new Error('response lost after commit'));
+    await cacheDO.recordClassifierUsage(usage);
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        status: 'duplicate',
+        result: {
+          usageId: usage.core.id,
+          createdAt: usage.core.created_at,
+          newMicrodollarsUsed: null,
+        },
+      })
+    );
+    vi.advanceTimersByTime(1000);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(storage.entries.has(`usage:${usage.core.id}`)).toBe(false);
+    vi.advanceTimersByTime(60 * 60 * 1000);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(storage.getAlarm()).resolves.toBeNull();
+  });
+
+  it('multiplexes retries and TTL sweeps without expiring usage events', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    await cacheDO.putEntry('model:hash', classification);
+    const sweepAt = Date.now() + 30 * 60 * 1000;
+    const usage = await classifierUsage();
+    fetchMock.mockResolvedValue(Response.json({ status: 'not_recorded', result: null }));
+    await cacheDO.recordClassifierUsage(usage);
+    await expect(storage.getAlarm()).resolves.toBe(Date.now() + 1000);
+
+    const key = `usage:${usage.core.id}`;
+    const retryAt = Date.now() + 40 * 60 * 1000;
+    storage.entries.set(key, {
+      usage,
+      attempts: 1,
+      firstAttemptAt: Date.now(),
+      nextAttemptAt: retryAt,
+    });
+    storage.clearAlarmForTest();
+    vi.setSystemTime(sweepAt);
+    await cacheDO.alarm();
+    expect(storage.entries.has('model:hash')).toBe(false);
+    expect(storage.entries.has(key)).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await expect(storage.getAlarm()).resolves.toBe(retryAt);
+
+    vi.setSystemTime(retryAt);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(storage.entries.get(key)).toMatchObject({ attempts: 2, usage });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(storage.getAlarm()).resolves.toBe(retryAt + 2000);
+  });
+
+  it('reschedules consecutive fired alarms and preserves the later TTL sweep', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    await cacheDO.putEntry('model:hash', classification);
+    const sweepAt = Date.now() + 30 * 60 * 1000;
+    const usage = await classifierUsage();
+    fetchMock.mockImplementation(async () =>
+      Response.json({ status: 'not_recorded', result: null })
+    );
+    await cacheDO.recordClassifierUsage(usage);
+
+    vi.advanceTimersByTime(1000);
+    await expect(storage.getAlarm()).resolves.toBe(Date.now());
+    await cacheDO.alarm();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(storage.getAlarm()).resolves.toBe(Date.now() + 2000);
+
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        status: 'recorded',
+        result: {
+          usageId: usage.core.id,
+          createdAt: usage.core.created_at,
+          newMicrodollarsUsed: usage.core.cost,
+        },
+      })
+    );
+    vi.advanceTimersByTime(2000);
+    await expect(storage.getAlarm()).resolves.toBe(Date.now());
+    await cacheDO.alarm();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(storage.entries.has(`usage:${usage.core.id}`)).toBe(false);
+    expect(storage.entries.has('model:hash')).toBe(true);
+    await expect(storage.getAlarm()).resolves.toBe(sweepAt);
+
+    vi.setSystemTime(sweepAt);
+    await cacheDO.alarm();
+    expect(storage.entries.size).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('logs and removes writes still unavailable at the retry horizon', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    const usage = await classifierUsage();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchMock.mockResolvedValue(Response.json({ status: 'not_recorded', result: null }));
+    await cacheDO.recordClassifierUsage(usage);
+    vi.advanceTimersByTime(24 * 60 * 60 * 1000);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(storage.entries.has(`usage:${usage.core.id}`)).toBe(false);
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"auto_routing_classifier_usage_dropped"')
+    );
+    await expect(storage.getAlarm()).resolves.toBeNull();
+  });
+});
+
+describe('conversation state', () => {
+  it('rejects older sticky writes without dropping their classification', async () => {
+    const { env, readState } = createCacheEnv();
+    const older = Date.now();
+    vi.advanceTimersByTime(1);
+    const newer = Date.now();
+    await putStickyDecision(env, 'conversation-1', 'new/chat', null, 'new/route', newer);
+    await putStickyDecision(env, 'conversation-1', 'old/chat', null, 'old/route', older);
+    await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
+    const state = await readState();
+    expect(state.sticky?.model).toBe('new/chat');
+    expect(state.classification).toEqual(classification);
+  });
+
+  it('accepts the last sticky write when request start times are equal', async () => {
+    const { env, readState } = createCacheEnv();
+    const generation = Date.now();
+    await putStickyDecision(env, 'conversation-1', 'first/chat', null, 'first/route', generation);
+    await putStickyDecision(env, 'conversation-1', 'last/chat', null, 'last/route', generation);
+    expect((await readState()).sticky?.model).toBe('last/chat');
+  });
+
+  it('does not write when reading a conversation', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    await cacheDO.readConversationState('model:hash');
+    expect(storage.put).not.toHaveBeenCalled();
+    expect(storage.delete).not.toHaveBeenCalled();
+  });
+
+  it('makes exactly one RPC on each cold and hot read', async () => {
+    const { cacheDO, readRpc, readState } = createCacheEnv();
+    await cacheDO.putEntry('efficient:model:hash', classification);
+
+    expect((await readState()).classification).toEqual(classification);
+    expect(readRpc).toHaveBeenCalledTimes(1);
+    expect((await readState()).classification).toEqual(classification);
+    expect(readRpc).toHaveBeenCalledTimes(2);
+  });
+
+  it('serves a hot classification while reading the latest sticky from storage', async () => {
+    const { env, storage, readState } = createCacheEnv();
+    await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
     await putStickyDecision(
       env,
       'conversation-1',
       'mid/chat',
       'thinking',
-      'implementation/code_generation'
+      'implementation/code_generation',
+      1
     );
-    await expect(getStickyDecision(env, 'conversation-1')).resolves.toEqual({
-      model: 'mid/chat',
-      variant: 'thinking',
-      routeKey: 'implementation/code_generation',
-    });
-  });
+    storage.entries.delete('efficient:model:hash');
 
-  it('round-trips a null sticky variant', async () => {
-    const { env } = createStickyEnv();
+    expect(await readState()).toEqual({
+      classification,
+      sticky: {
+        model: 'mid/chat',
+        variant: 'thinking',
+        routeKey: 'implementation/code_generation',
+      },
+    });
+
     await putStickyDecision(
       env,
       'conversation-1',
-      'mid/chat',
+      'other/chat',
       null,
-      'implementation/code_generation'
+      'implementation/code_generation',
+      2
     );
-    await expect(getStickyDecision(env, 'conversation-1')).resolves.toEqual({
-      model: 'mid/chat',
-      variant: null,
-      routeKey: 'implementation/code_generation',
-    });
+    expect((await readState()).sticky?.model).toBe('other/chat');
   });
 
-  it('expires sticky entries after the TTL', async () => {
-    const { env } = createStickyEnv();
+  it('reuses content-addressed classifications across conversations but not sticky state', async () => {
+    const first = createCacheEnv();
+    const second = createCacheEnv();
+    await putCachedClassification(first.env, 'conversation-1', 'hash', 'model', classification);
     await putStickyDecision(
-      env,
+      first.env,
       'conversation-1',
       'mid/chat',
       null,
-      'implementation/code_generation'
+      'implementation/code_generation',
+      1
     );
+
+    const state = await readConversationState(second.env, 'conversation-2', 'hash', 'model');
+
+    expect(state).toEqual({ classification, sticky: null });
+    expect(second.readRpc).toHaveBeenCalledTimes(1);
+  });
+
+  it('isolates sticky and classification state by router, defaulting to efficient', async () => {
+    const efficient = createCacheDO();
+    const frontier = createCacheDO();
+    const idFromName = vi.fn((name: string) => name);
+    const env = {
+      AUTO_ROUTING_DECISION_CACHE: {
+        idFromName,
+        get: (name: string) =>
+          name.startsWith('frontier:') ? frontier.cacheDO : efficient.cacheDO,
+      },
+    } as unknown as Pick<Env, 'AUTO_ROUTING_DECISION_CACHE'>;
+    await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
+    await putStickyDecision(env, 'conversation-1', 'efficient/chat', null, 'route', 1);
+    expect(await readConversationState(env, 'conversation-1', 'hash', 'model', 'frontier')).toEqual(
+      { classification: null, sticky: null }
+    );
+    const frontierClassification = { ...classification, confidence: 0.9 };
+    await putCachedClassification(
+      env,
+      'conversation-1',
+      'hash',
+      'model',
+      frontierClassification,
+      'frontier'
+    );
+    await putStickyDecision(env, 'conversation-1', 'frontier/chat', null, 'route', 1, 'frontier');
+    const efficientState = await readConversationState(env, 'conversation-1', 'hash', 'model');
+    const frontierState = await readConversationState(
+      env,
+      'conversation-1',
+      'hash',
+      'model',
+      'frontier'
+    );
+    expect(efficientState.classification).toEqual(classification);
+    expect(efficientState.sticky?.model).toBe('efficient/chat');
+    expect(frontierState.classification).toEqual(frontierClassification);
+    expect(frontierState.sticky?.model).toBe('frontier/chat');
+    expect(idFromName).toHaveBeenCalledWith('efficient:conversation-1');
+    expect(idFromName).toHaveBeenCalledWith('frontier:conversation-1');
+    expect(efficient.storage.entries.has('efficient:model:hash')).toBe(true);
+    expect(frontier.storage.entries.has('frontier:model:hash')).toBe(true);
+  });
+
+  it('populates the hot cache on a DO hit without extending the stored TTL', async () => {
+    const { cacheDO, storage, readState } = createCacheEnv();
+    await cacheDO.putEntry('efficient:model:hash', classification);
+    vi.advanceTimersByTime(29 * 60 * 1000);
+    expect((await readState()).classification).toEqual(classification);
+    storage.entries.delete('efficient:model:hash');
+    expect((await readState()).classification).toEqual(classification);
+
+    vi.advanceTimersByTime(2 * 60 * 1000);
+    expect((await readState()).classification).toBeNull();
+  });
+
+  it('expires classifications cached by a write and separates classifier models', async () => {
+    const { env, storage, readState } = createCacheEnv();
+    await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
+    storage.entries.delete('efficient:model:hash');
+    expect((await readState()).classification).toEqual(classification);
+    expect(
+      (await readConversationState(env, 'conversation-1', 'hash', 'other-model')).classification
+    ).toBeNull();
 
     vi.advanceTimersByTime(31 * 60 * 1000);
-    await expect(getStickyDecision(env, 'conversation-1')).resolves.toBeNull();
+    expect((await readState()).classification).toBeNull();
   });
 
-  it('returns null for invalid stored shapes', async () => {
-    const { env, cacheDO } = createStickyEnv();
-    await cacheDO.putEntry('sticky', { nope: true } as unknown as ClassifierOutput);
+  it('validates each stored value independently for rolling deploys', async () => {
+    const { env, storage, readState } = createCacheEnv();
+    await putStickyDecision(
+      env,
+      'conversation-1',
+      'mid/chat',
+      null,
+      'implementation/code_generation',
+      1
+    );
+    storage.entries.set('efficient:model:hash', { value: { nope: true }, storedAt: Date.now() });
 
-    await expect(getStickyDecision(env, 'conversation-1')).resolves.toBeNull();
+    expect(await readState()).toEqual({
+      classification: null,
+      sticky: { model: 'mid/chat', variant: null, routeKey: 'implementation/code_generation' },
+    });
   });
 
-  it('serves entries written before the routeKey and variant fields existed', async () => {
-    const { env, cacheDO } = createStickyEnv();
-    await cacheDO.putEntry('sticky', { model: 'mid/chat' } as unknown as ClassifierOutput);
+  it('returns null for invalid sticky shapes while keeping valid classification', async () => {
+    const { env, storage, readState } = createCacheEnv();
+    await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
+    storage.entries.set('sticky', { value: { nope: true }, storedAt: Date.now() });
 
-    await expect(getStickyDecision(env, 'conversation-1')).resolves.toEqual({
+    expect(await readState()).toEqual({
+      classification,
+      sticky: null,
+    });
+  });
+
+  it('serves sticky entries written before routeKey and variant existed', async () => {
+    const { storage, readState } = createCacheEnv();
+    storage.entries.set('sticky', { value: { model: 'mid/chat' }, storedAt: Date.now() });
+
+    expect((await readState()).sticky).toEqual({
       model: 'mid/chat',
       routeKey: null,
       variant: null,
+    });
+  });
+
+  it('returns empty state on RPC errors even when a classification is hot', async () => {
+    const { env, readRpc, readState } = createCacheEnv();
+    await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
+    readRpc.mockRejectedValueOnce(new Error('DO unavailable'));
+
+    await expect(readState()).resolves.toEqual({
+      classification: null,
+      sticky: null,
     });
   });
 });

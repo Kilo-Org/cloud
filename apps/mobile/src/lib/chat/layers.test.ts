@@ -9,6 +9,13 @@ import { layerToolsFor, modelFactsFor, RELAYED_SHAPE } from './layers';
 vi.mock('expo-crypto', () => ({ getRandomBytes: (count: number) => new Uint8Array(count) }));
 vi.mock('@kilocode/harness-sdk/plugins/store/expo', () => ({ layerExpoStore: () => undefined }));
 vi.mock('@/lib/auth/token-owner', () => ({ getAuthTokenForRequest: vi.fn() }));
+vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn() } }));
+vi.mock('./web-search-setting', () => ({
+  webSearchEnabledFor: async () => {
+    await Promise.resolve();
+    return true;
+  },
+}));
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'http://localhost:4700' }));
 vi.mock('./fetch', () => ({ chatFetch: () => undefined }));
 vi.mock('./backend-store', () => ({ listChatBackends: () => [] }));
@@ -90,12 +97,13 @@ const namesHeld = async (): Promise<readonly string[]> => {
 describe('the tools the registry holds', () => {
   it('is a live view, so a tool discovered after the runtime was built is in it', async () => {
     mcp.tools.length = 0;
-    expect(await namesHeld()).toEqual(['time', 'settings_list', 'settings_set']);
+    expect(await namesHeld()).toEqual(['time', 'web_search', 'settings_list', 'settings_set']);
 
     mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
 
     expect(await namesHeld()).toEqual([
       'time',
+      'web_search',
       'settings_list',
       'settings_set',
       'mcp_kilo_read-file',

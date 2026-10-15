@@ -1,5 +1,6 @@
 import {
   CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION,
+  CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   getSandboxAllocationProvider,
   getSandboxAllocationRequest,
   sandboxAllocationRequiresControlPlane,
@@ -9,6 +10,7 @@ import {
 import { providerUsesOutboundCredentialProxy } from './agent-sandbox/capabilities.js';
 import type { AgentSandboxProvider, SandboxId, Env } from './types.js';
 import {
+  CODE_REVIEW_PLATFORM,
   sessionPlaneForNewOwner,
   sessionPlaneFromId,
   type ControlPlaneOwnerEnv,
@@ -209,7 +211,7 @@ export function getOutboundContainerId(
   return getSandboxNamespace(env, sandboxId, options).idFromName(sandboxId).toString();
 }
 
-async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId> {
+export async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId> {
   const encoder = new TextEncoder();
   const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(input));
   const hashHex = Array.from(new Uint8Array(hashBuffer))
@@ -247,6 +249,7 @@ export type SandboxSelectionEnv = {
     | 'CLOUD_AGENT_CONTAINER_BILLING_ENABLED'
     | 'CLOUD_AGENT_CONTAINER_BILLING_USER_IDS'
     | 'CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS'
+    | 'CREDENTIAL_CONTAINMENT_ENABLED'
   >;
 
 type SelectSandboxForNewSessionInput = {
@@ -294,7 +297,7 @@ export function selectSandboxProvider(input: {
   });
 }
 
-function selectDefaultSandboxProvider(input: {
+export function selectDefaultSandboxProvider(input: {
   env: SandboxSelectionEnv;
   orgId?: string;
   userId: string;
@@ -333,6 +336,71 @@ function selectDefaultSandboxProvider(input: {
   return useContainers ? 'cloudflare-containers' : 'cloudflare';
 }
 
+export function credentialContainmentEnabled(env: {
+  CREDENTIAL_CONTAINMENT_ENABLED?: string;
+}): boolean {
+  return env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
+}
+
+/**
+ * New control-plane sessions that would start on Cloudflare sandbox small use
+ * the native containers runtime at 2 vCPU / 8 GiB instead. Legacy sessions stay
+ * on sandbox small: the native runtime exists only on the control plane.
+ * Existing sessions are unaffected because they keep their stored provider.
+ */
+export function cloudflareSandboxSmallNativeReplacement(input: {
+  env: SandboxSelectionEnv;
+  orgId?: string;
+  userId: string;
+  sessionId: string;
+  requestedAllocation?: SandboxAllocation;
+  contained: boolean;
+  createdOnPlatform?: string;
+  billingOrigin?: string;
+}): SandboxAllocation | undefined {
+  if (sessionPlaneFromId(input.sessionId) !== 'control' || !input.contained) return undefined;
+  if (
+    input.billingOrigin === CODE_REVIEW_PLATFORM ||
+    input.createdOnPlatform === CODE_REVIEW_PLATFORM
+  ) {
+    return undefined;
+  }
+  if (input.requestedAllocation === 'cloudflare-single') {
+    return CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION;
+  }
+  if (input.requestedAllocation !== undefined) return undefined;
+  const provider = selectDefaultSandboxProvider({
+    env: input.env,
+    orgId: input.orgId,
+    userId: input.userId,
+    plane: 'control',
+    isolated: true,
+  });
+  return provider === 'cloudflare' ? CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION : undefined;
+}
+
+export function resolveNewSessionSandboxAllocation(input: {
+  env: SandboxSelectionEnv;
+  orgId?: string;
+  userId: string;
+  sessionId: string;
+  requestedAllocation?: SandboxAllocation;
+  contained: boolean;
+  createdOnPlatform?: string;
+  billingOrigin?: string;
+}): SandboxAllocation | undefined {
+  return cloudflareSandboxSmallNativeReplacement(input) ?? input.requestedAllocation;
+}
+
+/** Ledger retries accept the request or the native replacement recorded for it. */
+export function recordedSandboxAllocationMatchesRequest(
+  recorded: SandboxAllocation | undefined,
+  requested: SandboxAllocation | undefined,
+  replacement: SandboxAllocation | undefined
+): boolean {
+  return recorded === requested || (replacement !== undefined && recorded === replacement);
+}
+
 export function getDefaultSandboxDestination(
   env: SandboxSelectionEnv & ControlPlaneOwnerEnv,
   owner: { userId: string; orgId?: string }
@@ -350,19 +418,31 @@ export function getDefaultSandboxDestination(
   if (provider === 'cloudflare-containers') {
     return getSandboxAllocationRequest(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION);
   }
+  if (credentialContainmentEnabled(env)) {
+    return getSandboxAllocationRequest(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION);
+  }
   return getSandboxAllocationRequest('cloudflare-single');
 }
 
 export async function selectSandboxForNewSession(
   input: SelectSandboxForNewSessionInput
 ): Promise<SandboxSelection> {
+  const sandboxAllocation = resolveNewSessionSandboxAllocation({
+    env: input.env,
+    orgId: input.orgId,
+    userId: input.userId,
+    sessionId: input.sessionId,
+    requestedAllocation: input.sandboxAllocation,
+    contained:
+      sessionPlaneFromId(input.sessionId) === 'control' && credentialContainmentEnabled(input.env),
+  });
   const sandboxId = await generateSandboxId(
     input.env.PER_SESSION_SANDBOX_ORG_IDS,
     input.orgId,
     input.userId,
     input.sessionId,
     input.botId,
-    { sandboxAllocation: input.sandboxAllocation }
+    { sandboxAllocation }
   );
   const provider = selectSandboxProvider({
     env: input.env,
@@ -370,7 +450,7 @@ export async function selectSandboxForNewSession(
     userId: input.userId,
     sandboxId,
     sessionId: input.sessionId,
-    sandboxAllocation: input.sandboxAllocation,
+    sandboxAllocation,
   });
 
   return { sandboxId, provider };
@@ -418,10 +498,7 @@ export async function generateSandboxRoutingTarget(
     }
   }
 
-  const sandboxOrgSegment = orgId ?? `user:${userId}`;
-  const originalFormat = botId
-    ? `${sandboxOrgSegment}__${userId}__bot:${botId}`
-    : `${sandboxOrgSegment}__${userId}`;
+  const originalFormat = sharedSandboxOwnerKey(orgId, userId, botId);
   const prefix: SharedSandboxPrefix = botId ? (orgId ? 'bot' : 'ubt') : orgId ? 'org' : 'usr';
   const sharedVersion =
     sessionPlaneFromId(sessionId) === 'control'
@@ -433,6 +510,18 @@ export async function generateSandboxRoutingTarget(
     kind: 'shared',
     routeKey,
   };
+}
+
+/** The owner identity a shared sandbox is keyed on: org (or personal user), user and bot. */
+export function sharedSandboxOwnerKey(
+  orgId: string | undefined,
+  userId: string,
+  botId: string | undefined
+): string {
+  const sandboxOrgSegment = orgId ?? `user:${userId}`;
+  return botId
+    ? `${sandboxOrgSegment}__${userId}__bot:${botId}`
+    : `${sandboxOrgSegment}__${userId}`;
 }
 
 export async function generateSandboxId(

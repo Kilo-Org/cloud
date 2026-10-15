@@ -133,10 +133,14 @@
     "status": "Statusi",
     "truncated": "Shkurtuar",
     "updated": "Përditësuar",
+    "generating": "Duke gjeneruar…",
     "working": "Duke punuar",
     "yourOwnRepositories": "Depot e tua",
     "dismissed": "E hedhur poshtë",
-    "agent": "Agjenti"
+    "agent": "Agjenti",
+    "durationMinuteShort": "min",
+    "durationHourShort": "orë",
+    "changes": "Ndryshimet"
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -325,6 +329,7 @@
       "collapseFile": "Fshih përmbajtjen e skedarit",
       "expandFile": "Shfaq përmbajtjen e skedarit",
       "diffTooLarge": "Ndryshimet janë tepër të mëdha për t'u shfaqur.",
+      "noPreview": "Nuk ka parapamje për këtë skedar",
       "openOnGitHub": "Hap në GitHub",
       "openDiffOnGitHub": "Hap ndryshimet e këtij skedari në GitHub",
       "githubDiff": "Ndryshimet në GitHub"
@@ -831,7 +836,8 @@
       "kiloclaw": "Aktiviteti i KiloClaw",
       "balance": "Njoftimet për gjendjen e llogarisë",
       "security": "Gjetjet e sigurisë",
-      "spend": "Njoftime për shpenzimet"
+      "spend": "Njoftime për shpenzimet",
+      "followedSessions": "Sesione të ndjekura"
     },
     "category": {
       "chatMessagesSubtitle": "përgjigje në bisedat e tua",
@@ -1254,7 +1260,7 @@
         "stoppedTitle": "Konfigurimi u ndal",
         "stoppedBody": "Instanca e {{name}} u ndal papritur gjatë konfigurimit.",
         "stalledTitle": "Diçka u bllokua",
-        "stalledBody": "Nuk arritëm ta përfundonim konfigurimin e {{name}}. Provo përsëri ose shkruaj në hi@kilo.ai nëse kjo vazhdon të ndodhë.",
+        "stalledBody": "Nuk arritëm ta përfundonim konfigurimin e {{name}}. Provo përsëri ose shkruaj në {{supportEmail}} nëse kjo vazhdon të ndodhë.",
         "timeoutTitle": "Po zgjat më shumë nga sa pritej",
         "timeoutBody": "Konfigurimi i {{name}} po zgjat më shumë se zakonisht (mbi {{displayMinutes}} minuta).",
         "continueInBackground": "Vazhdo në sfond",
@@ -1312,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Plani yt i qasjes së hershme kërkon rishikim manual përpara se ta përdorësh në telefon.",
       "iosTitle": "KiloClaw i padisponueshëm në iOS",
       "iosBody": "Qasja te KiloClaw menaxhohet jashtë aplikacionit iOS për këtë llogari.",
-      "iosContact": "Ke pyetje? Shkruaj në hi@kilo.ai.",
+      "iosContact": "Ke pyetje? Shkruaj në {{supportEmail}}.",
       "quarantinedCta": "Dërgo email për ekipin tonë",
       "nonCanonicalEarlybirdCta": "Shqyrto planin tënd në kilo.ai"
     },
@@ -1547,7 +1553,7 @@
         "recoveryLabel": "Përditëso aplikacionin GitHub"
       },
       "githubIpAllowList": {
-        "description": "Shqyrtuesi i kodit u çaktivizua sepse kjo organizatë në GitHub përdor një listë adresash IP të lejuara që bllokon Kilo. Kontakto hi@kilocode.ai për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
+        "description": "Shqyrtuesi i kodit u çaktivizua sepse kjo organizatë në GitHub përdor një listë adresash IP të lejuara që bllokon Kilo. Kontakto {{supportEmail}} për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
       },
       "gitlabProjectAccessRequired": {
         "description": "Shqyrtuesi i kodit u çaktivizua sepse Kilo nuk mund të krijojë një token qasjeje për këtë projekt në GitLab. Jep qasje me rolin e mirëmbajtësit ose aktivizo tokenët e qasjes në projekt, pastaj aktivizo përsëri shqyrtuesin e kodit.",
@@ -1562,7 +1568,7 @@
         "recoveryLabel": "Përditëso cilësimet e shqyrtuesit të kodit"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Shqyrtuesi i kodit u çaktivizua pasi klonimi i depos tejkaloi kohën e lejuar tri herë sot. Kontakto hi@kilocode.ai për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
+        "description": "Shqyrtuesi i kodit u çaktivizua pasi klonimi i depos tejkaloi kohën e lejuar tri herë sot. Kontakto {{supportEmail}} për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
       },
       "title": "Shqyrtuesi i kodit kërkon vëmendje.",
       "recoveryLabel": "Kontakto mbështetjen"
@@ -2086,6 +2092,8 @@
       "title": "Seanca",
       "copyErrorDetails": "Kopjo detajet e gabimit",
       "backToSessions": "Kthehu te seancat",
+      "follow": "Ndiq në ekranin e kyçjes",
+      "unfollow": "Ndalo ndjekjen në ekranin e kyçjes",
       "couldNotLoad": "Nuk u ngarkua seanca.",
       "failedToLoadDetails": "Nuk u ngarkuan detajet e seancës.",
       "failedToStopExecution": "Nuk u ndal ekzekutimi.",
@@ -2152,6 +2160,11 @@
       "collapse": "Palos qëllimin",
       "expand": "Shfaq qëllimin"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Qëllimet, {{completed}} nga {{total}} të përfunduara",
+      "rowAccessibility": "Qëllimet, {{completed}} nga {{total}} të përfunduara. Qëllimi aktual: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Të përdorura së fundmi",
       "couldNotLoadGithubRepositories": "Nuk u ngarkuan depot nga GitHub.",
@@ -2184,7 +2197,6 @@
       "retryLoadingEnvironment": "Provo ta ngarkosh përsëri mjedisin",
       "defaultEnvironment": "Mjedisi i parazgjedhur",
       "environmentSummary": "{{commands}} komanda · {{mcp}} MCP · {{skills}} aftësi · {{agents}} agjentë",
-      "changes": "Ndryshimet",
       "leaveChanges": "Lër ndryshimet",
       "commitAndPush": "Regjistro dhe dërgo",
       "startSession": "Nis seancën",
@@ -2207,6 +2219,10 @@
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
       "importFailed": "Nuk u arrit të importohej kjo seancë.",
+      "cliCannotFork": "Përditëso Kilo CLI për të degëzuar nga një mesazh.",
+      "forkCutNotSynced": "Ky mesazh nuk është ruajtur ende. Provo përsëri pas pak.",
+      "forkFilesFromBaseBranch": "Skedarët nisin nga dega bazë.",
+      "forkFilesUnchangedOnComputer": "Skedarët në këtë kompjuter nuk ndryshohen.",
       "pickProfile": "Zgjidh një profil",
       "noProfile": "Nuk ka profil",
       "manageProfiles": "Menaxho profilet",
@@ -2251,8 +2267,8 @@
       "toolList": "listo",
       "toolPatch": "zbato ndryshimet",
       "toolTask": "detyrë",
-      "readTodos": "Lexo listën e detyrave",
-      "updateTodos": "Përditëso listën e detyrave",
+      "readTodos": "Lexo planin",
+      "updateTodos": "Përditëso planin",
       "linesBadge": "{{displayCount}} rreshta",
       "filesBadge": "{{displayCount}} skedarë",
       "matchesBadge": "{{displayCount}} përputhje",
@@ -2322,6 +2338,7 @@
       "copyMessage": "Kopjo mesazhin",
       "copyText": "Kopjo tekstin",
       "selectText": "Zgjidh tekstin",
+      "forkFromHere": "Degëzo nga këtu",
       "reportAiResponse": "Raporto përgjigjen e AI",
       "reportAiResponseConfirm": "Të raportohet kjo përgjigje për shqyrtim?",
       "report": "Raporto",
@@ -2641,6 +2658,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modelet ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Shiko ndryshimet",
+      "asOf": "Deri në {{time}}",
+      "tooLarge": "Ndryshimet janë tepër të mëdha për t'u shfaqur në celular.",
+      "empty": "Ende nuk ka ndryshime skedarësh në këtë sesion."
     },
     "autoApprove": {
       "title": "Miratim automatik",
@@ -3153,6 +3176,8 @@
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
     "openSession": "Hap",
+    "finished": "Përfundoi",
+    "followFailed": "Ky agjent nuk mund të shfaqej në ekranin e kyçjes.",
     "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri.",
     "checked": "Kontrolluar",
     "lastKnown": "Gjendja e fundit e njohur",
@@ -3161,7 +3186,26 @@
     "waitingForYou": "Pret ty",
     "nextScheduled": "Të planifikuara në vijim",
     "answerNeeded": "Pret përgjigje",
-    "waitingToRetry": "Në pritje për të riprovuar"
+    "waitingToRetry": "Në pritje për të riprovuar",
+    "step": {
+      "editing": "Duke redaktuar",
+      "reading": "Duke lexuar",
+      "running": "Ekzekutim",
+      "searching": "Kërkim në web",
+      "thinking": "Duke e menduar"
+    },
+    "planOf": "nga",
+    "filesChanged": "skedarë të ndryshuar",
+    "finishedIn": "Përfundoi në",
+    "noActivityFor": "Pa aktivitet për",
+    "prOpened": "U hap kërkesa për tërheqje",
+    "permissionWants": "Dëshiron të ekzekutojë",
+    "failure": {
+      "provider": "U ndal: gabim ofruesi",
+      "tool": "U ndal: gabim mjeti",
+      "cancelled": "U ndal: anuluar",
+      "other": "U NDAL"
+    }
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",
@@ -3189,6 +3233,7 @@
     "tutorialLabel": "Tutoriali"
   },
   "modelChat": {
+    "offlineFailure": "Ky model ka nevojë për lidhje interneti. Lidhu dhe provo sërish, ose kalo te një model në këtë pajisje.",
     "empty": {
       "title": "Filloni një bisedë",
       "description": "Dërgo një mesazh për të biseduar me një model."
@@ -3196,10 +3241,32 @@
     "list": {
       "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
       "new": "Bisedë e re",
-      "openHint": "Hap bisedën. Shtypni gjatë për ta fshirë.",
       "deleteTitle": "Ta fshini këtë bisedë?"
     },
+    "rename": {
+      "title": "Riemërto bisedën",
+      "accessibility": "Riemërto bisedën: {{title}}",
+      "openHint": "Hap bisedën. Shtypni gjatë për ta riemërtuar ose fshirë."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Detajet e bisedës",
+      "backend": "Shërbimi mbështetës",
+      "effortDefault": "Parazgjedhja e modelit",
+      "noCost": "Pa kosto",
+      "costUnknown": "E panjohur",
+      "costEstimatedNote": "Përgjigjet që nuk raportuan çmim janë vlerësuar sipas çmimeve të listës.",
+      "costUnknownNote": "Nuk dihet asnjë çmim për këtë model.",
+      "costPartialNote": "Ky total nuk përfshin modelet pa çmim të njohur.",
+      "localNote": "Modelet në pajisje funksionojnë në këtë pajisje. Nuk kanë kosto as memorie të përkohshme për kërkesat, dhe numri i tokenëve të tyre mund të jetë i përafërt.",
+      "countedSinceNote": "Kjo bisedë filloi para se të regjistrohej përdorimi. Totalet tregojnë vetëm përgjigjet pas asaj kohe.",
+      "remoteServersOn": "Serverë MCP në distancë të aktivizuar"
+    },
+    "webSearch": {
+      "title": "Kërko në internet",
+      "description": "Lejo këtë bisedë të kërkojë informacion të përditësuar përmes llogarisë sate Kilo. Kërkimet përdorin kuotën tënde mujore të kërkimeve.",
+      "allowanceExhausted": "Kërkimet e tua falas në internet për këtë muaj kanë mbaruar. Shto kredite për të kërkuar përsëri."
+    },
     "mcp": {
       "title": "Mjetet Kilo",
       "use": "Përdor mjetet Kilo",
@@ -3222,7 +3289,6 @@
       "fieldName": "Emri i shfaqur",
       "fieldUrl": "URL-ja e serverit",
       "fieldUrlInvalid": "Fut një URL të vlefshme serveri.",
-      "fieldToken": "Token bartës (opsional)",
       "enableServer": "Aktivizo këtë server: {{name}}",
       "editServer": "Modifiko serverin",
       "deleteServer": "Fshi serverin",
@@ -3243,8 +3309,24 @@
       "serverUnreachable": "Nuk u arrit ky server",
       "serverOff": "Ky server është i fikur"
     },
+    "mcpOAuth": {
+      "authMethod": "Vërtetimi",
+      "authNone": "Pa hyrje",
+      "authBearer": "Token bartës",
+      "authOAuth": "Hyrje me OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Pasi të ruash, prek $t(modelChat.mcpOAuth.signIn) te serveri për të hyrë me shfletuesin tënd.",
+      "serverNeedsSignIn": "Hyr për të përdorur këtë server",
+      "signIn": "Hyr",
+      "signInA11y": "Hyr në këtë server: {{name}}",
+      "signInFailed": "Nuk u arrit hyrja në {{name}}. Provo përsëri."
+    },
     "backends": {
       "title": "Shërbimet mbështetëse të bisedës",
+      "providersTitle": "Ofruesit e bisedave",
+      "cloud": "Në re",
+      "cloudModel": "Modeli: {{model}}",
+      "cloudUnavailable": "Modelet Kilo nuk janë të disponueshme tani. Kontrollo lidhjen tënde.",
       "manage": "Menaxho shërbimet mbështetëse",
       "defaultKilo": "$t(consent.kilo) (i parazgjedhur)",
       "kiloHelp": "Shërbimi mbështetës i integruar përdor llogarinë tënde Kilo dhe nuk mund të modifikohet ose fshihet.",
@@ -3304,7 +3386,6 @@
     "gguf": {
       "title": "Modelet e shkarkueshme",
       "help": "Shkarko një model të hapur dhe ekzekutoje në këtë telefon me llama.cpp. Kërkesat dhe përgjigjet e tua mbeten në pajisje. Modelet janë të mëdha, prandaj përdor Wi-Fi.",
-      "details": "{{size}} · Licenca: {{license}}",
       "download": "Shkarko modelin",
       "pause": "Pauzo shkarkimin",
       "resume": "Rifillo shkarkimin",
@@ -3316,6 +3397,8 @@
       "url": "Lidhje e drejtpërdrejtë shkarkimi",
       "urlHelp": "Ngjit një lidhje HTTPS për një skedar .gguf, si një lidhje resolve nga Hugging Face. Shkarko modele vetëm nga burime që i beson.",
       "downloadUrl": "Shkarko nga lidhja",
+      "advanced": "Të avancuara",
+      "localPurpose": "Funksionon në këtë pajisje me llama.cpp. Kërkesat dhe përgjigjet qëndrojnë në pajisje.",
       "deleteTitle": "Të fshihet ky model?",
       "deleteMessage": "Të fshihet {{name}} nga kjo pajisje? Bisedat që e përdorin kanë nevojë për një model tjetër përpara se të vazhdojnë.",
       "errors": {
@@ -3325,12 +3408,62 @@
         "notGguf": "Lidhja duhet të tregojë një skedar .gguf.",
         "space": "Nuk ka hapësirë të lirë të mjaftueshme për këtë model. Liro hapësirë dhe provo përsëri.",
         "network": "Shkarkimi nuk përfundoi. Kontrollo lidhjen e internetit dhe provo përsëri.",
-        "invalidFile": "Skedari i shkarkuar nuk është një model që ky aplikacion mund ta ekzekutojë, prandaj u hoq."
+        "invalidFile": "Skedari i shkarkuar nuk është një model që ky aplikacion mund ta ekzekutojë, prandaj u hoq.",
+        "checksum": "Skedari i shkarkuar nuk përputhet me shumën e kontrollit të publikuar, prandaj u hoq. Provoni ta shkarkoni përsëri."
       }
+    },
+    "catalog": {
+      "browse": "Shfleto modelet",
+      "title": "Katalogu i modeleve",
+      "search": "Kërko modele në Hugging Face",
+      "tabs": "Filtri i modeleve",
+      "fitsTab": "Të përshtatshme për pajisjen",
+      "fromHuggingFace": "Nga Hugging Face",
+      "loading": "Po ngarkohen modelet",
+      "noResults": "Nuk u gjet asnjë model",
+      "noFits": "Asnjë model nuk përshtatet me këtë pajisje",
+      "noFitsDescription": "Modelet më të mëdha janë te skeda $t(common.all).",
+      "fit": {
+        "fits": "Përshtatet",
+        "tight": "Mezi përshtatet",
+        "tooLarge": "Shumë i madh",
+        "noStorage": "Hapësirë e pamjaftueshme",
+        "unknown": "Përshtatja e panjohur"
+      },
+      "recommendationsHelp": "Një listë e shkurtër që kjo aplikacion fikson: një skedar për model, nga një botues që deklaron një licencë. Asgjë tjetër nuk renditet.",
+      "compatibilityHelp": "Përshtatja krahason skedarin e modelit me memorien dhe hapësirën e lirë të kësaj pajisjeje. Shifra e memories është një vlerësim, jo një matje.",
+      "text": "Tekst",
+      "listTextPurpose": "Vetëm kërkesa teksti.",
+      "listImagePurpose": "Lexon imazhe ashtu si tekst.",
+      "smallestDownload": "Shkarkimi më i vogël: {{size}} · rreth {{memory}} memorie",
+      "fullFileName": "Skedari: {{name}}",
+      "memoryEstimateNote": "Shifrat e memories janë vlerësime, jo matje.",
+      "parameters": "Parametra: {{value}}",
+      "downloads": "Shkarkime: {{value}}",
+      "likes": "Pëlqime: {{value}}",
+      "context": "Dritarja e kontekstit: {{value}}",
+      "license": "Licenca: {{license}}",
+      "licenseUnknown": "Licenca nuk është specifikuar",
+      "tools": "Thirrje mjetesh",
+      "vision": "Hyrje imazhesh",
+      "hintsHelp": "Sugjerime nga Hugging Face. Aplikacioni e kontrollon modelin pasi të shkarkohet.",
+      "gated": "Ky model kërkon një llogari Hugging Face, prandaj aplikacioni nuk mund ta shkarkojë.",
+      "quantizations": "Kuantizimet",
+      "quantizationsHelp": "Skedarët më të vegjël përdorin më pak memorie dhe hapësirë. Skedarët më të mëdhenj zakonisht japin përgjigje më të mira.",
+      "quantDetail": "Shkarkim {{size}} · rreth {{memory}} memorie",
+      "downloadQuant": "Shkarko {{quant}}",
+      "loadingModel": "Po ngarkohen detajet e modelit",
+      "couldNotLoadModel": "Ky model nuk u ngarkua",
+      "noFiles": "Asnjë skedar që ky aplikacion mund të ekzekutojë",
+      "noFilesDescription": "Ky aplikacion ekzekuton modele që janë një skedar i vetëm GGUF.",
+      "tooLargeTitle": "Ky model mund të mos funksionojë",
+      "tooLargeMessage": "{{name}} ka gjasa të kërkojë më shumë memorie se sa ka kjo pajisje. Aplikacioni mund të mbyllet ndërsa modeli përgjigjet. Ta shkarkoj gjithsesi?",
+      "downloadAnyway": "Shkarko gjithsesi"
     },
     "localModels": {
       "title": "Modelet në pajisje",
-      "help": "Modelet në pajisje funksionojnë në këtë telefon. Kërkesat dhe përgjigjet e tua mbeten në pajisje dhe këto modele nuk mund të përdorin mjete.",
+      "help": "Modelet në pajisje funksionojnë në këtë telefon. Kërkesat dhe përgjigjet e tua mbeten në pajisje.",
+      "systemPurpose": "Modeli i integruar në sistemin e kësaj pajisjeje. Funksionon në pajisje.",
       "apple": "Apple Intelligence (në pajisje)",
       "checking": "Po kontrollohet disponueshmëria…",
       "ready": "Gati për përdorim",
@@ -3356,6 +3489,9 @@
       "downloading": "Po shkarkohet…",
       "downloadProgress": "Po shkarkohet… {{percent}}%",
       "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ky model mbështet nivelin e arsyetimit"
     }
   },
   "settingsTools": {
@@ -3578,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play nuk ktheu paketa kreditesh që përputhen.",
     "purchaseOwnedByAnotherAccount": "Kreditet në këtë Apple Account i përkasin një llogarie tjetër Kilo. Hyr në atë llogari Kilo për t'i përdorur.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditet në këtë llogari Google Play i përkasin një llogarie tjetër Kilo. Hyni në atë llogari Kilo për t'i përdorur."
+  },
+  "todos": {
+    "saveAsTodo": "Ruaj si detyrë",
+    "segment": {
+      "label": "Pamja e agjentëve",
+      "sessions": "Seancat",
+      "todos": "Detyrat"
+    },
+    "lists": {
+      "newList": "Listë e re",
+      "empty": "Ende pa lista",
+      "couldNotLoad": "Listat nuk u ngarkuan",
+      "noRepository": "Pa depo",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} hapur",
+      "openCount_other": "{{count}} hapur",
+      "archived_one": "Arkivuar ({{count}})",
+      "archived_other": "Arkivuar ({{count}})",
+      "archive": "Arkivo",
+      "unarchive": "Çarkivo",
+      "deleteTitle": "Të fshihet {{name}}?",
+      "deleteMessage": "Edhe detyrat e tij fshihen. Seancat e tyre mbeten."
+    },
+    "listSettings": {
+      "title": "Cilësimet e listës",
+      "name": "Emri",
+      "namePlaceholder": "Gabime, Ide, Publikime…",
+      "emoji": "Emoji",
+      "mode": "Mënyra",
+      "defaultsHint": "Seancat e nisura nga kjo listë përdorin këto parazgjedhje."
+    },
+    "list": {
+      "addPlaceholder": "Shto një detyrë",
+      "add": "Shto detyrë",
+      "empty": "Ende pa detyra",
+      "setDefaults": "Cakto depon, mënyrën dhe modelin",
+      "completed_one": "Përfunduar ({{count}})",
+      "completed_other": "Përfunduar ({{count}})"
+    },
+    "item": {
+      "markDone": "Shëno si të kryer",
+      "markOpen": "Shëno si të pakryer",
+      "markDonePrompt": "Të shënohet si e kryer?",
+      "deleted": "Detyra u fshi",
+      "undo": "Zhbëj",
+      "runCount_one": "{{count}} ekzekutim",
+      "runCount_other": "{{count}} ekzekutime",
+      "startNow": "Nis pa shqyrtim",
+      "startNowHint": "Shtypni gjatë për të nisur pa shqyrtim",
+      "titleLabel": "Titulli i detyrës",
+      "renameTitle": "Riemërto detyrën",
+      "notes": "Shënime",
+      "addNotes": "Shto shënime",
+      "notesPrompt": "Shto kontekst, kërkesa ose kritere pranimi.",
+      "markdownSupported": "Markdown i mbështetur",
+      "sessions": "Seancat e lidhura",
+      "noSessions": "Ende pa seanca",
+      "untitledLinkedSession": "Sesion i lidhur",
+      "sessionNeedsInput": "Sesioni kërkon të dhëna hyrëse",
+      "sessionRunning": "Sesioni po funksionon",
+      "sessionFinished": "Sesioni përfundoi",
+      "sessionPullRequest": "Kërkesë tërheqjeje e sesionit",
+      "sessionPullRequestNumber": "PR i sesionit #{{number}}",
+      "openSessionHint": "Hap sesionin.",
+      "unlinkSessionAction": "Shkëput sesionin",
+      "unlinkConfirmTitle": "Të shkëputet {{title}}?",
+      "unlinkConfirmMessage": "Vetë sesioni nuk fshihet. Hiqet vetëm lidhja e tij me këtë detyrë.",
+      "startNewSession": "Nis sesion të ri",
+      "startNewSessionHint": "Shtyp gjatë për të nisur një sesion të ri.",
+      "linkSession": "Lidh seancën",
+      "linkFailed": "Seanca nuk u lidh me detyrën"
+    },
+    "linkSession": {
+      "title": "Lidh një seancë",
+      "empty": "Pa seanca të fundit",
+      "emptyInRepository": "Pa seanca të fundit në {{repository}}"
+    },
+    "upNext": "Në vazhdim",
+    "sessionTodo": "Detyrë: {{title}}",
+    "linkToTodo": "Lidh me detyrën",
+    "candidates": {
+      "empty": "Pa detyra të hapura"
+    },
+    "saveSheet": {
+      "title": "Ruaj në listë",
+      "saved": "U ruajt në {{list}}"
+    }
   }
 }

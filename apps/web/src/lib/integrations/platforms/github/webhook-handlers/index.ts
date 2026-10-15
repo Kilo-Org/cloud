@@ -6,7 +6,6 @@ export {
 } from './installation-handler';
 export { handleInstallationTargetRenamed } from './installation-target-handler';
 export { handleInstallationRepositories } from './installation-repositories-handler';
-export { handlePushEvent } from './push-handler';
 export { handlePullRequest } from './pull-request-handler';
 export { handleIssue } from './issue-handler';
 export { handlePRReviewComment } from './pr-review-comment-handler';

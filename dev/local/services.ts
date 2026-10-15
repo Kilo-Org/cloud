@@ -63,7 +63,6 @@ const groups: ServiceGroup[] = [
   { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
   { id: 'auto-routing', label: 'Auto Routing', alwaysOn: false, sectionBreakBefore: true },
-  { id: 'ai-gateway', label: 'AI Gateway', alwaysOn: false },
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
   { id: 'deletion-mock', label: 'Deletion Mock', alwaysOn: false, sectionBreakBefore: true },
@@ -101,25 +100,32 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // must pull the worker in transitively — otherwise the mutation's fetch hits
   // a dead `SESSION_INGEST_WORKER_URL` and every run that asks for a web ticket
   // gets a 412 PRECONDITION_FAILED. Same precedent as mobile -> latency-ingest.
+  // The web app rewrites its AI gateway routes to the ai-gateway app (see
+  // apps/web/ai-gateway-rewrites.mjs), so it pulls that app in too.
   nextjs: {
     group: 'core',
-    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe', 'cloudflare-session-ingest'],
+    dependsOn: [
+      'postgres',
+      'redis',
+      'redis-http',
+      'stripe',
+      'cloudflare-session-ingest',
+      'ai-gateway',
+    ],
   },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
   'redis-http': { group: 'core', dependsOn: ['redis'] },
   stripe: { group: 'core', dependsOn: [] },
+  'ai-gateway': {
+    group: 'core',
+    dependsOn: ['postgres', 'redis', 'redis-http'],
+    dir: 'apps/ai-gateway',
+  },
   'user-data-export': {
     group: 'data-export',
     dependsOn: ['postgres', 'nextjs'],
     dir: 'services/user-data-export',
-  },
-  // The standalone AI gateway app (apps/ai-gateway). It serves the gateway
-  // routes the web app also serves, from the same database and Redis.
-  'ai-gateway': {
-    group: 'ai-gateway',
-    dependsOn: ['postgres', 'redis', 'redis-http'],
-    dir: 'apps/ai-gateway',
   },
   // auto-routing (kilo-auto/efficient decision engine + benchmark runner)
   'auto-routing': {
@@ -683,7 +689,12 @@ function workerEnvPrefix(): string[] {
   return vars.length > 0 ? ['env', ...vars] : [];
 }
 
+// Clear of the 3000-3009 range the web app's dev script probes.
 const AI_GATEWAY_BASE_PORT = 3010;
+
+function aiGatewayPort(): number {
+  return AI_GATEWAY_BASE_PORT + portOffset;
+}
 
 function buildServiceDefs(): ServiceDef[] {
   const repoRoot = REPO_ROOT;
@@ -699,24 +710,38 @@ function buildServiceDefs(): ServiceDef[] {
         dir: 'apps/web',
         port: nextjsTargetPort,
         dependsOn: meta.dependsOn,
-        command: ['pnpm', 'run', 'dev'],
+        command: [
+          'env',
+          `AI_GATEWAY_URL=http://localhost:${aiGatewayPort()}`,
+          'pnpm',
+          'run',
+          'dev',
+        ],
         group: meta.group,
       });
       continue;
     }
 
     if (name === 'ai-gateway') {
-      // Clear of the 3000-3009 range the web app's dev script probes. The port
-      // is passed as AI_GATEWAY_PORT because the session exports PORT for the
-      // web app.
-      const port = AI_GATEWAY_BASE_PORT + portOffset;
+      // The port is passed as AI_GATEWAY_PORT because the session exports PORT
+      // for the web app. The gateway starts before the web app writes
+      // `.dev-port`, so it gets the web port that dev:start already verified
+      // is free.
+      const port = aiGatewayPort();
       defs.push({
         name,
         type: 'nextjs',
         dir: meta.dir ?? name,
         port,
         dependsOn: meta.dependsOn,
-        command: ['env', `AI_GATEWAY_PORT=${port}`, 'pnpm', 'run', 'dev'],
+        command: [
+          'env',
+          `AI_GATEWAY_PORT=${port}`,
+          `AI_GATEWAY_WEB_PORT=${nextjsTargetPort}`,
+          'pnpm',
+          'run',
+          'dev',
+        ],
         group: meta.group,
       });
       continue;
@@ -1158,6 +1183,44 @@ export function resolveTargets(targets: string[]): string[] {
   const uniqueGroupIds = [...new Set(groupIdsToExpand)];
   const allNames = resolveGroups(resolveGroupTransitiveDeps(uniqueGroupIds));
   return topologicalSort(resolveTransitiveDeps(allNames));
+}
+
+export type ServiceExclusion = {
+  serviceNames: string[];
+  skipped: string[];
+  /** Selected services that declare a dependency on a skipped service. */
+  dependents: Map<string, string[]>;
+};
+
+/**
+ * Drop explicitly unwanted services from a resolved selection, for memory-
+ * constrained environments that run only what they exercise. Unknown names
+ * throw so a typo cannot silently start the full stack.
+ */
+export function excludeServices(
+  serviceNames: readonly string[],
+  excluded: readonly string[]
+): ServiceExclusion {
+  for (const name of excluded) getService(name);
+  const excludedSet = new Set(excluded);
+  const kept = serviceNames.filter(name => !excludedSet.has(name));
+  const dependents = new Map<string, string[]>();
+  for (const name of kept) {
+    const missing = getService(name).dependsOn.filter(dep => excludedSet.has(dep));
+    if (missing.length > 0) dependents.set(name, missing);
+  }
+  return {
+    serviceNames: kept,
+    skipped: serviceNames.filter(name => excludedSet.has(name)),
+    dependents,
+  };
+}
+
+export function parseServiceList(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map(name => name.trim())
+    .filter(name => name !== '');
 }
 
 export function getService(name: string): ServiceDef {

@@ -188,7 +188,9 @@ function cloudflareHarness(): ContractHarness {
   };
 }
 
-function containersHarness(): ContractHarness {
+function containersHarness(
+  options: { startSource?: ContainersStartSource; failLaunchLease?: boolean } = {}
+): ContractHarness {
   const state = {
     observation: {
       running: true,
@@ -210,10 +212,11 @@ function containersHarness(): ContractHarness {
     launchWrapper: async (input: ContainersLaunchInput) => {
       state.launchInputs.push(input);
       state.observation = { ...state.observation, currentAllocationRef: input.allocationRef };
-      return { started: true, startSource: 'image' as ContainersStartSource };
+      return { started: true, startSource: options.startSource ?? 'image' };
     },
     ensureLeaseAtLeast: async (_ref: string, ms: number) => {
       state.leaseMs.push(ms);
+      if (options.failLaunchLease) throw new Error('containers lease failed');
     },
     captureRepository: async (ref: string, repoKey: string, commit?: string) => {
       state.captures.push({ ref, repoKey, ...(commit === undefined ? {} : { commit }) });
@@ -386,6 +389,32 @@ const harnessFactories = [cloudflareHarness, containersHarness, vercelHarness];
 describe.each(harnessFactories.map(factory => [factory().name, factory] as const))(
   'provider adapter contract: %s',
   (_name, factory) => {
+    it('projects owned runtime identity without querying the backend', async () => {
+      const harness = factory();
+      const ref = await harness.create();
+      harness.failObserve();
+      harness.failCreate();
+      const container = harness.adapter.describeRuntime?.(ref);
+      expect(container).toEqual({
+        provider: harness.name,
+        sandboxId: SANDBOX,
+        instanceId: harness.name === 'vercel' ? 'session-1' : intent.intentId,
+        ...(harness.name === 'vercel'
+          ? {
+              region: 'fra1',
+              instanceType: 'small',
+              snapshotId: 'snapshot',
+              runtimeBuildId: 'build',
+              startSource: 'snapshot',
+            }
+          : harness.name === 'cloudflare'
+            ? { startSource: 'image' }
+            : { instanceType: 'standard-3' }),
+      });
+      expect(harness.adapter.describeRuntime?.(harness.foreignRef())).toBeUndefined();
+      expect(harness.adapter.describeRuntime?.('invalid')).toBeUndefined();
+    });
+
     it('creates a ref, then launch maps the ref, caller env and supervisor', async () => {
       const harness = factory();
       const ref = await harness.create();
@@ -479,6 +508,13 @@ describe.each(harnessFactories.map(factory => [factory().name, factory] as const
 );
 
 describe('provider-specific contract differences', () => {
+  it('reports the actual snapshot launch source even if its initial lease renewal fails', async () => {
+    const harness = containersHarness({ startSource: 'repository', failLaunchLease: true });
+    const ref = await harness.create();
+    await expect(harness.adapter.launch(ref, {})).resolves.toEqual({ startSource: 'repository' });
+    expect(harness.leaseCalls()).toBe(1);
+  });
+
   it('keeps Cloudflare logs as an opaque descriptor and ignores the lease duration', async () => {
     const harness = cloudflareHarness();
     const ref = await harness.create();
@@ -530,6 +566,7 @@ describe('provider-specific contract differences', () => {
 
     expect(harness.launchedEnv()).toMatchObject({
       CALLER: 'value',
+      CONTROL_WORKLOAD_LIMIT_MB: '8192',
       PROVIDER_INSTANCE_ID: ref,
       WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
     });

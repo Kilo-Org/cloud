@@ -16,6 +16,7 @@ vi.mock('./db', async importOriginal => {
     existsNewerCompletedRun: vi.fn(),
     getCaseResults: vi.fn(),
     getRunningRun: vi.fn(),
+    getLiveContainerLanes: vi.fn(),
     getRunWithModels: vi.fn(),
     getSummaries: vi.fn(),
     listLaneFailures: vi.fn(),
@@ -35,6 +36,7 @@ import {
   countCaseResultsByLane,
   getCaseResults,
   getRunningRun,
+  getLiveContainerLanes,
   getRunWithModels,
   getSummaries,
   listLaneFailures,
@@ -123,6 +125,7 @@ beforeEach(() => {
   vi.mocked(markProfilesFailedForEntries).mockResolvedValue(undefined);
   vi.mocked(markProfilesReadyForRun).mockResolvedValue(undefined);
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
   queueSendBatch.mockResolvedValue(undefined);
 });

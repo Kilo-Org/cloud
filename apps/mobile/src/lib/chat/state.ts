@@ -1,6 +1,9 @@
-import { type Turn } from '@kilocode/harness-sdk';
+import { type Part } from '@kilocode/cloud-agent-sdk';
+import { type Effort, type Turn } from '@kilocode/harness-sdk';
 
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
+
+import { type ChatRecord, NO_RECORD } from './store';
 
 /**
  * What a chat looks like to whoever is drawing it.
@@ -16,14 +19,19 @@ export type Question = {
   readonly images: readonly LocalImage[];
 };
 
+/** Where a question goes: the model, and the effort it is asked with. Null is the model's default. */
+export type ChatTarget = { readonly model: string; readonly effort: Effort | null };
+
 /** What a chat screen draws. */
 export type ChatState = {
   readonly sessionId: string;
   readonly model: string;
+  /** The effort the session asks with. Null asks with the model's own default. */
+  readonly effort: Effort | null;
   /** Every turn the store holds, oldest first. */
   readonly turns: readonly Turn[];
   /** The answer arriving right now, empty when none is. */
-  readonly answering: string;
+  readonly answering: readonly Part[];
   readonly status: 'opening' | 'idle' | 'working';
   /**
    * A question with no answer: still being asked, or asked and nothing came
@@ -35,6 +43,8 @@ export type ChatState = {
   readonly askedImages: readonly LocalImage[];
   /** The target that question was asked of, even if moving onto it failed. */
   readonly askedModel: string | null;
+  /** The effort that question was asked with. */
+  readonly askedEffort: Effort | null;
   /**
    * Questions typed while an answer was arriving, in the order they will be
    * asked. The composer stays open while the model works, so a person can ask
@@ -46,6 +56,11 @@ export type ChatState = {
   readonly failed: string | null;
   /** A fixed localization key safe to display, never a provider's raw error. */
   readonly failureKey: string | null;
+  /**
+   * What the chat used, how full the last call was, and when it started and
+   * last moved. Changed when a call ends, not on every word of an answer.
+   */
+  readonly record: ChatRecord;
 };
 
 /**
@@ -108,14 +123,16 @@ export function watchChats(watcher: () => void): () => void {
 /** A chat with nothing in it, which is what every chat starts as. */
 export const NOTHING = {
   turns: [] as readonly Turn[],
-  answering: '',
+  answering: [] as readonly Part[],
   asked: null,
   askedImages: [] as readonly LocalImage[],
   askedModel: null,
+  askedEffort: null,
   waiting: [] as readonly Question[],
   failed: null,
   failureKey: null,
-} satisfies Omit<ChatState, 'sessionId' | 'model' | 'status'>;
+  record: NO_RECORD,
+} satisfies Omit<ChatState, 'sessionId' | 'model' | 'effort' | 'status'>;
 
 function publish(sessionId: string): void {
   for (const watcher of watchers.get(sessionId) ?? []) {
@@ -163,7 +180,13 @@ export function snapshotOf(sessionId: string): ChatState {
   if (held !== undefined) {
     return held;
   }
-  const fresh: ChatState = { sessionId: target, model: '', status: 'opening', ...NOTHING };
+  const fresh: ChatState = {
+    sessionId: target,
+    model: '',
+    effort: null,
+    status: 'opening',
+    ...NOTHING,
+  };
   states.set(target, fresh);
   return fresh;
 }

@@ -4,12 +4,21 @@ import type {
   CustomRoutingTableResponse,
   PoolEntry,
 } from '@kilocode/auto-routing-contracts';
-import { MAX_POOL_ENTRIES, poolEntryKey } from '@kilocode/auto-routing-contracts';
-import { getSummariesForRuns, listReadyCurrentProfilesForEntries } from './db';
+import {
+  ComplexityLabelsSchema,
+  MAX_POOL_ENTRIES,
+  poolEntryKey,
+} from '@kilocode/auto-routing-contracts';
+import {
+  getRoutingCaseResultsForEntries,
+  getSummariesForRuns,
+  listReadyCurrentProfilesForEntries,
+} from './db';
 import { variantFromStorage } from './reasoning-effort';
 import { buildCustomRoutingTable } from './routing-table-builder';
 import { currentProfileContextFromConfig, ProfileValidationError } from './profiles';
 import { catalogCandidatePrices, fetchBenchmarkModelCatalog } from './platform-models';
+import caseComplexity from './datasets/case-complexity.json';
 
 function assertUniqueEntries(entries: readonly PoolEntry[]): void {
   if (entries.length < 1 || entries.length > MAX_POOL_ENTRIES) {
@@ -41,7 +50,11 @@ export async function assembleCustomRoutingTable(
     Partial<
       Pick<
         BenchmarkConfig,
-        'productionTokenProfile' | 'switchHorizonTurns' | 'lowConfidenceThreshold'
+        | 'router'
+        | 'accuracyNoiseBand'
+        | 'productionTokenProfile'
+        | 'switchHorizonTurns'
+        | 'lowConfidenceThreshold'
       >
     >,
   entries: readonly PoolEntry[],
@@ -51,6 +64,11 @@ export async function assembleCustomRoutingTable(
     fetchImpl?: typeof fetch;
   } = {}
 ): Promise<CustomRoutingTableResponse> {
+  if (config.router === 'frontier') {
+    throw new ProfileValidationError(
+      'Custom model pools are only supported by the efficient router'
+    );
+  }
   assertUniqueEntries(entries);
   const current = currentProfileContextFromConfig(config);
   const readyRows = await listReadyCurrentProfilesForEntries(db, current, entries);
@@ -72,7 +90,10 @@ export async function assembleCustomRoutingTable(
   }
 
   const runIds = [...new Set(readyEntries.map(r => r.runId))];
-  const summaries = await getSummariesForRuns(db, runIds);
+  const [summaries, perCaseResults] = await Promise.all([
+    getSummariesForRuns(db, runIds),
+    getRoutingCaseResultsForEntries(db, readyEntries),
+  ]);
   const generatedAt = (options.now ?? new Date()).toISOString();
   const prices = options.catalogEnv
     ? catalogCandidatePrices(
@@ -83,6 +104,7 @@ export async function assembleCustomRoutingTable(
   const table: CustomRoutingTable | null = buildCustomRoutingTable({
     generatedAt,
     minAccuracy: config.minAccuracy,
+    accuracyNoiseBand: config.accuracyNoiseBand,
     switchCostFactor: config.switchCostFactor,
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
     productionTokenProfile: config.productionTokenProfile ?? null,
@@ -91,6 +113,8 @@ export async function assembleCustomRoutingTable(
     prices,
     readyEntries,
     summaries,
+    perCaseResults,
+    complexityLabels: ComplexityLabelsSchema.parse(caseComplexity),
   });
 
   return { table };

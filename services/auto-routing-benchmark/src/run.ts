@@ -5,8 +5,11 @@ import {
 import {
   BENCHMARK_CONTAINER_BUDGET,
   CLASSIFIER_WINNER_KV_KEY,
-  ROUTING_TABLE_KV_KEY,
+  routingTableKvKey,
+  AUTO_ROUTERS,
+  type AutoRouter,
   resolveBenchmarkIdentity,
+  ComplexityLabelsSchema,
   type BenchmarkDeciderModel,
   type BenchmarkKind,
   type BenchmarkModelSummary,
@@ -14,9 +17,14 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import * as z from 'zod';
-import { getBenchmarkConfig } from './config';
+import {
+  BenchmarkConcurrencyBudgetError,
+  getBenchmarkConfig,
+  validateBenchmarkConcurrencyBudget,
+} from './config';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
-import { DECIDER_CASES } from './datasets/decider-cases';
+import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
+import caseComplexity from './datasets/case-complexity.json';
 import type { RunModelRow, RunRow } from './db';
 import {
   countCaseResultsByLane,
@@ -33,6 +41,7 @@ import {
   getLatestRoutingTable,
   getSummaries,
   getSummariesForRuns,
+  getRoutingCaseResultsForEntries,
   insertRun,
   listLaneFailures,
   listPendingCurrentProfiles,
@@ -119,6 +128,10 @@ export const BenchmarkJobMessageSchema = z.object({
   rep: z.number().int().min(0).optional(),
 });
 
+export function deciderCasesForRouter(router: AutoRouter = 'efficient') {
+  return router === 'frontier' ? FRONTIER_CASES : DECIDER_CASES;
+}
+
 // Decider cases run through the real `kilo` CLI in a container (up to ~3 min
 // each). Chunking caps how many cases a single queue invocation processes so
 // each stays well under CF's wall-clock limit.
@@ -197,7 +210,7 @@ export async function failRunAndDrain(env: Env, runId: string, error: string): P
       })
     );
   }
-  await drainQueues(env, 'both');
+  for (const router of AUTO_ROUTERS) await drainQueues(env, 'both', undefined, router);
 }
 
 const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
@@ -263,7 +276,7 @@ async function salvageTimedOutDeciderRun(env: Env, runId: string): Promise<void>
     env.BENCH_DB,
     runId,
     state,
-    DECIDER_CASES.length
+    deciderCasesForRouter(state.router).length
   );
   for (const lane of unfinished) {
     if (deadLaneKeys.has(laneKey(lane.model, lane.variant, lane.rep))) continue;
@@ -284,17 +297,25 @@ async function salvageTimedOutDeciderRun(env: Env, runId: string): Promise<void>
  * queues. Used by the scheduled handler so a failed final queue message cannot
  * strand pending work. Never throws for drain/slot contention.
  */
-export async function sweepStaleRunsAndDrain(env: Env): Promise<{
+export async function sweepStaleRunsAndDrain(
+  env: Env,
+  router: AutoRouter = 'efficient'
+): Promise<{
   staleRunIds: string[];
   drained: StartedQueueRun[];
 }> {
   const staleRunIds = await sweepStaleRuns(env);
   // Each platform drain reconciles the catalog before claiming entries.
-  const drained = await drainQueues(env, 'both');
+  const drained = await drainQueues(env, 'both', undefined, router);
   return { staleRunIds, drained };
 }
 
-export type StartedQueueRun = { runId: string; purpose: BenchmarkRunPurpose; entryCount: number };
+export type StartedQueueRun = {
+  router: AutoRouter;
+  runId: string;
+  purpose: BenchmarkRunPurpose;
+  entryCount: number;
+};
 
 /**
  * Drain the selected registry queues. 'both' starts at most one run per queue —
@@ -307,15 +328,23 @@ export async function drainQueues(
   // Filled with whatever each queue threw. The scheduled callers ignore it; an
   // admin who pressed a button needs to be told the queue is wedged instead of
   // being shown "nothing to run".
-  errors?: unknown[]
+  errors?: unknown[],
+  router: AutoRouter = 'efficient'
 ): Promise<StartedQueueRun[]> {
+  if (router === 'frontier' && selector === 'user') {
+    throw new BenchmarkRunConfigError('The frontier router does not support owner queues');
+  }
   const queues: BenchmarkRunPurpose[] =
-    selector === 'both' ? ['platform', 'user'] : [selector satisfies BenchmarkRunPurpose];
+    selector === 'both'
+      ? router === 'frontier'
+        ? ['platform']
+        : ['platform', 'user']
+      : [selector satisfies BenchmarkRunPurpose];
   const started: StartedQueueRun[] = [];
   for (const queue of queues) {
     try {
-      const drained = await drainQueue(env, queue);
-      if (drained) started.push({ ...drained, purpose: queue });
+      const drained = await drainQueue(env, queue, router);
+      if (drained) started.push({ ...drained, router, purpose: queue });
     } catch (error) {
       errors?.push(error);
       console.warn(
@@ -338,14 +367,19 @@ export async function drainQueues(
  */
 export async function syncPlatformRegistry(
   env: Env,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  router: AutoRouter = 'efficient'
 ): Promise<{ desiredEntries: number }> {
-  const config = await getBenchmarkConfig(env.BENCH_DB);
+  const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return { desiredEntries: 0 };
   const desired = await fetchPlatformRegistryEntries(env, config, fetchImpl);
   await syncPlatformRegistryRows(
     env.BENCH_DB,
-    { engineIdentity: computeEngineIdentity('decider'), repetitions: config.deciderRepetitions },
+    {
+      router,
+      engineIdentity: computeEngineIdentity('decider', router),
+      repetitions: config.deciderRepetitions,
+    },
     desired
   );
   return { desiredEntries: desired.length };
@@ -365,13 +399,15 @@ export async function syncPlatformRegistry(
  */
 export async function publishPlatformRoutingTable(
   env: Env,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  router: AutoRouter = 'efficient'
 ): Promise<{ version: string } | null> {
-  const config = await getBenchmarkConfig(env.BENCH_DB);
+  const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return null;
 
   const current = {
-    engineIdentity: computeEngineIdentity('decider'),
+    router,
+    engineIdentity: computeEngineIdentity('decider', router),
     repetitions: config.deciderRepetitions,
   };
   const catalog = await fetchBenchmarkModelCatalog(env, fetchImpl);
@@ -403,8 +439,9 @@ export async function publishPlatformRoutingTable(
     return null;
   }
 
-  const summaries = await getSummariesForRuns(env.BENCH_DB, [
-    ...new Set(readyEntries.map(r => r.runId)),
+  const [summaries, perCaseResults] = await Promise.all([
+    getSummariesForRuns(env.BENCH_DB, [...new Set(readyEntries.map(r => r.runId))]),
+    getRoutingCaseResultsForEntries(env.BENCH_DB, readyEntries),
   ]);
   const generatedAt = new Date().toISOString();
   const deciderModels: BenchmarkDeciderModel[] = readyEntries.map(({ entry }) => ({
@@ -412,22 +449,15 @@ export async function publishPlatformRoutingTable(
     variant: entry.variant,
     reasoningEffort: null,
   }));
+  const minAccuracy = Math.min(
+    1,
+    config.minAccuracy + (router === 'frontier' ? config.frontierMinAccuracyDelta : 0)
+  );
   const table = buildRoutingTable({
-    // Namespace the canonical artifact so identical legacy measurements republish.
-    version: `${computeRegistryRoutingTableVersion(
-      readyEntries.map(r => ({ runId: r.runId, model: r.entry.model, variant: r.entry.variant })),
-      {
-        minAccuracy: config.minAccuracy,
-        switchCostFactor: config.switchCostFactor,
-        bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
-        productionTokenProfile: config.productionTokenProfile,
-        switchHorizonTurns: config.switchHorizonTurns,
-        lowConfidenceThreshold: config.lowConfidenceThreshold,
-        prices,
-      }
-    )}-variants`,
+    version: generatedAt,
     generatedAt,
-    minAccuracy: config.minAccuracy,
+    minAccuracy,
+    accuracyNoiseBand: config.accuracyNoiseBand,
     switchCostFactor: config.switchCostFactor,
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
     productionTokenProfile: config.productionTokenProfile,
@@ -436,18 +466,37 @@ export async function publishPlatformRoutingTable(
     prices,
     deciderModels,
     summaries: filterSummariesByProvenance(readyEntries, summaries),
+    perCaseResults,
+    complexityLabels: ComplexityLabelsSchema.parse(caseComplexity),
   });
+  table.version = `${computeRegistryRoutingTableVersion(
+    readyEntries.map(r => ({ runId: r.runId, model: r.entry.model, variant: r.entry.variant })),
+    {
+      router,
+      engineIdentity: current.engineIdentity,
+      accuracyNoiseBand: config.accuracyNoiseBand,
+      frontierMinAccuracyDelta: config.frontierMinAccuracyDelta,
+      minAccuracy,
+      switchCostFactor: config.switchCostFactor,
+      bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
+      productionTokenProfile: config.productionTokenProfile,
+      switchHorizonTurns: config.switchHorizonTurns,
+      lowConfidenceThreshold: config.lowConfidenceThreshold,
+      prices,
+      summaries: filterSummariesByProvenance(readyEntries, summaries),
+      effortByComplexity: table.effortByComplexity,
+    }
+  )}-variants`;
 
   // The version hashes the contributing registry rows and the config knobs, so
   // an identical version means an identical table. Skip the write and the flush.
-  const published = await getLatestRoutingTable(env.BENCH_DB).catch(() => null);
+  const published = await getLatestRoutingTable(env.BENCH_DB, router).catch(() => null);
   if (published?.table.version === table.version) {
     return { version: table.version };
   }
 
-  await saveRoutingTable(env.BENCH_DB, table, generatedAt);
-  // Clear KV so the auto-routing worker repopulates from D1 on next request.
-  await env.AUTO_ROUTING_CONFIG.delete(ROUTING_TABLE_KV_KEY);
+  await saveRoutingTable(env.BENCH_DB, table, generatedAt, router);
+  await env.AUTO_ROUTING_CONFIG.delete(routingTableKvKey(router));
   console.log(
     JSON.stringify({
       event: 'routing_table_published',
@@ -480,23 +529,16 @@ function fnv1aHex(input: string): string {
 // version for code-level execution changes. Two runs sharing this identity
 // (plus repetitions + reasoning_effort) produced comparable measurements, so a
 // model's prior summaries can be carried instead of re-run.
-export function computeEngineIdentity(kind: BenchmarkKind): string {
-  // Tags the classifier execution path so summaries from the earlier
-  // chat-completions classifier are never carried into System One runs. Bumping
-  // BENCHMARK_ENGINE_VERSION instead would also re-run every decider profile.
+export function computeEngineIdentity(
+  kind: BenchmarkKind,
+  router: AutoRouter = 'efficient'
+): string {
+  const selectedRouter = kind === 'classifier' ? 'efficient' : router;
   const datasetSignature =
     kind === 'classifier'
-      ? {
-          engine: 'system-one',
-          cases: CLASSIFIER_CASES.map(c => ({ id: c.id, expected: c.expected })),
-        }
-      : DECIDER_CASES.map(c => ({
-          id: c.id,
-          taskType: c.taskType,
-          subtaskType: c.subtaskType,
-          check: c.check,
-        }));
-  return `v${BENCHMARK_ENGINE_VERSION}:${fnv1aHex(JSON.stringify(datasetSignature))}`;
+      ? { engine: 'system-one', cases: CLASSIFIER_CASES }
+      : deciderCasesForRouter(selectedRouter);
+  return `${selectedRouter}:v${BENCHMARK_ENGINE_VERSION}:${fnv1aHex(JSON.stringify(datasetSignature))}`;
 }
 
 function normalizeRunModelEntries(models: readonly (string | RunModelEntry)[]): RunModelEntry[] {
@@ -633,6 +675,7 @@ export function validateDeciderContainerBudget({
 }
 
 export type StartRunOptions = {
+  router?: AutoRouter;
   /** Classifier only: re-measure models that already have current results. */
   force?: boolean;
   /** Which registry queue this run drains. Classifier runs are always 'platform'. */
@@ -650,7 +693,11 @@ export async function startRun(
   kind: BenchmarkKind,
   options: StartRunOptions = {}
 ): Promise<{ runId: string; enqueuedModels: number; skippedModels: string[] }> {
+  const router = kind === 'classifier' ? 'efficient' : (options.router ?? 'efficient');
   const purpose: BenchmarkRunPurpose = options.purpose ?? 'platform';
+  if (router === 'frontier' && purpose === 'user') {
+    throw new BenchmarkRunConfigError('The frontier router does not support owner queues');
+  }
   if (kind === 'decider' && (!options.entries || options.entries.length === 0)) {
     throw new BenchmarkRunConfigError('decider runs require a non-empty registry entry snapshot');
   }
@@ -659,16 +706,17 @@ export async function startRun(
   // block new ones and the admin panel shows the truth.
   await sweepStaleRuns(env);
 
-  const config = await getBenchmarkConfig(env.BENCH_DB);
+  const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) {
     throw new Error('benchmark config not set: save it in the admin panel before starting a run');
   }
+  if (kind === 'decider') await validateBenchmarkConcurrencyBudget(env.BENCH_DB, config);
 
   // One active run per (kind, purpose). The unique partial index is the atomic
   // backstop; this pre-check turns the common case (a run already going) into a
   // clean RunAlreadyActiveError instead of an insert-constraint failure.
   // The platform and user queues hold independent slots and can run at once.
-  const activeRun = await getRunningRun(env.BENCH_DB, kind, purpose);
+  const activeRun = await getRunningRun(env.BENCH_DB, kind, purpose, router);
   if (activeRun) {
     throw new RunAlreadyActiveError(kind, activeRun.id);
   }
@@ -682,7 +730,7 @@ export async function startRun(
       ? normalizeRunModelEntries(options.entries ?? [])
       : config.classifierModels.map(model => ({ model, variant: null }));
 
-  const engineIdentity = computeEngineIdentity(kind);
+  const engineIdentity = computeEngineIdentity(kind, router);
 
   // Classifier entries with prior results are skipped (their latest summaries
   // are carried into this run's aggregate) unless the admin forces a re-run. A
@@ -695,7 +743,7 @@ export async function startRun(
   const priorByPair =
     options.force || kind === 'decider'
       ? new Map<string, PriorModelResult>()
-      : await getLatestSummariesByModel(env.BENCH_DB, kind);
+      : await getLatestSummariesByModel(env.BENCH_DB, kind, router);
   const isCarryable = (entry: RunModelEntry): boolean => {
     const prior = priorByPair.get(exactPairKey(entry.model, entry.variant));
     return (
@@ -732,6 +780,7 @@ export async function startRun(
   // millisecond, and a shared id makes each one's claim match the other's rows —
   // the loser's release would then hand back rows the winner is measuring.
   const runId =
+    (router === 'frontier' ? 'frontier-' : '') +
     (purpose === 'user' ? 'user' : kind) +
     `-${startedAt.replace(/[:.]/g, '-')}-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -743,6 +792,7 @@ export async function startRun(
   if (kind === 'decider') {
     try {
       claimedEntries = await markProfilesRunningForRun(env.BENCH_DB, runId, modelEntries, {
+        router,
         engineIdentity,
         repetitions,
       });
@@ -789,6 +839,9 @@ export async function startRun(
       env.BENCH_DB,
       {
         id: runId,
+        router,
+        accuracy_noise_band: config.accuracyNoiseBand,
+        frontier_min_accuracy_delta: config.frontierMinAccuracyDelta,
         kind,
         startedAt,
         min_accuracy: config.minAccuracy,
@@ -821,10 +874,14 @@ export async function startRun(
         );
       });
     }
-    // The pre-check already passed, so an insert failure is almost certainly a
-    // race losing the one-running-per-slot unique index. Re-read the winner and
-    // surface a clean conflict rather than a 500.
-    const winner = await getRunningRun(env.BENCH_DB, kind, purpose).catch(() => undefined);
+    let cause = error;
+    while (cause instanceof Error) {
+      if (cause.message.includes('NOT NULL constraint failed: benchmark_runs.max_concurrency')) {
+        throw new BenchmarkConcurrencyBudgetError();
+      }
+      cause = cause.cause;
+    }
+    const winner = await getRunningRun(env.BENCH_DB, kind, purpose, router).catch(() => undefined);
     if (winner && winner.id !== runId) {
       throw new RunAlreadyActiveError(kind, winner.id);
     }
@@ -848,6 +905,7 @@ export async function startRun(
     // take effect without re-running any model. The state mirrors the rows
     // insertRun just wrote, so no re-read is needed.
     await finalizeRunIfComplete(env, runId, kind, {
+      router,
       status: 'running',
       maxConcurrency: laneBudget,
       minAccuracy: config.minAccuracy,
@@ -874,7 +932,7 @@ export async function startRun(
   // Decider: seed as many shard lanes as fit under the live-container cap. Each
   // completed chunk enqueues the next chunk for the same lane, so one stable
   // container handles chunk N, N+shardCount, N+(2*shardCount), ...
-  const chunks = chunkArray(DECIDER_CASES, DECIDER_CHUNK_SIZE);
+  const chunks = chunkArray(deciderCasesForRouter(router), DECIDER_CHUNK_SIZE);
   const messages = buildDeciderMessages(
     runId,
     kind,
@@ -897,12 +955,16 @@ export async function startRun(
  */
 export async function drainQueue(
   env: Env,
-  queue: BenchmarkRunPurpose
+  queue: BenchmarkRunPurpose,
+  router: AutoRouter = 'efficient'
 ): Promise<{ runId: string; entryCount: number } | null> {
-  const config = await getBenchmarkConfig(env.BENCH_DB);
+  if (router === 'frontier' && queue === 'user') {
+    throw new BenchmarkRunConfigError('The frontier router does not support owner queues');
+  }
+  const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return null;
 
-  const active = await getRunningRun(env.BENCH_DB, 'decider', queue);
+  const active = await getRunningRun(env.BENCH_DB, 'decider', queue, router);
   if (active) {
     console.log(
       JSON.stringify({
@@ -916,13 +978,13 @@ export async function drainQueue(
 
   // Chained platform runs must also revalidate efforts before claiming work.
   // Catalog failure cannot schedule stale configurations.
-  if (queue === 'platform') await syncPlatformRegistry(env);
+  if (queue === 'platform') await syncPlatformRegistry(env, fetch, router);
 
-  const engineIdentity = computeEngineIdentity('decider');
+  const engineIdentity = computeEngineIdentity('decider', router);
   const repetitions = config.deciderRepetitions;
   const pending = await listPendingCurrentProfiles(
     env.BENCH_DB,
-    { engineIdentity, repetitions },
+    { router, engineIdentity, repetitions },
     queue
   );
   if (pending.length === 0) return null;
@@ -938,7 +1000,7 @@ export async function drainQueue(
   }));
 
   try {
-    const result = await startRun(env, 'decider', { purpose: queue, entries });
+    const result = await startRun(env, 'decider', { router, purpose: queue, entries });
     console.log(
       JSON.stringify({
         event: 'benchmark_queue_drain_started',
@@ -1125,6 +1187,7 @@ export async function processDeadLetter(env: Env, rawMessage: unknown): Promise<
 }
 
 type RunState = {
+  router: AutoRouter;
   status: RunRow['status'];
   maxConcurrency: number;
   minAccuracy: number;
@@ -1145,6 +1208,7 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
   if (!result) throw new Error(`unknown run ${runId}`);
   const { run, models } = result;
   return {
+    router: run.router ?? 'efficient',
     status: run.status,
     maxConcurrency: run.max_concurrency,
     minAccuracy: run.min_accuracy,
@@ -1172,7 +1236,7 @@ async function processDeciderJob(
     return { shouldFinalize: false };
   }
   const caseIds = new Set(message.caseIds);
-  const cases = DECIDER_CASES.filter(c => caseIds.has(c.id));
+  const cases = deciderCasesForRouter(state.router).filter(c => caseIds.has(c.id));
   if (cases.length === 0) {
     console.warn(
       JSON.stringify({
@@ -1412,7 +1476,8 @@ async function processDeciderJob(
     rep,
     chunk,
     shard,
-    shardCount
+    shardCount,
+    state.router
   );
   if (!hasNextChunk) {
     await destroyDeciderCliContainer(env, { instanceName }).catch(error => {
@@ -1434,9 +1499,10 @@ async function enqueueNextDeciderChunkIfNeeded(
   rep: number,
   chunk: number,
   shard: number,
-  shardCount: number
+  shardCount: number,
+  router: AutoRouter
 ): Promise<boolean> {
-  const chunks = chunkArray(DECIDER_CASES, DECIDER_CHUNK_SIZE);
+  const chunks = chunkArray(deciderCasesForRouter(router), DECIDER_CHUNK_SIZE);
   const nextChunkIndex = chunk + shardCount;
   const nextChunk = chunks[nextChunkIndex];
   if (!nextChunk) return false;
@@ -1605,7 +1671,8 @@ async function finalizeRunIfComplete(
   state: RunState
 ): Promise<void> {
   const enqueuedModels = state.models.filter(m => m.enqueued);
-  const caseCount = kind === 'classifier' ? CLASSIFIER_CASES.length : DECIDER_CASES.length;
+  const caseCount =
+    kind === 'classifier' ? CLASSIFIER_CASES.length : deciderCasesForRouter(state.router).length;
 
   // The run finalizes once every lane is accounted for, so one dead lane no
   // longer wedges the run until the stale sweep.
@@ -1696,7 +1763,7 @@ async function finalizeRunIfComplete(
       })
     );
     // Fresh registry rows may complete the platform model list, so republish.
-    await publishPlatformRoutingTable(env).catch(error => {
+    await publishPlatformRoutingTable(env, fetch, state.router).catch(error => {
       console.warn(
         JSON.stringify({
           event: 'routing_table_publish_skipped',
@@ -1707,7 +1774,7 @@ async function finalizeRunIfComplete(
     });
     // Both queues: this run's slot just freed, and a pair it just measured may
     // have been the only pending work the other queue was waiting on.
-    await drainQueues(env, 'both');
+    await drainQueues(env, 'both', undefined, state.router);
     return;
   }
 
@@ -1725,7 +1792,8 @@ async function finalizeRunIfComplete(
     env.BENCH_DB,
     kind,
     state.startedAt,
-    runId
+    runId,
+    state.router
   );
   if (supersededByNewer) {
     console.warn(JSON.stringify({ event: 'benchmark_publish_skipped_superseded', runId, kind }));

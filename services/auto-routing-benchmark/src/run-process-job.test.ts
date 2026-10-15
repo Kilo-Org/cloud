@@ -31,6 +31,7 @@ vi.mock('./db', async importOriginal => {
     getLatestRoutingTable: vi.fn(),
     countCurrentProfilesByStatus: vi.fn(),
     getSummariesForRuns: vi.fn(),
+    getRoutingCaseResultsForEntries: vi.fn().mockResolvedValue([]),
     listReadyCurrentProfilesForEntries: vi.fn(),
     markRunCompleted: vi.fn(),
     replaceModelSummaries: vi.fn(),
@@ -161,6 +162,9 @@ function deciderMessage(overrides: { variant?: string | null } = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getBenchmarkConfig).mockResolvedValue({
+    router: 'efficient',
+    accuracyNoiseBand: 0.05,
+    frontierMinAccuracyDelta: 0,
     classifierModels: ['classifier/a'],
     deciderModels: [{ id: model }],
     minAccuracy: 0.7,
@@ -176,8 +180,6 @@ beforeEach(() => {
     classifierRepetitions: 1,
     deciderRepetitions: 1,
     classifierMaxP95LatencyMs: 1000,
-    autoDeciderMinCostUsd: 15,
-    autoDeciderMaxCostUsd: 25,
     updatedAt: null,
     updatedBy: null,
   });
@@ -583,6 +585,8 @@ describe('processJob — canonical registry publication', () => {
       variant: 'max',
       accuracy: 0.9,
       avgCostUsd: 0.001,
+      p50LatencyMs: 90,
+      p50TtftMs: undefined,
       pricing: null,
       estimatedRequestCostUsd: 0.001,
       cases: 5,

@@ -102,10 +102,16 @@ import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
+  KILO_AUTO_FRONTIER_MODEL,
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
-import { fetchEfficientAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
+import {
+  fetchEfficientAutoDecision,
+  FRONTIER_ROUTING_FLAG,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
+import type { AutoRouter } from '@kilocode/auto-routing-contracts';
+import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
@@ -403,51 +409,58 @@ export async function handleLlmProxyRequest(
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
     isAutoEfficientRequest = isAutoEfficientId;
-    const efficientDecision = isAutoEfficientId
-      ? async () => {
-          const { user, authFailedResponse, organizationId } = await authPromise;
-          // The classifier is a paid call on Kilo's own credential. Skip it
-          // for unauthenticated requests: auto-routed models resolve to a
-          // paid model, so an unauthenticated caller is rejected downstream
-          // regardless, and a null decision simply falls back to balanced.
-          // This stops anonymous or abusive traffic from repeatedly spending
-          // Kilo-funded classification with no user to attribute it to.
-          if (!user || authFailedResponse) return null;
-          const { settings, plan } = await balanceAndSettingsPromise;
-          const groupPolicy = await organizationGroupPolicyPromise;
-          const deniedFromSettings =
-            !groupPolicy && plan === 'enterprise'
-              ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
-              : [];
-          const owner = { userId: user.id, organizationId: organizationId ?? null };
-          const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
-            groupPolicy ? collectDeniedAutoRoutingModelIds(groupPolicy, owner) : [],
-            isDataCollectionExplicitlyDisallowed(effectivePrivacy)
-              ? collectDataCollectionRequiredAutoRoutingModelIds(owner)
-              : [],
-          ]);
-          const deniedModelIds = [
-            ...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy]),
-          ];
-          const result = await fetchEfficientAutoDecision({
-            apiKind: requestBodyParsed.kind,
-            body: requestBodyParsed.body,
-            requestedModel,
-            providerHints: autoRoutingProviderHints,
-            bodyBytes: Buffer.byteLength(requestBodyText),
-            userId: user.id,
-            organizationId: organizationId ?? null,
-            sessionId: taskId ?? sessionHeader,
-            machineId: machineIdHeader,
-            clientRequestId,
-            mode: modeHeader,
-            userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
-            deniedModelIds,
-          });
-          legacyClassifierCostUsd = result?.costUsd ?? 0;
-          return result?.decision ?? null;
-        }
-      : undefined;
+    const decisionForRouter = async (router: AutoRouter) => {
+      const { user, authFailedResponse, organizationId } = await authPromise;
+      // The classifier uses Kilo's paid credential. Unauthenticated callers
+      // must never spend classification without a user to attribute it to.
+      if (!user || authFailedResponse) return null;
+      if (
+        router === 'frontier' &&
+        !(await isReleaseToggleEnabled(FRONTIER_ROUTING_FLAG, user.id))
+      ) {
+        return null;
+      }
+      const { settings, plan } = await balanceAndSettingsPromise;
+      const groupPolicy = await organizationGroupPolicyPromise;
+      const deniedFromSettings =
+        !groupPolicy && plan === 'enterprise'
+          ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
+          : [];
+      const owner = { userId: user.id, organizationId: organizationId ?? null };
+      const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
+        groupPolicy ? collectDeniedAutoRoutingModelIds(groupPolicy, owner) : [],
+        isDataCollectionExplicitlyDisallowed(effectivePrivacy)
+          ? collectDataCollectionRequiredAutoRoutingModelIds(owner)
+          : [],
+      ]);
+      const deniedModelIds = [
+        ...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy]),
+      ];
+      const result = await fetchEfficientAutoDecision({
+        ...(router === 'frontier' ? { router } : {}),
+        apiKind: requestBodyParsed.kind,
+        body: requestBodyParsed.body,
+        requestedModel,
+        providerHints: autoRoutingProviderHints,
+        bodyBytes: Buffer.byteLength(requestBodyText),
+        userId: user.id,
+        organizationId: organizationId ?? null,
+        sessionId: taskId ?? sessionHeader,
+        machineId: machineIdHeader,
+        clientRequestId,
+        mode: modeHeader,
+        userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+        deniedModelIds,
+      });
+      legacyClassifierCostUsd = result?.costUsd ?? 0;
+      return result?.decision ?? null;
+    };
+    const efficientDecision = isAutoEfficientId ? () => decisionForRouter('efficient') : undefined;
+    const frontierDecision =
+      requestedModelLowerCased === KILO_AUTO_FRONTIER_MODEL.id ||
+      requestedModelLowerCased === ORG_AUTO_MODEL.id
+        ? () => decisionForRouter('frontier')
+        : undefined;
     const autoResult = await applyResolvedAutoModel(
       {
         model: requestedModelLowerCased,
@@ -457,6 +470,7 @@ export async function handleLlmProxyRequest(
         apiKind: requestBodyParsed.kind,
         clientIp: ipAddress ?? null,
         efficientDecision,
+        frontierDecision,
         organizationContext: organizationContextPromise,
         isAutoFreeCandidateAllowed: async modelId => {
           const policy = await organizationGroupPolicyPromise;

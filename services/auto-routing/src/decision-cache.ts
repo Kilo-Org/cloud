@@ -1,4 +1,9 @@
-import { ClassifierOutputSchema, type ClassifierOutput } from '@kilocode/auto-routing-contracts';
+import {
+  ClassifierOutputSchema,
+  DEFAULT_AUTO_ROUTER,
+  type AutoRouter,
+  type ClassifierOutput,
+} from '@kilocode/auto-routing-contracts';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { USAGE_WRITER_TIMEOUT_MS } from '@kilocode/worker-utils/usage-writer-client';
 import { DurableObject } from 'cloudflare:workers';
@@ -183,22 +188,21 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
 
 type DecisionCacheEnv = Pick<Env, 'AUTO_ROUTING_DECISION_CACHE'>;
 
-function cacheStub(env: DecisionCacheEnv, conversationKey: string) {
+function cacheStub(env: DecisionCacheEnv, conversationKey: string, router: AutoRouter) {
   const namespace = env.AUTO_ROUTING_DECISION_CACHE;
-  return namespace.get(namespace.idFromName(conversationKey));
+  return namespace.get(namespace.idFromName(`${router}:${conversationKey}`));
 }
 
-function entryKey(contentHash: string, classifierModel: string): string {
-  // The classifier model is part of the key so a model switch never serves
-  // results produced by the previous model.
-  return `${classifierModel}:${contentHash}`;
+function entryKey(contentHash: string, classifierModel: string, router: AutoRouter): string {
+  return `${router}:${classifierModel}:${contentHash}`;
 }
 
 export function getHotCachedClassification(
   exactHash: string,
-  classifierModel: string
+  classifierModel: string,
+  router: AutoRouter = DEFAULT_AUTO_ROUTER
 ): ClassifierOutput | null {
-  const key = entryKey(exactHash, classifierModel);
+  const key = entryKey(exactHash, classifierModel, router);
   const entry = classificationHotCache.get(key);
   if (!entry) return null;
   if (Date.now() - entry.storedAt > ENTRY_TTL_MS) {
@@ -228,12 +232,13 @@ export async function readConversationState(
   env: DecisionCacheEnv,
   conversationKey: string,
   exactHash: string,
-  classifierModel: string
+  classifierModel: string,
+  router: AutoRouter = DEFAULT_AUTO_ROUTER
 ): Promise<ConversationState> {
   try {
-    const key = entryKey(exactHash, classifierModel);
-    const state = await cacheStub(env, conversationKey).readConversationState(key);
-    let classification = getHotCachedClassification(exactHash, classifierModel);
+    const key = entryKey(exactHash, classifierModel, router);
+    const state = await cacheStub(env, conversationKey, router).readConversationState(key);
+    let classification = getHotCachedClassification(exactHash, classifierModel, router);
     if (!classification) {
       const parsed = ClassifierOutputSchema.safeParse(state.classification?.value);
       if (parsed.success && state.classification) {
@@ -257,10 +262,11 @@ export async function putStickyDecision(
   model: string,
   variant: string | null,
   routeKey: string,
-  generation: number
+  generation: number,
+  router: AutoRouter = DEFAULT_AUTO_ROUTER
 ): Promise<void> {
   try {
-    await cacheStub(env, conversationKey).putStickyDecision(
+    await cacheStub(env, conversationKey, router).putStickyDecision(
       { model, variant, routeKey } satisfies StickyDecision,
       generation
     );
@@ -274,12 +280,13 @@ export async function putCachedClassification(
   conversationKey: string,
   contentHash: string,
   classifierModel: string,
-  classification: ClassifierOutput
+  classification: ClassifierOutput,
+  router: AutoRouter = DEFAULT_AUTO_ROUTER
 ): Promise<void> {
   try {
-    const key = entryKey(contentHash, classifierModel);
+    const key = entryKey(contentHash, classifierModel, router);
     const storedAt = Date.now();
-    await cacheStub(env, conversationKey).putEntry(key, classification);
+    await cacheStub(env, conversationKey, router).putEntry(key, classification);
     cacheClassification(key, classification, storedAt);
   } catch {
     // Cache writes are best effort and must not fail the decision.

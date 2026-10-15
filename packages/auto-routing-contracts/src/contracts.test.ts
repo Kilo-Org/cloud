@@ -154,7 +154,7 @@ describe('auto routing contracts', () => {
 });
 
 describe('BenchmarkConfigSchema defaults', () => {
-  it('applies config defaults for repetitions, classifier latency, switch threshold, and auto decider cost bounds', () => {
+  it('applies config defaults for repetitions, classifier latency, and switch threshold', () => {
     const result = BenchmarkConfigSchema.parse({
       classifierModels: ['model/a'],
       deciderModels: [{ id: 'model/b' }],
@@ -166,7 +166,6 @@ describe('BenchmarkConfigSchema defaults', () => {
       switchCostFactor: 2,
       updatedAt: null,
       updatedBy: null,
-      // classifierRepetitions, deciderRepetitions, classifierMaxP95LatencyMs intentionally omitted
     });
     expect(result.classifierRepetitions).toBe(1);
     expect(result.deciderRepetitions).toBe(1);
@@ -175,8 +174,6 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(result.productionTokenProfile).toBeNull();
     expect(result.switchHorizonTurns).toBeNull();
     expect(result.lowConfidenceThreshold).toBeNull();
-    expect(result.autoDeciderMinCostUsd).toBe(15);
-    expect(result.autoDeciderMaxCostUsd).toBe(25);
   });
 
   it('accepts only null or probability-range confidence thresholds', () => {
@@ -219,52 +216,40 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts explicit manual and excluded auto decider model lists', () => {
-    const result = BenchmarkConfigSchema.parse({
-      classifierModels: ['model/a'],
-      deciderModels: [{ id: 'model/b', variant: 'retired', reasoningEffort: 'high' }],
-      manualDeciderModels: [{ id: 'model/c', reasoningEffort: 'high' }],
-      autoDeciderModels: [{ id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 }],
-      excludedAutoDeciderModels: ['model/d'],
-      minAccuracy: 0.7,
-      switchCostFactor: 3,
-      maxConcurrency: 10,
-      userMaxConcurrency: 100,
-      benchmarkUserId: null,
-      benchmarkOrgId: null,
-      updatedAt: null,
-      updatedBy: null,
-    });
+  it.each(['efficient', 'frontier'])(
+    'strips retired auto decider fields for %s clients',
+    router => {
+      const result = BenchmarkConfigSchema.parse({
+        router,
+        classifierModels: ['model/a'],
+        deciderModels: [{ id: 'model/b', variant: 'retired', reasoningEffort: 'high' }],
+        manualDeciderModels: [{ id: 'model/c', reasoningEffort: 'high' }],
+        autoDeciderModels: [{ id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 }],
+        excludedAutoDeciderModels: ['model/d'],
+        autoDeciderMinCostUsd: 30,
+        autoDeciderMaxCostUsd: 20,
+        minAccuracy: 0.7,
+        switchCostFactor: 3,
+        maxConcurrency: 10,
+        userMaxConcurrency: 100,
+        benchmarkUserId: null,
+        benchmarkOrgId: null,
+        updatedAt: null,
+        updatedBy: null,
+      });
 
-    expect(result.deciderModels).toEqual([{ id: 'model/b' }]);
-    expect(result.manualDeciderModels).toEqual([{ id: 'model/c' }]);
-    expect(result.autoDeciderModels).toEqual([{ id: 'model/b', avgAttemptCostUsd: 21.1 }]);
-    expect(result.excludedAutoDeciderModels).toEqual(['model/d']);
-  });
-
-  it('rejects auto decider cost bounds where min is greater than max', () => {
-    const result = BenchmarkConfigSchema.safeParse({
-      classifierModels: ['model/a'],
-      deciderModels: [{ id: 'model/b' }],
-      minAccuracy: 0.7,
-      switchCostFactor: 3,
-      maxConcurrency: 10,
-      userMaxConcurrency: 100,
-      benchmarkUserId: null,
-      benchmarkOrgId: null,
-      autoDeciderMinCostUsd: 30,
-      autoDeciderMaxCostUsd: 20,
-      updatedAt: null,
-      updatedBy: null,
-    });
-
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues.some(issue => issue.path[0] === 'autoDeciderMaxCostUsd')).toBe(
-        true
-      );
+      expect(result.deciderModels).toEqual([{ id: 'model/b' }]);
+      for (const field of [
+        'manualDeciderModels',
+        'autoDeciderModels',
+        'excludedAutoDeciderModels',
+        'autoDeciderMinCostUsd',
+        'autoDeciderMaxCostUsd',
+      ]) {
+        expect(result).not.toHaveProperty(field);
+      }
     }
-  });
+  );
 });
 
 describe('resolveBenchmarkIdentity', () => {

@@ -249,6 +249,7 @@ export function computeDecision(
     constraints?: RoutingConstraints | undefined;
     contextTokens?: number | undefined;
     capabilityMap?: ModelCapabilitiesMap | undefined;
+    preserveIncumbentVariant?: boolean;
     // True only for custom-pool tables: drop candidates whose capability row
     // is missing or isActive !== true. Platform tables leave this unset.
     failClosedOnInactive?: boolean;
@@ -283,9 +284,21 @@ export function computeDecision(
     candidates,
     isLowConfidence(table, options.confidence) ? 'best_accuracy' : mode
   );
-  const freshPair = { model: freshPick.model, variant: candidateVariant(freshPick) };
+  const applyComplexityEffort = (candidate: RankedCandidate): RankedCandidate => {
+    if (options.preserveIncumbentVariant || !classification.reasoningComplexity) return candidate;
+    const variant =
+      table.effortByComplexity?.[routeKey]?.[candidate.model]?.[classification.reasoningComplexity];
+    if (variant === undefined) return candidate;
+    return (
+      candidates.find(c => c.model === candidate.model && candidateVariant(c) === variant) ??
+      candidate
+    );
+  };
+  const picked = applyComplexityEffort(freshPick);
+  const freshPair = { model: picked.model, variant: candidateVariant(picked) };
 
   const incumbentCandidate = findIncumbentCandidate(candidates, incumbent);
+  const incumbentPick = incumbentCandidate ? applyComplexityEffort(incumbentCandidate) : undefined;
   // Sticky eligibility, shared by the keep decision and the switchReason
   // telemetry below so the two can never disagree. best_accuracy keeps the
   // strict bar (that mode exists to buy accuracy); cost_per_accuracy keeps
@@ -299,60 +312,67 @@ export function computeDecision(
       table.switchHorizonTurns != null &&
       options.contextTokens != null &&
       candidate.estimatedRequestCostUsd != null &&
-      freshPick.estimatedRequestCostUsd != null &&
+      picked.estimatedRequestCostUsd != null &&
       candidate.pricing != null &&
-      freshPick.pricing != null
+      picked.pricing != null
     ) {
       const expectedSavings =
-        (candidate.estimatedRequestCostUsd - freshPick.estimatedRequestCostUsd) *
+        (candidate.estimatedRequestCostUsd - picked.estimatedRequestCostUsd) *
         table.switchHorizonTurns;
       const cacheLossCost =
         options.contextTokens *
-        (freshPick.pricing.promptUsdPerToken -
+        (picked.pricing.promptUsdPerToken -
           (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken));
       return expectedSavings > cacheLossCost;
     }
-    return freshPick.avgCostUsd * table.switchCostFactor < candidate.avgCostUsd;
+    return picked.avgCostUsd * table.switchCostFactor < candidate.avgCostUsd;
   };
   const stickyIncumbent =
     incumbentCandidate &&
+    incumbentPick &&
     incumbentStickyEligible(incumbentCandidate) &&
-    !sameExactPair(
-      { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
-      freshPair
-    ) &&
-    ((mode === 'cost_per_accuracy' && !costSwitchWorthwhile(incumbentCandidate)) ||
-      (mode === 'best_accuracy' &&
-        !(freshPick.accuracy - incumbentCandidate.accuracy > table.bestAccuracySwitchThreshold)));
+    ((incumbentCandidate.model === freshPick.model &&
+      ((options.preserveIncumbentVariant &&
+        !sameExactPair(
+          { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
+          freshPair
+        )) ||
+        incumbentPick !== incumbentCandidate ||
+        picked !== freshPick)) ||
+      (!sameExactPair(
+        { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
+        freshPair
+      ) &&
+        ((mode === 'cost_per_accuracy' && !costSwitchWorthwhile(incumbentPick)) ||
+          (mode === 'best_accuracy' &&
+            !(picked.accuracy - incumbentPick.accuracy > table.bestAccuracySwitchThreshold)))));
 
-  if (stickyIncumbent && incumbentCandidate) {
+  if (stickyIncumbent && incumbentCandidate && incumbentPick) {
     return {
       model: incumbentCandidate.model,
       taskType: classification.taskType,
       subtaskType: classification.subtaskType,
       source: table.source,
       tableVersion: table.version,
-      ...decisionFieldsFromCandidate(incumbentCandidate),
+      ...decisionFieldsFromCandidate(incumbentPick),
       sticky: true,
       switchReason: null,
     };
   }
 
-  // Legacy model-only sticky compares model only; exact-pair sticky compares
-  // both fields so two variants of the same model count as a switch.
   const switched =
     incumbent !== null &&
-    (incumbent.variant === null
-      ? incumbent.model !== freshPick.model
+    (picked !== freshPick || incumbent.variant === null
+      ? incumbent.model !== picked.model
       : !sameExactPair(incumbent, freshPair));
 
   return {
-    model: freshPick.model,
+    model: picked.model,
     taskType: classification.taskType,
     subtaskType: classification.subtaskType,
     source: table.source,
     tableVersion: table.version,
-    ...decisionFieldsFromCandidate(freshPick),
+    ...decisionFieldsFromCandidate(picked),
     sticky: false,
     // 'cost': the incumbent was eligible but the mode's switch condition
     // (cost factor / accuracy gap) made the fresh pick worth it;

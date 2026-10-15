@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classifierTaxonomy } from '@kilocode/auto-routing-contracts/classifier';
-import { DECIDER_CASES } from './decider-cases';
+import { DECIDER_CASES, FRONTIER_CASES } from './decider-cases';
 
 const TAXONOMY_PAIRS = classifierTaxonomy.taskTypes.flatMap(taskType =>
   taskType.subtypes.map(subtype => ({ taskType: taskType.id, subtaskType: subtype.id }))
@@ -18,8 +18,8 @@ describe('DECIDER_CASES', () => {
     expect(TAXONOMY_PAIRS.length).toBe(18);
   });
 
-  it('has exactly 540 cases with unique ids', () => {
-    expect(DECIDER_CASES.length).toBe(540);
+  it('has exactly 576 cases with unique ids', () => {
+    expect(DECIDER_CASES.length).toBe(576);
     const ids = new Set(DECIDER_CASES.map(c => c.id));
     expect(ids.size).toBe(DECIDER_CASES.length);
   });
@@ -96,5 +96,29 @@ describe('DECIDER_CASES', () => {
           expect(c.check.rubric.trim().length, c.id).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe('FRONTIER_CASES', () => {
+  it('preserves UTF-16 surrogate halves in the Unicode identity counterexample', () => {
+    const benchCase = FRONTIER_CASES.find(
+      candidate => candidate.id === 'frontier-refactoring-code-cleanup-unicode-key-identity'
+    );
+    expect(benchCase?.check).toMatchObject({
+      kind: 'json_equal',
+      value: {
+        witnesses: [
+          { candidate: 1 },
+          {
+            candidate: 3,
+            actual: {
+              value: {
+                points: ['é', 'é', '𝌆'].map(text => text.split('')),
+              },
+            },
+          },
+        ],
+      },
+    });
   });
 });

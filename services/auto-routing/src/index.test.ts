@@ -447,11 +447,7 @@ describe('auto routing worker', () => {
         expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(baselineCalls.billing);
         expect(benchmarkFetch).toHaveBeenCalledTimes(baselineCalls.origin);
         expect(writeDataPoint).toHaveBeenCalledTimes(baselineCalls.metrics);
-        expect(
-          configPut.mock.calls.filter(
-            ([key]) => !String(key).startsWith('coding_plan_preference:v2:')
-          )
-        ).toEqual([]);
+        expect(configPut).not.toHaveBeenCalled();
         expect(log).toHaveBeenCalledTimes(1);
         expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
           event: 'auto_routing_decision',
@@ -494,11 +490,7 @@ describe('auto routing worker', () => {
       expect(cacheReadConversationState).toHaveBeenCalledTimes(1);
       expect(cachePutEntry).toHaveBeenCalledTimes(cacheHit ? 1 : 2);
       expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(cacheHit ? 0 : 1);
-      expect(
-        configPut.mock.calls.filter(
-          ([key]) => !String(key).startsWith('coding_plan_preference:v2:')
-        )
-      ).toEqual([]);
+      expect(configPut).not.toHaveBeenCalled();
       expect(log).toHaveBeenCalledTimes(1);
       expect(JSON.parse(String(log.mock.calls[0]?.[0]))).not.toHaveProperty('shadowDiffers');
     });
@@ -530,17 +522,109 @@ describe('auto routing worker', () => {
         expect(cacheReadConversationState).toHaveBeenCalledTimes(1);
         expect(cachePutEntry).toHaveBeenCalledTimes(cacheHit ? 1 : 2);
         expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(cacheHit ? 0 : 1);
-        expect(
-          configPut.mock.calls.filter(
-            ([key]) => !String(key).startsWith('coding_plan_preference:v2:')
-          )
-        ).toEqual([]);
+        expect(configPut).not.toHaveBeenCalled();
         expect(log).toHaveBeenCalledTimes(1);
         expect(JSON.parse(String(log.mock.calls[0]?.[0]))).not.toHaveProperty('shadowDiffers');
       }
     );
   });
 
+  it('defaults /decide to the efficient table and cache namespace', async () => {
+    const response = await decideRequest(mirrorPayload());
+    expect(response.status).toBe(200);
+    expect(configGet).toHaveBeenCalledWith('routing_table_v1');
+    expect(cacheIdFromName).toHaveBeenCalledWith('efficient:user:user-1:task:task-123');
+  });
+
+  it('reads the frontier table and state without applying the owner efficient pool', async () => {
+    modeConfigGet.mockImplementation(() => ({
+      getSettings: async () => ({
+        mode: 'cost_per_accuracy',
+        pool: [{ model: 'owner/efficient', variant: null }],
+      }),
+    }));
+    const frontierTable = {
+      ...benchmarkRoutingTable,
+      version: 'frontier-table',
+      routes: {
+        'implementation/feature_development': [
+          {
+            model: 'anthropic/claude-opus-4.6',
+            accuracy: 0.95,
+            avgCostUsd: 0.01,
+            meetsThreshold: true,
+            reasoningEffort: null,
+          },
+        ],
+      },
+    };
+    configGet.mockImplementation(async (key: string) => {
+      if (key === 'routing_table_frontier_v1') return JSON.stringify(frontierTable);
+      if (key === SHADOW_ROUTING_TABLE_CONFIG_KEY) return JSON.stringify(benchmarkRoutingTable);
+      if (key === 'decision_log_sample_rate') return '1';
+      return null;
+    });
+    dbWhereCaps.mockResolvedValue([
+      {
+        openrouterId: 'anthropic/claude-opus-4.6',
+        inputModalities: ['image', 'file'],
+        contextLength: 200_000,
+        isActive: true,
+      },
+    ]);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const response = await decideRequest(
+      mirrorPayload({
+        router: 'frontier',
+        constraints: { requiredInputModalities: ['image', 'file'] },
+      })
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      decision: { model: 'anthropic/claude-opus-4.6', tableVersion: 'frontier-table' },
+    });
+    await drainBackgroundTasks();
+    const decisionLogs = log.mock.calls
+      .map(([value]) => value)
+      .filter((value): value is string => typeof value === 'string' && value.startsWith('{'))
+      .map(value => JSON.parse(value))
+      .filter(value => value.event === 'auto_routing_decision');
+    expect(decisionLogs).toHaveLength(1);
+    expect(decisionLogs[0]).not.toHaveProperty('shadowDiffers');
+    expect(getModelCapabilitiesMock).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ router: 'frontier' })
+    );
+    expect(cacheIdFromName).toHaveBeenCalledWith('frontier:user:user-1:task:task-123');
+    expect(cacheReadConversationState).toHaveBeenCalledWith(expect.stringMatching(/^frontier:/));
+    expect(configGet).not.toHaveBeenCalledWith('routing_table_v1');
+    expect(configGet).not.toHaveBeenCalledWith(SHADOW_ROUTING_TABLE_CONFIG_KEY);
+    expect(
+      benchmarkFetch.mock.calls.some(
+        ([url]) => typeof url === 'string' && url.includes('/admin/custom-routing-table')
+      )
+    ).toBe(false);
+  });
+
+  it('returns no frontier decision when only the efficient table exists', async () => {
+    configGet.mockImplementation(async (key: string) =>
+      key === 'routing_table_v1' ? JSON.stringify(benchmarkRoutingTable) : null
+    );
+    benchmarkFetch.mockImplementation(async () =>
+      Response.json({ table: null, publishedAt: null, winner: null })
+    );
+    const response = await decideRequest(mirrorPayload({ router: 'frontier' }));
+    await expect(response.json()).resolves.toMatchObject({ decision: null });
+    expect(benchmarkFetch).toHaveBeenCalledWith(
+      'https://auto-routing-benchmark/admin/routing-table?router=frontier',
+      expect.anything()
+    );
+  });
+
+  it('rejects unknown router identifiers', async () => {
+    const response = await decideRequest(mirrorPayload({ router: 'invalid' }));
+    expect(response.status).toBe(400);
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
   describe.each([false, true])('classifier overlap (cached=%s)', cacheHit => {
     it.each(['settings', 'capabilities', 'routing-table'])(
       'prepares classification while %s is pending',
@@ -1323,6 +1407,7 @@ describe('auto routing worker', () => {
       });
       expect(response.status).toBe(200);
       expect(registerBody).toEqual({
+        router: 'efficient',
         ownerType: 'user',
         ownerId: 'user-1',
         entries: pool,
@@ -1561,7 +1646,7 @@ describe('auto routing worker', () => {
       },
       classifierResult: { classification: mockClassification },
     });
-    expect(cacheIdFromName).toHaveBeenCalledWith('user:user-1:task:task-123');
+    expect(cacheIdFromName).toHaveBeenCalledWith('efficient:user:user-1:task:task-123');
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
     // The classification is not re-cached; only the served model is
     // remembered for session stickiness.
@@ -1583,7 +1668,7 @@ describe('auto routing worker', () => {
 
     expect(response.status).toBe(200);
     expect(cachePutEntry).toHaveBeenCalledWith(
-      expect.stringMatching(/^google\/gemini-2\.5-flash-lite:[0-9a-f]{16}$/),
+      expect.stringMatching(/^efficient:google\/gemini-2\.5-flash-lite:[0-9a-f]{16}$/),
       expect.objectContaining({ taskType: 'implementation' })
     );
   });
@@ -1702,7 +1787,7 @@ describe('auto routing worker', () => {
               },
             });
             expect(cachePutEntry).toHaveBeenCalledWith(
-              expect.stringMatching(/^typesafe\/jev-1\.13:/),
+              expect.stringMatching(/^efficient:typesafe\/jev-1\.13:/),
               mockClassification
             );
             expect(cachePutStickyDecision).toHaveBeenCalledTimes(1);
@@ -2489,7 +2574,7 @@ describe('auto routing worker', () => {
     const response = await decideRequest(mirrorPayload({ sessionId: null }));
 
     expect(response.status).toBe(200);
-    expect(cacheIdFromName).toHaveBeenCalledWith('user:user-1:machine:machine-1');
+    expect(cacheIdFromName).toHaveBeenCalledWith('efficient:user:user-1:machine:machine-1');
   });
 
   it('falls back to a content-fingerprint conversation key without session or machine ids', async () => {
@@ -2497,7 +2582,7 @@ describe('auto routing worker', () => {
 
     expect(response.status).toBe(200);
     expect(cacheIdFromName).toHaveBeenCalledWith(
-      expect.stringMatching(/^user:user-1:content:[0-9a-f]{16}$/)
+      expect.stringMatching(/^efficient:user:user-1:content:[0-9a-f]{16}$/)
     );
   });
 

@@ -6,6 +6,7 @@ import * as z from 'zod';
 import {
   BenchmarkModelSummarySchema,
   CandidatePricingSchema,
+  ComplexityLabelsSchema,
   ProductionTokenProfileSchema,
 } from '@kilocode/auto-routing-contracts';
 import { rowsToRoutingTable } from '../src/db';
@@ -148,33 +149,39 @@ async function main() {
         'cost-profile': { type: 'string' },
         sweep: { type: 'string' },
         'rebuild-from-sweep': { type: 'boolean', default: false },
+        'complexity-labels': { type: 'string' },
+        'accuracy-noise-band': { type: 'string' },
       },
       allowPositionals: true,
     });
     if (!values.label || !values.out || positionals.length > 0) {
       throw new Error(
-        'Usage: scoreboard build --label <label> [--table live|file.json] [--pricing live|file.json] [--cost-profile file.json] [--rerank-profile file.json] [--sweep file.json] [--rebuild-from-sweep] [--prod file.json] [--replay file.json] --out file.json'
+        'Usage: scoreboard build --label <label> [--table live|file.json] [--pricing live|file.json] [--cost-profile file.json] [--rerank-profile file.json] [--sweep file.json] [--rebuild-from-sweep --complexity-labels labels.json] [--prod file.json] [--replay file.json] --out file.json'
       );
     }
     const tablePath = values.table ?? 'live';
-    const [source, prod, replay, pricing, rerankProfile, costProfile, sweep] = await Promise.all([
-      tablePath === 'live'
-        ? loadLiveTable()
-        : readJson(tablePath, ScoreboardRoutingTableSchema).then(table => ({
-            table,
-            classifierRouteAccuracy: null,
-          })),
-      values.prod ? readJson(values.prod, ProdMetricsSchema) : null,
-      values.replay ? readJson(values.replay, ReplayMetricsSchema) : null,
-      values.pricing ? loadPricing(values.pricing) : null,
-      values['rerank-profile']
-        ? readJson(values['rerank-profile'], ProductionTokenProfileSchema)
-        : null,
-      values['cost-profile']
-        ? readJson(values['cost-profile'], ProductionTokenProfileSchema)
-        : null,
-      values.sweep ? readJson(values.sweep, OfflineSweepSchema) : null,
-    ]);
+    const [source, prod, replay, pricing, rerankProfile, costProfile, sweep, complexityLabels] =
+      await Promise.all([
+        tablePath === 'live'
+          ? loadLiveTable()
+          : readJson(tablePath, ScoreboardRoutingTableSchema).then(table => ({
+              table,
+              classifierRouteAccuracy: null,
+            })),
+        values.prod ? readJson(values.prod, ProdMetricsSchema) : null,
+        values.replay ? readJson(values.replay, ReplayMetricsSchema) : null,
+        values.pricing ? loadPricing(values.pricing) : null,
+        values['rerank-profile']
+          ? readJson(values['rerank-profile'], ProductionTokenProfileSchema)
+          : null,
+        values['cost-profile']
+          ? readJson(values['cost-profile'], ProductionTokenProfileSchema)
+          : null,
+        values.sweep ? readJson(values.sweep, OfflineSweepSchema) : null,
+        values['complexity-labels']
+          ? readJson(values['complexity-labels'], ComplexityLabelsSchema)
+          : null,
+      ]);
     if (pricing) {
       for (const candidates of Object.values(source.table.routes)) {
         for (const candidate of candidates) {
@@ -192,7 +199,12 @@ async function main() {
         costProfile,
         sweep,
         rebuildFromSweep: values['rebuild-from-sweep'],
+        complexityLabels,
         pricing,
+        accuracyNoiseBand:
+          values['accuracy-noise-band'] === undefined
+            ? undefined
+            : z.coerce.number().min(0).max(1).parse(values['accuracy-noise-band']),
         now: new Date(),
       })
     );

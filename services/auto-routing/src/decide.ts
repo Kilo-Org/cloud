@@ -1,6 +1,7 @@
 import {
   ClassifierOutputSchema,
   MirrorPayloadSchema,
+  DEFAULT_AUTO_ROUTER,
   poolEntryKey,
   taxonomyRouteKey,
   type AutoRoutingDecision,
@@ -339,6 +340,7 @@ function recordDecision(
       hashLoose: ctx.hashes.loose,
       reqSeq: ctx.reqSeq,
       colo: ctx.colo,
+      router: ctx.payload.router ?? DEFAULT_AUTO_ROUTER,
       classifierDurationMs: Math.round(durationMs),
       classifierCostCredits: summary.cost,
       messageCount: ctx.payload.input.messageCount,
@@ -394,6 +396,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   }
 
   const payload = parsed.data;
+  const router = payload.router ?? DEFAULT_AUTO_ROUTER;
   const startedAt = performance.now();
   const timings: DecisionTimings = {
     settingsMs: 0,
@@ -417,11 +420,12 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       organizationId: payload.organizationId,
     });
     timings.settingsMs = performance.now() - settingsStartedAt;
-    const configuredPool = effectiveSettings.pool;
+    const configuredPool = router === 'efficient' ? effectiveSettings.pool : null;
     let capabilities: ModelCapabilitiesMap = new Map();
     if (hasConstraints || configuredPool !== null) {
       const capabilitiesStartedAt = performance.now();
       capabilities = await getModelCapabilities(c.env, {
+        router,
         waitUntil: promise => c.executionCtx.waitUntil(promise),
         ...(configuredPool !== null
           ? { additionalModelIds: configuredPool.map(entry => entry.model) }
@@ -433,9 +437,9 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     const tableStartedAt = performance.now();
     const [routingTable, shadowRoutingTable] = await Promise.all([
       configuredPool === null
-        ? getRoutingTable(c.env)
+        ? getRoutingTable(c.env, router)
         : loadCustomRoutingTable(c.env, configuredPool),
-      getShadowRoutingTable(c.env),
+      router === 'efficient' ? getShadowRoutingTable(c.env) : null,
     ]);
     timings.tableMs = performance.now() - tableStartedAt;
     return {
@@ -517,7 +521,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     };
     const speculative: ClassificationRun | null =
       (payload.input.messageCount === null || payload.input.messageCount <= 2) &&
-      !getHotCachedClassification(hashes.exact, classifierModel)
+      !getHotCachedClassification(hashes.exact, classifierModel, router)
         ? { promise: runClassifier('speculative'), outcome: null }
         : null;
     if (speculative) {
@@ -532,7 +536,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       c.env,
       ctx.conversationKey,
       hashes.exact,
-      classifierModel
+      classifierModel,
+      router
     );
     timings.cacheReadMs = performance.now() - cacheReadStartedAt;
     if (cached) {
@@ -554,6 +559,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           deniedModelIds,
           routing.routingMode,
           {
+            preserveIncumbentVariant: true,
             constraints,
             contextTokens: payload.constraints?.promptTokensEstimate,
             capabilityMap:
@@ -626,7 +632,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
               ctx.conversationKey,
               ctx.hashes.exact,
               classifier.classifierModel,
-              classifier.classification
+              classifier.classification,
+              router
             ),
             decision
               ? putStickyDecision(
@@ -635,7 +642,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
                   decision.model,
                   decisionVariant(decision),
                   taxonomyRouteKey(classifier.classification),
-                  generation
+                  generation,
+                  router
                 )
               : Promise.resolve(),
           ]);
@@ -705,7 +713,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           decision.model,
           decisionVariant(decision),
           taxonomyRouteKey(cached),
-          generation
+          generation,
+          router
         )
       );
     }
@@ -767,7 +776,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         ctx.conversationKey,
         ctx.hashes.exact,
         classifier.classifierModel,
-        classifier.classification
+        classifier.classification,
+        router
       )
     );
     const decision = computeDecision(
@@ -786,7 +796,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           decision.model,
           decisionVariant(decision),
           taxonomyRouteKey(classifier.classification),
-          generation
+          generation,
+          router
         )
       );
     }

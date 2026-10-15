@@ -20,6 +20,7 @@ vi.mock('./scheduler', async importOriginal => {
     failChunk: vi.fn(),
     finishChunk: vi.fn(),
     getChunk: vi.fn(),
+    hasUnsettledChunks: vi.fn(),
     recoverChunks: vi.fn(),
     scheduleRunChunks: vi.fn(),
     startChunk: vi.fn(),
@@ -123,6 +124,7 @@ import {
   failChunk,
   finishChunk,
   getChunk,
+  hasUnsettledChunks,
   recoverChunks,
   scheduleRunChunks,
   startChunk,
@@ -260,6 +262,7 @@ beforeEach(() => {
   vi.mocked(beginPaidCase).mockResolvedValue(true);
   vi.mocked(claimScheduledChunks).mockResolvedValue([]);
   vi.mocked(recoverChunks).mockResolvedValue([]);
+  vi.mocked(hasUnsettledChunks).mockResolvedValue(false);
   mockClaim();
   vi.mocked(getBenchmarkConfig).mockResolvedValue({
     router: 'efficient',
@@ -861,6 +864,23 @@ describe('processJob — retryable rubric grading', () => {
         error: null,
       })
     );
+  });
+
+  it('skips run accounting while scheduled work is unsettled', async () => {
+    vi.mocked(hasUnsettledChunks).mockResolvedValue(true);
+    await processJob(env, deciderMessage());
+    expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(hasUnsettledChunks).toHaveBeenCalledWith(env.BENCH_DB, runId);
+    expect(countCaseResultsByLane).not.toHaveBeenCalled();
+    expect(getCaseResults).not.toHaveBeenCalled();
+    expect(markRunCompleted).not.toHaveBeenCalled();
+  });
+
+  it('runs run accounting once scheduled work has settled', async () => {
+    vi.mocked(hasUnsettledChunks).mockResolvedValue(false);
+    await processJob(env, deciderMessage());
+    expect(hasUnsettledChunks).toHaveBeenCalledWith(env.BENCH_DB, runId);
+    expect(countCaseResultsByLane).toHaveBeenCalled();
   });
 
   it('does not call the model or persist a zero when the judge client is unavailable', async () => {

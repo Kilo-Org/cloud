@@ -479,25 +479,26 @@ export async function failChunk(db: D1Database, id: string, token: string): Prom
 
 export async function recoverChunks(db: D1Database, now: number): Promise<SchedulerClaim[]> {
   const results = await db.batch<SchedulerClaim>([
-    db.prepare(`UPDATE scheduler_chunks SET status = 'completed', slot = NULL, token = NULL, lease_until = 0
+    db.prepare(`WITH RECURSIVE busy_run(run_id) AS (
+        SELECT * FROM (
+          SELECT c.run_id FROM scheduler_chunks AS c WHERE c.status = 'pending'
+          ORDER BY c.run_id LIMIT 1
+        )
+        UNION ALL
+        SELECT (SELECT c.run_id FROM scheduler_chunks AS c
+          WHERE c.status = 'pending' AND c.run_id > busy_run.run_id ORDER BY c.run_id LIMIT 1)
+        FROM busy_run WHERE busy_run.run_id IS NOT NULL
+      )
+      UPDATE scheduler_chunks SET status = 'completed', slot = NULL, token = NULL, lease_until = 0
       WHERE status IN ('pending', 'queued')
         AND run_id IN (
-          WITH RECURSIVE busy_run(run_id) AS (
-            SELECT * FROM (
-              SELECT c.run_id FROM scheduler_chunks AS c WHERE c.status = 'pending'
-              ORDER BY c.run_id LIMIT 1
-            )
-            UNION ALL
-            SELECT (SELECT c.run_id FROM scheduler_chunks AS c
-              WHERE c.status = 'pending' AND c.run_id > busy_run.run_id ORDER BY c.run_id LIMIT 1)
-            FROM busy_run WHERE busy_run.run_id IS NOT NULL
-          )
-          SELECT run_id FROM busy_run WHERE run_id IS NOT NULL
-          UNION SELECT DISTINCT run_id FROM scheduler_chunks WHERE status = 'queued'
-        )
-        AND EXISTS (
-          SELECT 1 FROM benchmark_runs
-          WHERE benchmark_runs.id = scheduler_chunks.run_id AND benchmark_runs.status != 'running')`),
+          SELECT candidate.run_id FROM (
+            SELECT run_id FROM busy_run WHERE run_id IS NOT NULL
+            UNION SELECT DISTINCT run_id FROM scheduler_chunks WHERE status = 'queued'
+          ) AS candidate
+          WHERE NOT EXISTS (
+            SELECT 1 FROM benchmark_runs WHERE id = candidate.run_id AND status = 'running')
+        )`),
     db
       .prepare(`UPDATE scheduler_chunks SET status = CASE WHEN EXISTS (
         SELECT 1 FROM run_lane_failures WHERE run_id = scheduler_chunks.run_id
@@ -514,32 +515,73 @@ export async function recoverChunks(db: D1Database, now: number): Promise<Schedu
         AND model = scheduler_chunks.model AND variant = scheduler_chunks.variant AND rep = scheduler_chunks.rep)
       LIMIT 250`),
     db
-      .prepare(`DELETE FROM scheduler_executions WHERE rowid IN (
-      SELECT execution.rowid FROM scheduler_executions AS execution
-      JOIN benchmark_runs AS run ON run.id = execution.run_id
+      .prepare(`WITH stale_run(run_id) AS MATERIALIZED (
+      SELECT marker.run_id FROM scheduler_runs AS marker
+      JOIN benchmark_runs AS run ON run.id = marker.run_id
       WHERE run.status != 'running' AND run.completed_at < ?
-        AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = run.id AND status = 'active')
+      LIMIT 100
+    )
+    DELETE FROM scheduler_executions WHERE rowid IN (
+      SELECT execution.rowid FROM scheduler_executions AS execution
+      WHERE execution.run_id IN (SELECT run_id FROM stale_run)
+        AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = execution.run_id AND status = 'active')
       LIMIT 1000
     )`)
       .bind(new Date(now - 24 * 3600_000).toISOString()),
     db
-      .prepare(`DELETE FROM scheduler_chunks WHERE id IN (
-      SELECT chunk.id FROM scheduler_chunks AS chunk JOIN benchmark_runs AS run ON run.id = chunk.run_id
-      WHERE run.status != 'running' AND run.completed_at < ? AND chunk.status IN ('completed', 'failed')
+      .prepare(`WITH stale_run(run_id) AS MATERIALIZED (
+      SELECT marker.run_id FROM scheduler_runs AS marker
+      JOIN benchmark_runs AS run ON run.id = marker.run_id
+      WHERE run.status != 'running' AND run.completed_at < ?
+      LIMIT 100
+    )
+    DELETE FROM scheduler_chunks WHERE id IN (
+      SELECT chunk.id FROM scheduler_chunks AS chunk
+      WHERE chunk.run_id IN (SELECT run_id FROM stale_run)
+        AND chunk.status IN ('completed', 'failed')
       LIMIT 1000
     )`)
       .bind(new Date(now - 24 * 3600_000).toISOString()),
     db
-      .prepare(`DELETE FROM scheduler_runs WHERE run_id IN (
-      SELECT run.id FROM benchmark_runs AS run WHERE run.status != 'running' AND run.completed_at < ?
-        AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = run.id)
-        AND NOT EXISTS (SELECT 1 FROM scheduler_executions WHERE run_id = run.id)
+      .prepare(`WITH stale_run(run_id) AS MATERIALIZED (
+      SELECT marker.run_id FROM scheduler_runs AS marker
+      JOIN benchmark_runs AS run ON run.id = marker.run_id
+      WHERE run.status != 'running' AND run.completed_at < ?
+      LIMIT 100
+    )
+    DELETE FROM scheduler_runs WHERE run_id IN (
+      SELECT marker.run_id FROM scheduler_runs AS marker
+      WHERE marker.run_id IN (SELECT run_id FROM stale_run)
+        AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = marker.run_id)
+        AND NOT EXISTS (SELECT 1 FROM scheduler_executions WHERE run_id = marker.run_id)
       LIMIT 1000
     )`)
       .bind(new Date(now - 24 * 3600_000).toISOString()),
     db.prepare('DELETE FROM scheduler_cooldowns WHERE until <= ?').bind(now),
   ]);
   return results[2]?.results ?? [];
+}
+
+/** SQL for {@link hasUnsettledChunks}; exported for the query-plan regression test. */
+export const SCHEDULER_UNSETTLED_SQL = `
+  SELECT 1 FROM scheduler_chunks AS chunk
+  WHERE chunk.run_id = ? AND chunk.status IN ('pending', 'queued', 'active')
+    AND NOT EXISTS (
+      SELECT 1 FROM run_lane_failures AS failure
+      WHERE failure.run_id = chunk.run_id AND failure.model = chunk.model
+        AND failure.variant = chunk.variant AND failure.rep = chunk.rep)
+  LIMIT 1
+`;
+
+/**
+ * Whether a run still has scheduled work that could settle it: a chunk that is
+ * pending, queued or active in a lane that has not dead-lettered. Runs without
+ * scheduler chunks (legacy whole-run work) are always settled. Callers use this
+ * to keep run accounting off the per-completion path.
+ */
+export async function hasUnsettledChunks(db: D1Database, runId: string): Promise<boolean> {
+  const row = await db.prepare(SCHEDULER_UNSETTLED_SQL).bind(runId).first();
+  return row !== null;
 }
 
 export async function beginPaidCase(

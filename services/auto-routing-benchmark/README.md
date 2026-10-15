@@ -121,6 +121,17 @@ pending row, so one throttle event costs a bounded write instead of rewriting th
 Materialization writes chunks in bounded batches, marks a batch complete when all of its
 cases already have results, and checks the run's status once per batch rather than per row.
 
+Run completion accounting reads every case result of the run, so it does not run per
+completed chunk. A completion first asks whether the run still has scheduled work — an
+index probe for a chunk that is pending, queued or active in a lane that has not
+dead-lettered — and only settled runs are accounted. Chunks of a dead-lettered lane never
+count as unsettled, so a run with a dead lane still settles once its live lanes finish, and
+runs with no scheduler chunks (legacy whole-run work) are always accounted. The dispatch
+sweep and the dead-letter path remain responsible for runs that settle without a train of
+completions. Chunk recovery and the 24-hour prune batches are likewise bounded: recovery
+completes only the runs that still hold unsettled chunks, and pruning is driven from the
+per-run scheduler markers instead of scanning the chunk, execution or run tables.
+
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger prevents automatic repetition if a worker disappears
 after inference may have started but before an output was saved. Such an ambiguous case

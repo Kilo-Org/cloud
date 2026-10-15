@@ -99,6 +99,7 @@ import {
   failChunk,
   finishChunk,
   getChunk,
+  hasUnsettledChunks,
   recoverChunks,
   scheduleRunChunks,
   schedulerBackoffSeconds,
@@ -1142,7 +1143,12 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
     );
   }
   await dispatchScheduler(env);
-  if (state) await finalizeRunIfComplete(env, claim.run_id, 'decider', state);
+  // Run accounting reads every case result of the run, so it only runs once the
+  // run's scheduled work has settled. Dispatch's settled-run sweep and the
+  // dead-letter path stay responsible for settling runs that never complete.
+  if (state && !(await hasUnsettledChunks(env.BENCH_DB, claim.run_id))) {
+    await finalizeRunIfComplete(env, claim.run_id, 'decider', state);
+  }
 }
 
 export async function processJob(env: Env, rawMessage: unknown): Promise<void> {

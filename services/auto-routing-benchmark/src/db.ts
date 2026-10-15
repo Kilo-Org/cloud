@@ -14,7 +14,6 @@ import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contrac
 import type { PoolEntry } from '@kilocode/auto-routing-contracts';
 import {
   BENCHMARK_CONTAINER_BUDGET,
-  BENCHMARK_PLATFORM_RESERVED_CONTAINERS,
   BENCHMARK_USER_CONTAINER_LIMIT,
   BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH,
 } from '@kilocode/auto-routing-contracts';
@@ -152,12 +151,14 @@ export async function getConfigRows(
   };
 }
 
-// The retired per-config lane budgets are no longer admin input, but the
-// columns are NOT NULL and a deployed worker still reads them, so every save
-// writes the shared-budget constants instead of saved values.
-const LEGACY_CONFIG_LANE_BUDGETS = {
-  max_concurrency: BENCHMARK_CONTAINER_BUDGET,
-  user_max_concurrency: BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS,
+// Retired per-config lane budgets. Nothing in this worker reads them, but the
+// columns are NOT NULL and the previously deployed worker sizes runs from them
+// and rejects configs unless efficient max + efficient user + frontier max <=
+// 200. Writing today's production values on every save (80 + 40 + 80 = 200)
+// keeps that worker valid during rollout.
+const ROLLBACK_SAFE_LEGACY_LANE_BUDGETS = {
+  max_concurrency: 80,
+  user_max_concurrency: 40,
 };
 
 export async function replaceConfig(
@@ -190,12 +191,12 @@ export async function replaceConfig(
       .values({
         id: router === 'efficient' ? 1 : 2,
         ...config,
-        ...LEGACY_CONFIG_LANE_BUDGETS,
+        ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
         router,
       })
       .onConflictDoUpdate({
         target: benchmarkConfig.router,
-        set: { ...config, ...LEGACY_CONFIG_LANE_BUDGETS },
+        set: { ...config, ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS },
       }),
     orm.delete(configClassifierModels).where(eq(configClassifierModels.router, router)),
     orm.delete(configDeciderModels).where(eq(configDeciderModels.router, router)),

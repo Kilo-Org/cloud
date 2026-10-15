@@ -25,8 +25,9 @@ export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
  * Which registry queue a run drains. Decider measurements all land in the one
  * global Benchmark-profile registry; the purpose only records who asked for the
  * entries — the saved platform decider list ('platform') or owner pools
- * ('user'). Each purpose owns its own decider slot and container budget, so the
- * two queues run independently. Classifier runs are always 'platform'.
+ * ('user'). Each purpose owns its own decider slot, so the two queues run
+ * independently; both draw on the shared container budget. Classifier runs
+ * are always 'platform'.
  */
 export const BenchmarkRunPurposeSchema = z.enum(['platform', 'user']);
 export type BenchmarkRunPurpose = z.infer<typeof BenchmarkRunPurposeSchema>;
@@ -36,22 +37,25 @@ export const BenchmarkQueueSelectorSchema = z.enum(['platform', 'user', 'both'])
 export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema>;
 
 /**
- * Total live decider containers the benchmark runner may hold (wrangler
- * `max_instances`). Every router and queue shares this one budget.
+ * Total live decider containers the benchmark runner may hold, shared by every
+ * router and queue. Each queue job holds one container for its consumer
+ * invocation, so this equals Cloudflare's limit of 250 concurrent push-consumer
+ * invocations. Raising it needs a Cloudflare limit increase plus matching
+ * container `max_instances` and jobs consumer `max_concurrency` in wrangler.jsonc.
  */
-export const BENCHMARK_CONTAINER_BUDGET = 500;
+export const BENCHMARK_CONTAINER_BUDGET = 250;
 
 /**
  * Containers withheld from owner-queue runs. User-queue runs stop at
  * BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS, and a
  * platform run may claim the whole budget minus the user lanes already live, so
- * 100 containers are always available to platform runs.
+ * these containers are always available to platform runs.
  */
 export const BENCHMARK_PLATFORM_RESERVED_CONTAINERS = 100;
 
 /**
  * Containers owner-queue runs may hold. User runs wait for platform runs once
- * they hold this many, so the reserved 100 containers always stay available.
+ * they hold this many, so the platform reserve always stays available.
  */
 export const BENCHMARK_USER_CONTAINER_LIMIT =
   BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS;

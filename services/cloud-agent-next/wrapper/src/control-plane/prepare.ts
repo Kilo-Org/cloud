@@ -787,7 +787,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     }
     setStep('setup');
     await runSetupCommands(spec, directory, env, redact, new AbortController().signal);
-    if (cloning || adopted) await onReplacementWorkspace?.();
     const commit = await headCommit(directory, env);
     // The stamp goes down before the snapshot, so a container restored from it
     // sees another allocation's stamp and adopts rather than trusting the files.
@@ -797,6 +796,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       setStep('snapshot');
       await captureWorkspace(spec, directory, env, commit);
     }
+    if (cloning || adopted) await onReplacementWorkspace?.();
     log(
       `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`
     );

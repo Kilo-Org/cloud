@@ -236,7 +236,7 @@ describe('useStoreCreditProducts paused store query', () => {
 
       onlineManager.setOnline(false);
       setConnected(true);
-      await waitFor(() => api().catalogEmpty);
+      await waitFor(() => api().catalogEmpty && !api().isLoading);
 
       expect(api().isLoading).toBe(false);
       expect(api().products).toHaveLength(0);

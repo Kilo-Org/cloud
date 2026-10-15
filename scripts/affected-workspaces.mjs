@@ -2,7 +2,7 @@
 // Select the workspaces whose typecheck and lint results a change can alter.
 //
 // Usage: node scripts/affected-workspaces.mjs <base-sha>
-// Prints JSON: { full, reasons, dirs, packages, build }.
+// Prints JSON: { full, reasons, full_checks, dirs, packages }.
 //
 // A workspace is affected when one of its files changed, or when it reads an
 // affected workspace. A workspace reads another through a workspace:* entry in
@@ -13,9 +13,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { posix } from 'node:path';
-
-// Packages that consumers typecheck and lint against as built output.
-const BUILT_PACKAGES = ['@kilocode/trpc', '@kilocode/harness-sdk'];
 
 // Root paths that change how every workspace is checked.
 const GLOBAL = [
@@ -197,11 +194,6 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
     affected.add(dir);
     queue.push(...readers.get(dir));
   }
-  const build = BUILT_PACKAGES.filter(name => {
-    const dir = dirOf.get(name);
-    if (!dir) return false;
-    return affected.has(dir) || [...readers.get(dir)].some(reader => affected.has(reader));
-  });
   return {
     full,
     reasons,
@@ -209,7 +201,6 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
     full_checks: full ? ['lint', 'typecheck'] : [...fullChecks].sort(),
     dirs: [...affected].sort(),
     packages: [...affected].map(dir => nameOf.get(dir)).sort(),
-    build,
   };
 }
 

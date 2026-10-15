@@ -243,12 +243,12 @@ jobs:
           typecheck_groups=$(jq -c '
             (.full_checks | index("typecheck") != null) as $all | .packages as $p | [
               (select($all or ($p | index("web")) or ($p | index("@kilocode/storybook"))) | "web"),
-              (select($all or (.build | index("@kilocode/trpc"))) | "trpc"),
+              (select($all or ($p | index("kilo-extension"))) | "trpc"),
               (select($all or ($p - ["web", "@kilocode/trpc", "@kilocode/storybook", "kilo-app", "kilo-extension"] | length > 0)) | "packages")
             ]' <<< "$affected")
           lint_groups=$(jq -c '
             (.full_checks | index("lint") != null) as $all | .dirs as $d | [
-              (select($all or ($d | index("apps/mobile")) or ($d | index("apps/extension"))) | "trpc"),
+              (select($all or ($d | index("apps/extension"))) | "trpc"),
               (select($all or ($d - ["apps/mobile", "apps/extension"] | length > 0)) | "rest")
             ]' <<< "$affected")
           {
@@ -341,24 +341,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        if: matrix.group == 'trpc'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
-      # The mobile and extension sources lint against the built tRPC and
-      # harness SDK types.
+      # The extension sources lint against the built tRPC types.
       - name: Build trpc types
         if: matrix.group == 'trpc'
         run: pnpm --filter @kilocode/trpc run build
-
-      - name: Build harness SDK
-        if: matrix.group == 'trpc'
-        run: pnpm --filter @kilocode/harness-sdk run build
 
       - name: Lint
         env:

@@ -22,7 +22,6 @@ const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
 
 for (const [file, name, command, condition] of [
   ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],
-  ['ci.yml', 'lint-groups', harnessBuild],
   ['ci.yml', 'harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
   [
     'ci.yml',
@@ -30,7 +29,7 @@ for (const [file, name, command, condition] of [
     'pnpm --filter ${{ matrix.workspace.name }} test',
     "matrix.workspace.name == '@kilocode/harness-sdk'",
   ],
-  ...['typecheck', 'lint', 'i18n-leftover', 'check-unused', 'mobile-test'].map(name => [
+  ...['typecheck', 'lint', 'check-unused', 'mobile-test'].map(name => [
     'kilo-app-ci.yml',
     name,
     harnessBuild,

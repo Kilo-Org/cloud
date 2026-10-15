@@ -28,7 +28,6 @@ test('a leaf change selects only the leaf', () => {
     full_checks: [],
     dirs: ['services/leaf'],
     packages: ['leaf'],
-    build: [],
   });
 });
 
@@ -43,9 +42,12 @@ test('a web .env change selects ai-gateway, which builds with those files', () =
 });
 
 test('a change reaches workspace dependents and relative-import readers', () => {
-  const { packages, build } = select(['packages/db/src/schema.ts']);
-  assert.deepEqual(packages, ['@kilocode/db', '@kilocode/trpc', 'kilo-app', 'web']);
-  assert.deepEqual(build, ['@kilocode/trpc']);
+  assert.deepEqual(select(['packages/db/src/schema.ts']).packages, [
+    '@kilocode/db',
+    '@kilocode/trpc',
+    'kilo-app',
+    'web',
+  ]);
   assert.deepEqual(select(['services/agent/src/shared/preview.ts']).packages, [
     '@kilocode/trpc',
     'agent',
@@ -59,12 +61,6 @@ test('a nested workspace change selects the workspace around it', () => {
     '@kilocode/trpc',
     'agent',
   ]);
-});
-
-test('a consumer of a built package needs that build without selecting it', () => {
-  const { packages, build } = select(['apps/mobile/src/app.tsx']);
-  assert.deepEqual(packages, ['kilo-app']);
-  assert.deepEqual(build, ['@kilocode/trpc']);
 });
 
 test('documentation and unchecked root paths select nothing', () => {
@@ -112,7 +108,6 @@ test('a check script change runs only that check everywhere', () => {
     full_checks: ['lint'],
     dirs: [],
     packages: [],
-    build: [],
   });
   const both = select(['scripts/typecheck-all.sh', 'services/leaf/src/a.ts']);
   assert.deepEqual(both.full_checks, ['typecheck']);

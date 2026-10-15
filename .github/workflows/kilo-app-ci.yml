@@ -191,20 +191,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
-      - name: Build trpc types
-        run: pnpm --filter @kilocode/trpc run build
-
-      - name: Build harness SDK
-        run: pnpm --filter @kilocode/harness-sdk run build
-
+      # Neither check reads types or built packages: the i18n oxlint config
+      # is not type-aware.
       - name: Check i18n catalogs and leftover copy
         run: pnpm --filter kilo-app run check:i18n
       - name: Check for silently-dropped NativeWind classes

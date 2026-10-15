@@ -9,8 +9,10 @@ set -euo pipefail
 #   scripts/lint-all.sh --group <name>   # CI: one group of KILO_AFFECTED
 #
 # Groups split the work across parallel CI jobs:
-#   trpc  apps/mobile and apps/extension, which lint against the built tRPC types
-#   rest  every other workspace
+#   trpc  apps/extension, which lints against the built tRPC types
+#   rest  every other workspace except apps/mobile
+# The groups leave out apps/mobile: the kilo-app CI lint job runs the same
+# oxlint command whenever the app is affected.
 # KILO_AFFECTED is the JSON printed by scripts/affected-workspaces.mjs.
 
 PATH="node_modules/.bin:$PATH"
@@ -34,7 +36,7 @@ affects() {
 in_group() {
   case "$group" in
     "") return 0 ;;
-    trpc) [[ "$1" == apps/mobile || "$1" == apps/extension ]] ;;
+    trpc) [[ "$1" == apps/extension ]] ;;
     rest) [[ "$1" != apps/mobile && "$1" != apps/extension ]] ;;
     *) echo "Unknown group: $group" >&2; exit 1 ;;
   esac

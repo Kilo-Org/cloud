@@ -22,12 +22,12 @@ import {
 } from '@/components/agents/session-list-rows';
 import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
+import { SessionRowSkeleton } from '@/components/agents/session-list-skeleton-rows';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { QueryError } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
@@ -284,15 +284,9 @@ export function AgentSessionListContent({
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SessionListRow>) => {
       if (item.kind === 'skeleton') {
-        // Reserved cold-open slot. The pitch must equal the stored session-row
-        // pitch (SessionRow: py-[13px] + eyebrow/title ≈ 61dp) so the rows
-        // swap into the reserved space without a surrounding jump:
-        // 12dp wrapper padding + 49dp block = 61dp.
-        return (
-          <View className="py-1.5">
-            <Skeleton className="mx-[22px] h-[49px] rounded-none" />
-          </View>
-        );
+        // Reserved cold-open slot in the stored row's own shape (eyebrow and
+        // title), so the rows swap into the reserved space without a jump.
+        return <SessionRowSkeleton index={item.index} subtitle={false} />;
       }
       if (item.kind === 'section-header') {
         return <SessionListSectionHeader title={item.title} count={item.count} />;

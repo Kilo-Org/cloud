@@ -478,6 +478,10 @@ export async function rewriteModelResponse_ChatCompletions({
       rewriteUsage(usage, removeCost);
     }
     for (const choice of json.choices ?? []) {
+      // Some APIs set null here, which @openrouter/ai-sdk-provider rejects in non-streaming responses
+      if (choice.message?.tool_calls === null) {
+        delete choice.message.tool_calls;
+      }
       applyReasoningDetailsResponseTransform(responseTransforms, choice.message);
     }
 
@@ -534,6 +538,9 @@ export async function rewriteModelResponse_ChatCompletions({
             // Some APIs set null here, which is not accepted by OpenCode
             if (delta.role === null) {
               delete delta.role;
+            }
+            if (delta.tool_calls === null) {
+              delete delta.tool_calls;
             }
             applyReasoningDetailsResponseTransform(responseTransforms, delta);
           }

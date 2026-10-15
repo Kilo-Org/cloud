@@ -526,6 +526,66 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(json.choices[0].message.reasoning_content).toBe('full thought');
       expect(json.choices[0].message.reasoning_details).toBeUndefined();
     });
+
+    test('drops null message tool_calls', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'It is cloudy in Paris.', tool_calls: null },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        content: 'It is cloudy in Paris.',
+      });
+    });
+
+    test('preserves message tool_calls arrays', async () => {
+      const toolCalls = [
+        {
+          id: 'call-1',
+          type: 'function',
+          function: { name: 'get_weather', arguments: '{"city":"Paris"}' },
+        },
+      ];
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: null, tool_calls: toolCalls },
+            finish_reason: 'tool_calls',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.tool_calls).toEqual(toolCalls);
+    });
   });
 
   describe('streaming responses', () => {
@@ -622,6 +682,27 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect('role' in chunk.choices[0].delta).toBe(false);
       expect(chunk.choices[0].delta.content).toBe('hi');
       expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
+    test('drops null delta tool_calls', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"hi","tool_calls":null}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({ content: 'hi' });
     });
 
     test('maps Gemini thought content and signatures to reasoning_details', async () => {

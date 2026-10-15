@@ -206,6 +206,7 @@ import {
   finishWorktreeDeletion,
   loadWorktreeDeletionJournal,
   persistWorktreeDeletionManifest,
+  WORKTREE_DELETION_PREFIX,
   WorktreeDeletionIncompleteError,
   worktreeOwnedRoutes,
   type ControlPlaneWorktreeDeletionInput,
@@ -932,6 +933,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const worktreeId = context.worktreeId;
     if (!worktreeId) return;
     const sessionIds = new Set([context.session.sessionId]);
+    for (const [, sessionId] of this.ctx.storage.kv.list({
+      prefix: `worktree_changes/${worktreeId}/subscribers/`,
+    })) {
+      sessionIds.add(z.string().parse(sessionId));
+    }
     for (const route of await listRoutes(this.db)) {
       if (
         route.credentialSource?.scopeId === worktreeId ||
@@ -948,8 +954,23 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
   }
 
+  private subscribeToWorktreeChanges(context: WorktreeChangesContext): void {
+    const { worktreeId, session } = context;
+    if (
+      !worktreeId ||
+      this.ctx.storage.kv.get(`${WORKTREE_DELETION_PREFIX}${worktreeId}`) !== undefined
+    ) {
+      return;
+    }
+    const key = `worktree_changes/${worktreeId}/subscribers/${session.sessionId}`;
+    if (this.ctx.storage.kv.get(key) === undefined) {
+      this.ctx.storage.kv.put(key, session.sessionId);
+    }
+  }
+
   async getWorktreeChanges(input: SharedWorktreeChangesInput): Promise<GetWorktreeChangesOutput> {
     await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
     return this.worktreeChanges.get(input);
   }
 
@@ -958,6 +979,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     query: unknown
   ): Promise<GetWorktreeFileOutput> {
     await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
     return this.worktreeChanges.getFile(input, query);
   }
 
@@ -965,6 +987,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     input: SharedWorktreeChangesInput
   ): Promise<RefreshWorktreeChangesOutput> {
     await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
     return this.worktreeChanges.refresh(input);
   }
 
@@ -972,6 +995,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     input: SharedWorktreeChangesInput
   ): Promise<WorktreeRecovery | undefined> {
     await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
     return this.worktreeChanges.recovery(input);
   }
 

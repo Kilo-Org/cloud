@@ -2,6 +2,7 @@ import { env, evictDurableObject, reset, runInDurableObject } from 'cloudflare:t
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import { deleteRoute, readRoute } from '../../src/control-plane/sandbox/routes.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { events } from '../../src/db/sqlite-schema.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
@@ -309,6 +310,118 @@ afterEach(async () => {
 });
 
 describe('control-plane worktree changes (B10)', () => {
+  it.each(['changes', 'file', 'recovery', 'refresh'] as const)(
+    'deduplicates %s readers and removes their subscription on worktree deletion',
+    async operation => {
+      const sessionId = newSessionId();
+      const worktreeId = `worktree_${crypto.randomUUID()}`;
+      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const sandbox = await injectProvider(sandboxId, createFakeProvider());
+      const context = worktreeChangesContext(
+        metadata({ sessionId, sandboxId, worktreeId, kiloSessionId: kiloSessionId() }),
+        '/workspace/shared'
+      );
+      if (!context) throw new Error('Missing worktree context');
+      const read = () => {
+        switch (operation) {
+          case 'changes':
+            return sandbox.getWorktreeChanges({ context });
+          case 'file':
+            return sandbox.getWorktreeFile({ context }, { path: 'saved.txt', expectedRevision: 1 });
+          case 'recovery':
+            return sandbox.getWorktreeRecovery({ context });
+          case 'refresh':
+            return sandbox.refreshWorktreeChanges({ context });
+        }
+      };
+      await read();
+      await read();
+      await runInDurableObject(sandbox, (_instance, state) => {
+        expect(
+          Array.from(
+            state.storage.kv.list({ prefix: `worktree_changes/${worktreeId}/subscribers/` })
+          )
+        ).toEqual([[`worktree_changes/${worktreeId}/subscribers/${sessionId}`, sessionId]]);
+      });
+      await sandbox.deleteWorktreeResources({
+        worktreeId,
+        kiloUserId: USER_ID,
+        location: { sandboxId, provider: 'cloudflare' },
+        sessionIds: [context.session.kiloSessionId],
+      });
+      await read();
+      await runInDurableObject(sandbox, (_instance, state) => {
+        expect(
+          Array.from(state.storage.kv.list({ prefix: `worktree_changes/${worktreeId}/` }))
+        ).toEqual([]);
+      });
+    }
+  );
+
+  it('notifies a historical sibling reader after route loss and sandbox DO eviction', async () => {
+    const sessionId = newSessionId();
+    const siblingId = newSessionId();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createFakeProvider();
+    const first = await startSessionWithSandbox({ sessionId, sandboxId, provider, worktreeId });
+    const second = await startSessionWithSandbox({
+      sessionId: siblingId,
+      sandboxId,
+      provider,
+      worktreeId,
+    });
+    const sandbox = sandboxes.getByName(sandboxId);
+    const initialWrapper = await connectAndHello(provider, sandboxId, 'wr_before_eviction');
+    await markRouteReady(first, initialWrapper, sessionId);
+    await markRouteReady(second, initialWrapper, siblingId);
+    await settleCaptures(initialWrapper);
+    initialWrapper.close();
+    await waitFor(async () =>
+      expect((await sandbox.getAllocationState()).kind).toBe('disconnected')
+    );
+    await runInDurableObject(sandbox, async (_instance, state) => {
+      await deleteRoute(drizzle(state.storage), sessionId);
+    });
+    const saved = await first.getWorktreeChanges();
+    expect(saved.snapshot).not.toBeNull();
+    await evictDurableObject(sandbox);
+    await injectProvider(sandboxId, provider);
+    const wrapper = await connectAndHello(provider, sandboxId, 'wr_after_eviction');
+    await settleCaptures(wrapper);
+    const response = await first.fetch(
+      new Request('https://session.test/stream', { headers: { Upgrade: 'websocket' } })
+    );
+    const observer = response.webSocket;
+    if (!observer) throw new Error('Missing historical reader stream');
+    observer.accept();
+    const observed: Array<{ streamEventType: string; data: { revision?: number } }> = [];
+    observer.addEventListener('message', event => {
+      observed.push(JSON.parse(String(event.data)));
+    });
+
+    const refresh = second.refreshWorktreeChanges();
+    const frame = await awaitFrame(wrapper, 'worktree.snapshot');
+    replySnapshot(wrapper, frame);
+    await expect(refresh).resolves.toMatchObject({
+      status: 'refreshed',
+      snapshot: { revision: frame.payload.revision },
+    });
+    await waitFor(() =>
+      expect(observed).toContainEqual(
+        expect.objectContaining({
+          streamEventType: 'cloud.worktree.changes.ready',
+          data: { revision: frame.payload.revision },
+        })
+      )
+    );
+    await runInDurableObject(sandbox, async (_instance, state) => {
+      expect(await readRoute(drizzle(state.storage), sessionId)).toBeNull();
+    });
+    observer.close();
+    wrapper.close();
+  }, 15_000);
+
   it('promotes newer historical sibling captures with lower revisions and rejects older seeds after eviction', async () => {
     const sessionId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
@@ -353,6 +466,7 @@ describe('control-plane worktree changes (B10)', () => {
       }
     );
     await evictDurableObject(sandboxes.getByName(sandboxId));
+    const rebased = { snapshot: { ...promoted.snapshot, revision: 101 } };
     for (const savedCapturedAt of ['2026-01-01T12:00:00.000Z', '2026-01-02T00:00:00.000Z']) {
       const stale = await startSessionWithSandbox({
         sessionId: newSessionId(),
@@ -363,9 +477,9 @@ describe('control-plane worktree changes (B10)', () => {
         savedRevision: 100,
         savedCapturedAt,
       });
-      await expect(stale.getWorktreeChanges()).resolves.toEqual(promoted);
+      await expect(stale.getWorktreeChanges()).resolves.toEqual(rebased);
     }
-    await expect(first.getWorktreeChanges()).resolves.toEqual(promoted);
+    await expect(first.getWorktreeChanges()).resolves.toEqual(rebased);
   });
 
   it('fences captures superseded by migration and never overwrites a live snapshot with historical data', async () => {
@@ -423,13 +537,93 @@ describe('control-plane worktree changes (B10)', () => {
       savedRevision: 999,
       savedCapturedAt: '2099-01-01T00:00:00.000Z',
     });
-    await expect(stale.getWorktreeChanges()).resolves.toEqual({ snapshot: live.snapshot });
+    await expect(stale.getWorktreeChanges()).resolves.toEqual({
+      snapshot: { ...live.snapshot, revision: 1000 },
+    });
     await expect(
       stale.getWorktreeFile({ path: 'lost.txt', expectedRevision: 999 })
     ).resolves.toEqual({
       status: 'no_longer_listed',
-      currentRevision: 11,
+      currentRevision: 1000,
     });
+  });
+
+  it('advances shared revisions past rejected historical ready events without replacing saved files', async () => {
+    const sessionId = newSessionId();
+    const siblingId = newSessionId();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createFakeProvider();
+    const first = await startSessionWithSandbox({
+      sessionId,
+      sandboxId,
+      provider,
+      worktreeId,
+      savedPatch: '+newer\n',
+      savedRevision: 9,
+      savedCapturedAt: '2026-01-02T00:00:00.000Z',
+    });
+    const historical = sessions.getByName(sessionDoName(USER_ID, siblingId));
+    await historical.getSession();
+    await runInDurableObject(historical, (_instance, state) => {
+      const db = drizzle(state.storage);
+      for (let revision = 1; revision <= 100; revision++) {
+        db.insert(events)
+          .values({
+            execution_id: '',
+            session_id: siblingId,
+            stream_event_type: 'cloud.worktree.changes.ready',
+            payload: JSON.stringify({ revision }),
+            timestamp: revision,
+            entity_id: `worktree-changes/${revision}`,
+          })
+          .run();
+      }
+    });
+    await startSessionWithSandbox({
+      sessionId: siblingId,
+      sandboxId,
+      provider,
+      worktreeId,
+      savedPatch: '+older\n',
+      savedRevision: 100,
+      savedCapturedAt: '2026-01-01T00:00:00.000Z',
+    });
+    await expect(historical.getWorktreeChanges()).resolves.toMatchObject({
+      snapshot: { revision: 101, files: [{ path: 'lost.txt', revision: 9 }] },
+    });
+    await expect(
+      historical.getWorktreeFile({ path: 'lost.txt', expectedRevision: 9 })
+    ).resolves.toMatchObject({ file: { diff: { patch: '+newer\n' } } });
+    await waitFor(async () => {
+      const readyEvents = await runInDurableObject(historical, (_instance, state) =>
+        drizzle(state.storage).select().from(events).all()
+      );
+      expect(readyEvents.filter(event => event.entity_id === 'worktree-changes/101')).toHaveLength(
+        1
+      );
+    });
+
+    const sandbox = sandboxes.getByName(sandboxId);
+    await evictDurableObject(sandbox);
+    await injectProvider(sandboxId, provider);
+    const wrapper = await connectAndHello(provider, sandboxId, 'wr_revision_floor');
+    await markRouteReady(historical, wrapper, siblingId);
+    const frame = await awaitFrame(wrapper, 'worktree.snapshot');
+    expect(frame.payload.revision).toBe(102);
+    replySnapshot(wrapper, frame);
+    await waitFor(async () =>
+      expect((await first.getWorktreeChanges()).snapshot?.revision).toBe(102)
+    );
+    await waitFor(async () => {
+      const readyEvents = await runInDurableObject(historical, (_instance, state) =>
+        drizzle(state.storage).select().from(events).all()
+      );
+      expect(readyEvents.filter(event => event.entity_id === 'worktree-changes/102')).toHaveLength(
+        1
+      );
+    });
+    wrapper.close();
   });
 
   it('coalesces concurrent sibling captures with a trailing capture and monotonic revisions', async () => {

@@ -548,6 +548,23 @@ describe('processJob — legacy whole-run migration', () => {
     expect(claimNextChunk).toHaveBeenCalled();
   });
 
+  it('still migrates and dispatches when legacy container teardown fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      vi.mocked(destroyDeciderCliContainer).mockRejectedValueOnce(new Error('destroy unavailable'));
+      await expect(
+        processJob(env, { runId, kind: 'decider', model, variant: null, shard: 1 })
+      ).resolves.toBeUndefined();
+      expect(scheduleRunChunks).toHaveBeenCalled();
+      expect(claimNextChunk).toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('benchmark_legacy_container_destroy_failed')
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it.each(['completed', 'failed'] as const)(
     'never migrates or executes a %s legacy run',
     async status => {

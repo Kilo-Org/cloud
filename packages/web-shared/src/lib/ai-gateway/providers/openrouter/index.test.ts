@@ -31,7 +31,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   getDataCollectionRequiredModelIds,
-  getProviderSlugsForModel,
+  getProviderSlugsForModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -44,7 +44,9 @@ jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
   () => ({
     getDataCollectionRequiredModelIds: jest.fn(() => Promise.resolve(new Set())),
-    getProviderSlugsForModel: jest.fn(() => Promise.resolve(new Set())),
+    getProviderSlugsForModels: jest.fn((ids: readonly string[]) =>
+      Promise.resolve(new Map(ids.map(id => [id, new Set<string>()])))
+    ),
   })
 );
 
@@ -205,7 +207,9 @@ describe('shouldSuppressOpenRouterModel', () => {
 
 describe('auto models', () => {
   beforeEach(() => {
-    jest.mocked(getProviderSlugsForModel).mockResolvedValue(new Set());
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(async ids => new Map(ids.map(id => [id, new Set<string>()])));
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
@@ -298,9 +302,17 @@ describe('auto models', () => {
       },
     });
     jest
-      .mocked(getProviderSlugsForModel)
-      .mockImplementation(async id =>
-        id === target.id ? new Set(['Google-Vertex', 'google-ai-studio']) : new Set(['deepinfra'])
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(
+        async ids =>
+          new Map(
+            ids.map(id => [
+              id,
+              id === target.id
+                ? new Set(['Google-Vertex', 'google-ai-studio'])
+                : new Set(['deepinfra']),
+            ])
+          )
       );
     global.fetch = jest.fn(() =>
       Promise.resolve(
@@ -329,9 +341,15 @@ describe('auto models', () => {
   });
 
   it('publishes normalized endpoint identities and preserves the public schema field', async () => {
+    jest.mocked(getProviderSlugsForModels).mockClear();
     jest
-      .mocked(getProviderSlugsForModel)
-      .mockResolvedValue(new Set(['DeepInfra/fp8', 'Fireworks', 'Together', 'deepinfra']));
+      .mocked(getProviderSlugsForModels)
+      .mockImplementation(
+        async ids =>
+          new Map(
+            ids.map(id => [id, new Set(['DeepInfra/fp8', 'Fireworks', 'Together', 'deepinfra'])])
+          )
+      );
     global.fetch = jest.fn(() =>
       Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
     ) as typeof fetch;
@@ -340,6 +358,7 @@ describe('auto models', () => {
     expect(
       response.data.find(model => model.id === 'vendor/model')?.inference_provider_ids
     ).toEqual(['deepinfra', 'fireworks', 'together']);
+    expect(getProviderSlugsForModels).toHaveBeenCalledTimes(1);
   });
 
   it('does not infer an upstream from the model author when metadata is missing', async () => {

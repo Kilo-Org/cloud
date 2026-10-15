@@ -1178,6 +1178,14 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
       for (const variant of legacyVariants) {
         await destroyDeciderCliContainer(env, {
           instanceName: getDeciderContainerInstanceName({ ...message, variant }),
+        }).catch(error => {
+          console.warn(
+            JSON.stringify({
+              event: 'benchmark_legacy_container_destroy_failed',
+              runId: message.runId,
+              ...formatError(error),
+            })
+          );
         });
       }
       await dispatchScheduler(env);

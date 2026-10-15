@@ -1373,7 +1373,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
     await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
 
-    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    await setAllocationField(stub, { last_activity_at: Date.now() - 30_000 });
     const heartbeatAt = Date.now();
     wrapper.heartbeat(true);
     await waitFor(async () =>
@@ -1384,8 +1384,11 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect((await readState(stub)).kind).toBe('connected');
     expect(provider.stopCalls).toEqual([]);
 
-    const lastActivityAt = Date.now() - 61_000;
-    await setAllocationField(stub, { last_activity_at: lastActivityAt });
+    const lastActivityAt = Date.now() - 30_000;
+    await setAllocationField(stub, {
+      last_activity_at: lastActivityAt,
+      last_frame_at: Date.now() - 1_000,
+    });
     const idleHeartbeatAt = Date.now();
     wrapper.heartbeat(false);
     await waitFor(async () =>
@@ -1393,6 +1396,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     );
     expect((await readState(stub)).lastActivityAt).toBe(lastActivityAt);
     expect(provider.leaseCalls).toEqual([120_000]);
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
     await runAlarm(stub);
     await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
     expect(provider.stopCalls).toEqual([provider.refs[0]]);

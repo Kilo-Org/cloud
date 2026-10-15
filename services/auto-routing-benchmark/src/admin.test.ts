@@ -425,6 +425,30 @@ describe('GET /admin/runs', () => {
     // Only runs that can still change are tallied.
     expect(listRunProgressCounts).toHaveBeenCalledWith(env.BENCH_DB, [running.id]);
   });
+
+  it('still lists runs when the progress query fails', async () => {
+    const running: BenchmarkRun = {
+      id: 'decider-2026-06-15T00-00-00-000Z',
+      router: 'efficient',
+      kind: 'decider',
+      purpose: 'platform',
+      status: 'running',
+      startedAt: '2026-06-15T00:00:00.000Z',
+      completedAt: null,
+      error: null,
+      summaries: [],
+    };
+    vi.mocked(listRuns).mockResolvedValue([running]);
+    vi.mocked(listRunProgressCounts).mockRejectedValue(new Error('D1 overloaded'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: BenchmarkRun[] };
+    expect(body.runs.map(run => run.id)).toEqual([running.id]);
+    expect(body.runs[0].progress).toBeUndefined();
+  });
 });
 
 describe('POST /admin/runs', () => {
@@ -624,6 +648,7 @@ describe('POST /admin/runs', () => {
     // Every lane is committed to runs already going. Waiting is the correct
     // outcome: the panel must not claim the queue failed, and must not pretend
     // a run started.
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     vi.mocked(getLiveContainerLanes).mockResolvedValue(500);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
@@ -639,6 +664,7 @@ describe('POST /admin/runs', () => {
   it('reports a wedged queue alongside the queue that did start', async () => {
     // The platform queue starts; the user queue's registry read fails. Hiding
     // that behind the started run would leave its pending work looking absent.
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     vi.mocked(listPendingCurrentProfiles).mockImplementation(async (_db, _filter, purpose) => {
       if (purpose === 'user') throw new Error('registry unavailable');
       return [{ model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' }];

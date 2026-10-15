@@ -14,6 +14,7 @@ import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contrac
 import type { PoolEntry } from '@kilocode/auto-routing-contracts';
 import {
   BENCHMARK_CONTAINER_BUDGET,
+  BENCHMARK_PLATFORM_RESERVED_CONTAINERS,
   BENCHMARK_USER_CONTAINER_LIMIT,
   BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH,
 } from '@kilocode/auto-routing-contracts';

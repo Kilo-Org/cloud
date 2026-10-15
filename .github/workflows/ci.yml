@@ -346,7 +346,7 @@ jobs:
           POSTGRES_URL: postgresql://unused:unused@localhost:5432/unused
 
   test:
-    needs: [changes, typecheck, lint, format-check, drizzle-check]
+    needs: changes
     if: needs.changes.outputs.kilocode_backend == 'true'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
@@ -428,7 +428,7 @@ jobs:
         run: pnpm --filter cloudflare-session-ingest run test:integration
 
   build:
-    needs: [changes, typecheck, lint, format-check, drizzle-check]
+    needs: changes
     if: needs.changes.outputs.kilocode_backend == 'true'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
@@ -477,7 +477,7 @@ jobs:
         run: pnpm run build
 
   build-ai-gateway:
-    needs: [changes, typecheck, lint, format-check, drizzle-check]
+    needs: changes
     if: needs.changes.outputs.ai_gateway == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
@@ -523,7 +523,7 @@ jobs:
         run: pnpm --filter ai-gateway run build
 
   build-ai-gateway-secure-proxy:
-    needs: [changes, typecheck, lint, format-check]
+    needs: changes
     if: needs.changes.outputs.ai_gateway_secure_proxy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
@@ -548,7 +548,7 @@ jobs:
         run: pnpm --filter ai-gateway-secure-proxy run build
 
   cloud-agent-next:
-    needs: [changes, typecheck, lint, format-check, drizzle-check]
+    needs: changes
     if: needs.changes.outputs.cloud_agent_next == 'true'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 15
@@ -617,7 +617,7 @@ jobs:
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloud-agent-next test:postgres
 
   harness-sdk:
-    needs: [changes, typecheck, lint, format-check, drizzle-check]
+    needs: changes
     if: needs.changes.outputs.harness_sdk == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
@@ -654,7 +654,7 @@ jobs:
         run: pnpm --filter @kilocode/harness-sdk check:ci
 
   workspace-tests:
-    needs: [changes, typecheck, lint, format-check, drizzle-check]
+    needs: changes
     if: ${{ needs.changes.outputs.workspace_matrix != '[]' }}
     strategy:
       fail-fast: false

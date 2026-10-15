@@ -119,7 +119,7 @@ jobs:
   # also covers the Chrome build. Firefox Selenium e2e (`e2e:firefox`) is intentionally
   # not run here: it relies on geckodriver tab detection that is unreliable headless.
   e2e-chrome:
-    needs: [changes, verify]
+    needs: changes
     if: needs.changes.outputs.extension == 'true'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 20

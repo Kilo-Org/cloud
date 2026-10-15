@@ -3,6 +3,7 @@ import {
   formatName,
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
+  getRawOpenRouterModels,
   shouldSuppressOpenRouterModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
@@ -220,6 +221,53 @@ describe('auto models', () => {
     );
   });
 
+  it.each([undefined, { name: 'Current model', slug: 'vendor/current' }])(
+    'validates raw upstream models with alias_target %j without falling back to unparsed data',
+    async aliasTarget => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve(
+          createMockResponse({
+            jsonData: {
+              data: [
+                {
+                  ...buildModel({ id: '~vendor/latest' }),
+                  alias_target: aliasTarget,
+                  canonical_slug: '~vendor/latest',
+                },
+              ],
+            },
+          })
+        )
+      ) as typeof fetch;
+
+      const response = await getRawOpenRouterModels();
+      expect(response.data[0]?.id).toBe('~vendor/latest');
+      expect(response.data[0]?.alias_target).toBeUndefined();
+      expect(response.data[0]).not.toHaveProperty('canonical_slug');
+    }
+  );
+
+  it.each(['~vendor/latest', 'vendor/concrete'])(
+    'does not publish an upstream alias target for %s without database alias metadata',
+    async modelId => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve(
+          createMockResponse({
+            jsonData: {
+              data: [buildModel({ id: modelId, alias_target: 'vendor/upstream-only' })],
+            },
+          })
+        )
+      ) as typeof fetch;
+
+      const response = await getEnhancedOpenRouterModels();
+      const model = response.data.find(entry => entry.id === modelId);
+      expect(model).toBeDefined();
+      expect(model?.alias_target).toBeUndefined();
+      expect(JSON.parse(JSON.stringify(model))).not.toHaveProperty('alias_target');
+    }
+  );
+
   it('publishes database alias targets only for alias entries and preserves them through validation', async () => {
     const alias = buildModel({ id: '~vendor/latest' });
     const target = buildModel({ id: 'vendor/current' });
@@ -236,12 +284,21 @@ describe('auto models', () => {
       },
     });
     global.fetch = jest.fn(() =>
-      Promise.resolve(createMockResponse({ jsonData: { data: [alias, target] } }))
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [
+              { ...alias, alias_target: { name: 'Upstream model', slug: 'vendor/upstream' } },
+              { ...target, alias_target: 'vendor/upstream' },
+            ],
+          },
+        })
+      )
     ) as unknown as typeof fetch;
 
     const response = OpenRouterModelsResponseSchema.parse(await getEnhancedOpenRouterModels());
     expect(response.data.find(model => model.id === alias.id)?.alias_target).toBe(target.id);
-    expect(response.data.find(model => model.id === target.id)).not.toHaveProperty('alias_target');
+    expect(response.data.find(model => model.id === target.id)?.alias_target).toBeUndefined();
   });
 
   it('excludes OpenRouter batch variants from the public model list', async () => {

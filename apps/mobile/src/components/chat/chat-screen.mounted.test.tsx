@@ -180,10 +180,22 @@ vi.mock('@/components/agents/session-context-metrics', () => ({
 vi.mock('@/components/chat/web-search-row', () => ({
   useWebSearchSetting: () => ({ enabled: true, setEnabled: () => undefined }),
 }));
-const keyboard = vi.hoisted(() => ({ isVisible: false }));
+const keyboard = vi.hoisted(() => ({ progress: 0 }));
 vi.mock('react-native-keyboard-controller', () => ({
   KeyboardAvoidingView: 'KeyboardAvoidingView',
-  useKeyboardState: (selector: (snapshot: { isVisible: boolean }) => boolean) => selector(keyboard),
+  useReanimatedKeyboardAnimation: () => ({ progress: { value: keyboard.progress } }),
+}));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  Extrapolation: { CLAMP: 'clamp' },
+  // Two-point interpolation, which is all the composer's safe-area inset asks
+  // for: closed (0) takes the first output, open (1) the second.
+  interpolate: (
+    value: number,
+    _input: readonly [number, number],
+    output: readonly [number, number]
+  ) => (value <= 0 ? output[0] : output[1]),
+  useAnimatedStyle: (style: () => unknown) => style(),
 }));
 vi.mock('react-native', () => ({
   Alert: { alert: backendUi.alert },
@@ -211,7 +223,7 @@ beforeEach(() => {
   state.model = 'm1';
   state.effort = null;
   state.images = false;
-  keyboard.isVisible = false;
+  keyboard.progress = 0;
   state.send.mockClear();
 });
 afterEach(() => {
@@ -226,6 +238,11 @@ async function mount(): Promise<ReactTestRenderer> {
 
 const count = (tree: ReactTestRenderer, type: string): number =>
   tree.root.findAll(node => (node.type as string) === type).length;
+
+/** The one status row above the composer; it reserves its height in every state. */
+function statusSlot(tree: ReactTestRenderer) {
+  return tree.root.findAll(node => node.props.testID === 'chat-status-slot')[0];
+}
 
 function isHandler(value: unknown): value is (...args: unknown[]) => unknown {
   return typeof value === 'function';
@@ -248,14 +265,33 @@ describe('the chat transcript while it opens', () => {
     expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
   });
 
-  it.each([false, true])(
-    'keeps the composer gap correct when keyboard visibility is %s',
-    async visible => {
-      keyboard.isVisible = visible;
+  it.each([
+    { progress: 0, paddingBottom: 24 },
+    { progress: 1, paddingBottom: 0 },
+  ])(
+    'keeps the composer inset in step with the keyboard at progress $progress',
+    async ({ progress, paddingBottom }) => {
+      keyboard.progress = progress;
       const tree = await mount();
       const composer = tree.root.find(node => (node.type as string) === 'ChatComposer');
 
-      expect(composer.parent?.props.style).toEqual({ paddingBottom: visible ? 0 : 24 });
+      // The composer holds its bottom spacing in step with the keyboard's own
+      // progress, rather than flipping it after the keyboard has landed.
+      expect(composer.parent?.props.style).toEqual({ paddingBottom });
+    }
+  );
+
+  it.each([
+    { status: 'idle' as const, liveStatuses: 0 },
+    { status: 'working' as const, liveStatuses: 1 },
+  ])(
+    'reserves the status slot above the composer in the $status state',
+    async ({ status, liveStatuses }) => {
+      state.status = status;
+      const tree = await mount();
+
+      expect(statusSlot(tree)).toBeDefined();
+      expect(count(tree, 'AccessibleStatus')).toBe(liveStatuses);
     }
   );
 

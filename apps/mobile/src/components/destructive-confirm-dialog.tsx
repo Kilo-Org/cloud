@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,8 +39,8 @@ export type DestructiveConfirmDialogProps = {
  * behind the sheet. The sheet sizes to the card and carries no drag indicator,
  * so the two buttons are the choices.
  *
- * Mount it only while it should be open (e.g. `{confirming && <DestructiveConfirmDialog ... />}`),
- * the same lifecycle `RenameModal` uses.
+ * Keep the request mounted until native dismissal finishes. The action runs
+ * afterward, so deleting its owner cannot empty the sheet during dismissal.
  */
 export function DestructiveConfirmDialog({
   title,
@@ -52,15 +53,42 @@ export function DestructiveConfirmDialog({
 }: Readonly<DestructiveConfirmDialogProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const [visible, setVisible] = useState(true);
+  const pendingAction = useRef<(() => void) | null>(null);
+
+  function dismiss(action: () => void) {
+    if (pendingAction.current !== null) {
+      return;
+    }
+    pendingAction.current = action;
+    setVisible(false);
+  }
+
   return (
-    <Sheet visible onClose={onCancel} showHandle={false}>
+    <Sheet
+      visible={visible}
+      onClose={() => {
+        dismiss(onCancel);
+      }}
+      onDismiss={() => {
+        const action = pendingAction.current ?? onCancel;
+        pendingAction.current = null;
+        action();
+      }}
+      showHandle={false}
+    >
       <View className="gap-4 px-5 pt-5" style={{ paddingBottom: insets.bottom + 20 }}>
         <Text accessibilityRole="header" className="text-base font-semibold">
           {title}
         </Text>
         <Text className="text-sm text-muted-foreground">{message}</Text>
         <View className="flex-row justify-end gap-3">
-          <Button variant="outline" onPress={onCancel}>
+          <Button
+            variant="outline"
+            onPress={() => {
+              dismiss(onCancel);
+            }}
+          >
             <Text>{cancelLabel ?? t('common.cancel')}</Text>
           </Button>
           {extraAction ? (
@@ -74,7 +102,12 @@ export function DestructiveConfirmDialog({
               <Text className="text-sm font-semibold text-foreground">{extraAction.label}</Text>
             </Pressable>
           ) : null}
-          <Button variant="destructive" onPress={onConfirm}>
+          <Button
+            variant="destructive"
+            onPress={() => {
+              dismiss(onConfirm);
+            }}
+          >
             <Text>{confirmLabel}</Text>
           </Button>
         </View>

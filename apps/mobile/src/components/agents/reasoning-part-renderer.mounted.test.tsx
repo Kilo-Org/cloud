@@ -217,6 +217,19 @@ describe('ReasoningPartRenderer mounted', () => {
     expect(renderer.root.children).toHaveLength(0);
   });
 
+  // A provider can leave a block it never put into words. A body made only of
+  // zero-width and format characters paints nothing, so it is not content: the
+  // row would open onto an empty body (video V1 ~8s, "MISAO" rows above short
+  // answers).
+  it('returns null for a body that draws nothing', async () => {
+    const renderer = await renderRenderer({
+      partId: 'p1',
+      text: '\u200B\u200B\uFEFF',
+      isStreaming: false,
+    });
+    expect(renderer.root.children).toHaveLength(0);
+  });
+
   it('drops selectable on expanded streaming text, then restores it when the part finishes', async () => {
     selectableMock.value = true;
     try {

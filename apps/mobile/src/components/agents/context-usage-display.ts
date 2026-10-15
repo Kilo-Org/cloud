@@ -121,10 +121,15 @@ export function getHeaderPillContent({
 }): HeaderPillContent {
   if (info) {
     const tone = getContextTone(info.percentage);
-    const primary =
+    // The bare "0%" the header drew left the reader to guess what it measured
+    // (video V0/V1): the ring and the number say nothing about the quantity
+    // behind them. The pill names it — this is the session's share of the
+    // model's context window — and the sheet it opens explains it in full.
+    const value =
       info.percentage !== undefined
         ? formatPercent(info.percentage, i18n.language)
         : formatCompactTokens(info.contextTokens);
+    const primary = i18n.t('agentChat.contextUsage.pillLabel', { value });
     const secondary = formatSessionTotalCost(totalCostMicrodollars);
     return {
       primary,

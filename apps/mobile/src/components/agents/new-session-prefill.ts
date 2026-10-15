@@ -10,6 +10,8 @@ export type NewSessionPrefillParams = {
   prompt?: string;
   /** The to-do the started session links to. */
   todoId?: string;
+  /** The to-do's title, carried so the create can name the session without a fetch. */
+  todoTitle?: string;
 };
 
 export type NewSessionPrefill = {
@@ -20,6 +22,7 @@ export type NewSessionPrefill = {
   variant?: string;
   prompt?: string;
   todoId?: string;
+  todoTitle?: string;
 };
 
 function isValidOwnerRepo(value: string): boolean {
@@ -99,6 +102,9 @@ export function appendNewSessionPrefill(base: string, params: NewSessionPrefillP
   }
   if (params.todoId) {
     entries.push(['todoId', params.todoId]);
+  }
+  if (params.todoTitle) {
+    entries.push(['prefillTodoTitle', params.todoTitle]);
   }
 
   if (entries.length === 0) {
@@ -217,6 +223,7 @@ export function readNewSessionPrefill(
   const rawVariant = getFirstParam(raw, 'prefillVariant');
   const rawPrompt = getFirstParam(raw, 'prefillPrompt');
   const rawTodoId = getFirstParam(raw, 'todoId');
+  const rawTodoTitle = getFirstParam(raw, 'prefillTodoTitle');
 
   return {
     mode: normalizeAgentMode(rawMode || undefined),
@@ -225,6 +232,7 @@ export function readNewSessionPrefill(
     ...(rawVariant ? { variant: rawVariant } : {}),
     ...(rawPrompt.trim() ? { prompt: rawPrompt } : {}),
     ...(rawTodoId ? { todoId: rawTodoId } : {}),
+    ...(rawTodoTitle.trim() ? { todoTitle: rawTodoTitle } : {}),
   };
 }
 

@@ -6,8 +6,10 @@ import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
+import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
+import { cn } from '@/lib/utils';
 
 import { useToolSummaryItemId } from './tool-summary-translation-scope';
 
@@ -25,6 +27,14 @@ type FixedPartRowProps = {
   status?: 'pending' | 'running' | 'completed' | 'error';
   /** 'solid' tools, 'dashed' reasoning. */
   variant?: 'solid' | 'dashed';
+  /**
+   * A control-sized row instead of a full-width one. Reasoning rows use it: a
+   * folded thought is a small affordance beside the answer, not a line of the
+   * transcript, and a full-width row for every one of them read as noise above
+   * short answers. The row keeps a 44pt iOS / 48dp Android tap area through its
+   * own minimum height plus hit slop. Tool rows keep the default.
+   */
+  compact?: boolean;
   /** Presence makes the row pressable and adds the chevron and details hint. */
   onPress?: () => void;
   /**
@@ -57,6 +67,7 @@ export function FixedPartRow({
   badge,
   status,
   variant = 'solid',
+  compact = false,
   onPress,
   translatable = true,
   accessibilityLabel,
@@ -75,14 +86,20 @@ export function FixedPartRow({
 
   return (
     <View
-      className={
-        variant === 'dashed'
-          ? 'overflow-hidden rounded-lg border border-dashed border-border'
-          : 'overflow-hidden rounded-lg border border-border'
-      }
+      className={cn(
+        'overflow-hidden border border-border',
+        compact ? 'self-start rounded-full' : 'rounded-lg',
+        variant === 'dashed' && 'border-dashed'
+      )}
     >
       <Pressable
-        className="flex-row items-center gap-2 px-3 py-2 active:bg-secondary"
+        className={cn(
+          'flex-row items-center active:bg-secondary',
+          compact ? 'min-h-[32px] gap-1.5 px-2.5' : 'gap-2 px-3 py-2'
+        )}
+        // The compact row is control-height, so its reach comes from the shared
+        // compact hit slop: it reaches the 44pt / 48dp minimum either way.
+        hitSlop={compact ? COMPACT_CONTROL_HIT_SLOP_DP : undefined}
         onPress={onPress}
         onLongPress={messageLongPress ?? undefined}
         disabled={!onPress}

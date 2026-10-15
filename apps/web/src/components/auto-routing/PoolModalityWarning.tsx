@@ -1,5 +1,7 @@
 'use client';
 
+// Web Jest compiles JSX with the classic runtime, which needs React in scope.
+import React from 'react';
 import { TriangleAlert } from 'lucide-react';
 import {
   poolModalityUnknownMessage,

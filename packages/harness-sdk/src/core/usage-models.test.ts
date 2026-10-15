@@ -12,23 +12,25 @@ const usage = (inputTokens: number, outputTokens: number, cost: number) => ({
   cost,
 });
 
+const weatherTool = Layer.succeed(ToolRegistry, {
+  tools: [
+    {
+      definition: {
+        name: 'weather',
+        description: 'weather',
+        parameters: { type: 'object', properties: {} },
+      },
+      run: () => Effect.succeed('sunny'),
+    },
+  ],
+});
+
 it('attributes every tool round to its served model while continuing to request Auto', async () => {
   const first = usage(10, 2, 0.01);
   const second = usage(20, 3, 0.02);
   const { value, calls } = await runWith({
     options: { system: 'sys', model: requested, maxTokens: 1024, tools: ['weather'] },
-    tools: Layer.succeed(ToolRegistry, {
-      tools: [
-        {
-          definition: {
-            name: 'weather',
-            description: 'weather',
-            parameters: { type: 'object', properties: {} },
-          },
-          run: () => Effect.succeed('sunny'),
-        },
-      ],
-    }),
+    tools: weatherTool,
     replies: [
       {
         model: 'vendor/first',

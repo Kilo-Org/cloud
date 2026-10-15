@@ -793,7 +793,7 @@ export const organizationAdminRouter = createTRPCRouter({
           await retireCreditBalance(tx, {
             owner: { type: 'organization', id: organizationId },
             actorId: user.id,
-            creditCategory: `organization_custom:${crypto.randomUUID()}`,
+            creditCategory: 'organization_custom',
             description: description?.trim() || 'Admin credit debit',
             amountMicrodollars: -amountMicrodollars,
             now: issuedAt,

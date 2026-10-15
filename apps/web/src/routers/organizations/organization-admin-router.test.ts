@@ -13,7 +13,7 @@ import {
   kilo_pass_org_issuance_snapshots,
   kilo_pass_org_term_versions,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, lt, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
@@ -421,7 +421,34 @@ describe('organization admin router', () => {
 
       expect(creditTransaction).toBeDefined();
       expect(creditTransaction.description).toBe(description);
+      expect(creditTransaction.credit_category).toBe('organization_custom');
       expect(creditTransaction.created_by_kilo_user_id).toBe(adminUser.id);
+    });
+
+    it('records repeated negative grants under the stable organization_custom category', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      for (const description of ['First correction', 'Second correction']) {
+        await caller.organizations.admin.grantCredit({
+          organizationId: testOrganization.id,
+          amount_usd: -2,
+          description,
+        });
+      }
+
+      const debits = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.organization_id, testOrganization.id),
+            lt(credit_transactions.amount_microdollars, 0)
+          )
+        );
+      expect(debits.map(debit => debit.credit_category)).toEqual([
+        'organization_custom',
+        'organization_custom',
+      ]);
     });
 
     it('should fail to grant negative credits without description', async () => {

@@ -2549,6 +2549,7 @@ export const auto_top_up_configs = pgTable(
     created_by_user_id: text(), // Audit trail: null for user-owned, set for org-owned
     stripe_payment_method_id: text().notNull(),
     amount_cents: integer().notNull().default(5000), // Default $50, options: 2000, 5000, 10000
+    threshold_cents: integer(), // Org-only; null means the default org threshold
     last_auto_top_up_at: timestamp({ withTimezone: true, mode: 'string' }),
     attempt_started_at: timestamp({ withTimezone: true, mode: 'string' }),
     disabled_reason: text(),

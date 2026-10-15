@@ -14,7 +14,10 @@ import {
   createOrganization,
   addUserToOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS } from '@kilocode/web-shared/lib/autoTopUpConstants';
+import {
+  DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+  DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
 
 // Mock Stripe client to avoid API calls in tests
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
@@ -116,6 +119,7 @@ describe('organization auto-top-up router', () => {
       expect(result).toEqual({
         enabled: false,
         amountCents: DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+        thresholdCents: DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
         paymentMethod: null,
       });
     });
@@ -127,6 +131,7 @@ describe('organization auto-top-up router', () => {
         owned_by_user_id: null,
         stripe_payment_method_id: 'pm_test_config_123',
         amount_cents: 10000,
+        threshold_cents: 10000,
       });
 
       const caller = await createCallerForUser(ownerUser.id);
@@ -135,6 +140,7 @@ describe('organization auto-top-up router', () => {
       });
 
       expect(result.amountCents).toBe(10000);
+      expect(result.thresholdCents).toBe(10000);
       // paymentMethod will be null because Stripe API call will fail in test
       // but the structure is correct
     });
@@ -277,6 +283,91 @@ describe('organization auto-top-up router', () => {
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config?.amount_cents).toBe(10000);
+    });
+
+    it('accepts the $5,000 amount', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_amount',
+        amount_cents: 50000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await caller.organizations.autoTopUp.updateAmount({
+        organizationId: testOrg.id,
+        amountCents: 500000,
+      });
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
+      });
+      expect(config?.amount_cents).toBe(500000);
+    });
+
+    it('rejects an amount below the configured threshold', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_amount',
+        amount_cents: 50000,
+        threshold_cents: 50000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await expect(
+        caller.organizations.autoTopUp.updateAmount({
+          organizationId: testOrg.id,
+          amountCents: 10000,
+        })
+      ).rejects.toThrow(/at least the balance threshold/);
+    });
+  });
+
+  describe('updateThreshold', () => {
+    it('updates the threshold', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_threshold',
+        amount_cents: 50000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      const result = await caller.organizations.autoTopUp.updateThreshold({
+        organizationId: testOrg.id,
+        thresholdCents: 50000,
+      });
+
+      expect(result.success).toBe(true);
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
+      });
+      expect(config?.threshold_cents).toBe(50000);
+    });
+
+    it('rejects a threshold above the top up amount', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_threshold',
+        amount_cents: 10000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await expect(
+        caller.organizations.autoTopUp.updateThreshold({
+          organizationId: testOrg.id,
+          thresholdCents: 50000,
+        })
+      ).rejects.toThrow(/at least the balance threshold/);
+    });
+
+    it('rejects unsupported thresholds', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await expect(
+        caller.organizations.autoTopUp.updateThreshold({
+          organizationId: testOrg.id,
+          // @ts-expect-error testing runtime validation with an unsupported threshold
+          thresholdCents: 2500,
+        })
+      ).rejects.toThrow(/thresholdCents/i);
     });
   });
 

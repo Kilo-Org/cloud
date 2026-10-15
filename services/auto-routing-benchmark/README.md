@@ -131,6 +131,7 @@ sweep and the dead-letter path remain responsible for runs that settle without a
 completions. Chunk recovery and the 24-hour prune batches are likewise bounded: recovery
 completes only the runs that still hold unsettled chunks, and pruning is driven from the
 per-run scheduler markers instead of scanning the chunk, execution or run tables.
+
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger prevents automatic repetition if a worker disappears
 after inference may have started but before an output was saved. Such an ambiguous case

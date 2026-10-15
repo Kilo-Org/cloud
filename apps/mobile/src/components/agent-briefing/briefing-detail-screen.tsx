@@ -120,7 +120,9 @@ export function BriefingDetailScreen() {
           <View className="overflow-hidden rounded-2xl border border-border bg-card">
             <BriefingScorecard report={report} />
           </View>
-          <Text className="text-xs text-muted-foreground">{t('agentBriefing.coverageHint')}</Text>
+          {Object.values(report.coverage).some(value => value !== 'complete') ? (
+            <Text className="text-xs text-muted-foreground">{t('agentBriefing.coverageHint')}</Text>
+          ) : null}
           <BriefingSummary report={report} />
           <View className="gap-2">
             <Text className="font-semibold">{t('common.agents')}</Text>

@@ -26,7 +26,7 @@ full=true
 affected='{}'
 if [ -n "$group" ]; then
   affected="${KILO_AFFECTED:?KILO_AFFECTED is required with --group}"
-  full=$(jq -r '.full' <<< "$affected")
+  full=$(jq -r '.full or (.full_checks | index("lint") != null)' <<< "$affected")
 fi
 affects() {
   [ "$full" = true ] || jq -e --arg dir "$1" '.dirs | index($dir)' <<< "$affected" > /dev/null

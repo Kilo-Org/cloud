@@ -22,7 +22,13 @@ const GLOBAL = [
   /^(package\.json|pnpm-workspace\.yaml|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|\.oxlintrc\.json|\.oxfmtrc\.json|oxlint-plugin-drizzle\.js|tsconfig[^/]*\.json)$/,
   /^(patches|tools\/oxlint)\//,
   /^\.github\/workflows\/(ci|kilo-app-ci)\.yml$/,
-  /^scripts\/(typecheck-all\.sh|lint-all\.sh|affected-workspaces\.mjs|changed-dependencies\.mjs)$/,
+  /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs)$/,
+];
+
+// Root scripts that change one check for every workspace, and nothing else.
+const CHECK_SCRIPTS = [
+  [/^scripts\/typecheck-all\.sh$/, 'typecheck'],
+  [/^scripts\/lint-all\.sh$/, 'lint'],
 ];
 
 // Root paths whose effect belongs to one workspace.
@@ -145,6 +151,7 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
   }
 
   const reasons = [];
+  const fullChecks = new Set();
   const changed = new Set();
   for (const file of changedFiles) {
     const dir = owner(dirs, file);
@@ -157,6 +164,11 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
     }
     if (GLOBAL.some(pattern => pattern.test(file))) {
       reasons.push(`${file} changes how every workspace is checked`);
+      continue;
+    }
+    const script = CHECK_SCRIPTS.find(([pattern]) => pattern.test(file));
+    if (script) {
+      fullChecks.add(script[1]);
       continue;
     }
     if (file === 'pnpm-lock.yaml') {
@@ -193,6 +205,8 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
   return {
     full,
     reasons,
+    // Checks that must cover every workspace, even when `full` is false.
+    full_checks: full ? ['lint', 'typecheck'] : [...fullChecks].sort(),
     dirs: [...affected].sort(),
     packages: [...affected].map(dir => nameOf.get(dir)).sort(),
     build,

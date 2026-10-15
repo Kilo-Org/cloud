@@ -31,7 +31,7 @@ workspace_typecheck_filters=(--filter '!kilocode-monorepo' --filter '!web' --fil
 
 if [ -n "$group" ]; then
   affected="${KILO_AFFECTED:?KILO_AFFECTED is required with --group}"
-  full=$(jq -r '.full' <<< "$affected")
+  full=$(jq -r '.full or (.full_checks | index("typecheck") != null)' <<< "$affected")
   affects() {
     [ "$full" = true ] || jq -e --arg name "$1" '.packages | index($name)' <<< "$affected" > /dev/null
   }

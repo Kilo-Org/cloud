@@ -228,7 +228,7 @@ jobs:
       - name: Detect changed workspaces with tests
         id: workspaces
         run: |
-          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web)
+          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web --exclude apps/mobile)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
       # Pull requests check only the workspaces a change can affect. Main
@@ -241,15 +241,15 @@ jobs:
           affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA")
           jq . <<< "$affected"
           typecheck_groups=$(jq -c '
-            .packages as $p | [
-              (select(.full or ($p | index("web")) or ($p | index("@kilocode/storybook"))) | "web"),
-              (select(.build | index("@kilocode/trpc")) | "trpc"),
-              (select(.full or ($p - ["web", "@kilocode/trpc", "@kilocode/storybook", "kilo-app", "kilo-extension"] | length > 0)) | "packages")
+            (.full_checks | index("typecheck") != null) as $all | .packages as $p | [
+              (select($all or ($p | index("web")) or ($p | index("@kilocode/storybook"))) | "web"),
+              (select($all or (.build | index("@kilocode/trpc"))) | "trpc"),
+              (select($all or ($p - ["web", "@kilocode/trpc", "@kilocode/storybook", "kilo-app", "kilo-extension"] | length > 0)) | "packages")
             ]' <<< "$affected")
           lint_groups=$(jq -c '
-            .dirs as $d | [
-              (select(.full or ($d | index("apps/mobile")) or ($d | index("apps/extension"))) | "trpc"),
-              (select(.full or ($d - ["apps/mobile", "apps/extension"] | length > 0)) | "rest")
+            (.full_checks | index("lint") != null) as $all | .dirs as $d | [
+              (select($all or ($d | index("apps/mobile")) or ($d | index("apps/extension"))) | "trpc"),
+              (select($all or ($d - ["apps/mobile", "apps/extension"] | length > 0)) | "rest")
             ]' <<< "$affected")
           {
             echo "affected=$(jq -c . <<< "$affected")"
@@ -517,7 +517,10 @@ jobs:
   test-scripts:
     needs: changes
     if: needs.changes.outputs.kilocode_backend == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    # The Postgres regressions ran on the large runner in the job this one
+    # replaces. The builder cleanup test drives two claims against the same
+    # rows, so keep the runner it was written for.
+    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
 
     services:

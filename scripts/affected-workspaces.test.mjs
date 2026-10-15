@@ -25,6 +25,7 @@ test('a leaf change selects only the leaf', () => {
   assert.deepEqual(select(['services/leaf/src/index.ts']), {
     full: false,
     reasons: [],
+    full_checks: [],
     dirs: ['services/leaf'],
     packages: ['leaf'],
     build: [],
@@ -93,14 +94,29 @@ test('an unattributable or global change selects everything', () => {
     'tsconfig.base.json',
     'unknown/file.ts',
     '.github/workflows/ci.yml',
-    'scripts/lint-all.sh',
+    'scripts/affected-workspaces.mjs',
     'patches/a.patch',
   ]) {
     const result = select([file]);
     assert.equal(result.full, true, file);
     assert.equal(result.dirs.length, items.length, file);
+    assert.deepEqual(result.full_checks, ['lint', 'typecheck'], file);
   }
   assert.equal(select(['<no base revision>']).full, true);
+});
+
+test('a check script change runs only that check everywhere', () => {
+  assert.deepEqual(select(['scripts/lint-all.sh']), {
+    full: false,
+    reasons: [],
+    full_checks: ['lint'],
+    dirs: [],
+    packages: [],
+    build: [],
+  });
+  const both = select(['scripts/typecheck-all.sh', 'services/leaf/src/a.ts']);
+  assert.deepEqual(both.full_checks, ['typecheck']);
+  assert.deepEqual(both.packages, ['leaf']);
 });
 
 test('lockfile changes select the workspaces whose dependencies changed', () => {

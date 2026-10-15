@@ -1902,6 +1902,7 @@
       "title": "O agente precisa de uma resposta",
       "skipQuestionsTitle": "Pular perguntas?",
       "skipQuestionsMessage": "O agente vai pular esta etapa.",
+      "answerProgress": "{{answered}} de {{total}} respondidas",
       "selectAllThatApply": "Selecione todas as opções que se aplicam.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, opção selecionada",

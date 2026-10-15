@@ -2429,6 +2429,7 @@
       "title": "အေးဂျင့်က အဖြေလိုအပ်နေသည်",
       "skipQuestionsTitle": "မေးခွန်းများကို ကျော်မလား။",
       "skipQuestionsMessage": "အေးဂျင့်က ဤအဆင့်ကို ကျော်သွားပါမည်။",
+      "answerProgress": "{{total}} ခုအနက် {{answered}} ခု ဖြေပြီး",
       "selectAllThatApply": "သက်ဆိုင်သမျှ အားလုံးကို ရွေးပါ။",
       "option": "{{label}}",
       "optionSelected": "{{label}}၊ ရွေးချယ်ထား",

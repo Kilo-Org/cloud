@@ -1917,6 +1917,7 @@
       "title": "エージェントからの質問",
       "skipQuestionsTitle": "質問をスキップしますか？",
       "skipQuestionsMessage": "エージェントはこのステップをスキップします。",
+      "answerProgress": "{{total}}件中{{answered}}件回答済み",
       "selectAllThatApply": "該当するものをすべて選択してください。",
       "option": "選択肢：{{label}}",
       "optionSelected": "{{label}}、選択済み",

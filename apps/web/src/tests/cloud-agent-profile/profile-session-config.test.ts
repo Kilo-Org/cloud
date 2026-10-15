@@ -13,6 +13,7 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   agent_environment_profile_agents,
+  agent_environment_profile_instructions,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -151,6 +152,20 @@ async function addAgent(
   });
 }
 
+async function addInstruction(
+  profileId: string,
+  name: string,
+  content: string,
+  opts: { enabled?: boolean } = {}
+): Promise<void> {
+  await db.insert(agent_environment_profile_instructions).values({
+    profile_id: profileId,
+    name,
+    content,
+    enabled: opts.enabled ?? true,
+  });
+}
+
 describe('mergeProfileConfiguration', () => {
   afterEach(async () => {
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -161,6 +176,8 @@ describe('mergeProfileConfiguration', () => {
     await db.delete(agent_environment_profile_skills);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_agents);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(agent_environment_profile_instructions);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_commands);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -643,6 +660,30 @@ describe('mergeProfileConfiguration', () => {
 
     expect(result.skills?.map(s => s.name).sort()).toEqual(['alpha', 'beta']);
     expect(result.skills?.find(s => s.name === 'alpha')?.rawMarkdown).toContain('override body');
+  });
+
+  test('includes only enabled instructions, merged by name across profile layers', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+
+    const baseProfileId = await createProfile(owner, 'base');
+    await addInstruction(baseProfileId, 'shared', 'base body');
+    await addInstruction(baseProfileId, 'disabled', 'disabled body', { enabled: false });
+    await bindRepo(owner, 'org/repo', 'github', baseProfileId);
+
+    const overrideId = await createProfile(owner, 'override');
+    await addInstruction(overrideId, 'shared', 'override body');
+    await addInstruction(overrideId, 'beta', 'beta body');
+
+    const result = await mergeProfileConfiguration(db, {
+      owner,
+      profileId: overrideId,
+      repoFullName: 'org/repo',
+      platform: 'github',
+    });
+
+    expect(result.instructions?.map(i => i.name).sort()).toEqual(['beta', 'shared']);
+    expect(result.instructions?.find(i => i.name === 'shared')?.content).toBe('override body');
   });
 
   test('MCP env values travel as encrypted envelopes in the client record', async () => {

@@ -2429,6 +2429,7 @@
       "title": "ئەجێنتەکە پێویستی بە وەڵامە",
       "skipQuestionsTitle": "تێپەڕاندنی پرسیارەکان؟",
       "skipQuestionsMessage": "ئەجێنتەکە ئەم هەنگاوە تێدەپەڕێنێت.",
+      "answerProgress": "{{answered}} لە {{total}} وەڵام دراوەتەوە",
       "selectAllThatApply": "هەموو بژاردە گونجاوەکان هەڵبژێرە.",
       "option": "{{label}}",
       "optionSelected": "{{label}}، هەڵبژێردراو",

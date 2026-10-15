@@ -2429,6 +2429,7 @@
       "title": "ایجنټ ځواب ته اړتیا لري",
       "skipQuestionsTitle": "له پوښتنو تېر شم؟",
       "skipQuestionsMessage": "ایجنټ به له دې ګام څخه تېر شي.",
+      "answerProgress": "له {{total}} څخه {{answered}} ځواب شوې",
       "selectAllThatApply": "ټول اړوند غوراوي غوره کړئ.",
       "option": "{{label}}",
       "optionSelected": "{{label}}، غوره شوی",

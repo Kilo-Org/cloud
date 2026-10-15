@@ -234,6 +234,19 @@ export const schedulerChunks = sqliteTable(
   table => [
     index('IX_scheduler_chunks_pending').on(table.status, table.available_at),
     index('IX_scheduler_chunks_run').on(table.run_id),
+    // Lane-head dispatch: a lane is one (run, model, variant, rep) chunk chain, and
+    // `(available_at, chunk)` orders its runnable head. This prefix lets a claim
+    // find each lane's next runnable chunk by index seek instead of scanning the
+    // run's or the backlog's pending rows.
+    index('IX_scheduler_chunks_lane').on(
+      table.status,
+      table.run_id,
+      table.model,
+      table.variant,
+      table.rep,
+      table.available_at,
+      table.chunk
+    ),
     uniqueIndex('UQ_scheduler_chunks_live_slot')
       .on(table.slot)
       .where(sql`${table.status} IN ('queued', 'active')`),
@@ -261,6 +274,33 @@ export const schedulerExecutions = sqliteTable(
   table => [
     primaryKey({ columns: [table.run_id, table.model, table.variant, table.rep, table.case_id] }),
   ]
+);
+
+/**
+ * Single row (id = 1) serializing dispatch passes. A pass holds the lease while it
+ * reads live occupancy and claims; another dispatcher that finds the lease held
+ * returns immediately and the next completion or cron wake retries. Model,
+ * provider and slot caps are only exact if one pass at a time reads occupancy.
+ */
+export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
+  id: integer('id').primaryKey(),
+  token: text('token'),
+  lease_until: integer('lease_until').notNull().default(0),
+});
+
+/**
+ * Model- and provider-wide throttle deadlines. Cooling is stored here rather than
+ * stamped onto every pending chunk so one throttle event costs a bounded write
+ * instead of rewriting the whole backlog.
+ */
+export const schedulerCooldowns = sqliteTable(
+  'scheduler_cooldowns',
+  {
+    scope: text('scope').$type<'model' | 'provider'>().notNull(),
+    key: text('key').notNull(),
+    until: integer('until').notNull(),
+  },
+  table => [primaryKey({ columns: [table.scope, table.key] })]
 );
 
 export const routingTables = sqliteTable('routing_tables', {

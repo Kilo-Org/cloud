@@ -2557,6 +2557,7 @@
       "title": "Mae angen mewnbwn ar yr asiant",
       "skipQuestionsTitle": "Hepgor cwestiynau?",
       "skipQuestionsMessage": "Bydd yr asiant yn hepgor y cam hwn.",
+      "answerProgress": "{{answered}} o {{total}} wedi'u hateb",
       "selectAllThatApply": "Dewiswch bob un sy'n berthnasol.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, wedi'i ddewis",

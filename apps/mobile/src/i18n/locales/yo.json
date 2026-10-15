@@ -2429,6 +2429,7 @@
       "title": "Aṣojú nílò ìdáhùn",
       "skipQuestionsTitle": "Re àwọn ìbéèrè kọjá?",
       "skipQuestionsMessage": "Aṣojú náà yóò re ìgbésẹ̀ yìí kọjá.",
+      "answerProgress": "A ti dáhùn {{answered}} nínú {{total}}",
       "selectAllThatApply": "Yan gbogbo èyí tó bá a mu.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, a ti yàn án",

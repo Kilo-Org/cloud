@@ -2429,6 +2429,7 @@
       "title": "Umenzeli udinga impendulo",
       "skipQuestionsTitle": "Uyafuna ukweqa imibuzo?",
       "skipQuestionsMessage": "Umenzeli uzokweqa lesi sinyathelo.",
+      "answerProgress": "Kuphendulwe {{answered}} kwangu-{{total}}",
       "selectAllThatApply": "Khetha konke okufanele.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, kukhethiwe",

@@ -10,7 +10,7 @@ import type {
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 import type { BenchmarkJobMessage } from './run';
 import {
-  claimNextChunk,
+  claimScheduledChunks,
   finishChunk,
   getChunk,
   recoverChunks,
@@ -20,7 +20,7 @@ import {
 
 vi.mock('./scheduler', async importOriginal => ({
   ...(await importOriginal<typeof SchedulerModule>()),
-  claimNextChunk: vi.fn(),
+  claimScheduledChunks: vi.fn(),
   finishChunk: vi.fn(),
   getChunk: vi.fn(),
   recoverChunks: vi.fn(),
@@ -226,7 +226,7 @@ beforeEach(() => {
       };
     });
   vi.mocked(scheduleRunChunks).mockReset().mockResolvedValue(undefined);
-  vi.mocked(claimNextChunk).mockReset().mockResolvedValue(null);
+  vi.mocked(claimScheduledChunks).mockReset().mockResolvedValue([]);
   vi.mocked(recoverChunks).mockReset().mockResolvedValue([]);
   vi.mocked(startChunk).mockReset().mockResolvedValue(true);
   vi.mocked(getChunk).mockReset().mockResolvedValue(null);
@@ -416,7 +416,7 @@ describe('startRun — registry-backed decider runs', () => {
     });
     expect(result.enqueuedModels).toBe(1);
     expect(scheduleRunChunks).toHaveBeenCalledOnce();
-    expect(claimNextChunk).toHaveBeenCalled();
+    expect(claimScheduledChunks).toHaveBeenCalled();
     expect(queueSend).not.toHaveBeenCalled();
   });
 
@@ -1259,8 +1259,8 @@ it('settles a failed resume plan without dispatching or stranding registry claim
   expect(markProfilesFailedForRun).toHaveBeenCalled();
 });
 
-it('dispatches only token-owned claims up to the scheduler slot limit', async () => {
-  vi.mocked(claimNextChunk).mockResolvedValue({
+it('dispatches every claim of one scheduler pass and stops when a pass claims nothing', async () => {
+  const claim = {
     id: 'claim-1',
     run_id: 'user-existing',
     model: 'platform/a',
@@ -1272,15 +1272,18 @@ it('dispatches only token-owned claims up to the scheduler slot limit', async ()
     slot: 1,
     token: 'claim-token',
     attempts: 1,
-  });
+  };
+  vi.mocked(claimScheduledChunks)
+    .mockResolvedValueOnce([claim, { ...claim, id: 'claim-2', token: 'claim-token-2' }])
+    .mockResolvedValue([]);
   const result = await startRun({ ...env, BENCHMARK_SCHEDULER_CONFIG: '{"slots":2}' }, 'decider', {
     purpose: 'user',
     entries: [{ model: 'platform/a', variant: 'high' }],
   });
   expect(result.enqueuedModels).toBe(1);
   expect(recoverChunks).toHaveBeenCalledWith(env.BENCH_DB, expect.any(Number));
-  expect(claimNextChunk).toHaveBeenCalledTimes(2);
-  expect(claimNextChunk).toHaveBeenCalledWith(
+  expect(claimScheduledChunks).toHaveBeenCalledTimes(1);
+  expect(claimScheduledChunks).toHaveBeenCalledWith(
     env.BENCH_DB,
     expect.objectContaining({ slots: 2 }),
     expect.any(Number),

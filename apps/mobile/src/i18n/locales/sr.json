@@ -2461,6 +2461,7 @@
       "title": "Agent čeka odgovor",
       "skipQuestionsTitle": "Preskočiti pitanja?",
       "skipQuestionsMessage": "Agent će preskočiti ovaj korak.",
+      "answerProgress": "Odgovoreno {{answered}} od {{total}}",
       "selectAllThatApply": "Izaberi sve što odgovara.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, izabrano",

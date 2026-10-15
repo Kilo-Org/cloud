@@ -1917,6 +1917,7 @@
       "title": "Der Agent braucht deine Antwort",
       "skipQuestionsTitle": "Fragen überspringen?",
       "skipQuestionsMessage": "Der Agent überspringt diesen Schritt.",
+      "answerProgress": "{{answered}} von {{total}} beantwortet",
       "selectAllThatApply": "Wähle alle zutreffenden Antworten aus.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, ausgewählt",

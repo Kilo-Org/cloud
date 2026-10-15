@@ -2429,6 +2429,7 @@
       "title": "Агент хариулт хүлээж байна",
       "skipQuestionsTitle": "Асуултуудыг алгасах уу?",
       "skipQuestionsMessage": "Агент энэ алхмыг алгасах болно.",
+      "answerProgress": "{{total}}-аас {{answered}} хариулсан",
       "selectAllThatApply": "Тохирох бүх хариултыг сонгоно уу.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, сонгогдсон",

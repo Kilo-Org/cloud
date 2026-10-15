@@ -2429,6 +2429,7 @@
       "title": "ಏಜೆಂಟ್‌ಗೆ ನಿಮ್ಮ ಉತ್ತರ ಬೇಕಿದೆ",
       "skipQuestionsTitle": "ಪ್ರಶ್ನೆಗಳನ್ನು ಬಿಟ್ಟುಬಿಡಬೇಕೆ?",
       "skipQuestionsMessage": "ಏಜೆಂಟ್ ಈ ಹಂತವನ್ನು ಬಿಟ್ಟುಬಿಡುತ್ತದೆ.",
+      "answerProgress": "{{total}} ರಲ್ಲಿ {{answered}} ಕ್ಕೆ ಉತ್ತರಿಸಲಾಗಿದೆ",
       "selectAllThatApply": "ಅನ್ವಯಿಸುವ ಎಲ್ಲ ಆಯ್ಕೆಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",

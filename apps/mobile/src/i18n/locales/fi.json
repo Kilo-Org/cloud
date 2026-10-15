@@ -2429,6 +2429,7 @@
       "title": "Agentti tarvitsee vastauksesi",
       "skipQuestionsTitle": "Ohitetaanko kysymykset?",
       "skipQuestionsMessage": "Agentti ohittaa tämän vaiheen.",
+      "answerProgress": "{{answered}}/{{total}} vastattu",
       "selectAllThatApply": "Valitse kaikki sopivat vaihtoehdot.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, valittu",

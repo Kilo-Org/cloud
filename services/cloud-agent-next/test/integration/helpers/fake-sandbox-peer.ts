@@ -92,6 +92,15 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
     return this.runtimeCredentialProxyFence;
   }
 
+  /** The synthetic peer never has an accepted scope handle. */
+  async resolveScopeHandle(): Promise<{ type: 'denied' }> {
+    return { type: 'denied' };
+  }
+
+  async getAcceptedHandleIssuerLocator(): Promise<null> {
+    return null;
+  }
+
   async getStatusSnapshot(): Promise<SandboxStatusSnapshot> {
     return this.statusSnapshot;
   }

@@ -2461,6 +2461,7 @@
       "title": "Aģents gaida atbildi",
       "skipQuestionsTitle": "Izlaist jautājumus?",
       "skipQuestionsMessage": "Aģents izlaidīs šo soli.",
+      "answerProgress": "Atbildēti {{answered}} no {{total}}",
       "selectAllThatApply": "Izvēlies visus atbilstošos variantus.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, izvēlēts",

@@ -148,6 +148,49 @@ describe('allocation idle deadline while disconnected', () => {
   });
 });
 
+describe('allocation recovery after delivery', () => {
+  it('keeps the reconnect window when delivery advances activity past the last frame', () => {
+    const state = disconnectedState(1_000, 0);
+    expect(nextAllocationAlarmAt(state, TIMERS)).toBe(TIMERS.reconnectMs);
+    const early = reduceAllocation(
+      state,
+      { type: 'tick', at: 61_000, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(early.state.kind).toBe('disconnected');
+    const due = reduceAllocation(
+      state,
+      { type: 'tick', at: TIMERS.reconnectMs, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(due.stopReason).toBe('connection_lost');
+  });
+
+  it('preserves the activity clock and heartbeat deadline after a late reconnect', () => {
+    const reconnectAt = 70_000;
+    const connected = reduceAllocation(
+      disconnectedState(1_000, 0),
+      {
+        type: 'hello-accepted',
+        at: reconnectAt,
+        allocationId: 'alloc-1',
+        connectionId: 'conn-2',
+        wrapperId: 'wr-2',
+      },
+      TIMERS
+    ).state;
+    expect(connected.kind).toBe('connected');
+    expect(connected.lastActivityAt).toBe(1_000);
+    expect(nextAllocationAlarmAt(connected, TIMERS)).toBe(reconnectAt + TIMERS.heartbeatMs);
+    const reduction = reduceAllocation(
+      connected,
+      { type: 'tick', at: reconnectAt, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(reduction.state.kind).toBe('connected');
+  });
+});
+
 describe('allocation create retry', () => {
   const CREATE_FAILED_AT = TIMERS.providerCreateMs;
 

@@ -92,7 +92,7 @@ import {
 import { pickClassifierWinner } from './winner';
 import {
   beginPaidCase,
-  claimNextChunk,
+  claimScheduledChunks,
   clearUnbilledCase,
   cooldownProviders,
   deferChunk,
@@ -1026,9 +1026,8 @@ export async function dispatchScheduler(env: Env): Promise<void> {
   for (const run of settled.results) {
     await finalizeRunIfComplete(env, run.id, 'decider', await getRunState(env, run.id));
   }
-  for (let dispatched = 0; dispatched < config.slots; dispatched++) {
-    const claim = await claimNextChunk(env.BENCH_DB, config, Date.now(), crypto.randomUUID());
-    if (!claim) break;
+  const claims = await claimScheduledChunks(env.BENCH_DB, config, Date.now(), crypto.randomUUID());
+  for (const [index, claim] of claims.entries()) {
     try {
       await env.BENCH_QUEUE.send({
         runId: claim.run_id,
@@ -1038,7 +1037,9 @@ export async function dispatchScheduler(env: Env): Promise<void> {
         claimToken: claim.token,
       });
     } catch (error) {
-      await deferChunk(env.BENCH_DB, claim.id, claim.token, Date.now());
+      for (const unsent of claims.slice(index)) {
+        await deferChunk(env.BENCH_DB, unsent.id, unsent.token, Date.now());
+      }
       throw error;
     }
   }
@@ -1047,6 +1048,7 @@ export async function dispatchScheduler(env: Env): Promise<void> {
       event: 'benchmark_scheduler_dispatched',
       activeSlots: await getLiveContainerLanes(env.BENCH_DB),
       slots: config.slots,
+      claimed: claims.length,
     })
   );
 }

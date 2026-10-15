@@ -1917,6 +1917,7 @@
       "title": "Agen membutuhkan masukan",
       "skipQuestionsTitle": "Lewati pertanyaan?",
       "skipQuestionsMessage": "Agen akan melewati langkah ini.",
+      "answerProgress": "{{answered}} dari {{total}} dijawab",
       "selectAllThatApply": "Pilih semua yang sesuai.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, dipilih",

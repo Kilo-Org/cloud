@@ -1917,6 +1917,7 @@
       "title": "Invoer voor de agent nodig",
       "skipQuestionsTitle": "Vragen overslaan?",
       "skipQuestionsMessage": "De agent slaat deze stap over.",
+      "answerProgress": "{{answered}} van {{total}} beantwoord",
       "selectAllThatApply": "Selecteer alle opties die van toepassing zijn.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, geselecteerd",

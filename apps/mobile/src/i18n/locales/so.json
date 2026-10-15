@@ -2429,6 +2429,7 @@
       "title": "Wakiilku wuxuu u baahan yahay jawaab",
       "skipQuestionsTitle": "Ma ka boodaysaa su'aalaha?",
       "skipQuestionsMessage": "Wakiilku wuxuu ka boodi doonaa tallaabadan.",
+      "answerProgress": "{{answered}} ka mid ah {{total}} ayaa la jawaabay",
       "selectAllThatApply": "Dooro dhammaan kuwa khuseeya.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, la doortay",

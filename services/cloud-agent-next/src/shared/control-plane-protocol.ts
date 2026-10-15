@@ -316,6 +316,10 @@ export const controlPlaneRouteSpecSchema = z
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
+    /**
+     * Preserves the runtime key and HOME of existing allocations. The Sandbox
+     * omits it only after negotiating worktree sharing for a new allocation.
+     */
     runtimeIsolation: z.enum(['per-session']).optional(),
     attemptId: z.string().min(1).max(128),
     /**
@@ -332,23 +336,7 @@ export const controlPlaneRouteSpecSchema = z
      */
     secretEnvKeys: z.array(z.string().min(1).max(128)).max(50).optional(),
   })
-  .strict()
-  .superRefine((spec, context) => {
-    if (
-      (spec.permission ||
-        spec.githubReviewTarget ||
-        spec.runtimeSkills?.length ||
-        spec.runtimeAgents?.length ||
-        spec.kiloCommands?.length) &&
-      spec.runtimeIsolation !== 'per-session'
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['runtimeIsolation'],
-        message: 'Runtime permissions and profiles require per-session isolation',
-      });
-    }
-  });
+  .strict();
 
 /**
  * Route spec accepted at the registration boundary. `secretEnvKeys` is
@@ -371,7 +359,7 @@ export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSche
  * DO-only credential source (plan "Clarification (2026-09-27, B3 credentials)").
  * The Session DO has the session metadata; the Sandbox DO does not. `prepare`
  * carries this minimal issue-time snapshot privately so the Sandbox DO can mint
- * and re-issue the per-session Git and Kilo credential grant. It must never be
+ * and re-issue the route's Git and Kilo credential grant. It must never be
  * serialized into a wrapper frame.
  */
 export const controlPlaneCredentialRepositorySchema = z.discriminatedUnion('type', [

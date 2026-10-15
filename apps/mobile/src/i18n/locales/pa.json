@@ -2429,6 +2429,7 @@
       "title": "ਏਜੰਟ ਨੂੰ ਤੁਹਾਡੇ ਜਵਾਬ ਦੀ ਲੋੜ ਹੈ",
       "skipQuestionsTitle": "ਕੀ ਸਵਾਲ ਛੱਡਣੇ ਹਨ?",
       "skipQuestionsMessage": "ਏਜੰਟ ਇਹ ਕਦਮ ਛੱਡ ਦੇਵੇਗਾ।",
+      "answerProgress": "{{total}} ਵਿੱਚੋਂ {{answered}} ਦੇ ਜਵਾਬ ਦਿੱਤੇ",
       "selectAllThatApply": "ਲਾਗੂ ਹੋਣ ਵਾਲੇ ਸਾਰੇ ਵਿਕਲਪ ਚੁਣੋ।",
       "option": "{{label}}",
       "optionSelected": "{{label}}, ਚੁਣਿਆ ਗਿਆ",

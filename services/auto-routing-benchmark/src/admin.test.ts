@@ -11,7 +11,7 @@ import { app } from './index';
 import type * as DbModule from './db';
 import type * as ProfilesModule from './profiles';
 import type * as SchedulerModule from './scheduler';
-import { claimNextChunk, recoverChunks, scheduleRunChunks } from './scheduler';
+import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity } from './run';
@@ -75,7 +75,7 @@ const TEST_CONFIG_ROWS = {
 
 vi.mock('./scheduler', async importOriginal => ({
   ...(await importOriginal<typeof SchedulerModule>()),
-  claimNextChunk: vi.fn(),
+  claimScheduledChunks: vi.fn(),
   recoverChunks: vi.fn(),
   scheduleRunChunks: vi.fn(),
 }));
@@ -254,7 +254,7 @@ beforeEach(() => {
       };
     });
   vi.mocked(scheduleRunChunks).mockReset().mockResolvedValue(undefined);
-  vi.mocked(claimNextChunk).mockReset().mockResolvedValue(null);
+  vi.mocked(claimScheduledChunks).mockReset().mockResolvedValue([]);
   vi.mocked(recoverChunks).mockReset().mockResolvedValue([]);
   queueSend.mockReset().mockResolvedValue(undefined);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
@@ -789,7 +789,7 @@ describe('POST /admin/runs', () => {
     expect(body.drainErrors).toEqual([]);
     expect(insertRun).toHaveBeenCalledOnce();
     expect(scheduleRunChunks).toHaveBeenCalledOnce();
-    expect(claimNextChunk).toHaveBeenCalled();
+    expect(claimScheduledChunks).toHaveBeenCalled();
     expect(queueSend).not.toHaveBeenCalled();
   });
 

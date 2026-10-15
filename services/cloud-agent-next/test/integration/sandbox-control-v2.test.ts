@@ -3437,7 +3437,7 @@ describe('SandboxControlV2 prepare frame secrets', () => {
       expect(frame.spec.env?.DATABASE_URL).toBe(secretValue);
       expect(frame.spec.secretEnvKeys).toEqual(['DATABASE_URL']);
       expect(frame.spec).toMatchObject(profile);
-      expect(frame.spec.runtimeIsolation).toBe('per-session');
+      expect(frame.spec.runtimeIsolation).toBeUndefined();
 
       const row = await readRouteRow(stub, sessionId);
       expect(row?.spec ?? '').not.toContain(secretValue);

@@ -1408,9 +1408,10 @@ export function sessionCredentialsPayloadFromGrant(
       ? (grant.kilo.alias ?? invalidCredentials())
       : grant.kilo.token;
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
-  // The runtime credential proxy facade and the per-session handle (minted by
-  // the Session DO and bound to the route grant) are projected here, never into
-  // the route spec.
+  // The runtime credential proxy facade and the route's handle (the scope's
+  // shared canonical handle for an adopted worktree scope, or a per-session one
+  // otherwise, minted by the Session DO and bound to the route grant) are
+  // projected here, never into the route spec.
   const proxyMember = grant.kilo.runtimeProxy?.members.find(
     member => member.sessionId === sessionId
   );
@@ -1465,7 +1466,8 @@ export function removeSessionCredentialMembership(
 }
 
 export function buildControlNetworkPolicy(
-  grants: readonly SessionCredentialGrant[]
+  grants: readonly SessionCredentialGrant[],
+  acceptedHandlesByScopeId?: ReadonlyMap<string, readonly string[]>
 ): VercelSandboxNetworkPolicy {
   const policies = grants.map(value => {
     const grant = validateGrant(value);
@@ -1483,7 +1485,14 @@ export function buildControlNetworkPolicy(
         targets: grant.kilo.targets,
         rootSessionIds: grant.members.map(member => member.kiloSessionId),
         organizationId: grant.orgId,
-        ...(grant.kilo.runtimeProxy ? { runtimeProxy: grant.kilo.runtimeProxy } : {}),
+        ...(grant.kilo.runtimeProxy
+          ? {
+              runtimeProxy: {
+                ...grant.kilo.runtimeProxy,
+                handles: acceptedHandlesByScopeId?.get(grant.scopeId) ?? [],
+              },
+            }
+          : {}),
       },
       ...(grant.repository?.type === 'github' && grant.scm?.nativeToken
         ? {

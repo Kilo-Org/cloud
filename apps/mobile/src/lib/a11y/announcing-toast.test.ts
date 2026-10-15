@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { announceForA11y } from './announce';
 import { announcingToast } from './announcing-toast';
 
 const sonnerMock = vi.hoisted(() => {
@@ -119,21 +118,5 @@ describe('announcingToast', () => {
     const toasted = sonnerMock.success.mock.calls[0]?.[0];
     expect(announced).toBe(toasted);
     expect(announced).toBe(message);
-  });
-
-  it('reuses announceForA11y from the shared helper (no second announce utility)', () => {
-    // The adapter must delegate to the shared announce helper so screen-reader
-    // behavior stays in one place. The earlier "announces the same message"
-    // test already proves the message reaches AccessibilityInfo via
-    // announceForA11y (which is the only path in the adapter). This test
-    // additionally asserts the imported helper is the same function reference
-    // we import at the top of the test, so a future refactor that reaches
-    // for `AccessibilityInfo.announceForAccessibility` directly would be
-    // caught — the visible result would still pass, but the import
-    // wouldn't be reused.
-    expect(typeof announceForA11y).toBe('function');
-    announcingToast.success('hello');
-    announcingToast.error('oops');
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledTimes(2);
   });
 });

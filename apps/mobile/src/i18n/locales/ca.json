@@ -2461,6 +2461,7 @@
       "title": "L'agent necessita una resposta",
       "skipQuestionsTitle": "Vols ometre les preguntes?",
       "skipQuestionsMessage": "L'agent ometrà aquest pas.",
+      "answerProgress": "{{answered}} de {{total}} respostes",
       "selectAllThatApply": "Selecciona totes les opcions que corresponguin.",
       "option": "Opció: {{label}}",
       "optionSelected": "{{label}}, seleccionada",

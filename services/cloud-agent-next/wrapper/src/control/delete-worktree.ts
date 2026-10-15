@@ -15,13 +15,9 @@ import {
 } from '../../../src/shared/control-diagnostics.js';
 import { fenceDirectoryOperations } from './worktree-operations';
 import { directoryForSession, forgetAttachedRoot } from './session-directories';
+import { sessionChildSchema, type SessionChild } from './session-child-schema';
 
-const sessionSchema = z.object({
-  id: z.string().startsWith('ses_').length(30),
-  directory: z.string(),
-});
-
-type CleanupSession = z.infer<typeof sessionSchema>;
+type CleanupSession = SessionChild;
 
 export type WorktreeKiloCleanupClient = {
   listSessionIds(directory: string): Promise<string[]>;
@@ -73,11 +69,11 @@ export function createWorktreeKiloCleanupClient(server: KiloServer): WorktreeKil
     async getSession(directory, sessionId) {
       const result = await client.session.get({ sessionID: sessionId, directory }, options());
       if (result.response?.status === 404) return null;
-      return sessionSchema.parse(requireData(result));
+      return sessionChildSchema.parse(requireData(result));
     },
     async children(directory, sessionId) {
       return z
-        .array(sessionSchema)
+        .array(sessionChildSchema)
         .parse(
           requireData(await client.session.children({ sessionID: sessionId, directory }, options()))
         );

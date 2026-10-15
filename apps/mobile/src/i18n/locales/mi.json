@@ -2429,6 +2429,7 @@
       "title": "E hiahia ana te māngai ki tō whakautu",
       "skipQuestionsTitle": "Tīpoka i ngā pātai?",
       "skipQuestionsMessage": "Ka tīpoka te māngai i tēnei hipanga.",
+      "answerProgress": "Kua whakautua te {{answered}} o te {{total}}",
       "selectAllThatApply": "Kōwhiria ngā mea katoa e hāngai ana.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, kua kōwhiria",

@@ -1,3 +1,7 @@
+import {
+  WORKTREE_RUNTIME_HEADER,
+  WORKTREE_RUNTIME_VERSION,
+} from '../../../src/shared/control-plane-runtime-contract.js';
 import { describe, expect, it } from 'bun:test';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -31,7 +35,10 @@ class TestSocket {
   sendCalls = 0;
   failSendAt?: number;
   closes = 0;
-  constructor() {
+  constructor(
+    _url: string,
+    readonly options?: { headers?: Record<string, string> }
+  ) {
     TestSocket.instances.push(this);
   }
   send(text: string): void {
@@ -138,6 +145,23 @@ async function withTestSocket(
     Object.assign(globalThis, { WebSocket: original });
   }
 }
+
+it('advertises worktree support without changing the strict legacy hello', () => {
+  withControlledConnection(({ connection }) => {
+    connection.start();
+    const socket = TestSocket.instances[0];
+    expect(socket.options?.headers?.[WORKTREE_RUNTIME_HEADER]).toBe(WORKTREE_RUNTIME_VERSION);
+    socket.onopen?.();
+    expect(socket.frames[0]).toEqual({
+      type: 'hello',
+      wrapperId: connection.wrapperId,
+      allocationId: 'alloc-1',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      heartbeatAck: true,
+      redactsNamedSecrets: true,
+    });
+  });
+});
 
 describe('acknowledged heartbeat', () => {
   it.each(['connected', 'awaiting_welcome', 'connecting'] as const)(

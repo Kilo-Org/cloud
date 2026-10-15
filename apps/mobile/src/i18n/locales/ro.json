@@ -2461,6 +2461,7 @@
       "title": "Răspuns necesar pentru agent",
       "skipQuestionsTitle": "Sari peste întrebări?",
       "skipQuestionsMessage": "Agentul va sări peste acest pas.",
+      "answerProgress": "{{answered}} din {{total}} cu răspuns",
       "selectAllThatApply": "Selectează toate opțiunile care se potrivesc.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, opțiune selectată",

@@ -1,7 +1,7 @@
 import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { api_request_log } from '@kilocode/db/schema';
+import { api_request_log, kilocode_users } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
@@ -132,6 +132,20 @@ function jsonError(message: string, status: number) {
   });
 }
 
+async function resolveUserId(userIdOrEmail: string): Promise<string | null> {
+  const users = await db
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(
+      or(eq(kilocode_users.id, userIdOrEmail), eq(kilocode_users.google_user_email, userIdOrEmail))
+    )
+    .limit(2);
+  const user = users.find(({ id }) => id === userIdOrEmail) ?? users[0];
+  if (user) return user.id;
+  // Logs can outlive their user row, so an unknown non-email value is still a valid user ID filter.
+  return userIdOrEmail.includes('@') ? null : userIdOrEmail;
+}
+
 function buildFilter(
   id: bigint | null,
   userId: string | null,
@@ -209,9 +223,14 @@ export async function GET(request: NextRequest) {
     return jsonError('Start must be before end.', 400);
   }
 
+  const resolvedUserId = userId ? await resolveUserId(userId) : null;
+  if (userId && !resolvedUserId) {
+    return jsonError(`No user found with email ${userId}`, 404);
+  }
+
   const filter = buildFilter(
     parsedId,
-    userId,
+    resolvedUserId,
     parsedStart.value,
     parsedEnd.value,
     model,

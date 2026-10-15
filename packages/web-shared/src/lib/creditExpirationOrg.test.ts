@@ -396,7 +396,7 @@ describe('processOrganizationExpirations', () => {
     expect(expirations[0].amount_microdollars).toBe(-3_000_000);
   });
 
-  it('creates zero-amount expiration when credits fully consumed', async () => {
+  it('creates zero-amount expiration and returns the refreshed pointer when credits are fully consumed', async () => {
     await db.insert(creditTransactionsTable).values({
       kilo_user_id: ownerId,
       organization_id: orgId,
@@ -422,7 +422,11 @@ describe('processOrganizationExpirations', () => {
       new Date('2024-01-15T00:00:00Z')
     );
 
-    expect(result).toBeNull();
+    expect(result).toEqual({
+      total_microdollars_acquired: 10_000_000,
+      microdollars_used: 8_000_000,
+      next_credit_expiration_at: null,
+    });
     const org = await db.query.organizations.findFirst({ where: eq(organizations.id, orgId) });
     expect(org).toMatchObject({
       total_microdollars_acquired: 10_000_000,

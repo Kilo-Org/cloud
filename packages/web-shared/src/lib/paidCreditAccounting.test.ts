@@ -197,6 +197,7 @@ describe('primary expiration snapshot safety', () => {
     expect(await processLocalExpirations(snapshot, new Date('2031-01-01'))).toEqual({
       total_microdollars_acquired: 20_000_000,
       microdollars_used: 20_000_000,
+      next_credit_expiration_at: null,
     });
   });
 });

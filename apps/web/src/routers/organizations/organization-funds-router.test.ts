@@ -184,6 +184,37 @@ describe('organization funds router', () => {
 
       expect(result.hasExpiringCredits).toBe(true);
     });
+
+    it('clears hasExpiringCredits once a fully consumed parent lot expires', async () => {
+      const past = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      await db
+        .update(organizations)
+        .set({
+          microdollars_used: 2_000_000,
+          microdollars_balance: 3_000_000,
+          next_credit_expiration_at: past,
+        })
+        .where(eq(organizations.id, parentOrg.id));
+      await db.insert(credit_transactions).values({
+        kilo_user_id: 'system',
+        is_free: true,
+        amount_microdollars: 1_000_000,
+        description: 'Consumed expiring grant',
+        credit_category: 'organization_custom',
+        expiry_date: past,
+        organization_id: parentOrg.id,
+        original_baseline_microdollars_used: 0,
+        expiration_baseline_microdollars_used: 0,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      const result = await caller.organizations.funds.childBalances({
+        organizationId: parentOrg.id,
+      });
+
+      expect(result.parentBalanceMicrodollars).toBe(3_000_000);
+      expect(result.hasExpiringCredits).toBe(false);
+    });
   });
 
   describe('distribute', () => {

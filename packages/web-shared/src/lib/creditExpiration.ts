@@ -70,34 +70,53 @@ export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx =
     );
 }
 
+type ExpirationBalanceState = Pick<
+  UserForLocalExpiration,
+  'total_microdollars_acquired' | 'microdollars_used' | 'next_credit_expiration_at'
+>;
+
+function refreshedExpirationState(
+  snapshot: ExpirationBalanceState,
+  current: ExpirationBalanceState
+): ExpirationBalanceState | null {
+  const snapshotExpiry = snapshot.next_credit_expiration_at;
+  const currentExpiry = current.next_credit_expiration_at;
+  const sameExpiry =
+    snapshotExpiry === null || currentExpiry === null
+      ? snapshotExpiry === currentExpiry
+      : new Date(snapshotExpiry).getTime() === new Date(currentExpiry).getTime();
+  if (
+    sameExpiry &&
+    current.total_microdollars_acquired === snapshot.total_microdollars_acquired &&
+    current.microdollars_used === snapshot.microdollars_used
+  ) {
+    return null;
+  }
+  return {
+    total_microdollars_acquired: current.total_microdollars_acquired,
+    microdollars_used: current.microdollars_used,
+    next_credit_expiration_at: currentExpiry,
+  };
+}
+
 /**
  * Process local expirations for a migrated user (not in legacy Orb system).
  * Uses idempotency checks to prevent double-processing by excluding transactions
  * that already have a credits_expired entry.
  *
- * Returns null if no expirations were due, otherwise returns the new balance fields.
+ * Returns null when the caller's snapshot is already current, otherwise the refreshed
+ * balance fields and expiration pointer.
  */
 export async function processLocalExpirations(
   user: UserForLocalExpiration,
   now: Date
-): Promise<null | {
-  total_microdollars_acquired: number;
-  microdollars_used: number;
-}> {
-  return await db.transaction(async tx => {
-    const current = await reconcileCreditExpirationsInTransaction(
-      { type: 'user', id: user.id },
-      tx,
-      now
-    );
-    return current.total_microdollars_acquired === user.total_microdollars_acquired &&
-      current.microdollars_used === user.microdollars_used
-      ? null
-      : {
-          total_microdollars_acquired: current.total_microdollars_acquired,
-          microdollars_used: current.microdollars_used,
-        };
-  });
+): Promise<ExpirationBalanceState | null> {
+  return await db.transaction(async tx =>
+    refreshedExpirationState(
+      user,
+      await reconcileCreditExpirationsInTransaction({ type: 'user', id: user.id }, tx, now)
+    )
+  );
 }
 
 /**
@@ -418,19 +437,11 @@ export async function processOrganizationExpirationsBatch(
 export async function processOrganizationExpirations(
   org: OrganizationForExpiration,
   now: Date
-): Promise<null | { total_microdollars_acquired: number; microdollars_used: number }> {
-  return await db.transaction(async tx => {
-    const current = await reconcileCreditExpirationsInTransaction(
-      { type: 'organization', id: org.id },
-      tx,
-      now
-    );
-    return current.total_microdollars_acquired === org.total_microdollars_acquired &&
-      current.microdollars_used === org.microdollars_used
-      ? null
-      : {
-          total_microdollars_acquired: current.total_microdollars_acquired,
-          microdollars_used: current.microdollars_used,
-        };
-  });
+): Promise<OrganizationExpirationState | null> {
+  return await db.transaction(async tx =>
+    refreshedExpirationState(
+      org,
+      await reconcileCreditExpirationsInTransaction({ type: 'organization', id: org.id }, tx, now)
+    )
+  );
 }

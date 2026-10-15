@@ -829,7 +829,7 @@ describe('processLocalExpirations', () => {
     expect(expirationB!.amount_microdollars).toBe(-4_000_000);
   });
 
-  it('zero-amount expirations are created and do not affect balance', async () => {
+  it('zero-amount expirations are created, do not affect balance, and refresh the pointer', async () => {
     // Scenario: User has fully consumed credits before expiration
     // Should create a zero-amount expiration transaction and not affect balance
     const initialAcquired = 5_000_000; // $5
@@ -856,7 +856,11 @@ describe('processLocalExpirations', () => {
     const now = new Date('2024-01-15');
     const result = await processLocalExpirations(user, now);
 
-    expect(result).toBeNull();
+    expect(result).toEqual({
+      total_microdollars_acquired: initialAcquired,
+      microdollars_used: initialUsed,
+      next_credit_expiration_at: null,
+    });
 
     // Verify zero-amount expiration transaction was created
     const expirationTxns = await db

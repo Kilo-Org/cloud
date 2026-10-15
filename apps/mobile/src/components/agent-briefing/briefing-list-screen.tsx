@@ -12,11 +12,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   BRIEFING_PATH,
-  briefingAccessDenied,
   useBriefingAccess,
   useBriefingDismissals,
   useBriefingInvalidation,
 } from '@/lib/agent-briefing';
+import { briefingAccessDenied } from '@/lib/agent-briefing-state';
 import { useBriefingListFilters } from '@/lib/hooks/use-briefing-list-filters';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';

@@ -4,12 +4,16 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import {
-  briefingAccessDenied,
   useBriefingDismissals,
   useBriefingInvalidation,
   useBriefingPreferences,
 } from '@/lib/agent-briefing';
-import { readableBriefingOrganizationIds } from '@/lib/agent-briefing-state';
+import {
+  briefingAccessDenied,
+  briefingReportMissing,
+  briefingSyncDelayMs,
+  readableBriefingOrganizationIds,
+} from '@/lib/agent-briefing-state';
 import { purgeInaccessibleBriefingCache } from '@/lib/agent-briefing-cache';
 import { type BriefingDismissal } from '@/lib/agent-briefing-dismissals';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -33,6 +37,7 @@ export function BriefingSyncMount() {
   const { mutateAsync: saveJournal, isPending: savingJournal } = save;
   const memberships = useOrganizationsList();
   const running = useRef(false);
+  const failures = useRef(0);
   const { mutateAsync: dismiss } = useMutation(
     trpc.agentBriefing.dismiss.mutationOptions({
       onError: () => {
@@ -56,14 +61,18 @@ export function BriefingSyncMount() {
   }, [authEpoch, client, isSigningOut, memberships.data, memberships.isSuccess, userId]);
 
   useEffect(() => {
+    failures.current = 0;
+  }, [isActive, offline, userId, authEpoch]);
+
+  useEffect(() => {
     if (running.current || savingJournal || offline || !isActive || isSigningOut || !data) {
-      return;
+      return undefined;
     }
     const pending = data.filter(item => !item.synced && Date.parse(item.expiresAt) > Date.now());
-    if (pending.length === 0) {
-      return;
+    const delay = briefingSyncDelayMs(failures.current);
+    if (pending.length === 0 || delay === null) {
+      return undefined;
     }
-    running.current = true;
     async function syncNextDismissal(): Promise<void> {
       const latest =
         client.getQueryData<BriefingDismissal[]>(['agent-briefing-dismissals', userId]) ?? [];
@@ -74,7 +83,7 @@ export function BriefingSyncMount() {
       try {
         await dismiss({ reportId: item.reportId });
       } catch (error) {
-        if (!briefingAccessDenied(error)) {
+        if (!briefingAccessDenied(error) && !briefingReportMissing(error)) {
           return;
         }
       }
@@ -93,19 +102,34 @@ export function BriefingSyncMount() {
             }
           : entry
       );
-      await saveJournal(settled);
+      try {
+        await saveJournal(settled);
+      } catch {
+        failures.current += 1;
+        return;
+      }
+      failures.current = 0;
       await syncNextDismissal();
     }
-    void (async () => {
-      try {
-        await syncNextDismissal();
-        await client.invalidateQueries({ queryKey: trpc.agentBriefing.list.pathKey() });
-      } catch {
-        // The journal mutation reports storage errors and retains the pending dismissal.
-      } finally {
-        running.current = false;
+    const timer = setTimeout(() => {
+      if (running.current) {
+        return;
       }
-    })();
+      running.current = true;
+      void (async () => {
+        try {
+          await syncNextDismissal();
+          await client.invalidateQueries({ queryKey: trpc.agentBriefing.list.pathKey() });
+        } catch {
+          // The journal mutation reports storage errors and retains the pending dismissal.
+        } finally {
+          running.current = false;
+        }
+      })();
+    }, delay);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [
     authEpoch,
     client,

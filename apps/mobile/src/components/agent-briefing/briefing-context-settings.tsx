@@ -10,7 +10,10 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
-import { briefingEstimateUnavailableKey } from '@/lib/agent-briefing-state';
+import {
+  briefingEstimateUnavailableKey,
+  parseBriefingSafeguards,
+} from '@/lib/agent-briefing-state';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
@@ -92,20 +95,10 @@ export function BriefingContextSettings({
     })
   );
   const updateLimits = () => {
-    const minutes = Number(duration.current);
-    const dollars = Number(spend.current);
-    const maxDurationSeconds = Math.round(minutes * 60);
-    const maxSpendMicrodollars = Math.round(dollars * 1_000_000);
-    const nextValid =
-      Number.isFinite(minutes) &&
-      Number.isFinite(dollars) &&
-      maxDurationSeconds > 0 &&
-      Number.isSafeInteger(maxDurationSeconds) &&
-      maxSpendMicrodollars > 0 &&
-      Number.isSafeInteger(maxSpendMicrodollars);
-    setValid(nextValid);
-    if (nextValid) {
-      setLimits({ maxDurationSeconds, maxSpendMicrodollars });
+    const next = parseBriefingSafeguards(Number(duration.current), Number(spend.current));
+    setValid(next !== null);
+    if (next !== null) {
+      setLimits(next);
     }
   };
   const enable = async () => {

@@ -5,6 +5,7 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import {
+  briefingAccessDenied,
   canReadBriefingContext,
   readableBriefingOrganizationIds,
 } from '@/lib/agent-briefing-state';
@@ -23,16 +24,10 @@ import { dateTimeFormat } from '@/lib/intl-cache';
 import { readCacheScope } from '@/lib/persist/cache-scope';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 import { useTRPC } from '@/lib/trpc';
-import { readTrpcErrorField } from '@/lib/trpc-error';
 
 export type BriefingReport = inferRouterOutputs<MobileRouter>['agentBriefing']['get'];
 export type BriefingPreferences = inferRouterOutputs<MobileRouter>['agentBriefing']['preferences'];
 export const BRIEFING_PATH = '/(app)/agent-briefing' as const;
-
-export function briefingAccessDenied(error: unknown): boolean {
-  const code = readTrpcErrorField(error, 'code');
-  return code === 'FORBIDDEN' || code === 'UNAUTHORIZED' || code === 'NOT_FOUND';
-}
 
 export function useBriefingAccess() {
   const { token, isSigningOut } = useAuth();

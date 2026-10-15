@@ -1,6 +1,8 @@
 import { type BriefingReport, isBriefingVisible } from '@kilocode/app-shared/agent-briefing';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
+import { readTrpcErrorField } from '@/lib/trpc-error';
+
 type BriefingMembership = Pick<
   inferRouterOutputs<MobileRouter>['organizations']['list'][number],
   'organizationId' | 'role'
@@ -81,4 +83,51 @@ export function briefingEstimateUnavailableKey(reason: string | null | undefined
       return 'agentBriefing.estimateUnavailable';
     }
   }
+}
+
+/** The server rejects a context's access (role, membership or sign-in), never a mere missing report. */
+export function briefingAccessDenied(error: unknown): boolean {
+  const code = readTrpcErrorField(error, 'code');
+  return code === 'FORBIDDEN' || code === 'UNAUTHORIZED';
+}
+
+/**
+ * A report older than 30 days, deleted, owned by someone else, or whose sources
+ * were removed answers NOT_FOUND. That is a neutral missing-report state, not a
+ * loss of access, so it never clears the read cache.
+ */
+export function briefingReportMissing(error: unknown): boolean {
+  return readTrpcErrorField(error, 'code') === 'NOT_FOUND';
+}
+
+/** `agentBriefing.safeguardInput`: whole seconds, 1 to 600, and a positive safe-integer spend. */
+const MAX_BRIEFING_DURATION_SECONDS = 600;
+
+export type BriefingSafeguards = { maxDurationSeconds: number; maxSpendMicrodollars: number };
+
+export function parseBriefingSafeguards(
+  minutes: number,
+  dollars: number
+): BriefingSafeguards | null {
+  const maxDurationSeconds = Math.round(minutes * 60);
+  const maxSpendMicrodollars = Math.round(dollars * 1_000_000);
+  const valid =
+    Number.isFinite(minutes) &&
+    Number.isFinite(dollars) &&
+    maxDurationSeconds >= 1 &&
+    maxDurationSeconds <= MAX_BRIEFING_DURATION_SECONDS &&
+    maxSpendMicrodollars > 0 &&
+    Number.isSafeInteger(maxSpendMicrodollars);
+  return valid ? { maxDurationSeconds, maxSpendMicrodollars } : null;
+}
+
+const SYNC_RETRY_DELAYS_MS = [0, 2000, 8000] as const;
+
+/**
+ * How long to wait before the next dismissal-journal sync attempt after this
+ * many consecutive failures, or null once the attempts are exhausted. The
+ * count resets on a foreground or reconnect, so a stuck store never spins.
+ */
+export function briefingSyncDelayMs(failures: number): number | null {
+  return SYNC_RETRY_DELAYS_MS[failures] ?? null;
 }

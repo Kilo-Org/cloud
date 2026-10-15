@@ -1,6 +1,6 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -14,11 +14,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   BRIEFING_PATH,
-  briefingAccessDenied,
   useBriefingAccess,
   useBriefingDismissals,
   useBriefingInvalidation,
 } from '@/lib/agent-briefing';
+import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatDate } from '@/lib/format';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
@@ -31,19 +31,35 @@ const BRIEFING_DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: 'medium', ti
 export function BriefingDetailScreen() {
   const { 'report-id': reportId } = useLocalSearchParams<{ 'report-id': string }>();
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const { setOrganizationId } = useOrganization();
   const access = useBriefingAccess();
   const offline = useOfflineBannerState();
   const dismissals = useBriefingDismissals();
+  const [goneReportId, setGoneReportId] = useState<string | null>(null);
+  const gone = goneReportId === reportId;
   const query = useQuery({
     ...trpc.agentBriefing.get.queryOptions({ reportId }),
-    enabled: access.enabled && Boolean(reportId),
+    enabled: access.enabled && Boolean(reportId) && !gone,
     refetchInterval: 15_000,
+    retry: (failureCount, error) => !briefingReportMissing(error) && failureCount < 3,
   });
   useBriefingInvalidation(query.error);
+  const missing = gone || briefingReportMissing(query.error);
+  useEffect(() => {
+    if (!briefingReportMissing(query.error) || gone) {
+      return;
+    }
+    setGoneReportId(reportId);
+    queryClient.removeQueries({
+      queryKey: trpc.agentBriefing.get.queryKey({ reportId }),
+      exact: true,
+    });
+  }, [gone, query.error, queryClient, reportId, trpc]);
   const report =
+    !missing &&
     query.data &&
     !briefingAccessDenied(query.error) &&
     access.canRead(query.data.context.organizationId)
@@ -64,7 +80,7 @@ export function BriefingDetailScreen() {
     marked.current = report.id;
     read.mutate({ reportId: report.id });
   }, [offline, read, report]);
-  const loading = !report && query.isPending && !offline;
+  const loading = !report && !missing && query.isPending && !offline;
   const failure = !report && !loading;
 
   return (
@@ -80,7 +96,8 @@ export function BriefingDetailScreen() {
           <Skeleton className="h-64 rounded-2xl" />
         </View>
       )}
-      {failure && (
+      {failure && missing && <QueryError variant="not-found" />}
+      {failure && !missing && (
         <QueryError
           title={t('agentBriefing.loadError')}
           variant={briefingAccessDenied(query.error) ? 'permission' : 'neutral'}

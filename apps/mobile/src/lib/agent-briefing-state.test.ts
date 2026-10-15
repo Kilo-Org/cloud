@@ -2,8 +2,12 @@ import { type BriefingReport } from '@kilocode/app-shared/agent-briefing';
 import { describe, expect, it } from 'vitest';
 
 import {
+  briefingAccessDenied,
   briefingEstimateUnavailableKey,
+  briefingReportMissing,
+  briefingSyncDelayMs,
   canReadBriefingContext,
+  parseBriefingSafeguards,
   readableBriefingOrganizationIds,
   visibleHomeBriefing,
 } from './agent-briefing-state';
@@ -130,5 +134,59 @@ describe('briefingEstimateUnavailableKey', () => {
       'agentBriefing.estimateUnavailable'
     );
     expect(briefingEstimateUnavailableKey(null)).toBe('agentBriefing.estimateUnavailable');
+  });
+});
+
+const trpcError = (code: string) => ({ data: { code } });
+
+describe('missing report versus lost access', () => {
+  it('treats NOT_FOUND as a neutral missing report that never clears the read cache', () => {
+    expect(briefingReportMissing(trpcError('NOT_FOUND'))).toBe(true);
+    expect(briefingAccessDenied(trpcError('NOT_FOUND'))).toBe(false);
+  });
+
+  it('treats FORBIDDEN and UNAUTHORIZED as lost access, and nothing else', () => {
+    expect(briefingAccessDenied(trpcError('FORBIDDEN'))).toBe(true);
+    expect(briefingAccessDenied(trpcError('UNAUTHORIZED'))).toBe(true);
+    expect(briefingReportMissing(trpcError('FORBIDDEN'))).toBe(false);
+    expect(briefingAccessDenied(trpcError('INTERNAL_SERVER_ERROR'))).toBe(false);
+    expect(briefingAccessDenied(new Error('offline'))).toBe(false);
+  });
+});
+
+describe('parseBriefingSafeguards', () => {
+  it('accepts the server range: whole seconds from 1 to 600 and a positive spend', () => {
+    expect(parseBriefingSafeguards(10, 2)).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 2_000_000,
+    });
+    expect(parseBriefingSafeguards(1 / 60, 0.5)).toEqual({
+      maxDurationSeconds: 1,
+      maxSpendMicrodollars: 500_000,
+    });
+  });
+
+  it('rejects a duration the server would refuse', () => {
+    expect(parseBriefingSafeguards(10.1, 2)).toBeNull();
+    expect(parseBriefingSafeguards(60, 2)).toBeNull();
+    expect(parseBriefingSafeguards(0, 2)).toBeNull();
+    expect(parseBriefingSafeguards(-1, 2)).toBeNull();
+  });
+
+  it('rejects a non-finite or non-positive spend', () => {
+    expect(parseBriefingSafeguards(5, 0)).toBeNull();
+    expect(parseBriefingSafeguards(5, Number.NaN)).toBeNull();
+    expect(parseBriefingSafeguards(Number.POSITIVE_INFINITY, 2)).toBeNull();
+    expect(parseBriefingSafeguards(5, Number.MAX_SAFE_INTEGER)).toBeNull();
+  });
+});
+
+describe('briefingSyncDelayMs', () => {
+  it('retries a failing dismissal journal with growing delays, then stops', () => {
+    expect(briefingSyncDelayMs(0)).toBe(0);
+    expect(briefingSyncDelayMs(1)).toBe(2000);
+    expect(briefingSyncDelayMs(2)).toBe(8000);
+    expect(briefingSyncDelayMs(3)).toBeNull();
+    expect(briefingSyncDelayMs(10)).toBeNull();
   });
 });

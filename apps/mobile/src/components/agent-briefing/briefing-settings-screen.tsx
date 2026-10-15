@@ -11,11 +11,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   BRIEFING_PATH,
-  briefingAccessDenied,
   useBriefingAccess,
   useBriefingInvalidation,
   useBriefingPreferences,
 } from '@/lib/agent-briefing';
+import { briefingAccessDenied } from '@/lib/agent-briefing-state';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 
 export function BriefingSettingsScreen() {

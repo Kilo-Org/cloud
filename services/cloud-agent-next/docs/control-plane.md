@@ -669,9 +669,9 @@ native activity plus the existing Cloud-work and PTY protections.
   decides again at each check; an answer reconnects the stream as above, and failed observation
   keeps reading snapshots. The hold ends as recovered once Kilo delivers events and its activity
   is observable. It ends with the restart as above after two quiet samples in a row while Kilo is
-  still unhealthy, or after 30 seconds; one episode holds at most 30 seconds. A cap that is full
+  still unhealthy, or after two minutes; one episode holds at most two minutes. A cap that is full
   of idle page cache does not raise the count, so it does not hold a restart. The cost: a genuine
-  hang during real memory pressure waits up to 30 extra seconds. This permits transient recovery
+  hang during real memory pressure waits up to two extra minutes. This permits transient recovery
   but bounds the wait when pressure cannot clear. While held, the runtime's executions
   pause their no-progress clocks, and the 120 s prompt delivery deadline does not run; it starts
   again when the hold ends. Each turn on the held runtime, including one that starts during the
@@ -790,7 +790,7 @@ them through one development-only override.
 | Socket drops, wrapper returns | Sandbox DO | Wrapper reconnects | None |
 | Socket down 90 s | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |
 | Wrapper crash | Supervisor | Restart wrapper; routes re-prepared | Accepted fail (`agent_restarted`) |
-| Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s; up to 30 extra seconds while the workload reclaims at its memory cap | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
+| Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s; up to two extra minutes while the workload reclaims at its memory cap | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
 | Kilo crash | Wrapper | Restart Kilo, at most 3 in 10 min | Same as Kilo hang, but the reason is `agent_restarted` |
 | Dead event stream (Kilo still answers health) | Wrapper, after 6 reconnects in 2 min | Restart Kilo, at most 3 in 10 min | Same as Kilo hang (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
 | Kilo restart budget used up | Wrapper | None until the next message | Queued and accepted fail (`agent_unavailable`) |

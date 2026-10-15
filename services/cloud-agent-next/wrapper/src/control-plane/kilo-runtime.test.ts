@@ -1402,7 +1402,7 @@ describe('Kilo hang restart under memory pressure', () => {
       .map(fields => [fields.phase, fields.memoryHoldOutcome]);
   }
 
-  it('keeps a silent Kilo running while reclaiming and resumes it without a restart', async () => {
+  it('recovers after 90 seconds of memory pressure without restarting with production timers', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();
     const feed = createFeedFactory();
@@ -1413,15 +1413,16 @@ describe('Kilo hang restart under memory pressure', () => {
       feed,
       probe,
       scheduler,
+      timers: CONTROL_PLANE_TIMERS,
       sampleMemory: reclaimingAtCap(),
       memoryHolds,
     });
 
     await runtime.ensure();
-    scheduleSilence(scheduler, TEST_TIMERS);
+    scheduleSilence(scheduler, CONTROL_PLANE_TIMERS);
     await waitFor(() => memoryHolds.length === 1);
-    // Each check probes again, so a Kilo that recovers is seen within one check.
-    scheduleTick(scheduler, TEST_TIMERS);
+    scheduler.advance(90_000);
+    scheduler.fire();
     await waitFor(() => probe.calls.count === 2);
     // Let the second decision settle; a check during an in-flight probe is skipped.
     await Bun.sleep(5);
@@ -1429,7 +1430,7 @@ describe('Kilo hang restart under memory pressure', () => {
     expect(runtime.isSuspected()).toBe(true);
 
     probe.set(true);
-    scheduleTick(scheduler, TEST_TIMERS);
+    scheduleTick(scheduler, CONTROL_PLANE_TIMERS);
     await waitFor(() => feed.feeds.length === 2);
     feed.feeds[1]!.callbacks.onEvent({
       type: 'server.heartbeat',
@@ -1437,7 +1438,7 @@ describe('Kilo hang restart under memory pressure', () => {
       nativeRuntimeId: 'r',
     });
     // The next check sees Kilo delivering events and observable, and ends the hold.
-    scheduleTick(scheduler, TEST_TIMERS);
+    scheduleTick(scheduler, CONTROL_PLANE_TIMERS);
     await waitFor(() => memoryHolds.length === 2);
 
     expect(spawner.spawnCount()).toBe(1);
@@ -1483,7 +1484,7 @@ describe('Kilo hang restart under memory pressure', () => {
     await runtime.shutdown();
   });
 
-  it('bounds sustained memory pressure to a 30-second hold with production timers', async () => {
+  it('bounds sustained memory pressure to a two-minute hold with production timers', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();
     const memoryHolds: boolean[] = [];
@@ -1500,7 +1501,7 @@ describe('Kilo hang restart under memory pressure', () => {
       await runtime.ensure();
       scheduleSilence(scheduler, CONTROL_PLANE_TIMERS);
       await waitFor(() => memoryHolds.length === 1);
-      scheduler.advance(29_999);
+      scheduler.advance(119_999);
       scheduler.fire();
       await Bun.sleep(1);
       expect(spawner.spawnCount()).toBe(1);

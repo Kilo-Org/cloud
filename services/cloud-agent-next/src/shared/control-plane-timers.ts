@@ -110,8 +110,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     sseReconnectWindowMs: 2 * MINUTE_MS,
     kiloRestartLimit: 3,
     kiloRestartWindowMs: ms(10 * MINUTE_MS),
-    // Allow transient reclaim to clear without extending an unresponsive turn for minutes.
-    kiloMemoryHoldMs: ms(30_000),
+    // Allow transient reclaim to clear while bounding a sustained memory stall.
+    kiloMemoryHoldMs: ms(2 * MINUTE_MS),
     noProgressMs: ms(20 * MINUTE_MS),
     turnHardCapMs: ms(120 * MINUTE_MS),
     reconnectBackoffMinMs: ms(1_000),

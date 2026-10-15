@@ -29,14 +29,9 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 const AUTO_MODEL_ID = 'kilo-auto/efficient';
-const WINDOW_DAYS = 7;
-
-function median(values: number[]): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
-}
+// The usage tables are large: a multi-day scan times out on the replica, while
+// six hours aggregates in seconds and still covers thousands of requests.
+const WINDOW_HOURS = 6;
 
 export async function GET(req: NextRequest) {
   const token = extractBearerToken(req.headers.get('authorization'));
@@ -44,12 +39,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const rows = await db
+  const windowStart = sql`NOW() - make_interval(hours => ${WINDOW_HOURS}::int)`;
+  const perSession = db
     .select({
-      sessionId: sql<string | null>`${microdollar_usage_metadata.session_id}`,
-      requests: sql<number>`count(*)::int`,
-      uncachedInputTokens: sql<number>`sum(greatest(${microdollar_usage.input_tokens} - ${microdollar_usage.cache_hit_tokens}, 0))::double precision`,
-      cachedInputTokens: sql<number>`sum(${microdollar_usage.cache_hit_tokens})::double precision`,
+      sessionId: sql<string | null>`${microdollar_usage_metadata.session_id}`.as('session_id'),
+      requests: sql<number>`count(*)::int`.as('requests'),
+      uncached:
+        sql<number>`sum(greatest(${microdollar_usage.input_tokens} - ${microdollar_usage.cache_hit_tokens}, 0))::double precision`.as(
+          'uncached'
+        ),
+      cached: sql<number>`sum(${microdollar_usage.cache_hit_tokens})::double precision`.as(
+        'cached'
+      ),
     })
     .from(microdollar_usage_metadata)
     .innerJoin(auto_model, eq(auto_model.auto_model_id, microdollar_usage_metadata.auto_model_id))
@@ -57,31 +58,35 @@ export async function GET(req: NextRequest) {
     .where(
       and(
         eq(auto_model.auto_model, AUTO_MODEL_ID),
-        sql`${microdollar_usage.created_at} >= NOW() - make_interval(days => ${WINDOW_DAYS}::int)`
+        sql`${microdollar_usage_metadata.created_at} >= ${windowStart}`,
+        sql`${microdollar_usage.created_at} >= ${windowStart}`
       )
     )
-    .groupBy(microdollar_usage_metadata.session_id);
+    .groupBy(microdollar_usage_metadata.session_id)
+    .as('per_session');
 
-  let sampleRequests = 0;
-  let uncachedInputTokens = 0;
-  let cachedInputTokens = 0;
-  const sessionTurns: number[] = [];
-  for (const row of rows) {
-    sampleRequests += row.requests;
-    uncachedInputTokens += row.uncachedInputTokens;
-    cachedInputTokens += row.cachedInputTokens;
-    if (row.sessionId !== null) sessionTurns.push(row.requests);
-  }
+  const [row] = await db
+    .select({
+      sampleRequests: sql<number | null>`sum(${perSession.requests})::int`,
+      uncached: sql<number | null>`sum(${perSession.uncached})::double precision`,
+      cached: sql<number | null>`sum(${perSession.cached})::double precision`,
+      medianTurns: sql<
+        number | null
+      >`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${perSession.requests}) FILTER (WHERE ${perSession.sessionId} IS NOT NULL)`,
+    })
+    .from(perSession);
+
+  const sampleRequests = row?.sampleRequests ?? 0;
   if (sampleRequests === 0) {
     return NextResponse.json(ProductionAutoMetricsResponseSchema.parse({ metrics: null }));
   }
 
   const metrics = ProductionAutoMetricsSchema.parse({
-    windowDays: WINDOW_DAYS,
+    windowHours: WINDOW_HOURS,
     sampleRequests,
-    uncachedInputTokens: uncachedInputTokens / sampleRequests,
-    cachedInputTokens: cachedInputTokens / sampleRequests,
-    medianTurnsPerSession: median(sessionTurns),
+    uncachedInputTokens: (row?.uncached ?? 0) / sampleRequests,
+    cachedInputTokens: (row?.cached ?? 0) / sampleRequests,
+    medianTurnsPerSession: row?.medianTurns ?? null,
   });
   return NextResponse.json(ProductionAutoMetricsResponseSchema.parse({ metrics }));
 }

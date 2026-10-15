@@ -226,7 +226,7 @@ export function resolveEffectivePolicy(config: PolicySettingSource): PolicySetti
  * and read by the benchmark worker's daily re-evaluation.
  */
 export const ProductionAutoMetricsSchema = z.object({
-  windowDays: z.number().int().positive(),
+  windowHours: z.number().int().positive(),
   sampleRequests: z.number().int().nonnegative(),
   uncachedInputTokens: z.number().nonnegative(),
   cachedInputTokens: z.number().nonnegative(),

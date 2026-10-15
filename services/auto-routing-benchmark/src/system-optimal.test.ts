@@ -221,7 +221,7 @@ describe('reevaluateSystemOptimalSettings', () => {
     });
 
     const saved = await reevaluateSystemOptimalSettings(env, 'efficient', {
-      windowDays: 7,
+      windowHours: 6,
       sampleRequests: 100,
       uncachedInputTokens: 1000,
       cachedInputTokens: 200,

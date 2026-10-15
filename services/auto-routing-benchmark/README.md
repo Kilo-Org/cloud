@@ -61,7 +61,7 @@ falls back to the system value. Publishing reads effective values only.
 - `productionTokenProfile` and `switchHorizonTurns`: derived from production auto-request usage.
   The worker has no Postgres access, so it reads mean uncached/cached input tokens and the
   median requests per auto session from `GET /api/internal/auto-routing-benchmark/production-profile`
-  on apps/web over a 7-day window. An unavailable endpoint leaves the previous computed values.
+  on apps/web over a 6-hour window. An unavailable endpoint leaves the previous computed values.
 - `frontierMinAccuracyDelta`, `switchCostFactor`, `bestAccuracySwitchThreshold`,
   `lowConfidenceThreshold`, classifier/decider repetitions, and `classifierMaxP95LatencyMs` are
   fixed constants: the held-out benchmark scores single requests, so session-economics and

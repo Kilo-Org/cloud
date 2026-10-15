@@ -275,7 +275,7 @@ export async function reevaluateSystemOptimalSettings(
       },
       computedAt,
       source: 'production-usage',
-      evidence: `mean input tokens over ${production.sampleRequests} auto requests in the last ${production.windowDays}d`,
+      evidence: `mean input tokens over ${production.sampleRequests} auto requests in the last ${production.windowHours}h`,
     };
     if (production.medianTurnsPerSession !== null) {
       const turns = Math.max(1, Math.round(production.medianTurnsPerSession));
@@ -283,7 +283,7 @@ export async function reevaluateSystemOptimalSettings(
         value: turns,
         computedAt,
         source: 'production-usage',
-        evidence: `median ${production.medianTurnsPerSession.toFixed(1)} auto requests per session in the last ${production.windowDays}d`,
+        evidence: `median ${production.medianTurnsPerSession.toFixed(1)} auto requests per session in the last ${production.windowHours}h`,
       };
     }
   }

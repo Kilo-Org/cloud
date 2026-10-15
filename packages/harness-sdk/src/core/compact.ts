@@ -2,7 +2,7 @@ import { Effect, Option, Ref, Stream } from 'effect';
 import type { ModelError, ModelUsage } from './model.js';
 import { appendTurn, sinceSummary } from './session.js';
 import { onStore, type StoreError } from './storage.js';
-import { add } from './usage.js';
+import { countUsage } from './usage.js';
 import { makeTurn } from './turn.js';
 import type { Wiring } from './wiring.js';
 
@@ -102,11 +102,7 @@ const summaryOf = (wiring: Wiring): Effect.Effect<string, ModelError> =>
         cacheKey: wiring.id,
       })
       .pipe(
-        Stream.tap(event =>
-          event.kind === 'done'
-            ? Ref.update(wiring.totals, held => add(held, event.usage))
-            : Effect.void
-        ),
+        Stream.tap(event => (event.kind === 'done' ? countUsage(wiring, event) : Effect.void)),
         Stream.runFold('', (held, event) => (event.kind === 'delta' ? held + event.text : held))
       );
   });

@@ -38,13 +38,14 @@ function sha256(value: string) {
   return createHash('sha256').update(value).digest();
 }
 
+// timingSafeEqual requires equal-length inputs; hashing first avoids an early length check that leaks the secret's length.
 function isAuthorized(request: Request, secret: string) {
   const authorization = request.headers.get('authorization') ?? '';
   return timingSafeEqual(sha256(authorization), sha256(`Bearer ${secret}`));
 }
 
 export async function handleSecureProxyRequest(request: Request): Promise<Response> {
-  const secret = process.env.AI_GATEWAY_SECURE_PROXY_SECRET;
+  const secret = process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET;
   if (!secret) {
     return errorResponse(500, 'Secure proxy secret is not configured');
   }

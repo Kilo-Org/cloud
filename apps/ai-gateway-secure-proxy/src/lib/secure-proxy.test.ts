@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { handleSecureProxyRequest } from './secure-proxy';
 
 const originalFetch = global.fetch;
-const originalSecret = process.env.AI_GATEWAY_SECURE_PROXY_SECRET;
+const originalSecret = process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET;
 const PROXY_SECRET = 'proxy-secret';
 const VALID_UPSTREAM_BODY = {
   kilo_secure_proxy: { url: 'https://llm.example.com', headers: {} },
@@ -34,12 +34,12 @@ function onlyFetchCall(fetchMock: jest.Mock<typeof fetch>) {
 
 describe('handleSecureProxyRequest', () => {
   beforeEach(() => {
-    process.env.AI_GATEWAY_SECURE_PROXY_SECRET = PROXY_SECRET;
+    process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = PROXY_SECRET;
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    process.env.AI_GATEWAY_SECURE_PROXY_SECRET = originalSecret;
+    process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = originalSecret;
   });
 
   it.each([
@@ -56,7 +56,7 @@ describe('handleSecureProxyRequest', () => {
   });
 
   it('rejects every request when the secret is not configured', async () => {
-    delete process.env.AI_GATEWAY_SECURE_PROXY_SECRET;
+    delete process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET;
     const fetchMock = mockUpstream(new Response('{}'));
 
     const response = await handleSecureProxyRequest(proxyRequest(VALID_UPSTREAM_BODY));

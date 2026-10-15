@@ -1,11 +1,11 @@
 # ai-gateway-secure-proxy
 
 Minimal Next.js app that relays custom LLM requests from the AI gateway to an
-upstream. It deploys to the `ai-gateway-secure-proxy` Vercel project, whose
+upstream. It deploys to the `kilocode-ai-gateway-secure-proxy` Vercel project, whose
 functions run in `sfo1` only (`vercel.json`), via the manually triggered
 `deploy-ai-gateway-secure-proxy.yml`.
 
-- Every request must carry `Authorization: Bearer <AI_GATEWAY_SECURE_PROXY_SECRET>`,
+- Every request must carry `Authorization: Bearer <KILO_AI_GATEWAY_SECURE_PROXY_SECRET>`,
   compared in constant time. The gateway takes the value from the custom LLM's
   `secure_proxy` credentials (`proxy_secret`). Without the env var the app
   rejects every request. Vercel Deployment Protection is off, so this check is

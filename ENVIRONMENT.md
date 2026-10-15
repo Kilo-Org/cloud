@@ -400,9 +400,9 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 ## AI Gateway Secure Proxy (apps/ai-gateway-secure-proxy)
 
-Set manually on the `ai-gateway-secure-proxy` Vercel project; not managed by `pnpm web:env`.
+Set manually on the `kilocode-ai-gateway-secure-proxy` Vercel project; not managed by `pnpm web:env`.
 
-- `AI_GATEWAY_SECURE_PROXY_SECRET` - Shared secret the gateway sends as `Authorization: Bearer <secret>`; read in `apps/ai-gateway-secure-proxy/src/lib/secure-proxy.ts`. Admins store the same value as `proxy_secret` in `secure_proxy` custom LLM credentials. When unset, the proxy rejects every request. `[SECRET]`
+- `KILO_AI_GATEWAY_SECURE_PROXY_SECRET` - Shared secret the gateway sends as `Authorization: Bearer <secret>`; read in `apps/ai-gateway-secure-proxy/src/lib/secure-proxy.ts`. Admins store the same value as `proxy_secret` in `secure_proxy` custom LLM credentials. When unset, the proxy rejects every request. `[SECRET]`
 
 ## Services
 

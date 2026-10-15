@@ -10,7 +10,7 @@ nearer `AGENTS.md` and follow its scoped invariants.
 |---|---|
 | `apps/web/` | Next.js web application deployed to Vercel |
 | `apps/ai-gateway/` | Next.js app for the AI gateway API routes, deployed to Vercel as `kilocode-ai-gateway` |
-| `apps/ai-gateway-secure-proxy/` | Minimal Next.js relay for custom LLM requests, deployed to Vercel as `ai-gateway-secure-proxy` |
+| `apps/ai-gateway-secure-proxy/` | Minimal Next.js relay for custom LLM requests, deployed to Vercel as `kilocode-ai-gateway-secure-proxy` |
 | `apps/mobile/` | React Native mobile application |
 | `apps/extension/` | WXT browser extension |
 | `services/` | Cloudflare Worker and supporting services |
@@ -78,7 +78,7 @@ suggests:
 |---|---|
 | `kilocode-app` | Frankfurt only |
 | `kilocode-ai-gateway` | Frankfurt and us-west (SFO) |
-| `ai-gateway-secure-proxy` | us-west (SFO) only |
+| `kilocode-ai-gateway-secure-proxy` | us-west (SFO) only |
 
 Treat this table as the source of truth for compute location, database
 round-trip latency, and replica reasoning. If an observed region is not `fra1` or

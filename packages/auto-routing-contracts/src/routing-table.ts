@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
+import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 
 /** Maximum Pool entries in an owner-configured Efficient model pool. */
 export const MAX_POOL_ENTRIES = 10;
@@ -52,6 +53,32 @@ export const EfficientModelPoolSchema = z
   });
 export type EfficientModelPool = z.infer<typeof EfficientModelPoolSchema>;
 
+export const CandidatePricingSchema = z.object({
+  promptUsdPerToken: z.number().nonnegative(),
+  completionUsdPerToken: z.number().nonnegative(),
+  cacheReadUsdPerToken: z.number().nonnegative().nullable(),
+});
+export type CandidatePricing = z.infer<typeof CandidatePricingSchema>;
+
+export const ProductionTokenProfileSchema = z.object({
+  uncachedInputTokens: z.number().nonnegative(),
+  cachedInputTokens: z.number().nonnegative(),
+});
+export type ProductionTokenProfile = z.infer<typeof ProductionTokenProfileSchema>;
+
+export function estimateRequestCostUsd(
+  candidate: { avgCostUsd: number; pricing?: CandidatePricing | null },
+  profile: ProductionTokenProfile | null
+): number {
+  if (profile === null || candidate.pricing == null) return candidate.avgCostUsd;
+  return (
+    candidate.avgCostUsd +
+    profile.uncachedInputTokens * candidate.pricing.promptUsdPerToken +
+    profile.cachedInputTokens *
+      (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken)
+  );
+}
+
 /**
  * Reader precedence for candidate variant identity: prefer `variant`; when
  * absent, a valid legacy `reasoningEffort` string may be interpreted as the
@@ -63,9 +90,14 @@ export const RankedCandidateSchema = z
     model: z.string().trim().min(1),
     // Benchmark accuracy in [0, 1] for this taxonomy route.
     accuracy: z.number().min(0).max(1),
+    cases: z.number().int().nonnegative().nullable().optional(),
     // Average observed OpenRouter cost per benchmark case, in USD credits.
     avgCostUsd: z.number().nonnegative(),
     meetsThreshold: z.boolean(),
+    pricing: CandidatePricingSchema.nullable().optional(),
+    estimatedRequestCostUsd: z.number().nonnegative().nullable().optional(),
+    p50TtftMs: z.number().nonnegative().nullable().optional(),
+    p50LatencyMs: z.number().nonnegative().nullable().optional(),
     // Canonical catalog variant key the model was benchmarked with.
     // Optional so tables published before this field existed stay valid.
     variant: z.string().trim().min(1).nullable().optional(),
@@ -84,6 +116,24 @@ export const RankedCandidateSchema = z
   });
 export type RankedCandidate = z.infer<typeof RankedCandidateSchema>;
 
+export const ReasoningComplexitySchema = z.enum(['low', 'medium', 'high']);
+export type ReasoningComplexity = z.infer<typeof ReasoningComplexitySchema>;
+export const ComplexityLabelsSchema = z.record(z.string().min(1), ReasoningComplexitySchema);
+export type ComplexityLabels = z.infer<typeof ComplexityLabelsSchema>;
+
+export const EffortByComplexitySchema = z
+  .record(
+    z.string(),
+    z.record(
+      z.string().trim().min(1),
+      z.partialRecord(ReasoningComplexitySchema, z.string().trim().min(1).nullable())
+    )
+  )
+  .superRefine((routes, ctx) => {
+    refineTaxonomyRouteKeys(routes, ctx);
+  });
+export type EffortByComplexity = z.infer<typeof EffortByComplexitySchema>;
+
 const routingTableFields = {
   // Benchmark run id.
   version: z.string().min(1),
@@ -95,6 +145,10 @@ const routingTableFields = {
   // In best-accuracy mode, keep a threshold-meeting incumbent unless the
   // fresh pick improves accuracy by more than this absolute delta.
   bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),
+  productionTokenProfile: ProductionTokenProfileSchema.nullable().optional(),
+  effortByComplexity: EffortByComplexitySchema.optional(),
+  switchHorizonTurns: z.number().int().positive().nullable().optional(),
+  lowConfidenceThreshold: z.number().min(0).max(1).nullable().optional(),
   source: z.enum(['benchmark']),
 } as const;
 
@@ -134,19 +188,21 @@ export const CustomRoutingTableSchema = z.object({
 export type CustomRoutingTable = z.infer<typeof CustomRoutingTableSchema>;
 
 export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';
+export const FRONTIER_ROUTING_TABLE_KV_KEY = 'routing_table_frontier_v1';
 
-// Accuracy comes from about 10 golden cases per route, so a candidate up to
-// this far below `minAccuracy` is inside benchmark noise. Such a candidate
-// competes on value with the candidates that meet the threshold.
+export function routingTableKvKey(router: AutoRouter = DEFAULT_AUTO_ROUTER): string {
+  return router === 'frontier' ? FRONTIER_ROUTING_TABLE_KV_KEY : ROUTING_TABLE_KV_KEY;
+}
+
+// Candidates within this raw-accuracy margin of minAccuracy compete on value.
 const ACCURACY_NOISE_BAND = 0.05;
-// Value = avgCostUsd * p50LatencyMs^LATENCY_WEIGHT / accuracy^ACCURACY_WEIGHT;
-// lower is better. The accuracy weight makes a 0.9 candidate rank first only
-// when its cost-latency product is about 4.9x better than a 1.0 candidate's.
+// Value uses the Wilson lower bound when the measured case count is known.
 const LATENCY_WEIGHT = 1.5;
+export const LATENCY_TOTAL_WEIGHT = 0.15;
 const ACCURACY_WEIGHT = 15;
 // Part of every registry table version: a policy change must republish tables
 // built from unchanged measurements.
-export const RANKING_POLICY_VERSION = 'value-latency-v1';
+export const RANKING_POLICY_VERSION = 'value-ttft-prodcost-wilson-v4';
 
 type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
   meetsThreshold?: boolean;
@@ -154,9 +210,27 @@ type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
   p50LatencyMs: number | null;
 };
 
-function rankValue(c: { avgCostUsd: number; accuracy: number; p50LatencyMs: number | null }) {
-  if (c.p50LatencyMs === null) return Number.POSITIVE_INFINITY;
-  return (c.avgCostUsd * c.p50LatencyMs ** LATENCY_WEIGHT) / c.accuracy ** ACCURACY_WEIGHT;
+export function wilsonLowerBound(accuracy: number, n: number, z = 1.0): number {
+  if (n <= 0) return 0;
+  const zSquared = z * z;
+  const denominator = 1 + zSquared / n;
+  const center = accuracy + zSquared / (2 * n);
+  const margin = z * Math.sqrt((accuracy * (1 - accuracy) + zSquared / (4 * n)) / n);
+  return Math.max(0, (center - margin) / denominator);
+}
+
+export function rankValue(c: {
+  avgCostUsd: number;
+  accuracy: number;
+  cases?: number | null;
+  p50LatencyMs: number | null;
+  p50TtftMs?: number | null;
+}) {
+  const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
+  if (c.p50LatencyMs === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
+  const effectiveLatency =
+    c.p50TtftMs == null ? c.p50LatencyMs : c.p50TtftMs + LATENCY_TOTAL_WEIGHT * c.p50LatencyMs;
+  return (c.avgCostUsd * effectiveLatency ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
 }
 
 // Candidates within ACCURACY_NOISE_BAND of the threshold come first, best
@@ -165,15 +239,30 @@ function rankValue(c: { avgCostUsd: number; accuracy: number; p50LatencyMs: numb
 // flag that sticky routing reads.
 export function rankCandidates(
   candidates: ReadonlyArray<RankInput>,
-  minAccuracy: number
+  minAccuracy: number,
+  options?: { profile?: ProductionTokenProfile | null; accuracyNoiseBand?: number }
 ): RankedCandidate[] {
-  const floor = minAccuracy - ACCURACY_NOISE_BAND;
+  const floor = minAccuracy - (options?.accuracyNoiseBand ?? ACCURACY_NOISE_BAND);
   return candidates
-    .map(({ p50LatencyMs, ...c }) => ({
-      candidate: { ...c, meetsThreshold: c.accuracy >= minAccuracy },
-      competes: c.accuracy > 0 && c.accuracy >= floor,
-      value: rankValue({ ...c, p50LatencyMs }),
-    }))
+    .map(({ p50LatencyMs, ...c }) => {
+      const estimatedRequestCostUsd = estimateRequestCostUsd(c, options?.profile ?? null);
+      return {
+        candidate: {
+          ...c,
+          p50LatencyMs,
+          estimatedRequestCostUsd,
+          meetsThreshold: c.accuracy >= minAccuracy,
+        },
+        competes: c.accuracy > 0 && c.accuracy >= floor,
+        value: rankValue({
+          avgCostUsd: estimatedRequestCostUsd,
+          accuracy: c.accuracy,
+          cases: c.cases,
+          p50LatencyMs,
+          p50TtftMs: c.p50TtftMs,
+        }),
+      };
+    })
     .toSorted((a, b) => {
       if (a.competes !== b.competes) return a.competes ? -1 : 1;
       if (a.competes && a.value !== b.value) return a.value < b.value ? -1 : 1;

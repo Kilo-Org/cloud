@@ -15,7 +15,7 @@ import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { type useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { prepareAgentSession } from '@/lib/app-actions/prepare-agent-session';
-import { linkStartedTodoSession } from '@/lib/hooks/use-todos';
+import { linkStartedTodoSession } from '@/lib/hooks/todo-session-link';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -54,6 +54,8 @@ type UseNewSessionCreatorInput = {
   setupCommands?: string[];
   /** The to-do the session was started from; the new session links to it. */
   todoId?: string;
+  /** That to-do's title; the new session is named after it. */
+  todoTitle?: string;
 };
 
 type UseNewSessionCreatorResult = {
@@ -98,6 +100,7 @@ export function useNewSessionCreator({
   manualEnvVars,
   setupCommands,
   todoId,
+  todoTitle,
 }: UseNewSessionCreatorInput): UseNewSessionCreatorResult {
   const router = useStackSafeReplace();
   const queryClient = useQueryClient();
@@ -268,7 +271,13 @@ export function useNewSessionCreator({
         // copies so owned temp files never outlive the session handoff.
         attachments.reset();
         if (todoId) {
-          void linkStartedTodoSession({ queryClient, trpc, todoId, sessionId: outcome.sessionId });
+          void linkStartedTodoSession({
+            queryClient,
+            trpc,
+            todoId,
+            sessionId: outcome.sessionId,
+            ...(todoTitle ? { title: todoTitle } : {}),
+          });
         }
         // Contained on its own so a rejected haptics call still navigates.
         try {
@@ -300,6 +309,7 @@ export function useNewSessionCreator({
     manualEnvVars,
     setupCommands,
     todoId,
+    todoTitle,
     queryClient,
     trpc,
     router,

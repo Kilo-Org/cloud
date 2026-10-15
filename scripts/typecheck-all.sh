@@ -26,6 +26,10 @@ if $changes_only; then
   if [ -z "$base" ]; then
     echo "[typecheck] no merge base found, running full typecheck"
     changes_only=false
+  # Catalog bumps in pnpm-workspace.yaml can alter the type surface across packages.
+  elif git diff --name-only "$base" -- pnpm-workspace.yaml | grep -q .; then
+    echo "[typecheck] pnpm-workspace.yaml changed, running full typecheck"
+    changes_only=false
   fi
 fi
 
@@ -35,11 +39,13 @@ if $changes_only; then
   if [ -n "$trpc_changed" ]; then
     echo "[typecheck] trpc source changed, rebuilding"
     pnpm --filter @kilocode/trpc run build
+    export KILO_TYPECHECK_TRPC_BUILT=1
   else
     echo "[typecheck] trpc source unchanged, skipping build"
   fi
 else
   pnpm --filter @kilocode/trpc run build
+  export KILO_TYPECHECK_TRPC_BUILT=1
 fi
 
 # 1b. Build the harness SDK, which apps/mobile typechecks against (same rule as trpc)
@@ -67,16 +73,6 @@ if ! $changes_only; then
 fi
 
 # Incremental: find workspace packages with TS or config changes and typecheck only those.
-# Also fall back to full typecheck if pnpm-workspace.yaml changed (catalog bumps can
-# alter the type surface across packages).
-if git diff --name-only "$base" -- pnpm-workspace.yaml | grep -q .; then
-  echo "[typecheck] pnpm-workspace.yaml changed, rebuilding trpc and running full workspace typecheck"
-  pnpm --filter @kilocode/trpc run build
-  pnpm --filter @kilocode/harness-sdk run build
-  pnpm -r "${workspace_typecheck_filters[@]}" run typecheck
-  exit 0
-fi
-
 changed_dirs=$(git diff --name-only "$base" -- '*.ts' '*.tsx' '**/tsconfig*.json' '**/package.json' | \
   { grep -v '^src/' || true; } | \
   sed 's|/src/.*||; s|/[^/]*\.[^/]*$||' | \

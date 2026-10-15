@@ -134,6 +134,7 @@
     "status": "Status",
     "truncated": "Truncated",
     "updated": "Updated",
+    "generating": "Generating…",
     "working": "Working",
     "yourOwnRepositories": "Your own repositories",
     "dismissed": "Dismissed",
@@ -1259,7 +1260,7 @@
         "stoppedTitle": "Setup stopped",
         "stoppedBody": "{{name}}'s instance stopped unexpectedly during setup.",
         "stalledTitle": "Something stalled",
-        "stalledBody": "We couldn't finish setting up {{name}}. Try again, or email hi@kilo.ai if this keeps happening.",
+        "stalledBody": "We couldn't finish setting up {{name}}. Try again, or email {{supportEmail}} if this keeps happening.",
         "timeoutTitle": "Taking longer than expected",
         "timeoutBody": "Setup for {{name}} is taking longer than usual (over {{displayMinutes}} minutes).",
         "continueInBackground": "Continue in background",
@@ -1317,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Your early-access plan needs a manual review before it can be used on mobile.",
       "iosTitle": "KiloClaw unavailable in iOS",
       "iosBody": "KiloClaw access is managed outside the iOS app for this account.",
-      "iosContact": "Questions? Contact hi@kilo.ai.",
+      "iosContact": "Questions? Contact {{supportEmail}}.",
       "quarantinedCta": "Email our team",
       "nonCanonicalEarlybirdCta": "Review your plan on kilo.ai"
     },
@@ -1552,7 +1553,7 @@
         "recoveryLabel": "Update GitHub App"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact hi@kilo.ai for help, then enable Code Reviewer again."
+        "description": "Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact {{supportEmail}} for help, then enable Code Reviewer again."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer was disabled because Kilo cannot create a GitLab Project Access Token for this project. Grant Maintainer access or enable Project Access Tokens, then enable Code Reviewer again.",
@@ -1567,7 +1568,7 @@
         "recoveryLabel": "Update Code Reviewer settings"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilo.ai for help, then enable Code Reviewer again."
+        "description": "Code Reviewer was disabled after three repository clone timeouts today. Contact {{supportEmail}} for help, then enable Code Reviewer again."
       },
       "title": "Code Reviewer needs attention",
       "recoveryLabel": "Contact support"
@@ -2656,6 +2657,7 @@
     },
     "contextUsage": {
       "windowUnavailable": "Context-window size unavailable",
+      "pillLabel": "Context · {{value}}",
       "tapToViewDetails": "Tap to view context details.",
       "costSuffix": ", cost {{cost}}",
       "tokensWindowUnavailable": "Context {{used}} tokens, window unavailable",
@@ -3263,6 +3265,10 @@
     },
     "backends": {
       "title": "Chat backends",
+      "providersTitle": "Chat providers",
+      "cloud": "In the cloud",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo models aren't available right now. Check your connection.",
       "manage": "Manage backends",
       "defaultKilo": "$t(consent.kilo) (default)",
       "kiloHelp": "The built-in backend uses your Kilo account and cannot be edited or deleted.",
@@ -3322,7 +3328,6 @@
     "gguf": {
       "title": "Downloadable models",
       "help": "Download an open model and run it on this phone with llama.cpp. Your prompts and replies stay on the device. Models are large, so use Wi-Fi.",
-      "details": "{{size}} · License: {{license}}",
       "download": "Download model",
       "pause": "Pause download",
       "resume": "Resume download",
@@ -3334,6 +3339,8 @@
       "url": "Direct download link",
       "urlHelp": "Paste an HTTPS link to a .gguf file, such as a Hugging Face resolve link. Only download models from sources you trust.",
       "downloadUrl": "Download from link",
+      "advanced": "Advanced",
+      "localPurpose": "Runs on this device with llama.cpp. Prompts and replies stay on the device.",
       "deleteTitle": "Delete this model?",
       "deleteMessage": "Delete {{name}} from this device? Chats that use it need another model before they can continue.",
       "errors": {
@@ -3362,8 +3369,17 @@
         "fits": "Fits",
         "tight": "Tight fit",
         "tooLarge": "Too large",
-        "noStorage": "Not enough storage"
+        "noStorage": "Not enough storage",
+        "unknown": "Fit unknown"
       },
+      "recommendationsHelp": "A shortlist this app pins: one file per model, from a publisher that states a license. Nothing else is ranked.",
+      "compatibilityHelp": "Fit compares the model file with this device's memory and free storage. The memory figure is an estimate, not a measurement.",
+      "text": "Text",
+      "listTextPurpose": "Text prompts only.",
+      "listImagePurpose": "Reads images as well as text.",
+      "smallestDownload": "Smallest download: {{size}} · about {{memory}} of memory",
+      "fullFileName": "File: {{name}}",
+      "memoryEstimateNote": "Memory figures are estimates, not measurements.",
       "parameters": "Parameters: {{value}}",
       "downloads": "Downloads: {{value}}",
       "likes": "Likes: {{value}}",
@@ -3388,7 +3404,8 @@
     },
     "localModels": {
       "title": "On-device models",
-      "help": "On-device models run on this phone. Your prompts and replies stay on the device, and these models can't use tools.",
+      "help": "On-device models run on this phone. Your prompts and replies stay on the device.",
+      "systemPurpose": "The model built into this device's system. It runs on the device.",
       "apple": "Apple Intelligence (on device)",
       "checking": "Checking availability…",
       "ready": "Ready to use",
@@ -3748,12 +3765,26 @@
       "startNow": "Start without review",
       "startNowHint": "Long-press to start without review",
       "titleLabel": "To-do title",
+      "renameTitle": "Rename task",
       "notes": "Notes",
-      "notesPlaceholder": "Add notes in Markdown",
+      "addNotes": "Add notes",
+      "notesPrompt": "Add context, requirements, or acceptance criteria.",
+      "markdownSupported": "Markdown supported",
       "sessions": "Sessions linked",
       "noSessions": "No sessions yet",
+      "untitledLinkedSession": "Linked session",
+      "sessionNeedsInput": "Session needs input",
+      "sessionRunning": "Session running",
+      "sessionFinished": "Session finished",
+      "sessionPullRequest": "Session pull request",
+      "sessionPullRequestNumber": "Session PR #{{number}}",
+      "openSessionHint": "Opens the session.",
+      "unlinkSessionAction": "Unlink session",
+      "unlinkConfirmTitle": "Unlink {{title}}?",
+      "unlinkConfirmMessage": "The session itself is not deleted. Only its link to this to-do is removed.",
+      "startNewSession": "Start new session",
+      "startNewSessionHint": "Long-press to start a new session.",
       "linkSession": "Link session",
-      "unlinkSession": "Unlink {{title}}",
       "linkFailed": "Couldn’t link the session to the to-do"
     },
     "linkSession": {

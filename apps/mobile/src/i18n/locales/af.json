@@ -133,6 +133,7 @@
     "status": "Toestand",
     "truncated": "Afgekap",
     "updated": "Bygewerk",
+    "generating": "Genereer…",
     "working": "Besig",
     "yourOwnRepositories": "Jou eie bewaarplekke",
     "dismissed": "Verwerp",
@@ -1259,7 +1260,7 @@
         "stoppedTitle": "Opstelling gestaak",
         "stoppedBody": "{{name}} se instansie het onverwags tydens die opstelling tot stilstand gekom.",
         "stalledTitle": "Iets het vasgesteek",
-        "stalledBody": "Ons kon nie {{name}} klaar opstel nie. Probeer weer of stuur 'n e-pos aan hi@kilo.ai as dit aanhou gebeur.",
+        "stalledBody": "Ons kon nie {{name}} klaar opstel nie. Probeer weer of stuur 'n e-pos aan {{supportEmail}} as dit aanhou gebeur.",
         "timeoutTitle": "Neem langer as verwag",
         "timeoutBody": "Die opstelling van {{name}} neem langer as gewoonlik (meer as {{displayMinutes}} minute).",
         "continueInBackground": "Gaan voort in die agtergrond",
@@ -1317,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Jou plan vir vroeë toegang moet deur 'n persoon hersien word voordat jy dit op jou foon kan gebruik.",
       "iosTitle": "KiloClaw nie op iOS beskikbaar nie",
       "iosBody": "KiloClaw-toegang vir hierdie rekening word buite die iOS-toep bestuur.",
-      "iosContact": "Vrae? Kontak hi@kilo.ai.",
+      "iosContact": "Vrae? Kontak {{supportEmail}}.",
       "quarantinedCta": "Stuur ons span 'n e-pos",
       "nonCanonicalEarlybirdCta": "Hersien jou plan op kilo.ai"
     },
@@ -1552,7 +1553,7 @@
         "recoveryLabel": "Werk die GitHub-app by"
       },
       "githubIpAllowList": {
-        "description": "Die Kodehersiener is gedeaktiveer omdat hierdie GitHub-organisasie 'n IP-toelatingslys gebruik wat Kilo blokkeer. Kontak hi@kilo.ai vir hulp en aktiveer die Kodehersiener daarna weer."
+        "description": "Die Kodehersiener is gedeaktiveer omdat hierdie GitHub-organisasie 'n IP-toelatingslys gebruik wat Kilo blokkeer. Kontak {{supportEmail}} vir hulp en aktiveer die Kodehersiener daarna weer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Die Kodehersiener is gedeaktiveer omdat Kilo nie 'n GitLab-projektoegangstoken vir hierdie projek kan skep nie. Verleen instandhouertoegang of aktiveer projektoegangstokens en aktiveer die Kodehersiener daarna weer.",
@@ -1567,7 +1568,7 @@
         "recoveryLabel": "Werk die Kodehersiener se instellings by"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Die Kodehersiener is gedeaktiveer omdat die kloning van die bewaarplek vandag drie keer die tydlimiet oorskry het. Kontak hi@kilo.ai vir hulp en aktiveer die Kodehersiener daarna weer."
+        "description": "Die Kodehersiener is gedeaktiveer omdat die kloning van die bewaarplek vandag drie keer die tydlimiet oorskry het. Kontak {{supportEmail}} vir hulp en aktiveer die Kodehersiener daarna weer."
       },
       "title": "Die kodehersiener het aandag nodig.",
       "recoveryLabel": "Kontak ondersteuning"
@@ -2630,6 +2631,7 @@
     },
     "contextUsage": {
       "windowUnavailable": "Konteksvenstergrootte onbeskikbaar",
+      "pillLabel": "Konteks · {{value}}",
       "tapToViewDetails": "Tik om konteksbesonderhede te bekyk.",
       "costSuffix": ", koste {{cost}}",
       "tokensWindowUnavailable": "Konteks: {{used}} tekens, venstergrootte onbeskikbaar",
@@ -3322,6 +3324,10 @@
     },
     "backends": {
       "title": "Kletsagtergrondstelsels",
+      "providersTitle": "Kletsverskaffers",
+      "cloud": "In die wolk",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo-modelle is tans nie beskikbaar nie. Kyk na jou verbinding.",
       "manage": "Bestuur agtergrondstelsels",
       "defaultKilo": "$t(consent.kilo) (verstek)",
       "kiloHelp": "Die ingeboude agtergrondstelsel gebruik jou Kilo-rekening en kan nie gewysig of geskrap word nie.",
@@ -3381,7 +3387,6 @@
     "gguf": {
       "title": "Modelle wat afgelaai kan word",
       "help": "Laai 'n oop model af en laat dit op hierdie foon met llama.cpp loop. Jou opdragte en antwoorde bly op die toestel. Modelle is groot, so gebruik Wi-Fi.",
-      "details": "{{size}} · Lisensie: {{license}}",
       "download": "Laai model af",
       "pause": "Pouseer aflaai",
       "resume": "Hervat aflaai",
@@ -3393,6 +3398,8 @@
       "url": "Direkte aflaai-skakel",
       "urlHelp": "Plak 'n HTTPS-skakel na 'n .gguf-lêer, soos 'n Hugging Face-resolve-skakel. Laai slegs modelle af van bronne wat jy vertrou.",
       "downloadUrl": "Laai af vanaf skakel",
+      "advanced": "Gevorderd",
+      "localPurpose": "Loop op hierdie toestel met llama.cpp. Vrae en antwoorde bly op die toestel.",
       "deleteTitle": "Vee hierdie model uit?",
       "deleteMessage": "Vee {{name}} van hierdie toestel uit? Gesprekke wat dit gebruik, het 'n ander model nodig voordat hulle kan voortgaan.",
       "errors": {
@@ -3421,8 +3428,17 @@
         "fits": "Pas",
         "tight": "Pas net-net",
         "tooLarge": "Te groot",
-        "noStorage": "Nie genoeg berging nie"
+        "noStorage": "Nie genoeg berging nie",
+        "unknown": "Inpas onbekend"
       },
+      "recommendationsHelp": "'n Kortlys wat hierdie app vaspen: een leer per model, van 'n uitgewer wat 'n lisensie vermeld. Niks anders word gerangskik nie.",
+      "compatibilityHelp": "Inpas vergelyk die modelleer met hierdie toestel se geheue en vrye berging. Die geheuesyfer is 'n skatting, nie 'n meting nie.",
+      "text": "Teks",
+      "listTextPurpose": "Slegs teks-opdragte.",
+      "listImagePurpose": "Lees beelde sowel as teks.",
+      "smallestDownload": "Kleinste aflaai: {{size}} · ongeveer {{memory}} geheue",
+      "fullFileName": "Leer: {{name}}",
+      "memoryEstimateNote": "Geheuesyfers is skattings, nie metings nie.",
       "parameters": "Parameters: {{value}}",
       "downloads": "Aflaaie: {{value}}",
       "likes": "Lourierte: {{value}}",
@@ -3447,7 +3463,8 @@
     },
     "localModels": {
       "title": "Modelle op die toestel",
-      "help": "Modelle op die toestel loop op hierdie foon. Jou opdragte en antwoorde bly op die toestel, en hierdie modelle kan nie gereedskap gebruik nie.",
+      "help": "Modelle op die toestel loop op hierdie foon. Jou opdragte en antwoorde bly op die toestel.",
+      "systemPurpose": "Die model wat in hierdie toestel se stelsel ingebou is. Dit loop op die toestel.",
       "apple": "Apple Intelligence (op die toestel)",
       "checking": "Kontroleer beskikbaarheid…",
       "ready": "Gereed vir gebruik",
@@ -3748,12 +3765,26 @@
       "startNow": "Begin sonder hersiening",
       "startNowHint": "Druk lank om sonder hersiening te begin",
       "titleLabel": "Taaktitel",
+      "renameTitle": "Hernoem taak",
       "notes": "Notas",
-      "notesPlaceholder": "Voeg notas in Markdown by",
+      "addNotes": "Voeg notas by",
+      "notesPrompt": "Voeg konteks, vereistes of aanvaardingskriteria by.",
+      "markdownSupported": "Markdown ondersteun",
       "sessions": "Sessies gekoppel",
       "noSessions": "Nog geen sessies nie",
+      "untitledLinkedSession": "Gekoppelde sessie",
+      "sessionNeedsInput": "Sessie benodig insette",
+      "sessionRunning": "Sessie loop",
+      "sessionFinished": "Sessie voltooi",
+      "sessionPullRequest": "Sessie-trekkingsversoek",
+      "sessionPullRequestNumber": "Sessie PR #{{number}}",
+      "openSessionHint": "Maak die sessie oop.",
+      "unlinkSessionAction": "Ontkoppel sessie",
+      "unlinkConfirmTitle": "Ontkoppel {{title}}?",
+      "unlinkConfirmMessage": "Die sessie self word nie uitgevee nie. Slegs sy skakel na hierdie taak word verwyder.",
+      "startNewSession": "Begin nuwe sessie",
+      "startNewSessionHint": "Druk lank om 'n nuwe sessie te begin.",
       "linkSession": "Koppel sessie",
-      "unlinkSession": "Ontkoppel {{title}}",
       "linkFailed": "Kon nie die sessie aan die taak koppel nie"
     },
     "linkSession": {

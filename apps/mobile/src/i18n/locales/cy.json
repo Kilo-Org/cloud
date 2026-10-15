@@ -133,6 +133,7 @@
     "status": "Statws",
     "truncated": "Wedi'i gwtogi",
     "updated": "Diweddarwyd",
+    "generating": "Yn cynhyrchu…",
     "working": "Yn gweithio",
     "yourOwnRepositories": "Dy ystorfeydd dy hun",
     "dismissed": "Wedi'i ddiystyru",
@@ -1331,7 +1332,7 @@
         "stoppedTitle": "Daeth y gosod i ben",
         "stoppedBody": "Stopiodd instans {{name}} yn annisgwyl wrth ei osod.",
         "stalledTitle": "Aeth rhywbeth yn sownd",
-        "stalledBody": "Ni lwyddwyd i orffen gosod {{name}}. Rhowch gynnig eto, neu anfonwch e-bost at hi@kilo.ai os bydd hyn yn dal i ddigwydd.",
+        "stalledBody": "Ni lwyddwyd i orffen gosod {{name}}. Rhowch gynnig eto, neu anfonwch e-bost at {{supportEmail}} os bydd hyn yn dal i ddigwydd.",
         "timeoutTitle": "Yn cymryd yn hirach na'r disgwyl",
         "timeoutBody": "Mae gosod {{name}} yn cymryd yn hirach nag arfer (dros {{displayMinutes}} munud).",
         "continueInBackground": "Parhau yn y cefndir",
@@ -1389,7 +1390,7 @@
       "nonCanonicalEarlybirdBody": "Rhaid i berson adolygu'ch cynllun mynediad cynnar cyn y gallwch ei ddefnyddio ar eich ffôn.",
       "iosTitle": "KiloClaw ddim ar gael ar iOS",
       "iosBody": "Ar gyfer y cyfrif hwn, rheolir mynediad at KiloClaw y tu allan i'r ap iOS.",
-      "iosContact": "Cwestiynau? Cysylltwch â hi@kilo.ai.",
+      "iosContact": "Cwestiynau? Cysylltwch â {{supportEmail}}.",
       "quarantinedCta": "Anfon e-bost i'n tîm",
       "nonCanonicalEarlybirdCta": "Adolygu eich cynllun ar kilo.ai"
     },
@@ -1628,7 +1629,7 @@
         "recoveryLabel": "Diweddaru ap GitHub"
       },
       "githubIpAllowList": {
-        "description": "Analluogwyd yr Adolygydd cod oherwydd bod y sefydliad GitHub hwn yn defnyddio rhestr cyfeiriadau IP a ganiateir sy'n rhwystro Kilo. Cysylltwch â hi@kilo.ai am gymorth, yna galluogwch yr Adolygydd cod eto."
+        "description": "Analluogwyd yr Adolygydd cod oherwydd bod y sefydliad GitHub hwn yn defnyddio rhestr cyfeiriadau IP a ganiateir sy'n rhwystro Kilo. Cysylltwch â {{supportEmail}} am gymorth, yna galluogwch yr Adolygydd cod eto."
       },
       "gitlabProjectAccessRequired": {
         "description": "Analluogwyd yr Adolygydd cod oherwydd na all Kilo greu tocyn mynediad prosiect GitLab ar gyfer y prosiect hwn. Rhowch fynediad cynhaliwr neu alluogwch docynnau mynediad prosiect, yna galluogwch yr Adolygydd cod eto.",
@@ -1643,7 +1644,7 @@
         "recoveryLabel": "Diweddaru gosodiadau'r Adolygydd cod"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Analluogwyd yr Adolygydd cod ar ôl i dair ymgais i glonio'r ystorfa fynd dros y terfyn amser heddiw. Cysylltwch â hi@kilo.ai am gymorth, yna galluogwch yr Adolygydd cod eto."
+        "description": "Analluogwyd yr Adolygydd cod ar ôl i dair ymgais i glonio'r ystorfa fynd dros y terfyn amser heddiw. Cysylltwch â {{supportEmail}} am gymorth, yna galluogwch yr Adolygydd cod eto."
       },
       "title": "Mae angen sylw ar yr adolygydd cod.",
       "recoveryLabel": "Cysylltu â'r tîm cymorth"
@@ -2774,6 +2775,7 @@
     },
     "contextUsage": {
       "windowUnavailable": "Nid yw maint y ffenestr gyd-destun ar gael",
+      "pillLabel": "Cyd-destun · {{value}}",
       "tapToViewDetails": "Tapio i weld manylion y cyd-destun.",
       "costSuffix": ", cost: {{cost}}",
       "tokensWindowUnavailable": "Cyd-destun: {{used}} tocyn, nid yw maint y ffenestr ar gael",
@@ -3486,6 +3488,10 @@
     },
     "backends": {
       "title": "Ôl-bennau sgwrs",
+      "providersTitle": "Darparwyr sgwrs",
+      "cloud": "Yn y cwmwl",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Nid yw modelau Kilo ar gael ar hyn o bryd. Gwiria dy gysylltiad.",
       "manage": "Rheoli ôl-bennau",
       "defaultKilo": "$t(consent.kilo) (rhagosodedig)",
       "kiloHelp": "Mae'r ôl-ben adeiledig yn defnyddio eich cyfrif Kilo ac ni ellir ei olygu na'i ddileu.",
@@ -3545,7 +3551,6 @@
     "gguf": {
       "title": "Modelau y gellir eu lawrlwytho",
       "help": "Lawrlwythwch fodel agored a'i redeg ar y ffôn hwn gyda llama.cpp. Mae eich anogwyr a'ch atebion yn aros ar y ddyfais. Mae modelau'n fawr, felly defnyddiwch Wi-Fi.",
-      "details": "{{size}} · Trwydded: {{license}}",
       "download": "Lawrlwytho model",
       "pause": "Seibio'r lawrlwythiad",
       "resume": "Ailddechrau'r lawrlwythiad",
@@ -3557,6 +3562,8 @@
       "url": "Dolen lawrlwytho uniongyrchol",
       "urlHelp": "Gludwch ddolen HTTPS i ffeil .gguf, fel dolen resolve Hugging Face. Dim ond o ffynonellau rydych yn ymddiried ynddynt y dylech lawrlwytho modelau.",
       "downloadUrl": "Lawrlwytho o ddolen",
+      "advanced": "Uwch",
+      "localPurpose": "Yn rhedeg ar y ddyfais hon gyda llama.cpp. Mae anogau ac atebion yn aros ar y ddyfais.",
       "deleteTitle": "Dileu'r model hwn?",
       "deleteMessage": "Dileu {{name}} o'r ddyfais hon? Mae sgyrsiau sy'n ei ddefnyddio angen model arall cyn y gallant barhau.",
       "errors": {
@@ -3585,8 +3592,17 @@
         "fits": "Yn ffitio",
         "tight": "Prin yn ffitio",
         "tooLarge": "Rhy fawr",
-        "noStorage": "Dim digon o storfa"
+        "noStorage": "Dim digon o storfa",
+        "unknown": "Addasrwydd yn anhysbys"
       },
+      "recommendationsHelp": "Rhestr fer y mae'r ap hwn yn ei phinio: un ffeil fesul model, gan gyhoeddwr sy'n nodi trwydded. Nid oes dim arall yn cael ei raddio.",
+      "compatibilityHelp": "Mae addasrwydd yn cymharu ffeil y model â chof y ddyfais hon a'r storfa rydd. Amcangyfrif yw'r ffigur cof, nid mesuriad.",
+      "text": "Testun",
+      "listTextPurpose": "Anogau testun yn unig.",
+      "listImagePurpose": "Yn darllen delweddau yn ogystal â thestun.",
+      "smallestDownload": "Llwythiad lleiaf: {{size}} · tua {{memory}} o gof",
+      "fullFileName": "Ffeil: {{name}}",
+      "memoryEstimateNote": "Amcangyfrifon yw ffigurau cof, nid mesuriadau.",
       "parameters": "Paramedrau: {{value}}",
       "downloads": "Lawrlwythiadau: {{value}}",
       "likes": "Hoffiadau: {{value}}",
@@ -3611,7 +3627,8 @@
     },
     "localModels": {
       "title": "Modelau ar y ddyfais",
-      "help": "Mae modelau ar y ddyfais yn rhedeg ar y ffôn hwn. Mae eich anogwyr a'r atebion yn aros ar y ddyfais, ac ni all y modelau hyn ddefnyddio offer.",
+      "help": "Mae modelau ar y ddyfais yn rhedeg ar y ffôn hwn. Mae eich anogwyr a'r atebion yn aros ar y ddyfais.",
+      "systemPurpose": "Y model sydd wedi'i adeiladu i mewn i system y ddyfais hon. Mae'n rhedeg ar y ddyfais.",
       "apple": "Apple Intelligence (ar y ddyfais)",
       "checking": "Yn gwirio argaeledd…",
       "ready": "Yn barod i'w ddefnyddio",
@@ -3928,12 +3945,26 @@
       "startNow": "Dechrau heb adolygiad",
       "startNowHint": "Pwyswch yn hir i ddechrau heb adolygiad",
       "titleLabel": "Teitl y dasg",
+      "renameTitle": "Ailenwi tasg",
       "notes": "Nodiadau",
-      "notesPlaceholder": "Ychwanegu nodiadau yn Markdown",
+      "addNotes": "Ychwanegu nodiadau",
+      "notesPrompt": "Ychwanega gyd-destun, gofynion, neu feini prawf derbyn.",
+      "markdownSupported": "Markdown yn cael ei gefnogi",
       "sessions": "Sesiynau wedi'u cysylltu",
       "noSessions": "Dim sesiynau eto",
+      "untitledLinkedSession": "Sesiwn gysylltiedig",
+      "sessionNeedsInput": "Angen mewnbwn ar y sesiwn",
+      "sessionRunning": "Sesiwn yn rhedeg",
+      "sessionFinished": "Sesiwn wedi gorffen",
+      "sessionPullRequest": "PR y sesiwn",
+      "sessionPullRequestNumber": "PR y sesiwn #{{number}}",
+      "openSessionHint": "Yn agor y sesiwn.",
+      "unlinkSessionAction": "Datgysylltu sesiwn",
+      "unlinkConfirmTitle": "Datgysylltu {{title}}?",
+      "unlinkConfirmMessage": "Nid yw'r sesiwn ei hun yn cael ei dileu. Dim ond ei chysylltiad â'r dasg hon sy'n cael ei dynnu.",
+      "startNewSession": "Dechrau sesiwn newydd",
+      "startNewSessionHint": "Gwasga'n hir i ddechrau sesiwn newydd.",
       "linkSession": "Cysylltu sesiwn",
-      "unlinkSession": "Datgysylltu {{title}}",
       "linkFailed": "Methu cysylltu'r sesiwn â'r dasg"
     },
     "linkSession": {

@@ -133,6 +133,7 @@
     "status": "Statuss",
     "truncated": "Saīsināts",
     "updated": "Atjaunināts",
+    "generating": "Ģenerē…",
     "working": "Strādā",
     "yourOwnRepositories": "Tavi repozitoriji",
     "dismissed": "Noraidīts",
@@ -1277,7 +1278,7 @@
         "stoppedTitle": "Iestatīšana apturēta",
         "stoppedBody": "Iestatīšanas laikā {{name}} vide negaidīti apstājās.",
         "stalledTitle": "Iestatīšana ir iestrēgusi",
-        "stalledBody": "Neizdevās pabeigt {{name}} iestatīšanu. Mēģini vēlreiz vai, ja problēma atkārtojas, raksti uz hi@kilo.ai.",
+        "stalledBody": "Neizdevās pabeigt {{name}} iestatīšanu. Mēģini vēlreiz vai, ja problēma atkārtojas, raksti uz {{supportEmail}}.",
         "timeoutTitle": "Aizņem ilgāk, nekā gaidīts",
         "timeoutBody": "{{name}} iestatīšana aizņem ilgāk nekā parasti. Pagājušais laiks minūtēs: vairāk nekā {{displayMinutes}}.",
         "continueInBackground": "Turpināt fonā",
@@ -1335,7 +1336,7 @@
       "nonCanonicalEarlybirdBody": "Pirms tavu agrīnās piekļuves plānu var izmantot mobilajā ierīcē, speciālistam tas jāpārbauda.",
       "iosTitle": "KiloClaw nav pieejams iOS",
       "iosBody": "KiloClaw piekļuve šim kontam tiek pārvaldīta ārpus iOS lietotnes.",
-      "iosContact": "Ir jautājumi? Raksti uz hi@kilo.ai.",
+      "iosContact": "Ir jautājumi? Raksti uz {{supportEmail}}.",
       "quarantinedCta": "Rakstīt mūsu komandai",
       "nonCanonicalEarlybirdCta": "Pārskatīt savu plānu vietnē kilo.ai"
     },
@@ -1571,7 +1572,7 @@
         "recoveryLabel": "Atjaunināt GitHub lietotni"
       },
       "githubIpAllowList": {
-        "description": "Koda pārskatītājs tika atspējots, jo šī GitHub organizācija izmanto atļauto IP adrešu sarakstu, kas bloķē Kilo. Raksti uz hi@kilo.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
+        "description": "Koda pārskatītājs tika atspējots, jo šī GitHub organizācija izmanto atļauto IP adrešu sarakstu, kas bloķē Kilo. Raksti uz {{supportEmail}}, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
       },
       "gitlabProjectAccessRequired": {
         "description": "Koda pārskatītājs tika atspējots, jo Kilo nevar izveidot GitLab projekta piekļuves pilnvaru šim projektam. Piešķir uzturētāja piekļuves tiesības vai iespējo projekta piekļuves pilnvaras un vēlreiz iespējo koda pārskatītāju.",
@@ -1586,7 +1587,7 @@
         "recoveryLabel": "Atjaunināt koda pārskatītāja iestatījumus"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koda pārskatītājs tika atspējots, jo šodien trīs reizes tika pārsniegts repozitorija klonēšanai atvēlētais laiks. Raksti uz hi@kilo.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
+        "description": "Koda pārskatītājs tika atspējots, jo šodien trīs reizes tika pārsniegts repozitorija klonēšanai atvēlētais laiks. Raksti uz {{supportEmail}}, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
       },
       "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
       "recoveryLabel": "Sazināties ar atbalsta dienestu"
@@ -2666,6 +2667,7 @@
     },
     "contextUsage": {
       "windowUnavailable": "Konteksta loga lielums nav pieejams",
+      "pillLabel": "Konteksts · {{value}}",
       "tapToViewDetails": "Pieskaries, lai skatītu detalizētu informāciju par kontekstu.",
       "costSuffix": ", izmaksas {{cost}}",
       "tokensWindowUnavailable": "Kontekstā izmantotie tokeni: {{used}}, konteksta loga lielums nav pieejams",
@@ -3363,6 +3365,10 @@
     },
     "backends": {
       "title": "Tērzēšanas aizmugursistēmas",
+      "providersTitle": "Tērzēšanas pakalpojumu sniedzēji",
+      "cloud": "Mākonī",
+      "cloudModel": "Modelis: {{model}}",
+      "cloudUnavailable": "Kilo modeļi šobrīd nav pieejami. Pārbaudiet savienojumu.",
       "manage": "Pārvaldīt aizmugursistēmas",
       "defaultKilo": "$t(consent.kilo) (noklusējums)",
       "kiloHelp": "Iebūvētā aizmugursistēma izmanto tavu Kilo kontu, un to nevar rediģēt vai dzēst.",
@@ -3422,7 +3428,6 @@
     "gguf": {
       "title": "Lejupielādējamie modeļi",
       "help": "Lejupielādējiet atvērtu modeli un palaidiet to šajā tālrunī ar llama.cpp. Jūsu uzvednes un atbildes paliek ierīcē. Modeļi ir lieli, tāpēc izmantojiet Wi-Fi.",
-      "details": "{{size}} · Licence: {{license}}",
       "download": "Lejupielādēt modeli",
       "pause": "Pauzēt lejupielādi",
       "resume": "Turpināt lejupielādi",
@@ -3434,6 +3439,8 @@
       "url": "Tiešā lejupielādes saite",
       "urlHelp": "Ielīmējiet HTTPS saiti uz .gguf failu, piemēram, Hugging Face resolve saiti. Lejupielādējiet modeļus tikai no uzticamiem avotiem.",
       "downloadUrl": "Lejupielādēt no saites",
+      "advanced": "Papildu",
+      "localPurpose": "Darbojas šajā ierīcē ar llama.cpp. Uzvednes un atbildes paliek ierīcē.",
       "deleteTitle": "Dzēst šo modeli?",
       "deleteMessage": "Dzēst {{name}} no šīs ierīces? Tērzēšanām, kas to izmanto, pirms turpināšanas ir nepieciešams cits modelis.",
       "errors": {
@@ -3462,8 +3469,17 @@
         "fits": "Der",
         "tight": "Knapi der",
         "tooLarge": "Pārāk liels",
-        "noStorage": "Nepietiek krātuves"
+        "noStorage": "Nepietiek krātuves",
+        "unknown": "Atbilstība nav zināma"
       },
+      "recommendationsHelp": "Šīs lietotnes izvēlēts saraksts: viens fails katram modelim, no izdevēja, kas norāda licenci. Nekas cits netiek ranžēts.",
+      "compatibilityHelp": "Atbilstība salīdzina modeļa failu ar šīs ierīces atmiņu un brīvo krātuvi. Atmiņas skaitlis ir aplēse, nevis mērījums.",
+      "text": "Teksts",
+      "listTextPurpose": "Tikai teksta uzvednes.",
+      "listImagePurpose": "Nolasa attēlus, kā arī tekstu.",
+      "smallestDownload": "Mazākā lejupielāde: {{size}} · apmēram {{memory}} atmiņas",
+      "fullFileName": "Fails: {{name}}",
+      "memoryEstimateNote": "Atmiņas skaitļi ir aplēses, nevis mērījumi.",
       "parameters": "Parametri: {{value}}",
       "downloads": "Lejupielādes: {{value}}",
       "likes": "Atzīmes “patīk”: {{value}}",
@@ -3488,7 +3504,8 @@
     },
     "localModels": {
       "title": "Ierīces modeļi",
-      "help": "Ierīces modeļi darbojas šajā tālrunī. Jūsu uzvednes un atbildes paliek ierīcē, un šie modeļi nevar izmantot rīkus.",
+      "help": "Ierīces modeļi darbojas šajā tālrunī. Jūsu uzvednes un atbildes paliek ierīcē.",
+      "systemPurpose": "Šīs ierīces sistēmā iebūvētais modelis. Tas darbojas ierīcē.",
       "apple": "Apple Intelligence (ierīcē)",
       "checking": "Pārbauda pieejamību…",
       "ready": "Gatavs lietošanai",
@@ -3793,12 +3810,26 @@
       "startNow": "Sākt bez pārskatīšanas",
       "startNowHint": "Turi nospiestu, lai sāktu bez pārskatīšanas",
       "titleLabel": "Uzdevuma nosaukums",
+      "renameTitle": "Pārdēvēt uzdevumu",
       "notes": "Piezīmes",
-      "notesPlaceholder": "Pievienot piezīmes Markdown formātā",
+      "addNotes": "Pievienot piezīmes",
+      "notesPrompt": "Pievienojiet kontekstu, prasības vai pieņemšanas kritērijus.",
+      "markdownSupported": "Atbalstīts Markdown",
       "sessions": "Saistītās sesijas",
       "noSessions": "Vēl nav sesiju",
+      "untitledLinkedSession": "Saistītā sesija",
+      "sessionNeedsInput": "Sesijai nepieciešama ievade",
+      "sessionRunning": "Sesija darbojas",
+      "sessionFinished": "Sesija pabeigta",
+      "sessionPullRequest": "Sesijas izmaiņu pieprasījums",
+      "sessionPullRequestNumber": "Sesijas PR #{{number}}",
+      "openSessionHint": "Atver sesiju.",
+      "unlinkSessionAction": "Atsaistīt sesiju",
+      "unlinkConfirmTitle": "Atsaistīt {{title}}?",
+      "unlinkConfirmMessage": "Pati sesija netiek dzēsta. Tiek noņemta tikai tās saite uz šo uzdevumu.",
+      "startNewSession": "Sākt jaunu sesiju",
+      "startNewSessionHint": "Turiet nospiestu, lai sāktu jaunu sesiju.",
       "linkSession": "Saistīt sesiju",
-      "unlinkSession": "Atsaistīt {{title}}",
       "linkFailed": "Neizdevās saistīt sesiju ar uzdevumu"
     },
     "linkSession": {

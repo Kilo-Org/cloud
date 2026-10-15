@@ -133,6 +133,7 @@
     "status": "Stare",
     "truncated": "Trunchiat",
     "updated": "Actualizat",
+    "generating": "Se generează…",
     "working": "În lucru",
     "yourOwnRepositories": "Depozitele tale de cod",
     "dismissed": "Ignorată",
@@ -1277,7 +1278,7 @@
         "stoppedTitle": "Configurare oprită",
         "stoppedBody": "Instanța lui {{name}} s-a oprit neașteptat în timpul configurării.",
         "stalledTitle": "Ceva s-a blocat",
-        "stalledBody": "Nu am putut finaliza configurarea lui {{name}}. Încearcă din nou sau trimite un e-mail la hi@kilo.ai dacă acest lucru se întâmplă în continuare.",
+        "stalledBody": "Nu am putut finaliza configurarea lui {{name}}. Încearcă din nou sau trimite un e-mail la {{supportEmail}} dacă acest lucru se întâmplă în continuare.",
         "timeoutTitle": "Durează mai mult decât era de așteptat",
         "timeoutBody": "Configurarea pentru {{name}} durează mai mult decât de obicei (peste {{displayMinutes}} minute).",
         "continueInBackground": "Continuă în fundal",
@@ -1335,7 +1336,7 @@
       "nonCanonicalEarlybirdBody": "Planul tău de acces timpuriu necesită o revizuire manuală înainte de a putea fi folosit pe mobil.",
       "iosTitle": "KiloClaw indisponibil pe iOS",
       "iosBody": "Pentru acest cont, accesul la KiloClaw este gestionat în afara aplicației iOS.",
-      "iosContact": "Ai întrebări? Scrie-ne la hi@kilo.ai.",
+      "iosContact": "Ai întrebări? Scrie-ne la {{supportEmail}}.",
       "quarantinedCta": "Trimite un e-mail echipei noastre",
       "nonCanonicalEarlybirdCta": "Verifică-ți planul pe kilo.ai"
     },
@@ -1571,7 +1572,7 @@
         "recoveryLabel": "Actualizează aplicația GitHub"
       },
       "githubIpAllowList": {
-        "description": "Agentul de revizuire a codului a fost dezactivat deoarece lista de adrese IP permise a acestei organizații GitHub blochează Kilo. Cere ajutor la hi@kilo.ai, apoi activează din nou agentul de revizuire a codului."
+        "description": "Agentul de revizuire a codului a fost dezactivat deoarece lista de adrese IP permise a acestei organizații GitHub blochează Kilo. Cere ajutor la {{supportEmail}}, apoi activează din nou agentul de revizuire a codului."
       },
       "gitlabProjectAccessRequired": {
         "description": "Agentul de revizuire a codului a fost dezactivat deoarece Kilo nu poate crea un token de acces pentru acest proiect GitLab. Acordă acces de responsabil de proiect sau activează tokenurile de acces la proiect, apoi activează din nou agentul de revizuire a codului.",
@@ -1586,7 +1587,7 @@
         "recoveryLabel": "Actualizează setările agentului de revizuire a codului"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Agentul de revizuire a codului a fost dezactivat după ce clonarea depozitului a depășit timpul alocat de trei ori astăzi. Cere ajutor la hi@kilo.ai, apoi activează din nou agentul de revizuire a codului."
+        "description": "Agentul de revizuire a codului a fost dezactivat după ce clonarea depozitului a depășit timpul alocat de trei ori astăzi. Cere ajutor la {{supportEmail}}, apoi activează din nou agentul de revizuire a codului."
       },
       "title": "Agentul de revizuire a codului necesită intervenția ta.",
       "recoveryLabel": "Contactează asistența"
@@ -2666,6 +2667,7 @@
     },
     "contextUsage": {
       "windowUnavailable": "Dimensiunea ferestrei de context nu este disponibilă",
+      "pillLabel": "Context · {{value}}",
       "tapToViewDetails": "Atinge pentru a vedea detaliile contextului.",
       "costSuffix": ", costul {{cost}}",
       "tokensWindowUnavailable": "Context: {{used}} tokenuri, dimensiunea ferestrei nu este disponibilă",
@@ -3363,6 +3365,10 @@
     },
     "backends": {
       "title": "Backenduri de chat",
+      "providersTitle": "Furnizori de chat",
+      "cloud": "În cloud",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Modelele Kilo nu sunt disponibile chiar acum. Verifică conexiunea.",
       "manage": "Gestionează backendurile",
       "defaultKilo": "$t(consent.kilo) (implicit)",
       "kiloHelp": "Backendul integrat folosește contul tău Kilo și nu poate fi editat sau șters.",
@@ -3422,7 +3428,6 @@
     "gguf": {
       "title": "Modele descărcabile",
       "help": "Descarcă un model deschis și rulează-l pe acest telefon cu llama.cpp. Solicitările și răspunsurile tale rămân pe dispozitiv. Modelele sunt mari, așa că folosește Wi-Fi.",
-      "details": "{{size}} · Licență: {{license}}",
       "download": "Descarcă modelul",
       "pause": "Întrerupe descărcarea",
       "resume": "Reia descărcarea",
@@ -3434,6 +3439,8 @@
       "url": "Link de descărcare directă",
       "urlHelp": "Lipește un link HTTPS către un fișier .gguf, cum ar fi un link resolve de pe Hugging Face. Descarcă modele doar din surse în care ai încredere.",
       "downloadUrl": "Descarcă de la link",
+      "advanced": "Avansat",
+      "localPurpose": "Rulează pe acest dispozitiv cu llama.cpp. Solicitările și răspunsurile rămân pe dispozitiv.",
       "deleteTitle": "Ștergi acest model?",
       "deleteMessage": "Ștergi {{name}} de pe acest dispozitiv? Conversațiile care îl folosesc au nevoie de un alt model înainte de a putea continua.",
       "errors": {
@@ -3462,8 +3469,17 @@
         "fits": "Se potrivește",
         "tight": "La limită",
         "tooLarge": "Prea mare",
-        "noStorage": "Spațiu de stocare insuficient"
+        "noStorage": "Spațiu de stocare insuficient",
+        "unknown": "Compatibilitate necunoscută"
       },
+      "recommendationsHelp": "O listă scurtă fixată de această aplicație: un fișier per model, de la un editor care declară o licență. Nimic altceva nu este clasat.",
+      "compatibilityHelp": "Compatibilitatea compară fișierul modelului cu memoria și spațiul liber de stocare ale acestui dispozitiv. Valoarea memoriei este o estimare, nu o măsurătoare.",
+      "text": "Text",
+      "listTextPurpose": "Doar solicitări text.",
+      "listImagePurpose": "Citește imagini, precum și text.",
+      "smallestDownload": "Cea mai mică descărcare: {{size}} · aproximativ {{memory}} de memorie",
+      "fullFileName": "Fișier: {{name}}",
+      "memoryEstimateNote": "Valorile memoriei sunt estimări, nu măsurători.",
       "parameters": "Parametri: {{value}}",
       "downloads": "Descărcări: {{value}}",
       "likes": "Aprecieri: {{value}}",
@@ -3488,7 +3504,8 @@
     },
     "localModels": {
       "title": "Modele pe dispozitiv",
-      "help": "Modelele pe dispozitiv rulează pe acest telefon. Solicitările și răspunsurile tale rămân pe dispozitiv, iar aceste modele nu pot folosi instrumente.",
+      "help": "Modelele pe dispozitiv rulează pe acest telefon. Solicitările și răspunsurile tale rămân pe dispozitiv.",
+      "systemPurpose": "Modelul integrat în sistemul acestui dispozitiv. Rulează pe dispozitiv.",
       "apple": "Apple Intelligence (pe dispozitiv)",
       "checking": "Se verifică disponibilitatea…",
       "ready": "Gata de utilizare",
@@ -3793,12 +3810,26 @@
       "startNow": "Pornește fără revizuire",
       "startNowHint": "Ține apăsat pentru a porni fără revizuire",
       "titleLabel": "Titlul sarcinii",
+      "renameTitle": "Redenumește activitatea",
       "notes": "Notițe",
-      "notesPlaceholder": "Adaugă notițe în Markdown",
+      "addNotes": "Adaugă notițe",
+      "notesPrompt": "Adaugă context, cerințe sau criterii de acceptare.",
+      "markdownSupported": "Markdown acceptat",
       "sessions": "Sesiuni asociate",
       "noSessions": "Încă nu există sesiuni",
+      "untitledLinkedSession": "Sesiune asociată",
+      "sessionNeedsInput": "Sesiunea necesită date",
+      "sessionRunning": "Sesiune în curs",
+      "sessionFinished": "Sesiune finalizată",
+      "sessionPullRequest": "Pull request de sesiune",
+      "sessionPullRequestNumber": "PR de sesiune #{{number}}",
+      "openSessionHint": "Deschide sesiunea.",
+      "unlinkSessionAction": "Dezleagă sesiunea",
+      "unlinkConfirmTitle": "Dezlegi {{title}}?",
+      "unlinkConfirmMessage": "Sesiunea în sine nu este ștearsă. Doar legătura acesteia cu această sarcină este eliminată.",
+      "startNewSession": "Începe o sesiune nouă",
+      "startNewSessionHint": "Ține apăsat pentru a începe o sesiune nouă.",
       "linkSession": "Asociază sesiunea",
-      "unlinkSession": "Dezasociază {{title}}",
       "linkFailed": "Nu s-a putut asocia sesiunea cu sarcina"
     },
     "linkSession": {

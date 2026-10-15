@@ -133,6 +133,7 @@
     "status": "狀態",
     "truncated": "已截斷",
     "updated": "已更新",
+    "generating": "正在產生…",
     "working": "處理中",
     "yourOwnRepositories": "你自己的存放庫",
     "dismissed": "已忽略",
@@ -650,7 +651,7 @@
     "redeployTitle": "重新部署執行個體",
     "accessRequired": {
       "iosBody": "此帳戶的 KiloClaw 存取權限需在 iOS 應用程式外管理。",
-      "iosContact": "有問題嗎？請聯絡 hi@kilo.ai。",
+      "iosContact": "有問題嗎？請聯絡 {{supportEmail}}。",
       "iosTitle": "無法在 iOS 上使用 KiloClaw",
       "multipleCurrentConflictBody": "你的帳戶有多個有效訂閱。為避免重複收費，我們已暫停服務。",
       "multipleCurrentConflictCta": "前往 kilo.ai 繼續操作",
@@ -783,7 +784,7 @@
         "queryErrorBody": "查詢 {{name}} 的設定進度時，連線中斷了。設定可能仍在進行，請再試一次或稍後查看。",
         "queryErrorTitle": "無法確認設定進度",
         "settingUp": "正在設定 {{name}}",
-        "stalledBody": "無法完成 {{name}} 的設定。請再試一次；如果問題持續發生，請寄信至 hi@kilo.ai。",
+        "stalledBody": "無法完成 {{name}} 的設定。請再試一次；如果問題持續發生，請寄信至 {{supportEmail}}。",
         "stalledTitle": "設定卡住了",
         "startingSandbox": "正在啟動沙箱",
         "stoppedBody": "{{name}} 的執行個體在設定過程中意外停止。",
@@ -1040,7 +1041,7 @@
         "recoveryLabel": "更新 GitHub App"
       },
       "githubIpAllowList": {
-        "description": "程式碼審查員已停用，因為此 GitHub 組織使用會封鎖 Kilo 的 IP 允許清單。請聯絡 hi@kilo.ai 尋求協助，然後重新啟用程式碼審查員。"
+        "description": "程式碼審查員已停用，因為此 GitHub 組織使用會封鎖 Kilo 的 IP 允許清單。請聯絡 {{supportEmail}} 尋求協助，然後重新啟用程式碼審查員。"
       },
       "gitlabProjectAccessRequired": {
         "description": "程式碼審查員已停用，因為 Kilo 無法為此專案建立 GitLab 專案存取權杖。請授予維護者權限或啟用專案存取權杖，再重新啟用程式碼審查員。",
@@ -1055,7 +1056,7 @@
         "recoveryLabel": "更新程式碼審查員設定"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "今天複製存放庫時已發生三次逾時，因此程式碼審查員已停用。請聯絡 hi@kilo.ai 尋求協助，再重新啟用程式碼審查員。"
+        "description": "今天複製存放庫時已發生三次逾時，因此程式碼審查員已停用。請聯絡 {{supportEmail}} 尋求協助，再重新啟用程式碼審查員。"
       },
       "title": "程式碼審查助手有問題需要處理。",
       "recoveryLabel": "聯絡客服"
@@ -2118,6 +2119,7 @@
     },
     "contextUsage": {
       "windowUnavailable": "無法取得上下文視窗大小",
+      "pillLabel": "上下文 · {{value}}",
       "tapToViewDetails": "點一下即可檢視上下文詳細資料。",
       "costSuffix": "，費用 {{cost}}",
       "tokensWindowUnavailable": "上下文已用 {{used}} 個詞元，無法取得視窗大小",
@@ -3322,6 +3324,10 @@
     },
     "backends": {
       "title": "聊天後端",
+      "providersTitle": "聊天供應商",
+      "cloud": "雲端",
+      "cloudModel": "模型：{{model}}",
+      "cloudUnavailable": "Kilo 模型目前無法使用。請檢查你的連線。",
       "manage": "管理後端",
       "defaultKilo": "$t(consent.kilo)（預設）",
       "kiloHelp": "內建後端使用你的 Kilo 帳戶，無法編輯或刪除。",
@@ -3381,7 +3387,6 @@
     "gguf": {
       "title": "可下載的模型",
       "help": "下載開放模型，並用 llama.cpp 在這支手機上執行。你的提示和回覆都會保留在裝置上。模型檔案很大，請使用 Wi-Fi。",
-      "details": "{{size}} · 授權條款：{{license}}",
       "download": "下載模型",
       "pause": "暫停下載",
       "resume": "繼續下載",
@@ -3393,6 +3398,8 @@
       "url": "直接下載連結",
       "urlHelp": "貼上 .gguf 檔案的 HTTPS 連結，例如 Hugging Face 的 resolve 連結。請只從你信任的來源下載模型。",
       "downloadUrl": "從連結下載",
+      "advanced": "進階",
+      "localPurpose": "使用 llama.cpp 在此裝置上執行。提示與回覆都留在本裝置上。",
       "deleteTitle": "要刪除這個模型嗎？",
       "deleteMessage": "要從這部裝置刪除 {{name}} 嗎？使用該模型的對話需要改用其他模型才能繼續。",
       "errors": {
@@ -3421,8 +3428,17 @@
         "fits": "適合",
         "tight": "勉強可用",
         "tooLarge": "過大",
-        "noStorage": "儲存空間不足"
+        "noStorage": "儲存空間不足",
+        "unknown": "適配不明"
       },
+      "recommendationsHelp": "本應用程式固定的一份候選清單：每個模型一個檔案，來自聲明了授權的發佈者。其他內容不予排名。",
+      "compatibilityHelp": "適配會比較模型檔案與本裝置的記憶體和可用儲存空間。記憶體數值為估算值，並非實測值。",
+      "text": "文字",
+      "listTextPurpose": "僅文字提示。",
+      "listImagePurpose": "可讀取圖像與文字。",
+      "smallestDownload": "最小下載：{{size}} · 約 {{memory}} 記憶體",
+      "fullFileName": "檔案：{{name}}",
+      "memoryEstimateNote": "記憶體數值為估算值，並非實測值。",
       "parameters": "參數：{{value}}",
       "downloads": "下載次數：{{value}}",
       "likes": "按讚數：{{value}}",
@@ -3447,7 +3463,8 @@
     },
     "localModels": {
       "title": "裝置端模型",
-      "help": "裝置端模型會在這支手機上執行。你的提示和回覆都會保留在裝置上，且這些模型無法使用工具。",
+      "help": "裝置端模型會在這支手機上執行。你的提示和回覆都會保留在裝置上。",
+      "systemPurpose": "此裝置系統內建的模型。它會在裝置上執行。",
       "apple": "Apple Intelligence（裝置端）",
       "checking": "正在檢查可用性⋯",
       "ready": "可以使用",
@@ -3748,12 +3765,26 @@
       "startNow": "不經審查直接開始",
       "startNowHint": "長按即可不經審查直接開始",
       "titleLabel": "待辦事項標題",
+      "renameTitle": "重新命名任務",
       "notes": "備註",
-      "notesPlaceholder": "使用 Markdown 新增備註",
+      "addNotes": "新增備註",
+      "notesPrompt": "新增背景、需求或驗收標準。",
+      "markdownSupported": "支援 Markdown",
       "sessions": "已連結的工作階段",
       "noSessions": "尚無工作階段",
+      "untitledLinkedSession": "已連結的工作階段",
+      "sessionNeedsInput": "工作階段需要輸入",
+      "sessionRunning": "工作階段執行中",
+      "sessionFinished": "工作階段已完成",
+      "sessionPullRequest": "工作階段 PR",
+      "sessionPullRequestNumber": "工作階段 PR #{{number}}",
+      "openSessionHint": "開啟該工作階段。",
+      "unlinkSessionAction": "取消連結工作階段",
+      "unlinkConfirmTitle": "要取消連結 {{title}} 嗎？",
+      "unlinkConfirmMessage": "工作階段本身不會被刪除，只會移除它與此待辦事項的連結。",
+      "startNewSession": "開始新的工作階段",
+      "startNewSessionHint": "長按以開始新的工作階段。",
       "linkSession": "連結工作階段",
-      "unlinkSession": "取消連結 {{title}}",
       "linkFailed": "無法將工作階段連結至待辦事項"
     },
     "linkSession": {

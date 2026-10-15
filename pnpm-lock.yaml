@@ -2126,6 +2126,9 @@ importers:
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../session-ingest-contracts
+      '@kilocode/usage-contracts':
+        specifier: workspace:*
+        version: link:../usage-contracts
       aws4fetch:
         specifier: 'catalog:'
         version: 1.0.20
@@ -2286,6 +2289,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/usage-contracts':
+        specifier: workspace:*
+        version: link:../../packages/usage-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

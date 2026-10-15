@@ -16,10 +16,12 @@ import { createSessionWorktreeHandlers } from './router/handlers/session-worktre
 import { deleteWorktree } from './router/handlers/worktree-deletion.js';
 import { createSessionWorktreeChangesHandlers } from './router/handlers/session-worktree-changes.js';
 import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
+import { getPreviewOptions } from './router/handlers/preview-options.js';
 
 export const appRouter = router({
   deleteWorktree,
   getSandboxSelectionOptions,
+  getPreviewOptions,
   ...createSessionManagementHandlers(),
   ...createSessionPrepareHandlers(),
   ...createSessionExecutionV2Handlers(),

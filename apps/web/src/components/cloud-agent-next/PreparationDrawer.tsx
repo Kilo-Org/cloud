@@ -18,18 +18,14 @@ import type {
 import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import { cn } from '@/lib/utils';
 import { useManager } from './CloudAgentProvider';
-import {
-  commandsForPhase,
-  formatAttemptDuration,
-  phaseStatus,
-  phaseStatusLabel,
-} from './preparation-phases';
+import { commandsForPhase, phaseStatus, phaseStatusLabel } from './preparation-phases';
 import {
   phaseDisplayText,
   preparationSummaryLine,
   summarizePreparationAttempt,
 } from './preparation-summary';
 import { useStickToBottom } from './hooks/useStickToBottom';
+import { PreparationDuration } from './PreparationDuration';
 
 type PreparationDrawerProps = {
   attemptId: string | null;
@@ -133,8 +129,6 @@ function PhaseRow({
   status: PreparationStepStatus;
   children?: React.ReactNode;
 }) {
-  const duration = formatAttemptDuration(step);
-
   return (
     <li className="border-b border-border py-2 last:border-b-0">
       <div className="flex min-h-6 items-center gap-2">
@@ -158,9 +152,10 @@ function PhaseRow({
           {phaseDisplayText(step)}
         </span>
         <span className="sr-only">{phaseStatusLabel(status)}</span>
-        {duration && (
-          <span className="ml-auto shrink-0 text-foreground-subtle tabular-nums">{duration}</span>
-        )}
+        <PreparationDuration
+          step={step}
+          className="ml-auto shrink-0 text-foreground-subtle tabular-nums"
+        />
       </div>
       {step.safeError && <p className="ml-7 mt-0.5 text-status-destructive">{step.safeError}</p>}
       {children && <div className="ml-7 mt-2">{children}</div>}
@@ -225,11 +220,12 @@ function CommandCard({
         </code>
         <span
           className={cn(
-            'ml-auto shrink-0 text-muted-foreground tabular-nums',
+            'ml-auto flex shrink-0 items-center gap-2 text-muted-foreground tabular-nums',
             step.status === 'failed' && 'text-status-destructive'
           )}
         >
-          {commandStatus(step)}
+          <span>{commandStatus(step)}</span>
+          <PreparationDuration step={step} />
         </span>
       </div>
       {error && (

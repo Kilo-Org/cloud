@@ -12,7 +12,7 @@ import {
   type WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap.js';
 import type { PreparationStepKind } from '../../src/shared/protocol.js';
-import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
+import { writeCloudAgentRulesFile } from './cloud-agent-rules-file.js';
 import {
   createSafeProcessDiagnostic,
   git,
@@ -682,12 +682,9 @@ async function writeSessionAuthFile(request: WrapperSessionReadyRequest): Promis
 }
 
 async function writeCloudAgentRules(request: WrapperSessionReadyRequest): Promise<void> {
-  const rulesDir = path.join(request.workspace.sessionHome, '.kilocode/rules');
-  await fs.mkdir(rulesDir, { recursive: true });
-  await fs.writeFile(
-    path.join(rulesDir, 'cloud-agent.md'),
-    buildCloudAgentRules(process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS)
-  );
+  await writeCloudAgentRulesFile(request.workspace.sessionHome, {
+    bashDefaultTimeoutMs: process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
+  });
 }
 
 async function bootstrapEmptyKiloSession(

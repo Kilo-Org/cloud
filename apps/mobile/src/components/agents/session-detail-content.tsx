@@ -107,6 +107,7 @@ import {
   countInFlightMessages,
   lastVisibleMessageFailure,
   resolveRetryPrompt,
+  restoreCanceledQueuedMessages,
   retryFailedMessage,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
@@ -1037,24 +1038,7 @@ export function SessionDetailContent({
     if (canceledQueuedMessages.size === 0) {
       return base;
     }
-    // Re-insert the canceled-but-kept rows the SDK already removed, in their
-    // original id-sorted position (the SDK orders messages by id).
-    const kept = [...canceledQueuedMessages.values()].filter(
-      m => !base.some(b => b.info.id === m.info.id)
-    );
-    if (kept.length === 0) {
-      return base;
-    }
-    // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; the spread already copies so nothing shared is mutated
-    return [...base, ...kept].sort((a, b) => {
-      if (a.info.id < b.info.id) {
-        return -1;
-      }
-      if (a.info.id > b.info.id) {
-        return 1;
-      }
-      return 0;
-    });
+    return restoreCanceledQueuedMessages(base, canceledQueuedMessages);
   }, [messages, droppedQueuedIds, supersededMessageIds, canceledQueuedMessages]);
 
   // Visibility-only strip for the "Hide thinking details" option. Applied once

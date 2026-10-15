@@ -20,6 +20,8 @@ import { toast } from 'sonner';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
+import { PoolModalityWarning } from './PoolModalityWarning';
+import { computePoolModalityCoverage } from '@/lib/auto-routing-pool-modality';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -817,6 +819,20 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     [modelsQuery.data?.data, draftPool]
   );
 
+  const catalogModels = modelsQuery.error ? undefined : modelsQuery.data?.data;
+  const modalityCoverage = useMemo(
+    () =>
+      computePoolModalityCoverage({
+        poolModelIds: (draftPool ?? []).map(entry => entry.model),
+        catalog:
+          catalogModels?.map(model => ({
+            id: model.id,
+            inputModalities: model.architecture?.input_modalities,
+          })) ?? null,
+      }),
+    [draftPool, catalogModels]
+  );
+
   const selectedAddModel = eligibleModels.find(model => model.id === addModelId);
   const addModelVariants = selectedAddModel?.variants ?? [];
 
@@ -1153,6 +1169,8 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
               })}
             </ul>
           )}
+
+          <PoolModalityWarning coverage={modalityCoverage} />
 
           {poolSupported && showAddFlow && editableChrome.showAddModel ? (
             <div ref={addModelSectionRef} className="bg-muted/20 space-y-3 rounded-md border p-3">

@@ -133,6 +133,7 @@
     "status": "Stat",
     "truncated": "Imqassar",
     "updated": "Aġġornat",
+    "generating": "Qed jiġġenera…",
     "working": "Fix-xogħol",
     "yourOwnRepositories": "Ir-repożitorji tiegħek stess",
     "dismissed": "Imwarrba",
@@ -1313,7 +1314,7 @@
         "stoppedTitle": "It-tħejjija waqfet",
         "stoppedBody": "L-istanza ta' {{name}} waqfet bla mistenni waqt it-tħejjija.",
         "stalledTitle": "Xi ħaġa weħlet",
-        "stalledBody": "Ma stajniex inlestu t-tħejjija ta' {{name}}. Erġa' pprova, jew ibgħat email lil hi@kilo.ai jekk dan ikompli jiġri.",
+        "stalledBody": "Ma stajniex inlestu t-tħejjija ta' {{name}}. Erġa' pprova, jew ibgħat email lil {{supportEmail}} jekk dan ikompli jiġri.",
         "timeoutTitle": "Qed jieħu aktar milli mistenni",
         "timeoutBody": "It-tħejjija ta' {{name}} qed tieħu aktar mis-soltu (aktar minn {{displayMinutes}} minuta).",
         "continueInBackground": "Kompli fl-isfond",
@@ -1371,7 +1372,7 @@
       "nonCanonicalEarlybirdBody": "Il-pjan ta' aċċess bikri tiegħek jeħtieġ reviżjoni manwali qabel ma jintuża fuq il-mowbajl.",
       "iosTitle": "KiloClaw mhux disponibbli fuq iOS",
       "iosBody": "Għal dan il-kont, l-aċċess għal KiloClaw jiġi mmaniġġjat barra mill-app ta' iOS.",
-      "iosContact": "Mistoqsijiet? Ikkuntattja hi@kilo.ai.",
+      "iosContact": "Mistoqsijiet? Ikkuntattja {{supportEmail}}.",
       "quarantinedCta": "Ibgħat email lit-tim tagħna",
       "nonCanonicalEarlybirdCta": "Irrevedi l-pjan tiegħek fuq kilo.ai"
     },
@@ -1609,7 +1610,7 @@
         "recoveryLabel": "Aġġorna l-app ta' GitHub"
       },
       "githubIpAllowList": {
-        "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex din l-organizzazzjoni ta' GitHub tuża lista ta' indirizzi IP permessi li timblokka lil Kilo. Ikkuntattja hi@kilo.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
+        "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex din l-organizzazzjoni ta' GitHub tuża lista ta' indirizzi IP permessi li timblokka lil Kilo. Ikkuntattja {{supportEmail}} għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
       },
       "gitlabProjectAccessRequired": {
         "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex Kilo ma jistax joħloq token ta' aċċess għall-proġett fuq GitLab. Agħti aċċess ta' manutentur jew attiva t-tokens ta' aċċess għall-proġett, imbagħad erġa' attiva r-reviżur tal-kodiċi.",
@@ -1624,7 +1625,7 @@
         "recoveryLabel": "Aġġorna l-issettjar tar-reviżur tal-kodiċi"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Ir-reviżur tal-kodiċi ġie diżattivat wara li l-klonazzjoni tar-repożitorju qabżet il-ħin permess tliet darbiet illum. Ikkuntattja hi@kilo.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
+        "description": "Ir-reviżur tal-kodiċi ġie diżattivat wara li l-klonazzjoni tar-repożitorju qabżet il-ħin permess tliet darbiet illum. Ikkuntattja {{supportEmail}} għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
       },
       "title": "Ir-reviżur tal-kodiċi jeħtieġ l-attenzjoni tiegħek.",
       "recoveryLabel": "Ikkuntattja l-appoġġ"
@@ -2738,6 +2739,7 @@
     },
     "contextUsage": {
       "windowUnavailable": "Id-daqs tat-tieqa tal-kuntest mhux disponibbli",
+      "pillLabel": "Kuntest · {{value}}",
       "tapToViewDetails": "Tektek biex tara d-dettalji tal-kuntest.",
       "costSuffix": ", spiża {{cost}}",
       "tokensWindowUnavailable": "Kuntest: {{used}} unitajiet tat-test, daqs tat-tieqa mhux disponibbli",
@@ -3445,6 +3447,10 @@
     },
     "backends": {
       "title": "Servizzi taċ-chat",
+      "providersTitle": "Fornituri tal-chat",
+      "cloud": "Fil-cloud",
+      "cloudModel": "Mudell: {{model}}",
+      "cloudUnavailable": "Il-mudelli Kilo mhumiex disponibbli bħalissa. Iċċekkja l-konnessjoni tiegħek.",
       "manage": "Immaniġġja s-servizzi",
       "defaultKilo": "$t(consent.kilo) (predefinit)",
       "kiloHelp": "Is-servizz integrat juża l-kont Kilo tiegħek u ma jistax jiġi editjat jew imħassar.",
@@ -3504,7 +3510,6 @@
     "gguf": {
       "title": "Mudelli li jistgħu jitniżżlu",
       "help": "Niżżel mudell miftuħ u ħaddmu fuq dan it-telefon permezz ta' llama.cpp. Il-messaġġi u t-tweġibiet tiegħek jibqgħu fuq l-apparat. Il-mudelli huma kbar, għalhekk uża l-Wi-Fi.",
-      "details": "{{size}} · Liċenzja: {{license}}",
       "download": "Niżżel il-mudell",
       "pause": "Ippawża t-tniżżil",
       "resume": "Kompli t-tniżżil",
@@ -3516,6 +3521,8 @@
       "url": "Link dirett għat-tniżżil",
       "urlHelp": "Ippejstja link HTTPS għal fajl .gguf, bħal link resolve ta' Hugging Face. Niżżel mudelli biss minn sorsi li tafda.",
       "downloadUrl": "Niżżel mil-link",
+      "advanced": "Avvanzat",
+      "localPurpose": "Jaħdem fuq dan l-apparat b'llama.cpp. Il-prompts u t-tweġibiet jibqgħu fuq l-apparat.",
       "deleteTitle": "Ħassar dan il-mudell?",
       "deleteMessage": "Ħassar {{name}} minn dan l-apparat? Il-chats li jużawh għandhom bżonn mudell ieħor qabel ma jkunu jistgħu jkomplu.",
       "errors": {
@@ -3544,8 +3551,17 @@
         "fits": "Jaqbel",
         "tight": "Bilkemm jaqbel",
         "tooLarge": "Kbir wisq",
-        "noStorage": "Mhemmx biżżejjed spazju"
+        "noStorage": "Mhemmx biżżejjed spazju",
+        "unknown": "Adattabilità mhux magħrufa"
       },
+      "recommendationsHelp": "Lista qasira li tiffissa din l-app: fajl wieħed għal kull mudell, minn pubblikatur li jiddikjara liċenza. Xejn ieħor mhu kklassifikat.",
+      "compatibilityHelp": "L-adattabilità tqabbel il-fajl tal-mudell mal-memorja u l-ħażna ħielsa ta' dan l-apparat. Il-figura tal-memorja hija stima, mhux kejl.",
+      "text": "Test",
+      "listTextPurpose": "Prompts tat-test biss.",
+      "listImagePurpose": "Jaqra stampi kif ukoll test.",
+      "smallestDownload": "L-iżgħar tniżżil: {{size}} · madwar {{memory}} ta' memorja",
+      "fullFileName": "Fajl: {{name}}",
+      "memoryEstimateNote": "Il-figuri tal-memorja huma stimi, mhux kejl.",
       "parameters": "Parametri: {{value}}",
       "downloads": "Tniżżil: {{value}}",
       "likes": "Likes: {{value}}",
@@ -3570,7 +3586,8 @@
     },
     "localModels": {
       "title": "Mudelli fuq l-apparat",
-      "help": "Il-mudelli fuq l-apparat jaħdmu fuq dan il-mowbajl. Il-messaġġi u t-tweġibiet tiegħek jibqgħu fuq l-apparat, u dawn il-mudelli ma jistgħux jużaw għodod.",
+      "help": "Il-mudelli fuq l-apparat jaħdmu fuq dan il-mowbajl. Il-messaġġi u t-tweġibiet tiegħek jibqgħu fuq l-apparat.",
+      "systemPurpose": "Il-mudell mibni fis-sistema ta' dan l-apparat. Jaħdem fuq l-apparat.",
       "apple": "Apple Intelligence (fuq l-apparat)",
       "checking": "Qed tiġi ċċekkjata d-disponibbiltà…",
       "ready": "Lest għall-użu",
@@ -3883,12 +3900,26 @@
       "startNow": "Ibda mingħajr reviżjoni",
       "startNowHint": "Agħfas fit-tul biex tibda mingħajr reviżjoni",
       "titleLabel": "Titlu tal-kompitu",
+      "renameTitle": "Semmi mill-ġdid il-kompitu",
       "notes": "Noti",
-      "notesPlaceholder": "Żid noti f'Markdown",
+      "addNotes": "Żid noti",
+      "notesPrompt": "Żid kuntest, rekwiżiti, jew kriterji ta' aċċettazzjoni.",
+      "markdownSupported": "Markdown appoġġjat",
       "sessions": "Sessjonijiet marbuta",
       "noSessions": "S'issa m'hemmx sessjonijiet",
+      "untitledLinkedSession": "Sessjoni marbuta",
+      "sessionNeedsInput": "Is-sessjoni teħtieġ input",
+      "sessionRunning": "Is-sessjoni għaddejja",
+      "sessionFinished": "Is-sessjoni spiċċat",
+      "sessionPullRequest": "Pull request tas-sessjoni",
+      "sessionPullRequestNumber": "PR tas-sessjoni #{{number}}",
+      "openSessionHint": "Jiftaħ is-sessjoni.",
+      "unlinkSessionAction": "Żarma s-sessjoni",
+      "unlinkConfirmTitle": "Żarma {{title}}?",
+      "unlinkConfirmMessage": "Is-sessjoni nnifisha mhix imħassra. Jiġi mneħħi biss il-link tagħha ma' dan ix-xogħol.",
+      "startNewSession": "Ibda sessjoni ġdida",
+      "startNewSessionHint": "Agħfas fit-tul biex tibda sessjoni ġdida.",
       "linkSession": "Qabbad sessjoni",
-      "unlinkSession": "Aqla' {{title}}",
       "linkFailed": "Ma setgħetx tiġi marbuta s-sessjoni mal-kompitu"
     },
     "linkSession": {

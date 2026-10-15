@@ -89,7 +89,7 @@ describe('a Hugging Face model detail', () => {
     expect(detail.quants.map(quant => quant.label)).toEqual(['Q4_K_M', 'Q8_0']);
     expect(detail.quants[0]?.model).toEqual({
       fileId: `hf-${'2'.repeat(16)}`,
-      name: 'Tiny-Chat (Q4_K_M)',
+      name: 'Tiny Chat (Q4_K_M)',
       url: `https://huggingface.co/acme/Tiny-Chat-GGUF/resolve/${REVISION}/Tiny-Chat-Q4_K_M.gguf`,
       sizeBytes: 500,
       sha256: sha('2'),

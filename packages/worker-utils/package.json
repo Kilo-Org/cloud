@@ -20,6 +20,7 @@
     "./kilo-auth-middleware": "./src/kilo-auth-middleware.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./sandbox-allocation": "./src/sandbox-allocation.ts",
+    "./egress-allowlist": "./src/egress-allowlist.ts",
     "./sha256": "./src/sha256.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",
@@ -51,7 +52,8 @@
     "./direct-byok-model": "./src/direct-byok-model.ts",
     "./user-id-encoding": "./src/user-id-encoding.ts",
     "./github-authorization": "./src/github-authorization.ts",
-    "./bounded-stream-reader": "./src/bounded-stream-reader.ts"
+    "./bounded-stream-reader": "./src/bounded-stream-reader.ts",
+    "./usage-writer-client": "./src/usage-writer-client.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -63,6 +65,7 @@
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
+    "@kilocode/usage-contracts": "workspace:*",
     "aws4fetch": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

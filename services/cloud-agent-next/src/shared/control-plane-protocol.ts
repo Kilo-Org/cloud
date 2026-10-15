@@ -9,6 +9,7 @@ import type {
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
+import { CloudAgentRunContainerSchema } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { gitAuthorSchema, sessionAttachMcpServersSchema } from './sandbox-control-protocol.js';
 import {
   sessionTerminalClosePayloadSchema,
@@ -550,13 +551,22 @@ const controlPlaneRoutePreparingSchema = z
     attemptId: z.string().min(1).max(128),
     step: controlPlanePreparationStepSchema.optional(),
     detail: controlPlanePreparationDetailSchema.optional(),
+    container: CloudAgentRunContainerSchema.optional(),
   })
   .strict();
 const controlPlaneRouteReadySchema = z
-  .object({ state: z.literal('ready'), attemptId: z.string().min(1).max(128) })
+  .object({
+    state: z.literal('ready'),
+    attemptId: z.string().min(1).max(128),
+    container: CloudAgentRunContainerSchema.optional(),
+  })
   .strict();
 const controlPlaneRouteReconnectingSchema = z
-  .object({ state: z.literal('reconnecting'), attemptId: z.string().min(1).max(128) })
+  .object({
+    state: z.literal('reconnecting'),
+    attemptId: z.string().min(1).max(128),
+    container: CloudAgentRunContainerSchema.optional(),
+  })
   .strict();
 const controlPlaneRouteFailedSchema = z
   .object({
@@ -564,6 +574,7 @@ const controlPlaneRouteFailedSchema = z
     attemptId: z.string().min(1).max(128),
     reason: controlPlaneFailureReasonSchema,
     subtype: controlPlaneWorkspaceFailureSubtypeSchema.optional().catch(undefined),
+    container: CloudAgentRunContainerSchema.optional(),
   })
   .strict();
 const controlPlaneRouteLostSchema = z
@@ -571,6 +582,7 @@ const controlPlaneRouteLostSchema = z
     state: z.literal('lost'),
     attemptId: z.string().min(1).max(128),
     reason: controlPlaneFailureReasonSchema,
+    container: CloudAgentRunContainerSchema.optional(),
   })
   .strict();
 
@@ -627,6 +639,7 @@ export const controlPlaneDeliverPayloadSchema = z
   .object({
     sessionId: z.string().min(1),
     messages: z.array(controlPlanePromptPayloadSchema).min(1),
+    allocationId: z.string().min(1).max(128).optional(),
   })
   .strict();
 

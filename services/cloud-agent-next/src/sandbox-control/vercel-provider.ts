@@ -31,6 +31,14 @@ const providerRefSchema = z
   .object({
     sandboxName: z.string().min(1),
     sessionId: z.string().min(1),
+    metadata: z
+      .object({
+        region: z.string().min(1).max(128),
+        sourceSnapshotId: z.string().min(1).max(128).optional(),
+        instanceType: z.enum(['small', 'large']).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -63,6 +71,30 @@ export type VercelControlRestClient = {
 
 export function encodeVercelProviderRef(ref: VercelProviderRef): string {
   return JSON.stringify(ref);
+}
+
+function encodeVercelSessionProviderRef(
+  runtime: VercelProviderRef,
+  session: VercelSandboxSession
+): string {
+  const instanceType =
+    session.vcpus === 2 && session.memory === 4096
+      ? 'small'
+      : session.vcpus === 4 && session.memory === 8192
+        ? 'large'
+        : undefined;
+  const metadata = providerRefSchema.shape.metadata.safeParse({
+    region: session.region,
+    ...(instanceType === undefined ? {} : { instanceType }),
+    ...(session.sourceSnapshotId === undefined
+      ? {}
+      : { sourceSnapshotId: session.sourceSnapshotId }),
+  });
+  return encodeVercelProviderRef({
+    sandboxName: runtime.sandboxName,
+    sessionId: runtime.sessionId,
+    ...(metadata.success ? { metadata: metadata.data } : {}),
+  });
 }
 
 /**
@@ -164,6 +196,22 @@ export function createVercelProviderAdapter(deps: {
 
   return {
     ensureBillingAdmission,
+    describeRuntime(ref) {
+      const parsed = decodeOwnedProviderRef(ref);
+      if (parsed === null) return undefined;
+      return {
+        provider: 'vercel',
+        sandboxId: parsed.sandboxName,
+        instanceId: parsed.sessionId,
+        ...(parsed.metadata?.instanceType === undefined
+          ? {}
+          : { instanceType: parsed.metadata.instanceType }),
+        ...(parsed.metadata === undefined ? {} : { region: parsed.metadata.region }),
+        snapshotId: parsed.metadata?.sourceSnapshotId ?? config.snapshotId,
+        runtimeBuildId: config.runtimeBuildId,
+        startSource: 'snapshot',
+      };
+    },
     async create(intent: ProviderCreateIntent) {
       // Read the authoritative grants and build the policy before the REST
       // create: the sandbox must never open with an empty or stale policy, so a
@@ -189,7 +237,7 @@ export function createVercelProviderAdapter(deps: {
           }
           throw error;
         });
-      const providerRef = encodeVercelProviderRef(created.runtime);
+      const providerRef = encodeVercelSessionProviderRef(created.runtime, created.session);
       await recordBillingLifetime(providerRef, created.session);
       return { providerRef };
     },
@@ -232,7 +280,7 @@ export function createVercelProviderAdapter(deps: {
             status: now() < intent.createdAt + DEADLINE_MS.createSettle ? 'unknown' : 'terminal',
           };
         }
-        const providerRef = encodeVercelProviderRef(inspected.runtime);
+        const providerRef = encodeVercelSessionProviderRef(inspected.runtime, inspected.session);
         await recordBillingLifetime(providerRef, inspected.session);
         return {
           status: classifyVercelSessionStatus(inspected.session.status),

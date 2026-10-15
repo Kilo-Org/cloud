@@ -133,6 +133,7 @@
     "status": "Katayuan",
     "truncated": "Pinaikli",
     "updated": "Na-update",
+    "generating": "Ginagawa…",
     "working": "Nagtatrabaho",
     "yourOwnRepositories": "Mga sarili mong repositoryo",
     "dismissed": "Binalewala",
@@ -1259,7 +1260,7 @@
         "stoppedTitle": "Huminto ang pag-setup",
         "stoppedBody": "Biglang huminto ang instance ni {{name}} habang sine-set up.",
         "stalledTitle": "May hindi umuusad",
-        "stalledBody": "Hindi namin natapos ang pag-setup kay {{name}}. Subukan muli, o mag-email sa hi@kilo.ai kung paulit-ulit itong nangyayari.",
+        "stalledBody": "Hindi namin natapos ang pag-setup kay {{name}}. Subukan muli, o mag-email sa {{supportEmail}} kung paulit-ulit itong nangyayari.",
         "timeoutTitle": "Mas tumatagal kaysa inaasahan",
         "timeoutBody": "Mas matagal kaysa karaniwan ang pag-setup kay {{name}} (mahigit {{displayMinutes}} minuto na).",
         "continueInBackground": "Magpatuloy sa background",
@@ -1317,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Kailangang suriin ng tao ang plano mo para sa maagang pag-access bago ito magamit sa mobile.",
       "iosTitle": "Hindi magagamit ang KiloClaw sa iOS",
       "iosBody": "Pinamamahalaan ang access sa KiloClaw sa labas ng iOS app para sa account na ito.",
-      "iosContact": "May mga tanong? Makipag-ugnayan sa hi@kilo.ai.",
+      "iosContact": "May mga tanong? Makipag-ugnayan sa {{supportEmail}}.",
       "quarantinedCta": "Mag-email sa aming team",
       "nonCanonicalEarlybirdCta": "Suriin ang iyong plano sa kilo.ai"
     },
@@ -1552,7 +1553,7 @@
         "recoveryLabel": "I-update ang GitHub App"
       },
       "githubIpAllowList": {
-        "description": "Hindi pinagana ang Code Reviewer dahil hinaharangan ang Kilo ng listahan ng mga pinapayagang IP ng organisasyong ito sa GitHub. Makipag-ugnayan sa hi@kilo.ai para sa tulong, saka paganahin muli ang Code Reviewer."
+        "description": "Hindi pinagana ang Code Reviewer dahil hinaharangan ang Kilo ng listahan ng mga pinapayagang IP ng organisasyong ito sa GitHub. Makipag-ugnayan sa {{supportEmail}} para sa tulong, saka paganahin muli ang Code Reviewer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Hindi pinagana ang Code Reviewer dahil hindi makagawa ang Kilo ng token para sa access sa proyektong ito sa GitLab. Magbigay ng access bilang tagapangalaga o payagan ang mga token para sa access sa proyekto, saka paganahin muli ang Code Reviewer.",
@@ -1567,7 +1568,7 @@
         "recoveryLabel": "I-update ang mga setting ng Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Hindi pinagana ang Code Reviewer dahil tatlong beses na lumampas sa takdang oras ang pag-clone ng repository ngayong araw. Makipag-ugnayan sa hi@kilo.ai para sa tulong, saka paganahin muli ang Code Reviewer."
+        "description": "Hindi pinagana ang Code Reviewer dahil tatlong beses na lumampas sa takdang oras ang pag-clone ng repository ngayong araw. Makipag-ugnayan sa {{supportEmail}} para sa tulong, saka paganahin muli ang Code Reviewer."
       },
       "title": "Kailangang asikasuhin ang tagasuri ng code.",
       "recoveryLabel": "Makipag-ugnayan sa suporta"
@@ -2630,6 +2631,7 @@
     },
     "contextUsage": {
       "windowUnavailable": "Hindi makuha ang kapasidad ng konteksto",
+      "pillLabel": "Konteksto · {{value}}",
       "tapToViewDetails": "I-tap para tingnan ang mga detalye ng konteksto.",
       "costSuffix": ", gastos {{cost}}",
       "tokensWindowUnavailable": "Konteksto: {{used}} na token, hindi makuha ang kapasidad",
@@ -3322,6 +3324,10 @@
     },
     "backends": {
       "title": "Mga sistema ng chat",
+      "providersTitle": "Mga provider ng chat",
+      "cloud": "Sa cloud",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Hindi available ang mga Kilo model ngayon. Suriin ang iyong koneksyon.",
       "manage": "Pamahalaan ang mga sistema",
       "defaultKilo": "$t(consent.kilo) (paunang pinili)",
       "kiloHelp": "Ginagamit ng nakapaloob na sistema ang iyong Kilo account at hindi ito maaaring i-edit o burahin.",
@@ -3381,7 +3387,6 @@
     "gguf": {
       "title": "Mga modelong maaaring i-download",
       "help": "Mag-download ng open na modelo at patakbuhin ito sa teleponong ito gamit ang llama.cpp. Mananatili sa device ang iyong mga prompt at sagot. Malalaki ang mga modelo, kaya gumamit ng Wi-Fi.",
-      "details": "{{size}} · Lisensya: {{license}}",
       "download": "I-download ang modelo",
       "pause": "I-pause ang pag-download",
       "resume": "Ituloy ang pag-download",
@@ -3393,6 +3398,8 @@
       "url": "Direktang link ng pag-download",
       "urlHelp": "I-paste ang HTTPS link sa isang .gguf file, tulad ng Hugging Face resolve link. Mag-download lamang ng mga modelo mula sa mga source na pinagkakatiwalaan mo.",
       "downloadUrl": "Mag-download mula sa link",
+      "advanced": "Advanced",
+      "localPurpose": "Tumatakbo sa device na ito gamit ang llama.cpp. Nananatili sa device ang mga prompt at sagot.",
       "deleteTitle": "Burahin ang modelong ito?",
       "deleteMessage": "Burahin ang {{name}} sa device na ito? Ang mga chat na gumagamit nito ay mangangailangan ng ibang modelo bago makapagpatuloy.",
       "errors": {
@@ -3421,8 +3428,17 @@
         "fits": "Kasya",
         "tight": "Halos kasya",
         "tooLarge": "Masyadong malaki",
-        "noStorage": "Kulang ang storage"
+        "noStorage": "Kulang ang storage",
+        "unknown": "Hindi alam ang pagkaangkop"
       },
+      "recommendationsHelp": "Isang shortlist na naka-pin sa app na ito: isang file bawat model, mula sa publisher na nagsasaad ng lisensya. Wala nang iba pang niraranggo.",
+      "compatibilityHelp": "Inihahambing ng pagkaangkop ang file ng model sa memory at libreng storage ng device na ito. Ang bilang ng memory ay tantya, hindi sukat.",
+      "text": "Text",
+      "listTextPurpose": "Mga prompt na text lang.",
+      "listImagePurpose": "Nagbabasa ng mga larawan at text.",
+      "smallestDownload": "Pinakamaliit na download: {{size}} · mga {{memory}} ng memory",
+      "fullFileName": "File: {{name}}",
+      "memoryEstimateNote": "Ang mga bilang ng memory ay tantya, hindi sukat.",
       "parameters": "Mga parameter: {{value}}",
       "downloads": "Mga download: {{value}}",
       "likes": "Mga like: {{value}}",
@@ -3447,7 +3463,8 @@
     },
     "localModels": {
       "title": "Mga modelong nasa device",
-      "help": "Tumatakbo sa teleponong ito ang mga modelong nasa device. Mananatili sa device ang iyong mga prompt at sagot, at hindi makakagamit ng mga tool ang mga modelong ito.",
+      "help": "Tumatakbo sa teleponong ito ang mga modelong nasa device. Mananatili sa device ang iyong mga prompt at sagot.",
+      "systemPurpose": "Ang modelong naka-built in sa system ng device na ito. Tumatakbo ito sa device.",
       "apple": "Apple Intelligence (sa device)",
       "checking": "Tinitingnan kung available…",
       "ready": "Handa nang gamitin",
@@ -3748,12 +3765,26 @@
       "startNow": "Simulan nang walang review",
       "startNowHint": "Pindutin nang matagal para simulan nang walang review",
       "titleLabel": "Pamagat ng gagawin",
+      "renameTitle": "Palitan ang pangalan ng gawain",
       "notes": "Mga tala",
-      "notesPlaceholder": "Magdagdag ng mga tala sa Markdown",
+      "addNotes": "Magdagdag ng mga tala",
+      "notesPrompt": "Magdagdag ng konteksto, mga kinakailangan, o pamantayan sa pagtanggap.",
+      "markdownSupported": "Sinusuportahan ang Markdown",
       "sessions": "Mga naka-link na sesyon",
       "noSessions": "Wala pang sesyon",
+      "untitledLinkedSession": "Naka-link na session",
+      "sessionNeedsInput": "Kailangan ng input ang session",
+      "sessionRunning": "Tumatakbo ang session",
+      "sessionFinished": "Tapos na ang session",
+      "sessionPullRequest": "PR ng session",
+      "sessionPullRequestNumber": "PR ng session #{{number}}",
+      "openSessionHint": "Binubuksan ang session.",
+      "unlinkSessionAction": "I-unlink ang session",
+      "unlinkConfirmTitle": "I-unlink ang {{title}}?",
+      "unlinkConfirmMessage": "Hindi binubura ang session mismo. Ang link nito sa gawaing ito lang ang tinatanggal.",
+      "startNewSession": "Magsimula ng bagong session",
+      "startNewSessionHint": "Mahabang pindot para magsimula ng bagong session.",
       "linkSession": "I-link ang sesyon",
-      "unlinkSession": "Alisin ang link ng {{title}}",
       "linkFailed": "Hindi na-link ang sesyon sa gagawin"
     },
     "linkSession": {

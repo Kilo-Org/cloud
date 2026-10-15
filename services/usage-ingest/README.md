@@ -38,7 +38,7 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 
 ## Usage writer client
 
-`src/usage-writer-client.ts` provides an HTTP helper for the existing Frankfurt
+`@kilocode/worker-utils/usage-writer-client` provides an HTTP helper for the existing Frankfurt
 `/api/internal/usage/record` endpoint. It is not called by the deployed consumer
 yet. Callers supply the full endpoint URL, its `x-internal-api-key` secret, and
 optionally a Vercel automation protection-bypass secret for staging.

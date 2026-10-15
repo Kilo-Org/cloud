@@ -4304,6 +4304,114 @@ describe('createSessionManager', () => {
     });
   });
 
+  describe('causal transcript ordering', () => {
+    it('repairs reply-before-parent replay and canonical updates without changing stored IDs', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      const storage = latestStorage;
+      const reply = createStoredAssistantMessage('a-reply', 'ses-root', {
+        parentID: 'z-prompt',
+        time: { created: 1 },
+      });
+      storage.upsertMessage(reply.info);
+      expect(config.store.get(mgr.atoms.messagesList).map(row => row.info.id)).toEqual(['a-reply']);
+
+      const optimistic = {
+        ...stubUserMessage({ id: 'z-prompt', sessionID: 'ses-root', time: { created: 60_000 } }),
+        synthetic: true,
+      };
+      storage.upsertMessage(optimistic);
+      storage.upsertMessage(
+        createStoredAssistantMessage('b-continuation', 'ses-root', {
+          parentID: 'z-prompt',
+        }).info
+      );
+      expect(storage.getMessageIds()).toEqual(['a-reply', 'b-continuation', 'z-prompt']);
+      expect(config.store.get(mgr.atoms.messagesList).map(row => row.info.id)).toEqual([
+        'z-prompt',
+        'a-reply',
+        'b-continuation',
+      ]);
+      storage.upsertMessage(stubUserMessage({ id: 'z-prompt', sessionID: 'ses-root' }));
+      expect(config.store.get(mgr.atoms.messagesList)[0]?.info).not.toHaveProperty('synthetic');
+      expect(config.store.get(mgr.atoms.messagesList).map(row => row.info.id)).toEqual([
+        'z-prompt',
+        'a-reply',
+        'b-continuation',
+      ]);
+      storage.deleteMessage('z-prompt');
+      expect(config.store.get(mgr.atoms.messagesList).map(row => row.info.id)).toEqual([
+        'a-reply',
+        'b-continuation',
+      ]);
+      mgr.destroy();
+    });
+
+    it('orders each child transcript independently and keeps message IDs stable during token deltas', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      const storage = latestStorage;
+      storage.upsertMessage(
+        createStoredAssistantMessage('a-child-reply', 'ses-child', {
+          parentID: 'z-child-prompt',
+        }).info
+      );
+      storage.upsertMessage(stubUserMessage({ id: 'z-child-prompt', sessionID: 'ses-child' }));
+      storage.upsertMessage(
+        createStoredAssistantMessage('b-root-reply', 'ses-root', {
+          parentID: 'z-child-prompt',
+        }).info
+      );
+      const getChildren = config.store.get(mgr.atoms.childMessages);
+      expect(getChildren('ses-child').map(row => row.info.id)).toEqual([
+        'z-child-prompt',
+        'a-child-reply',
+      ]);
+      expect(config.store.get(mgr.atoms.messagesList).map(row => row.info.id)).toEqual([
+        'b-root-reply',
+      ]);
+      const storedIds = config.store.get(storage.atoms.messageIds);
+      storage.upsertPart(
+        'a-child-reply',
+        stubTextPart({
+          id: 'part-child',
+          sessionID: 'ses-child',
+          messageID: 'a-child-reply',
+          text: 'First',
+        })
+      );
+      storage.applyPartDelta('a-child-reply', 'part-child', 'text', ' continuation');
+      expect(config.store.get(storage.atoms.messageIds)).toBe(storedIds);
+      expect(
+        config.store
+          .get(mgr.atoms.childMessages)('ses-child')
+          .map(row => row.info.id)
+      ).toEqual(['z-child-prompt', 'a-child-reply']);
+      mgr.destroy();
+    });
+    it('keeps the skewed prompt static and its streaming answer in the dynamic tail', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('a-reply', 'ses-root', { parentID: 'z-prompt' }).info
+      );
+      latestStorage.upsertMessage(stubUserMessage({ id: 'z-prompt', sessionID: 'ses-root' }));
+      expect(config.store.get(mgr.atoms.staticMessages).map(row => row.info.id)).toEqual([
+        'z-prompt',
+      ]);
+      expect(config.store.get(mgr.atoms.dynamicMessages).map(row => row.info.id)).toEqual([
+        'a-reply',
+      ]);
+      mgr.destroy();
+    });
+  });
+
   describe('child session hydration', () => {
     it('hydrates child snapshots while preserving root transcript filtering', async () => {
       const rootMessage = createStoredMessage('msg-root', 'ses-root', 'assistant');
@@ -8051,6 +8159,42 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     mockSessionCallbacks.onPermissionAsked = undefined;
     mockSessionCallbacks.onPermissionResolved = undefined;
     mockSessionCallbacks.onResolved = undefined;
+  });
+
+  it('repairs a persisted skewed turn on reopen and preserves opaque pagination cursors', async () => {
+    const reply = createStoredAssistantMessage('a-reply', 'ses-1', {
+      parentID: 'z-prompt',
+      time: { created: 1, completed: 2 },
+    });
+    const prompt = makePageMessage('z-prompt', 'ses-1', 'Phone-clock prompt');
+    const fetchSnapshotPage = createPageFetchMock(async (_id, options) =>
+      options.cursor
+        ? makePage({
+            messages: [makePageMessage('0-older', 'ses-1', 'Older history')],
+            nextCursor: null,
+          })
+        : makePage({ messages: [reply, prompt], nextCursor: 'opaque-id-cursor' })
+    );
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+    await mgr.switchSession(kiloId('ses-1'));
+    expect(config.store.get(mgr.atoms.messagesList).map(row => row.info.id)).toEqual([
+      'z-prompt',
+      'a-reply',
+    ]);
+    await mgr.loadOlderMessages();
+    expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'opaque-id-cursor' });
+    expect(config.store.get(mgr.atoms.messagesList).map(row => row.info.id)).toEqual([
+      '0-older',
+      'z-prompt',
+      'a-reply',
+    ]);
+    await mgr.switchSession(kiloId('ses-other'));
+    await mgr.switchSession(kiloId('ses-1'));
+    const reopened = config.store.get(mgr.atoms.messagesList).map(row => row.info.id);
+    expect(reopened).toContain('a-reply');
+    expect(reopened.indexOf('z-prompt')).toBeLessThan(reopened.indexOf('a-reply'));
+    mgr.destroy();
   });
 
   it('loads the initial bounded page on switchSession and stores the cursor', async () => {

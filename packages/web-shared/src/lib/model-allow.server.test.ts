@@ -5,6 +5,22 @@ import {
   type ProviderLookup,
 } from '@kilocode/web-shared/lib/model-allow.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
+import type * as ExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+
+// The live catalog's restricted Kilo-exclusive models come and go, so the restriction
+// cases use a synthetic alias restricted to StepFun and keep the real lookup otherwise.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ExclusiveModels>(
+    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
+  );
+  return {
+    ...actual,
+    getKiloExclusiveInferenceProviderRestriction: (modelId: string) =>
+      modelId === 'test/restricted-exclusive'
+        ? new Set(['stepfun'])
+        : actual.getKiloExclusiveInferenceProviderRestriction(modelId),
+  };
+});
 
 function lookup(map: Record<string, string[]>): ProviderLookup {
   return async modelId => new Set(map[modelId] ?? []);
@@ -159,7 +175,7 @@ describe('model access predicates', () => {
       lookup({ 'stepfun/step-5-preview': ['fireworks', 'stepfun'] })
     );
 
-    await expect(isAllowed('stepfun/step-5-preview-free')).resolves.toBe(false);
+    await expect(isAllowed('test/restricted-exclusive')).resolves.toBe(false);
     await expect(isAllowed('stepfun/step-5-preview')).resolves.toBe(true);
   });
 
@@ -170,13 +186,13 @@ describe('model access predicates', () => {
       lookup({ 'stepfun/step-5-preview': ['fireworks'] })
     );
 
-    await expect(isAllowed('stepfun/step-5-preview-free')).resolves.toBe(true);
+    await expect(isAllowed('test/restricted-exclusive')).resolves.toBe(true);
   });
 
   test('provider allow list still evaluates restricted exclusive models missing from the snapshot', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['stepfun'], lookup({}));
 
-    await expect(isAllowed('stepfun/step-5-preview-free')).resolves.toBe(true);
+    await expect(isAllowed('test/restricted-exclusive')).resolves.toBe(true);
     await expect(isAllowed('unknown/model')).resolves.toBe(false);
   });
 });

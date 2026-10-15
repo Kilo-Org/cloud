@@ -343,7 +343,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
           good: '#5FCB8E',
           info: '#60A5FA',
           idle: '#56544F',
-          primary: '#E8F27A',
+          primary: '#FFDD00',
           primaryFg: '#1A1A10',
           secondary: '#26262B',
           divider: '#2A2A30',

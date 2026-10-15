@@ -30,6 +30,141 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
+  it.each(
+    [undefined, [], ['Z.Example.COM.', 'EXAMPLE.COM', 'example.com']].map(egressAllowlist => ({
+      egressAllowlist,
+    }))
+  )('preserves canonical egress policy through serialization: %j', ({ egressAllowlist }) => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'workspace_test', userId: 'user' },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAllowlist,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    const expected =
+      egressAllowlist === undefined
+        ? undefined
+        : egressAllowlist.length === 0
+          ? []
+          : ['example.com', 'z.example.com'];
+    expect(metadata.workspace?.egressAllowlist).toEqual(expected);
+    expect(metadata.workspace?.egressMode).toBe('allowlist');
+    expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressMode).toBe(
+      'allowlist'
+    );
+    expect(
+      parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAllowlist
+    ).toEqual(expected);
+  });
+
+  it.each([
+    {
+      sessionId: 'agent_test',
+      provider: 'cloudflare-containers',
+      sandboxId: 'ses-0123456789abcdef',
+    },
+    { sessionId: 'workspace_test', provider: 'cloudflare', sandboxId: 'ses-0123456789abcdef' },
+    { sessionId: 'workspace_test', provider: 'vercel', sandboxId: 'ses-0123456789abcdef' },
+    {
+      sessionId: 'workspace_test',
+      provider: 'cloudflare-containers',
+      sandboxId: 'usr-0123456789abcdef',
+    },
+    {
+      sessionId: 'workspace_test',
+      provider: 'cloudflare-containers',
+      sandboxId: `sbx-${'a'.repeat(48)}`,
+      sandboxKind: 'shared',
+    },
+  ])(
+    'rejects unsupported egress placement %j',
+    ({ sessionId, provider, sandboxId, ...workspace }) => {
+      for (const egressAllowlist of [undefined, []]) {
+        expect(
+          CurrentSessionMetadataSchema.safeParse({
+            metadataSchemaVersion: 2,
+            identity: { sessionId, userId: 'user' },
+            auth: {},
+            workspace: {
+              ...workspace,
+              sandboxId,
+              sandboxProvider: provider,
+              egressMode: 'allowlist',
+              egressAllowlist,
+            },
+            lifecycle: { version: 1, timestamp: 1 },
+          }).success
+        ).toBe(false);
+      }
+    }
+  );
+
+  it.each(['cloudflare', 'vercel', 'cloudflare-containers'] as const)(
+    'preserves explicit unrestricted for provider %s without adding a list',
+    sandboxProvider => {
+      const metadata = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider,
+          egressMode: 'unrestricted',
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      expect(metadata.workspace?.egressMode).toBe('unrestricted');
+      expect(metadata.workspace?.egressAllowlist).toBeUndefined();
+      expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace).toEqual(
+        metadata.workspace
+      );
+    }
+  );
+
+  it('accepts explicit unrestricted in legacy shared metadata', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_test', userId: 'user' },
+      auth: {},
+      workspace: {
+        sandboxId: 'usr-0123456789abcdef',
+        egressMode: 'unrestricted',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(metadata.workspace?.egressMode).toBe('unrestricted');
+    expect(metadata.workspace?.egressAllowlist).toBeUndefined();
+  });
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
+    { egressMode: 'invalid' },
+    { egressMode: null },
+  ])('rejects invalid persisted egress policy %j', policy => {
+    expect(
+      CurrentSessionMetadataSchema.safeParse({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          ...policy,
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      }).success
+    ).toBe(false);
+  });
+
   it.each(['github', 'gitlab', 'bitbucket', 'kilocode'] as const)(
     'uses the same containment predicate for computed and persisted %s flags',
     flag => {

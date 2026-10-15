@@ -6815,6 +6815,21 @@ export type CloudAgentSessionRunFailureCode =
   | 'system_interrupt'
   | 'unclassified';
 
+// Runtime container identity for a run. Keep in sync with
+// CloudAgentRunContainerSchema in @kilocode/worker-utils/cloud-agent-queue-report.
+export type CloudAgentRunContainer = {
+  provider: 'cloudflare' | 'vercel' | 'cloudflare-containers';
+  sandboxId: string;
+  allocationId?: string;
+  instanceId?: string;
+  instanceType?: string;
+  region?: string;
+  imageRef?: string;
+  snapshotId?: string;
+  runtimeBuildId?: string;
+  startSource?: 'image' | 'snapshot';
+};
+
 export const cloud_agent_session_runs = pgTable(
   'cloud_agent_session_runs',
   {
@@ -6823,6 +6838,7 @@ export const cloud_agent_session_runs = pgTable(
       .references(() => cloud_agent_sessions.cloud_agent_session_id, { onDelete: 'cascade' }),
     message_id: text().notNull(),
     wrapper_run_id: text(),
+    container: jsonb().$type<CloudAgentRunContainer>(),
     status: text().notNull().$type<CloudAgentSessionRunStatus>(),
     queued_at: timestamp({ withTimezone: true, mode: 'string' }),
     dispatch_accepted_at: timestamp({ withTimezone: true, mode: 'string' }),

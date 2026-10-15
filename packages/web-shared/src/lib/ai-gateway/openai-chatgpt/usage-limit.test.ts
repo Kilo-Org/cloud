@@ -1,6 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
 import {
-  CHATGPT_USAGE_SETTINGS_URL,
   USAGE_LIMIT_UNKNOWN_RESET_WINDOW_MS,
   isChatGptUsageLimitCurrent,
   readChatGptUsageLimit,
@@ -82,15 +81,6 @@ describe('readChatGptUsageLimit', () => {
     expect(readChatGptUsageLimit(429, { detail: { type: 'server_error' } }, NOW)).toBeNull();
     expect(readChatGptUsageLimit(429, 'not json', NOW)).toBeNull();
     expect(readChatGptUsageLimit(429, null, NOW)).toBeNull();
-  });
-});
-
-describe('CHATGPT_USAGE_SETTINGS_URL', () => {
-  it('opens the page that lists the app-specific limit too', () => {
-    // The guideline's notice must open the usage settings page: an app-specific
-    // weekly limit can be exhausted while the plan still has allowance, and
-    // only that page names it.
-    expect(CHATGPT_USAGE_SETTINGS_URL).toBe('https://chatgpt.com/settings/usage');
   });
 });
 

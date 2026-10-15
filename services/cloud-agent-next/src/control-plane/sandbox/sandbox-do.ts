@@ -2008,6 +2008,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       now: () => Date.now(),
       routePreparationMs: this.sandboxTimers().routePreparationMs,
       sendPrepare: route => this.sendSessionPrepare(state, route),
+      releasePreparation: sessionId => {
+        const socket = this.boundWrapperSocket(state);
+        if (socket !== null) this.trySendFrame(socket, { type: 'session.release', sessionId });
+      },
       notify: async (sessionId, update) => {
         this.notifications.enqueue(sessionId, {
           kind: 'route',

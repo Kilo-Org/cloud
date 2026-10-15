@@ -520,7 +520,12 @@ describe('SandboxControlV2 credentials (B3)', () => {
         wrapperId: 'wr_upgrade',
         allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
       });
-      const first = await replacement.next();
+      const reconnectedFrames = [await replacement.next(), await replacement.next()];
+      expect(reconnectedFrames.find(frame => frame?.type === 'session.release')).toEqual({
+        type: 'session.release',
+        sessionId: SESSION_NEXT,
+      });
+      const first = reconnectedFrames.find(frame => frame?.type === 'session.prepare');
       if (first?.type !== 'session.prepare') throw new Error('missing upgraded preparation');
       expect(first.credentials.kilo.token === prepareFrame.credentials.kilo.token).toBe(false);
       if (modern) expect(Boolean(first.credentials.proxy?.handle)).toBe(true);
@@ -1143,6 +1148,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     await waitFor(async () =>
       expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
     );
+    expect(await wrapper.next()).toEqual({ type: 'session.release', sessionId: SESSION });
     await stub.prepare(prepareInput(SESSION));
     const next = await wrapper.next();
     if (next?.type !== 'session.prepare') throw new Error('missing retry prepare');

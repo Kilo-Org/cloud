@@ -53,11 +53,7 @@ describe('computePoolModalityCoverage', () => {
   it('unions modalities across the whole pool', () => {
     const coverage = computePoolModalityCoverage({
       poolModelIds: ['b', 'c'],
-      catalog: [
-        model('a', ['text', 'image']),
-        model('b', ['text']),
-        model('c', ['text', 'image']),
-      ],
+      catalog: [model('a', ['text', 'image']), model('b', ['text']), model('c', ['text', 'image'])],
     });
     expect(coverage).toEqual({ status: 'covered' });
   });

@@ -35,8 +35,8 @@ design, invariants, and rollout/rollback.
 `router` is `efficient` or `frontier`; omitted API selectors default to `efficient`.
 Each router owns its saved decider model list, catalog-expanded effort entries, registry,
 runs, routing table, and publication cache key. Accuracy thresholds, `accuracyNoiseBand`,
-`frontierMinAccuracyDelta`, token profile, switch horizon and thresholds, and platform
-`maxConcurrency` are configured independently. The classifier and its winner remain shared:
+`frontierMinAccuracyDelta`, token profile, switch horizon and thresholds are configured
+independently. The classifier and its winner remain shared:
 classifier runs use the efficient configuration even when requested from the frontier view.
 Classifier inference billing is owned by the routing worker. Usage IDs and durable delivery
 objects include the router, so an otherwise identical call on another router cannot be
@@ -70,14 +70,17 @@ falls back to the system value. Publishing reads effective values only.
 
 Frontier initially has no saved configuration or published table. No default model pool or
 efficient table is fabricated for it. Before enabling frontier serving, administrators must
-split the existing container budgets, save a frontier configuration with its own decider
-models, benchmark those entries, and publish a complete frontier table.
+save a frontier configuration with its own decider models, benchmark those entries, and
+publish a complete frontier table.
 
-Efficient platform and owner budgets plus frontier's platform budget must total at most
-`BENCHMARK_CONTAINER_BUDGET` (200). Frontier ignores `userMaxConcurrency`, never registers owner
+Container lanes come from one shared budget: `BENCHMARK_CONTAINER_BUDGET` (500, the wrangler
+`max_instances`), sized per run against the lanes other running runs hold. User-queue runs stop
+at `BENCHMARK_USER_CONTAINER_LIMIT` (400), which keeps `BENCHMARK_PLATFORM_RESERVED_CONTAINERS`
+(100) available to platform runs, and a platform run takes half of what is free so the efficient
+and frontier platform queues share the pool. Frontier never registers owner
 custom pools, and has only a platform queue (`both` selects that queue; `user` is rejected).
-Saving configuration and starting decider runs enforce the shared cap. Scheduled drains and
-daily platform sync process both routers with their configured budgets.
+A run that does not fit waits: the drain logs `benchmark_queue_drain_skipped_no_capacity` and
+retries on the next tick. Scheduled drains and daily platform sync process both routers.
 
 Efficient publications invalidate `routing_table_v1`; frontier publications invalidate
 `routing_table_frontier_v1`. Router, engine/dataset identity, ranking settings, and contributing
@@ -96,7 +99,7 @@ measurements are included in routing-table version hashes.
 - Owner pools still select exact pairs. Platform expansion does not change their entries.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
-The worker drains expanded entries in batches that fit the configured container budget.
+The worker drains expanded entries in batches that fit the shared container budget.
 New routing tables rank exact pairs and emit `variant`, not `reasoningEffort`.
 Legacy nullable effort storage columns remain. Router isolation requires D1 schema migration;
 existing rows stay in the efficient namespace, with noise band 0.05 and frontier delta 0.
@@ -422,12 +425,14 @@ row is global, so the pair is benchmarked once and serves both.
 | Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from owner pools (quota-charged) |
 | Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, 15-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
-| Container budget | `maxConcurrency` | `userMaxConcurrency` |
+| Container lanes | Half of the free lanes; the two routers split the platform pool | `BENCHMARK_USER_CONTAINER_LIMIT` (400), or the free lanes when fewer remain |
 | Slot | Its own; a running user-queue run never blocks it | Its own; a running platform-queue run never blocks it |
 
-The efficient platform and owner budgets plus the frontier platform budget must sum to at most
-`BENCHMARK_CONTAINER_BUDGET` (200, the wrangler `max_instances`). Split these budgets before
-saving frontier configuration; its owner budget is unused.
+Every router and queue shares one budget of `BENCHMARK_CONTAINER_BUDGET` (500, the wrangler
+`max_instances`). A run's lanes are recorded in `benchmark_runs.max_concurrency`, and the atomic
+insert refuses a run whose lanes would push the running total past 500, or the owner total past
+400. A run that cannot fit waits for a running one to finish; the drain logs
+`benchmark_queue_drain_skipped_no_capacity` rather than reporting a failure.
 
 After any decider run completes, the worker assembles the platform table from ready, current registry entries for the current catalog pairs.
 If a desired pair remains pending or running, the previous table stays live.
@@ -479,7 +484,9 @@ trigger, and on the 15-minute cron):
 1. If that queue's run is already active → log and leave its pending rows alone.
    The other queue is unaffected.
 2. Else take that queue's pending current-engine rows oldest-`requested_at`-first,
-   capped by its own container budget (`entries × repetitions ≤ budget`).
+   capped by the lanes that queue may hold now (`entries × repetitions ≤ free lanes`).
+   With no lanes free, log `benchmark_queue_drain_skipped_no_capacity` and leave the
+   rows pending.
 3. `startRun(purpose: queue, entries: snapshot)`.
 
 A row wanted by both queues appears in both listings; whichever run claims it

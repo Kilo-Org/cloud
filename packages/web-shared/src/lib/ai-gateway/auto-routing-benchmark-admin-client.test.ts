@@ -29,8 +29,6 @@ const configResponse = {
     productionTokenProfile: null,
     switchHorizonTurns: null,
     lowConfidenceThreshold: null,
-    maxConcurrency: 4,
-    userMaxConcurrency: 100,
     benchmarkUserId: null,
     benchmarkOrgId: null,
     classifierRepetitions: 1,

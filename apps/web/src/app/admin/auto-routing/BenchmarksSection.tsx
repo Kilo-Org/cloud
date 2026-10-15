@@ -2,6 +2,7 @@
 
 import {
   BENCHMARK_CONTAINER_BUDGET,
+  BENCHMARK_PLATFORM_RESERVED_CONTAINERS,
   DEFAULT_AUTO_ROUTER,
   type AutoRouter,
   BenchmarkConfigResponseSchema,
@@ -25,6 +26,7 @@ import {
   type PolicySettingState,
   type PolicySettingValue,
   resolvePolicySettings,
+  type BenchmarkRunProgress,
   type RankedCandidate,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -33,6 +35,11 @@ import { toast } from 'sonner';
 import { ChevronDown, ChevronRight, Play, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { toEligibleModelOptions } from '@/components/auto-routing/AutoRoutingModeCard';
+import { PoolModalityWarning } from '@/components/auto-routing/PoolModalityWarning';
+import {
+  computePoolModalityCoverage,
+  type ModalityCatalogModel,
+} from '@/lib/auto-routing-pool-modality';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,6 +48,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -82,6 +90,55 @@ export function costPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'a
   return candidate.accuracy > 0
     ? candidate.avgCostUsd / candidate.accuracy
     : Number.POSITIVE_INFINITY;
+}
+
+// Below this share of the expected cases the completion rate is still noise, so
+// no finish time is projected from it.
+const ETA_MIN_PERCENT = 5;
+
+export type RunProgressDisplay = {
+  /** Null when the run's expected total is unknown; render counts without a bar. */
+  percent: number | null;
+  counts: string;
+  eta: string | null;
+};
+
+function formatDuration(ms: number): string {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return '<1 min';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
+export function formatRunProgress(
+  progress: BenchmarkRunProgress,
+  startedAt: string,
+  now: number = Date.now()
+): RunProgressDisplay {
+  const { completedCases, totalCases } = progress;
+  const failed = progress.failedCases > 0 ? ` · ${progress.failedCases} failed` : '';
+  if (totalCases === null || totalCases <= 0) {
+    return { percent: null, counts: `${completedCases} / ? cases${failed}`, eta: null };
+  }
+  const percent = Math.min(100, (completedCases / totalCases) * 100);
+  const startedMs = Date.parse(startedAt);
+  const elapsedMs = now - startedMs;
+  const remainingCases = totalCases - completedCases;
+  const eta =
+    completedCases > 0 &&
+    remainingCases > 0 &&
+    percent >= ETA_MIN_PERCENT &&
+    Number.isFinite(startedMs) &&
+    elapsedMs > 0
+      ? formatDuration((elapsedMs / completedCases) * remainingCases)
+      : null;
+  return {
+    percent,
+    counts: `${completedCases} / ${totalCases} cases${failed}`,
+    eta,
+  };
 }
 
 export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
@@ -318,8 +375,6 @@ export type BenchmarkConfigFormState = {
   frontierMinAccuracyDelta: number;
   switchCostFactor: number;
   bestAccuracySwitchThreshold: number;
-  maxConcurrency: number;
-  userMaxConcurrency: number;
   benchmarkUserId: string;
   benchmarkOrgId: string;
   classifierRepetitions: number;
@@ -344,8 +399,6 @@ export function configToFormState(config: BenchmarkConfig | null): BenchmarkConf
       frontierMinAccuracyDelta: 0,
       switchCostFactor: 3,
       bestAccuracySwitchThreshold: 0.05,
-      maxConcurrency: BENCHMARK_CONTAINER_BUDGET / 2,
-      userMaxConcurrency: BENCHMARK_CONTAINER_BUDGET / 2,
       benchmarkUserId: '',
       benchmarkOrgId: '',
       classifierRepetitions: 1,
@@ -366,8 +419,6 @@ export function configToFormState(config: BenchmarkConfig | null): BenchmarkConf
     frontierMinAccuracyDelta: config.frontierMinAccuracyDelta,
     switchCostFactor: config.switchCostFactor,
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
-    maxConcurrency: config.maxConcurrency,
-    userMaxConcurrency: config.userMaxConcurrency,
     benchmarkUserId: config.benchmarkUserId ?? '',
     benchmarkOrgId: config.benchmarkOrgId ?? '',
     classifierRepetitions: config.classifierRepetitions,
@@ -406,8 +457,6 @@ export function formStateToConfig(
     productionTokenProfile: parseTokenProfile(state),
     switchHorizonTurns: parseOptionalNumber(state.switchHorizonTurns),
     lowConfidenceThreshold: parseOptionalNumber(state.lowConfidenceThreshold),
-    maxConcurrency: state.maxConcurrency,
-    userMaxConcurrency: state.userMaxConcurrency,
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
     benchmarkOrgId: benchmarkOrgId.length > 0 ? benchmarkOrgId : null,
     classifierRepetitions: state.classifierRepetitions,
@@ -534,6 +583,7 @@ function BenchmarkConfigEditor({
   classifierModelsLoading,
   classifierModelsError,
   registryEntries,
+  catalogModalities,
 }: {
   config: BenchmarkConfig | null;
   router: AutoRouter;
@@ -545,6 +595,7 @@ function BenchmarkConfigEditor({
   classifierModelsLoading: boolean;
   classifierModelsError?: string;
   registryEntries?: BenchmarkRegistryResponse['platformEntries'];
+  catalogModalities: readonly ModalityCatalogModel[];
 }) {
   const [form, setForm] = useState(() => configToFormState(config));
   // Tracks unsaved local edits. A background config refetch (the runs list
@@ -683,6 +734,14 @@ function BenchmarkConfigEditor({
     [updateForm]
   );
 
+  const modalityCoverage = useMemo(
+    () =>
+      computePoolModalityCoverage({
+        poolModelIds: form.deciderModels.map(row => row.id.trim()).filter(id => id.length > 0),
+        catalog: catalogModalities,
+      }),
+    [form.deciderModels, catalogModalities]
+  );
   return (
     <Card className="rounded-lg">
       <CardHeader className="p-4 pb-2">
@@ -825,6 +884,8 @@ function BenchmarkConfigEditor({
             Add model
           </Button>
         </div>
+
+        <PoolModalityWarning coverage={modalityCoverage} />
 
         <ConfigSectionHeading
           title="Ranking"
@@ -984,63 +1045,19 @@ function BenchmarkConfigEditor({
 
         <ConfigSectionHeading
           title="Benchmark runs"
-          description="Queue concurrency, repetitions, run identity, and the latency gate."
+          description="Container budget, repetitions, run identity, and the latency gate."
         />
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-max-concurrency" className="text-sm font-medium">
-              Platform max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
-            </Label>
-            <Input
-              id="benchmark-max-concurrency"
-              type="number"
-              min={1}
-              max={BENCHMARK_CONTAINER_BUDGET}
-              step={1}
-              value={form.maxConcurrency}
-              onChange={e =>
-                updateForm(prev => ({ ...prev, maxConcurrency: parseInt(e.target.value, 10) || 1 }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <span className="text-sm font-medium">Shared container budget</span>
             <p className="text-muted-foreground text-xs">
-              Live containers a platform-queue run may hold. Classifier runs use it for parallel
-              OpenRouter calls.
+              {BENCHMARK_CONTAINER_BUDGET} benchmark containers are shared by every queue and both
+              routers. User-queue runs use at most{' '}
+              {BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS}; the remaining{' '}
+              {BENCHMARK_PLATFORM_RESERVED_CONTAINERS} stay reserved for platform runs, which split
+              the free lanes with the other router.
             </p>
           </div>
-          {router === 'efficient' ? (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="benchmark-user-max-concurrency" className="text-sm font-medium">
-                User max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
-              </Label>
-              <Input
-                id="benchmark-user-max-concurrency"
-                type="number"
-                min={1}
-                max={BENCHMARK_CONTAINER_BUDGET}
-                step={1}
-                value={form.userMaxConcurrency}
-                onChange={e =>
-                  updateForm(prev => ({
-                    ...prev,
-                    userMaxConcurrency: parseInt(e.target.value, 10) || 1,
-                  }))
-                }
-                className="h-8 w-40 tabular-nums"
-              />
-              <p
-                className={
-                  form.maxConcurrency + form.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET
-                    ? 'text-destructive text-xs'
-                    : 'text-muted-foreground text-xs'
-                }
-              >
-                Live containers a user-queue run may hold. The two queues run at the same time, so
-                both budgets together must stay at or under {BENCHMARK_CONTAINER_BUDGET} (currently{' '}
-                {form.maxConcurrency + form.userMaxConcurrency}).
-              </p>
-            </div>
-          ) : null}
           <div className="sm:col-span-2">
             <PolicySettingField state={policyStates.classifierRepetitions} overridden={false} />
           </div>
@@ -1217,6 +1234,27 @@ function statusBadgeVariant(
   return 'destructive';
 }
 
+function RunProgress({
+  progress,
+  startedAt,
+}: {
+  progress: BenchmarkRunProgress;
+  startedAt: string;
+}) {
+  const { percent, counts, eta } = formatRunProgress(progress, startedAt);
+  return (
+    <div className="mt-1.5 flex w-40 flex-col gap-1">
+      {percent === null ? null : (
+        <Progress value={percent} className="h-1.5" aria-label={`Benchmark progress: ${counts}`} />
+      )}
+      <span className="text-muted-foreground text-[11px] tabular-nums">
+        {counts}
+        {eta === null ? '' : ` · ETA ${eta}`}
+      </span>
+    </div>
+  );
+}
+
 function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -1280,6 +1318,9 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
                 <Badge variant={statusBadgeVariant(run.status)} className="capitalize">
                   {run.status}
                 </Badge>
+                {run.progress ? (
+                  <RunProgress progress={run.progress} startedAt={run.startedAt} />
+                ) : null}
               </TableCell>
               <TableCell className="py-2 text-xs tabular-nums">{run.startedAt}</TableCell>
               <TableCell className="py-2 text-xs tabular-nums">{run.completedAt ?? '—'}</TableCell>
@@ -1505,6 +1546,14 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     }));
   }, [modelsQuery.data?.data]);
   const modelsError = modelsQuery.error instanceof Error ? modelsQuery.error.message : undefined;
+  const catalogModalities = useMemo(
+    () =>
+      (modelsQuery.data?.data ?? []).map(model => ({
+        id: model.id,
+        inputModalities: model.architecture?.input_modalities,
+      })),
+    [modelsQuery.data?.data]
+  );
   const systemOneModelsQuery = useSystemOneModelOptions();
   const systemOneModelsError =
     systemOneModelsQuery.error instanceof Error ? systemOneModelsQuery.error.message : undefined;
@@ -1640,6 +1689,9 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
         </TabsTrigger>
         <TabsTrigger value="benchmarks" className="px-2.5 text-xs">
           Benchmarks
+          {hasRunningRun ? (
+            <span className="text-primary ml-1.5 text-[10px] font-medium">Running</span>
+          ) : null}
         </TabsTrigger>
       </TabsList>
 
@@ -1668,6 +1720,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
             classifierModelOptions={systemOneModelsQuery.data ?? []}
             classifierModelsLoading={systemOneModelsQuery.isLoading}
             classifierModelsError={systemOneModelsError}
+            catalogModalities={catalogModalities}
           />
         ) : null}
       </TabsContent>

@@ -42,10 +42,24 @@ export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema
 
 /**
  * Total live decider containers the benchmark runner may hold (wrangler
- * `max_instances`). Platform and profile runs are independent, so their
- * configured lane budgets must sum to at most this.
+ * `max_instances`). Every router and queue shares this one budget.
  */
-export const BENCHMARK_CONTAINER_BUDGET = 200;
+export const BENCHMARK_CONTAINER_BUDGET = 500;
+
+/**
+ * Containers withheld from owner-queue runs. User-queue runs stop at
+ * BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS, and a
+ * platform run may claim the whole budget minus the user lanes already live, so
+ * 100 containers are always available to platform runs.
+ */
+export const BENCHMARK_PLATFORM_RESERVED_CONTAINERS = 100;
+
+/**
+ * Containers owner-queue runs may hold. User runs wait for platform runs once
+ * they hold this many, so the reserved 100 containers always stay available.
+ */
+export const BENCHMARK_USER_CONTAINER_LIMIT =
+  BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS;
 
 /** Exact model/effort identity in persisted benchmark run snapshots. */
 export const BenchmarkDeciderModelSchema = z
@@ -94,6 +108,10 @@ function addDuplicateModelIssues(ids: string[], path: string, ctx: z.RefinementC
   });
 }
 
+// Retired per-config concurrency knobs (maxConcurrency, userMaxConcurrency) are
+// gone from the contract: container lanes come from the shared budget in
+// BENCHMARK_CONTAINER_BUDGET. Zod strips the stale keys from payloads a
+// previous admin UI or a stored config still sends.
 export const BenchmarkConfigSchema = z
   .object({
     router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
@@ -103,17 +121,6 @@ export const BenchmarkConfigSchema = z
     minAccuracy: z.number().min(0).max(1),
     accuracyNoiseBand: z.number().min(0).max(1).default(0.05),
     frontierMinAccuracyDelta: z.number().min(0).max(1).default(0),
-    // Platform parallelism budget. Platform decider runs use it as a live
-    // container budget; classifier runs use it for parallel OpenRouter calls.
-    maxConcurrency: z.number().int().min(1).max(BENCHMARK_CONTAINER_BUDGET),
-    // Live container budget for user-queue runs. Separate from maxConcurrency so
-    // a user-queue run and a platform-queue run can hold containers at once.
-    userMaxConcurrency: z
-      .number()
-      .int()
-      .min(1)
-      .max(BENCHMARK_CONTAINER_BUDGET)
-      .default(BENCHMARK_CONTAINER_BUDGET / 2),
     // Optional override for the Kilo user whose identity/billing the decider
     // CLI runs execute under. Null means the worker uses DEFAULT_BENCHMARK_USER_ID.
     benchmarkUserId: z.string().trim().min(1).nullable(),
@@ -156,18 +163,6 @@ export const BenchmarkConfigSchema = z
       'deciderModels',
       ctx
     );
-    // Platform-queue and user-queue runs can hold containers at the same time,
-    // so the two budgets share one hard platform cap.
-    if (
-      config.router === 'efficient' &&
-      config.maxConcurrency + config.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['userMaxConcurrency'],
-        message: `Max concurrency + user max concurrency must be at most ${BENCHMARK_CONTAINER_BUDGET}`,
-      });
-    }
   });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
 
@@ -206,6 +201,16 @@ export const BenchmarkModelSummarySchema = z.object({
 });
 export type BenchmarkModelSummary = z.infer<typeof BenchmarkModelSummarySchema>;
 
+// Live case tally for a running run. `totalCases` is null when the expected
+// total cannot be derived exactly (the dataset changed after the run started),
+// so a reader shows counts without a completion estimate.
+export const BenchmarkRunProgressSchema = z.object({
+  completedCases: z.number().int().nonnegative(),
+  totalCases: z.number().int().nonnegative().nullable(),
+  failedCases: z.number().int().nonnegative(),
+});
+export type BenchmarkRunProgress = z.infer<typeof BenchmarkRunProgressSchema>;
+
 export const BenchmarkRunSchema = z.object({
   id: z.string(),
   router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
@@ -216,6 +221,9 @@ export const BenchmarkRunSchema = z.object({
   startedAt: z.string(),
   completedAt: z.string().nullable(),
   error: z.string().nullable(),
+  // Optional so run payloads persisted before the field existed still parse.
+  // Omitted for terminal runs, whose counts are already final in `summaries`.
+  progress: BenchmarkRunProgressSchema.optional(),
   summaries: z.array(BenchmarkModelSummarySchema),
 });
 export type BenchmarkRun = z.infer<typeof BenchmarkRunSchema>;

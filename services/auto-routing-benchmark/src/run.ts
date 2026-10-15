@@ -4,6 +4,7 @@ import {
 } from '@kilocode/auto-routing-contracts/classifier';
 import {
   BENCHMARK_CONTAINER_BUDGET,
+  BENCHMARK_USER_CONTAINER_LIMIT,
   CLASSIFIER_WINNER_KV_KEY,
   routingTableKvKey,
   AUTO_ROUTERS,
@@ -18,11 +19,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import * as z from 'zod';
-import {
-  BenchmarkConcurrencyBudgetError,
-  getBenchmarkConfig,
-  validateBenchmarkConcurrencyBudget,
-} from './config';
+import { getBenchmarkConfig } from './config';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 import caseComplexity from './datasets/case-complexity.json';
@@ -37,6 +34,7 @@ import {
   getPendingDeciderOutput,
   savePendingDeciderOutput,
   getLatestSummariesByModel,
+  getLiveContainerLanes,
   getRunningRun,
   getRunWithModels,
   getLatestRoutingTable,
@@ -133,6 +131,15 @@ export function deciderCasesForRouter(router: AutoRouter = 'efficient') {
   return router === 'frontier' ? FRONTIER_CASES : DECIDER_CASES;
 }
 
+/**
+ * Cases one model repetition runs for a run kind: the length of the dataset
+ * that kind selects. Shared with run progress so a displayed total cannot
+ * disagree with the count run completion waits for.
+ */
+export function expectedCaseCount(kind: BenchmarkKind, router: AutoRouter): number {
+  return kind === 'classifier' ? CLASSIFIER_CASES.length : deciderCasesForRouter(router).length;
+}
+
 // Decider cases run through the real `kilo` CLI in a container (up to ~3 min
 // each). Chunking caps how many cases a single queue invocation processes so
 // each stays well under CF's wall-clock limit.
@@ -142,6 +149,10 @@ const DECIDER_CHUNK_SIZE = 5;
 // invocation owns exactly one case, so a slow request cannot push a batch past
 // Cloudflare Queues' 15-minute wall-clock limit.
 const CLASSIFIER_CHUNK_SIZE = 1;
+
+// Parallel OpenRouter calls per classifier job. Classifier work holds no
+// containers, so it does not draw on BENCHMARK_CONTAINER_BUDGET.
+export const BENCHMARK_CLASSIFIER_PARALLELISM = 80;
 
 // Cloudflare Queues caps a single sendBatch at 100 messages. Classifier fan-out
 // can exceed that because each classifier case is its own message, so dispatch
@@ -659,6 +670,30 @@ export class BenchmarkRunConfigError extends Error {
   }
 }
 
+/**
+ * No container capacity for this run right now. A wait signal, not a fault:
+ * the queues retry, and a drain reports a skip rather than an error.
+ */
+export class BenchmarkCapacityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BenchmarkCapacityError';
+  }
+}
+
+/**
+ * Container lanes a starting run may claim, given the lanes live runs hold.
+ * Owner runs stop at BENCHMARK_USER_CONTAINER_LIMIT so the platform reserve
+ * survives; platform runs take half of what is free so the efficient and
+ * frontier platform queues share the pool instead of whichever router starts
+ * first holding all of it until it finishes.
+ */
+export function benchmarkLaneBudget(purpose: BenchmarkRunPurpose, liveLanes: number): number {
+  const free = BENCHMARK_CONTAINER_BUDGET - liveLanes;
+  if (purpose === 'user') return Math.max(0, Math.min(BENCHMARK_USER_CONTAINER_LIMIT, free));
+  return Math.max(0, Math.floor(free / 2));
+}
+
 export function validateDeciderContainerBudget({
   modelCount,
   repetitions,
@@ -671,8 +706,8 @@ export function validateDeciderContainerBudget({
   const modelRepetitions = modelCount * repetitions;
   if (modelRepetitions <= maxLiveContainers) return;
 
-  throw new BenchmarkRunConfigError(
-    `decider benchmark requires at least one live container lane per model repetition (${modelRepetitions}), but maxConcurrency is ${maxLiveContainers}; reduce decider models/repetitions before starting`
+  throw new BenchmarkCapacityError(
+    `decider run needs ${modelRepetitions} container lanes (one per model repetition) and ${maxLiveContainers} of ${BENCHMARK_CONTAINER_BUDGET} are free; it starts after a running benchmark run finishes`
   );
 }
 
@@ -712,7 +747,6 @@ export async function startRun(
   if (!config) {
     throw new Error('benchmark config not set: save it in the admin panel before starting a run');
   }
-  if (kind === 'decider') await validateBenchmarkConcurrencyBudget(env.BENCH_DB, config);
 
   // One active run per (kind, purpose). The unique partial index is the atomic
   // backstop; this pre-check turns the common case (a run already going) into a
@@ -764,10 +798,14 @@ export async function startRun(
 
   const benchmarkIdentity = resolveBenchmarkIdentity(config);
 
-  // Each queue owns its own lane budget so a running user-queue run never
-  // shrinks a platform-queue run (and vice versa). The config schema keeps the
-  // two budgets summing to at most the platform container cap.
-  const laneBudget = purpose === 'user' ? config.userMaxConcurrency : config.maxConcurrency;
+  // Lanes this run may hold. One shared budget covers every router and queue,
+  // so the cap is sized against the lanes running runs already hold; for
+  // classifier runs the column records their HTTP fan-out instead, since
+  // classifier work holds no containers.
+  const laneBudget =
+    kind === 'classifier'
+      ? BENCHMARK_CLASSIFIER_PARALLELISM
+      : benchmarkLaneBudget(purpose, await getLiveContainerLanes(env.BENCH_DB));
   if (kind === 'decider') {
     validateDeciderContainerBudget({
       modelCount: enqueuedEntries.length,
@@ -879,7 +917,9 @@ export async function startRun(
     let cause = error;
     while (cause instanceof Error) {
       if (cause.message.includes('NOT NULL constraint failed: benchmark_runs.max_concurrency')) {
-        throw new BenchmarkConcurrencyBudgetError();
+        throw new BenchmarkCapacityError(
+          `container budget full: running benchmark runs committed ${BENCHMARK_CONTAINER_BUDGET} lanes before this run could claim ${laneBudget}`
+        );
       }
       cause = cause.cause;
     }
@@ -909,7 +949,6 @@ export async function startRun(
     await finalizeRunIfComplete(env, runId, kind, {
       router,
       status: 'running',
-      maxConcurrency: laneBudget,
       minAccuracy: config.minAccuracy,
       switchCostFactor: config.switchCostFactor,
       bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
@@ -984,6 +1023,26 @@ export async function drainQueue(
 
   const engineIdentity = computeEngineIdentity('decider', router);
   const repetitions = config.deciderRepetitions;
+  const liveLanes = await getLiveContainerLanes(env.BENCH_DB);
+  // Oldest-first (query already ordered by requested_at). Cap by the lanes this
+  // queue may hold now: modelCount * repetitions <= lanes.
+  const maxLive = benchmarkLaneBudget(queue, liveLanes);
+  const maxEntries = Math.floor(maxLive / Math.max(1, repetitions));
+  if (maxEntries < 1) {
+    // Every lane is committed to runs already going. That is a wait, not a
+    // fault: the next tick retries once one of them finishes.
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_queue_drain_skipped_no_capacity',
+        queue,
+        liveLanes,
+        maxLive,
+        repetitions,
+      })
+    );
+    return null;
+  }
+
   const pending = await listPendingCurrentProfiles(
     env.BENCH_DB,
     { router, engineIdentity, repetitions },
@@ -991,10 +1050,6 @@ export async function drainQueue(
   );
   if (pending.length === 0) return null;
 
-  // Oldest-first (query already ordered by requested_at). Cap by this queue's
-  // container budget: modelCount * repetitions <= maxLiveContainers.
-  const maxLive = queue === 'user' ? config.userMaxConcurrency : config.maxConcurrency;
-  const maxEntries = Math.max(1, Math.floor(maxLive / Math.max(1, repetitions)));
   const batch = pending.slice(0, maxEntries);
   const entries: RunModelEntry[] = batch.map(row => ({
     model: row.model,
@@ -1030,6 +1085,18 @@ export async function drainQueue(
       // The other queue claimed this whole batch between our read and our
       // claim. The pairs are being measured; nothing to do.
       console.log(JSON.stringify({ event: 'benchmark_queue_drain_batch_already_claimed', queue }));
+      return null;
+    }
+    if (error instanceof BenchmarkCapacityError) {
+      // Another run took the lanes between our read and the insert. Same wait
+      // as the pre-check above, so the caller is not told a queue failed.
+      console.log(
+        JSON.stringify({
+          event: 'benchmark_queue_drain_skipped_no_capacity',
+          queue,
+          laneBudget: maxLive,
+        })
+      );
       return null;
     }
     throw error;
@@ -1077,7 +1144,7 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
     const classifierVariant = variantToStorage(message.variant);
     await runCasesWithConcurrency(
       expandedItems,
-      state.maxConcurrency,
+      BENCHMARK_CLASSIFIER_PARALLELISM,
       async ({ benchCase, rep }) => {
         const startedAt = performance.now();
         try {
@@ -1191,7 +1258,6 @@ export async function processDeadLetter(env: Env, rawMessage: unknown): Promise<
 type RunState = {
   router: AutoRouter;
   status: RunRow['status'];
-  maxConcurrency: number;
   minAccuracy: number;
   switchCostFactor: number;
   bestAccuracySwitchThreshold: number;
@@ -1212,7 +1278,6 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
   return {
     router: run.router ?? 'efficient',
     status: run.status,
-    maxConcurrency: run.max_concurrency,
     minAccuracy: run.min_accuracy,
     switchCostFactor: run.switch_cost_factor,
     bestAccuracySwitchThreshold: run.best_accuracy_switch_threshold,
@@ -1673,8 +1738,7 @@ async function finalizeRunIfComplete(
   state: RunState
 ): Promise<void> {
   const enqueuedModels = state.models.filter(m => m.enqueued);
-  const caseCount =
-    kind === 'classifier' ? CLASSIFIER_CASES.length : deciderCasesForRouter(state.router).length;
+  const caseCount = expectedCaseCount(kind, state.router);
 
   // The run finalizes once every lane is accounted for, so one dead lane no
   // longer wedges the run until the stale sweep.

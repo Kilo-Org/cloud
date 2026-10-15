@@ -8,7 +8,6 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
-import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
 import type {
   AutoRouter,
   BenchmarkKind,
@@ -38,13 +37,12 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   }).$type<ProductionTokenProfile>(),
   switch_horizon_turns: integer('switch_horizon_turns'),
   low_confidence_threshold: real('low_confidence_threshold'),
+  // Legacy lane-budget columns: never read by this worker, but still read by
+  // the previously deployed one, so they stay until a cleanup migration drops
+  // both. replaceConfig writes the shared-budget constants; the user default is
+  // migration 0010's stored default, kept so the column definition is unchanged.
   max_concurrency: integer('max_concurrency').notNull(),
-  // Live container budget for user-queue runs, independent of max_concurrency
-  // (the platform-queue budget). The two must sum to at most the platform
-  // container cap; the config contract enforces that at the write boundary.
-  user_max_concurrency: integer('user_max_concurrency')
-    .notNull()
-    .default(BENCHMARK_CONTAINER_BUDGET / 2),
+  user_max_concurrency: integer('user_max_concurrency').notNull().default(100),
   benchmark_user_id: text('benchmark_user_id'),
   benchmark_org_id: text('benchmark_org_id'),
   classifier_repetitions: integer('classifier_repetitions').notNull().default(1),

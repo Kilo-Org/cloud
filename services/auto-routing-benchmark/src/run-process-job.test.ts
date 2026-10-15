@@ -44,6 +44,7 @@ vi.mock('./db', async importOriginal => {
     markProfilesRunningForRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
     getRunningRun: vi.fn(),
+    getLiveContainerLanes: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
   };
 });
@@ -72,6 +73,7 @@ import {
   savePendingDeciderOutput,
   type PendingDeciderOutput,
   getRunWithModels,
+  getLiveContainerLanes,
   listPendingCurrentProfiles,
   getRunningRun,
   syncPlatformRegistryRows,
@@ -168,8 +170,6 @@ beforeEach(() => {
     classifierModels: ['classifier/a'],
     deciderModels: [{ id: model }],
     minAccuracy: 0.7,
-    maxConcurrency: 100,
-    userMaxConcurrency: 100,
     benchmarkUserId: 'user-1',
     benchmarkOrgId: null,
     switchCostFactor: 3,
@@ -191,6 +191,7 @@ beforeEach(() => {
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   tokenGet.mockResolvedValue('internal-secret');
   queueSendBatch.mockResolvedValue(undefined);
   vi.stubGlobal(

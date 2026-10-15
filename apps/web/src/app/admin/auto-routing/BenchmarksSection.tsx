@@ -595,7 +595,7 @@ function BenchmarkConfigEditor({
   classifierModelsLoading: boolean;
   classifierModelsError?: string;
   registryEntries?: BenchmarkRegistryResponse['platformEntries'];
-  catalogModalities: readonly ModalityCatalogModel[];
+  catalogModalities: readonly ModalityCatalogModel[] | null;
 }) {
   const [form, setForm] = useState(() => configToFormState(config));
   // Tracks unsaved local edits. A background config refetch (the runs list
@@ -1546,13 +1546,14 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     }));
   }, [modelsQuery.data?.data]);
   const modelsError = modelsQuery.error instanceof Error ? modelsQuery.error.message : undefined;
+  const catalogModels = modelsQuery.error ? undefined : modelsQuery.data?.data;
   const catalogModalities = useMemo(
     () =>
-      (modelsQuery.data?.data ?? []).map(model => ({
+      catalogModels?.map(model => ({
         id: model.id,
         inputModalities: model.architecture?.input_modalities,
-      })),
-    [modelsQuery.data?.data]
+      })) ?? null,
+    [catalogModels]
   );
   const systemOneModelsQuery = useSystemOneModelOptions();
   const systemOneModelsError =

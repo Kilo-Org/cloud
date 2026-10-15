@@ -40,6 +40,7 @@ function seed(sqlite: DatabaseSync): void {
       ('run-classifier', 'classifier', 'efficient', 2, '${classifierIdentity}', 'running'),
       ('run-just-started', 'decider', 'efficient', 1, '${deciderIdentity}', 'running'),
       ('run-drifted', 'decider', 'frontier', 1, 'frontier:v1:stale-dataset', 'running'),
+      ('run-old-engine', 'decider', 'efficient', 1, '${deciderIdentity.replace(/:v\d+:/, ':v0:')}', 'running'),
       ('run-terminal', 'classifier', 'efficient', 1, '${classifierIdentity}', 'completed'),
       ('run-unlisted', 'decider', 'efficient', 1, '${deciderIdentity}', 'running');
 
@@ -49,6 +50,7 @@ function seed(sqlite: DatabaseSync): void {
       ('run-classifier', 'classifier/c', '', 0),
       ('run-just-started', 'model/a', '', 1),
       ('run-drifted', 'model/b', '', 1),
+      ('run-old-engine', 'model/d', '', 1),
       ('run-terminal', 'classifier/a', '', 1),
       ('run-unlisted', 'model/c', '', 1);
 
@@ -102,6 +104,17 @@ describe('run progress counts', () => {
         failedCases: 0,
         totalCases: null,
       });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('keeps the total when only the engine version changed', async () => {
+    const sqlite = new DatabaseSync(':memory:');
+    seed(sqlite);
+    try {
+      const progress = await loadRunProgress(sqliteD1(sqlite), ['run-old-engine']);
+      expect(progress.get('run-old-engine')?.totalCases).toBe(DECIDER_CASES.length);
     } finally {
       sqlite.close();
     }

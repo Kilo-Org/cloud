@@ -17,6 +17,7 @@ export type ModalityCatalogModel = {
 
 export type PoolModalityCoverage =
   | { status: 'covered' }
+  | { status: 'pending' }
   | { status: 'missing'; missing: InputModality[] }
   | { status: 'unknown'; unknownModelIds: string[] };
 
@@ -29,8 +30,9 @@ function recognizedModalities(
 
 export function computePoolModalityCoverage(params: {
   poolModelIds: readonly string[];
-  catalog: readonly ModalityCatalogModel[];
+  catalog: readonly ModalityCatalogModel[] | null;
 }): PoolModalityCoverage {
+  if (params.catalog === null) return { status: 'pending' };
   const catalogById = new Map<string, InputModality[] | null>();
   const mattered = new Set<InputModality>();
   for (const entry of params.catalog) {

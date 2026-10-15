@@ -331,8 +331,8 @@ export type StartedQueueRun = {
 
 /**
  * Drain the selected registry queues. 'both' starts at most one run per queue —
- * they hold independent slots and container budgets. Drain failures are logged
- * per queue, never thrown, so one wedged queue cannot block the other.
+ * they hold independent slots and share the container budget. Drain failures
+ * are logged per queue, never thrown, so one wedged queue cannot block the other.
  */
 export async function drainQueues(
   env: Env,
@@ -697,17 +697,22 @@ export function benchmarkLaneBudget(purpose: BenchmarkRunPurpose, liveLanes: num
 export function validateDeciderContainerBudget({
   modelCount,
   repetitions,
-  maxLiveContainers,
+  purpose,
+  liveLanes,
+  laneBudget,
 }: {
   modelCount: number;
   repetitions: number;
-  maxLiveContainers: number;
+  purpose: BenchmarkRunPurpose;
+  liveLanes: number;
+  laneBudget: number;
 }): void {
   const modelRepetitions = modelCount * repetitions;
-  if (modelRepetitions <= maxLiveContainers) return;
+  if (modelRepetitions <= laneBudget) return;
 
+  const freeLanes = Math.max(0, BENCHMARK_CONTAINER_BUDGET - liveLanes);
   throw new BenchmarkCapacityError(
-    `decider run needs ${modelRepetitions} container lanes (one per model repetition) and ${maxLiveContainers} of ${BENCHMARK_CONTAINER_BUDGET} are free; it starts after a running benchmark run finishes`
+    `decider run needs ${modelRepetitions} container lanes (one per model repetition); ${freeLanes} of ${BENCHMARK_CONTAINER_BUDGET} are free and a ${purpose} run may claim ${laneBudget} of them now; it starts after a running benchmark run finishes`
   );
 }
 
@@ -802,15 +807,18 @@ export async function startRun(
   // so the cap is sized against the lanes running runs already hold; for
   // classifier runs the column records their HTTP fan-out instead, since
   // classifier work holds no containers.
+  const liveLanes = kind === 'decider' ? await getLiveContainerLanes(env.BENCH_DB) : 0;
   const laneBudget =
     kind === 'classifier'
       ? BENCHMARK_CLASSIFIER_PARALLELISM
-      : benchmarkLaneBudget(purpose, await getLiveContainerLanes(env.BENCH_DB));
+      : benchmarkLaneBudget(purpose, liveLanes);
   if (kind === 'decider') {
     validateDeciderContainerBudget({
       modelCount: enqueuedEntries.length,
       repetitions,
-      maxLiveContainers: laneBudget,
+      purpose,
+      liveLanes,
+      laneBudget,
     });
   }
 
@@ -918,7 +926,7 @@ export async function startRun(
     while (cause instanceof Error) {
       if (cause.message.includes('NOT NULL constraint failed: benchmark_runs.max_concurrency')) {
         throw new BenchmarkCapacityError(
-          `container budget full: running benchmark runs committed ${BENCHMARK_CONTAINER_BUDGET} lanes before this run could claim ${laneBudget}`
+          `container lanes taken: another run started after ${liveLanes} of ${BENCHMARK_CONTAINER_BUDGET} lanes were counted, so this ${purpose} run can no longer claim ${laneBudget}`
         );
       }
       cause = cause.cause;
@@ -987,11 +995,11 @@ export async function startRun(
 }
 
 /**
- * Claim the oldest pending registry batch of one queue that fits that queue's
- * container budget, and start a run for it. Runs on a timer, on the admin's
+ * Claim the oldest pending registry batch of one queue that fits the lanes that
+ * queue may hold now, and start a run for it. Runs on a timer, on the admin's
  * manual trigger, and after any decider run reaches a terminal state. No-ops
- * when that queue's slot is occupied or there is no pending work. The other
- * queue's state is irrelevant — the slots and budgets are independent.
+ * when that queue's slot is occupied, no lanes are free, or there is no pending
+ * work. The other queue's slot is irrelevant; only its live lanes count.
  * Returns the started run id, or null.
  */
 export async function drainQueue(

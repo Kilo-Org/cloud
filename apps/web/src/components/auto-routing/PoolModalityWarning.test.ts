@@ -13,6 +13,10 @@ describe('PoolModalityWarning', () => {
     expect(render({ status: 'covered' })).toBe('');
   });
 
+  it('renders nothing while the catalog is loading or failed to load', () => {
+    expect(render({ status: 'pending' })).toBe('');
+  });
+
   it('names the missing modality and the default-model fallback', () => {
     const html = render({ status: 'missing', missing: ['image'] });
     expect(html).toContain('No model in this pool accepts image input.');

@@ -48,8 +48,8 @@ const TEST_CONFIG_ROWS = {
     production_token_profile: null,
     switch_horizon_turns: null,
     low_confidence_threshold: null,
-    max_concurrency: 500,
-    user_max_concurrency: 400,
+    max_concurrency: 80,
+    user_max_concurrency: 40,
     benchmark_user_id: TEST_CONFIG.benchmarkUserId,
     benchmark_org_id: TEST_CONFIG.benchmarkOrgId,
     classifier_repetitions: TEST_CONFIG.classifierRepetitions,
@@ -469,6 +469,30 @@ describe('GET /admin/runs', () => {
     // Only runs that can still change are tallied.
     expect(listRunProgressCounts).toHaveBeenCalledWith(env.BENCH_DB, [running.id]);
   });
+
+  it('still lists runs when the progress query fails', async () => {
+    const running: BenchmarkRun = {
+      id: 'decider-2026-06-15T00-00-00-000Z',
+      router: 'efficient',
+      kind: 'decider',
+      purpose: 'platform',
+      status: 'running',
+      startedAt: '2026-06-15T00:00:00.000Z',
+      completedAt: null,
+      error: null,
+      summaries: [],
+    };
+    vi.mocked(listRuns).mockResolvedValue([running]);
+    vi.mocked(listRunProgressCounts).mockRejectedValue(new Error('D1 overloaded'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: BenchmarkRun[] };
+    expect(body.runs.map(run => run.id)).toEqual([running.id]);
+    expect(body.runs[0].progress).toBeUndefined();
+  });
 });
 
 describe('POST /admin/runs', () => {
@@ -639,8 +663,8 @@ describe('POST /admin/runs', () => {
   });
 
   it('caps a queue batch at the shared container budget', async () => {
-    // A stale saved lane budget must not size the batch: user lanes stop at 400,
-    // so with 5 repetitions each run may claim floor(400 / 5) = 80 entries.
+    // A stale saved lane budget must not size the batch: user lanes stop at 150,
+    // so with 5 repetitions each run may claim floor(150 / 5) = 30 entries.
     vi.mocked(getConfigRows).mockResolvedValue({
       ...TEST_CONFIG_ROWS,
       config: {
@@ -660,7 +684,7 @@ describe('POST /admin/runs', () => {
     await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
     const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
-    expect(modelRows).toHaveLength(80);
+    expect(modelRows).toHaveLength(30);
     expect(modelRows[0].model).toBe('m/0');
   });
 
@@ -668,7 +692,8 @@ describe('POST /admin/runs', () => {
     // Every lane is committed to runs already going. Waiting is the correct
     // outcome: the panel must not claim the queue failed, and must not pretend
     // a run started.
-    vi.mocked(getLiveContainerLanes).mockResolvedValue(500);
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(250);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
@@ -683,6 +708,7 @@ describe('POST /admin/runs', () => {
   it('reports a wedged queue alongside the queue that did start', async () => {
     // The platform queue starts; the user queue's registry read fails. Hiding
     // that behind the started run would leave its pending work looking absent.
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     vi.mocked(listPendingCurrentProfiles).mockImplementation(async (_db, _filter, purpose) => {
       if (purpose === 'user') throw new Error('registry unavailable');
       return [{ model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' }];

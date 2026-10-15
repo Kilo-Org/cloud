@@ -233,7 +233,7 @@ describe('all-effort platform scheduling', () => {
   it('schedules every exact effort over bounded registry batches', async () => {
     // A nearly committed shared budget bounds each batch: 4 free lanes, and a
     // platform run takes half of them, so floor(2 / 1 repetition) = 2 entries.
-    vi.mocked(getLiveContainerLanes).mockResolvedValue(496);
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(246);
     const variants = ['none', 'low', 'medium', 'high', 'max'];
     catalogFetch.mockImplementation(async () =>
       Response.json({
@@ -325,21 +325,21 @@ describe('startRun — registry-backed decider runs', () => {
 
   it('sizes each queue from the shared budget and keeps the platform reserve', async () => {
     // Nothing live: a platform run takes half the free lanes, a user run takes
-    // its full limit — 400 of 500, so 100 always stay available to platform runs.
+    // its full limit — 150 of 250, so 100 always stay available to platform runs.
     await startRun(env, 'decider', {
       purpose: 'platform',
       entries: [{ model: 'p/a', variant: null }],
     });
-    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(250);
+    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(125);
 
     vi.mocked(insertRun).mockClear();
     await startRun(env, 'decider', { purpose: 'user', entries: [{ model: 'u/a', variant: null }] });
-    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(400);
+    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(150);
 
     vi.mocked(insertRun).mockClear();
     // A user run holding its limit leaves 100 lanes, and a platform run splits
     // those with the other router rather than taking all of them.
-    vi.mocked(getLiveContainerLanes).mockResolvedValue(400);
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(150);
     await startRun(env, 'decider', {
       purpose: 'platform',
       entries: [{ model: 'p/b', variant: null }],
@@ -348,11 +348,20 @@ describe('startRun — registry-backed decider runs', () => {
   });
 
   it('refuses a decider run with no free lanes as capacity, not a config fault', async () => {
-    vi.mocked(getLiveContainerLanes).mockResolvedValue(500);
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(250);
     await expect(
       startRun(env, 'decider', { purpose: 'platform', entries: [{ model: 'p/a', variant: null }] })
     ).rejects.toThrow(BenchmarkCapacityError);
     expect(insertRun).not.toHaveBeenCalled();
+  });
+
+  it('reports the actual free lanes separately from the run share', async () => {
+    // 10 lanes free; a platform run may take half, so 6 model repetitions wait.
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(240);
+    const entries = Array.from({ length: 6 }, (_, i) => ({ model: `p/${i}`, variant: null }));
+    await expect(startRun(env, 'decider', { purpose: 'platform', entries })).rejects.toThrow(
+      '10 of 250 are free and a platform run may claim 5 of them now'
+    );
   });
 
   it('rejects decider runs without a registry entry snapshot', async () => {
@@ -703,7 +712,7 @@ describe('drainQueue', () => {
 
   it('skips only the queue whose own slot is occupied', async () => {
     // A running user-queue run must not block the platform queue: the two hold
-    // independent slots and independent container budgets.
+    // independent slots.
     vi.mocked(getRunningRun).mockImplementation(async (_db, _kind, purpose) =>
       purpose === 'user' ? runningRun('user-busy', 'user') : undefined
     );
@@ -718,7 +727,7 @@ describe('drainQueue', () => {
   });
 
   it('caps the user batch at the user container limit', async () => {
-    // User lanes stop at 400; repetitions 5 → floor(400 / 5) = 80 entries.
+    // User lanes stop at 150; repetitions 5 → floor(150 / 5) = 30 entries.
     mockConfig({ decider_repetitions: 5 });
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue(
       Array.from({ length: 100 }, (_, i) => ({
@@ -728,15 +737,15 @@ describe('drainQueue', () => {
       }))
     );
     const result = await drainQueue(env, 'user');
-    expect(result!.entryCount).toBe(80);
+    expect(result!.entryCount).toBe(30);
     const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
-    expect(modelRows).toHaveLength(80);
+    expect(modelRows).toHaveLength(30);
     expect(modelRows[0].model).toBe('m/0');
   });
 
   it('skips a queue quietly while the shared budget is fully committed', async () => {
     const infoLog = vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.mocked(getLiveContainerLanes).mockResolvedValue(500);
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(250);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/pending', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
@@ -849,7 +858,7 @@ describe('frontier router runs', () => {
         router: 'frontier',
         // Half of the free shared budget: the platform pool is split between the
         // two routers so neither one's long run can starve the other.
-        max_concurrency: 250,
+        max_concurrency: 125,
         frontier_min_accuracy_delta: 0.1,
         engine_identity: expect.stringMatching(/^frontier:v1:/),
       }),
@@ -901,9 +910,9 @@ describe('frontier router runs', () => {
       classifierModels: ['classifier/a'],
       deciderModels: [{ model: 'platform/a', variant: null, reasoning_effort: null }],
     }));
-    // The efficient run holds most of the budget; the platform pool is split, so
-    // frontier still gets a share instead of waiting for it to finish.
-    vi.mocked(getLiveContainerLanes).mockResolvedValue(300);
+    // The efficient runs hold 150 of 250 lanes; the platform pool is split, so
+    // frontier still gets a share instead of waiting for them to finish.
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(150);
 
     const result = await startRun(env, 'decider', {
       router: 'frontier',
@@ -911,7 +920,7 @@ describe('frontier router runs', () => {
     });
 
     expect(result.runId).toMatch(/^frontier-decider-/);
-    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(100);
+    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(50);
   });
 
   it('publishes the frontier router threshold from its effective policy values', async () => {

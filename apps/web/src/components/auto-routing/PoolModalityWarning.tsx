@@ -1,5 +1,7 @@
 'use client';
 
+// Web Jest compiles JSX with the classic runtime, which needs React in scope.
+import React from 'react';
 import { TriangleAlert } from 'lucide-react';
 import {
   poolModalityUnknownMessage,
@@ -8,7 +10,7 @@ import {
 } from '@/lib/auto-routing-pool-modality';
 
 export function PoolModalityWarning({ coverage }: { coverage: PoolModalityCoverage }) {
-  if (coverage.status === 'covered') return null;
+  if (coverage.status === 'covered' || coverage.status === 'pending') return null;
 
   if (coverage.status === 'unknown') {
     return (

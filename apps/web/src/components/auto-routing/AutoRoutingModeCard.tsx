@@ -819,16 +819,18 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     [modelsQuery.data?.data, draftPool]
   );
 
+  const catalogModels = modelsQuery.error ? undefined : modelsQuery.data?.data;
   const modalityCoverage = useMemo(
     () =>
       computePoolModalityCoverage({
         poolModelIds: (draftPool ?? []).map(entry => entry.model),
-        catalog: (modelsQuery.data?.data ?? []).map(model => ({
-          id: model.id,
-          inputModalities: model.architecture?.input_modalities,
-        })),
+        catalog:
+          catalogModels?.map(model => ({
+            id: model.id,
+            inputModalities: model.architecture?.input_modalities,
+          })) ?? null,
       }),
-    [draftPool, modelsQuery.data?.data]
+    [draftPool, catalogModels]
   );
 
   const selectedAddModel = eligibleModels.find(model => model.id === addModelId);

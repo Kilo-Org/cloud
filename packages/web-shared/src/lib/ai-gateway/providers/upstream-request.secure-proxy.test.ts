@@ -1,3 +1,4 @@
+import { SecureProxyRequestBodySchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
 import { buildDirectProvider } from './build-direct-provider';
 import { upstreamRequest } from './upstream-request';
 
@@ -59,7 +60,7 @@ async function sendThroughSecureProxy(disable_url_suffix: boolean) {
   return {
     url,
     headers: new Headers(init?.headers),
-    body: JSON.parse(String(init?.body)),
+    body: SecureProxyRequestBodySchema.parse(JSON.parse(String(init?.body))),
     sent: body,
   };
 }

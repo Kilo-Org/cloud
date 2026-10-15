@@ -405,8 +405,9 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      # oxfmt is a root dev dependency; the workspace packages are not needed.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
       - name: Format check
         run: |
@@ -417,6 +418,7 @@ jobs:
 
   drizzle-check:
     needs: changes
+    if: fromJSON(needs.changes.outputs.affected).full || contains(fromJSON(needs.changes.outputs.affected).packages, '@kilocode/db')
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -667,7 +669,7 @@ jobs:
 
   build-ai-gateway:
     needs: changes
-    if: needs.changes.outputs.ai_gateway == 'true'
+    if: needs.changes.outputs.ai_gateway == 'true' && (fromJSON(needs.changes.outputs.affected).full || contains(fromJSON(needs.changes.outputs.affected).packages, 'ai-gateway'))
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:

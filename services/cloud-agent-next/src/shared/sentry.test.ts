@@ -38,6 +38,9 @@ describe('Cloud Agent Sentry configuration', () => {
 
 describe('Cloud Agent Sentry privacy', () => {
   it('keeps exception stacks and correlation IDs without customer content', () => {
+    const frameUrl = new URL('https://host/file.js?private-query=value');
+    frameUrl.username = 'user';
+    frameUrl.password = 'private-password';
     const event: ErrorEvent = {
       type: undefined,
       event_id: 'event-id',
@@ -81,7 +84,7 @@ describe('Cloud Agent Sentry privacy', () => {
                   post_context: ['private-code'],
                   vars: { token: 'private-variable' },
                 },
-                { filename: 'https://user:private-password@host/file.js?private-query=value' },
+                { filename: frameUrl.toString() },
               ],
             },
           },
@@ -97,6 +100,7 @@ describe('Cloud Agent Sentry privacy', () => {
       colno: 22,
       in_app: true,
     });
+    expect(sanitized?.exception?.values?.[0]?.stacktrace?.frames?.[1]).toEqual({});
     expect(sanitized?.contexts).toEqual({
       cloud_agent: {
         component: 'worker',

@@ -39,13 +39,48 @@ describe('platform model selection', () => {
     });
   });
 
-  it('preserves the configured confidence threshold when saving unrelated form changes', () => {
-    const config = { ...baseConfig, lowConfidenceThreshold: 0.8 };
+  it('round-trips the token profile, switch horizon, and confidence threshold', () => {
+    const config: BenchmarkConfig = {
+      ...baseConfig,
+      productionTokenProfile: { uncachedInputTokens: 7900, cachedInputTokens: 122900 },
+      switchHorizonTurns: 10,
+      lowConfidenceThreshold: 0.8,
+    };
     const state = configToFormState(config);
-    expect(formStateToConfig({ ...state, minAccuracy: 0.9 }, config).lowConfidenceThreshold).toBe(
-      0.8
-    );
-    expect(formStateToConfig(configToFormState(null), null).lowConfidenceThreshold).toBeNull();
+    expect(formStateToConfig({ ...state, minAccuracy: 0.9 }, config)).toMatchObject({
+      productionTokenProfile: { uncachedInputTokens: 7900, cachedInputTokens: 122900 },
+      switchHorizonTurns: 10,
+      lowConfidenceThreshold: 0.8,
+    });
+  });
+
+  it('clears optional ranking settings when their fields are empty', () => {
+    const config: BenchmarkConfig = {
+      ...baseConfig,
+      productionTokenProfile: { uncachedInputTokens: 7900, cachedInputTokens: 122900 },
+      switchHorizonTurns: 10,
+      lowConfidenceThreshold: 0.8,
+    };
+    const state = {
+      ...configToFormState(config),
+      uncachedInputTokens: '',
+      cachedInputTokens: ' ',
+      switchHorizonTurns: '',
+      lowConfidenceThreshold: '',
+    };
+    expect(formStateToConfig(state, config)).toMatchObject({
+      productionTokenProfile: null,
+      switchHorizonTurns: null,
+      lowConfidenceThreshold: null,
+    });
+  });
+
+  it('treats one empty token field as zero tokens', () => {
+    const state = { ...configToFormState(baseConfig), cachedInputTokens: '122900' };
+    expect(formStateToConfig(state, baseConfig).productionTokenProfile).toEqual({
+      uncachedInputTokens: 0,
+      cachedInputTokens: 122900,
+    });
   });
 
   it('round-trips model-level selections without adding an effort', () => {

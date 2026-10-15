@@ -214,6 +214,31 @@ async function fetchBenchmarkRoutingTable(router: AutoRouter) {
 
 type DeciderModelRow = BenchmarkPlatformModel;
 
+function optionalNumberText(value: number | null | undefined): string {
+  return value == null ? '' : String(value);
+}
+
+function parseOptionalNumber(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) ? value : null;
+}
+
+// Both blank clears the profile; a single blank side counts as zero tokens.
+function parseTokenProfile(state: {
+  uncachedInputTokens: string;
+  cachedInputTokens: string;
+}): BenchmarkConfig['productionTokenProfile'] {
+  const uncachedInputTokens = parseOptionalNumber(state.uncachedInputTokens);
+  const cachedInputTokens = parseOptionalNumber(state.cachedInputTokens);
+  if (uncachedInputTokens === null && cachedInputTokens === null) return null;
+  return {
+    uncachedInputTokens: uncachedInputTokens ?? 0,
+    cachedInputTokens: cachedInputTokens ?? 0,
+  };
+}
+
 export function configToFormState(config: BenchmarkConfig | null): {
   classifierModels: string[];
   deciderModels: DeciderModelRow[];
@@ -229,6 +254,10 @@ export function configToFormState(config: BenchmarkConfig | null): {
   classifierRepetitions: number;
   deciderRepetitions: number;
   classifierMaxP95LatencyMs: string;
+  uncachedInputTokens: string;
+  cachedInputTokens: string;
+  switchHorizonTurns: string;
+  lowConfidenceThreshold: string;
 } {
   if (config === null) {
     // No config saved yet: identity fields are overrides, so blank means the
@@ -248,6 +277,10 @@ export function configToFormState(config: BenchmarkConfig | null): {
       classifierRepetitions: 1,
       deciderRepetitions: 1,
       classifierMaxP95LatencyMs: '1000',
+      uncachedInputTokens: '',
+      cachedInputTokens: '',
+      switchHorizonTurns: '',
+      lowConfidenceThreshold: '',
     };
   }
   return {
@@ -266,6 +299,10 @@ export function configToFormState(config: BenchmarkConfig | null): {
     deciderRepetitions: config.deciderRepetitions,
     classifierMaxP95LatencyMs:
       config.classifierMaxP95LatencyMs !== null ? String(config.classifierMaxP95LatencyMs) : '',
+    uncachedInputTokens: optionalNumberText(config.productionTokenProfile?.uncachedInputTokens),
+    cachedInputTokens: optionalNumberText(config.productionTokenProfile?.cachedInputTokens),
+    switchHorizonTurns: optionalNumberText(config.switchHorizonTurns),
+    lowConfidenceThreshold: optionalNumberText(config.lowConfidenceThreshold),
   };
 }
 
@@ -290,9 +327,9 @@ export function formStateToConfig(
     frontierMinAccuracyDelta: state.frontierMinAccuracyDelta,
     switchCostFactor: state.switchCostFactor,
     bestAccuracySwitchThreshold: state.bestAccuracySwitchThreshold,
-    productionTokenProfile: base?.productionTokenProfile ?? null,
-    switchHorizonTurns: base?.switchHorizonTurns ?? null,
-    lowConfidenceThreshold: base?.lowConfidenceThreshold ?? null,
+    productionTokenProfile: parseTokenProfile(state),
+    switchHorizonTurns: parseOptionalNumber(state.switchHorizonTurns),
+    lowConfidenceThreshold: parseOptionalNumber(state.lowConfidenceThreshold),
     maxConcurrency: state.maxConcurrency,
     userMaxConcurrency: state.userMaxConcurrency,
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
@@ -680,6 +717,101 @@ function BenchmarkConfigEditor({
               }
               className="h-8 w-40 tabular-nums"
             />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-switch-horizon-turns" className="text-sm font-medium">
+              Switch horizon (turns)
+            </Label>
+            <Input
+              id="benchmark-switch-horizon-turns"
+              type="number"
+              min={1}
+              step={1}
+              value={form.switchHorizonTurns}
+              onChange={e => updateForm(prev => ({ ...prev, switchHorizonTurns: e.target.value }))}
+              className="h-8 w-40 tabular-nums"
+              placeholder="(use switch cost factor)"
+              aria-describedby="benchmark-switch-horizon-turns-help"
+            />
+            <p id="benchmark-switch-horizon-turns-help" className="text-muted-foreground text-xs">
+              Switch to a cheaper model only when savings over this many turns exceed the lost
+              prompt cache. Empty uses the switch cost factor.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-low-confidence-threshold" className="text-sm font-medium">
+              Low-confidence threshold (0–1)
+            </Label>
+            <Input
+              id="benchmark-low-confidence-threshold"
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={form.lowConfidenceThreshold}
+              onChange={e =>
+                updateForm(prev => ({ ...prev, lowConfidenceThreshold: e.target.value }))
+              }
+              className="h-8 w-40 tabular-nums"
+              placeholder="(off)"
+              aria-describedby="benchmark-low-confidence-threshold-help"
+            />
+            <p
+              id="benchmark-low-confidence-threshold-help"
+              className="text-muted-foreground text-xs"
+            >
+              Classifications below this confidence pick the most accurate model. Empty turns it
+              off.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <span className="text-sm font-medium">Production token profile</span>
+            <div className="flex flex-wrap gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label
+                  htmlFor="benchmark-uncached-input-tokens"
+                  className="text-muted-foreground text-xs"
+                >
+                  Uncached input tokens
+                </Label>
+                <Input
+                  id="benchmark-uncached-input-tokens"
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={form.uncachedInputTokens}
+                  onChange={e =>
+                    updateForm(prev => ({ ...prev, uncachedInputTokens: e.target.value }))
+                  }
+                  className="h-8 w-40 tabular-nums"
+                  aria-describedby="benchmark-token-profile-help"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label
+                  htmlFor="benchmark-cached-input-tokens"
+                  className="text-muted-foreground text-xs"
+                >
+                  Cached input tokens
+                </Label>
+                <Input
+                  id="benchmark-cached-input-tokens"
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={form.cachedInputTokens}
+                  onChange={e =>
+                    updateForm(prev => ({ ...prev, cachedInputTokens: e.target.value }))
+                  }
+                  className="h-8 w-40 tabular-nums"
+                  aria-describedby="benchmark-token-profile-help"
+                />
+              </div>
+            </div>
+            <p id="benchmark-token-profile-help" className="text-muted-foreground text-xs">
+              Mean input tokens per production request. Ranking adds their cost at each model&apos;s
+              prompt and cache-read prices. Leave both empty to rank by benchmark cost only.
+            </p>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-max-concurrency" className="text-sm font-medium">

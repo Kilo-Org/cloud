@@ -2105,7 +2105,6 @@ export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 export const CustomLlmProviderSchema = z.enum([
   'anthropic', // uses Messages API
   'openai', // uses Responses API
-  'openai-compatible', // uses Chat Completions API with reasoning_content
   'openrouter', // uses Chat Completions API with reasoning_details
 ]);
 

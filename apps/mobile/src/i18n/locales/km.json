@@ -2428,6 +2428,7 @@
       "title": "ភ្នាក់ងារត្រូវការចម្លើយរបស់អ្នក",
       "skipQuestionsTitle": "រំលងសំណួរ?",
       "skipQuestionsMessage": "ភ្នាក់ងារនឹងរំលងជំហាននេះ។",
+      "answerProgress": "បានឆ្លើយ {{answered}} ក្នុងចំណោម {{total}}",
       "selectAllThatApply": "ជ្រើសរើសចម្លើយទាំងអស់ដែលសមស្រប។",
       "option": "{{label}}",
       "optionSelected": "{{label}}, បានជ្រើសរើស",

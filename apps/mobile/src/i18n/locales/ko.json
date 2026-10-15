@@ -1916,6 +1916,7 @@
       "title": "에이전트의 질문",
       "skipQuestionsTitle": "질문을 건너뛸까요?",
       "skipQuestionsMessage": "에이전트가 이 단계를 건너뜁니다.",
+      "answerProgress": "{{total}}개 중 {{answered}}개 답변 완료",
       "selectAllThatApply": "해당하는 항목을 모두 선택하세요.",
       "option": "항목: {{label}}",
       "optionSelected": "{{label}}, 선택됨",

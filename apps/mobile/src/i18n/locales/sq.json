@@ -2428,6 +2428,7 @@
       "title": "Agjenti kërkon përgjigjen tënde",
       "skipQuestionsTitle": "Të anashkalohen pyetjet?",
       "skipQuestionsMessage": "Agjenti do ta anashkalojë këtë hap.",
+      "answerProgress": "{{answered}} nga {{total}} të përgjigjura",
       "selectAllThatApply": "Zgjidh të gjitha opsionet që vlejnë.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, zgjedhur",

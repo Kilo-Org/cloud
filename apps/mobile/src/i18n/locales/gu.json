@@ -2428,6 +2428,7 @@
       "title": "એજન્ટને તમારો જવાબ જોઈએ છે",
       "skipQuestionsTitle": "પ્રશ્નો છોડવા?",
       "skipQuestionsMessage": "એજન્ટ આ પગલું છોડશે.",
+      "answerProgress": "{{total}} માંથી {{answered}} ના જવાબ અપાયા",
       "selectAllThatApply": "લાગુ પડતા બધા વિકલ્પો પસંદ કરો.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, પસંદ કરેલ",

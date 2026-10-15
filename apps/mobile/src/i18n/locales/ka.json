@@ -2428,6 +2428,7 @@
       "title": "აგენტი პასუხს ელოდება",
       "skipQuestionsTitle": "გამოვტოვოთ კითხვები?",
       "skipQuestionsMessage": "აგენტი გამოტოვებს ამ ნაბიჯს.",
+      "answerProgress": "პასუხი გაცემულია {{total}}-დან {{answered}}-ზე",
       "selectAllThatApply": "აირჩიეთ ყველა შესაბამისი ვარიანტი.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, არჩეულია",

@@ -1901,6 +1901,7 @@
       "title": "Richiesta dell'agente",
       "skipQuestionsTitle": "Saltare le domande?",
       "skipQuestionsMessage": "L'agente salterà questo passaggio.",
+      "answerProgress": "{{answered}} di {{total}} risposte",
       "selectAllThatApply": "Seleziona tutte le opzioni pertinenti.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, opzione selezionata",

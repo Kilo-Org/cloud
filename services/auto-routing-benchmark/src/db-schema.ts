@@ -208,6 +208,61 @@ export const pendingDeciderOutputs = sqliteTable(
   ]
 );
 
+export const schedulerChunks = sqliteTable(
+  'scheduler_chunks',
+  {
+    id: text('id').primaryKey(),
+    run_id: text('run_id')
+      .notNull()
+      .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    providers: text('providers').notNull(),
+    rep: integer('rep').notNull(),
+    chunk: integer('chunk').notNull(),
+    case_ids: text('case_ids').notNull(),
+    status: text('status')
+      .$type<'pending' | 'queued' | 'active' | 'completed' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    token: text('token'),
+    slot: integer('slot'),
+    lease_until: integer('lease_until').notNull().default(0),
+    available_at: integer('available_at').notNull().default(0),
+    attempts: integer('attempts').notNull().default(0),
+  },
+  table => [
+    index('IX_scheduler_chunks_pending').on(table.status, table.available_at),
+    index('IX_scheduler_chunks_run').on(table.run_id),
+    uniqueIndex('UQ_scheduler_chunks_live_slot')
+      .on(table.slot)
+      .where(sql`${table.status} IN ('queued', 'active')`),
+  ]
+);
+
+export const schedulerRuns = sqliteTable('scheduler_runs', {
+  run_id: text('run_id')
+    .primaryKey()
+    .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
+});
+
+export const schedulerExecutions = sqliteTable(
+  'scheduler_executions',
+  {
+    run_id: text('run_id')
+      .notNull()
+      .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    rep: integer('rep').notNull(),
+    case_id: text('case_id').notNull(),
+    token: text('token').notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.run_id, table.model, table.variant, table.rep, table.case_id] }),
+  ]
+);
+
 export const routingTables = sqliteTable('routing_tables', {
   run_id: text('run_id').primaryKey(),
   router: text('router').$type<AutoRouter>().notNull().default('efficient'),

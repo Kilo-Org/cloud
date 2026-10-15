@@ -2428,6 +2428,7 @@
       "title": "ഏജന്റിന് മറുപടി ആവശ്യമാണ്",
       "skipQuestionsTitle": "ചോദ്യങ്ങൾ ഒഴിവാക്കണോ?",
       "skipQuestionsMessage": "ഏജന്റ് ഈ ഘട്ടം ഒഴിവാക്കും.",
+      "answerProgress": "{{total}} ൽ {{answered}} എണ്ണത്തിന് ഉത്തരം നൽകി",
       "selectAllThatApply": "ബാധകമായവയെല്ലാം തിരഞ്ഞെടുക്കുക.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, തിരഞ്ഞെടുത്തു",

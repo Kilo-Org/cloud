@@ -2428,6 +2428,7 @@
       "title": "Agent vajab vastust",
       "skipQuestionsTitle": "Kas jätta küsimused vahele?",
       "skipQuestionsMessage": "Agent jätab selle sammu vahele.",
+      "answerProgress": "Vastatud {{answered}}/{{total}}",
       "selectAllThatApply": "Vali kõik sobivad variandid.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, valitud",

@@ -1948,6 +1948,7 @@
       "title": "Agent czeka na odpowiedź",
       "skipQuestionsTitle": "Pominąć pytania?",
       "skipQuestionsMessage": "Agent pominie ten krok.",
+      "answerProgress": "Odpowiedziano na {{answered}} z {{total}}",
       "selectAllThatApply": "Zaznacz wszystkie pasujące odpowiedzi.",
       "option": "Opcja: {{label}}",
       "optionSelected": "Opcja: {{label}}, wybrana",

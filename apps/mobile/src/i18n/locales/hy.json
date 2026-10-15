@@ -2428,6 +2428,7 @@
       "title": "Գործակալը պատասխանի է սպասում",
       "skipQuestionsTitle": "Բաց թողնե՞լ հարցերը",
       "skipQuestionsMessage": "Գործակալը կբաց թողնի այս քայլը։",
+      "answerProgress": "Պատասխանված՝ {{answered}}/{{total}}",
       "selectAllThatApply": "Ընտրեք բոլոր համապատասխան տարբերակները։",
       "option": "{{label}}",
       "optionSelected": "{{label}}, ընտրված",

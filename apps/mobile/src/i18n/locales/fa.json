@@ -2428,6 +2428,7 @@
       "title": "نیاز عامل به پاسخ شما",
       "skipQuestionsTitle": "از پرسش‌ها بگذرید؟",
       "skipQuestionsMessage": "عامل از این مرحله می‌گذرد.",
+      "answerProgress": "{{answered}} از {{total}} پاسخ داده شده",
       "selectAllThatApply": "همهٔ گزینه‌های مرتبط را انتخاب کنید.",
       "option": "{{label}}",
       "optionSelected": "{{label}}، انتخاب‌شده",

@@ -2428,6 +2428,7 @@
       "title": "Onye nnọchi anya chọrọ azịza",
       "skipQuestionsTitle": "Mafee ajụjụ?",
       "skipQuestionsMessage": "Onye nnọchi anya ga-amafe nzọụkwụ a.",
+      "answerProgress": "Azịrị {{answered}} n'ime {{total}}",
       "selectAllThatApply": "Họrọ ihe niile metụtara gị.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, ahọpụtara",

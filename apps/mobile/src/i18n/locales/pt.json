@@ -2460,6 +2460,7 @@
       "title": "Resposta necessária",
       "skipQuestionsTitle": "Saltar as perguntas?",
       "skipQuestionsMessage": "O agente vai saltar este passo.",
+      "answerProgress": "{{answered}} de {{total}} respondidas",
       "selectAllThatApply": "Selecione todas as opções aplicáveis.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, selecionada",

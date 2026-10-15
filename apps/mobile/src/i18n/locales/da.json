@@ -2428,6 +2428,7 @@
       "title": "Agenten har brug for svar",
       "skipQuestionsTitle": "Spring spørgsmål over?",
       "skipQuestionsMessage": "Agenten springer dette trin over.",
+      "answerProgress": "{{answered}} af {{total}} besvaret",
       "selectAllThatApply": "Vælg alle relevante svar.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, valgt",

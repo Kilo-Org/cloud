@@ -2428,6 +2428,7 @@
       "title": "Fulltrúinn þarf svar",
       "skipQuestionsTitle": "Sleppa spurningum?",
       "skipQuestionsMessage": "Fulltrúinn sleppir þessu skrefi.",
+      "answerProgress": "{{answered}} af {{total}} svarað",
       "selectAllThatApply": "Veldu allt sem á við.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, valið",

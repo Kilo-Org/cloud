@@ -2428,6 +2428,7 @@
       "title": "Agent benodig insette",
       "skipQuestionsTitle": "Vrae oorslaan?",
       "skipQuestionsMessage": "Die agent sal hierdie stap oorslaan.",
+      "answerProgress": "{{answered}} van {{total}} beantwoord",
       "selectAllThatApply": "Kies alles wat van toepassing is.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, gekies",

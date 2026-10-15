@@ -2428,6 +2428,7 @@
       "title": "Ejen memerlukan maklumat",
       "skipQuestionsTitle": "Langkau soalan?",
       "skipQuestionsMessage": "Ejen akan melangkau langkah ini.",
+      "answerProgress": "{{answered}} daripada {{total}} dijawab",
       "selectAllThatApply": "Pilih semua yang berkenaan.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, dipilih",

@@ -2428,6 +2428,7 @@
       "title": "ଏଜେଣ୍ଟକୁ ଆପଣଙ୍କ ଉତ୍ତର ଦରକାର",
       "skipQuestionsTitle": "ପ୍ରଶ୍ନ ଛାଡ଼ିବେ?",
       "skipQuestionsMessage": "ଏଜେଣ୍ଟ ଏହି ପଦକ୍ଷେପ ଛାଡ଼ି ଆଗକୁ ଯିବ।",
+      "answerProgress": "{{total}} ମଧ୍ୟରୁ {{answered}} ର ଉତ୍ତର ଦିଆଯାଇଛି",
       "selectAllThatApply": "ପ୍ରଯୁଜ୍ୟ ସମସ୍ତ ବିକଳ୍ପ ବାଛନ୍ତୁ।",
       "option": "{{label}}",
       "optionSelected": "{{label}}, ଚୟନ ହୋଇଛି",

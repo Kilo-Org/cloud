@@ -1916,6 +1916,7 @@
       "title": "Ajan yanıt bekliyor",
       "skipQuestionsTitle": "Sorular atlansın mı?",
       "skipQuestionsMessage": "Ajan bu adımı atlayacak.",
+      "answerProgress": "{{answered}}/{{total}} yanıtlandı",
       "selectAllThatApply": "Uygun seçeneklerin tümünü seç.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, seçili",

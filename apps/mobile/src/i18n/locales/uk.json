@@ -1948,6 +1948,7 @@
       "title": "Агенту потрібна відповідь",
       "skipQuestionsTitle": "Пропустити запитання?",
       "skipQuestionsMessage": "Агент пропустить цей крок.",
+      "answerProgress": "Відповіді: {{answered}} з {{total}}",
       "selectAllThatApply": "Виберіть усі відповідні варіанти.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, вибрано",

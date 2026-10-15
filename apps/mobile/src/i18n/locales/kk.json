@@ -2428,6 +2428,7 @@
       "title": "Агентке жауап қажет",
       "skipQuestionsTitle": "Сұрақтарды өткізіп жібересіз бе?",
       "skipQuestionsMessage": "Агент бұл қадамды өткізіп жібереді.",
+      "answerProgress": "{{total}} ішінен {{answered}} жауап берілді",
       "selectAllThatApply": "Сәйкес келетін нұсқалардың бәрін таңдаңыз.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, таңдалған",

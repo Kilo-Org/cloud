@@ -1932,6 +1932,7 @@
       "title": "הסוכן ממתין לתשובה",
       "skipQuestionsTitle": "לדלג על השאלות?",
       "skipQuestionsMessage": "הסוכן ידלג על השלב הזה.",
+      "answerProgress": "נענו {{answered}} מתוך {{total}}",
       "selectAllThatApply": "בחר את כל האפשרויות הרלוונטיות.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, האפשרות נבחרה",

@@ -7,7 +7,7 @@
     "deploy": "wrangler deploy",
     "predeploy": "wrangler d1 migrations apply auto-routing-benchmark --remote",
     "dev": "wrangler dev",
-    "types": "wrangler types --include-runtime=false",
+    "types": "wrangler types --include-runtime=false --strict-vars=false",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/auto-routing-benchmark/src",
     "db:generate": "drizzle-kit generate",
@@ -16,6 +16,7 @@
     "judge:calibrate": "tsx scripts/judge-calibration.ts",
     "sweep:offline": "tsx scripts/offline-sweep.ts",
     "screen:candidates": "tsx scripts/screen-candidates.ts",
+    "smoke:scheduler": "tsx scripts/scheduler-smoke.ts",
     "test": "vitest run"
   },
   "dependencies": {

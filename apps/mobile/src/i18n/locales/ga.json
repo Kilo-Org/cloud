@@ -2524,6 +2524,7 @@
       "title": "Tá ionchur ag teastáil ón ngníomhaire",
       "skipQuestionsTitle": "An bhfágfar na ceisteanna gan freagra?",
       "skipQuestionsMessage": "Fágfaidh an gníomhaire an chéim seo ar lár.",
+      "answerProgress": "{{answered}} as {{total}} freagartha",
       "selectAllThatApply": "Roghnaigh gach ceann a bhaineann leat.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, roghnaithe",

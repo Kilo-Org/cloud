@@ -1916,6 +1916,7 @@
       "title": "Tác nhân cần bạn trả lời",
       "skipQuestionsTitle": "Bỏ qua các câu hỏi?",
       "skipQuestionsMessage": "Tác nhân sẽ bỏ qua bước này.",
+      "answerProgress": "Đã trả lời {{answered}}/{{total}}",
       "selectAllThatApply": "Chọn tất cả các mục phù hợp.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, đã chọn",

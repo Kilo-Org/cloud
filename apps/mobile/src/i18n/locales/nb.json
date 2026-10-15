@@ -2428,6 +2428,7 @@
       "title": "Agenten trenger svar",
       "skipQuestionsTitle": "Hoppe over spørsmål?",
       "skipQuestionsMessage": "Agenten hopper over dette trinnet.",
+      "answerProgress": "{{answered}} av {{total}} besvart",
       "selectAllThatApply": "Velg alle alternativene som passer.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, valgt",

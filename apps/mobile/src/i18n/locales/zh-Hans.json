@@ -1916,6 +1916,7 @@
       "title": "智能体需要你的回答",
       "skipQuestionsTitle": "跳过问题？",
       "skipQuestionsMessage": "智能体将跳过此步骤。",
+      "answerProgress": "已回答 {{answered}}/{{total}}",
       "selectAllThatApply": "请选择所有适用的选项。",
       "option": "{{label}}",
       "optionSelected": "{{label}}，已选中",

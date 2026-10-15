@@ -1833,6 +1833,7 @@
       "title": "Réponse attendue par l'agent",
       "skipQuestionsTitle": "Passer les questions ?",
       "skipQuestionsMessage": "L'agent passera cette étape.",
+      "answerProgress": "Réponses : {{answered}} sur {{total}}",
       "selectAllThatApply": "Sélectionnez toutes les réponses pertinentes.",
       "option": "Option : {{label}}",
       "optionSelected": "{{label}}, sélectionné",

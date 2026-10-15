@@ -2,7 +2,6 @@
 
 import {
   BENCHMARK_CONTAINER_BUDGET,
-  BENCHMARK_PLATFORM_RESERVED_CONTAINERS,
   DEFAULT_AUTO_ROUTER,
   type AutoRouter,
   BenchmarkConfigResponseSchema,
@@ -1053,11 +1052,9 @@ function BenchmarkConfigEditor({
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <span className="text-sm font-medium">Shared container budget</span>
             <p className="text-muted-foreground text-xs">
-              {BENCHMARK_CONTAINER_BUDGET} benchmark containers are shared by every queue and both
-              routers. User-queue runs use at most{' '}
-              {BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS}; the remaining{' '}
-              {BENCHMARK_PLATFORM_RESERVED_CONTAINERS} stay reserved for platform runs, which split
-              the free lanes with the other router.
+              Up to {BENCHMARK_CONTAINER_BUDGET} containers are shared by every queue and both
+              routers. Freed slots take eligible unfinished work using weighted shares with
+              borrowing. Model and provider concurrency limits apply to active chunks.
             </p>
           </div>
           <div className="sm:col-span-2">

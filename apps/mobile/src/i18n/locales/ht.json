@@ -2428,6 +2428,7 @@
       "title": "Ajan an bezwen yon repons",
       "skipQuestionsTitle": "Sote kesyon yo?",
       "skipQuestionsMessage": "Ajan an ap sote etap sa a.",
+      "answerProgress": "{{answered}} sou {{total}} reponn",
       "selectAllThatApply": "Chwazi tout repons ki valab yo.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, chwazi",

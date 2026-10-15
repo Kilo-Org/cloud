@@ -2428,6 +2428,7 @@
       "title": "නියෝජිතයාට ඔබේ පිළිතුර අවශ්‍යයි",
       "skipQuestionsTitle": "ප්‍රශ්න මඟ හරින්නද?",
       "skipQuestionsMessage": "නියෝජිතයා මෙම පියවර මඟ හරිනු ඇත.",
+      "answerProgress": "{{total}} න් {{answered}} කට පිළිතුරු දී ඇත",
       "selectAllThatApply": "අදාළ වන සියල්ල තෝරන්න.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, තෝරා ඇත",

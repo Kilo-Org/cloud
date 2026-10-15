@@ -2428,6 +2428,7 @@
       "title": "Agentga javob kerak",
       "skipQuestionsTitle": "Savollar o'tkazib yuborilsinmi?",
       "skipQuestionsMessage": "Agent bu bosqichni o'tkazib yuboradi.",
+      "answerProgress": "{{total}} tadan {{answered}} tasiga javob berildi",
       "selectAllThatApply": "Mos keladigan barcha variantlarni tanlang.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, tanlangan",

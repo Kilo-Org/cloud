@@ -350,6 +350,7 @@ const OpenRouterModelSchema = z.object({
   enkrypt: EnkryptPublishedBenchmarkSchema.optional(),
   opencode: OpenCodeSettingsSchema.optional(),
   alias_target: z.string().optional().catch(undefined),
+  inference_provider_ids: z.array(z.string()).optional(),
 
   id: z.string(),
   name: z.string(),

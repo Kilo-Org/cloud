@@ -2492,6 +2492,7 @@
       "title": "Агенту патрэбны адказ",
       "skipQuestionsTitle": "Прапусціць пытанні?",
       "skipQuestionsMessage": "Агент прапусціць гэты крок.",
+      "answerProgress": "Адказана {{answered}} з {{total}}",
       "selectAllThatApply": "Выберыце ўсе прыдатныя варыянты.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, выбрана",

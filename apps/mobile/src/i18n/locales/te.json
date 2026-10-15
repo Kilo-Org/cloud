@@ -2428,6 +2428,7 @@
       "title": "ఏజెంట్‌కు మీ సమాధానం అవసరం",
       "skipQuestionsTitle": "ప్రశ్నలను దాటవేయాలా?",
       "skipQuestionsMessage": "ఏజెంట్ ఈ దశను దాటవేస్తుంది.",
+      "answerProgress": "{{total}}లో {{answered}}కి సమాధానం ఇచ్చారు",
       "selectAllThatApply": "వర్తించేవన్నీ ఎంచుకోండి.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, ఎంచుకున్నది",

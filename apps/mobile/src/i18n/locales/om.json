@@ -2428,6 +2428,7 @@
       "title": "Ergamaan deebii barbaada",
       "skipQuestionsTitle": "Gaaffilee irra darbitaa?",
       "skipQuestionsMessage": "Ergamaan tarkaanfii kana irra ni darba.",
+      "answerProgress": "{{total}} keessaa {{answered}} deebi'eera",
       "selectAllThatApply": "Kan si ilaallatan hunda filadhu.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, filatame",

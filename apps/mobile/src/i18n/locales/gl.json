@@ -2428,6 +2428,7 @@
       "title": "O axente precisa unha resposta",
       "skipQuestionsTitle": "Omitir as preguntas?",
       "skipQuestionsMessage": "O axente omitirá este paso.",
+      "answerProgress": "{{answered}} de {{total}} respondidas",
       "selectAllThatApply": "Selecciona todas as opcións que correspondan.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, seleccionada",

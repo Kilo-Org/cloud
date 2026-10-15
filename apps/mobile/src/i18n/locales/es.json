@@ -1932,6 +1932,7 @@
       "title": "El agente necesita una respuesta",
       "skipQuestionsTitle": "¿Omitir preguntas?",
       "skipQuestionsMessage": "El agente omitirá este paso.",
+      "answerProgress": "{{answered}} de {{total}} respondidas",
       "selectAllThatApply": "Selecciona todas las opciones que correspondan.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, opción seleccionada",

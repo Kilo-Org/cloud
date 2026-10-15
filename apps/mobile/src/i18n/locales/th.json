@@ -2428,6 +2428,7 @@
       "title": "เอเจนต์ต้องการข้อมูลเพิ่มเติม",
       "skipQuestionsTitle": "ข้ามคำถามหรือไม่?",
       "skipQuestionsMessage": "เอเจนต์จะข้ามขั้นตอนนี้",
+      "answerProgress": "ตอบแล้ว {{answered}} จาก {{total}}",
       "selectAllThatApply": "เลือกทั้งหมดที่เกี่ยวข้อง",
       "option": "ตัวเลือก {{label}}",
       "optionSelected": "{{label}}, เลือกแล้ว",

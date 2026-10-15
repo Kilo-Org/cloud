@@ -2428,6 +2428,7 @@
       "title": "Agent cavab gözləyir",
       "skipQuestionsTitle": "Suallar ötürülsün?",
       "skipQuestionsMessage": "Agent bu addımı ötürəcək.",
+      "answerProgress": "{{total}} sualdan {{answered}} cavablanıb",
       "selectAllThatApply": "Uyğun olanların hamısını seç.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, seçilib",

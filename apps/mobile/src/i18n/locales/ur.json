@@ -2428,6 +2428,7 @@
       "title": "ایجنٹ کو جواب درکار ہے",
       "skipQuestionsTitle": "سوالات چھوڑیں؟",
       "skipQuestionsMessage": "ایجنٹ یہ مرحلہ چھوڑ دے گا۔",
+      "answerProgress": "{{total}} میں سے {{answered}} کے جواب دیے گئے",
       "selectAllThatApply": "تمام متعلقہ اختیارات منتخب کریں۔",
       "option": "{{label}}",
       "optionSelected": "{{label}}، منتخب شدہ",

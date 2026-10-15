@@ -3,9 +3,66 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   BenchmarkModelCatalogSchema,
   catalogCandidatePrices,
+  catalogModelProviders,
   fetchPlatformRegistryEntries,
   platformRegistryEntries,
 } from './platform-models';
+
+describe('catalog inference providers', () => {
+  it('preserves every canonical upstream identity rather than using the model author', () => {
+    const catalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        {
+          id: 'meta-llama/llama-3.3-70b-instruct',
+          inference_provider_ids: ['deepinfra', 'fireworks', 'together'],
+        },
+      ],
+    });
+    expect(catalogModelProviders(catalog, 'meta-llama/llama-3.3-70b-instruct')).toEqual([
+      'deepinfra',
+      'fireworks',
+      'together',
+    ]);
+  });
+
+  it('uses the canonical target providers instead of stale alias metadata', () => {
+    const catalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        {
+          id: '~vendor/latest',
+          alias_target: 'vendor/current',
+          inference_provider_ids: ['deepinfra'],
+        },
+        { id: 'vendor/current', inference_provider_ids: ['google-vertex', 'google-ai-studio'] },
+      ],
+    });
+    expect(catalogModelProviders(catalog, '~vendor/latest')).toEqual([
+      'google-vertex',
+      'google-ai-studio',
+    ]);
+  });
+
+  it('returns unknown when a model or its provider metadata is absent', () => {
+    const catalog = BenchmarkModelCatalogSchema.parse({
+      data: [{ id: 'anthropic/claude-sonnet' }],
+    });
+    expect(catalogModelProviders(catalog, 'anthropic/claude-sonnet')).toEqual([]);
+    expect(catalogModelProviders(catalog, 'missing/model')).toEqual([]);
+  });
+
+  it('retains published alias providers when the target is not listed', () => {
+    const catalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        {
+          id: '~vendor/latest',
+          alias_target: 'vendor/missing',
+          inference_provider_ids: ['deepinfra', 'deepinfra'],
+        },
+      ],
+    });
+    expect(catalogModelProviders(catalog, '~vendor/latest')).toEqual(['deepinfra']);
+  });
+});
 
 describe('catalog candidate pricing', () => {
   it('keeps normal models usable alongside variable-price virtual models', () => {

@@ -451,7 +451,7 @@ export function CustomLlmsContent() {
                   <p className="mt-2">
                     To route through the secure proxy, set the definition&apos;s{' '}
                     <code className="text-foreground">base_url</code> to the proxy&apos;s{' '}
-                    <code className="text-foreground">/api/v1</code> URL and use:
+                    <code className="text-foreground">/api/proxy</code> URL and use:
                   </p>
                   <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
                     {`{

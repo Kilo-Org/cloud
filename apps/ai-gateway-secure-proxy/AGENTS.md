@@ -11,8 +11,8 @@ functions run in `sfo1` only (`vercel.json`), via the manually triggered
   rejects every request. Vercel Deployment Protection is off, so this check is
   the only thing keeping the proxy from being an open relay; check
   authorization before reading the body.
-- `POST /api/v1/{chat/completions,responses,messages}` all behave the same: read
-  `kilo_secure_proxy: { url, headers }` from the JSON body, remove it, and POST
+- `POST /api/proxy` is the only route; it is API-agnostic. It reads
+  `kilo_secure_proxy: { url, headers }` from the JSON body, removes it, and POSTs
   the remaining body to `url` with exactly `headers`. Incoming request headers
   are never forwarded; response headers pass through the same allowlist as the
   gateway's `wrapInSafeNextResponse`. Upstream redirects are not followed and

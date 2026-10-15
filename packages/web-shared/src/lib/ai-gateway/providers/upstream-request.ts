@@ -327,7 +327,6 @@ export async function upstreamRequest({
     const outgoing = provider.secureProxy
       ? buildSecureProxyRequest({
           secureProxy: provider.secureProxy,
-          chatApiPath: CHAT_API_PATHS[chatApi],
           upstreamUrl: targetUrl,
           upstreamHeaders: headers,
           body,

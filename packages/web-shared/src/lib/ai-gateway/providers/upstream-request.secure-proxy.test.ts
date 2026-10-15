@@ -18,7 +18,7 @@ function secureProxyProvider(disable_url_suffix: boolean) {
     'custom',
     ['chat_completions'],
     {
-      base_url: 'https://secure-proxy.example.com/api/v1',
+      base_url: 'https://secure-proxy.example.com/api/proxy',
       disable_url_suffix,
       extra_headers: { 'x-definition-header': 'definition' },
     },
@@ -72,7 +72,7 @@ describe('upstreamRequest through the secure proxy', () => {
   it('sends only the proxy secret to the proxy and moves upstream auth into the body', async () => {
     const { url, headers, body, sent } = await sendThroughSecureProxy(false);
 
-    expect(url).toBe('https://secure-proxy.example.com/api/v1/chat/completions');
+    expect(url).toBe('https://secure-proxy.example.com/api/proxy');
     expect(Object.fromEntries(headers)).toEqual({
       'content-type': 'application/json',
       authorization: 'Bearer proxy-secret',
@@ -93,10 +93,10 @@ describe('upstreamRequest through the secure proxy', () => {
     expect(sent).not.toHaveProperty('kilo_secure_proxy');
   });
 
-  it('applies disable_url_suffix to the upstream URL but not to the proxy URL', async () => {
+  it('applies disable_url_suffix to the upstream URL and never changes the proxy URL', async () => {
     const { url, body } = await sendThroughSecureProxy(true);
 
-    expect(url).toBe('https://secure-proxy.example.com/api/v1/chat/completions');
+    expect(url).toBe('https://secure-proxy.example.com/api/proxy');
     expect(body.kilo_secure_proxy.url).toBe('https://llm.example.com/v1?trace=1');
   });
 });

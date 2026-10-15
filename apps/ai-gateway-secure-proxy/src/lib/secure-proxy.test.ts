@@ -9,7 +9,7 @@ const VALID_UPSTREAM_BODY = {
 };
 
 function proxyRequest(body: unknown, headers: Record<string, string> = {}) {
-  return new Request('https://secure-proxy.example.com/api/v1/chat/completions', {
+  return new Request('https://secure-proxy.example.com/api/proxy', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',

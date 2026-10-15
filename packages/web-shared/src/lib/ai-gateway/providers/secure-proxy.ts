@@ -6,19 +6,17 @@ import type { SecureProxyRoute } from '@kilocode/web-shared/lib/ai-gateway/provi
 
 export function buildSecureProxyRequest({
   secureProxy,
-  chatApiPath,
   upstreamUrl,
   upstreamHeaders,
   body,
 }: {
   secureProxy: SecureProxyRoute;
-  chatApiPath: string;
   upstreamUrl: string;
   upstreamHeaders: Headers;
   body: object;
 }) {
   return {
-    url: `${secureProxy.url}${chatApiPath}`,
+    url: secureProxy.url,
     headers: new Headers({
       'Content-Type': 'application/json',
       Authorization: `Bearer ${secureProxy.secret}`,

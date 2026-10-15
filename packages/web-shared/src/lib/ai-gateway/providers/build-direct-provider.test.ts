@@ -238,7 +238,7 @@ describe('buildDirectProvider authentication', () => {
     const provider = buildDirectProvider(
       'custom',
       ['messages'],
-      { base_url: 'https://secure-proxy.example.com/api/v1', disable_url_suffix: true },
+      { base_url: 'https://secure-proxy.example.com/api/proxy', disable_url_suffix: true },
       {
         type: 'secure_proxy',
         credentials: {
@@ -258,7 +258,7 @@ describe('buildDirectProvider authentication', () => {
       apiKey: '',
       apiKeyHeader: null,
       secureProxy: {
-        url: 'https://secure-proxy.example.com/api/v1',
+        url: 'https://secure-proxy.example.com/api/proxy',
         secret: 'proxy-secret',
         upstreamAuthHeaders: { authorization: 'Bearer upstream-key' },
       },

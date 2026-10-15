@@ -44,7 +44,7 @@ export type ProviderApiUrlOverrides = Readonly<Partial<Record<GatewayChatApiKind
 export type ProviderResponseTransforms = ReasoningDetailsTransformType;
 
 export type SecureProxyRoute = {
-  /** Proxy base URL; the chat API path is appended. */
+  /** Proxy endpoint URL, used as-is. */
   url: string;
   secret: string;
   /** Upstream authentication headers, applied by the proxy instead of the API key. */

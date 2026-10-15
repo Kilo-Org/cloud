@@ -275,16 +275,16 @@ jobs:
       - name: Check unused exports
         run: pnpm --filter kilo-app run check:unused
 
-  # Four shards run the mobile Vitest suite in parallel; the `test` job below
+  # Six shards run the mobile Vitest suite in parallel; the `test` job below
   # reports the combined result under the required check name.
   mobile-test:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.mobile == 'true'
-    name: mobile-test (${{ matrix.shard }}/4)
+    name: mobile-test (${{ matrix.shard }}/6)
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -318,7 +318,7 @@ jobs:
         run: pnpm --filter @kilocode/harness-sdk run build
 
       - name: Test
-        run: pnpm --filter kilo-app run test --shard=${{ matrix.shard }}/4
+        run: pnpm --filter kilo-app run test --shard=${{ matrix.shard }}/6
 
   # Required check. Skipped shards (no mobile change) pass; a failed or
   # cancelled shard fails this job.

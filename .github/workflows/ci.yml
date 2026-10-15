@@ -65,6 +65,14 @@ jobs:
       - name: Test affected workspace detection
         run: node --test scripts/affected-workspaces.test.mjs
 
+      # These two read only the plugin manifests, so they run here instead of
+      # in a job that waits for the workspace checks.
+      - name: Plugin shared-schemas sync check
+        run: bash scripts/sync-plugin-shared.sh --check
+
+      - name: Plugin openclaw peer-dep pin check
+        run: bash scripts/check-plugin-openclaw-pin.sh
+
       - name: Test changes-filter retry wiring
         run: node --test scripts/changes-filter-retry.test.mjs
 
@@ -297,19 +305,6 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-
-      - name: Plugin shared-schemas sync check
-        run: bash scripts/sync-plugin-shared.sh --check
-
-      - name: Plugin openclaw peer-dep pin check
-        run: bash scripts/check-plugin-openclaw-pin.sh
-
       - name: Check typecheck results
         env:
           RESULTS: ${{ toJSON(needs.*.result) }}

@@ -1,47 +1,72 @@
-import {
-  ReasoningEffortSchema,
-  type OpenCodeSettings,
-  type OpenCodeVariant,
-  type ReasoningEffort,
-  type ReasoningOption,
-} from '@kilocode/db/schema-types';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
+import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
+import { isMistralModel } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
+import { isKimiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
+import { isLongCatModel } from '@kilocode/web-shared/lib/ai-gateway/providers/longcat';
+import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { isQwenModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
+import { isStepModel } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
+import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
+import { isGlmModel } from '@kilocode/web-shared/lib/ai-gateway/providers/zai';
+import type { ReasoningEffort, ReasoningOption } from '@kilocode/db/schema-types';
 
-// The binary variant sets name their enabled variant `thinking` rather than after its effort.
-const TOGGLE_ON_VARIANT = 'thinking';
-
-function variantEffort(variant: OpenCodeVariant): ReasoningEffort | undefined {
-  return variant.reasoning?.enabled === false ? 'none' : variant.reasoning?.effort;
+export function effortOptions(...values: ReasoningEffort[]): ReasoningOption[] {
+  return [{ type: 'effort', values }];
 }
 
-/**
- * Derives models.dev `reasoning_options` from the OpenRouter-shaped `variants`. Returns undefined
- * when there are no variants or any variant has no expressible effort, so clients fall back to
- * their own defaults instead of receiving `[]`, which means "no reasoning control".
- */
-export function getReasoningOptions(
-  variants: OpenCodeSettings['variants']
-): ReasoningOption[] | undefined {
-  const entries = Object.entries(variants ?? {}).map(([name, variant]) => ({
-    name,
-    effort: variantEffort(variant),
-  }));
-  if (entries.length === 0 || entries.some(entry => entry.effort === undefined)) {
-    return undefined;
-  }
-  const efforts = new Set(entries.map(entry => entry.effort));
-  const isToggle =
-    efforts.has('none') &&
-    entries.some(entry => entry.name === TOGGLE_ON_VARIANT) &&
-    entries.every(entry => entry.name === TOGGLE_ON_VARIANT || entry.effort === 'none');
-  if (isToggle) {
-    return [{ type: 'toggle' }];
-  }
-  return [
-    { type: 'effort', values: ReasoningEffortSchema.options.filter(effort => efforts.has(effort)) },
-  ];
-}
+export const REASONING_TOGGLE: ReasoningOption[] = [{ type: 'toggle' }];
 
-export function withReasoningOptions(settings: OpenCodeSettings): OpenCodeSettings {
-  const reasoning_options = getReasoningOptions(settings.variants);
-  return reasoning_options ? { ...settings, reasoning_options } : settings;
+export function getFallbackReasoningOptions(model: string): ReasoningOption[] | undefined {
+  if (isClaudeModel(model)) {
+    return effortOptions('none', 'low', 'medium', 'high', 'xhigh', 'max');
+  }
+  if (isDeepseekModel(model)) {
+    return effortOptions('none', 'low', 'high', 'max');
+  }
+  if (model.includes('gemma')) {
+    return REASONING_TOGGLE;
+  }
+  if (isGeminiModel(model)) {
+    return effortOptions('minimal', 'low', 'medium', 'high');
+  }
+  if (isGlmModel(model)) {
+    return effortOptions('none', 'high', 'xhigh');
+  }
+  if (isGrokModel(model)) {
+    return effortOptions('low', 'medium', 'high');
+  }
+  if (isKimiModel(model)) {
+    return effortOptions('low', 'high', 'max');
+  }
+  if (isLongCatModel(model) || model.includes('laguna') || model.includes('ling-')) {
+    return REASONING_TOGGLE;
+  }
+  if (model.includes('mercury')) {
+    return effortOptions('none', 'low', 'medium', 'high');
+  }
+  if (isMinimaxModel(model) || model.includes('mimo') || isMistralModel(model)) {
+    return REASONING_TOGGLE;
+  }
+  if (isMuseModel(model)) {
+    return effortOptions('none', 'minimal', 'low', 'medium', 'high', 'xhigh');
+  }
+  if (model.includes('nemotron')) {
+    return effortOptions('none', 'medium', 'high');
+  }
+  if (isOpenAiModel(model)) {
+    return effortOptions('none', 'low', 'medium', 'high', 'xhigh', 'max');
+  }
+  if (isQwenModel(model)) {
+    return effortOptions('minimal', 'low', 'medium', 'high', 'xhigh');
+  }
+  if (isStepModel(model)) {
+    return effortOptions('low', 'medium', 'high');
+  }
+  if (model === 'stealth/glyph-cluster') {
+    return effortOptions('low', 'medium', 'high', 'xhigh');
+  }
+  return undefined;
 }

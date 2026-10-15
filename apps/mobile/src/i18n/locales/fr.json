@@ -2040,7 +2040,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Taille de la fenêtre de contexte indisponible",
-      "pillLabel": "Contexte · {{value}}",
       "tapToViewDetails": "Touchez pour voir les détails du contexte.",
       "costSuffix": ", coût {{cost}}",
       "tokensWindowUnavailable": "Contexte : {{used}} jetons, taille de la fenêtre indisponible",

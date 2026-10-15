@@ -2657,7 +2657,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Context-window size unavailable",
-      "pillLabel": "Context · {{value}}",
       "tapToViewDetails": "Tap to view context details.",
       "costSuffix": ", cost {{cost}}",
       "tokensWindowUnavailable": "Context {{used}} tokens, window unavailable",

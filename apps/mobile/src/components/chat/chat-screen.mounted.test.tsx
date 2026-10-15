@@ -94,7 +94,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
       model: state.model,
       effort: state.effort,
       turns: [],
-      answering: '',
+      answering: [],
       status: state.status,
       asked: state.asked,
       waiting: [],

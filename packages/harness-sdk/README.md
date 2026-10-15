@@ -117,7 +117,7 @@ polyfill.
 | `redacted` | Thinking the provider encrypted. There is nothing here to show a reader |
 | `toolCall` | A tool the model asked for, whole: its id, its name, its arguments |
 | `toolResult` | What that tool said, and whether it failed |
-| `done` | This call's token counts, and why the model stopped |
+| `done` | This call's token counts, reported cost and served model when available, and why the model stopped |
 
 When only the answer matters, `said` folds the stream into it:
 
@@ -137,6 +137,12 @@ context window — because both leave half a sentence. `unknown` means no frame
 said why, which on the shapes served here means the stream ended early; treat
 it the same way.
 
+`done.model` is the model the provider reports serving, which can differ from
+the requested Auto target. It never changes the model requested on the next
+call. All three gateway shapes read the billed cost in US dollars when present:
+`usage.cost`, or `usage.cost_details.upstream_inference_cost` when `is_byok` is
+true. An absent cost is unknown, not zero, and the SDK never estimates a price.
+
 ```ts
 yield* Stream.runForEach(session.ask('Name three fruits.'), event =>
   Effect.sync(() => {
@@ -154,8 +160,11 @@ yield* Stream.runForEach(session.ask('Name three fruits.'), event =>
 ```
 
 The handle also carries `history` (every turn, as a plain array), `usage` (the
-counts of every call so far — pass it to `hitRatio`), `compact`, and the three
-that work the queue: `queue`, `cancel` and `queued`.
+counts of every call so far — pass it to `hitRatio`), `usageByModel` (a readonly
+map of those counts grouped by served model, or requested model when none was
+reported), `compact`, and the three that work the queue: `queue`, `cancel` and
+`queued`. Both usage totals include summary calls and start from zero when a
+session is opened or continued.
 
 One session does one thing at a time. A second question, or a `compact`,
 started while the first answer is still streaming fails with

@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Konteksvenstergrootte onbeskikbaar",
-      "pillLabel": "Konteks · {{value}}",
       "tapToViewDetails": "Tik om konteksbesonderhede te bekyk.",
       "costSuffix": ", koste {{cost}}",
       "tokensWindowUnavailable": "Konteks: {{used}} tekens, venstergrootte onbeskikbaar",

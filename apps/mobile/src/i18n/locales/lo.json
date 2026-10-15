@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "ບໍ່ມີຂໍ້ມູນຂະໜາດບໍລິບົດສູງສຸດ",
-      "pillLabel": "ບໍລິບົດ · {{value}}",
       "tapToViewDetails": "ແຕະເພື່ອເບິ່ງລາຍລະອຽດບໍລິບົດ.",
       "costSuffix": ", ຄ່າໃຊ້ຈ່າຍ {{cost}}",
       "tokensWindowUnavailable": "ບໍລິບົດ {{used}} ໂທເຄັນ, ບໍ່ມີຂໍ້ມູນຂະໜາດສູງສຸດ",

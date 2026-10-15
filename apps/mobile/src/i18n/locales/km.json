@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "មិនមានព័ត៌មានអំពីទំហំបង្អួចបរិបទទេ",
-      "pillLabel": "បរិបទ · {{value}}",
       "tapToViewDetails": "ប៉ះដើម្បីមើលព័ត៌មានលម្អិតនៃបរិបទ។",
       "costSuffix": ", ថ្លៃចំណាយ {{cost}}",
       "tokensWindowUnavailable": "បរិបទប្រើតូខេន {{used}} មិនមានព័ត៌មានអំពីទំហំបង្អួចបរិបទទេ",

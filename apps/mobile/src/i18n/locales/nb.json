@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Størrelsen på kontekstvinduet er ukjent",
-      "pillLabel": "Kontekst · {{value}}",
       "tapToViewDetails": "Trykk for å se kontekstdetaljer.",
       "costSuffix": ", kostnad {{cost}}",
       "tokensWindowUnavailable": "Kontekst: {{used}} tokener, størrelsen på kontekstvinduet er ukjent",

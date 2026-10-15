@@ -417,11 +417,16 @@ A call is tried again on a transport failure and on 408, 409, 425, 429, 500,
 body is read, so a second try never repeats text the caller has already seen.
 The older `/api/openrouter` prefix also works; the package does not use it.
 
-A `chat_completions` reply on this gateway reports what the call cost, in US
-dollars, as `usage.cost`. The wire reads it into `ModelUsage.cost`, and
-`session.usage` adds it up. The gateway removes it for a free model and for a
-model with a custom price, so an absent cost is not a zero. The `messages` and
-`responses` wires do not read a cost.
+All three gateway shapes read what the call cost, in US dollars, into
+`ModelUsage.cost`, and `session.usage` adds it up. The cost is `usage.cost`,
+except on a call OpenRouter served on a provider key (`is_byok`): there `cost`
+is only OpenRouter's fee, and the gateway bills
+`cost_details.upstream_inference_cost`, so that is what is read. The gateway
+removes the cost fields for a free model and for a model with a custom price,
+so an absent cost is not a zero. `done.model` preserves the provider's served model.
+`session.usageByModel` groups all completed calls, including summaries, by that
+model and falls back to the requested model when none was reported. Routing
+metadata never replaces the requested model for the next call.
 
 ### The gateway wants the session id in a header
 

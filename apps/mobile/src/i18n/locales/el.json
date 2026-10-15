@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Μη διαθέσιμο μέγεθος παραθύρου συμφραζομένων",
-      "pillLabel": "Πλαίσιο · {{value}}",
       "tapToViewDetails": "Πάτησε για να δεις τις λεπτομέρειες των συμφραζομένων.",
       "costSuffix": ", κόστος {{cost}}",
       "tokensWindowUnavailable": "Συμφραζόμενα: {{used}} διακριτικά, μη διαθέσιμο μέγεθος παραθύρου",

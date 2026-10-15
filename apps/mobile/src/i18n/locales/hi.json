@@ -2086,7 +2086,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "संदर्भ विंडो का आकार उपलब्ध नहीं",
-      "pillLabel": "संदर्भ · {{value}}",
       "tapToViewDetails": "संदर्भ का विवरण देखने के लिए टैप करें।",
       "costSuffix": ", लागत {{cost}}",
       "tokensWindowUnavailable": "संदर्भ में {{used}} टोकन, विंडो का आकार उपलब्ध नहीं",

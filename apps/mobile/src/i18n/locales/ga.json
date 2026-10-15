@@ -2739,7 +2739,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Méid na fuinneoige comhthéacs gan fáil",
-      "pillLabel": "Comhthéacs · {{value}}",
       "tapToViewDetails": "Tapáil le sonraí comhthéacs a fheiceáil.",
       "costSuffix": ", costas {{cost}}",
       "tokensWindowUnavailable": "Comhthéacs: {{used}} comhartha, méid na fuinneoige gan fáil",

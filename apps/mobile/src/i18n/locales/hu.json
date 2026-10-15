@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "A kontextusablak mérete nem érhető el",
-      "pillLabel": "Kontextus · {{value}}",
       "tapToViewDetails": "A kontextus részleteihez koppints.",
       "costSuffix": ", költség: {{cost}}",
       "tokensWindowUnavailable": "Kontextus: {{used}} token, a kontextusablak mérete nem érhető el",

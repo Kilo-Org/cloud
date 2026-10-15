@@ -2119,7 +2119,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "컨텍스트 창 크기 확인 불가",
-      "pillLabel": "컨텍스트 · {{value}}",
       "tapToViewDetails": "컨텍스트 세부 정보를 보려면 누르세요.",
       "costSuffix": ", 비용 {{cost}}",
       "tokensWindowUnavailable": "컨텍스트 토큰 {{used}}개 사용, 컨텍스트 창 크기 확인 불가",

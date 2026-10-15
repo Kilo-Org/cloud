@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "የዐውድ መስኮቱ መጠን አይገኝም",
-      "pillLabel": "አውድ · {{value}}",
       "tapToViewDetails": "የዐውድ ዝርዝሮችን ለማየት ይንኩ።",
       "costSuffix": "፣ ወጪ {{cost}}",
       "tokensWindowUnavailable": "ዐውድ፦ {{used}} ቶከኖች፣ የመስኮቱ መጠን አይገኝም",

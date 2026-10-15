@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "സന്ദർഭ പരിധി ലഭ്യമല്ല",
-      "pillLabel": "സന്ദർഭം · {{value}}",
       "tapToViewDetails": "സന്ദർഭ വിശദാംശങ്ങൾ കാണാൻ ടാപ്പ് ചെയ്യുക.",
       "costSuffix": ", ചെലവ് {{cost}}",
       "tokensWindowUnavailable": "സന്ദർഭത്തിൽ {{used}} ടോക്കണുകൾ, സന്ദർഭ പരിധി ലഭ്യമല്ല",

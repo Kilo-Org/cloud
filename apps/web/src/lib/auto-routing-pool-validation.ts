@@ -23,10 +23,7 @@ export type PoolValidationReason =
   | 'hidden_model'
   | 'byok_only_model'
   | 'organization_denied_model'
-  | 'missing_variant'
-  | 'unknown_variant'
-  | 'unexpected_variant'
-  | 'duplicate_pair'
+  | 'duplicate_model'
   | 'too_many_entries'
   | 'empty_pool';
 
@@ -52,13 +49,7 @@ export type AutoRoutingSettingsApiResponse = Omit<AutoRoutingSettingsResponse, '
 };
 
 export type EligibleModelInfo = {
-  /** Canonical catalog model id. */
   id: string;
-  /**
-   * Canonical variant keys when the model exposes `opencode.variants`.
-   * `null` means the model exposes no variants (variant must be null).
-   */
-  variantKeys: ReadonlySet<string> | null;
 };
 
 export type EligibleCatalog = {
@@ -77,23 +68,13 @@ const REJECTION_MESSAGES: Record<PoolValidationReason, string> = {
   hidden_model: 'This model is not visible in your model picker.',
   byok_only_model: 'Direct BYOK-only models cannot be added to an Efficient pool.',
   organization_denied_model: 'This model is not allowed for the organization.',
-  missing_variant: 'A catalog variant is required for this model.',
-  unknown_variant: 'Unknown variant for this model.',
-  unexpected_variant: 'This model does not expose variants; variant must be null.',
-  duplicate_pair: 'Duplicate model and variant pair in the pool.',
+  duplicate_model: 'Duplicate model in the pool.',
   too_many_entries: `An Efficient pool can include at most ${MAX_POOL_ENTRIES} models.`,
   empty_pool: 'An Efficient pool must include at least one model.',
 };
 
 export function poolValidationMessage(reason: PoolValidationReason): string {
   return REJECTION_MESSAGES[reason];
-}
-
-function variantKeysForModel(model: OpenRouterModel): ReadonlySet<string> | null {
-  const variants = model.opencode?.variants;
-  if (!variants) return null;
-  const keys = Object.keys(variants).filter(key => key.trim().length > 0);
-  return keys.length > 0 ? new Set(keys) : null;
 }
 
 function isHiddenExclusiveModel(modelId: string): boolean {
@@ -152,7 +133,6 @@ export async function buildEligibleCatalog(params: {
 
     byId.set(id, {
       id,
-      variantKeys: variantKeysForModel(model),
     });
   }
 
@@ -168,15 +148,7 @@ export async function buildEligibleCatalog(params: {
 function classifyIneligibleModel(
   modelId: string,
   catalog: EligibleCatalog
-): Exclude<
-  PoolValidationReason,
-  | 'missing_variant'
-  | 'unknown_variant'
-  | 'unexpected_variant'
-  | 'duplicate_pair'
-  | 'too_many_entries'
-  | 'empty_pool'
-> {
+): Exclude<PoolValidationReason, 'duplicate_model' | 'too_many_entries' | 'empty_pool'> {
   if (isVirtualAutoModelId(modelId)) return 'virtual_model';
   if (catalog.byokOnlyIds.has(modelId)) return 'byok_only_model';
   if (isHiddenExclusiveModel(modelId)) return 'hidden_model';
@@ -224,56 +196,7 @@ function validateSingleEntry(
     };
   }
 
-  const rawVariant = entry.variant;
-  const variant =
-    rawVariant === null || rawVariant === undefined ? null : rawVariant.trim() || null;
-
-  if (eligible.variantKeys === null) {
-    if (variant !== null) {
-      return {
-        ok: false,
-        error: {
-          reason: 'unexpected_variant',
-          message: poolValidationMessage('unexpected_variant'),
-          index,
-          entry,
-        },
-      };
-    }
-    return { ok: true, entry: { model: eligible.id, variant: null } };
-  }
-
-  if (variant === null) {
-    return {
-      ok: false,
-      error: {
-        reason: 'missing_variant',
-        message: poolValidationMessage('missing_variant'),
-        index,
-        entry,
-      },
-    };
-  }
-
-  // Match exact catalog key (trim already applied); keys are as cataloged.
-  if (!eligible.variantKeys.has(variant)) {
-    // Also accept if a catalog key equals after the same trim (keys are already trimmed filters).
-    const canonical = [...eligible.variantKeys].find(key => key === variant);
-    if (!canonical) {
-      return {
-        ok: false,
-        error: {
-          reason: 'unknown_variant',
-          message: poolValidationMessage('unknown_variant'),
-          index,
-          entry,
-        },
-      };
-    }
-    return { ok: true, entry: { model: eligible.id, variant: canonical } };
-  }
-
-  return { ok: true, entry: { model: eligible.id, variant } };
+  return { ok: true, entry: { model: eligible.id } };
 }
 
 /**
@@ -326,8 +249,8 @@ export async function validatePoolEntries(params: {
       return {
         ok: false,
         error: {
-          reason: 'duplicate_pair',
-          message: poolValidationMessage('duplicate_pair'),
+          reason: 'duplicate_model',
+          message: poolValidationMessage('duplicate_model'),
           index,
           entry: result.entry,
         },
@@ -338,17 +261,6 @@ export async function validatePoolEntries(params: {
   }
 
   return { ok: true, entries: canonical };
-}
-
-function isEntryAvailable(entry: PoolEntry, catalog: EligibleCatalog): boolean {
-  const eligible = catalog.byId.get(entry.model);
-  if (!eligible) return false;
-
-  if (eligible.variantKeys === null) {
-    return entry.variant === null;
-  }
-  if (entry.variant === null) return false;
-  return eligible.variantKeys.has(entry.variant);
 }
 
 /**
@@ -363,7 +275,7 @@ export function annotatePoolAvailability(params: {
   if (entries === null) return null;
   return entries.map(entry => ({
     ...entry,
-    unavailable: !isEntryAvailable(entry, catalog),
+    unavailable: !catalog.byId.has(entry.model),
   }));
 }
 

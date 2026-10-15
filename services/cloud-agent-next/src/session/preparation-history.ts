@@ -258,10 +258,12 @@ export function materializePreparationEvent(
       label: data.label,
       status: 'running',
       startedAt: data.timestamp,
+      startedRevision: data.revision,
       revision: data.revision,
       ...(data.command === undefined ? {} : { command: data.command }),
       ...(data.commandIndex === undefined ? {} : { commandIndex: data.commandIndex }),
       ...(data.commandCount === undefined ? {} : { commandCount: data.commandCount }),
+      ...(data.parentStepId === undefined ? {} : { parentStepId: data.parentStepId }),
     };
   } else {
     if (!step || data.revision <= step.revision || isTerminal(step.status)) return false;
@@ -331,7 +333,16 @@ export function readPreparationSteps(
     const snapshot = parseSnapshot(row.payload);
     if (snapshot?.action === 'step_snapshot') steps.push(snapshot.stepSnapshot);
   }
-  return steps;
+  return steps.sort((a, b) => {
+    if ((a.startedRevision === undefined) !== (b.startedRevision === undefined)) {
+      return a.startedRevision === undefined ? -1 : 1;
+    }
+    return (
+      (a.startedRevision ?? 0) - (b.startedRevision ?? 0) ||
+      a.startedAt - b.startedAt ||
+      a.id.localeCompare(b.id)
+    );
+  });
 }
 
 export type PreparationOutcome = { status: 'completed' } | { status: 'failed'; safeError: string };

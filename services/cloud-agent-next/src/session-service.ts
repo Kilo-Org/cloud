@@ -561,6 +561,32 @@ export function buildCommandGuardBashPermissions(
   return bashPermissions;
 }
 
+export function getCommandGuardPermissions(
+  policy: CommandGuardPolicy,
+  workspacePath: string,
+  bitbucketReviewId?: string
+): Record<string, string | Record<string, string>> {
+  const bitbucketReviewPolicy = policy.policyName === 'bitbucket-code-review-read-only';
+  return {
+    edit:
+      policy.policyName === 'security-remediation-pr'
+        ? 'allow'
+        : bitbucketReviewPolicy && bitbucketReviewId
+          ? {
+              '*': 'deny',
+              [relative(workspacePath, bitbucketReviewInputPath(bitbucketReviewId))]: 'allow',
+            }
+          : 'deny',
+    bash: buildCommandGuardBashPermissions(policy),
+    ...(bitbucketReviewPolicy ? { task: 'deny', lsp: 'deny' } : {}),
+    webfetch: 'deny',
+    websearch: 'deny',
+    codesearch: 'deny',
+    todowrite: 'allow',
+    todoread: 'allow',
+  };
+}
+
 function matchesKiloPermissionPattern(input: string, pattern: string): boolean {
   let escaped = pattern
     .replaceAll('\\', '/')
@@ -767,7 +793,11 @@ export async function writeGlobalRules(
 
   await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
 
-  await sandbox.writeFile(rulesPath, buildCloudAgentRules(bashDefaultTimeoutMs));
+  // This legacy writer always runs on a Cloudflare Sandbox (`SandboxInstance`).
+  await sandbox.writeFile(
+    rulesPath,
+    buildCloudAgentRules({ bashDefaultTimeoutMs, sandboxProvider: 'cloudflare' })
+  );
 }
 
 function shortHash(input: string): string {
@@ -1262,35 +1292,14 @@ export class SessionService {
     };
 
     if (commandGuardPolicy) {
-      const bashPermissions = buildCommandGuardBashPermissions(commandGuardPolicy);
-
-      // Parity with old autoApproval config:
-      //   read: allow  (was read.enabled: true)
-      //   edit: deny   (was write.enabled: false)
-      //   webfetch/websearch/codesearch: deny  (was browser.enabled: false)
-      //   MCP: allowed by default (was mcp.enabled: true)
-      //   question: handled above (line 564) for non-interactive sessions
-      const bitbucketReviewPolicy =
-        commandGuardPolicy.policyName === 'bitbucket-code-review-read-only';
-      Object.assign(permission, {
-        edit:
-          commandGuardPolicy.policyName === 'security-remediation-pr'
-            ? 'allow'
-            : bitbucketReviewPolicy && bitbucketInputPath
-              ? {
-                  '*': 'deny',
-                  [relative(workspacePath, bitbucketInputPath)]: 'allow',
-                }
-              : 'deny',
-        bash: bashPermissions,
-        task: bitbucketReviewPolicy ? 'deny' : permission.task,
-        lsp: bitbucketReviewPolicy ? 'deny' : permission.lsp,
-        webfetch: 'deny',
-        websearch: 'deny',
-        codesearch: 'deny',
-        todowrite: 'allow',
-        todoread: 'allow',
-      });
+      Object.assign(
+        permission,
+        getCommandGuardPermissions(
+          commandGuardPolicy,
+          workspacePath,
+          bitbucketReviewId ?? undefined
+        )
+      );
 
       logger
         .withFields({
@@ -2684,7 +2693,7 @@ export class SessionService {
     createdOnPlatform: string,
     title?: string,
     gitUrl?: string,
-    cloneFromKiloSessionId?: string,
+    clone?: { cloneFromKiloSessionId: string; cloneUpToMessageId?: string },
     cloudAgentWorktreeId?: CloudAgentWorktreeId,
     cloudAgentWorktreeLocation?: CloudAgentWorktreeLocation
   ): Promise<CreateSessionForCloudAgentResult | undefined> {
@@ -2698,7 +2707,8 @@ export class SessionService {
         title,
         gitUrl,
         profileId,
-        cloneFromKiloSessionId,
+        cloneFromKiloSessionId: clone?.cloneFromKiloSessionId,
+        ...(clone?.cloneUpToMessageId ? { cloneUpToMessageId: clone.cloneUpToMessageId } : {}),
         ...(cloudAgentWorktreeId ? { cloudAgentWorktreeId } : {}),
         ...(cloudAgentWorktreeLocation ? { cloudAgentWorktreeLocation } : {}),
       });

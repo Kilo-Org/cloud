@@ -133,9 +133,14 @@
     "status": "Toestand",
     "truncated": "Afgekap",
     "updated": "Bygewerk",
+    "generating": "Genereer…",
     "working": "Besig",
     "yourOwnRepositories": "Jou eie bewaarplekke",
-    "dismissed": "Verwerp"
+    "dismissed": "Verwerp",
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Wysigings"
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -324,6 +329,7 @@
       "collapseFile": "Vou lêer toe",
       "expandFile": "Vou lêer uit",
       "diffTooLarge": "Die verskille is te groot om te vertoon.",
+      "noPreview": "Geen voorskou beskikbaar vir hierdie lêer nie",
       "openOnGitHub": "Maak op GitHub oop",
       "openDiffOnGitHub": "Maak hierdie lêer se verskille op GitHub oop",
       "githubDiff": "Verskille op GitHub"
@@ -830,7 +836,8 @@
       "kiloclaw": "KiloClaw-aktiwiteit",
       "balance": "Saldowaarskuwings",
       "security": "Sekuriteitsbevindings",
-      "spend": "Bestedingswaarskuwings"
+      "spend": "Bestedingswaarskuwings",
+      "followedSessions": "Gevolgde sessies"
     },
     "category": {
       "chatMessagesSubtitle": "antwoorde in jou gesprekke",
@@ -1253,7 +1260,7 @@
         "stoppedTitle": "Opstelling gestaak",
         "stoppedBody": "{{name}} se instansie het onverwags tydens die opstelling tot stilstand gekom.",
         "stalledTitle": "Iets het vasgesteek",
-        "stalledBody": "Ons kon nie {{name}} klaar opstel nie. Probeer weer of stuur 'n e-pos aan hi@kilo.ai as dit aanhou gebeur.",
+        "stalledBody": "Ons kon nie {{name}} klaar opstel nie. Probeer weer of stuur 'n e-pos aan {{supportEmail}} as dit aanhou gebeur.",
         "timeoutTitle": "Neem langer as verwag",
         "timeoutBody": "Die opstelling van {{name}} neem langer as gewoonlik (meer as {{displayMinutes}} minute).",
         "continueInBackground": "Gaan voort in die agtergrond",
@@ -1311,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Jou plan vir vroeë toegang moet deur 'n persoon hersien word voordat jy dit op jou foon kan gebruik.",
       "iosTitle": "KiloClaw nie op iOS beskikbaar nie",
       "iosBody": "KiloClaw-toegang vir hierdie rekening word buite die iOS-toep bestuur.",
-      "iosContact": "Vrae? Kontak hi@kilo.ai.",
+      "iosContact": "Vrae? Kontak {{supportEmail}}.",
       "quarantinedCta": "Stuur ons span 'n e-pos",
       "nonCanonicalEarlybirdCta": "Hersien jou plan op kilo.ai"
     },
@@ -1400,6 +1407,8 @@
       "retryTitle": "Probeer die hersiening weer?",
       "retryMessage": "Dit sal die kodehersiening weer uitvoer.",
       "retryReview": "Probeer hersiening weer",
+      "retryNeedsSettings": "Kodehersiener is af of sy instellings vereis aandag. Herstel die instellings en probeer dan hierdie hersiening weer.",
+      "fixSettings": "Herstel instellings",
       "couldNotLoad": "Die hersiening kon nie gelaai word nie.",
       "couldNotGetLatest": "Die jongste data kon nie verkry word nie.",
       "byline": "{{repo}} #{{number}} deur {{author}}",
@@ -1544,7 +1553,7 @@
         "recoveryLabel": "Werk die GitHub-app by"
       },
       "githubIpAllowList": {
-        "description": "Die Kodehersiener is gedeaktiveer omdat hierdie GitHub-organisasie 'n IP-toelatingslys gebruik wat Kilo blokkeer. Kontak hi@kilocode.ai vir hulp en aktiveer die Kodehersiener daarna weer."
+        "description": "Die Kodehersiener is gedeaktiveer omdat hierdie GitHub-organisasie 'n IP-toelatingslys gebruik wat Kilo blokkeer. Kontak {{supportEmail}} vir hulp en aktiveer die Kodehersiener daarna weer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Die Kodehersiener is gedeaktiveer omdat Kilo nie 'n GitLab-projektoegangstoken vir hierdie projek kan skep nie. Verleen instandhouertoegang of aktiveer projektoegangstokens en aktiveer die Kodehersiener daarna weer.",
@@ -1559,7 +1568,7 @@
         "recoveryLabel": "Werk die Kodehersiener se instellings by"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Die Kodehersiener is gedeaktiveer omdat die kloning van die bewaarplek vandag drie keer die tydlimiet oorskry het. Kontak hi@kilocode.ai vir hulp en aktiveer die Kodehersiener daarna weer."
+        "description": "Die Kodehersiener is gedeaktiveer omdat die kloning van die bewaarplek vandag drie keer die tydlimiet oorskry het. Kontak {{supportEmail}} vir hulp en aktiveer die Kodehersiener daarna weer."
       },
       "title": "Die kodehersiener het aandag nodig.",
       "recoveryLabel": "Kontak ondersteuning"
@@ -2083,6 +2092,8 @@
       "title": "Sessie",
       "copyErrorDetails": "Kopieer foutbesonderhede",
       "backToSessions": "Terug na sessies",
+      "follow": "Volg op die sluitskerm",
+      "unfollow": "Hou op volg op die sluitskerm",
       "couldNotLoad": "Die sessie kon nie gelaai word nie.",
       "failedToLoadDetails": "Die sessiebesonderhede kon nie gelaai word nie.",
       "failedToStopExecution": "Die uitvoering kon nie gestop word nie.",
@@ -2149,6 +2160,11 @@
       "collapse": "Vou doel toe",
       "expand": "Vou doel uit"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Take, {{completed}} van {{total}} voltooi",
+      "rowAccessibility": "Take, {{completed}} van {{total}} voltooi. Huidige taak: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Onlangs gebruik",
       "couldNotLoadGithubRepositories": "Die GitHub-bewaarplekke kon nie gelaai word nie.",
@@ -2181,7 +2197,6 @@
       "retryLoadingEnvironment": "Probeer weer om die omgewing te laai",
       "defaultEnvironment": "Standaardomgewing",
       "environmentSummary": "{{commands}} opdragte · {{mcp}} MCP · {{skills}} vaardighede · {{agents}} agente",
-      "changes": "Wysigings",
       "leaveChanges": "Laat wysigings staan",
       "commitAndPush": "Lê vas en stoot op",
       "startSession": "Begin sessie",
@@ -2204,6 +2219,10 @@
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
       "importFailed": "Hierdie sessie kon nie ingevoer word nie.",
+      "cliCannotFork": "Dateer die Kilo CLI op om van 'n boodskap af te vertak.",
+      "forkCutNotSynced": "Hierdie boodskap is nog nie gestoor nie. Probeer weer oor 'n oomblik.",
+      "forkFilesFromBaseBranch": "Lêers begin vanaf die basistak.",
+      "forkFilesUnchangedOnComputer": "Lêers op hierdie rekenaar word nie verander nie.",
       "pickProfile": "Kies 'n profiel",
       "noProfile": "Geen profiel nie",
       "manageProfiles": "Bestuur profiele",
@@ -2248,8 +2267,8 @@
       "toolList": "lys",
       "toolPatch": "pas wysiging toe",
       "toolTask": "taak",
-      "readTodos": "Lees taaklys",
-      "updateTodos": "Werk taaklys by",
+      "readTodos": "Lees plan",
+      "updateTodos": "Werk plan by",
       "linesBadge": "{{displayCount}} reëls",
       "filesBadge": "{{displayCount}} lêers",
       "matchesBadge": "{{displayCount}} treffers",
@@ -2319,6 +2338,7 @@
       "copyMessage": "Kopieer boodskap",
       "copyText": "Kopieer teks",
       "selectText": "Kies teks",
+      "forkFromHere": "Vertak van hier af",
       "reportAiResponse": "Rapporteer AI-antwoord",
       "reportAiResponseConfirm": "Wil jy hierdie antwoord vir hersiening rapporteer?",
       "report": "Rapporteer",
@@ -2638,6 +2658,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modelle ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Bekyk wysigings",
+      "asOf": "Soos teen {{time}}",
+      "tooLarge": "Hierdie verskille is te groot om op mobiel te vertoon.",
+      "empty": "Nog geen lêerwysigings in hierdie sessie nie."
     },
     "autoApprove": {
       "title": "Outo-goedkeuring",
@@ -3150,9 +3176,36 @@
     "channelName": "Aktiewe agente",
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
     "openSession": "Oop",
+    "finished": "Voltooi",
+    "followFailed": "Kon nie hierdie agent op die sluitskerm wys nie.",
     "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer.",
-    "newestResult": "Nuutste resultaat",
-    "scheduledWakes": "word wakker {{time}}"
+    "checked": "Gekontroleer",
+    "lastKnown": "Laas bekend",
+    "awaitingUpdate": "Wag op opdatering",
+    "nextRun": "Volgende uitvoering",
+    "waitingForYou": "Wag vir jou",
+    "nextScheduled": "Volgende geskeduleerde",
+    "answerNeeded": "Antwoord nodig",
+    "waitingToRetry": "Wag om weer te probeer",
+    "step": {
+      "editing": "Wysig",
+      "reading": "Lees",
+      "running": "Hardloop",
+      "searching": "Websoektog",
+      "thinking": "Dink dit deur"
+    },
+    "planOf": "van",
+    "filesChanged": "lêers verander",
+    "finishedIn": "Klaar in",
+    "noActivityFor": "Geen aktiwiteit vir",
+    "prOpened": "Trekversoek oopgemaak",
+    "permissionWants": "Wil uitvoer",
+    "failure": {
+      "provider": "Gestop: verskafferfout",
+      "tool": "Gestop: gereedskapfout",
+      "cancelled": "Gestop: gekanselleer",
+      "other": "GESTAAK"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
@@ -3180,6 +3233,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Hierdie model het 'n internetverbinding nodig. Koppel en probeer weer, of skakel oor na 'n model op hierdie toestel.",
     "empty": {
       "title": "Begin 'n klets",
       "description": "Stuur 'n boodskap om met 'n model te gesels."
@@ -3187,10 +3241,32 @@
     "list": {
       "loadFailed": "Kon nie kletsgeskiedenis laai nie.",
       "new": "Nuwe klets",
-      "openHint": "Maak die klets oop. Hou lank in om te skrap.",
       "deleteTitle": "Skrap hierdie klets?"
     },
+    "rename": {
+      "title": "Hernoem klets",
+      "accessibility": "Hernoem klets: {{title}}",
+      "openHint": "Maak die klets oop. Hou lank in om te hernoem of te skrap."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Kletsbesonderhede",
+      "backend": "Agtergrondstelsel",
+      "effortDefault": "Modelverstek",
+      "noCost": "Geen koste",
+      "costUnknown": "Onbekend",
+      "costEstimatedNote": "Antwoorde wat nie 'n prys aangegee het nie, word volgens lyspryse geskat.",
+      "costUnknownNote": "Geen prys is vir hierdie model bekend nie.",
+      "costPartialNote": "Hierdie totaal sluit nie modelle in waarvoor geen prys bekend is nie.",
+      "localNote": "Modelle op die toestel loop op hierdie toestel. Hulle het geen koste en geen promptkas nie, en hul tekentellings kan skattings wees.",
+      "countedSinceNote": "Hierdie klets het begin voordat gebruik aangeteken is. Die totale wys slegs die antwoorde daarna.",
+      "remoteServersOn": "Afgeleë MCP-bedieners aan"
+    },
+    "webSearch": {
+      "title": "Deursoek die web",
+      "description": "Laat hierdie klets huidige inligting deur jou Kilo-rekening opsoek. Soektogte gebruik jou maandelikse soektoelaag.",
+      "allowanceExhausted": "Jou gratis websoektogte vir hierdie maand is opgebruik. Voeg krediete by om weer te soek."
+    },
     "mcp": {
       "title": "Kilo-nutsmiddels",
       "use": "Gebruik Kilo-nutsmiddels",
@@ -3213,7 +3289,6 @@
       "fieldName": "Vertoonnaam",
       "fieldUrl": "Bediener-URL",
       "fieldUrlInvalid": "Voer 'n geldige bediener-URL in.",
-      "fieldToken": "Draertoken (opsioneel)",
       "enableServer": "Aktiveer hierdie bediener: {{name}}",
       "editServer": "Wysig bediener",
       "deleteServer": "Skrap bediener",
@@ -3234,8 +3309,24 @@
       "serverUnreachable": "Kon nie hierdie bediener bereik nie",
       "serverOff": "Hierdie bediener is af"
     },
+    "mcpOAuth": {
+      "authMethod": "Verifikasie",
+      "authNone": "Geen aanmelding",
+      "authBearer": "Draertoken",
+      "authOAuth": "OAuth-aanmelding",
+      "fieldToken": "Token",
+      "oauthHint": "Nadat jy gestoor het, tik $t(modelChat.mcpOAuth.signIn) op die bediener om met jou blaaier aan te meld.",
+      "serverNeedsSignIn": "Meld aan om hierdie bediener te gebruik",
+      "signIn": "Meld aan",
+      "signInA11y": "Meld aan by hierdie bediener: {{name}}",
+      "signInFailed": "Kon nie by {{name}} aanmeld nie. Probeer weer."
+    },
     "backends": {
       "title": "Kletsagtergrondstelsels",
+      "providersTitle": "Kletsverskaffers",
+      "cloud": "In die wolk",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo-modelle is tans nie beskikbaar nie. Kyk na jou verbinding.",
       "manage": "Bestuur agtergrondstelsels",
       "defaultKilo": "$t(consent.kilo) (verstek)",
       "kiloHelp": "Die ingeboude agtergrondstelsel gebruik jou Kilo-rekening en kan nie gewysig of geskrap word nie.",
@@ -3295,7 +3386,6 @@
     "gguf": {
       "title": "Modelle wat afgelaai kan word",
       "help": "Laai 'n oop model af en laat dit op hierdie foon met llama.cpp loop. Jou opdragte en antwoorde bly op die toestel. Modelle is groot, so gebruik Wi-Fi.",
-      "details": "{{size}} · Lisensie: {{license}}",
       "download": "Laai model af",
       "pause": "Pouseer aflaai",
       "resume": "Hervat aflaai",
@@ -3307,6 +3397,8 @@
       "url": "Direkte aflaai-skakel",
       "urlHelp": "Plak 'n HTTPS-skakel na 'n .gguf-lêer, soos 'n Hugging Face-resolve-skakel. Laai slegs modelle af van bronne wat jy vertrou.",
       "downloadUrl": "Laai af vanaf skakel",
+      "advanced": "Gevorderd",
+      "localPurpose": "Loop op hierdie toestel met llama.cpp. Vrae en antwoorde bly op die toestel.",
       "deleteTitle": "Vee hierdie model uit?",
       "deleteMessage": "Vee {{name}} van hierdie toestel uit? Gesprekke wat dit gebruik, het 'n ander model nodig voordat hulle kan voortgaan.",
       "errors": {
@@ -3316,12 +3408,62 @@
         "notGguf": "Die skakel moet na 'n .gguf-lêer wys.",
         "space": "Daar is nie genoeg gratis berging vir hierdie model nie. Maak spasie vry en probeer weer.",
         "network": "Die aflaai het nie klaargemaak nie. Kontroleer jou verbinding en probeer weer.",
-        "invalidFile": "Die afgelaaide lêer is nie 'n model wat hierdie app kan loop nie, so dit is verwyder."
+        "invalidFile": "Die afgelaaide lêer is nie 'n model wat hierdie app kan loop nie, so dit is verwyder.",
+        "checksum": "Die afgelaaide lêer stem nie ooreen met sy gepubliseerde kontrolesom nie, so dit is verwyder. Probeer die aflaai weer."
       }
+    },
+    "catalog": {
+      "browse": "Blaai deur modelle",
+      "title": "Modelkatalogus",
+      "search": "Soek Hugging Face-modelle",
+      "tabs": "Modelfilter",
+      "fitsTab": "Pas op hierdie toestel",
+      "fromHuggingFace": "Van Hugging Face",
+      "loading": "Laai tans modelle",
+      "noResults": "Geen modelle gevind nie",
+      "noFits": "Geen modelle pas op hierdie toestel nie",
+      "noFitsDescription": "Groter modelle is op die $t(common.all)-oortjie.",
+      "fit": {
+        "fits": "Pas",
+        "tight": "Pas net-net",
+        "tooLarge": "Te groot",
+        "noStorage": "Nie genoeg berging nie",
+        "unknown": "Inpas onbekend"
+      },
+      "recommendationsHelp": "'n Kortlys wat hierdie app vaspen: een leer per model, van 'n uitgewer wat 'n lisensie vermeld. Niks anders word gerangskik nie.",
+      "compatibilityHelp": "Inpas vergelyk die modelleer met hierdie toestel se geheue en vrye berging. Die geheuesyfer is 'n skatting, nie 'n meting nie.",
+      "text": "Teks",
+      "listTextPurpose": "Slegs teks-opdragte.",
+      "listImagePurpose": "Lees beelde sowel as teks.",
+      "smallestDownload": "Kleinste aflaai: {{size}} · ongeveer {{memory}} geheue",
+      "fullFileName": "Leer: {{name}}",
+      "memoryEstimateNote": "Geheuesyfers is skattings, nie metings nie.",
+      "parameters": "Parameters: {{value}}",
+      "downloads": "Aflaaie: {{value}}",
+      "likes": "Lourierte: {{value}}",
+      "context": "Konteksvenster: {{value}}",
+      "license": "Lisensie: {{license}}",
+      "licenseUnknown": "Die lisensie word nie vermeld nie",
+      "tools": "Gereedskapgebruik",
+      "vision": "Beeldinvoer",
+      "hintsHelp": "Wenke van Hugging Face. Die app kontroleer die model nadat dit afgelaai is.",
+      "gated": "Hierdie model vereis 'n Hugging Face-rekening, so die app kan dit nie aflaai nie.",
+      "quantizations": "Kwantiserings",
+      "quantizationsHelp": "Kleiner lêers gebruik minder geheue en berging. Groter lêers gee gewoonlik beter antwoorde.",
+      "quantDetail": "{{size}} aflaai · sowat {{memory}} geheue",
+      "downloadQuant": "Laai {{quant}} af",
+      "loadingModel": "Laai tans modelbesonderhede",
+      "couldNotLoadModel": "Kon nie hierdie model laai nie",
+      "noFiles": "Geen lêers wat hierdie app kan laat loop nie",
+      "noFilesDescription": "Hierdie app laat modelle loop wat uit een GGUF-lêer bestaan.",
+      "tooLargeTitle": "Hierdie model loop dalk nie",
+      "tooLargeMessage": "{{name}} het waarskynlik meer geheue nodig as wat hierdie toestel het. Die app kan toemaak terwyl die model antwoord. Laai dit tog af?",
+      "downloadAnyway": "Laai tog af"
     },
     "localModels": {
       "title": "Modelle op die toestel",
-      "help": "Modelle op die toestel loop op hierdie foon. Jou opdragte en antwoorde bly op die toestel, en hierdie modelle kan nie gereedskap gebruik nie.",
+      "help": "Modelle op die toestel loop op hierdie foon. Jou opdragte en antwoorde bly op die toestel.",
+      "systemPurpose": "Die model wat in hierdie toestel se stelsel ingebou is. Dit loop op die toestel.",
       "apple": "Apple Intelligence (op die toestel)",
       "checking": "Kontroleer beskikbaarheid…",
       "ready": "Gereed vir gebruik",
@@ -3347,6 +3489,9 @@
       "downloading": "Laai tans af…",
       "downloadProgress": "Laai tans af… {{percent}}%",
       "downloadFailed": "Die aflaai is nie voltooi nie. Kontroleer jou verbinding en vrye berging, en probeer dan weer."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Hierdie model ondersteun denkinspanning"
     }
   },
   "settingsTools": {
@@ -3526,7 +3671,6 @@
       "template": "Sjabloon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Verduidelik $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Hardloop as subtaak",
       "edit": "Wysig skuinsstreep opdrag",
       "saveFailed": "Kon nie opdrag stoor nie",
@@ -3570,5 +3714,92 @@
     "noMatchingProductsPlay": "Geen passende kredietpakkette is deur Google Play terugbesorg nie.",
     "purchaseOwnedByAnotherAccount": "Die krediete op hierdie Apple Account behoort aan 'n ander Kilo-rekening. Meld by daardie Kilo-rekening aan om dit te gebruik.",
     "purchaseOwnedByAnotherAccountPlay": "Die krediete op hierdie Google Play-rekening behoort aan 'n ander Kilo-rekening. Teken in by daardie Kilo-rekening om dit te gebruik."
+  },
+  "todos": {
+    "saveAsTodo": "Stoor as taak",
+    "segment": {
+      "label": "Agente-aansig",
+      "sessions": "Sessies",
+      "todos": "Take"
+    },
+    "lists": {
+      "newList": "Nuwe lys",
+      "empty": "Nog geen lyste nie",
+      "couldNotLoad": "Kon nie lyste laai nie",
+      "noRepository": "Geen bewaarplek",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} oop",
+      "openCount_other": "{{count}} oop",
+      "archived_one": "Geargiveer ({{count}})",
+      "archived_other": "Geargiveer ({{count}})",
+      "archive": "Argiveer",
+      "unarchive": "Ontargiveer",
+      "deleteTitle": "Skrap {{name}}?",
+      "deleteMessage": "Sy take word ook geskrap. Hul sessies bly."
+    },
+    "listSettings": {
+      "title": "Lysinstellings",
+      "name": "Naam",
+      "namePlaceholder": "Foute, Idees, Vrystelling…",
+      "emoji": "Emoji",
+      "mode": "Modus",
+      "defaultsHint": "Sessies wat uit hierdie lys begin word, gebruik hierdie verstekwaardes."
+    },
+    "list": {
+      "addPlaceholder": "Voeg 'n taak by",
+      "add": "Voeg taak by",
+      "empty": "Nog geen take nie",
+      "setDefaults": "Stel bewaarplek, modus en model",
+      "completed_one": "Voltooi ({{count}})",
+      "completed_other": "Voltooi ({{count}})"
+    },
+    "item": {
+      "markDone": "Merk as klaar",
+      "markOpen": "Merk as nie klaar nie",
+      "markDonePrompt": "Merk as klaar?",
+      "deleted": "Taak geskrap",
+      "undo": "Ontdoen",
+      "runCount_one": "{{count}} lopie",
+      "runCount_other": "{{count}} lopies",
+      "startNow": "Begin sonder hersiening",
+      "startNowHint": "Druk lank om sonder hersiening te begin",
+      "titleLabel": "Taaktitel",
+      "renameTitle": "Hernoem taak",
+      "notes": "Notas",
+      "addNotes": "Voeg notas by",
+      "notesPrompt": "Voeg konteks, vereistes of aanvaardingskriteria by.",
+      "markdownSupported": "Markdown ondersteun",
+      "sessions": "Sessies gekoppel",
+      "noSessions": "Nog geen sessies nie",
+      "untitledLinkedSession": "Gekoppelde sessie",
+      "sessionNeedsInput": "Sessie benodig insette",
+      "sessionRunning": "Sessie loop",
+      "sessionFinished": "Sessie voltooi",
+      "sessionPullRequest": "Sessie-trekkingsversoek",
+      "sessionPullRequestNumber": "Sessie PR #{{number}}",
+      "openSessionHint": "Maak die sessie oop.",
+      "unlinkSessionAction": "Ontkoppel sessie",
+      "unlinkConfirmTitle": "Ontkoppel {{title}}?",
+      "unlinkConfirmMessage": "Die sessie self word nie uitgevee nie. Slegs sy skakel na hierdie taak word verwyder.",
+      "startNewSession": "Begin nuwe sessie",
+      "startNewSessionHint": "Druk lank om 'n nuwe sessie te begin.",
+      "linkSession": "Koppel sessie",
+      "linkFailed": "Kon nie die sessie aan die taak koppel nie"
+    },
+    "linkSession": {
+      "title": "Koppel 'n sessie",
+      "empty": "Geen onlangse sessies nie",
+      "emptyInRepository": "Geen onlangse sessies in {{repository}} nie"
+    },
+    "upNext": "Volgende",
+    "sessionTodo": "Taak: {{title}}",
+    "linkToTodo": "Koppel aan taak",
+    "candidates": {
+      "empty": "Geen oop take nie"
+    },
+    "saveSheet": {
+      "title": "Stoor in lys",
+      "saved": "Gestoor in {{list}}"
+    }
   }
 }

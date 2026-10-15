@@ -59,7 +59,7 @@ type TestBindings = {
   };
   CONNECTION_TICKET_DO: {
     get: ReturnType<typeof vi.fn>;
-    idFromName: ReturnType<typeof vi.fn>;
+    newUniqueId: ReturnType<typeof vi.fn>;
   };
   DIRECT_INGEST_PERCENT: string;
   DIRECT_INGEST_USER_IDS: string;
@@ -82,7 +82,7 @@ function makeTestEnv(overrides: Partial<TestBindings> = {}): TestBindings {
     },
     CONNECTION_TICKET_DO: {
       get: vi.fn(),
-      idFromName: vi.fn(),
+      newUniqueId: vi.fn(),
     },
     DIRECT_INGEST_PERCENT: '0',
     DIRECT_INGEST_USER_IDS: '',
@@ -245,6 +245,9 @@ describe('api routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(getSessionIngestDO).mockImplementation(env => r2StagingStub(env) as never);
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      clearSession: vi.fn(async () => undefined),
+    } as never);
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
@@ -1259,6 +1262,90 @@ describe('api routes', () => {
     expect(ingestStub.getAllStream).toHaveBeenCalled();
   });
 
+  it('GET /session/:sessionId/diff returns 404 without reading the DO when access is denied', async () => {
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce(null);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/diff', { method: 'GET' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ success: false, error: 'session_not_found' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('GET /session/:sessionId/export passes an upToMessageId cut to the DO export', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const payload = JSON.stringify({ info: {}, messages: [], sessionDiff: [] });
+    const ingestStub = {
+      hasMessageItem: vi.fn(async () => true),
+      getAllStream: vi.fn(async () => new Response(payload).body!),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        'http://local/session/ses_12345678901234567890123456/export?upToMessageId=msg_02',
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(payload);
+    expect(ingestStub.hasMessageItem).toHaveBeenCalledWith('msg_02');
+    expect(ingestStub.getAllStream).toHaveBeenCalledWith('msg_02');
+  });
+
+  it('GET /session/:sessionId/export returns 404 clone_cut_not_found for an absent cut message', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const ingestStub = {
+      hasMessageItem: vi.fn(async () => false),
+      getAllStream: vi.fn(),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        'http://local/session/ses_12345678901234567890123456/export?upToMessageId=msg_99',
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'clone_cut_not_found' });
+    expect(ingestStub.getAllStream).not.toHaveBeenCalled();
+  });
+
+  it('GET /session/:sessionId/export returns 400 for an invalid upToMessageId', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        'http://local/session/ses_12345678901234567890123456/export?upToMessageId=not-a-message',
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid upToMessageId' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
   it('GET /session/:sessionId/messages returns 400 for invalid sessionId', async () => {
     const app = makeApiApp();
     const res = await app.fetch(
@@ -2061,6 +2148,8 @@ describe('api routes', () => {
     vi.mocked(getSessionIngestDO).mockReturnValue(
       ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
     );
+    const connectionStub = { clearSession: vi.fn(async () => undefined) };
+    vi.mocked(getUserConnectionDO).mockReturnValue(connectionStub as never);
 
     const app = makeApiApp();
     const env = makeTestEnv();
@@ -2113,6 +2202,8 @@ describe('api routes', () => {
       sessionId: parentSessionId,
     });
     expect(ingestStub.clear).toHaveBeenCalledTimes(2);
+    expect(getUserConnectionDO).toHaveBeenCalledWith(env, { kiloUserId: 'usr_test' });
+    expect(connectionStub.clearSession.mock.calls).toEqual([[childSessionId], [parentSessionId]]);
     expect(notifyUserSessionEvent).toHaveBeenNthCalledWith(1, env, 'usr_test', {
       type: 'session.deleted',
       data: {
@@ -2822,7 +2913,8 @@ describe('api routes', () => {
     const mint = vi.fn(async () => undefined);
     const ticketStub = { mint };
     const env = makeTestEnv();
-    env.CONNECTION_TICKET_DO.idFromName.mockReturnValue('ticket-do-id');
+    const objectId = 'a'.repeat(64);
+    env.CONNECTION_TICKET_DO.newUniqueId.mockReturnValue({ toString: () => objectId });
     env.CONNECTION_TICKET_DO.get.mockReturnValue(ticketStub);
 
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
@@ -2837,14 +2929,34 @@ describe('api routes', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ticket: string; expiresAt: number };
     expect(body).toEqual({
-      ticket: expect.any(String),
+      ticket: expect.stringMatching(new RegExp(`^${objectId}\\.[0-9a-f-]{36}$`)),
       expiresAt: 1_700_000_060,
     });
     expect(Number.isInteger(body.expiresAt)).toBe(true);
     expect(mint).toHaveBeenCalledWith({
       userId: 'usr_test',
       expiresAt: 1_700_000_060_000,
+      secret: body.ticket.split('.')[1],
     });
+  });
+
+  it('POST /user/web-ticket retries a retryable Durable Object error', async () => {
+    const reset = Object.assign(new Error('Durable Object reset because its code was updated.'), {
+      retryable: true,
+    });
+    const mint = vi.fn().mockRejectedValueOnce(reset).mockResolvedValueOnce(undefined);
+    const env = makeTestEnv();
+    env.CONNECTION_TICKET_DO.newUniqueId.mockReturnValue({ toString: () => 'b'.repeat(64) });
+    env.CONNECTION_TICKET_DO.get.mockReturnValue({ mint });
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/user/web-ticket', { method: 'POST' }),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    expect(mint).toHaveBeenCalledTimes(2);
+    expect(env.CONNECTION_TICKET_DO.newUniqueId).toHaveBeenCalledTimes(1);
   });
 
   describe('GET /instances/active', () => {

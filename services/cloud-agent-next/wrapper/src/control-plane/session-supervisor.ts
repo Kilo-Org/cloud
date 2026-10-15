@@ -11,6 +11,8 @@ import {
 } from './execution-clock.js';
 
 export type ExecutionFailure = 'no_progress' | 'execution_limit';
+/** Kilo's last `retry` status since the execution's last real progress. */
+export type ExecutionRetry = { message: string };
 export type SessionActivity = 'running' | 'waiting' | 'stopping';
 export type SessionInteraction = {
   id: string;
@@ -22,6 +24,8 @@ export type SessionObservation = {
   directory: string;
   parentID?: string;
   status: 'busy' | 'retry' | 'idle';
+  /** Present when `status` is `retry`. */
+  retry?: ExecutionRetry;
   messages: Array<{
     info: { id: string; role: string; time?: { created: number; completed?: number } };
     parts: unknown[];
@@ -46,11 +50,23 @@ export type SessionSupervisorOptions = {
     reason: ExecutionFailure,
     signal: AbortSignal
   ): Promise<void>;
-  /** Called before native abort events can settle a Cloud message with another reason. */
-  onDeadline(identity: ExecutionIdentity, reason: ExecutionFailure): void;
+  /**
+   * Called before native abort events can settle a Cloud message with another reason.
+   * `retry` is set when a `no_progress` execution, or a descendant it stops, was stalled
+   * in Kilo's model retry loop: the stall belongs to the model path, not the platform.
+   */
+  onDeadline(
+    identity: ExecutionIdentity,
+    reason: ExecutionFailure,
+    retry: ExecutionRetry | undefined
+  ): void;
   /** The existing runtime owner performs bounded process recovery, including sibling failures. */
   onObservationFailure(reason: 'abort_unconfirmed' | 'activity_capacity'): void;
 };
+
+export function executionRetry(status: Record<string, unknown>): ExecutionRetry {
+  return { message: typeof status.message === 'string' ? status.message : '' };
+}
 
 type Part = {
   kind: string;
@@ -68,6 +84,8 @@ type Execution = ExecutionPauses & {
   lastProgressAt: number;
   progressed: boolean;
   status: 'busy' | 'retry' | 'idle';
+  /** Kept through the `busy` status of each retry attempt; cleared by progress or `idle`. */
+  retry?: ExecutionRetry;
   openRequests: number;
   activity: SessionActivity;
   parts: Map<string, Part>;
@@ -188,6 +206,7 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       if (execution && execution.activity !== 'stopping') {
         next.revision = revision;
         execution.lastProgressAt = options.now();
+        execution.retry = undefined;
         restartPauses(execution, options.now());
         execution.progressed = true;
       }
@@ -347,9 +366,14 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       }
       start(record).openRequests++;
     } else if (event.type === 'session.status') {
-      const status = isRecord(properties.status) ? properties.status.type : undefined;
+      const statusObject = isRecord(properties.status) ? properties.status : {};
+      const status = statusObject.type;
       if (status === 'busy' || status === 'retry') start(record).status = status;
-      if (status === 'idle' && record.execution) record.execution.status = 'idle';
+      if (status === 'retry') start(record).retry = executionRetry(statusObject);
+      if (status === 'idle' && record.execution) {
+        record.execution.status = 'idle';
+        record.execution.retry = undefined;
+      }
     } else if (
       event.type === 'message.updated' &&
       typeof info?.id === 'string' &&
@@ -378,10 +402,14 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
     } else if (event.type === 'session.turn.close' && record.execution) {
       const execution = record.execution;
       execution.openRequests = Math.max(0, execution.openRequests - 1);
+      // A `superseded` close is Kilo handing off to a queued follow-up: the next turn
+      // continues this execution, so its no-progress and wall-clock limits keep running.
+      // If no turn follows, the next idle snapshot finishes it.
       if (
         execution.openRequests === 0 &&
         execution.status === 'idle' &&
-        execution.activity !== 'stopping'
+        execution.activity !== 'stopping' &&
+        properties.reason !== 'superseded'
       ) {
         finish(record);
         prune();
@@ -471,6 +499,9 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
         }
         // The adapter includes each known in-flight message, so missing parts have ended.
         for (const id of execution.parts.keys()) if (!partIds.has(id)) execution.parts.delete(id);
+        // After the parts: a snapshot that is still retrying is retrying after any progress it shows.
+        if (item.retry) execution.retry = item.retry;
+        else if (item.status === 'idle') execution.retry = undefined;
       }
       observed = true;
       refresh();
@@ -508,7 +539,14 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
           ? [{ record: child, execution: child.execution }]
           : []
       );
-      options.onDeadline(target, reason);
+      // Parents expire first, so a subagent stalled in a retry loop is found among
+      // the descendants this deadline stops.
+      const retry =
+        reason === 'no_progress'
+          ? [execution, ...stoppedChildren.map(child => child.execution)].find(item => item.retry)
+              ?.retry
+          : undefined;
+      options.onDeadline(target, reason, retry);
       void options.interrupt(target, reason, stop.signal).then(
         () => {
           if (disposed) return;
@@ -551,6 +589,14 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
     needsCompute: () =>
       [...sessions.values()].some(
         record => record.execution && record.execution.activity !== 'waiting'
+      ),
+    hasRecentProgress: (withinMs: number) =>
+      [...sessions.values()].some(
+        record =>
+          record.execution &&
+          record.execution.activity !== 'stopping' &&
+          record.execution.progressed &&
+          options.now() - record.execution.lastProgressAt < withinMs
       ),
     state(id: string) {
       const record = sessions.get(id);

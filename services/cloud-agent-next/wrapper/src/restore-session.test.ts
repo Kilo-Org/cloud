@@ -2140,6 +2140,36 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     );
   });
 
+  it('imports history without applying ingest diffs when file restoration is delegated', async () => {
+    const imported = path.join(tmpDir, 'history-import.json');
+    writeCapturingMockKilo(binDir, imported);
+    const snapshot = JSON.stringify({
+      info: snapshotInfo(),
+      messages: [{ info: { id: 'message-history' } }],
+      sessionDiff: [
+        { file: 'existing.txt', after: 'older ingest', status: 'modified' },
+        { file: 'deleted.txt', status: 'deleted' },
+        { file: 'added.txt', after: 'ingest addition', status: 'added' },
+      ],
+    });
+    fs.writeFileSync(path.join(workspace, 'existing.txt'), 'fresh checkout');
+    fs.writeFileSync(path.join(workspace, 'deleted.txt'), 'still present');
+    mockFetchOk(snapshot);
+    const result = await restoreSession(SESSION_ID, workspace, undefined, { restoreFiles: false });
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 0, skipped: 0, total: 0 },
+    });
+    expect(JSON.parse(fs.readFileSync(imported, 'utf8')).messages).toEqual([
+      { info: { id: 'message-history' } },
+    ]);
+    expect(fs.readFileSync(path.join(workspace, 'existing.txt'), 'utf8')).toBe('fresh checkout');
+    expect(fs.readFileSync(path.join(workspace, 'deleted.txt'), 'utf8')).toBe('still present');
+    expect(fs.existsSync(path.join(workspace, 'added.txt'))).toBe(false);
+  });
+
   it('continues with a partial restore when a patch cannot be applied', async () => {
     fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
     Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });

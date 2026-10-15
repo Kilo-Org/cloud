@@ -53,6 +53,7 @@ const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor
 // starter/`hasText` gating can be observed across a re-render, not just the
 // mount-time initial value.
 const stateSlots = vi.hoisted(() => ({ slots: [] as { value: unknown }[], cursor: 0 }));
+const keyboardState = vi.hoisted(() => ({ height: 0 }));
 const returnSendsPref = vi.hoisted(() => ({ returnSendsMessage: false }));
 const reducedMotionOn = vi.hoisted(() => ({ value: false }));
 
@@ -99,10 +100,7 @@ vi.mock('react-native', () => ({
   AppState: {
     addEventListener: () => ({ remove: vi.fn() }),
   },
-  Keyboard: {
-    addListener: vi.fn(() => ({ remove: vi.fn() })),
-    dismiss: vi.fn(),
-  },
+  Keyboard: { dismiss: vi.fn() },
   I18nManager: layoutDirection,
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
@@ -113,6 +111,11 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeAreaInsets,
+}));
+
+// The composer reads the keyboard from the provider, not from a listener of its own.
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: <T>(selector: (state: { height: number }) => T) => selector(keyboardState),
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -239,6 +242,7 @@ vi.mock('@/components/agents/use-text-height', () => ({
     maxHeight: 124,
     measureElement: null,
     reset: vi.fn(),
+    setNativeContentHeight: vi.fn(),
     setText: vi.fn(),
   }),
 }));
@@ -517,6 +521,7 @@ beforeEach(() => {
   returnSendsPref.returnSendsMessage = false;
   reducedMotionOn.value = false;
   layoutDirection.isRTL = false;
+  keyboardState.height = 0;
   voiceStatus.value = 'idle';
   safeAreaInsets.bottom = 0;
   safeAreaInsets.left = 0;

@@ -200,7 +200,7 @@ vi.mock('@/lib/navigation/stack-safe-replace', () => ({
     },
   }),
 }));
-vi.mock('expo-keep-awake', () => ({ useKeepAwake: vi.fn() }));
+vi.mock('@/lib/keep-awake', () => ({ useKeepAwake: vi.fn() }));
 const hapticsSelection = vi.hoisted(() => vi.fn());
 vi.mock('expo-haptics', () => ({
   selectionAsync: hapticsSelection,
@@ -210,6 +210,8 @@ vi.mock('expo-haptics', () => ({
 vi.mock('@/components/agents/mobile-session-manager', () => ({
   isCancelQueuedUpgradeRequired: vi.fn(),
 }));
+// The Follow control reads ActivityKit and the token graph; this suite renders none.
+vi.mock('@/components/agents/session-follow-button', () => ({ SessionFollowButton: () => null }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
@@ -289,6 +291,10 @@ vi.mock('@/lib/session-handoff', () => ({
   },
 }));
 vi.mock('@/components/agents/session-pr-badge', () => ({ SessionPrBadge: 'SessionPrBadge' }));
+vi.mock('@/components/agents/session-tasks-indicator', () => ({
+  SessionTasksChip: 'SessionTasksChip',
+  SessionTasksRow: 'SessionTasksRow',
+}));
 vi.mock('@/components/agents/session-status-indicator', () => ({
   SessionStatusIndicator: 'SessionStatusIndicator',
 }));
@@ -315,6 +321,7 @@ vi.mock('@/components/agents/chat-markdown-text', () => ({
 vi.mock('@/components/agents/tool-cards', () => ({
   TaskToolCard: 'TaskToolCard',
   ReadToolCard: 'ReadToolCard',
+  TodoToolCard: 'TodoToolCard',
 }));
 vi.mock('@/components/agents/suggest-tool-card', () => ({ SuggestToolCard: 'SuggestToolCard' }));
 vi.mock('@/components/agents/session-message-list', () => ({
@@ -512,6 +519,10 @@ vi.mock('@/lib/persist/use-draft-load', () => ({
 const organizations = vi.hoisted(() => [
   { organizationId: 'org-a', organizationName: 'Session organization' },
 ]);
+vi.mock('@/components/todos/session-todo-link', () => ({
+  SessionTodoChip: () => null,
+  SessionTodoLinkRow: () => null,
+}));
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {},
   useTRPC: () => ({
@@ -1465,13 +1476,13 @@ describe('session detail header right cluster', () => {
     expect(slot[0]?.props.className).toContain('shrink');
 
     // ...and the cluster inside it shrinks into that cap, so it can never paint
-    // past the slot edge. It holds the context pill and nothing else: the PR
-    // badge now shares the goal row instead.
+    // past the slot edge. It holds the Follow control and the context pill and
+    // nothing else: the PR badge now shares the goal row instead.
     const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
     expect(cluster?.props.className).toContain('min-w-0');
     expect(cluster?.props.className).toContain('shrink');
     expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
-    expect(cluster?.children).toHaveLength(1);
+    expect(cluster?.children).toHaveLength(2);
 
     // The pill is the flexible part of the cluster: it shrinks into the cap
     // with it, so the cluster can never paint past the slot edge.
@@ -3399,9 +3410,8 @@ describe('SessionDetailContent goal visibility', () => {
     // The context sheet owns its own PR pill, so scope this assertion to the goal row.
     const section = goalSectionOf(view);
     expect(section.props.goal).toEqual(pausedGoal);
-    expect(section.props.trailing).toMatchObject({ props: { pr: ASSOCIATED_PR } });
     expect(section.props.onPress).toBeTypeOf('function');
-    expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
+    expect(section.findByType('SessionPrBadge' as ElementType).props.pr).toEqual(ASSOCIATED_PR);
   });
 
   it('displays the merged PR badge in the active goal row', async () => {
@@ -3411,8 +3421,48 @@ describe('SessionDetailContent goal visibility', () => {
 
     const section = goalSectionOf(view);
     expect(section.props.goal).toEqual(activeGoal);
-    expect(section.props.trailing).toMatchObject({ props: { pr: mergedPr } });
-    expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
+    expect(section.findByType('SessionPrBadge' as ElementType).props.pr).toEqual(mergedPr);
+  });
+
+  it('shows open tasks under the PR pill with a goal, and as a row without one', async () => {
+    const todoMessage: StoredMessage = {
+      info: { ...assistantMessage('msg-todo').info, sessionID: ROOT_ID },
+      parts: [
+        {
+          id: 'part-todo',
+          sessionID: ROOT_ID,
+          messageID: 'msg-todo',
+          type: 'tool',
+          callID: 'call-todo',
+          tool: 'todowrite',
+          state: {
+            status: 'completed',
+            input: { todos: [{ content: 'Write tests', status: 'in_progress' }] },
+            output: '',
+            title: 'todowrite',
+            metadata: {},
+            time: { start: 0, end: 1 },
+          },
+        },
+      ],
+    };
+    const summary = { partId: 'part-todo', completed: 0, total: 1 };
+
+    goalMountOptions = { goal: activeGoal, resolvedType: 'remote' };
+    associatedPrMountOption = mergedPr;
+    const withGoal = await mountDetails([todoMessage], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const section = goalSectionOf(withGoal);
+    expect(section.findByType('SessionTasksChip' as ElementType).props.summary).toMatchObject(
+      summary
+    );
+    expect(withGoal.renderer.root.findAllByType('SessionTasksRow' as ElementType)).toHaveLength(0);
+    withGoal.renderer.unmount();
+
+    goalMountOptions = { resolvedType: 'remote' };
+    const withoutGoal = await mountDetails([todoMessage], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(
+      withoutGoal.renderer.root.findByType('SessionTasksRow' as ElementType).props.summary
+    ).toMatchObject(summary);
   });
 
   it.each(['open', 'merged'] as const)(

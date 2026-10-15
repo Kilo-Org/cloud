@@ -19,7 +19,6 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatNumber } from '@/lib/format';
@@ -173,13 +172,12 @@ export function FindingRemediationPanel({
   const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const startRemediation = useStartSecurityRemediation(scope);
   const retryRemediation = useRetrySecurityRemediation(scope);
   const cancelRemediation = useCancelSecurityRemediation(scope);
 
   const openPullRequest = (url: string) => {
-    const destination = resolveCodeReviewerOpenPrDestination(url, prReviewEnabled);
+    const destination = resolveCodeReviewerOpenPrDestination(url);
     if (destination.kind === 'in-app') {
       router.push(destination.href);
       return;

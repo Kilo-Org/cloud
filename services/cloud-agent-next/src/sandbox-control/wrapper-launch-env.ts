@@ -1,9 +1,14 @@
 import { sandboxControlWebSocketUrl } from './control-url.js';
 import { mintControlLogUploadGrant } from './log-upload-grant.js';
+import {
+  CONTROL_SANDBOX_PROVIDER_ENV,
+  type AgentSandboxProvider,
+} from '../shared/sandbox-provider.js';
 
 export type ControlWrapperLaunchEnvInput = {
   workerUrl?: string;
   sandboxId: string;
+  provider: AgentSandboxProvider;
   credential: string;
   workloadCgroup?: string;
   diagnostics?: {
@@ -53,6 +58,7 @@ export function buildControlWrapperLaunchEnv(
     SANDBOX_CONTROL_URL: sandboxControlWebSocketUrl(workerUrl, input.sandboxId),
     SANDBOX_CONTROL_CREDENTIAL: input.credential,
     PROVIDER_INSTANCE_ID: input.sandboxId,
+    [CONTROL_SANDBOX_PROVIDER_ENV]: input.provider,
     KILO_PLATFORM: 'cloud-agent',
     KILO_DISABLE_AUTOUPDATE: 'true',
     KILO_DEBUG_SESSION_INGEST: '1',

@@ -5,11 +5,13 @@ import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import * as Haptics from 'expo-haptics';
+import { type Href } from 'expo-router';
 
 import { normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
-import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
+import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
+import { withComposerHandoff } from '@/lib/share-navigation';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
@@ -17,15 +19,22 @@ import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { prepareAgentSession } from '@/lib/app-actions/prepare-agent-session';
 import { useTRPC } from '@/lib/trpc';
 
+/** The Continue form's destination, plus the fork cut when forking from a message. */
+type ContinueCloudDestination = {
+  repository: NewSessionRepository | null;
+  model: string;
+  variant: string;
+  /** Inclusive fork cut; absent clones the whole session. */
+  cloneUpToMessageId?: string;
+  /** A forked user message's text, prefilled (never sent) in the new composer. */
+  forkPrefillText?: string;
+};
+
 export function useContinueCloudCreate(
   organizationId: string | undefined,
   /** Invoked once the clone settled, right before the success navigation. */
   onCreated?: () => void
-): (
-  sessionId: KiloSessionId,
-  dest: { repository: NewSessionRepository | null; model: string; variant: string },
-  mode: string
-) => Promise<void> {
+): (sessionId: KiloSessionId, dest: ContinueCloudDestination, mode: string) => Promise<void> {
   const router = useStackSafeReplace();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
@@ -42,15 +51,12 @@ export function useContinueCloudCreate(
   } = useMutationOutbox();
 
   return useCallback(
-    async (
-      sessionId: KiloSessionId,
-      dest: { repository: NewSessionRepository | null; model: string; variant: string },
-      mode: string
-    ) => {
+    async (sessionId: KiloSessionId, dest: ContinueCloudDestination, mode: string) => {
       const outcome = await prepareAgentSession(
         {
           kind: 'continue',
           cloneFromKiloSessionId: sessionId,
+          ...(dest.cloneUpToMessageId ? { cloneUpToMessageId: dest.cloneUpToMessageId } : {}),
           repository: dest.repository,
           mode: normalizeAgentMode(mode),
           model: dest.model,
@@ -105,8 +111,13 @@ export function useContinueCloudCreate(
       }
       try {
         // Replace (not push) the continue form with the cloned session so
-        // back from the new session returns to the source session.
-        replaceWithAgentSession(router, outcome.sessionId, organizationId);
+        // back from the new session returns to the source session. A forked
+        // user message only prefills the new composer, never auto-sends.
+        router.replace(
+          withComposerHandoff(getAgentSessionPath(outcome.sessionId, organizationId) as string, {
+            forkPrefillText: dest.forkPrefillText,
+          }) as Href
+        );
       } catch {
         // A navigation failure is not a create failure.
       }

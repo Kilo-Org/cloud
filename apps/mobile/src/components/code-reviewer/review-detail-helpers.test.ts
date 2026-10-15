@@ -4,6 +4,7 @@ import {
   councilDecisionLabel,
   councilVoteLabel,
   flattenCouncilFindings,
+  selectRetryAction,
 } from './review-detail-helpers';
 
 type Finding = { path: string; severity: string };
@@ -62,5 +63,57 @@ describe('councilVoteLabel', () => {
   it('labels a null vote as no result', () => {
     expect(councilVoteLabel(null)).toBe('No result');
     expect(councilVoteLabel(undefined)).toBe('No result');
+  });
+});
+
+describe('selectRetryAction', () => {
+  const enabled = { isEnabled: true, actionRequired: null };
+
+  it('keeps Retry for a manual review whatever the config says', () => {
+    expect(
+      selectRetryAction({
+        hasManualConfig: true,
+        configPending: false,
+        config: { isEnabled: false, actionRequired: { reason: 'byok_invalid_key' } },
+      })
+    ).toBe('retry');
+  });
+
+  it('shows nothing while the config loads', () => {
+    expect(
+      selectRetryAction({ hasManualConfig: false, configPending: true, config: undefined })
+    ).toBeNull();
+  });
+
+  it('keeps Retry when the config is unknown', () => {
+    expect(
+      selectRetryAction({ hasManualConfig: false, configPending: false, config: undefined })
+    ).toBe('retry');
+  });
+
+  it('keeps Retry when Code Reviewer is on and needs no attention', () => {
+    expect(
+      selectRetryAction({ hasManualConfig: false, configPending: false, config: enabled })
+    ).toBe('retry');
+  });
+
+  it('links to the settings when Code Reviewer is off', () => {
+    expect(
+      selectRetryAction({
+        hasManualConfig: false,
+        configPending: false,
+        config: { isEnabled: false, actionRequired: null },
+      })
+    ).toBe('fix-settings');
+  });
+
+  it('links to the settings when the configuration needs attention', () => {
+    expect(
+      selectRetryAction({
+        hasManualConfig: false,
+        configPending: false,
+        config: { ...enabled, actionRequired: { reason: 'byok_invalid_key' } },
+      })
+    ).toBe('fix-settings');
   });
 });

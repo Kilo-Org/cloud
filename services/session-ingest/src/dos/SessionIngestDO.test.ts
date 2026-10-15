@@ -935,6 +935,72 @@ describe('SessionIngestDO live activity + cost persist', () => {
     };
   }
 
+  function toolPart(id: string, status: 'running' | 'completed', filePath: string) {
+    return {
+      type: 'part' as const,
+      data: {
+        id,
+        messageID: 'm1',
+        type: 'tool',
+        tool: 'edit',
+        state: { status, input: { filePath } },
+      },
+    };
+  }
+
+  it('guards the live summary by the activity time it rides with', async () => {
+    const harness = makeLiveHarness();
+    const ingestedAt = 1_700_000_000_000;
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.15), toolPart('p1', 'running', 'src/auth.ts')],
+      'usr_live',
+      'ses_live',
+      1,
+      ingestedAt
+    );
+    await harness.settle();
+
+    const set = harness.lastPgSet!;
+    expect(set).toHaveProperty('live_summary');
+    // A slower in-flight write of an older batch must not replace a newer
+    // summary, so the write is a CASE on the stored activity, like its siblings.
+    expect(sqlContainsCase(set.live_summary)).toBe(true);
+    const summarySql = sqlFragmentText(set.live_summary);
+    expect(summarySql).toContain(new Date(ingestedAt).toISOString());
+    expect(summarySql).toContain('auth.ts');
+  });
+
+  it('folds only the items the timestamp guard stored into the live summary', async () => {
+    const harness = makeLiveHarness();
+    const newer = 1_700_000_100_000;
+    const older = 1_700_000_000_000;
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.15), toolPart('p1', 'running', 'src/auth.ts')],
+      'usr_live',
+      'ses_live',
+      1,
+      newer
+    );
+    await harness.settle();
+    expect(harness.meta.get('liveSummaryState')).toContain('auth.ts');
+
+    // A replay of an older version of a part the DO already holds newer is
+    // skipped by the guard, so it must not move the step either.
+    await harness.durableObject.ingest(
+      [toolPart('p1', 'running', 'src/stale.ts')],
+      'usr_live',
+      'ses_live',
+      1,
+      older
+    );
+    await harness.settle();
+    const state = harness.meta.get('liveSummaryState') ?? '';
+    expect(state).toContain('auth.ts');
+    expect(state).not.toContain('stale.ts');
+  });
+
   it('persists activity + cost on first assistant message batch', async () => {
     const harness = makeLiveHarness();
     const ingestedAt = 1_700_000_000_000;
@@ -1579,10 +1645,17 @@ describe('SessionIngestDO clone primitives', () => {
           if (table === ingestItems) items.length = 0;
           if (table === ingestMeta) meta.clear();
         },
-        where: () => ({
+        where: (condition: unknown) => ({
           run: () => {
-            if (table === ingestMeta) {
-              for (const key of meta.keys()) if (key !== 'deleted') meta.delete(key);
+            if (table !== ingestMeta) return;
+            // `ne(key, 'deleted')` wipes all but the tombstone; `eq(key, k)` deletes one key.
+            const key = collectBoundParams(condition).find(
+              (p): p is string => typeof p === 'string'
+            );
+            if (key === 'deleted') {
+              for (const k of meta.keys()) if (k !== 'deleted') meta.delete(k);
+            } else if (key !== undefined) {
+              meta.delete(key);
             }
           },
         }),
@@ -2055,6 +2128,101 @@ describe('SessionIngestDO clone primitives', () => {
         destinationSessionId: 'dst',
       })
     ).toEqual({ status: 'empty' });
+  });
+
+  it('treats a stage built for another message cut as a different clone', () => {
+    const harness = makeCloneHarness();
+    const cutIdentity = {
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      upToMessageId: 'msg_02',
+    };
+
+    expect(
+      harness.durableObject.stageCloneBatch({
+        ...cutIdentity,
+        rows: [
+          {
+            itemId: 'message/msg_01',
+            itemType: 'message' as const,
+            itemData: '{}',
+            itemDataR2Key: null,
+            ingestedAt: 1,
+          },
+        ],
+        nextCursor: { ingestedAt: 1, id: 1 },
+        rollingDigest: 'digest-cut',
+        copiedItemCount: 1,
+      }).status
+    ).toBe('staged');
+    expect(harness.meta.get('cloneUpToMessageId')).toBe('msg_02');
+
+    expect(harness.durableObject.inspectCloneStage(cutIdentity)).toMatchObject({
+      status: 'in_progress',
+      copiedItemCount: 1,
+    });
+    for (const other of [
+      { sourceSessionId: 'src', destinationSessionId: 'dst' },
+      { ...cutIdentity, upToMessageId: 'msg_03' },
+    ]) {
+      expect(harness.durableObject.inspectCloneStage(other)).toMatchObject({
+        status: 'mismatch',
+        storedStage: 'in_progress',
+      });
+      expect(
+        harness.durableObject.stageCloneBatch({
+          ...other,
+          rows: [],
+          nextCursor: null,
+          rollingDigest: 'digest-other',
+          copiedItemCount: 0,
+        }).status
+      ).toBe('mismatch');
+      expect(
+        harness.durableObject.finalizeCloneStage({
+          ...other,
+          finalDigest: 'digest-cut',
+          finalItemCount: 1,
+        }).status
+      ).toBe('mismatch');
+    }
+
+    expect(
+      harness.durableObject.finalizeCloneStage({
+        ...cutIdentity,
+        finalDigest: 'digest-cut',
+        finalItemCount: 1,
+      }).status
+    ).toBe('complete');
+    expect(harness.durableObject.inspectCloneStage(cutIdentity)).toMatchObject({
+      status: 'complete',
+    });
+    expect(
+      harness.durableObject.inspectCloneStage({ ...cutIdentity, upToMessageId: 'msg_01' })
+    ).toMatchObject({ status: 'mismatch', storedStage: 'complete' });
+  });
+
+  it('records no message cut for a full clone stage and clears a stale one', () => {
+    const harness = makeCloneHarness();
+    // A leftover cut with no stage identity reads as an empty stage.
+    harness.meta.set('cloneUpToMessageId', 'msg_stale');
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows: [],
+      nextCursor: null,
+      rollingDigest: 'digest',
+      copiedItemCount: 0,
+    });
+
+    expect(harness.meta.has('cloneUpToMessageId')).toBe(false);
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src',
+        destinationSessionId: 'dst',
+        upToMessageId: 'msg_01',
+      })
+    ).toMatchObject({ status: 'mismatch' });
   });
 
   it('swallows an R2 delete failure so resetCloneStage still returns a typed reject', async () => {

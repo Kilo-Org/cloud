@@ -86,6 +86,8 @@ function createFakeClient(onDispatch: (id: string) => void = () => undefined) {
   let summaryImpl: (opts: SummaryCall) => Promise<boolean> = async () => true;
   let probeImpl: WrapperKiloClient['probeMessagePart'];
   let permissionImpl: () => Promise<boolean> = async () => true;
+  let rejectQuestionImpl: () => Promise<boolean> = async () => true;
+  let abortImpl: () => Promise<boolean> = async () => true;
   const client = {
     sendPromptAsync: async (opts: PromptCall) => {
       prompts.push(opts);
@@ -104,7 +106,7 @@ function createFakeClient(onDispatch: (id: string) => void = () => undefined) {
     },
     abortSession: async (opts: { sessionId: string }) => {
       aborts.push(opts.sessionId);
-      return true;
+      return abortImpl();
     },
     answerQuestion: async (questionId: string, answers: string[][], directory?: string) => {
       questionAnswers.push({ questionId, answers, directory });
@@ -112,7 +114,7 @@ function createFakeClient(onDispatch: (id: string) => void = () => undefined) {
     },
     rejectQuestion: async (questionId: string, directory?: string) => {
       questionRejections.push({ questionId, directory });
-      return true;
+      return rejectQuestionImpl();
     },
     answerPermission: async (
       permissionId: string,
@@ -149,6 +151,12 @@ function createFakeClient(onDispatch: (id: string) => void = () => undefined) {
     permissionAnswers,
     setPermissionImpl: (impl: () => Promise<boolean>) => {
       permissionImpl = impl;
+    },
+    setRejectQuestionImpl: (impl: () => Promise<boolean>) => {
+      rejectQuestionImpl = impl;
+    },
+    setAbortImpl: (impl: () => Promise<boolean>) => {
+      abortImpl = impl;
     },
     setPromptImpl: (impl: (opts: PromptCall) => Promise<void>) => {
       promptImpl = impl;
@@ -246,6 +254,7 @@ function createHarness(
   const states = new Map<string, ReturnType<TurnKiloRuntime['sessionState']>>();
   let clock = 0;
   let materializeCalls = 0;
+  let observeDispatches = true;
 
   const scheduler: TurnScheduler = {
     setInterval: () => 0 as unknown as ReturnType<typeof setInterval>,
@@ -283,12 +292,16 @@ function createHarness(
     runAutoCommit: options.runAutoCommit ?? ((async () => ({ success: true })) as never),
   });
 
+  function observeDispatch(id: string): void {
+    if (observeDispatches) {
+      manager.observeKiloEvent(kiloEvent('session.turn.open', { sessionID: id }));
+    }
+  }
+
   function ensureRuntime(spec: ControlPlaneRouteSpec): void {
     const key = runtimeKey(spec);
     if (clients.has(key)) return;
-    const fake = createFakeClient(id =>
-      manager.observeKiloEvent(kiloEvent('session.turn.open', { sessionID: id }))
-    );
+    const fake = createFakeClient(observeDispatch);
     clients.set(key, fake);
     flags.set(key, {});
     envs.set(key, {});
@@ -341,12 +354,10 @@ function createHarness(
     retireClient(spec: ControlPlaneRouteSpec): void {
       const key = runtimeKey(spec);
       retiredClients.add(clients.get(key)!.client);
-      clients.set(
-        key,
-        createFakeClient(id =>
-          manager.observeKiloEvent(kiloEvent('session.turn.open', { sessionID: id }))
-        )
-      );
+      clients.set(key, createFakeClient(observeDispatch));
+    },
+    setDispatchObservation(enabled: boolean): void {
+      observeDispatches = enabled;
     },
     setEnv(spec: ControlPlaneRouteSpec, env: Record<string, string>): void {
       envs.set(runtimeKey(spec), env);
@@ -500,6 +511,108 @@ describe('turn manager submission', () => {
     expect(client.commands[0]).toMatchObject({ sessionId: KILO_SESSION, command: 'init' });
   });
 
+  it('cancels a compact completion wait without dispatching its follow-up after Stop', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    // The compact's native execution owns compute; its completion wait adds none.
+    expect(h.manager.hasPendingWork()).toBe(false);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    h.manager.abort(SESSION_ID);
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(routeSpec()).prompts).toEqual([]);
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'cancelled', lastMessageId: 'm1' }]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+  });
+
+  it('fails a standalone compact when its close is not observed within the bounded wait', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.setState(KILO_SESSION, runningState);
+    const summary = Promise.withResolvers<boolean>();
+    h.client(routeSpec()).setSummaryImpl(() => summary.promise);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    // A long summary, then a close wait while the execution is live: its supervisor bounds both.
+    h.advance(10 * 60_000);
+    summary.resolve(true);
+    await settle();
+    for (let index = 0; index < 5; index += 1) {
+      h.advance(60_000);
+      h.manager.tick();
+    }
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    // The compact's native execution owns compute; its completion wait adds none.
+    expect(h.manager.hasPendingWork()).toBe(false);
+
+    // The execution ends without a processed close: the delivery deadline starts now.
+    h.setState(KILO_SESSION, undefined);
+    h.manager.refreshActivity(DIRECTORY);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(120_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(1);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'c1' },
+    ]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+  });
+
+  it('pauses the compact close wait while Kilo is memory-held', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    const key = runtimeKey(spec);
+    h.registerRoute(spec);
+    const client = h.client(spec);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(client.prompts).toEqual([]);
+
+    // The response arrived but the hold stalls the feed, so the close is late.
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: true, key });
+    h.advance(10 * 60_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: false, key });
+    h.advance(120_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1']);
+    expect(outcomeFrames(h.frames)).toEqual([]);
+  });
+
+  it('retires the old compact completion wait without failing its restart resubmission', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    await settle();
+    expect(h.client(routeSpec()).summaries).toHaveLength(2);
+    expect(h.client(routeSpec()).prompts).toEqual([]);
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(routeSpec()).prompts.map(call => call.messageId)).toEqual(['m1']);
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+  });
+
   it('drains the inbox when a heartbeat arrives after Kilo recovers', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());
@@ -536,6 +649,402 @@ describe('turn manager submission', () => {
     expect(available?.properties.commands).toEqual([
       { name: 'compact', description: 'Compact the conversation' },
     ]);
+  });
+});
+
+describe('serialized command delivery wait', () => {
+  function pendingCompact(h: ReturnType<typeof createHarness>) {
+    const client = h.client(routeSpec());
+    const summary = Promise.withResolvers<boolean>();
+    client.setSummaryImpl(() => summary.promise);
+    return { client, summary };
+  }
+
+  function blockedCompact(h: ReturnType<typeof createHarness>) {
+    h.setState(KILO_SESSION, runningState);
+    return pendingCompact(h);
+  }
+
+  it('does not expire a follow-up waiting behind a live observed compact response', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const { client, summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    expect(client.summaries).toHaveLength(1);
+
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(client.prompts).toEqual([]);
+
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    // The live execution running the command keeps compute; the follower adds none.
+    expect(h.manager.hasPendingWork()).toBe(false);
+
+    summary.resolve(true);
+    await settle();
+    // The follower also waits for the compact's close. The close defers while the native
+    // execution is still live; clearing it reconciles the deferred completion.
+    expect(client.prompts).toEqual([]);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    h.setState(KILO_SESSION, undefined);
+    h.manager.refreshActivity(DIRECTORY);
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1']);
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toEqual([
+      { type: 'session.outcome', sessionId: SESSION_ID, status: 'completed', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('keeps arrival order for multiple follow-ups behind the serialized command', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const { client, summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    summary.resolve(true);
+    h.setState(KILO_SESSION, undefined);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(client.summaries).toHaveLength(1);
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1', 'm2']);
+  });
+
+  it('dispatches a prompt parked during a restart before a command received after it', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    h.setFlags(spec, { restarting: true, suspected: true });
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    // Kilo is back, and c1 arrives before anything drains the inbox.
+    h.setFlags(spec, { restarting: false, suspected: false });
+    const { client, summary } = blockedCompact(h);
+    const promptsBeforeSummary: string[][] = [];
+    client.setSummaryImpl(() => {
+      promptsBeforeSummary.push(client.prompts.map(call => call.messageId));
+      return summary.promise;
+    });
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.tick();
+    await settle();
+    expect(promptsBeforeSummary).toEqual([['m1']]);
+
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    summary.resolve(true);
+  });
+
+  it('excludes waiting behind a live observed non-compact command too', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.setState(KILO_SESSION, runningState);
+    const client = h.client(routeSpec());
+    const command = Promise.withResolvers<unknown>();
+    client.setCommandImpl(() => command.promise);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'init'));
+    await settle();
+    expect(client.commands).toHaveLength(1);
+
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    command.resolve({});
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1']);
+  });
+
+  it('fails the batch on the deadline of a compact that stays unobserved', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.setState(KILO_SESSION, runningState);
+    h.setDispatchObservation(false);
+    pendingCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.advance(60_000);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    // The live execution is other work, so the compact itself is a stuck intake. Its own deadline
+    // runs out first: a follower's budget never starts earlier than the command it waits behind.
+    h.advance(60_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('does not credit an accepted wait to a follower the command never exempted', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    const client = h.client(spec);
+    const summary = Promise.withResolvers<boolean>();
+    client.setSummaryImpl(() => summary.promise);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.advance(30_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    // No live execution ever covered m1. The command clearing must not extend its
+    // window: it still expires 120s after receipt, not 120s after the ack.
+    h.setFlags(spec, { restarting: true, suspected: true });
+    summary.resolve(true);
+    await settle();
+    h.advance(90_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('bounds a follow-up when the native execution ends while the response is pending', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const { summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    // The execution is gone but the serialized HTTP response is still pending: no
+    // native bound covers the follower, so its own delivery window applies.
+    h.setState(KILO_SESSION, undefined);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+    summary.resolve(true);
+  });
+
+  it('expires a follow-up a normal deadline after a longer-than-deadline serialized wait', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    const { summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    // A legitimate wait well past the 120s delivery deadline.
+    for (let index = 0; index < 5; index += 1) {
+      h.advance(60_000);
+      h.manager.tick();
+    }
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    // The command clears while the runtime is restarting, so the follower stays in
+    // the inbox undispatched: it must not expire on the spot after that long wait,
+    // but its own deadline must still run out a normal window later.
+    h.setFlags(spec, { restarting: true, suspected: true });
+    summary.resolve(true);
+    h.setState(KILO_SESSION, undefined);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(120_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('keeps the deadline honest across a memory hold and a serialized wait', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    const key = runtimeKey(spec);
+    h.registerRoute(spec);
+    const { summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.advance(60_000);
+    h.manager.tick();
+
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: true, key });
+    h.advance(10 * 60_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    // The hold ends but the serialized wait continues for several more minutes.
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: false, key });
+    for (let index = 0; index < 5; index += 1) {
+      h.advance(60_000);
+      h.manager.tick();
+    }
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    // The execution clears while the response is still pending: the follower must
+    // not expire immediately, and must expire a normal deadline later.
+    h.setState(KILO_SESSION, undefined);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(120_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+    summary.resolve(true);
+  });
+
+  it('settles a long serialized wait on the native bound without later delivery', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    const { client, summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    for (let index = 0; index < 30; index += 1) {
+      h.advance(60_000);
+      h.manager.tick();
+    }
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    h.manager.onNativeDeadline(
+      { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
+      'no_progress',
+      undefined,
+      runtimeKey(spec)
+    );
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'no_progress' }]);
+    summary.resolve(true);
+    await settle();
+    expect(client.prompts).toEqual([]);
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
+  });
+
+  it('does not hold compute for a follower behind a command waiting on the user', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.setState(KILO_SESSION, { ...runningState, activity: 'waiting' });
+    const { client } = pendingCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+    expect(client.prompts).toEqual([]);
+  });
+
+  it('still expires a follow-up waiting behind an ordinary prompt response', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    // A live native execution, so only the prompt type keeps m2 from the exemption.
+    h.setState(KILO_SESSION, runningState);
+    const client = h.client(routeSpec());
+    const first = Promise.withResolvers<void>();
+    client.setPromptImpl(opts => (opts.messageId === 'm1' ? first.promise : Promise.resolve()));
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1']);
+
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm2' },
+    ]);
+  });
+
+  it('still expires a first command blocked without native observation', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.setFlags(routeSpec(), { restarting: true, suspected: true });
+    const client = h.client(routeSpec());
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    expect(client.summaries).toEqual([]);
+
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'c1' },
+    ]);
+  });
+
+  it('settles the batch when the serialized command fails without hanging the queue', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const client = h.client(routeSpec());
+    client.setSummaryImpl(async () => false);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+    expect(client.prompts).toEqual([]);
+
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m2']);
+  });
+
+  it('cancels a command batch on Stop and never delivers the waiting prompt', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const { client, summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    h.manager.abort(SESSION_ID);
+    await settle();
+    expect(outcomeFrames(h.frames)).toEqual([
+      { type: 'session.outcome', sessionId: SESSION_ID, status: 'cancelled', lastMessageId: 'm1' },
+    ]);
+    summary.resolve(true);
+    await settle();
+    expect(client.prompts).toEqual([]);
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
   });
 });
 
@@ -1973,10 +2482,11 @@ describe('automatic permissions', () => {
   });
 
   it.each(['skillShell', 'sandboxEscalation'])(
-    'keeps CLI-enforced %s human approvals interactive',
+    'keeps CLI-enforced %s human approvals interactive for web sessions',
     async flag => {
       const h = createHarness();
-      h.registerRoute(routeSpec());
+      const spec = routeSpec({ createdOnPlatform: 'cloud-agent-web' });
+      h.registerRoute(spec);
       h.manager.submit(SESSION_ID, promptPayload('m1'));
       await settle();
       h.manager.observeKiloEvent(
@@ -1987,10 +2497,60 @@ describe('automatic permissions', () => {
         })
       );
       await settle();
-      expect(h.client(routeSpec()).permissionAnswers).toEqual([]);
+      expect(h.client(spec).permissionAnswers).toEqual([]);
       expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toHaveLength(
         1
       );
+    }
+  );
+
+  it.each(
+    ['slack', 'github', 'security-agent', 'webhook', 'scheduled', undefined].flatMap(origin =>
+      ['skillShell', 'sandboxEscalation'].map(flag => [origin, flag] as const)
+    )
+  )(
+    'rejects CLI-enforced human approvals for unattended %s sessions (%s)',
+    async (createdOnPlatform, flag) => {
+      const h = createHarness();
+      const spec = routeSpec({ createdOnPlatform });
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.asked', {
+          sessionID: KILO_SESSION,
+          id: 'p1',
+          metadata: { [flag]: true },
+        })
+      );
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p2' })
+      );
+      await settle();
+      expect(h.client(spec).permissionAnswers).toEqual([
+        {
+          permissionId: 'p1',
+          response: 'reject',
+          message: expect.stringContaining(
+            `${createdOnPlatform ?? 'unattended'} non-interactive mode`
+          ),
+          directory: DIRECTORY,
+        },
+        { permissionId: 'p2', response: 'always', message: undefined, directory: DIRECTORY },
+      ]);
+      expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.replied', { sessionID: KILO_SESSION, requestID: 'p1' })
+      );
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.replied', { sessionID: KILO_SESSION, requestID: 'p2' })
+      );
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      expect(eventFrames(h.frames).filter(event => event.type === 'permission.replied')).toEqual(
+        []
+      );
+      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
     }
   );
 
@@ -2042,11 +2602,15 @@ describe('automatic permissions', () => {
     expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
   });
 
-  it.each([KILO_SESSION, 'ses_child'])(
-    'rejects code-review permissions from %s without approving or forwarding them',
-    async kiloSessionId => {
+  it.each(
+    ['code-review', 'security-remediation'].flatMap(origin =>
+      [KILO_SESSION, 'ses_child'].map(id => [origin, id])
+    )
+  )(
+    'rejects %s permissions from %s without approving or forwarding them',
+    async (createdOnPlatform, kiloSessionId) => {
       const h = createHarness();
-      const spec = routeSpec({ createdOnPlatform: 'code-review' });
+      const spec = routeSpec({ createdOnPlatform });
       h.registerRoute(spec);
       h.manager.submit(SESSION_ID, promptPayload('m1'));
       await settle();
@@ -2067,31 +2631,436 @@ describe('automatic permissions', () => {
           permissionId: 'p1',
           response: 'reject',
           directory: DIRECTORY,
-          message: expect.stringContaining('code-review non-interactive mode'),
+          message: expect.stringContaining(`${createdOnPlatform} non-interactive mode`),
         },
       ]);
       expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
     }
   );
 
-  it('fails closed if a code-review permission cannot be rejected', async () => {
+  it.each([
+    ['code-review', {}, 'Code-review permission rejection failed'],
+    ['security-remediation', {}, 'Security-remediation permission rejection failed'],
+    ['webhook', { skillShell: true }, 'Webhook permission rejection failed'],
+  ] as const)(
+    'fails closed if a %s permission cannot be rejected',
+    async (createdOnPlatform, metadata, reason) => {
+      const h = createHarness();
+      const spec = routeSpec({ createdOnPlatform });
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.client(spec).setPermissionImpl(async () => {
+        throw new Error('reply unavailable');
+      });
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1', metadata })
+      );
+      await settle();
+      expect(h.client(spec).aborts).toEqual([KILO_SESSION]);
+      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason }]);
+      expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
+    }
+  );
+});
+
+describe('GitHub review publication recovery', () => {
+  const reviewSpec = () =>
+    routeSpec({
+      createdOnPlatform: 'code-review',
+      runtimeIsolation: 'per-session',
+      githubReviewTarget: {
+        repo: 'acme/widgets',
+        pullRequestNumber: 42,
+        appType: 'standard',
+        botUserId: '123',
+      },
+    });
+  const publication = (output: string, sessionID = KILO_SESSION) =>
+    kiloEvent('message.part.updated', {
+      sessionID,
+      part: {
+        type: 'tool',
+        tool: 'code_review_publish_review_summary',
+        state: { status: 'completed', output },
+      },
+    });
+
+  it('recovers a missing publication once before finalization, keeping the admitted message identity', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    expect(h.client(spec).prompts).toHaveLength(2);
+    expect(h.client(spec).prompts[1].prompt).toContain('code_review_publish_review_summary');
+    expect(h.client(spec).prompts[1].messageId).toMatch(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+    expect(h.client(spec).prompts[1].model).toEqual(h.client(spec).prompts[0].model);
+    h.manager.observeKiloEvent(publication('{"verified":true,"commentId":99}'));
+    h.manager.observeKiloEvent(
+      kiloEvent('session.status', {
+        sessionID: KILO_SESSION,
+        status: { type: 'idle' },
+        gateResult: 'pass',
+      })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'completed', lastMessageId: 'm1', gateResult: 'pass' },
+    ]);
+    expect(h.client(spec).prompts).toHaveLength(2);
+  });
+
+  it('does not recover an already verified publication', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(publication('{"verified":true,"commentId":99}'));
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(spec).prompts).toHaveLength(1);
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
+  });
+
+  it('settles recovery when its native close is deferred until activity reconciliation', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(spec).prompts).toHaveLength(2);
+    h.setState(KILO_SESSION, runningState);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.setState(KILO_SESSION, undefined);
+    h.manager.refreshActivity(runtimeKey(spec));
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
+    expect(h.client(spec).prompts).toHaveLength(2);
+  });
+
+  it('does not fail the original review on assistant-aborted events from an abandoned recovery', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.client(spec).setPromptImpl(() => new Promise(() => {}));
+    h.client(spec).setAbortImpl(async () => {
+      h.manager.observeKiloEvent(
+        kiloEvent('message.updated', {
+          info: {
+            sessionID: KILO_SESSION,
+            id: 'recovery1',
+            role: 'assistant',
+            error: { name: 'MessageAbortedError' },
+          },
+        })
+      );
+      h.manager.observeKiloEvent(
+        kiloEvent('session.error', {
+          sessionID: KILO_SESSION,
+          error: { name: 'MessageAbortedError' },
+        })
+      );
+      h.manager.observeKiloEvent(
+        kiloEvent('session.turn.close', { sessionID: KILO_SESSION, reason: 'interrupted' })
+      );
+      return true;
+    });
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    h.timeouts.find(timeout => timeout.ms === 15_000 && !timeout.cancelled)?.handler();
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
+  });
+
+  it.each(['locked', 'rate_limited', 'scan_limit', 'forbidden', 'misconfigured'])(
+    'does not reprompt after terminal publisher error %s',
+    async code => {
+      const h = createHarness();
+      const spec = reviewSpec();
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(
+        kiloEvent('message.part.updated', {
+          sessionID: KILO_SESSION,
+          part: {
+            type: 'tool',
+            tool: 'code_review_publish_review_summary',
+            state: { status: 'error', error: `${code}: publication unavailable` },
+          },
+        })
+      );
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      expect(h.client(spec).prompts).toHaveLength(1);
+      expect(outcomeFrames(h.frames)).toHaveLength(1);
+    }
+  );
+
+  it('seals after one unverified recovery rather than looping', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(publication('{"verified":false}'));
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    h.manager.observeKiloEvent(publication('{"verified":false}'));
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(spec).prompts).toHaveLength(2);
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
+  });
+
+  it('does not mistake a descendant publication for a verified root review', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: 'ses_child', parentID: KILO_SESSION } })
+    );
+    h.manager.observeKiloEvent(publication('{"verified":true,"commentId":99}', 'ses_child'));
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(spec).prompts).toHaveLength(2);
+    h.manager.abort(SESSION_ID);
+  });
+
+  it('never recovers a turn that reached its output limit with no actionable output', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.delta', {
+        sessionID: KILO_SESSION,
+        partID: 'text1',
+        delta: 'The model reached its output limit. ',
+      })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.delta', {
+        sessionID: KILO_SESSION,
+        partID: 'text1',
+        delta: 'No actionable output was produced.',
+      })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(spec).prompts).toHaveLength(1);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', assistantReason: 'output_limit' },
+    ]);
+  });
+
+  it('does not treat user-quoted output-limit notices as assistant failures', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', { info: { sessionID: KILO_SESSION, id: 'user1', role: 'user' } })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        sessionID: KILO_SESSION,
+        part: {
+          id: 'text1',
+          messageID: 'user1',
+          type: 'text',
+          text: 'The model reached its output limit. No actionable output was produced.',
+        },
+      })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(spec).prompts).toHaveLength(2);
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.manager.abort(SESSION_ID);
+  });
+
+  it('does not recover or publish after a root assistant error', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', {
+        info: {
+          sessionID: KILO_SESSION,
+          id: 'assistant1',
+          role: 'assistant',
+          error: { name: 'MessageOutputLengthError' },
+        },
+      })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(spec).prompts).toHaveLength(1);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', assistantReason: 'output_limit' },
+    ]);
+  });
+
+  it('cancels an outstanding recovery submission when the route is released', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.client(spec).setPromptImpl(() => new Promise(() => {}));
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    const recovery = h.client(spec).prompts[1];
+    h.manager.release(SESSION_ID);
+    expect(recovery.signal?.aborted).toBe(true);
+    expect(
+      h.timeouts.filter(timeout => timeout.ms === 15_000).every(timeout => timeout.cancelled)
+    ).toBe(true);
+    expect(outcomeFrames(h.frames)).toEqual([]);
+  });
+
+  it('bounds recovery submission at 15 seconds and releases the admitted turn', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.client(spec).setPromptImpl(() => new Promise(() => {}));
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    const deadline = h.timeouts.find(timeout => timeout.ms === 15_000 && !timeout.cancelled);
+    expect(deadline).toBeDefined();
+    deadline?.handler();
+    await settle();
+    expect(h.client(spec).aborts).toEqual([KILO_SESSION]);
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
+  });
+});
+
+describe('non-interactive review questions', () => {
+  it('ignores cancellation aftershocks before a newer review has native execution evidence', async () => {
     const h = createHarness();
     const spec = routeSpec({ createdOnPlatform: 'code-review' });
     h.registerRoute(spec);
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     await settle();
-    h.client(spec).setPermissionImpl(async () => {
-      throw new Error('reply unavailable');
-    });
-    h.manager.observeKiloEvent(
-      kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1' })
-    );
+    h.manager.abort(SESSION_ID);
+    h.setFlags(spec, { suspected: true });
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
     await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', {
+        info: {
+          sessionID: KILO_SESSION,
+          id: 'old-assistant',
+          role: 'assistant',
+          error: { name: 'MessageAbortedError' },
+        },
+      })
+    );
+    h.setFlags(spec, { suspected: false });
+    h.manager.tick();
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'cancelled', lastMessageId: 'm1' },
+      { status: 'completed', lastMessageId: 'm2' },
+    ]);
+  });
+
+  it.each([KILO_SESSION, 'ses_child'])(
+    'rejects questions from %s instead of pausing or forwarding them',
+    async kiloSessionId => {
+      const h = createHarness();
+      const spec = routeSpec({ createdOnPlatform: 'code-review' });
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(
+        kiloEvent('session.created', { info: { id: 'ses_child', parentID: KILO_SESSION } })
+      );
+      h.manager.observeKiloEvent(
+        kiloEvent('question.asked', { sessionID: kiloSessionId, id: 'q1' })
+      );
+      h.manager.observeKiloEvent(
+        kiloEvent('session.status', { sessionID: kiloSessionId, status: { type: 'question' } })
+      );
+      await settle();
+      expect(h.client(spec).questionRejections).toEqual([
+        { questionId: 'q1', directory: DIRECTORY },
+      ]);
+      expect(
+        eventFrames(h.frames).filter(
+          event =>
+            event.type === 'question.asked' ||
+            (event.type === 'session.status' &&
+              (event.properties.status as { type: string }).type === 'question')
+        )
+      ).toEqual([]);
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
+    }
+  );
+
+  it('retries transient rejection failures, then fails closed instead of leaving a review waiting', async () => {
+    const h = createHarness();
+    const spec = routeSpec({ createdOnPlatform: 'code-review' });
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.client(spec).setRejectQuestionImpl(async () => false);
+    h.manager.observeKiloEvent(kiloEvent('question.asked', { sessionID: KILO_SESSION, id: 'q1' }));
+    await settle();
+    expect(h.client(spec).questionRejections).toHaveLength(2);
     expect(h.client(spec).aborts).toEqual([KILO_SESSION]);
     expect(outcomeFrames(h.frames)).toMatchObject([
-      { status: 'failed', reason: 'Code-review permission rejection failed' },
+      { status: 'failed', reason: 'Code-review question rejection failed' },
     ]);
-    expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
+  });
+
+  it('does not fail a newer turn when an older question rejection finishes late', async () => {
+    const h = createHarness();
+    const spec = routeSpec({ createdOnPlatform: 'code-review' });
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    let failReply = () => {};
+    const reply = new Promise<boolean>(resolve => {
+      failReply = () => resolve(false);
+    });
+    h.client(spec).setRejectQuestionImpl(() => reply);
+    h.manager.observeKiloEvent(kiloEvent('question.asked', { sessionID: KILO_SESSION, id: 'q1' }));
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    failReply();
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+    expect(h.client(spec).aborts).toEqual([]);
+    expect(h.manager.activeTurnCount()).toBe(1);
+    h.manager.abort(SESSION_ID);
   });
 });
 
@@ -2193,6 +3162,7 @@ describe('native session outcome transitions', () => {
   it.each([
     ['hang', undefined, 'agent_unresponsive', 'Kilo was not responding and was restarted'],
     ['hang', 'activity_capacity', 'agent_restarted', 'the agent restarted'],
+    ['hang', 'activity_observation', 'agent_restarted', 'the agent restarted'],
     ['exit', undefined, 'agent_restarted', 'the agent restarted'],
   ] as const)(
     'reports a %s (%s) restart of native work without a Cloud turn as %s',
@@ -2223,6 +3193,7 @@ describe('native session outcome transitions', () => {
     h.manager.onNativeDeadline(
       { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
       'no_progress',
+      undefined,
       runtimeKey(routeSpec())
     );
     await settle();
@@ -2230,6 +3201,73 @@ describe('native session outcome transitions', () => {
     const native = h.nativeDiagnostics.find(entry => entry.fields.phase === 'session_outcome');
     expect(native?.fields.status).toBe('failed');
     expect(native?.fields.outcomeReason).toBe('no_progress');
+  });
+
+  it('fails a no-progress stall in a model retry loop as the assistant failure Kilo was retrying', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.onNativeDeadline(
+      { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
+      'no_progress',
+      {
+        message:
+          '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
+      },
+      runtimeKey(routeSpec())
+    );
+    await settle();
+
+    expect(outcomeFrames(h.frames).at(-1)).toMatchObject({
+      status: 'failed',
+      reason: 'Assistant request was rate limited',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'byok',
+    });
+    const native = h.nativeDiagnostics.find(entry => entry.fields.phase === 'session_outcome');
+    expect(native?.fields.status).toBe('failed');
+    expect(native?.fields).not.toHaveProperty('outcomeReason');
+    expect(JSON.stringify(native?.fields)).not.toContain('API key');
+  });
+
+  it('fails a retry stall with unrecognized retry text as a provider failure, never unknown', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.onNativeDeadline(
+      { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
+      'no_progress',
+      { message: 'Provider returned error' },
+      runtimeKey(routeSpec())
+    );
+    await settle();
+
+    expect(outcomeFrames(h.frames).at(-1)).toMatchObject({
+      status: 'failed',
+      reason: 'Assistant service is unavailable',
+      assistantReason: 'provider_unavailable',
+    });
+  });
+
+  it('names the retry cause when an unrouted execution stalls in a model retry loop', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    await settle();
+    h.manager.onNativeDeadline(
+      { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
+      'no_progress',
+      { message: 'Too Many Requests' },
+      runtimeKey(routeSpec())
+    );
+    await settle();
+
+    const error = eventFrames(h.frames).find(event => event.type === 'session.error');
+    expect(error?.properties).toMatchObject({ sessionID: KILO_SESSION, reason: 'no_progress' });
+    expect(String(error?.properties.error)).toBe(
+      'Execution stopped while the model request kept retrying: Assistant request was rate limited. You can continue in this chat.'
+    );
   });
 
   it('never copies a Kilo assistant safeMessage into outcomeReason', async () => {

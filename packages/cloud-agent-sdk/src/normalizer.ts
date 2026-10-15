@@ -136,6 +136,7 @@ export type ServiceEvent =
       timestamp?: number | undefined;
       action?: string | undefined;
       stepId?: string | undefined;
+      parentStepId?: string | undefined;
       kind?: 'phase' | 'setup_command' | undefined;
       label?: string | undefined;
       command?: string | undefined;
@@ -174,8 +175,10 @@ export type ServiceEvent =
       timestamp?: string | undefined;
     }
   | { type: 'cloud.status'; cloudStatus: CloudStatus }
+  | { type: 'bootstrap.complete' }
   | {
       type: 'connected';
+      bootstrapPending?: boolean | undefined;
       cloudSessionId?: string;
       sessionStatus?: SessionStatus | undefined;
       cloudStatus?: CloudStatus | undefined;
@@ -554,6 +557,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
               timestamp: r.data.timestamp,
               action: r.data.action,
               ...(r.data.stepId === undefined ? {} : { stepId: r.data.stepId }),
+              ...(r.data.parentStepId === undefined ? {} : { parentStepId: r.data.parentStepId }),
               ...(r.data.kind === undefined ? {} : { kind: r.data.kind }),
               ...(r.data.label === undefined ? {} : { label: r.data.label }),
               ...(r.data.command === undefined ? {} : { command: r.data.command }),
@@ -605,11 +609,15 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       if (!r.success) return null;
       return {
         type: 'connected',
+        ...(r.data.bootstrapPending !== undefined && { bootstrapPending: r.data.bootstrapPending }),
         ...(r.data.sessionStatus !== undefined && { sessionStatus: r.data.sessionStatus }),
         ...(r.data.cloudStatus !== undefined && { cloudStatus: r.data.cloudStatus }),
         ...(r.data.activeMessageId !== undefined && { activeMessageId: r.data.activeMessageId }),
       };
     }
+
+    case 'bootstrap.complete':
+      return z.object({}).safeParse(data).success ? { type: 'bootstrap.complete' } : null;
 
     case 'commands.available': {
       const r = commandsAvailableDataSchema.safeParse(data);

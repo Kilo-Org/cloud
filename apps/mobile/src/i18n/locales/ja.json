@@ -133,9 +133,14 @@
     "status": "ステータス",
     "truncated": "一部省略",
     "updated": "更新",
+    "generating": "生成中…",
     "working": "作業中",
     "yourOwnRepositories": "自分のリポジトリ",
-    "dismissed": "却下済み"
+    "dismissed": "却下済み",
+    "agent": "エージェント",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "変更内容"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -319,7 +324,8 @@
       "kiloclaw": "KiloClawのアクティビティ",
       "balance": "残高アラート",
       "security": "セキュリティの検出事項",
-      "spend": "支出アラート"
+      "spend": "支出アラート",
+      "followedSessions": "フォロー中のセッション"
     },
     "category": {
       "chatMessagesSubtitle": "会話内の返信",
@@ -645,7 +651,7 @@
     "redeployTitle": "インスタンスを再デプロイ",
     "accessRequired": {
       "iosBody": "このアカウントでは、KiloClawへのアクセスはiOSアプリの外で管理されています。",
-      "iosContact": "ご不明な点はhi@kilo.aiまでお問い合わせください。",
+      "iosContact": "ご不明な点は{{supportEmail}}までお問い合わせください。",
       "iosTitle": "IOSではKiloClawを利用できません",
       "multipleCurrentConflictBody": "このアカウントに有効なサブスクリプションが複数見つかりました。二重請求を防ぐため、処理を一時停止しています。",
       "multipleCurrentConflictCta": "Kilo.aiで続行",
@@ -778,7 +784,7 @@
         "queryErrorBody": "{{name}}のセットアップ状況を確認中に接続が切れました。セットアップは続いている可能性があります。もう一度お試しいただくか、しばらくしてから確認してください。",
         "queryErrorTitle": "セットアップの状況を確認できませんでした",
         "settingUp": "{{name}}をセットアップ中",
-        "stalledBody": "{{name}}のセットアップを完了できませんでした。もう一度お試しください。問題が続く場合は、hi@kilo.aiまでメールでお問い合わせください。",
+        "stalledBody": "{{name}}のセットアップを完了できませんでした。もう一度お試しください。問題が続く場合は、{{supportEmail}}までメールでお問い合わせください。",
         "stalledTitle": "処理が進んでいません",
         "startingSandbox": "サンドボックスを起動中",
         "stoppedBody": "セットアップ中に{{name}}のインスタンスが予期せず停止しました。",
@@ -939,6 +945,8 @@
       "noFindings": "指摘はありません。",
       "retryMessage": "コードレビューをもう一度実行します。",
       "retryReview": "レビューを再試行",
+      "retryNeedsSettings": "コードレビュアーがオフになっているか、設定の確認が必要です。設定を修正してから、このレビューを再試行してください。",
+      "fixSettings": "設定を修正",
       "retryTitle": "レビューを再試行しますか？",
       "showMore": "さらに表示",
       "started": "開始日時",
@@ -1033,7 +1041,7 @@
         "recoveryLabel": "GitHub Appを更新"
       },
       "githubIpAllowList": {
-        "description": "このGitHub組織のIP許可リストがKiloをブロックしているため、コードレビュアーを無効にしました。hi@kilocode.aiにサポートを依頼してから、コードレビュアーを再度有効にしてください。"
+        "description": "このGitHub組織のIP許可リストがKiloをブロックしているため、コードレビュアーを無効にしました。{{supportEmail}}にサポートを依頼してから、コードレビュアーを再度有効にしてください。"
       },
       "gitlabProjectAccessRequired": {
         "description": "KiloがこのプロジェクトのGitLabプロジェクトアクセストークンを作成できないため、コードレビュアーを無効にしました。メンテナー権限を付与するか、プロジェクトアクセストークンを有効にしてから、コードレビュアーを再度有効にしてください。",
@@ -1048,7 +1056,7 @@
         "recoveryLabel": "コードレビュアーの設定を更新"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "今日、リポジトリのクローンが3回タイムアウトしたため、コードレビュアーを無効にしました。hi@kilocode.aiにサポートを依頼してから、コードレビュアーを再度有効にしてください。"
+        "description": "今日、リポジトリのクローンが3回タイムアウトしたため、コードレビュアーを無効にしました。{{supportEmail}}にサポートを依頼してから、コードレビュアーを再度有効にしてください。"
       },
       "title": "コードレビュアーで対応が必要です。",
       "recoveryLabel": "サポートに連絡"
@@ -1572,6 +1580,8 @@
       "title": "セッション",
       "copyErrorDetails": "エラーの詳細をコピー",
       "backToSessions": "セッション一覧に戻る",
+      "follow": "ロック画面でフォロー",
+      "unfollow": "ロック画面でのフォローを停止",
       "couldNotLoad": "セッションを読み込めませんでした。",
       "failedToLoadDetails": "セッションの詳細を読み込めませんでした。",
       "failedToStopExecution": "実行を停止できませんでした。",
@@ -1638,6 +1648,11 @@
       "collapse": "ゴールを折りたたむ",
       "expand": "ゴールを展開"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "タスク、{{total}} 件中 {{completed}} 件完了",
+      "rowAccessibility": "タスク、{{total}} 件中 {{completed}} 件完了。現在のタスク: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "最近使用した項目",
       "couldNotLoadGithubRepositories": "GitHubのリポジトリを読み込めませんでした。",
@@ -1670,7 +1685,6 @@
       "retryLoadingEnvironment": "環境の読み込みを再試行",
       "defaultEnvironment": "デフォルト環境",
       "environmentSummary": "コマンド {{commands}}件・MCP {{mcp}}件・スキル {{skills}}件・エージェント {{agents}}件",
-      "changes": "変更内容",
       "leaveChanges": "変更を残す",
       "commitAndPush": "コミットしてプッシュ",
       "startSession": "セッションを開始",
@@ -1693,6 +1707,10 @@
       "importingSession": "セッションをインポート中",
       "cliCannotContinue": "このCLIではセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
       "importFailed": "このセッションをインポートできませんでした。",
+      "cliCannotFork": "メッセージからフォークするには、Kilo CLIを更新してください。",
+      "forkCutNotSynced": "このメッセージはまだ保存されていません。しばらくしてからもう一度お試しください。",
+      "forkFilesFromBaseBranch": "ファイルはベースブランチから開始されます。",
+      "forkFilesUnchangedOnComputer": "このコンピューター上のファイルは変更されません。",
       "pickProfile": "プロフィールを選択してください",
       "noProfile": "プロフィールなし",
       "manageProfiles": "プロファイルの管理",
@@ -1737,8 +1755,8 @@
       "toolList": "一覧",
       "toolPatch": "パッチ適用",
       "toolTask": "タスク",
-      "readTodos": "タスクを読み取り",
-      "updateTodos": "タスクを更新",
+      "readTodos": "プランを読み取り",
+      "updateTodos": "プランを更新",
       "linesBadge": "{{displayCount}}行",
       "filesBadge": "{{displayCount}}ファイル",
       "matchesBadge": "{{displayCount}}件",
@@ -1808,6 +1826,7 @@
       "copyMessage": "メッセージをコピー",
       "copyText": "テキストをコピー",
       "selectText": "テキストを選択",
+      "forkFromHere": "ここからフォーク",
       "reportAiResponse": "AIの応答を報告",
       "reportAiResponseConfirm": "この応答を報告して、内容の確認を依頼しますか？",
       "report": "報告",
@@ -2127,6 +2146,12 @@
       "modelAccessibilityLabel": "{{name}}、{{provider}}、{{steps}}、{{cost}}",
       "modelsCount_one": "モデル（{{displayCount}}）",
       "modelsCount_other": "モデル（{{displayCount}}）"
+    },
+    "sessionChanges": {
+      "viewChanges": "変更内容を表示",
+      "asOf": "{{time}}時点",
+      "tooLarge": "この差分は大きすぎるため、モバイルでは表示できません。",
+      "empty": "このセッションではまだファイルの変更はありません。"
     },
     "autoApprove": {
       "title": "自動承認",
@@ -2631,6 +2656,7 @@
     "fileRows": {
       "collapseFile": "ファイルを折りたたむ",
       "diffTooLarge": "差分が大きすぎるため表示できません。",
+      "noPreview": "このファイルはプレビューできません",
       "expandFile": "ファイルを展開",
       "markViewed": "{{path}}を確認済みにする",
       "openDiffOnGitHub": "このファイルの差分をGitHubで開く",
@@ -3150,9 +3176,36 @@
     "channelName": "アクティブなエージェント",
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。",
     "openSession": "開く",
+    "finished": "終了",
+    "followFailed": "このエージェントをロック画面に表示できませんでした。",
     "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。",
-    "newestResult": "最新の結果",
-    "scheduledWakes": "{{time}}に起動"
+    "checked": "最終確認",
+    "lastKnown": "最終記録",
+    "awaitingUpdate": "更新待ち",
+    "nextRun": "次回実行",
+    "waitingForYou": "操作待ち",
+    "nextScheduled": "次の予定",
+    "answerNeeded": "回答が必要",
+    "waitingToRetry": "再試行待ち",
+    "step": {
+      "editing": "編集",
+      "reading": "読み取り",
+      "running": "実行",
+      "searching": "ウェブ検索",
+      "thinking": "思考中"
+    },
+    "planOf": "/",
+    "filesChanged": "ファイル変更",
+    "finishedIn": "所要時間",
+    "noActivityFor": "アクティビティなし",
+    "prOpened": "プルリクエストを開きました",
+    "permissionWants": "実行を希望",
+    "failure": {
+      "provider": "停止: プロバイダーエラー",
+      "tool": "停止: ツールエラー",
+      "cancelled": "停止: キャンセル",
+      "other": "停止"
+    }
   },
   "transcriptionModel": {
     "title": "文字起こしモデル",
@@ -3180,6 +3233,7 @@
     "tutorialLabel": "チュートリアル"
   },
   "modelChat": {
+    "offlineFailure": "このモデルにはインターネット接続が必要です。接続して再試行するか、このデバイス上のモデルに切り替えてください。",
     "empty": {
       "title": "チャットを開始",
       "description": "モデルと話すにはメッセージを送信してください。"
@@ -3187,10 +3241,32 @@
     "list": {
       "loadFailed": "チャット履歴を読み込めませんでした。",
       "new": "新しいチャット",
-      "openHint": "チャットを開きます。長押しで削除します。",
       "deleteTitle": "このチャットを削除しますか？"
     },
+    "rename": {
+      "title": "チャット名を変更",
+      "accessibility": "チャット「{{title}}」の名前を変更",
+      "openHint": "チャットを開きます。長押しで名前の変更または削除ができます。"
+    },
     "beta": "ベータ",
+    "details": {
+      "title": "チャットの詳細",
+      "backend": "バックエンド",
+      "effortDefault": "モデルのデフォルト",
+      "noCost": "コストなし",
+      "costUnknown": "不明",
+      "costEstimatedNote": "価格が報告されなかった回答は、定価から推定しています。",
+      "costUnknownNote": "このモデルの価格は不明です。",
+      "costPartialNote": "この合計には、価格が不明なモデルは含まれていません。",
+      "localNote": "オンデバイスモデルはこのデバイス上で動作します。コストもプロンプトキャッシュもなく、トークン数は推定値の場合があります。",
+      "countedSinceNote": "このチャットは使用状況の記録が始まる前に開始されました。合計にはそれ以降の回答のみが含まれます。",
+      "remoteServersOn": "オンのリモートMCPサーバー"
+    },
+    "webSearch": {
+      "title": "ウェブを検索",
+      "description": "このチャットが Kilo アカウントを通じて最新の情報を調べられるようにします。検索には毎月の検索枠が使われます。",
+      "allowanceExhausted": "今月の無料ウェブ検索を使い切りました。もう一度検索するにはクレジットを追加してください。"
+    },
     "mcp": {
       "title": "Kiloツール",
       "use": "Kiloツールを使う",
@@ -3213,7 +3289,6 @@
       "fieldName": "表示名",
       "fieldUrl": "サーバーURL",
       "fieldUrlInvalid": "有効なサーバーURLを入力してください。",
-      "fieldToken": "Bearerトークン（任意）",
       "enableServer": "このサーバーを有効にする：{{name}}",
       "editServer": "サーバーを編集",
       "deleteServer": "サーバーを削除",
@@ -3234,8 +3309,24 @@
       "serverUnreachable": "このサーバーに接続できませんでした",
       "serverOff": "このサーバーはオフです"
     },
+    "mcpOAuth": {
+      "authMethod": "認証",
+      "authNone": "サインインなし",
+      "authBearer": "Bearerトークン",
+      "authOAuth": "OAuthサインイン",
+      "fieldToken": "トークン",
+      "oauthHint": "保存後、サーバーの$t(modelChat.mcpOAuth.signIn)をタップして、ブラウザでサインインしてください。",
+      "serverNeedsSignIn": "このサーバーを使うにはサインインしてください",
+      "signIn": "サインイン",
+      "signInA11y": "このサーバーにサインイン：{{name}}",
+      "signInFailed": "{{name}}にサインインできませんでした。もう一度お試しください。"
+    },
     "backends": {
       "title": "チャットバックエンド",
+      "providersTitle": "チャットプロバイダー",
+      "cloud": "クラウド上",
+      "cloudModel": "モデル: {{model}}",
+      "cloudUnavailable": "Kilo のモデルは現在利用できません。接続を確認してください。",
       "manage": "バックエンドを管理",
       "defaultKilo": "$t(consent.kilo)（デフォルト）",
       "kiloHelp": "組み込みのバックエンドはKiloアカウントを使用します。編集も削除もできません。",
@@ -3295,7 +3386,6 @@
     "gguf": {
       "title": "ダウンロード可能なモデル",
       "help": "オープンモデルをダウンロードし、llama.cpp でこのスマートフォン上で実行できます。プロンプトと返信はデバイス内にとどまります。モデルはサイズが大きいため、Wi-Fi をご利用ください。",
-      "details": "{{size}} · ライセンス: {{license}}",
       "download": "モデルをダウンロード",
       "pause": "ダウンロードを一時停止",
       "resume": "ダウンロードを再開",
@@ -3307,6 +3397,8 @@
       "url": "直接ダウンロードリンク",
       "urlHelp": "Hugging Face の resolve リンクなど、.gguf ファイルへの HTTPS リンクを貼り付けてください。信頼できるソースからのみモデルをダウンロードしてください。",
       "downloadUrl": "リンクからダウンロード",
+      "advanced": "詳細設定",
+      "localPurpose": "llama.cpp を使ってこのデバイス上で動作します。プロンプトと応答はデバイス内にとどまります。",
       "deleteTitle": "このモデルを削除しますか？",
       "deleteMessage": "{{name}} をこのデバイスから削除しますか？このモデルを使用しているチャットは、続行する前に別のモデルが必要です。",
       "errors": {
@@ -3316,12 +3408,62 @@
         "notGguf": "リンクは .gguf ファイルを指している必要があります。",
         "space": "このモデルに必要な空き容量が足りません。空き容量を増やして、もう一度お試しください。",
         "network": "ダウンロードが完了しませんでした。接続を確認して、もう一度お試しください。",
-        "invalidFile": "ダウンロードしたファイルはこのアプリで実行できるモデルではないため、削除されました。"
+        "invalidFile": "ダウンロードしたファイルはこのアプリで実行できるモデルではないため、削除されました。",
+        "checksum": "ダウンロードしたファイルが公開されているチェックサムと一致しないため、削除されました。もう一度ダウンロードしてください。"
       }
+    },
+    "catalog": {
+      "browse": "モデルを探す",
+      "title": "モデルカタログ",
+      "search": "Hugging Face のモデルを検索",
+      "tabs": "モデルの絞り込み",
+      "fitsTab": "このデバイスに対応",
+      "fromHuggingFace": "Hugging Face から",
+      "loading": "モデルを読み込み中",
+      "noResults": "モデルが見つかりません",
+      "noFits": "このデバイスに対応するモデルはありません",
+      "noFitsDescription": "より大きなモデルは「$t(common.all)」タブにあります。",
+      "fit": {
+        "fits": "対応",
+        "tight": "ぎりぎり",
+        "tooLarge": "大きすぎます",
+        "noStorage": "空き容量不足",
+        "unknown": "適合性不明"
+      },
+      "recommendationsHelp": "このアプリが固定した候補リストです。モデルごとに1ファイル、ライセンスを明示する配布元のものだけです。それ以外はランク付けされません。",
+      "compatibilityHelp": "適合性は、モデルファイルとこのデバイスのメモリおよび空きストレージを比較します。メモリの数値は推定値であり、実測値ではありません。",
+      "text": "テキスト",
+      "listTextPurpose": "テキストプロンプトのみ。",
+      "listImagePurpose": "テキストだけでなく画像も読み取ります。",
+      "smallestDownload": "最小ダウンロード: {{size}} · メモリ約 {{memory}}",
+      "fullFileName": "ファイル: {{name}}",
+      "memoryEstimateNote": "メモリの数値は推定値であり、実測値ではありません。",
+      "parameters": "パラメータ数: {{value}}",
+      "downloads": "ダウンロード数: {{value}}",
+      "likes": "いいね: {{value}}",
+      "context": "コンテキストウィンドウ: {{value}}",
+      "license": "ライセンス: {{license}}",
+      "licenseUnknown": "ライセンスが記載されていません",
+      "tools": "ツール呼び出し",
+      "vision": "画像入力",
+      "hintsHelp": "Hugging Face からの情報です。モデルはダウンロード後にアプリで確認されます。",
+      "gated": "このモデルには Hugging Face アカウントが必要なため、アプリでダウンロードできません。",
+      "quantizations": "量子化",
+      "quantizationsHelp": "小さいファイルほどメモリとストレージの使用量が少なくなります。大きいファイルのほうが通常は回答の質が高くなります。",
+      "quantDetail": "ダウンロード {{size}} · メモリ約 {{memory}}",
+      "downloadQuant": "{{quant}} をダウンロード",
+      "loadingModel": "モデルの詳細を読み込み中",
+      "couldNotLoadModel": "このモデルを読み込めませんでした",
+      "noFiles": "このアプリで実行できるファイルがありません",
+      "noFilesDescription": "このアプリは単一の GGUF ファイルで構成されたモデルを実行します。",
+      "tooLargeTitle": "このモデルは実行できない可能性があります",
+      "tooLargeMessage": "{{name}} には、このデバイスのメモリを超える容量が必要な可能性があります。モデルの回答中にアプリが終了することがあります。それでもダウンロードしますか？",
+      "downloadAnyway": "それでもダウンロード"
     },
     "localModels": {
       "title": "オンデバイスモデル",
-      "help": "オンデバイスモデルはこのスマートフォン上で動作します。プロンプトと返信はデバイス内にとどまり、これらのモデルはツールを使用できません。",
+      "help": "オンデバイスモデルはこのスマートフォン上で動作します。プロンプトと返信はデバイス内にとどまります。",
+      "systemPurpose": "このデバイスのシステムに組み込まれたモデルです。デバイス上で動作します。",
       "apple": "Apple Intelligence（デバイス上）",
       "checking": "利用可能か確認中…",
       "ready": "使用可能",
@@ -3347,6 +3489,9 @@
       "downloading": "ダウンロード中…",
       "downloadProgress": "ダウンロード中… {{percent}}%",
       "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。"
+    },
+    "reasoningEffort": {
+      "modelFlag": "このモデルは思考量の指定に対応しています"
     }
   },
   "settingsTools": {
@@ -3526,7 +3671,6 @@
       "template": "テンプレート",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS の説明",
-      "agent": "エージェント",
       "subtask": "サブタスクとして実行",
       "edit": "スラッシュコマンドの編集",
       "saveFailed": "コマンドを保存できませんでした",
@@ -3570,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Playから一致するクレジットパックが返されませんでした。",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
+  },
+  "todos": {
+    "saveAsTodo": "タスクとして保存",
+    "segment": {
+      "label": "エージェント表示",
+      "sessions": "セッション",
+      "todos": "タスク"
+    },
+    "lists": {
+      "newList": "新しいリスト",
+      "empty": "リストはまだありません",
+      "couldNotLoad": "リストを読み込めませんでした",
+      "noRepository": "リポジトリなし",
+      "rowA11y": "{{name}}、{{openCount}}",
+      "openCount_one": "未完了{{count}}件",
+      "openCount_other": "未完了{{count}}件",
+      "archived_one": "アーカイブ済み ({{count}})",
+      "archived_other": "アーカイブ済み ({{count}})",
+      "archive": "アーカイブ",
+      "unarchive": "アーカイブを解除",
+      "deleteTitle": "{{name}}を削除しますか？",
+      "deleteMessage": "そのタスクも削除されます。セッションは残ります。"
+    },
+    "listSettings": {
+      "title": "リストの設定",
+      "name": "名前",
+      "namePlaceholder": "バグ、アイデア、リリース…",
+      "emoji": "絵文字",
+      "mode": "モード",
+      "defaultsHint": "このリストから開始したセッションには、この既定値が使われます。"
+    },
+    "list": {
+      "addPlaceholder": "タスクを追加",
+      "add": "タスクを追加",
+      "empty": "タスクはまだありません",
+      "setDefaults": "リポジトリ、モード、モデルを設定",
+      "completed_one": "完了 ({{count}})",
+      "completed_other": "完了 ({{count}})"
+    },
+    "item": {
+      "markDone": "完了にする",
+      "markOpen": "未完了にする",
+      "markDonePrompt": "完了にしますか？",
+      "deleted": "タスクを削除しました",
+      "undo": "元に戻す",
+      "runCount_one": "実行{{count}}回",
+      "runCount_other": "実行{{count}}回",
+      "startNow": "レビューなしで開始",
+      "startNowHint": "長押しでレビューなしで開始",
+      "titleLabel": "タスクのタイトル",
+      "renameTitle": "タスク名を変更",
+      "notes": "メモ",
+      "addNotes": "メモを追加",
+      "notesPrompt": "コンテキスト、要件、受け入れ条件を追加します。",
+      "markdownSupported": "Markdown 対応",
+      "sessions": "リンク済みのセッション",
+      "noSessions": "セッションはまだありません",
+      "untitledLinkedSession": "リンクされたセッション",
+      "sessionNeedsInput": "セッションが入力を待っています",
+      "sessionRunning": "セッション実行中",
+      "sessionFinished": "セッション終了",
+      "sessionPullRequest": "セッションのプルリクエスト",
+      "sessionPullRequestNumber": "セッション PR #{{number}}",
+      "openSessionHint": "セッションを開きます。",
+      "unlinkSessionAction": "セッションのリンクを解除",
+      "unlinkConfirmTitle": "{{title}} のリンクを解除しますか?",
+      "unlinkConfirmMessage": "セッション自体は削除されません。この ToDo へのリンクだけが解除されます。",
+      "startNewSession": "新しいセッションを開始",
+      "startNewSessionHint": "長押しして新しいセッションを開始します。",
+      "linkSession": "セッションをリンク",
+      "linkFailed": "セッションをタスクにリンクできませんでした"
+    },
+    "linkSession": {
+      "title": "セッションをリンク",
+      "empty": "最近のセッションはありません",
+      "emptyInRepository": "{{repository}}に最近のセッションはありません"
+    },
+    "upNext": "次の予定",
+    "sessionTodo": "タスク：{{title}}",
+    "linkToTodo": "タスクにリンク",
+    "candidates": {
+      "empty": "未完了のタスクはありません"
+    },
+    "saveSheet": {
+      "title": "リストに保存",
+      "saved": "{{list}}に保存しました"
+    }
   }
 }

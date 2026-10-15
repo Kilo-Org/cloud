@@ -105,6 +105,31 @@ describe('pushDataSchema active_agents_glanceable', () => {
     needsInputSince: null,
   } as const;
 
+  it('retains bounded Home details beside the generic snapshot', () => {
+    const homeWidgetDetails = {
+      primaryTitle: 'Private Home title',
+      waitingAgents: [{ title: 'Awaiting approval', kind: 'permission' }],
+      scheduledAgents: [],
+    };
+    const parsed = pushDataSchema.parse({ ...payload, homeWidgetDetails });
+    expect(parsed).toMatchObject({ homeWidgetDetails });
+    expect(
+      pushDataSchema.safeParse({
+        ...payload,
+        homeWidgetDetails: { ...homeWidgetDetails, primaryTitle: 'x'.repeat(161) },
+      }).success
+    ).toBe(false);
+    expect(
+      pushDataSchema.safeParse({
+        ...payload,
+        homeWidgetDetails: {
+          ...homeWidgetDetails,
+          waitingAgents: Array(4).fill(homeWidgetDetails.waitingAgents[0]),
+        },
+      }).success
+    ).toBe(false);
+  });
+
   it('parses a payload from a server without the newest-result keys as null', () => {
     const parsed = pushDataSchema.parse(payload);
     if (parsed.type !== 'active_agents_glanceable') {

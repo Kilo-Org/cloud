@@ -6,10 +6,14 @@ import {
   decodeKiloSdkMessagesCursor,
   encodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_SESSION_DIFF_READ_BYTES,
   messageIdSchema,
   partIdSchema,
+  sessionDiffFileSchema,
   type KiloSdkMessagesCursor,
   type KiloSdkMessagesLegacyCursor,
+  type SessionDiffFile,
+  type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
 import { ingestItems } from '../db/sqlite-schema';
@@ -216,14 +220,20 @@ export async function readKiloSdkMessages(
   };
 }
 
+// Message rows use `message/<id>` item ids. Part rows (`msg_…/prt_…`) and the
+// singleton rows (`session`, `session_diff`, …) sort after them, so a
+// newest-first scan without an upper bound walks every part row before it
+// reaches a message. Under SQLite's BINARY collation '/' sorts just before '0'.
+const MESSAGE_ITEM_ID_RANGE = { start: 'message/', end: 'message0' };
+
 function messageItemId(messageId: string): string {
-  return `message/${messageId}`;
+  return `${MESSAGE_ITEM_ID_RANGE.start}${messageId}`;
 }
 
 function parsePersistedKiloSdkMessageStorageIdentity(
   itemId: string
 ): PersistedKiloSdkMessageStorageIdentity | null {
-  const prefix = 'message/';
+  const prefix = MESSAGE_ITEM_ID_RANGE.start;
   if (!itemId.startsWith(prefix)) return null;
   const parsed = messageIdSchema.safeParse(itemId.slice(prefix.length));
   return parsed.success && !parsed.data.includes('/') ? { itemId, messageId: parsed.data } : null;
@@ -268,7 +278,11 @@ function hasOlderKiloSdkMessageRows(
       .select({ id: ingestItems.id })
       .from(ingestItems)
       .where(
-        and(eq(ingestItems.item_type, 'message'), lt(ingestItems.item_id, beforeMessageItemId))
+        and(
+          eq(ingestItems.item_type, 'message'),
+          gte(ingestItems.item_id, MESSAGE_ITEM_ID_RANGE.start),
+          lt(ingestItems.item_id, beforeMessageItemId)
+        )
       )
       .limit(1)
       .get()
@@ -316,7 +330,7 @@ async function enumerateBoundedKiloSdkMessageInfos(
   let omittedItemCount = 0;
   let consumedRowCount = 0;
   let lastConsumedMessageStorageIdentity: PersistedKiloSdkMessageStorageIdentity | undefined;
-  let scanBeforeItemId = before ? messageItemId(before.id) : undefined;
+  let scanBeforeItemId = before ? messageItemId(before.id) : MESSAGE_ITEM_ID_RANGE.end;
   while (
     pageNewestFirst.length < limit &&
     consumedRowCount < KILO_SDK_HISTORY_BOUNDED_MESSAGE_SCAN_ROW_WORK_CAP
@@ -327,7 +341,8 @@ async function enumerateBoundedKiloSdkMessageInfos(
       .where(
         and(
           eq(ingestItems.item_type, 'message'),
-          scanBeforeItemId ? lt(ingestItems.item_id, scanBeforeItemId) : undefined
+          gte(ingestItems.item_id, MESSAGE_ITEM_ID_RANGE.start),
+          lt(ingestItems.item_id, scanBeforeItemId)
         )
       )
       .orderBy(desc(ingestItems.item_id))
@@ -633,6 +648,11 @@ async function hydrateKiloSdkMessageParts(
   return { parts, omittedItemCount, aggregateBudgetExhausted: false };
 }
 
+type BoundedItemTextRead =
+  | { kind: 'text'; text: string; byteLength: number }
+  | { kind: 'too_large'; byteLength: number }
+  | { kind: 'r2_missing' };
+
 type BoundedItemRead =
   | { kind: 'value'; value: Record<string, unknown>; byteLength: number }
   | { kind: 'too_large'; byteLength: number }
@@ -646,18 +666,17 @@ function isSameItemReference(
   return left?.item_data === right?.item_data && left?.item_data_r2_key === right?.item_data_r2_key;
 }
 
-async function readBoundedItemData(
+async function readBoundedItemText(
   ref: ItemDataRef,
   r2: R2Bucket,
   maximumBytes: number
-): Promise<BoundedItemRead> {
+): Promise<BoundedItemTextRead> {
   if (!ref.item_data_r2_key) {
     const byteLength = new TextEncoder().encode(ref.item_data).byteLength;
     if (byteLength > maximumBytes) {
       return { kind: 'too_large', byteLength };
     }
-    const value = parseItemObject(ref.item_data);
-    return value ? { kind: 'value', value, byteLength } : { kind: 'invalid_data' };
+    return { kind: 'text', text: ref.item_data, byteLength };
   }
 
   const metadata = await r2.head(ref.item_data_r2_key);
@@ -677,13 +696,81 @@ async function readBoundedItemData(
     return { kind: 'too_large', byteLength: object.size };
   }
 
-  const data = await object.text();
-  const byteLength = new TextEncoder().encode(data).byteLength;
+  const text = await object.text();
+  const byteLength = new TextEncoder().encode(text).byteLength;
   if (byteLength > maximumBytes) {
     return { kind: 'too_large', byteLength };
   }
-  const value = parseItemObject(data);
-  return value ? { kind: 'value', value, byteLength } : { kind: 'invalid_data' };
+  return { kind: 'text', text, byteLength };
+}
+
+async function readBoundedItemData(
+  ref: ItemDataRef,
+  r2: R2Bucket,
+  maximumBytes: number
+): Promise<BoundedItemRead> {
+  const result = await readBoundedItemText(ref, r2, maximumBytes);
+  if (result.kind !== 'text') return result;
+  const value = parseItemObject(result.text);
+  return value ? { kind: 'value', value, byteLength: result.byteLength } : { kind: 'invalid_data' };
+}
+
+function parseSessionDiffFiles(text: string): SessionDiffFile[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed)) return null;
+  const files: SessionDiffFile[] = [];
+  for (const entry of parsed) {
+    // Historical before/after entries carry no patch; every reader drops them.
+    if (typeof entry === 'object' && entry !== null && !('patch' in entry)) continue;
+    const file = sessionDiffFileSchema.safeParse(entry);
+    if (!file.success) return null;
+    files.push(file.data);
+  }
+  return files;
+}
+
+/**
+ * Read the cumulative `session_diff` singleton (inline or R2-backed). A
+ * session that never emitted a diff reads as an empty file list. A missing R2
+ * object is retried once against the current row, because a newer diff can
+ * replace the row (and its R2 object) between the select and the read.
+ */
+export async function readSessionDiff(
+  db: DrizzleSqliteDODatabase,
+  r2: R2Bucket
+): Promise<SessionDiffRead> {
+  const resolveDiff = () =>
+    db
+      .select({
+        item_data: ingestItems.item_data,
+        item_data_r2_key: ingestItems.item_data_r2_key,
+      })
+      .from(ingestItems)
+      .where(eq(ingestItems.item_type, 'session_diff'))
+      .limit(1)
+      .get();
+
+  let ref = resolveDiff();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (!ref) return { kind: 'value', files: [] };
+    const result = await readBoundedItemText(ref, r2, MAX_SESSION_DIFF_READ_BYTES);
+    if (result.kind === 'too_large') {
+      return { kind: 'too_large', maximumBytes: MAX_SESSION_DIFF_READ_BYTES };
+    }
+    if (result.kind === 'text') {
+      const files = parseSessionDiffFiles(result.text);
+      return files ? { kind: 'value', files } : { kind: 'invalid_data' };
+    }
+    const current = resolveDiff();
+    if (isSameItemReference(ref, current)) break;
+    ref = current;
+  }
+  return { kind: 'retryable_failure' };
 }
 
 export async function readKiloSdkSessionItem(

@@ -12,7 +12,6 @@ import { describePrBadge, normalizePrBadgeState } from './session-pr-badge-model
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   openExternalUrl: vi.fn(),
-  useFeatureFlag: vi.fn(() => true),
 }));
 
 vi.mock('react-native', () => ({
@@ -46,10 +45,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/external-link', () => ({
   openExternalUrl: mocks.openExternalUrl,
-}));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
-  useFeatureFlag: mocks.useFeatureFlag,
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -202,7 +197,6 @@ describe('SessionPrBadge mounted', () => {
   beforeEach(() => {
     mocks.push.mockClear();
     mocks.openExternalUrl.mockClear();
-    mocks.useFeatureFlag.mockReturnValue(true);
   });
 
   it('reserves a 52pt skeleton while loading', async () => {
@@ -277,10 +271,9 @@ describe('SessionPrBadge mounted', () => {
     expect(mocks.openExternalUrl).not.toHaveBeenCalled();
   });
 
-  it('opens the browser for a GitHub PR when the PR review flag is off', async () => {
-    mocks.useFeatureFlag.mockReturnValue(false);
+  it('opens the browser for an unsupported GitHub Enterprise PR', async () => {
     const renderer = await renderBadge({
-      pr: pr({ platform: 'github', url: 'https://github.com/octocat/hello-world/pull/42' }),
+      pr: pr({ platform: 'github', url: 'https://github.example.com/octocat/hello-world/pull/42' }),
       loading: false,
     });
 
@@ -288,7 +281,7 @@ describe('SessionPrBadge mounted', () => {
     pressable?.props.onPress();
 
     expect(mocks.openExternalUrl).toHaveBeenCalledWith(
-      'https://github.com/octocat/hello-world/pull/42',
+      'https://github.example.com/octocat/hello-world/pull/42',
       { label: 'pull request' }
     );
     expect(mocks.push).not.toHaveBeenCalled();

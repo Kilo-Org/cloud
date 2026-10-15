@@ -162,13 +162,14 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 15. For eligible first-time monthly subscribers started strictly before `2026-10-09T00:00:00Z`, streak month 1 MUST use
     the 50% welcome bonus, month 2 MUST use the normal 10% ramp, and month 3 MUST use the normal 15% ramp.
     This includes subscriptions started before May 7, 2026; no two-month welcome-promo grandfathering remains.
-16. For eligible first-time monthly subscribers started at or after `2026-10-09T00:00:00Z`, streak month 1 MUST use the
-    normal 5% ramp, month 2 MUST use the 50% welcome bonus, and month 3 MUST use the normal 15% ramp.
-    The subscription start timestamp MUST determine the schedule, with no persisted schedule flag.
-    Missing or invalid subscription starts MUST conservatively use the legacy month-1 schedule.
+16. Eligible first-time monthly subscriptions started at or after `2026-10-09T00:00:00Z` MUST receive 10% in month 1,
+    the 50% welcome bonus in month 2, and the normal 15% ramp in month 3.
+    The existing welcome cutoff MUST select this schedule without a persisted marker or a new activation date.
+    Missing or invalid starts MUST retain the legacy month-1 welcome schedule.
     Non-first-time subscribers MUST always use the normal monthly ramp, regardless of subscription start.
-17. From streak month 3 onward, and in any month where the welcome promo does not apply, monthly cadence MUST use the
-    monthly ramp value.
+17. From streak month 3 onward, and in any month where neither the welcome promo nor the eligible first-month
+    10% override applies, monthly cadence MUST use the monthly ramp value.
+    The first-month 10% override MUST use the same first-time and payment eligibility as the welcome promo.
 18. New welcome-promo grants MUST use the `bonus` issuance-item kind with a 50% applied percent.
     `promo_first_month_50pct` remains a recognized legacy kind only.
 
@@ -247,6 +248,10 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
    rules.
 
 ### Projections and UI
+
+Credit-expiration summaries MUST group positive remaining balances by expiration instant.
+They MUST exclude non-expiring and exhausted blocks and show each group in chronological order.
+Summaries MUST NOT label all dated credits as bonus credits.
 
 38. The Kilo Pass state read path MUST keep actual issuance amounts and projected amounts separate. It MUST compute
     current-period and next-period projections from tier, cadence, streak, first-time-subscriber status, provider, and
@@ -435,6 +440,13 @@ Passing the cancellation cooldown after 24 hours does not make a previously clai
 promo or Kilo Pass referral conversion.
 
 ## Changelog
+
+### 2026-10-13 -- First-month bonus increase
+
+- Reused the existing October 9 welcome cutoff for the first-month increase.
+- Eligible first-time starts at or after the cutoff receive 10%, 50%, then 15%.
+- Earlier starts, returning-subscriber bonuses, yearly bonuses, payment eligibility, and usage unlock remain unchanged.
+- Removed the proposed schedule marker, migration, and new activation date.
 
 ### 2026-10-08 -- Timestamp-based monthly welcome bonus cutoff
 

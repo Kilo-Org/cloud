@@ -14,6 +14,8 @@ import { getWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
  */
 let actionNotice: string | null = null;
 let noticeAskKey: string | null = null;
+/** An Approve tap is being answered: the card says "Approving…" and drops Approve. */
+let approving = false;
 
 /** The recorded ask identity the notice describes; '' means "no ask". */
 function askKey(ask: WaitingAsk | null): string {
@@ -29,13 +31,32 @@ export function setGlanceableActionNotice(notice: string | null): void {
   noticeAskKey = notice === null ? null : askKey(getWaitingAsk());
 }
 
+/**
+ * Mark (or clear) the in-flight answer; it ends with the ask like the notice does.
+ * A new answer supersedes the last failure: the notice outranks "Approving…" on
+ * the card, so a retry would otherwise keep showing the old failure line.
+ */
+export function setGlanceableActionApproving(value: boolean): void {
+  approving = value;
+  if (value) {
+    setGlanceableActionNotice(null);
+  }
+}
+
+export function isActionApproving(): boolean {
+  return approving;
+}
+
 /** The notice waiting to reach the next notification text, or null. */
 export function getActionNotice(): string | null {
   return actionNotice;
 }
 
-/** Drop the notice once nothing needs input or the recorded ask has changed. */
+/** Drop the notice (and the in-flight mark) once nothing needs input; the notice also when the ask changed. */
 export function pruneActionNotice(snapshot: GlanceableAgentsSnapshot): void {
+  if (snapshot.needsInput === 0) {
+    approving = false;
+  }
   if (
     actionNotice !== null &&
     (snapshot.needsInput === 0 || askKey(getWaitingAsk()) !== noticeAskKey)

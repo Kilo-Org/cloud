@@ -68,6 +68,8 @@ function dataCollectionExclusiveModel(
   return model;
 }
 
+const noUnavailableModels: ReadonlySet<string> = new Set();
+
 describe('applyFreeEndpointDataPolicy', () => {
   test('applies free OpenRouter endpoint policy by normalized model and provider', () => {
     const freeVariant = offering('example/model:free', true);
@@ -77,12 +79,16 @@ describe('applyFreeEndpointDataPolicy', () => {
       { provider: { slug: 'novita' }, models: [freeVariant, matching] },
       { provider: { slug: 'deepinfra' }, models: [otherProvider] },
     ];
-    const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(providerModelData);
+    const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(
+      providerModelData,
+      noUnavailableModels
+    );
 
     applyFreeEndpointDataPolicy({
       providerModelData,
       openRouterFreeEndpoints,
       kiloExclusiveModels: [],
+      unavailableModelIds: noUnavailableModels,
     });
 
     expect(freeVariant.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
@@ -100,10 +106,12 @@ describe('applyFreeEndpointDataPolicy', () => {
 
     applyFreeEndpointDataPolicy({
       providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],
-      openRouterFreeEndpoints: getOpenRouterFreeEndpoints([
-        { provider: { slug: 'novita' }, models: [model] },
-      ]),
+      openRouterFreeEndpoints: getOpenRouterFreeEndpoints(
+        [{ provider: { slug: 'novita' }, models: [model] }],
+        noUnavailableModels
+      ),
       kiloExclusiveModels: [],
+      unavailableModelIds: noUnavailableModels,
     });
 
     expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
@@ -120,6 +128,7 @@ describe('applyFreeEndpointDataPolicy', () => {
       ],
       openRouterFreeEndpoints: [],
       kiloExclusiveModels: [freeExclusiveModel('example/model:free', [])],
+      unavailableModelIds: noUnavailableModels,
     });
 
     expect(first.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
@@ -135,6 +144,7 @@ describe('applyFreeEndpointDataPolicy', () => {
       providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],
       openRouterFreeEndpoints: [],
       kiloExclusiveModels: [hidden],
+      unavailableModelIds: noUnavailableModels,
     });
 
     expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
@@ -147,6 +157,7 @@ describe('applyFreeEndpointDataPolicy', () => {
       providerModelData: [{ provider: { slug: 'deepseek' }, models: [model] }],
       openRouterFreeEndpoints: [],
       kiloExclusiveModels: [dataCollectionExclusiveModel('example/model:discounted', ['deepseek'])],
+      unavailableModelIds: noUnavailableModels,
     });
 
     expect(model.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
@@ -163,6 +174,7 @@ describe('applyFreeEndpointDataPolicy', () => {
       ],
       openRouterFreeEndpoints: [],
       kiloExclusiveModels: [freeExclusiveModel('example/model:free', ['stepfun'])],
+      unavailableModelIds: noUnavailableModels,
     });
 
     expect(allowed.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
@@ -183,6 +195,7 @@ describe('applyFreeEndpointDataPolicy', () => {
         freeExclusiveModel('example/model:free', ['stepfun']),
         freeExclusiveModel('example/model:promo', ['novita']),
       ],
+      unavailableModelIds: noUnavailableModels,
     });
 
     expect(first.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
@@ -212,6 +225,7 @@ describe('applyFreeEndpointDataPolicy', () => {
       providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],
       openRouterFreeEndpoints: [],
       kiloExclusiveModels: [disabled, paid],
+      unavailableModelIds: noUnavailableModels,
     });
 
     expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
@@ -221,11 +235,13 @@ describe('applyFreeEndpointDataPolicy', () => {
     const freeVariant = offering('google/gemma-4-31b-it:free', true);
     const model = offering('google/gemma-4-31b-it');
     const providerModelData = [{ provider: { slug: 'darkbloom' }, models: [freeVariant, model] }];
+    const unavailableModelIds = new Set(['google/gemma-4-31b-it:free']);
 
     applyFreeEndpointDataPolicy({
       providerModelData,
-      openRouterFreeEndpoints: getOpenRouterFreeEndpoints(providerModelData),
+      openRouterFreeEndpoints: getOpenRouterFreeEndpoints(providerModelData, unavailableModelIds),
       kiloExclusiveModels: [freeExclusiveModel('google/gemma-4-31b-it:free', [])],
+      unavailableModelIds,
     });
 
     expect(freeVariant.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
@@ -235,13 +251,17 @@ describe('applyFreeEndpointDataPolicy', () => {
   test('does not collect free keys from offerings injected later', () => {
     const model = offering('example/model');
     const providerModelData = [{ provider: { slug: 'novita' }, models: [model] }];
-    const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(providerModelData);
+    const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(
+      providerModelData,
+      noUnavailableModels
+    );
     providerModelData[0].models.push(offering('example/model:free', true));
 
     applyFreeEndpointDataPolicy({
       providerModelData,
       openRouterFreeEndpoints,
       kiloExclusiveModels: [],
+      unavailableModelIds: noUnavailableModels,
     });
 
     expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });

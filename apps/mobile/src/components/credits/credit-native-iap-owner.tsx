@@ -34,6 +34,7 @@ import {
   getStoreCreditPurchaseErrorMessageKey,
   isRecoverableCreditPurchase,
   isStoreAlreadyOwnedError,
+  isStoreNotReadyError,
   showDedupedPurchaseError,
 } from '@/lib/credits/use-store-credit-purchase';
 import { useTRPC } from '@/lib/trpc';
@@ -210,6 +211,19 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         return;
       }
       releasePurchaseRequest(request.generation);
+      if (isStoreNotReadyError(error)) {
+        // Play dropped its billing client after this owner connected, so every
+        // later tap would fail the same way. Restore the connection for the next
+        // tap; the request itself never reached the store, so the generic copy
+        // below is still the truth for this one.
+        void (async () => {
+          try {
+            await reconnectStore();
+          } catch {
+            // Still unreachable: the screen keeps its store-unavailable state.
+          }
+        })();
+      }
       if (isStoreAlreadyOwnedError(error)) {
         // The store says the pack is already owned. For a consumable that is
         // usually this same user's unfinished purchase — charged, granted
@@ -545,10 +559,30 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     storefront,
   ]);
 
+  // Play can drop its billing client after this owner connected (a service
+  // disconnect, or another owner's `endConnection`); `connected` still reads
+  // true and the next price lookup fails with `NotPrepared`. Reconnect and ask
+  // once more, so one dropped connection is not reported as a store outage. A
+  // reconnect that fails, or a second failure, reaches the loader, which shows
+  // the store-unavailable copy.
+  const fetchStoreProducts = useCallback(
+    async (productSkus: string[]): Promise<StoreCreditProductListing[]> => {
+      try {
+        return await fetchCreditStoreProducts(productSkus);
+      } catch (error) {
+        if (!isStoreNotReadyError(error) || !(await reconnectStore())) {
+          throw error;
+        }
+        return fetchCreditStoreProducts(productSkus);
+      }
+    },
+    [reconnectStore]
+  );
+
   const value = useMemo<CreditNativeIapContextValue>(
     () => ({
       connected,
-      fetchStoreProducts: fetchCreditStoreProducts,
+      fetchStoreProducts,
       reconnectStore,
       purchase: startPurchase,
       completingProductId,
@@ -562,6 +596,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       completingProductId,
       connected,
       errorMessageKey,
+      fetchStoreProducts,
       reconnectStore,
       startPurchase,
     ]

@@ -1111,17 +1111,36 @@ describe('writeGlobalRules', () => {
 
     expect(writeFile).toHaveBeenCalledWith(
       '/home/agent_test/.kilocode/rules/cloud-agent.md',
-      buildCloudAgentRules('900000')
+      buildCloudAgentRules({ bashDefaultTimeoutMs: '900000', sandboxProvider: 'cloudflare' })
     );
+    const rules = writeFile.mock.calls[0]?.[1];
+    expect(rules).toContain('Port 3000 is used by the sandbox itself.');
   });
 });
 
 describe('buildCloudAgentRules', () => {
   it('bounds commands and sleeps to the shell-tool timeout', () => {
-    const rules = buildCloudAgentRules(240_000);
+    const rules = buildCloudAgentRules({ bashDefaultTimeoutMs: 240_000 });
 
     expect(rules).toContain('no more than 3 minutes 30 seconds');
     expect(rules).toContain('never sleep longer than this limit');
+  });
+
+  it.each([
+    ['cloudflare', 'Port 3000 is used by the sandbox itself.'],
+    ['vercel', 'Port 23456 is used by the sandbox itself.'],
+  ] as const)('names the reserved port of %s', (sandboxProvider, sentence) => {
+    expect(buildCloudAgentRules({ sandboxProvider })).toContain(sentence);
+  });
+
+  it.each([
+    ['cloudflare-containers', 'cloudflare-containers' as const],
+    ['an unknown provider', undefined],
+  ])('names no reserved port for %s', (_name, sandboxProvider) => {
+    const rules = buildCloudAgentRules({ sandboxProvider });
+    expect(rules).not.toContain('used by the sandbox itself');
+    expect(rules).toContain('read its output to find the port that it uses');
+    expect(rules).toContain('give its exact URL as plain text, for example http://localhost:5173.');
   });
 });
 
@@ -3937,7 +3956,7 @@ describe('SessionService session-ingest compatibility', () => {
       'cloud-agent',
       undefined,
       undefined,
-      'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+      { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' }
     );
 
     expect(result).toEqual(readyResult);
@@ -3953,6 +3972,35 @@ describe('SessionService session-ingest compatibility', () => {
       gitUrl: undefined,
       cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
+  });
+
+  it('forwards the clone cut to session-ingest', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      undefined,
+      'cloud-agent',
+      undefined,
+      undefined,
+      {
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      }
+    );
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      })
+    );
   });
 
   it('returns undefined when the old worker sends no clone acknowledgement', async () => {

@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { buildPreferredModels, selectAutoFreeCandidate } from './models';
+import { selectAutoFreeCandidate } from './models';
 import {
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
@@ -19,7 +19,6 @@ import {
   gemma_4_26b_a4b_it_free_model,
   glyph_cluster_stealth_free_model,
 } from './kilo-exclusive-models';
-import { isUnavailableModel } from './unavailable-models';
 import { getRandomNumber } from './getRandomNumber';
 
 describe('rate-limited Kilo-exclusive models', () => {
@@ -82,20 +81,6 @@ describe('isFreeModel', () => {
 
     test('should return true for openrouter/free', async () => {
       expect(await isFreeModel('openrouter/free')).toBe(true);
-    });
-
-    test('recognizes inclusionai/ling-3.1-flash as free without the suffix', () => {
-      expect(isFreeModel('inclusionai/ling-3.1-flash')).toBe(true);
-    });
-
-    test.each([
-      'inclusionai/ling-3.0-flash',
-      'inclusionai/ling-3.1-flash-preview',
-      'INCLUSIONAI/LING-3.1-FLASH',
-      ' inclusionai/ling-3.1-flash',
-      'inclusionai/ling-3.1-flash ',
-    ])('does not classify %s as free', model => {
-      expect(isFreeModel(model)).toBe(false);
     });
 
     test('should return true for OpenRouter stealth alpha models', async () => {
@@ -171,31 +156,22 @@ describe('isFreeModel', () => {
     });
 
     test.each(['tencent/hy3:free', 'meituan/longcat-2.0-free', 'nex-agi/nex-n2.5-pro:free'])(
-      'removes %s from exclusive and preferred models without restricting availability',
+      'removes %s from exclusive models',
       modelId => {
         expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
         expect(findKiloExclusiveModel(modelId)).toBeNull();
-        expect(isUnavailableModel(modelId)).toBe(false);
-        expect(buildPreferredModels([])).not.toContain(modelId);
       }
     );
 
     test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
-      'inherits %s without an exclusive definition or availability restriction',
+      'inherits %s without an exclusive definition or provider restriction',
       async model => {
         expect(kiloExclusiveModels.some(entry => entry.public_id === model)).toBe(false);
         expect(findKiloExclusiveModel(model)).toBeNull();
         expect(getKiloExclusiveInferenceProviderRestriction(model)).toBeUndefined();
-        expect(isUnavailableModel(model)).toBe(false);
         expect(await isFreeModel(model)).toBe(true);
       }
     );
-
-    test('keeps MiniMax free models outside preferred models', () => {
-      for (const model of ['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free']) {
-        expect(buildPreferredModels([])).not.toContain(model);
-      }
-    });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
       expect(getInferenceProvider(claude_opus_4_7_stealth_model)?.slug).toBe('stealth');
@@ -309,9 +285,6 @@ describe('hasBestEffortGuessDataCollectionRequirement', () => {
 
   test('requires data collection for free models', async () => {
     expect(await hasBestEffortGuessDataCollectionRequirement('openrouter/free')).toBe(true);
-    expect(await hasBestEffortGuessDataCollectionRequirement('inclusionai/ling-3.1-flash')).toBe(
-      true
-    );
   });
 
   test('does not require data collection for regular paid models', async () => {

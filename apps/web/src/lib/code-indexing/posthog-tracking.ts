@@ -73,9 +73,6 @@ type CodeIndexingUpsertEvent = BaseCodeIndexingEvent & {
   success: boolean;
 };
 
-/**
- * Track code indexing search operation
- */
 export function trackCodeIndexingSearch(properties: CodeIndexingSearchEvent): void {
   try {
     posthogClient.capture({
@@ -95,9 +92,6 @@ export function trackCodeIndexingSearch(properties: CodeIndexingSearchEvent): vo
   }
 }
 
-/**
- * Track code indexing delete operation
- */
 export function trackCodeIndexingDelete(properties: CodeIndexingDeleteEvent): void {
   try {
     posthogClient.capture({
@@ -122,9 +116,6 @@ export function trackCodeIndexingDelete(properties: CodeIndexingDeleteEvent): vo
   }
 }
 
-/**
- * Track code indexing manifest retrieval
- */
 export function trackCodeIndexingManifest(properties: CodeIndexingManifestEvent): void {
   try {
     posthogClient.capture({
@@ -144,9 +135,6 @@ export function trackCodeIndexingManifest(properties: CodeIndexingManifestEvent)
   }
 }
 
-/**
- * Track code indexing stats retrieval
- */
 export function trackCodeIndexingStats(properties: CodeIndexingStatsEvent): void {
   try {
     posthogClient.capture({
@@ -166,9 +154,6 @@ export function trackCodeIndexingStats(properties: CodeIndexingStatsEvent): void
   }
 }
 
-/**
- * Track code indexing project files retrieval
- */
 export function trackCodeIndexingProjectFiles(properties: CodeIndexingProjectFilesEvent): void {
   try {
     posthogClient.capture({
@@ -188,9 +173,6 @@ export function trackCodeIndexingProjectFiles(properties: CodeIndexingProjectFil
   }
 }
 
-/**
- * Track code indexing delete before date operation
- */
 export function trackCodeIndexingDeleteBeforeDate(
   properties: CodeIndexingDeleteBeforeDateEvent
 ): void {
@@ -212,9 +194,6 @@ export function trackCodeIndexingDeleteBeforeDate(
   }
 }
 
-/**
- * Track code indexing file upsert operation
- */
 export function trackCodeIndexingUpsert(properties: CodeIndexingUpsertEvent): void {
   try {
     posthogClient.capture({

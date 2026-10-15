@@ -8,7 +8,7 @@
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import type { Images } from '@kilocode/app-shared/images-schema';
-import type { NormalizedEvent } from './normalizer';
+import type { NormalizedEvent, ServiceEvent } from './normalizer';
 import type { SuggestionAction } from './types';
 import type { RemoteModelOverride, RemoteModelState } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
@@ -249,6 +249,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   });
 
   let transport: Transport | null = null;
+  let replaying = false;
+  const replayedQueuedMessages = new Map<
+    string,
+    Extract<ServiceEvent, { type: 'cloud.message.queued' }>
+  >();
   let connectGeneration = 0;
   let disarmUpgradeWatcher: (() => void) | null = null;
 
@@ -304,20 +309,52 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       // synthetic user message when none exists so the UI renders the
       // prompt as soon as the server acknowledges it.
       if (event.type === 'cloud.message.queued') {
+        if (replaying) replayedQueuedMessages.set(event.messageId, event);
+        else {
+          chatProcessor.synthesizeQueuedUserMessage({
+            messageId: event.messageId,
+            sessionId: config.kiloSessionId,
+            content: event.content,
+          });
+        }
+      }
+      // `cloud.message.canceled` removes the synthetic (or real) local row the
+      // queued event materialized, so a replay of queued then canceled nets empty.
+      if (event.type === 'cloud.message.canceled') {
+        replayedQueuedMessages.delete(event.messageId);
+        storage.deleteMessage(event.messageId);
+      }
+      if (event.type === 'cloud.message.completed') replayedQueuedMessages.delete(event.messageId);
+      config.onEvent?.(event);
+    },
+    onReplayStarted: () => {
+      replaying = true;
+      replayedQueuedMessages.clear();
+      serviceState.beginReplay();
+    },
+    onReplayCanceled: () => {
+      replaying = false;
+      replayedQueuedMessages.clear();
+      serviceState.cancelReplay();
+    },
+    onReplayComplete: () => {
+      for (const event of replayedQueuedMessages.values()) {
+        if (
+          !serviceState.getPendingMessages().has(event.messageId) &&
+          serviceState.getActiveMessageId() !== event.messageId
+        )
+          continue;
         chatProcessor.synthesizeQueuedUserMessage({
           messageId: event.messageId,
           sessionId: config.kiloSessionId,
           content: event.content,
         });
       }
-      // `cloud.message.canceled` removes the synthetic (or real) local row the
-      // queued event materialized, so a replay of queued then canceled nets empty.
-      if (event.type === 'cloud.message.canceled') {
-        storage.deleteMessage(event.messageId);
-      }
-      config.onEvent?.(event);
+      replayedQueuedMessages.clear();
+      replaying = false;
+      serviceState.endReplay();
+      config.onReplayComplete?.();
     },
-    onReplayComplete: () => config.onReplayComplete?.(),
   };
 
   function pickTransportFactory(resolved: ResolvedSession): TransportFactory {

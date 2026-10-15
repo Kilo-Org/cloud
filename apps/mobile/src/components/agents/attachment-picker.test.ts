@@ -4,7 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { normalizeImageAsset, pickAgentAttachments, pickAgentPicture } from './attachment-picker';
 import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -79,6 +79,21 @@ vi.mock('@sentry/react-native', () => ({
 }));
 
 const getDocumentAsyncMock = vi.mocked(DocumentPicker.getDocumentAsync);
+
+type OnFrame = (time: number) => void;
+
+beforeEach(() => {
+  // Every source launch waits one frame for the sheet's modal to close; run
+  // that frame at once unless a test holds it.
+  vi.stubGlobal('requestAnimationFrame', (onFrame: OnFrame) => {
+    onFrame(0);
+    return 0;
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 type ShowActionSheet = ActionSheetProps['showActionSheetWithOptions'];
 type SheetButtonHandler = Parameters<ShowActionSheet>[1];
@@ -332,6 +347,26 @@ describe('agent attachment picker (document MIME derivation)', () => {
     // Cancel is button index 3; Files (2) with a canceled document result
     // also yields []. Use Files so the document path is exercised.
     expect(await pickWithSheetSelection(2)).toEqual([]);
+  });
+
+  // KILO-APP-3BF: a picker presented before the sheet's modal closes is
+  // dismissed with the modal, and every later Files tap fails.
+  it('opens the document picker only after the sheet has closed', async () => {
+    const frames: OnFrame[] = [];
+    vi.stubGlobal('requestAnimationFrame', (onFrame: OnFrame) => frames.push(onFrame));
+    getDocumentAsyncMock.mockClear();
+    const canceled: DocumentPicker.DocumentPickerCanceledResult = { canceled: true, assets: null };
+    getDocumentAsyncMock.mockResolvedValueOnce(canceled);
+
+    // The sheet callback runs before the sheet's modal closes.
+    const result = pickWithSheetSelection(2);
+    expect(frames).toHaveLength(1);
+    expect(getDocumentAsyncMock).not.toHaveBeenCalled();
+
+    frames[0]?.(0);
+
+    expect(await result).toEqual([]);
+    expect(getDocumentAsyncMock).toHaveBeenCalledTimes(1);
   });
 });
 

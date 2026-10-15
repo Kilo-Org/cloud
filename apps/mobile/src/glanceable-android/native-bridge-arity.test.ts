@@ -14,6 +14,8 @@ const MODULE_SOURCE = readFileSync(
 
 const BRIDGE_SOURCE = readFileSync(join(__dirname, 'live-update.ts'), 'utf8');
 
+const SESSION_BRIDGE_SOURCE = readFileSync(join(__dirname, 'session-notification.ts'), 'utf8');
+
 /**
  * Expo's `Function` builder declares one overload per arity and stops at eight
  * (expo-modules-core `ObjectDefinitionBuilder`: `reified P0` … `reified P7`). A
@@ -61,11 +63,14 @@ function declaredArity(name: string): number {
 }
 
 /** The argument count the JS wrapper passes to `nativeModule?.<name>(…)`. */
-function bridgedArity(name: string): number {
+function bridgedArity(name: string, source = BRIDGE_SOURCE): number {
   const marker = `nativeModule?.${name}(`;
-  const start = BRIDGE_SOURCE.indexOf(marker);
-  expect(start, `${marker} is missing from live-update.ts`).toBeGreaterThan(-1);
-  const args = BRIDGE_SOURCE.slice(start + marker.length);
+  const lazyMarker = `nativeModule()?.${name}(`;
+  const start = source.includes(marker) ? source.indexOf(marker) : source.indexOf(lazyMarker);
+  const found = source.includes(marker) ? marker : lazyMarker;
+
+  expect(start, `${found} is missing from the bridge`).toBeGreaterThan(-1);
+  const args = source.slice(start + found.length);
   let depth = 1;
   let end = -1;
   for (let index = 0; index < args.length; index += 1) {
@@ -109,6 +114,10 @@ describe('ActiveAgentsLiveUpdate native bridge arity', () => {
       'end',
       'setWidgetSnapshot',
       'getWidgetSnapshot',
+      'postSession',
+      'dismissSession',
+      'pruneSessions',
+      'getSessionCards',
     ]) {
       expect(declaredArity(name), `${name} declares too many arguments`).toBeLessThanOrEqual(
         EXPO_FUNCTION_MAX_ARGS
@@ -119,6 +128,43 @@ describe('ActiveAgentsLiveUpdate native bridge arity', () => {
   it('passes exactly the arguments the native Function declares', () => {
     expect(bridgedArity('start')).toBe(declaredArity('start'));
     expect(bridgedArity('update')).toBe(declaredArity('update'));
+  });
+
+  /**
+   * The session card crosses the bridge as JSON text: the record converter
+   * rejects a null inside an object argument, and a card carries nullable
+   * fields. Both sides must agree on the argument count and on the text form.
+   */
+  it('passes the session card as JSON text with matching arity', () => {
+    expect(declaredArity('postSession')).toBe(2);
+    expect(declaredArity('dismissSession')).toBe(1);
+    expect(declaredArity('pruneSessions')).toBe(1);
+    expect(declaredArity('getSessionCards')).toBe(0);
+    for (const name of ['postSession', 'dismissSession', 'pruneSessions', 'getSessionCards']) {
+      expect(SESSION_BRIDGE_SOURCE, `${name} must be called from the session bridge`).toContain(
+        `nativeModule?.${name}(`
+      );
+    }
+
+    expect(SESSION_BRIDGE_SOURCE).toContain('JSON.stringify(card)');
+    expect(SESSION_BRIDGE_SOURCE).toContain('JSON.stringify(keep)');
+    expect(MODULE_SOURCE).toContain(
+      'SessionNotifications.post(context, sessionCardFromJson(cardJson)'
+    );
+    expect(MODULE_SOURCE).toContain('SessionNotifications.prune(context, keepJson)');
+  });
+
+  it('runs every session write on the module queue and keeps the read synchronous', () => {
+    for (const name of ['postSession', 'dismissSession', 'pruneSessions']) {
+      const block = registration(name);
+      expect(block, `${name} must be an AsyncFunction`).toContain(`AsyncFunction("${name}") {`);
+      expect(block, `${name} must run on the module queue`).toContain('.runOnQueue(moduleQueue)');
+    }
+    const read = registration('getSessionCards');
+    expect(read, 'getSessionCards must stay a synchronous Function').toContain(
+      'Function("getSessionCards") {'
+    );
+    expect(read, 'getSessionCards must not be queued').not.toContain('.runOnQueue(');
   });
 });
 

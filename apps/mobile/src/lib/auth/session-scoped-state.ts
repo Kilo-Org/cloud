@@ -16,25 +16,14 @@ import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
+import { reportSystemSearchFailure } from '@/lib/system-search-telemetry';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { reapTempFiles } from '@/lib/temp-file-registry';
 
 /**
- * One report per failed OS search clear, tagged so the subsystem is filterable.
- * The previous account's entries stay searchable until a later clear succeeds,
- * so the failure must be visible and a later clear must be able to retry it.
- */
-function reportSystemSearchClearFailure(error: unknown): void {
-  captureTelemetry({
-    error,
-    level: 'warning',
-    tags: { 'error.subsystem': 'system-search', 'error.operation': 'clear' },
-  });
-}
-
-/**
  * Fire the OS search clear without awaiting, so the caller stays synchronous
- * and never throws, and report a rejection instead of swallowing it. The clear
+ * and never throws, and report a rejection instead of swallowing it. A timeout
+ * is not reported: the next signed-out launch repeats the clear. The clear
  * is idempotent: it wipes the app's whole search domain and the fingerprint
  * ledger the indexer diffs against, so the next sync re-indexes whatever the
  * active account can see.
@@ -46,7 +35,7 @@ function clearSearchIndexBestEffort(): void {
     try {
       await clearSystemSearchIndex();
     } catch (error) {
-      reportSystemSearchClearFailure(error);
+      reportSystemSearchFailure('clear', error);
     }
   })();
 }

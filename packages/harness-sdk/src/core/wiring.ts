@@ -83,6 +83,7 @@ interface Wiring extends Omit<SessionOptions, 'tools'> {
   readonly store: Option.Option<SessionStoreService>;
   readonly state: Ref.Ref<Session>;
   readonly totals: Ref.Ref<ModelUsage>;
+  readonly modelTotals: Ref.Ref<ReadonlyMap<string, ModelUsage>>;
   /** What the last request put in front of the model. Drives compaction. */
   readonly prompted: Ref.Ref<number>;
   /** True while a question is streaming. See `SessionBusyError`. */
@@ -186,6 +187,7 @@ const wiringFor = (
       store: yield* Effect.serviceOption(SessionStore),
       state: yield* Ref.make(session),
       totals: yield* Ref.make(zeroUsage),
+      modelTotals: yield* Ref.make<ReadonlyMap<string, ModelUsage>>(new Map()),
       prompted: yield* Ref.make(prompted),
       busy: yield* Ref.make(false),
       tools,

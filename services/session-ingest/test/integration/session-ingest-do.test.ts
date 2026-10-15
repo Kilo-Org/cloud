@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import {
   decodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_SESSION_DIFF_READ_BYTES,
 } from '@kilocode/session-ingest-contracts';
 import {
   KILO_SDK_HISTORY_BOUNDED_MESSAGE_SCAN_ROW_WORK_CAP,
@@ -219,6 +220,48 @@ describe('SessionIngestDO integration', () => {
       expect(snapshot.messages[0].info.id).toBe('msg_1');
       expect(snapshot.messages[1].info.id).toBe('msg_2');
     });
+
+    it('exports only the transcript up to an inclusive message cut and drops the session diff', async () => {
+      const sessionId = 'ses_roundtrip_cut_0000000005';
+      const stub = getStub(kiloUserId, sessionId);
+
+      // Ingest order is not message order: a late part of msg_2 lands after msg_3.
+      await stub.ingest(
+        [
+          { type: 'session', data: { title: 'Cut Session' } },
+          { type: 'message', data: { id: 'msg_1', role: 'user', content: 'first' } },
+          { type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text' } },
+          { type: 'message', data: { id: 'msg_2', role: 'assistant', content: 'second' } },
+          { type: 'message', data: { id: 'msg_3', role: 'user', content: 'third' } },
+          { type: 'part', data: { id: 'part_2', messageID: 'msg_2', type: 'text' } },
+          { type: 'part', data: { id: 'part_3', messageID: 'msg_3', type: 'text' } },
+          { type: 'session_diff', data: [{ file: 'a.ts', additions: 1, deletions: 0 }] },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(await stub.hasMessageItem('msg_2')).toBe(true);
+      expect(await stub.hasMessageItem('msg_9')).toBe(false);
+
+      const cut = JSON.parse(await stub.getAllStream('msg_2').then(s => new Response(s).text()));
+      expect(cut.info).toEqual({ title: 'Cut Session' });
+      expect(
+        cut.messages.map((m: { info: { id: string }; parts: Array<{ id: string }> }) => [
+          m.info.id,
+          m.parts.map(p => p.id),
+        ])
+      ).toEqual([
+        ['msg_1', ['part_1']],
+        ['msg_2', ['part_2']],
+      ]);
+      expect(cut.sessionDiff).toEqual([]);
+
+      const full = JSON.parse(await stub.getAllStream().then(s => new Response(s).text()));
+      expect(full.messages).toHaveLength(3);
+      expect(full.sessionDiff).toEqual([{ file: 'a.ts', additions: 1, deletions: 0 }]);
+    });
   });
 
   describe('SDK session snapshot reads', () => {
@@ -301,6 +344,105 @@ describe('SessionIngestDO integration', () => {
       expect(await stub.readKiloSdkSessionSnapshot()).toEqual({
         kind: 'retryable_failure',
       });
+    });
+  });
+
+  describe('session diff reads', () => {
+    const modifiedFile = {
+      file: 'src/index.ts',
+      patch: 'diff --git a/src/index.ts b/src/index.ts\n@@ -1 +1 @@\n-a\n+b\n',
+      additions: 1,
+      deletions: 1,
+      status: 'modified',
+    };
+
+    it('reads an empty file list before the session emitted a diff', async () => {
+      const stub = getStub(kiloUserId, 'ses_diff_read_none_000000000001');
+
+      expect(await stub.readSessionDiff()).toEqual({ kind: 'value', files: [] });
+    });
+
+    it('reads the latest diff, drops patchless historical entries and unknown keys', async () => {
+      const sessionId = 'ses_diff_read_value_00000000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest(
+        [{ type: 'session_diff', data: [{ ...modifiedFile, patch: 'old' }] }],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await stub.ingest(
+        [
+          {
+            type: 'session_diff',
+            data: [
+              { ...modifiedFile, futureField: true },
+              { file: 'legacy.ts', before: 'a', after: 'b', additions: 1, deletions: 1 },
+              { file: 'img.png', patch: '', additions: 0, deletions: 0, status: 'renamed' },
+            ],
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        2
+      );
+
+      expect(await stub.readSessionDiff()).toEqual({
+        kind: 'value',
+        files: [modifiedFile, { file: 'img.png', patch: '', additions: 0, deletions: 0 }],
+      });
+    });
+
+    it('reads an R2-backed diff', async () => {
+      const sessionId = 'ses_diff_read_r2_0000000000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const r2Key = `items/${kiloUserId}/${sessionId}/session_diff/1000`;
+      await env.SESSION_INGEST_R2.put(r2Key, JSON.stringify([modifiedFile]));
+      await stub.ingest([{ type: 'session_diff', data: [] }], kiloUserId, sessionId, 1, 1000, {
+        session_diff: r2Key,
+      });
+
+      expect(await stub.readSessionDiff()).toEqual({ kind: 'value', files: [modifiedFile] });
+    });
+
+    it('bounds an oversized R2-backed diff before reading its body', async () => {
+      const sessionId = 'ses_diff_read_large_00000000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const r2Key = `items/${kiloUserId}/${sessionId}/session_diff/oversized`;
+      await env.SESSION_INGEST_R2.put(
+        r2Key,
+        JSON.stringify([{ ...modifiedFile, patch: 'x'.repeat(MAX_SESSION_DIFF_READ_BYTES) }])
+      );
+      await stub.ingest([{ type: 'session_diff', data: [] }], kiloUserId, sessionId, 1, 1000, {
+        session_diff: r2Key,
+      });
+
+      expect(await stub.readSessionDiff()).toEqual({
+        kind: 'too_large',
+        maximumBytes: MAX_SESSION_DIFF_READ_BYTES,
+      });
+    });
+
+    it('returns retryable_failure for a missing R2 diff object', async () => {
+      const sessionId = 'ses_diff_read_missing_000000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest([{ type: 'session_diff', data: [] }], kiloUserId, sessionId, 1, 1000, {
+        session_diff: `items/${sessionId}/session_diff/missing`,
+      });
+
+      expect(await stub.readSessionDiff()).toEqual({ kind: 'retryable_failure' });
+    });
+
+    it('returns invalid_data for a malformed stored diff', async () => {
+      const sessionId = 'ses_diff_read_invalid_000000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const r2Key = `items/${kiloUserId}/${sessionId}/session_diff/invalid`;
+      await env.SESSION_INGEST_R2.put(r2Key, JSON.stringify([{ file: 'a.ts', patch: 1 }]));
+      await stub.ingest([{ type: 'session_diff', data: [] }], kiloUserId, sessionId, 1, 1000, {
+        session_diff: r2Key,
+      });
+
+      expect(await stub.readSessionDiff()).toEqual({ kind: 'invalid_data' });
     });
   });
 
@@ -595,6 +737,75 @@ describe('SessionIngestDO integration', () => {
       const earlier = await stub.readKiloSdkMessages({ limit: 2, before: latest.nextCursor });
       expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_100', 'msg_200']);
       expect(earlier.nextCursor).toBeNull();
+    });
+
+    it('reads the newest page without scanning the part rows that sort after message rows', async () => {
+      const sessionId = 'ses_sdk_page_part_scan_000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const message = (id: string, created: number) => ({
+        id,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      });
+      const oldest = message('msg_100_oldest', 100);
+      const newest = message('msg_200_newest', 200);
+      const newestPart = {
+        id: 'prt_newest',
+        sessionID: sessionId,
+        messageID: newest.id,
+        type: 'text',
+        text: 'latest',
+      };
+      await stub.ingest(
+        [
+          { type: 'message', data: oldest },
+          { type: 'message', data: newest },
+          { type: 'part', data: newestPart },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      // A long session: thousands of part rows whose `msg_…/prt_…` item ids
+      // sort after every `message/…` item id.
+      const olderPartCount = 2000;
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (let index = 0; index < olderPartCount; index += 1) {
+          const id = `prt_${String(index).padStart(4, '0')}`;
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+            `${oldest.id}/${id}`,
+            'part',
+            JSON.stringify({ id, sessionID: sessionId, messageID: oldest.id, type: 'text' })
+          );
+        }
+      });
+
+      const rowsRead = await runInDurableObject(stub, async (instance, state) => {
+        const sqlStorage: SqlStorage = Object.getPrototypeOf(state.storage.sql);
+        const exec = sqlStorage.exec;
+        const cursors: Array<{ rowsRead: number }> = [];
+        sqlStorage.exec = function (this: SqlStorage, ...args: Parameters<SqlStorage['exec']>) {
+          const cursor = exec.apply(this, args);
+          cursors.push(cursor);
+          return cursor;
+        };
+        try {
+          await expect(instance.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+            messages: [{ info: newest, parts: [newestPart] }],
+            nextCursor: expect.any(String),
+            omittedItemCount: 0,
+          });
+        } finally {
+          sqlStorage.exec = exec;
+        }
+        return cursors.reduce((sum, cursor) => sum + cursor.rowsRead, 0);
+      });
+
+      expect(rowsRead).toBeLessThan(100);
     });
 
     it('clamps oversized direct DO page requests to the shared positive page maximum', async () => {

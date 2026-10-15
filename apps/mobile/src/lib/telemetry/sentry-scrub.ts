@@ -75,30 +75,50 @@ const TOKEN_RUN_PATTERN = /[A-Za-z0-9_-]{20,}/g;
 /** A chain of lowercase words: `agent-message-render`, `render_part`. */
 const LOWERCASE_WORD_CHAIN_PATTERN = /^[a-z]+(?:[-_][a-z]+)+$/;
 
-/** A chain of CapitalizedWords: React's `MessageErrorBoundary`. */
-const CAPITALIZED_WORD_CHAIN_PATTERN = /^[A-Z][a-z]+(?:[A-Z][a-z]+)+$/;
+/**
+ * A camelCase or CapitalizedWords chain: tRPC's `getSessionMessagesPage`,
+ * React's `MessageErrorBoundary`.
+ */
+const CAMEL_CASE_WORD_CHAIN_PATTERN = /^[A-Za-z][a-z]+(?:[A-Z][a-z]+)+$/;
+
+/** A chain of uppercase words: tRPC's `INTERNAL_SERVER_ERROR` code. */
+const UPPERCASE_WORD_CHAIN_PATTERN = /^[A-Z]+(?:_[A-Z]+)+$/;
 
 /** True when a token-shaped run is a word chain, i.e. maybe a name. */
 function isIdentifierRun(run: string): boolean {
-  return LOWERCASE_WORD_CHAIN_PATTERN.test(run) || CAPITALIZED_WORD_CHAIN_PATTERN.test(run);
+  return (
+    LOWERCASE_WORD_CHAIN_PATTERN.test(run) ||
+    CAMEL_CASE_WORD_CHAIN_PATTERN.test(run) ||
+    UPPERCASE_WORD_CHAIN_PATTERN.test(run)
+  );
 }
 
 /**
  * The exact event paths whose own value is a contractually app-set identifier
- * rather than payload data: the `error.subsystem` / `error.operation` tags the
- * app writes, and the React `componentStack` the render boundary attaches as a
- * direct `extra` field. Each entry is `<section>.<field>` for one of the maps
- * {@link scrubEvent} walks.
+ * rather than payload data: the `error.subsystem`, `error.operation`,
+ * `trpc.procedure`, `trpc.code`, `auth.cause`, `auth.branch` and `auth.keys`
+ * tags the app writes (code names such as `refresh_token_unreadable` or
+ * `cliSessionsV2.getSessionMessagesPage`), the `turbo_module.method` tag the
+ * Sentry SDK writes, and the React `componentStack` the render boundary
+ * attaches as a direct `extra` field. Each entry is `<section>.<field>` for one
+ * of the maps {@link scrubEvent} walks.
  *
  * The exemption is keyed on the full path, never on a bare property name: a
  * `componentStack` or `error.subsystem` nested inside another object is payload
  * data, and a word-chain secret there (`my-super-secret-prod-token`) must be
  * redacted like anywhere else. The shape alone is not proof a run is safe.
+ * `auth.route` stays out: its value is a request path, not a code name.
  */
 const IDENTIFIER_PATHS = new Set([
   'extra.componentStack',
   'tags.error.subsystem',
   'tags.error.operation',
+  'tags.trpc.procedure',
+  'tags.trpc.code',
+  'tags.auth.cause',
+  'tags.auth.branch',
+  'tags.auth.keys',
+  'tags.turbo_module.method',
 ]);
 
 /** True when a value reached through `path` is an app-set identifier field. */
@@ -120,10 +140,12 @@ function isIdentifierPath(path: readonly (string | number)[]): boolean {
  *
  * A run is 20+ consecutive base64url characters. At an identifier path a run
  * that is a chain of words is a name, not a credential: without that, the app's
- * `agent-message-render` tags and React's `MessageErrorBoundary` component
- * names are delivered as `[redacted]`, and they are the only copy of the
- * diagnostic the app sends. Everywhere else a run is redacted on shape alone. A
- * `Bearer ` prefix names the whole value a credential, so it redacts whole.
+ * `agent-message-render` tags, tRPC procedure names, and React's
+ * `MessageErrorBoundary` component names are delivered as `[redacted]`, and
+ * they are the only copy of the diagnostic the app sends. A random token or a
+ * JWT is not a word chain, so it is redacted at an identifier path too.
+ * Everywhere else a run is redacted on shape alone. A `Bearer ` prefix names
+ * the whole value a credential, so it redacts whole.
  */
 function redactString(value: string, keepIdentifiers: boolean): string {
   if (value.startsWith('Bearer ')) {

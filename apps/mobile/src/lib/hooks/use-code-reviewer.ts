@@ -111,26 +111,33 @@ export function useGitLabRepositories(scope: string, enabled: boolean) {
   return isPersonal(scope) ? personal : org;
 }
 
+/**
+ * `enabled: false` sends no request. A disabled personal query keeps a
+ * placeholder input, so it can still return data cached for that placeholder:
+ * read `data` only while the query is enabled.
+ */
 export function useReviewConfig(
   scope: string,
-  platform: ReviewerPlatform
+  platform: ReviewerPlatform,
+  { enabled = true }: { enabled?: boolean } = {}
 ): UseQueryResult<ReviewConfigData> {
   const trpc = useTRPC();
+  const personalEnabled = enabled && isPersonal(scope);
   const personal = useQuery({
     ...trpc.personalReviewAgent.getReviewConfig.queryOptions({
-      // toPersonalPlatform throws on bitbucket, so only invoke it for the
-      // actually-active personal scope. The personal query under an org scope
-      // is disabled and never sent; its input is a harmless default.
-      platform: isPersonal(scope) ? toPersonalPlatform(platform) : 'github',
+      // toPersonalPlatform throws on bitbucket, so only invoke it for an
+      // enabled personal query. A disabled personal query is never sent; its
+      // input is a harmless default.
+      platform: personalEnabled ? toPersonalPlatform(platform) : 'github',
     }),
-    enabled: isPersonal(scope),
+    enabled: personalEnabled,
   });
   const org = useQuery({
     ...trpc.organizations.reviewAgent.getReviewConfig.queryOptions({
       organizationId: scope,
       platform,
     }),
-    enabled: !isPersonal(scope),
+    enabled: enabled && !isPersonal(scope),
   });
   // The org procedure's inferred type carries a few org/Bitbucket-only
   // fields (manuallyAddedRepositories, reviewMemoryEnabled) beyond our

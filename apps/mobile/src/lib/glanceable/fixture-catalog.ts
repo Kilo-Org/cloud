@@ -1,5 +1,7 @@
 import { type GlanceableAgentsSnapshotStatus } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { APPROVAL_ROWS, combinationRows, many, mixedRows, roundWake } from './fixture-rows';
+import { SESSION_CARD_FIXTURES } from './session-fixture-catalog';
 import { type GlanceableActionFeedback } from './surface-extras';
 
 /**
@@ -10,8 +12,27 @@ import { type GlanceableActionFeedback } from './surface-extras';
  * relative to the apply moment so relative copy ("28 min") looks real.
  *
  * `apps/mobile/scripts/glanceable-fixtures.json` lists the names and
- * descriptions; `fixture-catalog.test.ts` keeps the two in sync.
+ * descriptions for capture scripts; regenerate it after a catalog change.
  */
+
+/** The richer session card facts a fixture applies, as a server push would. */
+const MINUTE_MS = 60_000;
+
+type SessionCardFacts = {
+  step?: {
+    verb: 'editing' | 'reading' | 'running' | 'searching' | 'thinking' | 'other';
+    target: string | null;
+  };
+  plan?: { done: number; total: number; current: string | null };
+  changes?: { files: number; added: number; removed: number };
+  permissionCommand?: string;
+  outcome?: 'pr_opened' | 'changes' | 'none';
+  failure?: 'provider' | 'tool' | 'cancelled' | 'other';
+  /** Minutes since the last activity the server saw. */
+  activityAgo?: number;
+  costMicrodollars?: number;
+  startedAgo?: number;
+};
 
 export type GlanceableFixtureRow = {
   /** Tray status: `permission`/`question` (needs input), `busy`, `scheduled`, `idle`. */
@@ -27,62 +48,23 @@ export type GlanceableFixture = {
   description: string;
   /** Overrides the happy/empty derivation, exactly as the publisher does. */
   status?: Exclude<GlanceableAgentsSnapshotStatus, 'happy' | 'empty'>;
+  /** Minutes since the last successful confirmation. */
+  checkedAgo?: number;
   rows?: (now: number) => GlanceableFixtureRow[];
   actionFeedback?: Exclude<GlanceableActionFeedback, null>;
+  /**
+   * Follow one row with a session card. `approvalKey` adds the key a server
+   * push carries for a permission wait; `finish` follows the row while it
+   * works, then reports it finished; `card` applies the richer facts a server
+   * push carries (the step, the plan, the diff, the outcome, the stop reason).
+   */
+  follow?: {
+    index: number;
+    approvalKey?: boolean;
+    finish?: boolean;
+    card?: SessionCardFacts;
+  };
 };
-
-const MINUTE_MS = 60_000;
-
-/** `count` rows of one status, the newest `ago` minutes back, each a minute older. */
-function many(
-  spec: Omit<GlanceableFixtureRow, 'title'> & { count: number }
-): GlanceableFixtureRow[] {
-  const { count, ago, ...rest } = spec;
-  return Array.from({ length: count }, (_, index) => ({
-    ...rest,
-    ago: ago + index,
-    title: `Agent ${spec.status} ${index + 1}`,
-  }));
-}
-
-/**
- * A wake on a round clock time at least two hours out, so the scheduled row
- * reads like a real schedule ("14:30") rather than an odd minute.
- */
-function roundWake(now: number): string {
-  const wake = new Date(now + 120 * MINUTE_MS);
-  wake.setMinutes(wake.getMinutes() <= 30 ? 30 : 60, 0, 0);
-  return wake.toISOString();
-}
-
-const APPROVAL_ROWS = (): GlanceableFixtureRow[] => [
-  { status: 'permission', ago: 28, title: 'Migrate the billing webhooks' },
-  { status: 'permission', ago: 9, title: 'Bump the Expo SDK' },
-  { status: 'question', ago: 3, title: 'Fix the flaky login test' },
-];
-
-/** All four kinds; `newest` picks which kind changed last (the large footer). */
-function mixedRows(
-  now: number,
-  newest: 'needsInput' | 'running' | 'scheduled' | 'idle'
-): GlanceableFixtureRow[] {
-  const ago = (kind: typeof newest, otherwise: number): number => (kind === newest ? 1 : otherwise);
-  return [
-    { status: 'permission', ago: ago('needsInput', 28), title: 'Migrate the billing webhooks' },
-    { status: 'question', ago: 31, title: 'Pick a color for the badge' },
-    { status: 'busy', ago: ago('running', 6), title: 'Fix the flaky login test' },
-    { status: 'busy', ago: 14, title: 'Write the release notes' },
-    { status: 'busy', ago: 22, title: 'Profile the session list' },
-    {
-      status: 'scheduled',
-      ago: ago('scheduled', 40),
-      title: 'Nightly dependency audit',
-      scheduledAt: roundWake(now),
-    },
-    { status: 'idle', ago: ago('idle', 55), title: 'Review the onboarding copy' },
-    { status: 'idle', ago: 70, title: 'Triage new issues' },
-  ];
-}
 
 export const GLANCEABLE_FIXTURES = {
   'signed-out': {
@@ -101,12 +83,15 @@ export const GLANCEABLE_FIXTURES = {
     status: 'privacy',
   },
   expired: {
-    description: 'Expired: counts dropped, the expired copy.',
+    description: 'Expired activity: the Home widget retains last-known mixed work.',
     status: 'expired',
+    checkedAgo: 600,
+    rows: now => mixedRows(now, 'running'),
   },
   stale: {
-    description: 'Delayed: the mixed counts under the updates-delayed copy.',
+    description: 'Delayed: mixed work retains its last successful confirmation time.',
     status: 'stale',
+    checkedAgo: 31,
     rows: now => mixedRows(now, 'running'),
   },
   'needs-approval': {
@@ -203,6 +188,101 @@ export const GLANCEABLE_FIXTURES = {
     description: 'Mixed counts; newest change is idle (large footer).',
     rows: now => mixedRows(now, 'idle'),
   },
+  'scheduled-no-time': {
+    description: 'Scheduled agents without a usable wake time.',
+    rows: () => [
+      { status: 'scheduled', ago: 12, title: 'Dependency audit' },
+      { status: 'scheduled', ago: 30, title: 'Usage report' },
+    ],
+  },
+  'scheduled-overdue': {
+    description: 'The earliest scheduled wake passed without confirmation; never invent working.',
+    rows: now => [
+      {
+        status: 'scheduled',
+        ago: 35,
+        title: 'Dependency audit',
+        scheduledAt: new Date(now - 15 * MINUTE_MS).toISOString(),
+      },
+      { status: 'idle', ago: 50, title: 'Review documentation' },
+    ],
+  },
+  'scheduled-tomorrow': {
+    description: 'Three future runs show non-today local dates and times.',
+    rows: now =>
+      [1, 2, 3].map(day => ({
+        status: 'scheduled',
+        ago: 20,
+        title:
+          ['Nightly dependency audit', 'Weekly usage report', 'Release readiness review'][
+            day - 1
+          ] ?? '',
+        scheduledAt: roundWake(now + day * 24 * 60 * MINUTE_MS),
+      })),
+  },
+  'retry-only': {
+    description: 'Needs input from provider retry states, with no permission to approve.',
+    rows: () => [{ status: 'retry', ago: 15, title: 'Recover the interrupted build' }],
+  },
+  untitled: {
+    description: 'Waiting and scheduled rows without titles use a localized generic label.',
+    rows: now => [
+      { status: 'question', ago: 5, title: '' },
+      { status: 'scheduled', ago: 8, title: '', scheduledAt: roundWake(now) },
+    ],
+  },
+  'stale-idle': {
+    description: 'Old idle work remains useful without claiming current confirmation.',
+    checkedAgo: 600,
+    status: 'stale',
+    rows: () => [{ status: 'idle', ago: 30, title: 'Review the onboarding copy' }],
+  },
+  'stale-empty': {
+    description: 'A last-known empty state retains creation and an honest timestamp.',
+    checkedAgo: 180,
+    status: 'stale',
+  },
+  'mix-input-running': {
+    description: 'Needs input and working.',
+    rows: combinationRows(['needsInput', 'running']),
+  },
+  'mix-input-scheduled': {
+    description: 'Needs input and scheduled.',
+    rows: combinationRows(['needsInput', 'scheduled']),
+  },
+  'mix-input-idle': {
+    description: 'Needs input and idle.',
+    rows: combinationRows(['needsInput', 'idle']),
+  },
+  'mix-running-scheduled': {
+    description: 'Working and scheduled.',
+    rows: combinationRows(['running', 'scheduled']),
+  },
+  'mix-running-idle': {
+    description: 'Working and idle.',
+    rows: combinationRows(['running', 'idle']),
+  },
+  'mix-scheduled-idle': {
+    description: 'Scheduled and idle; the wake time takes priority over idle details.',
+    rows: combinationRows(['scheduled', 'idle']),
+  },
+  'mix-input-running-scheduled': {
+    description: 'Needs input, working, and scheduled.',
+    rows: combinationRows(['needsInput', 'running', 'scheduled']),
+  },
+  'mix-input-running-idle': {
+    description: 'Needs input, working, and idle.',
+    rows: combinationRows(['needsInput', 'running', 'idle']),
+  },
+  'mix-input-scheduled-idle': {
+    description: 'Needs input, scheduled, and idle.',
+    rows: combinationRows(['needsInput', 'scheduled', 'idle']),
+  },
+  'mix-running-scheduled-idle': {
+    description: 'Working, scheduled, and idle.',
+    rows: combinationRows(['running', 'scheduled', 'idle']),
+  },
+  ...SESSION_CARD_FIXTURES,
 } satisfies Record<string, GlanceableFixture>;
 
 export type GlanceableFixtureName = keyof typeof GLANCEABLE_FIXTURES;

@@ -1,12 +1,11 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import {
-  applyGatewayModelsFallback,
   applyPreferredProvider,
   applyProviderSpecificLogic,
   applyReasoningDetailsTransform,
   getIgnoredProviders,
+  removeModelsFallback,
   removeUnsupportedRequestServiceTier,
   withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
@@ -16,7 +15,6 @@ import {
   ReasoningDetailsTransform,
   type BYOKResult,
   type Provider,
-  type ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
@@ -182,6 +180,63 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
   });
 });
 
+describe('applyProviderSpecificLogic recursive tool schemas', () => {
+  async function applyToToolParameters(model: string) {
+    const request: Extract<GatewayRequest, { kind: 'responses' }> = {
+      kind: 'responses',
+      body: {
+        model,
+        input: 'hello',
+        tools: [
+          {
+            type: 'function',
+            name: 'filter',
+            strict: false,
+            parameters: {
+              type: 'object',
+              properties: { filters: { $ref: '#/$defs/filters' } },
+              $defs: {
+                filters: { type: 'array', items: { $ref: '#/$defs/filters' } },
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    const tool = request.body.tools?.[0];
+    return tool?.type === 'function' ? tool.parameters : undefined;
+  }
+
+  it('removes recursive refs for Muse models', async () => {
+    const parameters = await applyToToolParameters('meta/muse-spark-1.3');
+
+    expect(parameters?.$defs).toEqual({ filters: { type: 'array', items: { type: 'array' } } });
+  });
+
+  it('preserves recursive refs for other models', async () => {
+    const parameters = await applyToToolParameters('vendor/model');
+
+    expect(parameters?.$defs).toEqual({
+      filters: { type: 'array', items: { $ref: '#/$defs/filters' } },
+    });
+  });
+});
+
 describe('applyReasoningDetailsTransform', () => {
   function makeReasoningRequest(): Extract<GatewayRequest, { kind: 'chat_completions' }> {
     return {
@@ -335,40 +390,13 @@ describe('applyReasoningDetailsTransform', () => {
   });
 });
 
-describe('applyGatewayModelsFallback', () => {
-  it.each([
-    ['openrouter', 'anthropic/claude-fable-5'],
-    ['vercel', 'anthropic/claude-fable-5'],
-    ['openrouter', 'anthropic/claude-opus-5'],
-    ['vercel', 'anthropic/claude-opus-5'],
-  ] satisfies [ProviderId, string][])(
-    'sets Opus 4.8 as the fallback for %s requests to %s',
-    async (providerId, requestedModel) => {
+describe('removeModelsFallback', () => {
+  it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5', 'openai/gpt-4o'])(
+    'removes caller-provided fallbacks for %s',
+    requestedModel => {
       const request = makeRequest(requestedModel, ['caller/fallback']);
 
-      await applyGatewayModelsFallback(providerId, requestedModel, request);
-
-      expect(request.body.models).toEqual([requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID]);
-    }
-  );
-
-  it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5'])(
-    'removes caller-provided fallbacks for %s on other providers',
-    async requestedModel => {
-      const request = makeRequest(requestedModel, ['caller/fallback']);
-
-      await applyGatewayModelsFallback('martian', requestedModel, request);
-
-      expect(request.body.models).toBeUndefined();
-    }
-  );
-
-  it.each(['anthropic/claude-opus-4.8', 'anthropic/claude-opus-6', 'openai/gpt-4o'])(
-    'removes caller-provided fallbacks for other model %s',
-    async requestedModel => {
-      const request = makeRequest(requestedModel, ['caller/fallback']);
-
-      await applyGatewayModelsFallback('openrouter', requestedModel, request);
+      removeModelsFallback(request);
 
       expect(request.body.models).toBeUndefined();
     }

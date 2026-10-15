@@ -198,7 +198,7 @@ const SessionRow = memo(function SessionRow({
             onChange={e => onEditTitleChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={onSaveRename}
-            className="bg-muted min-w-0 flex-1 rounded px-1 py-0.5 text-sm leading-snug outline-none focus:ring-1 focus:ring-ring"
+            className="bg-muted min-w-0 flex-1 rounded px-1 py-0.5 text-sm leading-snug outline-none select-text focus:ring-1 focus:ring-ring"
           />
         ) : (
           <>
@@ -435,7 +435,7 @@ function WorktreeGroupRow({
                   if (!savingRenameRef.current) finishRename();
                 }
               }}
-              className="bg-muted focus:ring-ring min-w-0 flex-1 rounded px-1 py-0.5 text-sm leading-snug outline-none focus:ring-1"
+              className="bg-muted focus:ring-ring min-w-0 flex-1 rounded px-1 py-0.5 text-sm leading-snug outline-none select-text focus:ring-1"
             />
             {(isSavingRename || isDeleting) && (
               <LoaderCircle
@@ -830,6 +830,12 @@ export function ChatSidebar({
     event.stopPropagation();
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('application/x-kilo-workspace-folder', JSON.stringify(item));
+    const bounds = event.currentTarget.getBoundingClientRect();
+    event.dataTransfer.setDragImage(
+      event.currentTarget,
+      event.clientX - bounds.left,
+      event.clientY - bounds.top
+    );
     setDragItem(item);
     setDropTarget(null);
   };
@@ -1148,7 +1154,7 @@ export function ChatSidebar({
 
       {/* Session list */}
       <div
-        className="flex-1 space-y-px overflow-y-auto p-2"
+        className="flex-1 space-y-px overflow-y-auto p-2 select-none"
         aria-busy={workspaceFolders?.isSaving || undefined}
       >
         {workspaceFolders?.isLoading && (

@@ -41,11 +41,14 @@ export type GroupedRegisterSessionInput = {
     NonNullable<SessionMetadata['workspace']>,
     | 'sandboxId'
     | 'sandboxRoute'
+    | 'sandboxKind'
     | 'sandboxProvider'
     | 'shallow'
     | 'credentialContainment'
     | 'devcontainerRequested'
     | 'sandboxAllocation'
+    | 'egressMode'
+    | 'egressAllowlist'
   >;
 };
 

@@ -133,9 +133,14 @@
     "status": "Trạng thái",
     "truncated": "Đã cắt bớt",
     "updated": "Đã cập nhật",
+    "generating": "Đang tạo…",
     "working": "Đang xử lý",
     "yourOwnRepositories": "Kho mã nguồn của riêng bạn",
-    "dismissed": "Đã bỏ qua"
+    "dismissed": "Đã bỏ qua",
+    "agent": "Đại lý",
+    "durationMinuteShort": "phút",
+    "durationHourShort": "giờ",
+    "changes": "Thay đổi"
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -319,7 +324,8 @@
       "kiloclaw": "Hoạt động KiloClaw",
       "balance": "Cảnh báo số dư",
       "security": "Vấn đề bảo mật",
-      "spend": "Cảnh báo chi tiêu"
+      "spend": "Cảnh báo chi tiêu",
+      "followedSessions": "Phiên đã theo dõi"
     },
     "category": {
       "chatMessagesSubtitle": "câu trả lời trong các cuộc trò chuyện của bạn",
@@ -645,7 +651,7 @@
     "redeployTitle": "Triển khai lại phiên chạy",
     "accessRequired": {
       "iosBody": "Quyền truy cập KiloClaw cho tài khoản này được quản lý bên ngoài ứng dụng iOS.",
-      "iosContact": "Nếu có thắc mắc, hãy liên hệ hi@kilo.ai.",
+      "iosContact": "Nếu có thắc mắc, hãy liên hệ {{supportEmail}}.",
       "iosTitle": "KiloClaw không khả dụng trên iOS",
       "multipleCurrentConflictBody": "Tài khoản của bạn có nhiều gói đăng ký còn hiệu lực. Chúng tôi đã tạm dừng dịch vụ để tránh tính phí trùng lặp.",
       "multipleCurrentConflictCta": "Tiếp tục trên kilo.ai",
@@ -778,7 +784,7 @@
         "queryErrorBody": "Kết nối bị mất khi kiểm tra tiến độ thiết lập {{name}}. Quá trình thiết lập có thể vẫn đang chạy. Thử lại hoặc quay lại kiểm tra sau một lát.",
         "queryErrorTitle": "Không thể kiểm tra tiến độ thiết lập",
         "settingUp": "Đang thiết lập {{name}}",
-        "stalledBody": "Chúng tôi không thể hoàn tất thiết lập {{name}}. Hãy thử lại hoặc gửi email đến hi@kilo.ai nếu sự cố vẫn tiếp diễn.",
+        "stalledBody": "Chúng tôi không thể hoàn tất thiết lập {{name}}. Hãy thử lại hoặc gửi email đến {{supportEmail}} nếu sự cố vẫn tiếp diễn.",
         "stalledTitle": "Quá trình thiết lập bị gián đoạn",
         "startingSandbox": "Đang khởi động môi trường cô lập",
         "stoppedBody": "Phiên chạy của {{name}} đã dừng đột ngột trong quá trình thiết lập.",
@@ -939,6 +945,8 @@
       "noFindings": "Không phát hiện vấn đề nào.",
       "retryMessage": "Thao tác này sẽ chạy lại lượt rà soát mã.",
       "retryReview": "Rà soát lại",
+      "retryNeedsSettings": "Trợ lý rà soát mã đang tắt hoặc cài đặt của trợ lý cần được xử lý. Hãy sửa cài đặt, sau đó rà soát lại.",
+      "fixSettings": "Sửa cài đặt",
       "retryTitle": "Rà soát lại?",
       "showMore": "Xem thêm",
       "started": "Đã bắt đầu",
@@ -1033,7 +1041,7 @@
         "recoveryLabel": "Cập nhật ứng dụng GitHub"
       },
       "githubIpAllowList": {
-        "description": "Trình rà soát mã đã bị tắt vì danh sách địa chỉ IP được phép của tổ chức GitHub này chặn Kilo. Hãy liên hệ hi@kilocode.ai để được hỗ trợ rồi bật lại Trình rà soát mã."
+        "description": "Trình rà soát mã đã bị tắt vì danh sách địa chỉ IP được phép của tổ chức GitHub này chặn Kilo. Hãy liên hệ {{supportEmail}} để được hỗ trợ rồi bật lại Trình rà soát mã."
       },
       "gitlabProjectAccessRequired": {
         "description": "Trình rà soát mã đã bị tắt vì Kilo không thể tạo mã truy cập dự án trên GitLab cho dự án này. Hãy cấp quyền người bảo trì hoặc cho phép tạo mã truy cập dự án rồi bật lại Trình rà soát mã.",
@@ -1048,7 +1056,7 @@
         "recoveryLabel": "Cập nhật cài đặt Trình rà soát mã"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Trình rà soát mã đã bị tắt sau ba lần sao chép kho lưu trữ quá thời gian chờ trong hôm nay. Hãy liên hệ hi@kilocode.ai để được hỗ trợ rồi bật lại Trình rà soát mã."
+        "description": "Trình rà soát mã đã bị tắt sau ba lần sao chép kho lưu trữ quá thời gian chờ trong hôm nay. Hãy liên hệ {{supportEmail}} để được hỗ trợ rồi bật lại Trình rà soát mã."
       },
       "title": "Trợ lý rà soát mã cần bạn xử lý sự cố.",
       "recoveryLabel": "Liên hệ hỗ trợ"
@@ -1572,6 +1580,8 @@
       "title": "Phiên",
       "copyErrorDetails": "Sao chép chi tiết lỗi",
       "backToSessions": "Quay lại danh sách phiên",
+      "follow": "Theo dõi trên màn hình khóa",
+      "unfollow": "Dừng theo dõi trên màn hình khóa",
       "couldNotLoad": "Không thể tải phiên.",
       "failedToLoadDetails": "Không thể tải thông tin phiên.",
       "failedToStopExecution": "Không thể dừng tác vụ đang chạy.",
@@ -1638,6 +1648,11 @@
       "collapse": "Thu gọn mục tiêu",
       "expand": "Mở rộng mục tiêu"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Nhiệm vụ, đã xong {{completed}} trên {{total}}",
+      "rowAccessibility": "Nhiệm vụ, đã xong {{completed}} trên {{total}}. Nhiệm vụ hiện tại: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Đã dùng gần đây",
       "couldNotLoadGithubRepositories": "Không thể tải danh sách kho mã GitHub.",
@@ -1670,7 +1685,6 @@
       "retryLoadingEnvironment": "Thử tải lại môi trường",
       "defaultEnvironment": "Môi trường mặc định",
       "environmentSummary": "{{commands}} lệnh · {{mcp}} MCP · {{skills}} kỹ năng · {{agents}} tác nhân",
-      "changes": "Thay đổi",
       "leaveChanges": "Giữ thay đổi",
       "commitAndPush": "Ghi nhận và đẩy",
       "startSession": "Bắt đầu phiên",
@@ -1693,6 +1707,10 @@
       "importingSession": "Đang nhập phiên",
       "cliCannotContinue": "CLI này không hỗ trợ tiếp tục phiên. Hãy chọn Cloud Agent hoặc CLI khác.",
       "importFailed": "Không thể nhập phiên này.",
+      "cliCannotFork": "Hãy cập nhật Kilo CLI để tách nhánh từ một tin nhắn.",
+      "forkCutNotSynced": "Tin nhắn này chưa được lưu. Hãy thử lại sau giây lát.",
+      "forkFilesFromBaseBranch": "Các tệp bắt đầu từ nhánh gốc.",
+      "forkFilesUnchangedOnComputer": "Các tệp trên máy tính này không bị thay đổi.",
       "pickProfile": "Chọn một hồ sơ",
       "noProfile": "Không có hồ sơ",
       "manageProfiles": "Quản lý hồ sơ",
@@ -1737,8 +1755,8 @@
       "toolList": "liệt kê",
       "toolPatch": "áp dụng bản vá",
       "toolTask": "tác vụ",
-      "readTodos": "Đọc danh sách việc cần làm",
-      "updateTodos": "Cập nhật danh sách việc cần làm",
+      "readTodos": "Đọc kế hoạch",
+      "updateTodos": "Cập nhật kế hoạch",
       "linesBadge": "{{displayCount}} dòng",
       "filesBadge": "{{displayCount}} tệp",
       "matchesBadge": "{{displayCount}} kết quả khớp",
@@ -1808,6 +1826,7 @@
       "copyMessage": "Sao chép tin nhắn",
       "copyText": "Sao chép văn bản",
       "selectText": "Chọn văn bản",
+      "forkFromHere": "Tách nhánh từ đây",
       "reportAiResponse": "Báo cáo phản hồi AI",
       "reportAiResponseConfirm": "Bạn có muốn báo cáo phản hồi này để chúng tôi kiểm tra không?",
       "report": "Báo cáo",
@@ -2127,6 +2146,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Mô hình ({{displayCount}})",
       "modelsCount_other": "Mô hình ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Xem thay đổi",
+      "asOf": "Tính đến {{time}}",
+      "tooLarge": "Bản so sánh này quá lớn nên không thể hiển thị trên thiết bị di động.",
+      "empty": "Phiên này chưa có thay đổi tệp nào."
     },
     "autoApprove": {
       "title": "Tự động phê duyệt",
@@ -2631,6 +2656,7 @@
     "fileRows": {
       "collapseFile": "Thu gọn tệp",
       "diffTooLarge": "Bản so sánh quá lớn nên không thể hiển thị.",
+      "noPreview": "Không có bản xem trước cho tệp này",
       "expandFile": "Mở rộng tệp",
       "markViewed": "Đánh dấu {{path}} là đã xem",
       "openDiffOnGitHub": "Mở bản so sánh của tệp này trên GitHub",
@@ -3150,9 +3176,36 @@
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
     "openSession": "Mở",
+    "finished": "Đã hoàn tất",
+    "followFailed": "Không thể hiển thị tác nhân này trên màn hình khóa.",
     "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại.",
-    "newestResult": "Kết quả mới nhất",
-    "scheduledWakes": "thức dậy {{time}}"
+    "checked": "Đã kiểm tra",
+    "lastKnown": "Ghi nhận gần nhất",
+    "awaitingUpdate": "Đang chờ cập nhật",
+    "nextRun": "Lần chạy tiếp theo",
+    "waitingForYou": "Đang chờ bạn",
+    "nextScheduled": "Lịch tiếp theo",
+    "answerNeeded": "Cần trả lời",
+    "waitingToRetry": "Đang chờ thử lại",
+    "step": {
+      "editing": "Đang chỉnh sửa",
+      "reading": "Đang đọc",
+      "running": "Chạy",
+      "searching": "Tìm kiếm web",
+      "thinking": "Đang suy nghĩ kỹ"
+    },
+    "planOf": "trong",
+    "filesChanged": "tệp đã thay đổi",
+    "finishedIn": "Hoàn thành trong",
+    "noActivityFor": "Không có hoạt động trong",
+    "prOpened": "Đã mở pull request",
+    "permissionWants": "Muốn chạy",
+    "failure": {
+      "provider": "Đã dừng: lỗi nhà cung cấp",
+      "tool": "Đã dừng: lỗi công cụ",
+      "cancelled": "Đã dừng: đã hủy",
+      "other": "ĐÃ DỪNG"
+    }
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",
@@ -3180,6 +3233,7 @@
     "tutorialLabel": "Hướng dẫn"
   },
   "modelChat": {
+    "offlineFailure": "Mô hình này cần kết nối internet. Hãy kết nối và thử lại, hoặc chuyển sang một mô hình trên thiết bị này.",
     "empty": {
       "title": "Bắt đầu trò chuyện",
       "description": "Gửi tin nhắn để trò chuyện với mô hình."
@@ -3187,10 +3241,32 @@
     "list": {
       "loadFailed": "Không thể tải lịch sử trò chuyện.",
       "new": "Cuộc trò chuyện mới",
-      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để xóa.",
       "deleteTitle": "Xóa cuộc trò chuyện này?"
     },
+    "rename": {
+      "title": "Đổi tên cuộc trò chuyện",
+      "accessibility": "Đổi tên cuộc trò chuyện: {{title}}",
+      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để đổi tên hoặc xóa."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Chi tiết cuộc trò chuyện",
+      "backend": "Máy chủ",
+      "effortDefault": "Mặc định của mô hình",
+      "noCost": "Không tốn phí",
+      "costUnknown": "Không rõ",
+      "costEstimatedNote": "Các câu trả lời không báo giá được ước tính theo giá niêm yết.",
+      "costUnknownNote": "Chưa rõ giá của mô hình này.",
+      "costPartialNote": "Tổng này không bao gồm các mô hình chưa rõ giá.",
+      "localNote": "Mô hình trên thiết bị chạy ngay trên thiết bị này. Chúng không tốn phí, không có bộ nhớ đệm lời nhắc và số token có thể là ước tính.",
+      "countedSinceNote": "Cuộc trò chuyện này bắt đầu trước khi mức sử dụng được ghi lại. Tổng chỉ tính các câu trả lời sau thời điểm đó.",
+      "remoteServersOn": "Máy chủ MCP từ xa đang bật"
+    },
+    "webSearch": {
+      "title": "Tìm kiếm trên web",
+      "description": "Cho phép cuộc trò chuyện này tra cứu thông tin mới nhất qua tài khoản Kilo của bạn. Mỗi lần tìm kiếm dùng hạn mức tìm kiếm hằng tháng của bạn.",
+      "allowanceExhausted": "Bạn đã dùng hết lượt tìm kiếm web miễn phí của tháng này. Hãy thêm tín dụng để tìm kiếm tiếp."
+    },
     "mcp": {
       "title": "Công cụ Kilo",
       "use": "Dùng công cụ Kilo",
@@ -3213,7 +3289,6 @@
       "fieldName": "Tên hiển thị",
       "fieldUrl": "URL máy chủ",
       "fieldUrlInvalid": "Nhập URL máy chủ hợp lệ.",
-      "fieldToken": "Mã Bearer (không bắt buộc)",
       "enableServer": "Bật máy chủ này: {{name}}",
       "editServer": "Sửa máy chủ",
       "deleteServer": "Xóa máy chủ",
@@ -3234,8 +3309,24 @@
       "serverUnreachable": "Không thể kết nối với máy chủ này",
       "serverOff": "Máy chủ này đang tắt"
     },
+    "mcpOAuth": {
+      "authMethod": "Xác thực",
+      "authNone": "Không đăng nhập",
+      "authBearer": "Mã Bearer",
+      "authOAuth": "Đăng nhập OAuth",
+      "fieldToken": "Mã",
+      "oauthHint": "Sau khi lưu, nhấn $t(modelChat.mcpOAuth.signIn) trên máy chủ để đăng nhập bằng trình duyệt.",
+      "serverNeedsSignIn": "Đăng nhập để dùng máy chủ này",
+      "signIn": "Đăng nhập",
+      "signInA11y": "Đăng nhập vào máy chủ này: {{name}}",
+      "signInFailed": "Không thể đăng nhập vào {{name}}. Hãy thử lại."
+    },
     "backends": {
       "title": "Máy chủ trò chuyện",
+      "providersTitle": "Nhà cung cấp trò chuyện",
+      "cloud": "Trên đám mây",
+      "cloudModel": "Mô hình: {{model}}",
+      "cloudUnavailable": "Mô hình Kilo hiện không khả dụng. Hãy kiểm tra kết nối của bạn.",
       "manage": "Quản lý máy chủ",
       "defaultKilo": "$t(consent.kilo) (mặc định)",
       "kiloHelp": "Máy chủ tích hợp sẵn sử dụng tài khoản Kilo của bạn và không thể sửa hoặc xóa.",
@@ -3295,7 +3386,6 @@
     "gguf": {
       "title": "Mô hình có thể tải xuống",
       "help": "Tải xuống một mô hình mở và chạy nó ngay trên điện thoại này bằng llama.cpp. Lời nhắc và câu trả lời của bạn được giữ trên thiết bị. Mô hình có kích thước lớn, nên hãy dùng Wi-Fi.",
-      "details": "{{size}} · Giấy phép: {{license}}",
       "download": "Tải mô hình xuống",
       "pause": "Tạm dừng tải xuống",
       "resume": "Tiếp tục tải xuống",
@@ -3307,6 +3397,8 @@
       "url": "Liên kết tải xuống trực tiếp",
       "urlHelp": "Dán liên kết HTTPS đến tệp .gguf, chẳng hạn như liên kết resolve của Hugging Face. Chỉ tải mô hình từ những nguồn bạn tin cậy.",
       "downloadUrl": "Tải xuống từ liên kết",
+      "advanced": "Nâng cao",
+      "localPurpose": "Chạy trên thiết bị này bằng llama.cpp. Câu lệnh và trả lời vẫn ở trên thiết bị.",
       "deleteTitle": "Xóa mô hình này?",
       "deleteMessage": "Xóa {{name}} khỏi thiết bị này? Các cuộc trò chuyện sử dụng mô hình này cần một mô hình khác trước khi có thể tiếp tục.",
       "errors": {
@@ -3316,12 +3408,62 @@
         "notGguf": "Liên kết phải trỏ đến tệp .gguf.",
         "space": "Không đủ dung lượng trống cho mô hình này. Hãy giải phóng dung lượng và thử lại.",
         "network": "Tải xuống chưa hoàn tất. Kiểm tra kết nối của bạn và thử lại.",
-        "invalidFile": "Tệp đã tải xuống không phải là mô hình mà ứng dụng này có thể chạy, nên tệp đã bị xóa."
+        "invalidFile": "Tệp đã tải xuống không phải là mô hình mà ứng dụng này có thể chạy, nên tệp đã bị xóa.",
+        "checksum": "Tệp đã tải xuống không khớp với mã kiểm tra đã công bố, nên tệp đã bị xóa. Hãy thử tải xuống lại."
       }
+    },
+    "catalog": {
+      "browse": "Duyệt mô hình",
+      "title": "Danh mục mô hình",
+      "search": "Tìm mô hình trên Hugging Face",
+      "tabs": "Bộ lọc mô hình",
+      "fitsTab": "Phù hợp với thiết bị này",
+      "fromHuggingFace": "Từ Hugging Face",
+      "loading": "Đang tải danh sách mô hình",
+      "noResults": "Không tìm thấy mô hình nào",
+      "noFits": "Không có mô hình nào phù hợp với thiết bị này",
+      "noFitsDescription": "Các mô hình lớn hơn nằm ở thẻ $t(common.all).",
+      "fit": {
+        "fits": "Phù hợp",
+        "tight": "Vừa sát",
+        "tooLarge": "Quá lớn",
+        "noStorage": "Không đủ dung lượng",
+        "unknown": "Không rõ độ phù hợp"
+      },
+      "recommendationsHelp": "Danh sách rút gọn mà ứng dụng này ghim: một tệp cho mỗi mô hình, từ nhà phát hành có nêu giấy phép. Không có gì khác được xếp hạng.",
+      "compatibilityHelp": "Độ phù hợp so sánh tệp mô hình với bộ nhớ và dung lượng trống của thiết bị này. Con số bộ nhớ là ước tính, không phải phép đo.",
+      "text": "Văn bản",
+      "listTextPurpose": "Chỉ nhận câu lệnh văn bản.",
+      "listImagePurpose": "Đọc được cả hình ảnh lẫn văn bản.",
+      "smallestDownload": "Tải nhỏ nhất: {{size}} · khoảng {{memory}} bộ nhớ",
+      "fullFileName": "Tệp: {{name}}",
+      "memoryEstimateNote": "Các con số bộ nhớ là ước tính, không phải phép đo.",
+      "parameters": "Tham số: {{value}}",
+      "downloads": "Lượt tải xuống: {{value}}",
+      "likes": "Lượt thích: {{value}}",
+      "context": "Cửa sổ ngữ cảnh: {{value}}",
+      "license": "Giấy phép: {{license}}",
+      "licenseUnknown": "Chưa nêu rõ giấy phép",
+      "tools": "Gọi công cụ",
+      "vision": "Đầu vào hình ảnh",
+      "hintsHelp": "Gợi ý từ Hugging Face. Ứng dụng sẽ kiểm tra mô hình sau khi tải xuống.",
+      "gated": "Mô hình này yêu cầu tài khoản Hugging Face nên ứng dụng không thể tải xuống.",
+      "quantizations": "Lượng tử hóa",
+      "quantizationsHelp": "Tệp nhỏ hơn dùng ít bộ nhớ và dung lượng hơn. Tệp lớn hơn thường cho câu trả lời tốt hơn.",
+      "quantDetail": "Tải xuống {{size}} · khoảng {{memory}} bộ nhớ",
+      "downloadQuant": "Tải {{quant}} xuống",
+      "loadingModel": "Đang tải chi tiết mô hình",
+      "couldNotLoadModel": "Không thể tải mô hình này",
+      "noFiles": "Không có tệp nào ứng dụng này chạy được",
+      "noFilesDescription": "Ứng dụng này chạy các mô hình gồm một tệp GGUF duy nhất.",
+      "tooLargeTitle": "Mô hình này có thể không chạy được",
+      "tooLargeMessage": "{{name}} có thể cần nhiều bộ nhớ hơn mức thiết bị này có. Ứng dụng có thể bị đóng khi mô hình đang trả lời. Vẫn tải xuống?",
+      "downloadAnyway": "Vẫn tải xuống"
     },
     "localModels": {
       "title": "Mô hình trên thiết bị",
-      "help": "Mô hình trên thiết bị chạy ngay trên điện thoại này. Lời nhắc và câu trả lời của bạn được giữ trên thiết bị, và các mô hình này không thể dùng công cụ.",
+      "help": "Mô hình trên thiết bị chạy ngay trên điện thoại này. Lời nhắc và câu trả lời của bạn được giữ trên thiết bị.",
+      "systemPurpose": "Mô hình tích hợp sẵn trong hệ thống của thiết bị này. Mô hình chạy ngay trên thiết bị.",
       "apple": "Apple Intelligence (trên thiết bị)",
       "checking": "Đang kiểm tra khả dụng…",
       "ready": "Sẵn sàng sử dụng",
@@ -3347,6 +3489,9 @@
       "downloading": "Đang tải xuống…",
       "downloadProgress": "Đang tải xuống… {{percent}}%",
       "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
     }
   },
   "settingsTools": {
@@ -3526,7 +3671,6 @@
       "template": "Bản mẫu",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Giải thích $ARGUMENTS",
-      "agent": "Đại lý",
       "subtask": "Chạy dưới dạng nhiệm vụ phụ",
       "edit": "Chỉnh sửa lệnh gạch chéo",
       "saveFailed": "Không thể lưu lệnh",
@@ -3570,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play không trả về gói tín dụng phù hợp nào.",
     "purchaseOwnedByAnotherAccount": "Tín dụng trên Apple Account này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng.",
     "purchaseOwnedByAnotherAccountPlay": "Tín dụng trên Tài khoản Google Play này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng."
+  },
+  "todos": {
+    "saveAsTodo": "Lưu thành việc cần làm",
+    "segment": {
+      "label": "Chế độ xem trợ lý",
+      "sessions": "Phiên",
+      "todos": "Việc cần làm"
+    },
+    "lists": {
+      "newList": "Danh sách mới",
+      "empty": "Chưa có danh sách nào",
+      "couldNotLoad": "Không thể tải danh sách",
+      "noRepository": "Không có kho mã nguồn",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} chưa xong",
+      "openCount_other": "{{count}} chưa xong",
+      "archived_one": "Đã lưu trữ ({{count}})",
+      "archived_other": "Đã lưu trữ ({{count}})",
+      "archive": "Lưu trữ",
+      "unarchive": "Bỏ lưu trữ",
+      "deleteTitle": "Xóa {{name}}?",
+      "deleteMessage": "Việc cần làm của nó cũng bị xóa. Các phiên vẫn được giữ lại."
+    },
+    "listSettings": {
+      "title": "Cài đặt danh sách",
+      "name": "Tên",
+      "namePlaceholder": "Lỗi, Ý tưởng, Bản phát hành…",
+      "emoji": "Biểu tượng cảm xúc",
+      "mode": "Chế độ",
+      "defaultsHint": "Các phiên bắt đầu từ danh sách này dùng các giá trị mặc định này."
+    },
+    "list": {
+      "addPlaceholder": "Thêm việc cần làm",
+      "add": "Thêm",
+      "empty": "Chưa có việc cần làm nào",
+      "setDefaults": "Đặt kho mã nguồn, chế độ và mô hình",
+      "completed_one": "Đã hoàn tất ({{count}})",
+      "completed_other": "Đã hoàn tất ({{count}})"
+    },
+    "item": {
+      "markDone": "Đánh dấu đã xong",
+      "markOpen": "Đánh dấu chưa xong",
+      "markDonePrompt": "Đánh dấu đã xong?",
+      "deleted": "Đã xóa việc cần làm",
+      "undo": "Hoàn tác",
+      "runCount_one": "{{count}} lần chạy",
+      "runCount_other": "{{count}} lần chạy",
+      "startNow": "Bắt đầu không cần rà soát",
+      "startNowHint": "Nhấn giữ để bắt đầu không cần rà soát",
+      "titleLabel": "Tiêu đề việc cần làm",
+      "renameTitle": "Đổi tên tác vụ",
+      "notes": "Ghi chú",
+      "addNotes": "Thêm ghi chú",
+      "notesPrompt": "Thêm ngữ cảnh, yêu cầu hoặc tiêu chí chấp nhận.",
+      "markdownSupported": "Hỗ trợ Markdown",
+      "sessions": "Phiên đã liên kết",
+      "noSessions": "Chưa có phiên nào",
+      "untitledLinkedSession": "Phiên được liên kết",
+      "sessionNeedsInput": "Phiên cần nhập liệu",
+      "sessionRunning": "Phiên đang chạy",
+      "sessionFinished": "Phiên đã kết thúc",
+      "sessionPullRequest": "PR của phiên",
+      "sessionPullRequestNumber": "PR của phiên #{{number}}",
+      "openSessionHint": "Mở phiên.",
+      "unlinkSessionAction": "Bỏ liên kết phiên",
+      "unlinkConfirmTitle": "Bỏ liên kết {{title}}?",
+      "unlinkConfirmMessage": "Bản thân phiên không bị xóa. Chỉ liên kết của nó với việc cần làm này bị gỡ bỏ.",
+      "startNewSession": "Bắt đầu phiên mới",
+      "startNewSessionHint": "Nhấn giữ để bắt đầu phiên mới.",
+      "linkSession": "Liên kết phiên",
+      "linkFailed": "Không thể liên kết phiên với việc cần làm"
+    },
+    "linkSession": {
+      "title": "Liên kết một phiên",
+      "empty": "Không có phiên gần đây",
+      "emptyInRepository": "Không có phiên gần đây trong {{repository}}"
+    },
+    "upNext": "Tiếp theo",
+    "sessionTodo": "Việc cần làm: {{title}}",
+    "linkToTodo": "Liên kết với việc cần làm",
+    "candidates": {
+      "empty": "Không có việc cần làm đang mở"
+    },
+    "saveSheet": {
+      "title": "Lưu vào danh sách",
+      "saved": "Đã lưu vào {{list}}"
+    }
   }
 }

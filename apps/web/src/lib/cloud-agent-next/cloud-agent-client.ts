@@ -1,8 +1,11 @@
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
+import { getHTTPStatusCodeFromError } from '@trpc/server/http';
+import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
   sandboxSelectionCapabilitiesSchema,
   type SandboxAllocationInput,
@@ -26,11 +29,15 @@ import {
   type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
-import { baseGetMessageResultNextOutputSchema } from '@/routers/cloud-agent-next-schemas';
+import {
+  baseGetMessageResultNextOutputSchema,
+  workerPreviewOptionsSchema,
+} from '@/routers/cloud-agent-next-schemas';
 import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
 } from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
+import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 export type { SendMessagePayload } from './types.js';
 
 /**
@@ -177,6 +184,8 @@ type PrepareSessionSharedFields = {
   /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 /** Non-clone prepare input: required `prompt` and the current optional initial fields. */
@@ -189,11 +198,14 @@ export type PrepareSessionNonCloneInput = PrepareSessionSharedFields & {
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey?: string;
   cloneFromKiloSessionId?: undefined;
+  cloneUpToMessageId?: undefined;
 };
 
 /** Clone-only prepare input: copies the source session and forbids a synthetic initial turn. */
 export type PrepareSessionCloneInput = PrepareSessionSharedFields & {
   cloneFromKiloSessionId: string;
+  /** Inclusive cut: copy source messages up to and including this ID. */
+  cloneUpToMessageId?: string;
   autoInitiate: true;
   operationKey: string;
 };
@@ -204,6 +216,9 @@ export type PrepareSessionInput = PrepareSessionNonCloneInput | PrepareSessionCl
 export type GetSandboxSelectionOptionsInput = {
   kilocodeOrganizationId?: string;
   devcontainer?: boolean;
+  repositoryType?: 'github' | 'gitlab' | 'bitbucket' | 'git';
+  /** With `repositoryType`, resolves saved repository overrides into `effectiveDestination`. */
+  repositoryFullName?: string;
 };
 
 /** Output from prepareSession procedure */
@@ -372,6 +387,7 @@ export type GetSessionOutput = {
   model?: string;
   autoCommit?: boolean;
   upstreamBranch?: string;
+  branchName?: string;
 
   /** Custom agents stored on this session (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{
@@ -518,10 +534,16 @@ export class CloudAgentBillingError extends Error {
   }
 }
 
+function isTRPCErrorCode(code: unknown): code is TRPC_ERROR_CODE_KEY {
+  return typeof code === 'string' && Object.hasOwn(TRPC_ERROR_CODES_BY_KEY, code);
+}
+
 /**
- * Helper to re-throw InsufficientCreditsError as TRPCError with PAYMENT_REQUIRED code.
+ * Re-throws a Cloud Agent error as a TRPCError for the web tRPC response.
+ * Billing errors keep their billing status. A worker 4xx error keeps its tRPC
+ * code and message; tRPC reports any other error as a 500.
  */
-export function rethrowAsPaymentRequired(error: unknown): never {
+export function rethrowCloudAgentError(error: unknown): never {
   if (error instanceof CloudAgentBillingError) {
     throw new TRPCError({
       code:
@@ -539,6 +561,15 @@ export function rethrowAsPaymentRequired(error: unknown): never {
       code: 'PAYMENT_REQUIRED',
       message: error.message,
     });
+  }
+  if (error instanceof TRPCClientError) {
+    const code: unknown = error.data?.code ?? error.shape?.data?.code;
+    if (isTRPCErrorCode(code)) {
+      const workerError = new TRPCError({ code, message: error.message, cause: error });
+      if (getHTTPStatusCodeFromError(workerError) < 500) {
+        throw workerError;
+      }
+    }
   }
   throw error;
 }
@@ -637,6 +668,9 @@ type CloudAgentNextTRPCClient = {
   };
   getSandboxSelectionOptions: {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
+  };
+  getPreviewOptions: {
+    query: (input: { cloudAgentSessionId: string; organizationId?: string }) => Promise<unknown>;
   };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
@@ -959,6 +993,13 @@ export class CloudAgentNextClient {
     return sandboxSelectionCapabilitiesSchema.parse(
       await this.client.getSandboxSelectionOptions.query(input)
     );
+  }
+
+  async getPreviewOptions(input: {
+    cloudAgentSessionId: string;
+    organizationId?: string;
+  }): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
+    return workerPreviewOptionsSchema.parse(await this.client.getPreviewOptions.query(input));
   }
 
   /**
@@ -1286,4 +1327,59 @@ export async function closeCloudAgentOrgStreams(
       `Cloud Agent stream close failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`
     );
   }
+}
+
+// Optional enrichment that runs after the active-session read inside the native
+// widget route's ten-second deadline: a slow identity read drops only the key.
+const WIDGET_APPROVAL_KEY_BUDGET_MS = 1_500;
+
+const widgetApprovalKeyResponseSchema = z.object({
+  approvalKey: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable(),
+  // Absent when an older Worker answers; the session card then shows no command.
+  command: z.string().max(60).nullable().optional(),
+});
+
+/** The approval binding and the pending request's command, both null when none waits. */
+export type CloudAgentWidgetApproval = { approvalKey: string | null; command: string | null };
+
+/**
+ * The binding of the oldest pending permission on one owned control-plane
+ * session: SHA-256 of `JSON.stringify([kiloSessionId, permissionId])`, computed
+ * in the Worker so the raw permission never reaches this process, plus that
+ * request's command (one trimmed line, at most 60 characters) for the session
+ * card. The Worker re-checks user, organization scope and the Kilo/cloud
+ * session pairing; the key grants no authority. Bounded, and throws on any
+ * non-OK answer so the caller can drop the identity while keeping counts.
+ */
+export async function readCloudAgentWidgetApprovalKey(
+  input: {
+    userId: string;
+    organizationId: string | null;
+    kiloSessionId: string;
+    cloudAgentSessionId: string;
+  },
+  signal?: AbortSignal
+): Promise<CloudAgentWidgetApproval> {
+  const budget = AbortSignal.timeout(WIDGET_APPROVAL_KEY_BUDGET_MS);
+  const response = await fetchWithinBudget(
+    `${CLOUD_AGENT_NEXT_API_URL}/internal/widgets/approval-key`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': INTERNAL_API_SECRET,
+      },
+      body: JSON.stringify(input),
+      cache: 'no-store',
+      signal: signal ? AbortSignal.any([budget, signal]) : budget,
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Cloud Agent widget approval key failed: ${response.status}`);
+  }
+  const parsed = widgetApprovalKeyResponseSchema.parse(await response.json());
+  return { approvalKey: parsed.approvalKey, command: parsed.command ?? null };
 }

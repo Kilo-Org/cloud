@@ -7,7 +7,6 @@ import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
-import { ModelSelector } from '@/components/agents/model-selector';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -18,14 +17,15 @@ import { MessageCircle, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { autoModelLabel } from '@/lib/auto-model-name';
+import { defaultChatModel } from '@/lib/chat/backend-model-options';
 import { rememberModelFacts } from '@/lib/chat/layers';
 import { type ChatSummary } from '@/lib/chat/store';
-import { chatPlaceOf, newChat, useChatList } from '@/lib/chat/use-chat';
+import { newChat, useChatList, useChatPlace } from '@/lib/chat/use-chat';
 import { useChatBackends } from '@/lib/chat/backend-store';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
-import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
@@ -59,8 +59,7 @@ function ScopedChatListScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
-  const { userId } = useCurrentUserId();
-  const place = chatPlaceOf(userId, organizationId);
+  const place = useChatPlace();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const tabBarHeight = useMemo(
@@ -70,19 +69,17 @@ function ScopedChatListScreen() {
 
   const {
     models,
+    isLoading: modelsLoading,
     isError: modelsFailed,
     refetch: refetchModels,
   } = useAvailableModels(organizationId ?? undefined);
   const backends = useChatBackends();
   const localModels = useLocalModels();
-  const [picked, setPicked] = useState<string | null>(null);
   const gatewayOptions = useMemo(
     () => models.map(model => ({ ...model, displayId: model.id, showGatewayMetadata: true })),
     [models]
   );
   const options = useChatModelOptions(gatewayOptions, backends, localModels);
-  const selectedModel = picked ?? models.find(one => one.isPreferred)?.id ?? models[0]?.id;
-  const selectionValid = options.some(option => option.id === selectedModel);
 
   // The catalog is what tells a session its context window, and a session with
   // no window never compacts. It is handed over as it arrives.
@@ -90,10 +87,22 @@ function ScopedChatListScreen() {
     rememberModelFacts(models);
   }, [models]);
 
-  const { chats, isLoading, isError, refetch, remove } = useChatList(place);
+  const { chats, isLoading, isError, refetch, remove, rename } = useChatList(place);
+
+  // There is no picker here: a chat starts on the model the latest one is on,
+  // and the conversation's own picker switches it from its next message.
+  const selectedModel = defaultChatModel({
+    options,
+    latestChatModel: chats[0]?.model,
+    catalogLoading: modelsLoading,
+  });
 
   const nameOf = useCallback(
-    (id: string) => options.find(model => model.id === id)?.name ?? '',
+    (id: string) =>
+      // Kilo's own Auto models arrive with an English catalogue name that no
+      // catalog translates, so the row resolves it the same way the composer's
+      // chip does and the two never disagree.
+      autoModelLabel(id, options.find(model => model.id === id)?.name ?? ''),
     [options]
   );
 
@@ -111,14 +120,17 @@ function ScopedChatListScreen() {
       return;
     }
     const model = selectedModel;
-    if (place === null || model === undefined || !selectionValid) {
+    if (place === null || model === undefined) {
       return;
     }
     startingRef.current = true;
     setStarting(true);
     void (async () => {
       try {
-        const sessionId = await newChat(place, model);
+        const sessionId = await newChat(place, {
+          model,
+          effort: null,
+        });
         // Whatever the last attempt failed with is moot once a chat starts.
         toast.dismiss('chat-start-failed');
         router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
@@ -138,7 +150,7 @@ function ScopedChatListScreen() {
         setStarting(false);
       }
     })();
-  }, [selectedModel, selectionValid, place, router, t]);
+  }, [selectedModel, place, router, t]);
 
   const open = useCallback(
     (sessionId: string) => {
@@ -162,9 +174,10 @@ function ScopedChatListScreen() {
         last={index === chats.length - 1}
         onPress={open}
         onDelete={drop}
+        onRename={rename}
       />
     ),
-    [chats.length, drop, nameOf, open]
+    [chats.length, drop, nameOf, open, rename]
   );
 
   // Nothing to start a chat with is nothing for the button to do, and an empty
@@ -236,7 +249,7 @@ function ScopedChatListScreen() {
             <Button
               onPress={start}
               loading={starting}
-              disabled={!selectionValid}
+              disabled={selectedModel === undefined}
               accessibilityLabel={t('modelChat.list.new')}
             >
               <Text>{t('modelChat.list.new')}</Text>
@@ -279,32 +292,14 @@ function ScopedChatListScreen() {
           className="px-[22px] pb-1"
           headerRight={<BackendSettingsControl />}
         />
-        {options.length > 0 && (
-          <View className="px-[22px] py-2">
-            <ModelSelector
-              value={selectedModel ?? ''}
-              variant=""
-              options={options}
-              onSelect={modelId => {
-                setPicked(modelId);
-              }}
-              disabled={starting}
-            />
-          </View>
-        )}
-        {picked !== null && !selectionValid && (
-          <Text className="px-[22px] pb-2 text-destructive">
-            {t('modelChat.backends.invalidTarget')}
-          </Text>
-        )}
         <View className="flex-1">{renderBody()}</View>
         {showFab && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('modelChat.list.new')}
-            accessibilityState={{ disabled: starting || !selectionValid, busy: starting }}
+            accessibilityState={{ disabled: starting, busy: starting }}
             testID="chat-new-fab"
-            disabled={starting || !selectionValid}
+            disabled={starting}
             onPress={start}
             className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
             style={fabStyle}

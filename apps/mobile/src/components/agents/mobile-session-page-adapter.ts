@@ -8,6 +8,30 @@ import {
 import { trpcClient } from '@/lib/trpc';
 
 /**
+ * Message and tRPC-style code for a typed worker failure of the paged read.
+ * One source for the preview's error state and the manager's snapshot replay:
+ * `retryable_failure` stays retryable, the terminal kinds do not.
+ */
+export const SESSION_HISTORY_FAILURES = {
+  retryable_failure: {
+    message: 'Session history temporarily unavailable',
+    code: 'INTERNAL_SERVER_ERROR',
+  },
+  too_large: { message: 'Session history too large to load', code: 'UNPROCESSABLE_CONTENT' },
+  invalid_data: { message: 'Session history is unavailable', code: 'UNPROCESSABLE_CONTENT' },
+} as const;
+
+/** A typed worker failure, carrying the `code` the query error readers classify on. */
+export class SessionHistoryFailureError extends Error {
+  readonly code: string;
+
+  constructor(failure: { message: string; code: string }) {
+    super(failure.message);
+    this.code = failure.code;
+  }
+}
+
+/**
  * Type guard to narrow KiloSdkMessageHistory to the page variant.
  * The shared union is discriminated by the presence of the `messages` array.
  */

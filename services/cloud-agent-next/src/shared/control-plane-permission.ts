@@ -22,3 +22,11 @@ export const CONTROL_PLANE_SANDBOX_PERMISSION = {
   cron_list: 'deny',
   cron_delete: 'deny',
 } as const;
+
+/**
+ * Only a Cloud Agent web session has a person who can answer a question or a
+ * CLI-enforced human approval. Every other origin runs unattended.
+ */
+export function isInteractiveSessionOrigin(createdOnPlatform: string | undefined): boolean {
+  return createdOnPlatform === 'cloud-agent-web';
+}

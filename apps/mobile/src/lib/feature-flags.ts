@@ -14,14 +14,6 @@ import * as Application from 'expo-application';
  * then skip the key they do not understand instead of acting on it.
  */
 
-export const FEATURE_FLAG_PR_REVIEW = 'mobile-pr-review';
-/**
- * The rebuilt chat tab. It has a key of its own rather than the removed quick
- * chat's `mobile-quick-chat`: a shipped build reads that key for the old screen,
- * so turning this one on through it would turn the removed screen on too.
- */
-export const FEATURE_FLAG_CHAT = 'mobile-chat';
-
 export type FeatureFlagDefinition = Readonly<{
   key: string;
   /** Oldest app version that understands this flag. Lower builds fall back to `defaultValue`. */
@@ -30,16 +22,8 @@ export type FeatureFlagDefinition = Readonly<{
   defaultValue: boolean;
 }>;
 
-/**
- * The registry the version gate reads. Minimums record the first release that
- * shipped each flag's reading code:
- * - `mobile-pr-review` (#4669) first released in 1.0.4.
- * - `mobile-chat` (#5895) first released in 1.0.11.
- */
-export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
-  { key: FEATURE_FLAG_PR_REVIEW, minAppVersion: '1.0.4', defaultValue: true },
-  { key: FEATURE_FLAG_CHAT, minAppVersion: '1.0.11', defaultValue: true },
-];
+/** Register future mobile flags with their first supported app version. */
+export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [];
 
 const DEFINITIONS_BY_KEY: ReadonlyMap<string, FeatureFlagDefinition> = new Map(
   FEATURE_FLAG_DEFINITIONS.map(definition => [definition.key, definition])

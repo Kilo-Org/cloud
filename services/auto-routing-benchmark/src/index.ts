@@ -1,12 +1,18 @@
 import { Hono } from 'hono';
+import { AUTO_ROUTERS, POLICY_SETTING_KEYS } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
-import { syncAutoDeciderModels } from './auto-decider-sync';
 import type { HonoEnv } from './hono-env';
+import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './system-optimal';
+import { isRetryableContainerAvailabilityError } from './cli-runner';
 import {
   processDeadLetter,
   processJob,
+  drainQueues,
+  publishPlatformRoutingTable,
+  sweepStaleRuns,
+  syncPlatformRegistry,
   sweepStaleRunsAndDrain,
   type BenchmarkJobMessage,
 } from './run';
@@ -14,8 +20,6 @@ import {
 // Queue name of the dead-letter queue, matched against batch.queue.
 const DLQ_NAME = 'auto-routing-benchmark-dlq';
 
-// Daily platform cadence: refresh auto decider candidates and start a platform
-// run when they changed. Every other cron tick only drains profile work.
 const PLATFORM_SYNC_CRON = '0 5 * * *';
 
 // Re-exported so the Durable Object class binding (BENCH_RUNNER) can find it.
@@ -33,51 +37,122 @@ app.onError(createErrorHandler());
 export default {
   fetch: app.fetch,
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
-    // Each queue holds its own slot and container budget, so the frequent tick
-    // starts pending registry work without waiting for the platform cadence.
-    if (controller.cron !== PLATFORM_SYNC_CRON) {
-      const result = await sweepStaleRunsAndDrain(env);
-      console.log(
-        JSON.stringify({
-          event: 'benchmark_queue_drain_tick_completed',
-          cron: controller.cron,
-          staleRunIds: result.staleRunIds,
-          drained: result.drained,
-        })
-      );
-      return;
+    const errors: unknown[] = [];
+    const production =
+      controller.cron === PLATFORM_SYNC_CRON ? await fetchProductionAutoMetrics(env) : null;
+    for (const router of AUTO_ROUTERS) {
+      try {
+        if (controller.cron !== PLATFORM_SYNC_CRON) {
+          const result = await sweepStaleRunsAndDrain(env, router);
+          console.log(
+            JSON.stringify({
+              event: 'benchmark_queue_drain_tick_completed',
+              cron: controller.cron,
+              router,
+              staleRunIds: result.staleRunIds,
+              drained: result.drained,
+            })
+          );
+        } else {
+          const staleRunIds = await sweepStaleRuns(env);
+          const { desiredEntries } = await syncPlatformRegistry(env, fetch, router);
+          const computed = await reevaluateSystemOptimalSettings(env, router, production).catch(
+            error => {
+              console.warn(
+                JSON.stringify({
+                  event: 'system_optimal_settings_skipped',
+                  router,
+                  error: error instanceof Error ? error.message : String(error),
+                })
+              );
+              return null;
+            }
+          );
+          if (computed) {
+            const computedValues: Record<string, unknown> = {};
+            for (const key of POLICY_SETTING_KEYS) {
+              const record = computed[key];
+              if (record) computedValues[key] = { value: record.value, source: record.source };
+            }
+            console.log(
+              JSON.stringify({
+                event: 'system_optimal_settings_computed',
+                cron: controller.cron,
+                router,
+                computed: computedValues,
+              })
+            );
+          }
+          const startedRuns = await drainQueues(
+            env,
+            router === 'frontier' ? 'platform' : 'both',
+            undefined,
+            router
+          );
+          const published = await publishPlatformRoutingTable(env, fetch, router).catch(error => {
+            console.warn(
+              JSON.stringify({
+                event: 'routing_table_publish_skipped',
+                router,
+                error: error instanceof Error ? error.message : String(error),
+              })
+            );
+            return null;
+          });
+          console.log(
+            JSON.stringify({
+              event: 'benchmark_platform_sync_completed',
+              cron: controller.cron,
+              router,
+              staleRunIds,
+              platformEntries: desiredEntries,
+              startedRuns,
+              publishedVersion: published?.version ?? null,
+            })
+          );
+        }
+      } catch (error) {
+        errors.push(error);
+        console.error(
+          JSON.stringify({
+            event: 'benchmark_scheduled_router_failed',
+            cron: controller.cron,
+            router,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        );
+      }
     }
-    const result = await syncAutoDeciderModels(env);
-    console.log(
-      JSON.stringify({
-        event: 'auto_decider_model_sync_completed',
-        cron: controller.cron,
-        ...result,
-      })
-    );
+    if (errors.length > 0) throw new AggregateError(errors, 'Benchmark scheduled routers failed');
   },
   async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
-    // Dead-lettered messages: record the lane death and try to finalize the
-    // run. Same retry contract as the jobs branch: a throw (transient D1
-    // failure after the death was recorded) skips the ack so the message
-    // retries and finalization is re-attempted. A message still failing after
-    // max_retries is dropped (the DLQ has no DLQ); the stale sweep remains
-    // the backstop for runs that never finalize.
-    if (batch.queue === DLQ_NAME) {
-      for (const message of batch.messages) {
-        await processDeadLetter(env, message.body);
-        message.ack();
-      }
-      return;
-    }
     for (const message of batch.messages) {
-      // Deliberately no try/catch: a throw from processJob (transient token,
-      // D1 or container failures) must skip the ack so the queue retries the
-      // whole (run, model, rep, chunk) unit, dead-lettering after max_retries.
-      // Case-level failures are recorded as failed rows inside processJob and
-      // do not throw. Swallowing the throw here would silently drop chunks.
-      await processJob(env, message.body);
-      message.ack();
+      try {
+        if (batch.queue === DLQ_NAME) {
+          await processDeadLetter(env, message.body);
+        } else {
+          await processJob(env, message.body);
+        }
+        message.ack();
+      } catch (error) {
+        if (batch.queue !== DLQ_NAME && isRetryableContainerAvailabilityError(error)) {
+          try {
+            await env.BENCH_QUEUE.send(message.body, { delaySeconds: 30 });
+            message.ack();
+            continue;
+          } catch (dispatchError) {
+            console.error(
+              JSON.stringify({
+                event: 'benchmark_capacity_requeue_failed',
+                error: String(dispatchError),
+              })
+            );
+          }
+        }
+        console.error(JSON.stringify({ event: 'benchmark_job_retry', error: String(error) }));
+        // Explicit retry preserves redelivery without reducing Queue consumer concurrency.
+        message.retry();
+      }
     }
   },
 };

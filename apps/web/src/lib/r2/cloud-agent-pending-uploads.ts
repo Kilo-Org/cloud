@@ -1,6 +1,7 @@
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { TRPCError } from '@trpc/server';
 import { randomUUID } from 'crypto';
-import { and, count, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, count, eq, inArray, like, not, sql, type SQL } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { r2Client, r2CloudAgentAttachmentsBucketName } from '@kilocode/web-shared/lib/r2/client';
 import {
@@ -19,30 +20,49 @@ export type AdmitPendingUploadParams = {
   messageUuid: string;
   attachmentId: string;
   objectKey: string;
+  /** Key admitted instead of objectKey when objectKey's row is no longer 'pending'. */
+  freshObjectKey: string;
   byteSize: number;
 };
 
 /**
- * Admit a presigned upload into the pending-upload ledger. Runs in one
- * transaction: take the per-(user, message) advisory lock, count pending rows,
- * reject at the file-count bound, reject oversized uploads, then insert the
- * pending row with a 24-hour lease. The inserted row is later flipped to
- * 'linked' by linkPendingUploads when the message is actually sent, or to
- * 'reaped' once its object is deleted.
+ * Admit a presigned upload into the pending-upload ledger and return the
+ * admitted object key. Runs in one transaction: take the per-(user, message)
+ * advisory lock, count pending rows, reject at the file-count bound, reject
+ * oversized uploads, then admit a pending row with a 24-hour lease.
+ *
+ * A client Retry presigns the same ids. If the attachment already has a
+ * 'pending' row, that row is refreshed in place, keeps its key (which can be
+ * an earlier fresh key), and does not count against the bound. Otherwise a
+ * row for objectKey in any other state keeps its key, and the upload gets freshObjectKey:
+ * a release or reaper claim sets 'reaped' before its DeleteObject runs, so a
+ * PUT to the old key could land before that delete, and a 'linked' key holds
+ * a sent attachment. The row is later flipped to 'linked' by
+ * linkPendingUploads when the message is actually sent, or to 'reaped' once
+ * its object is deleted.
  */
 export async function admitPendingUpload({
   kiloUserId,
   messageUuid,
   attachmentId,
   objectKey,
+  freshObjectKey,
   byteSize,
-}: AdmitPendingUploadParams): Promise<void> {
-  await db.transaction(async tx => {
+}: AdmitPendingUploadParams): Promise<string> {
+  return db.transaction(async tx => {
     // The composer presigns every attached file at once, so an unlocked
     // count-then-insert lets parallel admits all read the same count and
     // insert past the bound. The lock releases on commit or rollback.
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${`cloud-agent-pending-upload:${kiloUserId}:${messageUuid}`}))`
+    );
+
+    // A retry of this attachment: same id and same key suffix. A different
+    // suffix is a different file type, so its row must not be reused.
+    const suffix = objectKey.slice(objectKey.lastIndexOf('.'));
+    const sameAttachment = and(
+      eq(cloud_agent_pending_uploads.attachment_id, attachmentId),
+      like(cloud_agent_pending_uploads.object_key, `%${suffix}`)
     );
 
     const pendingRows = await tx
@@ -52,31 +72,64 @@ export async function admitPendingUpload({
         and(
           eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
           eq(cloud_agent_pending_uploads.message_uuid, messageUuid),
-          eq(cloud_agent_pending_uploads.status, 'pending')
+          eq(cloud_agent_pending_uploads.status, 'pending'),
+          not(sameAttachment ?? sql`false`)
         )
       );
     const pendingCount = pendingRows[0]?.pendingCount ?? 0;
 
     if (pendingCount >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT) {
-      throw new Error(
-        `Maximum ${CLOUD_AGENT_ATTACHMENT_MAX_COUNT} attachments allowed per message`
-      );
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Maximum ${CLOUD_AGENT_ATTACHMENT_MAX_COUNT} attachments allowed per message`,
+      });
     }
 
     if (byteSize > CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES) {
-      throw new Error('Attachment exceeds the maximum size');
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Attachment exceeds the maximum size',
+      });
     }
 
-    await tx.insert(cloud_agent_pending_uploads).values({
-      id: randomUUID(),
+    const expiresAt = new Date(Date.now() + CLOUD_AGENT_PENDING_UPLOAD_TTL_MS).toISOString();
+
+    // Release, the reaper and linkPendingUploads do not take this lock, so the
+    // status check must be in the same statement as the refresh.
+    const refreshed = await tx
+      .update(cloud_agent_pending_uploads)
+      .set({ byte_size: byteSize, expires_at: expiresAt })
+      .where(
+        and(
+          eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+          eq(cloud_agent_pending_uploads.message_uuid, messageUuid),
+          sameAttachment,
+          eq(cloud_agent_pending_uploads.status, 'pending')
+        )
+      )
+      .returning({ object_key: cloud_agent_pending_uploads.object_key });
+    const refreshedKey = refreshed[0]?.object_key;
+    if (refreshedKey !== undefined) return refreshedKey;
+
+    const row = {
       kilo_user_id: kiloUserId,
-      object_key: objectKey,
       message_uuid: messageUuid,
       attachment_id: attachmentId,
       byte_size: byteSize,
       status: 'pending',
-      expires_at: new Date(Date.now() + CLOUD_AGENT_PENDING_UPLOAD_TTL_MS).toISOString(),
-    });
+      expires_at: expiresAt,
+    };
+    const inserted = await tx
+      .insert(cloud_agent_pending_uploads)
+      .values({ ...row, id: randomUUID(), object_key: objectKey })
+      .onConflictDoNothing({ target: cloud_agent_pending_uploads.object_key })
+      .returning({ id: cloud_agent_pending_uploads.id });
+    if (inserted.length > 0) return objectKey;
+
+    await tx
+      .insert(cloud_agent_pending_uploads)
+      .values({ ...row, id: randomUUID(), object_key: freshObjectKey });
+    return freshObjectKey;
   });
 }
 

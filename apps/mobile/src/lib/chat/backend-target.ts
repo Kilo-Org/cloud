@@ -1,4 +1,5 @@
 import { ModelError } from '@kilocode/harness-sdk';
+import { onlineManager } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
 
@@ -40,7 +41,9 @@ export function backendFailureKey(error: unknown): string {
       return failure.key;
     }
   }
-  return 'common.somethingWentWrong';
+  // A remote model fails with no connection, and an on-device one does not.
+  // Saying so tells the person what to change instead of only that it failed.
+  return onlineManager.isOnline() ? 'common.somethingWentWrong' : 'modelChat.offlineFailure';
 }
 
 type BackendTarget = {
@@ -66,6 +69,17 @@ export type ResolvedChatTarget =
       readonly modelId: string;
     }
   | ({ readonly kind: 'local' } & LocalTarget);
+
+/**
+ * Who answers a target, read from its prefix alone. A target that no longer
+ * resolves — its backend was deleted — still says who answered it.
+ */
+export function chatTargetKind(id: string): ResolvedChatTarget['kind'] {
+  if (id.startsWith(LOCAL_PREFIX)) {
+    return 'local';
+  }
+  return id.startsWith(PREFIX) ? 'custom' : 'kilo';
+}
 
 /** `local:apple`, `local:android`, or `local:gguf:<encodeURIComponent(fileId)>`. */
 export function localTargetId(provider: 'apple' | 'android'): string;

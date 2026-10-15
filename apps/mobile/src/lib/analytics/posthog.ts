@@ -74,14 +74,8 @@ export {
 /** Legacy mobile surface values (existing payloads, unchanged). */
 export type AnalyticsSurface = (typeof ANALYTICS_SURFACES)[number];
 
-// PostHog feature flags. The project is shared with web, so mobile-only flags
-// are prefixed to avoid colliding with web flag keys. The keys and their
-// version gates live in `@/lib/feature-flags`; they are re-exported here so
-// existing `@/lib/analytics/posthog` imports keep working unchanged.
-export { FEATURE_FLAG_PR_REVIEW, type FeatureFlagDefinition } from '@/lib/feature-flags';
-/* A key of its own: the removed quick chat used `mobile-quick-chat`, and a
-   shipped build still reads it, so the rebuilt tab must not share it. */
-export { FEATURE_FLAG_CHAT } from '@/lib/feature-flags';
+// Mobile-only flag keys and version gates live in the shared registry.
+export { type FeatureFlagDefinition } from '@/lib/feature-flags';
 
 let client: PostHog | null = null;
 /** Generation that created the client. Stale events from a prior account

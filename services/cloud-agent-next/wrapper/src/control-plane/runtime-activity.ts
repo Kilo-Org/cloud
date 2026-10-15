@@ -7,6 +7,7 @@ import {
   createSessionSupervisor,
   type ExecutionFailure,
   type ExecutionIdentity,
+  type ExecutionRetry,
 } from './session-supervisor.js';
 
 /** Reconciliation is independent of the five-second wrapper heartbeat. */
@@ -20,7 +21,11 @@ export type RuntimeActivityOptions = {
   client: WrapperKiloClient;
   timers: ControlPlaneTimers['wrapper'];
   now(): number;
-  onDeadline(identity: ExecutionIdentity, reason: ExecutionFailure): void;
+  onDeadline(
+    identity: ExecutionIdentity,
+    reason: ExecutionFailure,
+    retry: ExecutionRetry | undefined
+  ): void;
   /** False when the runtime holds the fault (memory pressure); it is raised again next check. */
   onFault(reason: ActivityFault): boolean;
   onChange(): void;
@@ -140,6 +145,8 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
     needsCompute: () =>
       !lifetime.signal.aborted && (unhealthySince !== undefined || supervisor.needsCompute()),
     isReady: () => !lifetime.signal.aborted && !faulted && unhealthySince === undefined,
+    observationFailureSince: () => unhealthySince,
+    hasRecentProgress: supervisor.hasRecentProgress,
     refresh,
     lost,
     connected() {

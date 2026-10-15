@@ -8,6 +8,7 @@
  * that declares them is `unsupported` — never a silent unauthenticated run.
  */
 
+import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import { createHttpCallbacks, createHttpSessionSandbox } from './e2e-surface-client.js';
 import type { ScenarioEnvironment } from './scenario-capabilities.js';
 
@@ -15,6 +16,7 @@ export type DeployedScenarioEnvironmentInput = {
   surfaceUrl?: string;
   bearerToken?: string;
   internalApiSecret?: string;
+  expectedAllocation?: SandboxAllocation;
 };
 
 export function createDeployedScenarioEnvironment(
@@ -33,6 +35,9 @@ export function createDeployedScenarioEnvironment(
       surfaceUrl,
       internalApiSecret,
       ...(input.bearerToken !== undefined ? { bearerToken: input.bearerToken } : {}),
+      ...(input.expectedAllocation !== undefined
+        ? { expectedAllocation: input.expectedAllocation }
+        : {}),
     };
     env.sessionSandbox = createHttpSessionSandbox(surface);
     env.callbacks = createHttpCallbacks(surface);

@@ -8,9 +8,6 @@ const TEST_ORG_ID = 'test-org';
 const TEST_PROJECT_ID = 'test-project';
 const TEST_GIT_BRANCH = 'main';
 
-// ============================================================================
-// Route handler
-// ============================================================================
 export async function GET(request: NextRequest) {
   try {
     const client = getMilvusClient();

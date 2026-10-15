@@ -16,16 +16,15 @@ import {
   STORAGE_HEADROOM_BYTES,
 } from './gguf-records';
 import {
+  type GgufActiveDownload as Active,
   activeDownload,
   currentTransfer,
   downloadProgress,
   expectedBytes,
-  type GgufActiveDownload,
   moveIntoPlace,
+  readVerified,
   transfersOf,
 } from './gguf-transfers';
-
-type Active = GgufActiveDownload;
 
 /**
  * Downloaded GGUF models and the one download in progress. A download the
@@ -93,24 +92,24 @@ export function ggufDownloads({
     void settle(download, download.task.downloadAsync());
   };
 
-  /** Every file is whole and sized; llama.cpp has to read them before they are a model. */
+  /** Every file is whole, sized and hashed; llama.cpp has to read them before they are a model. */
   const verify = async (download: Active, sizeBytes: number) => {
     const [model, projector] = download.transfers;
     if (model === undefined) {
       return;
     }
-    const projectorPath = projector === undefined ? undefined : storage.path(projector.part);
-    const read = await settled(inspect(storage.path(model.part), projectorPath));
+    const read = await readVerified(storage, inspect, download.transfers);
     if (active !== download) {
       return;
     }
     // A projector the model cannot read images with is not the file the catalog promised.
     if (
+      read === 'checksum' ||
       !read.ok ||
       (projector !== undefined && !read.value.vision) ||
       !moveIntoPlace(storage, download.transfers)
     ) {
-      fail(download, 'invalidFile');
+      fail(download, read === 'checksum' ? 'checksum' : 'invalidFile');
       return;
     }
     active = undefined;
@@ -124,6 +123,7 @@ export function ggufDownloads({
         contextWindow: read.value.contextWindow,
         tools: read.value.tools,
         vision: projector !== undefined,
+        thinking: read.value.thinking,
       },
     ]);
     publish();

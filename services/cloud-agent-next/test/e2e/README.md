@@ -13,21 +13,13 @@ cloud-agent-next refactor.
 
 1. Copy `.dev.vars.example` → `.dev.vars` and fill in local values.
    Leave `KILO_OPENROUTER_BASE` pointed at local Next.js (`@url nextjs/api`).
-   For control-plane scenarios, enroll the E2E user in `CONTROL_PLANE_IDS`.
-   The worktree-creating scenarios (`worktree-chat`, `worktree-multi-chat`,
-   `long-conversation`, `leave-and-return`, `large-stream`, `concurrent-chats`,
-   `interrupt-then-continue`, `question-idle-resume`, and the five `sandboxFaults`
-   scenarios) additionally
-   require `WORKTREE_CREATION_ENABLED_IDS`; use the seeded enrolled user
-   (`E2E_USER_EMAIL`) rather than a fresh per-run user.
-   Both accept comma-separated user or org IDs or `*`. Production defaults to empty/off;
-   wrangler `dev` and `.dev.vars.example` default to `*`.
-   Ordinary control-plane scenarios do not require `WORKTREE_CREATION_ENABLED_IDS`.
-   These are Worker settings read by `auth.ts` from this service's `.dev.vars`,
-   not driver environment overrides: prefixing the driver command with either
-   flag does not configure the Worker. The unannotated template entries pass
-   through matching root `.env.local` values during `pnpm dev:env`. Configure
-   the Worker before starting it, or restart it after changing these values.
+   Control-plane scenarios need no extra enrollment: interactive
+   `cloud-agent-web` creates always route to the control plane, and
+   control-plane browser creates always create a worktree. Worker settings come
+   from this service's `.dev.vars`, not driver environment overrides; the
+   unannotated template entries pass through matching root `.env.local` values
+   during `pnpm dev:env`. Configure the Worker before starting it, or restart it
+   after changing these values.
 2. Ensure local Postgres is up and root `.env.local` defines `POSTGRES_URL`
    (or export `DATABASE_URL`) — the driver inserts a test user row via
    `@kilocode/db`.
@@ -149,11 +141,12 @@ pnpm exec tsx services/cloud-agent-next/test/e2e/multichat-real.ts \
 ```
 
 This driver discovers the existing local stack's ports and requires an already
-funded test user enrolled for control-plane and worktree creation. Pass credentials
-only through an owned mode-600 auth file, never as a command-line token. The output
-directory must not already exist. Bootstrap is API-assisted; sibling creation,
-sends, and Stop use the real web endpoints. Three chats exercise repeated shared
-file writes/reads, native tool overlap, Stop isolation, and post-Stop follow-ups.
+funded test user; control-plane and worktree creation need no enrollment. Pass
+credentials only through an owned mode-600 auth file, never as a command-line
+token. The output directory must not already exist. Bootstrap is API-assisted;
+sibling creation, sends, and Stop use the real web endpoints. Three chats
+exercise repeated shared file writes/reads, native tool overlap, Stop isolation,
+and post-Stop follow-ups.
 Private reports and transcripts are retained; chats and sandboxes are not deleted
 automatically. See the known CLI 7.4.20 limitation under Troubleshooting.
 
@@ -200,6 +193,16 @@ tsx services/cloud-agent-next/test/e2e/run.ts wrapper-freeze-settled-reap _
 tsx services/cloud-agent-next/test/e2e/run.ts control-socket-recycle-boot _
 tsx services/cloud-agent-next/test/e2e/run.ts question-idle-resume _
 
+# Preview HTTP (local Docker only): boots a control-plane session, starts the
+# owned-container Node fixture, and drives the hostname-dispatched preview
+# proxy. The running Worker must set PREVIEW_HOST_SUFFIX=localhost in its
+# .dev.vars; the scenario fails immediately if dispatch is off. Requests carry an explicit
+# `Host: p<port>-<hex>.localhost` and a manual cookie jar. Needs
+# E2E_CONTROL_PLANE_V2=1 and CONTROL_PLANE_IDS enrollment; it declares
+# `controlPlaneRuntime`, so it is `unsupported` on the HTTP profiles. See
+# "Preview HTTP (hostname dispatch)" below.
+tsx services/cloud-agent-next/test/e2e/run.ts preview-http _
+
 # Queue semantics — the hold is a bounded `slow:60:1000:16` turn (no parked
 # gate, no release call); the conversation value is a result label only.
 tsx services/cloud-agent-next/test/e2e/run.ts queue-while-busy _
@@ -238,15 +241,13 @@ Every scenario is now a shared definition. The long scenarios (`worktree-chat`,
 (`external-kill`, `kill-mid-flight`, `wrapper-freeze-settled-reap`,
 `wrapper-freeze-inflight-reap`, `control-socket-recycle-boot`) are all in the
 registry, so the matrix runs them:
-the worktree flows need an enrolled driver user, and the fault flows stop or
-freeze a real container, so they run last. They stay name-runnable
-(`run.ts <name> _`) for focused runs; the matrix marks the capability-gated
-ones `unsupported`. Long scenarios take
+the fault flows stop or freeze a real container, so they run last. They stay
+name-runnable (`run.ts <name> _`) for focused runs; the matrix marks the
+capability-gated ones `unsupported`. Long scenarios take
 6–30 minutes and require the funded seeded user
 (`E2E_USER_EMAIL=evgeny@kilocode.ai`), the offset-prefixed `WORKER_URL` and
 `FAKE_LLM_URL`, and `E2E_MODEL=kilo/fake-deterministic`; the new scenarios reject
-other models. They use the unified API and require control-plane/worktree
-enrollment.
+other models. They use the unified API and run on the control plane.
 
 Matrix (runs the default regression suite):
 
@@ -363,7 +364,7 @@ Two Workers, in deploy order:
    `test/e2e/deploy/deploy-fake-llm.sh deploy`.
 2. `cloud-agent-e2e-test` — private render of this package's Worker;
    deploy second with
-   `E2E_USER_ID=<id> FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
+   `FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
    Add `E2E_INTERNAL_API_SECRET=<secret>` on the first deploy or to rotate it; a
    redeploy without it keeps the deployed Worker secret.
 
@@ -447,7 +448,10 @@ The new-plane `kilo-kill-recovery`, `wrapper-kill-recovery`, and
 `controlPlaneV2` + `controlPlaneRuntime`; `control-plane-callbacks` declares the
 local-only `reports` (Postgres); `attachment` declares the unimplemented
 `attachments`; `contained-credentials` declares `credentialContainment`, read from
-the Worker `.dev.vars`. Only `cold-hot` and `unknown-model` declare no capability.
+the Worker `.dev.vars`; `preview-http` declares `controlPlaneV2` +
+`controlPlaneRuntime` and also needs the local owned-container Node fixture
+capability, so it is local Docker only. Only `cold-hot` and `unknown-model`
+declare no capability.
 Every other scenario that runs under both declares `sessionSandbox`, which both
 profiles provide; `auth-reject` and the sandbox-fault scenarios are the exceptions
 named above. Container identity stays a capability-gated assertion.
@@ -811,9 +815,8 @@ wrapper (`kilocode-control-plane-wrapper.js`) uniquely in the owned container an
 returns its identity; a legacy container has no such process, so `proveNewPlane`
 throws and an opted-in run against a still-legacy plane fails loudly instead of
 false-passing. `prepareBrowserSession` already sets `createdOnPlatform:
-'cloud-agent-web'`, so once the driver is enrolled in `CONTROL_PLANE_IDS` and C1
-lands, the cutover routes these sessions to the new plane; the scenario does not
-need a separate create path.
+'cloud-agent-web'`, so once C1 lands, the cutover routes these sessions to the
+new plane; the scenario does not need a separate create path.
 
 | Lifecycle | What it does |
 |---|---|
@@ -848,6 +851,75 @@ Honest limits, recorded because C1 and B8 are not done:
   same `messageID` appends a second copy of the text parts. No scenario relies on
   idempotent resubmission; the hang scenario depends on the wrapper's own
   restart-resubmission, not on the harness replaying a message id.
+
+
+#### Preview HTTP (hostname dispatch)
+
+Preview is host-based now, not path-based: the browser reaches a dev server at
+`http://p<port>-<workspace-uuid-hex>.<suffix>/` and the Worker matches the
+request URL's hostname against the configured suffix before any route, then
+dispatches to the owned container's loopback port. The
+entry is `/.kilo-preview/enter?ticket=<jwt>`; the Worker exchanges that
+short-lived entry ticket for a host-bound session cookie it signs itself, so the
+harness never mints or holds a session token (it only mints the 60 s entry
+ticket with the local `NEXTAUTH_SECRET`).
+
+Required environment: `services/cloud-agent-next/.dev.vars` (or the dev env) sets
+`PREVIEW_HOST_SUFFIX=localhost`. Unset/empty disables preview dispatch, and the
+scenario fails immediately with a message naming this variable. The web app needs
+no preview setting: it learns availability from the Worker and opens
+`<worker>/preview/open?ticket=<jwt>`, which the Worker redirects to the preview host.
+
+Run (from the repository root, with a running local stack,
+`E2E_CONTROL_PLANE_V2=1`, and the driver user enrolled in `CONTROL_PLANE_IDS`):
+
+```bash
+WORKER_URL=http://localhost:<8794+offset> FAKE_LLM_URL=http://localhost:<8811+offset> \
+  tsx services/cloud-agent-next/test/e2e/run.ts preview-http _
+```
+
+What it proves (each observation is recorded in the result message):
+
+- Dispatch is on: a preview host with no ticket answers `401` with the route's
+  fixed text (the precondition probe).
+- Entry `303` to `/` with no ticket in the `Location`; `Set-Cookie: kilo_preview`
+  is `HttpOnly` and not `Secure` over http.
+- A follow-up `GET /` with that cookie serves the fixture; `/app.js` imports
+  `/lib.js`; the fixture is an ES-module chain.
+- `POST /submit` with `Origin: http://<preview host>` echoes the body and the app
+  never receives `kilo_preview`; a foreign Origin and `Origin: null` get `403`.
+- `/redirect-me` keeps its relative `/login`; `/abs` is rewritten to an absolute
+  URL on the preview origin.
+- `Set-Cookie: app=1` round-trips without `Domain`/`Secure`, and an app cookie
+  echo shows `kilo_preview` was dropped.
+- `GET /health` on the normal worker host (no preview `Host`) still returns the
+  worker JSON, so preview dispatch does not shadow worker routes.
+- A reserved provider port (`3000` for `cloudflare`, derived from
+  `isReservedPreviewPort`) is refused `403` before any upstream fetch; a closed
+  port is `502`; both well under 5 s.
+- The session's own `kilo serve` port (read from the owned container) is reachable
+  on loopback, and Kilo itself answers `401` because the wrapper starts it with a
+  per-process `KILO_SERVER_PASSWORD`; the body is not the preview route's own 401.
+- A chunked response delivers its first chunk to the client before a later
+  `/release` request lets the origin finish.
+- A >2 MiB streamed response arrives with the expected size and SHA-256; a >1 MiB
+  request body arrives with the expected byte count and hash.
+- WebSocket: a legitimate `Origin` gets `101`, the offered subprotocol is echoed,
+  and text + binary frames echo before a clean close; foreign, `null`, and
+  missing `Origin` upgrades get `403` without reaching the fixture.
+- Negative tickets (wrong audience, tampered, expired) and a ticket for another
+  session/label are `401` on the entry; the entry ticket used as a cookie is
+  `401` on a proxied path.
+
+What it does **not** prove:
+
+- Hosted providers (`cloudflare`, `cloudflare-containers`, `vercel`) are never
+  exercised; only the local Docker sandbox and the local Worker are.
+- Real hosted preview domains and production cookie scoping are not covered (the
+  local stack uses `*.localhost`, so the preview host and the worker host share
+  one registrable site rather than being independent).
+- Sleep/no-wake and lease behaviour are not covered here; preview is a
+  request-path behaviour and this scenario never lets a sandbox idle out.
 
 
 ### e2e surface auth (HTTP profiles)

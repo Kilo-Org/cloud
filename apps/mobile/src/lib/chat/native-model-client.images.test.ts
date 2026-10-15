@@ -30,6 +30,7 @@ function fakeBridge(availability: NativeAvailability) {
     generate: vi.fn(async (request: Parameters<NativeModelBridge['generate']>[0]) => {
       await Promise.resolve();
       for (const listener of listeners) {
+        listener({ id: request.id, kind: 'delta', text: 'Answer' });
         listener({ id: request.id, kind: 'done', stop: 'end', usageSource: 'reported' });
       }
     }),

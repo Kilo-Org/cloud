@@ -26,9 +26,15 @@ vi.mock('@/lib/settings/registry', () => ({
 }));
 vi.mock('@/lib/settings/confirm', () => ({ confirmSettingChange: () => undefined }));
 vi.mock('./settings-tools-switch', () => ({ isSettingsToolsEnabled: () => true }));
+// The search itself is proved in its own suite; this one reads the names.
+vi.mock('./web-search', () => ({
+  WEB_SEARCH_TOOL_NAME: 'web_search',
+  webSearchTool: () => ({ definition: { name: 'web_search' }, run: () => undefined }),
+}));
 
 const input = (overrides: Partial<ChatToolSetInput> = {}): ChatToolSetInput => ({
   settingsEnabled: true,
+  webSearchEnabled: false,
   kiloEnabled: false,
   kiloNames: [],
   remoteNames: [],
@@ -74,6 +80,14 @@ describe('the names a chat is opened with', () => {
     ]);
   });
 
+  it('names web search only for a chat that has it on, right after the clock', () => {
+    expect(toolNamesFor(input({ webSearchEnabled: true }))).toEqual([
+      'time',
+      'web_search',
+      ...SETTINGS_TOOL_NAMES,
+    ]);
+  });
+
   it('names only the servers that are enabled, because s4 already dropped the rest', () => {
     /* A disabled server contributes nothing to the list it is read from, so the
        builder adds exactly what it is given and no name of a server that is
@@ -111,12 +125,15 @@ describe('the names a chat is opened with', () => {
  * gate and the tool objects cannot disagree about whether they are offered.
  */
 describe('the tools behind those names', () => {
-  it('is the clock and the settings tools while the group switch is on', () => {
-    expect(namesOf(chatToolsFor(input()))).toEqual(['time', ...SETTINGS_TOOL_NAMES]);
+  it('is the clock, web search and the settings tools while the group switch is on', () => {
+    expect(namesOf(chatToolsFor(input()))).toEqual(['time', 'web_search', ...SETTINGS_TOOL_NAMES]);
   });
 
   it('leaves the settings tools out entirely when the group switch is off', () => {
-    expect(namesOf(chatToolsFor(input({ settingsEnabled: false })))).toEqual(['time']);
+    expect(namesOf(chatToolsFor(input({ settingsEnabled: false })))).toEqual([
+      'time',
+      'web_search',
+    ]);
   });
 
   it('holds the discovered remote tools, in list order', () => {
@@ -124,6 +141,7 @@ describe('the tools behind those names', () => {
 
     expect(namesOf(chatToolsFor(input({ remoteTools: remote })))).toEqual([
       'time',
+      'web_search',
       ...SETTINGS_TOOL_NAMES,
       'mcp_notes_list',
       'mcp_calendar_today',

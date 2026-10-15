@@ -129,6 +129,10 @@
             "message": "Use sonner-native."
           },
           {
+            "name": "expo-keep-awake",
+            "message": "Use useKeepAwake from @/lib/keep-awake; it handles the Android rejection when the activity is gone."
+          },
+          {
             "name": "moti",
             "message": "Use @/components/ui/skeleton."
           },
@@ -359,6 +363,12 @@
       }
     },
     {
+      "files": ["src/lib/chat/remote-mcp-pkce.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
       "files": ["src/components/ui/icons.test.ts"],
       "rules": {
         "import/no-nodejs-modules": "off"
@@ -393,6 +403,7 @@
       // import a unified element's underlying library directly.
       //   sheet.tsx  — the single home of `@expo/ui` BottomSheet
       //   dialog.tsx — the single home of `@rn-primitives/dialog`
+      //   keep-awake.ts — the single home of `expo-keep-awake`
       // Test files mock `react-native` and the native libraries directly, so
       // they are exempt permanently. No file imports `Modal` from
       // `react-native` any more, and no exception exists for it: see
@@ -400,6 +411,7 @@
       "files": [
         "src/components/ui/sheet.tsx",
         "src/components/ui/dialog.tsx",
+        "src/lib/keep-awake.ts",
         "**/*.test.ts",
         "**/*.test.tsx"
       ],

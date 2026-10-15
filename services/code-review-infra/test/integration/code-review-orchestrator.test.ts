@@ -2499,33 +2499,38 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
   });
 
-  it('aborts alarm recovery before cloud-agent calls when DB is already terminal', async () => {
-    const stub = getReviewStub();
-    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
-      const url = String(request);
-      if (url.includes('/api/internal/code-review-status/')) {
-        return Response.json({
-          success: true,
-          message: 'Review already in terminal state',
-          currentStatus: 'cancelled',
-        });
-      }
-      return new Response('cloud-agent should not be called', { status: 500 });
-    });
-    globalThis.fetch = fetchMock;
+  it.each([undefined, 'assistant_invalid_request_byok'] as const)(
+    'aborts alarm recovery and preserves terminal reason %s when DB is already terminal',
+    async terminalReason => {
+      const stub = getReviewStub();
+      const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+        const url = String(request);
+        if (url.includes('/api/internal/code-review-status/')) {
+          return Response.json({
+            success: true,
+            message: 'Review already in terminal state',
+            currentStatus: 'cancelled',
+            terminalReason,
+          });
+        }
+        return new Response('cloud-agent should not be called', { status: 500 });
+      });
+      globalThis.fetch = fetchMock;
 
-    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
-      await state.storage.put('state', codeReview());
-      await state.storage.setAlarm(Date.now() + 30_000);
-    });
+      await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+        await state.storage.put('state', codeReview());
+        await state.storage.setAlarm(Date.now() + 30_000);
+      });
 
-    const ran = await runDurableObjectAlarm(stub);
+      const ran = await runDurableObjectAlarm(stub);
 
-    expect(ran).toBe(true);
-    const status = await stub.status();
-    expect(status.status).toBe('cancelled');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
+      expect(ran).toBe(true);
+      const status = await stub.status();
+      expect(status.status).toBe('cancelled');
+      expect(status.terminalReason).toBe(terminalReason);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('ignores unknown DB terminal reasons when DB is already terminal', async () => {
     const stub = getReviewStub();

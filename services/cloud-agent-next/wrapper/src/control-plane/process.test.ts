@@ -222,7 +222,7 @@ describe('control-plane wrapper process', () => {
     }
   }, 20_000);
 
-  it('writes a production-interval status line, then exits cleanly on SIGTERM without later status', async () => {
+  it('writes a production-interval status line, then exits non-zero on SIGTERM (recoverable) without later status', async () => {
     const controlPort = await closedPort();
     const uploadPort = await closedPort();
     const handle = spawnWrapper(
@@ -260,7 +260,7 @@ describe('control-plane wrapper process', () => {
       // The process is still alive when the line appears.
       expect(handle.child.exitCode).toBeNull();
       process.kill(handle.child.pid, 'SIGTERM');
-      expect(await waitForExit(handle.child, 8_000)).toBe(0);
+      expect(await waitForExit(handle.child, 8_000)).toBe(1);
       const stoppedText = handle.stderr();
       const stoppingIndex = stoppedText.indexOf('"phase":"stopping"');
       expect(stoppingIndex).toBeGreaterThanOrEqual(0);

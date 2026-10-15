@@ -1,4 +1,4 @@
-import { type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { matchQuery, type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
@@ -150,7 +150,21 @@ export function useAgentProfileMutations(organizationId?: string) {
     withOrganization(trpc.agentProfiles.update.mutationOptions(callbacks), organizationId)
   );
   const deleteProfile = useMutation(
-    withOrganization(trpc.agentProfiles.delete.mutationOptions(callbacks), organizationId)
+    withOrganization(
+      trpc.agentProfiles.delete.mutationOptions({
+        ...callbacks,
+        // The deleted profile's screens stay mounted until navigation ends.
+        // Refetching its detail can only fail with NOT_FOUND, so skip it.
+        onSuccess: (_data, { profileId }) => {
+          const deletedDetail = trpc.agentProfiles.get.queryFilter({ profileId });
+          void queryClient.invalidateQueries({
+            ...profilesFilter,
+            predicate: query => !matchQuery(deletedDetail, query),
+          });
+        },
+      }),
+      organizationId
+    )
   );
   const setVar = useMutation(
     withOrganization(trpc.agentProfiles.setVar.mutationOptions(callbacks), organizationId)

@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { safeLocalStorage } from '@/lib/localStorage';
 import {
   parseWorktreeChatTabs,
   reduceWorktreeChatTabs,
@@ -12,6 +11,7 @@ import {
 type ScopedClosedWorktreeChatTabs = {
   storageKey: string | null;
   tabs: WorktreeChatTabsState;
+  storageUnavailable?: boolean;
 };
 
 export function useClosedWorktreeChatTabs(storageKey: string | null) {
@@ -20,31 +20,47 @@ export function useClosedWorktreeChatTabs(storageKey: string | null) {
 
   const getScopedState = useCallback(() => {
     const current = stateRef.current;
-    if (current?.storageKey === storageKey) return current;
-
-    const loaded = {
-      storageKey,
-      tabs: parseWorktreeChatTabs(
-        storageKey === null ? null : safeLocalStorage.getItem(storageKey)
-      ),
-    };
-    stateRef.current = loaded;
-    return loaded;
+    const fallback: ScopedClosedWorktreeChatTabs =
+      current?.storageKey === storageKey
+        ? current
+        : { storageKey, tabs: parseWorktreeChatTabs(null) };
+    if (storageKey === null || fallback.storageUnavailable) return fallback;
+    try {
+      return { storageKey, tabs: parseWorktreeChatTabs(window.localStorage.getItem(storageKey)) };
+    } catch {
+      return fallback;
+    }
   }, [storageKey]);
 
   useEffect(() => {
-    setState(getScopedState());
-  }, [getScopedState]);
+    const sync = () => {
+      const loaded = getScopedState();
+      stateRef.current = loaded;
+      setState(loaded);
+    };
+    sync();
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea && event.storageArea !== window.localStorage) return;
+      if (storageKey !== null && (event.key === storageKey || event.key === null)) sync();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [getScopedState, storageKey]);
 
   const update = useCallback(
     (action: WorktreeChatTabsAction) => {
       const current = getScopedState();
       const tabs = reduceWorktreeChatTabs(current.tabs, action);
-      const next = tabs === current.tabs ? current : { storageKey, tabs };
+      const next: ScopedClosedWorktreeChatTabs =
+        tabs === current.tabs ? current : { ...current, tabs };
       stateRef.current = next;
       setState(next);
       if (storageKey !== null && next !== current) {
-        safeLocalStorage.setItem(storageKey, JSON.stringify(tabs));
+        try {
+          window.localStorage.setItem(storageKey, JSON.stringify(tabs));
+        } catch {
+          next.storageUnavailable = true;
+        }
       }
     },
     [getScopedState, storageKey]

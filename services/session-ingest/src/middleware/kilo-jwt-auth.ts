@@ -13,6 +13,7 @@ import {
 import { decodeJwt } from 'jose';
 
 import type { Env } from '../env';
+import { resolveConnectionTicket } from '../dos/connection-ticket';
 
 export type KiloJwtAuthVariables = {
   user_id: string;
@@ -39,8 +40,8 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
       return c.json({ success: false, error: 'Missing or invalid ticket' }, 401);
     }
 
-    const stub = c.env.CONNECTION_TICKET_DO.get(c.env.CONNECTION_TICKET_DO.idFromName(ticket));
-    const consumed = await stub.consume();
+    const resolved = resolveConnectionTicket(c.env.CONNECTION_TICKET_DO, ticket);
+    const consumed = resolved ? await resolved.stub.consume(resolved.secret) : null;
     if (!consumed) {
       return c.json({ success: false, error: 'Invalid or expired ticket' }, 401);
     }

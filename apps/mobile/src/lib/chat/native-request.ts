@@ -1,6 +1,7 @@
 import { type ModelRequest } from '@kilocode/harness-sdk';
 
 import { type NativeTool, nativeTools } from './native-tool-schema';
+import { offeredTools } from './offered-tools';
 
 /**
  * What a model gets in place of an image over its per-request limit. The
@@ -138,7 +139,8 @@ export function nativeRequest(request: ModelRequest, options: RequestOptions): N
       messages.push({ role: 'toolCalls', calls });
     }
   }
-  const toolSchemas = tools && request.tools !== undefined ? nativeTools(request.tools) : [];
+  const toolSchemas =
+    tools && request.tools !== undefined ? nativeTools(offeredTools(request.tools)) : [];
   return {
     id,
     system: request.prompt.system.map(block => block.text).join('\n\n'),

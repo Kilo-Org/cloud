@@ -1,6 +1,3 @@
-export const QWEN37_MAX_MODEL_ID = 'qwen/qwen3.7-max';
-export const QWEN37_PLUS_MODEL_ID = 'qwen/qwen3.7-plus';
-
 export function isQwenModel(model: string) {
   return model.includes('qwen');
 }

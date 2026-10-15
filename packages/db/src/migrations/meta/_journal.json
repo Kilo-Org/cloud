@@ -1926,6 +1926,41 @@
       "when": 1791665999549,
       "tag": "0274_drop_quick_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 275,
+      "version": "7",
+      "when": 1791802756295,
+      "tag": "0275_skinny_ironclad",
+      "breakpoints": true
+    },
+    {
+      "idx": 276,
+      "version": "7",
+      "when": 1791882735449,
+      "tag": "0276_thin_whirlwind",
+      "breakpoints": true
+    },
+    {
+      "idx": 277,
+      "version": "7",
+      "when": 1791906786083,
+      "tag": "0277_curved_joystick",
+      "breakpoints": true
+    },
+    {
+      "idx": 278,
+      "version": "7",
+      "when": 1791913993257,
+      "tag": "0278_needy_master_mold",
+      "breakpoints": true
+    },
+    {
+      "idx": 279,
+      "version": "7",
+      "when": 1792003227489,
+      "tag": "0279_bitter_screwball",
+      "breakpoints": true
     }
   ]
 }

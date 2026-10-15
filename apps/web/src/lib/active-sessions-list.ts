@@ -354,6 +354,10 @@ export type ListActiveSessionsInput = {
   organizationId: string | null | undefined;
   /** When true, also merge live cloud-agent root sessions from Postgres. */
   includeCloudAgentSessions: boolean;
+  /** Snapshot refreshes must fail rather than confirm partial/empty work on an upstream outage. */
+  requireCompleteSnapshot?: boolean;
+  /** Caller deadline; aborts the session-ingest fetch. Postgres reads cannot be cancelled. */
+  signal?: AbortSignal;
 };
 
 /**
@@ -366,15 +370,20 @@ export async function listActiveSessions({
   userId,
   organizationId,
   includeCloudAgentSessions,
+  requireCompleteSnapshot = false,
+  signal,
 }: ListActiveSessionsInput): Promise<{ sessions: ActiveSession[] }> {
-  // Phase 1: fetch + parse the worker response. Any failure here
-  // (HTTP error, malformed JSON, schema mismatch) degrades to an empty
-  // list exactly as before — these are "no data" outcomes from the
-  // mobile client's point of view. With includeCloudAgentSessions, all
-  // three early exits fall through to the cloud-candidates query (D11).
+  // Normal list callers retain best-effort behavior. Background snapshots
+  // require an authoritative read so outages never erase last-known work.
   let parsed: { sessions: ActiveSession[] } = { sessions: [] };
 
   if (!SESSION_INGEST_WORKER_URL) {
+    if (requireCompleteSnapshot) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Session ingest is not configured',
+      });
+    }
     if (!includeCloudAgentSessions) {
       return { sessions: [] as ActiveSession[] };
     }
@@ -392,9 +401,16 @@ export async function listActiveSessions({
       // exactly as any other upstream failure does.
       const response = await fetchWithinBudget(url, {
         headers: { Authorization: `Bearer ${token}` },
+        signal,
       });
 
       if (!response.ok) {
+        if (requireCompleteSnapshot) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to fetch active sessions',
+          });
+        }
         console.warn(
           `[active-sessions] fetch failed: ${response.status} ${response.statusText}`,
           await response.text().catch(() => '')
@@ -407,6 +423,13 @@ export async function listActiveSessions({
         parsed = activeSessionsResponseSchema.parse(raw);
       }
     } catch (error) {
+      if (requireCompleteSnapshot) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch active sessions',
+          cause: error,
+        });
+      }
       console.warn('[active-sessions] error:', error);
       if (!includeCloudAgentSessions) {
         return { sessions: [] as ActiveSession[] };

@@ -34,6 +34,16 @@ const expectClasses = (className: string, expectedClasses: string[]) => {
 };
 
 describe('design primitive defaults', () => {
+  it('defines the web brand yellow and coordinated interaction colors', () => {
+    const globalsCss = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8');
+
+    expect(globalsCss).toContain('--brand-primary: #ffdd00;');
+    expect(globalsCss).toContain('--brand-primary-hover: #edcd00;');
+    expect(globalsCss).toContain('--brand-primary-ring: #ffdd0059;');
+    expect(globalsCss).toContain('--primary: var(--brand-primary);');
+    expect(globalsCss).toContain('--status-warning-foreground: var(--status-yellow-300);');
+  });
+
   it('uses semantic global border fallback', () => {
     const globalsCss = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8');
 

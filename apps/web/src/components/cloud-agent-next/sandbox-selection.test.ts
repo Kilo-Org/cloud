@@ -12,9 +12,11 @@ import {
   formatSandboxDestination,
   formatSandboxDestinationWithoutTier,
   formatSandboxInstance,
-  getPreferredInitialSandboxAllocation,
   getSandboxSelectionGroups,
   getSandboxSelectionOptions,
+  DEFAULT_SANDBOX_VALUE,
+  resolveSandboxChoice,
+  resolveSandboxPicker,
   resolveSandboxSelection,
   resolveSandboxSelectionSubmissionError,
   type SandboxSelectionDraft,
@@ -349,41 +351,25 @@ describe('resolveSandboxSelection', () => {
       error: 'This sandbox is unavailable. Choose another sandbox or Default.',
     });
   });
-});
 
-describe('getPreferredInitialSandboxAllocation', () => {
-  const options: SandboxSelectionCapabilities['options'] = [
-    {
-      allocation: getSandboxAllocationRequest('cloudflare-single'),
-    },
-    {
-      allocation: getSandboxAllocationRequest('vercel-large'),
-    },
-    {
-      allocation: getSandboxAllocationRequest('vercel-small'),
-    },
-  ];
-
-  it('restores the matching destination', () => {
+  it('blocks a sandbox that is unavailable for the current repository', () => {
     expect(
-      getPreferredInitialSandboxAllocation({
-        options,
-        lastUsedKey: getSandboxAllocationKey(getSandboxAllocationRequest('vercel-large')),
+      resolveSandboxSelection({
+        ...input,
+        capabilities: {
+          enabled: true,
+          options: [
+            {
+              allocation: structuredClone(vercelLarge),
+              repositoryUnavailableReason: 'Vercel sandboxes support GitHub repositories only',
+            },
+          ],
+        },
       })
-    ).toEqual(vercelLarge);
-  });
-
-  it('restores nothing without a stored destination', () => {
-    expect(getPreferredInitialSandboxAllocation({ options, lastUsedKey: null })).toBeUndefined();
-  });
-
-  it('ignores a stored destination that is no longer offered', () => {
-    expect(
-      getPreferredInitialSandboxAllocation({
-        options,
-        lastUsedKey: getSandboxAllocationKey(getSandboxAllocationRequest('cloudflare-shared')),
-      })
-    ).toBeUndefined();
+    ).toEqual({
+      sandboxAllocation: vercelLarge,
+      error: 'Vercel sandboxes support GitHub repositories only',
+    });
   });
 });
 
@@ -504,5 +490,154 @@ describe('resolveSandboxSelectionSubmissionError', () => {
         pendingOperation: null,
       })
     ).toBeUndefined();
+  });
+});
+
+describe('resolveSandboxPicker', () => {
+  const single = getSandboxAllocationRequest('cloudflare-single');
+  const shared = getSandboxAllocationRequest('cloudflare-shared');
+  const key = getSandboxAllocationKey;
+  const pickerCapabilities = (
+    overrides: Partial<SandboxSelectionCapabilities> = {}
+  ): SandboxSelectionCapabilities => ({
+    enabled: true,
+    defaultDestination: single,
+    options: [{ allocation: single }, { allocation: shared }, { allocation: vercelLarge }],
+    ...overrides,
+  });
+
+  it('selects the default option when nothing was chosen', () => {
+    expect(
+      resolveSandboxPicker({
+        capabilities: pickerCapabilities(),
+        draftAllocation: undefined,
+        lastUsedKey: null,
+      })
+    ).toEqual({
+      value: key(single),
+      defaultKey: key(single),
+      defaultDestination: single,
+      allocation: undefined,
+      destination: single,
+    });
+  });
+
+  it('prefers the saved default over the platform default', () => {
+    const picker = resolveSandboxPicker({
+      capabilities: pickerCapabilities({ effectiveDestination: shared }),
+      draftAllocation: undefined,
+      lastUsedKey: null,
+    });
+    expect(picker.value).toBe(key(shared));
+    expect(picker.defaultKey).toBe(key(shared));
+    expect(picker.allocation).toBeUndefined();
+  });
+
+  it('selects the remembered sandbox while it is still offered', () => {
+    const picker = resolveSandboxPicker({
+      capabilities: pickerCapabilities(),
+      draftAllocation: undefined,
+      lastUsedKey: key(vercelLarge),
+    });
+    expect(picker.value).toBe(key(vercelLarge));
+    expect(picker.allocation).toEqual(vercelLarge);
+    expect(picker.destination).toEqual(vercelLarge);
+    expect(picker.defaultKey).toBe(key(single));
+  });
+
+  it.each([
+    [
+      'the repository cannot use it',
+      [
+        { allocation: single },
+        { allocation: vercelLarge, repositoryUnavailableReason: 'GitHub only' },
+      ],
+    ],
+    [
+      'the owner cannot use it',
+      [{ allocation: single }, { allocation: vercelLarge, unavailableReason: 'Off' }],
+    ],
+    ['it is no longer offered', [{ allocation: single }]],
+  ])('falls back to the default when %s', (_name, options) => {
+    const picker = resolveSandboxPicker({
+      capabilities: pickerCapabilities({ options }),
+      draftAllocation: undefined,
+      lastUsedKey: key(vercelLarge),
+    });
+    expect(picker.allocation).toBeUndefined();
+    expect(picker.value).toBe(key(single));
+  });
+
+  it('treats a remembered sandbox that equals the default as the default', () => {
+    const picker = resolveSandboxPicker({
+      capabilities: pickerCapabilities(),
+      draftAllocation: undefined,
+      lastUsedKey: key(single),
+    });
+    expect(picker.allocation).toBeUndefined();
+    expect(picker.value).toBe(key(single));
+  });
+
+  it('keeps a choice made in this panel over a remembered sandbox', () => {
+    const picker = resolveSandboxPicker({
+      capabilities: pickerCapabilities(),
+      draftAllocation: shared,
+      lastUsedKey: key(vercelLarge),
+    });
+    expect(picker.allocation).toEqual(shared);
+    expect(picker.value).toBe(key(shared));
+  });
+
+  it('lists the default separately when no option matches it', () => {
+    const providerDefault = {
+      provider: { id: 'vercel', account: 'kilo' },
+      instanceType: 'default',
+    } satisfies SandboxDestination;
+    const picker = resolveSandboxPicker({
+      capabilities: pickerCapabilities({ defaultDestination: providerDefault }),
+      draftAllocation: undefined,
+      lastUsedKey: null,
+    });
+    expect(picker).toMatchObject({
+      value: DEFAULT_SANDBOX_VALUE,
+      defaultKey: undefined,
+      allocation: undefined,
+      destination: providerDefault,
+    });
+  });
+
+  it('has nothing to show before capabilities load', () => {
+    expect(
+      resolveSandboxPicker({
+        capabilities: undefined,
+        draftAllocation: undefined,
+        lastUsedKey: null,
+      })
+    ).toMatchObject({ value: DEFAULT_SANDBOX_VALUE, destination: undefined });
+  });
+});
+
+describe('resolveSandboxChoice', () => {
+  const single = getSandboxAllocationRequest('cloudflare-single');
+  const options = [{ allocation: single }, { allocation: vercelLarge }];
+  const picker = { defaultKey: getSandboxAllocationKey(single) };
+
+  it('returns to the default for the default option and the separate default entry', () => {
+    expect(resolveSandboxChoice(getSandboxAllocationKey(single), picker, options)).toEqual({
+      allocation: undefined,
+    });
+    expect(resolveSandboxChoice(DEFAULT_SANDBOX_VALUE, picker, options)).toEqual({
+      allocation: undefined,
+    });
+  });
+
+  it('picks another offered sandbox', () => {
+    expect(resolveSandboxChoice(getSandboxAllocationKey(vercelLarge), picker, options)).toEqual({
+      allocation: vercelLarge,
+    });
+  });
+
+  it('ignores a value that is not offered', () => {
+    expect(resolveSandboxChoice('unknown', picker, options)).toBeUndefined();
   });
 });

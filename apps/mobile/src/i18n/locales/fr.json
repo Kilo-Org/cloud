@@ -133,9 +133,14 @@
     "status": "Statut",
     "truncated": "Tronqué",
     "updated": "Mis à jour",
+    "generating": "Génération…",
     "working": "En cours",
     "yourOwnRepositories": "Vos propres dépôts",
-    "dismissed": "Ignoré"
+    "dismissed": "Ignoré",
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Modifications"
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -261,7 +266,8 @@
       "kiloclaw": "Activité KiloClaw",
       "balance": "Alertes sur le solde",
       "security": "Problèmes de sécurité",
-      "spend": "Alertes de dépenses"
+      "spend": "Alertes de dépenses",
+      "followedSessions": "Sessions suivies"
     },
     "category": {
       "chatMessagesSubtitle": "réponses dans vos conversations",
@@ -616,7 +622,7 @@
     "redeployTitle": "Redéployer l'instance",
     "accessRequired": {
       "iosBody": "L'accès à KiloClaw pour ce compte se gère en dehors de l'application iOS.",
-      "iosContact": "Des questions ? Contactez hi@kilo.ai.",
+      "iosContact": "Des questions ? Contactez {{supportEmail}}.",
       "iosTitle": "KiloClaw indisponible sur iOS",
       "multipleCurrentConflictBody": "Nous avons trouvé plusieurs abonnements actifs sur votre compte. Nous avons donc tout mis en pause pour éviter une double facturation.",
       "multipleCurrentConflictCta": "Continuer sur kilo.ai",
@@ -750,7 +756,7 @@
         "queryErrorBody": "Nous avons perdu la connexion pendant la vérification de la configuration de {{name}}. Elle est peut-être encore en cours. Réessayez ou revenez dans un instant.",
         "queryErrorTitle": "Impossible de vérifier l'avancement",
         "settingUp": "Configuration de {{name}}",
-        "stalledBody": "Nous n'avons pas pu terminer la configuration de {{name}}. Réessayez, ou écrivez à hi@kilo.ai si cela se reproduit.",
+        "stalledBody": "Nous n'avons pas pu terminer la configuration de {{name}}. Réessayez, ou écrivez à {{supportEmail}} si cela se reproduit.",
         "stalledTitle": "Configuration bloquée",
         "startingSandbox": "Démarrage du bac à sable",
         "stoppedBody": "L'instance de {{name}} s'est arrêtée de façon inattendue pendant la configuration.",
@@ -911,6 +917,8 @@
       "noFindings": "Aucun signalement.",
       "retryMessage": "Cela relancera la revue de code.",
       "retryReview": "Relancer la revue",
+      "retryNeedsSettings": "L'agent de revue de code est désactivé ou ses paramètres nécessitent votre attention. Corrigez les paramètres, puis relancez cette revue.",
+      "fixSettings": "Corriger les paramètres",
       "retryTitle": "Relancer la revue ?",
       "showMore": "Afficher la suite",
       "started": "Date de début",
@@ -1005,7 +1013,7 @@
         "recoveryLabel": "Mettre à jour l'application GitHub"
       },
       "githubIpAllowList": {
-        "description": "L'agent de revue de code a été désactivé, car cette organisation GitHub utilise une liste d'adresses IP autorisées qui bloque Kilo. Contactez hi@kilocode.ai pour obtenir de l'aide, puis réactivez l'agent de revue de code."
+        "description": "L'agent de revue de code a été désactivé, car cette organisation GitHub utilise une liste d'adresses IP autorisées qui bloque Kilo. Contactez {{supportEmail}} pour obtenir de l'aide, puis réactivez l'agent de revue de code."
       },
       "gitlabProjectAccessRequired": {
         "description": "L'agent de revue de code a été désactivé, car Kilo ne peut pas créer de jeton d'accès au projet GitLab. Accordez le rôle de responsable du projet ou activez les jetons d'accès au projet, puis réactivez l'agent de revue de code.",
@@ -1020,7 +1028,7 @@
         "recoveryLabel": "Modifier les paramètres de l'agent de revue de code"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "L'agent de revue de code a été désactivé après trois tentatives de clonage du dépôt ayant dépassé le délai imparti aujourd'hui. Contactez hi@kilocode.ai pour obtenir de l'aide, puis réactivez l'agent de revue de code."
+        "description": "L'agent de revue de code a été désactivé après trois tentatives de clonage du dépôt ayant dépassé le délai imparti aujourd'hui. Contactez {{supportEmail}} pour obtenir de l'aide, puis réactivez l'agent de revue de code."
       },
       "title": "L'agent de revue de code nécessite votre intervention.",
       "recoveryLabel": "Contacter l'assistance"
@@ -1485,6 +1493,8 @@
       "title": "Session de travail",
       "copyErrorDetails": "Copier les détails de l'erreur",
       "backToSessions": "Retour aux sessions",
+      "follow": "Suivre sur l’écran verrouillé",
+      "unfollow": "Ne plus suivre sur l’écran verrouillé",
       "couldNotLoad": "Impossible de charger la session.",
       "failedToLoadDetails": "Impossible de charger les détails de la session.",
       "failedToStopExecution": "Impossible d'arrêter l'exécution.",
@@ -1551,6 +1561,11 @@
       "collapse": "Réduire l'objectif",
       "expand": "Développer l'objectif"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tâches, {{completed}} sur {{total}} terminées",
+      "rowAccessibility": "Tâches, {{completed}} sur {{total}} terminées. Tâche en cours : {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Utilisés récemment",
       "couldNotLoadGithubRepositories": "Impossible de charger les dépôts GitHub.",
@@ -1583,7 +1598,6 @@
       "retryLoadingEnvironment": "Réessayer de charger l'environnement",
       "defaultEnvironment": "Environnement par défaut",
       "environmentSummary": "{{commands}} commandes · {{mcp}} MCP · {{skills}} compétences · {{agents}} agents",
-      "changes": "Modifications",
       "leaveChanges": "Conserver en l'état",
       "commitAndPush": "Valider et envoyer",
       "startSession": "Démarrer la session",
@@ -1606,6 +1620,10 @@
       "importingSession": "Importation de la session…",
       "cliCannotContinue": "Cette CLI ne permet pas de reprendre une session. Choisissez Cloud Agent ou une autre CLI.",
       "importFailed": "Impossible d'importer cette session.",
+      "cliCannotFork": "Mettez à jour la CLI Kilo pour dupliquer à partir d'un message.",
+      "forkCutNotSynced": "Ce message n'est pas encore enregistré. Réessayez dans un instant.",
+      "forkFilesFromBaseBranch": "Les fichiers partent de la branche de base.",
+      "forkFilesUnchangedOnComputer": "Les fichiers de cet ordinateur ne sont pas modifiés.",
       "pickProfile": "Choisissez un profil",
       "noProfile": "Aucun profil",
       "manageProfiles": "Gérer les profils",
@@ -1651,8 +1669,8 @@
       "toolList": "lister",
       "toolPatch": "appliquer un correctif",
       "toolTask": "tâche",
-      "readTodos": "Lire les tâches",
-      "updateTodos": "Mettre à jour les tâches",
+      "readTodos": "Lire le programme",
+      "updateTodos": "Mettre à jour le programme",
       "linesBadge": "{{displayCount}} lignes",
       "filesBadge": "{{displayCount}} fichiers",
       "matchesBadge": "{{displayCount}} résultats",
@@ -1725,6 +1743,7 @@
       "copyMessage": "Copier le message",
       "copyText": "Copier le texte",
       "selectText": "Sélectionner le texte",
+      "forkFromHere": "Dupliquer à partir d'ici",
       "reportAiResponse": "Signaler la réponse de l'IA",
       "reportAiResponseConfirm": "Signaler cette réponse pour qu'elle soit examinée ?",
       "report": "Signaler",
@@ -2050,6 +2069,12 @@
       "modelsCount_one": "Modèle ({{displayCount}})",
       "modelsCount_other": "Modèles ({{displayCount}})",
       "modelsCount_many": "Modèles ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Voir les modifications",
+      "asOf": "À {{time}}",
+      "tooLarge": "Les différences sont trop volumineuses pour être affichées sur mobile.",
+      "empty": "Aucune modification de fichier dans cette session pour l'instant."
     },
     "autoApprove": {
       "title": "Approbation automatique",
@@ -2659,6 +2684,7 @@
     "fileRows": {
       "collapseFile": "Réduire le fichier",
       "diffTooLarge": "Les différences sont trop volumineuses pour être affichées.",
+      "noPreview": "Aucun aperçu disponible pour ce fichier",
       "expandFile": "Développer le fichier",
       "markViewed": "Marquer {{path}} comme consulté",
       "openDiffOnGitHub": "Ouvrir les différences de ce fichier sur GitHub",
@@ -3191,9 +3217,36 @@
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
     "openSession": "Ouvrir",
+    "finished": "Terminé",
+    "followFailed": "Impossible d’afficher cet agent sur l’écran verrouillé.",
     "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer.",
-    "newestResult": "Dernier résultat",
-    "scheduledWakes": "se réveille {{time}}"
+    "checked": "Vérifié",
+    "lastKnown": "Dernier état connu",
+    "awaitingUpdate": "En attente de mise à jour",
+    "nextRun": "Prochaine exécution",
+    "waitingForYou": "En attente de votre intervention",
+    "nextScheduled": "Prochaines exécutions",
+    "answerNeeded": "Réponse requise",
+    "waitingToRetry": "Nouvelle tentative en attente",
+    "step": {
+      "editing": "Modification",
+      "reading": "Lecture",
+      "running": "Exécution",
+      "searching": "Recherche web",
+      "thinking": "Réflexion"
+    },
+    "planOf": "sur",
+    "filesChanged": "fichiers modifiés",
+    "finishedIn": "Terminé en",
+    "noActivityFor": "Aucune activité depuis",
+    "prOpened": "Pull request ouverte",
+    "permissionWants": "Veut exécuter",
+    "failure": {
+      "provider": "Arrêté : erreur du fournisseur",
+      "tool": "Arrêté : erreur d'outil",
+      "cancelled": "Arrêté : annulé",
+      "other": "ARRÊTÉ"
+    }
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",
@@ -3221,6 +3274,7 @@
     "tutorialLabel": "Tutoriel"
   },
   "modelChat": {
+    "offlineFailure": "Ce modèle nécessite une connexion Internet. Connectez-vous et réessayez, ou passez à un modèle sur cet appareil.",
     "empty": {
       "title": "Démarrer une discussion",
       "description": "Envoyez un message pour discuter avec un modèle."
@@ -3228,10 +3282,32 @@
     "list": {
       "loadFailed": "Impossible de charger l'historique de la conversation.",
       "new": "Nouvelle discussion",
-      "openHint": "Ouvre la discussion. Appui long pour supprimer.",
       "deleteTitle": "Supprimer cette discussion ?"
     },
+    "rename": {
+      "title": "Renommer la discussion",
+      "accessibility": "Renommer la discussion : {{title}}",
+      "openHint": "Ouvre la discussion. Appui long pour renommer ou supprimer."
+    },
     "beta": "Bêta",
+    "details": {
+      "title": "Détails de la discussion",
+      "backend": "Service",
+      "effortDefault": "Valeur par défaut du modèle",
+      "noCost": "Aucun coût",
+      "costUnknown": "Inconnu",
+      "costEstimatedNote": "Le coût des réponses qui n'ont pas indiqué de prix est estimé d'après les prix catalogue.",
+      "costUnknownNote": "Aucun prix n'est connu pour ce modèle.",
+      "costPartialNote": "Ce total n'inclut pas les modèles dont le prix est inconnu.",
+      "localNote": "Les modèles sur l'appareil s'exécutent sur cet appareil. Ils n'ont ni coût ni cache de prompts, et leur nombre de jetons peut être une estimation.",
+      "countedSinceNote": "Cette discussion a commencé avant l'enregistrement de l'utilisation. Les totaux n'indiquent que les réponses suivantes.",
+      "remoteServersOn": "Serveurs MCP distants activés"
+    },
+    "webSearch": {
+      "title": "Rechercher sur le web",
+      "description": "Autorisez ce chat à rechercher des informations récentes via votre compte Kilo. Les recherches utilisent votre quota mensuel de recherches.",
+      "allowanceExhausted": "Vos recherches web gratuites de ce mois sont épuisées. Ajoutez des crédits pour rechercher à nouveau."
+    },
     "mcp": {
       "title": "Outils Kilo",
       "use": "Utiliser les outils Kilo",
@@ -3254,7 +3330,6 @@
       "fieldName": "Nom affiché",
       "fieldUrl": "URL du serveur",
       "fieldUrlInvalid": "Saisissez une URL de serveur valide.",
-      "fieldToken": "Jeton Bearer (facultatif)",
       "enableServer": "Activer ce serveur : {{name}}",
       "editServer": "Modifier le serveur",
       "deleteServer": "Supprimer le serveur",
@@ -3275,8 +3350,24 @@
       "serverUnreachable": "Impossible de joindre ce serveur",
       "serverOff": "Ce serveur est désactivé"
     },
+    "mcpOAuth": {
+      "authMethod": "Authentification",
+      "authNone": "Sans connexion",
+      "authBearer": "Jeton Bearer",
+      "authOAuth": "Connexion OAuth",
+      "fieldToken": "Jeton",
+      "oauthHint": "Après l'enregistrement, appuyez sur $t(modelChat.mcpOAuth.signIn) sur le serveur pour vous connecter avec votre navigateur.",
+      "serverNeedsSignIn": "Connectez-vous pour utiliser ce serveur",
+      "signIn": "Se connecter",
+      "signInA11y": "Se connecter à ce serveur : {{name}}",
+      "signInFailed": "Impossible de se connecter à {{name}}. Réessayez."
+    },
     "backends": {
       "title": "Services de discussion",
+      "providersTitle": "Fournisseurs de chat",
+      "cloud": "Dans le nuage",
+      "cloudModel": "Modèle : {{model}}",
+      "cloudUnavailable": "Les modèles Kilo ne sont pas disponibles pour le moment. Vérifiez votre connexion.",
       "manage": "Gérer les services",
       "defaultKilo": "$t(consent.kilo) (par défaut)",
       "kiloHelp": "Le service intégré utilise votre compte Kilo et ne peut être ni modifié ni supprimé.",
@@ -3336,7 +3427,6 @@
     "gguf": {
       "title": "Modèles téléchargeables",
       "help": "Téléchargez un modèle ouvert et exécutez-le sur ce téléphone avec llama.cpp. Vos requêtes et les réponses restent sur l'appareil. Les modèles sont volumineux, utilisez donc le Wi-Fi.",
-      "details": "{{size}} · Licence : {{license}}",
       "download": "Télécharger le modèle",
       "pause": "Mettre en pause le téléchargement",
       "resume": "Reprendre le téléchargement",
@@ -3348,6 +3438,8 @@
       "url": "Lien de téléchargement direct",
       "urlHelp": "Collez un lien HTTPS vers un fichier .gguf, comme un lien resolve de Hugging Face. Ne téléchargez des modèles qu'à partir de sources fiables.",
       "downloadUrl": "Télécharger depuis le lien",
+      "advanced": "Avancé",
+      "localPurpose": "Fonctionne sur cet appareil avec llama.cpp. Les invites et les réponses restent sur l'appareil.",
       "deleteTitle": "Supprimer ce modèle ?",
       "deleteMessage": "Supprimer {{name}} de cet appareil ? Les conversations qui l'utilisent ont besoin d'un autre modèle avant de pouvoir continuer.",
       "errors": {
@@ -3357,12 +3449,62 @@
         "notGguf": "Le lien doit pointer vers un fichier .gguf.",
         "space": "L'espace de stockage disponible est insuffisant pour ce modèle. Libérez de l'espace et réessayez.",
         "network": "Le téléchargement ne s'est pas terminé. Vérifiez votre connexion et réessayez.",
-        "invalidFile": "Le fichier téléchargé n'est pas un modèle que cette application peut exécuter ; il a donc été supprimé."
+        "invalidFile": "Le fichier téléchargé n'est pas un modèle que cette application peut exécuter ; il a donc été supprimé.",
+        "checksum": "Le fichier téléchargé ne correspond pas à sa somme de contrôle publiée ; il a donc été supprimé. Réessayez le téléchargement."
       }
+    },
+    "catalog": {
+      "browse": "Parcourir les modèles",
+      "title": "Catalogue de modèles",
+      "search": "Rechercher des modèles Hugging Face",
+      "tabs": "Filtre des modèles",
+      "fitsTab": "Compatibles avec cet appareil",
+      "fromHuggingFace": "Depuis Hugging Face",
+      "loading": "Chargement des modèles",
+      "noResults": "Aucun modèle trouvé",
+      "noFits": "Aucun modèle compatible avec cet appareil",
+      "noFitsDescription": "Les modèles plus volumineux se trouvent dans l'onglet $t(common.all).",
+      "fit": {
+        "fits": "Compatible",
+        "tight": "Juste",
+        "tooLarge": "Trop volumineux",
+        "noStorage": "Stockage insuffisant",
+        "unknown": "Compatibilité inconnue"
+      },
+      "recommendationsHelp": "Une présélection définie par cette app : un fichier par modèle, provenant d'un éditeur qui indique une licence. Rien d'autre n'est classé.",
+      "compatibilityHelp": "La compatibilité compare le fichier du modèle avec la mémoire et l'espace libre de cet appareil. Le chiffre de mémoire est une estimation, pas une mesure.",
+      "text": "Texte",
+      "listTextPurpose": "Invites textuelles uniquement.",
+      "listImagePurpose": "Lit les images ainsi que le texte.",
+      "smallestDownload": "Téléchargement le plus petit : {{size}} · environ {{memory}} de mémoire",
+      "fullFileName": "Fichier : {{name}}",
+      "memoryEstimateNote": "Les chiffres de mémoire sont des estimations, pas des mesures.",
+      "parameters": "Paramètres : {{value}}",
+      "downloads": "Téléchargements : {{value}}",
+      "likes": "J'aime : {{value}}",
+      "context": "Fenêtre de contexte : {{value}}",
+      "license": "Licence : {{license}}",
+      "licenseUnknown": "La licence n'est pas indiquée",
+      "tools": "Appel d'outils",
+      "vision": "Entrée d'images",
+      "hintsHelp": "Indications fournies par Hugging Face. L'application vérifie le modèle après son téléchargement.",
+      "gated": "Ce modèle nécessite un compte Hugging Face, l'application ne peut donc pas le télécharger.",
+      "quantizations": "Quantifications",
+      "quantizationsHelp": "Les fichiers plus petits utilisent moins de mémoire et de stockage. Les fichiers plus volumineux donnent généralement de meilleures réponses.",
+      "quantDetail": "Téléchargement de {{size}} · environ {{memory}} de mémoire",
+      "downloadQuant": "Télécharger {{quant}}",
+      "loadingModel": "Chargement des détails du modèle",
+      "couldNotLoadModel": "Impossible de charger ce modèle",
+      "noFiles": "Aucun fichier exécutable par cette application",
+      "noFilesDescription": "Cette application exécute les modèles constitués d'un seul fichier GGUF.",
+      "tooLargeTitle": "Ce modèle risque de ne pas fonctionner",
+      "tooLargeMessage": "{{name}} nécessite probablement plus de mémoire que cet appareil n'en dispose. L'application peut se fermer pendant que le modèle répond. Le télécharger quand même ?",
+      "downloadAnyway": "Télécharger quand même"
     },
     "localModels": {
       "title": "Modèles sur l'appareil",
-      "help": "Les modèles sur l'appareil s'exécutent sur ce téléphone. Vos requêtes et les réponses restent sur l'appareil, et ces modèles ne peuvent pas utiliser d'outils.",
+      "help": "Les modèles sur l'appareil s'exécutent sur ce téléphone. Vos requêtes et les réponses restent sur l'appareil.",
+      "systemPurpose": "Le modèle intégré au système de cet appareil. Il s'exécute sur l'appareil.",
       "apple": "Apple Intelligence (sur l'appareil)",
       "checking": "Vérification de la disponibilité…",
       "ready": "Prêt à l'emploi",
@@ -3388,6 +3530,9 @@
       "downloading": "Téléchargement…",
       "downloadProgress": "Téléchargement… {{percent}} %",
       "downloadFailed": "Le téléchargement n'a pas abouti. Vérifiez votre connexion et l'espace de stockage disponible, puis réessayez."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ce modèle prend en charge le niveau de réflexion"
     }
   },
   "settingsTools": {
@@ -3567,7 +3712,6 @@
       "template": "Modèle",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Expliquez $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Exécuter en tant que sous-tâche",
       "edit": "Modifier la commande barre oblique",
       "saveFailed": "Impossible d'enregistrer la commande",
@@ -3611,5 +3755,96 @@
     "noMatchingProductsPlay": "Google Play n'a renvoyé aucun pack de crédits correspondant.",
     "purchaseOwnedByAnotherAccount": "Les crédits associés à ce compte Apple Account appartiennent à un autre compte Kilo. Connectez-vous à cet autre compte Kilo pour les utiliser.",
     "purchaseOwnedByAnotherAccountPlay": "Les crédits sur ce compte Google Play appartiennent à un autre compte Kilo. Connectez-vous à ce compte Kilo pour les utiliser."
+  },
+  "todos": {
+    "saveAsTodo": "Enregistrer comme tâche",
+    "segment": {
+      "label": "Vue Agents",
+      "sessions": "Sessions",
+      "todos": "Tâches"
+    },
+    "lists": {
+      "newList": "Nouvelle liste",
+      "empty": "Aucune liste pour l'instant",
+      "couldNotLoad": "Impossible de charger les listes",
+      "noRepository": "Aucun dépôt",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} à faire",
+      "openCount_other": "{{count}} à faire",
+      "openCount_many": "{{count}} à faire",
+      "archived_one": "Archivées ({{count}})",
+      "archived_other": "Archivées ({{count}})",
+      "archived_many": "Archivées ({{count}})",
+      "archive": "Archiver",
+      "unarchive": "Désarchiver",
+      "deleteTitle": "Supprimer {{name}} ?",
+      "deleteMessage": "Ses tâches sont aussi supprimées. Ses sessions sont conservées."
+    },
+    "listSettings": {
+      "title": "Paramètres de la liste",
+      "name": "Nom",
+      "namePlaceholder": "Bugs, Idées, Version…",
+      "emoji": "Émoji",
+      "mode": "Mode",
+      "defaultsHint": "Les sessions lancées depuis cette liste utilisent ces valeurs par défaut."
+    },
+    "list": {
+      "addPlaceholder": "Ajouter une tâche",
+      "add": "Ajouter la tâche",
+      "empty": "Aucune tâche pour l'instant",
+      "setDefaults": "Définir le dépôt, le mode et le modèle",
+      "completed_one": "Terminées ({{count}})",
+      "completed_other": "Terminées ({{count}})",
+      "completed_many": "Terminées ({{count}})"
+    },
+    "item": {
+      "markDone": "Marquer comme terminé",
+      "markOpen": "Marquer comme non terminé",
+      "markDonePrompt": "Marquer comme terminé ?",
+      "deleted": "Tâche supprimée",
+      "undo": "Annuler",
+      "runCount_one": "{{count}} exécution",
+      "runCount_other": "{{count}} exécutions",
+      "runCount_many": "{{count}} exécutions",
+      "startNow": "Démarrer sans revue",
+      "startNowHint": "Appui long pour démarrer sans revue",
+      "titleLabel": "Titre de la tâche",
+      "renameTitle": "Renommer la tâche",
+      "notes": "Notes",
+      "addNotes": "Ajouter des notes",
+      "notesPrompt": "Ajoutez du contexte, des exigences ou des critères d'acceptation.",
+      "markdownSupported": "Markdown pris en charge",
+      "sessions": "Sessions liées",
+      "noSessions": "Aucune session pour l'instant",
+      "untitledLinkedSession": "Session liée",
+      "sessionNeedsInput": "La session nécessite une saisie",
+      "sessionRunning": "Session en cours",
+      "sessionFinished": "Session terminée",
+      "sessionPullRequest": "PR de la session",
+      "sessionPullRequestNumber": "PR de la session #{{number}}",
+      "openSessionHint": "Ouvre la session.",
+      "unlinkSessionAction": "Dissocier la session",
+      "unlinkConfirmTitle": "Dissocier {{title}} ?",
+      "unlinkConfirmMessage": "La session elle-même n'est pas supprimée. Seul son lien avec cette tâche est supprimé.",
+      "startNewSession": "Démarrer une nouvelle session",
+      "startNewSessionHint": "Appuyez longuement pour démarrer une nouvelle session.",
+      "linkSession": "Lier une session",
+      "linkFailed": "Impossible de lier la session à la tâche"
+    },
+    "linkSession": {
+      "title": "Lier une session",
+      "empty": "Aucune session récente",
+      "emptyInRepository": "Aucune session récente dans {{repository}}"
+    },
+    "upNext": "À suivre",
+    "sessionTodo": "Tâche : {{title}}",
+    "linkToTodo": "Lier à une tâche",
+    "candidates": {
+      "empty": "Aucune tâche à faire"
+    },
+    "saveSheet": {
+      "title": "Enregistrer dans une liste",
+      "saved": "Enregistré dans {{list}}"
+    }
   }
 }

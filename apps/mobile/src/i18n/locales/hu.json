@@ -133,9 +133,14 @@
     "status": "Állapot",
     "truncated": "Csonkolva",
     "updated": "Frissítve",
+    "generating": "Generálás…",
     "working": "Dolgozik",
     "yourOwnRepositories": "Saját adattáraid",
-    "dismissed": "Elvetve"
+    "dismissed": "Elvetve",
+    "agent": "Ügynök",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Változtatások"
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -324,6 +329,7 @@
       "collapseFile": "Fájl összecsukása",
       "expandFile": "Fájl kibontása",
       "diffTooLarge": "A különbségnézet túl nagy a megjelenítéshez.",
+      "noPreview": "Ehhez a fájlhoz nem érhető el előnézet",
       "openOnGitHub": "Megnyitás a GitHubon",
       "openDiffOnGitHub": "A fájl különbségnézetének megnyitása a GitHubon",
       "githubDiff": "GitHub-különbségnézet"
@@ -830,7 +836,8 @@
       "kiloclaw": "KiloClaw-tevékenység",
       "balance": "Egyenlegértesítések",
       "security": "Biztonsági találatok",
-      "spend": "Költésfigyelmeztetések"
+      "spend": "Költésfigyelmeztetések",
+      "followedSessions": "Követett munkamenetek"
     },
     "category": {
       "chatMessagesSubtitle": "válaszok a beszélgetéseidben",
@@ -1253,7 +1260,7 @@
         "stoppedTitle": "A beállítás leállt",
         "stoppedBody": "{{name}} példánya váratlanul leállt a beállítás során.",
         "stalledTitle": "Valami elakadt",
-        "stalledBody": "Nem sikerült befejeznünk {{name}} beállítását. Próbáld újra. Ha a hiba ismétlődik, írj a hi@kilo.ai címre.",
+        "stalledBody": "Nem sikerült befejeznünk {{name}} beállítását. Próbáld újra. Ha a hiba ismétlődik, írj a {{supportEmail}} címre.",
         "timeoutTitle": "Tovább tart a vártnál",
         "timeoutBody": "{{name}} beállítása a szokásosnál tovább tart (már több mint {{displayMinutes}} perce).",
         "continueInBackground": "Folytatás a háttérben",
@@ -1311,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "A korai hozzáférést biztosító csomagodat előbb kézzel felül kell vizsgálnunk, hogy mobilon is használhasd.",
       "iosTitle": "A KiloClaw nem érhető el iOS-en",
       "iosBody": "Ennél a fióknál a KiloClaw-hozzáférést az iOS-alkalmazáson kívül lehet kezelni.",
-      "iosContact": "Kérdésed van? Írj a hi@kilo.ai címre.",
+      "iosContact": "Kérdésed van? Írj a {{supportEmail}} címre.",
       "quarantinedCta": "E-mail küldése a csapatunknak",
       "nonCanonicalEarlybirdCta": "Csomag áttekintése a kilo.ai oldalon"
     },
@@ -1400,6 +1407,8 @@
       "retryTitle": "Újraindítod a kódellenőrzést?",
       "retryMessage": "Ez újra lefuttatja a kódellenőrzést.",
       "retryReview": "Kódellenőrzés újrapróbálása",
+      "retryNeedsSettings": "A Kódellenőrző ki van kapcsolva, vagy a beállításai figyelmet igényelnek. Javítsa a beállításokat, majd próbálja újra ezt a kódellenőrzést.",
+      "fixSettings": "Beállítások javítása",
       "couldNotLoad": "Nem sikerült betölteni a kódellenőrzést.",
       "couldNotGetLatest": "Nem sikerült lekérni a legfrissebb adatokat.",
       "byline": "{{repo}} #{{number}}, szerző: {{author}}",
@@ -1544,7 +1553,7 @@
         "recoveryLabel": "GitHub-alkalmazás frissítése"
       },
       "githubIpAllowList": {
-        "description": "A kódellenőrző kikapcsolt, mert a GitHub-szervezet engedélyezett IP-címeinek listája blokkolja a Kilo hozzáférését. Kérj segítséget a hi@kilocode.ai címen, majd engedélyezd újra a kódellenőrzőt."
+        "description": "A kódellenőrző kikapcsolt, mert a GitHub-szervezet engedélyezett IP-címeinek listája blokkolja a Kilo hozzáférését. Kérj segítséget a {{supportEmail}} címen, majd engedélyezd újra a kódellenőrzőt."
       },
       "gitlabProjectAccessRequired": {
         "description": "A kódellenőrző kikapcsolt, mert a Kilo nem tud GitLab-hozzáférési tokent létrehozni ehhez a projekthez. Adj karbantartói jogosultságot, vagy engedélyezd a projektszintű hozzáférési tokeneket, majd engedélyezd újra a kódellenőrzőt.",
@@ -1559,7 +1568,7 @@
         "recoveryLabel": "Kódellenőrző beállításainak frissítése"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "A kódellenőrző kikapcsolt, mert ma háromszor is túllépte az időkorlátot a kódtár klónozása. Kérj segítséget a hi@kilocode.ai címen, majd engedélyezd újra a kódellenőrzőt."
+        "description": "A kódellenőrző kikapcsolt, mert ma háromszor is túllépte az időkorlátot a kódtár klónozása. Kérj segítséget a {{supportEmail}} címen, majd engedélyezd újra a kódellenőrzőt."
       },
       "title": "A kódellenőrző beavatkozást igényel.",
       "recoveryLabel": "Kapcsolatfelvétel az ügyfélszolgálattal"
@@ -2083,6 +2092,8 @@
       "title": "Munkamenet",
       "copyErrorDetails": "Hibarészletek másolása",
       "backToSessions": "Vissza a munkamenetekhez",
+      "follow": "Követés a zárolási képernyőn",
+      "unfollow": "Követés leállítása a zárolási képernyőn",
       "couldNotLoad": "Nem sikerült betölteni a munkamenetet.",
       "failedToLoadDetails": "Nem sikerült betölteni a munkamenet részleteit.",
       "failedToStopExecution": "Nem sikerült leállítani a végrehajtást.",
@@ -2149,6 +2160,11 @@
       "collapse": "Cél összecsukása",
       "expand": "Cél kibontása"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Feladatok, {{total}}ból {{completed}} kész",
+      "rowAccessibility": "Feladatok, {{total}}ból {{completed}} kész. Jelenlegi feladat: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Legutóbb használt",
       "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-tárolókat.",
@@ -2181,7 +2197,6 @@
       "retryLoadingEnvironment": "Környezet betöltésének újrapróbálása",
       "defaultEnvironment": "Alapértelmezett környezet",
       "environmentSummary": "{{commands}} parancs · {{mcp}} MCP · {{skills}} készség · {{agents}} ügynök",
-      "changes": "Változtatások",
       "leaveChanges": "Változtatások megtartása",
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",
@@ -2204,6 +2219,10 @@
       "importingSession": "Munkamenet importálása…",
       "cliCannotContinue": "Ez a CLI nem támogatja a munkamenetek folytatását. Válaszd a Cloud Agentet vagy egy másik CLI-t.",
       "importFailed": "Nem sikerült importálni ezt a munkamenetet.",
+      "cliCannotFork": "Frissítsd a Kilo CLI-t, hogy egy üzenettől elágaztathass.",
+      "forkCutNotSynced": "Ez az üzenet még nincs mentve. Próbáld újra egy kis idő múlva.",
+      "forkFilesFromBaseBranch": "A fájlok az alapági állapotból indulnak.",
+      "forkFilesUnchangedOnComputer": "A számítógépen lévő fájlok nem változnak.",
       "pickProfile": "Válassz egy profilt",
       "noProfile": "Nincs profil",
       "manageProfiles": "Profilok kezelése",
@@ -2248,8 +2267,8 @@
       "toolList": "listázás",
       "toolPatch": "módosítás",
       "toolTask": "feladat",
-      "readTodos": "Teendők olvasása",
-      "updateTodos": "Teendők frissítése",
+      "readTodos": "Terv olvasása",
+      "updateTodos": "Terv frissítése",
       "linesBadge": "{{displayCount}} sor",
       "filesBadge": "{{displayCount}} fájl",
       "matchesBadge": "{{displayCount}} találat",
@@ -2323,6 +2342,7 @@
       "copyMessage": "Üzenet másolása",
       "copyText": "Szöveg másolása",
       "selectText": "Szöveg kijelölése",
+      "forkFromHere": "Elágaztatás innen",
       "reportAiResponse": "AI-válasz jelentése",
       "reportAiResponseConfirm": "Jelented ezt a választ, hogy ellenőrizzük?",
       "report": "Jelentés",
@@ -2638,6 +2658,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modell ({{displayCount}})",
       "modelsCount_other": "Modellek ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Változtatások megtekintése",
+      "asOf": "Állapot: {{time}}",
+      "tooLarge": "Ez a különbségnézet túl nagy a mobilon való megjelenítéshez.",
+      "empty": "Ebben a munkamenetben még nincsenek fájlváltoztatások."
     },
     "autoApprove": {
       "title": "Automatikus jóváhagyás",
@@ -3150,9 +3176,36 @@
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn.",
     "openSession": "Megnyitás",
+    "finished": "Befejezve",
+    "followFailed": "Nem sikerült megjeleníteni ezt az ügynököt a zárolási képernyőn.",
     "approveFailed": "Nem sikerült jóváhagyni. Az újrapróbáláshoz koppints a $t(common.approve) elemre.",
-    "newestResult": "Legújabb eredmény",
-    "scheduledWakes": "{{time}} felébred"
+    "checked": "Ellenőrizve",
+    "lastKnown": "Utolsó ismert",
+    "awaitingUpdate": "Frissítésre vár",
+    "nextRun": "Következő futás",
+    "waitingForYou": "Rád vár",
+    "nextScheduled": "Következő ütemezések",
+    "answerNeeded": "Válaszra vár",
+    "waitingToRetry": "Újrapróbálkozásra vár",
+    "step": {
+      "editing": "Szerkesztés",
+      "reading": "Olvasás",
+      "running": "Futtatás",
+      "searching": "Webes keresés",
+      "thinking": "Végiggondolás"
+    },
+    "planOf": "/",
+    "filesChanged": "módosított fájl",
+    "finishedIn": "Befejezve",
+    "noActivityFor": "Nincs aktivitás",
+    "prOpened": "Pull request megnyitva",
+    "permissionWants": "Futtatni szeretne",
+    "failure": {
+      "provider": "Leállt: szolgáltatói hiba",
+      "tool": "Leállt: eszközhiba",
+      "cancelled": "Leállt: megszakítva",
+      "other": "LEÁLLÍTVA"
+    }
   },
   "transcriptionModel": {
     "title": "Átírási modell",
@@ -3180,6 +3233,7 @@
     "tutorialLabel": "Oktatóprogram"
   },
   "modelChat": {
+    "offlineFailure": "Ehhez a modellhez internetkapcsolat szükséges. Csatlakozzon, és próbálja újra, vagy váltson egy ezen az eszközön lévő modellre.",
     "empty": {
       "title": "Kezdjen csevegést",
       "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."
@@ -3187,10 +3241,32 @@
     "list": {
       "loadFailed": "Nem sikerült betölteni a csevegés előzményeit.",
       "new": "Új csevegés",
-      "openHint": "Megnyitja a csevegést. Hosszan nyomja meg a törléshez.",
       "deleteTitle": "Törli ezt a csevegést?"
     },
+    "rename": {
+      "title": "Csevegés átnevezése",
+      "accessibility": "Csevegés átnevezése: {{title}}",
+      "openHint": "Megnyitja a csevegést. Hosszan nyomja meg az átnevezéshez vagy a törléshez."
+    },
     "beta": "Béta",
+    "details": {
+      "title": "Csevegés részletei",
+      "backend": "Háttérrendszer",
+      "effortDefault": "A modell alapértelmezése",
+      "noCost": "Nincs költség",
+      "costUnknown": "Nem ismert",
+      "costEstimatedNote": "Az árat nem jelentő válaszok költsége listaárak alapján becsült.",
+      "costUnknownNote": "Ehhez a modellhez nem ismert ár.",
+      "costPartialNote": "Ez az összeg nem tartalmazza az ismert ár nélküli modelleket.",
+      "localNote": "Az eszközön futó modellek ezen az eszközön futnak. Nincs költségük és utasítás-gyorsítótáruk, a tokenszámuk pedig becsült lehet.",
+      "countedSinceNote": "Ez a csevegés még a használat rögzítése előtt kezdődött. Az összesítések csak az azt követő válaszokat mutatják.",
+      "remoteServersOn": "Bekapcsolt távoli MCP-szerverek"
+    },
+    "webSearch": {
+      "title": "Keresés a weben",
+      "description": "Engedd, hogy ez a csevegés aktuális információkat keressen a Kilo-fiókodon keresztül. A keresések a havi keresési keretedet használják.",
+      "allowanceExhausted": "Elfogytak az e havi ingyenes webes kereséseid. Adj hozzá kreditet, hogy újra kereshess."
+    },
     "mcp": {
       "title": "Kilo-eszközök",
       "use": "Kilo-eszközök használata",
@@ -3213,7 +3289,6 @@
       "fieldName": "Megjelenített név",
       "fieldUrl": "Szerver URL-címe",
       "fieldUrlInvalid": "Adj meg érvényes szerver URL-címet.",
-      "fieldToken": "Bearer token (nem kötelező)",
       "enableServer": "Szerver engedélyezése: {{name}}",
       "editServer": "Szerver szerkesztése",
       "deleteServer": "Szerver törlése",
@@ -3234,8 +3309,24 @@
       "serverUnreachable": "Nem sikerült elérni ezt a szervert",
       "serverOff": "Ez a szerver ki van kapcsolva"
     },
+    "mcpOAuth": {
+      "authMethod": "Hitelesítés",
+      "authNone": "Nincs bejelentkezés",
+      "authBearer": "Bearer token",
+      "authOAuth": "OAuth-bejelentkezés",
+      "fieldToken": "Token",
+      "oauthHint": "Mentés után koppints a(z) $t(modelChat.mcpOAuth.signIn) gombra a szervernél, hogy a böngésződben bejelentkezz.",
+      "serverNeedsSignIn": "Jelentkezz be a szerver használatához",
+      "signIn": "Bejelentkezés",
+      "signInA11y": "Bejelentkezés ebbe a szerverbe: {{name}}",
+      "signInFailed": "Nem sikerült bejelentkezni ide: {{name}}. Próbáld újra."
+    },
     "backends": {
       "title": "Csevegési háttérrendszerek",
+      "providersTitle": "Csevegésszolgáltatók",
+      "cloud": "A felhőben",
+      "cloudModel": "Modell: {{model}}",
+      "cloudUnavailable": "A Kilo modelljei jelenleg nem érhetők el. Ellenőrizd a kapcsolatot.",
       "manage": "Háttérrendszerek kezelése",
       "defaultKilo": "$t(consent.kilo) (alapértelmezett)",
       "kiloHelp": "A beépített háttérrendszer a Kilo-fiókodat használja, és nem szerkeszthető vagy törölhető.",
@@ -3295,7 +3386,6 @@
     "gguf": {
       "title": "Letölthető modellek",
       "help": "Töltsön le egy nyílt modellt, és futtassa ezen a telefonon a llama.cpp segítségével. A kérései és a válaszai az eszközön maradnak. A modellek nagyok, ezért használjon Wi-Fi-t.",
-      "details": "{{size}} · Licenc: {{license}}",
       "download": "Modell letöltése",
       "pause": "Letöltés szüneteltetése",
       "resume": "Letöltés folytatása",
@@ -3307,6 +3397,8 @@
       "url": "Közvetlen letöltési hivatkozás",
       "urlHelp": "Illesszen be egy HTTPS-hivatkozást egy .gguf fájlra, például egy Hugging Face resolve-hivatkozást. Csak megbízható forrásból töltsön le modelleket.",
       "downloadUrl": "Letöltés hivatkozásról",
+      "advanced": "Speciális",
+      "localPurpose": "Ezen az eszközön fut a llama.cpp-vel. A bemenetek és a válaszok az eszközön maradnak.",
       "deleteTitle": "Törli ezt a modellt?",
       "deleteMessage": "Törli a(z) {{name}} modellt erről az eszközről? A beszélgetéseknek, amelyek használják, másik modellre van szükségük a folytatáshoz.",
       "errors": {
@@ -3316,12 +3408,62 @@
         "notGguf": "A hivatkozásnak .gguf fájlra kell mutatnia.",
         "space": "Nincs elég szabad tárhely ehhez a modellhez. Szabadítson fel tárhelyet, és próbálja újra.",
         "network": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot, és próbálja újra.",
-        "invalidFile": "A letöltött fájl nem olyan modell, amelyet ez az alkalmazás futtatni tud, ezért eltávolítottuk."
+        "invalidFile": "A letöltött fájl nem olyan modell, amelyet ez az alkalmazás futtatni tud, ezért eltávolítottuk.",
+        "checksum": "A letöltött fájl nem egyezik a közzétett ellenőrzőösszegével, ezért eltávolítottuk. Próbálja meg újra a letöltést."
       }
+    },
+    "catalog": {
+      "browse": "Modellek böngészése",
+      "title": "Modellkatalógus",
+      "search": "Keresés a Hugging Face modellek között",
+      "tabs": "Modellszűrő",
+      "fitsTab": "Elfér ezen az eszközön",
+      "fromHuggingFace": "A Hugging Face-ről",
+      "loading": "Modellek betöltése",
+      "noResults": "Nem található modell",
+      "noFits": "Egyik modell sem fér el ezen az eszközön",
+      "noFitsDescription": "A nagyobb modellek a(z) $t(common.all) lapon találhatók.",
+      "fit": {
+        "fits": "Elfér",
+        "tight": "Épphogy elfér",
+        "tooLarge": "Túl nagy",
+        "noStorage": "Nincs elég tárhely",
+        "unknown": "Ismeretlen kompatibilitás"
+      },
+      "recommendationsHelp": "Az alkalmazás által meghatározott rövid lista: modellenként egy fájl, olyan kiadótól, amely megadja a licencet. Semmi mást nem rangsorolunk.",
+      "compatibilityHelp": "A kompatibilitás a modellfájlt az eszköz memóriájához és szabad tárhelyéhez hasonlítja. A memóriaadat becslés, nem mérés.",
+      "text": "Szöveg",
+      "listTextPurpose": "Csak szöveges bemenetek.",
+      "listImagePurpose": "Képeket és szöveget is olvas.",
+      "smallestDownload": "Legkisebb letöltés: {{size}} · körülbelül {{memory}} memória",
+      "fullFileName": "Fájl: {{name}}",
+      "memoryEstimateNote": "A memóriaadatok becslések, nem mérések.",
+      "parameters": "Paraméterek: {{value}}",
+      "downloads": "Letöltések: {{value}}",
+      "likes": "Kedvelések: {{value}}",
+      "context": "Kontextusablak: {{value}}",
+      "license": "Licenc: {{license}}",
+      "licenseUnknown": "A licenc nincs megadva",
+      "tools": "Eszközhívás",
+      "vision": "Képbemenet",
+      "hintsHelp": "Tippek a Hugging Face-ről. Az alkalmazás a letöltés után ellenőrzi a modellt.",
+      "gated": "Ehhez a modellhez Hugging Face-fiók szükséges, ezért az alkalmazás nem tudja letölteni.",
+      "quantizations": "Kvantálások",
+      "quantizationsHelp": "A kisebb fájlok kevesebb memóriát és tárhelyet használnak. A nagyobb fájlok általában jobb válaszokat adnak.",
+      "quantDetail": "{{size}} letöltés · kb. {{memory}} memória",
+      "downloadQuant": "{{quant}} letöltése",
+      "loadingModel": "Modell részleteinek betöltése",
+      "couldNotLoadModel": "Nem sikerült betölteni ezt a modellt",
+      "noFiles": "Nincs az alkalmazás által futtatható fájl",
+      "noFilesDescription": "Az alkalmazás egyetlen GGUF-fájlból álló modelleket futtat.",
+      "tooLargeTitle": "Előfordulhat, hogy ez a modell nem fut",
+      "tooLargeMessage": "A(z) {{name}} valószínűleg több memóriát igényel, mint amennyi ezen az eszközön van. Az alkalmazás bezáródhat, miközben a modell válaszol. Letölti mégis?",
+      "downloadAnyway": "Letöltés mégis"
     },
     "localModels": {
       "title": "Eszközön futó modellek",
-      "help": "Az eszközön futó modellek ezen a telefonon működnek. A kérései és a válaszok az eszközön maradnak, és ezek a modellek nem használhatnak eszközöket.",
+      "help": "Az eszközön futó modellek ezen a telefonon működnek. A kérései és a válaszok az eszközön maradnak.",
+      "systemPurpose": "Az eszköz rendszerébe épített modell. Az eszközön működik.",
       "apple": "Apple Intelligence (az eszközön)",
       "checking": "Elérhetőség ellenőrzése…",
       "ready": "Használatra kész",
@@ -3347,6 +3489,9 @@
       "downloading": "Letöltés…",
       "downloadProgress": "Letöltés… {{percent}}%",
       "downloadFailed": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot és a szabad tárhelyet, majd próbálja újra."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"
     }
   },
   "settingsTools": {
@@ -3526,7 +3671,6 @@
       "template": "Sablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Magyarázza el $ARGUMENTS",
-      "agent": "Ügynök",
       "subtask": "Futtassa részfeladatként",
       "edit": "Szerkessze a perjel parancsot",
       "saveFailed": "Nem sikerült menteni a parancsot",
@@ -3570,5 +3714,92 @@
     "noMatchingProductsPlay": "A Google Play nem adott vissza megfelelő kreditcsomagot.",
     "purchaseOwnedByAnotherAccount": "Az ehhez az Apple Account-fiókhoz tartozó kreditek egy másik Kilo-fiókhoz kapcsolódnak. A használatukhoz jelentkezz be abba a Kilo-fiókba.",
     "purchaseOwnedByAnotherAccountPlay": "Az ezen Google Play-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba."
+  },
+  "todos": {
+    "saveAsTodo": "Mentés teendőként",
+    "segment": {
+      "label": "Ügynöknézet",
+      "sessions": "Munkamenetek",
+      "todos": "Teendők"
+    },
+    "lists": {
+      "newList": "Új lista",
+      "empty": "Még nincsenek listák",
+      "couldNotLoad": "Nem sikerült betölteni a listákat.",
+      "noRepository": "Nincs adattár",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} nyitott",
+      "openCount_other": "{{count}} nyitott",
+      "archived_one": "Archivált ({{count}})",
+      "archived_other": "Archivált ({{count}})",
+      "archive": "Archiválás",
+      "unarchive": "Archiválás visszavonása",
+      "deleteTitle": "Törlöd ezt a listát: {{name}}?",
+      "deleteMessage": "A teendői is törlődnek. A munkamenetei megmaradnak."
+    },
+    "listSettings": {
+      "title": "Listabeállítások",
+      "name": "Név",
+      "namePlaceholder": "Hibák, ötletek, kiadás…",
+      "emoji": "Emodzsi",
+      "mode": "Mód",
+      "defaultsHint": "Az ebből a listából indított munkamenetek ezeket az alapértékeket használják."
+    },
+    "list": {
+      "addPlaceholder": "Írj be egy teendőt",
+      "add": "Teendő hozzáadása",
+      "empty": "Még nincsenek teendők",
+      "setDefaults": "Adattár, mód és modell beállítása",
+      "completed_one": "Befejezve ({{count}})",
+      "completed_other": "Befejezve ({{count}})"
+    },
+    "item": {
+      "markDone": "Késznek jelölése",
+      "markOpen": "Nem késznek jelölése",
+      "markDonePrompt": "Késznek jelölöd?",
+      "deleted": "Teendő törölve",
+      "undo": "Visszavonás",
+      "runCount_one": "{{count}} futás",
+      "runCount_other": "{{count}} futás",
+      "startNow": "Indítás ellenőrzés nélkül",
+      "startNowHint": "Hosszú nyomás az ellenőrzés nélküli indításhoz",
+      "titleLabel": "Teendő címe",
+      "renameTitle": "Feladat átnevezése",
+      "notes": "Jegyzetek",
+      "addNotes": "Jegyzetek hozzáadása",
+      "notesPrompt": "Adj hozzá kontextust, követelményeket vagy elfogadási feltételeket.",
+      "markdownSupported": "Markdown támogatott",
+      "sessions": "Hozzákapcsolt munkamenetek",
+      "noSessions": "Még nincsenek munkamenetek",
+      "untitledLinkedSession": "Csatolt munkamenet",
+      "sessionNeedsInput": "A munkamenet bemenetre vár",
+      "sessionRunning": "A munkamenet fut",
+      "sessionFinished": "A munkamenet befejeződött",
+      "sessionPullRequest": "A munkamenet PR",
+      "sessionPullRequestNumber": "A munkamenet PR #{{number}}",
+      "openSessionHint": "Megnyitja a munkamenetet.",
+      "unlinkSessionAction": "Munkamenet leválasztása",
+      "unlinkConfirmTitle": "Leválasztod: {{title}}?",
+      "unlinkConfirmMessage": "Magát a munkamenetet nem törli. Csak a feladathoz fűződő kapcsolata szűnik meg.",
+      "startNewSession": "Új munkamenet indítása",
+      "startNewSessionHint": "Hosszan nyomd meg új munkamenet indításához.",
+      "linkSession": "Munkamenet társítása",
+      "linkFailed": "Nem sikerült a munkamenetet a teendőhöz kapcsolni."
+    },
+    "linkSession": {
+      "title": "Munkamenet hozzákapcsolása",
+      "empty": "Nincsenek legutóbbi munkamenetek",
+      "emptyInRepository": "Nincsenek legutóbbi munkamenetek itt: {{repository}}"
+    },
+    "upNext": "Következő",
+    "sessionTodo": "Teendő: {{title}}",
+    "linkToTodo": "Teendőhöz kapcsolás",
+    "candidates": {
+      "empty": "Nincsenek nyitott teendők"
+    },
+    "saveSheet": {
+      "title": "Mentés listába",
+      "saved": "Elmentve a listába: {{list}}"
+    }
   }
 }

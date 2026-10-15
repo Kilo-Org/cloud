@@ -544,6 +544,7 @@ export function createSessionManagementHandlers() {
             variant: sessionMetadata.agent?.variant,
             autoCommit: sessionMetadata.finalization?.autoCommit,
             upstreamBranch: sessionMetadata.repository?.upstreamBranch,
+            branchName: sessionMetadata.workspace?.branchName,
             runtimeAgents: metadataProfile.runtimeAgents?.map(agent => ({
               slug: agent.slug,
               name: agent.name,
@@ -705,10 +706,11 @@ export function createSessionManagementHandlers() {
             ? interval.rate
             : catalogRate
           : catalogRate;
-        const attribution =
-          sandboxId && isGeneratedSharedSandboxId(sandboxId)
-            ? ('payer_shared' as const)
-            : ('session' as const);
+        const sandboxKind = metadata.workspace?.sandboxKind;
+        const ownerScoped = sandboxKind
+          ? sandboxKind === 'shared'
+          : sandboxId !== undefined && isGeneratedSharedSandboxId(sandboxId);
+        const attribution = ownerScoped ? ('payer_shared' as const) : ('session' as const);
         const phase = !runtime
           ? ('unavailable' as const)
           : runtime.context || hasCurrentInterval

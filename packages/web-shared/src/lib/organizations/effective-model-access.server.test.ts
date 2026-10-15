@@ -6,6 +6,22 @@ import {
 } from './effective-model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { VIRTUAL_PROVIDER } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import type * as ExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+
+// The live catalog's restricted Kilo-exclusive models come and go, so the restriction
+// cases use a synthetic alias restricted to StepFun and keep the real lookup otherwise.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ExclusiveModels>(
+    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
+  );
+  return {
+    ...actual,
+    getKiloExclusiveInferenceProviderRestriction: (modelId: string) =>
+      modelId === 'test/restricted-exclusive'
+        ? new Set(['stepfun'])
+        : actual.getKiloExclusiveInferenceProviderRestriction(modelId),
+  };
+});
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -380,7 +396,7 @@ describe('effective organization model access', () => {
     const catalogLookup = async () => new Set(['fireworks', 'stepfun']);
 
     expect(
-      await getEffectiveModelDecision(policy, 'stepfun/step-5-preview-free', catalogLookup)
+      await getEffectiveModelDecision(policy, 'test/restricted-exclusive', catalogLookup)
     ).toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 
@@ -396,7 +412,7 @@ describe('effective organization model access', () => {
     );
     const decision = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-5-preview-free',
+      'test/restricted-exclusive',
       async () => new Set(['fireworks'])
     );
 
@@ -418,7 +434,7 @@ describe('effective organization model access', () => {
 
     const exclusive = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-5-preview-free',
+      'test/restricted-exclusive',
       catalogLookup
     );
     const catalogModel = await getEffectiveModelDecision(
@@ -446,7 +462,7 @@ describe('effective organization model access', () => {
 
     const restricted = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-5-preview-free',
+      'test/restricted-exclusive',
       emptySnapshot
     );
     const unrestricted = await getEffectiveModelDecision(policy, 'unknown/model', emptySnapshot);

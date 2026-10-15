@@ -83,6 +83,7 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
 
 vi.mock('@/glanceable-ios/ios-sink', () => ({
   setGlanceableActionNotice: mocks.iosNotice,
+  setGlanceableActionApproving: vi.fn(),
   renderStoredSnapshotWithNotice: mocks.iosRender,
 }));
 vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
@@ -90,10 +91,20 @@ vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
   OPEN_AGENTS_URL: 'kiloapp:///cloud/sessions',
   ActiveAgentsLiveActivity: { getInstances: mocks.getInstances },
 }));
+// The press here comes from the aggregate card; no session card exists.
+vi.mock('@/glanceable-ios/session-card-press', () => ({
+  findSessionCard: () => null,
+  renderSessionCardPress: vi.fn(),
+}));
+// A session card press reads the stored scope; the native store cannot load here.
+vi.mock('@/lib/auth/secure-store-value', () => ({
+  readStoredValue: vi.fn().mockResolvedValue(null),
+}));
 
 vi.mock('@/glanceable-android/android-sink', () => ({
   androidSink: { publish: vi.fn(), endImmediate: vi.fn(), startOrUpdate: vi.fn() },
   setGlanceableActionNotice: mocks.androidNotice,
+  setGlanceableActionApproving: vi.fn(),
   renderStoredSnapshotWithNotice: mocks.androidRender,
 }));
 
@@ -207,7 +218,6 @@ describe('activity Approve parity across platforms', () => {
 
       expect(mocks.recordWaitingAsk).toHaveBeenCalledWith(null);
       expect(harness.notice).not.toHaveBeenCalled();
-      expect(harness.render).not.toHaveBeenCalled();
     }
   );
 
@@ -218,7 +228,6 @@ describe('activity Approve parity across platforms', () => {
 
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(harness.notice).not.toHaveBeenCalled();
-    expect(harness.render).not.toHaveBeenCalled();
   });
 
   it.each(PLATFORMS)(
@@ -230,7 +239,6 @@ describe('activity Approve parity across platforms', () => {
 
       expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
       expect(harness.notice).not.toHaveBeenCalled();
-      expect(harness.render).not.toHaveBeenCalled();
     }
   );
 
@@ -248,7 +256,6 @@ describe('activity Approve parity across platforms', () => {
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.refreshGlanceableSnapshot).not.toHaveBeenCalled();
     expect(harness.notice).not.toHaveBeenCalled();
-    expect(harness.render).not.toHaveBeenCalled();
   });
 
   it.each(PLATFORMS)(

@@ -133,9 +133,14 @@
     "status": "Statuss",
     "truncated": "Saīsināts",
     "updated": "Atjaunināts",
+    "generating": "Ģenerē…",
     "working": "Strādā",
     "yourOwnRepositories": "Tavi repozitoriji",
-    "dismissed": "Noraidīts"
+    "dismissed": "Noraidīts",
+    "agent": "Aģents",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Izmaiņas"
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -324,6 +329,7 @@
       "collapseFile": "Sakļaut failu",
       "expandFile": "Izvērst failu",
       "diffTooLarge": "Izmaiņu salīdzinājums ir pārāk liels, lai to parādītu.",
+      "noPreview": "Šim failam priekšskatījums nav pieejams",
       "openOnGitHub": "Atvērt GitHub",
       "openDiffOnGitHub": "Atvērt šī faila izmaiņu salīdzinājumu GitHub",
       "githubDiff": "GitHub izmaiņu salīdzinājums"
@@ -846,7 +852,8 @@
       "kiloclaw": "KiloClaw darbība",
       "balance": "Brīdinājumi par atlikumu",
       "security": "Drošības konstatējumi",
-      "spend": "Izdevumu brīdinājumi"
+      "spend": "Izdevumu brīdinājumi",
+      "followedSessions": "Sekotās sesijas"
     },
     "category": {
       "chatMessagesSubtitle": "atbildes tavās sarunās",
@@ -1271,7 +1278,7 @@
         "stoppedTitle": "Iestatīšana apturēta",
         "stoppedBody": "Iestatīšanas laikā {{name}} vide negaidīti apstājās.",
         "stalledTitle": "Iestatīšana ir iestrēgusi",
-        "stalledBody": "Neizdevās pabeigt {{name}} iestatīšanu. Mēģini vēlreiz vai, ja problēma atkārtojas, raksti uz hi@kilo.ai.",
+        "stalledBody": "Neizdevās pabeigt {{name}} iestatīšanu. Mēģini vēlreiz vai, ja problēma atkārtojas, raksti uz {{supportEmail}}.",
         "timeoutTitle": "Aizņem ilgāk, nekā gaidīts",
         "timeoutBody": "{{name}} iestatīšana aizņem ilgāk nekā parasti. Pagājušais laiks minūtēs: vairāk nekā {{displayMinutes}}.",
         "continueInBackground": "Turpināt fonā",
@@ -1329,7 +1336,7 @@
       "nonCanonicalEarlybirdBody": "Pirms tavu agrīnās piekļuves plānu var izmantot mobilajā ierīcē, speciālistam tas jāpārbauda.",
       "iosTitle": "KiloClaw nav pieejams iOS",
       "iosBody": "KiloClaw piekļuve šim kontam tiek pārvaldīta ārpus iOS lietotnes.",
-      "iosContact": "Ir jautājumi? Raksti uz hi@kilo.ai.",
+      "iosContact": "Ir jautājumi? Raksti uz {{supportEmail}}.",
       "quarantinedCta": "Rakstīt mūsu komandai",
       "nonCanonicalEarlybirdCta": "Pārskatīt savu plānu vietnē kilo.ai"
     },
@@ -1419,6 +1426,8 @@
       "retryTitle": "Atkārtot koda pārskatīšanu?",
       "retryMessage": "Koda pārskatīšana tiks veikta vēlreiz.",
       "retryReview": "Atkārtot koda pārskatīšanu",
+      "retryNeedsSettings": "Koda pārskatītājs ir izslēgts, vai tā iestatījumiem nepieciešama uzmanība. Labojiet iestatījumus un pēc tam atkārtojiet šo koda pārskatīšanu.",
+      "fixSettings": "Labot iestatījumus",
       "couldNotLoad": "Neizdevās ielādēt koda pārskatīšanu.",
       "couldNotGetLatest": "Neizdevās iegūt jaunākos datus.",
       "byline": "{{repo}} #{{number}} autors: {{author}}",
@@ -1563,7 +1572,7 @@
         "recoveryLabel": "Atjaunināt GitHub lietotni"
       },
       "githubIpAllowList": {
-        "description": "Koda pārskatītājs tika atspējots, jo šī GitHub organizācija izmanto atļauto IP adrešu sarakstu, kas bloķē Kilo. Raksti uz hi@kilocode.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
+        "description": "Koda pārskatītājs tika atspējots, jo šī GitHub organizācija izmanto atļauto IP adrešu sarakstu, kas bloķē Kilo. Raksti uz {{supportEmail}}, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
       },
       "gitlabProjectAccessRequired": {
         "description": "Koda pārskatītājs tika atspējots, jo Kilo nevar izveidot GitLab projekta piekļuves pilnvaru šim projektam. Piešķir uzturētāja piekļuves tiesības vai iespējo projekta piekļuves pilnvaras un vēlreiz iespējo koda pārskatītāju.",
@@ -1578,7 +1587,7 @@
         "recoveryLabel": "Atjaunināt koda pārskatītāja iestatījumus"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koda pārskatītājs tika atspējots, jo šodien trīs reizes tika pārsniegts repozitorija klonēšanai atvēlētais laiks. Raksti uz hi@kilocode.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
+        "description": "Koda pārskatītājs tika atspējots, jo šodien trīs reizes tika pārsniegts repozitorija klonēšanai atvēlētais laiks. Raksti uz {{supportEmail}}, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
       },
       "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
       "recoveryLabel": "Sazināties ar atbalsta dienestu"
@@ -2111,6 +2120,8 @@
       "title": "Sesija",
       "copyErrorDetails": "Kopēt informāciju par kļūdu",
       "backToSessions": "Atpakaļ uz sesijām",
+      "follow": "Sekot bloķēšanas ekrānā",
+      "unfollow": "Pārtraukt sekošanu bloķēšanas ekrānā",
       "couldNotLoad": "Neizdevās ielādēt sesiju.",
       "failedToLoadDetails": "Neizdevās ielādēt sesijas informāciju.",
       "failedToStopExecution": "Neizdevās apturēt izpildi.",
@@ -2177,6 +2188,11 @@
       "collapse": "Sakļaut mērķi",
       "expand": "Izvērst mērķi"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Uzdevumi, {{completed}} no {{total}} izpildīti",
+      "rowAccessibility": "Uzdevumi, {{completed}} no {{total}} izpildīti. Pašreizējais uzdevums: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nesen lietotie",
       "couldNotLoadGithubRepositories": "Neizdevās ielādēt GitHub repozitorijus.",
@@ -2209,7 +2225,6 @@
       "retryLoadingEnvironment": "Mēģināt ielādēt vidi vēlreiz",
       "defaultEnvironment": "Noklusējuma vide",
       "environmentSummary": "Komandas: {{commands}} · MCP: {{mcp}} · prasmes: {{skills}} · aģenti: {{agents}}",
-      "changes": "Izmaiņas",
       "leaveChanges": "Atstāt izmaiņas",
       "commitAndPush": "Fiksēt un nosūtīt",
       "startSession": "Sākt sesiju",
@@ -2232,6 +2247,10 @@
       "importingSession": "Importē sesiju…",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlies Cloud Agent vai citu CLI.",
       "importFailed": "Neizdevās importēt šo sesiju.",
+      "cliCannotFork": "Atjaunini Kilo CLI, lai atzarotu no ziņojuma.",
+      "forkCutNotSynced": "Šis ziņojums vēl nav saglabāts. Mēģini vēlreiz pēc brīža.",
+      "forkFilesFromBaseBranch": "Faili sākas no bāzes zara.",
+      "forkFilesUnchangedOnComputer": "Faili šajā datorā netiek mainīti.",
       "pickProfile": "Izvēlieties profilu",
       "noProfile": "Nav profila",
       "manageProfiles": "Pārvaldīt profilus",
@@ -2277,8 +2296,8 @@
       "toolList": "uzskaitīt",
       "toolPatch": "labot",
       "toolTask": "uzdevums",
-      "readTodos": "Lasīt uzdevumus",
-      "updateTodos": "Atjaunināt uzdevumus",
+      "readTodos": "Lasīt plānu",
+      "updateTodos": "Atjaunināt plānu",
       "linesBadge": "{{displayCount}} rindas",
       "filesBadge": "{{displayCount}} faili",
       "matchesBadge": "{{displayCount}} atbilstības",
@@ -2351,6 +2370,7 @@
       "copyMessage": "Kopēt ziņojumu",
       "copyText": "Kopēt tekstu",
       "selectText": "Atlasīt tekstu",
+      "forkFromHere": "Atzarot no šejienes",
       "reportAiResponse": "Ziņot par AI atbildi",
       "reportAiResponseConfirm": "Nosūtīt ziņojumu par šo atbildi, lai to pārbaudītu?",
       "report": "Ziņot",
@@ -2676,6 +2696,12 @@
       "modelsCount_one": "Modelis ({{displayCount}})",
       "modelsCount_other": "Modeļi ({{displayCount}})",
       "modelsCount_zero": "Modeļi ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Skatīt izmaiņas",
+      "asOf": "Stāvoklis uz {{time}}",
+      "tooLarge": "Šis izmaiņu salīdzinājums ir pārāk liels, lai to parādītu mobilajā ierīcē.",
+      "empty": "Šajā sesijā vēl nav izmaiņu failos."
     },
     "autoApprove": {
       "title": "Automātiska apstiprināšana",
@@ -3191,9 +3217,36 @@
     "channelName": "Aktīvie aģenti",
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus.",
     "openSession": "Atvērt",
+    "finished": "Pabeigts",
+    "followFailed": "Neizdevās parādīt šo aģentu bloķēšanas ekrānā.",
     "approveFailed": "Neizdevās apstiprināt. Pieskaries $t(common.approve), lai mēģinātu vēlreiz.",
-    "newestResult": "Jaunākais rezultāts",
-    "scheduledWakes": "pamostas {{time}}"
+    "checked": "Pārbaudīts",
+    "lastKnown": "Pēdējais zināmais",
+    "awaitingUpdate": "Gaida atjauninājumu",
+    "nextRun": "Nākamā palaišana",
+    "waitingForYou": "Gaida jūs",
+    "nextScheduled": "Nākamie ieplānotie",
+    "answerNeeded": "Nepieciešama atbilde",
+    "waitingToRetry": "Gaida atkārtotu mēģinājumu",
+    "step": {
+      "editing": "Rediģēšana",
+      "reading": "Lasīšana",
+      "running": "Palaišana",
+      "searching": "Tīmekļa meklēšana",
+      "thinking": "Domāšana"
+    },
+    "planOf": "no",
+    "filesChanged": "mainīti faili",
+    "finishedIn": "Pabeigts pēc",
+    "noActivityFor": "Nav aktivitātes",
+    "prOpened": "Atvērts pull pieprasījums",
+    "permissionWants": "Vēlas palaist",
+    "failure": {
+      "provider": "Apturēts: pakalpojuma sniedzēja kļūda",
+      "tool": "Apturēts: rīka kļūda",
+      "cancelled": "Apturēts: atcelts",
+      "other": "APTURĒTS"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripcijas modelis",
@@ -3221,6 +3274,7 @@
     "tutorialLabel": "Apmācība"
   },
   "modelChat": {
+    "offlineFailure": "Šim modelim nepieciešams interneta savienojums. Izveido savienojumu un mēģini vēlreiz vai pārslēdzies uz modeli šajā ierīcē.",
     "empty": {
       "title": "Sākt tērzēšanu",
       "description": "Nosūti ziņojumu, lai sarunātos ar modeli."
@@ -3228,10 +3282,32 @@
     "list": {
       "loadFailed": "Neizdevās ielādēt tērzēšanas vēsturi.",
       "new": "Jauna tērzēšana",
-      "openHint": "Atver tērzēšanu. Turiet nospiestu, lai dzēstu.",
       "deleteTitle": "Vai dzēst šo tērzēšanu?"
     },
+    "rename": {
+      "title": "Pārdēvēt tērzēšanu",
+      "accessibility": "Pārdēvēt tērzēšanu: {{title}}",
+      "openHint": "Atver tērzēšanu. Turiet nospiestu, lai pārdēvētu vai dzēstu."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Tērzēšanas informācija",
+      "backend": "Aizmugursistēma",
+      "effortDefault": "Modeļa noklusējums",
+      "noCost": "Bez maksas",
+      "costUnknown": "Nav zināms",
+      "costEstimatedNote": "Atbildes, kurām cena netika norādīta, ir aprēķinātas pēc cenrāža cenām.",
+      "costUnknownNote": "Šim modelim cena nav zināma.",
+      "costPartialNote": "Šajā kopsummā nav iekļauti modeļi, kuriem cena nav zināma.",
+      "localNote": "Ierīces modeļi darbojas šajā ierīcē. Tiem nav izmaksu un uzvedņu kešatmiņas, un to tokenu skaits var būt aptuvens.",
+      "countedSinceNote": "Šī tērzēšana sākās, pirms tika reģistrēts lietojums. Kopsummās ir tikai atbildes pēc tam.",
+      "remoteServersOn": "Ieslēgti attālinātie MCP serveri"
+    },
+    "webSearch": {
+      "title": "Meklēt tīmeklī",
+      "description": "Ļaujiet šai tērzēšanai meklēt aktuālu informāciju, izmantojot jūsu Kilo kontu. Meklēšana izmanto jūsu mēneša meklēšanas limitu.",
+      "allowanceExhausted": "Jūsu bezmaksas tīmekļa meklējumi šim mēnesim ir izlietoti. Pievienojiet kredītus, lai meklētu atkal."
+    },
     "mcp": {
       "title": "Kilo rīki",
       "use": "Izmantot Kilo rīkus",
@@ -3254,7 +3330,6 @@
       "fieldName": "Parādāmais nosaukums",
       "fieldUrl": "Servera URL",
       "fieldUrlInvalid": "Ievadi derīgu servera URL.",
-      "fieldToken": "Bearera pilnvara (neobligāti)",
       "enableServer": "Iespējot šo serveri: {{name}}",
       "editServer": "Rediģēt serveri",
       "deleteServer": "Dzēst serveri",
@@ -3275,8 +3350,24 @@
       "serverUnreachable": "Neizdevās sasniegt šo serveri",
       "serverOff": "Šis serveris ir izslēgts"
     },
+    "mcpOAuth": {
+      "authMethod": "Autentifikācija",
+      "authNone": "Bez pieteikšanās",
+      "authBearer": "Bearera pilnvara",
+      "authOAuth": "OAuth pieteikšanās",
+      "fieldToken": "Pilnvara",
+      "oauthHint": "Pēc saglabāšanas pieskaries pie $t(modelChat.mcpOAuth.signIn) pie servera, lai pieteiktos ar pārlūku.",
+      "serverNeedsSignIn": "Piesakies, lai izmantotu šo serveri",
+      "signIn": "Pieteikties",
+      "signInA11y": "Pieteikties šajā serverī: {{name}}",
+      "signInFailed": "Neizdevās pieteikties serverī {{name}}. Mēģini vēlreiz."
+    },
     "backends": {
       "title": "Tērzēšanas aizmugursistēmas",
+      "providersTitle": "Tērzēšanas pakalpojumu sniedzēji",
+      "cloud": "Mākonī",
+      "cloudModel": "Modelis: {{model}}",
+      "cloudUnavailable": "Kilo modeļi šobrīd nav pieejami. Pārbaudiet savienojumu.",
       "manage": "Pārvaldīt aizmugursistēmas",
       "defaultKilo": "$t(consent.kilo) (noklusējums)",
       "kiloHelp": "Iebūvētā aizmugursistēma izmanto tavu Kilo kontu, un to nevar rediģēt vai dzēst.",
@@ -3336,7 +3427,6 @@
     "gguf": {
       "title": "Lejupielādējamie modeļi",
       "help": "Lejupielādējiet atvērtu modeli un palaidiet to šajā tālrunī ar llama.cpp. Jūsu uzvednes un atbildes paliek ierīcē. Modeļi ir lieli, tāpēc izmantojiet Wi-Fi.",
-      "details": "{{size}} · Licence: {{license}}",
       "download": "Lejupielādēt modeli",
       "pause": "Pauzēt lejupielādi",
       "resume": "Turpināt lejupielādi",
@@ -3348,6 +3438,8 @@
       "url": "Tiešā lejupielādes saite",
       "urlHelp": "Ielīmējiet HTTPS saiti uz .gguf failu, piemēram, Hugging Face resolve saiti. Lejupielādējiet modeļus tikai no uzticamiem avotiem.",
       "downloadUrl": "Lejupielādēt no saites",
+      "advanced": "Papildu",
+      "localPurpose": "Darbojas šajā ierīcē ar llama.cpp. Uzvednes un atbildes paliek ierīcē.",
       "deleteTitle": "Dzēst šo modeli?",
       "deleteMessage": "Dzēst {{name}} no šīs ierīces? Tērzēšanām, kas to izmanto, pirms turpināšanas ir nepieciešams cits modelis.",
       "errors": {
@@ -3357,12 +3449,62 @@
         "notGguf": "Saitei ir jānorāda uz .gguf failu.",
         "space": "Šim modelim nav pietiekami daudz brīvas krātuves vietas. Atbrīvojiet vietu un mēģiniet vēlreiz.",
         "network": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
-        "invalidFile": "Lejupielādētais fails nav modelis, ko šī lietotne var palaist, tāpēc tas tika noņemts."
+        "invalidFile": "Lejupielādētais fails nav modelis, ko šī lietotne var palaist, tāpēc tas tika noņemts.",
+        "checksum": "Lejupielādētais fails neatbilst publicētajai kontrolsummai, tāpēc tas tika noņemts. Mēģiniet lejupielādēt vēlreiz."
       }
+    },
+    "catalog": {
+      "browse": "Pārlūkot modeļus",
+      "title": "Modeļu katalogs",
+      "search": "Meklēt Hugging Face modeļus",
+      "tabs": "Modeļu filtrs",
+      "fitsTab": "Der šai ierīcei",
+      "fromHuggingFace": "No Hugging Face",
+      "loading": "Ielādē modeļus",
+      "noResults": "Neviens modelis nav atrasts",
+      "noFits": "Neviens modelis neder šai ierīcei",
+      "noFitsDescription": "Lielāki modeļi ir cilnē $t(common.all).",
+      "fit": {
+        "fits": "Der",
+        "tight": "Knapi der",
+        "tooLarge": "Pārāk liels",
+        "noStorage": "Nepietiek krātuves",
+        "unknown": "Atbilstība nav zināma"
+      },
+      "recommendationsHelp": "Šīs lietotnes izvēlēts saraksts: viens fails katram modelim, no izdevēja, kas norāda licenci. Nekas cits netiek ranžēts.",
+      "compatibilityHelp": "Atbilstība salīdzina modeļa failu ar šīs ierīces atmiņu un brīvo krātuvi. Atmiņas skaitlis ir aplēse, nevis mērījums.",
+      "text": "Teksts",
+      "listTextPurpose": "Tikai teksta uzvednes.",
+      "listImagePurpose": "Nolasa attēlus, kā arī tekstu.",
+      "smallestDownload": "Mazākā lejupielāde: {{size}} · apmēram {{memory}} atmiņas",
+      "fullFileName": "Fails: {{name}}",
+      "memoryEstimateNote": "Atmiņas skaitļi ir aplēses, nevis mērījumi.",
+      "parameters": "Parametri: {{value}}",
+      "downloads": "Lejupielādes: {{value}}",
+      "likes": "Atzīmes “patīk”: {{value}}",
+      "context": "Konteksta logs: {{value}}",
+      "license": "Licence: {{license}}",
+      "licenseUnknown": "Licence nav norādīta",
+      "tools": "Rīku izsaukšana",
+      "vision": "Attēlu ievade",
+      "hintsHelp": "Norādes no Hugging Face. Lietotne pārbauda modeli pēc tā lejupielādes.",
+      "gated": "Šim modelim nepieciešams Hugging Face konts, tāpēc lietotne to nevar lejupielādēt.",
+      "quantizations": "Kvantizācijas",
+      "quantizationsHelp": "Mazāki faili izmanto mazāk atmiņas un krātuves. Lielāki faili parasti sniedz labākas atbildes.",
+      "quantDetail": "Lejupielāde: {{size}} · aptuveni {{memory}} atmiņas",
+      "downloadQuant": "Lejupielādēt {{quant}}",
+      "loadingModel": "Ielādē modeļa informāciju",
+      "couldNotLoadModel": "Neizdevās ielādēt šo modeli",
+      "noFiles": "Nav failu, ko šī lietotne var palaist",
+      "noFilesDescription": "Šī lietotne palaiž modeļus, kas sastāv no viena GGUF faila.",
+      "tooLargeTitle": "Šis modelis var nedarboties",
+      "tooLargeMessage": "{{name}}, visticamāk, nepieciešams vairāk atmiņas, nekā ir šai ierīcei. Lietotne var aizvērties, kamēr modelis atbild. Vai tomēr lejupielādēt?",
+      "downloadAnyway": "Tomēr lejupielādēt"
     },
     "localModels": {
       "title": "Ierīces modeļi",
-      "help": "Ierīces modeļi darbojas šajā tālrunī. Jūsu uzvednes un atbildes paliek ierīcē, un šie modeļi nevar izmantot rīkus.",
+      "help": "Ierīces modeļi darbojas šajā tālrunī. Jūsu uzvednes un atbildes paliek ierīcē.",
+      "systemPurpose": "Šīs ierīces sistēmā iebūvētais modelis. Tas darbojas ierīcē.",
       "apple": "Apple Intelligence (ierīcē)",
       "checking": "Pārbauda pieejamību…",
       "ready": "Gatavs lietošanai",
@@ -3388,6 +3530,9 @@
       "downloading": "Notiek lejupielāde…",
       "downloadProgress": "Notiek lejupielāde… {{percent}}%",
       "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
     }
   },
   "settingsTools": {
@@ -3567,7 +3712,6 @@
       "template": "Veidne",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Izskaidrojiet $ARGUMENTS",
-      "agent": "Aģents",
       "subtask": "Palaist kā apakšuzdevumu",
       "edit": "Rediģēt slīpsvītras komandu",
       "saveFailed": "Nevarēja saglabāt komandu",
@@ -3611,5 +3755,96 @@
     "noMatchingProductsPlay": "Google Play neatgrieza nevienu atbilstošu kredītu paketi.",
     "purchaseOwnedByAnotherAccount": "Kredīti šajā Apple Account kontā pieder citam Kilo kontam. Lai tos izmantotu, pieraksties attiecīgajā Kilo kontā.",
     "purchaseOwnedByAnotherAccountPlay": "Kredīti šajā Google Play kontā pieder citam Kilo kontam. Lai tos izmantotu, piesakieties tajā Kilo kontā."
+  },
+  "todos": {
+    "saveAsTodo": "Saglabāt kā uzdevumu",
+    "segment": {
+      "label": "Aģentu skats",
+      "sessions": "Sesijas",
+      "todos": "Uzdevumi"
+    },
+    "lists": {
+      "newList": "Jauns saraksts",
+      "empty": "Vēl nav sarakstu",
+      "couldNotLoad": "Neizdevās ielādēt sarakstus",
+      "noRepository": "Nav repozitorija",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} atvērti",
+      "openCount_other": "{{count}} atvērti",
+      "openCount_zero": "{{count}} atvērtu",
+      "archived_one": "Arhivēti ({{count}})",
+      "archived_other": "Arhivēti ({{count}})",
+      "archived_zero": "Arhivētu ({{count}})",
+      "archive": "Arhivēt",
+      "unarchive": "Atcelt arhivēšanu",
+      "deleteTitle": "Dzēst {{name}}?",
+      "deleteMessage": "Tiks dzēsti arī tā uzdevumi. Sesijas paliks."
+    },
+    "listSettings": {
+      "title": "Saraksta iestatījumi",
+      "name": "Nosaukums",
+      "namePlaceholder": "Kļūdas, idejas, laidieni…",
+      "emoji": "Emocijzīme",
+      "mode": "Režīms",
+      "defaultsHint": "Sesijas, kas sāktas no šī saraksta, izmanto šos noklusējumus."
+    },
+    "list": {
+      "addPlaceholder": "Pievienot jaunu uzdevumu",
+      "add": "Pievienot uzdevumu",
+      "empty": "Vēl nav uzdevumu",
+      "setDefaults": "Iestatīt repozitoriju, režīmu un modeli",
+      "completed_one": "Pabeigti ({{count}})",
+      "completed_other": "Pabeigti ({{count}})",
+      "completed_zero": "Pabeigtu ({{count}})"
+    },
+    "item": {
+      "markDone": "Atzīmēt kā izpildītu",
+      "markOpen": "Atzīmēt kā neizpildītu",
+      "markDonePrompt": "Atzīmēt kā izpildītu?",
+      "deleted": "Uzdevums dzēsts",
+      "undo": "Atsaukt",
+      "runCount_one": "{{count}} palaišana",
+      "runCount_other": "{{count}} palaišanas",
+      "runCount_zero": "{{count}} palaišanu",
+      "startNow": "Sākt bez pārskatīšanas",
+      "startNowHint": "Turi nospiestu, lai sāktu bez pārskatīšanas",
+      "titleLabel": "Uzdevuma nosaukums",
+      "renameTitle": "Pārdēvēt uzdevumu",
+      "notes": "Piezīmes",
+      "addNotes": "Pievienot piezīmes",
+      "notesPrompt": "Pievienojiet kontekstu, prasības vai pieņemšanas kritērijus.",
+      "markdownSupported": "Atbalstīts Markdown",
+      "sessions": "Saistītās sesijas",
+      "noSessions": "Vēl nav sesiju",
+      "untitledLinkedSession": "Saistītā sesija",
+      "sessionNeedsInput": "Sesijai nepieciešama ievade",
+      "sessionRunning": "Sesija darbojas",
+      "sessionFinished": "Sesija pabeigta",
+      "sessionPullRequest": "Sesijas izmaiņu pieprasījums",
+      "sessionPullRequestNumber": "Sesijas PR #{{number}}",
+      "openSessionHint": "Atver sesiju.",
+      "unlinkSessionAction": "Atsaistīt sesiju",
+      "unlinkConfirmTitle": "Atsaistīt {{title}}?",
+      "unlinkConfirmMessage": "Pati sesija netiek dzēsta. Tiek noņemta tikai tās saite uz šo uzdevumu.",
+      "startNewSession": "Sākt jaunu sesiju",
+      "startNewSessionHint": "Turiet nospiestu, lai sāktu jaunu sesiju.",
+      "linkSession": "Saistīt sesiju",
+      "linkFailed": "Neizdevās saistīt sesiju ar uzdevumu"
+    },
+    "linkSession": {
+      "title": "Sesijas saistīšana",
+      "empty": "Nav jaunāko sesiju",
+      "emptyInRepository": "Nav jaunāko sesiju repozitorijā {{repository}}"
+    },
+    "upNext": "Nākamais",
+    "sessionTodo": "Uzdevums: {{title}}",
+    "linkToTodo": "Saistīt ar uzdevumu",
+    "candidates": {
+      "empty": "Nav atvērtu uzdevumu"
+    },
+    "saveSheet": {
+      "title": "Saglabāt sarakstā",
+      "saved": "Saglabāts sarakstā {{list}}"
+    }
   }
 }

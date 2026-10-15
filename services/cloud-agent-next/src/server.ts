@@ -46,6 +46,9 @@ import {
   resolveSessionStub,
 } from './sandbox-session/session-stub.js';
 import { isControlSession, isLegacySession, sessionFor } from './session-plane.js';
+import { PREVIEW_OPEN_PATH, handlePreviewOpen, handlePreviewRequest } from './preview/route.js';
+import { matchPreviewHost } from './preview/host.js';
+import { withoutPreviewMarkers } from './shared/preview-headers.js';
 import { withDORetry } from './utils/do-retry.js';
 import { parseBearerCredential } from './sandbox-control/credential.js';
 import { admitSandboxWrapperUpgrade } from './sandbox-control/socket-admission.js';
@@ -70,6 +73,12 @@ import {
   RUNTIME_PROXY_ATTESTATION_HEADER,
   type RuntimeProxyAttestationAudience,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { TRPCError } from '@trpc/server';
+import {
+  readWidgetApprovalKey,
+  widgetApprovalKeyRequestSchema,
+  type WidgetApproval,
+} from './widget-approval-key.js';
 
 const app = new Hono<HonoContext>();
 
@@ -1085,6 +1094,32 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
   return c.body(null, 204);
 });
 
+// Home widget identity read for the trusted web backend only: the internal key
+// gates the route, the body names the exact owned session, and the response
+// carries a one-way binding plus the pending request's command as one trimmed
+// line, never the raw permission or any mutation authority.
+app.post('/internal/widgets/approval-key', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const parsed = widgetApprovalKeyRequestSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.text('Invalid request', 400);
+  }
+
+  let approval: WidgetApproval;
+  try {
+    approval = await readWidgetApprovalKey(c.env, parsed.data);
+  } catch (error) {
+    // Ownership refusals (403) and an unavailable access read (503) come from
+    // `requireCurrentSessionAccess`; anything else is a DO failure (500).
+    if (error instanceof TRPCError) return projectSessionAccessHttpError(error);
+    throw error;
+  }
+  c.header('Cache-Control', 'no-store');
+  return c.json({ approvalKey: approval.approvalKey, command: approval.command });
+});
+
 app.use('/trpc/*', authMiddleware);
 app.use('/trpc/*', balanceMiddleware);
 
@@ -1124,8 +1159,17 @@ export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
 export const OUTCOME_AGGREGATE_CRONS = new Set([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
+  fetch(incoming: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
+    // The preview marker selects the physical sandbox DO's port path, so a client
+    // copy never passes ingress, whichever route later forwards the request.
+    const request = withoutPreviewMarkers(incoming);
     const url = new URL(request.url);
+    if (matchPreviewHost(url.hostname, env.PREVIEW_HOST_SUFFIX) !== null) {
+      return handlePreviewRequest(request, env);
+    }
+    if (url.pathname === PREVIEW_OPEN_PATH) {
+      return handlePreviewOpen(request, env);
+    }
     if (
       url.pathname === '/terminal' &&
       request.headers.get('Upgrade')?.toLowerCase() === 'websocket'

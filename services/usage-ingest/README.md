@@ -36,6 +36,19 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing` |
 | Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging` |
 
+## Usage writer client
+
+`@kilocode/worker-utils/usage-writer-client` provides an HTTP helper for the existing Frankfurt
+`/api/internal/usage/record` endpoint. It is not called by the deployed consumer
+yet. Callers supply the full endpoint URL, its `x-internal-api-key` secret, and
+optionally a Vercel automation protection-bypass secret for staging.
+
+The helper preserves the event, makes one attempt with a 160-second timeout,
+and accepts only `recorded` or `duplicate` with the matching usage ID. HTTP 200
+`not_recorded`, invalid responses, redirects, and transport failures are reported
+as unavailable. Responses are limited to 4 KiB; logs contain only the usage ID
+and categorical outcome. Queue retries and acknowledgement remain future work.
+
 ## Deploy
 
 The existing `.github/workflows/deploy-workers.yml` discovers this service for

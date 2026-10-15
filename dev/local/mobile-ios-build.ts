@@ -8,11 +8,11 @@ import {
   createProjectHashAsync,
   DEFAULT_SOURCE_SKIPS,
   SourceSkips,
-  type HashSourceContents,
+  type HashSource,
 } from '@expo/fingerprint';
 
 import { hashRootNativeInputs, withNativeBuildSemaphore } from './mobile-native-build';
-import { fetchIosApp } from './mobile-remote-native';
+import { fetchIosApp, remoteNativeRequired } from './mobile-remote-native';
 
 // Compatibility dimensions hashed into the cache key. Any change must
 // invalidate the key so cached artifacts are not reused for an
@@ -147,11 +147,15 @@ export type CliArgs =
 // optional native config all remain in the hash. Repo-root inputs that
 // shape the native build but live outside apps/mobile (pnpm patches,
 // pnpm-workspace.yaml, pnpm-lock.yaml) are mixed in as an extra source.
+// Expo hashes only the ios/ folders that autolinking resolves, so the
+// whole local modules/ tree and the targets/ sources that config plugins
+// copy into ios/ are added as directories. Android code, module JS, and
+// tests in modules/ do not affect the iOS binary and stay out.
 export function buildFingerprintOptions(): {
   platforms: ['ios'];
   sourceSkips: number;
   ignorePaths: string[];
-  extraSources: HashSourceContents[];
+  extraSources: HashSource[];
   silent: boolean;
 } {
   return {
@@ -160,7 +164,7 @@ export function buildFingerprintOptions(): {
     // The generated ios/ tree is output, not an input: its bytes differ per
     // worktree (pbxproj UUIDs, absolute paths in Podfile.lock). Pin it out of
     // the hash so no fingerprint version can key builds on it.
-    ignorePaths: ['ios/**'],
+    ignorePaths: ['ios/**', 'modules/*/android/**', 'modules/*/src/**', 'modules/**/*.test.ts'],
     extraSources: [
       {
         type: 'contents',
@@ -168,6 +172,8 @@ export function buildFingerprintOptions(): {
         contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
         reasons: ['repo-root patches/, pnpm-workspace.yaml, and pnpm-lock.yaml'],
       },
+      { type: 'dir', filePath: 'modules', reasons: ['localExpoModules'] },
+      { type: 'dir', filePath: 'targets', reasons: ['iosExtensionSources'] },
     ],
     silent: true,
   };
@@ -818,9 +824,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 
 // Check that the generated native project exists. Expo generates
 // `apps/mobile/ios/Kilo.xcworkspace` via `npx expo prebuild --platform
-// ios` (or as a side effect of `expo run:ios`). We do NOT run prebuild
-// ourselves — the caller is expected to have done so. A missing
-// workspace is a clear, actionable error.
+// ios`; ensureCurrentNativeProject runs it before a local compile. A
+// missing workspace is a clear, actionable error.
 export function validateXcodeWorkspace(mobileRoot: string): void {
   const workspace = path.join(mobileRoot, 'ios', 'Kilo.xcworkspace');
   if (!fs.existsSync(workspace)) {
@@ -828,6 +833,27 @@ export function validateXcodeWorkspace(mobileRoot: string): void {
       `Native iOS project is missing at ${workspace}. Run \`npx expo prebuild --platform ios\` in apps/mobile before invoking this command.`
     );
   }
+}
+
+// The generated ios/ tree records the nativeHash it was prebuilt from.
+// The fingerprint ignores ios/**, so the stamp never changes the hash.
+const PREBUILD_STAMP = '.kilo-native-hash';
+
+// Regenerate ios/ when it is missing or was prebuilt from different
+// native inputs. Without this, xcodebuild compiles a stale project (for
+// example, one without a newly added local module) and the result is
+// cached under the new key.
+export function ensureCurrentNativeProject(args: {
+  mobileRoot: string;
+  nativeHash: string;
+  prebuild: (mobileRoot: string) => void;
+}): void {
+  const iosRoot = path.join(args.mobileRoot, 'ios');
+  const stampPath = path.join(iosRoot, PREBUILD_STAMP);
+  const stamp = fs.existsSync(stampPath) ? fs.readFileSync(stampPath, 'utf8').trim() : undefined;
+  if (stamp === args.nativeHash && fs.existsSync(path.join(iosRoot, 'Kilo.xcworkspace'))) return;
+  args.prebuild(args.mobileRoot);
+  fs.writeFileSync(stampPath, `${args.nativeHash}\n`);
 }
 
 // Build the exact xcodebuild invocation. A dedicated derivedDataPath
@@ -891,6 +917,7 @@ export type BuildDeps = {
     derivedDataPath: string;
     udid: string;
     mobileRoot: string;
+    nativeHash: string;
   }) => Promise<void>;
   readInfoPlist: (appPath: string, key: string) => string | undefined;
   install: (udid: string, appPath: string) => void;
@@ -901,14 +928,17 @@ export type BuildDeps = {
   sleep?: (ms: number) => Promise<void>;
   // Fetch a prebuilt Kilo.app for this nativeHash into productsDir (the
   // directory locateProducedApp reads). Returns false on a miss. When set,
-  // a cache miss tries this before compiling locally. `toolchain` is the
-  // host's own Xcode and simulator SDK: the artifact is keyed on nativeHash
-  // alone, so the fetcher must reject one built by a different toolchain.
+  // a cache miss tries this before compiling locally. The artifact is keyed on
+  // nativeHash alone, so the fetcher must reject one the target simulator
+  // `udid` cannot run.
   fetchRemote?: (args: {
     nativeHash: string;
     productsDir: string;
-    toolchain: { xcodeBuildVersion: string; simulatorSdkVersion: string };
+    udid: string;
   }) => Promise<boolean>;
+  // When true, a failed remote fetch fails the build instead of compiling
+  // locally (KILO_REMOTE_NATIVE=required).
+  requireRemote?: boolean;
 };
 
 export type RunFingerprintDeps = {
@@ -964,6 +994,7 @@ export async function publishCacheEntry(args: {
       derivedDataPath,
       udid: args.udid,
       mobileRoot: args.deps.mobileRoot,
+      nativeHash: args.compatibility.nativeHash,
     });
     const builtApp = locateProducedApp(derivedDataPath);
     const stagingApp = path.join(staging, ENTRY_BUNDLE_NAME);
@@ -1059,7 +1090,8 @@ function validateKey(key: string): void {
 // compile. Reuses publishCacheEntry unchanged — only the build step is
 // swapped for a fetch into the products directory it already reads — so the
 // bundle-id check, checksum, manifest, and atomic publish all still apply.
-// Any failure returns undefined and the caller compiles locally.
+// Any failure returns undefined and the caller compiles locally, unless
+// deps.requireRemote is set: then the failure propagates.
 async function tryRemotePublish(args: {
   key: string;
   compatibility: CompatibilityDimensions;
@@ -1089,19 +1121,21 @@ async function tryRemotePublish(args: {
           const fetched = await fetchRemote({
             nativeHash: args.compatibility.nativeHash,
             productsDir,
-            toolchain: {
-              xcodeBuildVersion: args.compatibility.xcodeBuildVersion,
-              simulatorSdkVersion: args.compatibility.simulatorSdkVersion,
-            },
+            udid: args.udid,
           });
           if (!fetched) throw new Error('remote native artifact unavailable');
         },
       },
     });
   } catch (error) {
-    process.stderr.write(
-      `remote native build unavailable (${error instanceof Error ? error.message : error}); building locally\n`
-    );
+    const reason = error instanceof Error ? error.message : String(error);
+    if (deps.requireRemote) {
+      throw new Error(
+        `remote native build unavailable (${reason}); KILO_REMOTE_NATIVE=required forbids a local build`,
+        { cause: error }
+      );
+    }
+    process.stderr.write(`remote native build unavailable (${reason}); building locally\n`);
     return undefined;
   }
 }
@@ -1283,8 +1317,13 @@ async function main(): Promise<void> {
         }),
       validateClaim: (udid: string, worktreeRoot: string, claimRoot: string) =>
         validateSimulatorClaim(udid, worktreeRoot, claimRoot),
-      fetchRemote: async ({ nativeHash, productsDir, toolchain }) =>
-        fetchIosApp({ nativeHash, productsDir, toolchain }),
+      fetchRemote: async ({ nativeHash, productsDir, udid }) =>
+        fetchIosApp({
+          nativeHash,
+          productsDir,
+          simulatorRuntimeVersion: querySimulatorRuntimeVersion(udid),
+        }),
+      requireRemote: remoteNativeRequired(),
     });
     process.stdout.write(`Installed ${parsed.udid}\n`);
     return;
@@ -1292,16 +1331,22 @@ async function main(): Promise<void> {
   throw new Error('Usage: pnpm dev:mobile:ios [fingerprint|build <udid>|prune]');
 }
 
-// Production builder: validates the Xcode workspace, then invokes
-// xcodebuild with a dedicated derivedDataPath under the staging
+// Production builder: brings ios/ up to date with the nativeHash, then
+// invokes xcodebuild with a dedicated derivedDataPath under the staging
 // directory. The staging directory is created by `runBuild` and
-// passed in; we do not prebuild or mutate the global workspace.
+// passed in.
 async function productionBuilder(args: {
   stagingDir: string;
   derivedDataPath: string;
   udid: string;
   mobileRoot: string;
+  nativeHash: string;
 }): Promise<void> {
+  ensureCurrentNativeProject({
+    mobileRoot: args.mobileRoot,
+    nativeHash: args.nativeHash,
+    prebuild: productionPrebuild,
+  });
   validateXcodeWorkspace(args.mobileRoot);
   const cmd = buildXcodeBuildCommand({
     mobileRoot: args.mobileRoot,
@@ -1310,6 +1355,16 @@ async function productionBuilder(args: {
   });
   execFileSync(cmd.command, cmd.args, { stdio: 'inherit' });
   locateProducedApp(args.derivedDataPath);
+}
+
+// `--clean` regenerates ios/ from scratch, as CI does on a fresh checkout.
+// CI=1 keeps the Expo CLI non-interactive (no dirty-git-tree prompt).
+function productionPrebuild(mobileRoot: string): void {
+  execFileSync('pnpm', ['exec', 'expo', 'prebuild', '--platform', 'ios', '--clean'], {
+    cwd: mobileRoot,
+    stdio: 'inherit',
+    env: { ...process.env, CI: '1' },
+  });
 }
 
 function productionReadInfoPlist(appPath: string, key: string): string | undefined {
@@ -1358,6 +1413,23 @@ function querySimulatorSdkVersion(): string {
     encoding: 'utf8',
   });
   return raw.trim();
+}
+
+type SimctlList = {
+  devices?: Record<string, { udid?: string }[]>;
+  runtimes?: { identifier?: string; version?: string }[];
+};
+
+function querySimulatorRuntimeVersion(udid: string): string {
+  const list = JSON.parse(
+    execFileSync('xcrun', ['simctl', 'list', '--json'], { encoding: 'utf8' })
+  ) as SimctlList;
+  const runtimeIdentifier = Object.entries(list.devices ?? {}).find(([, devices]) =>
+    devices.some(device => device.udid === udid)
+  )?.[0];
+  const version = list.runtimes?.find(runtime => runtime.identifier === runtimeIdentifier)?.version;
+  if (!version) throw new Error(`Unable to determine the simulator runtime of ${udid}`);
+  return version;
 }
 
 // Resolve the mobile project root from this module's location, never from

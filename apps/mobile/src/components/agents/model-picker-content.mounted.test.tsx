@@ -75,8 +75,8 @@ vi.mock('@shopify/flash-list', async () => {
     FlashList: (props: {
       data: readonly ModelPickerRow[];
       renderItem?: (info: { item: ModelPickerRow; index: number }) => ReactNode;
-      keyExtractor?: (item: ModelPickerRow) => string;
-      getItemType?: (item: ModelPickerRow) => string;
+      keyExtractor?: (item: ModelPickerRow, index: number) => string;
+      getItemType?: (item: ModelPickerRow | undefined) => string | undefined;
       style?: unknown;
       contentContainerStyle?: unknown;
     }) => {
@@ -84,7 +84,7 @@ vi.mock('@shopify/flash-list', async () => {
       const rows = props.data.map((item, index) =>
         React.createElement(
           React.Fragment,
-          { key: props.keyExtractor ? props.keyExtractor(item) : String(index) },
+          { key: props.keyExtractor ? props.keyExtractor(item, index) : String(index) },
           props.renderItem ? props.renderItem({ item, index }) : null
         )
       );
@@ -93,6 +93,8 @@ vi.mock('@shopify/flash-list', async () => {
         {
           data: props.data,
           getItemType: props.getItemType,
+          renderItem: props.renderItem,
+          keyExtractor: props.keyExtractor,
           style: props.style,
           contentContainerStyle: props.contentContainerStyle,
         },
@@ -204,9 +206,35 @@ function listRows(renderer: TestRenderer.ReactTestRenderer): ModelPickerRow[] {
 }
 
 /** The item-type selector FlashList uses to recycle headers apart from rows. */
-function getItemType(renderer: TestRenderer.ReactTestRenderer): (item: ModelPickerRow) => string {
+function getItemType(
+  renderer: TestRenderer.ReactTestRenderer
+): (item: ModelPickerRow | undefined) => string | undefined {
   /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
-  return listHost(renderer).props.getItemType as (item: ModelPickerRow) => string;
+  return listHost(renderer).props.getItemType as (
+    item: ModelPickerRow | undefined
+  ) => string | undefined;
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+function keyExtractor(
+  renderer: TestRenderer.ReactTestRenderer
+): (item: ModelPickerRow | undefined, index: number) => string {
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  return listHost(renderer).props.keyExtractor as (
+    item: ModelPickerRow | undefined,
+    index: number
+  ) => string;
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+function renderItem(
+  renderer: TestRenderer.ReactTestRenderer
+): (info: { item: ModelPickerRow | undefined; index: number }) => ReactNode {
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  return listHost(renderer).props.renderItem as (info: {
+    item: ModelPickerRow | undefined;
+    index: number;
+  }) => ReactNode;
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
 
@@ -476,6 +504,20 @@ describe('ModelPickerContent deferred search', () => {
     // would measure one as the other. Pin the split.
     expect(getItemType(renderer)(header)).toBe('header');
     expect(getItemType(renderer)(model)).toBe('model');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('tolerates FlashList asking for a row past the end of the data', async () => {
+    // A discarded deferred-search render can leave FlashList with shorter rows
+    // than the committed list, so it passes an undefined row (KILO-APP-3K0).
+    const renderer = await mount();
+
+    expect(getItemType(renderer)(undefined)).toBeUndefined();
+    expect(keyExtractor(renderer)(undefined, 7)).toBe('7');
+    expect(renderItem(renderer)({ item: undefined, index: 7 })).toBeNull();
 
     act(() => {
       renderer.unmount();

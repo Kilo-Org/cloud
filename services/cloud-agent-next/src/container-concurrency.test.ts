@@ -37,6 +37,9 @@ describe('countLiveContainers', () => {
     const query = new PgDialect().sqlToQuery(where.mock.calls[0][0]);
     expect(query.sql).toContain('"container_usage_interval"."service" not like $5');
     expect(query.sql).toContain('"container_usage_interval"."instance_id" not like $6');
+    expect(query.sql).toContain(
+      "coalesce(\"container_usage_interval\".\"metadata\"->>'origin', '') <> 'code-review'"
+    );
     expect(query.params).toEqual([
       'user',
       'user_1',
@@ -66,6 +69,18 @@ describe('assertContainerCapacity', () => {
     });
   });
 
+  it('admits any start when the account concurrency cap is disabled', async () => {
+    const countLive = vi.fn(async () => PERSONAL_CONTAINER_LIMIT);
+    await expect(
+      assertContainerCapacity(
+        { ...env, CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true' },
+        request(),
+        { countLive }
+      )
+    ).resolves.toBeUndefined();
+    expect(countLive).not.toHaveBeenCalled();
+  });
+
   it('applies the organization limit to organization subjects', async () => {
     const org = request({ subject: { type: 'org', id: 'org_1' } });
     await expect(
@@ -82,6 +97,18 @@ describe('assertContainerCapacity', () => {
       assertContainerCapacity(env, request({ instanceId: 'crv-abcdef' }), { countLive })
     ).resolves.toBeUndefined();
     expect(countLive).not.toHaveBeenCalled();
+  });
+
+  it('exempts neutral Code Reviewer keys while enforcing ordinary neutral keys', async () => {
+    const countLive = vi.fn(async () => PERSONAL_CONTAINER_LIMIT);
+    const neutral = request({ instanceId: `sbx-${'a'.repeat(48)}` });
+    await expect(
+      assertContainerCapacity(env, { ...neutral, billingOrigin: 'code-review' }, { countLive })
+    ).resolves.toBeUndefined();
+    expect(countLive).not.toHaveBeenCalled();
+    await expect(
+      assertContainerCapacity(env, { ...neutral, billingOrigin: 'cloud-agent-web' }, { countLive })
+    ).rejects.toBeInstanceOf(ContainerConcurrencyLimitError);
   });
 
   it('admits the start when the count is unavailable', async () => {

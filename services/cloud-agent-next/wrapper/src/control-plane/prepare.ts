@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH,
   CONTROL_PLANE_SETUP_EVENTS,
   type ControlPlanePreparationStep,
   type ControlPlaneRouteSpec,
@@ -17,6 +18,7 @@ import type { ControlDiagnosticReporter } from '../../../src/shared/control-diag
 import { parseControlPlaneCredential } from '../../../src/shared/control-plane-credential.js';
 import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import { fetchKiloServer } from '../kilo-server-auth.js';
 import {
   git,
   runProcess,
@@ -44,6 +46,7 @@ import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
+import { restoreWorktreeRecovery } from './worktree-recovery.js';
 import type { ControlWorkload } from '../control/workload-cgroup.js';
 import {
   emptyWorkspaceDirectory,
@@ -150,6 +153,7 @@ export type PrepareDeps = {
   /** Starts the default setup command, e.g. inside the setup cgroup. */
   spawnSetup?: ProcessSpawn;
   restore?: typeof restoreSession;
+  recoverWorktree?: typeof restoreWorktreeRecovery;
   seedRegistration?: typeof seedSessionIngestRegistration;
   configureGitAuthor?: typeof configureWorkspaceGitAuthor;
   sessionExists?: (
@@ -229,7 +233,7 @@ async function defaultSessionExists(
 ): Promise<boolean> {
   const url = new URL(`/session/${encodeURIComponent(kiloSessionId)}`, client.serverUrl);
   url.searchParams.set('directory', directory);
-  const response = await fetch(url, { signal });
+  const response = await fetchKiloServer(client.server, url, { signal });
   if (response.status === 404) return false;
   if (!response.ok) throw new Error('Kilo session probe failed');
   const data: unknown = await response.json();
@@ -321,7 +325,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       type: 'session.progress',
       sessionId,
       step,
-      ...(detail === undefined ? {} : { detail }),
+      ...(detail === undefined
+        ? {}
+        : {
+            detail:
+              detail.length > CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH
+                ? `${detail.slice(0, CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH - 1)}…`
+                : detail,
+          }),
     });
   }
 
@@ -738,17 +749,31 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     env: Record<string, string>,
     redact: (text: string) => string,
     home: string,
-    setStep: (step: ControlPlanePreparationStep) => void
+    setStep: (step: ControlPlanePreparationStep) => void,
+    onReplacementWorkspace?: () => Promise<void>
   ): Promise<ControlPlaneWorkspaceOutcome> {
+    const workspaceStartedAt = Date.now();
+    const inspectStartedAt = Date.now();
     const { inspection, stamp: previous } = await inspectWorkspace(directory);
+    log(
+      `control-plane workspace inspect session=${spec.sessionId} inspection=${inspection} elapsedMs=${Date.now() - inspectStartedAt}`
+    );
     if (inspection === 'same') return 'same';
     let adopted = false;
     if (inspection === 'foreign') {
+      const clearStartedAt = Date.now();
       await clearStaleHomes(homeRoot, home).catch(() => undefined);
+      log(
+        `control-plane workspace stale homes cleared session=${spec.sessionId} elapsedMs=${Date.now() - clearStartedAt}`
+      );
       // A snapshot at the generation cap that is due again is not adopted: it is
       // rebuilt from a clone, so the layers stacked on it do not accumulate.
       const rebuild = previous !== null && snapshotAction(previous, now()) === 'rebuild';
+      const adoptStartedAt = Date.now();
       adopted = !rebuild && (await adoptWorkspace(spec, directory, env, redact, setStep));
+      log(
+        `control-plane workspace adopt done session=${spec.sessionId} adopted=${adopted} rebuild=${rebuild} elapsedMs=${Date.now() - adoptStartedAt}`
+      );
       if (!adopted) await emptyDirectory(directory);
     }
     // A clone happens only when there is no repository yet; a partly prepared
@@ -762,6 +787,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     }
     setStep('setup');
     await runSetupCommands(spec, directory, env, redact, new AbortController().signal);
+    if (cloning || adopted) await onReplacementWorkspace?.();
     const commit = await headCommit(directory, env);
     // The stamp goes down before the snapshot, so a container restored from it
     // sees another allocation's stamp and adopts rather than trusting the files.
@@ -771,6 +797,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       setStep('snapshot');
       await captureWorkspace(spec, directory, env, commit);
     }
+    log(
+      `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`
+    );
     return adopted ? 'adopted' : 'cloned';
   }
 
@@ -849,12 +878,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     directory: string,
     env: Record<string, string>,
     client: WrapperKiloClient,
-    signal: AbortSignal
+    signal: AbortSignal,
+    restoreFiles: boolean
   ): Promise<void> {
     await seedRegistration(spec.kiloSessionId, env, signal);
     if (await sessionExists(client, spec.kiloSessionId, directory, signal)) return;
     emitProgress(spec.sessionId, 'kilo_session', 'Loading session history');
-    const restored = await restore(spec.kiloSessionId, directory, undefined, { env, signal });
+    const restored = await restore(spec.kiloSessionId, directory, undefined, {
+      env,
+      signal,
+      restoreFiles,
+    });
     if (restored.ok) {
       if (restored.diffs.skipped > 0) {
         await reportRestoreIncomplete({
@@ -929,6 +963,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       targets: credentials?.proxy?.targets ?? kiloConfig.targets,
     };
     const home = homeFor(homeKey(spec), directory, homeRoot);
+    log(`control-plane prepare received session=${sessionId} directory=${directory}`);
 
     try {
       // Built inside the failure scope: an over-limit CLI config must surface as
@@ -941,7 +976,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           kiloAuth,
           spec.env ?? {},
           inheritedEnv,
-          spec.mcp
+          spec.mcp,
+          spec
         ),
         spec
       );
@@ -961,13 +997,57 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // directory and inspect the stamp inside the lock, so a waiting session
       // sees the finished workspace and skips the work.
       let workspace: ControlPlaneWorkspaceOutcome | undefined;
+      let replacementWorkspace = false;
+      let localRecoveryApplied = false;
+      const recovery = spec.worktreeRecovery;
       await withWorkspaceLock(directory, async () => {
         if (!needsWorkspace) return;
-        workspace = await prepareWorkspace(spec, directory, env, redact, home, step => {
-          currentStep = step;
-        });
+        workspace = await prepareWorkspace(
+          spec,
+          directory,
+          env,
+          redact,
+          home,
+          step => {
+            currentStep = step;
+          },
+          async () => {
+            replacementWorkspace = true;
+            if (!recovery || owner.released) return;
+            currentStep = 'restore';
+            try {
+              emitProgress(sessionId, 'restore', 'Restoring saved worktree changes');
+              const diffs = await (deps.recoverWorktree ?? restoreWorktreeRecovery)(
+                directory,
+                recovery,
+                env,
+                AbortSignal.timeout(30_000)
+              );
+              log(
+                `local worktree recovery session=${sessionId} applied=${diffs.applied} skipped=${diffs.skipped} total=${diffs.total}`
+              );
+              localRecoveryApplied = diffs.applied > 0 || diffs.total === 0;
+              const incomplete = await reportRestoreIncomplete({
+                diffs,
+                identity: `kiloSessionId=${spec.kiloSessionId}`,
+                log,
+              });
+              if (incomplete) emitProgress(sessionId, 'restore', incomplete.message);
+            } catch {
+              log(`local worktree recovery session=${sessionId} failed; continuing`);
+              emitProgress(
+                sessionId,
+                'restore',
+                'Saved worktree changes could not be restored; continuing'
+              );
+            }
+          }
+        );
       });
       if (owner.released) return;
+      if (recovery && !replacementWorkspace) {
+        log(`local worktree recovery session=${sessionId} skipped reason=surviving_workspace`);
+      }
       currentStep = 'kilo_runtime';
       emitProgress(sessionId, 'kilo_runtime');
       if (spec.runtimeIsolation === 'per-session') await materializeRuntimeProfile(home, spec);
@@ -988,7 +1068,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       await withOneRetry(
         () =>
           withinStep('kilo_session', timers.kiloSessionMs, signal =>
-            resolveKiloSession(spec, directory, env, client, signal)
+            resolveKiloSession(
+              spec,
+              directory,
+              env,
+              client,
+              signal,
+              !(replacementWorkspace && localRecoveryApplied)
+            )
           ),
         () => !owner.released
       );
@@ -1032,7 +1119,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         },
         route.spec.env ?? {},
         inheritedEnv,
-        route.spec.mcp
+        route.spec.mcp,
+        route.spec
       ),
       route.spec
     );

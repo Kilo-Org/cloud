@@ -31,12 +31,10 @@ export function UserCodeIndexingView({ userId }: UserCodeIndexingViewProps) {
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
 
-  // Fetch user's code indexing stats
   const { data: projects, isLoading: isLoadingStats } = useQuery({
     ...trpc.codeIndexing.getOrganizationStats.queryOptions({ overrideUser: userId }),
   });
 
-  // Selected project for branch viewing and files
   const [selectedProjectForBranches, setSelectedProjectForBranches] = useState<string | null>(null);
   const [selectedProjectForFiles, setSelectedProjectForFiles] = useState<string | null>(null);
   const [branchSearchQuery, setBranchSearchQuery] = useState('');
@@ -83,7 +81,6 @@ export function UserCodeIndexingView({ userId }: UserCodeIndexingViewProps) {
       if (result.success) {
         toast.success('Project deleted successfully');
         void queryClient.invalidateQueries(trpc.codeIndexing.admin.pathFilter());
-        // Clear selected project if it was deleted
         if (selectedProjectForBranches === projectId) {
           setSelectedProjectForBranches(null);
         }
@@ -190,7 +187,6 @@ export function UserCodeIndexingView({ userId }: UserCodeIndexingViewProps) {
     }
   };
 
-  // Sort projects by storage size
   const sortedProjects = useMemo(() => {
     if (!projects) return [];
     const sorted = [...projects];
@@ -198,7 +194,6 @@ export function UserCodeIndexingView({ userId }: UserCodeIndexingViewProps) {
     return sorted;
   }, [projects]);
 
-  // Filter branches based on search query
   const selectedProjectData = projects?.find(p => p.project_id === selectedProjectForBranches);
   const filteredBranches = useMemo(() => {
     if (!selectedProjectData) return [];
@@ -210,7 +205,6 @@ export function UserCodeIndexingView({ userId }: UserCodeIndexingViewProps) {
     return branches.filter(branch => branch.branch_name.toLowerCase().includes(query));
   }, [selectedProjectData, branchSearchQuery]);
 
-  // Fetch project files when a project is selected
   const { data: projectFiles, isLoading: isLoadingFiles } = useQuery({
     ...trpc.codeIndexing.getProjectFiles.queryOptions({
       organizationId: null,

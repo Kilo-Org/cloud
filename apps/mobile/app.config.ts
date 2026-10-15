@@ -232,7 +232,7 @@ const config: ExpoConfig = {
     googleServicesFile: './google-services.json',
     package: 'com.kilocode.kiloapp',
     adaptiveIcon: {
-      backgroundColor: '#FAF74F',
+      backgroundColor: '#FFDD00',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-foreground.png',
@@ -368,7 +368,7 @@ const config: ExpoConfig = {
       'expo-notifications',
       {
         icon: './assets/images/android-notification-icon.png',
-        color: '#FAF74F',
+        color: '#FFDD00',
         // Name the channel Firebase falls back to when a message omits
         // `channel_id`. Without it FirebaseMessaging logs "Missing Default
         // Notification Channel metadata in AndroidManifest" on every message.
@@ -394,6 +394,10 @@ const config: ExpoConfig = {
         organization: 'anaconda-nq',
         useNativeInit: true,
         options: SENTRY_NATIVE_OPTIONS,
+        // Android release builds upload NDK debug symbols and the R8 mapping, so
+        // native tombstones (libhermes, libreactnative, Expo modules) and Java
+        // frames symbolicate. The default sentry.gradle.kts uploads only JS source maps.
+        experimental_android: { enableAndroidGradlePlugin: true },
       },
     ],
     // One native splash configuration and shared AnimatedSplashOverlay lifecycle
@@ -403,7 +407,7 @@ const config: ExpoConfig = {
       './plugins/withBrandedSplash',
       {
         image: './assets/images/logo-mark.png',
-        backgroundColor: '#FAF74F',
+        backgroundColor: '#FFDD00',
         imageWidth: 100,
       },
     ],
@@ -497,6 +501,8 @@ const config: ExpoConfig = {
     // Aggregate "Active Agents" glanceable surfaces: one Live Activity plus Home
     // Screen and Lock Screen widgets, rendered by src/glanceable-ios. The widget
     // target reuses the existing app group; no second group is created.
+    // Native Home refresh runs after expo-widgets' source generation (mods run in reverse).
+    './plugins/withHomeWidgetRefresh',
     [
       'expo-widgets',
       {

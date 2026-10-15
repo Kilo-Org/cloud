@@ -61,7 +61,7 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => ({
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(),
   createCloudAgentNextClientForModel: jest.fn(),
-  rethrowAsPaymentRequired: jest.fn(),
+  rethrowCloudAgentError: jest.fn(),
 }));
 jest.mock('@/lib/cloud-agent-next/worktree-chat', () => ({ createWorktreeChat: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/trpc/min-version', () => ({

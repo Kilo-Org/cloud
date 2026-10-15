@@ -3,8 +3,10 @@ import type { Env } from '../types.js';
 import { vercelBillingIdentity } from '../container-usage-context.js';
 import {
   buildControlPlaneCreateInput,
+  buildControlPlaneRegisterInput,
   buildControlPlanePromptPayload,
 } from './control-plane-session-input.js';
+import { buildControlPlaneSessionRegistration } from '../control-plane/session/registration.js';
 
 const FULL_MODEL = 'kilo/fake-deterministic';
 
@@ -42,6 +44,56 @@ describe('buildControlPlanePromptPayload', () => {
 
 describe('buildControlPlaneCreateInput', () => {
   it.each([
+    { egressMode: undefined, egressAllowlist: undefined },
+    { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+    { egressMode: 'allowlist' as const, egressAllowlist: undefined },
+    { egressMode: 'allowlist' as const, egressAllowlist: [] },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['Z.Example.COM.', 'example.com'] },
+  ])(
+    'persists and selects the same policy for start and registration: %j',
+    async ({ egressMode, egressAllowlist }) => {
+      const command = {
+        identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
+        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+        message: {
+          initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          turn: { type: 'prompt' as const, prompt: 'hi' },
+        },
+        agent: { mode: 'code', model: FULL_MODEL },
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef' as const,
+          sandboxProvider: 'cloudflare-containers' as const,
+          egressMode,
+          egressAllowlist,
+        },
+      };
+      const created = await buildControlPlaneCreateInput({
+        command,
+        env: {} as Env,
+        attachments: [],
+        agent: command.agent,
+      });
+      const registered = await buildControlPlaneRegisterInput({ command, env: {} as Env });
+      const expected =
+        egressAllowlist === undefined
+          ? undefined
+          : egressAllowlist.length === 0
+            ? []
+            : ['example.com', 'z.example.com'];
+      for (const input of [created, registered]) {
+        expect(input.metadata.workspace?.egressMode).toBe(egressMode);
+        expect(input.sandboxSelection.egressMode).toBe(egressMode);
+        expect(input.metadata.workspace?.egressAllowlist).toEqual(expected);
+        expect(input.sandboxSelection.egressAllowlist).toEqual(expected);
+        expect(
+          buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection)
+            .sandboxSelection?.egressAllowlist
+        ).toEqual(expected);
+      }
+    }
+  );
+
+  it.each([
     [undefined, { vcpus: 2, memory: 4096 }, 'SandboxVercelSmall'],
     ['vercel-large', { vcpus: 4, memory: 8192 }, 'SandboxVercelLarge'],
   ] as const)(
@@ -71,6 +123,79 @@ describe('buildControlPlaneCreateInput', () => {
       });
       expect(input.sandboxSelection.configuration).toEqual({ provider: 'vercel', resources });
       expect(vercelBillingIdentity(resources).className).toBe(className);
+    }
+  );
+
+  it.each([
+    ['isolated', 'workspace_12345678-1234-1234-1234-123456789abc'],
+    ['shared', undefined],
+  ] as const)(
+    'carries the %s kind into the pin and its billing input',
+    async (sandboxKind, billedSessionId) => {
+      const sandboxId = `sbx-${'a'.repeat(48)}` as const;
+      const input = await buildControlPlaneCreateInput({
+        command: {
+          identity: {
+            sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+            userId: 'usr_1',
+          },
+          auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+          message: {
+            initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+            turn: { type: 'prompt', prompt: 'hi' },
+          },
+          agent: { mode: 'code', model: FULL_MODEL },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare', sandboxKind },
+        },
+        env: {} as Env,
+        attachments: [],
+        agent: { mode: 'code', model: FULL_MODEL },
+      });
+
+      expect(input.metadata.workspace?.sandboxKind).toBe(sandboxKind);
+      expect(input.sandboxSelection.sandboxKind).toBe(sandboxKind);
+      expect(input.sandboxSelection.billing).toMatchObject({ sandboxId, sandboxKind });
+      expect(input.sandboxSelection.billing?.sessionId).toBe(billedSessionId);
+      // The Session DO accepts the Worker's selection as built.
+      expect(
+        buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection)
+          .sandboxSelection?.sandboxKind
+      ).toBe(sandboxKind);
+    }
+  );
+
+  it.each([
+    ['cloudflare-containers-standard-3', 'standard-3'],
+    ['cloudflare-containers-standard-4', 'standard-4'],
+  ] as const)(
+    'pins %s selection to its Cloudflare container instance',
+    async (allocation, instance) => {
+      const input = await buildControlPlaneCreateInput({
+        command: {
+          identity: {
+            sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+            userId: 'usr_1',
+          },
+          auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+          message: {
+            initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+            turn: { type: 'prompt', prompt: 'hi' },
+          },
+          agent: { mode: 'code', model: FULL_MODEL },
+          workspace: {
+            sandboxId: 'ses-0123456789abcdef',
+            sandboxProvider: 'cloudflare-containers',
+            sandboxAllocation: allocation,
+          },
+        },
+        env: {} as Env,
+        attachments: [],
+        agent: { mode: 'code', model: FULL_MODEL },
+      });
+      expect(input.sandboxSelection.configuration).toEqual({
+        provider: 'cloudflare-containers',
+        instance,
+      });
     }
   );
 

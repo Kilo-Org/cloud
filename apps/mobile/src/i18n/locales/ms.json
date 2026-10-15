@@ -133,9 +133,14 @@
     "status": "Keadaan",
     "truncated": "Dipotong",
     "updated": "Dikemas kini",
+    "generating": "Menjana…",
     "working": "Memproses…",
     "yourOwnRepositories": "Repositori anda sendiri",
-    "dismissed": "Diketepikan"
+    "dismissed": "Diketepikan",
+    "agent": "ejen",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Perubahan"
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -324,6 +329,7 @@
       "collapseFile": "Sembunyikan kandungan fail",
       "expandFile": "Paparkan kandungan fail",
       "diffTooLarge": "Perbezaan kod terlalu besar untuk dipaparkan.",
+      "noPreview": "Tiada pratonton tersedia untuk fail ini",
       "openOnGitHub": "Buka di GitHub",
       "openDiffOnGitHub": "Buka perbezaan kod fail ini di GitHub",
       "githubDiff": "Perbezaan kod GitHub"
@@ -830,7 +836,8 @@
       "kiloclaw": "Aktiviti KiloClaw",
       "balance": "Amaran baki",
       "security": "Dapatan keselamatan",
-      "spend": "Amaran perbelanjaan"
+      "spend": "Amaran perbelanjaan",
+      "followedSessions": "Sesi diikuti"
     },
     "category": {
       "chatMessagesSubtitle": "balasan dalam perbualan anda",
@@ -1253,7 +1260,7 @@
         "stoppedTitle": "Persediaan dihentikan",
         "stoppedBody": "Tika {{name}} terhenti secara tidak dijangka semasa persediaan.",
         "stalledTitle": "Proses tergendala",
-        "stalledBody": "Kami tidak dapat menyiapkan {{name}}. Cuba lagi atau hantar e-mel ke hi@kilo.ai jika masalah ini berulang.",
+        "stalledBody": "Kami tidak dapat menyiapkan {{name}}. Cuba lagi atau hantar e-mel ke {{supportEmail}} jika masalah ini berulang.",
         "timeoutTitle": "Mengambil masa lebih lama daripada jangkaan",
         "timeoutBody": "Persediaan untuk {{name}} mengambil masa lebih lama daripada biasa (lebih daripada {{displayMinutes}} minit).",
         "continueInBackground": "Teruskan di latar belakang",
@@ -1311,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Pelan akses awal anda memerlukan semakan manual sebelum boleh digunakan pada peranti mudah alih.",
       "iosTitle": "KiloClaw tidak tersedia dalam iOS",
       "iosBody": "Akses KiloClaw diuruskan di luar apl iOS untuk akaun ini.",
-      "iosContact": "Ada soalan? Hubungi hi@kilo.ai.",
+      "iosContact": "Ada soalan? Hubungi {{supportEmail}}.",
       "quarantinedCta": "Hantar e-mel kepada pasukan kami",
       "nonCanonicalEarlybirdCta": "Semak pelan anda di kilo.ai"
     },
@@ -1400,6 +1407,8 @@
       "retryTitle": "Cuba semakan semula?",
       "retryMessage": "Ini akan menjalankan semula semakan kod.",
       "retryReview": "Cuba semakan semula",
+      "retryNeedsSettings": "Penyemak kod dimatikan atau tetapannya memerlukan perhatian. Betulkan tetapan, kemudian cuba semakan ini semula.",
+      "fixSettings": "Betulkan tetapan",
       "couldNotLoad": "Tidak dapat memuatkan semakan.",
       "couldNotGetLatest": "Tidak dapat mendapatkan maklumat terkini.",
       "byline": "{{repo}} #{{number}} oleh {{author}}",
@@ -1544,7 +1553,7 @@
         "recoveryLabel": "Kemas kini apl GitHub"
       },
       "githubIpAllowList": {
-        "description": "Penyemak Kod dinyahdayakan kerana senarai alamat IP yang dibenarkan oleh organisasi GitHub ini menyekat Kilo. Hubungi hi@kilocode.ai untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
+        "description": "Penyemak Kod dinyahdayakan kerana senarai alamat IP yang dibenarkan oleh organisasi GitHub ini menyekat Kilo. Hubungi {{supportEmail}} untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
       },
       "gitlabProjectAccessRequired": {
         "description": "Penyemak Kod dinyahdayakan kerana Kilo tidak dapat mencipta token akses projek GitLab untuk projek ini. Berikan akses penyelenggara atau dayakan token akses projek, kemudian dayakan Penyemak Kod semula.",
@@ -1559,7 +1568,7 @@
         "recoveryLabel": "Kemas kini tetapan Penyemak Kod"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Penyemak Kod dinyahdayakan selepas tiga percubaan mengklon repositori melebihi had masa hari ini. Hubungi hi@kilocode.ai untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
+        "description": "Penyemak Kod dinyahdayakan selepas tiga percubaan mengklon repositori melebihi had masa hari ini. Hubungi {{supportEmail}} untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
       },
       "title": "Penyemak kod memerlukan perhatian anda.",
       "recoveryLabel": "Hubungi sokongan"
@@ -2083,6 +2092,8 @@
       "title": "Sesi",
       "copyErrorDetails": "Salin butiran ralat",
       "backToSessions": "Kembali ke sesi",
+      "follow": "Ikuti pada Skrin Kunci",
+      "unfollow": "Berhenti mengikuti pada Skrin Kunci",
       "couldNotLoad": "Tidak dapat memuatkan sesi.",
       "failedToLoadDetails": "Gagal memuatkan butiran sesi.",
       "failedToStopExecution": "Gagal menghentikan pelaksanaan.",
@@ -2149,6 +2160,11 @@
       "collapse": "Sembunyikan matlamat",
       "expand": "Paparkan matlamat"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tugasan, {{completed}} daripada {{total}} selesai",
+      "rowAccessibility": "Tugasan, {{completed}} daripada {{total}} selesai. Tugasan semasa: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Digunakan baru-baru ini",
       "couldNotLoadGithubRepositories": "Tidak dapat memuatkan repositori GitHub.",
@@ -2181,7 +2197,6 @@
       "retryLoadingEnvironment": "Cuba muatkan semula persekitaran",
       "defaultEnvironment": "Persekitaran lalai",
       "environmentSummary": "{{commands}} arahan · {{mcp}} MCP · {{skills}} kemahiran · {{agents}} ejen",
-      "changes": "Perubahan",
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Komit dan hantar",
       "startSession": "Mulakan sesi",
@@ -2204,6 +2219,10 @@
       "importingSession": "Mengimport sesi",
       "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Cloud Agent atau CLI lain.",
       "importFailed": "Tidak dapat mengimport sesi ini.",
+      "cliCannotFork": "Kemas kini Kilo CLI untuk fork daripada mesej.",
+      "forkCutNotSynced": "Mesej ini belum disimpan. Cuba lagi sebentar lagi.",
+      "forkFilesFromBaseBranch": "Fail bermula daripada cabang asas.",
+      "forkFilesUnchangedOnComputer": "Fail pada komputer ini tidak diubah.",
       "pickProfile": "Pilih profil",
       "noProfile": "Tiada profil",
       "manageProfiles": "Urus profil",
@@ -2248,8 +2267,8 @@
       "toolList": "senaraikan",
       "toolPatch": "tampal",
       "toolTask": "tugasan",
-      "readTodos": "Baca tugasan",
-      "updateTodos": "Kemas kini tugasan",
+      "readTodos": "Baca pelan",
+      "updateTodos": "Kemas kini pelan",
       "linesBadge": "{{displayCount}} baris",
       "filesBadge": "{{displayCount}} fail",
       "matchesBadge": "{{displayCount}} padanan",
@@ -2319,6 +2338,7 @@
       "copyMessage": "Salin mesej",
       "copyText": "Salin teks",
       "selectText": "Pilih teks",
+      "forkFromHere": "Fork dari sini",
       "reportAiResponse": "Laporkan respons AI",
       "reportAiResponseConfirm": "Laporkan respons ini untuk semakan?",
       "report": "Lapor",
@@ -2638,6 +2658,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Model ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Lihat perubahan",
+      "asOf": "Setakat {{time}}",
+      "tooLarge": "Perbezaan kod ini terlalu besar untuk dipaparkan pada peranti mudah alih.",
+      "empty": "Belum ada perubahan fail dalam sesi ini."
     },
     "autoApprove": {
       "title": "Lulus automatik",
@@ -3150,9 +3176,36 @@
     "channelName": "Ejen aktif",
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci.",
     "openSession": "Buka",
+    "finished": "Selesai",
+    "followFailed": "Tidak dapat memaparkan ejen ini pada Skrin Kunci.",
     "approveFailed": "Tidak dapat meluluskan. Ketik $t(common.approve) untuk mencuba semula.",
-    "newestResult": "Hasil terbaharu",
-    "scheduledWakes": "bangun {{time}}"
+    "checked": "Disemak",
+    "lastKnown": "Terakhir diketahui",
+    "awaitingUpdate": "Menunggu kemas kini",
+    "nextRun": "Pelaksanaan seterusnya",
+    "waitingForYou": "Menunggu anda",
+    "nextScheduled": "Jadual seterusnya",
+    "answerNeeded": "Perlu jawapan",
+    "waitingToRetry": "Menunggu cubaan semula",
+    "step": {
+      "editing": "Menyunting",
+      "reading": "Membaca",
+      "running": "Jalankan",
+      "searching": "Carian web",
+      "thinking": "Sedang berfikir"
+    },
+    "planOf": "daripada",
+    "filesChanged": "fail diubah",
+    "finishedIn": "Selesai dalam",
+    "noActivityFor": "Tiada aktiviti selama",
+    "prOpened": "Permintaan tarik dibuka",
+    "permissionWants": "Ingin menjalankan",
+    "failure": {
+      "provider": "Berhenti: ralat pembekal",
+      "tool": "Berhenti: ralat alat",
+      "cancelled": "Berhenti: dibatalkan",
+      "other": "DIHENTIKAN"
+    }
   },
   "transcriptionModel": {
     "title": "Model transkripsi",
@@ -3180,6 +3233,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Model ini memerlukan sambungan internet. Sambung dan cuba lagi, atau tukar kepada model pada peranti ini.",
     "empty": {
       "title": "Mulakan sembang",
       "description": "Hantar mesej untuk bercakap dengan model."
@@ -3187,10 +3241,32 @@
     "list": {
       "loadFailed": "Tidak dapat memuatkan sejarah sembang.",
       "new": "Sembang baharu",
-      "openHint": "Membuka sembang. Tekan lama untuk memadam.",
       "deleteTitle": "Padam sembang ini?"
     },
+    "rename": {
+      "title": "Namakan semula sembang",
+      "accessibility": "Namakan semula sembang: {{title}}",
+      "openHint": "Membuka sembang. Tekan lama untuk menamakan semula atau memadam."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Butiran sembang",
+      "backend": "Sistem pelayan",
+      "effortDefault": "Lalai model",
+      "noCost": "Tiada kos",
+      "costUnknown": "Tidak diketahui",
+      "costEstimatedNote": "Jawapan yang tidak melaporkan harga dianggarkan daripada harga senarai.",
+      "costUnknownNote": "Tiada harga yang diketahui untuk model ini.",
+      "costPartialNote": "Jumlah ini tidak termasuk model yang tiada harga diketahui.",
+      "localNote": "Model pada peranti berjalan pada peranti ini. Model ini tiada kos dan tiada cache gesaan, dan kiraan tokennya mungkin anggaran.",
+      "countedSinceNote": "Sembang ini bermula sebelum penggunaan direkodkan. Jumlah hanya menunjukkan jawapan selepas itu.",
+      "remoteServersOn": "Pelayan MCP jauh yang dihidupkan"
+    },
+    "webSearch": {
+      "title": "Cari di web",
+      "description": "Benarkan sembang ini mencari maklumat terkini melalui akaun Kilo anda. Carian menggunakan peruntukan carian bulanan anda.",
+      "allowanceExhausted": "Carian web percuma anda untuk bulan ini telah habis. Tambah kredit untuk mencari lagi."
+    },
     "mcp": {
       "title": "Alat Kilo",
       "use": "Gunakan alat Kilo",
@@ -3213,7 +3289,6 @@
       "fieldName": "Nama paparan",
       "fieldUrl": "URL pelayan",
       "fieldUrlInvalid": "Masukkan URL pelayan yang sah.",
-      "fieldToken": "Token Bearer (pilihan)",
       "enableServer": "Dayakan pelayan ini: {{name}}",
       "editServer": "Edit pelayan",
       "deleteServer": "Padam pelayan",
@@ -3234,8 +3309,24 @@
       "serverUnreachable": "Tidak dapat menghubungi pelayan ini",
       "serverOff": "Pelayan ini dimatikan"
     },
+    "mcpOAuth": {
+      "authMethod": "Pengesahan",
+      "authNone": "Tiada log masuk",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Log masuk OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Selepas anda menyimpan, ketik $t(modelChat.mcpOAuth.signIn) pada pelayan untuk log masuk dengan pelayar anda.",
+      "serverNeedsSignIn": "Log masuk untuk menggunakan pelayan ini",
+      "signIn": "Log masuk",
+      "signInA11y": "Log masuk ke pelayan ini: {{name}}",
+      "signInFailed": "Tidak dapat log masuk ke {{name}}. Cuba lagi."
+    },
     "backends": {
       "title": "Sistem pelayan sembang",
+      "providersTitle": "Penyedia sembang",
+      "cloud": "Di awan",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Model Kilo tidak tersedia buat masa ini. Semak sambungan anda.",
       "manage": "Urus sistem pelayan",
       "defaultKilo": "$t(consent.kilo) (lalai)",
       "kiloHelp": "Sistem pelayan terbina dalam menggunakan akaun Kilo anda dan tidak boleh diedit atau dipadam.",
@@ -3295,7 +3386,6 @@
     "gguf": {
       "title": "Model yang boleh dimuat turun",
       "help": "Muat turun model terbuka dan jalankannya pada telefon ini dengan llama.cpp. Gesaan dan balasan anda kekal pada peranti. Model bersaiz besar, jadi gunakan Wi-Fi.",
-      "details": "{{size}} · Lesen: {{license}}",
       "download": "Muat turun model",
       "pause": "Jeda muat turun",
       "resume": "Sambung muat turun",
@@ -3307,6 +3397,8 @@
       "url": "Pautan muat turun terus",
       "urlHelp": "Tampal pautan HTTPS ke fail .gguf, seperti pautan resolve Hugging Face. Muat turun model hanya daripada sumber yang anda percaya.",
       "downloadUrl": "Muat turun daripada pautan",
+      "advanced": "Lanjutan",
+      "localPurpose": "Berjalan pada peranti ini dengan llama.cpp. Gesaan dan balasan kekal pada peranti.",
       "deleteTitle": "Padam model ini?",
       "deleteMessage": "Padam {{name}} daripada peranti ini? Sembang yang menggunakannya memerlukan model lain sebelum boleh diteruskan.",
       "errors": {
@@ -3316,12 +3408,62 @@
         "notGguf": "Pautan mesti menunjuk ke fail .gguf.",
         "space": "Ruang storan kosong tidak mencukupi untuk model ini. Kosongkan ruang dan cuba lagi.",
         "network": "Muat turun tidak selesai. Semak sambungan anda dan cuba lagi.",
-        "invalidFile": "Fail yang dimuat turun bukan model yang boleh dijalankan oleh aplikasi ini, jadi ia telah dibuang."
+        "invalidFile": "Fail yang dimuat turun bukan model yang boleh dijalankan oleh aplikasi ini, jadi ia telah dibuang.",
+        "checksum": "Fail yang dimuat turun tidak sepadan dengan checksum yang diterbitkan, jadi ia telah dibuang. Cuba muat turun sekali lagi."
       }
+    },
+    "catalog": {
+      "browse": "Layari model",
+      "title": "Katalog model",
+      "search": "Cari model Hugging Face",
+      "tabs": "Penapis model",
+      "fitsTab": "Sesuai untuk peranti ini",
+      "fromHuggingFace": "Daripada Hugging Face",
+      "loading": "Memuatkan model",
+      "noResults": "Tiada model ditemui",
+      "noFits": "Tiada model yang sesuai untuk peranti ini",
+      "noFitsDescription": "Model yang lebih besar terdapat dalam tab $t(common.all).",
+      "fit": {
+        "fits": "Sesuai",
+        "tight": "Hampir tidak muat",
+        "tooLarge": "Terlalu besar",
+        "noStorage": "Storan tidak mencukupi",
+        "unknown": "Kesesuaian tidak diketahui"
+      },
+      "recommendationsHelp": "Senarai pendek yang disematkan oleh apl ini: satu fail setiap model, daripada penerbit yang menyatakan lesen. Tiada yang lain diberi kedudukan.",
+      "compatibilityHelp": "Kesesuaian membandingkan fail model dengan memori dan storan bebas peranti ini. Angka memori ialah anggaran, bukan ukuran.",
+      "text": "Teks",
+      "listTextPurpose": "Gesaan teks sahaja.",
+      "listImagePurpose": "Membaca imej serta teks.",
+      "smallestDownload": "Muat turun terkecil: {{size}} · kira-kira {{memory}} memori",
+      "fullFileName": "Fail: {{name}}",
+      "memoryEstimateNote": "Angka memori ialah anggaran, bukan ukuran.",
+      "parameters": "Parameter: {{value}}",
+      "downloads": "Muat turun: {{value}}",
+      "likes": "Suka: {{value}}",
+      "context": "Tetingkap konteks: {{value}}",
+      "license": "Lesen: {{license}}",
+      "licenseUnknown": "Lesen tidak dinyatakan",
+      "tools": "Panggilan alat",
+      "vision": "Input imej",
+      "hintsHelp": "Petunjuk daripada Hugging Face. Apl menyemak model selepas ia dimuat turun.",
+      "gated": "Model ini memerlukan akaun Hugging Face, jadi apl tidak dapat memuat turunnya.",
+      "quantizations": "Pengkuantuman",
+      "quantizationsHelp": "Fail yang lebih kecil menggunakan kurang memori dan storan. Fail yang lebih besar biasanya memberikan jawapan yang lebih baik.",
+      "quantDetail": "Muat turun {{size}} · kira-kira {{memory}} memori",
+      "downloadQuant": "Muat turun {{quant}}",
+      "loadingModel": "Memuatkan butiran model",
+      "couldNotLoadModel": "Tidak dapat memuatkan model ini",
+      "noFiles": "Tiada fail yang boleh dijalankan oleh apl ini",
+      "noFilesDescription": "Apl ini menjalankan model yang terdiri daripada satu fail GGUF.",
+      "tooLargeTitle": "Model ini mungkin tidak dapat dijalankan",
+      "tooLargeMessage": "{{name}} mungkin memerlukan lebih banyak memori daripada yang ada pada peranti ini. Apl mungkin tertutup semasa model menjawab. Muat turun juga?",
+      "downloadAnyway": "Muat turun juga"
     },
     "localModels": {
       "title": "Model pada peranti",
-      "help": "Model pada peranti berjalan pada telefon ini. Gesaan dan balasan anda kekal pada peranti, dan model ini tidak boleh menggunakan alat.",
+      "help": "Model pada peranti berjalan pada telefon ini. Gesaan dan balasan anda kekal pada peranti.",
+      "systemPurpose": "Model yang terbina dalam sistem peranti ini. Ia berjalan pada peranti.",
       "apple": "Apple Intelligence (pada peranti)",
       "checking": "Menyemak ketersediaan…",
       "ready": "Sedia untuk digunakan",
@@ -3347,6 +3489,9 @@
       "downloading": "Memuat turun…",
       "downloadProgress": "Memuat turun… {{percent}}%",
       "downloadFailed": "Muat turun tidak selesai. Semak sambungan dan ruang storan kosong anda, kemudian cuba lagi."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Model ini menyokong tahap pemikiran"
     }
   },
   "settingsTools": {
@@ -3526,7 +3671,6 @@
       "template": "templat",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Terangkan $ARGUMENTS",
-      "agent": "ejen",
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit arahan slash",
       "saveFailed": "Tidak dapat menyimpan arahan",
@@ -3570,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play tidak memulangkan pek kredit yang sepadan.",
     "purchaseOwnedByAnotherAccount": "Kredit dalam Apple Account ini milik akaun Kilo yang lain. Log masuk ke akaun Kilo itu untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit pada Akaun Google Play ini kepunyaan akaun Kilo yang berbeza. Log masuk ke akaun Kilo itu untuk menggunakannya."
+  },
+  "todos": {
+    "saveAsTodo": "Simpan sebagai tugasan",
+    "segment": {
+      "label": "Paparan ejen",
+      "sessions": "Sesi",
+      "todos": "Tugasan"
+    },
+    "lists": {
+      "newList": "Senarai baharu",
+      "empty": "Belum ada senarai",
+      "couldNotLoad": "Tidak dapat memuatkan senarai",
+      "noRepository": "Tiada repositori",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} terbuka",
+      "openCount_other": "{{count}} terbuka",
+      "archived_one": "Diarkibkan ({{count}})",
+      "archived_other": "Diarkibkan ({{count}})",
+      "archive": "Arkibkan",
+      "unarchive": "Nyaharkib",
+      "deleteTitle": "Padam {{name}}?",
+      "deleteMessage": "Tugasannya juga dipadam. Sesinya kekal."
+    },
+    "listSettings": {
+      "title": "Tetapan senarai",
+      "name": "Nama",
+      "namePlaceholder": "Pepijat, Idea, Keluaran…",
+      "emoji": "Emoji",
+      "mode": "Mod",
+      "defaultsHint": "Sesi yang dimulakan daripada senarai ini menggunakan tetapan lalai ini."
+    },
+    "list": {
+      "addPlaceholder": "Tambah tugasan baharu",
+      "add": "Tambah tugasan",
+      "empty": "Belum ada tugasan",
+      "setDefaults": "Tetapkan repositori, mod dan model",
+      "completed_one": "Selesai ({{count}})",
+      "completed_other": "Selesai ({{count}})"
+    },
+    "item": {
+      "markDone": "Tandakan selesai",
+      "markOpen": "Tandakan belum selesai",
+      "markDonePrompt": "Tandakan selesai?",
+      "deleted": "Tugasan dipadam",
+      "undo": "Buat asal",
+      "runCount_one": "{{count}} pelaksanaan",
+      "runCount_other": "{{count}} pelaksanaan",
+      "startNow": "Mulakan tanpa semakan",
+      "startNowHint": "Tekan lama untuk mulakan tanpa semakan",
+      "titleLabel": "Tajuk tugasan",
+      "renameTitle": "Namakan semula tugasan",
+      "notes": "Nota",
+      "addNotes": "Tambah nota",
+      "notesPrompt": "Tambah konteks, keperluan atau kriteria penerimaan.",
+      "markdownSupported": "Markdown disokong",
+      "sessions": "Sesi dipautkan",
+      "noSessions": "Belum ada sesi",
+      "untitledLinkedSession": "Sesi berpaut",
+      "sessionNeedsInput": "Sesi perlukan input",
+      "sessionRunning": "Sesi sedang berjalan",
+      "sessionFinished": "Sesi selesai",
+      "sessionPullRequest": "Permintaan tarik sesi",
+      "sessionPullRequestNumber": "PR sesi #{{number}}",
+      "openSessionHint": "Membuka sesi.",
+      "unlinkSessionAction": "Nyahpaut sesi",
+      "unlinkConfirmTitle": "Nyahpaut {{title}}?",
+      "unlinkConfirmMessage": "Sesi itu sendiri tidak dipadamkan. Hanya pautannya pada tugasan ini dialihkan.",
+      "startNewSession": "Mulakan sesi baharu",
+      "startNewSessionHint": "Tekan lama untuk memulakan sesi baharu.",
+      "linkSession": "Pautkan sesi",
+      "linkFailed": "Tidak dapat memautkan sesi pada tugasan"
+    },
+    "linkSession": {
+      "title": "Pautkan satu sesi",
+      "empty": "Tiada sesi terkini",
+      "emptyInRepository": "Tiada sesi terkini dalam {{repository}}"
+    },
+    "upNext": "Seterusnya",
+    "sessionTodo": "Tugasan: {{title}}",
+    "linkToTodo": "Pautkan pada tugasan",
+    "candidates": {
+      "empty": "Tiada tugasan terbuka"
+    },
+    "saveSheet": {
+      "title": "Simpan ke senarai",
+      "saved": "Disimpan ke {{list}}"
+    }
   }
 }

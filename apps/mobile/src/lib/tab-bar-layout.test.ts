@@ -413,60 +413,44 @@ describe('tabAccessibilityLabel', () => {
 });
 
 describe('visibleTabCount', () => {
-  it('counts three base tabs when both flagged tabs are hidden', () => {
-    expect(visibleTabCount(false, false)).toBe(3);
+  it('counts Home, Agents, Chat, and Profile when KiloClaw is hidden', () => {
+    expect(visibleTabCount(false)).toBe(4);
   });
 
-  it('adds the KiloClaw tab only', () => {
-    expect(visibleTabCount(true, false)).toBe(4);
-  });
-
-  it('adds the Chat tab only', () => {
-    expect(visibleTabCount(false, true)).toBe(4);
-  });
-
-  it('adds both flagged tabs', () => {
-    expect(visibleTabCount(true, true)).toBe(5);
+  it('adds the KiloClaw tab when visible', () => {
+    expect(visibleTabCount(true)).toBe(5);
   });
 });
 
 describe('tabBarPosition', () => {
-  const noFlags = { showKiloClaw: false, showChat: false };
-  const kiloclawOnly = { showKiloClaw: true, showChat: false };
-  const chatOnly = { showKiloClaw: false, showChat: true };
-  const both = { showKiloClaw: true, showChat: true };
+  const withoutKiloClaw = { showKiloClaw: false };
+  const withKiloClaw = { showKiloClaw: true };
 
-  it('positions Home at 1 in every combination', () => {
-    expect(tabBarPosition('home', noFlags)).toBe(1);
-    expect(tabBarPosition('home', both)).toBe(1);
+  it('positions Home at 1 regardless of KiloClaw visibility', () => {
+    expect(tabBarPosition('home', withoutKiloClaw)).toBe(1);
+    expect(tabBarPosition('home', withKiloClaw)).toBe(1);
   });
 
   it('returns null for a hidden KiloClaw tab', () => {
-    expect(tabBarPosition('kiloclaw', noFlags)).toBeNull();
-    expect(tabBarPosition('kiloclaw', chatOnly)).toBeNull();
+    expect(tabBarPosition('kiloclaw', withoutKiloClaw)).toBeNull();
   });
 
   it('positions KiloClaw at 2 when shown', () => {
-    expect(tabBarPosition('kiloclaw', kiloclawOnly)).toBe(2);
-    expect(tabBarPosition('kiloclaw', both)).toBe(2);
+    expect(tabBarPosition('kiloclaw', withKiloClaw)).toBe(2);
   });
 
   it('positions Agents after KiloClaw', () => {
-    expect(tabBarPosition('agents', noFlags)).toBe(2);
-    expect(tabBarPosition('agents', kiloclawOnly)).toBe(3);
+    expect(tabBarPosition('agents', withoutKiloClaw)).toBe(2);
+    expect(tabBarPosition('agents', withKiloClaw)).toBe(3);
   });
 
-  it('returns null for a hidden Chat tab and positions it after Agents when shown', () => {
-    expect(tabBarPosition('chat', noFlags)).toBeNull();
-    expect(tabBarPosition('chat', kiloclawOnly)).toBeNull();
-    expect(tabBarPosition('chat', chatOnly)).toBe(3);
-    expect(tabBarPosition('chat', both)).toBe(4);
+  it('always positions Chat after Agents', () => {
+    expect(tabBarPosition('chat', withoutKiloClaw)).toBe(3);
+    expect(tabBarPosition('chat', withKiloClaw)).toBe(4);
   });
 
-  it('positions Profile last in every combination', () => {
-    expect(tabBarPosition('profile', noFlags)).toBe(3);
-    expect(tabBarPosition('profile', kiloclawOnly)).toBe(4);
-    expect(tabBarPosition('profile', chatOnly)).toBe(4);
-    expect(tabBarPosition('profile', both)).toBe(5);
+  it('positions Profile last regardless of KiloClaw visibility', () => {
+    expect(tabBarPosition('profile', withoutKiloClaw)).toBe(4);
+    expect(tabBarPosition('profile', withKiloClaw)).toBe(5);
   });
 });

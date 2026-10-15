@@ -4,18 +4,21 @@
 
   Same union of exclusions as kilo_backup_rules.xml, declared once for each
   of cloud-backup and device-transfer: shared preferences are included,
-  SecureStore and the AppsFlyer capture files are excluded.
+  SecureStore, the native Home widget cache, and the AppsFlyer capture files
+  are excluded.
 -->
 <data-extraction-rules>
   <cloud-backup>
     <include domain="sharedpref" path="."/>
     <exclude domain="sharedpref" path="SecureStore"/>
+    <exclude domain="sharedpref" path="home-widget-refresh"/>
     <exclude domain="sharedpref" path="appsflyer-data"/>
     <exclude domain="sharedpref" path="appsflyer-purchase-data"/>
   </cloud-backup>
   <device-transfer>
     <include domain="sharedpref" path="."/>
     <exclude domain="sharedpref" path="SecureStore"/>
+    <exclude domain="sharedpref" path="home-widget-refresh"/>
     <exclude domain="sharedpref" path="appsflyer-data"/>
     <exclude domain="sharedpref" path="appsflyer-purchase-data"/>
   </device-transfer>

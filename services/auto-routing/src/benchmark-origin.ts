@@ -7,6 +7,8 @@ import {
   CustomRoutingTableRequestSchema,
   CustomRoutingTableResponseSchema,
   RegisterBenchmarkProfilesRequestSchema,
+  DEFAULT_AUTO_ROUTER,
+  type AutoRouter,
   type BenchmarkProfileStatusesResponse,
   type ClassifierWinner,
   type CustomRoutingTable,
@@ -51,8 +53,15 @@ async function fetchBenchmarkJson(env: BenchmarkEnv, path: string): Promise<unkn
   return res.json();
 }
 
-export async function fetchRoutingTableFromOrigin(env: BenchmarkEnv): Promise<RoutingTable | null> {
-  const body = await fetchBenchmarkJson(env, '/admin/routing-table');
+export async function fetchRoutingTableFromOrigin(
+  env: BenchmarkEnv,
+  router: AutoRouter = DEFAULT_AUTO_ROUTER
+): Promise<RoutingTable | null> {
+  const path =
+    router === DEFAULT_AUTO_ROUTER
+      ? '/admin/routing-table'
+      : `/admin/routing-table?router=${router}`;
+  const body = await fetchBenchmarkJson(env, path);
   const parsed = BenchmarkRoutingTableResponseSchema.safeParse(body);
   if (!parsed.success) {
     throw new Error(

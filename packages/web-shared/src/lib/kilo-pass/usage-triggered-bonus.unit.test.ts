@@ -157,7 +157,14 @@ describe('usage-triggered-bonus (unit)', () => {
     });
 
     test.each([
-      [1, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.05],
+      [1, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.1],
+      [1, KiloPassWelcomePromoEligibilityReason.MissingFingerprint, true, 0.1],
+      [1, KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint, true, 0.1],
+      [1, KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed, true, 0.05],
+      [1, KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement, true, 0.05],
+      [1, KiloPassWelcomePromoEligibilityReason.SettlementUnresolved, true, 0.05],
+      [1, null, true, 0.05],
+      [1, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, false, 0.05],
       [2, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.5],
       [2, KiloPassWelcomePromoEligibilityReason.MissingFingerprint, true, 0.5],
       [2, KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint, true, 0.5],

@@ -133,9 +133,14 @@
     "status": "Stav",
     "truncated": "Skrátené",
     "updated": "Aktualizované",
+    "generating": "Generuje sa…",
     "working": "Pracuje sa",
     "yourOwnRepositories": "Tvoje vlastné repozitáre",
-    "dismissed": "Ignorované"
+    "dismissed": "Ignorované",
+    "agent": "agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Zmeny"
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -324,6 +329,7 @@
       "collapseFile": "Zbaliť súbor",
       "expandFile": "Rozbaliť súbor",
       "diffTooLarge": "Prehľad zmien je príliš veľký na zobrazenie.",
+      "noPreview": "Pre tento súbor nie je k dispozícii náhľad",
       "openOnGitHub": "Otvoriť na GitHub",
       "openDiffOnGitHub": "Otvoriť prehľad zmien tohto súboru na GitHub",
       "githubDiff": "Prehľad zmien na GitHub"
@@ -862,7 +868,8 @@
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornenia na zostatok",
       "security": "Bezpečnostné zistenia",
-      "spend": "Upozornenia na výdavky"
+      "spend": "Upozornenia na výdavky",
+      "followedSessions": "Sledované relácie"
     },
     "category": {
       "chatMessagesSubtitle": "odpovede v tvojich konverzáciách",
@@ -1289,7 +1296,7 @@
         "stoppedTitle": "Nastavovanie sa zastavilo",
         "stoppedBody": "Inštancia {{name}} sa neočakávane zastavila počas nastavovania.",
         "stalledTitle": "Nastavovanie sa zaseklo",
-        "stalledBody": "Nepodarilo sa dokončiť nastavenie pre {{name}}. Skús to znova. Ak sa problém opakuje, napíš na hi@kilo.ai.",
+        "stalledBody": "Nepodarilo sa dokončiť nastavenie pre {{name}}. Skús to znova. Ak sa problém opakuje, napíš na {{supportEmail}}.",
         "timeoutTitle": "Trvá to dlhšie, než sa očakávalo",
         "timeoutBody": "Nastavovanie pre {{name}} trvá dlhšie než zvyčajne (viac než {{displayMinutes}} minút).",
         "continueInBackground": "Pokračovať na pozadí",
@@ -1347,7 +1354,7 @@
       "nonCanonicalEarlybirdBody": "Pred používaním v mobile musí tvoj program prednostného prístupu prejsť ručnou kontrolou.",
       "iosTitle": "KiloClaw nie je dostupný v systéme iOS",
       "iosBody": "Prístup k službe KiloClaw sa pre tento účet spravuje mimo aplikácie pre iOS.",
-      "iosContact": "Máš otázky? Napíš na hi@kilo.ai.",
+      "iosContact": "Máš otázky? Napíš na {{supportEmail}}.",
       "quarantinedCta": "Napísať nášmu tímu",
       "nonCanonicalEarlybirdCta": "Skontrolovať svoj program na kilo.ai"
     },
@@ -1438,6 +1445,8 @@
       "retryTitle": "Zopakovať kontrolu?",
       "retryMessage": "Kontrola kódu sa spustí znova.",
       "retryReview": "Zopakovať kontrolu",
+      "retryNeedsSettings": "Agent na kontrolu kódu je vypnutý alebo jeho nastavenia vyžadujú pozornosť. Opravte nastavenia a potom túto kontrolu zopakujte.",
+      "fixSettings": "Opraviť nastavenia",
       "couldNotLoad": "Kontrolu sa nepodarilo načítať.",
       "couldNotGetLatest": "Najnovšie údaje sa nepodarilo načítať.",
       "byline": "{{repo}} #{{number}} · autor: {{author}}",
@@ -1582,7 +1591,7 @@
         "recoveryLabel": "Aktualizovať aplikáciu GitHub"
       },
       "githubIpAllowList": {
-        "description": "Kontrolór kódu bol vypnutý, pretože organizácia na platforme GitHub používa zoznam povolených IP adries, ktorý blokuje Kilo. Požiadajte o pomoc na hi@kilocode.ai a potom kontrolóra kódu znova zapnite."
+        "description": "Kontrolór kódu bol vypnutý, pretože organizácia na platforme GitHub používa zoznam povolených IP adries, ktorý blokuje Kilo. Požiadajte o pomoc na {{supportEmail}} a potom kontrolóra kódu znova zapnite."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kontrolór kódu bol vypnutý, pretože Kilo nemôže vytvoriť prístupový token pre tento projekt na platforme GitLab. Udeľte rolu správcu alebo povoľte prístupové tokeny projektov a potom kontrolóra kódu znova zapnite.",
@@ -1597,7 +1606,7 @@
         "recoveryLabel": "Aktualizovať nastavenia kontrolóra kódu"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kontrolór kódu bol vypnutý, pretože klonovanie repozitára dnes trikrát prekročilo časový limit. Požiadajte o pomoc na hi@kilocode.ai a potom kontrolóra kódu znova zapnite."
+        "description": "Kontrolór kódu bol vypnutý, pretože klonovanie repozitára dnes trikrát prekročilo časový limit. Požiadajte o pomoc na {{supportEmail}} a potom kontrolóra kódu znova zapnite."
       },
       "title": "Agent na kontrolu kódu vyžaduje tvoju pozornosť.",
       "recoveryLabel": "Kontaktovať podporu"
@@ -2139,6 +2148,8 @@
       "title": "Relácia",
       "copyErrorDetails": "Kopírovať podrobnosti chyby",
       "backToSessions": "Späť na relácie",
+      "follow": "Sledovať na uzamknutej obrazovke",
+      "unfollow": "Prestať sledovať na uzamknutej obrazovke",
       "couldNotLoad": "Reláciu sa nepodarilo načítať.",
       "failedToLoadDetails": "Podrobnosti relácie sa nepodarilo načítať.",
       "failedToStopExecution": "Vykonávanie sa nepodarilo zastaviť.",
@@ -2205,6 +2216,11 @@
       "collapse": "Zbaliť cieľ",
       "expand": "Rozbaliť cieľ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Úlohy, dokončené {{completed}} z {{total}}",
+      "rowAccessibility": "Úlohy, dokončené {{completed}} z {{total}}. Aktuálna úloha: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Naposledy použité",
       "couldNotLoadGithubRepositories": "Repozitáre zo služby GitHub sa nepodarilo načítať.",
@@ -2237,7 +2253,6 @@
       "retryLoadingEnvironment": "Skúsiť znova načítať prostredie",
       "defaultEnvironment": "Predvolené prostredie",
       "environmentSummary": "príkazy: {{commands}} · MCP: {{mcp}} · zručnosti: {{skills}} · agenti: {{agents}}",
-      "changes": "Zmeny",
       "leaveChanges": "Ponechať zmeny",
       "commitAndPush": "Vytvoriť commit a odoslať",
       "startSession": "Spustiť reláciu",
@@ -2260,6 +2275,10 @@
       "importingSession": "Importuje sa relácia",
       "cliCannotContinue": "Táto verzia CLI nepodporuje pokračovanie v relácii. Vyber službu Cloud Agent alebo inú inštanciu CLI.",
       "importFailed": "Túto reláciu sa nepodarilo importovať.",
+      "cliCannotFork": "Ak chceš rozvetviť reláciu od správy, aktualizuj Kilo CLI.",
+      "forkCutNotSynced": "Táto správa ešte nie je uložená. Skús to znova o chvíľu.",
+      "forkFilesFromBaseBranch": "Súbory vychádzajú zo základnej vetvy.",
+      "forkFilesUnchangedOnComputer": "Súbory v tomto počítači sa nezmenia.",
       "pickProfile": "Vyberte profil",
       "noProfile": "Žiadny profil",
       "manageProfiles": "Spravovať profily",
@@ -2306,8 +2325,8 @@
       "toolList": "zobraziť zoznam",
       "toolPatch": "použiť záplatu",
       "toolTask": "úloha",
-      "readTodos": "Prečítať úlohy",
-      "updateTodos": "Aktualizovať úlohy",
+      "readTodos": "Prečítať plán",
+      "updateTodos": "Aktualizovať plán",
       "linesBadge": "riadky: {{displayCount}}",
       "filesBadge": "súbory: {{displayCount}}",
       "matchesBadge": "zhody: {{displayCount}}",
@@ -2383,6 +2402,7 @@
       "copyMessage": "Kopírovať správu",
       "copyText": "Kopírovať text",
       "selectText": "Vybrať text",
+      "forkFromHere": "Rozvetviť odtiaľto",
       "reportAiResponse": "Nahlásiť odpoveď AI",
       "reportAiResponseConfirm": "Nahlásiť túto odpoveď na preverenie?",
       "report": "Nahlásiť",
@@ -2714,6 +2734,12 @@
       "modelsCount_other": "Modely ({{displayCount}})",
       "modelsCount_few": "Modely ({{displayCount}})",
       "modelsCount_many": "Modely ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Zobraziť zmeny",
+      "asOf": "Stav k {{time}}",
+      "tooLarge": "Prehľad zmien je príliš veľký na zobrazenie v mobile.",
+      "empty": "V tejto relácii zatiaľ nie sú žiadne zmeny súborov."
     },
     "autoApprove": {
       "title": "Automatické schvaľovanie",
@@ -3232,9 +3258,36 @@
     "channelName": "Aktívne agenty",
     "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke.",
     "openSession": "Otvoriť",
+    "finished": "Dokončené",
+    "followFailed": "Tohto agenta sa nepodarilo zobraziť na uzamknutej obrazovke.",
     "approveFailed": "Schválenie sa nepodarilo. Klepnutím na $t(common.approve) to skús znova.",
-    "newestResult": "Najnovší výsledok",
-    "scheduledWakes": "prebudí sa {{time}}"
+    "checked": "Overené",
+    "lastKnown": "Posledný známy stav",
+    "awaitingUpdate": "Čaká na aktualizáciu",
+    "nextRun": "Ďalšie spustenie",
+    "waitingForYou": "Čaká na vás",
+    "nextScheduled": "Ďalšie naplánované",
+    "answerNeeded": "Čaká na odpoveď",
+    "waitingToRetry": "Čaká na opakovanie",
+    "step": {
+      "editing": "Úprava",
+      "reading": "Čítanie",
+      "running": "Spustenie",
+      "searching": "Webové vyhľadávanie",
+      "thinking": "Premýšľanie"
+    },
+    "planOf": "z",
+    "filesChanged": "zmenených súborov",
+    "finishedIn": "Dokončené za",
+    "noActivityFor": "Žiadna aktivita už",
+    "prOpened": "Pull request otvorený",
+    "permissionWants": "Chce spustiť",
+    "failure": {
+      "provider": "Zastavené: chyba poskytovateľa",
+      "tool": "Zastavené: chyba nástroja",
+      "cancelled": "Zastavené: zrušené",
+      "other": "ZASTAVENÉ"
+    }
   },
   "transcriptionModel": {
     "title": "Model prepisu",
@@ -3262,6 +3315,7 @@
     "tutorialLabel": "Sprievodca"
   },
   "modelChat": {
+    "offlineFailure": "Tento model vyžaduje pripojenie na internet. Pripojte sa a skúste to znova alebo prepnite na model v tomto zariadení.",
     "empty": {
       "title": "Začať chat",
       "description": "Pošlite správu a porozprávajte sa s modelom."
@@ -3269,10 +3323,32 @@
     "list": {
       "loadFailed": "Históriu chatu sa nepodarilo načítať.",
       "new": "Nový chat",
-      "openHint": "Otvorí chat. Dlhým stlačením odstránite.",
       "deleteTitle": "Odstrániť tento chat?"
     },
+    "rename": {
+      "title": "Premenovať chat",
+      "accessibility": "Premenovať chat: {{title}}",
+      "openHint": "Otvorí chat. Dlhým stlačením ho premenujete alebo odstránite."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Podrobnosti chatu",
+      "backend": "Server",
+      "effortDefault": "Predvolené pre model",
+      "noCost": "Bez nákladov",
+      "costUnknown": "Neznáme",
+      "costEstimatedNote": "Náklady na odpovede, ktoré neuviedli cenu, sú odhadnuté podľa cenníkových cien.",
+      "costUnknownNote": "Cena tohto modelu nie je známa.",
+      "costPartialNote": "Tento súčet nezahŕňa modely, ktorých cena nie je známa.",
+      "localNote": "Modely v zariadení bežia v tomto zariadení. Nemajú žiadne náklady ani vyrovnávaciu pamäť promptov a ich počty tokenov môžu byť odhadované.",
+      "countedSinceNote": "Tento chat sa začal pred zaznamenávaním využitia. Súčty zahŕňajú iba odpovede po tomto čase.",
+      "remoteServersOn": "Zapnuté vzdialené servery MCP"
+    },
+    "webSearch": {
+      "title": "Hľadať na webe",
+      "description": "Povoľte tomuto četu vyhľadávať aktuálne informácie cez váš účet Kilo. Vyhľadávania čerpajú váš mesačný limit vyhľadávania.",
+      "allowanceExhausted": "Vaše bezplatné webové vyhľadávania na tento mesiac sa minuli. Pridajte kredity a hľadajte znova."
+    },
     "mcp": {
       "title": "Nástroje Kilo",
       "use": "Používať nástroje Kilo",
@@ -3295,7 +3371,6 @@
       "fieldName": "Zobrazovaný názov",
       "fieldUrl": "URL servera",
       "fieldUrlInvalid": "Zadajte platnú URL servera.",
-      "fieldToken": "Token Bearer (voliteľné)",
       "enableServer": "Povoliť tento server: {{name}}",
       "editServer": "Upraviť server",
       "deleteServer": "Odstrániť server",
@@ -3316,8 +3391,24 @@
       "serverUnreachable": "Nepodarilo sa pripojiť k tomuto serveru",
       "serverOff": "Tento server je vypnutý"
     },
+    "mcpOAuth": {
+      "authMethod": "Overenie",
+      "authNone": "Bez prihlásenia",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Prihlásenie cez OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Po uložení ťuknite pri serveri na $t(modelChat.mcpOAuth.signIn) a prihláste sa v prehliadači.",
+      "serverNeedsSignIn": "Ak chcete používať tento server, prihláste sa",
+      "signIn": "Prihlásiť sa",
+      "signInA11y": "Prihlásiť sa k tomuto serveru: {{name}}",
+      "signInFailed": "Nepodarilo sa prihlásiť k {{name}}. Skúste to znova."
+    },
     "backends": {
       "title": "Servery chatu",
+      "providersTitle": "Poskytovatelia chatu",
+      "cloud": "V cloude",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Modely Kilo teraz nie sú dostupné. Skontrolujte pripojenie.",
       "manage": "Spravovať servery",
       "defaultKilo": "$t(consent.kilo) (predvolené)",
       "kiloHelp": "Vstavaný server používa váš účet Kilo a nedá sa upraviť ani odstrániť.",
@@ -3377,7 +3468,6 @@
     "gguf": {
       "title": "Modely na stiahnutie",
       "help": "Stiahnite si otvorený model a spustite ho v tomto telefóne pomocou llama.cpp. Vaše výzvy a odpovede zostávajú v zariadení. Modely sú veľké, preto použite Wi-Fi.",
-      "details": "{{size}} · Licencia: {{license}}",
       "download": "Stiahnuť model",
       "pause": "Pozastaviť sťahovanie",
       "resume": "Pokračovať v sťahovaní",
@@ -3389,6 +3479,8 @@
       "url": "Priamy odkaz na stiahnutie",
       "urlHelp": "Vložte odkaz HTTPS na súbor .gguf, napríklad odkaz na Hugging Face typu resolve. Modely sťahujte iba zo zdrojov, ktorým dôverujete.",
       "downloadUrl": "Stiahnuť z odkazu",
+      "advanced": "Pokročilé",
+      "localPurpose": "Beží na tomto zariadení s llama.cpp. Výzvy a odpovede zostávajú v zariadení.",
       "deleteTitle": "Odstrániť tento model?",
       "deleteMessage": "Odstrániť {{name}} z tohto zariadenia? Konverzácie, ktoré ho používajú, potrebujú pred pokračovaním iný model.",
       "errors": {
@@ -3398,12 +3490,62 @@
         "notGguf": "Odkaz musí smerovať na súbor .gguf.",
         "space": "Na tento model nie je dostatok voľného úložiska. Uvoľnite miesto a skúste to znova.",
         "network": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a skúste to znova.",
-        "invalidFile": "Stiahnutý súbor nie je model, ktorý by táto aplikácia mohla spustiť, preto bol odstránený."
+        "invalidFile": "Stiahnutý súbor nie je model, ktorý by táto aplikácia mohla spustiť, preto bol odstránený.",
+        "checksum": "Stiahnutý súbor sa nezhoduje so zverejneným kontrolným súčtom, preto bol odstránený. Skúste ho stiahnuť znova."
       }
+    },
+    "catalog": {
+      "browse": "Prehliadať modely",
+      "title": "Katalóg modelov",
+      "search": "Hľadať modely na Hugging Face",
+      "tabs": "Filter modelov",
+      "fitsTab": "Vhodné pre toto zariadenie",
+      "fromHuggingFace": "Z Hugging Face",
+      "loading": "Načítavajú sa modely",
+      "noResults": "Nenašli sa žiadne modely",
+      "noFits": "Pre toto zariadenie nie je vhodný žiadny model",
+      "noFitsDescription": "Väčšie modely nájdete na karte $t(common.all).",
+      "fit": {
+        "fits": "Vhodný",
+        "tight": "Tesne vhodný",
+        "tooLarge": "Príliš veľký",
+        "noStorage": "Nedostatok úložiska",
+        "unknown": "Zhoda neznáma"
+      },
+      "recommendationsHelp": "Krátky zoznam, ktorý táto aplikácia pripína: jeden súbor na model od vydavateľa, ktorý uvádza licenciu. Nič iné sa nehodnotí.",
+      "compatibilityHelp": "Zhoda porovnáva súbor modelu s pamäťou a voľným úložiskom tohto zariadenia. Údaj o pamäti je odhad, nie meranie.",
+      "text": "Text",
+      "listTextPurpose": "Iba textové výzvy.",
+      "listImagePurpose": "Číta obrázky aj text.",
+      "smallestDownload": "Najmenšie stiahnutie: {{size}} · približne {{memory}} pamäte",
+      "fullFileName": "Súbor: {{name}}",
+      "memoryEstimateNote": "Údaje o pamäti sú odhady, nie merania.",
+      "parameters": "Parametre: {{value}}",
+      "downloads": "Stiahnutia: {{value}}",
+      "likes": "Páči sa: {{value}}",
+      "context": "Kontextové okno: {{value}}",
+      "license": "Licencia: {{license}}",
+      "licenseUnknown": "Licencia nie je uvedená",
+      "tools": "Volanie nástrojov",
+      "vision": "Vstup obrázkov",
+      "hintsHelp": "Údaje z Hugging Face. Aplikácia model po stiahnutí skontroluje.",
+      "gated": "Tento model vyžaduje účet Hugging Face, preto ho aplikácia nemôže stiahnuť.",
+      "quantizations": "Kvantizácie",
+      "quantizationsHelp": "Menšie súbory zaberajú menej pamäte a úložiska. Väčšie súbory zvyčajne dávajú lepšie odpovede.",
+      "quantDetail": "Na stiahnutie {{size}} · približne {{memory}} pamäte",
+      "downloadQuant": "Stiahnuť {{quant}}",
+      "loadingModel": "Načítavajú sa podrobnosti modelu",
+      "couldNotLoadModel": "Tento model sa nepodarilo načítať",
+      "noFiles": "Žiadne súbory, ktoré táto aplikácia dokáže spustiť",
+      "noFilesDescription": "Táto aplikácia spúšťa modely tvorené jedným súborom GGUF.",
+      "tooLargeTitle": "Tento model nemusí fungovať",
+      "tooLargeMessage": "{{name}} pravdepodobne potrebuje viac pamäte, než má toto zariadenie. Aplikácia sa môže počas odpovedania modelu zavrieť. Chcete ho napriek tomu stiahnuť?",
+      "downloadAnyway": "Napriek tomu stiahnuť"
     },
     "localModels": {
       "title": "Modely v zariadení",
-      "help": "Modely v zariadení bežia priamo v tomto telefóne. Vaše výzvy a odpovede zostávajú v zariadení a tieto modely nemôžu používať nástroje.",
+      "help": "Modely v zariadení bežia priamo v tomto telefóne. Vaše výzvy a odpovede zostávajú v zariadení.",
+      "systemPurpose": "Model zabudovaný do systému tohto zariadenia. Beží priamo v zariadení.",
       "apple": "Apple Intelligence (v zariadení)",
       "checking": "Kontroluje sa dostupnosť…",
       "ready": "Pripravený na použitie",
@@ -3429,6 +3571,9 @@
       "downloading": "Sťahuje sa…",
       "downloadProgress": "Sťahuje sa… {{percent}} %",
       "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tento model podporuje intenzitu uvažovania"
     }
   },
   "settingsTools": {
@@ -3608,7 +3753,6 @@
       "template": "Šablóna",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Vysvetlite $ARGUMENTS",
-      "agent": "agent",
       "subtask": "Spustiť ako podúlohu",
       "edit": "Príkaz na úpravu lomky",
       "saveFailed": "Príkaz sa nepodarilo uložiť",
@@ -3652,5 +3796,100 @@
     "noMatchingProductsPlay": "Google Play nevrátil žiadne zodpovedajúce balíky kreditov.",
     "purchaseOwnedByAnotherAccount": "Kredity na tomto účte Apple Account patria inému účtu Kilo. Ak ich chcete použiť, prihláste sa do príslušného účtu Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účte Google Play patria inému účtu Kilo. Prihláste sa do tohto účtu Kilo, aby ste ich použili."
+  },
+  "todos": {
+    "saveAsTodo": "Uložiť ako úlohu",
+    "segment": {
+      "label": "Zobrazenie agentov",
+      "sessions": "Relácie",
+      "todos": "Úlohy"
+    },
+    "lists": {
+      "newList": "Nový zoznam",
+      "empty": "Zatiaľ žiadne zoznamy",
+      "couldNotLoad": "Zoznamy sa nepodarilo načítať",
+      "noRepository": "Žiadny repozitár",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "Otvorené: {{count}}",
+      "openCount_few": "Otvorené: {{count}}",
+      "openCount_many": "Otvorené: {{count}}",
+      "openCount_other": "Otvorené: {{count}}",
+      "archived_one": "Archivované ({{count}})",
+      "archived_few": "Archivované ({{count}})",
+      "archived_many": "Archivované ({{count}})",
+      "archived_other": "Archivované ({{count}})",
+      "archive": "Archivovať",
+      "unarchive": "Obnoviť z archívu",
+      "deleteTitle": "Odstrániť {{name}}?",
+      "deleteMessage": "Odstránia sa aj jeho úlohy. Ich relácie zostanú."
+    },
+    "listSettings": {
+      "title": "Nastavenia zoznamu",
+      "name": "Názov",
+      "namePlaceholder": "Chyby, nápady, vydanie…",
+      "emoji": "emoji",
+      "mode": "Režim",
+      "defaultsHint": "Relácie spustené z tohto zoznamu používajú tieto predvolené hodnoty."
+    },
+    "list": {
+      "addPlaceholder": "Pridať novú úlohu",
+      "add": "Pridať úlohu",
+      "empty": "Zatiaľ žiadne úlohy",
+      "setDefaults": "Nastaviť repozitár, režim a model",
+      "completed_one": "Dokončené ({{count}})",
+      "completed_few": "Dokončené ({{count}})",
+      "completed_many": "Dokončené ({{count}})",
+      "completed_other": "Dokončené ({{count}})"
+    },
+    "item": {
+      "markDone": "Označiť ako dokončené",
+      "markOpen": "Označiť ako nedokončené",
+      "markDonePrompt": "Označiť ako dokončené?",
+      "deleted": "Úloha bola odstránená",
+      "undo": "Vrátiť späť",
+      "runCount_one": "{{count}} spustenie",
+      "runCount_few": "{{count}} spustenia",
+      "runCount_many": "{{count}} spustenia",
+      "runCount_other": "{{count}} spustení",
+      "startNow": "Spustiť bez kontroly",
+      "startNowHint": "Dlhým stlačením spustíte bez kontroly",
+      "titleLabel": "Názov úlohy",
+      "renameTitle": "Premenovať úlohu",
+      "notes": "Poznámky",
+      "addNotes": "Pridať poznámky",
+      "notesPrompt": "Pridajte kontext, požiadavky alebo kritériá prijatia.",
+      "markdownSupported": "Podporovaný Markdown",
+      "sessions": "Prepojené relácie",
+      "noSessions": "Zatiaľ žiadne relácie",
+      "untitledLinkedSession": "Prepojená relácia",
+      "sessionNeedsInput": "Relácia potrebuje vstup",
+      "sessionRunning": "Relácia beží",
+      "sessionFinished": "Relácia dokončená",
+      "sessionPullRequest": "PR relácie",
+      "sessionPullRequestNumber": "PR relácie #{{number}}",
+      "openSessionHint": "Otvorí reláciu.",
+      "unlinkSessionAction": "Odpojiť reláciu",
+      "unlinkConfirmTitle": "Odpojiť {{title}}?",
+      "unlinkConfirmMessage": "Samotná relácia sa neodstráni. Odstráni sa iba jej prepojenie s touto úlohou.",
+      "startNewSession": "Začať novú reláciu",
+      "startNewSessionHint": "Dlhým stlačením začnete novú reláciu.",
+      "linkSession": "Prepojiť reláciu",
+      "linkFailed": "Reláciu sa nepodarilo prepojiť s úlohou"
+    },
+    "linkSession": {
+      "title": "Prepojenie relácie",
+      "empty": "Žiadne nedávne relácie",
+      "emptyInRepository": "V repozitári {{repository}} nie sú žiadne nedávne relácie"
+    },
+    "upNext": "Ďalej",
+    "sessionTodo": "Úloha: {{title}}",
+    "linkToTodo": "Prepojiť s úlohou",
+    "candidates": {
+      "empty": "Žiadne otvorené úlohy"
+    },
+    "saveSheet": {
+      "title": "Uložiť do zoznamu",
+      "saved": "Uložené do zoznamu {{list}}"
+    }
   }
 }

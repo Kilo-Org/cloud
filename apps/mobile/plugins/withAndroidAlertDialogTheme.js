@@ -40,7 +40,7 @@ const { assignColorValue } = AndroidConfig.Colors;
  *
  * Values mirror src/global.css: the panel is `--popover` (#FFFFFF light,
  * #1F1F24 dark) and the action labels are `--primary` (#4F5A10 light,
- * #E8F27A dark), the same accent the app's own buttons use.
+ * #FFDD00 dark), the same accent the app's own buttons use.
  *
  * The action labels also carry the stock ALL-CAPS treatment: AppCompat's alert
  * button style (`Widget.AppCompat.Button.ButtonBar.AlertDialog`, the value of
@@ -61,7 +61,7 @@ const DIALOG_BACKGROUND_DARK = '#1F1F24';
 /** Mirrors src/global.css `--primary` (light). */
 const DIALOG_ACTION_LIGHT = '#4F5A10';
 /** Mirrors src/global.css `--primary` (dark, prefers-color-scheme). */
-const DIALOG_ACTION_DARK = '#E8F27A';
+const DIALOG_ACTION_DARK = '#FFDD00';
 
 const BACKGROUND_COLOR_NAME = 'app_dialog_background';
 const ACTION_COLOR_NAME = 'app_dialog_action';

@@ -1,7 +1,13 @@
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { LedgerDatabase } from '@kilocode/db/operation-ledger';
 
 /** Owner type for agent environment profiles - exactly one of organizationId or userId must be set. */
 export type ProfileOwner = { type: 'organization'; id: string } | { type: 'user'; id: string };
+
+/** Accepts a pool-backed database or an open transaction so callers can compose writes. */
+export type ProfileDatabase = LedgerDatabase;
+
+export type RepositoryPlatform = 'github' | 'gitlab';
 
 /** Owner type discriminator for UI display. */
 export type ProfileOwnerType = ProfileOwner['type'];

@@ -642,7 +642,11 @@ describe('selectSandboxForNewSession', () => {
           sandboxAllocation,
         });
         expect(selection.provider).toBe(
-          sandboxAllocation.startsWith('vercel-') ? 'vercel' : 'cloudflare'
+          sandboxAllocation === 'cloudflare-single'
+            ? 'cloudflare-containers'
+            : sandboxAllocation.startsWith('vercel-')
+              ? 'vercel'
+              : 'cloudflare'
         );
         expect(selection.sandboxId).toMatch(
           sandboxAllocation === 'cloudflare-shared' ? /^org-/ : /^ses-/
@@ -865,7 +869,7 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('keeps isolated control-plane sessions on Cloudflare when the containers gate is unset', async () => {
+  it('moves isolated control-plane sessions to native containers when the containers gate is unset', async () => {
     const selection = await selectSandboxForNewSession({
       env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id' },
       orgId: 'org-id',
@@ -873,7 +877,7 @@ describe('selectSandboxForNewSession', () => {
       sessionId: controlSessionId,
     });
 
-    expect(selection.provider).toBe('cloudflare');
+    expect(selection.provider).toBe('cloudflare-containers');
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
@@ -888,7 +892,7 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('selects containers only for enrolled isolated control-plane organizations', async () => {
+  it('selects containers for enrolled and unenrolled isolated control-plane organizations', async () => {
     const enrolled = await selectSandboxForNewSession({
       env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' },
       orgId: 'org-id',
@@ -903,7 +907,7 @@ describe('selectSandboxForNewSession', () => {
     });
 
     expect(enrolled.provider).toBe('cloudflare-containers');
-    expect(outside.provider).toBe('cloudflare');
+    expect(outside.provider).toBe('cloudflare-containers');
   });
 
   it('keeps enrolled isolated legacy sessions on Cloudflare', async () => {
@@ -967,7 +971,7 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('falls through to Cloudflare for an enforced organization without containers enrollment', async () => {
+  it('moves an enforced organization without containers enrollment to native containers', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
         PER_SESSION_SANDBOX_ORG_IDS: '*',
@@ -981,7 +985,7 @@ describe('selectSandboxForNewSession', () => {
       sessionId: controlSessionId,
     });
 
-    expect(selection.provider).toBe('cloudflare');
+    expect(selection.provider).toBe('cloudflare-containers');
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
@@ -1022,7 +1026,6 @@ describe('selectSandboxForNewSession', () => {
   it('defaults an enforced owner to containers instead of Vercel', () => {
     const destination = getDefaultSandboxDestination(
       {
-        CONTROL_PLANE_IDS: '*',
         PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
         VERCEL_SANDBOX_ORG_IDS: '*',
@@ -1034,7 +1037,7 @@ describe('selectSandboxForNewSession', () => {
     );
 
     expect(destination.provider.id).toBe('cloudflare-containers');
-    expect(destination.instanceType).toBe('standard-4');
+    expect(destination.instanceType).toBe('standard-3');
   });
 });
 

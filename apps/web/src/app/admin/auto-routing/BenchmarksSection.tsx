@@ -1,9 +1,9 @@
 'use client';
 
 import {
-  AUTO_DECIDER_DEFAULT_MAX_COST_USD,
-  AUTO_DECIDER_DEFAULT_MIN_COST_USD,
   BENCHMARK_CONTAINER_BUDGET,
+  DEFAULT_AUTO_ROUTER,
+  type AutoRouter,
   BenchmarkConfigResponseSchema,
   BenchmarkRegistryResponseSchema,
   BenchmarkRoutingTableResponseSchema,
@@ -13,7 +13,6 @@ import {
   getReasoningVariantKeys,
   RequeueBenchmarkRegistryResponseSchema,
   StartBenchmarkRunResponseSchema,
-  type AutoBenchmarkDeciderModel,
   type BenchmarkConfig,
   type BenchmarkPlatformModel,
   type BenchmarkKind,
@@ -23,6 +22,10 @@ import {
   type BenchmarkRegistryResponse,
   type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
+  type PolicySettingState,
+  type PolicySettingValue,
+  resolvePolicySettings,
+  type BenchmarkRunProgress,
   type RankedCandidate,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -31,6 +34,11 @@ import { toast } from 'sonner';
 import { ChevronDown, ChevronRight, Play, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { toEligibleModelOptions } from '@/components/auto-routing/AutoRoutingModeCard';
+import { PoolModalityWarning } from '@/components/auto-routing/PoolModalityWarning';
+import {
+  computePoolModalityCoverage,
+  type ModalityCatalogModel,
+} from '@/lib/auto-routing-pool-modality';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,6 +47,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -47,6 +56,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -81,9 +91,129 @@ export function costPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'a
     : Number.POSITIVE_INFINITY;
 }
 
+// Below this share of the expected cases the completion rate is still noise, so
+// no finish time is projected from it.
+const ETA_MIN_PERCENT = 5;
+
+export type RunProgressDisplay = {
+  /** Null when the run's expected total is unknown; render counts without a bar. */
+  percent: number | null;
+  counts: string;
+  eta: string | null;
+};
+
+function formatDuration(ms: number): string {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return '<1 min';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
+export function formatRunProgress(
+  progress: BenchmarkRunProgress,
+  startedAt: string,
+  now: number = Date.now()
+): RunProgressDisplay {
+  const { completedCases, totalCases } = progress;
+  const failed = progress.failedCases > 0 ? ` · ${progress.failedCases} failed` : '';
+  if (totalCases === null || totalCases <= 0) {
+    return { percent: null, counts: `${completedCases} / ? cases${failed}`, eta: null };
+  }
+  const percent = Math.min(100, (completedCases / totalCases) * 100);
+  const startedMs = Date.parse(startedAt);
+  const elapsedMs = now - startedMs;
+  const remainingCases = totalCases - completedCases;
+  const eta =
+    completedCases > 0 &&
+    remainingCases > 0 &&
+    percent >= ETA_MIN_PERCENT &&
+    Number.isFinite(startedMs) &&
+    elapsedMs > 0
+      ? formatDuration((elapsedMs / completedCases) * remainingCases)
+      : null;
+  return {
+    percent,
+    counts: `${completedCases} / ${totalCases} cases${failed}`,
+    eta,
+  };
+}
+
 export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
   const value = costPerAccuracy(candidate);
   return Number.isFinite(value) ? formatUsd(value) : '—';
+}
+
+export function formatPolicyValue(value: PolicySettingValue): string {
+  if (value === null) return 'off';
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)));
+  }
+  return `${Math.round(value.uncachedInputTokens)} uncached / ${Math.round(value.cachedInputTokens)} cached tokens`;
+}
+
+// The four auto settings that accept an admin override, plus the two token
+// fields the profile override is entered through.
+type PolicyOverrideForm = {
+  minAccuracy: string;
+  accuracyNoiseBand: string;
+  switchHorizonTurns: string;
+  uncachedInputTokens: string;
+  cachedInputTokens: string;
+};
+
+function overrideNumberText(value: PolicySettingValue | undefined): string {
+  return typeof value === 'number' ? String(value) : '';
+}
+
+function overrideFormFromConfig(config: BenchmarkConfig | null): PolicyOverrideForm {
+  const overrides = config?.policyOverrides ?? null;
+  const profile = overrides?.productionTokenProfile ?? null;
+  return {
+    minAccuracy: overrideNumberText(overrides?.minAccuracy),
+    accuracyNoiseBand: overrideNumberText(overrides?.accuracyNoiseBand),
+    switchHorizonTurns: overrideNumberText(overrides?.switchHorizonTurns),
+    uncachedInputTokens:
+      profile !== null && typeof profile === 'object' ? String(profile.uncachedInputTokens) : '',
+    cachedInputTokens:
+      profile !== null && typeof profile === 'object' ? String(profile.cachedInputTokens) : '',
+  };
+}
+
+function parseBoundedOverride(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) && value >= 0 && value <= 1 ? value : null;
+}
+
+function parseTurnOverride(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return null;
+  const turns = Math.round(Number(trimmed));
+  return Number.isFinite(turns) && turns >= 1 ? turns : null;
+}
+
+export function policyOverridesFromForm(
+  form: PolicyOverrideForm
+): BenchmarkConfig['policyOverrides'] {
+  const overrides: NonNullable<BenchmarkConfig['policyOverrides']> = {};
+  const minAccuracy = parseBoundedOverride(form.minAccuracy);
+  if (minAccuracy !== null) overrides.minAccuracy = minAccuracy;
+  const accuracyNoiseBand = parseBoundedOverride(form.accuracyNoiseBand);
+  if (accuracyNoiseBand !== null) overrides.accuracyNoiseBand = accuracyNoiseBand;
+  const switchHorizonTurns = parseTurnOverride(form.switchHorizonTurns);
+  if (switchHorizonTurns !== null) overrides.switchHorizonTurns = switchHorizonTurns;
+  const uncached = parseOptionalNumber(form.uncachedInputTokens);
+  const cached = parseOptionalNumber(form.cachedInputTokens);
+  if (uncached !== null || cached !== null) {
+    overrides.productionTokenProfile = {
+      uncachedInputTokens: uncached ?? 0,
+      cachedInputTokens: cached ?? 0,
+    };
+  }
+  return Object.keys(overrides).length > 0 ? overrides : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -122,8 +252,8 @@ export function effortCoverageForModel(
 // Fetch helpers
 // ---------------------------------------------------------------------------
 
-async function fetchBenchmarkConfig() {
-  const response = await fetch('/admin/api/auto-routing/benchmark-config');
+async function fetchBenchmarkConfig(router: AutoRouter) {
+  const response = await fetch(`/admin/api/auto-routing/benchmark-config?router=${router}`);
   return parseAdminResponse(response, BenchmarkConfigResponseSchema);
 }
 
@@ -159,8 +289,10 @@ export function runTypeLabel(run: Pick<BenchmarkRun, 'kind' | 'purpose'>): strin
   return run.purpose === 'user' ? 'User queue' : 'Platform queue';
 }
 
-async function fetchBenchmarkRuns(filter: RunFilter) {
-  const response = await fetch(`/admin/api/auto-routing/benchmark-runs${runFilterQuery(filter)}`);
+async function fetchBenchmarkRuns(filter: RunFilter, router: AutoRouter) {
+  const query = new URLSearchParams(runFilterQuery(filter).replace(/^\?/, ''));
+  query.set('router', router);
+  const response = await fetch(`/admin/api/auto-routing/benchmark-runs?${query}`);
   return parseAdminResponse(response, BenchmarkRunsResponseSchema);
 }
 
@@ -168,35 +300,37 @@ async function startBenchmarkRun({
   kind,
   force,
   queue,
+  router,
 }: {
   kind: BenchmarkKind;
   force: boolean;
   queue: BenchmarkQueueSelector;
+  router: AutoRouter;
 }) {
   const response = await fetch('/admin/api/auto-routing/benchmark-runs', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ kind, force, queue }),
+    body: JSON.stringify({ kind, force, queue, router }),
   });
   return parseAdminResponse(response, StartBenchmarkRunResponseSchema);
 }
 
-async function fetchBenchmarkRegistry() {
-  const response = await fetch('/admin/api/auto-routing/benchmark-registry');
+async function fetchBenchmarkRegistry(router: AutoRouter) {
+  const response = await fetch(`/admin/api/auto-routing/benchmark-registry?router=${router}`);
   return parseAdminResponse(response, BenchmarkRegistryResponseSchema);
 }
 
-async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector) {
+async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector, router: AutoRouter) {
   const response = await fetch('/admin/api/auto-routing/benchmark-registry', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ scope }),
+    body: JSON.stringify({ scope, router }),
   });
   return parseAdminResponse(response, RequeueBenchmarkRegistryResponseSchema);
 }
 
-async function fetchBenchmarkRoutingTable() {
-  const response = await fetch('/admin/api/auto-routing/benchmark-routing-table');
+async function fetchBenchmarkRoutingTable(router: AutoRouter) {
+  const response = await fetch(`/admin/api/auto-routing/benchmark-routing-table?router=${router}`);
   return parseAdminResponse<BenchmarkRoutingTableResponse>(
     response,
     BenchmarkRoutingTableResponseSchema
@@ -209,135 +343,127 @@ async function fetchBenchmarkRoutingTable() {
 
 type DeciderModelRow = BenchmarkPlatformModel;
 
-type AutoDeciderModelRow = AutoBenchmarkDeciderModel;
+function optionalNumberText(value: number | null | undefined): string {
+  return value == null ? '' : String(value);
+}
 
-export function configToFormState(config: BenchmarkConfig | null): {
+function parseOptionalNumber(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) ? value : null;
+}
+
+// Both blank clears the profile; a single blank side counts as zero tokens.
+function parseTokenProfile(state: {
+  uncachedInputTokens: string;
+  cachedInputTokens: string;
+}): BenchmarkConfig['productionTokenProfile'] {
+  const uncachedInputTokens = parseOptionalNumber(state.uncachedInputTokens);
+  const cachedInputTokens = parseOptionalNumber(state.cachedInputTokens);
+  if (uncachedInputTokens === null && cachedInputTokens === null) return null;
+  return {
+    uncachedInputTokens: uncachedInputTokens ?? 0,
+    cachedInputTokens: cachedInputTokens ?? 0,
+  };
+}
+
+export type BenchmarkConfigFormState = {
   classifierModels: string[];
   deciderModels: DeciderModelRow[];
-  autoDeciderModels: AutoDeciderModelRow[];
-  excludedAutoDeciderModels: string;
   minAccuracy: number;
+  accuracyNoiseBand: number;
+  frontierMinAccuracyDelta: number;
   switchCostFactor: number;
   bestAccuracySwitchThreshold: number;
-  maxConcurrency: number;
-  userMaxConcurrency: number;
   benchmarkUserId: string;
   benchmarkOrgId: string;
   classifierRepetitions: number;
   deciderRepetitions: number;
   classifierMaxP95LatencyMs: string;
-  autoDeciderMinCostUsd: number;
-  autoDeciderMaxCostUsd: number;
-} {
+  uncachedInputTokens: string;
+  cachedInputTokens: string;
+  switchHorizonTurns: string;
+  lowConfidenceThreshold: string;
+  policyOverrides: PolicyOverrideForm;
+};
+
+export function configToFormState(config: BenchmarkConfig | null): BenchmarkConfigFormState {
   if (config === null) {
     // No config saved yet: identity fields are overrides, so blank means the
     // worker uses its default benchmark user and org at run time.
     return {
       classifierModels: [],
       deciderModels: [],
-      autoDeciderModels: [],
-      excludedAutoDeciderModels: '',
       minAccuracy: 0.7,
+      accuracyNoiseBand: 0.05,
+      frontierMinAccuracyDelta: 0,
       switchCostFactor: 3,
       bestAccuracySwitchThreshold: 0.05,
-      maxConcurrency: BENCHMARK_CONTAINER_BUDGET / 2,
-      userMaxConcurrency: BENCHMARK_CONTAINER_BUDGET / 2,
       benchmarkUserId: '',
       benchmarkOrgId: '',
       classifierRepetitions: 1,
       deciderRepetitions: 1,
       classifierMaxP95LatencyMs: '1000',
-      autoDeciderMinCostUsd: AUTO_DECIDER_DEFAULT_MIN_COST_USD,
-      autoDeciderMaxCostUsd: AUTO_DECIDER_DEFAULT_MAX_COST_USD,
+      uncachedInputTokens: '',
+      cachedInputTokens: '',
+      switchHorizonTurns: '',
+      lowConfidenceThreshold: '',
+      policyOverrides: overrideFormFromConfig(null),
     };
   }
   return {
     classifierModels: config.classifierModels,
-    deciderModels: (config.manualDeciderModels ?? config.deciderModels).map(({ id }) => ({ id })),
-    autoDeciderModels: config.autoDeciderModels ?? [],
-    excludedAutoDeciderModels: (config.excludedAutoDeciderModels ?? []).join('\n'),
+    deciderModels: config.deciderModels.map(({ id }) => ({ id })),
     minAccuracy: config.minAccuracy,
+    accuracyNoiseBand: config.accuracyNoiseBand,
+    frontierMinAccuracyDelta: config.frontierMinAccuracyDelta,
     switchCostFactor: config.switchCostFactor,
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
-    maxConcurrency: config.maxConcurrency,
-    userMaxConcurrency: config.userMaxConcurrency,
     benchmarkUserId: config.benchmarkUserId ?? '',
     benchmarkOrgId: config.benchmarkOrgId ?? '',
     classifierRepetitions: config.classifierRepetitions,
     deciderRepetitions: config.deciderRepetitions,
     classifierMaxP95LatencyMs:
       config.classifierMaxP95LatencyMs !== null ? String(config.classifierMaxP95LatencyMs) : '',
-    autoDeciderMinCostUsd: config.autoDeciderMinCostUsd,
-    autoDeciderMaxCostUsd: config.autoDeciderMaxCostUsd,
+    uncachedInputTokens: optionalNumberText(config.productionTokenProfile?.uncachedInputTokens),
+    cachedInputTokens: optionalNumberText(config.productionTokenProfile?.cachedInputTokens),
+    switchHorizonTurns: optionalNumberText(config.switchHorizonTurns),
+    lowConfidenceThreshold: optionalNumberText(config.lowConfidenceThreshold),
+    policyOverrides: overrideFormFromConfig(config),
   };
 }
 
-function parseModelLines(value: string): string[] {
-  return value
-    .split('\n')
-    .map(s => s.trim())
-    .filter(s => s.length > 0);
-}
-
-export function effectiveDeciderModels({
-  manualDeciderModels,
-  autoDeciderModels,
-  excludedAutoDeciderModels,
-}: {
-  manualDeciderModels: DeciderModelRow[];
-  autoDeciderModels: AutoDeciderModelRow[];
-  excludedAutoDeciderModels: string[];
-}): BenchmarkPlatformModel[] {
-  const manual = manualDeciderModels
-    .filter(row => row.id.trim().length > 0)
-    .map(row => ({ id: row.id.trim() }));
-  const manualIds = new Set(manual.map(model => model.id));
-  const excludedAuto = new Set(excludedAutoDeciderModels);
-  return [
-    ...manual,
-    ...autoDeciderModels
-      .filter(model => !excludedAuto.has(model.id))
-      .filter(model => !manualIds.has(model.id))
-      .map(({ id }) => ({ id })),
-  ];
-}
-
 export function formStateToConfig(
-  state: ReturnType<typeof configToFormState>,
+  state: BenchmarkConfigFormState,
   base: BenchmarkConfig | null
 ): BenchmarkConfig {
   const classifierModels = state.classifierModels.map(id => id.trim()).filter(id => id.length > 0);
-  const excludedAutoDeciderModels = parseModelLines(state.excludedAutoDeciderModels);
-  const manualDeciderModels = state.deciderModels
+  const deciderModels = state.deciderModels
     .filter(row => row.id.trim().length > 0)
     .map(row => ({ id: row.id.trim() }));
-  const deciderModels = effectiveDeciderModels({
-    manualDeciderModels,
-    autoDeciderModels: state.autoDeciderModels,
-    excludedAutoDeciderModels,
-  });
   const benchmarkUserId = state.benchmarkUserId.trim();
   const benchmarkOrgId = state.benchmarkOrgId.trim();
   const rawLatency = state.classifierMaxP95LatencyMs.trim();
   const classifierMaxP95LatencyMs = rawLatency.length > 0 ? parseInt(rawLatency, 10) || null : null;
   return {
+    router: base?.router ?? DEFAULT_AUTO_ROUTER,
     classifierModels,
     deciderModels,
-    manualDeciderModels,
-    autoDeciderModels: state.autoDeciderModels,
-    excludedAutoDeciderModels,
     minAccuracy: state.minAccuracy,
+    accuracyNoiseBand: state.accuracyNoiseBand,
+    frontierMinAccuracyDelta: state.frontierMinAccuracyDelta,
     switchCostFactor: state.switchCostFactor,
     bestAccuracySwitchThreshold: state.bestAccuracySwitchThreshold,
-    maxConcurrency: state.maxConcurrency,
-    userMaxConcurrency: state.userMaxConcurrency,
+    productionTokenProfile: parseTokenProfile(state),
+    switchHorizonTurns: parseOptionalNumber(state.switchHorizonTurns),
+    lowConfidenceThreshold: parseOptionalNumber(state.lowConfidenceThreshold),
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
     benchmarkOrgId: benchmarkOrgId.length > 0 ? benchmarkOrgId : null,
     classifierRepetitions: state.classifierRepetitions,
     deciderRepetitions: state.deciderRepetitions,
     classifierMaxP95LatencyMs,
-    autoDeciderMinCostUsd: state.autoDeciderMinCostUsd,
-    autoDeciderMaxCostUsd: state.autoDeciderMaxCostUsd,
+    policyOverrides: policyOverridesFromForm(state.policyOverrides),
     updatedAt: base?.updatedAt ?? null,
     updatedBy: base?.updatedBy ?? null,
   };
@@ -347,7 +473,108 @@ export function formStateToConfig(
 // Config editor sub-component
 // ---------------------------------------------------------------------------
 
+function ConfigSectionHeading({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="mt-4 flex flex-col gap-0.5">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <p className="text-muted-foreground text-xs">{description}</p>
+    </div>
+  );
+}
+
+function formatComputedAt(computedAt: string): string {
+  const date = new Date(computedAt);
+  return Number.isNaN(date.getTime()) ? computedAt : date.toLocaleString();
+}
+
+/**
+ * One policy setting on the Policy tab. Auto settings show the effective value,
+ * whether it comes from the system or an override, the last computed value and
+ * its evidence, and an override input with a reset. Fixed settings are read-only
+ * with the reason nobody should change them.
+ */
+function PolicySettingField({
+  state,
+  overridden,
+  help,
+  children,
+}: {
+  state: PolicySettingState;
+  overridden: boolean;
+  help?: string;
+  children?: React.ReactNode;
+}) {
+  const computed = state.computed;
+  if (state.kind === 'fixed') {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium">{state.label}</span>
+          <Badge variant="outline" className="text-[10px]">
+            Fixed
+          </Badge>
+          <span className="text-sm tabular-nums">{formatPolicyValue(state.effective)}</span>
+        </div>
+        {state.reason ? <p className="text-muted-foreground text-xs">{state.reason}</p> : null}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium">{state.label}</span>
+        <Badge variant={overridden ? 'default' : 'secondary'} className="text-[10px]">
+          {overridden ? 'Override' : 'System'}
+        </Badge>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          Effective {formatPolicyValue(state.effective)}
+        </span>
+      </div>
+      {computed ? (
+        <>
+          <p className="text-muted-foreground text-xs">
+            System {formatPolicyValue(computed.value)} · computed{' '}
+            {formatComputedAt(computed.computedAt)} · {computed.source}
+          </p>
+          <p className="text-muted-foreground text-xs">{computed.evidence}</p>
+        </>
+      ) : (
+        <p className="text-muted-foreground text-xs">
+          Not computed yet — the current value stands until the daily re-evaluation has data.
+        </p>
+      )}
+      {help ? <p className="text-muted-foreground text-xs">{help}</p> : null}
+      {children ? <div className="flex flex-wrap items-end gap-2">{children}</div> : null}
+    </div>
+  );
+}
+
+function UseSystemValueButton({
+  overridden,
+  onClick,
+  label,
+}: {
+  overridden: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-8"
+      disabled={!overridden}
+      onClick={onClick}
+      aria-label={label}
+    >
+      Use system value
+    </Button>
+  );
+}
+
 function BenchmarkConfigEditor({
+  router,
   config,
   onSaved,
   modelOptions,
@@ -357,8 +584,10 @@ function BenchmarkConfigEditor({
   classifierModelsLoading,
   classifierModelsError,
   registryEntries,
+  catalogModalities,
 }: {
   config: BenchmarkConfig | null;
+  router: AutoRouter;
   onSaved: (next: { config: BenchmarkConfig | null }) => void;
   modelOptions: ModelOption[];
   modelsLoading: boolean;
@@ -367,6 +596,7 @@ function BenchmarkConfigEditor({
   classifierModelsLoading: boolean;
   classifierModelsError?: string;
   registryEntries?: BenchmarkRegistryResponse['platformEntries'];
+  catalogModalities: readonly ModalityCatalogModel[] | null;
 }) {
   const [form, setForm] = useState(() => configToFormState(config));
   // Tracks unsaved local edits. A background config refetch (the runs list
@@ -399,7 +629,7 @@ function BenchmarkConfigEditor({
   }, [config]);
 
   const saveMutation = useMutation({
-    mutationFn: saveBenchmarkConfig,
+    mutationFn: (next: BenchmarkConfig) => saveBenchmarkConfig({ ...next, router }),
     onSuccess: data => {
       // The save is now the source of truth: clear dirty and re-sync so the
       // next background refetch is free to update the form again.
@@ -469,35 +699,60 @@ function BenchmarkConfigEditor({
     [updateForm]
   );
 
-  const handleToggleAutoDeciderModel = useCallback(
-    (modelId: string, included: boolean) => {
-      updateForm(prev => {
-        const excluded = new Set(parseModelLines(prev.excludedAutoDeciderModels));
-        if (included) {
-          excluded.delete(modelId);
-        } else {
-          excluded.add(modelId);
-        }
-        return {
-          ...prev,
-          excludedAutoDeciderModels: [...excluded].sort().join('\n'),
-        };
-      });
-    },
-    [updateForm]
-  );
-
   const handleSave = useCallback(() => {
     saveMutation.mutate(formStateToConfig(form, config));
   }, [form, config, saveMutation]);
 
+  // Effective/computed/override per policy setting, resolved from the live form
+  // so an unsaved override shows immediately, against the server's computed map.
+  const policyStates = useMemo(
+    () =>
+      resolvePolicySettings({
+        minAccuracy: form.minAccuracy,
+        accuracyNoiseBand: form.accuracyNoiseBand,
+        frontierMinAccuracyDelta: form.frontierMinAccuracyDelta,
+        productionTokenProfile: parseTokenProfile(form),
+        switchHorizonTurns: parseOptionalNumber(form.switchHorizonTurns),
+        switchCostFactor: form.switchCostFactor,
+        bestAccuracySwitchThreshold: form.bestAccuracySwitchThreshold,
+        lowConfidenceThreshold: parseOptionalNumber(form.lowConfidenceThreshold),
+        classifierRepetitions: form.classifierRepetitions,
+        deciderRepetitions: form.deciderRepetitions,
+        classifierMaxP95LatencyMs: parseOptionalNumber(form.classifierMaxP95LatencyMs),
+        policyOverrides: policyOverridesFromForm(form.policyOverrides),
+        policyComputed: config?.policyComputed ?? null,
+      }),
+    [form, config]
+  );
+
+  const setOverride = useCallback(
+    (patch: Partial<PolicyOverrideForm>) => {
+      updateForm(prev => ({
+        ...prev,
+        policyOverrides: { ...prev.policyOverrides, ...patch },
+      }));
+    },
+    [updateForm]
+  );
+
+  const modalityCoverage = useMemo(
+    () =>
+      computePoolModalityCoverage({
+        poolModelIds: form.deciderModels.map(row => row.id.trim()).filter(id => id.length > 0),
+        catalog: catalogModalities,
+      }),
+    [form.deciderModels, catalogModalities]
+  );
   return (
     <Card className="rounded-lg">
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-base">Benchmark Config</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 p-4 pt-0">
-        {/* Classifier models */}
+        <ConfigSectionHeading
+          title="Models"
+          description="Classifier and decider models measured by the benchmark queues."
+        />
         <div className="flex flex-col gap-1.5">
           <Label className="text-sm font-medium">Classifier models</Label>
           <div className="rounded-md border">
@@ -557,9 +812,8 @@ function BenchmarkConfigEditor({
           </Button>
         </div>
 
-        {/* Manual decider models table */}
         <div className="flex flex-col gap-1.5">
-          <Label className="text-sm font-medium">Manual decider models</Label>
+          <Label className="text-sm font-medium">Decider models</Label>
           <p className="text-muted-foreground text-xs">
             Each selected model benchmarks every supported reasoning effort. Queue status is shown
             in the registry below.
@@ -632,250 +886,182 @@ function BenchmarkConfigEditor({
           </Button>
         </div>
 
-        {/* Auto decider models */}
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-3">
-            <Label className="text-sm font-medium">Auto decider models</Label>
-            <Badge variant="secondary">{form.autoDeciderModels.length} synced</Badge>
+        <PoolModalityWarning coverage={modalityCoverage} />
+
+        <ConfigSectionHeading
+          title="Ranking"
+          description="How candidates are filtered and costed before a routing table is published."
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <PolicySettingField
+              state={policyStates.minAccuracy}
+              overridden={policyStates.minAccuracy.override !== null}
+              help="Chosen by a held-out grid over the measured registry: the middle of the stable plateau with the best accuracy per estimated request dollar."
+            >
+              <Input
+                id="benchmark-min-accuracy-override"
+                type="text"
+                inputMode="decimal"
+                value={form.policyOverrides.minAccuracy}
+                onChange={e => setOverride({ minAccuracy: e.target.value })}
+                className="h-8 w-28 tabular-nums"
+                placeholder={formatPolicyValue(
+                  policyStates.minAccuracy.computed?.value ?? policyStates.minAccuracy.effective
+                )}
+                aria-label="Minimum accuracy override"
+              />
+              <UseSystemValueButton
+                overridden={policyStates.minAccuracy.override !== null}
+                onClick={() => setOverride({ minAccuracy: '' })}
+                label="Use the system minimum accuracy"
+              />
+            </PolicySettingField>
           </div>
-          {form.autoDeciderModels.length > 0 ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Model ID</TableHead>
-                    <TableHead className="w-32">Avg run</TableHead>
-                    <TableHead>Effort coverage</TableHead>
-                    <TableHead className="w-24">Included</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {form.autoDeciderModels.map(model => {
-                    const excluded = parseModelLines(form.excludedAutoDeciderModels).includes(
-                      model.id
-                    );
-                    return (
-                      <TableRow key={model.id}>
-                        <TableCell className="font-mono text-xs">{model.id}</TableCell>
-                        <TableCell className="tabular-nums">
-                          {formatUsd(model.avgAttemptCostUsd)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-xs">
-                          {effortCoverageForModel(
-                            modelOptions.find(option => option.id === model.id),
-                            registryEntries
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Checkbox
-                            checked={!excluded}
-                            onCheckedChange={checked =>
-                              handleToggleAutoDeciderModel(model.id, checked === true)
-                            }
-                            aria-label={`${excluded ? 'Include' : 'Exclude'} ${model.id}`}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+          <div className="sm:col-span-2">
+            <PolicySettingField
+              state={policyStates.accuracyNoiseBand}
+              overridden={policyStates.accuracyNoiseBand.override !== null}
+              help="Candidates within this band of the threshold compete on value. Chosen by the same held-out grid as the minimum accuracy."
+            >
+              <Input
+                id="benchmark-accuracy-noise-band-override"
+                type="text"
+                inputMode="decimal"
+                value={form.policyOverrides.accuracyNoiseBand}
+                onChange={e => setOverride({ accuracyNoiseBand: e.target.value })}
+                className="h-8 w-28 tabular-nums"
+                placeholder={formatPolicyValue(
+                  policyStates.accuracyNoiseBand.computed?.value ??
+                    policyStates.accuracyNoiseBand.effective
+                )}
+                aria-label="Accuracy noise band override"
+              />
+              <UseSystemValueButton
+                overridden={policyStates.accuracyNoiseBand.override !== null}
+                onClick={() => setOverride({ accuracyNoiseBand: '' })}
+                label="Use the system accuracy noise band"
+              />
+            </PolicySettingField>
+          </div>
+          {router === 'frontier' ? (
+            <div className="sm:col-span-2">
+              <PolicySettingField
+                state={policyStates.frontierMinAccuracyDelta}
+                overridden={false}
+              />
             </div>
-          ) : (
-            <div className="text-muted-foreground rounded-md border px-3 py-2 text-sm">
-              No auto decider models synced yet.
-            </div>
-          )}
+          ) : null}
+          <div className="sm:col-span-2">
+            <PolicySettingField
+              state={policyStates.productionTokenProfile}
+              overridden={policyStates.productionTokenProfile.override !== null}
+              help="Mean input tokens per production auto request, measured from real usage. Ranking adds their cost at each model's prompt and cache-read prices."
+            >
+              <div className="flex flex-col gap-1.5">
+                <Label
+                  htmlFor="benchmark-uncached-input-tokens-override"
+                  className="text-muted-foreground text-xs"
+                >
+                  Uncached input tokens
+                </Label>
+                <Input
+                  id="benchmark-uncached-input-tokens-override"
+                  type="text"
+                  inputMode="numeric"
+                  value={form.policyOverrides.uncachedInputTokens}
+                  onChange={e => setOverride({ uncachedInputTokens: e.target.value })}
+                  className="h-8 w-40 tabular-nums"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label
+                  htmlFor="benchmark-cached-input-tokens-override"
+                  className="text-muted-foreground text-xs"
+                >
+                  Cached input tokens
+                </Label>
+                <Input
+                  id="benchmark-cached-input-tokens-override"
+                  type="text"
+                  inputMode="numeric"
+                  value={form.policyOverrides.cachedInputTokens}
+                  onChange={e => setOverride({ cachedInputTokens: e.target.value })}
+                  className="h-8 w-40 tabular-nums"
+                />
+              </div>
+              <UseSystemValueButton
+                overridden={policyStates.productionTokenProfile.override !== null}
+                onClick={() => setOverride({ uncachedInputTokens: '', cachedInputTokens: '' })}
+                label="Use the system production token profile"
+              />
+            </PolicySettingField>
+          </div>
         </div>
 
-        {/* Numeric inputs */}
+        <ConfigSectionHeading
+          title="Switching"
+          description="When a session keeps its incumbent model instead of switching."
+        />
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-min-accuracy" className="text-sm font-medium">
-              Min accuracy (0–1)
-            </Label>
-            <Input
-              id="benchmark-min-accuracy"
-              type="number"
-              min={0}
-              max={1}
-              step={0.05}
-              value={form.minAccuracy}
-              onChange={e =>
-                updateForm(prev => ({ ...prev, minAccuracy: parseFloat(e.target.value) || 0 }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-switch-cost-factor" className="text-sm font-medium">
-              Switch cost factor (1–100)
-            </Label>
-            <Input
-              id="benchmark-switch-cost-factor"
-              type="number"
-              min={1}
-              max={100}
-              step={0.5}
-              value={form.switchCostFactor}
-              onChange={e =>
-                updateForm(prev => ({ ...prev, switchCostFactor: parseFloat(e.target.value) || 1 }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label
-              htmlFor="benchmark-best-accuracy-switch-threshold"
-              className="text-sm font-medium"
+          <div className="sm:col-span-2">
+            <PolicySettingField
+              state={policyStates.switchHorizonTurns}
+              overridden={policyStates.switchHorizonTurns.override !== null}
+              help="Switch to a cheaper model only when savings over this many turns exceed the lost prompt cache. Taken from the median number of requests in a production auto session."
             >
-              Best accuracy switch threshold (0–1)
-            </Label>
-            <Input
-              id="benchmark-best-accuracy-switch-threshold"
-              type="number"
-              min={0}
-              max={1}
-              step={0.01}
-              value={form.bestAccuracySwitchThreshold}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  bestAccuracySwitchThreshold: parseFloat(e.target.value) || 0,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
+              <Input
+                id="benchmark-switch-horizon-turns-override"
+                type="text"
+                inputMode="numeric"
+                value={form.policyOverrides.switchHorizonTurns}
+                onChange={e => setOverride({ switchHorizonTurns: e.target.value })}
+                className="h-8 w-28 tabular-nums"
+                placeholder={formatPolicyValue(
+                  policyStates.switchHorizonTurns.computed?.value ??
+                    policyStates.switchHorizonTurns.effective
+                )}
+                aria-label="Switch horizon override"
+              />
+              <UseSystemValueButton
+                overridden={policyStates.switchHorizonTurns.override !== null}
+                onClick={() => setOverride({ switchHorizonTurns: '' })}
+                label="Use the system switch horizon"
+              />
+            </PolicySettingField>
+          </div>
+          <div className="sm:col-span-2">
+            <PolicySettingField state={policyStates.switchCostFactor} overridden={false} />
+          </div>
+          <div className="sm:col-span-2">
+            <PolicySettingField
+              state={policyStates.bestAccuracySwitchThreshold}
+              overridden={false}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-max-concurrency" className="text-sm font-medium">
-              Platform max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
-            </Label>
-            <Input
-              id="benchmark-max-concurrency"
-              type="number"
-              min={1}
-              max={BENCHMARK_CONTAINER_BUDGET}
-              step={1}
-              value={form.maxConcurrency}
-              onChange={e =>
-                updateForm(prev => ({ ...prev, maxConcurrency: parseInt(e.target.value, 10) || 1 }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
+          <div className="sm:col-span-2">
+            <PolicySettingField state={policyStates.lowConfidenceThreshold} overridden={false} />
+          </div>
+        </div>
+
+        <ConfigSectionHeading
+          title="Benchmark runs"
+          description="Container budget, repetitions, run identity, and the latency gate."
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <span className="text-sm font-medium">Shared container budget</span>
             <p className="text-muted-foreground text-xs">
-              Live containers a platform-queue run may hold. Classifier runs use it for parallel
-              OpenRouter calls.
+              Up to {BENCHMARK_CONTAINER_BUDGET} containers are shared by every queue and both
+              routers. Freed slots take eligible unfinished work using weighted shares with
+              borrowing. Model and provider concurrency limits apply to active chunks.
             </p>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-user-max-concurrency" className="text-sm font-medium">
-              User max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
-            </Label>
-            <Input
-              id="benchmark-user-max-concurrency"
-              type="number"
-              min={1}
-              max={BENCHMARK_CONTAINER_BUDGET}
-              step={1}
-              value={form.userMaxConcurrency}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  userMaxConcurrency: parseInt(e.target.value, 10) || 1,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-            <p
-              className={
-                form.maxConcurrency + form.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET
-                  ? 'text-destructive text-xs'
-                  : 'text-muted-foreground text-xs'
-              }
-            >
-              Live containers a user-queue run may hold. The two queues run at the same time, so
-              both budgets together must stay at or under {BENCHMARK_CONTAINER_BUDGET} (currently{' '}
-              {form.maxConcurrency + form.userMaxConcurrency}).
-            </p>
+          <div className="sm:col-span-2">
+            <PolicySettingField state={policyStates.classifierRepetitions} overridden={false} />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-auto-decider-min-cost" className="text-sm font-medium">
-              Auto min run cost
-            </Label>
-            <Input
-              id="benchmark-auto-decider-min-cost"
-              type="number"
-              min={0}
-              step={1}
-              value={form.autoDeciderMinCostUsd}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  autoDeciderMinCostUsd: parseFloat(e.target.value) || 0,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-auto-decider-max-cost" className="text-sm font-medium">
-              Auto max run cost
-            </Label>
-            <Input
-              id="benchmark-auto-decider-max-cost"
-              type="number"
-              min={0}
-              step={1}
-              value={form.autoDeciderMaxCostUsd}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  autoDeciderMaxCostUsd: parseFloat(e.target.value) || 0,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-classifier-repetitions" className="text-sm font-medium">
-              Classifier repetitions (1–5)
-            </Label>
-            <Input
-              id="benchmark-classifier-repetitions"
-              type="number"
-              min={1}
-              max={5}
-              step={1}
-              value={form.classifierRepetitions}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  classifierRepetitions: parseInt(e.target.value, 10) || 1,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-decider-repetitions" className="text-sm font-medium">
-              Decider repetitions (1–5)
-            </Label>
-            <Input
-              id="benchmark-decider-repetitions"
-              type="number"
-              min={1}
-              max={5}
-              step={1}
-              value={form.deciderRepetitions}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  deciderRepetitions: parseInt(e.target.value, 10) || 1,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
+          <div className="sm:col-span-2">
+            <PolicySettingField state={policyStates.deciderRepetitions} overridden={false} />
           </div>
         </div>
 
@@ -913,56 +1099,37 @@ function BenchmarkConfigEditor({
           </div>
         </div>
 
-        {/* Classifier max p95 latency */}
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="benchmark-classifier-max-p95-latency" className="text-sm font-medium">
-            Classifier max p95 latency (ms)
-          </Label>
-          <Input
-            id="benchmark-classifier-max-p95-latency"
-            type="number"
-            min={1}
-            step={1}
-            value={form.classifierMaxP95LatencyMs}
-            onChange={e =>
-              updateForm(prev => ({ ...prev, classifierMaxP95LatencyMs: e.target.value }))
-            }
-            className="h-8 w-40 tabular-nums"
-            placeholder="(no limit)"
-          />
-          <p className="text-muted-foreground text-xs">
-            Winner must classify under this p95 latency; empty disables the latency gate.
-          </p>
-        </div>
-
-        {/* Actions + metadata */}
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" onClick={handleSave} disabled={saveMutation.isPending}>
-              <Save className="size-4" />
-              Save config
-            </Button>
-            {dirty ? (
-              <>
-                <Button type="button" variant="outline" onClick={handleReload}>
-                  Discard &amp; reload
-                </Button>
-                <span className="text-muted-foreground text-xs">Unsaved changes</span>
-              </>
-            ) : null}
-          </div>
-          {config === null ? (
-            <p className="text-muted-foreground text-xs">
-              No config saved yet — runs cannot start until one is saved.
-            </p>
-          ) : config.updatedAt ? (
-            <p className="text-muted-foreground text-xs">
-              Last updated {config.updatedAt}
-              {config.updatedBy ? ` by ${config.updatedBy}` : ''}
-            </p>
-          ) : null}
+          <PolicySettingField state={policyStates.classifierMaxP95LatencyMs} overridden={false} />
         </div>
       </CardContent>
+
+      <div className="bg-card sticky bottom-0 flex flex-col gap-2 rounded-b-xl border-t p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" onClick={handleSave} disabled={saveMutation.isPending}>
+            <Save className="size-4" />
+            Save config
+          </Button>
+          {dirty ? (
+            <>
+              <Button type="button" variant="outline" onClick={handleReload}>
+                Discard &amp; reload
+              </Button>
+              <span className="text-muted-foreground text-xs">Unsaved changes</span>
+            </>
+          ) : null}
+        </div>
+        {config === null ? (
+          <p className="text-muted-foreground text-xs">
+            No config saved yet — runs cannot start until one is saved.
+          </p>
+        ) : config.updatedAt ? (
+          <p className="text-muted-foreground text-xs">
+            Last updated {config.updatedAt}
+            {config.updatedBy ? ` by ${config.updatedBy}` : ''}
+          </p>
+        ) : null}
+      </div>
     </Card>
   );
 }
@@ -1066,6 +1233,27 @@ function statusBadgeVariant(
   return 'destructive';
 }
 
+function RunProgress({
+  progress,
+  startedAt,
+}: {
+  progress: BenchmarkRunProgress;
+  startedAt: string;
+}) {
+  const { percent, counts, eta } = formatRunProgress(progress, startedAt);
+  return (
+    <div className="mt-1.5 flex w-40 flex-col gap-1">
+      {percent === null ? null : (
+        <Progress value={percent} className="h-1.5" aria-label={`Benchmark progress: ${counts}`} />
+      )}
+      <span className="text-muted-foreground text-[11px] tabular-nums">
+        {counts}
+        {eta === null ? '' : ` · ETA ${eta}`}
+      </span>
+    </div>
+  );
+}
+
 function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -1129,6 +1317,9 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
                 <Badge variant={statusBadgeVariant(run.status)} className="capitalize">
                   {run.status}
                 </Badge>
+                {run.progress ? (
+                  <RunProgress progress={run.progress} startedAt={run.startedAt} />
+                ) : null}
               </TableCell>
               <TableCell className="py-2 text-xs tabular-nums">{run.startedAt}</TableCell>
               <TableCell className="py-2 text-xs tabular-nums">{run.completedAt ?? '—'}</TableCell>
@@ -1151,6 +1342,36 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
 // Routing table view
 // ---------------------------------------------------------------------------
 
+function RoutingTableSummary({ table }: { table: BenchmarkRoutingTableResponse['table'] }) {
+  if (!table) return null;
+
+  const tokenProfile = table.productionTokenProfile;
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+      <dt className="text-muted-foreground">Version</dt>
+      <dd className="font-mono">{table.version}</dd>
+      <dt className="text-muted-foreground">Generated at</dt>
+      <dd className="tabular-nums">{table.generatedAt}</dd>
+      <dt className="text-muted-foreground">Min accuracy</dt>
+      <dd className="tabular-nums">{formatAccuracy(table.minAccuracy)}</dd>
+      <dt className="text-muted-foreground">Switch horizon</dt>
+      <dd className="tabular-nums">
+        {table.switchHorizonTurns != null
+          ? `${table.switchHorizonTurns} turns`
+          : `cost factor ${table.switchCostFactor}`}
+      </dd>
+      <dt className="text-muted-foreground">Token profile</dt>
+      <dd className="tabular-nums">
+        {tokenProfile
+          ? `${tokenProfile.uncachedInputTokens} uncached / ${tokenProfile.cachedInputTokens} cached`
+          : 'not set'}
+      </dd>
+      <dt className="text-muted-foreground">Source</dt>
+      <dd className="capitalize">{table.source}</dd>
+    </dl>
+  );
+}
+
 export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
   if (!data.table) {
     return <p className="text-muted-foreground text-sm">No routing table published yet.</p>;
@@ -1161,17 +1382,6 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-muted-foreground text-xs flex flex-wrap gap-x-4 gap-y-1">
-        <span>
-          Version: <span className="font-mono">{table.version}</span>
-        </span>
-        <span>Generated: {table.generatedAt}</span>
-        <span>Min accuracy: {formatAccuracy(table.minAccuracy)}</span>
-        <span>
-          Source: <span className="capitalize">{table.source}</span>
-        </span>
-      </div>
-
       {routeEntries.map(([routeKey, candidates]) => {
         const first = candidates[0];
         return (
@@ -1262,7 +1472,9 @@ const REGISTRY_STATUSES = ['pending', 'running', 'ready', 'failed'] as const;
 
 function RegistrySummary({
   data,
+  router,
 }: {
+  router: AutoRouter;
   data: {
     engineIdentity: string;
     repetitions: number;
@@ -1272,7 +1484,7 @@ function RegistrySummary({
 }) {
   const queues: { label: string; queue: BenchmarkRegistryQueue }[] = [
     { label: 'Platform queue', queue: data.platform },
-    { label: 'User queue', queue: data.user },
+    ...(router === 'efficient' ? [{ label: 'User queue', queue: data.user }] : []),
   ];
   return (
     <div className="flex flex-col gap-2">
@@ -1305,8 +1517,8 @@ function RegistrySummary({
       <p className="text-muted-foreground text-xs">
         Engine <span className="font-mono">{data.engineIdentity}</span>, {data.repetitions}{' '}
         {data.repetitions === 1 ? 'repetition' : 'repetitions'}. Counts exclude entries measured
-        under an older engine identity. An entry wanted by both queues is counted in both — it is
-        one measurement, shared.
+        under an older engine identity.
+        {router === 'efficient' ? ' Entries wanted by both queues share one measurement.' : null}
       </p>
     </div>
   );
@@ -1316,7 +1528,7 @@ function RegistrySummary({
 // Main exported section component
 // ---------------------------------------------------------------------------
 
-export function BenchmarksSection() {
+export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
   const queryClient = useQueryClient();
   const [forceRerun, setForceRerun] = useState(false);
   const [runFilter, setRunFilter] = useState<RunFilter>('all');
@@ -1333,28 +1545,37 @@ export function BenchmarksSection() {
     }));
   }, [modelsQuery.data?.data]);
   const modelsError = modelsQuery.error instanceof Error ? modelsQuery.error.message : undefined;
+  const catalogModels = modelsQuery.error ? undefined : modelsQuery.data?.data;
+  const catalogModalities = useMemo(
+    () =>
+      catalogModels?.map(model => ({
+        id: model.id,
+        inputModalities: model.architecture?.input_modalities,
+      })) ?? null,
+    [catalogModels]
+  );
   const systemOneModelsQuery = useSystemOneModelOptions();
   const systemOneModelsError =
     systemOneModelsQuery.error instanceof Error ? systemOneModelsQuery.error.message : undefined;
 
   const configQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-config'],
-    queryFn: fetchBenchmarkConfig,
+    queryKey: ['auto-routing', 'benchmark-config', router],
+    queryFn: () => fetchBenchmarkConfig(router),
   });
 
   const runsQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-runs', runFilter],
-    queryFn: () => fetchBenchmarkRuns(runFilter),
+    queryKey: ['auto-routing', 'benchmark-runs', router, runFilter],
+    queryFn: () => fetchBenchmarkRuns(runFilter, router),
   });
 
   const registryQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-registry'],
-    queryFn: fetchBenchmarkRegistry,
+    queryKey: ['auto-routing', 'benchmark-registry', router],
+    queryFn: () => fetchBenchmarkRegistry(router),
   });
 
   const routingTableQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-routing-table'],
-    queryFn: fetchBenchmarkRoutingTable,
+    queryKey: ['auto-routing', 'benchmark-routing-table', router],
+    queryFn: () => fetchBenchmarkRoutingTable(router),
   });
 
   // Run activity drives polling and cache invalidation, so it must not depend
@@ -1362,8 +1583,8 @@ export function BenchmarksSection() {
   // reads the classifier list is still a completion. On the 'all' filter this
   // shares its key with runsQuery, so it costs no extra request.
   const allRunsQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-runs', 'all'],
-    queryFn: () => fetchBenchmarkRuns('all'),
+    queryKey: ['auto-routing', 'benchmark-runs', router, 'all'],
+    queryFn: () => fetchBenchmarkRuns('all', router),
   });
 
   // Poll runs every 30s while any run is 'running'
@@ -1388,16 +1609,21 @@ export function BenchmarksSection() {
   useEffect(() => {
     if (prevHasRunningRun.current && !hasRunningRun) {
       void queryClient.invalidateQueries({
-        queryKey: ['auto-routing', 'benchmark-routing-table'],
+        queryKey: ['auto-routing', 'benchmark-routing-table', router],
       });
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-config'] });
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['auto-routing', 'benchmark-config', router],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['auto-routing', 'benchmark-registry', router],
+      });
     }
     prevHasRunningRun.current = hasRunningRun;
-  }, [hasRunningRun, queryClient]);
+  }, [hasRunningRun, queryClient, router]);
 
   const startRunMutation = useMutation({
-    mutationFn: startBenchmarkRun,
+    mutationFn: (input: { kind: BenchmarkKind; force: boolean; queue: BenchmarkQueueSelector }) =>
+      startBenchmarkRun({ ...input, router }),
     onSuccess: (data, variables) => {
       if (variables.kind === 'classifier') {
         toast.success(
@@ -1418,8 +1644,10 @@ export function BenchmarksSection() {
       for (const message of data.drainErrors) {
         toast.error(`A queue could not start: ${message}`);
       }
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-runs'] });
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry'] });
+      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-runs', router] });
+      void queryClient.invalidateQueries({
+        queryKey: ['auto-routing', 'benchmark-registry', router],
+      });
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Failed to start benchmark run');
@@ -1427,14 +1655,16 @@ export function BenchmarksSection() {
   });
 
   const requeueMutation = useMutation({
-    mutationFn: requeueBenchmarkRegistry,
+    mutationFn: (scope: BenchmarkQueueSelector) => requeueBenchmarkRegistry(scope, router),
     onSuccess: data => {
       toast.success(
         data.requeued === 0
           ? 'No failed entries to requeue'
           : `${data.requeued} failed ${data.requeued === 1 ? 'entry' : 'entries'} requeued`
       );
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['auto-routing', 'benchmark-registry', router],
+      });
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Failed to requeue entries');
@@ -1443,231 +1673,249 @@ export function BenchmarksSection() {
 
   const handleConfigSaved = useCallback(
     (next: { config: BenchmarkConfig | null }) => {
-      queryClient.setQueryData(['auto-routing', 'benchmark-config'], next);
+      queryClient.setQueryData(['auto-routing', 'benchmark-config', router], next);
     },
-    [queryClient]
+    [queryClient, router]
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-lg font-semibold">Benchmarks</h2>
-        <p className="text-muted-foreground text-sm">
-          Benchmark configuration, runs, and published routing table.
-        </p>
-      </div>
+    <Tabs defaultValue="policy">
+      <TabsList className="h-8">
+        <TabsTrigger value="policy" className="px-2.5 text-xs">
+          Policy
+        </TabsTrigger>
+        <TabsTrigger value="routing-table" className="px-2.5 text-xs">
+          Routing table
+        </TabsTrigger>
+        <TabsTrigger value="benchmarks" className="px-2.5 text-xs">
+          Benchmarks
+          {hasRunningRun ? (
+            <span className="text-primary ml-1.5 text-[10px] font-medium">Running</span>
+          ) : null}
+        </TabsTrigger>
+      </TabsList>
 
-      {/* Config editor */}
-      {configQuery.isLoading ? (
+      <TabsContent value="policy" className="mt-4">
+        {configQuery.isLoading ? (
+          <Card className="rounded-lg">
+            <CardContent className="p-4">
+              <Skeleton className="h-48 w-full" />
+            </CardContent>
+          </Card>
+        ) : configQuery.error ? (
+          <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
+            {configQuery.error instanceof Error
+              ? configQuery.error.message
+              : 'Failed to load benchmark config'}
+          </div>
+        ) : configQuery.data ? (
+          <BenchmarkConfigEditor
+            router={router}
+            config={configQuery.data.config}
+            onSaved={handleConfigSaved}
+            modelOptions={modelOptions}
+            modelsLoading={modelsQuery.isLoading}
+            modelsError={modelsError}
+            registryEntries={registryQuery.data?.platformEntries}
+            classifierModelOptions={systemOneModelsQuery.data ?? []}
+            classifierModelsLoading={systemOneModelsQuery.isLoading}
+            classifierModelsError={systemOneModelsError}
+            catalogModalities={catalogModalities}
+          />
+        ) : null}
+      </TabsContent>
+
+      <TabsContent value="benchmarks" className="mt-4 flex flex-col gap-4">
         <Card className="rounded-lg">
-          <CardContent className="p-4">
-            <Skeleton className="h-48 w-full" />
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">Decider Registry</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 p-4 pt-0">
+            <p className="text-muted-foreground text-xs">
+              Measurements and published tables are isolated for the selected router. Classifier
+              measurements are shared. Custom owner pools use the efficient router only.
+            </p>
+            {registryQuery.isLoading ? (
+              <Skeleton className="h-20 w-full" />
+            ) : registryQuery.error ? (
+              <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
+                {registryQuery.error instanceof Error
+                  ? registryQuery.error.message
+                  : 'Failed to load registry'}
+              </div>
+            ) : registryQuery.data ? (
+              <RegistrySummary data={registryQuery.data} router={router} />
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={startRunMutation.isPending}
+                onClick={() =>
+                  startRunMutation.mutate({ kind: 'decider', force: false, queue: 'platform' })
+                }
+              >
+                <Play className="size-4" />
+                Run platform queue
+              </Button>
+              {router === 'efficient' ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={startRunMutation.isPending}
+                    onClick={() =>
+                      startRunMutation.mutate({ kind: 'decider', force: false, queue: 'user' })
+                    }
+                  >
+                    <Play className="size-4" />
+                    Run user queue
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={startRunMutation.isPending}
+                    onClick={() =>
+                      startRunMutation.mutate({ kind: 'decider', force: false, queue: 'both' })
+                    }
+                  >
+                    <Play className="size-4" />
+                    Run both queues
+                  </Button>
+                </>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={requeueMutation.isPending}
+                onClick={() => requeueMutation.mutate(router === 'efficient' ? 'both' : 'platform')}
+              >
+                <RotateCcw className="size-4" />
+                Requeue failed
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Queues also drain on a timer. A queue whose run is already active is skipped.
+            </p>
           </CardContent>
         </Card>
-      ) : configQuery.error ? (
-        <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
-          {configQuery.error instanceof Error
-            ? configQuery.error.message
-            : 'Failed to load benchmark config'}
-        </div>
-      ) : configQuery.data ? (
-        <BenchmarkConfigEditor
-          config={configQuery.data.config}
-          onSaved={handleConfigSaved}
-          modelOptions={modelOptions}
-          modelsLoading={modelsQuery.isLoading}
-          modelsError={modelsError}
-          registryEntries={registryQuery.data?.platformEntries}
-          classifierModelOptions={systemOneModelsQuery.data ?? []}
-          classifierModelsLoading={systemOneModelsQuery.isLoading}
-          classifierModelsError={systemOneModelsError}
-        />
-      ) : null}
 
-      {/* Registry + run controls */}
-      <Card className="rounded-lg">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">Decider Registry</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 p-4 pt-0">
-          <p className="text-muted-foreground text-xs">
-            Every decider measurement lives in one global registry, keyed by model, reasoning effort
-            and engine identity. The platform routing table and each owner pool's table are
-            assembled from it, so a model wanted by both is benchmarked once. A model with no
-            current entry is queued; the two queues run independently, each with its own container
-            budget.
-          </p>
-          {registryQuery.isLoading ? (
-            <Skeleton className="h-20 w-full" />
-          ) : registryQuery.error ? (
-            <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
-              {registryQuery.error instanceof Error
-                ? registryQuery.error.message
-                : 'Failed to load registry'}
+        <Card className="rounded-lg">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">Run Classifier Benchmark</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 p-4 pt-0">
+            <p className="text-muted-foreground text-xs">
+              Classifier candidates are not registry-tracked: models with existing results are
+              skipped unless "Re-run models with existing results" is checked.
+            </p>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="force-rerun"
+                checked={forceRerun}
+                onCheckedChange={checked => setForceRerun(checked === true)}
+              />
+              <Label htmlFor="force-rerun" className="text-sm font-normal cursor-pointer">
+                Re-run models with existing results
+              </Label>
             </div>
-          ) : registryQuery.data ? (
-            <RegistrySummary data={registryQuery.data} />
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={startRunMutation.isPending}
-              onClick={() =>
-                startRunMutation.mutate({ kind: 'decider', force: false, queue: 'platform' })
-              }
-            >
-              <Play className="size-4" />
-              Run platform queue
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={startRunMutation.isPending}
-              onClick={() =>
-                startRunMutation.mutate({ kind: 'decider', force: false, queue: 'user' })
-              }
-            >
-              <Play className="size-4" />
-              Run user queue
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={startRunMutation.isPending}
-              onClick={() =>
-                startRunMutation.mutate({ kind: 'decider', force: false, queue: 'both' })
-              }
-            >
-              <Play className="size-4" />
-              Run both queues
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={requeueMutation.isPending}
-              onClick={() => requeueMutation.mutate('both')}
-            >
-              <RotateCcw className="size-4" />
-              Requeue failed
-            </Button>
-          </div>
-          <p className="text-muted-foreground text-xs">
-            Queues also drain on a timer. A queue whose run is already active is skipped.
-          </p>
-        </CardContent>
-      </Card>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={startRunMutation.isPending}
+                onClick={() =>
+                  startRunMutation.mutate({
+                    kind: 'classifier',
+                    force: forceRerun,
+                    queue: 'platform',
+                  })
+                }
+              >
+                <Play className="size-4" />
+                Run classifier benchmark
+              </Button>
+              {hasRunningRun ? (
+                <p className="text-muted-foreground self-center text-xs">
+                  A benchmark is running — refreshing every 30 s
+                </p>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Classifier run controls */}
-      <Card className="rounded-lg">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">Run Classifier Benchmark</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 p-4 pt-0">
-          <p className="text-muted-foreground text-xs">
-            Classifier candidates are not registry-tracked: models with existing results are skipped
-            unless "Re-run models with existing results" is checked.
-          </p>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="force-rerun"
-              checked={forceRerun}
-              onCheckedChange={checked => setForceRerun(checked === true)}
-            />
-            <Label htmlFor="force-rerun" className="text-sm font-normal cursor-pointer">
-              Re-run models with existing results
-            </Label>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={startRunMutation.isPending}
-              onClick={() =>
-                startRunMutation.mutate({
-                  kind: 'classifier',
-                  force: forceRerun,
-                  queue: 'platform',
-                })
-              }
-            >
-              <Play className="size-4" />
-              Run classifier benchmark
-            </Button>
-            {hasRunningRun ? (
-              <p className="text-muted-foreground self-center text-xs">
-                A benchmark is running — refreshing every 30 s
-              </p>
+        <Card className="rounded-lg">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 pb-2">
+            <CardTitle className="text-base">Benchmark Runs</CardTitle>
+            <Select value={runFilter} onValueChange={value => setRunFilter(value as RunFilter)}>
+              <SelectTrigger className="h-8 w-44 text-xs" aria-label="Filter runs by type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(router === 'efficient'
+                  ? (['all', 'classifier', 'platform', 'user'] as const)
+                  : (['all', 'classifier', 'platform'] as const)
+                ).map(value => (
+                  <SelectItem key={value} value={value}>
+                    {RUN_FILTER_LABELS[value]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            {runsQuery.isLoading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : runsQuery.error ? (
+              <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
+                {runsQuery.error instanceof Error
+                  ? runsQuery.error.message
+                  : 'Failed to load benchmark runs'}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8" />
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Started</TableHead>
+                    <TableHead>Completed</TableHead>
+                    <TableHead>Error</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <BenchmarkRunsTable runs={runsQuery.data?.runs ?? []} />
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="routing-table" className="mt-4">
+        <Card className="rounded-lg">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">Published Routing Table</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 p-4 pt-0">
+            {routingTableQuery.isLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : routingTableQuery.error ? (
+              <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
+                {routingTableQuery.error instanceof Error
+                  ? routingTableQuery.error.message
+                  : 'Failed to load routing table'}
+              </div>
+            ) : routingTableQuery.data ? (
+              <>
+                <RoutingTableSummary table={routingTableQuery.data.table} />
+                <RoutingTableView data={routingTableQuery.data} />
+              </>
             ) : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Runs table */}
-      <Card className="rounded-lg">
-        <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 pb-2">
-          <CardTitle className="text-base">Benchmark Runs</CardTitle>
-          <Select value={runFilter} onValueChange={value => setRunFilter(value as RunFilter)}>
-            <SelectTrigger className="h-8 w-44 text-xs" aria-label="Filter runs by type">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(['all', 'classifier', 'platform', 'user'] as const).map(value => (
-                <SelectItem key={value} value={value}>
-                  {RUN_FILTER_LABELS[value]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          {runsQuery.isLoading ? (
-            <Skeleton className="h-24 w-full" />
-          ) : runsQuery.error ? (
-            <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
-              {runsQuery.error instanceof Error
-                ? runsQuery.error.message
-                : 'Failed to load benchmark runs'}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8" />
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead>Completed</TableHead>
-                  <TableHead>Error</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <BenchmarkRunsTable runs={runsQuery.data?.runs ?? []} />
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Routing table */}
-      <Card className="rounded-lg">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">Published Routing Table</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          {routingTableQuery.isLoading ? (
-            <Skeleton className="h-32 w-full" />
-          ) : routingTableQuery.error ? (
-            <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
-              {routingTableQuery.error instanceof Error
-                ? routingTableQuery.error.message
-                : 'Failed to load routing table'}
-            </div>
-          ) : routingTableQuery.data ? (
-            <RoutingTableView data={routingTableQuery.data} />
-          ) : null}
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
   );
 }

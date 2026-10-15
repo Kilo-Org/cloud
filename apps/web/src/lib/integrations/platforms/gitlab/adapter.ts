@@ -447,6 +447,21 @@ export async function fetchGitLabProjects(
   return projects;
 }
 
+/**
+ * An HTTP refusal from the GitLab branches API. The status is the only
+ * provider detail a caller can act on; the response body is never included,
+ * so a message built from this error cannot leak a token or a project path.
+ */
+export class GitLabBranchesFetchError extends Error {
+  constructor(
+    readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'GitLabBranchesFetchError';
+  }
+}
+
 export async function fetchGitLabBranches(
   accessToken: string,
   projectId: string | number,
@@ -474,7 +489,10 @@ export async function fetchGitLabBranches(
     if (!response.ok) {
       const error = await response.text();
       logExceptInTest('GitLab branches fetch failed:', { status: response.status, error });
-      throw new Error(`GitLab branches fetch failed: ${response.status}`);
+      throw new GitLabBranchesFetchError(
+        response.status,
+        `GitLab branches fetch failed: ${response.status}`
+      );
     }
 
     const data = (await response.json()) as GitLabBranch[];

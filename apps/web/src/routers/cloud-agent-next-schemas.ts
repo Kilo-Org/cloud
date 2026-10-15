@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
@@ -20,6 +21,10 @@ import {
   CLOUD_AGENT_IMAGE_MAX_COUNT,
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
 } from '@/lib/cloud-agent/constants';
+import {
+  PREVIEW_PORT_MAX,
+  PREVIEW_PORT_MIN,
+} from '../../../../services/cloud-agent-next/src/shared/preview-port';
 
 export {
   SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
@@ -57,12 +62,6 @@ export const cloudAgentGetImageUploadUrlSchema = z.object({
   contentType: z.enum(CLOUD_AGENT_IMAGE_ALLOWED_TYPES),
   contentLength: z.number().int().positive().max(CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES),
 });
-
-const cloudAgentAttachmentFilenameSchema = z
-  .string()
-  .regex(
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$/
-  );
 
 const DENIED_EXTENSION_SET = new Set<string>(CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS);
 
@@ -102,9 +101,17 @@ export const cloudAgentRelaxedAttachmentFilenameSchema = z.string().superRefine(
   }
 });
 
+/**
+ * Send-time attachment reference (`prepareSession`, `sendMessage`). Accepts
+ * every basename the upload presign can issue, so a file uploaded with a
+ * relaxed extension is not rejected when the message is sent.
+ */
 export const cloudAgentAttachmentsSchema = z.object({
   path: z.uuid(),
-  files: z.array(cloudAgentAttachmentFilenameSchema).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
+  files: z
+    .array(cloudAgentRelaxedAttachmentFilenameSchema)
+    .min(1)
+    .max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
 
 /**
@@ -450,6 +457,7 @@ const PrepareSessionNonCloneVariant = z.object({
    * Old callers omit the field and create an empty destination session.
    */
   cloneFromKiloSessionId: z.undefined().optional(),
+  cloneUpToMessageId: z.undefined().optional(),
   ...PrepareSessionSharedFields,
 });
 
@@ -458,6 +466,11 @@ const PrepareSessionCloneVariant = z.object({
   initialMessageId: z.undefined().optional(),
   initialPayload: z.undefined().optional(),
   cloneFromKiloSessionId: kiloSessionIdSchema,
+  /**
+   * Inclusive cut ("Fork from here"): copy only the source messages up to and
+   * including this message. Omitted copies the whole session.
+   */
+  cloneUpToMessageId: messageIdNextSchema.optional(),
   autoInitiate: z.literal(true),
   operationKey: z.string().uuid(),
   ...PrepareSessionSharedFields,
@@ -466,6 +479,7 @@ const PrepareSessionCloneVariant = z.object({
 // Schema for preparing a session
 export const basePrepareSessionNextSchema = z
   .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
+  .and(egressPolicySchema)
   .refine(
     data =>
       [data.githubRepo, data.gitlabProject, data.bitbucketRepo].filter(
@@ -713,6 +727,38 @@ export const baseCloseTerminalNextOutputSchema = z.object({
   success: z.boolean(),
 });
 
+const previewSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+
+export const baseCreatePreviewNextSchema = z.object({
+  cloudAgentSessionId: previewSessionIdSchema,
+  port: z.number().int().min(PREVIEW_PORT_MIN).max(PREVIEW_PORT_MAX),
+  /** Where the preview opens; the Worker validates it where it redirects. */
+  path: z.string().startsWith('/').max(2048).optional(),
+});
+
+export const baseCreatePreviewNextOutputSchema = z.object({
+  url: z.url(),
+  expiresAt: z.number().int().positive(),
+});
+
+export const basePreviewOptionsNextSchema = z.object({
+  cloudAgentSessionId: previewSessionIdSchema,
+  /** The route's organization; the Worker uses it only to decide whether to show preview. */
+  organizationId: z.uuid().optional(),
+});
+
+/** The Worker's answer: its preview hostname with a `{port}` placeholder. */
+export const workerPreviewOptionsSchema = z.discriminatedUnion('enabled', [
+  z.object({ enabled: z.literal(false) }),
+  z.object({ enabled: z.literal(true), hostTemplate: z.string().min(1) }),
+]);
+
+/** The browser's answer: the full preview URL with a `{port}` placeholder. */
+export const basePreviewOptionsNextOutputSchema = z.discriminatedUnion('enabled', [
+  z.object({ enabled: z.literal(false) }),
+  z.object({ enabled: z.literal(true), urlTemplate: z.string().min(1) }),
+]);
+
 // Execution status schema for getSession response
 export const executionStatusNextSchema = z
   .object({
@@ -752,6 +798,7 @@ export const baseGetSessionNextOutputSchema = z.object({
   variant: z.string().optional(),
   autoCommit: z.boolean().optional(),
   upstreamBranch: z.string().optional(),
+  branchName: z.string().optional(),
 
   /** Custom agents stored on this session (shown in the chat picker). */
   runtimeAgents: z

@@ -133,9 +133,14 @@
     "status": "Būsena",
     "truncated": "Sutrumpinta",
     "updated": "Atnaujinta",
+    "generating": "Generuojama…",
     "working": "Vykdoma",
     "yourOwnRepositories": "Tavo saugyklos",
-    "dismissed": "Atmesta"
+    "dismissed": "Atmesta",
+    "agent": "Agentas",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Pakeitimai"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -324,6 +329,7 @@
       "collapseFile": "Sutraukti failą",
       "expandFile": "Išskleisti failą",
       "diffTooLarge": "Pakeitimų palyginimas per didelis, kad būtų galima jį parodyti.",
+      "noPreview": "Šio failo peržiūra negalima",
       "openOnGitHub": "Atidaryti GitHub platformoje",
       "openDiffOnGitHub": "Atidaryti šio failo pakeitimų palyginimą GitHub platformoje",
       "githubDiff": "GitHub pakeitimų palyginimas"
@@ -862,7 +868,8 @@
       "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",
       "security": "Saugos problemos",
-      "spend": "Išlaidų įspėjimai"
+      "spend": "Išlaidų įspėjimai",
+      "followedSessions": "Sekamos sesijos"
     },
     "category": {
       "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",
@@ -1289,7 +1296,7 @@
         "stoppedTitle": "Sąranka sustabdyta",
         "stoppedBody": "Ruošiant {{name}} egzempliorių, jis netikėtai nustojo veikti.",
         "stalledTitle": "Sąranka užstrigo",
-        "stalledBody": "Nepavyko baigti ruošti {{name}}. Bandyk dar kartą. Jei problema kartojasi, parašyk adresu hi@kilo.ai.",
+        "stalledBody": "Nepavyko baigti ruošti {{name}}. Bandyk dar kartą. Jei problema kartojasi, parašyk adresu {{supportEmail}}.",
         "timeoutTitle": "Užtrunka ilgiau nei tikėtasi",
         "timeoutBody": "{{name}} sąranka trunka ilgiau nei įprastai (daugiau nei {{displayMinutes}} min.).",
         "continueInBackground": "Tęsti fone",
@@ -1347,7 +1354,7 @@
       "nonCanonicalEarlybirdBody": "Kad galėtum naudoti ankstyvosios prieigos planą mobiliajame įrenginyje, jį pirmiausia turi peržiūrėti specialistai.",
       "iosTitle": "KiloClaw nepasiekiamas iOS programėlėje",
       "iosBody": "Šios paskyros KiloClaw prieiga tvarkoma ne iOS programėlėje.",
-      "iosContact": "Turi klausimų? Parašyk adresu hi@kilo.ai.",
+      "iosContact": "Turi klausimų? Parašyk adresu {{supportEmail}}.",
       "quarantinedCta": "Rašyti mūsų komandai el. paštu",
       "nonCanonicalEarlybirdCta": "Peržiūrėti savo planą svetainėje kilo.ai"
     },
@@ -1438,6 +1445,8 @@
       "retryTitle": "Pakartoti peržiūrą?",
       "retryMessage": "Kodo peržiūra bus atlikta dar kartą.",
       "retryReview": "Pakartoti peržiūrą",
+      "retryNeedsSettings": "Kodo peržiūros agentas išjungtas arba jo nustatymams reikia dėmesio. Pataisykite nustatymus, tada pakartokite šią peržiūrą.",
+      "fixSettings": "Pataisyti nustatymus",
       "couldNotLoad": "Nepavyko įkelti peržiūros.",
       "couldNotGetLatest": "Nepavyko gauti naujausių duomenų.",
       "byline": "{{repo}} #{{number}} · Autorius: {{author}}",
@@ -1582,7 +1591,7 @@
         "recoveryLabel": "Atnaujinti GitHub programėlę"
       },
       "githubIpAllowList": {
-        "description": "Kodo peržiūros agentas išjungtas, nes šios GitHub organizacijos leidžiamų IP adresų sąrašas blokuoja Kilo prieigą. Kreipkis pagalbos el. paštu hi@kilocode.ai, tada vėl įjunk kodo peržiūros agentą."
+        "description": "Kodo peržiūros agentas išjungtas, nes šios GitHub organizacijos leidžiamų IP adresų sąrašas blokuoja Kilo prieigą. Kreipkis pagalbos el. paštu {{supportEmail}}, tada vėl įjunk kodo peržiūros agentą."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kodo peržiūros agentas išjungtas, nes Kilo negali sukurti šio GitLab projekto prieigos rakto. Suteik prižiūrėtojo teises arba įjunk projekto prieigos raktus, tada vėl įjunk kodo peržiūros agentą.",
@@ -1597,7 +1606,7 @@
         "recoveryLabel": "Atnaujinti kodo peržiūros agento nustatymus"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kodo peržiūros agentas išjungtas, nes šiandien tris kartus viršytas saugyklos klonavimui skirtas laikas. Kreipkis pagalbos el. paštu hi@kilocode.ai, tada vėl įjunk kodo peržiūros agentą."
+        "description": "Kodo peržiūros agentas išjungtas, nes šiandien tris kartus viršytas saugyklos klonavimui skirtas laikas. Kreipkis pagalbos el. paštu {{supportEmail}}, tada vėl įjunk kodo peržiūros agentą."
       },
       "title": "Kodo peržiūros agentui reikia tavo dėmesio.",
       "recoveryLabel": "Kreiptis į pagalbos tarnybą"
@@ -2139,6 +2148,8 @@
       "title": "Sesija",
       "copyErrorDetails": "Kopijuoti klaidos informaciją",
       "backToSessions": "Grįžti į sesijas",
+      "follow": "Sekti užrakinimo ekrane",
+      "unfollow": "Nebesekti užrakinimo ekrane",
       "couldNotLoad": "Nepavyko įkelti sesijos.",
       "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos.",
       "failedToStopExecution": "Nepavyko sustabdyti vykdymo.",
@@ -2205,6 +2216,11 @@
       "collapse": "Sutraukti tikslą",
       "expand": "Išskleisti tikslą"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Užduotys, atlikta {{completed}} iš {{total}}",
+      "rowAccessibility": "Užduotys, atlikta {{completed}} iš {{total}}. Dabartinė užduotis: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Neseniai naudota",
       "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",
@@ -2237,7 +2253,6 @@
       "retryLoadingEnvironment": "Bandyti įkelti aplinką iš naujo",
       "defaultEnvironment": "Numatytoji aplinka",
       "environmentSummary": "komandų: {{commands}} · MCP: {{mcp}} · įgūdžių: {{skills}} · agentų: {{agents}}",
-      "changes": "Pakeitimai",
       "leaveChanges": "Palikti pakeitimus",
       "commitAndPush": "Įrašyti ir išsiųsti",
       "startSession": "Pradėti sesiją",
@@ -2260,6 +2275,10 @@
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šioje CLI sesijos tęsti negalima. Pasirinkite „Cloud Agent“ arba kitą CLI.",
       "importFailed": "Nepavyko importuoti šios sesijos.",
+      "cliCannotFork": "Atnaujinkite Kilo CLI, kad galėtumėte atšakoti nuo žinutės.",
+      "forkCutNotSynced": "Ši žinutė dar neišsaugota. Netrukus bandykite dar kartą.",
+      "forkFilesFromBaseBranch": "Failai pradedami nuo bazinės šakos.",
+      "forkFilesUnchangedOnComputer": "Failai šiame kompiuteryje nekeičiami.",
       "pickProfile": "Pasirinkite profilį",
       "noProfile": "Nėra profilio",
       "manageProfiles": "Tvarkyti profilius",
@@ -2306,8 +2325,8 @@
       "toolList": "rodyti sąrašą",
       "toolPatch": "taisyti",
       "toolTask": "užduotis",
-      "readTodos": "Skaityti užduočių sąrašą",
-      "updateTodos": "Atnaujinti užduočių sąrašą",
+      "readTodos": "Skaityti planą",
+      "updateTodos": "Atnaujinti planą",
       "linesBadge": "eil.: {{displayCount}}",
       "filesBadge": "failų: {{displayCount}}",
       "matchesBadge": "atitikčių: {{displayCount}}",
@@ -2383,6 +2402,7 @@
       "copyMessage": "Kopijuoti žinutę",
       "copyText": "Kopijuoti tekstą",
       "selectText": "Pažymėti tekstą",
+      "forkFromHere": "Atšakoti nuo čia",
       "reportAiResponse": "Pranešti apie AI atsakymą",
       "reportAiResponseConfirm": "Pranešti apie šį atsakymą, kad jis būtų patikrintas?",
       "report": "Pranešti",
@@ -2714,6 +2734,12 @@
       "modelsCount_other": "Modeliai ({{displayCount}})",
       "modelsCount_few": "Modeliai ({{displayCount}})",
       "modelsCount_many": "Modeliai ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Peržiūrėti pakeitimus",
+      "asOf": "Būsena {{time}}",
+      "tooLarge": "Šis pakeitimų palyginimas per didelis, kad būtų galima jį parodyti mobiliajame įrenginyje.",
+      "empty": "Šioje sesijoje failų pakeitimų dar nėra."
     },
     "autoApprove": {
       "title": "Automatinis tvirtinimas",
@@ -3232,9 +3258,36 @@
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
     "openSession": "Atidaryti",
+    "finished": "Baigta",
+    "followFailed": "Nepavyko parodyti šio agento užrakinimo ekrane.",
     "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
-    "newestResult": "Naujausias rezultatas",
-    "scheduledWakes": "prabunda {{time}}"
+    "checked": "Patikrinta",
+    "lastKnown": "Paskutinė žinoma",
+    "awaitingUpdate": "Laukiama atnaujinimo",
+    "nextRun": "Kitas vykdymas",
+    "waitingForYou": "Laukia jūsų",
+    "nextScheduled": "Artimiausi suplanuoti",
+    "answerNeeded": "Laukia atsakymo",
+    "waitingToRetry": "Laukiama pakartojimo",
+    "step": {
+      "editing": "Redagavimas",
+      "reading": "Skaitymas",
+      "running": "Vykdoma",
+      "searching": "Paieška žiniatinklyje",
+      "thinking": "Mąstoma"
+    },
+    "planOf": "iš",
+    "filesChanged": "pakeisti failai",
+    "finishedIn": "Baigta per",
+    "noActivityFor": "Nėra veiklos",
+    "prOpened": "Atidaryta pull užklausa",
+    "permissionWants": "Nori vykdyti",
+    "failure": {
+      "provider": "Sustabdyta: teikėjo klaida",
+      "tool": "Sustabdyta: įrankio klaida",
+      "cancelled": "Sustabdyta: atšaukta",
+      "other": "SUSTABDYTA"
+    }
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",
@@ -3262,6 +3315,7 @@
     "tutorialLabel": "Pamoka"
   },
   "modelChat": {
+    "offlineFailure": "Šiam modeliui reikalingas interneto ryšys. Prisijunkite ir bandykite dar kartą arba perjunkite į šio įrenginio modelį.",
     "empty": {
       "title": "Pradėti pokalbį",
       "description": "Siųskite žinutę, kad pakalbėtumėte su modeliu."
@@ -3269,10 +3323,32 @@
     "list": {
       "loadFailed": "Nepavyko įkelti pokalbio istorijos.",
       "new": "Naujas pokalbis",
-      "openHint": "Atidaro pokalbį. Palaikykite, kad ištrintumėte.",
       "deleteTitle": "Ištrinti šį pokalbį?"
     },
+    "rename": {
+      "title": "Pervadinti pokalbį",
+      "accessibility": "Pervadinti pokalbį: {{title}}",
+      "openHint": "Atidaro pokalbį. Palaikykite, kad pervadintumėte arba ištrintumėte."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Pokalbio informacija",
+      "backend": "Serveris",
+      "effortDefault": "Modelio numatytasis",
+      "noCost": "Nemokama",
+      "costUnknown": "Nežinoma",
+      "costEstimatedNote": "Atsakymų, kurie nenurodė kainos, kaina apskaičiuota pagal kainoraščio kainas.",
+      "costUnknownNote": "Šio modelio kaina nežinoma.",
+      "costPartialNote": "Į šią sumą neįtraukti modeliai, kurių kaina nežinoma.",
+      "localNote": "Įrenginio modeliai veikia šiame įrenginyje. Jie neturi kainos ir užklausų talpyklos, o jų žetonų skaičius gali būti apytikslis.",
+      "countedSinceNote": "Šis pokalbis prasidėjo prieš pradedant registruoti naudojimą. Sumos rodo tik vėlesnius atsakymus.",
+      "remoteServersOn": "Įjungti nuotoliniai MCP serveriai"
+    },
+    "webSearch": {
+      "title": "Ieškoti žiniatinklyje",
+      "description": "Leiskite šiam pokalbiui ieškoti naujausios informacijos per jūsų Kilo paskyrą. Paieškos naudoja jūsų mėnesinį paieškų limitą.",
+      "allowanceExhausted": "Jūsų nemokamos šio mėnesio žiniatinklio paieškos išnaudotos. Pridėkite kreditų, kad vėl galėtumėte ieškoti."
+    },
     "mcp": {
       "title": "Kilo įrankiai",
       "use": "Naudoti Kilo įrankius",
@@ -3295,7 +3371,6 @@
       "fieldName": "Rodomas pavadinimas",
       "fieldUrl": "Serverio URL",
       "fieldUrlInvalid": "Įveskite galiojantį serverio URL.",
-      "fieldToken": "Bearer prieigos raktas (neprivaloma)",
       "enableServer": "Įjungti šį serverį: {{name}}",
       "editServer": "Redaguoti serverį",
       "deleteServer": "Ištrinti serverį",
@@ -3316,8 +3391,24 @@
       "serverUnreachable": "Nepavyko pasiekti šio serverio",
       "serverOff": "Šis serveris išjungtas"
     },
+    "mcpOAuth": {
+      "authMethod": "Autentifikavimas",
+      "authNone": "Be prisijungimo",
+      "authBearer": "Bearer prieigos raktas",
+      "authOAuth": "OAuth prisijungimas",
+      "fieldToken": "Prieigos raktas",
+      "oauthHint": "Išsaugojęs bakstelėk $t(modelChat.mcpOAuth.signIn) prie serverio, kad prisijungtum naršyklėje.",
+      "serverNeedsSignIn": "Prisijunk, kad galėtum naudoti šį serverį",
+      "signIn": "Prisijungti",
+      "signInA11y": "Prisijungti prie šio serverio: {{name}}",
+      "signInFailed": "Nepavyko prisijungti prie {{name}}. Bandyk dar kartą."
+    },
     "backends": {
       "title": "Pokalbių serveriai",
+      "providersTitle": "Pokalbių teikėjai",
+      "cloud": "Debesyje",
+      "cloudModel": "Modelis: {{model}}",
+      "cloudUnavailable": "„Kilo“ modeliai šiuo metu nepasiekiami. Patikrinkite ryšį.",
       "manage": "Tvarkyti serverius",
       "defaultKilo": "$t(consent.kilo) (numatytasis)",
       "kiloHelp": "Integruotas serveris naudoja jūsų Kilo paskyrą ir negali būti redaguojamas ar ištrinamas.",
@@ -3377,7 +3468,6 @@
     "gguf": {
       "title": "Atsisiunčiami modeliai",
       "help": "Atsisiųskite atvirą modelį ir paleiskite jį šiame telefone su llama.cpp. Jūsų užklausos ir atsakymai lieka įrenginyje. Modeliai yra dideli, todėl naudokite Wi-Fi.",
-      "details": "{{size}} · Licencija: {{license}}",
       "download": "Atsisiųsti modelį",
       "pause": "Pristabdyti atsisiuntimą",
       "resume": "Tęsti atsisiuntimą",
@@ -3389,6 +3479,8 @@
       "url": "Tiesioginė atsisiuntimo nuoroda",
       "urlHelp": "Įklijuokite HTTPS nuorodą į .gguf failą, pavyzdžiui, Hugging Face resolve nuorodą. Atsisiųskite modelius tik iš šaltinių, kuriais pasitikite.",
       "downloadUrl": "Atsisiųsti iš nuorodos",
+      "advanced": "Išplėstinė",
+      "localPurpose": "Veikia šiame įrenginyje su llama.cpp. Užklausos ir atsakymai lieka įrenginyje.",
       "deleteTitle": "Ištrinti šį modelį?",
       "deleteMessage": "Ištrinti {{name}} iš šio įrenginio? Pokalbių, kurie jį naudoja, tęsimui reikia kito modelio.",
       "errors": {
@@ -3398,12 +3490,62 @@
         "notGguf": "Nuoroda turi nurodyti į .gguf failą.",
         "space": "Šiam modeliui nepakanka laisvos vietos. Atlaisvinkite vietos ir bandykite dar kartą.",
         "network": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir bandykite dar kartą.",
-        "invalidFile": "Atsisiųstas failas nėra modelis, kurį ši programa gali paleisti, todėl jis buvo pašalintas."
+        "invalidFile": "Atsisiųstas failas nėra modelis, kurį ši programa gali paleisti, todėl jis buvo pašalintas.",
+        "checksum": "Atsisiųstas failas neatitinka paskelbtos kontrolinės sumos, todėl jis buvo pašalintas. Pabandykite atsisiųsti dar kartą."
       }
+    },
+    "catalog": {
+      "browse": "Naršyti modelius",
+      "title": "Modelių katalogas",
+      "search": "Ieškoti Hugging Face modelių",
+      "tabs": "Modelių filtras",
+      "fitsTab": "Tinka šiam įrenginiui",
+      "fromHuggingFace": "Iš Hugging Face",
+      "loading": "Įkeliami modeliai",
+      "noResults": "Modelių nerasta",
+      "noFits": "Šiam įrenginiui netinka nė vienas modelis",
+      "noFitsDescription": "Didesni modeliai yra skirtuke „$t(common.all)“.",
+      "fit": {
+        "fits": "Tinka",
+        "tight": "Vos tinka",
+        "tooLarge": "Per didelis",
+        "noStorage": "Nepakanka vietos",
+        "unknown": "Tinkamumas nežinomas"
+      },
+      "recommendationsHelp": "Šios programos pasirinktas sąrašas: vienas failas vienam modeliui, iš leidėjo, kuris nurodo licenciją. Niekas kitas nereitinguojamas.",
+      "compatibilityHelp": "Tinkamumas palygina modelio failą su šio įrenginio atmintimi ir laisva saugykla. Atminties skaičius yra įvertis, o ne matavimas.",
+      "text": "Tekstas",
+      "listTextPurpose": "Tik tekstinės užklausos.",
+      "listImagePurpose": "Skaito vaizdus ir tekstą.",
+      "smallestDownload": "Mažiausias atsisiuntimas: {{size}} · apie {{memory}} atminties",
+      "fullFileName": "Failas: {{name}}",
+      "memoryEstimateNote": "Atminties skaičiai yra įverčiai, o ne matavimai.",
+      "parameters": "Parametrai: {{value}}",
+      "downloads": "Atsisiuntimai: {{value}}",
+      "likes": "Patinka: {{value}}",
+      "context": "Konteksto langas: {{value}}",
+      "license": "Licencija: {{license}}",
+      "licenseUnknown": "Licencija nenurodyta",
+      "tools": "Įrankių iškvietimas",
+      "vision": "Vaizdų įvestis",
+      "hintsHelp": "Užuominos iš Hugging Face. Programa patikrina modelį, kai jis atsisiunčiamas.",
+      "gated": "Šiam modeliui reikia Hugging Face paskyros, todėl programa negali jo atsisiųsti.",
+      "quantizations": "Kvantavimai",
+      "quantizationsHelp": "Mažesni failai naudoja mažiau atminties ir saugyklos vietos. Didesni failai paprastai pateikia geresnius atsakymus.",
+      "quantDetail": "Atsisiuntimas: {{size}} · apie {{memory}} atminties",
+      "downloadQuant": "Atsisiųsti {{quant}}",
+      "loadingModel": "Įkeliama modelio informacija",
+      "couldNotLoadModel": "Nepavyko įkelti šio modelio",
+      "noFiles": "Nėra failų, kuriuos ši programa galėtų paleisti",
+      "noFilesDescription": "Ši programa paleidžia modelius, sudarytus iš vieno GGUF failo.",
+      "tooLargeTitle": "Šis modelis gali neveikti",
+      "tooLargeMessage": "Modeliui {{name}} greičiausiai reikia daugiau atminties, nei turi šis įrenginys. Programa gali užsidaryti, kol modelis atsakinėja. Vis tiek atsisiųsti?",
+      "downloadAnyway": "Vis tiek atsisiųsti"
     },
     "localModels": {
       "title": "Įrenginio modeliai",
-      "help": "Įrenginio modeliai veikia šiame telefone. Jūsų užklausos ir atsakymai lieka įrenginyje, o šie modeliai negali naudoti įrankių.",
+      "help": "Įrenginio modeliai veikia šiame telefone. Jūsų užklausos ir atsakymai lieka įrenginyje.",
+      "systemPurpose": "Į šio įrenginio sistemą integruotas modelis. Jis veikia įrenginyje.",
       "apple": "Apple Intelligence (įrenginyje)",
       "checking": "Tikrinamas pasiekiamumas…",
       "ready": "Paruošta naudoti",
@@ -3429,6 +3571,9 @@
       "downloading": "Atsisiunčiama…",
       "downloadProgress": "Atsisiunčiama… {{percent}}%",
       "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
     }
   },
   "settingsTools": {
@@ -3608,7 +3753,6 @@
       "template": "Šablonas",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Paaiškinkite $ARGUMENTS",
-      "agent": "Agentas",
       "subtask": "Vykdyti kaip papildomą užduotį",
       "edit": "Redaguoti pasvirojo brūkšnio komandą",
       "saveFailed": "Nepavyko išsaugoti komandos",
@@ -3652,5 +3796,100 @@
     "noMatchingProductsPlay": "Google Play negrąžino jokių atitinkančių kreditų paketų.",
     "purchaseOwnedByAnotherAccount": "Šios Apple Account paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros.",
     "purchaseOwnedByAnotherAccountPlay": "Šios Google Play paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros."
+  },
+  "todos": {
+    "saveAsTodo": "Išsaugoti kaip užduotį",
+    "segment": {
+      "label": "Agentų rodinys",
+      "sessions": "Sesijos",
+      "todos": "Užduotys"
+    },
+    "lists": {
+      "newList": "Naujas sąrašas",
+      "empty": "Sąrašų dar nėra",
+      "couldNotLoad": "Sąrašų įkelti nepavyko",
+      "noRepository": "Nėra saugyklos",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "Atviros: {{count}}",
+      "openCount_few": "Atviros: {{count}}",
+      "openCount_many": "Atviros: {{count}}",
+      "openCount_other": "Atviros: {{count}}",
+      "archived_one": "Archyvuota ({{count}})",
+      "archived_few": "Archyvuota ({{count}})",
+      "archived_many": "Archyvuota ({{count}})",
+      "archived_other": "Archyvuota ({{count}})",
+      "archive": "Archyvuoti",
+      "unarchive": "Išarchyvuoti",
+      "deleteTitle": "Ištrinti {{name}}?",
+      "deleteMessage": "Jos užduotys taip pat ištrinamos. Jų sesijos lieka."
+    },
+    "listSettings": {
+      "title": "Sąrašo nustatymai",
+      "name": "Pavadinimas",
+      "namePlaceholder": "Klaidos, idėjos, leidimas…",
+      "emoji": "Emodžis",
+      "mode": "Režimas",
+      "defaultsHint": "Sesijos, pradėtos iš šio sąrašo, naudoja šias numatytąsias reikšmes."
+    },
+    "list": {
+      "addPlaceholder": "Pridėti naują užduotį",
+      "add": "Pridėti užduotį",
+      "empty": "Užduočių dar nėra",
+      "setDefaults": "Nustatyti saugyklą, režimą ir modelį",
+      "completed_one": "Baigta ({{count}})",
+      "completed_few": "Baigta ({{count}})",
+      "completed_many": "Baigta ({{count}})",
+      "completed_other": "Baigta ({{count}})"
+    },
+    "item": {
+      "markDone": "Žymėti kaip baigtą",
+      "markOpen": "Žymėti kaip nebaigtą",
+      "markDonePrompt": "Žymėti kaip baigtą?",
+      "deleted": "Užduotis ištrinta",
+      "undo": "Grąžinti atgal",
+      "runCount_one": "{{count}} paleidimas",
+      "runCount_few": "{{count}} paleidimai",
+      "runCount_many": "{{count}} paleidimo",
+      "runCount_other": "{{count}} paleidimų",
+      "startNow": "Pradėti be peržiūros",
+      "startNowHint": "Palaikykite nuspaudę, kad pradėtumėte be peržiūros",
+      "titleLabel": "Užduoties pavadinimas",
+      "renameTitle": "Pervadinti užduotį",
+      "notes": "Pastabos",
+      "addNotes": "Pridėti pastabas",
+      "notesPrompt": "Pridėkite kontekstą, reikalavimus arba priėmimo kriterijus.",
+      "markdownSupported": "Palaikomas Markdown",
+      "sessions": "Susietos sesijos",
+      "noSessions": "Sesijų dar nėra",
+      "untitledLinkedSession": "Susieta sesija",
+      "sessionNeedsInput": "Sesijai reikia įvesties",
+      "sessionRunning": "Sesija veikia",
+      "sessionFinished": "Sesija baigta",
+      "sessionPullRequest": "Sesijos pakeitimo užklausa",
+      "sessionPullRequestNumber": "Sesijos PR #{{number}}",
+      "openSessionHint": "Atidaro sesiją.",
+      "unlinkSessionAction": "Atsieti sesiją",
+      "unlinkConfirmTitle": "Atsieti {{title}}?",
+      "unlinkConfirmMessage": "Pati sesija neištrinama. Pašalinama tik jos nuoroda į šią užduotį.",
+      "startNewSession": "Pradėti naują sesiją",
+      "startNewSessionHint": "Paspauskite ir palaikykite, kad pradėtumėte naują sesiją.",
+      "linkSession": "Susieti sesiją",
+      "linkFailed": "Sesijos susieti su užduotimi nepavyko"
+    },
+    "linkSession": {
+      "title": "Sesijos susiejimas",
+      "empty": "Nėra naujausių sesijų",
+      "emptyInRepository": "Saugykloje {{repository}} nėra naujausių sesijų"
+    },
+    "upNext": "Toliau",
+    "sessionTodo": "Užduotis: {{title}}",
+    "linkToTodo": "Susieti su užduotimi",
+    "candidates": {
+      "empty": "Nėra atvirų užduočių"
+    },
+    "saveSheet": {
+      "title": "Išsaugoti į sąrašą",
+      "saved": "Išsaugota į {{list}}"
+    }
   }
 }

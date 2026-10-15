@@ -182,9 +182,6 @@ async function sealedRuntimeAuthorization(
 function createProvider(): FakeProvider {
   const provider: FakeProvider = { adapter: null as unknown as ProviderAdapter, launchEnvs: [] };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent) {
       return { providerRef: `mem_${intent.intentId}` };
@@ -200,6 +197,7 @@ function createProvider(): FakeProvider {
       return 'terminal' as StopResult;
     },
     async ensureLeaseAtLeast() {},
+    async applyContainedCredentials() {},
     async logs() {
       return '';
     },

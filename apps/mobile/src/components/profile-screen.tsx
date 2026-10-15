@@ -35,7 +35,6 @@ import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
 import { i18n } from '@/i18n';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { openExternalUrl } from '@/lib/external-link';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
@@ -91,7 +90,6 @@ export function ProfileScreen() {
   // automated UI session holds one open) must not hide the Linked accounts row,
   // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   // Both destructive confirms on this screen go through the app's dialog: it
   // carries the destructive (red) affordance on iOS and Android alike, because
   // Android's native `AlertDialog` paints every button with the theme accent.
@@ -144,6 +142,7 @@ export function ProfileScreen() {
     phase: deletePhase,
     isPending: deletePending,
     devCode,
+    canSubmitCode,
     beginDelete,
     submitCode,
     setCode,
@@ -259,24 +258,22 @@ export function ProfileScreen() {
         </View>
 
         {/* PR Review */}
-        {prReviewEnabled && (
-          <View className="mt-6 gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('profile.reviews')}
-            </Text>
-            <ConfigureRow
-              icon={GitMerge}
-              title={t('common.prReview')}
-              subtitle={t('profile.prReviewSubtitle')}
-              hue="gold"
-              className="rounded-lg bg-secondary px-3"
-              last
-              onPress={() => {
-                router.push(getPrReviewEntryPath());
-              }}
-            />
-          </View>
-        )}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('profile.reviews')}
+          </Text>
+          <ConfigureRow
+            icon={GitMerge}
+            title={t('common.prReview')}
+            subtitle={t('profile.prReviewSubtitle')}
+            hue="gold"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push(getPrReviewEntryPath());
+            }}
+          />
+        </View>
 
         {/* Organization */}
         {organizationId != null && (
@@ -473,7 +470,7 @@ export function ProfileScreen() {
               <Button
                 variant="destructive"
                 loading={deletePhase === 'executing'}
-                disabled={deletePhase === 'executing'}
+                disabled={deletePhase === 'executing' || !canSubmitCode}
                 onPress={submitCode}
               >
                 <Text>{t('profile.confirmDeletion')}</Text>

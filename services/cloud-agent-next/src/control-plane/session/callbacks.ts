@@ -3,6 +3,7 @@ import {
   type CallbackJobQueueFitResult,
 } from '../../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../../callbacks/types.js';
+import { renderRecentActivity } from '../../callbacks/recent-activity.js';
 import { logger } from '../../logger.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { projectTerminalClientError } from '../../session/terminal-error-projector.js';
@@ -39,6 +40,11 @@ export type MessageCallbacksDependencies = {
     kiloSessionId: string,
     parentMessageId: string
   ) => LatestAssistantMessage | null;
+  getRecentAssistantMessagesForUserMessage: (
+    sessionId: string,
+    kiloSessionId: string,
+    parentMessageId: string
+  ) => LatestAssistantMessage[];
 };
 
 export type MessageCallbacks = {
@@ -155,8 +161,13 @@ function redactCallbackTargetUrl(callbackUrl: string): string {
 export function createMessageCallbacks(
   dependencies: MessageCallbacksDependencies
 ): MessageCallbacks {
-  const { storage, getMetadata, getCallbackQueue, getAssistantMessageForUserMessage } =
-    dependencies;
+  const {
+    storage,
+    getMetadata,
+    getCallbackQueue,
+    getAssistantMessageForUserMessage,
+    getRecentAssistantMessagesForUserMessage,
+  } = dependencies;
   let repairInFlight: Promise<void> | undefined;
 
   function buildJob(
@@ -171,6 +182,7 @@ export function createMessageCallbacks(
     const sessionId = metadata.identity.sessionId;
     const kiloSessionId = metadata.auth.kiloSessionId;
     let lastAssistantMessageText: string | undefined;
+    let recentActivity: string | undefined;
     if (status === 'completed' && kiloSessionId) {
       try {
         const assistantMessage = getAssistantMessageForUserMessage(
@@ -186,6 +198,15 @@ export function createMessageCallbacks(
         logger
           .withFields({ sessionId, messageId: message.messageId })
           .warn('Unable to include the assistant answer in the callback snapshot');
+      }
+      try {
+        recentActivity = renderRecentActivity(
+          getRecentAssistantMessagesForUserMessage(sessionId, kiloSessionId, message.messageId)
+        );
+      } catch {
+        logger
+          .withFields({ sessionId, messageId: message.messageId })
+          .warn('Unable to include recent activity in the callback snapshot');
       }
     }
     // The classification is derived from the message alone; settlement facts
@@ -214,11 +235,20 @@ export function createMessageCallbacks(
         ...(status === 'completed'
           ? {}
           : {
-              clientError: projectTerminalClientError({ status, error: errorMessage }),
+              clientError: projectTerminalClientError({
+                status,
+                error: errorMessage,
+                failureCode: failure?.code,
+                failureStage: failure?.stage,
+              }),
             }),
         lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
         kiloSessionId,
         lastAssistantMessageText,
+        recentActivity,
+        ...(status === 'completed' && facts?.gateResult !== undefined
+          ? { gateResult: facts.gateResult }
+          : {}),
         idempotencyKey: message.messageId,
       },
     };

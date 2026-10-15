@@ -1,10 +1,10 @@
 import { createIs } from 'typia';
 import type { ModelUsage, StopReason } from '../../../core/model.js';
 import { stopFrom, type Wire, type WirePart } from './wire.js';
-import { readCached, type TokenCount } from './usage.js';
+import { costOf, type CostFields, readCached, type TokenCount } from './usage.js';
 import { toBody } from './completions-body.js';
 
-interface Counts {
+interface Counts extends CostFields {
   prompt_tokens: TokenCount;
   completion_tokens: TokenCount;
   prompt_tokens_details?: { cached_tokens?: TokenCount | null } | null;
@@ -64,13 +64,16 @@ const isCall = createIs<CallEvent>();
 const isReasoning = createIs<ReasoningEvent>();
 const isUsage = createIs<UsageEvent>();
 const isStop = createIs<StopEvent>();
+const isModel = createIs<{ model: string }>();
 
-const readUsage = (usage: Counts): Partial<ModelUsage> =>
-  readCached(
+const readUsage = (usage: Counts): Partial<ModelUsage> => ({
+  ...readCached(
     usage.prompt_tokens,
     usage.completion_tokens,
     usage.prompt_tokens_details?.cached_tokens ?? 0
-  );
+  ),
+  ...costOf(usage),
+});
 
 /**
  * The empty-choices frame is filtered here rather than in the type. A tuple
@@ -118,11 +121,15 @@ const toUsage = (event: unknown): Partial<ModelUsage> | undefined =>
 const toStop = (event: unknown): StopReason | undefined =>
   isStop(event) ? asStop(event.choices[0]?.finish_reason) : undefined;
 
+const toModel = (event: unknown): string | undefined =>
+  isModel(event) && event.model.length > 0 ? event.model : undefined;
+
 const completionsWire: Wire = {
   path: '/api/gateway/v1/chat/completions',
   toBody,
   toDelta,
   toUsage,
+  toModel,
   toStop,
 };
 

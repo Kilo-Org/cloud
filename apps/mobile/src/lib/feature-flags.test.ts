@@ -1,14 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  compareAppVersions,
-  currentAppVersion,
-  FEATURE_FLAG_CHAT,
-  FEATURE_FLAG_DEFINITIONS,
-  FEATURE_FLAG_PR_REVIEW,
-  getFeatureFlagDefinition,
-  isAppVersionAtLeast,
-} from './feature-flags';
+import { compareAppVersions, currentAppVersion, isAppVersionAtLeast } from './feature-flags';
 
 // expo-application is a native module whose source pulls in react-native
 // (Flow-typed), which the pure vitest pipeline cannot parse. Mock it with a
@@ -58,26 +50,7 @@ describe('isAppVersionAtLeast', () => {
   });
 });
 
-describe('registry', () => {
-  it('registers every shipped flag with its first release', () => {
-    expect(FEATURE_FLAG_DEFINITIONS).toEqual([
-      { key: FEATURE_FLAG_PR_REVIEW, minAppVersion: '1.0.4', defaultValue: true },
-      { key: FEATURE_FLAG_CHAT, minAppVersion: '1.0.11', defaultValue: true },
-    ]);
-  });
-
-  it('gates the rebuilt chat on a key of its own, not the removed quick chat key', () => {
-    // A shipped build reads `mobile-quick-chat` for the screen this branch
-    // removes; the tab must not share it or enabling the tab enables that one.
-    expect(FEATURE_FLAG_CHAT).toBe('mobile-chat');
-    expect(getFeatureFlagDefinition('mobile-quick-chat')).toBeUndefined();
-  });
-
-  it('looks a definition up by key', () => {
-    expect(getFeatureFlagDefinition(FEATURE_FLAG_CHAT)?.minAppVersion).toBe('1.0.11');
-    expect(getFeatureFlagDefinition('mobile-unknown')).toBeUndefined();
-  });
-
+describe('currentAppVersion', () => {
   it('reads the running build version, null when absent', () => {
     hoisted.nativeApplicationVersion = '1.0.8';
     expect(currentAppVersion()).toBe('1.0.8');

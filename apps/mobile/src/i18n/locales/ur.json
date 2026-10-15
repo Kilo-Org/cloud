@@ -133,9 +133,14 @@
     "status": "حالت",
     "truncated": "نامکمل",
     "updated": "اپ ڈیٹ کیا گیا",
+    "generating": "بنایا جا رہا ہے…",
     "working": "کام جاری ہے",
     "yourOwnRepositories": "آپ کی اپنی ریپوزٹریز",
-    "dismissed": "نظر انداز کردہ"
+    "dismissed": "نظر انداز کردہ",
+    "agent": "ایجنٹ",
+    "durationMinuteShort": "منٹ",
+    "durationHourShort": "گھنٹہ",
+    "changes": "تبدیلیاں"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -324,6 +329,7 @@
       "collapseFile": "فائل کی تفصیل چھپائیں",
       "expandFile": "فائل کی تفصیل دکھائیں",
       "diffTooLarge": "تبدیلیوں کا موازنہ اتنا بڑا ہے کہ اسے دکھایا نہیں جا سکتا۔",
+      "noPreview": "اس فائل کا کوئی پیش منظر دستیاب نہیں",
       "openOnGitHub": "GitHub پر کھولیں",
       "openDiffOnGitHub": "اس فائل کی تبدیلیوں کا موازنہ GitHub پر کھولیں",
       "githubDiff": "GitHub پر تبدیلیوں کا موازنہ"
@@ -830,7 +836,8 @@
       "kiloclaw": "KiloClaw کی سرگرمی",
       "balance": "بیلنس کی تنبیہات",
       "security": "شناخت شدہ سیکیورٹی مسائل",
-      "spend": "اخراجات کی تنبیہات"
+      "spend": "اخراجات کی تنبیہات",
+      "followedSessions": "فالو کیے گئے سیشنز"
     },
     "category": {
       "chatMessagesSubtitle": "آپ کی گفتگو میں جوابات",
@@ -1253,7 +1260,7 @@
         "stoppedTitle": "سیٹ اپ رک گیا",
         "stoppedBody": "سیٹ اپ کے دوران {{name}} کی انسٹنس غیر متوقع طور پر رک گئی۔",
         "stalledTitle": "پیش رفت رک گئی",
-        "stalledBody": "ہم {{name}} کا سیٹ اپ مکمل نہیں کر سکے۔ دوبارہ کوشش کریں، یا اگر ایسا بار بار ہو تو hi@kilo.ai پر ای میل کریں۔",
+        "stalledBody": "ہم {{name}} کا سیٹ اپ مکمل نہیں کر سکے۔ دوبارہ کوشش کریں، یا اگر ایسا بار بار ہو تو {{supportEmail}} پر ای میل کریں۔",
         "timeoutTitle": "توقع سے زیادہ وقت لگ رہا ہے",
         "timeoutBody": "{{name}} کا سیٹ اپ معمول سے زیادہ وقت لے رہا ہے ({{displayMinutes}} منٹ سے زیادہ)۔",
         "continueInBackground": "پس منظر میں جاری رکھیں",
@@ -1311,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "موبائل پر استعمال سے پہلے آپ کے ابتدائی رسائی والے پلان کا انسانی جائزہ ضروری ہے۔",
       "iosTitle": "IOS پر KiloClaw دستیاب نہیں",
       "iosBody": "اس اکاؤنٹ کے لیے KiloClaw تک رسائی کا انتظام iOS ایپ سے باہر ہوتا ہے۔",
-      "iosContact": "کوئی سوال ہے؟ hi@kilo.ai پر رابطہ کریں۔",
+      "iosContact": "کوئی سوال ہے؟ {{supportEmail}} پر رابطہ کریں۔",
       "quarantinedCta": "ہماری ٹیم کو ای میل بھیجیں",
       "nonCanonicalEarlybirdCta": "اپنا پلان Kilo.ai پر دیکھیں"
     },
@@ -1400,6 +1407,8 @@
       "retryTitle": "جائزے کی دوبارہ کوشش کریں؟",
       "retryMessage": "اس سے کوڈ کا دوبارہ جائزہ لیا جائے گا۔",
       "retryReview": "جائزے کی دوبارہ کوشش کریں",
+      "retryNeedsSettings": "کوڈ کا جائزہ کار بند ہے یا اس کی ترتیبات پر توجہ درکار ہے۔ ترتیبات درست کریں، پھر اس جائزے کی دوبارہ کوشش کریں۔",
+      "fixSettings": "ترتیبات درست کریں",
       "couldNotLoad": "جائزہ لوڈ نہیں ہو سکا۔",
       "couldNotGetLatest": "تازہ ترین معلومات حاصل نہیں ہو سکیں۔",
       "byline": "{{repo}} #{{number}}، مصنف: {{author}}",
@@ -1544,7 +1553,7 @@
         "recoveryLabel": "GitHub ایپ اپ ڈیٹ کریں"
       },
       "githubIpAllowList": {
-        "description": "کوڈ ریویور غیر فعال کر دیا گیا کیونکہ اس GitHub تنظیم کی اجازت یافتہ IP پتوں کی فہرست Kilo کی رسائی روکتی ہے۔ مدد کے لیے hi@kilocode.ai پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
+        "description": "کوڈ ریویور غیر فعال کر دیا گیا کیونکہ اس GitHub تنظیم کی اجازت یافتہ IP پتوں کی فہرست Kilo کی رسائی روکتی ہے۔ مدد کے لیے {{supportEmail}} پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
       },
       "gitlabProjectAccessRequired": {
         "description": "کوڈ ریویور غیر فعال کر دیا گیا کیونکہ Kilo اس پروجیکٹ کے لیے GitLab پر رسائی کا ٹوکن نہیں بنا سکتا۔ دیکھ بھال کرنے والے کی سطح کی رسائی دیں یا پروجیکٹ تک رسائی کے ٹوکن فعال کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔",
@@ -1559,7 +1568,7 @@
         "recoveryLabel": "کوڈ ریویور کی ترتیبات اپ ڈیٹ کریں"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "آج ریپوزٹری کلون کرنے کی تین کوششیں مقررہ وقت میں مکمل نہ ہونے پر کوڈ ریویور غیر فعال کر دیا گیا۔ مدد کے لیے hi@kilocode.ai پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
+        "description": "آج ریپوزٹری کلون کرنے کی تین کوششیں مقررہ وقت میں مکمل نہ ہونے پر کوڈ ریویور غیر فعال کر دیا گیا۔ مدد کے لیے {{supportEmail}} پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
       },
       "title": "کوڈ کے جائزہ کار کو آپ کی توجہ درکار ہے۔",
       "recoveryLabel": "معاونت کی ٹیم سے رابطہ کریں"
@@ -2083,6 +2092,8 @@
       "title": "سیشن",
       "copyErrorDetails": "خرابی کی تفصیلات کاپی کریں",
       "backToSessions": "سیشنز پر واپس جائیں",
+      "follow": "لاک اسکرین پر فالو کریں",
+      "unfollow": "لاک اسکرین پر فالو کرنا بند کریں",
       "couldNotLoad": "سیشن لوڈ نہیں ہو سکا۔",
       "failedToLoadDetails": "سیشن کی تفصیلات لوڈ نہیں ہو سکیں۔",
       "failedToStopExecution": "کام کو روکا نہیں جا سکا۔",
@@ -2149,6 +2160,11 @@
       "collapse": "ہدف چھپائیں",
       "expand": "ہدف دکھائیں"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "اہداف، {{total}} میں سے {{completed}} مکمل",
+      "rowAccessibility": "اہداف، {{total}} میں سے {{completed}} مکمل۔ موجودہ ہدف: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "حال ہی میں استعمال شدہ",
       "couldNotLoadGithubRepositories": "GitHub کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
@@ -2181,7 +2197,6 @@
       "retryLoadingEnvironment": "ماحول دوبارہ لوڈ کرنے کی کوشش کریں",
       "defaultEnvironment": "پہلے سے طے شدہ ماحول",
       "environmentSummary": "{{commands}} کمانڈز · {{mcp}} MCP · {{skills}} مہارتیں · {{agents}} ایجنٹ",
-      "changes": "تبدیلیاں",
       "leaveChanges": "تبدیلیاں رہنے دیں",
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
@@ -2204,6 +2219,10 @@
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
       "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔",
+      "cliCannotFork": "کسی پیغام سے فورک کرنے کے لیے Kilo CLI اپ ڈیٹ کریں۔",
+      "forkCutNotSynced": "یہ پیغام ابھی محفوظ نہیں ہوا۔ تھوڑی دیر میں دوبارہ کوشش کریں۔",
+      "forkFilesFromBaseBranch": "فائلیں بیس برانچ سے شروع ہوتی ہیں۔",
+      "forkFilesUnchangedOnComputer": "اس کمپیوٹر پر فائلیں تبدیل نہیں ہوتیں۔",
       "pickProfile": "ایک پروفائل منتخب کریں۔",
       "noProfile": "کوئی پروفائل نہیں۔",
       "manageProfiles": "پروفائلز کا نظم کریں۔",
@@ -2248,8 +2267,8 @@
       "toolList": "فہرست بنانا",
       "toolPatch": "ترمیم کرنا",
       "toolTask": "کام",
-      "readTodos": "کاموں کی فہرست پڑھیں",
-      "updateTodos": "کاموں کی فہرست اپ ڈیٹ کریں",
+      "readTodos": "منصوبہ پڑھیں",
+      "updateTodos": "منصوبہ اپ ڈیٹ کریں",
       "linesBadge": "{{displayCount}} سطریں",
       "filesBadge": "{{displayCount}} فائلیں",
       "matchesBadge": "{{displayCount}} مماثلتیں",
@@ -2319,6 +2338,7 @@
       "copyMessage": "پیغام کاپی کریں",
       "copyText": "متن کاپی کریں",
       "selectText": "متن منتخب کریں",
+      "forkFromHere": "یہاں سے فورک کریں",
       "reportAiResponse": "AI کے جواب کی رپورٹ کریں",
       "reportAiResponseConfirm": "اس جواب کے جائزے کے لیے رپورٹ بھیجیں؟",
       "report": "رپورٹ کریں",
@@ -2638,6 +2658,12 @@
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
       "modelsCount_one": "ماڈل ({{displayCount}})",
       "modelsCount_other": "ماڈلز ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "تبدیلیاں دیکھیں",
+      "asOf": "{{time}} تک",
+      "tooLarge": "تبدیلیوں کا یہ موازنہ اتنا بڑا ہے کہ اسے موبائل پر دکھایا نہیں جا سکتا۔",
+      "empty": "اس سیشن میں ابھی تک فائلوں میں کوئی تبدیلی نہیں ہوئی۔"
     },
     "autoApprove": {
       "title": "خودکار منظوری",
@@ -3150,9 +3176,36 @@
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
     "openSession": "کھولیں",
+    "finished": "مکمل",
+    "followFailed": "اس ایجنٹ کو لاک اسکرین پر نہیں دکھایا جا سکا۔",
     "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
-    "newestResult": "تازہ ترین نتیجہ",
-    "scheduledWakes": "{{time}} بیدار ہوگا"
+    "checked": "آخری تصدیق",
+    "lastKnown": "آخری معلوم حالت",
+    "awaitingUpdate": "اپ ڈیٹ کا انتظار",
+    "nextRun": "اگلا اجرا",
+    "waitingForYou": "آپ کا انتظار",
+    "nextScheduled": "آئندہ شیڈول",
+    "answerNeeded": "جواب درکار",
+    "waitingToRetry": "دوبارہ کوشش کا انتظار",
+    "step": {
+      "editing": "ترمیم",
+      "reading": "پڑھ رہا ہے",
+      "running": "چلائیں",
+      "searching": "ویب تلاش",
+      "thinking": "غور کر رہا ہے"
+    },
+    "planOf": "میں سے",
+    "filesChanged": "فائلیں تبدیل ہوئیں",
+    "finishedIn": "مکمل ہونے میں",
+    "noActivityFor": "کوئی سرگرمی نہیں",
+    "prOpened": "پل ریکویسٹ کھول دی گئی",
+    "permissionWants": "چلانا چاہتا ہے",
+    "failure": {
+      "provider": "رک گیا: فراہم کنندہ کی خرابی",
+      "tool": "رک گیا: ٹول کی خرابی",
+      "cancelled": "رک گیا: منسوخ کیا گیا",
+      "other": "رکا ہوا"
+    }
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
@@ -3180,6 +3233,7 @@
     "tutorialLabel": "ٹیوٹوریل"
   },
   "modelChat": {
+    "offlineFailure": "اس ماڈل کو انٹرنیٹ کنکشن درکار ہے۔ کنیکٹ کریں اور دوبارہ کوشش کریں، یا اس ڈیوائس پر موجود کسی ماڈل پر سوئچ کریں۔",
     "empty": {
       "title": "چیٹ شروع کریں",
       "description": "کسی ماڈل سے بات کرنے کے لیے پیغام بھیجیں۔"
@@ -3187,10 +3241,32 @@
     "list": {
       "loadFailed": "چیٹ کی سرگزشت لوڈ نہیں ہو سکی۔",
       "new": "نئی چیٹ",
-      "openHint": "چیٹ کھولتا ہے۔ حذف کرنے کے لیے دبائے رکھیں۔",
       "deleteTitle": "یہ چیٹ حذف کریں؟"
     },
+    "rename": {
+      "title": "چیٹ کا نام تبدیل کریں",
+      "accessibility": "چیٹ کا نام تبدیل کریں: {{title}}",
+      "openHint": "چیٹ کھولتا ہے۔ نام تبدیل کرنے یا حذف کرنے کے لیے دبائے رکھیں۔"
+    },
     "beta": "بیٹا",
+    "details": {
+      "title": "چیٹ کی تفصیلات",
+      "backend": "بیک اینڈ",
+      "effortDefault": "ماڈل کا ڈیفالٹ",
+      "noCost": "کوئی لاگت نہیں",
+      "costUnknown": "معلوم نہیں",
+      "costEstimatedNote": "جن جوابات نے قیمت نہیں بتائی، ان کی لاگت فہرستی قیمتوں سے اندازاً لگائی گئی ہے۔",
+      "costUnknownNote": "اس ماڈل کی کوئی قیمت معلوم نہیں۔",
+      "costPartialNote": "اس کل میں وہ ماڈلز شامل نہیں جن کی قیمت معلوم نہیں۔",
+      "localNote": "ڈیوائس پر چلنے والے ماڈلز اسی ڈیوائس پر چلتے ہیں۔ ان کی کوئی لاگت نہیں اور کوئی پرامپٹ کیش نہیں، اور ان کے ٹوکن کی تعداد تخمینہ ہو سکتی ہے۔",
+      "countedSinceNote": "یہ چیٹ استعمال ریکارڈ ہونے سے پہلے شروع ہوئی تھی۔ کل میں صرف اس کے بعد کے جوابات دکھائے جاتے ہیں۔",
+      "remoteServersOn": "فعال ریموٹ MCP سرورز"
+    },
+    "webSearch": {
+      "title": "ویب پر تلاش کریں",
+      "description": "اس چیٹ کو اپنے Kilo اکاؤنٹ کے ذریعے تازہ معلومات تلاش کرنے دیں۔ تلاشیں آپ کی ماہانہ تلاش کی حد استعمال کرتی ہیں۔",
+      "allowanceExhausted": "اس مہینے کی آپ کی مفت ویب تلاشیں ختم ہو گئی ہیں۔ دوبارہ تلاش کرنے کے لیے کریڈٹ شامل کریں۔"
+    },
     "mcp": {
       "title": "Kilo ٹولز",
       "use": "Kilo ٹولز استعمال کریں",
@@ -3213,7 +3289,6 @@
       "fieldName": "دکھایا جانے والا نام",
       "fieldUrl": "سرور URL",
       "fieldUrlInvalid": "درست سرور URL درج کریں۔",
-      "fieldToken": "Bearer ٹوکن (اختیاری)",
       "enableServer": "اس سرور کو فعال کریں: {{name}}",
       "editServer": "سرور میں ترمیم کریں",
       "deleteServer": "سرور حذف کریں",
@@ -3234,8 +3309,24 @@
       "serverUnreachable": "اس سرور تک نہیں پہنچ سکا",
       "serverOff": "یہ سرور بند ہے"
     },
+    "mcpOAuth": {
+      "authMethod": "تصدیق",
+      "authNone": "سائن ان کے بغیر",
+      "authBearer": "Bearer ٹوکن",
+      "authOAuth": "OAuth سائن ان",
+      "fieldToken": "ٹوکن",
+      "oauthHint": "محفوظ کرنے کے بعد، اپنے براؤزر سے سائن ان کرنے کے لیے سرور پر $t(modelChat.mcpOAuth.signIn) پر ٹیپ کریں۔",
+      "serverNeedsSignIn": "یہ سرور استعمال کرنے کے لیے سائن ان کریں",
+      "signIn": "سائن ان کریں",
+      "signInA11y": "اس سرور میں سائن ان کریں: {{name}}",
+      "signInFailed": "{{name}} میں سائن ان نہیں ہو سکا۔ دوبارہ کوشش کریں۔"
+    },
     "backends": {
       "title": "چیٹ بیک اینڈز",
+      "providersTitle": "چیٹ فراہم کنندگان",
+      "cloud": "کلاؤڈ میں",
+      "cloudModel": "ماڈل: {{model}}",
+      "cloudUnavailable": "Kilo ماڈلز ابھی دستیاب نہیں ہیں۔ اپنا کنکشن چیک کریں.",
       "manage": "بیک اینڈز کا نظم کریں",
       "defaultKilo": "$t(consent.kilo) (ڈیفالٹ)",
       "kiloHelp": "بلٹ اِن بیک اینڈ آپ کا Kilo اکاؤنٹ استعمال کرتا ہے اور اس میں ترمیم یا اسے حذف نہیں کیا جا سکتا۔",
@@ -3295,7 +3386,6 @@
     "gguf": {
       "title": "ڈاؤن لوڈ کے قابل ماڈلز",
       "help": "ایک اوپن ماڈل ڈاؤن لوڈ کریں اور llama.cpp کے ساتھ اسی فون پر چلائیں۔ آپ کے پرامپٹس اور جوابات ڈیوائس پر ہی رہتے ہیں۔ ماڈلز بڑے ہوتے ہیں، اس لیے Wi-Fi استعمال کریں۔",
-      "details": "{{size}} · لائسنس: {{license}}",
       "download": "ماڈل ڈاؤن لوڈ کریں",
       "pause": "ڈاؤن لوڈ روکیں",
       "resume": "ڈاؤن لوڈ دوبارہ شروع کریں",
@@ -3307,6 +3397,8 @@
       "url": "براہ راست ڈاؤن لوڈ لنک",
       "urlHelp": ".gguf فائل کا HTTPS لنک پیسٹ کریں، جیسے Hugging Face کا resolve لنک۔ صرف قابل اعتماد ذرائع سے ماڈلز ڈاؤن لوڈ کریں۔",
       "downloadUrl": "لنک سے ڈاؤن لوڈ کریں",
+      "advanced": "جدید",
+      "localPurpose": "یہ اس ڈیوائس پر llama.cpp کے ساتھ چلتا ہے۔ پرامپٹ اور جوابات ڈیوائس پر ہی رہتے ہیں.",
       "deleteTitle": "یہ ماڈل حذف کریں؟",
       "deleteMessage": "{{name}} کو اس ڈیوائس سے حذف کریں؟ جو چیٹس اسے استعمال کرتی ہیں انہیں جاری رکھنے کے لیے کسی دوسرے ماڈل کی ضرورت ہوگی۔",
       "errors": {
@@ -3316,12 +3408,62 @@
         "notGguf": "لنک کا .gguf فائل کی طرف اشارہ ہونا چاہیے۔",
         "space": "اس ماڈل کے لیے کافی خالی اسٹوریج نہیں ہے۔ جگہ خالی کریں اور دوبارہ کوشش کریں۔",
         "network": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
-        "invalidFile": "ڈاؤن لوڈ شدہ فائل ایسا ماڈل نہیں ہے جو یہ ایپ چلا سکے، اس لیے اسے ہٹا دیا گیا۔"
+        "invalidFile": "ڈاؤن لوڈ شدہ فائل ایسا ماڈل نہیں ہے جو یہ ایپ چلا سکے، اس لیے اسے ہٹا دیا گیا۔",
+        "checksum": "ڈاؤن لوڈ شدہ فائل اپنے شائع شدہ چیک سم سے مطابقت نہیں رکھتی، اس لیے اسے ہٹا دیا گیا۔ دوبارہ ڈاؤن لوڈ کرنے کی کوشش کریں۔"
       }
+    },
+    "catalog": {
+      "browse": "ماڈلز براؤز کریں",
+      "title": "ماڈل کیٹلاگ",
+      "search": "Hugging Face ماڈلز تلاش کریں",
+      "tabs": "ماڈل فلٹر",
+      "fitsTab": "اس آلے کے موافق",
+      "fromHuggingFace": "Hugging Face سے",
+      "loading": "ماڈلز لوڈ ہو رہے ہیں",
+      "noResults": "کوئی ماڈل نہیں ملا",
+      "noFits": "کوئی ماڈل اس آلے کے موافق نہیں",
+      "noFitsDescription": "بڑے ماڈلز $t(common.all) ٹیب میں ہیں۔",
+      "fit": {
+        "fits": "موافق",
+        "tight": "بمشکل موافق",
+        "tooLarge": "بہت بڑا",
+        "noStorage": "اسٹوریج ناکافی",
+        "unknown": "موزونیت نامعلوم"
+      },
+      "recommendationsHelp": "یہ ایپ جس مختصر فہرست کو نمایاں کرتی ہے: فی ماڈل ایک فائل، ایسے ناشر سے جو لائسنس بتاتا ہو۔ اس کے علاوہ کچھ درجہ بند نہیں.",
+      "compatibilityHelp": "موزونیت ماڈل فائل کا اس ڈیوائس کی میموری اور خالی اسٹوریج سے موازنہ کرتی ہے۔ میموری کا عدد ایک تخمینہ ہے، پیمائش نہیں.",
+      "text": "متن",
+      "listTextPurpose": "صرف متنی پرامپٹ.",
+      "listImagePurpose": "متن کے ساتھ تصاویر بھی پڑھتا ہے.",
+      "smallestDownload": "سب سے چھوٹا ڈاؤن لوڈ: {{size}} · تقریباً {{memory}} میموری",
+      "fullFileName": "فائل: {{name}}",
+      "memoryEstimateNote": "میموری کے اعداد تخمینے ہیں، پیمائش نہیں.",
+      "parameters": "پیرامیٹرز: {{value}}",
+      "downloads": "ڈاؤن لوڈز: {{value}}",
+      "likes": "پسندیدگیاں: {{value}}",
+      "context": "سیاق و سباق کی حد: {{value}}",
+      "license": "لائسنس: {{license}}",
+      "licenseUnknown": "لائسنس درج نہیں ہے",
+      "tools": "ٹول کالنگ",
+      "vision": "تصویری ان پٹ",
+      "hintsHelp": "یہ اشارے Hugging Face سے ہیں۔ ایپ ڈاؤن لوڈ کے بعد ماڈل کی جانچ کرتی ہے۔",
+      "gated": "اس ماڈل کے لیے Hugging Face اکاؤنٹ درکار ہے، اس لیے ایپ اسے ڈاؤن لوڈ نہیں کر سکتی۔",
+      "quantizations": "کوانٹائزیشنز",
+      "quantizationsHelp": "چھوٹی فائلیں کم میموری اور اسٹوریج استعمال کرتی ہیں۔ بڑی فائلیں عموماً بہتر جوابات دیتی ہیں۔",
+      "quantDetail": "{{size}} ڈاؤن لوڈ · تقریباً {{memory}} میموری",
+      "downloadQuant": "{{quant}} ڈاؤن لوڈ کریں",
+      "loadingModel": "ماڈل کی تفصیلات لوڈ ہو رہی ہیں",
+      "couldNotLoadModel": "یہ ماڈل لوڈ نہیں ہو سکا",
+      "noFiles": "ایسی کوئی فائل نہیں جو یہ ایپ چلا سکے",
+      "noFilesDescription": "یہ ایپ صرف وہ ماڈلز چلاتی ہے جو ایک GGUF فائل پر مشتمل ہوں۔",
+      "tooLargeTitle": "ہو سکتا ہے یہ ماڈل نہ چلے",
+      "tooLargeMessage": "{{name}} کو غالباً اس آلے سے زیادہ میموری درکار ہے۔ ماڈل کے جواب دیتے وقت ایپ بند ہو سکتی ہے۔ پھر بھی ڈاؤن لوڈ کریں؟",
+      "downloadAnyway": "پھر بھی ڈاؤن لوڈ کریں"
     },
     "localModels": {
       "title": "ڈیوائس پر چلنے والے ماڈلز",
-      "help": "ڈیوائس پر چلنے والے ماڈلز اسی فون پر چلتے ہیں۔ آپ کے پرامپٹس اور جوابات ڈیوائس پر ہی رہتے ہیں، اور یہ ماڈلز ٹولز استعمال نہیں کر سکتے۔",
+      "help": "ڈیوائس پر چلنے والے ماڈلز اسی فون پر چلتے ہیں۔ آپ کے پرامپٹس اور جوابات ڈیوائس پر ہی رہتے ہیں۔",
+      "systemPurpose": "اس ڈیوائس کے سسٹم میں شامل ماڈل۔ یہ ڈیوائس پر ہی چلتا ہے۔",
       "apple": "Apple Intelligence (ڈیوائس پر)",
       "checking": "دستیابی چیک کی جا رہی ہے…",
       "ready": "استعمال کے لیے تیار",
@@ -3347,6 +3489,9 @@
       "downloading": "ڈاؤن لوڈ ہو رہا ہے…",
       "downloadProgress": "ڈاؤن لوڈ ہو رہا ہے… {{percent}}%",
       "downloadFailed": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن اور خالی اسٹوریج چیک کریں، پھر دوبارہ کوشش کریں۔"
+    },
+    "reasoningEffort": {
+      "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"
     }
   },
   "settingsTools": {
@@ -3526,7 +3671,6 @@
       "template": "سانچہ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS کی وضاحت کریں۔",
-      "agent": "ایجنٹ",
       "subtask": "ذیلی کام کے طور پر چلائیں۔",
       "edit": "سلیش کمانڈ میں ترمیم کریں۔",
       "saveFailed": "کمانڈ کو محفوظ نہیں کیا جا سکا",
@@ -3570,5 +3714,92 @@
     "noMatchingProductsPlay": "Google Play نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
     "purchaseOwnedByAnotherAccount": "اس Apple Account کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اسی Kilo اکاؤنٹ میں سائن ان کریں۔",
     "purchaseOwnedByAnotherAccountPlay": "اس Google Play اکاؤنٹ کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔"
+  },
+  "todos": {
+    "saveAsTodo": "کام کے طور پر محفوظ کریں",
+    "segment": {
+      "label": "ایجنٹ ویو",
+      "sessions": "سیشنز",
+      "todos": "کام"
+    },
+    "lists": {
+      "newList": "نئی فہرست",
+      "empty": "ابھی تک کوئی فہرست نہیں",
+      "couldNotLoad": "فہرستیں لوڈ نہیں ہو سکیں",
+      "noRepository": "ریپوزٹری موجود نہیں",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "کھلے: {{count}}",
+      "openCount_other": "کھلے: {{count}}",
+      "archived_one": "آرکائیو شدہ ({{count}})",
+      "archived_other": "آرکائیو شدہ ({{count}})",
+      "archive": "آرکائیو کریں",
+      "unarchive": "آرکائیو سے نکالیں",
+      "deleteTitle": "{{name}} حذف کریں؟",
+      "deleteMessage": "اس کے کام بھی حذف ہو جائیں گے۔ ان کے سیشن باقی رہیں گے۔"
+    },
+    "listSettings": {
+      "title": "فہرست کی ترتیبات",
+      "name": "نام",
+      "namePlaceholder": "بگز، آئیڈیاز، ریلیز…",
+      "emoji": "ایموجی",
+      "mode": "موڈ",
+      "defaultsHint": "اس فہرست سے شروع کیے گئے سیشن یہ طے شدہ اقدار استعمال کرتے ہیں۔"
+    },
+    "list": {
+      "addPlaceholder": "نیا کام شامل کریں",
+      "add": "کام شامل کریں",
+      "empty": "ابھی تک کوئی کام نہیں",
+      "setDefaults": "ریپوزٹری، موڈ اور ماڈل مقرر کریں",
+      "completed_one": "مکمل ({{count}})",
+      "completed_other": "مکمل ({{count}})"
+    },
+    "item": {
+      "markDone": "مکمل کے طور پر نشان زد کریں",
+      "markOpen": "نامکمل کے طور پر نشان زد کریں",
+      "markDonePrompt": "مکمل کے طور پر نشان زد کریں؟",
+      "deleted": "کام حذف ہو گیا",
+      "undo": "واپس لائیں",
+      "runCount_one": "{{count}} بار چلایا گیا",
+      "runCount_other": "{{count}} بار چلایا گیا",
+      "startNow": "بغیر جائزے کے شروع کریں",
+      "startNowHint": "بغیر جائزے کے شروع کرنے کے لیے دیر تک دبائیں",
+      "titleLabel": "کام کا عنوان",
+      "renameTitle": "ٹاسک کا نام بدلیں",
+      "notes": "نوٹس",
+      "addNotes": "نوٹس شامل کریں",
+      "notesPrompt": "سیاق، تقاضے یا قبولیت کے معیار شامل کریں.",
+      "markdownSupported": "Markdown سپورٹڈ",
+      "sessions": "منسلک سیشن",
+      "noSessions": "ابھی تک کوئی سیشن نہیں",
+      "untitledLinkedSession": "منسلک سیشن",
+      "sessionNeedsInput": "سیشن کو ان پٹ درکار ہے",
+      "sessionRunning": "سیشن چل رہا ہے",
+      "sessionFinished": "سیشن مکمل ہو گیا",
+      "sessionPullRequest": "سیشن PR",
+      "sessionPullRequestNumber": "سیشن PR #{{number}}",
+      "openSessionHint": "سیشن کھولتا ہے.",
+      "unlinkSessionAction": "سیشن کا لنک ہٹائیں",
+      "unlinkConfirmTitle": "{{title}} کا لنک ہٹائیں؟",
+      "unlinkConfirmMessage": "سیشن خود حذف نہیں ہوتا۔ صرف اس کا اس ٹو-ڈو سے لنک ہٹایا جاتا ہے.",
+      "startNewSession": "نیا سیشن شروع کریں",
+      "startNewSessionHint": "نیا سیشن شروع کرنے کے لیے دیر تک دبائیں.",
+      "linkSession": "سیشن لنک کریں",
+      "linkFailed": "سیشن کو کام سے لنک نہیں کیا جا سکا"
+    },
+    "linkSession": {
+      "title": "سیشن منسلک کریں",
+      "empty": "کوئی حالیہ سیشن نہیں",
+      "emptyInRepository": "{{repository}} میں کوئی حالیہ سیشن نہیں"
+    },
+    "upNext": "اگلا",
+    "sessionTodo": "کام: {{title}}",
+    "linkToTodo": "کام سے لنک کریں",
+    "candidates": {
+      "empty": "کوئی کھلا کام نہیں"
+    },
+    "saveSheet": {
+      "title": "فہرست میں محفوظ کریں",
+      "saved": "{{list}} میں محفوظ ہو گیا"
+    }
   }
 }

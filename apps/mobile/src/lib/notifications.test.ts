@@ -20,7 +20,7 @@ import {
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
-import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import { ACTIVE_USER_ID_KEY, AUTH_TOKEN_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   _setGlanceableSinksLoaderForTests,
   applyGlanceablePushData,
@@ -173,6 +173,18 @@ vi.mock('@/glanceable-ios/active-agents-live-activity', async () => {
     })),
   };
 });
+// The session card layout pulls in @expo/ui's native views. This suite follows
+// no session, so the factory lists no card and never starts one.
+vi.mock('@/glanceable-ios/session-live-activity', () => ({
+  SESSION_LIVE_ACTIVITY_NAME: 'SessionLiveActivity',
+  SessionLiveActivity: {
+    getInstances: () => [],
+    start: () => {
+      throw new Error('This suite starts no session card');
+    },
+  },
+  refreshSessionLiveActivityCopy: vi.fn(),
+}));
 vi.mock('@/glanceable-ios/active-agents-widget', () => ({
   ActiveAgentsWidget: { updateSnapshot: vi.fn(), updateTimeline: vi.fn() },
 }));
@@ -199,11 +211,44 @@ vi.mock('@kilocode/notifications', async importOriginal => ({
     { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
     { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
     { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
+    {
+      id: 'followed-sessions-lock-screen',
+      name: 'Followed sessions',
+      importance: 'default',
+      bypassDnd: false,
+    },
   ],
 }));
 
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: mocks.captureEvent,
+}));
+
+// The headless session push only: the follow store and the row delete are
+// observed here; every other export keeps its real implementation.
+const sessionPush = vi.hoisted(() => ({
+  restoreFollowedSessionsFromStorage: vi.fn(async () => {
+    await Promise.resolve();
+    return true;
+  }),
+  isSessionFollowed: vi.fn((_sessionId: string) => false),
+  applySessionLiveUpdate: vi.fn(async () => {
+    await Promise.resolve();
+    return false;
+  }),
+  releaseAndroidSessionToken: vi.fn(async (_sessionId: string) => {
+    await Promise.resolve();
+  }),
+}));
+vi.mock('@/lib/glanceable/session-follow', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  restoreFollowedSessionsFromStorage: sessionPush.restoreFollowedSessionsFromStorage,
+  isSessionFollowed: sessionPush.isSessionFollowed,
+  applySessionLiveUpdate: sessionPush.applySessionLiveUpdate,
+}));
+vi.mock('@/lib/glanceable/session-activity-tokens-android', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  releaseAndroidSessionToken: sessionPush.releaseAndroidSessionToken,
 }));
 
 // Each test starts with fresh channel and pending-link state. Only native
@@ -297,10 +342,20 @@ describe('ensureAndroidNotificationChannels', () => {
       ['kiloclaw', { name: 'KiloClaw activity', importance: 3, bypassDnd: false }],
       ['balance', { name: 'Balance alerts', importance: 3, bypassDnd: false }],
       ['security', { name: 'Security findings', importance: 4, bypassDnd: false }],
+      [
+        'followed-sessions-lock-screen',
+        {
+          name: 'Followed sessions',
+          importance: 3,
+          bypassDnd: false,
+          sound: null,
+          enableVibrate: false,
+        },
+      ],
     ]);
   });
 
-  it('silences only the progress channel so needs-input keeps the default sound', async () => {
+  it('silences progress and followed sessions without silencing needs-input', async () => {
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
     await ensureAndroidNotificationChannels();
@@ -312,11 +367,17 @@ describe('ensureAndroidNotificationChannels', () => {
     // Vibration is a separate channel setting that defaults to enabled, so a
     // silent channel disables it explicitly.
     expect(optionsFor('agent-progress')).toMatchObject({ sound: null, enableVibrate: false });
+    expect(optionsFor('followed-sessions-lock-screen')).toMatchObject({
+      importance: 3,
+      sound: null,
+      enableVibrate: false,
+      bypassDnd: false,
+    });
     expect(optionsFor('needs-input')).not.toHaveProperty('sound');
     expect(optionsFor('needs-input')).not.toHaveProperty('enableVibrate');
   });
 
-  it('deletes the three legacy channels on first creation', async () => {
+  it('deletes legacy channels including the LOW-importance session channel', async () => {
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
     await ensureAndroidNotificationChannels();
@@ -325,6 +386,7 @@ describe('ensureAndroidNotificationChannels', () => {
       ['agent'],
       ['chat'],
       ['active-agents'],
+      ['followed-sessions'],
     ]);
   });
 
@@ -348,6 +410,16 @@ describe('ensureAndroidNotificationChannels', () => {
       ['kiloclaw', { name: expect.any(String), importance: 3, bypassDnd: false }],
       ['balance', { name: expect.any(String), importance: 3, bypassDnd: false }],
       ['security', { name: expect.any(String), importance: 4, bypassDnd: false }],
+      [
+        'followed-sessions-lock-screen',
+        {
+          name: expect.any(String),
+          importance: 3,
+          bypassDnd: false,
+          sound: null,
+          enableVibrate: false,
+        },
+      ],
     ]);
     // Legacy deletion is part of the single-flight creation pass, not a rename.
     expect(mocks.deleteNotificationChannelAsync).not.toHaveBeenCalled();
@@ -361,8 +433,8 @@ describe('ensureAndroidNotificationChannels', () => {
 
     expect(first).toBe(second);
     await Promise.all([first, second]);
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(5);
-    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(3);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(4);
   });
 
   it('swallows a per-channel failure and still creates the remaining channels', async () => {
@@ -371,8 +443,8 @@ describe('ensureAndroidNotificationChannels', () => {
 
     await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(5);
-    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(3);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(4);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
         'error.subsystem': 'notifications',
@@ -388,7 +460,7 @@ describe('ensureAndroidNotificationChannels', () => {
 
     await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
 
-    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(3);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(4);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
         'error.subsystem': 'notifications',
@@ -416,6 +488,7 @@ describe('ensureAndroidNotificationChannels', () => {
       'kiloclaw',
       'balance',
       'security',
+      'followed-sessions-lock-screen',
     ]);
 
     // A fully successful pass is cached again.
@@ -428,7 +501,7 @@ describe('ensureAndroidNotificationChannels', () => {
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
     await ensureAndroidNotificationChannels();
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(5);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
     mocks.setNotificationChannelAsync.mockClear();
 
     await ensureAndroidNotificationChannels();
@@ -2140,6 +2213,82 @@ describe('runBackgroundNotificationTask', () => {
   });
 });
 
+describe('a headless session_live_update push', () => {
+  async function deliver(sessionId: string, event: 'update' | 'end' = 'update'): Promise<void> {
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+    await loaded.runBackgroundNotificationTask({
+      data: {
+        notification: null,
+        data: {
+          dataString: JSON.stringify({
+            type: 'session_live_update',
+            schemaVersion: 1,
+            event,
+            content: {
+              sessionId,
+              title: null,
+              statusKind: 'running',
+              statusSince: '2026-10-12T09:48:00.000Z',
+              scheduledAt: null,
+              awaitingPermission: false,
+              approvalKey: null,
+              updatedAt: '2026-10-12T10:00:00.000Z',
+            },
+          }),
+        },
+      },
+      error: null,
+      executionInfo: { eventId: 'e-session', taskName: 'active-agents-glanceable-background-task' },
+    });
+  }
+
+  beforeEach(() => {
+    sessionPush.restoreFollowedSessionsFromStorage.mockClear();
+    sessionPush.isSessionFollowed.mockClear();
+    sessionPush.releaseAndroidSessionToken.mockClear();
+    sessionPush.applySessionLiveUpdate.mockReset();
+    sessionPush.applySessionLiveUpdate.mockResolvedValue(false);
+  });
+
+  it('drops the row of a session this device does not follow', async () => {
+    sessionPush.restoreFollowedSessionsFromStorage.mockResolvedValueOnce(true);
+    sessionPush.isSessionFollowed.mockReturnValueOnce(false);
+
+    await deliver('session-9');
+
+    expect(sessionPush.releaseAndroidSessionToken).toHaveBeenCalledExactlyOnceWith('session-9');
+  });
+
+  it('awaits the end release without starting a second release that supersedes it', async () => {
+    const release = Promise.withResolvers<boolean>();
+    sessionPush.applySessionLiveUpdate.mockReturnValueOnce(release.promise);
+    let completed = false;
+    const delivering = (async () => {
+      await deliver('session-1', 'end');
+      completed = true;
+    })();
+
+    await vi.waitFor(() => {
+      expect(sessionPush.applySessionLiveUpdate).toHaveBeenCalled();
+    });
+    expect(completed).toBe(false);
+    expect(sessionPush.releaseAndroidSessionToken).not.toHaveBeenCalled();
+    release.resolve(true);
+    await delivering;
+    expect(sessionPush.releaseAndroidSessionToken).not.toHaveBeenCalled();
+  });
+
+  it('keeps the row when the keychain could not be read', async () => {
+    // The empty follow set then says nothing: a locked keychain is not an unfollow.
+    sessionPush.restoreFollowedSessionsFromStorage.mockResolvedValueOnce(false);
+
+    await deliver('session-1');
+
+    expect(sessionPush.releaseAndroidSessionToken).not.toHaveBeenCalled();
+  });
+});
+
 describe('runGlanceableBackgroundRefresh', () => {
   const SUCCESS = 1;
   const FAILED = 2;
@@ -2212,6 +2361,8 @@ describe('runGlanceableBackgroundRefresh', () => {
 
 describe('foreground attention-push suppression', () => {
   async function loadHandler() {
+    // The app posts its own raise only while notifications are allowed.
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
     const loaded = await loadNotifications();
     // Imported through the same resetModules cycle as './notifications', so the
     // posted marker this test reads is the one the handler reads.
@@ -2433,6 +2584,8 @@ describe('cold iOS background delivery', () => {
     secureStore.set('glanceable-scope-key', SCOPE_KEY);
     secureStore.set(ACTIVE_USER_ID_KEY, 'u1');
     secureStore.set(ORGANIZATION_STORAGE_KEY, 'org-9');
+    // A signed-in cold process reads its access token from the keychain.
+    secureStore.set(AUTH_TOKEN_KEY, 'access-token');
     mocks.getItemAsync.mockImplementation(secureStoreMock.getItemAsync);
     mocks.setItemAsync.mockImplementation(secureStoreMock.setItemAsync);
     mocks.deleteItemAsync.mockImplementation(async (key: string) => {
@@ -2743,6 +2896,8 @@ describe('cold iOS background delivery', () => {
       // No ask is recorded for this cold push, so the app-built state says so
       // explicitly; the layout gates Approve on this flag.
       canApprove: false,
+      // The header shows the check time, so the app-built state carries it.
+      updatedAt: '2026-01-02T00:00:00.000Z',
     });
     expect(rows.has('scope-token')).toBe(true);
   });

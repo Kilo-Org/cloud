@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- the screen keeps every existing detail section plus the read-only transcript slot */
 
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
@@ -13,7 +13,10 @@ import {
 } from '@kilocode/app-shared/code-review';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
-import { flattenCouncilFindings } from '@/components/code-reviewer/review-detail-helpers';
+import {
+  flattenCouncilFindings,
+  selectRetryAction,
+} from '@/components/code-reviewer/review-detail-helpers';
 import { ReviewSpectatorSheet } from '@/components/code-reviewer/review-spectator-sheet';
 import {
   CouncilSection,
@@ -29,11 +32,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatNumber } from '@/lib/format';
+import { isPersonal, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -57,11 +60,20 @@ export function ReviewDetailScreen({
   const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
   const [visibleCount, setVisibleCount] = useState(FINDINGS_PAGE_SIZE);
+  const loadedReview = data?.success ? data.review : undefined;
+  // Only a retriggerable automatic review needs the reviewer config. Bitbucket
+  // is org-only, and a personal Bitbucket query would throw in toPersonalPlatform.
+  const reviewPlatform = loadedReview?.platform ?? 'github';
+  const configQueryEnabled =
+    loadedReview != null &&
+    loadedReview.manual_config == null &&
+    isRetriggerableReviewStatus(loadedReview.status) &&
+    !(isPersonal(scope) && reviewPlatform === 'bitbucket');
+  const reviewConfig = useReviewConfig(scope, reviewPlatform, { enabled: configQueryEnabled });
 
   function confirmCancel(onConfirm: () => void) {
     confirm({
@@ -121,7 +133,13 @@ export function ReviewDetailScreen({
   const { review, tokenUsage } = data;
   const meta = statusMeta(review.status);
   const canCancel = isCancellableReviewStatus(review.status);
-  const canRetry = isRetriggerableReviewStatus(review.status);
+  const retryAction = isRetriggerableReviewStatus(review.status)
+    ? selectRetryAction({
+        hasManualConfig: review.manual_config != null,
+        configPending: configQueryEnabled && reviewConfig.isPending,
+        config: configQueryEnabled ? reviewConfig.data : undefined,
+      })
+    : null;
 
   const allFindings = flattenCouncilFindings(review.council_result);
   const visibleFindings = allFindings.slice(0, visibleCount);
@@ -262,10 +280,7 @@ export function ReviewDetailScreen({
           <Button
             variant="secondary"
             onPress={() => {
-              const destination = resolveCodeReviewerOpenPrDestination(
-                review.pr_url,
-                prReviewEnabled
-              );
+              const destination = resolveCodeReviewerOpenPrDestination(review.pr_url);
               if (destination.kind === 'in-app') {
                 router.push(destination.href);
                 return;
@@ -301,7 +316,7 @@ export function ReviewDetailScreen({
             </Button>
           ) : null}
 
-          {canRetry ? (
+          {retryAction === 'retry' ? (
             <Button
               variant="secondary"
               disabled={retriggerReview.isPending}
@@ -320,6 +335,24 @@ export function ReviewDetailScreen({
             >
               <Text>{t('codeReviewer.reviewDetail.retryReview')}</Text>
             </Button>
+          ) : null}
+
+          {retryAction === 'fix-settings' ? (
+            <View className="gap-2">
+              <Text variant="muted" className="text-xs">
+                {t('codeReviewer.reviewDetail.retryNeedsSettings')}
+              </Text>
+              <Button
+                variant="secondary"
+                onPress={() => {
+                  router.push(
+                    `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${review.platform}` as Href
+                  );
+                }}
+              >
+                <Text>{t('codeReviewer.reviewDetail.fixSettings')}</Text>
+              </Button>
+            </View>
           ) : null}
         </View>
       </TabScreenScrollView>

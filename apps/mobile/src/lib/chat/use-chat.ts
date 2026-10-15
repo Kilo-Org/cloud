@@ -2,6 +2,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
+import { getAuthenticatedOwner, subscribeAuthenticatedOwner } from '@/lib/context-scope';
+import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
+import { useOrganization } from '@/lib/organization-context';
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import { type ChatPlace, chatPlaceOf } from './scope';
 import {
@@ -13,9 +16,9 @@ import {
   startChat,
   stopChat,
 } from './registry';
-import { type ChatState, snapshotOf, watch, watchChats } from './state';
-import { forgetAsked } from './pending';
-import { type ChatSummary, deleteChat, listChats } from './store';
+import { type ChatState, type ChatTarget, snapshotOf, watch, watchChats } from './state';
+import { forgetAsked, titledByAsked } from './pending';
+import { type ChatSummary, deleteChat, listChats, renameChat } from './store';
 
 /**
  * The chat surface, as React sees it.
@@ -26,8 +29,19 @@ import { type ChatSummary, deleteChat, listChats } from './store';
  * whatever it says.
  */
 
-/** Re-exported so a screen reads where a chat belongs from the hook module. */
-export { chatPlaceOf };
+/**
+ * Where the signed-in account's chats live.
+ *
+ * A chat is on the device, so it must open when the account cannot be
+ * confirmed: offline, or with the API down. The restored account answers then,
+ * the same one the app shell opened on.
+ */
+export function useChatPlace(): ChatPlace | null {
+  const { organizationId } = useOrganization();
+  const owner = useSyncExternalStore(subscribeAuthenticatedOwner, getAuthenticatedOwner);
+  const userId = useRestoredAccountId(owner.authEpoch, owner.restored);
+  return chatPlaceOf(userId, organizationId);
+}
 
 const listKey = (scope: string) => ['chats', scope] as const;
 
@@ -38,6 +52,7 @@ export type ChatList = {
   readonly isError: boolean;
   readonly refetch: () => void;
   readonly remove: (sessionId: string) => Promise<void>;
+  readonly rename: (sessionId: string, title: string) => Promise<void>;
 };
 
 export function useChatList(place: ChatPlace | null): ChatList {
@@ -46,12 +61,14 @@ export function useChatList(place: ChatPlace | null): ChatList {
   const query = useQuery({
     queryKey: listKey(scope ?? ''),
     enabled: place !== null,
+    // The list is read from the device's database, so no connection is needed.
+    networkMode: 'always',
     queryFn: async () => {
       if (place === null) {
         return [];
       }
       await prepareChats(place);
-      return listChats(await encryptedDatabase(), place.chatScope);
+      return titledByAsked(listChats(await encryptedDatabase(), place.chatScope));
     },
   });
   // A chat writes its turns when its answer ends, and the title of a row is the
@@ -75,6 +92,13 @@ export function useChatList(place: ChatPlace | null): ChatList {
     },
     [client, scope]
   );
+  const rename = useCallback(
+    async (sessionId: string, title: string) => {
+      renameChat(await encryptedDatabase(), snapshotOf(sessionId).sessionId, title);
+      await client.invalidateQueries({ queryKey: listKey(scope ?? '') });
+    },
+    [client, scope]
+  );
   return {
     chats: query.data ?? [],
     isLoading: query.isLoading,
@@ -83,6 +107,7 @@ export function useChatList(place: ChatPlace | null): ChatList {
       void query.refetch();
     },
     remove,
+    rename,
   };
 }
 
@@ -96,7 +121,11 @@ export function useChatList(place: ChatPlace | null): ChatList {
 /** One conversation, as a screen reads it. */
 export type OpenChat = {
   readonly state: ChatState;
-  readonly send: (text: string, model: string, images?: readonly LocalImage[]) => Promise<void>;
+  readonly send: (
+    text: string,
+    target: ChatTarget,
+    images?: readonly LocalImage[]
+  ) => Promise<void>;
   readonly stop: () => Promise<void>;
   readonly retry: () => Promise<void>;
 };
@@ -127,8 +156,8 @@ export function useChat(place: ChatPlace | null, opened: string): OpenChat {
 
   return {
     state,
-    send: async (text, model, images = []) => {
-      await say(sessionId, { text, images }, model);
+    send: async (text, target, images = []) => {
+      await say(sessionId, { text, images }, target);
     },
     stop: async () => {
       await stopChat(sessionId);

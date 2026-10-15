@@ -103,10 +103,7 @@ async function repaymentGrant(userId: string, amount: number, expiry = '2031-01-
         expiry_date: expiry,
         paid_credit_policy: 'one_year',
         credit_source: 'stripe',
-        original_baseline_microdollars_used: Math.min(
-          owner.microdollars_used,
-          owner.total_microdollars_acquired
-        ),
+        original_baseline_microdollars_used: owner.microdollars_used,
         expiration_baseline_microdollars_used: Math.min(
           owner.microdollars_used,
           owner.total_microdollars_acquired

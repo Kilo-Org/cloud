@@ -698,7 +698,7 @@ export async function transferCreditLots(
         is_free: true,
         credit_category: params.incomingCategory,
         description: params.incomingDescription,
-        original_baseline_microdollars_used: Math.min(to.microdollars_used, targetAcquired),
+        original_baseline_microdollars_used: to.microdollars_used,
         expiration_baseline_microdollars_used: Math.min(to.microdollars_used, targetAcquired),
       })
       .returning({ id: credit_transactions.id });

@@ -121,6 +121,70 @@ describe('GET /admin/api/api-request-log/download', () => {
     });
   });
 
+  it.each(['1', '9007199254740993', '9223372036854775807'])(
+    'downloads only the requested log ID %s without requiring other filters',
+    async id => {
+      const rows = [id, id === '1' ? '2' : String(BigInt(id) - BigInt(1))];
+      await db.insert(api_request_log).values(
+        rows.map(rowId => {
+          const request_r2_key = `2026-08-01/id-${rowId}/request.json`;
+          fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ id: rowId }));
+          return { ...baseRow, id: BigInt(rowId), request_r2_key };
+        })
+      );
+
+      const params = new URLSearchParams({ id });
+      const response = await GET(
+        new NextRequest(`http://localhost:3000/admin/api/api-request-log/download?${params}`)
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Disposition')).toContain(`_id-${id}.zip`);
+      const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+      expect(Object.keys(entries)).toHaveLength(1);
+      expect(JSON.parse(readEntry(entries, `_${id}_request.json`))).toEqual({ id });
+    }
+  );
+
+  it.each<Record<string, string>>([
+    { userId: 'another-user' },
+    { model: 'another-model' },
+    { sessionId: 'another-session' },
+    { startTime: '13:00' },
+    { endTime: '11:00' },
+    { errorsOnly: 'true' },
+  ])('combines the log ID with the other filters %j', async overrides => {
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, status_code: 200 })
+      .returning({ id: api_request_log.id });
+
+    const response = await GET(createRequest({ id: String(row.id), ...overrides }));
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'No records found for the given criteria' });
+  });
+
+  it.each([
+    '',
+    '0',
+    '-1',
+    '1.5',
+    '1e3',
+    'abc',
+    ' 1 ',
+    '01',
+    '9223372036854775808',
+    '100000000000000000000',
+  ])('rejects invalid log ID %j', async id => {
+    const response = await GET(createRequest({ id }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid log ID. Use an integer between 1 and 9223372036854775807.',
+    });
+  });
+
   it('filters by UTC start and end time, including the whole end minute', async () => {
     const createdAts = [
       '2026-08-01T09:59:59.999Z',

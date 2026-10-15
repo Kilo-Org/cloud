@@ -3853,13 +3853,17 @@
     "spendLimit": "花費上限（USD）",
     "safeguardHint": "每份摘要的固定上限，並非每日預算。預設：10 分鐘與 $2。報告最多五分鐘後發佈，產生作業會在這些限制內繼續進行。",
     "invalidSafeguards": "請輸入大於零的有限時間與花費上限。",
-    "estimate": "預估 {{estimate}} · 最高 {{maximum}}",
-    "estimateUnavailable": "這些設定無法使用付費摘要。",
+    "estimate": "預估 {{estimate}} · 上限 {{maximum}}",
+    "estimateUnavailable": "這些設定無法提供付費摘要。",
     "confirmPaid": "要為 {{context}} 啟用付費摘要嗎？",
     "confirmGeneration": "要產生付費摘要嗎？",
     "paidDisclosure": "預估 {{estimate}}，最高 {{maximum}}，時間上限 {{minutes}} 分鐘。即使產生失敗仍會收費。",
     "enable": "啟用付費摘要",
     "contextSettings": "AI 設定 · {{context}}",
-    "allContexts": "個人與組織的簡報會分開保存。"
+    "allContexts": "個人與組織的簡報會分開保存。",
+    "estimatePricingUnavailable": "此模型的定價無法取得。",
+    "estimateBalanceUnavailable": "餘額不足以產生付費摘要。",
+    "estimateModelNotAllowed": "此模型在此不受允許。",
+    "estimateSpendLimitTooLow": "請提高消費保障上限，才能允許此摘要。"
   }
 }

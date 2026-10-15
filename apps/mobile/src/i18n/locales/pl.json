@@ -3943,13 +3943,17 @@
     "spendLimit": "Limit wydatków (USD)",
     "safeguardHint": "Skończone limity na podsumowanie, a nie budżet dzienny. Domyślnie: 10 minut i $2. Raport publikowany jest po maksymalnie pięciu minutach, a generowanie trwa dalej w tych limitach.",
     "invalidSafeguards": "Wpisz dodatnie, skończone limity czasu i wydatków.",
-    "estimate": "Szacunkowo {{estimate}} · maksymalnie {{maximum}}",
-    "estimateUnavailable": "Płatne podsumowanie jest niedostępne dla tych ustawień.",
+    "estimate": "Szacunek {{estimate}} · maksymalnie {{maximum}}",
+    "estimateUnavailable": "Płatne podsumowanie nie jest dostępne dla tych ustawień.",
     "confirmPaid": "Włączyć płatne podsumowania dla {{context}}?",
     "confirmGeneration": "Utworzyć płatne podsumowanie?",
     "paidDisclosure": "Szacunkowo {{estimate}}, maksymalnie {{maximum}}, limit {{minutes}} min. Opłata obowiązuje nawet w razie niepowodzenia.",
     "enable": "Włącz płatne podsumowania",
     "contextSettings": "Ustawienia AI · {{context}}",
-    "allContexts": "Raporty osobiste i organizacji są przechowywane oddzielnie."
+    "allContexts": "Raporty osobiste i organizacji są przechowywane oddzielnie.",
+    "estimatePricingUnavailable": "Cennik tego modelu jest niedostępny.",
+    "estimateBalanceUnavailable": "Brak wystarczających środków na płatne podsumowanie.",
+    "estimateModelNotAllowed": "Ten model nie jest tu dozwolony.",
+    "estimateSpendLimitTooLow": "Zwiększ limit wydatków, aby umożliwić to podsumowanie."
   }
 }

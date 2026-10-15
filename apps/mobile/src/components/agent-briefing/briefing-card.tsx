@@ -17,6 +17,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { briefingSummaryStatusKey, visibleHomeBriefing } from '@/lib/agent-briefing-state';
 import { cn } from '@/lib/utils';
+import { formatNumber } from '@/lib/format';
 import { numberFormat } from '@/lib/intl-cache';
 
 export function briefingMoney(microdollars: number, language: string): string {
@@ -59,7 +60,7 @@ export function BriefingScorecard({ report }: { readonly report: BriefingReport 
         if (row.coverage !== 'unavailable' && (row.coverage === 'complete' || row.amount > 0)) {
           value = row.money
             ? briefingMoney(row.amount, i18n.language)
-            : row.amount.toLocaleString(i18n.language);
+            : formatNumber(row.amount, i18n.language);
         }
         const displayValue =
           row.coverage !== 'complete' && row.amount > 0 && row.coverage !== 'unavailable'
@@ -107,17 +108,16 @@ export function BriefingCard({
   const offline = useOfflineBannerState();
   const dismissals = useBriefingDismissals();
   const colors = useThemeColors();
-  let summaryPreview = t(briefingSummaryStatusKey(report.summary.status));
-  if (report.summary.status === 'disabled') {
-    summaryPreview = t('agentBriefing.view');
-  } else if (report.summary.status === 'ready' && report.summary.text) {
-    summaryPreview = report.summary.text;
-  }
+  const aiPreview =
+    report.summary.status === 'ready' && report.summary.text
+      ? report.summary.text
+      : t(briefingSummaryStatusKey(report.summary.status));
+  const hasAiPreview = report.summary.status !== 'disabled';
   const preview = [
     offline ? t('agentBriefing.offline') : null,
     report.revised ? t('agentBriefing.revised', { revision: report.revision }) : null,
-    summaryPreview,
-    report.summary.status === 'disabled' ? report.localDate : null,
+    hasAiPreview ? aiPreview : t('agentBriefing.view'),
+    hasAiPreview ? null : report.localDate,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -142,7 +142,9 @@ export function BriefingCard({
       <View className="min-h-[68px] flex-row items-center gap-2 px-4 py-3">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('agentBriefing.viewWithPreview', { preview })}
+          accessibilityLabel={
+            hasAiPreview ? t('agentBriefing.viewWithPreview', { preview }) : preview
+          }
           className="min-h-[44px] min-w-0 flex-1 flex-row items-center gap-2 active:opacity-70"
           onPress={() => {
             router.push(`${BRIEFING_PATH}/${report.id}` as Href);
@@ -151,18 +153,18 @@ export function BriefingCard({
           <Text numberOfLines={2} className="min-w-0 flex-1 text-sm text-foreground">
             {preview}
           </Text>
-          <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+          <DirectionalChevronRight size={18} color={colors.foreground} />
         </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('agentBriefing.dismiss')}
-          className="size-[44px] items-center justify-center rounded-full active:opacity-70"
+          className="size-11 shrink-0 items-center justify-center rounded-full border border-border bg-secondary active:opacity-70"
           disabled={dismissals.save.isPending}
           onPress={() => {
             dismissals.dismiss(report);
           }}
         >
-          <X size={16} color={colors.mutedForeground} />
+          <X size={18} color={colors.foreground} />
         </Pressable>
       </View>
     </View>

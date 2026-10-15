@@ -3853,13 +3853,17 @@
     "spendLimit": "Ààbò ìnáwó (USD)",
     "safeguardHint": "Àwọn ààbò tó ní òpin fún àkópọ̀ kọ̀ọ̀kan, kì í ṣe ìnáwó ojoojúmọ́. Àìyípadà: ìṣẹ́jú 10 àti $2. Ìròyìn yóò jáde lẹ́yìn ìṣẹ́jú márùn-ún ó pọ̀ jù, nígbà tí ìṣẹ̀dá ń bá a lọ láàárín òpin wọ̀nyí.",
     "invalidSafeguards": "Tẹ òpin àkókò àti ìnáwó tó jẹ́ rere, tó sì ní òpin.",
-    "estimate": "Ìdíyelé {{estimate}} · ó pọ̀ jù {{maximum}}",
-    "estimateUnavailable": "Kò sí àkópọ̀ olówó fún ètò wọ̀nyí.",
+    "estimate": "Ìsirò {{estimate}} · ti ó pọ̀jù {{maximum}}",
+    "estimateUnavailable": "Àkọọ́lẹ̀ tí ó ní owó kò sí fún àwọn ètò yìí.",
     "confirmPaid": "Mú àkópọ̀ olówó ṣiṣẹ́ fún {{context}}?",
     "confirmGeneration": "Ṣẹ̀dá àkópọ̀ olówó?",
     "paidDisclosure": "Ìdíyelé {{estimate}}, títí dé {{maximum}}, pẹ̀lú òpin ìṣẹ́jú {{minutes}}. Owó yóò wà kódà tí ìṣẹ̀dá bá kùnà.",
     "enable": "Mú àkópọ̀ olówó ṣiṣẹ́",
     "contextSettings": "Ètò AI · {{context}}",
-    "allContexts": "Àwọn àkópọ̀ ti ara ẹni àti ti àjọ wà lọ́tọ̀ọ̀tọ̀."
+    "allContexts": "Àwọn àkópọ̀ ti ara ẹni àti ti àjọ wà lọ́tọ̀ọ̀tọ̀.",
+    "estimatePricingUnavailable": "Owó tí a ń gbà fún àwòkọ̀ yìí kò hàn.",
+    "estimateBalanceUnavailable": "Owó inú àkántì kò tó fún àkọọ́lẹ̀ tí ó ní owó.",
+    "estimateModelNotAllowed": "A kò jẹ́ kí a lo àwòkọ̀ yìí níbí.",
+    "estimateSpendLimitTooLow": "Gbé ìdààbòbò inúl owó sókè kí a lè fi sí àkọọ́lẹ̀ yìí."
   }
 }

@@ -3989,12 +3989,16 @@
     "safeguardHint": "Salvagwardji finiti għal kull sommarju, mhux baġit ta' kuljum. Default: 10 minuti u $2. Rapport jiġi ppubblikat wara mhux aktar minn ħames minuti filwaqt li l-ġenerazzjoni tkompli f'dawn il-limiti.",
     "invalidSafeguards": "Daħħal limiti ta' ħin u nfiq pożittivi u finiti.",
     "estimate": "Stima {{estimate}} · massimu {{maximum}}",
-    "estimateUnavailable": "Sommarju bi ħlas mhux disponibbli għal dawn is-settings.",
+    "estimateUnavailable": "Sommarju li jitħallas mhuwiex disponibbli għal dawn is-settings.",
     "confirmPaid": "Tixgħel sommarji bi ħlas għal {{context}}?",
     "confirmGeneration": "Tiġġenera sommarju bi ħlas?",
     "paidDisclosure": "{{estimate}} stmat, sa {{maximum}}, b'limitu ta' {{minutes}} minuti. Il-ħlasijiet japplikaw anke jekk il-ġenerazzjoni tfalli.",
     "enable": "Ixgħel sommarji bi ħlas",
     "contextSettings": "Settings tal-AI · {{context}}",
-    "allContexts": "Il-briefings personali u tal-organizzazzjoni jibqgħu separati."
+    "allContexts": "Il-briefings personali u tal-organizzazzjoni jibqgħu separati.",
+    "estimatePricingUnavailable": "Il-prezzijiet għal dan il-model mhuwiex disponibbli.",
+    "estimateBalanceUnavailable": "Mhemmx bilans biżżejjed għal sommarju li jitħallas.",
+    "estimateModelNotAllowed": "Dan il-model mhuwiex permess hawn.",
+    "estimateSpendLimitTooLow": "Iżżid is-safeguard tal-infiq biex tippermetti dan is-sommarju."
   }
 }

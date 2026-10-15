@@ -3853,13 +3853,17 @@
     "spendLimit": "Umkhawulo wezindleko (USD)",
     "safeguardHint": "Imikhawulo enqunyiwe ngesifinyezo ngasinye, hhayi isabelomali sansuku zonke. Okuzenzakalelayo: amaminithi angu-10 no-$2. Umbiko ushicilelwa ngemva kwamaminithi amahlanu kakhulu ngenkathi ukukhiqiza kuqhubeka ngaphakathi kwale mikhawulo.",
     "invalidSafeguards": "Faka imikhawulo yesikhathi neyezindleko enhle nenqunyiwe.",
-    "estimate": "Isilinganiso {{estimate}} · okuphezulu {{maximum}}",
-    "estimateUnavailable": "Isifinyezo esikhokhelwayo asitholakali kulezi zilungiselelo.",
+    "estimate": "Kulinganiselwe {{estimate}} · okuphezulu kakhulu {{maximum}}",
+    "estimateUnavailable": "Isifinyezo esikhokhelwayo asitholakali kule zilungiselelo.",
     "confirmPaid": "Vula izifinyezo ezikhokhelwayo ze-{{context}}?",
     "confirmGeneration": "Khiqiza isifinyezo esikhokhelwayo?",
     "paidDisclosure": "Kulinganiselwa ku-{{estimate}}, kuze kufike ku-{{maximum}}, nomkhawulo wamaminithi angu-{{minutes}}. Izindleko ziyasebenza ngisho noma ukukhiqiza kwehluleka.",
     "enable": "Vula izifinyezo ezikhokhelwayo",
     "contextSettings": "Izilungiselelo ze-AI · {{context}}",
-    "allContexts": "Izifinyezo zomuntu siqu nezenhlangano zihlala zihlukene."
+    "allContexts": "Izifinyezo zomuntu siqu nezenhlangano zihlala zihlukene.",
+    "estimatePricingUnavailable": "Intengo yale modeli ayitholakali.",
+    "estimateBalanceUnavailable": "Ibalansi ayanele ngokwanele ukuthola isifinyezo esikhokhelwayo.",
+    "estimateModelNotAllowed": "Le modeli ayivunyelwe lapha.",
+    "estimateSpendLimitTooLow": "Nyusa umkhombe wokusebenzisa imali ukuze uvumele lesi sifinyezo."
   }
 }

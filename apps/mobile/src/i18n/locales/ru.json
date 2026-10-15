@@ -3950,6 +3950,10 @@
     "paidDisclosure": "Оценка {{estimate}}, не более {{maximum}}, лимит {{minutes}} мин. Оплата взимается, даже если генерация не удалась.",
     "enable": "Включить платные резюме",
     "contextSettings": "Настройки AI · {{context}}",
-    "allContexts": "Личные сводки и сводки организаций хранятся отдельно."
+    "allContexts": "Личные сводки и сводки организаций хранятся отдельно.",
+    "estimatePricingUnavailable": "Цены для этой модели недоступны.",
+    "estimateBalanceUnavailable": "Недостаточно средств для платного резюме.",
+    "estimateModelNotAllowed": "Эта модель здесь недоступна.",
+    "estimateSpendLimitTooLow": "Повышайте лимит расходов, чтобы разрешить это резюме."
   }
 }

@@ -3853,13 +3853,17 @@
     "spendLimit": "Nchekwa mmefu (USD)",
     "safeguardHint": "Nchekwa nwere oke maka nchịkọta ọ bụla, ọ bụghị mmefu kwa ụbọchị. Ndabara: nkeji 10 na $2. Akụkọ na-apụta n'ime nkeji ise kacha, ebe mmepụta na-aga n'ihu n'ime oke ndị a.",
     "invalidSafeguards": "Tinye oke oge na mmefu dị mma, nwere njedebe.",
-    "estimate": "Atụmatụ {{estimate}} · kacha {{maximum}}",
-    "estimateUnavailable": "Nchịkọta akwụ ụgwọ adịghị maka ntọala ndị a.",
+    "estimate": "Atụmatụ {{estimate}} · kachasị {{maximum}}",
+    "estimateUnavailable": "Nchịkọta a na-akwụ ụgwọ adịghị maka ntọala ndị a.",
     "confirmPaid": "Kwado nchịkọta akwụ ụgwọ maka {{context}}?",
     "confirmGeneration": "Mepụta nchịkọta akwụ ụgwọ?",
     "paidDisclosure": "Atụmatụ {{estimate}}, ruo {{maximum}}, na oke nkeji {{minutes}}. A ga-akwụ ụgwọ ọbụna ma mmepụta daa.",
     "enable": "Kwado nchịkọta akwụ ụgwọ",
     "contextSettings": "Ntọala AI · {{context}}",
-    "allContexts": "Nkọwa onwe na nke nzukọ na-anọ iche."
+    "allContexts": "Nkọwa onwe na nke nzukọ na-anọ iche.",
+    "estimatePricingUnavailable": "Ego ụgwọ maka ihe nlere a adịghị.",
+    "estimateBalanceUnavailable": "Ego ezughị maka nchịkọta a na-akwụ ụgwọ.",
+    "estimateModelNotAllowed": "Ihe nlere a anaghị anabata ebe a.",
+    "estimateSpendLimitTooLow": "Bulie nchebe mmefu iji kwe ka nchịkọta a."
   }
 }

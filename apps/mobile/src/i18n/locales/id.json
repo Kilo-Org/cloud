@@ -3853,13 +3853,17 @@
     "spendLimit": "Batas biaya (USD)",
     "safeguardHint": "Batas tetap per ringkasan, bukan anggaran harian. Default: 10 menit dan $2. Laporan diterbitkan paling lambat lima menit sementara pembuatan berlanjut dalam batas ini.",
     "invalidSafeguards": "Masukkan batas waktu dan biaya yang positif dan terbatas.",
-    "estimate": "Perkiraan {{estimate}} · maksimum {{maximum}}",
+    "estimate": "Estimasi {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk pengaturan ini.",
     "confirmPaid": "Aktifkan ringkasan berbayar untuk {{context}}?",
     "confirmGeneration": "Buat ringkasan berbayar?",
     "paidDisclosure": "Perkiraan {{estimate}}, hingga {{maximum}}, dengan batas {{minutes}} menit. Biaya tetap berlaku meskipun pembuatan gagal.",
     "enable": "Aktifkan ringkasan berbayar",
     "contextSettings": "Pengaturan AI · {{context}}",
-    "allContexts": "Ringkasan pribadi dan organisasi tetap terpisah."
+    "allContexts": "Ringkasan pribadi dan organisasi tetap terpisah.",
+    "estimatePricingUnavailable": "Harga untuk model ini tidak tersedia.",
+    "estimateBalanceUnavailable": "Saldo tidak cukup untuk ringkasan berbayar.",
+    "estimateModelNotAllowed": "Model ini tidak diizinkan di sini.",
+    "estimateSpendLimitTooLow": "Naikkan batas pengeluaran untuk mengizinkan ringkasan ini."
   }
 }

@@ -3854,12 +3854,16 @@
     "safeguardHint": "Özet başına sınırlar; günlük bütçe değildir. Varsayılanlar: 10 dakika ve $2. Oluşturma bu sınırlar içinde sürerken rapor en geç beş dakika sonra yayımlanır.",
     "invalidSafeguards": "Pozitif ve sonlu süre ve harcama sınırları girin.",
     "estimate": "Tahmini {{estimate}} · en fazla {{maximum}}",
-    "estimateUnavailable": "Bu ayarlar için ücretli özet kullanılamıyor.",
+    "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil.",
     "confirmPaid": "{{context}} için ücretli özetler etkinleştirilsin mi?",
     "confirmGeneration": "Ücretli özet oluşturulsun mu?",
     "paidDisclosure": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
     "enable": "Ücretli özetleri etkinleştir",
     "contextSettings": "AI ayarları · {{context}}",
-    "allContexts": "Kişisel ve kuruluş özetleri ayrı tutulur."
+    "allContexts": "Kişisel ve kuruluş özetleri ayrı tutulur.",
+    "estimatePricingUnavailable": "Bu model için fiyatlandırma mevcut değil.",
+    "estimateBalanceUnavailable": "Ücretli özet için bakiye yetersiz.",
+    "estimateModelNotAllowed": "Bu model burada kullanılamaz.",
+    "estimateSpendLimitTooLow": "Bu önete izin vermek için harcama limitini yükseltin."
   }
 }

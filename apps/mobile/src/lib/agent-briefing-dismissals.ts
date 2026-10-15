@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { readCacheScope } from '@/lib/persist/cache-scope';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
-import { readCacheScope } from '@/lib/persist/read-cache';
 
 export const BRIEFING_DISMISSALS_KEY = 'agent-briefing-dismissals';
 const dismissalsSchema = z.array(

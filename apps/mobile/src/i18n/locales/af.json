@@ -3854,12 +3854,16 @@
     "safeguardHint": "Eindige beveiligings per opsomming, nie 'n daaglikse begroting nie. Verstek: 10 minute en $2. 'n Verslag word ná hoogstens vyf minute gepubliseer terwyl generering binne hierdie limiete voortgaan.",
     "invalidSafeguards": "Voer positiewe, eindige tyd- en bestedingslimiete in.",
     "estimate": "Skatting {{estimate}} · maksimum {{maximum}}",
-    "estimateUnavailable": "'n Betaalde opsomming is nie vir hierdie instellings beskikbaar nie.",
+    "estimateUnavailable": "’n Betaalde opsomming is nie beskikbaar vir hierdie instellings nie.",
     "confirmPaid": "Aktiveer betaalde opsommings vir {{context}}?",
     "confirmGeneration": "Genereer 'n betaalde opsomming?",
     "paidDisclosure": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} minute. Heffings geld selfs as generering misluk.",
     "enable": "Aktiveer betaalde opsommings",
     "contextSettings": "AI-instellings · {{context}}",
-    "allContexts": "Persoonlike en organisasieverslae bly apart."
+    "allContexts": "Persoonlike en organisasieverslae bly apart.",
+    "estimatePricingUnavailable": "Prysinligting vir hierdie model is nie beskikbaar nie.",
+    "estimateBalanceUnavailable": "Nie genoeg saldo vir ’n betaalde opsomming nie.",
+    "estimateModelNotAllowed": "Hierdie model is hier nie toegelaat nie.",
+    "estimateSpendLimitTooLow": "Verhoog die bestedingswaaktaam om hierdie opsomming toe te laat."
   }
 }

@@ -6,10 +6,12 @@ import type { agent_briefing_events } from '@kilocode/db/schema';
 const start = '2026-10-14T22:00:00.000Z';
 const cutoff = '2026-10-15T08:00:00.000Z';
 const night = '2026-10-15T02:00:00.000Z';
+const sessionStatus = { status: null, status_updated_at: null, status_transition_id: null };
 const rows = [
-  { session_id: 'root', parent_session_id: null, title: 'Root' },
-  { session_id: 'child', parent_session_id: 'root', title: 'Child' },
+  { session_id: 'root', parent_session_id: null, title: 'Root', ...sessionStatus },
+  { session_id: 'child', parent_session_id: 'root', title: 'Child', ...sessionStatus },
 ];
+const collectedBeforeNight = '2026-10-14T12:00:00.000Z';
 function event(
   id: string,
   overrides: Partial<typeof agent_briefing_events.$inferSelect> = {}
@@ -257,5 +259,162 @@ describe('aggregateBriefingEvidence', () => {
     expect(report.sources[0]?.excerpt).toContain('Parser updated');
     expect(report.sources[0]?.excerpt?.length).toBeLessThanOrEqual(600);
     expect(report.sources[0]?.excerpt).not.toMatch(/person@example.com|token=secret/);
+  });
+
+  describe('coverage', () => {
+    const charged = { id: 'charge', sessionId: 'root', cost: 290_000, occurredAt: night };
+    const timestampedBlocker = event('blocked', {
+      kind: 'status',
+      status: 'question',
+      payload: {
+        previousStatus: 'busy',
+        previousStatusKnown: true,
+        transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FA1',
+      },
+    });
+
+    it('is complete when collection was live before the night and every source is attributed', () => {
+      const report = aggregateBriefingEvidence(
+        rows,
+        [event('activity'), timestampedBlocker],
+        [charged],
+        start,
+        cutoff,
+        collectedBeforeNight
+      );
+      expect(report.coverage).toEqual({
+        activity: 'complete',
+        spend: 'complete',
+        blockers: 'complete',
+        pullRequests: 'complete',
+      });
+      expect(report.scorecard).toMatchObject({ blockers: 1, spendMicrodollars: 290_000 });
+    });
+
+    it('stays partial when collection started during the night or is unknown', () => {
+      for (const collectionStartedAt of [null, '2026-10-15T01:00:00.000Z']) {
+        const report = aggregateBriefingEvidence(
+          rows,
+          [event('activity'), timestampedBlocker],
+          [charged],
+          start,
+          cutoff,
+          collectionStartedAt
+        );
+        expect(report.coverage).toEqual({
+          activity: 'partial',
+          spend: 'partial',
+          blockers: 'partial',
+          pullRequests: 'partial',
+        });
+      }
+    });
+
+    it('marks blockers partial for producer transitions without ordering identity or predecessor', () => {
+      for (const payload of [
+        { previousStatus: 'busy', previousStatusKnown: true },
+        {
+          previousStatus: null,
+          previousStatusKnown: false,
+          transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FA2',
+        },
+      ]) {
+        const report = aggregateBriefingEvidence(
+          rows,
+          [event('activity'), event('legacy', { kind: 'status', status: 'question', payload })],
+          [charged],
+          start,
+          cutoff,
+          collectedBeforeNight
+        );
+        expect(report.coverage.blockers).toBe('partial');
+        expect(report.coverage.activity).toBe('complete');
+      }
+    });
+
+    it('keeps server-observed status resets complete', () => {
+      const report = aggregateBriefingEvidence(
+        rows,
+        [event('activity'), event('reset', { kind: 'status', status: 'retry', payload: null })],
+        [charged],
+        start,
+        cutoff,
+        collectedBeforeNight
+      );
+      expect(report.coverage.blockers).toBe('complete');
+    });
+
+    it('marks blockers partial when a legacy untimestamped status was projected during the night', () => {
+      const legacyRows = [
+        rows[0],
+        {
+          ...rows[1],
+          status: 'question',
+          status_updated_at: '2026-10-15T03:00:00.000Z',
+          status_transition_id: null,
+        },
+      ];
+      const report = aggregateBriefingEvidence(
+        legacyRows,
+        [event('activity')],
+        [charged],
+        start,
+        cutoff,
+        collectedBeforeNight
+      );
+      expect(report.coverage.blockers).toBe('partial');
+      const priorLegacyRows = [
+        rows[0],
+        { ...legacyRows[1], status_updated_at: '2026-10-14T20:00:00.000Z' },
+      ];
+      expect(
+        aggregateBriefingEvidence(
+          priorLegacyRows,
+          [event('activity')],
+          [charged],
+          start,
+          cutoff,
+          collectedBeforeNight
+        ).coverage.blockers
+      ).toBe('complete');
+    });
+
+    it('marks spend partial when an active session has no attributed usage', () => {
+      const report = aggregateBriefingEvidence(
+        [
+          ...rows,
+          { session_id: 'other', parent_session_id: null, title: 'Other', ...sessionStatus },
+        ],
+        [event('activity'), event('uncharged', { session_id: 'other' })],
+        [charged],
+        start,
+        cutoff,
+        collectedBeforeNight
+      );
+      expect(report.coverage.spend).toBe('partial');
+    });
+
+    it('is unavailable only when no usage exists for active sessions', () => {
+      expect(
+        aggregateBriefingEvidence(
+          rows,
+          [event('activity')],
+          [],
+          start,
+          cutoff,
+          collectedBeforeNight
+        ).coverage.spend
+      ).toBe('unavailable');
+      expect(
+        aggregateBriefingEvidence(
+          rows,
+          [event('pr', { kind: 'pull_request', url: 'https://github.com/kilo/repo/pull/9' })],
+          [],
+          start,
+          cutoff,
+          collectedBeforeNight
+        ).coverage.spend
+      ).toBe('complete');
+    });
   });
 });

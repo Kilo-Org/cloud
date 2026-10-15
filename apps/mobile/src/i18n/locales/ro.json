@@ -3898,13 +3898,17 @@
     "spendLimit": "Limită de cheltuieli (USD)",
     "safeguardHint": "Limite finite per rezumat, nu un buget zilnic. Implicit: 10 minute și $2. Un raport se publică după cel mult cinci minute, iar generarea continuă în aceste limite.",
     "invalidSafeguards": "Introdu limite de timp și de cheltuieli pozitive și finite.",
-    "estimate": "Estimare {{estimate}} · maximum {{maximum}}",
-    "estimateUnavailable": "Un rezumat plătit nu este disponibil pentru aceste setări.",
+    "estimate": "Estimare {{estimate}} · maxim {{maximum}}",
+    "estimateUnavailable": "Nu este disponibil un rezumat plătit pentru aceste setări.",
     "confirmPaid": "Activezi rezumatele plătite pentru {{context}}?",
     "confirmGeneration": "Generezi un rezumat plătit?",
     "paidDisclosure": "Estimat {{estimate}}, până la {{maximum}}, cu o limită de {{minutes}} minute. Taxele se aplică și dacă generarea eșuează.",
     "enable": "Activează rezumatele plătite",
     "contextSettings": "Setări AI · {{context}}",
-    "allContexts": "Rezumatele personale și cele ale organizației rămân separate."
+    "allContexts": "Rezumatele personale și cele ale organizației rămân separate.",
+    "estimatePricingUnavailable": "Prețurile pentru acest model nu sunt disponibile.",
+    "estimateBalanceUnavailable": "Sold insuficient pentru un rezumat plătit.",
+    "estimateModelNotAllowed": "Acest model nu este permis aici.",
+    "estimateSpendLimitTooLow": "Creșteți limita de cheltuieli pentru a permite acest rezumat."
   }
 }

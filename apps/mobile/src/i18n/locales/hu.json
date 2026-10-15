@@ -3853,13 +3853,17 @@
     "spendLimit": "Költési korlát (USD)",
     "safeguardHint": "Véges, összefoglalónkénti korlátok, nem napi keret. Alapértelmezés: 10 perc és $2. A jelentés legfeljebb öt perc után megjelenik, a generálás pedig e korlátokon belül folytatódik.",
     "invalidSafeguards": "Adj meg pozitív, véges idő- és költési korlátot.",
-    "estimate": "Becslés: {{estimate}} · maximum: {{maximum}}",
-    "estimateUnavailable": "Ezekkel a beállításokkal nem érhető el fizetős összefoglaló.",
+    "estimate": "Becsült {{estimate}} · legfeljebb {{maximum}}",
+    "estimateUnavailable": "Fizetett összefoglaló nem elérhető ezekkel a beállításokkal.",
     "confirmPaid": "Engedélyezed a fizetős összefoglalókat ehhez: {{context}}?",
     "confirmGeneration": "Készítsünk fizetős összefoglalót?",
     "paidDisclosure": "Becsült költség {{estimate}}, legfeljebb {{maximum}}, {{minutes}} perces korláttal. A díj sikertelen generálás esetén is felszámításra kerül.",
     "enable": "Fizetős összefoglalók engedélyezése",
     "contextSettings": "AI-beállítások · {{context}}",
-    "allContexts": "A személyes és a szervezeti összefoglalók külön maradnak."
+    "allContexts": "A személyes és a szervezeti összefoglalók külön maradnak.",
+    "estimatePricingUnavailable": "A modell árazása nem elérhető.",
+    "estimateBalanceUnavailable": "Nincs elég egyenleg a fizetett összefoglalóhoz.",
+    "estimateModelNotAllowed": "Ez a modell itt nem engedélyezett.",
+    "estimateSpendLimitTooLow": "Emeld a költési korlátot az összefoglaló engedélyezéséhez."
   }
 }

@@ -3905,6 +3905,10 @@
     "paidDisclosure": "{{estimate}} estimado, até {{maximum}}, com um limite de {{minutes}} minutos. As cobranças aplicam-se mesmo que a geração falhe.",
     "enable": "Ativar resumos pagos",
     "contextSettings": "Definições de AI · {{context}}",
-    "allContexts": "Os resumos pessoais e da organização são mantidos em separado."
+    "allContexts": "Os resumos pessoais e da organização são mantidos em separado.",
+    "estimatePricingUnavailable": "O preço deste modelo não está disponível.",
+    "estimateBalanceUnavailable": "Saldo insuficiente para um resumo pago.",
+    "estimateModelNotAllowed": "Este modelo não é permitido aqui.",
+    "estimateSpendLimitTooLow": "Aumente o limite de segurança de gastos para permitir este resumo."
   }
 }

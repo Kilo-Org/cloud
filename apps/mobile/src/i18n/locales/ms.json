@@ -3860,6 +3860,10 @@
     "paidDisclosure": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
     "enable": "Dayakan ringkasan berbayar",
     "contextSettings": "Tetapan AI · {{context}}",
-    "allContexts": "Taklimat peribadi dan organisasi kekal berasingan."
+    "allContexts": "Taklimat peribadi dan organisasi kekal berasingan.",
+    "estimatePricingUnavailable": "Harga untuk model ini tidak tersedia.",
+    "estimateBalanceUnavailable": "Baki tidak mencukupi untuk ringkasan berbayar.",
+    "estimateModelNotAllowed": "Model ini tidak dibenarkan di sini.",
+    "estimateSpendLimitTooLow": "Naikkan had perbelanjaan untuk membenarkan ringkasan ini."
   }
 }

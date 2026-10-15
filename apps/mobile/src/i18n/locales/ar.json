@@ -4040,6 +4040,10 @@
     "paidDisclosure": "التكلفة المقدّرة {{estimate}}، وحتى {{maximum}}، بحد زمني {{minutes}} دقيقة. تُطبّق الرسوم حتى إذا فشل الإنشاء.",
     "enable": "تفعيل الملخصات المدفوعة",
     "contextSettings": "إعدادات AI · {{context}}",
-    "allContexts": "تبقى الملخصات الشخصية وملخصات المؤسسة منفصلة."
+    "allContexts": "تبقى الملخصات الشخصية وملخصات المؤسسة منفصلة.",
+    "estimatePricingUnavailable": "تسعير هذا النموذج غير متاح.",
+    "estimateBalanceUnavailable": "لا يوجد رصيد كافٍ لملخص مدفوع.",
+    "estimateModelNotAllowed": "هذا النموذج غير مسموح به هنا.",
+    "estimateSpendLimitTooLow": "ارفع حد الإنفاق للسماح بهذا الملخص."
   }
 }

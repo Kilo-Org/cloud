@@ -3854,12 +3854,16 @@
     "safeguardHint": "Límites finitos por resumo, non un orzamento diario. Predeterminados: 10 minutos e $2. O informe publícase como moito tras cinco minutos mentres a xeración continúa dentro destes límites.",
     "invalidSafeguards": "Introduce límites de tempo e gasto positivos e finitos.",
     "estimate": "Estimación {{estimate}} · máximo {{maximum}}",
-    "estimateUnavailable": "Non hai resumo de pago dispoñible con esta configuración.",
+    "estimateUnavailable": "Non hai dispoñible un resumo de pago para estes axustes.",
     "confirmPaid": "Activar os resumos de pago para {{context}}?",
     "confirmGeneration": "Xerar un resumo de pago?",
     "paidDisclosure": "{{estimate}} estimado, ata {{maximum}}, cun límite de {{minutes}} minutos. Cóbrase aínda que a xeración falle.",
     "enable": "Activar resumos de pago",
     "contextSettings": "Configuración de AI · {{context}}",
-    "allContexts": "Os resumos persoais e da organización mantéñense separados."
+    "allContexts": "Os resumos persoais e da organización mantéñense separados.",
+    "estimatePricingUnavailable": "Non está dispoñible o prezo deste modelo.",
+    "estimateBalanceUnavailable": "Non hai saldo abondo para un resumo de pago.",
+    "estimateModelNotAllowed": "Este modelo non está permitido aquí.",
+    "estimateSpendLimitTooLow": "Suba o límite de gasto para permitir este resumo."
   }
 }

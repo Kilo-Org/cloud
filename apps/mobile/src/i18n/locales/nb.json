@@ -3853,13 +3853,17 @@
     "spendLimit": "Forbruksgrense (USD)",
     "safeguardHint": "Faste grenser per sammendrag, ikke et dagsbudsjett. Standard: 10 minutter og $2. En rapport publiseres etter maks fem minutter mens genereringen fortsetter innenfor disse grensene.",
     "invalidSafeguards": "Angi positive, endelige grenser for tid og forbruk.",
-    "estimate": "Anslag {{estimate}} · maks {{maximum}}",
-    "estimateUnavailable": "Betalt sammendrag er ikke tilgjengelig med disse innstillingene.",
+    "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
+    "estimateUnavailable": "En betalt oppsummering er ikke tilgjengelig for disse innstillingene.",
     "confirmPaid": "Slå på betalte sammendrag for {{context}}?",
     "confirmGeneration": "Lage et betalt sammendrag?",
     "paidDisclosure": "Anslått {{estimate}}, opptil {{maximum}}, med en grense på {{minutes}} minutter. Kostnader påløper selv om genereringen mislykkes.",
     "enable": "Slå på betalte sammendrag",
     "contextSettings": "AI-innstillinger · {{context}}",
-    "allContexts": "Personlige briefer og organisasjonsbriefer holdes atskilt."
+    "allContexts": "Personlige briefer og organisasjonsbriefer holdes atskilt.",
+    "estimatePricingUnavailable": "Prising for denne modellen er utilgjengelig.",
+    "estimateBalanceUnavailable": "Ikke nok saldo for en betalt oppsummering.",
+    "estimateModelNotAllowed": "Denne modellen er ikke tillatt her.",
+    "estimateSpendLimitTooLow": "Øk forbruksgrensen for å tillate denne oppsummeringen."
   }
 }

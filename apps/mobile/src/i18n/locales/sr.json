@@ -3905,6 +3905,10 @@
     "paidDisclosure": "Procena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} min. Naplata važi i ako generisanje ne uspe.",
     "enable": "Omogući plaćene rezimee",
     "contextSettings": "AI podešavanja · {{context}}",
-    "allContexts": "Lični i organizacioni pregledi ostaju odvojeni."
+    "allContexts": "Lični i organizacioni pregledi ostaju odvojeni.",
+    "estimatePricingUnavailable": "Cene za ovaj model nisu dostupne.",
+    "estimateBalanceUnavailable": "Nedovoljno sredstava za plaćeni rezime.",
+    "estimateModelNotAllowed": "Ovaj model ovde nije dozvoljen.",
+    "estimateSpendLimitTooLow": "Podignite ograničenje potrošnje da biste omogućili ovaj rezime."
   }
 }

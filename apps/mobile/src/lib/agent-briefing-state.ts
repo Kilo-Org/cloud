@@ -57,3 +57,28 @@ export function briefingSummaryStatusKey(status: string): string {
     }
   }
 }
+
+export function briefingEstimateUnavailableKey(reason: string | null | undefined): string {
+  switch (reason) {
+    case 'model_pricing_unavailable':
+    case 'invalid_model_pricing': {
+      return 'agentBriefing.estimatePricingUnavailable';
+    }
+    case 'balance_unavailable': {
+      return 'agentBriefing.estimateBalanceUnavailable';
+    }
+    case 'model_not_allowed': {
+      return 'agentBriefing.estimateModelNotAllowed';
+    }
+    case 'spend_limit_too_low': {
+      return 'agentBriefing.estimateSpendLimitTooLow';
+    }
+    case null:
+    case undefined: {
+      return 'agentBriefing.estimateUnavailable';
+    }
+    default: {
+      return 'agentBriefing.estimateUnavailable';
+    }
+  }
+}

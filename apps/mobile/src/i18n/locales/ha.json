@@ -3853,13 +3853,17 @@
     "spendLimit": "Kariyar kashe kuɗi (USD)",
     "safeguardHint": "Kariya mai iyaka ga kowace taƙaitawa, ba kasafin kuɗin yau da kullum ba. Na asali: mintuna 10 da $2. Ana wallafa rahoto bayan mintuna biyar a mafi yawa yayin da ƙirƙira ke ci gaba cikin waɗannan iyakoki.",
     "invalidSafeguards": "Shigar da iyakokin lokaci da kashe kuɗi masu kyau da iyaka.",
-    "estimate": "Ƙiyasi {{estimate}} · mafi yawa {{maximum}}",
-    "estimateUnavailable": "Babu taƙaitawa ta biya don waɗannan saituna.",
+    "estimate": "Kimanin {{estimate}} · matsakaici {{maximum}}",
+    "estimateUnavailable": "Biyyan kudi ba a samu ba don waɗannan saituna.",
     "confirmPaid": "Kunna taƙaitawa ta biya don {{context}}?",
     "confirmGeneration": "Ƙirƙiri taƙaitawa ta biya?",
     "paidDisclosure": "Ƙiyasin {{estimate}}, har zuwa {{maximum}}, tare da iyakar mintuna {{minutes}}. Ana caji ko da ƙirƙira ta gaza.",
     "enable": "Kunna taƙaitawa ta biya",
     "contextSettings": "Saitunan AI · {{context}}",
-    "allContexts": "Bayanan kai da na ƙungiya suna zama daban."
+    "allContexts": "Bayanan kai da na ƙungiya suna zama daban.",
+    "estimatePricingUnavailable": "Farashin wannan abin ƙira ba a samu ba.",
+    "estimateBalanceUnavailable": "Ma'aunin kuɗi bai isa ba don taƙaitaccen biyan kudi.",
+    "estimateModelNotAllowed": "Wannan abin ƙira ba a yarda da shi a nan ba.",
+    "estimateSpendLimitTooLow": "Ɗaga iyakar kula da kashe kuɗi don ba da izinin wannan taƙaitaccen."
   }
 }

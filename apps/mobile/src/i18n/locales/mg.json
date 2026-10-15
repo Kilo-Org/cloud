@@ -3853,13 +3853,17 @@
     "spendLimit": "Fetra fandaniana (USD)",
     "safeguardHint": "Fetra voafaritra isaky ny famintinana, fa tsy teti-bola isan'andro. Default: 10 minitra sy $2. Avoaka ao anatin'ny dimy minitra farafahabetsany ny tatitra raha mbola mitohy ao anatin'ireo fetra ireo ny famoronana.",
     "invalidSafeguards": "Ampidiro fetra fotoana sy fandaniana tsara sy voafetra.",
-    "estimate": "Tombana {{estimate}} · ambony indrindra {{maximum}}",
-    "estimateUnavailable": "Tsy misy famintinana andoavana ho an'ireo fikirakirana ireo.",
+    "estimate": "Vinavina {{estimate}} · ambony indrindra {{maximum}}",
+    "estimateUnavailable": "Tsy misy famintinana kando iyou ho an'ireto fandrindrana ireto.",
     "confirmPaid": "Alefa ve ny famintinana andoavana ho an'i {{context}}?",
     "confirmGeneration": "Mamorona famintinana andoavana?",
     "paidDisclosure": "Tombana {{estimate}}, hatramin'ny {{maximum}}, miaraka amin'ny fetra {{minutes}} minitra. Misy sarany na dia tsy mahomby aza ny famoronana.",
     "enable": "Alefaso ny famintinana andoavana",
     "contextSettings": "Fikirakirana AI · {{context}}",
-    "allContexts": "Misaraka ny tatitra manokana sy ny an'ny fikambanana."
+    "allContexts": "Misaraka ny tatitra manokana sy ny an'ny fikambanana.",
+    "estimatePricingUnavailable": "Tsy misy ny vidin'ity modely ity.",
+    "estimateBalanceUnavailable": "Tsy ampy ny fandanjana ho an'ny famintinana kando iyou.",
+    "estimateModelNotAllowed": "Tsy azo ekena ity modely ity eto.",
+    "estimateSpendLimitTooLow": "Ampidiro ny fetra fiarovana vola mba hahafahan'ity famintinana ity."
   }
 }

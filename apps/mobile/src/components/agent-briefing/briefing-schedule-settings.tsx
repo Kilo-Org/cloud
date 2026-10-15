@@ -6,10 +6,11 @@ import { Platform, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
+import { formatDate } from '@/lib/format';
 import { dateTimeFormat } from '@/lib/intl-cache';
 import { useTRPC } from '@/lib/trpc';
 
@@ -94,11 +95,10 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Briefi
   return (
     <View className="gap-4">
       <View className="gap-2">
-        <Text className="text-sm">{t('agentBriefing.timezone')}</Text>
-        <Input
+        <FormField
           key={timezoneInputKey}
+          label={t('agentBriefing.timezone')}
           defaultValue={draft.current.timezone}
-          accessibilityLabel={t('agentBriefing.timezone')}
           autoCapitalize="none"
           autoCorrect={false}
           onChangeText={value => {
@@ -134,10 +134,7 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Briefi
               }}
             >
               <Text>
-                {pickerValue.toLocaleTimeString(i18n.language, {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {formatDate(pickerValue, i18n.language, { hour: '2-digit', minute: '2-digit' })}
               </Text>
             </Button>
             {activeTime === field.key ? (

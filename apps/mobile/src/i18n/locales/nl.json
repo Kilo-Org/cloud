@@ -3854,12 +3854,16 @@
     "safeguardHint": "Vaste limieten per samenvatting, geen dagbudget. Standaard: 10 minuten en $2. Een rapport verschijnt na maximaal vijf minuten terwijl het genereren binnen deze limieten doorgaat.",
     "invalidSafeguards": "Voer positieve, eindige tijd- en uitgavenlimieten in.",
     "estimate": "Schatting {{estimate}} · maximaal {{maximum}}",
-    "estimateUnavailable": "Voor deze instellingen is geen betaalde samenvatting beschikbaar.",
+    "estimateUnavailable": "Er is geen betaalde samenvatting beschikbaar voor deze instellingen.",
     "confirmPaid": "Betaalde samenvattingen inschakelen voor {{context}}?",
     "confirmGeneration": "Betaalde samenvatting genereren?",
     "paidDisclosure": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} minuten. Kosten gelden ook als het genereren mislukt.",
     "enable": "Betaalde samenvattingen inschakelen",
     "contextSettings": "AI-instellingen · {{context}}",
-    "allContexts": "Persoonlijke en organisatiebriefings blijven gescheiden."
+    "allContexts": "Persoonlijke en organisatiebriefings blijven gescheiden.",
+    "estimatePricingUnavailable": "De prijs van dit model is niet beschikbaar.",
+    "estimateBalanceUnavailable": "Onvoldoende saldo voor een betaalde samenvatting.",
+    "estimateModelNotAllowed": "Dit model is hier niet toegestaan.",
+    "estimateSpendLimitTooLow": "Verhoog de uitgavenbeveiliging om deze samenvatting toe te staan."
   }
 }

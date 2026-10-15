@@ -2,6 +2,7 @@ import { type BriefingReport } from '@kilocode/app-shared/agent-briefing';
 import { describe, expect, it } from 'vitest';
 
 import {
+  briefingEstimateUnavailableKey,
   canReadBriefingContext,
   readableBriefingOrganizationIds,
   visibleHomeBriefing,
@@ -108,5 +109,26 @@ describe('briefing context access', () => {
 
   it('permits only a currently accessible organization', () => {
     expect(canReadBriefingContext('org-1', true, ['org-1'])).toBe(true);
+  });
+});
+
+describe('briefingEstimateUnavailableKey', () => {
+  it('explains each actionable estimate refusal and falls back for others', () => {
+    expect(briefingEstimateUnavailableKey('invalid_model_pricing')).toBe(
+      'agentBriefing.estimatePricingUnavailable'
+    );
+    expect(briefingEstimateUnavailableKey('balance_unavailable')).toBe(
+      'agentBriefing.estimateBalanceUnavailable'
+    );
+    expect(briefingEstimateUnavailableKey('model_not_allowed')).toBe(
+      'agentBriefing.estimateModelNotAllowed'
+    );
+    expect(briefingEstimateUnavailableKey('spend_limit_too_low')).toBe(
+      'agentBriefing.estimateSpendLimitTooLow'
+    );
+    expect(briefingEstimateUnavailableKey('gateway_declined')).toBe(
+      'agentBriefing.estimateUnavailable'
+    );
+    expect(briefingEstimateUnavailableKey(null)).toBe('agentBriefing.estimateUnavailable');
   });
 });

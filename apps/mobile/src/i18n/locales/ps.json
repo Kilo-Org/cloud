@@ -3853,13 +3853,17 @@
     "spendLimit": "د لګښت ساتنه (USD)",
     "safeguardHint": "د هر لنډیز محدود ساتنې، نه ورځنۍ بودیجه. ډیفالټ: ۱۰ دقیقې او $2. راپور تر ډېره پنځو دقیقو وروسته خپرېږي پداسې حال کې چې جوړونه په دې حدونو کې دوام کوي.",
     "invalidSafeguards": "مثبت، محدود د وخت او لګښت حدونه ولیکئ.",
-    "estimate": "اټکل {{estimate}} · اعظمي {{maximum}}",
-    "estimateUnavailable": "د دې تنظیماتو لپاره پیسه ییز لنډیز شتون نه لري.",
+    "estimate": "اټکل {{estimate}} · تر ټولو زیات {{maximum}}",
+    "estimateUnavailable": "د دې ترتیباتو لپاره باشخه لنډیز شتون نلري.",
     "confirmPaid": "د {{context}} لپاره پیسه ییز لنډیزونه فعال کړئ؟",
     "confirmGeneration": "پیسه ییز لنډیز جوړ کړئ؟",
     "paidDisclosure": "{{estimate}} اټکل شوی، تر {{maximum}} پورې، د {{minutes}} دقیقو حد سره. لګښت حتی د جوړونې د ناکامۍ په صورت کې هم پلي کېږي.",
     "enable": "پیسه ییز لنډیزونه فعال کړئ",
     "contextSettings": "د AI تنظیمات · {{context}}",
-    "allContexts": "شخصي او سازماني لنډیزونه جلا پاتې کېږي."
+    "allContexts": "شخصي او سازماني لنډیزونه جلا پاتې کېږي.",
+    "estimatePricingUnavailable": "د دې موډل بیې نه دی معلومې.",
+    "estimateBalanceUnavailable": "د باشخه لنډیز لپاره بیلانس کافي نه دی.",
+    "estimateModelNotAllowed": "دا موډل دلته اجازه نه لري.",
+    "estimateSpendLimitTooLow": "د لګښت خوندیتوب حد لوړ کړئ تر څو دا لنډیز شونې وي."
   }
 }

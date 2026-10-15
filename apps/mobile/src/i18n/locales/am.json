@@ -3854,12 +3854,16 @@
     "safeguardHint": "ለእያንዳንዱ ማጠቃለያ የተወሰኑ ጥበቃዎች እንጂ ዕለታዊ በጀት አይደሉም። ነባሪዎች፦ 10 ደቂቃ እና $2። ማመንጨቱ በእነዚህ ገደቦች ውስጥ ሲቀጥል ሪፖርቱ ቢበዛ ከአምስት ደቂቃ በኋላ ይታተማል።",
     "invalidSafeguards": "አዎንታዊ እና የተወሰኑ የጊዜ እና የወጪ ገደቦችን ያስገቡ።",
     "estimate": "ግምት {{estimate}} · ከፍተኛ {{maximum}}",
-    "estimateUnavailable": "ለእነዚህ ቅንብሮች የሚከፈልበት ማጠቃለያ አይገኝም።",
+    "estimateUnavailable": "ለእነዚህ ቅንበሮች የክፍያ ማጠቃለያ አይገኝም።",
     "confirmPaid": "ለ{{context}} የሚከፈልባቸው ማጠቃለያዎች ይንቁ?",
     "confirmGeneration": "የሚከፈልበት ማጠቃለያ ይፈጠር?",
     "paidDisclosure": "ግምቱ {{estimate}}፣ እስከ {{maximum}}፣ ከ{{minutes}} ደቂቃ ገደብ ጋር። ማመንጨቱ ባይሳካም ክፍያዎች ይተገበራሉ።",
     "enable": "የሚከፈልባቸው ማጠቃለያዎችን አንቃ",
     "contextSettings": "የAI ቅንብሮች · {{context}}",
-    "allContexts": "የግል እና የድርጅት ማጠቃለያዎች ተለይተው ይቀመጣሉ።"
+    "allContexts": "የግል እና የድርጅት ማጠቃለያዎች ተለይተው ይቀመጣሉ።",
+    "estimatePricingUnavailable": "ለዚህ ሞዴል የዋጋ መረጃ አይገኝም።",
+    "estimateBalanceUnavailable": "ለክፍያ ማጠቃለያ በቂ ሂሳብ የለም።",
+    "estimateModelNotAllowed": "ይህ ሞዴል እዚህ አይፈቀድም።",
+    "estimateSpendLimitTooLow": "ይህን ማጠቃለያ ለመፍቀድ የወጪ ጥበቃውን ጨምር።"
   }
 }

@@ -3944,12 +3944,16 @@
     "safeguardHint": "Pevné limity pro každé shrnutí, nikoli denní rozpočet. Výchozí: 10 minut a $2. Report se zveřejní nejpozději po pěti minutách, generování pokračuje v rámci limitů.",
     "invalidSafeguards": "Zadejte kladné konečné limity času a útraty.",
     "estimate": "Odhad {{estimate}} · maximum {{maximum}}",
-    "estimateUnavailable": "Placené shrnutí není pro toto nastavení dostupné.",
+    "estimateUnavailable": "Placené shrnutí není pro tato nastavení dostupné.",
     "confirmPaid": "Povolit placená shrnutí pro {{context}}?",
     "confirmGeneration": "Vytvořit placené shrnutí?",
     "paidDisclosure": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
     "enable": "Povolit placená shrnutí",
     "contextSettings": "Nastavení AI · {{context}}",
-    "allContexts": "Osobní a organizační přehledy zůstávají oddělené."
+    "allContexts": "Osobní a organizační přehledy zůstávají oddělené.",
+    "estimatePricingUnavailable": "Ceny pro tento model nejsou dostupné.",
+    "estimateBalanceUnavailable": "Nedostatečný zůstatek pro placené shrnutí.",
+    "estimateModelNotAllowed": "Tento model zde není povolen.",
+    "estimateSpendLimitTooLow": "Zvyšte limit výdajů, aby toto shrnutí bylo povoleno."
   }
 }

@@ -7,7 +7,10 @@ import { briefingMoney } from './briefing-card';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { type BriefingReport, useBriefingPreferences } from '@/lib/agent-briefing';
-import { briefingSummaryStatusKey } from '@/lib/agent-briefing-state';
+import {
+  briefingEstimateUnavailableKey,
+  briefingSummaryStatusKey,
+} from '@/lib/agent-briefing-state';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
 
@@ -49,7 +52,7 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
     const result = await estimate.refetch();
     const quote = result.data;
     if (!quote?.canGenerate) {
-      toast.error(t('agentBriefing.estimateUnavailable'));
+      toast.error(t(briefingEstimateUnavailableKey(quote?.unavailableReason)));
       return;
     }
     Alert.alert(
@@ -94,11 +97,14 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
       {report.summary.model ? (
         <Text className="text-xs text-muted-foreground">{report.summary.model}</Text>
       ) : null}
-      <Text className="text-xs text-muted-foreground">
-        {report.summary.chargeStatus === 'settled'
-          ? t('agentBriefing.summaryCharge', { cost })
-          : t('agentBriefing.summaryChargePending')}
-      </Text>
+      {report.summary.costMicrodollars > 0 ||
+      (report.summary.chargeStatus === 'pending' && report.summary.startedAt !== null) ? (
+        <Text className="text-xs text-muted-foreground">
+          {report.summary.chargeStatus === 'settled'
+            ? t('agentBriefing.summaryCharge', { cost })
+            : t('agentBriefing.summaryChargePending')}
+        </Text>
+      ) : null}
       {canRequest ? (
         <View className="gap-2">
           {estimate.data?.canGenerate ? (
@@ -110,7 +116,7 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
             </Text>
           ) : (
             <Text className="text-xs text-muted-foreground">
-              {t('agentBriefing.estimateUnavailable')}
+              {t(briefingEstimateUnavailableKey(estimate.data?.unavailableReason))}
             </Text>
           )}
           {estimate.isError ? (

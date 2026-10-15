@@ -3853,13 +3853,17 @@
     "spendLimit": "Xarajat cheklovi (USD)",
     "safeguardHint": "Har bir xulosa uchun cheklangan himoya, kunlik byudjet emas. Standart: 10 daqiqa va $2. Hisobot ko‘pi bilan besh daqiqada e’lon qilinadi, yaratish esa shu cheklovlar doirasida davom etadi.",
     "invalidSafeguards": "Musbat, cheklangan vaqt va xarajat limitlarini kiriting.",
-    "estimate": "Taxminan {{estimate}} · maksimal {{maximum}}",
+    "estimate": "Taxminiy hisob {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu sozlamalar uchun pullik xulosa mavjud emas.",
     "confirmPaid": "{{context}} uchun pullik xulosalar yoqilsinmi?",
     "confirmGeneration": "Pullik xulosa yaratilsinmi?",
     "paidDisclosure": "Taxminan {{estimate}}, ko‘pi bilan {{maximum}}, {{minutes}} daqiqa cheklov bilan. Yaratish muvaffaqiyatsiz bo‘lsa ham to‘lov olinadi.",
     "enable": "Pullik xulosalarni yoqish",
     "contextSettings": "AI sozlamalari · {{context}}",
-    "allContexts": "Shaxsiy va tashkilot brifinglari alohida saqlanadi."
+    "allContexts": "Shaxsiy va tashkilot brifinglari alohida saqlanadi.",
+    "estimatePricingUnavailable": "Bu model uchun narxlar mavjud emas.",
+    "estimateBalanceUnavailable": "Pullik xuloma uchun balans yetarli emas.",
+    "estimateModelNotAllowed": "Bu model bu yerda ruxsat etilmagan.",
+    "estimateSpendLimitTooLow": "Bu xulosani ruxsat berish uchun sarflash chegarasini oshiring."
   }
 }

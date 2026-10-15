@@ -3853,13 +3853,17 @@
     "spendLimit": "Kostnadsgräns (USD)",
     "safeguardHint": "Fasta gränser per sammanfattning, inte en daglig budget. Standard: 10 minuter och $2. En rapport publiceras efter högst fem minuter medan genereringen fortsätter inom dessa gränser.",
     "invalidSafeguards": "Ange positiva, ändliga tids- och kostnadsgränser.",
-    "estimate": "Uppskattning {{estimate}} · max {{maximum}}",
+    "estimate": "Uppskattning {{estimate}} · maximalt {{maximum}}",
     "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar.",
     "confirmPaid": "Aktivera betalda sammanfattningar för {{context}}?",
     "confirmGeneration": "Skapa en betald sammanfattning?",
     "paidDisclosure": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} minuter. Avgifter tas ut även om genereringen misslyckas.",
     "enable": "Aktivera betalda sammanfattningar",
     "contextSettings": "AI-inställningar · {{context}}",
-    "allContexts": "Personliga sammanfattningar och organisationssammanfattningar hålls åtskilda."
+    "allContexts": "Personliga sammanfattningar och organisationssammanfattningar hålls åtskilda.",
+    "estimatePricingUnavailable": "Prissättning för denna modell är inte tillgänglig.",
+    "estimateBalanceUnavailable": "Inte tillräcklig saldo för en betald sammanfattning.",
+    "estimateModelNotAllowed": "Denna modell är inte tillåten här.",
+    "estimateSpendLimitTooLow": "Höj utgiftsskyddet för att tillåta denna sammanfattning."
   }
 }

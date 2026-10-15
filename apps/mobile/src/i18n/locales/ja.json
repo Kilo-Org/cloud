@@ -3853,13 +3853,17 @@
     "spendLimit": "支出の上限(USD)",
     "safeguardHint": "要約ごとの上限であり、1日の予算ではありません。デフォルト: 10分と$2。生成がこの上限内で続く間も、レポートは最長5分後に公開されます。",
     "invalidSafeguards": "正の有限な時間と支出の上限を入力してください。",
-    "estimate": "見積もり {{estimate}} · 最大 {{maximum}}",
-    "estimateUnavailable": "この設定では有料要約を利用できません。",
+    "estimate": "推定 {{estimate}} · 最大 {{maximum}}",
+    "estimateUnavailable": "これらの設定では有料サマリーを利用できません。",
     "confirmPaid": "{{context}}の有料要約を有効にしますか?",
     "confirmGeneration": "有料要約を生成しますか?",
     "paidDisclosure": "見積もり{{estimate}}、最大{{maximum}}、制限時間{{minutes}}分。生成に失敗しても料金が発生します。",
     "enable": "有料要約を有効にする",
     "contextSettings": "AI設定 · {{context}}",
-    "allContexts": "個人と組織のブリーフィングは別々に管理されます。"
+    "allContexts": "個人と組織のブリーフィングは別々に管理されます。",
+    "estimatePricingUnavailable": "このモデルの価格情報はご利用いただけません。",
+    "estimateBalanceUnavailable": "有料サマリーには残高が不足しています。",
+    "estimateModelNotAllowed": "このモデルはここでは使用できません。",
+    "estimateSpendLimitTooLow": "このサマリーを許可するには利用上限を引き上げてください。"
   }
 }

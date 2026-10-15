@@ -1,45 +1,26 @@
-/* eslint-disable max-lines -- the shared live feedback (Home and the Agents tab) and the Home section that places its notices share one state model */
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
-import { BriefingCard, useHomeBriefing } from '@/components/agent-briefing/briefing-card';
-import { AdaptiveHomeCardFrame } from '@/components/home/adaptive-home-card-frame';
-
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
-import { useSessionRowPress } from '@/components/agents/use-session-row-press';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
-import {
-  GlanceableActiveCard,
-  GlanceableActiveCardSkeleton,
-} from '@/components/home/glanceable-active-card';
-import {
-  LiveSessionHeaderNotice,
-  useLiveSessionHeaderNotice,
-} from '@/components/home/live-session-header-notice';
 import {
   liveSessionContent,
   type LiveSessionContext,
   type LiveSessions,
 } from '@/components/home/live-session-state';
-import { SectionHeader } from '@/components/home/section-header';
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { createSubmitLock } from '@/lib/submit-lock';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
-
-// The trailing slash pins the index route.
-const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
 
 type LiveSessionProps = Readonly<{ context: LiveSessionContext; sessions: LiveSessions }>;
 
@@ -304,75 +285,5 @@ export function LiveSessionFeedback({
     <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
   ) : (
     feedback
-  );
-}
-
-export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const { reducedMotion } = useMotionPolicy();
-  const handleRowPress = useSessionRowPress();
-  const content = liveSessionContent(context, sessions);
-  const failureLabel = t('home.couldNotLoadActiveSessions');
-  const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
-  const { briefing, frameReport } = useHomeBriefing();
-
-  return (
-    <View>
-      {/* The header row stays in every state, so settling never adds or
-          removes it. `See all` keeps its box but hides while nothing runs: it
-          would advertise the Agents live index for sessions that do not exist. */}
-      <SectionHeader
-        label={briefing ? t('agentBriefing.title') : t('home.agentSessions')}
-        actionLabel={briefing ? t('agentBriefing.history') : t('home.seeAll')}
-        actionHidden={!briefing && content === 'empty'}
-        onActionPress={() => {
-          if (briefing) {
-            router.push('/(app)/agent-briefing' as Href);
-            return;
-          }
-          // Switch tabs, then pop a previously pushed history screen to the live index.
-          router.navigate(AGENTS_INDEX_HREF as Href);
-          router.dismissTo(AGENTS_INDEX_HREF as Href);
-        }}
-        notice={notice && <LiveSessionHeaderNotice notice={notice} />}
-      />
-      <View className="mx-4 gap-2">
-        <LiveSessionFeedback
-          context={context}
-          sessions={sessions}
-          failureLabel={failureLabel}
-          inlineNotices={false}
-        />
-        {/* One card, not a row per session. The skeleton shares the loaded
-            card's minimum frame; scaled text can grow the loaded content. */}
-        <Animated.View layout={LinearTransition}>
-          {(frameReport !== undefined ||
-            content === 'pending' ||
-            content === 'empty' ||
-            content === 'rows') && (
-            <Animated.View
-              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-            >
-              <AdaptiveHomeCardFrame
-                live={
-                  content === 'pending' ? (
-                    <GlanceableActiveCardSkeleton embedded />
-                  ) : (
-                    <GlanceableActiveCard
-                      sessions={sessions.activeSessions}
-                      onPressSession={handleRowPress}
-                      embedded
-                    />
-                  )
-                }
-                briefing={frameReport ? <BriefingCard report={frameReport} embedded /> : undefined}
-                showBriefing={Boolean(briefing)}
-              />
-            </Animated.View>
-          )}
-        </Animated.View>
-      </View>
-    </View>
   );
 }

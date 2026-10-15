@@ -3943,13 +3943,17 @@
     "spendLimit": "Išlaidų apribojimas (USD)",
     "safeguardHint": "Baigtiniai apribojimai kiekvienai santraukai, ne dienos biudžetas. Numatyta: 10 minučių ir $2. Ataskaita paskelbiama ne vėliau kaip po penkių minučių, o kūrimas tęsiasi neviršijant šių ribų.",
     "invalidSafeguards": "Įveskite teigiamas, baigtines laiko ir išlaidų ribas.",
-    "estimate": "Įvertis {{estimate}} · daugiausia {{maximum}}",
-    "estimateUnavailable": "Su šiais nustatymais mokama santrauka negalima.",
+    "estimate": "Apskaičiavimas {{estimate}} · daugiausia {{maximum}}",
+    "estimateUnavailable": "Mokama santrauka šiems nustatymams neprieinama.",
     "confirmPaid": "Įjungti mokamas santraukas kontekstui {{context}}?",
     "confirmGeneration": "Kurti mokamą santrauką?",
     "paidDisclosure": "Įvertis {{estimate}}, daugiausia {{maximum}}, laiko riba {{minutes}} min. Mokestis taikomas net ir nepavykus sukurti.",
     "enable": "Įjungti mokamas santraukas",
     "contextSettings": "AI nustatymai · {{context}}",
-    "allContexts": "Asmeninės ir organizacijos suvestinės laikomos atskirai."
+    "allContexts": "Asmeninės ir organizacijos suvestinės laikomos atskirai.",
+    "estimatePricingUnavailable": "Šio modelio kainos neprieinamos.",
+    "estimateBalanceUnavailable": "Nepakanka balanso mokamai santrukai.",
+    "estimateModelNotAllowed": "Šis modelis čia neleidžiamas.",
+    "estimateSpendLimitTooLow": "Padidinkite išlaidų apsaugą, kad leistumėte šią santrauką."
   }
 }

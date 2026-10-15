@@ -3853,13 +3853,17 @@
     "spendLimit": "지출 안전 한도(USD)",
     "safeguardHint": "일일 예산이 아닌 요약별 고정 안전 한도입니다. 기본값: 10분 및 $2. 보고서는 최대 5분 후 게시되며, 생성은 이 한도 내에서 계속됩니다.",
     "invalidSafeguards": "유한한 양수로 시간 및 지출 한도를 입력하세요.",
-    "estimate": "예상 {{estimate}} · 최대 {{maximum}}",
-    "estimateUnavailable": "이 설정으로는 유료 요약을 사용할 수 없습니다.",
+    "estimate": "예상 비용 {{estimate}} · 최대 {{maximum}}",
+    "estimateUnavailable": "이 설정에는 유료 요약을 사용할 수 없습니다.",
     "confirmPaid": "{{context}}에 유료 요약을 사용하시겠습니까?",
     "confirmGeneration": "유료 요약을 생성하시겠습니까?",
     "paidDisclosure": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
     "enable": "유료 요약 사용",
     "contextSettings": "AI 설정 · {{context}}",
-    "allContexts": "개인 및 조직 브리핑은 별도로 관리됩니다."
+    "allContexts": "개인 및 조직 브리핑은 별도로 관리됩니다.",
+    "estimatePricingUnavailable": "이 모델의 가격 정보를 사용할 수 없습니다.",
+    "estimateBalanceUnavailable": "유료 요약을 위한 잔액이 부족합니다.",
+    "estimateModelNotAllowed": "이 모델은 여기서 사용할 수 없습니다.",
+    "estimateSpendLimitTooLow": "이 요약을 허용하려면 지출 안전장치를 높이세요."
   }
 }

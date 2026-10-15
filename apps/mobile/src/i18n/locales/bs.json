@@ -3898,13 +3898,17 @@
     "spendLimit": "Ograničenje potrošnje (USD)",
     "safeguardHint": "Konačna ograničenja po sažetku, ne dnevni budžet. Zadano: 10 minuta i $2. Izvještaj se objavljuje nakon najviše pet minuta dok se generisanje nastavlja unutar ovih ograničenja.",
     "invalidSafeguards": "Unesite pozitivna, konačna ograničenja vremena i potrošnje.",
-    "estimate": "Procjena {{estimate}} · maksimum {{maximum}}",
+    "estimate": "Procjena {{estimate}} · maksimalno {{maximum}}",
     "estimateUnavailable": "Plaćeni sažetak nije dostupan za ove postavke.",
     "confirmPaid": "Omogućiti plaćene sažetke za {{context}}?",
     "confirmGeneration": "Generisati plaćeni sažetak?",
     "paidDisclosure": "Procjena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} min. Naplata se vrši čak i ako generisanje ne uspije.",
     "enable": "Omogući plaćene sažetke",
     "contextSettings": "AI postavke · {{context}}",
-    "allContexts": "Lični i organizacijski pregledi ostaju odvojeni."
+    "allContexts": "Lični i organizacijski pregledi ostaju odvojeni.",
+    "estimatePricingUnavailable": "Cijene za ovaj model nisu dostupne.",
+    "estimateBalanceUnavailable": "Nema dovoljno sredstava za plaćeni sažetak.",
+    "estimateModelNotAllowed": "Ovaj model ovdje nije dozvoljen.",
+    "estimateSpendLimitTooLow": "Povećajte ograničenje potrošnje da biste omogućili ovaj sažetak."
   }
 }

@@ -3853,13 +3853,17 @@
     "spendLimit": "Kikomo cha matumizi (USD)",
     "safeguardHint": "Vikomo maalum kwa kila muhtasari, si bajeti ya kila siku. Chaguomsingi: dakika 10 na $2. Ripoti huchapishwa baada ya dakika tano zaidi huku utengenezaji ukiendelea ndani ya vikomo hivi.",
     "invalidSafeguards": "Weka vikomo chanya na maalum vya muda na matumizi.",
-    "estimate": "Makadirio {{estimate}} · upeo {{maximum}}",
-    "estimateUnavailable": "Muhtasari wa kulipia haupatikani kwa mipangilio hii.",
+    "estimate": "Makadirio {{estimate}} · kiwango cha juu {{maximum}}",
+    "estimateUnavailable": "Muhtasari wenye malipo haupatikani kwa mipangilio hii.",
     "confirmPaid": "Washa muhtasari wa kulipia kwa {{context}}?",
     "confirmGeneration": "Tengeneza muhtasari wa kulipia?",
     "paidDisclosure": "Makadirio {{estimate}}, hadi {{maximum}}, na kikomo cha dakika {{minutes}}. Malipo yanatozwa hata utengenezaji ukishindwa.",
     "enable": "Washa muhtasari wa kulipia",
     "contextSettings": "Mipangilio ya AI · {{context}}",
-    "allContexts": "Muhtasari wa binafsi na wa shirika hubaki tofauti."
+    "allContexts": "Muhtasari wa binafsi na wa shirika hubaki tofauti.",
+    "estimatePricingUnavailable": "Bei ya modeli hii haipatikani.",
+    "estimateBalanceUnavailable": "Salio halitoshi kwa muhtasari wenye malipo.",
+    "estimateModelNotAllowed": "Modeli hii hairuhusiwa hapa.",
+    "estimateSpendLimitTooLow": "Ongeza kikomo cha matumizi ili kuruhusu muhtasari huu."
   }
 }

@@ -3899,12 +3899,16 @@
     "safeguardHint": "Límits finits per resum, no un pressupost diari. Per defecte: 10 minuts i $2. L'informe es publica com a màxim al cap de cinc minuts mentre la generació continua dins d'aquests límits.",
     "invalidSafeguards": "Introdueix límits de temps i despesa positius i finits.",
     "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
-    "estimateUnavailable": "No hi ha cap resum de pagament disponible amb aquesta configuració.",
+    "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració.",
     "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",
     "confirmGeneration": "Vols generar un resum de pagament?",
     "paidDisclosure": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} minuts. Els càrrecs s'apliquen encara que la generació falli.",
     "enable": "Activa els resums de pagament",
     "contextSettings": "Configuració d'AI · {{context}}",
-    "allContexts": "Els resums personals i d'organització es mantenen separats."
+    "allContexts": "Els resums personals i d'organització es mantenen separats.",
+    "estimatePricingUnavailable": "El preu d'aquest model no està disponible.",
+    "estimateBalanceUnavailable": "No hi ha prou saldo per a un resum de pagament.",
+    "estimateModelNotAllowed": "Aquest model no està permès aquí.",
+    "estimateSpendLimitTooLow": "Augmenta la salvaguarda de despesa per permetre aquest resum."
   }
 }

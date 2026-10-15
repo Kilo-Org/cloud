@@ -3853,13 +3853,17 @@
     "spendLimit": "ખર્ચ મર્યાદા (USD)",
     "safeguardHint": "દરેક સારાંશ માટે નિશ્ચિત મર્યાદા, દૈનિક બજેટ નહીં. ડિફૉલ્ટ: 10 મિનિટ અને $2. જનરેશન આ મર્યાદામાં ચાલુ રહે ત્યારે રિપોર્ટ વધુમાં વધુ પાંચ મિનિટ પછી પ્રકાશિત થાય છે.",
     "invalidSafeguards": "હકારાત્મક, નિશ્ચિત સમય અને ખર્ચ મર્યાદા દાખલ કરો.",
-    "estimate": "અંદાજ {{estimate}} · મહત્તમ {{maximum}}",
+    "estimate": "અંદાજ {{estimate}} · વધુમાં વધુ {{maximum}}",
     "estimateUnavailable": "આ સેટિંગ્સ માટે પેઇડ સારાંશ ઉપલબ્ધ નથી.",
     "confirmPaid": "{{context}} માટે પેઇડ સારાંશ ચાલુ કરીએ?",
     "confirmGeneration": "પેઇડ સારાંશ બનાવીએ?",
     "paidDisclosure": "અંદાજે {{estimate}}, વધુમાં વધુ {{maximum}}, {{minutes}} મિનિટની મર્યાદા સાથે. જનરેશન નિષ્ફળ જાય તો પણ ચાર્જ લાગે છે.",
     "enable": "પેઇડ સારાંશ ચાલુ કરો",
     "contextSettings": "AI સેટિંગ્સ · {{context}}",
-    "allContexts": "વ્યક્તિગત અને સંસ્થાના સારાંશ અલગ રહે છે."
+    "allContexts": "વ્યક્તિગત અને સંસ્થાના સારાંશ અલગ રહે છે.",
+    "estimatePricingUnavailable": "આ મોડેલ માટે પ્રાઇસિંગ ઉપલબ્ધ નથી.",
+    "estimateBalanceUnavailable": "પેઇડ સારાંશ માટે પૂરતી બેલેન્સ નથી.",
+    "estimateModelNotAllowed": "આ મોડેલ અહીં મંજૂર નથી.",
+    "estimateSpendLimitTooLow": "આ સારાંશની મંજૂરી માટે સ્પેન્ડ સેફગાર્ડ વધારો."
   }
 }

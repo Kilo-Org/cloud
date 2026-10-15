@@ -3944,12 +3944,16 @@
     "safeguardHint": "Končne omejitve na povzetek, ne dnevni proračun. Privzeto: 10 minut in $2. Poročilo se objavi najpozneje po petih minutah, ustvarjanje pa se nadaljuje znotraj teh omejitev.",
     "invalidSafeguards": "Vnesite pozitivni, končni omejitvi časa in porabe.",
     "estimate": "Ocena {{estimate}} · največ {{maximum}}",
-    "estimateUnavailable": "Plačljiv povzetek za te nastavitve ni na voljo.",
+    "estimateUnavailable": "Plačljivo povzetek za te nastavitve ni na voljo.",
     "confirmPaid": "Omogočiti plačljive povzetke za {{context}}?",
     "confirmGeneration": "Ustvariti plačljiv povzetek?",
     "paidDisclosure": "Ocena {{estimate}}, največ {{maximum}}, z omejitvijo {{minutes}} min. Stroški nastanejo tudi, če ustvarjanje ne uspe.",
     "enable": "Omogoči plačljive povzetke",
     "contextSettings": "Nastavitve AI · {{context}}",
-    "allContexts": "Osebni in organizacijski povzetki ostanejo ločeni."
+    "allContexts": "Osebni in organizacijski povzetki ostanejo ločeni.",
+    "estimatePricingUnavailable": "Cene za ta model niso na voljo.",
+    "estimateBalanceUnavailable": "Ni dovolj sredstev za plačljiv povzetek.",
+    "estimateModelNotAllowed": "Ta model tu ni dovoljen.",
+    "estimateSpendLimitTooLow": "Povečajte varovalko porabe, da omogočite ta povzetek."
   }
 }

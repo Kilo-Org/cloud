@@ -3853,13 +3853,17 @@
     "spendLimit": "Limit depans (USD)",
     "safeguardHint": "Limit fiks pou chak rezime, se pa yon bidjè chak jou. Pa defo: 10 minit ak $2. Yon rapò pibliye apre senk minit pou pi plis pandan jenerasyon an kontinye nan limit sa yo.",
     "invalidSafeguards": "Antre limit tan ak depans ki pozitif epi fini.",
-    "estimate": "Estimasyon {{estimate}} · maksimòm {{maximum}}",
-    "estimateUnavailable": "Pa gen rezime peye disponib pou paramèt sa yo.",
+    "estimate": "Estime {{estimate}} · maksimòm {{maximum}}",
+    "estimateUnavailable": "Pa gen rezime ki pou peye ki disponib pou paramèt sa yo.",
     "confirmPaid": "Aktive rezime peye pou {{context}}?",
     "confirmGeneration": "Kreye yon rezime peye?",
     "paidDisclosure": "{{estimate}} estime, jiska {{maximum}}, ak yon limit {{minutes}} minit. Frè yo aplike menm si jenerasyon an echwe.",
     "enable": "Aktive rezime peye",
     "contextSettings": "Paramèt AI · {{context}}",
-    "allContexts": "Rezime pèsonèl ak rezime òganizasyon rete separe."
+    "allContexts": "Rezime pèsonèl ak rezime òganizasyon rete separe.",
+    "estimatePricingUnavailable": "Pri pou modèl sa a pa disponib.",
+    "estimateBalanceUnavailable": "Balans pa ase pou yon rezime ki pou peye.",
+    "estimateModelNotAllowed": "Modèl sa a pa otorize isit la.",
+    "estimateSpendLimitTooLow": "Ogmante limit depans la pou pèmèt rezime sa a."
   }
 }

@@ -3853,13 +3853,17 @@
     "spendLimit": "Xərc limiti (USD)",
     "safeguardHint": "Hər xülasə üçün sonlu limitlər, gündəlik büdcə deyil. Standart: 10 dəqiqə və $2. Hesabat ən çox beş dəqiqədən sonra dərc olunur, yaratma isə bu limitlər daxilində davam edir.",
     "invalidSafeguards": "Müsbət, sonlu vaxt və xərc limitləri daxil edin.",
-    "estimate": "Təxmini {{estimate}} · maksimum {{maximum}}",
-    "estimateUnavailable": "Bu ayarlar üçün ödənişli xülasə mövcud deyil.",
+    "estimate": "Təxmin {{estimate}} · maksimum {{maximum}}",
+    "estimateUnavailable": "Bu parametrlər üçün ödənişli icmal mövcud deyil.",
     "confirmPaid": "{{context}} üçün ödənişli xülasələr aktiv edilsin?",
     "confirmGeneration": "Ödənişli xülasə yaradılsın?",
     "paidDisclosure": "Təxminən {{estimate}}, maksimum {{maximum}}, {{minutes}} dəqiqəlik limitlə. Yaratma uğursuz olsa belə ödəniş tutulur.",
     "enable": "Ödənişli xülasələri aktiv et",
     "contextSettings": "AI ayarları · {{context}}",
-    "allContexts": "Şəxsi və təşkilat brifinqləri ayrı saxlanılır."
+    "allContexts": "Şəxsi və təşkilat brifinqləri ayrı saxlanılır.",
+    "estimatePricingUnavailable": "Bu model üçün qiymətləndirmə mövcud deyil.",
+    "estimateBalanceUnavailable": "Ödənişli icmal üçün balans kifayət etmir.",
+    "estimateModelNotAllowed": "Bu model burada icazə verilmir.",
+    "estimateSpendLimitTooLow": "Bu icmalın icazəsi üçün xərcləmə limitini artırın."
   }
 }

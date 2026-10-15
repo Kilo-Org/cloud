@@ -3860,6 +3860,10 @@
     "paidDisclosure": "अनुमानित {{estimate}}, अधिकतम {{maximum}}, {{minutes}} मिनट की सीमा के साथ। सारांश विफल होने पर भी शुल्क लगेगा।",
     "enable": "सशुल्क सारांश चालू करें",
     "contextSettings": "AI सेटिंग्स · {{context}}",
-    "allContexts": "व्यक्तिगत और संगठन ब्रीफ़िंग अलग-अलग रहती हैं।"
+    "allContexts": "व्यक्तिगत और संगठन ब्रीफ़िंग अलग-अलग रहती हैं।",
+    "estimatePricingUnavailable": "इस मॉडल की कीमत उपलब्ध नहीं है।",
+    "estimateBalanceUnavailable": "सशुल्क सारांश के लिए पर्याप्त बैलेंस नहीं है।",
+    "estimateModelNotAllowed": "यह मॉडल यहाँ अनुमत नहीं है।",
+    "estimateSpendLimitTooLow": "इस सारांश की अनुमति देने के लिए खर्च सुरक्षा सीमा बढ़ाएँ।"
   }
 }

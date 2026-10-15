@@ -3853,13 +3853,17 @@
     "spendLimit": "Eegumsa baasii (USD)",
     "safeguardHint": "Eegumsa cuunfaa tokkoof daangeffame, baajata guyyaa miti. Durtii: daqiiqaa 10 fi $2. Gabaasni yoo baay'ate daqiiqaa shan booda ni maxxanfama, uumamni daangaa kana keessatti itti fufa.",
     "invalidSafeguards": "Daangaa yeroo fi baasii poozatiivii fi daangeffame galchi.",
-    "estimate": "Tilmaama {{estimate}} · olaanaa {{maximum}}",
-    "estimateUnavailable": "Qindaa'ina kanaaf cuunfaan kaffaltii hin jiru.",
+    "estimate": "Goleessi {{estimate}} · daangaa {{maximum}}",
+    "estimateUnavailable": "Waaloo bu'aa arguu kan dandeessisaa Hin qabu.",
     "confirmPaid": "Cuunfaa kaffaltii {{context}}f dandeessisuu?",
     "confirmGeneration": "Cuunfaa kaffaltii uumuu?",
     "paidDisclosure": "Tilmaamaan {{estimate}}, hanga {{maximum}}, daangaa daqiiqaa {{minutes}} wajjin. Uumamni yoo kufe illee kaffaltiin ni jira.",
     "enable": "Cuunfaa kaffaltii dandeessisi",
     "contextSettings": "Qindaa'ina AI · {{context}}",
-    "allContexts": "Gabaasonni dhuunfaa fi dhaabbataa adda adda ta'u."
+    "allContexts": "Gabaasonni dhuunfaa fi dhaabbataa adda adda ta'u.",
+    "estimatePricingUnavailable": "Gatii moodelii kanaa hin argamu.",
+    "estimateBalanceUnavailable": "Hanga baalansii waaloo bu'aa argachuuf hin ga'u.",
+    "estimateModelNotAllowed": "Moodelii kun asitti hin hayyamamu.",
+    "estimateSpendLimitTooLow": "Waaloo bu'aa hayyachuuf eegumsa baasii ol kaa'i."
   }
 }

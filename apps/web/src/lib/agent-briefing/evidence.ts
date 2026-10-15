@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, isNull, isNotNull, lt, lte, notLike, or, sql }
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_briefing_events,
+  agent_briefing_preferences,
   cli_sessions_v2,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -10,7 +11,12 @@ import { redactBriefingExcerpt, type BriefingSource } from '@kilocode/app-shared
 
 type Session = Pick<
   typeof cli_sessions_v2.$inferSelect,
-  'session_id' | 'parent_session_id' | 'title'
+  | 'session_id'
+  | 'parent_session_id'
+  | 'title'
+  | 'status'
+  | 'status_updated_at'
+  | 'status_transition_id'
 >;
 type Event = typeof agent_briefing_events.$inferSelect;
 type Usage = { id: string; sessionId: string; cost: number; occurredAt: string };
@@ -21,15 +27,33 @@ export type BriefingEvidenceCoverage = {
   pullRequests: 'complete' | 'partial';
 };
 
+/**
+ * Coverage is complete only where the evidence proves it. `collectionStartedAt`
+ * is when this user's briefing collection is known to have been live (their
+ * preferences row is created by the feature that ships with the collectors);
+ * null or later than the night start means earlier activity may be missing.
+ */
 export function aggregateBriefingEvidence(
   rows: Session[],
   events: Event[],
   usage: Usage[],
   nightStartAt: string,
-  cutoffAt: string
+  cutoffAt: string,
+  collectionStartedAt: string | null = null
 ) {
   const start = Date.parse(nightStartAt);
   const cutoff = Date.parse(cutoffAt);
+  const collectionCovered =
+    collectionStartedAt !== null && Date.parse(collectionStartedAt) <= start;
+  let untimestampedStatus = rows.some(
+    row =>
+      row.status !== null &&
+      row.status_transition_id === null &&
+      row.status_updated_at !== null &&
+      Date.parse(row.status_updated_at) >= start
+  );
+  const activityRoots = new Set<string>();
+  const spendRoots = new Set<string>();
   const byId = new Map(rows.map(row => [row.session_id, row]));
   const rootById = new Map<string, Session>();
   for (const row of rows) {
@@ -86,6 +110,14 @@ export function aggregateBriefingEvidence(
   for (const event of ordered) {
     const at = Date.parse(event.occurred_at);
     if (!Number.isFinite(at) || at > cutoff || !rootById.has(event.session_id)) continue;
+    if (
+      event.kind === 'status' &&
+      at >= start &&
+      event.payload !== null &&
+      (typeof event.payload.transitionId !== 'string' || event.payload.previousStatusKnown !== true)
+    ) {
+      untimestampedStatus = true;
+    }
     if (event.kind === 'status') {
       const previous = statuses.get(event.session_id);
       const blocked = event.status === 'question' || event.status === 'permission';
@@ -159,6 +191,7 @@ export function aggregateBriefingEvidence(
     } else if (event.kind !== 'activity') continue;
     group.sources.push(source);
     activeRoots.add(group.sessionId);
+    if (event.kind === 'activity') activityRoots.add(group.sessionId);
   }
   let blockers = 0;
   for (const [sessionId, state] of statuses) {
@@ -189,6 +222,7 @@ export function aggregateBriefingEvidence(
     group.spendMicrodollars += item.cost;
     spendMicrodollars += item.cost;
     activeRoots.add(group.sessionId);
+    spendRoots.add(group.sessionId);
     group.sources.push({
       id: `usage:${item.id}`,
       sessionId: item.sessionId,
@@ -208,11 +242,19 @@ export function aggregateBriefingEvidence(
   sessions.sort((a, b) => a.sessionId.localeCompare(b.sessionId));
   const sources = sessions.flatMap(session => session.sources);
   sources.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id));
+  const everyActiveSessionCharged = [...activityRoots].every(root => spendRoots.has(root));
   const coverage: BriefingEvidenceCoverage = {
-    activity: 'partial',
-    spend: used.size === 0 ? 'unavailable' : 'partial',
-    blockers: 'partial',
-    pullRequests: 'partial',
+    activity: collectionCovered ? 'complete' : 'partial',
+    spend:
+      used.size === 0
+        ? collectionCovered && activityRoots.size === 0
+          ? 'complete'
+          : 'unavailable'
+        : collectionCovered && everyActiveSessionCharged
+          ? 'complete'
+          : 'partial',
+    blockers: collectionCovered && !untimestampedStatus ? 'complete' : 'partial',
+    pullRequests: collectionCovered ? 'complete' : 'partial',
   };
   return {
     scorecard: {
@@ -268,9 +310,16 @@ export async function collectBriefingEvidence(
           session_id: cli_sessions_v2.session_id,
           parent_session_id: cli_sessions_v2.parent_session_id,
           title: cli_sessions_v2.title,
+          status: cli_sessions_v2.status,
+          status_updated_at: cli_sessions_v2.status_updated_at,
+          status_transition_id: cli_sessions_v2.status_transition_id,
         })
         .from(cli_sessions_v2)
         .where(scope);
+      const [preferences] = await tx
+        .select({ createdAt: agent_briefing_preferences.created_at })
+        .from(agent_briefing_preferences)
+        .where(eq(agent_briefing_preferences.kilo_user_id, userId));
       const baseline = await tx
         .selectDistinctOn([agent_briefing_events.session_id])
         .from(agent_briefing_events)
@@ -336,7 +385,8 @@ export async function collectBriefingEvidence(
         [...baseline, ...events],
         usage,
         nightStartAt,
-        cutoffAt
+        cutoffAt,
+        preferences?.createdAt ?? null
       );
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }

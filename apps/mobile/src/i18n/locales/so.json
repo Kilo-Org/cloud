@@ -3853,13 +3853,17 @@
     "spendLimit": "Ilaalinta kharashka (USD)",
     "safeguardHint": "Ilaalino xaddidan oo soo koobid kasta ah, maaha miisaaniyad maalinle ah. Caadi ahaan: 10 daqiiqo iyo $2. Warbixin ayaa la daabacaa ugu badnaan shan daqiiqo kadib inta samaynta ay sii socoto xadkan gudahooda.",
     "invalidSafeguards": "Geli xadad waqti iyo kharash oo togan oo xaddidan.",
-    "estimate": "Qiyaas {{estimate}} · ugu badnaan {{maximum}}",
-    "estimateUnavailable": "Soo koobid lacag leh lagama heli karo dejintan.",
+    "estimate": "Qiimeyn {{estimate}} · ugu badnaan {{maximum}}",
+    "estimateUnavailable": "Kooban lacag lagu qiimaystay laguma heli karo dejimyadan.",
     "confirmPaid": "Ma shidaysaa soo koobidda lacagta leh ee {{context}}?",
     "confirmGeneration": "Ma samaynaysaa soo koobid lacag leh?",
     "paidDisclosure": "Qiyaas {{estimate}}, ilaa {{maximum}}, xad {{minutes}} daqiiqo ah. Lacagta waa la jarayaa xitaa haddii samayntu fashilanto.",
     "enable": "Shid soo koobidda lacagta leh",
     "contextSettings": "Dejinta AI · {{context}}",
-    "allContexts": "Warbixinnada shakhsiga iyo ururka way kala gooni yihiin."
+    "allContexts": "Warbixinnada shakhsiga iyo ururka way kala gooni yihiin.",
+    "estimatePricingUnavailable": "Qiimaha noocan aan la helin.",
+    "estimateBalanceUnavailable": "Haaru lacag kuma filna kooban lacag lagu qiimaystay.",
+    "estimateModelNotAllowed": "Noocan laguma ogola halkan.",
+    "estimateSpendLimitTooLow": "Kordhi ilaalinaha kharashka si aad u ogolaatid koobankan."
   }
 }

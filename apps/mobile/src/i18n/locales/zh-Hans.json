@@ -3853,13 +3853,17 @@
     "spendLimit": "花费保护上限（USD）",
     "safeguardHint": "每份摘要的有限保护上限，并非每日预算。默认值：10 分钟和 $2。报告最多五分钟后发布，生成过程会在这些限制内继续。",
     "invalidSafeguards": "请输入有限的正数时间和花费上限。",
-    "estimate": "预计 {{estimate}} · 最多 {{maximum}}",
-    "estimateUnavailable": "当前设置无法使用付费摘要。",
+    "estimate": "预估 {{estimate}} · 最高 {{maximum}}",
+    "estimateUnavailable": "这些设置下无法获取付费摘要。",
     "confirmPaid": "为 {{context}} 启用付费摘要？",
     "confirmGeneration": "生成付费摘要？",
     "paidDisclosure": "预计 {{estimate}}，最多 {{maximum}}，时间上限 {{minutes}} 分钟。即使生成失败也会收费。",
     "enable": "启用付费摘要",
     "contextSettings": "AI 设置 · {{context}}",
-    "allContexts": "个人和组织简报相互独立。"
+    "allContexts": "个人和组织简报相互独立。",
+    "estimatePricingUnavailable": "该模型的价格信息不可用。",
+    "estimateBalanceUnavailable": "余额不足，无法生成付费摘要。",
+    "estimateModelNotAllowed": "此处不允许使用该模型。",
+    "estimateSpendLimitTooLow": "请提高消费保护限额以允许此摘要。"
   }
 }

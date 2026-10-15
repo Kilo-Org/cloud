@@ -3853,13 +3853,17 @@
     "spendLimit": "Ārai whakapaunga (USD)",
     "safeguardHint": "He ārai mutunga mō ia whakarāpopototanga, ehara i te tahua ia rā. Taunoa: 10 meneti me $2. Ka whakaputaina he pūrongo i muri i te rima meneti te roa rawa, ā, ka haere tonu te waihanga i roto i ēnei tepe.",
     "invalidSafeguards": "Tāurua he tepe wā, whakapaunga hoki e tōrunga ana, e mutunga ana.",
-    "estimate": "Matapae {{estimate}} · mōrahi {{maximum}}",
-    "estimateUnavailable": "Kāore he whakarāpopototanga utu e wātea ana mō ēnei tautuhinga.",
+    "estimate": "Tatau {{estimate}} · teitei rawa {{maximum}}",
+    "estimateUnavailable": "Kāore he whakarāpopototanga utu mō ēnei tautuhinga.",
     "confirmPaid": "Whakahohe i ngā whakarāpopototanga utu mō {{context}}?",
     "confirmGeneration": "Waihanga i tētahi whakarāpopototanga utu?",
     "paidDisclosure": "{{estimate}} te matapae, tae noa ki {{maximum}}, me te tepe {{minutes}} meneti. Ka utua ahakoa ka rahua te waihanga.",
     "enable": "Whakahohe whakarāpopototanga utu",
     "contextSettings": "Ngā tautuhinga AI · {{context}}",
-    "allContexts": "Ka noho motuhake ngā whakamōhiotanga whaiaro me ā te whakahaere."
+    "allContexts": "Ka noho motuhake ngā whakamōhiotanga whaiaro me ā te whakahaere.",
+    "estimatePricingUnavailable": "Kāore he utu wātea mō tēnei tauira.",
+    "estimateBalanceUnavailable": "Kāore i te nui te moni mō tētahi whakarāpopototanga utu.",
+    "estimateModelNotAllowed": "Kāore e taea tēnei tauira i konei.",
+    "estimateSpendLimitTooLow": "Whakarahia te haumanga ārai moni kia taea tēnei whakarāpopototanga."
   }
 }

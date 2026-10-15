@@ -7,9 +7,10 @@ import { toast } from 'sonner-native';
 import { briefingMoney } from './briefing-card';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
+import { briefingEstimateUnavailableKey } from '@/lib/agent-briefing-state';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
@@ -115,7 +116,7 @@ export function BriefingContextSettings({
     const result = await estimate.refetch();
     const quote = result.data;
     if (!quote?.canGenerate) {
-      toast.error(t('agentBriefing.estimateUnavailable'));
+      toast.error(t(briefingEstimateUnavailableKey(quote?.unavailableReason)));
       return;
     }
     Alert.alert(
@@ -183,32 +184,32 @@ export function BriefingContextSettings({
           <Text>{t('common.couldNotLoadModels')}</Text>
         </Button>
       ) : null}
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled={offline || update.isPending}
-        onPress={() => {
-          setModel(defaultModel);
-        }}
-      >
-        <Text>{t('agentBriefing.defaultModel')}</Text>
-      </Button>
+      {model === defaultModel ? null : (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={offline || update.isPending}
+          onPress={() => {
+            setModel(defaultModel);
+          }}
+        >
+          <Text>{t('agentBriefing.defaultModel')}</Text>
+        </Button>
+      )}
       <View className="gap-2">
-        <Text className="text-sm">{t('agentBriefing.duration')}</Text>
-        <Input
+        <FormField
+          label={t('agentBriefing.duration')}
           defaultValue={duration.current}
           keyboardType="decimal-pad"
-          accessibilityLabel={t('agentBriefing.duration')}
           onChangeText={value => {
             duration.current = value;
             updateLimits();
           }}
         />
-        <Text className="text-sm">{t('agentBriefing.spendLimit')}</Text>
-        <Input
+        <FormField
+          label={t('agentBriefing.spendLimit')}
           defaultValue={spend.current}
           keyboardType="decimal-pad"
-          accessibilityLabel={t('agentBriefing.spendLimit')}
           onChangeText={value => {
             spend.current = value;
             updateLimits();
@@ -228,7 +229,7 @@ export function BriefingContextSettings({
         </Text>
       ) : (
         <Text className="text-xs text-muted-foreground">
-          {t('agentBriefing.estimateUnavailable')}
+          {t(briefingEstimateUnavailableKey(estimate.data?.unavailableReason))}
         </Text>
       )}
       {estimate.isError ? (

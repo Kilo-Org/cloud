@@ -20,10 +20,13 @@ import {
   useBriefingInvalidation,
 } from '@/lib/agent-briefing';
 import { openExternalUrl } from '@/lib/external-link';
+import { formatDate } from '@/lib/format';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
+
+const BRIEFING_DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
 
 export function BriefingDetailScreen() {
   const { 'report-id': reportId } = useLocalSearchParams<{ 'report-id': string }>();
@@ -95,8 +98,12 @@ export function BriefingDetailScreen() {
             <Text className="text-sm text-muted-foreground">{report.localDate}</Text>
             <Text className="text-xs text-muted-foreground">
               {t('agentBriefing.window', {
-                start: new Date(parseTimestamp(report.nightStartAt)).toLocaleString(i18n.language),
-                end: new Date(parseTimestamp(report.cutoffAt)).toLocaleString(i18n.language),
+                start: formatDate(
+                  parseTimestamp(report.nightStartAt),
+                  i18n.language,
+                  BRIEFING_DATE_TIME
+                ),
+                end: formatDate(parseTimestamp(report.cutoffAt), i18n.language, BRIEFING_DATE_TIME),
               })}
             </Text>
             {report.revised ? (
@@ -173,7 +180,7 @@ export function BriefingDetailScreen() {
               >
                 <Text className="text-sm">{source.title}</Text>
                 <Text className="text-xs text-muted-foreground">
-                  {new Date(parseTimestamp(source.occurredAt)).toLocaleString(i18n.language)}
+                  {formatDate(parseTimestamp(source.occurredAt), i18n.language, BRIEFING_DATE_TIME)}
                 </Text>
               </Pressable>
             ))}

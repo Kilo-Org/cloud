@@ -3905,6 +3905,10 @@
     "paidDisclosure": "Procjena {{estimate}}, najviše {{maximum}}, uz ograničenje od {{minutes}} min. Naplata vrijedi i ako generiranje ne uspije.",
     "enable": "Omogući plaćene sažetke",
     "contextSettings": "AI postavke · {{context}}",
-    "allContexts": "Osobni i organizacijski pregledi ostaju odvojeni."
+    "allContexts": "Osobni i organizacijski pregledi ostaju odvojeni.",
+    "estimatePricingUnavailable": "Cijene za ovaj model nisu dostupne.",
+    "estimateBalanceUnavailable": "Nema dovoljno sredstava za plaćeni sažetak.",
+    "estimateModelNotAllowed": "Ovaj model ovdje nije dopušten.",
+    "estimateSpendLimitTooLow": "Podignite ograničenje potrošnje da biste omogućili ovaj sažetak."
   }
 }

@@ -3898,13 +3898,17 @@
     "spendLimit": "מגבלת הוצאה (USD)",
     "safeguardHint": "מגבלות סופיות לכל סיכום, לא תקציב יומי. ברירות מחדל: 10 דקות ו-$2. דוח מתפרסם אחרי חמש דקות לכל היותר, והיצירה ממשיכה בתוך המגבלות.",
     "invalidSafeguards": "יש להזין מגבלות זמן והוצאה חיוביות וסופיות.",
-    "estimate": "הערכה {{estimate}} · מקסימום {{maximum}}",
-    "estimateUnavailable": "סיכום בתשלום אינו זמין בהגדרות אלה.",
+    "estimate": "הערכת עלות {{estimate}} · מקסימום {{maximum}}",
+    "estimateUnavailable": "סיכום בתשלום אינו זמין עבור הגדרות אלה.",
     "confirmPaid": "להפעיל סיכומים בתשלום עבור {{context}}?",
     "confirmGeneration": "ליצור סיכום בתשלום?",
     "paidDisclosure": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דקות. החיוב חל גם אם היצירה נכשלת.",
     "enable": "הפעלת סיכומים בתשלום",
     "contextSettings": "הגדרות AI · {{context}}",
-    "allContexts": "תדריכים אישיים ותדריכי ארגון נשמרים בנפרד."
+    "allContexts": "תדריכים אישיים ותדריכי ארגון נשמרים בנפרד.",
+    "estimatePricingUnavailable": "מחיר עבור המודל הזה אינו זמין.",
+    "estimateBalanceUnavailable": "אין מספיק יתרה לסיכום בתשלום.",
+    "estimateModelNotAllowed": "המודל הזה אינו מותר כאן.",
+    "estimateSpendLimitTooLow": "העלה את מגבלת ההוצאות כדי לאפשר סיכום זה."
   }
 }

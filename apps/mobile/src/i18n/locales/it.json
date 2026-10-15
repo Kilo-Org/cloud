@@ -3899,12 +3899,16 @@
     "safeguardHint": "Limiti finiti per singolo riepilogo, non un budget giornaliero. Predefiniti: 10 minuti e $2. Un report viene pubblicato entro cinque minuti mentre la generazione continua entro questi limiti.",
     "invalidSafeguards": "Inserisci limiti di tempo e spesa positivi e finiti.",
     "estimate": "Stima {{estimate}} · massimo {{maximum}}",
-    "estimateUnavailable": "Nessun riepilogo a pagamento disponibile con queste impostazioni.",
+    "estimateUnavailable": "Nessun riepilogo a pagamento disponibile per queste impostazioni.",
     "confirmPaid": "Attivare i riepiloghi a pagamento per {{context}}?",
     "confirmGeneration": "Generare un riepilogo a pagamento?",
     "paidDisclosure": "Stima {{estimate}}, fino a {{maximum}}, con un limite di {{minutes}} minuti. L'addebito si applica anche se la generazione non riesce.",
     "enable": "Attiva riepiloghi a pagamento",
     "contextSettings": "Impostazioni AI · {{context}}",
-    "allContexts": "I briefing personali e dell'organizzazione restano separati."
+    "allContexts": "I briefing personali e dell'organizzazione restano separati.",
+    "estimatePricingUnavailable": "Prezzi non disponibili per questo modello.",
+    "estimateBalanceUnavailable": "Saldo insufficiente per un riepilogo a pagamento.",
+    "estimateModelNotAllowed": "Questo modello non è consentito qui.",
+    "estimateSpendLimitTooLow": "Aumenta la tutela di spesa per consentire questo riepilogo."
   }
 }

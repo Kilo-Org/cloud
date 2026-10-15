@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_briefing_events,
+  agent_briefing_preferences,
   agent_briefing_context_preferences,
   agent_briefing_reports,
   cli_sessions_v2,
@@ -120,6 +121,53 @@ describe('agent briefing ownership and lifecycle', () => {
     expect(reread.readAt).toMatch(/Z$/);
     expect(reread.cutoffAt).toBe(new Date(report.cutoff_at).toISOString());
     expect(reread.coverage.spend).toBe('unavailable');
+  });
+  it('reports complete coverage once collection predates the night and all spend is attributed', async () => {
+    const { report, sessionIds } = await seedReport();
+    const sessionId = sessionIds[0];
+    if (!sessionId) throw new Error('Missing source fixture');
+    const usageId = crypto.randomUUID();
+    await db.insert(microdollar_usage).values({
+      id: usageId,
+      kilo_user_id: user.id,
+      cost: 290_000,
+      input_tokens: 10,
+      output_tokens: 10,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: new Date(Date.now() - 3600_000).toISOString(),
+    });
+    await db
+      .insert(microdollar_usage_metadata)
+      .values({ id: usageId, session_id: sessionId, message_id: 'overnight-charge' });
+    const collect = () =>
+      collectBriefingEvidence(
+        user.id,
+        null,
+        report.night_start_at,
+        report.cutoff_at,
+        report.morning_end_at
+      );
+    expect((await collect()).coverage).toEqual({
+      activity: 'partial',
+      spend: 'partial',
+      blockers: 'partial',
+      pullRequests: 'partial',
+    });
+    await db.insert(agent_briefing_preferences).values({
+      kilo_user_id: user.id,
+      timezone: 'UTC',
+      next_run_at: new Date().toISOString(),
+      created_at: new Date(Date.parse(report.night_start_at) - 3600_000).toISOString(),
+    });
+    const facts = await collect();
+    expect(facts.coverage).toEqual({
+      activity: 'complete',
+      spend: 'complete',
+      blockers: 'complete',
+      pullRequests: 'complete',
+    });
+    expect(facts.scorecard.spendMicrodollars).toBe(290_000);
   });
   it.each(['ready', 'running'] as const)(
     'clears %s AI content when the sweep removes a deleted source before a read',
@@ -316,14 +364,12 @@ describe('agent briefing ownership and lifecycle', () => {
     const { report } = await seedReport();
     const now = new Date();
     const end = new Date(now.getTime() + 30_000);
-    await db
-      .insert(agent_briefing_context_preferences)
-      .values({
-        kilo_user_id: user.id,
-        context_key: 'personal',
-        model: 'test/bounded',
-        ai_enabled: true,
-      });
+    await db.insert(agent_briefing_context_preferences).values({
+      kilo_user_id: user.id,
+      context_key: 'personal',
+      model: 'test/bounded',
+      ai_enabled: true,
+    });
     await db
       .update(agent_briefing_reports)
       .set({

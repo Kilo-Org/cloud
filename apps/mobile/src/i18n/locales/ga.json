@@ -3989,12 +3989,16 @@
     "safeguardHint": "Cosaintí teoranta in aghaidh na hachoimre, ní buiséad laethúil. Réamhshocruithe: 10 nóiméad agus $2. Foilsítear tuarascáil tar éis cúig nóiméad ar a mhéad agus leanann an giniúint ar aghaidh laistigh de na teorainneacha seo.",
     "invalidSafeguards": "Cuir isteach teorainneacha ama agus caiteachais dearfacha, teoranta.",
     "estimate": "Meastachán {{estimate}} · uasmhéid {{maximum}}",
-    "estimateUnavailable": "Níl achoimre íoctha ar fáil leis na socruithe seo.",
+    "estimateUnavailable": "Níl achoimre íoctha ar fáil le haghaidh na socruithe seo.",
     "confirmPaid": "Cumasaigh achoimrí íoctha do {{context}}?",
     "confirmGeneration": "Gin achoimre íoctha?",
     "paidDisclosure": "{{estimate}} measta, suas le {{maximum}}, le teorainn {{minutes}} nóiméad. Gearrtar muirir fiú má theipeann ar an nginiúint.",
     "enable": "Cumasaigh achoimrí íoctha",
     "contextSettings": "Socruithe AI · {{context}}",
-    "allContexts": "Coinnítear achoimrí pearsanta agus eagraíochta ar leith."
+    "allContexts": "Coinnítear achoimrí pearsanta agus eagraíochta ar leith.",
+    "estimatePricingUnavailable": "Níl praghsáil ar fáil le haghaidh an tsamhail seo.",
+    "estimateBalanceUnavailable": "Níl cothromaíocht dhóthainach le haghaidh achoimre íoctha.",
+    "estimateModelNotAllowed": "Níl cead an tsamhail seo a úsáid anseo.",
+    "estimateSpendLimitTooLow": "Méadaigh an chosaint chaitheamh chun an achoimre seo a cheadú."
   }
 }

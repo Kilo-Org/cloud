@@ -3898,13 +3898,17 @@
     "spendLimit": "Izdevumu ierobežojums (USD)",
     "safeguardHint": "Galīgi ierobežojumi katram kopsavilkumam, nevis dienas budžets. Noklusējums: 10 minūtes un $2. Atskaite tiek publicēta ne vēlāk kā pēc piecām minūtēm, kamēr ģenerēšana turpinās šo ierobežojumu robežās.",
     "invalidSafeguards": "Ievadiet pozitīvus, galīgus laika un izdevumu ierobežojumus.",
-    "estimate": "Aplēse {{estimate}} · maksimums {{maximum}}",
-    "estimateUnavailable": "Šiem iestatījumiem maksas kopsavilkums nav pieejams.",
+    "estimate": "Novērtējums {{estimate}} · maksimums {{maximum}}",
+    "estimateUnavailable": "Apmaksāts kopsavilkums šiem iestatījumiem nav pieejams.",
     "confirmPaid": "Iespējot maksas kopsavilkumus kontekstam {{context}}?",
     "confirmGeneration": "Ģenerēt maksas kopsavilkumu?",
     "paidDisclosure": "Aplēse {{estimate}}, līdz {{maximum}}, ar {{minutes}} minūšu ierobežojumu. Maksa tiek piemērota arī tad, ja ģenerēšana neizdodas.",
     "enable": "Iespējot maksas kopsavilkumus",
     "contextSettings": "AI iestatījumi · {{context}}",
-    "allContexts": "Personīgie un organizācijas kopsavilkumi tiek glabāti atsevišķi."
+    "allContexts": "Personīgie un organizācijas kopsavilkumi tiek glabāti atsevišķi.",
+    "estimatePricingUnavailable": "Šī modeļa cenu informācija nav pieejama.",
+    "estimateBalanceUnavailable": "Nepietiek līdzekļu apmaksātam kopsavilkumam.",
+    "estimateModelNotAllowed": "Šis modelis šeit nav atļauts.",
+    "estimateSpendLimitTooLow": "Palieliniet tēriņu ierobežojumu, lai atļautu šo kopsavilkumu."
   }
 }

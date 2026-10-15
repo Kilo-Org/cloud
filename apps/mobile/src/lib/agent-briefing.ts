@@ -20,8 +20,8 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { dateTimeFormat } from '@/lib/intl-cache';
+import { readCacheScope } from '@/lib/persist/cache-scope';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
-import { readCacheScope } from '@/lib/persist/read-cache';
 import { useTRPC } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 

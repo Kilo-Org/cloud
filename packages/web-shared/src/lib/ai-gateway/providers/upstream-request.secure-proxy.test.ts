@@ -26,7 +26,7 @@ function secureProxyProvider(disable_url_suffix: boolean) {
       type: 'secure_proxy',
       credentials: {
         type: 'secure_proxy',
-        vercel_protection_bypass_secret: 'bypass-secret',
+        proxy_secret: 'proxy-secret',
         config: {
           url: 'https://llm.example.com/v1',
           extra_headers: { Authorization: 'Bearer upstream-key' },
@@ -69,13 +69,13 @@ describe('upstreamRequest through the secure proxy', () => {
     global.fetch = originalFetch;
   });
 
-  it('sends only the bypass secret to the proxy and moves upstream auth into the body', async () => {
+  it('sends only the proxy secret to the proxy and moves upstream auth into the body', async () => {
     const { url, headers, body, sent } = await sendThroughSecureProxy(false);
 
     expect(url).toBe('https://secure-proxy.example.com/api/v1/chat/completions');
     expect(Object.fromEntries(headers)).toEqual({
       'content-type': 'application/json',
-      'x-vercel-protection-bypass': 'bypass-secret',
+      authorization: 'Bearer proxy-secret',
     });
     expect(body).toEqual({
       ...sent,

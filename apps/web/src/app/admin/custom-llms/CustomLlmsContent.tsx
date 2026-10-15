@@ -456,7 +456,7 @@ export function CustomLlmsContent() {
                   <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
                     {`{
   "type": "secure_proxy",
-  "vercel_protection_bypass_secret": "PROXY_BYPASS_SECRET",
+  "proxy_secret": "AI_GATEWAY_SECURE_PROXY_SECRET value",
   "config": {
     "url": "https://upstream.example.com/v1",
     "extra_headers": { "Authorization": "Bearer YOUR_API_KEY" }

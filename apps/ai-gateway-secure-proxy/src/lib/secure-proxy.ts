@@ -3,6 +3,7 @@ import {
   SecureProxyRequestBodySchema,
 } from '@kilocode/ai-gateway-secure-proxy-contracts';
 import { NextResponse } from 'next/server';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 function getOutputHeaders(response: Response) {
   const outputHeaders = new Headers();
@@ -33,7 +34,24 @@ function isRedirect(response: Response) {
   return response.status >= 300 && response.status < 400;
 }
 
+function sha256(value: string) {
+  return createHash('sha256').update(value).digest();
+}
+
+function isAuthorized(request: Request, secret: string) {
+  const authorization = request.headers.get('authorization') ?? '';
+  return timingSafeEqual(sha256(authorization), sha256(`Bearer ${secret}`));
+}
+
 export async function handleSecureProxyRequest(request: Request): Promise<Response> {
+  const secret = process.env.AI_GATEWAY_SECURE_PROXY_SECRET;
+  if (!secret) {
+    return errorResponse(500, 'Secure proxy secret is not configured');
+  }
+  if (!isAuthorized(request, secret)) {
+    return errorResponse(401, 'Unauthorized');
+  }
+
   const parsed = SecureProxyRequestBodySchema.safeParse(
     await request.json().catch(() => undefined)
   );

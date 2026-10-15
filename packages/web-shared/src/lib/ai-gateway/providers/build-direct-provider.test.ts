@@ -243,7 +243,7 @@ describe('buildDirectProvider authentication', () => {
         type: 'secure_proxy',
         credentials: {
           type: 'secure_proxy',
-          vercel_protection_bypass_secret: 'bypass-secret',
+          proxy_secret: 'proxy-secret',
           config: {
             url: 'https://llm.example.com/invoke',
             extra_headers: { authorization: 'Bearer upstream-key' },
@@ -259,7 +259,7 @@ describe('buildDirectProvider authentication', () => {
       apiKeyHeader: null,
       secureProxy: {
         url: 'https://secure-proxy.example.com/api/v1',
-        protectionBypassSecret: 'bypass-secret',
+        secret: 'proxy-secret',
         upstreamAuthHeaders: { authorization: 'Bearer upstream-key' },
       },
     });

@@ -56,7 +56,7 @@ describe('CustomLlmCredentialsSchema and CustomLlmDefinitionSchema', () => {
     expect(
       CustomLlmCredentialsSchema.safeParse({
         type: 'secure_proxy',
-        vercel_protection_bypass_secret: 'bypass-secret',
+        proxy_secret: 'proxy-secret',
         config: {
           url: 'https://llm.example.com/v1',
           extra_headers: { Authorization: 'Bearer partner-token' },
@@ -69,7 +69,7 @@ describe('CustomLlmCredentialsSchema and CustomLlmDefinitionSchema', () => {
     expect(
       CustomLlmCredentialsSchema.safeParse({
         type: 'secure_proxy',
-        vercel_protection_bypass_secret: 'bypass-secret',
+        proxy_secret: 'proxy-secret',
         config: { url: 'http://llm.example.com/v1' },
       }).success
     ).toBe(false);

@@ -21,7 +21,7 @@ export function buildSecureProxyRequest({
     url: `${secureProxy.url}${chatApiPath}`,
     headers: new Headers({
       'Content-Type': 'application/json',
-      'x-vercel-protection-bypass': secureProxy.protectionBypassSecret,
+      Authorization: `Bearer ${secureProxy.secret}`,
     }),
     body: JSON.stringify({
       ...body,

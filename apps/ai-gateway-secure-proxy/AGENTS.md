@@ -5,10 +5,12 @@ upstream. It deploys to the `ai-gateway-secure-proxy` Vercel project, whose
 functions run in `sfo1` only (`vercel.json`), via the manually triggered
 `deploy-ai-gateway-secure-proxy.yml`.
 
-- Access is gated by Vercel Deployment Protection, which must cover production.
-  The gateway sends a Protection Bypass for Automation secret as
-  `x-vercel-protection-bypass`, taken from the custom LLM's `secure_proxy`
-  credentials. The app itself performs no authentication.
+- Every request must carry `Authorization: Bearer <AI_GATEWAY_SECURE_PROXY_SECRET>`,
+  compared in constant time. The gateway takes the value from the custom LLM's
+  `secure_proxy` credentials (`proxy_secret`). Without the env var the app
+  rejects every request. Vercel Deployment Protection is off, so this check is
+  the only thing keeping the proxy from being an open relay; check
+  authorization before reading the body.
 - `POST /api/v1/{chat/completions,responses,messages}` all behave the same: read
   `kilo_secure_proxy: { url, headers }` from the JSON body, remove it, and POST
   the remaining body to `url` with exactly `headers`. Incoming request headers

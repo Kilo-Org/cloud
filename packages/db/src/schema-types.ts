@@ -2238,7 +2238,7 @@ export type CustomLlmXApiKeyCredentials = z.infer<typeof CustomLlmXApiKeyCredent
  */
 export const CustomLlmSecureProxyCredentialsSchema = z.object({
   type: z.literal('secure_proxy'),
-  vercel_protection_bypass_secret: z.string().min(1),
+  proxy_secret: z.string().min(1),
   config: z.object({
     url: SecureProxyUpstreamUrlSchema,
     extra_headers: CustomLlmExtraHeadersSchema.optional(),

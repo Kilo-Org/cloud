@@ -1,12 +1,21 @@
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { handleSecureProxyRequest } from './secure-proxy';
 
 const originalFetch = global.fetch;
+const originalSecret = process.env.AI_GATEWAY_SECURE_PROXY_SECRET;
+const PROXY_SECRET = 'proxy-secret';
+const VALID_UPSTREAM_BODY = {
+  kilo_secure_proxy: { url: 'https://llm.example.com', headers: {} },
+};
 
 function proxyRequest(body: unknown, headers: Record<string, string> = {}) {
   return new Request('https://secure-proxy.example.com/api/v1/chat/completions', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...headers },
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${PROXY_SECRET}`,
+      ...headers,
+    },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 }
@@ -24,8 +33,36 @@ function onlyFetchCall(fetchMock: jest.Mock<typeof fetch>) {
 }
 
 describe('handleSecureProxyRequest', () => {
+  beforeEach(() => {
+    process.env.AI_GATEWAY_SECURE_PROXY_SECRET = PROXY_SECRET;
+  });
+
   afterEach(() => {
     global.fetch = originalFetch;
+    process.env.AI_GATEWAY_SECURE_PROXY_SECRET = originalSecret;
+  });
+
+  it.each([
+    ['a missing authorization header', { authorization: '' }],
+    ['a wrong secret', { authorization: 'Bearer wrong-secret' }],
+    ['the secret without the Bearer scheme', { authorization: PROXY_SECRET }],
+  ])('rejects %s without calling upstream', async (_description, headers) => {
+    const fetchMock = mockUpstream(new Response('{}'));
+
+    const response = await handleSecureProxyRequest(proxyRequest(VALID_UPSTREAM_BODY, headers));
+
+    expect(response.status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects every request when the secret is not configured', async () => {
+    delete process.env.AI_GATEWAY_SECURE_PROXY_SECRET;
+    const fetchMock = mockUpstream(new Response('{}'));
+
+    const response = await handleSecureProxyRequest(proxyRequest(VALID_UPSTREAM_BODY));
+
+    expect(response.status).toBe(500);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('forwards the body without the config to the configured URL with the configured headers', async () => {
@@ -41,7 +78,7 @@ describe('handleSecureProxyRequest', () => {
             headers: { authorization: 'Bearer upstream-key', 'x-custom': 'value' },
           },
         },
-        { 'x-vercel-protection-bypass': 'bypass-secret', cookie: 'session=1' }
+        { cookie: 'session=1', 'x-forwarded-for': '203.0.113.1' }
       )
     );
 
@@ -110,9 +147,7 @@ describe('handleSecureProxyRequest', () => {
       new Response(null, { status: 307, headers: { location: 'https://elsewhere.example.com' } })
     );
 
-    const response = await handleSecureProxyRequest(
-      proxyRequest({ kilo_secure_proxy: { url: 'https://llm.example.com', headers: {} } })
-    );
+    const response = await handleSecureProxyRequest(proxyRequest(VALID_UPSTREAM_BODY));
 
     expect(response.status).toBe(502);
     expect(response.headers.get('location')).toBeNull();
@@ -127,9 +162,7 @@ describe('handleSecureProxyRequest', () => {
       .fn<typeof fetch>()
       .mockRejectedValue(new Error('connect ECONNREFUSED https://llm.example.com'));
 
-    const response = await handleSecureProxyRequest(
-      proxyRequest({ kilo_secure_proxy: { url: 'https://llm.example.com', headers: {} } })
-    );
+    const response = await handleSecureProxyRequest(proxyRequest(VALID_UPSTREAM_BODY));
 
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toEqual({ error: 'Upstream request failed' });

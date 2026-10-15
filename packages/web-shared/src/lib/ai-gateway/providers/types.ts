@@ -46,7 +46,7 @@ export type ProviderResponseTransforms = ReasoningDetailsTransformType;
 export type SecureProxyRoute = {
   /** Proxy base URL; the chat API path is appended. */
   url: string;
-  protectionBypassSecret: string;
+  secret: string;
   /** Upstream authentication headers, applied by the proxy instead of the API key. */
   upstreamAuthHeaders: Record<string, string>;
 };

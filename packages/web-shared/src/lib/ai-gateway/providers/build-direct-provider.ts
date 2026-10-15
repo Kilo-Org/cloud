@@ -23,7 +23,7 @@ function resolveRouting(
     apiKeyHeader: null,
     secureProxy: {
       url: upstream.base_url,
-      protectionBypassSecret: auth.credentials.vercel_protection_bypass_secret,
+      secret: auth.credentials.proxy_secret,
       upstreamAuthHeaders: auth.credentials.config.extra_headers ?? {},
     },
   };

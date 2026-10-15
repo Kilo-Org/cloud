@@ -221,9 +221,7 @@ describe('atomic running-container admission', () => {
     };
     const lanes = (): unknown =>
       sqlite
-        .prepare(
-          `SELECT SUM(max_concurrency) AS lanes FROM benchmark_runs WHERE kind = 'decider'`
-        )
+        .prepare(`SELECT SUM(max_concurrency) AS lanes FROM benchmark_runs WHERE kind = 'decider'`)
         .get();
     return { sqlite, db, queries, apply, rejects, lanes };
   }

@@ -155,7 +155,8 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         // another started is reported alongside the run that did start.
         if (started.length === 0 && drainErrors.length > 0) {
           const [first] = drainErrors;
-          if (first instanceof BenchmarkRunConfigError) return c.json({ error: first.message }, 400);
+          if (first instanceof BenchmarkRunConfigError)
+            return c.json({ error: first.message }, 400);
           throw first;
         }
         return c.json({

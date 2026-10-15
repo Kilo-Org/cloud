@@ -94,26 +94,96 @@ export const POLICY_SETTINGS = {
 
 export type PolicySettingKind = PolicySettingMeta['kind'];
 
-/** Sparse admin overrides. A missing key (or an explicit null) means "no override". */
-export const PolicySettingOverridesSchema = z.partialRecord(
-  PolicySettingKeySchema,
-  PolicySettingValueSchema
-);
-export type PolicySettingOverrides = Partial<Record<PolicySettingKey, PolicySettingValue>>;
+/**
+ * The shape each setting's value must take. An override or computed value is
+ * accepted only when it matches its own key's schema; it is never coerced.
+ */
+export const POLICY_SETTING_VALUE_SCHEMAS = {
+  minAccuracy: z.number().min(0).max(1),
+  accuracyNoiseBand: z.number().min(0).max(1),
+  frontierMinAccuracyDelta: z.number().min(0).max(1),
+  productionTokenProfile: ProductionTokenProfileSchema,
+  switchHorizonTurns: z.number().int().positive(),
+  switchCostFactor: z.number().min(1).max(100),
+  bestAccuracySwitchThreshold: z.number().min(0).max(1),
+  lowConfidenceThreshold: z.number().min(0).max(1),
+  classifierRepetitions: z.number().int().min(1).max(5),
+  deciderRepetitions: z.number().int().min(1).max(5),
+  classifierMaxP95LatencyMs: z.number().int().positive(),
+} as const satisfies Record<PolicySettingKey, z.ZodType>;
 
-export const PolicySettingComputedSchema = z.object({
-  value: PolicySettingValueSchema,
-  computedAt: z.iso.datetime({ offset: true }),
-  source: z.string().trim().min(1),
-  evidence: z.string().trim().min(1),
+const VALUE = POLICY_SETTING_VALUE_SCHEMAS;
+
+/** Sparse admin overrides. A missing key (or an explicit null) means "no override". */
+export const PolicySettingOverridesSchema = z.object({
+  minAccuracy: VALUE.minAccuracy.nullable().optional(),
+  accuracyNoiseBand: VALUE.accuracyNoiseBand.nullable().optional(),
+  frontierMinAccuracyDelta: VALUE.frontierMinAccuracyDelta.nullable().optional(),
+  productionTokenProfile: VALUE.productionTokenProfile.nullable().optional(),
+  switchHorizonTurns: VALUE.switchHorizonTurns.nullable().optional(),
+  switchCostFactor: VALUE.switchCostFactor.nullable().optional(),
+  bestAccuracySwitchThreshold: VALUE.bestAccuracySwitchThreshold.nullable().optional(),
+  lowConfidenceThreshold: VALUE.lowConfidenceThreshold.nullable().optional(),
+  classifierRepetitions: VALUE.classifierRepetitions.nullable().optional(),
+  deciderRepetitions: VALUE.deciderRepetitions.nullable().optional(),
+  classifierMaxP95LatencyMs: VALUE.classifierMaxP95LatencyMs.nullable().optional(),
 });
+export type PolicySettingOverrides = z.infer<typeof PolicySettingOverridesSchema>;
+
+function computedRecordSchema<T extends z.ZodType>(value: T) {
+  return z.object({
+    value,
+    computedAt: z.iso.datetime({ offset: true }),
+    source: z.string().trim().min(1),
+    evidence: z.string().trim().min(1),
+  });
+}
+
+/** Display shape of one computed record, for the admin state response. */
+export const PolicySettingComputedSchema = computedRecordSchema(PolicySettingValueSchema);
 export type PolicySettingComputed = z.infer<typeof PolicySettingComputedSchema>;
 
-export const PolicySettingComputedMapSchema = z.partialRecord(
-  PolicySettingKeySchema,
-  PolicySettingComputedSchema
-);
-export type PolicySettingComputedMap = Partial<Record<PolicySettingKey, PolicySettingComputed>>;
+export const PolicySettingComputedMapSchema = z.object({
+  minAccuracy: computedRecordSchema(VALUE.minAccuracy).optional(),
+  accuracyNoiseBand: computedRecordSchema(VALUE.accuracyNoiseBand).optional(),
+  frontierMinAccuracyDelta: computedRecordSchema(VALUE.frontierMinAccuracyDelta).optional(),
+  productionTokenProfile: computedRecordSchema(VALUE.productionTokenProfile).optional(),
+  switchHorizonTurns: computedRecordSchema(VALUE.switchHorizonTurns).optional(),
+  switchCostFactor: computedRecordSchema(VALUE.switchCostFactor).optional(),
+  bestAccuracySwitchThreshold: computedRecordSchema(VALUE.bestAccuracySwitchThreshold).optional(),
+  lowConfidenceThreshold: computedRecordSchema(VALUE.lowConfidenceThreshold).optional(),
+  classifierRepetitions: computedRecordSchema(VALUE.classifierRepetitions).optional(),
+  deciderRepetitions: computedRecordSchema(VALUE.deciderRepetitions).optional(),
+  classifierMaxP95LatencyMs: computedRecordSchema(VALUE.classifierMaxP95LatencyMs).optional(),
+});
+export type PolicySettingComputedMap = z.infer<typeof PolicySettingComputedMapSchema>;
+
+function validEntries(
+  raw: object,
+  shape: Record<PolicySettingKey, z.ZodType>
+): Record<string, unknown> {
+  const valid: Record<string, unknown> = {};
+  for (const key of POLICY_SETTING_KEYS) {
+    if (!(key in raw)) continue;
+    const value: unknown = Reflect.get(raw, key);
+    if (shape[key].safeParse(value).success) valid[key] = value;
+  }
+  return valid;
+}
+
+/** Stored overrides with every entry that fails its key's schema dropped. */
+export function parseStoredPolicyOverrides(raw: unknown): PolicySettingOverrides | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  return PolicySettingOverridesSchema.parse(validEntries(raw, PolicySettingOverridesSchema.shape));
+}
+
+/** Stored computed records with every entry that fails its key's schema dropped. */
+export function parseStoredPolicyComputed(raw: unknown): PolicySettingComputedMap | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  return PolicySettingComputedMapSchema.parse(
+    validEntries(raw, PolicySettingComputedMapSchema.shape)
+  );
+}
 
 export const PolicySettingStateSchema = z.object({
   kind: z.enum(['auto', 'fixed']),
@@ -150,29 +220,25 @@ export type PolicySettingSource = PolicySettingDefaults & {
 
 function resolveValue(
   key: PolicySettingKey,
-  meta: PolicySettingMeta,
   defaults: PolicySettingDefaults,
   overrides: PolicySettingOverrides | null,
   computed: PolicySettingComputedMap | null
 ): PolicySettingValue {
+  const meta: PolicySettingMeta = POLICY_SETTINGS[key];
   if (meta.kind === 'fixed') return meta.fixed;
-  const override = overrides?.[key] ?? null;
-  if (override !== null) return override;
-  const record = computed?.[key] ?? null;
-  if (record !== null) return record.value;
-  return defaults[key];
+  return overrides?.[key] ?? computed?.[key]?.value ?? defaults[key];
 }
 
 export function resolvePolicySettings(config: PolicySettingSource): PolicySettingsState {
-  const overrides = config.policyOverrides ?? null;
-  const computed = config.policyComputed ?? null;
+  const overrides = parseStoredPolicyOverrides(config.policyOverrides);
+  const computed = parseStoredPolicyComputed(config.policyComputed);
   const states = {} as PolicySettingsState;
   for (const key of POLICY_SETTING_KEYS) {
-    const meta = POLICY_SETTINGS[key];
+    const meta: PolicySettingMeta = POLICY_SETTINGS[key];
     states[key] = {
       kind: meta.kind,
       label: meta.label,
-      effective: resolveValue(key, meta, config, overrides, computed),
+      effective: resolveValue(key, config, overrides, computed),
       override: overrides?.[key] ?? null,
       computed: computed?.[key] ?? null,
       reason: meta.kind === 'fixed' ? meta.reason : null,
@@ -183,40 +249,24 @@ export function resolvePolicySettings(config: PolicySettingSource): PolicySettin
 
 /** Effective values in their concrete types, for read sites that build tables. */
 export function resolveEffectivePolicy(config: PolicySettingSource): PolicySettingDefaults {
-  const s = resolvePolicySettings(config);
+  const overrides = parseStoredPolicyOverrides(config.policyOverrides);
+  const computed = parseStoredPolicyComputed(config.policyComputed);
+  // Overrides and computed values passed their own key's schema above, defaults
+  // are typed per key, and each fixed value is authored for its key.
+  const value = <K extends PolicySettingKey>(key: K) =>
+    resolveValue(key, config, overrides, computed) as PolicySettingDefaults[K];
   return {
-    minAccuracy: typeof s.minAccuracy.effective === 'number' ? s.minAccuracy.effective : 0,
-    accuracyNoiseBand:
-      typeof s.accuracyNoiseBand.effective === 'number' ? s.accuracyNoiseBand.effective : 0,
-    frontierMinAccuracyDelta:
-      typeof s.frontierMinAccuracyDelta.effective === 'number'
-        ? s.frontierMinAccuracyDelta.effective
-        : 0,
-    productionTokenProfile:
-      s.productionTokenProfile.effective !== null &&
-      typeof s.productionTokenProfile.effective === 'object'
-        ? s.productionTokenProfile.effective
-        : null,
-    switchHorizonTurns:
-      typeof s.switchHorizonTurns.effective === 'number' ? s.switchHorizonTurns.effective : null,
-    switchCostFactor:
-      typeof s.switchCostFactor.effective === 'number' ? s.switchCostFactor.effective : 0,
-    bestAccuracySwitchThreshold:
-      typeof s.bestAccuracySwitchThreshold.effective === 'number'
-        ? s.bestAccuracySwitchThreshold.effective
-        : 0,
-    lowConfidenceThreshold:
-      typeof s.lowConfidenceThreshold.effective === 'number'
-        ? s.lowConfidenceThreshold.effective
-        : null,
-    classifierRepetitions:
-      typeof s.classifierRepetitions.effective === 'number' ? s.classifierRepetitions.effective : 1,
-    deciderRepetitions:
-      typeof s.deciderRepetitions.effective === 'number' ? s.deciderRepetitions.effective : 1,
-    classifierMaxP95LatencyMs:
-      typeof s.classifierMaxP95LatencyMs.effective === 'number'
-        ? s.classifierMaxP95LatencyMs.effective
-        : null,
+    minAccuracy: value('minAccuracy'),
+    accuracyNoiseBand: value('accuracyNoiseBand'),
+    frontierMinAccuracyDelta: value('frontierMinAccuracyDelta'),
+    productionTokenProfile: value('productionTokenProfile'),
+    switchHorizonTurns: value('switchHorizonTurns'),
+    switchCostFactor: value('switchCostFactor'),
+    bestAccuracySwitchThreshold: value('bestAccuracySwitchThreshold'),
+    lowConfidenceThreshold: value('lowConfidenceThreshold'),
+    classifierRepetitions: value('classifierRepetitions'),
+    deciderRepetitions: value('deciderRepetitions'),
+    classifierMaxP95LatencyMs: value('classifierMaxP95LatencyMs'),
   };
 }
 

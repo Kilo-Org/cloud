@@ -357,6 +357,19 @@ describe('PUT /admin/config', () => {
     expect(replaceConfig).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when an override value does not fit its setting', async () => {
+    const res = await authedPut('/admin/config', {
+      ...TEST_CONFIG,
+      policyOverrides: { minAccuracy: { uncachedInputTokens: 1000, cachedInputTokens: 200 } },
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      error: 'Invalid benchmark config',
+    });
+    expect(replaceConfig).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for duplicate decider model ids instead of a D1 PK violation', async () => {
     const res = await authedPut('/admin/config', {
       ...TEST_CONFIG,

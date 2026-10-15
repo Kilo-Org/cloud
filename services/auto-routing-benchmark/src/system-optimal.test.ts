@@ -5,6 +5,7 @@ import type * as ConfigModule from './config';
 import type { OfflineSweep } from './scoreboard/schema';
 import {
   caseSplitForId,
+  fetchProductionAutoMetrics,
   optimizeThresholdPolicy,
   reevaluateSystemOptimalSettings,
 } from './system-optimal';
@@ -164,6 +165,26 @@ describe('optimizeThresholdPolicy', () => {
 
     expect(optimization).toBeNull();
   });
+
+  it('counts a held-out case once per route however many models graded it', () => {
+    // Six distinct held-out cases on each of two routes is 12 cases, below the
+    // 20-case gate, even though three models graded them (36 graded rows).
+    const optimization = optimizeThresholdPolicy({
+      pairs: pairsFor(
+        ['first', 'second', 'third'].map(model => ({
+          model,
+          train: { score: 1, costUsd: 0.001 },
+          heldOut: { score: 1, costUsd: 0.001 },
+        })),
+        ROUTES,
+        6
+      ),
+      profile: null,
+      pricing: noPricing,
+    });
+
+    expect(optimization).toBeNull();
+  });
 });
 
 const baseConfig: BenchmarkConfig = {
@@ -263,5 +284,71 @@ describe('reevaluateSystemOptimalSettings', () => {
 
     expect(saved).toBeNull();
     expect(savePolicyComputed).not.toHaveBeenCalled();
+  });
+
+  it('keeps production-derived settings when the catalog is unavailable', async () => {
+    vi.mocked(getBenchmarkConfig).mockResolvedValue({
+      ...baseConfig,
+      policyComputed: {
+        minAccuracy: {
+          value: 0.65,
+          computedAt: '2026-06-01T00:00:00.000Z',
+          source: 'held-out-grid',
+          evidence: 'earlier run',
+        },
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('unavailable', { status: 503 }))
+    );
+
+    const saved = await reevaluateSystemOptimalSettings(env, 'efficient', {
+      windowHours: 6,
+      sampleRequests: 100,
+      uncachedInputTokens: 1000,
+      cachedInputTokens: 200,
+      medianTurnsPerSession: 4,
+    });
+
+    expect(saved).toMatchObject({
+      minAccuracy: { value: 0.65, evidence: 'earlier run' },
+      productionTokenProfile: { value: { uncachedInputTokens: 1000, cachedInputTokens: 200 } },
+      switchHorizonTurns: { value: 4 },
+    });
+    expect(savePolicyComputed).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'efficient',
+      expect.objectContaining({
+        productionTokenProfile: expect.objectContaining({ source: 'production-usage' }),
+      })
+    );
+  });
+});
+
+describe('fetchProductionAutoMetrics', () => {
+  it('treats a request that hits the timeout as unavailable', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      const controller = new AbortController();
+      controller.abort(new DOMException('The operation timed out.', 'TimeoutError'));
+      return controller.signal;
+    });
+    // Never settles on its own: only the abort signal can end the request.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            const signal = init?.signal;
+            if (!signal) return;
+            if (signal.aborted) reject(signal.reason);
+            signal.addEventListener('abort', () => reject(signal.reason));
+          })
+      )
+    );
+
+    await expect(fetchProductionAutoMetrics(env)).resolves.toBeNull();
+    expect(timeout).toHaveBeenCalledWith(10_000);
+    timeout.mockRestore();
   });
 });

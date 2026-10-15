@@ -6,6 +6,7 @@ import {
   rankCandidates,
   resolveEffectivePolicy,
   type AutoRouter,
+  type BenchmarkConfig,
   type CandidatePricing,
   type PolicySettingComputedMap,
   type ProductionAutoMetrics,
@@ -24,7 +25,7 @@ import {
 } from './platform-models';
 import { variantFromStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
-import { summarizeSweep } from './scoreboard/sweep';
+import { isGradedSweepResult, summarizeSweep } from './scoreboard/sweep';
 import type { OfflineSweep, OfflineSweepSummary } from './scoreboard/schema';
 
 export const MIN_ACCURACY_GRID = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9] as const;
@@ -86,18 +87,33 @@ export function optimizeThresholdPolicy(params: {
   profile: ProductionTokenProfile | null;
   pricing: ReadonlyMap<string, CandidatePricing | null>;
 }): ThresholdOptimization | null {
-  const summaries = summarizeSweep(
-    params.pairs.map(pair => ({
-      ...pair,
-      results: pair.results.map(result => ({ ...result, split: caseSplitForId(result.caseId) })),
-    }))
-  );
+  const splitPairs = params.pairs.map(pair => ({
+    ...pair,
+    results: pair.results.map(result => ({ ...result, split: caseSplitForId(result.caseId) })),
+  }));
+  const summaries = summarizeSweep(splitPairs);
+
+  // Every model on a route is graded on the same held-out cases, so the sample
+  // size is the distinct case ids per route, not the sum over models.
+  const heldOutCaseIdsByRoute = new Map<string, Set<string>>();
+  for (const pair of splitPairs) {
+    for (const result of pair.results) {
+      if (result.split !== 'heldOut' || !isGradedSweepResult(result)) continue;
+      let caseIds = heldOutCaseIdsByRoute.get(result.routeKey);
+      if (!caseIds) {
+        caseIds = new Set();
+        heldOutCaseIdsByRoute.set(result.routeKey, caseIds);
+      }
+      caseIds.add(result.caseId);
+    }
+  }
+  let heldOutCases = 0;
+  for (const caseIds of heldOutCaseIdsByRoute.values()) heldOutCases += caseIds.size;
 
   const byRoute = new Map<
     string,
     Map<string, { train?: OfflineSweepSummary; heldOut?: OfflineSweepSummary }>
   >();
-  let heldOutCases = 0;
   let evaluableRoutes = 0;
   for (const summary of summaries) {
     const key = poolEntryKey({ model: summary.model, variant: summary.variant });
@@ -120,7 +136,6 @@ export function optimizeThresholdPolicy(params: {
     ) {
       evaluableRoutes += 1;
     }
-    for (const entry of candidates.values()) heldOutCases += entry.heldOut?.cases ?? 0;
   }
   if (heldOutCases < MIN_HELDOUT_GRADED_CASES || evaluableRoutes < MIN_EVALUATED_ROUTES) {
     return null;
@@ -220,15 +235,18 @@ export function optimizeThresholdPolicy(params: {
 
 /**
  * Read production auto-request usage from the web app. Returns null when the
- * endpoint is unavailable or has no data, so the daily run keeps the last
- * computed values instead of inventing numbers.
+ * endpoint is unavailable, slow, or has no data, so the daily run keeps the
+ * last computed values instead of inventing numbers or stalling the tick.
  */
 export async function fetchProductionAutoMetrics(env: Env): Promise<ProductionAutoMetrics | null> {
   try {
     const secret = await env.INTERNAL_API_SECRET_PROD.get();
     const response = await fetch(
       `${env.KILO_WEB_API_BASE_URL}/api/internal/auto-routing-benchmark/production-profile`,
-      { headers: { authorization: `Bearer ${secret}` } }
+      {
+        headers: { authorization: `Bearer ${secret}` },
+        signal: AbortSignal.timeout(10_000),
+      }
     );
     if (!response.ok) {
       console.warn(
@@ -288,9 +306,51 @@ export async function reevaluateSystemOptimalSettings(
     }
   }
 
-  const tentative = { ...(config.policyComputed ?? {}), ...fresh };
-  const effective = resolveEffectivePolicy({ ...config, policyComputed: tentative });
+  const profile = resolveEffectivePolicy({
+    ...config,
+    policyComputed: { ...(config.policyComputed ?? {}), ...fresh },
+  }).productionTokenProfile;
+  // The thresholds need the catalog and registry; the production records above
+  // do not, so a catalog or D1 failure here must not discard them.
+  const optimization = await optimizeRegistryThresholds(env, config, router, profile).catch(
+    error => {
+      console.warn(
+        JSON.stringify({
+          event: 'system_optimal_thresholds_skipped',
+          router,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+      return null;
+    }
+  );
+  if (optimization) {
+    fresh.minAccuracy = {
+      value: optimization.minAccuracy,
+      computedAt,
+      source: 'held-out-grid',
+      evidence: optimization.evidence,
+    };
+    fresh.accuracyNoiseBand = {
+      value: optimization.accuracyNoiseBand,
+      computedAt,
+      source: 'held-out-grid',
+      evidence: optimization.evidence,
+    };
+  }
 
+  if (Object.keys(fresh).length === 0) return null;
+  const saved = { ...(config.policyComputed ?? {}), ...fresh };
+  await savePolicyComputed(env.BENCH_DB, router, saved);
+  return saved;
+}
+
+async function optimizeRegistryThresholds(
+  env: Env,
+  config: BenchmarkConfig,
+  router: AutoRouter,
+  profile: ProductionTokenProfile | null
+): Promise<ThresholdOptimization | null> {
   const current = {
     router,
     engineIdentity: computeEngineIdentity('decider', router),
@@ -305,31 +365,10 @@ export async function reevaluateSystemOptimalSettings(
       entry: { model: row.model, variant: variantFromStorage(row.variant) },
       runId: row.run_id,
     }));
-  if (readyEntries.length > 0) {
-    const pairs = await getRoutingCaseResultsForEntries(env.BENCH_DB, readyEntries);
-    const optimization = optimizeThresholdPolicy({
-      pairs,
-      profile: effective.productionTokenProfile,
-      pricing: catalogCandidatePrices(catalog),
-    });
-    if (optimization) {
-      fresh.minAccuracy = {
-        value: optimization.minAccuracy,
-        computedAt,
-        source: 'held-out-grid',
-        evidence: optimization.evidence,
-      };
-      fresh.accuracyNoiseBand = {
-        value: optimization.accuracyNoiseBand,
-        computedAt,
-        source: 'held-out-grid',
-        evidence: optimization.evidence,
-      };
-    }
-  }
-
-  if (Object.keys(fresh).length === 0) return null;
-  const saved = { ...(config.policyComputed ?? {}), ...fresh };
-  await savePolicyComputed(env.BENCH_DB, router, saved);
-  return saved;
+  if (readyEntries.length === 0) return null;
+  return optimizeThresholdPolicy({
+    pairs: await getRoutingCaseResultsForEntries(env.BENCH_DB, readyEntries),
+    profile,
+    pricing: catalogCandidatePrices(catalog),
+  });
 }

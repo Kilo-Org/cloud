@@ -56,12 +56,16 @@ falls back to the system value. Publishing reads effective values only.
   summaries, scored on held-out cases (a deterministic sha256 train/held-out split of the case
   ids). The objective is mean held-out accuracy per estimated request dollar, subject to a
   quality floor, and the chosen point is the middle of the stable plateau rather than its edge.
-  Insufficient held-out data (`< 20` graded cases or `< 2` evaluated routes) leaves the current
-  value in place.
+  Insufficient held-out data (`< 20` distinct graded held-out cases summed over routes, or `< 2`
+  evaluated routes) leaves the current value in place, as does a catalog or registry failure;
+  production-derived settings are still saved in that case.
 - `productionTokenProfile` and `switchHorizonTurns`: derived from production auto-request usage.
   The worker has no Postgres access, so it reads mean uncached/cached input tokens and the
   median requests per auto session from `GET /api/internal/auto-routing-benchmark/production-profile`
-  on apps/web over a 6-hour window. An unavailable endpoint leaves the previous computed values.
+  on apps/web over a 6-hour window, with a 10-second timeout. An unavailable or slow endpoint
+  leaves the previous computed values.
+- Each setting has its own value schema. `PUT /admin/config` rejects an override that does not
+  fit its setting (400), and stored overrides or computed values that do not fit are ignored.
 - `frontierMinAccuracyDelta`, `switchCostFactor`, `bestAccuracySwitchThreshold`,
   `lowConfidenceThreshold`, classifier/decider repetitions, and `classifierMaxP95LatencyMs` are
   fixed constants: the held-out benchmark scores single requests, so session-economics and

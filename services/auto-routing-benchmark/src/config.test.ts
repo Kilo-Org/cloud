@@ -113,4 +113,29 @@ describe('platform model configuration', () => {
       },
     });
   });
+
+  it('drops stored policy entries that do not fit their setting', () => {
+    const models = [{ model: 'manual/model', variant: null, reasoning_effort: null }];
+    const config = mapConfigRows(
+      {
+        ...configRow,
+        policy_overrides: {
+          minAccuracy: { uncachedInputTokens: 1000, cachedInputTokens: 200 },
+          accuracyNoiseBand: 0.03,
+        },
+        policy_computed: {
+          minAccuracy: {
+            value: { uncachedInputTokens: 1000, cachedInputTokens: 200 },
+            computedAt: '2026-06-01T00:00:00.000Z',
+            source: 'held-out-grid',
+            evidence: 'fixture',
+          },
+        },
+      },
+      ['classifier/model'],
+      models
+    );
+    expect(config?.policyOverrides).toEqual({ accuracyNoiseBand: 0.03 });
+    expect(config?.policyComputed).toEqual({});
+  });
 });

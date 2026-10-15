@@ -2,9 +2,11 @@ import type {
   AutoRouter,
   BenchmarkConfig,
   BenchmarkPlatformModel,
-  PolicySettingComputedMap,
-  PolicySettingOverrides,
   ProductionTokenProfile,
+} from '@kilocode/auto-routing-contracts';
+import {
+  parseStoredPolicyComputed,
+  parseStoredPolicyOverrides,
 } from '@kilocode/auto-routing-contracts';
 import { getConfigRows, replaceConfig, type ConfigDeciderModelRow } from './db';
 
@@ -36,8 +38,9 @@ export function mapConfigRows(
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
-    policy_overrides?: PolicySettingOverrides | null;
-    policy_computed?: PolicySettingComputedMap | null;
+    // Stored JSON; entries that fail their key's schema are ignored on read.
+    policy_overrides?: unknown;
+    policy_computed?: unknown;
     updated_at: string;
     updated_by: string | null;
   } | null,
@@ -67,8 +70,8 @@ export function mapConfigRows(
     classifierRepetitions: configRow.classifier_repetitions,
     deciderRepetitions: configRow.decider_repetitions,
     classifierMaxP95LatencyMs: configRow.classifier_max_p95_latency_ms,
-    policyOverrides: configRow.policy_overrides ?? null,
-    policyComputed: configRow.policy_computed ?? null,
+    policyOverrides: parseStoredPolicyOverrides(configRow.policy_overrides),
+    policyComputed: parseStoredPolicyComputed(configRow.policy_computed),
     updatedAt: configRow.updated_at,
     updatedBy: configRow.updated_by,
   };

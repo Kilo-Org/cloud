@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { BenchmarkConfigSchema } from './benchmark';
 import {
   POLICY_SETTING_KEYS,
+  POLICY_SETTING_VALUE_SCHEMAS,
+  POLICY_SETTINGS,
+  parseStoredPolicyComputed,
+  parseStoredPolicyOverrides,
   resolveEffectivePolicy,
   resolvePolicySettings,
+  type PolicySettingMeta,
   type PolicySettingSource,
 } from './policy-settings';
 
@@ -96,5 +101,75 @@ describe('policy setting resolution', () => {
     expect(Object.keys(states).sort()).toEqual([...POLICY_SETTING_KEYS].sort());
     expect(states.minAccuracy).toMatchObject({ kind: 'auto', effective: 0.7, computed: null });
     expect(states.accuracyNoiseBand).toMatchObject({ effective: 0.05 });
+  });
+
+  it('rejects an override whose value does not fit its own setting', () => {
+    const config = {
+      router: 'efficient',
+      classifierModels: ['classifier/a'],
+      deciderModels: [{ id: 'platform/a' }],
+      minAccuracy: 0.7,
+      benchmarkUserId: null,
+      switchCostFactor: 3,
+      updatedAt: null,
+      updatedBy: null,
+    };
+    for (const policyOverrides of [
+      { minAccuracy: { uncachedInputTokens: 1000, cachedInputTokens: 200 } },
+      { minAccuracy: 1.5 },
+      { productionTokenProfile: 0.7 },
+      { switchHorizonTurns: 2.5 },
+    ]) {
+      expect(BenchmarkConfigSchema.safeParse({ ...config, policyOverrides }).success).toBe(false);
+    }
+    expect(
+      BenchmarkConfigSchema.parse({
+        ...config,
+        policyOverrides: {
+          minAccuracy: 0.8,
+          accuracyNoiseBand: null,
+          productionTokenProfile: { uncachedInputTokens: 1000, cachedInputTokens: 200 },
+        },
+      }).policyOverrides
+    ).toEqual({
+      minAccuracy: 0.8,
+      accuracyNoiseBand: null,
+      productionTokenProfile: { uncachedInputTokens: 1000, cachedInputTokens: 200 },
+    });
+  });
+
+  it('ignores stored entries that fail their own setting instead of coercing them', () => {
+    const storedOverrides: unknown = {
+      minAccuracy: { uncachedInputTokens: 1000, cachedInputTokens: 200 },
+      accuracyNoiseBand: 0.02,
+    };
+    const storedComputed: unknown = {
+      minAccuracy: { value: 'high', computedAt, source: 'held-out-grid', evidence: 'fixture' },
+      productionTokenProfile: { value: 0.5, computedAt, source: 'production-usage', evidence: 'x' },
+      switchHorizonTurns: { value: 7, computedAt, source: 'production-usage', evidence: 'x' },
+    };
+    const overrides = parseStoredPolicyOverrides(storedOverrides);
+    const computed = parseStoredPolicyComputed(storedComputed);
+
+    expect(overrides).toEqual({ accuracyNoiseBand: 0.02 });
+    expect(computed).toEqual({
+      switchHorizonTurns: { value: 7, computedAt, source: 'production-usage', evidence: 'x' },
+    });
+    expect(
+      resolveEffectivePolicy({ ...base, policyOverrides: overrides, policyComputed: computed })
+    ).toMatchObject({
+      minAccuracy: 0.7,
+      accuracyNoiseBand: 0.02,
+      productionTokenProfile: null,
+      switchHorizonTurns: 7,
+    });
+  });
+
+  it('authors every fixed value to fit its own setting', () => {
+    for (const key of POLICY_SETTING_KEYS) {
+      const meta: PolicySettingMeta = POLICY_SETTINGS[key];
+      if (meta.kind !== 'fixed' || meta.fixed === null) continue;
+      expect(POLICY_SETTING_VALUE_SCHEMAS[key].safeParse(meta.fixed).success).toBe(true);
+    }
   });
 });

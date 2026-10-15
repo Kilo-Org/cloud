@@ -111,10 +111,7 @@ describe('run progress counts', () => {
     const sqlite = new DatabaseSync(':memory:');
     seed(sqlite);
     try {
-      const progress = await loadRunProgress(sqliteD1(sqlite), [
-        'run-terminal',
-        'run-classifier',
-      ]);
+      const progress = await loadRunProgress(sqliteD1(sqlite), ['run-terminal', 'run-classifier']);
       expect([...progress.keys()]).toEqual(['run-classifier']);
     } finally {
       sqlite.close();

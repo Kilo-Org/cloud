@@ -757,6 +757,19 @@ describe('prepare session sandbox selection', () => {
     model: 'kilo/test-model',
   };
   const organizationInput = { ...baseInput, organizationId: MESSAGE_UUID };
+  it.each([
+    { egressAudit: false },
+    { egressMode: 'unrestricted', egressAudit: false },
+    { egressMode: 'allowlist', egressAudit: false },
+    { egressMode: 'allowlist', egressAudit: true },
+  ])('preserves personal and organization audit opt-ins: %j', policy => {
+    expect(personalPrepareSessionNextSchema.parse({ ...baseInput, ...policy }).egressAudit).toBe(
+      policy.egressAudit
+    );
+    expect(
+      organizationPrepareSessionNextSchema.parse({ ...organizationInput, ...policy }).egressAudit
+    ).toBe(policy.egressAudit);
+  });
   it.each([[], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'preserves canonical API-only policy %j',
     ({ egressAllowlist }) => {
@@ -798,6 +811,10 @@ describe('prepare session sandbox selection', () => {
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'deny-all' },
     { egressMode: null },
+    { egressAudit: true },
+    { egressMode: 'unrestricted', egressAudit: true },
+    { egressMode: 'allowlist', egressAudit: null },
+    { egressMode: 'allowlist', egressAudit: 'true' },
   ])('rejects ambiguous or unsupported egress policies: %j', policy => {
     expect(personalPrepareSessionNextSchema.safeParse({ ...baseInput, ...policy }).success).toBe(
       false

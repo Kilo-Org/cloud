@@ -185,6 +185,91 @@ describe('CloudAgentNextClient review message results', () => {
   });
 });
 
+describe('CloudAgentNextClient getEgressAudit', () => {
+  const input = {
+    cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    cursor: 6,
+    limit: 10,
+  };
+  const query =
+    jest.fn<(request: CloudAgentClientModule.GetEgressAuditInput) => Promise<unknown>>();
+  const audit = {
+    records: [
+      {
+        id: 7,
+        requestId: '12345678-1234-4234-9234-123456789abc',
+        allocationRef: 'allocation:1',
+        timestamp: '2026-10-15T12:00:00.000Z',
+        method: 'GET',
+        hostname: 'example.com',
+        protocol: 'https:',
+        port: 443,
+        decision: 'allowed',
+      },
+    ],
+    nextCursor: 7,
+  };
+
+  beforeEach(() => {
+    query.mockReset();
+    mockCreateTRPCClient.mockReturnValueOnce({ getEgressAudit: { query } });
+  });
+
+  it.each([audit, { records: [], nextCursor: null }])(
+    'validates audit pages and forwards session pagination unchanged',
+    async output => {
+      query.mockResolvedValue(output);
+      await expect(new CloudAgentNextClient('token').getEgressAudit(input)).resolves.toEqual(
+        output
+      );
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(query).toHaveBeenCalledWith(input);
+    }
+  );
+
+  it.each([
+    { records: [] },
+    { records: [], nextCursor: -1 },
+    { records: [{ ...audit.records[0], decision: 'unknown' }], nextCursor: null },
+    { records: [{ ...audit.records[0], hostname: 'example.com/private' }], nextCursor: null },
+    { records: Array.from({ length: 101 }, () => audit.records[0]), nextCursor: null },
+  ])('rejects invalid audit responses: %j', async output => {
+    query.mockResolvedValue(output);
+    await expect(new CloudAgentNextClient('token').getEgressAudit(input)).rejects.toThrow();
+  });
+
+  it('strips fields outside the public audit response', async () => {
+    query.mockResolvedValue({
+      ...audit,
+      sandboxId: 'private-sandbox',
+      records: audit.records.map(record => ({ ...record, url: 'https://example.com/private' })),
+    });
+    await expect(new CloudAgentNextClient('token').getEgressAudit(input)).resolves.toEqual(audit);
+  });
+
+  it.each([
+    { code: 'UNAUTHORIZED', httpStatus: 401 },
+    { code: 'FORBIDDEN', httpStatus: 403 },
+    { code: 'PRECONDITION_FAILED', httpStatus: 412 },
+  ])('preserves Worker $code denials', async data => {
+    query.mockRejectedValue(
+      new TRPCClientError('Audit unavailable', {
+        result: { error: { message: 'Audit unavailable', code: -32003, data } },
+      })
+    );
+    await expect(new CloudAgentNextClient('token').getEgressAudit(input)).rejects.toMatchObject({
+      code: data.code,
+      message: 'Audit unavailable',
+    });
+  });
+
+  it('propagates transport failures without turning them into an empty audit page', async () => {
+    const failure = new Error('connection lost');
+    query.mockRejectedValue(failure);
+    await expect(new CloudAgentNextClient('token').getEgressAudit(input)).rejects.toBe(failure);
+  });
+});
+
 describe('CloudAgentNextClient worktree changes', () => {
   const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
   const snapshot: WorktreeChangesSnapshot = {
@@ -636,6 +721,10 @@ describe('CloudAgentNextClient sandbox selection', () => {
     { egressMode: 'allowlist' as const },
     { egressMode: 'allowlist' as const, egressAllowlist: [] },
     { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'] },
+    { egressAudit: false },
+    { egressMode: 'unrestricted' as const, egressAudit: false },
+    { egressMode: 'allowlist' as const, egressAudit: true },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'], egressAudit: true },
   ])('forwards prepare egress policy unchanged: %j', async policy => {
     const input: PrepareSessionInput = {
       githubRepo: 'acme/repo',

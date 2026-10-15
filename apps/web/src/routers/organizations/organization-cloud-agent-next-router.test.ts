@@ -49,6 +49,7 @@ import {
   type SelectableSandboxAllocationRequest,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import type { GetSandboxSelectionOptionsInput } from '@/lib/cloud-agent-next/cloud-agent-client';
+import type { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 
 const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
 
@@ -106,6 +107,8 @@ const mockGetPendingInteractions =
     (cloudAgentSessionId: string) => Promise<{ questions: unknown[]; permissions: unknown[] }>
   >();
 const mockGetMessageResult = jest.fn<CloudAgentNextClient['getMessageResult']>();
+const mockGetEgressAudit =
+  jest.fn<(input: CloudAgentClientModule.GetEgressAuditInput) => Promise<unknown>>();
 const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
 
 const mockCancelQueuedMessage =
@@ -131,6 +134,7 @@ const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
   getMessageResult: mockGetMessageResult,
+  getEgressAudit: mockGetEgressAudit,
   getPendingInteractions: mockGetPendingInteractions,
   cancelQueuedMessage: mockCancelQueuedMessage,
   getSandboxStatus: mockGetSandboxStatus,
@@ -205,8 +209,12 @@ const mockEnsureOrganizationAccess =
   jest.fn<typeof OrganizationUtilsModule.ensureOrganizationAccess>();
 const mockRequireActiveSubscription = jest.fn<() => void>();
 
+const mockCreateControlTokenForRequest = jest.fn<
+  (...args: Parameters<typeof createControlTokenForRequest>) => Promise<{ token: string }>
+>(async () => ({ token: 'cloud-agent-token' }));
+
 jest.mock('@/lib/auth/resource-delegation', () => ({
-  createControlTokenForRequest: jest.fn(async () => ({ token: 'cloud-agent-token' })),
+  createControlTokenForRequest: mockCreateControlTokenForRequest,
 }));
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
@@ -365,6 +373,9 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     organizationId: string;
     cloudAgentSessionId: string;
   }) => Promise<SandboxStatusSnapshot>;
+  getEgressAudit: (
+    input: CloudAgentClientModule.GetEgressAuditInput & { organizationId: string }
+  ) => ReturnType<CloudAgentNextClient['getEgressAudit']>;
   checkEligibility: (input: { organizationId: string }) => Promise<{
     balance: number;
     minBalance: number;
@@ -690,6 +701,7 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
     mockGetWorktreeChanges.mockResolvedValue({ snapshot: null });
     mockRefreshWorktreeChanges.mockResolvedValue({ status: 'offline', snapshot: null });
     mockGetWorktreeFile.mockResolvedValue({ status: 'not_captured' });
+    mockGetEgressAudit.mockReset().mockResolvedValue({ records: [], nextCursor: null });
     await db
       .update(organizations)
       .set({ deleted_at: null })
@@ -702,6 +714,136 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
         role: 'owner',
       })
       .onConflictDoNothing();
+  });
+
+  describe('getEgressAudit', () => {
+    function call(user = owner, overrides = {}) {
+      return createCaller({ user }).getEgressAudit({
+        organizationId: organization.id,
+        cloudAgentSessionId: orgSessionId,
+        ...overrides,
+      });
+    }
+
+    it.each([{ cursor: 0, limit: 1 }, { cursor: 7, limit: 100 }, {}])(
+      'authorizes organization ownership and proxies only session pagination: %j',
+      async pagination => {
+        mockRequireActiveSubscription.mockImplementation(() => {
+          throw new Error('Subscription inactive');
+        });
+        mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockImplementationOnce(async () => {
+          expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+          expect(mockCreateControlTokenForRequest).not.toHaveBeenCalled();
+          return { kiloSessionId: 'ses_changes_org' };
+        });
+        await expect(call(owner, pagination)).resolves.toEqual({ records: [], nextCursor: null });
+        expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+          expect.objectContaining({ user: owner }),
+          organization.id
+        );
+        expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).toHaveBeenCalledWith(
+          expect.anything(),
+          organization.id,
+          owner.id,
+          orgSessionId
+        );
+        expect(mockCreateControlTokenForRequest).toHaveBeenCalledWith(
+          owner,
+          'cloud-agent-next',
+          expect.objectContaining({ organizationId: organization.id, tokenSource: 'cloud-agent' })
+        );
+        expect(mockGetEgressAudit).toHaveBeenCalledWith({
+          cloudAgentSessionId: orgSessionId,
+          cursor: pagination.cursor,
+          limit: pagination.limit ?? 50,
+        });
+        expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
+        expect(mockRequireActiveSubscription).not.toHaveBeenCalled();
+        expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+        expect(mockGetBalanceForOrganizationUser).not.toHaveBeenCalled();
+        expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each(['foreign owner', 'different organization', 'personal session', 'missing session'])(
+      'denies %s before token creation or the Worker call',
+      async scenario => {
+        const user = scenario === 'foreign owner' ? otherMember : owner;
+        const overrides =
+          scenario === 'different organization'
+            ? { organizationId: otherOrganization.id }
+            : scenario === 'personal session'
+              ? { cloudAgentSessionId: personalSessionId }
+              : scenario === 'missing session'
+                ? { cloudAgentSessionId: 'workspace_22345678-1234-4234-9234-123456789abc' }
+                : {};
+        await expect(call(user, overrides)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        expect(mockCreateControlTokenForRequest).not.toHaveBeenCalled();
+        expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+        expect(mockGetEgressAudit).not.toHaveBeenCalled();
+      }
+    );
+
+    it('rejects revoked membership even if the organization middleware grants access', async () => {
+      await db
+        .delete(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.id),
+            eq(organization_memberships.kilo_user_id, owner.id)
+          )
+        );
+      await expect(call()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockCreateControlTokenForRequest).not.toHaveBeenCalled();
+      expect(mockGetEgressAudit).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleted organizations before contacting the Worker', async () => {
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, organization.id));
+      await expect(call()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+      expect(mockGetEgressAudit).not.toHaveBeenCalled();
+    });
+
+    it('requires organization middleware access before looking up session ownership', async () => {
+      mockEnsureOrganizationAccess.mockRejectedValueOnce(new TRPCError({ code: 'FORBIDDEN' }));
+      await expect(call()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    });
+
+    it.each([{ cursor: -1 }, { limit: 101 }, { sandboxId: 'untrusted-sandbox' }])(
+      'rejects invalid pagination and routing input %j before ownership lookup',
+      async pagination => {
+        await expect(call(owner, pagination)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+        expect(mockGetEgressAudit).not.toHaveBeenCalled();
+      }
+    );
+
+    it('validates the Worker audit response', async () => {
+      mockGetEgressAudit.mockResolvedValueOnce({ records: [], nextCursor: -1 });
+      await expect(call()).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    });
+
+    it('strips private fields from the Worker response', async () => {
+      mockGetEgressAudit.mockResolvedValueOnce({
+        records: [],
+        nextCursor: null,
+        sandboxId: 'private-sandbox',
+      });
+      await expect(call()).resolves.toEqual({ records: [], nextCursor: null });
+    });
+
+    it('preserves Worker access denials', async () => {
+      mockGetEgressAudit.mockRejectedValueOnce(
+        new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+      );
+      await expect(call()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
   });
 
   describe.each(['sendMessage', 'getMessageResult'] as const)('review %s', procedure => {
@@ -1798,6 +1940,33 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     model: 'kilo/test-model',
     githubRepo: 'acme/repo',
   };
+
+  it.each([
+    { egressAudit: false },
+    { egressMode: 'unrestricted' as const, egressAudit: false },
+    { egressMode: 'allowlist' as const, egressAudit: true },
+  ])('forwards organization prepare audit settings: %j', async policy => {
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+    await caller.prepareSession({ ...sandboxInput, ...policy });
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user: { id: 'member', is_admin: false } }),
+      ORGANIZATION_ID
+    );
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ ...policy, kilocodeOrganizationId: ORGANIZATION_ID })
+    );
+  });
+
+  it.each([undefined, 'unrestricted'] as const)(
+    'rejects organization audit without allowlist mode: %s',
+    async egressMode => {
+      const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+      await expect(
+        caller.prepareSession({ ...sandboxInput, egressMode, egressAudit: true })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockPrepareSession).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
     'forwards the normalized legacy organization sandbox preset %s',

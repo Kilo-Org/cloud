@@ -49,6 +49,7 @@ export type GroupedRegisterSessionInput = {
     | 'sandboxAllocation'
     | 'egressMode'
     | 'egressAllowlist'
+    | 'egressAudit'
   >;
 };
 

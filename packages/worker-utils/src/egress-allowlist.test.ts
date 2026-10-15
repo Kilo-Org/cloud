@@ -67,8 +67,28 @@ describe('egressPolicySchema', () => {
     { egressMode: 'allowlist' },
     { egressMode: 'allowlist', egressAllowlist: [] },
     { egressMode: 'allowlist', egressAllowlist: ['example.com'] },
+    { egressAudit: false },
+    { egressMode: 'unrestricted', egressAudit: false },
+    { egressMode: 'allowlist', egressAudit: false },
+    { egressMode: 'allowlist', egressAudit: true },
   ])('preserves an explicit policy without inferring a mode: %j', policy => {
     expect(egressPolicySchema.parse(policy)).toEqual(policy);
+  });
+
+  it.each([
+    { egressAudit: true },
+    { egressMode: 'unrestricted', egressAudit: true },
+    { egressMode: 'allowlist', egressAudit: null },
+    { egressMode: 'allowlist', egressAudit: 'true' },
+    { egressMode: 'allowlist', egressAudit: 1 },
+  ])('rejects invalid audit opt-ins: %j', policy => {
+    const parsed = egressPolicySchema.safeParse(policy);
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues).toContainEqual(
+        expect.objectContaining({ path: ['egressAudit'] })
+      );
+    }
   });
 
   it('normalizes the list when allowlist is explicit', () => {

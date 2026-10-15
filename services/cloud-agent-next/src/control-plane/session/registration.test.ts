@@ -52,6 +52,50 @@ function metadata(overrides: Record<string, unknown> = {}) {
 const selection = { provider: 'cloudflare' as const };
 
 describe('egress policy registration', () => {
+  it.each([
+    { storedAudit: true, selectedAudit: false },
+    { storedAudit: true, selectedAudit: undefined },
+    { storedAudit: false, selectedAudit: true },
+    { storedAudit: undefined, selectedAudit: true },
+  ])('rejects mismatched audit opt-ins: %j', ({ storedAudit, selectedAudit }) => {
+    const input = metadata({
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAudit: storedAudit,
+      },
+    });
+    expect(() =>
+      buildControlPlaneSessionRegistration(input, {
+        provider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAudit: selectedAudit,
+      })
+    ).toThrow('Sandbox selection egress audit does not match session metadata');
+  });
+
+  it.each([
+    { storedAudit: false, selectedAudit: undefined },
+    { storedAudit: undefined, selectedAudit: false },
+  ])('treats false and omitted audit equivalently: %j', ({ storedAudit, selectedAudit }) => {
+    const input = metadata({
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAudit: storedAudit,
+      },
+    });
+    expect(
+      buildControlPlaneSessionRegistration(input, {
+        provider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAudit: selectedAudit,
+      }).sandboxSelection?.egressAudit
+    ).toBe(selectedAudit);
+  });
+
   it.each([[], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'preserves a matching policy %j',
     ({ egressAllowlist }) => {
@@ -150,6 +194,9 @@ describe('egress policy registration', () => {
     { egressMode: 'unrestricted', egressAllowlist: [] },
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'invalid' },
+    { egressAudit: true },
+    { egressMode: 'unrestricted', egressAudit: true },
+    { egressMode: 'allowlist', egressAudit: null },
   ])('rejects ambiguous sandbox selection policy %j', policy => {
     expect(
       controlPlaneSandboxSelectionSchema.safeParse({

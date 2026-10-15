@@ -8,6 +8,7 @@ export const nativeEgressAllowlistSchema = z
 export const nativeEgressPolicySchema = z.object({
   allocationRef: z.string().min(1),
   allowlist: nativeEgressAllowlistSchema,
+  egressAudit: z.boolean().optional(),
 });
 
 export type NativeEgressPolicy = z.infer<typeof nativeEgressPolicySchema>;

@@ -1240,6 +1240,9 @@ function buildSessionRegistrationCommand(
       sandboxId: allocation.sandboxId,
       sandboxProvider: allocation.sandboxProvider,
       ...(input.runtime?.egressMode === undefined ? {} : { egressMode: input.runtime.egressMode }),
+      ...(input.runtime?.egressAudit === undefined
+        ? {}
+        : { egressAudit: input.runtime.egressAudit }),
       ...(input.runtime?.egressMode === 'allowlist'
         ? { egressAllowlist: egressAllowlistSchema.parse(input.runtime.egressAllowlist ?? []) }
         : {}),
@@ -1838,6 +1841,7 @@ export async function sessionCreateIntentFingerprint(
                     egressAllowlist: egressAllowlistSchema.parse(
                       input.runtime.egressAllowlist ?? []
                     ),
+                    ...(input.runtime.egressAudit === true ? { egressAudit: true } : {}),
                   }
                 : {}),
             }
@@ -2393,6 +2397,7 @@ async function readSessionMetadata(
     metadata !== null &&
     ((metadata.workspace?.egressMode ?? 'unrestricted') !==
       (input.runtime?.egressMode ?? 'unrestricted') ||
+      (metadata.workspace?.egressAudit ?? false) !== (input.runtime?.egressAudit ?? false) ||
       JSON.stringify(metadata.workspace?.egressAllowlist ?? []) !==
         JSON.stringify(egressAllowlistSchema.parse(input.runtime?.egressAllowlist ?? [])))
   ) {

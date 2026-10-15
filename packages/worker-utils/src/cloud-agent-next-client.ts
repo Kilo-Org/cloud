@@ -13,6 +13,11 @@ import {
   type CodeReviewTerminalReason as CloudAgentTerminalReason,
 } from '@kilocode/db/schema-types';
 import type { EgressMode } from './egress-allowlist.js';
+import {
+  GetEgressAuditResponseSchema,
+  type GetEgressAuditInput,
+  type GetEgressAuditResponse,
+} from './egress-audit.js';
 
 // ---------------------------------------------------------------------------
 // Types — aligned with cloud-agent-next tRPC router contracts
@@ -69,6 +74,7 @@ export type CloudAgentPrepareSessionInput = {
   sandboxAllocation?: 'isolated-standard';
   egressMode?: EgressMode;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
   runtimeSkills?: Array<{
     name: string;
     rawMarkdown: string;
@@ -119,6 +125,10 @@ export type CloudAgentSendMessageOutput = {
 };
 
 export type CloudAgentSessionHealthInput = {
+  cloudAgentSessionId: string;
+};
+
+export type CloudAgentGetEgressAuditInput = GetEgressAuditInput & {
   cloudAgentSessionId: string;
 };
 
@@ -305,6 +315,11 @@ export type CloudAgentNextFetchClient = {
     input: CloudAgentSessionHealthInput
   ): Promise<CloudAgentSessionHealthOutput>;
 
+  getEgressAudit(
+    headers: Record<string, string>,
+    input: CloudAgentGetEgressAuditInput
+  ): Promise<GetEgressAuditResponse>;
+
   interruptSession(
     headers: Record<string, string>,
     input: CloudAgentInterruptInput
@@ -413,6 +428,27 @@ export function createCloudAgentNextFetchClient(baseUrl: string): CloudAgentNext
         input,
         'interruptSession'
       );
+    },
+
+    async getEgressAudit(headers, input) {
+      const url = new URL(trpc('getEgressAudit'));
+      url.searchParams.set('input', JSON.stringify(input));
+      const response = await fetch(url.toString(), { method: 'GET', headers });
+      if (!response.ok) {
+        throw new CloudAgentNextError('getEgressAudit', response.status, await response.text());
+      }
+      const envelope: unknown = await response.json();
+      if (
+        typeof envelope !== 'object' ||
+        envelope === null ||
+        !('result' in envelope) ||
+        typeof envelope.result !== 'object' ||
+        envelope.result === null ||
+        !('data' in envelope.result)
+      ) {
+        throw new Error('Unexpected getEgressAudit response shape');
+      }
+      return GetEgressAuditResponseSchema.parse(envelope.result.data);
     },
   };
 }

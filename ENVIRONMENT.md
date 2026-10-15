@@ -50,7 +50,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `CSA_VERCEL_PROTECTION_BYPASS` - CSA Vercel Deployment Protection automation bypass. Cloud sends it as the `x-vercel-protection-bypass` header on Cloud → CSA `POST /api/internal/cloud/users/gdpr-scrub`, never as a query parameter. Required when CSA has Vercel Authentication enabled; without it Vercel returns 401 before the CSA route. Distinct from `SUPPORT_API_SECRET`. `[SECRET]`
 - `SENTRY_ORG` - Sentry organization slug for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
 - `SENTRY_PROJECT` - Sentry project slug for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
-- `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
+- `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs`, `apps/ai-gateway/next.config.mjs`, and Cloud Agent deployment CI. Cloud Agent uploads target `kilo-code/kilo-cloud-agent`; the token must never enter sandbox environments or image build arguments. `[SECRET]`
 - `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for server and Edge runtime error reporting; used in `apps/web/sentry.edge.config.ts` and `packages/web-shared/src/lib/observability/sentry-server.ts`. `[PUBLIC]`
 
 ### Marketing Tags
@@ -448,6 +448,8 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `KILO_SESSION_INGEST_URL` - URL used by the Cloud Agent Next wrapper to ingest session data. [SERVER]
 - `KILO_PLATFORM` - Target platform identifier used by the Cloud Agent Next wrapper (`darwin`, `linux`, etc.). [SERVER]
 - `WRAPPER_LOG_PATH` - File path for the Cloud Agent Next wrapper's log output. [SERVER]
+- `CLOUD_AGENT_SENTRY_DSN` - Optional Worker-owned Sentry DSN for the `kilo-code/kilo-cloud-agent` project, used for Cloud Agent exceptions and wrapper crashes. Forwarded only at wrapper launch, never taken from agent profiles. Missing or invalid disables reporting. [SERVER]
+- `CLOUD_AGENT_SENTRY_ENVIRONMENT` - Cloud Agent Sentry environment label; defaults to `production`. Use a separate label for nonproduction deployments. [SERVER]
 - `KILO_BIN_PATH` - Path or name of the `kilo` CLI binary; used by `services/cloud-agent-next/scripts/update-default-slash-commands.mjs`. [SERVER]
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]

@@ -8,3 +8,7 @@ packages/harness-sdk/src/plugins/remote-model/security\.test\.ts
 # embedded credentials ("user:secret@localhost") is rejected. Exclude the
 # fixture path so the synthetic credential URI does not fail the scan.
 apps/web/src/lib/cloud-agent/preview-link\.test\.ts
+
+# Sentry privacy fixtures use synthetic URL credentials to test sanitization.
+# Exclude this fixture path because the literal URI remains in branch history.
+services/cloud-agent-next/src/shared/sentry\.test\.ts

@@ -22,6 +22,11 @@ import {
   type ControlFileLogUploader,
 } from '../control/file-log-uploader.js';
 import { logToFile } from '../utils.js';
+import {
+  createWrapperSentryReporter,
+  type WrapperSentryContext,
+  type WrapperSentryReporter,
+} from '../sentry.js';
 import { createControlPlaneConnection, type ControlPlaneConnection } from './connection.js';
 import {
   cleanupStaleKiloPidfiles,
@@ -72,9 +77,14 @@ export function controlPlaneExitPolicy(event: ControlPlaneExitEvent): number | n
 }
 
 export type ControlPlaneProcess = {
-  once(event: 'SIGTERM' | 'uncaughtException', listener: () => void): unknown;
+  once(event: 'SIGTERM' | 'uncaughtException', listener: (error: unknown) => void): unknown;
   on(event: 'unhandledRejection', listener: (reason: unknown) => void): unknown;
 };
+
+type ControlPlaneSentryContext = Pick<
+  WrapperSentryContext,
+  'allocationId' | 'providerInstanceId' | 'wrapperInstanceId'
+>;
 
 export type ControlPlaneLifecycleDeps = {
   connection: ControlPlaneConnection;
@@ -84,6 +94,8 @@ export type ControlPlaneLifecycleDeps = {
   exit: (code: number) => void;
   process?: ControlPlaneProcess;
   log?: (message: string) => void;
+  sentry?: WrapperSentryReporter;
+  sentryContext?: ControlPlaneSentryContext;
   /** Stops owned Kilo runtimes before the process exits. */
   stop?: () => Promise<void>;
 };
@@ -117,11 +129,13 @@ export function createControlPlaneLifecycle(
   async function shutdown(
     exitCode: number,
     reason: string,
-    phase: 'stopping' | 'failed' = exitCode === 0 ? 'stopping' : 'failed'
+    phase: 'stopping' | 'failed' = exitCode === 0 ? 'stopping' : 'failed',
+    flushSentry = false
   ): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     log(`control-plane wrapper stopping exitCode=${exitCode} reason=${reason}`);
+    const sentryFlush = flushSentry ? deps.sentry?.flush() : undefined;
     deps.connection.close();
     await settle(() => deps.stop?.() ?? Promise.resolve());
     const detail = diagnosticDetail(reason);
@@ -132,24 +146,46 @@ export function createControlPlaneLifecycle(
     });
     await settle(() => deps.diagnostics.finalize(DIAGNOSTICS_FINALIZE_TIMEOUT_MS));
     await settle(() => deps.fileLogs.finalize(FILE_LOG_FINALIZE_TIMEOUT_MS));
+    if (sentryFlush) await settle(() => sentryFlush);
     deps.exit(exitCode);
   }
 
-  function handleExitEvent(event: ControlPlaneExitEvent, reason: string): void {
+  function handleExitEvent(event: ControlPlaneExitEvent, reason: string, error?: unknown): void {
     const exitCode = controlPlaneExitPolicy(event);
     if (exitCode === null) {
       log(`control-plane wrapper ignored ${reason}`);
       return;
     }
+    if (shuttingDown) return;
+    if (event === 'uncaught_exception') {
+      deps.sentry?.capture(error, {
+        ...deps.sentryContext,
+        operation: 'uncaught_exception',
+        exitCode,
+      });
+    }
     // SIGTERM is a stop, not a wrapper failure: the wrapper cannot tell the
     // supervisor's forwarded TERM from a stray one, and the supervisor's
     // `wrapper_restart` or `supervisor_exit` line records which it was.
-    void shutdown(exitCode, reason, event === 'sigterm' ? 'stopping' : 'failed');
+    void shutdown(
+      exitCode,
+      reason,
+      event === 'sigterm' ? 'stopping' : 'failed',
+      event === 'uncaught_exception'
+    );
   }
 
   proc.once('SIGTERM', () => handleExitEvent('sigterm', 'SIGTERM'));
-  proc.once('uncaughtException', () => handleExitEvent('uncaught_exception', 'uncaught exception'));
+  proc.once('uncaughtException', error =>
+    handleExitEvent('uncaught_exception', 'uncaught exception', error)
+  );
   proc.on('unhandledRejection', reason => {
+    if (!shuttingDown) {
+      deps.sentry?.capture(reason, {
+        ...deps.sentryContext,
+        operation: 'unhandled_rejection',
+      });
+    }
     // Closed native record: the free-text reason stays in the file log only.
     deps.onNativeDiagnostic?.('wrapper.lifecycle', {
       phase: 'failed',
@@ -207,12 +243,10 @@ export function createControlPlaneSessionHost(options: {
   };
 }
 
-/**
- * Process entry for the control-plane wrapper. Runs forever until `shutdown`
- * frame, SIGTERM or an uncaught exception; a disconnect never exits.
- */
-export async function runControlPlaneWrapper(
-  env: Record<string, string | undefined> = process.env
+async function main(
+  env: Record<string, string | undefined>,
+  sentry: WrapperSentryReporter,
+  sentryContext: ControlPlaneSentryContext
 ): Promise<ControlPlaneLifecycle | undefined> {
   const uploadUrl = env.CONTROL_LOG_UPLOAD_URL;
   const uploadGrant = env.CONTROL_LOG_UPLOAD_GRANT;
@@ -380,6 +414,7 @@ export async function runControlPlaneWrapper(
     onConnected: () => diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true }),
     onDisconnected: reason => logToFile(`control-plane disconnected: ${reason}`),
   });
+  sentryContext.wrapperInstanceId = connection.wrapperId;
   terminalsRef.current = createControlPlaneTerminals({
     controlUrl: url,
     wrapperId: connection.wrapperId,
@@ -470,6 +505,8 @@ export async function runControlPlaneWrapper(
     diagnostics,
     fileLogs,
     onNativeDiagnostic: projector,
+    sentry,
+    sentryContext,
     exit: code => process.exit(code),
     log: logToFile,
     stop: async () => {
@@ -487,6 +524,38 @@ export async function runControlPlaneWrapper(
   nativeStatus.start();
   lifecycle.start();
   return lifecycle;
+}
+
+/**
+ * Process entry for the control-plane wrapper. Runs forever until `shutdown`
+ * frame, SIGTERM or an uncaught exception; a disconnect never exits.
+ */
+export async function runControlPlaneWrapper(
+  env: Record<string, string | undefined> = process.env,
+  sentry?: WrapperSentryReporter
+): Promise<ControlPlaneLifecycle | undefined> {
+  sentry ??= await createWrapperSentryReporter({
+    env: {
+      CLOUD_AGENT_SENTRY_DSN: env.CLOUD_AGENT_SENTRY_DSN,
+      CLOUD_AGENT_SENTRY_ENVIRONMENT: env.CLOUD_AGENT_SENTRY_ENVIRONMENT,
+    },
+    log: message => {
+      logToFile(message);
+      console.error(message);
+    },
+  });
+  const sentryContext: ControlPlaneSentryContext = {
+    allocationId: env[CONTROL_PLANE_ALLOCATION_ID_ENV],
+    providerInstanceId: env.PROVIDER_INSTANCE_ID,
+    wrapperInstanceId: env.CONTROL_WRAPPER_INSTANCE_ID,
+  };
+  try {
+    return await main(env, sentry, sentryContext);
+  } catch (error) {
+    sentry.capture(error, { ...sentryContext, operation: 'startup', exitCode: 1 });
+    await sentry.flush();
+    throw error;
+  }
 }
 
 if (import.meta.main) {

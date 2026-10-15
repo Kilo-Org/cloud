@@ -65,6 +65,22 @@ corepack enable
 corepack install
 ```
 
+### Bun 1.3.14 (Cloud Agent development)
+
+Cloud Agent wrapper builds require exactly Bun 1.3.14, matching
+`RUNTIME_DISTRIBUTION.bun` in
+`services/cloud-agent-next/src/shared/runtime-distribution.ts`. The service's
+`dev`, `dev:no-proxy`, `start`, and `deploy` scripts build the wrapper automatically.
+
+Install or switch to this version using the
+[official installer](https://bun.com/docs/installation#installing-older-versions),
+then verify the version:
+
+```bash
+curl -fsSL https://bun.com/install | bash -s "bun-v1.3.14"
+bun --version
+```
+
 ### Docker
 
 Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) either from the website or via Homebrew:

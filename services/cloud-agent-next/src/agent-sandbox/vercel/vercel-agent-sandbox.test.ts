@@ -5,6 +5,7 @@ import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { VercelAgentSandbox } from './vercel-agent-sandbox.js';
 import type { VercelSandboxRuntimeConfig } from './vercel-runtime-config.js';
+import { WrapperClient } from '../../kilo/wrapper-client.js';
 import {
   VercelSandboxRestError,
   type VercelSandboxCommand,
@@ -367,6 +368,49 @@ describe('VercelAgentSandbox', () => {
     });
     expect(health).toHaveBeenCalledOnce();
     wrapperHealth.mockRestore();
+  });
+
+  it.each([
+    {
+      CLOUD_AGENT_SENTRY_DSN: 'https://0123456789abcdef@o123.ingest.sentry.io/456',
+      CLOUD_AGENT_SENTRY_ENVIRONMENT: 'production',
+    },
+    {},
+    { CLOUD_AGENT_SENTRY_DSN: 'http://key@o123.ingest.sentry.io/456' },
+  ])('launches legacy Vercel with only validated trusted Sentry config: %j', async sentry => {
+    const context = runtimeContext();
+    const client = restClient();
+    vi.spyOn(WrapperClient.prototype, 'health').mockResolvedValue({
+      healthy: true,
+      state: 'idle',
+      sessionId: 'kilo-session',
+      version: WRAPPER_VERSION,
+      wrapperInstanceId: 'instance-1',
+      wrapperInstanceGeneration: 2,
+    });
+    const sessionMetadata: SessionMetadata = metadata();
+    sessionMetadata.profile = {
+      envVars: {
+        CLOUD_AGENT_SENTRY_DSN: 'https://forged@evil.example.com/123',
+        CLOUD_AGENT_SENTRY_ENVIRONMENT: 'forged',
+      },
+    };
+    const sandbox = new VercelAgentSandbox(sessionMetadata, config, context, {
+      restClient: asRestClient(client),
+      sentry,
+    });
+
+    await sandbox.ensureWrapper(ensureRequest());
+
+    const launch = client.executeCommand.mock.calls.find(([, options]) => !options.wait)?.[1];
+    expect(launch).toBeDefined();
+    if (sentry.CLOUD_AGENT_SENTRY_ENVIRONMENT === 'production') {
+      expect(launch?.env).toMatchObject(sentry);
+    } else {
+      expect(launch?.env).not.toHaveProperty('CLOUD_AGENT_SENTRY_DSN');
+      expect(launch?.env).not.toHaveProperty('CLOUD_AGENT_SENTRY_ENVIRONMENT');
+    }
+    expect(launch?.args.join(' ')).not.toContain('CLOUD_AGENT_SENTRY');
   });
 
   it('uses bounded exponential delays until wrapper health matches the persisted lease', async () => {

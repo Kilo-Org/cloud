@@ -36,6 +36,8 @@ import {
 import { KILO_SERVER_ENV_KEYS, type KiloServerEnv } from '../shared/kilo-server-env.js';
 import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../shared/tool-cgroup-env.js';
 import { parseWrapperSessionReadyErrorResponse } from './wrapper-ready-error.js';
+import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
+import { getSentryConfig } from '../shared/sentry.js';
 
 export type WrapperClientOptions =
   | {
@@ -78,6 +80,7 @@ export type EnsureRunningOptions = {
    * Not org-gated — only keys set in the Worker environment are included.
    */
   kiloServerEnv?: KiloServerEnv;
+  sentry?: Parameters<typeof getSentryConfig>[0];
 };
 
 export type EnsureWrapperOptions = {
@@ -92,6 +95,7 @@ export type EnsureWrapperOptions = {
   toolCgroupEnv?: ToolCgroupEnv;
   /** See {@link EnsureRunningOptions.kiloServerEnv}. */
   kiloServerEnv?: KiloServerEnv;
+  sentry?: EnsureRunningOptions['sentry'];
   /**
    * Force the wrapper to listen on this exact port instead of a random one.
    * When set, the per-attempt port-retry loop is skipped.
@@ -109,6 +113,7 @@ export type EnsureBootstrapWrapperOptions = {
   toolCgroupEnv?: ToolCgroupEnv;
   /** See {@link EnsureRunningOptions.kiloServerEnv}. */
   kiloServerEnv?: KiloServerEnv;
+  sentry?: EnsureRunningOptions['sentry'];
 };
 
 export type SessionBinding = {
@@ -571,6 +576,7 @@ export class WrapperClient {
       runtimeEnv,
       toolCgroupEnv,
       kiloServerEnv,
+      sentry: sentryEnv,
     } = options;
 
     try {
@@ -632,6 +638,14 @@ export class WrapperClient {
       ...dockerEnvParts,
     ];
     const processEnv = mergeEnvRecords(runtimeEnv, wrapperEnv, dockerSocketEnv(dockerSocketPath));
+    for (const key of CONTROL_RUNTIME_RESERVED_ENV_VARS) {
+      delete processEnv[key];
+    }
+    const sentry = getSentryConfig(sentryEnv ?? {});
+    if (sentry) {
+      processEnv.CLOUD_AGENT_SENTRY_DSN = sentry.dsn;
+      processEnv.CLOUD_AGENT_SENTRY_ENVIRONMENT = sentry.environment;
+    }
     const argParts = [`--user-id ${shellQuote(userId)}`];
     if (sessionId) {
       argParts.push(`--session-id ${shellQuote(sessionId)}`);

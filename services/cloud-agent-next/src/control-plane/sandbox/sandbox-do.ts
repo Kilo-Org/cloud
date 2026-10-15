@@ -3908,6 +3908,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         sandboxId: this.sandboxId,
         provider,
         credential: launchCredential,
+        sentry: {
+          CLOUD_AGENT_SENTRY_DSN: this.env.CLOUD_AGENT_SENTRY_DSN,
+          CLOUD_AGENT_SENTRY_ENVIRONMENT: this.env.CLOUD_AGENT_SENTRY_ENVIRONMENT,
+        },
         diagnostics: { allocationId, signingSecret },
         ...(typeof workloadCgroup === 'string' ? { workloadCgroup } : {}),
       }),

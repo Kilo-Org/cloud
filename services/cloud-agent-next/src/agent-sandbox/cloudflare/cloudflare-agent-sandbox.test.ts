@@ -295,6 +295,45 @@ describe('CloudflareAgentSandbox', () => {
     ensureBootstrapWrapper.mockRestore();
   });
 
+  it('passes Worker-owned Sentry configuration to bootstrap before materializing the user profile', async () => {
+    const bootstrapSession = {};
+    const createSession = vi.fn().mockResolvedValue(bootstrapSession);
+    const ensureBootstrapWrapper = vi
+      .spyOn(WrapperClient, 'ensureBootstrapWrapper')
+      .mockResolvedValueOnce({ client: {} as WrapperClient });
+    const sessionMetadata = metadata();
+    sessionMetadata.profile = {
+      envVars: {
+        CLOUD_AGENT_SENTRY_DSN: 'https://forged@evil.example.com/123',
+        CLOUD_AGENT_SENTRY_ENVIRONMENT: 'forged',
+      },
+    };
+    const sentry = {
+      CLOUD_AGENT_SENTRY_DSN: 'https://0123456789abcdef@o123.ingest.sentry.io/456',
+      CLOUD_AGENT_SENTRY_ENVIRONMENT: 'production',
+    };
+    const sandbox = new CloudflareAgentSandbox(sentry as Env, sessionMetadata, {
+      resolveSandbox: () =>
+        ({
+          exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'exists\n', stderr: '' }),
+          createSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await sandbox.ensureWrapper(ensureRequest());
+
+    expect(createSession).toHaveBeenCalledWith({
+      name: 'agent_cloudflare-bootstrap',
+      env: {},
+      cwd: '/',
+    });
+    expect(ensureBootstrapWrapper).toHaveBeenCalledWith(expect.anything(), bootstrapSession, {
+      agentSessionId: 'agent_cloudflare',
+      userId: 'user_cloudflare',
+      sentry,
+    });
+  });
+
   it('passes TOOL_CGROUP_* env through without organization gating', async () => {
     const bootstrapSession = {};
     const createSession = vi.fn().mockResolvedValue(bootstrapSession);

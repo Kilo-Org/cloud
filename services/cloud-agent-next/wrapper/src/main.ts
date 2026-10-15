@@ -34,6 +34,12 @@ import { createGlobalFeedManager, type SessionBoundFeedPolicy } from './global-f
 import { logToFile } from './utils.js';
 import { startToolCgroup } from './tool-cgroup.js';
 import { abortKiloSessionForShutdown } from './shutdown.js';
+import { createLegacyCrashHandler } from './crash.js';
+import {
+  createWrapperSentryReporter,
+  type WrapperSentryContext,
+  type WrapperSentryReporter,
+} from './sentry.js';
 import { kiloServerBootstrapError, WrapperBootstrapError } from './bootstrap-error.js';
 import type { WrapperCommand } from '../../src/shared/protocol.js';
 import type {
@@ -68,7 +74,7 @@ function getOptionalEnvInt(name: string, defaultValue: number): number {
 function failStartup(message: string): never {
   logToFile(`ERROR: ${message}`);
   console.error(message);
-  process.exit(1);
+  throw new Error(message);
 }
 
 type StartupArgs = {
@@ -157,7 +163,11 @@ function parseStartupArgs(argv: string[]): StartupArgs {
   return { agentSessionId, userId, sessionId, wrapperInstanceId, wrapperInstanceGeneration };
 }
 
-async function main() {
+async function main(
+  sentry: WrapperSentryReporter,
+  state: WrapperState,
+  startupContext: Pick<WrapperSentryContext, 'sessionId'>
+) {
   logToFile(`wrapper starting (long-running mode) bun=${Bun.version}`);
 
   // Parse environment variables and startup args — only session-stable config remains here.
@@ -204,6 +214,7 @@ async function main() {
   if (!SESSION_ID_RE.test(agentSessionId)) {
     failStartup(`Invalid agent session ID: ${agentSessionId}`);
   }
+  startupContext.sessionId = agentSessionId;
 
   if (!process.env.WRAPPER_LOG_PATH) {
     process.env.WRAPPER_LOG_PATH = `/tmp/kilocode-wrapper-${Date.now()}.log`;
@@ -225,7 +236,6 @@ async function main() {
   // when the cgroup fs is unavailable, e.g. in devcontainers).
   const toolCgroup = startToolCgroup(process.env);
 
-  const state = new WrapperState();
   let kiloSessionId = configuredSessionId ?? '';
   let connectionManager: ReturnType<typeof createConnectionManager> | undefined;
   let lifecycleManager: ReturnType<typeof createLifecycleManager> | undefined;
@@ -937,28 +947,55 @@ async function main() {
   process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
   process.on('SIGINT', () => void handleShutdown('SIGINT'));
 
-  function handleCrash(label: string): void {
-    if (isShuttingDown) return;
-
-    logToFile(label);
-    console.error(`Wrapper ${label}`);
-
-    const uploader = state.logUploader;
-    if (uploader) {
-      void uploader.finalize().finally(() => {
-        process.exit(1);
-      });
-    } else {
-      process.exit(1);
-    }
-  }
-
-  process.on('uncaughtException', () => handleCrash('uncaught exception'));
-  process.on('unhandledRejection', () => handleCrash('unhandled rejection'));
+  const handleCrash = createLegacyCrashHandler({
+    sentry,
+    getContext: () => ({
+      sessionId: state.currentSession?.agentSessionId ?? agentSessionId,
+      wrapperRunId: state.currentSession?.wrapperRunId,
+    }),
+    isShuttingDown: () => isShuttingDown,
+    log: label => {
+      logToFile(label);
+      console.error(`Wrapper ${label}`);
+    },
+    finalizeLogs: () => state.logUploader?.finalize() ?? Promise.resolve(),
+    exit: code => process.exit(code),
+  });
+  process.on('uncaughtException', error => handleCrash('uncaught_exception', error));
+  process.on('unhandledRejection', reason => handleCrash('unhandled_rejection', reason));
 }
 
-main().catch(() => {
-  logToFile('fatal error');
-  console.error('Wrapper fatal error');
-  process.exit(1);
-});
+export async function runLegacyWrapper(sentry?: WrapperSentryReporter): Promise<void> {
+  sentry ??= await createWrapperSentryReporter({
+    env: {
+      CLOUD_AGENT_SENTRY_DSN: process.env.CLOUD_AGENT_SENTRY_DSN,
+      CLOUD_AGENT_SENTRY_ENVIRONMENT: process.env.CLOUD_AGENT_SENTRY_ENVIRONMENT,
+    },
+    log: message => {
+      logToFile(message);
+      console.error(message);
+    },
+  });
+  const state = new WrapperState();
+  const startupContext: Pick<WrapperSentryContext, 'sessionId'> = {};
+  try {
+    await main(sentry, state, startupContext);
+  } catch (error) {
+    sentry.capture(error, {
+      ...startupContext,
+      wrapperRunId: state.currentSession?.wrapperRunId,
+      operation: 'startup',
+      exitCode: 1,
+    });
+    await sentry.flush();
+    throw error;
+  }
+}
+
+if (import.meta.main) {
+  await runLegacyWrapper().catch(() => {
+    logToFile('fatal error');
+    console.error('Wrapper fatal error');
+    process.exit(1);
+  });
+}

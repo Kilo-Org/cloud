@@ -4,6 +4,7 @@ FROM docker.io/cloudflare/sandbox:0.12.9
 ARG BUILD_DATE=""
 ARG VCS_REF=""
 ARG KILOCODE_CLI_VERSION="7.8.1"
+ARG BUN_VERSION="1.3.14"
 ARG PNPM_VERSION="11.1.2"
 ARG GLAB_VERSION="1.93.0"
 
@@ -63,20 +64,10 @@ ENV LANG=en_US.UTF-8
 
 # Install dependencies globally (accessible to all users)
 RUN npm install -g pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
+RUN npm install --prefix /opt/kilo-cloud/bun --no-save bun@${BUN_VERSION} \
+    && ln -sf /opt/kilo-cloud/bun/node_modules/.bin/bun /usr/local/bin/bun
 
-# === Build wrapper bundle inside container ===
-# This ensures the wrapper is built with the same Bun version that will run it,
-# avoiding any compatibility issues between build and runtime environments.
-# The build entrypoint list lives in src/shared/runtime-distribution.ts.
-COPY wrapper /tmp/wrapper-build/wrapper
-COPY src/shared /tmp/wrapper-build/src/shared
-
-# Install wrapper dependencies (pnpm symlinks don't survive COPY) and build
-RUN cd /tmp/wrapper-build/wrapper && \
-    bun install --production && \
-    ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules && \
-    bun run build.ts --install-dir /usr/local/bin && \
-    rm -rf /tmp/wrapper-build
+COPY wrapper/dist/runtime/ /usr/local/bin/
 
 # DO NOT override USER, WORKDIR, or ENTRYPOINT from the base image
 # The Cloudflare sandbox base image entrypoint must run its control server

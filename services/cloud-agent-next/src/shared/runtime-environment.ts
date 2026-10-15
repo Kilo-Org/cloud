@@ -42,6 +42,8 @@ export function isStrippedGitConfigEnvVar(key: string): boolean {
 }
 
 export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
+  'CLOUD_AGENT_SENTRY_DSN',
+  'CLOUD_AGENT_SENTRY_ENVIRONMENT',
   'SANDBOX_CONTROL_CREDENTIAL',
   'SANDBOX_CONTROL_URL',
   'PROVIDER_INSTANCE_ID',

@@ -28,7 +28,6 @@ import {
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({

@@ -5,7 +5,7 @@ import type { OpenAiChatGptOwner } from '@kilocode/web-shared/lib/ai-gateway/ope
 import {
   ReasoningDetailsTransform,
   type ReasoningDetailsTransform as ReasoningDetailsTransformType,
-} from '@kilocode/db';
+} from '@kilocode/db/schema-types';
 
 export { ReasoningDetailsTransform };
 

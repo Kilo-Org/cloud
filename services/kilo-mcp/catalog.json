@@ -97,6 +97,360 @@
     ],
     "searchBlob": "activeSessions.widgetSnapshot Get the home widget snapshot of active agents and sessions for the current user, optionally scoped to an organization, for rendering a glanceable dashboard widget. Use this to fetch the widget's data payload. activesessions widgetsnapshot organizationid organizationId"
   },
+  "agentBriefing.dismiss": {
+    "path": "agentBriefing.dismiss",
+    "kind": "mutation",
+    "summary": "Dismiss an agent briefing report so it is no longer shown.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "dismiss",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.dismiss Dismiss an agent briefing report so it is no longer shown. agentbriefing dismiss reportid reportId"
+  },
+  "agentBriefing.estimateSummary": {
+    "path": "agentBriefing.estimateSummary",
+    "kind": "query",
+    "summary": "Estimate the cost and availability of generating an AI briefing summary before turning it on.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "maxSpendMicrodollars": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxDurationSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "estimatesummary",
+      "organizationid",
+      "model",
+      "maxspendmicrodollars",
+      "maxdurationseconds",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.estimateSummary Estimate the cost and availability of generating an AI briefing summary before turning it on. agentbriefing estimatesummary organizationid model maxspendmicrodollars maxdurationseconds reportid organizationId model maxSpendMicrodollars maxDurationSeconds reportId"
+  },
+  "agentBriefing.generateSummary": {
+    "path": "agentBriefing.generateSummary",
+    "kind": "mutation",
+    "summary": "Generate an AI summary for a briefing report using a verified cost estimate.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "estimateToken": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reportId",
+        "estimateToken"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "generatesummary",
+      "reportid",
+      "estimatetoken"
+    ],
+    "searchBlob": "agentBriefing.generateSummary Generate an AI summary for a briefing report using a verified cost estimate. agentbriefing generatesummary reportid estimatetoken reportId estimateToken"
+  },
+  "agentBriefing.get": {
+    "path": "agentBriefing.get",
+    "kind": "query",
+    "summary": "Fetch a single agent briefing report by ID, reconciling any pending charge.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "get",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.get Fetch a single agent briefing report by ID, reconciling any pending charge. agentbriefing get reportid reportId"
+  },
+  "agentBriefing.list": {
+    "path": "agentBriefing.list",
+    "kind": "query",
+    "summary": "List the user's agent briefing reports, filtered by personal or organization scope, with pagination.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "all",
+            "personal",
+            "organization"
+          ]
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cursor": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "currentOnly": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "list",
+      "scope",
+      "organizationid",
+      "cursor",
+      "limit",
+      "currentonly"
+    ],
+    "searchBlob": "agentBriefing.list List the user's agent briefing reports, filtered by personal or organization scope, with pagination. agentbriefing list scope organizationid cursor limit currentonly scope organizationId cursor limit currentOnly"
+  },
+  "agentBriefing.preferences": {
+    "path": "agentBriefing.preferences",
+    "kind": "query",
+    "summary": "Get the current user's agent briefing preferences, including timezone, language, notification schedule, and delivery settings.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "preferences",
+      "timezone",
+      "language"
+    ],
+    "searchBlob": "agentBriefing.preferences Get the current user's agent briefing preferences, including timezone, language, notification schedule, and delivery settings. agentbriefing preferences timezone language timezone language"
+  },
+  "agentBriefing.read": {
+    "path": "agentBriefing.read",
+    "kind": "mutation",
+    "summary": "Mark an agent briefing report as read.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "read",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.read Mark an agent briefing report as read. agentbriefing read reportid reportId"
+  },
+  "agentBriefing.retrySummary": {
+    "path": "agentBriefing.retrySummary",
+    "kind": "mutation",
+    "summary": "Retry generating an AI summary for a briefing report that previously failed.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "estimateToken": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reportId",
+        "estimateToken"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "retrysummary",
+      "reportid",
+      "estimatetoken"
+    ],
+    "searchBlob": "agentBriefing.retrySummary Retry generating an AI summary for a briefing report that previously failed. agentbriefing retrysummary reportid estimatetoken reportId estimateToken"
+  },
+  "agentBriefing.updateContextPreferences": {
+    "path": "agentBriefing.updateContextPreferences",
+    "kind": "mutation",
+    "summary": "Enable or disable AI-generated summaries for a briefing context and set the model, spend cap, and duration limits, verifying the cost estimate first.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "aiEnabled": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "maxSpendMicrodollars": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxDurationSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "estimateToken": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "aiEnabled"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "updatecontextpreferences",
+      "organizationid",
+      "aienabled",
+      "model",
+      "maxspendmicrodollars",
+      "maxdurationseconds",
+      "estimatetoken"
+    ],
+    "searchBlob": "agentBriefing.updateContextPreferences Enable or disable AI-generated summaries for a briefing context and set the model, spend cap, and duration limits, verifying the cost estimate first. agentbriefing updatecontextpreferences organizationid aienabled model maxspendmicrodollars maxdurationseconds estimatetoken organizationId aiEnabled model maxSpendMicrodollars maxDurationSeconds estimateToken"
+  },
+  "agentBriefing.updatePreferences": {
+    "path": "agentBriefing.updatePreferences",
+    "kind": "mutation",
+    "summary": "Update the user's agent briefing preferences such as timezone, language, night and morning time windows, and whether notifications are enabled.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        },
+        "nightStart": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "morningStart": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "morningEnd": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "notificationsEnabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "updatepreferences",
+      "timezone",
+      "language",
+      "nightstart",
+      "morningstart",
+      "morningend",
+      "notificationsenabled"
+    ],
+    "searchBlob": "agentBriefing.updatePreferences Update the user's agent briefing preferences such as timezone, language, night and morning time windows, and whether notifications are enabled. agentbriefing updatepreferences timezone language nightstart morningstart morningend notificationsenabled timezone language nightStart morningStart morningEnd notificationsEnabled"
+  },
   "agentProfiles.bindToRepo": {
     "path": "agentProfiles.bindToRepo",
     "kind": "mutation",

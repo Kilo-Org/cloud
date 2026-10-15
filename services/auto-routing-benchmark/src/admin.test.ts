@@ -10,6 +10,8 @@ import {
 import { app } from './index';
 import type * as DbModule from './db';
 import type * as ProfilesModule from './profiles';
+import type * as SchedulerModule from './scheduler';
+import { claimNextChunk, recoverChunks, scheduleRunChunks } from './scheduler';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity } from './run';
@@ -71,6 +73,13 @@ const TEST_CONFIG_ROWS = {
 // Stubs: the db module is mocked at its function boundary (drizzle generates
 // the SQL, so statement-level stubbing would couple tests to its internals).
 
+vi.mock('./scheduler', async importOriginal => ({
+  ...(await importOriginal<typeof SchedulerModule>()),
+  claimNextChunk: vi.fn(),
+  recoverChunks: vi.fn(),
+  scheduleRunChunks: vi.fn(),
+}));
+
 vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
   return {
@@ -83,6 +92,10 @@ vi.mock('./db', async importOriginal => {
     getClassifierWinner: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
     insertRun: vi.fn(),
+    getRunWithModels: vi.fn(),
+    countCaseResultsByLane: vi.fn().mockResolvedValue([]),
+    listLaneFailures: vi.fn().mockResolvedValue([]),
+    reuseDeciderCaseResults: vi.fn().mockResolvedValue(0),
     markStaleRunsFailed: vi.fn(),
     listStaleRunningDeciderRuns: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
@@ -120,6 +133,7 @@ import {
   getLiveContainerLanes,
   existsNewerCompletedRun,
   insertRun,
+  getRunWithModels,
   listPendingCurrentProfiles,
   markProfilesRunningForRun,
   listReadyCurrentProfilesForEntries,
@@ -137,11 +151,23 @@ import { lookupProfileStatuses, ProfileQuotaExceededError, registerProfiles } fr
 
 const tokenGet = vi.fn<() => Promise<string>>();
 const queueSendBatch = vi.fn();
+const queueSend = vi.fn();
+
+function schedulerDatabase(): D1Database {
+  const statement = {
+    bind: vi.fn().mockReturnThis(),
+    first: vi.fn().mockResolvedValue(null),
+    all: vi.fn().mockResolvedValue({ results: [] }),
+    run: vi.fn().mockResolvedValue({ meta: { changes: 0 } }),
+  };
+  return { prepare: vi.fn(() => statement) } as unknown as D1Database;
+}
 
 const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
-  BENCH_DB: {} as D1Database,
-  BENCH_QUEUE: { sendBatch: queueSendBatch },
+  BENCH_DB: schedulerDatabase(),
+  BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
+  BENCHMARK_SCHEDULER_CONFIG: '{}',
   AUTO_ROUTING_CONFIG: { put: vi.fn(), get: vi.fn(), delete: vi.fn() },
   KILO_WEB_API_BASE_URL: 'https://app.test',
 } as unknown as Env;
@@ -206,6 +232,31 @@ beforeEach(() => {
   vi.mocked(getClassifierWinner).mockResolvedValue(null);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
   vi.mocked(insertRun).mockResolvedValue(undefined);
+  vi.mocked(getRunWithModels)
+    .mockReset()
+    .mockImplementation(async (_db, id) => {
+      const inserted = vi.mocked(insertRun).mock.calls.find(([, run]) => run.id === id);
+      if (!inserted) return null;
+      const [, run, models] = inserted;
+      return {
+        run: {
+          ...run,
+          started_at: run.startedAt,
+          router: run.router ?? 'efficient',
+          purpose: run.purpose ?? 'platform',
+          accuracy_noise_band: run.accuracy_noise_band ?? 0.05,
+          frontier_min_accuracy_delta: run.frontier_min_accuracy_delta ?? 0,
+          status: 'running',
+          completed_at: null,
+          error: null,
+        },
+        models,
+      };
+    });
+  vi.mocked(scheduleRunChunks).mockReset().mockResolvedValue(undefined);
+  vi.mocked(claimNextChunk).mockReset().mockResolvedValue(null);
+  vi.mocked(recoverChunks).mockReset().mockResolvedValue([]);
+  queueSend.mockReset().mockResolvedValue(undefined);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
@@ -642,6 +693,14 @@ describe('POST /admin/runs', () => {
     // Owner-requested work must not silently re-admit platform models.
     expect(syncPlatformRegistryRows).not.toHaveBeenCalled();
     expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('user');
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: expect.any(String),
+      entries: [{ model: 'owner/a', variant: 'high', providers: [] }],
+      repetitions: TEST_CONFIG.deciderRepetitions,
+      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
+    expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
   it('starts one run per queue for queue=both', async () => {
@@ -678,9 +737,7 @@ describe('POST /admin/runs', () => {
     expect(insertRun).not.toHaveBeenCalled();
   });
 
-  it('caps a queue batch at the shared container budget', async () => {
-    // A stale saved lane budget must not size the batch: user lanes stop at 150,
-    // so with 5 repetitions each run may claim floor(150 / 5) = 30 entries.
+  it('admits the whole registry batch independently of retired concurrency limits', async () => {
     vi.mocked(getConfigRows).mockResolvedValue({
       ...TEST_CONFIG_ROWS,
       config: {
@@ -697,17 +754,24 @@ describe('POST /admin/runs', () => {
       }))
     );
 
-    await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
-    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
-    expect(modelRows).toHaveLength(30);
+    expect(res.status).toBe(200);
+    const [, run, modelRows] = vi.mocked(insertRun).mock.calls[0];
+    expect(modelRows).toHaveLength(100);
+    expect(run).toMatchObject({ repetitions: 5, max_concurrency: 0, router: 'efficient' });
     expect(modelRows[0].model).toBe('m/0');
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: run.id,
+      entries: modelRows.map(row => ({ model: row.model, variant: null, providers: [] })),
+      repetitions: 5,
+      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
+    expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
-  it('reports a fully committed budget as a wait, not a queue failure', async () => {
-    // Every lane is committed to runs already going. Waiting is the correct
-    // outcome: the panel must not claim the queue failed, and must not pretend
-    // a run started.
+  it('starts a durable run when all live scheduler slots are occupied', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     vi.mocked(getLiveContainerLanes).mockResolvedValue(250);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
@@ -717,8 +781,16 @@ describe('POST /admin/runs', () => {
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toMatchObject({ startedRuns: [], drainErrors: [] });
-    expect(insertRun).not.toHaveBeenCalled();
+    const body = (await res.json()) as {
+      startedRuns: { purpose: string; entryCount: number }[];
+      drainErrors: string[];
+    };
+    expect(body.startedRuns).toEqual([expect.objectContaining({ purpose: 'user', entryCount: 1 })]);
+    expect(body.drainErrors).toEqual([]);
+    expect(insertRun).toHaveBeenCalledOnce();
+    expect(scheduleRunChunks).toHaveBeenCalledOnce();
+    expect(claimNextChunk).toHaveBeenCalled();
+    expect(queueSend).not.toHaveBeenCalled();
   });
 
   it('reports a wedged queue alongside the queue that did start', async () => {

@@ -31,7 +31,8 @@ const OWNED = [
   [/^tools\/(i18n|nativewind)\//, 'apps/mobile'],
 ];
 
-// [pattern, workspace]: files outside a workspace that the workspace reads.
+// [pattern, workspace]: files whose change also affects a workspace, beyond
+// the workspace that owns the file.
 const EXTRA_INPUTS = [
   // The ai-gateway build copies these web app files (the build-ai-gateway job
   // in ci.yml).

@@ -137,7 +137,6 @@ import {
   CONTROL_PLANE_TIMERS,
   resolveControlPlaneTimers,
   sandboxIdlePolicyForOrigins,
-  type SandboxIdlePolicy,
 } from '../../shared/control-plane-timers.js';
 import {
   controlPlaneSandboxSelectionSchema,
@@ -596,7 +595,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return projectAllocationStatusSnapshot({
         allocation,
         observedAt: Date.now(),
-        inactivityTimeoutMs: this.sandboxTimers().idleMs,
+        inactivityTimeoutMs: this.sandboxIdleTimeoutMs(allocation),
       });
     });
   }
@@ -3649,21 +3648,23 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
 
     if (frame.type === 'heartbeat') {
-      if (
-        !connectionMatches(
-          await this.readAllocation(),
-          attachment.allocationId,
-          attachment.connectionId
-        )
-      )
-        return;
+      const state = await this.readAllocation();
+      if (!connectionMatches(state, attachment.allocationId, attachment.connectionId)) return;
+      const at = Date.now();
       await this.applyEvent({
         type: 'heartbeat',
-        at: Date.now(),
+        at,
         allocationId: attachment.allocationId,
         connectionId: attachment.connectionId,
         active: frame.active,
       });
+      if (
+        !frame.active &&
+        state.lastActivityAt !== null &&
+        at >= state.lastActivityAt + this.sandboxIdleTimeoutMs(state)
+      ) {
+        await this.applyEvent({ type: 'stop-requested', at, reason: 'sandbox_stopped' });
+      }
       if (
         attachment.heartbeatAck &&
         connectionMatches(
@@ -4102,7 +4103,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         configuration: this.providerPin?.configuration ?? null,
       },
       observedAt: Date.now(),
-      inactivityTimeoutMs: this.sandboxTimers().idleMs,
+      inactivityTimeoutMs: this.sandboxIdleTimeoutMs(state),
     });
     try {
       socket.send(
@@ -4191,10 +4192,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private sandboxTimers(): SandboxTimers {
-    return resolveControlPlaneTimers(
-      this.env as unknown as Record<string, string | undefined>,
-      this.sandboxIdlePolicy()
-    ).sandbox;
+    return resolveControlPlaneTimers(this.env as unknown as Record<string, string | undefined>)
+      .sandbox;
   }
 
   /**
@@ -4202,31 +4201,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * it stale. SQLite extracts only the origin; an unreadable credential source
    * keeps the longer interactive window.
    */
-  private sandboxIdlePolicy(): SandboxIdlePolicy {
+  private sandboxIdleTimeoutMs(state: AllocationState | null): number {
+    const timers = this.sandboxTimers();
+    if (state?.kind !== 'connected') return timers.idleMs;
     const source = routesTable.credential_source;
     const routes = this.db
       .select({
+        state: routesTable.state,
         readable: sql<number>`coalesce(json_valid(${source}), 1)`,
         origin: sql<unknown>`case when json_valid(${source}) then json_extract(${source}, '$.createdOnPlatform') end`,
       })
       .from(routesTable)
       .all();
-    if (routes.some(route => route.readable === 0)) return 'interactive';
-    return sandboxIdlePolicyForOrigins(routes.map(route => route.origin));
+    return routes.some(route => route.state === 'preparing' || route.readable === 0) ||
+      sandboxIdlePolicyForOrigins(routes.map(route => route.origin)) === 'interactive'
+      ? timers.idleMs
+      : timers.unattendedIdleMs;
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
-    const apply = async (): Promise<T> => {
-      const providerLeaseMs = this.sandboxTimers().providerLeaseMs;
-      try {
-        return await task();
-      } finally {
-        if (this.sandboxTimers().providerLeaseMs > providerLeaseMs) {
-          this.ctx.waitUntil(this.runLease());
-        }
-      }
-    };
-    const run = this.operations.tail.then(apply, apply);
+    const run = this.operations.tail.then(task, task);
     this.operations.tail = run.then(
       () => undefined,
       () => undefined

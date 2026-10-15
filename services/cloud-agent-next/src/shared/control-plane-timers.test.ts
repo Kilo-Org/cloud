@@ -8,37 +8,29 @@ import {
 describe('control-plane idle timers', () => {
   it('preserves interactive timers by default', () => {
     expect(resolveControlPlaneTimers({})).toBe(CONTROL_PLANE_TIMERS);
-    expect(resolveControlPlaneTimers({}, 'interactive')).toBe(CONTROL_PLANE_TIMERS);
     expect(CONTROL_PLANE_TIMERS.sandbox.idleMs).toBe(600_000);
     expect(CONTROL_PLANE_TIMERS.sandbox.providerLeaseMs).toBe(660_000);
+    expect(CONTROL_PLANE_TIMERS.sandbox.reconnectMs).toBe(90_000);
   });
 
-  it('shortens only unattended idle time and its provider lease', () => {
-    expect(resolveControlPlaneTimers({}, 'unattended')).toEqual({
-      ...CONTROL_PLANE_TIMERS,
-      sandbox: {
-        ...CONTROL_PLANE_TIMERS.sandbox,
-        idleMs: 60_000,
-        providerLeaseMs: 120_000,
-      },
-    });
-  });
-
-  it('reuses the resolved unattended timers', () => {
-    expect(resolveControlPlaneTimers({}, 'unattended')).toBe(
-      resolveControlPlaneTimers({}, 'unattended')
+  it('has a separate unattended idle window without shortening recovery or provider leases', () => {
+    expect(CONTROL_PLANE_TIMERS.sandbox.unattendedIdleMs).toBe(60_000);
+    expect(CONTROL_PLANE_TIMERS.sandbox.unattendedIdleMs).toBeLessThan(
+      CONTROL_PLANE_TIMERS.sandbox.reconnectMs
     );
   });
 
   it('scales unattended idle time with the development timer divisor', () => {
-    const timers = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' }, 'unattended');
-    expect(timers.sandbox.idleMs).toBe(6_000);
-    expect(timers.sandbox.providerLeaseMs).toBe(66_000);
+    const timers = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' });
+    expect(timers.sandbox.unattendedIdleMs).toBe(6_000);
+    expect(timers.sandbox.idleMs).toBe(60_000);
+    expect(timers.sandbox.providerLeaseMs).toBe(120_000);
+    expect(timers.sandbox.reconnectMs).toBe(9_000);
   });
 
-  it.each(['0', '1', '-1', 'invalid'])('ignores divisor %s for unattended timers', divisor => {
-    expect(resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: divisor }, 'unattended')).toBe(
-      resolveControlPlaneTimers({}, 'unattended')
+  it.each(['0', '1', '-1', 'invalid'])('preserves production timers for divisor %s', divisor => {
+    expect(resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: divisor })).toEqual(
+      CONTROL_PLANE_TIMERS
     );
   });
 });

@@ -9539,12 +9539,21 @@
     "path": "credits.getMobileStoreProducts",
     "kind": "query",
     "summary": "List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount.",
-    "inputSchema": {},
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "supportsCreditExpiry": {
+          "type": "boolean"
+        }
+      }
+    },
     "tags": [
       "credits",
-      "getmobilestoreproducts"
+      "getmobilestoreproducts",
+      "supportscreditexpiry"
     ],
-    "searchBlob": "credits.getMobileStoreProducts List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount. credits getmobilestoreproducts"
+    "searchBlob": "credits.getMobileStoreProducts List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount. credits getmobilestoreproducts supportscreditexpiry supportsCreditExpiry"
   },
   "debug.badInputError": {
     "path": "debug.badInputError",
@@ -37560,6 +37569,11 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -37569,9 +37583,10 @@
     "tags": [
       "user",
       "getcreditpurchaseconfirmation",
-      "transactionid"
+      "transactionid",
+      "organizationid"
     ],
-    "searchBlob": "user.getCreditPurchaseConfirmation Get confirmation details for a specific personal credit purchase transaction by ID, including amount and purchase time. user getcreditpurchaseconfirmation transactionid transactionId"
+    "searchBlob": "user.getCreditPurchaseConfirmation Get confirmation details for a specific personal credit purchase transaction by ID, including amount and purchase time. user getcreditpurchaseconfirmation transactionid organizationid transactionId organizationId"
   },
   "user.getCreditPurchaseHistory": {
     "path": "user.getCreditPurchaseHistory",
@@ -37586,15 +37601,21 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 9007199254740991
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       }
     },
     "tags": [
       "user",
       "getcreditpurchasehistory",
-      "cursor"
+      "cursor",
+      "organizationid"
     ],
-    "searchBlob": "user.getCreditPurchaseHistory Fetch a paginated history of the user's personal credit purchases and automatic top-ups with amounts and dates. user getcreditpurchasehistory cursor cursor"
+    "searchBlob": "user.getCreditPurchaseHistory Fetch a paginated history of the user's personal credit purchases and automatic top-ups with amounts and dates. user getcreditpurchasehistory cursor organizationid cursor organizationId"
   },
   "user.getCreditPurchaseReceipt": {
     "path": "user.getCreditPurchaseReceipt",
@@ -37608,6 +37629,11 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -37617,9 +37643,10 @@
     "tags": [
       "user",
       "getcreditpurchasereceipt",
-      "transactionid"
+      "transactionid",
+      "organizationid"
     ],
-    "searchBlob": "user.getCreditPurchaseReceipt Get the receipt URL for a Stripe credit purchase. user getcreditpurchasereceipt transactionid transactionId"
+    "searchBlob": "user.getCreditPurchaseReceipt Get the receipt URL for a Stripe credit purchase. user getcreditpurchasereceipt transactionid organizationid transactionId organizationId"
   },
   "user.getDiscordGuildStatus": {
     "path": "user.getDiscordGuildStatus",
@@ -37664,6 +37691,17 @@
       "getnotificationpreferences"
     ],
     "searchBlob": "user.getNotificationPreferences Get the current user's notification preferences for push notifications, chat messages, balance alerts, security findings, and more. user getnotificationpreferences"
+  },
+  "user.getPaidCreditPolicy": {
+    "path": "user.getPaidCreditPolicy",
+    "kind": "query",
+    "summary": "Check whether paid credits and Kilo Pass credits currently expire after one year, returning the current policy and its effective date so an agent can tell if expiry rules are active for users.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "getpaidcreditpolicy"
+    ],
+    "searchBlob": "user.getPaidCreditPolicy Check whether paid credits and Kilo Pass credits currently expire after one year, returning the current policy and its effective date so an agent can tell if expiry rules are active for users. user getpaidcreditpolicy"
   },
   "user.getPasskeys": {
     "path": "user.getPasskeys",

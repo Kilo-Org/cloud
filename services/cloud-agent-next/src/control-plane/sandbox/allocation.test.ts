@@ -248,6 +248,48 @@ describe('allocation create retry', () => {
     expect(state).toEqual(initialAllocationState());
     expect(effects).toEqual([]);
   });
+
+  it('fails an expired cold bootstrap launch (ref present) instead of renewing', () => {
+    const { state, effects, stopReason } = reduceAllocation(
+      { ...creatingState(), providerRef: 'ref-1' },
+      {
+        type: 'tick',
+        at: CREATE_FAILED_AT,
+        nextAllocationId: 'alloc-2',
+        retryAllowed: true,
+        bootstrapExpiryReason: 'runtime_artifact_deadline',
+      },
+      TIMERS
+    );
+    expect(state.kind).toBe('stopping');
+    // The original id and deadline survive; the retry branch never ran.
+    expect(state.allocationId).toBe('alloc-1');
+    expect(state.createDeadlineAt).toBe(CREATE_FAILED_AT);
+    expect(stopReason).toBe('runtime_artifact_deadline');
+    expect(effects).toEqual([{ type: 'stop', stopAttempt: 1 }]);
+  });
+
+  it('keeps the generic cold retry when the tick lands on a null-ref retry pause', () => {
+    // `create-failed` with retryAllowed leaves a null ref and a short pause. The
+    // cold reason must not terminalize that pause; it starts the next attempt
+    // with a full create budget, exactly as the generic policy does.
+    const { state, effects } = reduceAllocation(
+      { ...creatingState(), providerRef: null },
+      {
+        type: 'tick',
+        at: CREATE_FAILED_AT,
+        nextAllocationId: 'alloc-2',
+        retryAllowed: true,
+        bootstrapExpiryReason: 'runtime_artifact_deadline',
+      },
+      TIMERS
+    );
+    expect(state.kind).toBe('creating');
+    expect(state.allocationId).toBe('alloc-2');
+    expect(state.providerRef).toBeNull();
+    expect(state.createDeadlineAt).toBe(CREATE_FAILED_AT + TIMERS.providerCreateMs);
+    expect(effects).toEqual([{ type: 'create', allocationId: 'alloc-2' }]);
+  });
 });
 
 describe('allocation socket close origin', () => {
@@ -316,5 +358,81 @@ describe('allocation socket close origin', () => {
     );
     expect(next).toBe(state);
     expect(effects).toEqual([]);
+  });
+});
+
+describe('allocation first-connect deadline', () => {
+  function creatingState(): AllocationState {
+    return reduceAllocation(
+      initialAllocationState(),
+      { type: 'ensure', at: 0, allocationId: 'alloc-1' },
+      TIMERS
+    ).state;
+  }
+
+  it('uses the per-phase first-connect window when the created event names no deadline', () => {
+    const { state } = reduceAllocation(
+      creatingState(),
+      { type: 'created', at: 1_000, allocationId: 'alloc-1', providerRef: 'ref-1' },
+      TIMERS
+    );
+    expect(state.kind).toBe('starting');
+    expect(state.firstConnectDeadlineAt).toBe(1_000 + TIMERS.wrapperFirstConnectMs);
+  });
+
+  it('keeps the absolute cold-bootstrap deadline instead of a fresh window', () => {
+    const absolute = 2_500;
+    const { state } = reduceAllocation(
+      creatingState(),
+      {
+        type: 'created',
+        at: 1_000,
+        allocationId: 'alloc-1',
+        providerRef: 'ref-1',
+        firstConnectDeadlineAt: absolute,
+      },
+      TIMERS
+    );
+    expect(state.firstConnectDeadlineAt).toBe(absolute);
+  });
+
+  function startingState(): AllocationState {
+    return reduceAllocation(
+      creatingState(),
+      {
+        type: 'created',
+        at: 1_000,
+        allocationId: 'alloc-1',
+        providerRef: 'ref-1',
+        firstConnectDeadlineAt: 2_500,
+      },
+      TIMERS
+    ).state;
+  }
+
+  it('owns the cold bootstrap expiry reason carried by the tick', () => {
+    const { state, stopReason } = reduceAllocation(
+      startingState(),
+      {
+        type: 'tick',
+        at: 2_500,
+        nextAllocationId: 'alloc-2',
+        retryAllowed: true,
+        bootstrapExpiryReason: 'runtime_artifact_deadline',
+      },
+      TIMERS
+    );
+    expect(state.kind).toBe('stopping');
+    expect(stopReason).toBe('runtime_artifact_deadline');
+  });
+
+  it('keeps connection_lost for a tick that carries no cold reason', () => {
+    const { state, stopReason } = reduceAllocation(
+      startingState(),
+      { type: 'tick', at: 2_500, nextAllocationId: 'alloc-2', retryAllowed: true },
+      TIMERS
+    );
+    expect(state.kind).toBe('stopping');
+    expect(stopReason).toBe('connection_lost');
   });
 });

@@ -65,6 +65,7 @@ import {
   snapshotAction,
   readWorkspaceStamp,
   writeWorkspaceStamp,
+  type StampPlan,
   type WorkspaceInspection,
   type WorkspaceStamp,
 } from './workspace-stamp.js';
@@ -882,15 +883,18 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     redact: (text: string) => string,
     home: string,
     setStep: (step: ControlPlanePreparationStep) => void,
-    onReplacementWorkspace?: () => Promise<void>
-  ): Promise<ControlPlaneWorkspaceOutcome> {
+    onReplacementWorkspace?: () => Promise<boolean>
+  ): Promise<{
+    outcome: ControlPlaneWorkspaceOutcome;
+    deferredStamp: { commit: string; plan: StampPlan } | null;
+  }> {
     const workspaceStartedAt = Date.now();
     const inspectStartedAt = Date.now();
     const { inspection, stamp: previous } = await inspectWorkspace(directory);
     log(
       `control-plane workspace inspect session=${spec.sessionId} inspection=${inspection} elapsedMs=${Date.now() - inspectStartedAt}`
     );
-    if (inspection === 'same') return 'same';
+    if (inspection === 'same') return { outcome: 'same', deferredStamp: null };
     let adopted = false;
     if (inspection === 'foreign') {
       const clearStartedAt = Date.now();
@@ -919,11 +923,30 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     }
     setStep('setup');
     await runSetupCommands(spec, directory, env, redact, new AbortController().signal);
-    if (cloning || adopted) await onReplacementWorkspace?.();
+    // The callback reports whether the recovery steps actually applied. A clone
+    // with no `.git` yet, or a surviving workspace, never runs it.
+    const recoveryApplied =
+      cloning || adopted ? ((await onReplacementWorkspace?.()) ?? false) : false;
     const commit = await headCommit(directory, env);
     // The stamp goes down before the snapshot, so a container restored from it
     // sees another allocation's stamp and adopts rather than trusting the files.
-    const plan = planStamp({ cloning, adopted, previous, now: now() });
+    // A recovery-bearing preparation is never captured (see `planStamp`).
+    const plan = planStamp({
+      cloning,
+      adopted,
+      previous,
+      recovery: spec.worktreeRecovery,
+      now: now(),
+    });
+    // Recovery requested but not applied: defer the current-allocation stamp until
+    // after the deferred import, so a crash in between cannot leave a stamp that
+    // makes the next preparation look like a surviving workspace.
+    if (spec.worktreeRecovery !== undefined && !recoveryApplied) {
+      log(
+        `control-plane workspace stamp deferred session=${spec.sessionId} elapsedMs=${Date.now() - workspaceStartedAt}`
+      );
+      return { outcome: adopted ? 'adopted' : 'cloned', deferredStamp: { commit, plan } };
+    }
     await writeStamp(directory, { allocationId: deps.allocationId, commit, ...plan.lineage });
     if (plan.capture && spec.capture === true) {
       setStep('snapshot');
@@ -932,7 +955,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     log(
       `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`
     );
-    return adopted ? 'adopted' : 'cloned';
+    return { outcome: adopted ? 'adopted' : 'cloned', deferredStamp: null };
   }
 
   async function runSetupCommands(
@@ -1237,10 +1260,45 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       let workspace: ControlPlaneWorkspaceOutcome | undefined;
       let replacementWorkspace = false;
       let localRecoveryApplied = false;
+      let deferredRuntimeStarted = false;
       const recovery = spec.worktreeRecovery;
+      // Older ingest restoration must not overwrite newer local recovery. That is
+      // proven for a replacement workspace whose recovery applied, and for a
+      // surviving workspace this allocation already stamped (a wrapper restart
+      // after the stamp but before import). An unstamped repository is a partial
+      // preparation, not proof of recovery, so it keeps ingest restoration.
+      const restoreFilesFor = (): boolean =>
+        !(replacementWorkspace && localRecoveryApplied) &&
+        !(recovery !== undefined && workspace === 'same');
+      // One owner for runtime profile, runtime start and session resolution, shared
+      // by the normal path after the lock and the deferred path inside it.
+      const ensureRuntimeAndSession = async (restoreFiles: boolean): Promise<void> => {
+        currentStep = 'kilo_runtime';
+        emitProgress(sessionId, 'kilo_runtime');
+        await materializeRuntimeProfile(home, spec);
+        const client = await withRuntimeStartRetry(
+          key,
+          () =>
+            withinStep('kilo_runtime', timers.kiloRuntimeStartMs, () =>
+              deps.runtimes.ensure({ key, directory, env: builtEnv })
+            ),
+          () => !owner.released
+        );
+        if (owner.released) return;
+        currentStep = 'kilo_session';
+        emitProgress(sessionId, 'kilo_session');
+        await settleReleaseCleanup(sessionId);
+        await withOneRetry(
+          () =>
+            withinStep('kilo_session', timers.kiloSessionMs, signal =>
+              resolveKiloSession(spec, directory, builtEnv, client, signal, restoreFiles)
+            ),
+          () => !owner.released
+        );
+      };
       await withWorkspaceLock(directory, async () => {
         if (!needsWorkspace) return;
-        workspace = await prepareWorkspace(
+        const preparedWorkspace = await prepareWorkspace(
           spec,
           directory,
           builtEnv,
@@ -1251,7 +1309,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           },
           async () => {
             replacementWorkspace = true;
-            if (!recovery || owner.released) return;
+            if (!recovery || owner.released) return false;
             currentStep = 'restore';
             try {
               emitProgress(sessionId, 'restore', 'Restoring saved worktree changes');
@@ -1271,6 +1329,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
                 log,
               });
               if (incomplete) emitProgress(sessionId, 'restore', incomplete.message);
+              return localRecoveryApplied;
             } catch {
               log(`local worktree recovery session=${sessionId} failed; continuing`);
               emitProgress(
@@ -1278,45 +1337,35 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
                 'restore',
                 'Saved worktree changes could not be restored; continuing'
               );
+              return false;
             }
           }
         );
+        workspace = preparedWorkspace.outcome;
+        if (preparedWorkspace.deferredStamp === null || owner.released) return;
+        // Recovery was requested but did not apply. Import the older ingest while
+        // the tree is unstamped, then write the same `planStamp` result only after
+        // the import returns, so a crash in between leaves the tree unstamped. The
+        // lock keeps siblings from adopting or emptying the directory meanwhile.
+        deferredRuntimeStarted = true;
+        await ensureRuntimeAndSession(restoreFilesFor());
+        if (!owner.released) {
+          await writeStamp(directory, {
+            allocationId: deps.allocationId,
+            commit: preparedWorkspace.deferredStamp.commit,
+            ...preparedWorkspace.deferredStamp.plan.lineage,
+          });
+        }
       });
-      if (owner.released) return;
+      if (owner.released) {
+        return;
+      }
       if (recovery && !replacementWorkspace) {
         log(`local worktree recovery session=${sessionId} skipped reason=surviving_workspace`);
       }
-      currentStep = 'kilo_runtime';
-      emitProgress(sessionId, 'kilo_runtime');
-      await materializeRuntimeProfile(home, spec);
-      const started = await withRuntimeStartRetry(
-        key,
-        () =>
-          withinStep('kilo_runtime', timers.kiloRuntimeStartMs, () =>
-            deps.runtimes.ensure({ key, directory, env: builtEnv })
-          ),
-        () => !owner.released
-      );
-      if (owner.released) return;
-      currentStep = 'kilo_session';
-      emitProgress(sessionId, 'kilo_session');
-      // A previous release's tree walk may still be running on this runtime;
-      // stop it before resolving so it cannot abort the new session.
-      await settleReleaseCleanup(sessionId);
-      await withOneRetry(
-        () =>
-          withinStep('kilo_session', timers.kiloSessionMs, signal =>
-            resolveKiloSession(
-              spec,
-              directory,
-              builtEnv,
-              started,
-              signal,
-              !(replacementWorkspace && localRecoveryApplied)
-            )
-          ),
-        () => !owner.released
-      );
+      if (!deferredRuntimeStarted) {
+        await ensureRuntimeAndSession(restoreFilesFor());
+      }
       if (owner.released) return;
       prepared.set(sessionId, {
         key,

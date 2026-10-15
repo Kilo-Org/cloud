@@ -1,9 +1,9 @@
-FROM docker.io/cloudflare/sandbox:0.12.9
+FROM docker.io/cloudflare/sandbox:0.12.9 AS generic-tools
 
-# Build arguments for metadata (all optional with defaults)
+# Build arguments for metadata (all optional with defaults). The Kilo CLI version
+# is declared only in the baked stage below, which is the stage that installs it.
 ARG BUILD_DATE=""
 ARG VCS_REF=""
-ARG KILOCODE_CLI_VERSION="7.8.1"
 ARG PNPM_VERSION="11.1.2"
 ARG GLAB_VERSION="1.93.0"
 
@@ -60,8 +60,19 @@ COPY scripts/kilo-git-credential /opt/kilo-cloud/kilo-git-credential
 RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
 	&& ln -sf /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential
 
-# Install pnpm and kilocode 
-RUN npm install -g pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
+# Install pnpm. The package manager is a generic toolchain dependency that stays
+# in the `generic-tools` stage; the pinned Kilo CLI does not, so
+# `Dockerfile.runtime-free` can repeat this stage without any Kilo bytes.
+RUN npm install -g pnpm@${PNPM_VERSION}
+
+# === Baked runtime image (final stage) ===
+# The final stage adds the pinned Kilo CLI and builds the wrapper bundles; it
+# keeps the existing local/legacy behavior unchanged.
+FROM generic-tools AS baked
+
+ARG KILOCODE_CLI_VERSION="7.8.1"
+
+RUN npm install -g @kilocode/cli@${KILOCODE_CLI_VERSION}
 
 # Copy to install pre-built kilo binary (built via ./cloud-agent-build.sh)
 #COPY kilo /usr/local/bin/kilo

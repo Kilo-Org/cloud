@@ -1,0 +1,102 @@
+# Runtime-free control-plane base candidate (cold-start amendment).
+#
+# This image is the `generic-tools` stage of `Dockerfile.dev`, repeated here in
+# full and stopped at the stage boundary: it contains no Kilo CLI and no control
+# wrapper bundle. `src/sandbox-image-versions.test.ts` fails when the two stages'
+# instructions differ. The launch-time installer embedded in
+# `runtimeLaunchCommand()` (see `src/sandbox-control/runtime-bootstrap.ts`) fetches
+# the CLI and control bytes from the published runtime release and installs them
+# before the wrapper starts, so nothing Kilo-specific is baked in.
+#
+# The compatible base Bun is a compatibility contract, not a generic tool with a
+# floating version. The base image ships a different Bun, so the image is built
+# from a pinned `oven/bun:$BUN_VERSION` stage and that Bun replaces the base one.
+# `BUN_VERSION` has no default: a bare build fails, and the cold-local tooling
+# supplies `RUNTIME_DISTRIBUTION.bun` (the shared owner) as an `image_vars` build
+# argument.
+#
+# It is only selected for the sandbox class the cold-local session starts in; the
+# legacy sandbox classes keep the fully baked `Dockerfile.dev` image, and the
+# native `Dockerfile.containers` image stays unchanged.
+ARG BUN_VERSION
+
+FROM docker.io/cloudflare/sandbox:0.12.9 AS generic-tools
+
+# Build arguments for metadata (all optional with defaults), kept identical to
+# the `generic-tools` stage of `Dockerfile.dev`. The Kilo CLI version is not
+# declared here: this image installs no Kilo CLI.
+ARG BUILD_DATE=""
+ARG VCS_REF=""
+ARG PNPM_VERSION="11.1.2"
+ARG GLAB_VERSION="1.93.0"
+
+# Install latest stable git + git-lfs from the git-core PPA, GitHub CLI, plus supporting CLI tools,
+# and generate locales to suppress setlocale warnings.
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		ca-certificates \
+		gnupg \
+		software-properties-common \
+		wget; \
+	add-apt-repository -y ppa:git-core/ppa; \
+	mkdir -p -m 755 /etc/apt/keyrings; \
+	wget -nv -O /etc/apt/keyrings/githubcli-archive-keyring.gpg https://cli.github.com/packages/githubcli-archive-keyring.gpg; \
+	chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg; \
+	mkdir -p -m 755 /etc/apt/sources.list.d; \
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+		| tee /etc/apt/sources.list.d/github-cli.list > /dev/null; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		git \
+		git-lfs \
+		gh \
+		jq \
+		locales \
+		openssh-client \
+		ripgrep; \
+	git lfs install --system --skip-repo; \
+	sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen; \
+	locale-gen; \
+	apt-get clean; \
+	rm -rf /var/lib/apt/lists/*
+ENV LC_ALL=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+
+# Install GitLab CLI (glab) - download official .deb from GitLab releases.
+# Version 1.82.0+ is required for OAuth2 access token support (GLAB_IS_OAUTH2).
+RUN wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
+	&& dpkg -i /tmp/glab.deb \
+	&& rm /tmp/glab.deb
+
+COPY scripts/kilo-git-credential /opt/kilo-cloud/kilo-git-credential
+RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
+	&& ln -sf /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential
+
+# pnpm is a generic toolchain dependency, not a Kilo runtime byte.
+RUN npm install -g pnpm@${PNPM_VERSION}
+
+# Pinned Bun source stage; the tag is the shared `RUNTIME_DISTRIBUTION.bun` value.
+FROM oven/bun:${BUN_VERSION} AS bun
+
+FROM generic-tools AS runtime-free
+
+# Replace the base image's Bun with the pinned compatible one. The installer's
+# `hostPlatform()` requires an exact Bun match, so the base and the runtime share
+# one pinned version.
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
+
+# Optional local intercept CA for the cold-local HTTPS artifact forwarder. The
+# cold-local tooling passes the PEM base64-encoded (single-line build arg); an
+# empty value writes an empty file, which is inert for both Node and Bun. This
+# only ever carries a local development CA: production origin trust is enforced
+# in the provider, which refuses a plain-HTTP origin outside the explicit
+# trusted-local opt-in.
+ARG KILO_LOCAL_CA_PEM_B64=""
+RUN mkdir -p /usr/local/share \
+	&& printf '%s' "$KILO_LOCAL_CA_PEM_B64" | base64 -d > /usr/local/share/kilo-local-ca.pem
+ENV NODE_EXTRA_CA_CERTS=/usr/local/share/kilo-local-ca.pem
+
+# DO NOT override USER, WORKDIR, or ENTRYPOINT from the base image
+# The Cloudflare sandbox base image entrypoint must run its control server
+# Installing packages globally makes them accessible regardless of the user

@@ -2535,6 +2535,9 @@ importers:
       '@vitest/ui':
         specifier: 'catalog:'
         version: 4.1.11(vitest@4.1.11)
+      aws4fetch:
+        specifier: 'catalog:'
+        version: 1.0.20
       drizzle-kit:
         specifier: 'catalog:'
         version: 0.31.10
@@ -2556,6 +2559,9 @@ importers:
       ws:
         specifier: 8.21.0
         version: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      yaml:
+        specifier: 2.8.4
+        version: 2.8.4
 
   services/cloud-agent-next/wrapper:
     dependencies:

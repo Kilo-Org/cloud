@@ -48,6 +48,7 @@ import {
   createCloudflareProviderAdapter,
   decodeCloudflareProviderRef,
 } from '../../sandbox-control/cloudflare-provider.js';
+import { RuntimeInstallerError } from '../../sandbox-control/runtime-release-loader.js';
 import { parseControlPlaneCredential } from '../../sandbox-control/managed-credential.js';
 import {
   sandboxProviderConfigurationSchema,
@@ -289,6 +290,13 @@ const OWNER_KEY = 'control_plane_owner';
 /** Backstop over the container DO's own capture timeout; the wrapper waits slightly longer. */
 const REPOSITORY_CAPTURE_CALL_MS = 5 * 60_000 + 5_000;
 const ALLOCATION_ROW_ID = 'current';
+/**
+ * The launch timeout message, compared in the create catch so a cold launch that
+ * overruns its own absolute deadline reports `runtime_artifact_deadline`
+ * (typed, no retry) rather than a generic creation timeout. There is one
+ * absolute budget with no extra grace.
+ */
+const SANDBOX_LAUNCH_TIMEOUT_MESSAGE = 'Sandbox launch timed out';
 
 export type StoredProviderPin = {
   provider: AgentSandboxProvider;
@@ -1682,7 +1690,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await this.recoverRepositoryPreparationFailures();
       const state = await this.readAllocation();
       await failExpiredRoutes(this.routeContext(state));
-      if (state.kind === 'creating' && this.createInFlight) {
+      // The cold bootstrap owns one absolute deadline for create and first
+      // connect. An expired one fails with its one reason even while a create
+      // call is still in flight, and never renews its id; baked and Vercel
+      // creating keep the in-flight backstop and the generic retry.
+      const coldExpiryReason = this.coldBootstrapExpiryReason();
+      // A committed ref means a launch attempt owns the deadline. A null ref is
+      // the short create retry pause, which must keep the generic retry.
+      const coldCreatingExpired =
+        coldExpiryReason !== null &&
+        state.kind === 'creating' &&
+        state.providerRef !== null &&
+        state.createDeadlineAt !== null &&
+        Date.now() >= state.createDeadlineAt;
+      if (state.kind === 'creating' && this.createInFlight && !coldCreatingExpired) {
         // N2: the in-flight attempt owns the create deadline. Keep a backstop;
         // it will dispatch its own result and re-arm.
         for (const entry of await this.billingSchedule.dueEntries()) {
@@ -1700,12 +1721,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         return;
       }
+      const coldStartingExpired =
+        coldExpiryReason !== null &&
+        state.kind === 'starting' &&
+        state.firstConnectDeadlineAt !== null &&
+        Date.now() >= state.firstConnectDeadlineAt;
       await this.applyEvent({
         type: 'tick',
         at: Date.now(),
         nextAllocationId: crypto.randomUUID(),
         retryAllowed: await this.retryAllowed(),
+        ...(coldExpiryReason !== null ? { bootstrapExpiryReason: coldExpiryReason } : {}),
       });
+      if ((coldCreatingExpired || coldStartingExpired) && coldExpiryReason !== null) {
+        await this.failPreparingRoutesForColdExpiry(coldExpiryReason);
+      }
       try {
         await withTimeout(
           this.runBillingAlarm(),
@@ -4069,15 +4099,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
         await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped);
-        if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+        if (Date.now() >= launchDeadline) throw new Error(SANDBOX_LAUNCH_TIMEOUT_MESSAGE);
+        // One absolute creation deadline: the cold bootstrap and the native
+        // container installer both carry the same deadline, so preflight, SDK
+        // start, install, probe and wrapper startup do not reset it per phase.
         const launchOptions = {
           ...launch.options,
-          ...(pin.provider === 'cloudflare-containers' ? { deadlineAt: launchDeadline } : {}),
+          ...(pin.provider === 'vercel' ? {} : { deadlineAt: launchDeadline }),
         };
+        // One absolute budget, no extra grace: the provider classifies its own
+        // absolute-deadline failure, and the create catch maps a cold backstop
+        // timeout to `runtime_artifact_deadline` before the generic branch.
         let launched = await withTimeout(
           this.provider.launch(createdRef, launchEnv, launchOptions),
           remainingMs(launchDeadline),
-          'Sandbox launch timed out'
+          SANDBOX_LAUNCH_TIMEOUT_MESSAGE
         );
         if (launched.snapshotFailed) {
           const imageCredential = generateSandboxCredential();
@@ -4090,7 +4126,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           const ownsCleanup = await this.enqueue(async () => {
             const latest = await this.readAllocation();
             if (latest.kind !== 'creating' || latest.allocationId !== allocationId) return false;
-            if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+            if (Date.now() >= launchDeadline) throw new Error(SANDBOX_LAUNCH_TIMEOUT_MESSAGE);
             await this.ctx.storage.put(CREDENTIAL_HASH_KEY, imageCredentialHash);
             return true;
           });
@@ -4098,7 +4134,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             await this.recordLaunch(allocationId, launched.startSource);
             return;
           }
-          if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+          if (Date.now() >= launchDeadline) throw new Error(SANDBOX_LAUNCH_TIMEOUT_MESSAGE);
           const confirmed = await withTimeout(
             this.stopRef(createdRef, allocationId),
             remainingMs(launchDeadline),
@@ -4108,7 +4144,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           const afterCleanup = await this.readAllocation();
           if (afterCleanup.kind !== 'creating' || afterCleanup.allocationId !== allocationId)
             return;
-          if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+          if (Date.now() >= launchDeadline) throw new Error(SANDBOX_LAUNCH_TIMEOUT_MESSAGE);
           logControlDiagnostic('snapshot_fallback', {
             sandboxId: this.sandboxId,
             allocationId,
@@ -4129,7 +4165,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
               deadlineAt: launchDeadline,
             }),
             remainingMs(launchDeadline),
-            'Sandbox launch timed out'
+            SANDBOX_LAUNCH_TIMEOUT_MESSAGE
           );
           if (launched.snapshotFailed) throw new Error('Sandbox image launch failed');
         }
@@ -4139,6 +4175,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
           at: Date.now(),
           allocationId,
           providerRef: createdRef,
+          // The cold bootstrap shares one absolute deadline with wrapper
+          // startup; the baked path keeps its per-phase first-connect window.
+          ...(this.cloudflareBootstrapLaunch(pin)
+            ? { firstConnectDeadlineAt: launchDeadline }
+            : {}),
         });
       } catch (error) {
         logControlDiagnostic(
@@ -4155,6 +4196,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         if (isContainerConcurrencyLimitError(error)) {
           await this.failCreationRoutes(allocationId, false, 'container_limit_reached');
+          return;
+        }
+        // A typed cold-bootstrap failure is permanent for this descriptor: fail
+        // the routes with the one reason and stop the allocation. It never
+        // counts as a repository snapshot failure, so no snapshot is evicted or
+        // retried from the base.
+        if (error instanceof RuntimeInstallerError) {
+          await this.failCreationRoutes(allocationId, false, error.reason);
+          return;
+        }
+        // The cold launch owns its absolute-deadline reason. If the provider
+        // overruns its own deadline and the DO backstop fires, report the same
+        // reason (permanent, no retry) instead of a generic creation timeout.
+        if (
+          this.coldBootstrapExpiryReason() !== null &&
+          error instanceof Error &&
+          error.message === SANDBOX_LAUNCH_TIMEOUT_MESSAGE
+        ) {
+          await this.failCreationRoutes(allocationId, false, 'runtime_artifact_deadline');
           return;
         }
         if (error instanceof ProviderCreationError && error.permanentReason !== null) {
@@ -4568,6 +4628,32 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ws.close(1008, 'Runtime contract mismatch');
         return;
       }
+      // The cold-launch pre-hello admission shares one absolute deadline with
+      // creation: a hello that arrives after it is not made ready and the launch
+      // is stopped through the existing stop action, so an expired cold launch
+      // cannot later become ready. Baked and Vercel admission are out of scope
+      // and keep their existing behavior.
+      const coldExpiryReason = this.coldBootstrapExpiryReason();
+      if (coldExpiryReason !== null) {
+        const admissionState = await this.readAllocation();
+        const admissionDeadline =
+          admissionState.kind === 'creating'
+            ? admissionState.createDeadlineAt
+            : admissionState.kind === 'starting'
+              ? admissionState.firstConnectDeadlineAt
+              : null;
+        if (admissionDeadline !== null && Date.now() >= admissionDeadline) {
+          this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
+          ws.close(1008, 'shutdown');
+          await this.failPreparingRoutesForColdExpiry(coldExpiryReason);
+          await this.applyEvent({
+            type: 'stop-requested',
+            at: Date.now(),
+            reason: coldExpiryReason,
+          });
+          return;
+        }
+      }
       const connectionId = crypto.randomUUID();
       this.releaseBoundSockets(ws, frame.allocationId);
       ws.serializeAttachment({
@@ -4937,6 +5023,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
+  /**
+   * A cold first-connect expiry is one specific user-visible failure: fail every
+   * preparing route with the one reason instead of leaving them to their own
+   * attempt deadline (which would report a generic preparation timeout).
+   */
+  private async failPreparingRoutesForColdExpiry(reason: ControlPlaneFailureReason): Promise<void> {
+    const state = await this.readAllocation();
+    for (const route of await listRoutes(this.db)) {
+      if (route.state !== 'preparing') continue;
+      await failCurrentAttempt(
+        this.routeContext(state),
+        route.sessionId,
+        route.attemptId,
+        reason,
+        'create_failed'
+      );
+    }
+  }
+
   private async recordVercelBillingLifetime(evidence: {
     providerRef: string;
     createdAtMs?: number;
@@ -4961,6 +5066,39 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private ensureVercelBillingRuntime() {
     return this.billingRuntime.ensureRuntime();
+  }
+
+  /**
+   * Trusted cold-launch inputs for the Cloudflare provider (amendment "cold
+   * session without a snapshot"). The descriptor is the generated-config env
+   * value only; the reader is the private artifact bucket; the origin is a
+   * trusted config value, never a request value. A missing descriptor is the
+   * baked selection and keeps the existing supervisor path.
+   */
+  private cloudflareRuntimeRelease() {
+    return {
+      reader: this.env.RUNTIME_RELEASE_BUCKET,
+      descriptor: this.env.RUNTIME_RELEASE_DESCRIPTOR,
+      grantSecret: async () => (await resolveSecret(this.env.NEXTAUTH_SECRET)) ?? null,
+      origin: this.env.RUNTIME_ARTIFACT_ORIGIN ?? this.env.WORKER_URL,
+    };
+  }
+
+  /** True when this pin is launching the cold runtime bootstrap, not the baked image. */
+  private cloudflareBootstrapLaunch(pin: StoredProviderPin): boolean {
+    return pin.provider === 'cloudflare' && this.env.RUNTIME_RELEASE_DESCRIPTOR !== undefined;
+  }
+
+  /**
+   * The one owner of the cold bootstrap expiry reason. The allocation tick
+   * (create and first connect) and the pre-hello admission use it, so an
+   * expired cold launch reports one durable `runtime_artifact_deadline`
+   * whichever fires first. Baked and Vercel admission return null and keep
+   * their existing behavior (`connection_lost` or the create retry).
+   */
+  private coldBootstrapExpiryReason(): ControlPlaneFailureReason | null {
+    const pin = this.providerPin;
+    return pin !== null && this.cloudflareBootstrapLaunch(pin) ? 'runtime_artifact_deadline' : null;
   }
 
   private createProviderAdapter(pin: StoredProviderPin): ProviderAdapter {
@@ -5003,6 +5141,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             forceDestroyControlPlaneSandbox(
               this.sandboxNamespace(pin, id, options.containment).getByName(id)
             ),
+          runtimeRelease: this.cloudflareRuntimeRelease(),
         });
       default: {
         void (pin.provider satisfies never);

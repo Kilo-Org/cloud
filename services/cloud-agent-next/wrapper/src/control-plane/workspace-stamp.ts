@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
+import type { WorktreeRecovery } from '../../../src/shared/worktree-changes-wire.js';
 
 const STAMP_FILE = 'kilo-workspace.json';
 
@@ -115,21 +116,29 @@ export type StampPlan = {
  * A fresh clone is captured as generation 0. An adopted snapshot is captured again
  * only when it is due for a refresh, and otherwise keeps its capture time and
  * generation, so its age keeps counting from the snapshot taken.
+ *
+ * A preparation that carries `recovery` never captures: its filesystem includes
+ * restored user changes that must not enter a reusable snapshot (spec §10,
+ * "Environment Preparation Cache"). An adopted stamp still keeps its previous
+ * capture time and generation, so a skipped capture does not advance lineage.
  */
 export function planStamp(input: {
   cloning: boolean;
   adopted: boolean;
   previous: WorkspaceStamp | null;
+  recovery: WorktreeRecovery | undefined;
   now: number;
 }): StampPlan {
-  const { cloning, adopted, previous, now } = input;
+  const { cloning, adopted, previous, recovery, now } = input;
+  const recovered = recovery !== undefined;
   if (adopted && previous !== null) {
-    return snapshotAction(previous, now) === 'refresh'
-      ? { lineage: { capturedAt: now, generation: previous.generation + 1 }, capture: true }
-      : {
-          lineage: { capturedAt: previous.capturedAt, generation: previous.generation },
-          capture: false,
-        };
+    if (recovered || snapshotAction(previous, now) !== 'refresh') {
+      return {
+        lineage: { capturedAt: previous.capturedAt, generation: previous.generation },
+        capture: false,
+      };
+    }
+    return { lineage: { capturedAt: now, generation: previous.generation + 1 }, capture: true };
   }
-  return { lineage: { capturedAt: now, generation: 0 }, capture: cloning };
+  return { lineage: { capturedAt: now, generation: 0 }, capture: cloning && !recovered };
 }

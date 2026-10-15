@@ -10,10 +10,19 @@ const packageDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..
 const sourceConfigPath = join(packageDir, 'wrangler.jsonc');
 const targetConfigPath = join(packageDir, '.wrangler', 'wrangler.e2e-test.jsonc');
 const localTargetConfigPath = join(packageDir, '.wrangler', 'wrangler.e2e-local.jsonc');
+const coldLocalTargetConfigPath = join(packageDir, '.wrangler', 'wrangler.cold-local.jsonc');
 const packageDevVarsPath = join(packageDir, '.dev.vars');
 const localDevVarsPath = join(packageDir, '.wrangler', '.dev.vars');
 const e2eEntryPath = '../src/e2e-entry.ts';
 const defaultWorkerUrl = 'https://cloud-agent-e2e-test.engineering-e11.workers.dev';
+
+// The sandbox class a cold-local session starts in selects the runtime-free
+// image, resolved one directory up from the generated config in `.wrangler/`.
+const COLD_LOCAL_RUNTIME_FREE_IMAGE = '../Dockerfile.runtime-free';
+// Launch descriptor byte cap. Owned by `src/shared/runtime-release.ts`
+// (`RUNTIME_DESCRIPTOR_MAX_BYTES`); repeated because this Node-only renderer
+// cannot import the Worker's zod schema.
+const RUNTIME_DESCRIPTOR_MAX_BYTES = 65_536;
 
 // Wrangler resolves `.dev.vars` relative to the selected config's directory and
 // prefers `${configDir}/.dev.vars.${env}` over `${configDir}/.dev.vars`, so with
@@ -255,6 +264,178 @@ export function buildLocalE2eWorkerConfig(sourceConfig) {
   }
 
   return config;
+}
+
+/**
+ * Render one container entry's relative paths for the `.wrangler/` location and
+ * point the selected class at the runtime-free image. The runtime-free image
+ * carries no Kilo bytes; the installer-delivered runtime is selected at launch
+ * by the embedded `RUNTIME_RELEASE_DESCRIPTOR`.
+ */
+function rebaseContainerEntries(containers) {
+  return (containers ?? []).map(entry => {
+    const rebased = { ...entry, image: rebaseImage(entry.image) };
+    if (entry.images) {
+      rebased.images = Object.fromEntries(
+        Object.entries(entry.images).map(([name, spec]) => [
+          name,
+          { ...spec, dockerfile: rebaseImage(spec.dockerfile) },
+        ])
+      );
+    }
+    return rebased;
+  });
+}
+
+function withRuntimeFreeImage(entry, options) {
+  const next = { ...entry, image: COLD_LOCAL_RUNTIME_FREE_IMAGE };
+  const imageVars = { ...(entry.image_vars ?? {}), ...(options.buildVars ?? {}) };
+  if (typeof options.localCaPem === 'string' && options.localCaPem.length > 0) {
+    imageVars.KILO_LOCAL_CA_PEM_B64 = Buffer.from(options.localCaPem, 'utf8').toString('base64');
+  }
+  if (Object.keys(imageVars).length > 0) next.image_vars = imageVars;
+  return next;
+}
+
+/**
+ * Cold-local config for a snapshot-less `workspace_*` session.
+ *
+ * It is the dev config rebased for `.wrangler/`, with exactly the sandbox class
+ * a local session starts in pointed at the runtime-free image. It does not add
+ * the e2e entrypoint, callback sink or strict-public fetch flag: this is the
+ * real Worker. `RUNTIME_RELEASE_DESCRIPTOR` is the exact publisher output and
+ * `RUNTIME_ARTIFACT_ORIGIN` names the origin the container fetches the runtime
+ * from. Both are non-inheritable `env.dev.vars` values, so `--env dev` reads
+ * them; an absent descriptor keeps the baked supervisor selection.
+ *
+ * `buildVars` become the selected class's `image_vars` (Wrangler's build-time
+ * variables for a container app). The cold tooling puts `BUN_VERSION` there for
+ * `Dockerfile.runtime-free`'s no-default `ARG`; the value comes from the shared
+ * `RUNTIME_DISTRIBUTION.bun` owner, never a private copy.
+ */
+export function buildColdLocalWorkerConfig(sourceConfig, options) {
+  const {
+    runtimeReleaseDescriptor,
+    runtimeReleaseBucket,
+    artifactOrigin,
+    runtimeFreeClasses = ['Sandbox'],
+    localCaPem,
+    buildVars,
+  } = options;
+
+  if (typeof runtimeReleaseDescriptor !== 'string' || runtimeReleaseDescriptor.length === 0) {
+    throw new Error('runtimeReleaseDescriptor is required and must be a non-empty string');
+  }
+  const descriptorBytes = new TextEncoder().encode(runtimeReleaseDescriptor).byteLength;
+  if (descriptorBytes > RUNTIME_DESCRIPTOR_MAX_BYTES) {
+    throw new Error(
+      `runtimeReleaseDescriptor is ${descriptorBytes} bytes, above the ${RUNTIME_DESCRIPTOR_MAX_BYTES} cap owned by src/shared/runtime-release.ts`
+    );
+  }
+  if (typeof artifactOrigin !== 'string' || artifactOrigin.length === 0) {
+    throw new Error('artifactOrigin is required and must be a non-empty string');
+  }
+
+  const freeClasses = new Set(runtimeFreeClasses);
+  const imageOptions = { buildVars, localCaPem };
+  const config = structuredClone(sourceConfig);
+  config.$schema = '../node_modules/wrangler/config-schema.json';
+  config.main = '../src/index.ts';
+  // Only `env.dev.containers` selects the runtime-free image. The top-level
+  // classes keep their own rebased baked images so a non-dev environment (and
+  // anything that reads the root set) is untouched.
+  config.containers = rebaseContainerEntries(config.containers);
+  // Match the other local profiles: the production route would make `wrangler
+  // dev` synthesize a production origin and break the Worker's self-fetch.
+  delete config.routes;
+
+  if (!config.env?.dev) {
+    throw new Error('the source config has no env.dev; the cold-local profile needs it');
+  }
+  const releaseBucket = config.env.dev.r2_buckets?.find(
+    binding => binding.binding === 'RUNTIME_RELEASE_BUCKET'
+  );
+  if (!releaseBucket) throw new Error('the cold-local profile requires RUNTIME_RELEASE_BUCKET');
+  if (runtimeReleaseBucket !== undefined) {
+    if (typeof runtimeReleaseBucket !== 'string' || runtimeReleaseBucket.length === 0) {
+      throw new Error('runtimeReleaseBucket must be a non-empty bucket name');
+    }
+    releaseBucket.bucket_name = runtimeReleaseBucket;
+  }
+  if (
+    config.env.dev.r2_buckets.some(
+      binding =>
+        binding.binding !== 'RUNTIME_RELEASE_BUCKET' &&
+        binding.bucket_name === releaseBucket.bucket_name
+    )
+  ) {
+    throw new Error('the cold-local release bucket must be separate from session storage');
+  }
+  config.env.dev.containers = rebaseContainerEntries(config.env.dev.containers).map(entry =>
+    freeClasses.has(entry.class_name) ? withRuntimeFreeImage(entry, imageOptions) : entry
+  );
+  config.env.dev.vars = {
+    ...config.env.dev.vars,
+    RUNTIME_RELEASE_DESCRIPTOR: runtimeReleaseDescriptor,
+    RUNTIME_ARTIFACT_ORIGIN: artifactOrigin,
+  };
+
+  return config;
+}
+
+/** Preserve the package `.dev.vars` verbatim; the cold Worker needs every line. */
+export function buildColdLocalDevVarsContent(existingContent) {
+  const content = String(existingContent ?? '');
+  if (content.trim().length === 0) {
+    throw new Error('the package .dev.vars is empty; the cold-local Worker needs its bindings');
+  }
+  return content.endsWith('\n') ? content : `${content}\n`;
+}
+
+export function coldLocalRenderPaths() {
+  return {
+    packageDir,
+    sourceConfigPath,
+    targetConfigPath: coldLocalTargetConfigPath,
+    packageDevVarsPath,
+    localDevVarsPath,
+  };
+}
+
+/**
+ * Write the cold-local config and the `.dev.vars` beside it. It starts from the
+ * package `.dev.vars` (the same bindings the plain dev worker reads) so the
+ * generated file carries `WORKER_URL`, the ingest URL and the secrets. Every
+ * validation runs before the first write.
+ */
+export function renderColdLocal({
+  runtimeReleaseDescriptor,
+  runtimeReleaseBucket,
+  artifactOrigin,
+  localCaPem,
+  runtimeFreeClasses,
+  buildVars,
+  paths = coldLocalRenderPaths(),
+  log = message => console.log(message),
+}) {
+  assertNoConflictingDevVars(paths.localDevVarsPath, LOCAL_DEV_VARS_ENV);
+  const sourceConfig = parse(readFileSync(paths.sourceConfigPath, 'utf8'));
+  const rendered = buildColdLocalWorkerConfig(sourceConfig, {
+    runtimeReleaseDescriptor,
+    runtimeReleaseBucket,
+    artifactOrigin,
+    runtimeFreeClasses,
+    localCaPem,
+    buildVars,
+  });
+  const devVars = buildColdLocalDevVarsContent(readLocalDevVarsSource(paths));
+
+  mkdirSync(dirname(paths.targetConfigPath), { recursive: true });
+  writeFileSync(paths.targetConfigPath, `${JSON.stringify(rendered, null, 2)}\n`);
+  mkdirSync(dirname(paths.localDevVarsPath), { recursive: true });
+  writeFileSync(paths.localDevVarsPath, devVars);
+  log(`Rendered ${paths.targetConfigPath}`);
+  log(`Copied the dev vars to ${paths.localDevVarsPath}`);
 }
 
 /**

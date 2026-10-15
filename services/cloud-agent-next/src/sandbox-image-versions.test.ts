@@ -6,9 +6,11 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SLASH_COMMANDS_SOURCE } from './shared/default-slash-commands.generated.js';
 import { KILO_CLI_VERSION } from './shared/kilo-cli-version.js';
 import {
+  DEFAULT_KILO_EXECUTABLE_PATH,
   GIT_CREDENTIAL_HELPER,
   RUNTIME_DISTRIBUTION,
   WRAPPER_BUNDLES,
+  resolveKiloExecutable,
   runtimeInstallPath,
 } from './shared/runtime-distribution.js';
 import { SYSTEM_GIT_CONFIG_ENV } from './shared/runtime-environment.js';
@@ -21,7 +23,24 @@ function readServiceFile(relativePath: string): string {
   return readFileSync(fileURLToPath(new URL(relativePath, import.meta.url).href), 'utf8');
 }
 
+/** The instruction lines of a Dockerfile's `generic-tools` stage, without comments. */
+function genericToolsStage(dockerfile: string): string[] {
+  const lines = dockerfile.split('\n');
+  const start = lines.findIndex(line => /^FROM \S+ AS generic-tools$/.test(line));
+  if (start === -1) throw new Error('Dockerfile has no generic-tools stage');
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('FROM '));
+  return lines
+    .slice(start, end === -1 ? undefined : end)
+    .filter(line => line.trim() !== '' && !line.trimStart().startsWith('#'));
+}
+
 describe('sandbox image version parity', () => {
+  it('keeps the runtime-free image on the same generic-tools stage as the baked dev image', () => {
+    expect(genericToolsStage(readServiceFile('../Dockerfile.runtime-free'))).toEqual(
+      genericToolsStage(readServiceFile('../Dockerfile.dev'))
+    );
+  });
+
   it('keeps every sandbox image aligned with the Cloudflare sandbox SDK', () => {
     const packageJson = JSON.parse(readServiceFile('../package.json')) as {
       dependencies: Record<string, string>;
@@ -152,5 +171,34 @@ describe('runtime distribution packaging', () => {
     expect(harness).not.toContain("from './");
     expect(harness).not.toContain("from '../");
     expect(harness).toContain('CONTROL_PLANE_WRAPPER_COMMAND');
+  });
+});
+
+describe('resolveKiloExecutable', () => {
+  it('selects the installer-provided absolute path from the inherited environment', () => {
+    expect(
+      resolveKiloExecutable({
+        KILO_RUNTIME_CLI_PATH: '/opt/kilo-cloud/active/cli/package/bin/kilo',
+      })
+    ).toBe('/opt/kilo-cloud/active/cli/package/bin/kilo');
+  });
+
+  it('defaults to the baked platform path when the selection is absent', () => {
+    expect(DEFAULT_KILO_EXECUTABLE_PATH).toBe('/usr/local/bin/kilo');
+    expect(resolveKiloExecutable({})).toBe('/usr/local/bin/kilo');
+  });
+
+  it('rejects a present but non-absolute or empty selection instead of running the baked path', () => {
+    // A present value must be an absolute path. Falling back to the baked path
+    // would execute the old or a non-existent CLI instead of failing the launch.
+    expect(() => resolveKiloExecutable({ KILO_RUNTIME_CLI_PATH: 'kilo' })).toThrow();
+    expect(() => resolveKiloExecutable({ KILO_RUNTIME_CLI_PATH: './bin/kilo' })).toThrow();
+    expect(() => resolveKiloExecutable({ KILO_RUNTIME_CLI_PATH: '' })).toThrow();
+    // The worktree environment must retain a present-but-invalid inherited
+    // selection so the resolver sees it. Dropping an empty value would silently
+    // fall back to the baked path that a runtime-free image does not have.
+    const worktreeRuntime = readServiceFile('../wrapper/src/control/worktree-runtime.ts');
+    expect(worktreeRuntime).toContain('inheritedKiloCliPath !== undefined');
+    expect(worktreeRuntime).not.toContain('inheritedKiloCliPath.length > 0');
   });
 });

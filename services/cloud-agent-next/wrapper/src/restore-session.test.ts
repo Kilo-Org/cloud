@@ -391,6 +391,7 @@ describe('restoreSession', () => {
       KILO_SESSION_INGEST_URL: process.env.KILO_SESSION_INGEST_URL,
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
       KILOCODE_TOKEN_FILE: process.env.KILOCODE_TOKEN_FILE,
+      KILO_RUNTIME_CLI_PATH: process.env.KILO_RUNTIME_CLI_PATH,
       SANDBOX_CONTROL_CREDENTIAL: process.env.SANDBOX_CONTROL_CREDENTIAL,
       RESTORE_PROCESS_ONLY: process.env.RESTORE_PROCESS_ONLY,
       PATH: process.env.PATH,
@@ -400,6 +401,9 @@ describe('restoreSession', () => {
     process.env.KILO_SESSION_INGEST_URL = 'http://localhost:9999';
     process.env.KILOCODE_TOKEN = 'test-token';
     delete process.env.KILOCODE_TOKEN_FILE;
+    // The installer exports this for a runtime-free image; here it points at the
+    // fake executable so import selection is the fake's absolute path, not PATH.
+    process.env.KILO_RUNTIME_CLI_PATH = path.join(binDir, 'kilo');
     process.env.PATH = `${binDir}:${process.env.PATH}`;
     process.env.TMPDIR = tmpDir;
 
@@ -470,7 +474,7 @@ describe('restoreSession', () => {
         PATH: process.env.PATH ?? '',
         RESTORE_CAPTURE_PATH: capturePath,
       },
-      {}
+      { KILO_RUNTIME_CLI_PATH: path.join(binDir, 'kilo') }
     );
     fs.writeFileSync(
       path.join(binDir, 'kilo'),
@@ -525,6 +529,26 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     expect(JSON.stringify(imported)).not.toContain('actual-');
     expect(process.env.KILOCODE_TOKEN).toBe('actual-managed-token');
     expect(process.env.SANDBOX_CONTROL_CREDENTIAL).toBe('actual-control-credential');
+  });
+
+  it('runs kilo import through the inherited absolute CLI selection, not PATH', async () => {
+    const capturePath = path.join(tmpDir, 'selected-import');
+    const selectedPath = path.join(binDir, 'selected-kilo');
+    // A fixture outside `binDir/kilo` (which `PATH` points at) proves the
+    // resolved absolute selection is executed rather than a PATH lookup.
+    fs.writeFileSync(
+      selectedPath,
+      `#!/bin/sh\nif [ "$1" = "import" ]; then printf '%s' "$0" > "${capturePath}"; fi\nexit 0\n`,
+      { mode: 0o755 }
+    );
+    mockFetchOk(makeSnapshot([]));
+
+    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+      env: { ...process.env, KILO_RUNTIME_CLI_PATH: selectedPath },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(fs.readFileSync(capturePath, 'utf8')).toBe(selectedPath);
   });
 
   it('does not fall back to process-global auth when an explicit restore environment omits it', async () => {
@@ -1799,7 +1823,7 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     // New executable scripts can consume the import deadline during macOS startup.
     const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
       (command, args, options) =>
-        command === 'kilo'
+        command === path.join(binDir, 'kilo')
           ? runProcess('/bin/sh', [path.join(binDir, 'kilo'), ...args], options)
           : runProcess(command, args, options)
     );

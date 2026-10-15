@@ -63,6 +63,10 @@
     },
   ],
   "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],
+  "r2_buckets": [
+    { "binding": "R2_BUCKET", "bucket_name": "cloud-agent-test-artifacts" },
+    { "binding": "RUNTIME_RELEASE_BUCKET", "bucket_name": "cloud-agent-test-runtime-releases" },
+  ],
   "queues": {
     "producers": [
       { "binding": "EXECUTION_QUEUE", "queue": "cloud-agent-executions" },

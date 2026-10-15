@@ -119,6 +119,30 @@ describe('cloud runtime feature configuration', () => {
     expect(JSON.parse(env.KILO_CONFIG_CONTENT).snapshot).toBe(false);
     expect(JSON.parse(env.OPENCODE_CONFIG_CONTENT).snapshot).toBe(false);
   });
+
+  it('keeps the trusted inherited CLI selection and ignores a profile override', () => {
+    const env = buildWorktreeKiloEnvironment(
+      identity.directory,
+      '/runtime-home',
+      auth,
+      { KILO_RUNTIME_CLI_PATH: '/tmp/profile-kilo' },
+      { KILO_RUNTIME_CLI_PATH: '/opt/kilo-cloud/active/cli/package/bin/kilo' }
+    );
+
+    expect(env.KILO_RUNTIME_CLI_PATH).toBe('/opt/kilo-cloud/active/cli/package/bin/kilo');
+  });
+
+  it('never lets a profile value supply the CLI selection when no inherited value exists', () => {
+    const env = buildWorktreeKiloEnvironment(
+      identity.directory,
+      '/runtime-home',
+      auth,
+      { KILO_RUNTIME_CLI_PATH: '/tmp/profile-kilo' },
+      {}
+    );
+
+    expect(env.KILO_RUNTIME_CLI_PATH).toBeUndefined();
+  });
 });
 
 function createFeedConnection(sseMaxRetryAttempts: number): {

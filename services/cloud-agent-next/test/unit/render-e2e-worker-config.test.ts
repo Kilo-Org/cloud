@@ -14,6 +14,8 @@ import { parse } from 'jsonc-parser';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  buildColdLocalDevVarsContent,
+  buildColdLocalWorkerConfig,
   buildE2eWorkerConfig,
   buildLocalDevVarsContent,
   buildLocalE2eWorkerConfig,
@@ -462,8 +464,202 @@ describe('local e2e worker config', () => {
   });
 });
 
-const VALID_SECRET = 'e2e-internal-secret-0123456789';
+describe('cold-local worker config', () => {
+  const DESCRIPTOR = '{"format":1,"marker":"exact-publisher-output"}';
+  const ORIGIN = 'https://host.docker.internal:9599';
+  const CA_PEM = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n';
 
+  it('targets the real Worker, keeps env.dev, and embeds the exact descriptor and origin', () => {
+    const config = buildColdLocalWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    expect(config.main).toBe('../src/index.ts');
+    expect(config.$schema).toBe('../node_modules/wrangler/config-schema.json');
+    expect('routes' in config).toBe(false);
+    expect(config.env.dev.vars.RUNTIME_RELEASE_DESCRIPTOR).toBe(DESCRIPTOR);
+    expect(config.env.dev.vars.RUNTIME_ARTIFACT_ORIGIN).toBe(ORIGIN);
+    // The cold profile is the real Worker: no e2e entry or callback sink.
+    expect(JSON.stringify(config)).not.toContain('E2eCallbackSink');
+    expect(config.compatibility_flags).not.toContain('global_fetch_strictly_public');
+  });
+
+  it('points only the started sandbox class at the runtime-free image', () => {
+    const source = readSourceConfig();
+    const sourceByClass = new Map<
+      string,
+      { image?: string; images?: Record<string, { dockerfile: string }> }
+    >(
+      source.env.dev.containers.map(
+        (entry: { class_name: string }) => [entry.class_name, entry] as const
+      )
+    );
+    const config = buildColdLocalWorkerConfig(source, {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    const sandbox = config.env.dev.containers.find(
+      (entry: { class_name: string }) => entry.class_name === 'Sandbox'
+    );
+    expect(sandbox.image).toBe('../Dockerfile.runtime-free');
+
+    for (const entry of config.env.dev.containers as {
+      class_name: string;
+      image?: string;
+      images?: Record<string, { dockerfile: string }>;
+    }[]) {
+      if (entry.class_name === 'Sandbox') continue;
+      const original = sourceByClass.get(entry.class_name);
+      if (entry.image !== undefined) {
+        expect(entry.image, entry.class_name).toBe(`../${original?.image?.replace(/^\.\//, '')}`);
+      }
+      for (const [name, spec] of Object.entries(entry.images ?? {})) {
+        expect(spec.dockerfile, `${entry.class_name}.${name}`).toBe(
+          `../${original?.images?.[name]?.dockerfile.replace(/^\.\//, '')}`
+        );
+        expect(spec.dockerfile, `${entry.class_name}.${name}`).not.toBe(
+          '../Dockerfile.runtime-free'
+        );
+      }
+    }
+  });
+
+  it('keeps release storage separate and binds a custom local publication bucket', () => {
+    const source = readSourceConfig();
+    const config = buildColdLocalWorkerConfig(source, {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+      runtimeReleaseBucket: 'isolated-local-runtime-releases',
+    });
+    expect(
+      config.env.dev.r2_buckets.find(
+        (binding: { binding: string }) => binding.binding === 'RUNTIME_RELEASE_BUCKET'
+      ).bucket_name
+    ).toBe('isolated-local-runtime-releases');
+    expect(
+      config.env.dev.r2_buckets.find(
+        (binding: { binding: string }) => binding.binding === 'R2_BUCKET'
+      ).bucket_name
+    ).toBe('kilocode-sessions-dev');
+    expect(config.r2_buckets).toEqual(source.r2_buckets);
+    expect(() =>
+      buildColdLocalWorkerConfig(source, {
+        runtimeReleaseDescriptor: DESCRIPTOR,
+        artifactOrigin: ORIGIN,
+        runtimeReleaseBucket: 'kilocode-sessions-dev',
+      })
+    ).toThrow('separate from session storage');
+  });
+
+  it('resolves every relative container image from the generated .wrangler location', () => {
+    const config = buildColdLocalWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    const images = [
+      ...(config.containers ?? []).map((entry: { image: string }) => entry.image),
+      ...(config.env.dev.containers ?? []).map((entry: { image: string }) => entry.image),
+      ...(config.env.dev.containers ?? []).flatMap(
+        (entry: { images?: Record<string, { dockerfile?: string }> }) =>
+          Object.values(entry.images ?? {}).map(spec => spec.dockerfile)
+      ),
+    ];
+    for (const image of images) {
+      if (typeof image !== 'string') continue;
+      expect(existsSync(resolve(process.cwd(), '.wrangler', image)), image).toBe(true);
+    }
+  });
+
+  it('bakes the local CA as a base64 build var only when one is given', () => {
+    const withCa = buildColdLocalWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+      localCaPem: CA_PEM,
+    });
+    const sandbox = withCa.env.dev.containers.find(
+      (entry: { class_name: string }) => entry.class_name === 'Sandbox'
+    );
+    expect(sandbox.image_vars.KILO_LOCAL_CA_PEM_B64).toBe(
+      Buffer.from(CA_PEM, 'utf8').toString('base64')
+    );
+
+    const withoutCa = buildColdLocalWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    const plain = withoutCa.env.dev.containers.find(
+      (entry: { class_name: string }) => entry.class_name === 'Sandbox'
+    );
+    expect(plain.image_vars?.KILO_LOCAL_CA_PEM_B64).toBeUndefined();
+  });
+
+  it('puts buildVars on the selected class image_vars and merges with the CA', () => {
+    const config = buildColdLocalWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+      localCaPem: CA_PEM,
+      // The version value is the shared owner's; the renderer only carries it.
+      buildVars: { BUN_VERSION: '1.2.3' },
+    });
+    for (const entry of config.env.dev.containers as {
+      class_name: string;
+      image_vars?: Record<string, string>;
+    }[]) {
+      if (entry.class_name === 'Sandbox') {
+        expect(entry.image_vars?.BUN_VERSION).toBe('1.2.3');
+        expect(entry.image_vars?.KILO_LOCAL_CA_PEM_B64).toBe(
+          Buffer.from(CA_PEM, 'utf8').toString('base64')
+        );
+      } else {
+        expect(entry.image_vars?.BUN_VERSION, entry.class_name).toBeUndefined();
+      }
+    }
+  });
+
+  it('rejects a missing descriptor, a missing origin and an over-cap descriptor', () => {
+    const source = readSourceConfig();
+    expect(() =>
+      buildColdLocalWorkerConfig(source, { runtimeReleaseDescriptor: '', artifactOrigin: ORIGIN })
+    ).toThrow(/runtimeReleaseDescriptor/);
+    expect(() =>
+      buildColdLocalWorkerConfig(source, {
+        runtimeReleaseDescriptor: DESCRIPTOR,
+        artifactOrigin: '',
+      })
+    ).toThrow(/artifactOrigin/);
+    expect(() =>
+      buildColdLocalWorkerConfig(source, {
+        runtimeReleaseDescriptor: 'x'.repeat(65_537),
+        artifactOrigin: ORIGIN,
+      })
+    ).toThrow(/above the 65536 cap/);
+  });
+
+  it('does not mutate the source config', () => {
+    const source = readSourceConfig();
+    const snapshot = structuredClone(source);
+    buildColdLocalWorkerConfig(source, {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    expect(source).toEqual(snapshot);
+    expect(source.containers[0].image).toBe('./Dockerfile');
+  });
+});
+
+describe('buildColdLocalDevVarsContent', () => {
+  it('preserves every line verbatim and normalizes the trailing newline', () => {
+    expect(buildColdLocalDevVarsContent('WORKER_URL=http://x\nNEXTAUTH_SECRET=abc')).toBe(
+      'WORKER_URL=http://x\nNEXTAUTH_SECRET=abc\n'
+    );
+  });
+
+  it('refuses empty content', () => {
+    expect(() => buildColdLocalDevVarsContent('   \n')).toThrow(/empty/);
+  });
+});
+
+const VALID_SECRET = 'e2e-internal-secret-0123456789';
 describe('requireE2eInternalSecret', () => {
   it('accepts a value that satisfies the deployment rules', () => {
     expect(requireE2eInternalSecret(VALID_SECRET)).toBe(VALID_SECRET);

@@ -118,6 +118,17 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'prompt_failed',
   'sandbox_stopped',
   'execution_limit',
+  // Cold runtime-bootstrap failures (amendment "cold session without a
+  // snapshot"). Each names one recovered phase, so the user is not given a
+  // generic creation timeout. They are disjoint from supervisor exit codes.
+  'runtime_artifact_missing',
+  'runtime_artifact_unavailable',
+  'runtime_artifact_integrity',
+  'runtime_artifact_unauthorized',
+  'runtime_base_incompatible',
+  'runtime_install_probe_failed',
+  'runtime_supervisor_missing',
+  'runtime_artifact_deadline',
 ] as const;
 export type ControlPlaneFailureReason = (typeof CONTROL_PLANE_FAILURE_REASON_VALUES)[number];
 

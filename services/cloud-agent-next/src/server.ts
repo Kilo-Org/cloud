@@ -54,6 +54,7 @@ import { parseBearerCredential } from './sandbox-control/credential.js';
 import { admitSandboxWrapperUpgrade } from './sandbox-control/socket-admission.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
+import { registerRuntimeArtifactRoutes } from './sandbox-control/runtime-artifact-routes.js';
 import {
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeCredentialProxyUpstream,
@@ -302,6 +303,7 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 }
 
 registerControlLogRoutes(app);
+registerRuntimeArtifactRoutes(app);
 
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
   return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');

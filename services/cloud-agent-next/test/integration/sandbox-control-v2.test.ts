@@ -119,6 +119,7 @@ function containedGrant(
 
 type FakeProviderOptions = {
   failFirstCreate?: boolean;
+  failFirstLaunch?: string;
   gateCreate?: boolean;
   gateLaunch?: boolean;
   gateStop?: boolean;
@@ -171,6 +172,9 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
     },
     async launch(_ref, env) {
       provider.launchEnvs.push({ ...env });
+      if (options.failFirstLaunch !== undefined && provider.launchEnvs.length === 1) {
+        throw new Error(options.failFirstLaunch);
+      }
       if (options.gateLaunch) {
         await new Promise<void>((resolve, reject) => {
           provider.launchGates.push(error => (error === undefined ? resolve() : reject(error)));
@@ -213,6 +217,10 @@ type StartOptions = {
   egressMode?: EgressMode;
   egressAllowlist?: string[];
   sandboxKind?: StoredProviderPin['sandboxKind'];
+  /** Trusted cold-launch descriptor; sets `cloudflareBootstrapLaunch` on this DO. */
+  runtimeDescriptor?: string;
+  /** Shrink sandbox timers (e.g. `providerCreateMs`) for expiry tests. */
+  timers?: Partial<typeof TIMERS>;
 };
 
 /** Injects the fake adapter, then triggers `ensure` through a real DO RPC so
@@ -232,9 +240,17 @@ async function startAllocation(
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
-      ...(options.meter === undefined
+      ...(options.meter === undefined && options.runtimeDescriptor === undefined
         ? {}
-        : { env: { ...instance.env, CONTAINER_USAGE_METER: options.meter } }),
+        : {
+            env: {
+              ...instance.env,
+              ...(options.meter === undefined ? {} : { CONTAINER_USAGE_METER: options.meter }),
+              ...(options.runtimeDescriptor === undefined
+                ? {}
+                : { RUNTIME_RELEASE_DESCRIPTOR: options.runtimeDescriptor }),
+            },
+          }),
       ...(options.admissionError === undefined
         ? {}
         : options.admissionError === 'hang'
@@ -254,6 +270,9 @@ async function startAllocation(
                   throw new Error(options.admissionError);
                 },
               }),
+      ...(options.timers === undefined
+        ? {}
+        : { sandboxTimers: () => ({ ...TIMERS, ...options.timers }) }),
     });
   });
   if (options.preparingRoute !== undefined) {
@@ -327,6 +346,20 @@ function readProviderPin(stub: DurableObjectStub<SandboxControlV2>) {
       .from(allocationTable)
       .where(eq(allocationTable.id, 'current'));
     return rows[0]?.pin ?? null;
+  });
+}
+
+function readDeadlines(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const rows = await db
+      .select({
+        firstConnect: allocationTable.first_connect_deadline_at,
+        create: allocationTable.create_deadline_at,
+      })
+      .from(allocationTable)
+      .where(eq(allocationTable.id, 'current'));
+    return rows[0] ?? null;
   });
 }
 
@@ -2576,6 +2609,161 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     });
     expect(row[0]).toMatchObject({ state: 'failed', reason: 'preparation_timeout' });
   });
+
+  it('carries the exact cold launch deadline as the first-connect deadline', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      runtimeDescriptor: '{"format":1,"bootstrap":1}',
+      preparingRoute: 'workspace_cold_deadline',
+    });
+    await awaitStarting(provider, stub);
+    const deadlines = await readDeadlines(stub);
+    expect(deadlines?.firstConnect).not.toBeNull();
+    // Exact equality, not "less than a fresh window": the cold first-connect
+    // deadline is the one absolute launch deadline.
+    expect(deadlines?.firstConnect).toBe(deadlines?.create);
+  });
+
+  it('maps an overrun cold launch to runtime_artifact_deadline with no re-create', async () => {
+    // A provider launch that never resolves forces the DO's own outer backstop,
+    // so this proves the DO deadline path, not the observer.
+    const provider = createFakeProvider({ gateLaunch: true });
+    const stub = await startAllocation(provider, {
+      runtimeDescriptor: '{"format":1,"bootstrap":1}',
+      preparingRoute: 'workspace_cold_backstop',
+      timers: { providerCreateMs: 30 },
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'workspace_cold_backstop' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'runtime_artifact_deadline',
+      })
+    );
+    expect(provider.createCalls).toBe(1);
+  });
+
+  it('rejects an expired cold hello, never connects, and fails the route with the cold reason', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      runtimeDescriptor: '{"format":1,"bootstrap":1}',
+      preparingRoute: 'workspace_cold_hello',
+    });
+    await awaitStarting(provider, stub);
+    await setDeadline(stub, { first_connect_deadline_at: Date.now() - 1 });
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({ wrapperId: 'wr_cold', allocationId });
+    expect(reply).toEqual({ type: 'shutdown', reason: 'hello_rejected' });
+    await waitFor(async () => expect((await readState(stub)).kind).not.toBe('connected'));
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'workspace_cold_hello' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'runtime_artifact_deadline',
+      })
+    );
+  });
+
+  it('expires an unconnected cold launch on the alarm with the same reason, not connection_lost', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      runtimeDescriptor: '{"format":1,"bootstrap":1}',
+      preparingRoute: 'workspace_cold_alarm',
+    });
+    await awaitStarting(provider, stub);
+    await setDeadline(stub, { first_connect_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'workspace_cold_alarm' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'runtime_artifact_deadline',
+      })
+    );
+    expect(provider.createCalls).toBe(1);
+  });
+
+  it('fails a rehydrated expired cold create instead of retrying, and stops its own ref', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const stub = await startAllocation(provider, {
+      runtimeDescriptor: '{"format":1,"bootstrap":1}',
+      preparingRoute: 'workspace_cold_creating',
+    });
+    await awaitStarting(provider, stub);
+    const before = await readState(stub);
+    if (before.allocationId === null || before.providerRef === null)
+      throw new Error('Expected an allocation with a provider ref');
+    // The in-memory create is gone (a new DO instance), so nothing owns the
+    // deadline promise. The store fixture is the rehydrated `creating` row that
+    // still owns the ref but whose absolute cold deadline already passed.
+    const createInFlight = await runInDurableObject(stub, instance =>
+      Promise.resolve((instance as unknown as { createInFlight: boolean }).createInFlight)
+    );
+    expect(createInFlight).toBe(false);
+    await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      await db
+        .update(allocationTable)
+        .set({
+          state: 'creating',
+          create_deadline_at: Date.now() - 1,
+          first_connect_deadline_at: null,
+        })
+        .where(eq(allocationTable.id, 'current'));
+    });
+
+    const createCallsBefore = provider.createCalls;
+    const launchCallsBefore = provider.launchEnvs.length;
+    await runAlarm(stub);
+
+    // The failure keeps the original id and issues a stop for its own ref: no
+    // re-create, no new id.
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopping'));
+    const stopping = await readState(stub);
+    expect(stopping.allocationId).toBe(before.allocationId);
+    expect(provider.createCalls).toBe(createCallsBefore);
+    expect(provider.launchEnvs).toHaveLength(launchCallsBefore);
+    await waitFor(() => expect(provider.stopCalls).toContain(before.providerRef));
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'workspace_cold_creating' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'runtime_artifact_deadline',
+      })
+    );
+
+    await releaseGate(stub, () => provider.stopGates.shift()?.('terminal'));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+
+    // The failed allocation's late hello cannot become ready.
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({ wrapperId: 'wr_late', allocationId });
+    expect(reply).toEqual({ type: 'shutdown', reason: 'hello_rejected' });
+    expect((await readState(stub)).kind).not.toBe('connected');
+  }, 20_000);
+
+  it('keeps the generic cold retry after a transient launch failure at the retry pause', async () => {
+    const provider = createFakeProvider({
+      failFirstLaunch: 'runtime bootstrap failed without a phase receipt',
+    });
+    const stub = await startAllocation(provider, {
+      runtimeDescriptor: '{"format":1,"bootstrap":1}',
+      preparingRoute: 'workspace_cold_retry',
+      timers: { providerCreateRetryMs: 1 },
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const firstAttempt = launchIdentity(provider);
+    // The first attempt fails after committing its ref; cleanup stops that ref
+    // and the reducer enters the short retry pause with a null ref.
+    await waitFor(async () => {
+      const state = await readState(stub);
+      expect(state.allocationId).not.toBe(firstAttempt.allocationId);
+      expect(state.providerRef).toBeNull();
+    });
+    await runAlarm(stub);
+    // The cold reason must not terminalize the pause: a second attempt starts.
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    const view = (await stub.status({ sessionId: 'workspace_cold_retry' })).view;
+    expect(view).not.toMatchObject({ state: 'failed', reason: 'runtime_artifact_deadline' });
+  }, 20_000);
 
   it.each(['provider-gone', 'confirmed-stop'] as const)(
     'settles measured billing before reallocating a preparing route after %s',

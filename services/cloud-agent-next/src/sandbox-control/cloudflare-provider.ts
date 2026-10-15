@@ -21,8 +21,147 @@ import { ProviderCreationError } from './provider.js';
 import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { parseWrapperProcScanOutput, WRAPPER_PROC_SCAN_COMMAND } from './wrapper-proc-scan.js';
 import { withDORetry } from '../utils/do-retry.js';
+import {
+  RUNTIME_ARTIFACT_GRANT_SECONDS,
+  mintRuntimeArtifactGrant,
+} from './runtime-artifact-grant.js';
+import {
+  type RuntimeArtifactReader,
+  RuntimeInstallerError,
+  loadRuntimeRelease,
+  runtimeInstallerReasonForCode,
+} from './runtime-release-loader.js';
+import {
+  RUNTIME_ARTIFACT_GRANT_ENV,
+  RUNTIME_ARTIFACT_ORIGIN_ENV,
+  RUNTIME_DESCRIPTOR_ENV,
+  runtimeLaunchCommand,
+} from './runtime-bootstrap.js';
+import { observeRuntimeLaunchPhase } from './runtime-launch-phase.js';
+import { runtimeLaunchReceiptPath } from './runtime-launch-receipt.js';
+import {
+  RUNTIME_DEFAULT_DEADLINE_MS,
+  parseTrustedRuntimeArtifactOrigin,
+  runtimeArtifactHashes,
+} from '../shared/runtime-release.js';
 
 export const WRAPPER_PROC_PROBE_TIMEOUT_MS = 5_000;
+
+/**
+ * Trusted cold-launch inputs (amendment "cold session without a snapshot"). They
+ * are derived from the Worker environment at DO construction and passed into the
+ * adapter; no launch reads a descriptor from a request, an R2 object, or a
+ * sandbox file. An absent descriptor is the explicit baked selection.
+ */
+export type CloudflareRuntimeReleaseDeps = {
+  /** Private object store the preflight verifies the two artifacts against. */
+  reader: RuntimeArtifactReader;
+  /** Trusted generated-config descriptor; `undefined` is the baked image. */
+  descriptor: string | undefined;
+  /** Resolve the artifact read-grant signing secret at launch. */
+  grantSecret: () => Promise<string | null>;
+  /** Trusted absolute artifact origin; `undefined` fails a descriptor launch. */
+  origin: string | undefined;
+};
+
+/** Small bound for the best-effort launch-receipt cleanup; it never blocks a handoff. */
+const RUNTIME_LAUNCH_RECEIPT_CLEANUP_MS = 5_000;
+
+/**
+ * Start the verified cold runtime. Preflight checks that both objects are
+ * published with their declared size before the read grant is minted; the
+ * installer hashes the downloaded bytes. A present but unverifiable descriptor
+ * throws with no baked fallback. `allocationId` is the
+ * decoded allocation identity (`providerRef.instanceId`), the one grant owner.
+ */
+async function startRuntimeRelease(
+  release: CloudflareRuntimeReleaseDeps,
+  sandbox: CloudflareSandboxHandle,
+  env: Record<string, string>,
+  allocationId: string,
+  deadlineAtOption: number | undefined
+): Promise<void> {
+  const descriptor = release.descriptor;
+  if (descriptor === undefined) {
+    throw new RuntimeInstallerError(
+      'runtime_artifact_missing',
+      'runtime release descriptor is absent'
+    );
+  }
+  const deadlineAt = deadlineAtOption ?? Date.now() + RUNTIME_DEFAULT_DEADLINE_MS;
+  const loaded = await loadRuntimeRelease({ reader: release.reader, descriptor, deadlineAt });
+  if (loaded === null) {
+    throw new RuntimeInstallerError('runtime_artifact_missing', 'runtime release was not verified');
+  }
+  const secret = await release.grantSecret();
+  if (!secret) {
+    throw new RuntimeInstallerError(
+      'runtime_artifact_unavailable',
+      'runtime artifact grant signing is unavailable'
+    );
+  }
+  const origin = parseTrustedRuntimeArtifactOrigin(release.origin);
+  if (origin === null) {
+    throw new RuntimeInstallerError(
+      'runtime_artifact_unavailable',
+      'runtime artifact origin must be a trusted HTTPS origin'
+    );
+  }
+  const ttlSeconds = Math.min(
+    RUNTIME_ARTIFACT_GRANT_SECONDS,
+    Math.max(1, Math.floor((deadlineAt - Date.now()) / 1000))
+  );
+  const grant = mintRuntimeArtifactGrant(
+    { hashes: runtimeArtifactHashes(loaded), allocationId },
+    secret,
+    ttlSeconds
+  );
+  const launchId = crypto.randomUUID();
+  const command = runtimeLaunchCommand({ launchId, deadlineAt });
+  const process = await sandbox.startProcess(command, {
+    cwd: '/',
+    // The terminal record must outlive exit so the launch phase can read a fresh
+    // DTO; the sandbox destroy releases it. The launch never uses waitForExit,
+    // whose SSE stream would otherwise stay open for a healthy supervisor.
+    autoCleanup: false,
+    env: {
+      ...env,
+      [RUNTIME_DESCRIPTOR_ENV]: descriptor,
+      [RUNTIME_ARTIFACT_GRANT_ENV]: grant,
+      [RUNTIME_ARTIFACT_ORIGIN_ENV]: origin,
+    },
+  });
+  const outcome = await observeRuntimeLaunchPhase(
+    sandbox,
+    sandbox,
+    process.id,
+    launchId,
+    deadlineAt
+  );
+  // Best-effort cleanup of only this launch's own receipt, at its fixed path and
+  // safe id. It is fire-and-forget and bounded, so a handoff never waits on it;
+  // the SDK's HTTP request is finite, and a missed delete is at worst a bounded
+  // stored receipt. Never another launch's file or a user file.
+  void withTimeout(
+    sandbox.deleteFile(runtimeLaunchReceiptPath(launchId)),
+    RUNTIME_LAUNCH_RECEIPT_CLEANUP_MS,
+    'runtime launch receipt cleanup timed out'
+  ).catch(() => undefined);
+  if (outcome.kind === 'handoff') return;
+  if (outcome.kind === 'installer-failed') {
+    throw new RuntimeInstallerError(
+      runtimeInstallerReasonForCode(outcome.code),
+      `runtime installer failed (code ${outcome.code})`
+    );
+  }
+  if (outcome.kind === 'deadline') {
+    throw new RuntimeInstallerError(
+      'runtime_artifact_deadline',
+      'runtime release deadline exceeded before the supervisor handed off'
+    );
+  }
+  throw new Error('runtime bootstrap failed without a phase receipt');
+}
 
 export type CloudflareWrapperProbeResult =
   | { outcome: 'count'; count: number; incomplete: boolean }
@@ -73,6 +212,11 @@ export function createCloudflareProviderAdapter(deps: {
   sandboxId: string;
   getSandbox: (id: string, options: SandboxOptions) => CloudflareSandboxHandle;
   destroy: (allocationId: string, options: SandboxOptions) => Promise<void>;
+  /**
+   * Trusted cold-launch inputs. Absent, and a descriptor absent within it, keep
+   * the baked supervisor selection.
+   */
+  runtimeRelease?: CloudflareRuntimeReleaseDeps;
 }): CloudflareProviderAdapter {
   const decodeOwnedProviderRef = (
     ref: string | null
@@ -174,21 +318,34 @@ export function createCloudflareProviderAdapter(deps: {
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
-    async launch(ref, env) {
+    async launch(ref, env, options) {
       const parsed = decodeCloudflareProviderRef(ref);
       if (!parsed || parsed.sandboxId !== deps.sandboxId) {
         throw new ProviderCreationError('invalid_configuration');
       }
       const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
       if (parsed.containment) await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);
-      await sandbox.startProcess(CONTROL_SUPERVISOR_PATH, {
-        cwd: '/',
-        env: {
-          ...env,
-          PROVIDER_INSTANCE_ID: ref,
-          WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
-        },
-      });
+      const launchEnv = {
+        ...env,
+        PROVIDER_INSTANCE_ID: ref,
+        WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
+      };
+      // One launch selection (amendment "cold session without a snapshot"): a
+      // trusted descriptor starts the verified runtime-launch command; no
+      // descriptor starts the baked supervisor path unchanged.
+      if (deps.runtimeRelease && deps.runtimeRelease.descriptor !== undefined) {
+        // The grant identity is the decoded allocation id, not the encoded
+        // provider ref (which is a >128-byte JSON the grant schema rejects).
+        await startRuntimeRelease(
+          deps.runtimeRelease,
+          sandbox,
+          launchEnv,
+          parsed.instanceId,
+          options?.deadlineAt
+        );
+      } else {
+        await sandbox.startProcess(CONTROL_SUPERVISOR_PATH, { cwd: '/', env: launchEnv });
+      }
       return { startSource: 'image' };
     },
     async observe(ref, intent) {

@@ -561,6 +561,7 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
+  RUNTIME_RELEASE_BUCKET: R2Bucket;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** Dedicated best-effort Cloud Agent reporting queue. */
@@ -593,6 +594,18 @@ export type Env = {
   INTERNAL_API_SECRET?: string;
   /** Worker base URL for building WebSocket ingest endpoint */
   WORKER_URL?: string;
+  /**
+   * Trusted generated-config runtime release descriptor for the cold launch
+   * (amendment "cold session without a snapshot"). Absent selects the baked
+   * image. It is read only from the Worker environment, never from a request.
+   */
+  RUNTIME_RELEASE_DESCRIPTOR?: string;
+  /**
+   * Trusted absolute origin the sandbox fetches runtime artifacts from. Falls
+   * back to `WORKER_URL`. A plain-HTTP origin is a deliberate local-dev value
+   * and is the only case that relaxes the installer's HTTPS requirement.
+   */
+  RUNTIME_ARTIFACT_ORIGIN?: string;
   /** Sandbox control transport; local dev uses RPC for streaming backup restores */
   SANDBOX_TRANSPORT?: 'http' | 'websocket' | 'rpc';
   /**

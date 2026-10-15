@@ -8,6 +8,9 @@
  */
 
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { Hono } from 'hono';
+import type { HonoContext } from '../src/hono-context.js';
+import { registerRuntimeArtifactRoutes } from '../src/sandbox-control/runtime-artifact-routes.js';
 import type { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
 import {
   KILO_FACADE_AUTH_TOKEN_HEADER,
@@ -84,7 +87,14 @@ type TestEnv = {
   SANDBOX_CONTROL: Env['SANDBOX_CONTROL'];
   SANDBOX_SESSION: Env['SANDBOX_SESSION'];
   NEXTAUTH_SECRET: Env['NEXTAUTH_SECRET'];
+  R2_BUCKET: R2Bucket;
+  RUNTIME_RELEASE_BUCKET: R2Bucket;
 };
+
+// The runtime artifact read route is mounted from the same registrar the
+// production Worker uses, so the integration test exercises the real handler.
+const runtimeArtifactApp = new Hono<HonoContext>();
+registerRuntimeArtifactRoutes(runtimeArtifactApp);
 
 function routeToUserKiloFacade(request: Request, env: TestEnv, userId: string): Promise<Response> {
   const facade = env.USER_KILO_FACADE.get(env.USER_KILO_FACADE.idFromName(userId));
@@ -123,6 +133,10 @@ function isTerminalRouteIdentity(ownerId: string, sessionId: string, ptyId: stri
 export default {
   async fetch(request: Request, env: TestEnv): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname.startsWith('/sandbox-artifacts/')) {
+      return runtimeArtifactApp.fetch(request, env as unknown as Env);
+    }
 
     if (url.pathname.startsWith('/sandbox-control/')) {
       const sandboxId = decodeURIComponent(url.pathname.slice('/sandbox-control/'.length));

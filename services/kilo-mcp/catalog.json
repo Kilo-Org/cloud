@@ -6936,6 +6936,10 @@
                   ],
                   "additionalProperties": false
                 },
+                "publicRepoUrl": {
+                  "type": "string",
+                  "format": "uri"
+                },
                 "mode": {
                   "type": "string",
                   "minLength": 1,
@@ -7424,6 +7428,10 @@
                     "repositoryUuid"
                   ],
                   "additionalProperties": false
+                },
+                "publicRepoUrl": {
+                  "type": "string",
+                  "format": "uri"
                 },
                 "mode": {
                   "type": "string",
@@ -19822,6 +19830,10 @@
                       ],
                       "additionalProperties": false
                     },
+                    "publicRepoUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
                     "mode": {
                       "type": "string",
                       "minLength": 1,
@@ -20310,6 +20322,10 @@
                         "repositoryUuid"
                       ],
                       "additionalProperties": false
+                    },
+                    "publicRepoUrl": {
+                      "type": "string",
+                      "format": "uri"
                     },
                     "mode": {
                       "type": "string",

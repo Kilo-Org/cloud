@@ -97,13 +97,16 @@ measurements are included in routing-table version hashes.
 ## Platform model selection
 
 - Select a model, not one effort, in the platform configuration.
-- The worker expands each selected model into every reasoning variant from the current `/api/openrouter/models` catalog.
+- The worker resolves `~` model aliases through the catalog's `alias_target` when the concrete target is present, then expands every reasoning variant from that target's current `/api/openrouter/models` entry. An alias whose target is absent stays alias-keyed.
+- Exact resolved `(model, variant)` pairs are deduplicated: an alias and its target, or multiple aliases for one target, share a measurement. Retargeting an alias requests the new concrete pair instead of reusing the old target's result.
 - Variants must contain explicit `reasoning.enabled` or `reasoning.effort` controls. Unrelated presets do not create benchmark entries.
 - A model without reasoning controls creates one `(model, null)` entry.
 - If the catalog fails or omits a selected model, reconciliation fails. It does not infer a default effort.
 - Catalog requests have a 10-second deadline, including body reads, so a stalled response cannot block both queues indefinitely.
 - Manual and automatic selections use the same expansion. Existing saved effort selections no longer restrict platform measurements.
-- Owner pools use the same model-level selection and all-efforts expansion.
+- Owner pools use the same alias resolution and all-efforts expansion, sharing concrete measurements with the platform. Status responses preserve the requested model ids; custom routing tables use concrete ids.
+- Custom tables are already scoped to the requested resolved pairs by the benchmark worker. The serving worker accepts those concrete candidates and loads capabilities by their ids rather than re-filtering against saved alias ids.
+- Deploy the serving worker before the benchmark worker when introducing alias resolution; older serving workers filter concrete custom-table candidates against the original pool aliases.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
 The worker drains expanded entries in batches that fit the shared container budget.

@@ -49,7 +49,11 @@ import {
 } from './db';
 import { loadRunProgress } from './run-progress';
 import type { HonoEnv } from './hono-env';
-import { fetchBenchmarkModelCatalog, platformRegistryEntries } from './platform-models';
+import {
+  fetchBenchmarkModelCatalog,
+  mapProfileStatusesToRequestedModels,
+  platformRegistryEntries,
+} from './platform-models';
 
 const DebugCliRequestSchema = z.object({
   model: z.string().trim().min(1),
@@ -340,9 +344,18 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           ownerType: body.ownerType,
           ownerId: body.ownerId,
           pairs,
-          retryPairs: pairs.filter(pair => retryModels.has(pair.model)),
+          retryPairs: platformRegistryEntries(
+            {
+              deciderModels: body.entries
+                .filter(entry => retryModels.has(entry.model))
+                .map(entry => ({ id: entry.model })),
+            },
+            catalog
+          ),
         });
-        return c.json(result);
+        return c.json({
+          statuses: mapProfileStatusesToRequestedModels(body.entries, catalog, result.statuses),
+        });
       } catch (error) {
         if (error instanceof ProfileQuotaExceededError) {
           return c.json(error.quota, 429);
@@ -389,7 +402,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
             : { statuses: [] };
         return c.json({
           statuses: [
-            ...result.statuses,
+            ...mapProfileStatusesToRequestedModels(supported, catalog, result.statuses),
             ...body.entries
               .filter(entry => !available.has(entry.model))
               .map(entry => ({

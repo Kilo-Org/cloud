@@ -1507,60 +1507,65 @@ describe('auto routing worker', () => {
       );
     });
 
-    it('allows every effort of pool models and rejects models outside the pool', async () => {
-      setOwnerPool(pool);
-      dbWhereCaps.mockResolvedValue([
-        {
-          openrouterId: 'pool/chat',
-          inputModalities: [],
-          contextLength: 1_000_000,
-          isActive: true,
-        },
-        {
-          openrouterId: 'outside/chat',
-          inputModalities: [],
-          contextLength: 1_000_000,
-          isActive: true,
-        },
-      ]);
-      benchmarkFetch.mockImplementation(async (url: string) => {
-        if (String(url).includes('/admin/custom-routing-table')) {
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({
-              table: {
-                ...customTable,
-                routes: {
-                  'implementation/feature_development': [
-                    {
-                      model: 'outside/chat',
-                      variant: 'max',
-                      accuracy: 1,
-                      avgCostUsd: 0,
-                      meetsThreshold: true,
-                    },
-                    {
-                      model: 'pool/chat',
-                      variant: 'max',
-                      accuracy: 1,
-                      avgCostUsd: 0.0001,
-                      meetsThreshold: true,
-                    },
-                    ...customTable.routes['implementation/feature_development'],
-                  ],
+    it.each(['pool/chat', '~pool/latest'])(
+      'uses returned candidate %s for capabilities across benchmark worker versions',
+      async candidateModel => {
+        setOwnerPool([{ model: '~pool/latest' }]);
+        dbWhereCaps.mockResolvedValue([
+          {
+            openrouterId: candidateModel,
+            inputModalities: [],
+            contextLength: 1_000_000,
+            isActive: true,
+          },
+        ]);
+        benchmarkFetch.mockImplementation(async (url: string) => {
+          if (String(url).includes('/admin/custom-routing-table')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                table: {
+                  ...customTable,
+                  routes: {
+                    'implementation/feature_development': [
+                      {
+                        model: candidateModel,
+                        variant: 'max',
+                        accuracy: 1,
+                        avgCostUsd: 0.0001,
+                        meetsThreshold: true,
+                      },
+                      ...customTable.routes['implementation/feature_development'].map(
+                        candidate => ({
+                          ...candidate,
+                          model: candidateModel,
+                        })
+                      ),
+                    ],
+                  },
                 },
-              },
-            }),
-          };
-        }
-        return { ok: true, status: 200, json: async () => ({ winner: null }) };
-      });
-      const response = await decideRequest(mirrorPayload());
-      await expect(response.json()).resolves.toMatchObject({
-        decision: { model: 'pool/chat', variant: 'max' },
-      });
-    });
+              }),
+            };
+          }
+          return { ok: true, status: 200, json: async () => ({ winner: null }) };
+        });
+        const response = await decideRequest(mirrorPayload());
+        await expect(response.json()).resolves.toMatchObject({
+          decision: { model: candidateModel, variant: 'max' },
+        });
+        expect(getModelCapabilitiesMock).toHaveBeenCalledWith(
+          env,
+          expect.objectContaining({ additionalModelIds: [candidateModel] })
+        );
+        expect(benchmarkFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/admin/custom-routing-table'),
+          expect.objectContaining({
+            body: JSON.stringify({ router: 'efficient', entries: [{ model: '~pool/latest' }] }),
+          })
+        );
+      }
+    );
 
     it('returns a null decision when custom table lookup fails', async () => {
       setOwnerPool(pool);

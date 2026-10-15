@@ -158,10 +158,14 @@ async function enhancedModelList(models: OpenRouterModel[]) {
             )?.pricing);
         const pricing = getModelDisplayPricing(rawPricing);
         const terminalBench = terminalBenchFor(summaries, model.id);
+        const aliasTarget = model.id.startsWith('~')
+          ? endpointsMetadata[model.id]?.alias_target?.slug
+          : undefined;
         return {
           ...model,
           ...(pricing && { pricing }),
           ...(terminalBench && { terminalBench }),
+          ...(aliasTarget && { alias_target: aliasTarget }),
         };
       })
       .concat(

@@ -20,6 +20,8 @@ import {
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -199,6 +201,7 @@ describe('auto models', () => {
   });
 
   afterEach(() => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
     global.fetch = originalFetch;
   });
 
@@ -215,6 +218,30 @@ describe('auto models', () => {
       'https://openrouter.ai/api/v1/models',
       expect.objectContaining({ cache: 'force-cache', next: { revalidate: 60 } })
     );
+  });
+
+  it('publishes database alias targets only for alias entries and preserves them through validation', async () => {
+    const alias = buildModel({ id: '~vendor/latest' });
+    const target = buildModel({ id: 'vendor/current' });
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValueOnce({
+      [alias.id]: {
+        ...alias,
+        endpoints: [],
+        alias_target: { slug: target.id },
+      },
+      [target.id]: {
+        ...target,
+        endpoints: [],
+        alias_target: { slug: 'vendor/ignored' },
+      },
+    });
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: [alias, target] } }))
+    ) as unknown as typeof fetch;
+
+    const response = OpenRouterModelsResponseSchema.parse(await getEnhancedOpenRouterModels());
+    expect(response.data.find(model => model.id === alias.id)?.alias_target).toBe(target.id);
+    expect(response.data.find(model => model.id === target.id)).not.toHaveProperty('alias_target');
   });
 
   it('excludes OpenRouter batch variants from the public model list', async () => {

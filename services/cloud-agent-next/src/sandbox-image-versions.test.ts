@@ -77,9 +77,10 @@ describe('runtime distribution packaging', () => {
     expect(RUNTIME_DISTRIBUTION.gh).toBe('2.82.1');
     expect(RUNTIME_DISTRIBUTION.nodeMajor).toBe('24');
     const e2eWorkflow = readServiceFile('../../../.github/workflows/cloud-agent-e2e-deploy.yml');
-    expect(e2eWorkflow).toContain('uses: oven-sh/setup-bun@v2');
+    const bunSetup = 'uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6';
+    expect(e2eWorkflow).toContain(bunSetup);
     expect(e2eWorkflow).toContain(`bun-version: ${RUNTIME_DISTRIBUTION.bun}`);
-    expect(e2eWorkflow.indexOf('uses: oven-sh/setup-bun@v2')).toBeLessThan(
+    expect(e2eWorkflow.indexOf(bunSetup)).toBeLessThan(
       e2eWorkflow.indexOf('name: Deploy Cloud Agent e2e Worker')
     );
   });

@@ -17,6 +17,7 @@ import type {
 import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
+import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -278,7 +279,11 @@ export async function upstreamRequest({
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
     headers.set(key, value);
   }
-  if (provider.apiKeyHeader === 'x-api-key') {
+  if (provider.secureProxy) {
+    for (const [key, value] of Object.entries(provider.secureProxy.upstreamAuthHeaders)) {
+      headers.set(key, value);
+    }
+  } else if (provider.apiKeyHeader === 'x-api-key') {
     headers.set('x-api-key', provider.apiKey);
   } else {
     headers.set('Authorization', `Bearer ${provider.apiKey}`);
@@ -319,10 +324,20 @@ export async function upstreamRequest({
       ? appendQueryString(apiUrl, search)
       : `${apiUrl}${path}${search}`;
 
-    const response = await fetch(targetUrl, {
+    const outgoing = provider.secureProxy
+      ? buildSecureProxyRequest({
+          secureProxy: provider.secureProxy,
+          chatApiPath: CHAT_API_PATHS[chatApi],
+          upstreamUrl: targetUrl,
+          upstreamHeaders: headers,
+          body,
+        })
+      : { url: targetUrl, headers, body: JSON.stringify(body) };
+
+    const response = await fetch(outgoing.url, {
       method,
-      headers,
-      body: JSON.stringify(body),
+      headers: outgoing.headers,
+      body: outgoing.body,
       // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
       duplex: 'half',
       signal: combinedSignal,
@@ -350,6 +365,9 @@ export async function upstreamRequest({
       const failureMetadata = {
         providerId: provider.id,
         targetHost: getProviderTargetHost(apiUrl),
+        ...(provider.secureProxy && {
+          secureProxyHost: getProviderTargetHost(provider.secureProxy.url),
+        }),
         path,
         failureFamily,
         errorName,

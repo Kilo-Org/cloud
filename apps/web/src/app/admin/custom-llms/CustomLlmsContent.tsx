@@ -448,6 +448,21 @@ export function CustomLlmsContent() {
                     instead when the provider expects an{' '}
                     <code className="text-foreground">x-api-key</code> header.
                   </p>
+                  <p className="mt-2">
+                    To route through the secure proxy, set the definition&apos;s{' '}
+                    <code className="text-foreground">base_url</code> to the proxy&apos;s{' '}
+                    <code className="text-foreground">/api/v1</code> URL and use:
+                  </p>
+                  <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
+                    {`{
+  "type": "secure_proxy",
+  "vercel_protection_bypass_secret": "PROXY_BYPASS_SECRET",
+  "config": {
+    "url": "https://upstream.example.com/v1",
+    "extra_headers": { "Authorization": "Bearer YOUR_API_KEY" }
+  }
+}`}
+                  </pre>
                 </div>
               )}
             </div>

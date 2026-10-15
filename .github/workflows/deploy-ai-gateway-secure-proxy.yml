@@ -1,0 +1,44 @@
+name: Deploy AI Gateway Secure Proxy to Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-ai-gateway-secure-proxy
+  cancel-in-progress: false
+
+jobs:
+  verify-main:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify main branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::This workflow must be run from main. Got: $GITHUB_REF"
+            exit 1
+          fi
+
+  stage-secure-proxy:
+    needs: verify-main
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      target_environment: production
+      vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY_SECURE_PROXY
+    secrets:
+      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY }}
+
+  promote-secure-proxy:
+    needs: stage-secure-proxy
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-secure-proxy.outputs.deployment_url }}
+      axiom_annotation_dataset: vercel
+      axiom_expected_project: ai-gateway-secure-proxy
+    secrets:
+      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

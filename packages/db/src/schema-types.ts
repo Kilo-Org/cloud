@@ -1,3 +1,4 @@
+import { SecureProxyUpstreamUrlSchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
 import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
@@ -2230,10 +2231,27 @@ export const CustomLlmXApiKeyCredentialsSchema = z.object({
 
 export type CustomLlmXApiKeyCredentials = z.infer<typeof CustomLlmXApiKeyCredentialsSchema>;
 
+/**
+ * Routes requests through apps/ai-gateway-secure-proxy. The definition's
+ * `base_url` is the proxy origin plus `/api/v1`; `config.url` is the upstream
+ * base URL that `disable_url_suffix` applies to.
+ */
+export const CustomLlmSecureProxyCredentialsSchema = z.object({
+  type: z.literal('secure_proxy'),
+  vercel_protection_bypass_secret: z.string().min(1),
+  config: z.object({
+    url: SecureProxyUpstreamUrlSchema,
+    extra_headers: CustomLlmExtraHeadersSchema.optional(),
+  }),
+});
+
+export type CustomLlmSecureProxyCredentials = z.infer<typeof CustomLlmSecureProxyCredentialsSchema>;
+
 export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
   CustomLlmXApiKeyCredentialsSchema,
   GoogleServiceAccountKeySchema,
+  CustomLlmSecureProxyCredentialsSchema,
 ]);
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;

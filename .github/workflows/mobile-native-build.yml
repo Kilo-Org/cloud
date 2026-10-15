@@ -165,11 +165,9 @@ jobs:
             build
 
       # A tarball keeps the executable bit that upload-artifact's zip drops.
-      # The artifact name keys only on nativeHash, but the local cache key
-      # also keys on the Xcode and simulator SDK. Record them so a consumer
-      # on a different toolchain refuses the binary (see
-      # dev/local/mobile-remote-native.ts) instead of caching an app its
-      # simulator runtime cannot launch.
+      # The artifact name keys only on nativeHash. Record the Xcode and
+      # simulator SDK so a consumer refuses a binary its target simulator
+      # runtime cannot launch (see dev/local/mobile-remote-native.ts).
       - name: Package
         run: |
           set -euo pipefail

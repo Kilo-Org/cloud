@@ -922,7 +922,10 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   const lockScreenCard = (scheme: Scheme) => {
     const detail = lockScreenDetail(scheme, 13);
     return (
-      <VStack alignment="leading" spacing={0}>
+      // A stale or stopped card dims its content only. Dimming the banner root
+      // also faded the background tint, and the system Lock Screen platter
+      // showed through the card.
+      <VStack alignment="leading" spacing={0} modifiers={[opacity(dimmed ? 0.72 : 1)]}>
         <HStack
           alignment="center"
           spacing={8}
@@ -966,7 +969,6 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
           // The widget process takes its locale from the device language; the
           // baked tag keeps the times in the app language.
           environment({ key: 'locale', value: locale }),
-          opacity(dimmed ? 0.72 : 1),
         ]}
       >
         {lockScreenCard(card)}

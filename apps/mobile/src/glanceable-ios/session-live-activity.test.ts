@@ -250,6 +250,29 @@ describe('session card layout: states', () => {
     expect(texts(banner)).toContain('Last known ·');
   });
 
+  it.each([
+    { name: 'out of date', state: { statusKind: 'scheduled' as const }, stale: true },
+    {
+      name: 'stopped',
+      state: { statusKind: 'failed' as const, failure: { kind: 'other' as const } },
+      stale: false,
+    },
+  ])('keeps the card background opaque when a $name card dims', ({ state, stale }) => {
+    const { banner } = render({ ...BASE, ...state }, { colorScheme: 'light', isStale: stale });
+    const [root, ...inner] = collect(banner);
+    const rootModifiers = (root?.props.modifiers ?? []) as { $type: string; args: unknown }[];
+    // A faded root also fades the tint, and the system Lock Screen platter then
+    // shows through the card. Only the content dims.
+    expect(rootModifiers).toContainEqual({ $type: 'activityBackgroundTint', args: '#FBFAF5' });
+    expect(rootModifiers.some(modifier => modifier.$type === 'opacity')).toBe(false);
+    const dims = inner.flatMap(item =>
+      ((item.props.modifiers ?? []) as { $type: string; args: unknown }[]).filter(
+        modifier => modifier.$type === 'opacity'
+      )
+    );
+    expect(dims).toContainEqual({ $type: 'opacity', args: 0.72 });
+  });
+
   it('shows the trimmed command with Approve and Open on a permission wait', () => {
     const { banner } = render({
       ...BASE,

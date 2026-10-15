@@ -73,12 +73,14 @@ const { basename } = require('node:path');
 const { spawnSync } = require('node:child_process');
 const args = process.argv.slice(2);
 const name = basename(process.argv[1]);
+const changes = process.env.CHANGES.split(',');
 if (name === 'git') {
   if (args[0] === 'merge-base') console.log('base');
-  else if (args.includes('packages/trpc/src/**') && process.env.CHANGES === 'trpc') console.log('packages/trpc/src/index.ts');
-  else if (args.includes('pnpm-workspace.yaml') && process.env.CHANGES === 'workspace') console.log('pnpm-workspace.yaml');
+  else if (args.includes('packages/trpc/src/**') && changes.includes('trpc')) console.log('packages/trpc/src/index.ts');
+  else if (args.includes('pnpm-workspace.yaml') && changes.includes('workspace')) console.log('pnpm-workspace.yaml');
   else if (args.includes('*.ts')) console.log('apps/extension/package.json');
 } else if (name === 'pnpm' && args[0] === '-r') {
+  appendFileSync(process.env.COMMAND_LOG, name + ' ' + args.join(' ') + '\\n');
   const result = spawnSync('sh', ['-c', process.env.EXTENSION_TYPECHECK], { stdio: 'inherit' });
   process.exit(result.status ?? 1);
 } else {
@@ -137,11 +139,28 @@ test('extension compiler errors still fail when tRPC is already built', t => {
   assert.equal(runTypecheck(t, { built: '1', checkExit: 9 }).status, 9);
 });
 
-for (const changes of ['', 'trpc', 'extension', 'workspace']) {
-  test(`root ${changes || 'full'} typecheck builds tRPC once and checks the extension`, t => {
+const workspaceFilters = '--filter !kilocode-monorepo --filter !web --filter !@kilocode/trpc';
+const fullWorkspaceTypecheck = `pnpm -r ${workspaceFilters} run typecheck`;
+const extensionTypecheck = `pnpm -r --filter ${extension.name}... ${workspaceFilters} run typecheck`;
+
+for (const [changes, harnessBuilds, workspaceTypecheck] of [
+  ['', 1, fullWorkspaceTypecheck],
+  ['trpc', 0, extensionTypecheck],
+  ['extension', 0, extensionTypecheck],
+  ['workspace', 1, fullWorkspaceTypecheck],
+  ['trpc,workspace', 1, fullWorkspaceTypecheck],
+]) {
+  test(`root ${changes || 'full'} typecheck builds each prerequisite once and checks the extension`, t => {
     const result = runTypecheck(t, { root: true, changes });
+    const count = name =>
+      result.commands.filter(command => command.startsWith(`pnpm --filter ${name} `)).length;
     assert.equal(result.status, 0);
-    assert.equal(result.commands.filter(command => command.includes('@kilocode/trpc')).length, 1);
+    assert.equal(count('@kilocode/trpc'), 1);
+    assert.equal(count('@kilocode/harness-sdk'), harnessBuilds);
+    assert.deepEqual(
+      result.commands.filter(command => command.startsWith('pnpm -r')),
+      [workspaceTypecheck]
+    );
     assert.equal(result.commands.at(-1), 'tsc --noEmit');
   });
 }

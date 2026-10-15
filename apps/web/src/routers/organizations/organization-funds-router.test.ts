@@ -289,6 +289,43 @@ describe('organization funds router', () => {
       expect(balanceOf(await getOrg(unrelatedOrg.id))).toBe(0);
     });
 
+    it('rejects a nonexistent recipient as a bad request', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(
+        caller.organizations.funds.distribute({
+          organizationId: parentOrg.id,
+          allocations: [
+            { childOrganizationId: crypto.randomUUID(), amountMicrodollars: 1_000_000 },
+          ],
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'All recipients must be direct child organizations.',
+      });
+      expect(balanceOf(await getOrg(parentOrg.id))).toBe(5_000_000);
+    });
+
+    it('rejects a foreign recipient while another transaction holds its row lock', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const outcome = await db.transaction(async tx => {
+        await tx
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(eq(organizations.id, unrelatedOrg.id))
+          .for('update');
+        return caller.organizations.funds
+          .distribute({
+            organizationId: parentOrg.id,
+            allocations: [{ childOrganizationId: unrelatedOrg.id, amountMicrodollars: 1_000_000 }],
+          })
+          .catch((error: unknown) => error);
+      });
+
+      expect(outcome).toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
     it('distributes expiring lots without changing deadlines or paid cohorts', async () => {
       const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       await setBalance(parentOrg.id, 5_000_000, 1_000_000);

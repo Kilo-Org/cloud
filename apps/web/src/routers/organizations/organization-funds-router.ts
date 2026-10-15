@@ -1,5 +1,5 @@
 import { organizations } from '@kilocode/db/schema';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
@@ -79,6 +79,34 @@ async function getOrganizationWithExpiryProcessed(organizationId: string) {
   return organization;
 }
 
+async function requireDirectChildren(
+  tx: DrizzleTransaction,
+  parentOrganizationId: string,
+  childIds: string[]
+) {
+  const childRows = await tx
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+    })
+    .from(organizations)
+    .where(
+      and(
+        eq(organizations.parent_organization_id, parentOrganizationId),
+        inArray(organizations.id, childIds),
+        isNull(organizations.deleted_at)
+      )
+    );
+  const childById = new Map(childRows.map(child => [child.id, child]));
+  if (childById.size !== childIds.length) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'All recipients must be direct child organizations.',
+    });
+  }
+  return childById;
+}
+
 export const organizationFundsRouter = createTRPCRouter({
   // Per-child balances plus the parent balance and eligibility flag, used to
   // render the fund-distribution table. Restricted to owner/billing_manager.
@@ -150,15 +178,16 @@ export const organizationFundsRouter = createTRPCRouter({
         (sum, allocation) => sum + allocation.amountMicrodollars,
         0
       );
+      const childIds = allocations.map(allocation => allocation.childOrganizationId);
 
       const childCount = await db.transaction(async tx => {
+        // Validate before reconciling any recipient's credits; re-check once the rows are locked.
+        await requireDirectChildren(tx, organizationId, childIds);
         await lockCreditOwners(tx, [
           { type: 'organization', id: organizationId },
-          ...allocations.map(allocation => ({
-            type: 'organization' as const,
-            id: allocation.childOrganizationId,
-          })),
+          ...childIds.map(id => ({ type: 'organization' as const, id })),
         ]);
+        const childById = await requireDirectChildren(tx, organizationId, childIds);
         const [parent] = await tx
           .select()
           .from(organizations)
@@ -172,30 +201,6 @@ export const organizationFundsRouter = createTRPCRouter({
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'The total amount to distribute exceeds the available balance.',
-          });
-        }
-
-        // Validate every target is a direct, non-deleted child and lock the rows.
-        const childIds = allocations.map(allocation => allocation.childOrganizationId);
-        const childRows = await tx
-          .select({
-            id: organizations.id,
-            name: organizations.name,
-          })
-          .from(organizations)
-          .where(
-            and(
-              eq(organizations.parent_organization_id, organizationId),
-              inArray(organizations.id, childIds),
-              isNull(organizations.deleted_at)
-            )
-          );
-
-        const childById = new Map(childRows.map(child => [child.id, child]));
-        if (childById.size !== childIds.length) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'All recipients must be direct child organizations.',
           });
         }
 

@@ -44,9 +44,6 @@ vi.mock('@/components/ui/icons', () => ({
   XCircle: 'XCircle',
   Eye: 'Eye',
 }));
-vi.mock('@/components/ui/eyebrow', () => ({
-  Eyebrow: 'Eyebrow',
-}));
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
@@ -203,7 +200,6 @@ describe('FixedPartRow mounted', () => {
     const renderer = await renderRow(
       {
         label: 'Thinking',
-        labelKind: 'eyebrow',
         variant: 'dashed',
         onPress,
         accessibilityLabel: 'Thinking',
@@ -228,7 +224,6 @@ describe('FixedPartRow mounted', () => {
     const onPress = vi.fn(() => undefined);
     const renderer = await renderRow({
       label: 'Thinking',
-      labelKind: 'eyebrow',
       variant: 'dashed',
       onPress,
       accessibilityLabel: 'Thinking',
@@ -254,27 +249,9 @@ describe('FixedPartRow mounted', () => {
     expect(findHost(renderer.root, 'Eye')).toHaveLength(0);
   });
 
-  it('keeps the eyebrow label on a single line', async () => {
-    const renderer = await renderRow({
-      label: 'Thought',
-      labelKind: 'eyebrow',
-      accessibilityLabel: 'Thought',
-    });
-
-    const eyebrows = findHost(renderer.root, 'Eyebrow');
-    expect(eyebrows).toHaveLength(1);
-    const eyebrow = eyebrows[0];
-    if (!eyebrow) {
-      throw new Error('eyebrow not found');
-    }
-    expect(eyebrow.props.numberOfLines).toBe(1);
-    expect(eyebrow.props.className).toContain('shrink');
-  });
-
   it('matches the dashed outer box to the solid outer box', async () => {
     const renderer = await renderRow({
       label: 'Thought',
-      labelKind: 'eyebrow',
       variant: 'dashed',
       accessibilityLabel: 'Thought',
     });
@@ -506,17 +483,5 @@ describe('FixedPartRow label and detail alignment', () => {
     const content = findContentRow(renderer.root);
     expect(content.props.className).toContain('items-baseline');
     expect(textWithContent(renderer.root, 'fleet.py')).toHaveLength(1);
-  });
-
-  it('keeps the alignment for an eyebrow label', async () => {
-    const renderer = await renderRow({
-      label: 'Thought',
-      labelKind: 'eyebrow',
-      badge: '3',
-      accessibilityLabel: 'Thought',
-    });
-
-    const content = findContentRow(renderer.root);
-    expect(content.props.className).toContain('items-baseline');
   });
 });

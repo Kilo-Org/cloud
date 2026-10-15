@@ -2119,7 +2119,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Không có thông tin về giới hạn ngữ cảnh",
-      "pillLabel": "Ngữ cảnh · {{value}}",
       "tapToViewDetails": "Chạm để xem chi tiết ngữ cảnh.",
       "costSuffix": ", chi phí {{cost}}",
       "tokensWindowUnavailable": "Ngữ cảnh đã dùng {{used}} token, chưa rõ giới hạn",

@@ -2139,7 +2139,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "גודל חלון ההקשר אינו זמין",
-      "pillLabel": "הקשר · {{value}}",
       "tapToViewDetails": "הקש כדי לצפות בפרטי ההקשר.",
       "costSuffix": ", עלות {{cost}}",
       "tokensWindowUnavailable": "הקשר: {{used}} טוקנים, גודל חלון ההקשר אינו זמין",

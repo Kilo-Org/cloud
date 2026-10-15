@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "د سیاق د کړکۍ اندازه نه ده معلومه",
-      "pillLabel": "شالید · {{value}}",
       "tapToViewDetails": "د سیاق د جزیاتو د لیدلو لپاره ټک وکړئ.",
       "costSuffix": "، لګښت {{cost}}",
       "tokensWindowUnavailable": "سیاق: {{used}} ټوکنونه، د کړکۍ اندازه نه ده معلومه",

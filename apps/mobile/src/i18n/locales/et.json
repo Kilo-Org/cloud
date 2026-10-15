@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Kontekstiakna suurus pole saadaval",
-      "pillLabel": "Kontekst · {{value}}",
       "tapToViewDetails": "Konteksti üksikasjade vaatamiseks puuduta.",
       "costSuffix": ", kulu {{cost}}",
       "tokensWindowUnavailable": "Kontekstis {{used}} tokenit, kontekstiakna suurus pole saadaval",

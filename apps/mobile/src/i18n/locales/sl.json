@@ -2703,7 +2703,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Velikost kontekstnega okna ni na voljo",
-      "pillLabel": "Kontekst · {{value}}",
       "tapToViewDetails": "Tapni za prikaz podrobnosti konteksta.",
       "costSuffix": ", strošek {{cost}}",
       "tokensWindowUnavailable": "Žetoni v kontekstu: {{used}}, velikost okna ni na voljo",

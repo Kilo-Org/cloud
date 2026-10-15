@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Контекст терезесінің көлемі белгісіз",
-      "pillLabel": "Контекст · {{value}}",
       "tapToViewDetails": "Контекст мәліметтерін қарау үшін түртіңіз.",
       "costSuffix": ", құны {{cost}}",
       "tokensWindowUnavailable": "Контексте {{used}} токен бар, терезе көлемі белгісіз",

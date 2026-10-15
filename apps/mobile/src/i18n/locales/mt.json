@@ -2739,7 +2739,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Id-daqs tat-tieqa tal-kuntest mhux disponibbli",
-      "pillLabel": "Kuntest · {{value}}",
       "tapToViewDetails": "Tektek biex tara d-dettalji tal-kuntest.",
       "costSuffix": ", spiża {{cost}}",
       "tokensWindowUnavailable": "Kuntest: {{used}} unitajiet tat-test, daqs tat-tieqa mhux disponibbli",

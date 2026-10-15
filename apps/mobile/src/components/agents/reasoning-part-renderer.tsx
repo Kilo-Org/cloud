@@ -57,9 +57,7 @@ export function ReasoningPartRenderer({
 
   return (
     <FixedPartRow
-      compact
       variant="dashed"
-      labelKind="eyebrow"
       label={label}
       accessibilityLabel={label}
       onPress={

@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Tamaño da xanela de contexto non dispoñible",
-      "pillLabel": "Contexto · {{value}}",
       "tapToViewDetails": "Toca para ver os detalles do contexto.",
       "costSuffix": ", custo {{cost}}",
       "tokensWindowUnavailable": "Contexto: {{used}} tokens; tamaño da xanela non dispoñible",

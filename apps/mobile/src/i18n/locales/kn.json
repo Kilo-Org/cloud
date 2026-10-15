@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "ಸಂದರ್ಭದ ಗರಿಷ್ಠ ಗಾತ್ರ ಲಭ್ಯವಿಲ್ಲ",
-      "pillLabel": "ಸಂದರ್ಭ · {{value}}",
       "tapToViewDetails": "ಸಂದರ್ಭ ವಿವರಗಳನ್ನು ವೀಕ್ಷಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ.",
       "costSuffix": ", ವೆಚ್ಚ {{cost}}",
       "tokensWindowUnavailable": "ಸಂದರ್ಭದಲ್ಲಿ {{used}} ಟೋಕನ್‌ಗಳಿವೆ, ಗರಿಷ್ಠ ಗಾತ್ರ ಲಭ್ಯವಿಲ್ಲ",

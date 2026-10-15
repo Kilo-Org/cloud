@@ -2119,7 +2119,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Bağlam penceresinin boyutu bilinmiyor",
-      "pillLabel": "Bağlam · {{value}}",
       "tapToViewDetails": "Bağlam ayrıntılarını görüntülemek için dokun.",
       "costSuffix": ", maliyet {{cost}}",
       "tokensWindowUnavailable": "Bağlamda {{used}} token var, pencere boyutu bilinmiyor",

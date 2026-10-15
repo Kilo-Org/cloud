@@ -2703,7 +2703,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Памер кантэкстнага акна невядомы",
-      "pillLabel": "Кантэкст · {{value}}",
       "tapToViewDetails": "Націсніце, каб убачыць падрабязнасці кантэксту.",
       "costSuffix": ", кошт {{cost}}",
       "tokensWindowUnavailable": "Токенаў у кантэксце: {{used}}, памер кантэкстнага акна невядомы",

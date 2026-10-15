@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "ਸੰਦਰਭ ਵਿੰਡੋ ਦਾ ਆਕਾਰ ਉਪਲਬਧ ਨਹੀਂ",
-      "pillLabel": "ਸੰਦਰਭ · {{value}}",
       "tapToViewDetails": "ਸੰਦਰਭ ਦੇ ਵੇਰਵੇ ਵੇਖਣ ਲਈ ਟੈਪ ਕਰੋ।",
       "costSuffix": ", ਲਾਗਤ {{cost}}",
       "tokensWindowUnavailable": "ਸੰਦਰਭ ਵਿੱਚ {{used}} ਟੋਕਨ, ਵਿੰਡੋ ਦਾ ਆਕਾਰ ਉਪਲਬਧ ਨਹੀਂ",

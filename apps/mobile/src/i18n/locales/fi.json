@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Konteksti-ikkunan koko ei ole saatavilla",
-      "pillLabel": "Konteksti · {{value}}",
       "tapToViewDetails": "Näytä kontekstin tiedot napauttamalla.",
       "costSuffix": ", kustannus {{cost}}",
       "tokensWindowUnavailable": "Kontekstissa {{used}} tokenia, konteksti-ikkunan koko ei ole saatavilla",

@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "සන්දර්භ කවුළුවේ ප්‍රමාණය ලබා ගත නොහැක",
-      "pillLabel": "සන්දර්භය · {{value}}",
       "tapToViewDetails": "සන්දර්භ විස්තර බැලීමට තට්ටු කරන්න.",
       "costSuffix": ", පිරිවැය {{cost}}",
       "tokensWindowUnavailable": "සන්දර්භයේ ටෝකන {{used}}, කවුළුවේ ප්‍රමාණය ලබා ගත නොහැක",

@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
-import { AUTO_ROUTERS } from '@kilocode/auto-routing-contracts';
+import { AUTO_ROUTERS, POLICY_SETTING_KEYS } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
 import type { HonoEnv } from './hono-env';
+import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './system-optimal';
 import {
   processDeadLetter,
   processJob,
@@ -36,6 +37,8 @@ export default {
   fetch: app.fetch,
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     const errors: unknown[] = [];
+    const production =
+      controller.cron === PLATFORM_SYNC_CRON ? await fetchProductionAutoMetrics(env) : null;
     for (const router of AUTO_ROUTERS) {
       try {
         if (controller.cron !== PLATFORM_SYNC_CRON) {
@@ -52,6 +55,33 @@ export default {
         } else {
           const staleRunIds = await sweepStaleRuns(env);
           const { desiredEntries } = await syncPlatformRegistry(env, fetch, router);
+          const computed = await reevaluateSystemOptimalSettings(env, router, production).catch(
+            error => {
+              console.warn(
+                JSON.stringify({
+                  event: 'system_optimal_settings_skipped',
+                  router,
+                  error: error instanceof Error ? error.message : String(error),
+                })
+              );
+              return null;
+            }
+          );
+          if (computed) {
+            const computedValues: Record<string, unknown> = {};
+            for (const key of POLICY_SETTING_KEYS) {
+              const record = computed[key];
+              if (record) computedValues[key] = { value: record.value, source: record.source };
+            }
+            console.log(
+              JSON.stringify({
+                event: 'system_optimal_settings_computed',
+                cron: controller.cron,
+                router,
+                computed: computedValues,
+              })
+            );
+          }
           const startedRuns = await drainQueues(
             env,
             router === 'frontier' ? 'platform' : 'both',

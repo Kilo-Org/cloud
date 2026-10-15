@@ -654,7 +654,7 @@
     "redeployTitle": "Wdróż instancję ponownie",
     "accessRequired": {
       "iosBody": "Na tym koncie dostępem do KiloClaw zarządza się poza aplikacją na iOS.",
-      "iosContact": "Masz pytania? Napisz na hi@kilo.ai.",
+      "iosContact": "Masz pytania? Napisz na {{supportEmail}}.",
       "iosTitle": "KiloClaw niedostępny w iOS",
       "multipleCurrentConflictBody": "Na twoim koncie znaleźliśmy więcej niż jedną aktywną subskrypcję. Wstrzymaliśmy działanie, aby nie naliczać podwójnych opłat.",
       "multipleCurrentConflictCta": "Kontynuuj na kilo.ai",
@@ -789,7 +789,7 @@
         "queryErrorBody": "Utraciliśmy połączenie podczas sprawdzania konfiguracji bota {{name}}. Konfiguracja może nadal trwać. Spróbuj ponownie lub wróć za chwilę.",
         "queryErrorTitle": "Nie udało się sprawdzić postępu konfiguracji",
         "settingUp": "Konfiguracja bota {{name}}",
-        "stalledBody": "Nie udało się dokończyć konfiguracji bota {{name}}. Spróbuj ponownie. Jeśli problem się powtarza, napisz na hi@kilo.ai.",
+        "stalledBody": "Nie udało się dokończyć konfiguracji bota {{name}}. Spróbuj ponownie. Jeśli problem się powtarza, napisz na {{supportEmail}}.",
         "stalledTitle": "Konfiguracja nie postępuje",
         "startingSandbox": "Uruchamianie środowiska izolowanego",
         "stoppedBody": "Instancja bota {{name}} nieoczekiwanie się zatrzymała podczas konfiguracji.",
@@ -1046,7 +1046,7 @@
         "recoveryLabel": "Zaktualizuj aplikację GitHub"
       },
       "githubIpAllowList": {
-        "description": "Recenzent kodu został wyłączony, ponieważ lista dozwolonych adresów IP tej organizacji w serwisie GitHub blokuje Kilo. Napisz na hi@kilo.ai, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
+        "description": "Recenzent kodu został wyłączony, ponieważ lista dozwolonych adresów IP tej organizacji w serwisie GitHub blokuje Kilo. Napisz na {{supportEmail}}, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
       },
       "gitlabProjectAccessRequired": {
         "description": "Recenzent kodu został wyłączony, ponieważ Kilo nie może utworzyć tokenu dostępu do tego projektu w serwisie GitLab. Przyznaj rolę opiekuna projektu lub włącz tokeny dostępu do projektu, a następnie ponownie włącz recenzenta kodu.",
@@ -1061,7 +1061,7 @@
         "recoveryLabel": "Zaktualizuj ustawienia recenzenta kodu"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Recenzent kodu został wyłączony, ponieważ dzisiaj trzykrotnie przekroczono limit czasu klonowania repozytorium. Napisz na hi@kilo.ai, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
+        "description": "Recenzent kodu został wyłączony, ponieważ dzisiaj trzykrotnie przekroczono limit czasu klonowania repozytorium. Napisz na {{supportEmail}}, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
       },
       "title": "Asystent przeglądu kodu wymaga twojej uwagi.",
       "recoveryLabel": "Skontaktuj się z pomocą techniczną"

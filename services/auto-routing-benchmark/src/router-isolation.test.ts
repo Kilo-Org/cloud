@@ -54,8 +54,6 @@ const config = BenchmarkConfigSchema.parse({
   classifierModels: ['classifier'],
   deciderModels: [{ id: 'model' }],
   minAccuracy: 0.9,
-  maxConcurrency: 30,
-  userMaxConcurrency: 30,
   benchmarkUserId: null,
   switchCostFactor: 3,
   updatedAt: null,
@@ -114,8 +112,6 @@ describe('router contracts and database isolation', () => {
           frontier_min_accuracy_delta: config.frontierMinAccuracyDelta,
           switch_cost_factor: config.switchCostFactor,
           best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
-          max_concurrency: config.maxConcurrency,
-          user_max_concurrency: config.userMaxConcurrency,
           benchmark_user_id: null,
           benchmark_org_id: null,
           classifier_repetitions: 1,
@@ -138,6 +134,12 @@ describe('router contracts and database isolation', () => {
         expect(query.sql).toContain('"router"');
         expect(query.params).toContain(router);
       }
+      // Values the previously deployed worker accepts (80 + 40 + 80 = 200 across
+      // both routers), never the shared budget, so a rollback stays valid.
+      const configInsert = queries.find(
+        query => query.sql.startsWith('insert') && query.sql.includes('"benchmark_config"')
+      );
+      expect(configInsert?.params).toEqual(expect.arrayContaining([80, 40]));
     }
   );
 
@@ -168,77 +170,155 @@ describe('router contracts and database isolation', () => {
 });
 
 describe('atomic running-container admission', () => {
-  it('counts live snapshots across routers, rejects overflow and leaves classifier admission unchanged', async () => {
+  const SCHEMA_SQL = `
+    CREATE TABLE benchmark_runs (
+      id TEXT PRIMARY KEY NOT NULL,
+      router TEXT NOT NULL DEFAULT 'efficient',
+      kind TEXT NOT NULL,
+      status TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      completed_at TEXT,
+      error TEXT,
+      min_accuracy REAL NOT NULL,
+      accuracy_noise_band REAL NOT NULL DEFAULT 0.05,
+      frontier_min_accuracy_delta REAL NOT NULL DEFAULT 0,
+      switch_cost_factor REAL NOT NULL,
+      best_accuracy_switch_threshold REAL NOT NULL DEFAULT 0.05,
+      max_concurrency INTEGER NOT NULL,
+      benchmark_user_id TEXT,
+      benchmark_org_id TEXT,
+      repetitions INTEGER NOT NULL DEFAULT 1,
+      classifier_max_p95_latency_ms INTEGER,
+      engine_identity TEXT NOT NULL DEFAULT '',
+      purpose TEXT NOT NULL DEFAULT 'platform'
+    );
+    CREATE UNIQUE INDEX one_running_slot ON benchmark_runs(router, kind, purpose)
+      WHERE status = 'running';
+  `;
+
+  const run = {
+    id: 'efficient-platform',
+    router: 'efficient' as const,
+    kind: 'decider' as const,
+    startedAt: 'now',
+    min_accuracy: 0.9,
+    switch_cost_factor: 3,
+    best_accuracy_switch_threshold: 0.05,
+    max_concurrency: 150,
+    benchmark_user_id: null,
+    benchmark_org_id: null,
+    repetitions: 1,
+    classifier_max_p95_latency_ms: null,
+    engine_identity: 'efficient:engine',
+  };
+
+  function admissionHarness() {
     const sqlite = new DatabaseSync(':memory:');
-    sqlite.exec(`
-      CREATE TABLE benchmark_runs (
-        id TEXT PRIMARY KEY NOT NULL,
-        router TEXT NOT NULL DEFAULT 'efficient',
-        kind TEXT NOT NULL,
-        status TEXT NOT NULL,
-        started_at TEXT NOT NULL,
-        completed_at TEXT,
-        error TEXT,
-        min_accuracy REAL NOT NULL,
-        accuracy_noise_band REAL NOT NULL DEFAULT 0.05,
-        frontier_min_accuracy_delta REAL NOT NULL DEFAULT 0,
-        switch_cost_factor REAL NOT NULL,
-        best_accuracy_switch_threshold REAL NOT NULL DEFAULT 0.05,
-        max_concurrency INTEGER NOT NULL,
-        benchmark_user_id TEXT,
-        benchmark_org_id TEXT,
-        repetitions INTEGER NOT NULL DEFAULT 1,
-        classifier_max_p95_latency_ms INTEGER,
-        engine_identity TEXT NOT NULL DEFAULT '',
-        purpose TEXT NOT NULL DEFAULT 'platform'
-      );
-      CREATE UNIQUE INDEX one_running_slot ON benchmark_runs(router, kind, purpose)
-        WHERE status = 'running';
-    `);
+    sqlite.exec(SCHEMA_SQL);
     const { db, queries } = capturingDatabase();
-    const run = {
-      id: 'efficient-running',
-      router: 'efficient' as const,
-      kind: 'decider' as const,
-      startedAt: 'now',
-      min_accuracy: 0.9,
-      switch_cost_factor: 3,
-      best_accuracy_switch_threshold: 0.05,
-      max_concurrency: 180,
-      benchmark_user_id: null,
-      benchmark_org_id: null,
-      repetitions: 1,
-      classifier_max_p95_latency_ms: null,
-      engine_identity: 'efficient:engine',
+    const apply = (index: number): void => {
+      const query = queries[index];
+      sqlite.prepare(query.sql).run(...(query.params as never[]));
     };
+    const rejects = (index: number): void => {
+      expect(() => apply(index)).toThrow(
+        'NOT NULL constraint failed: benchmark_runs.max_concurrency'
+      );
+    };
+    const lanes = (): unknown =>
+      sqlite
+        .prepare(`SELECT SUM(max_concurrency) AS lanes FROM benchmark_runs WHERE kind = 'decider'`)
+        .get();
+    return { sqlite, db, queries, apply, rejects, lanes };
+  }
+
+  it('caps the total across every router and purpose', async () => {
+    const { sqlite, db, queries, apply, rejects, lanes } = admissionHarness();
     try {
-      await insertRun(db, run, [], []);
+      await insertRun(db, { ...run, id: 'efficient-platform' }, [], []);
       await insertRun(
         db,
-        { ...run, id: 'frontier-running', router: 'frontier', max_concurrency: 20 },
+        { ...run, id: 'frontier-platform', router: 'frontier', max_concurrency: 100 },
         [],
         []
       );
-      await insertRun(db, { ...run, id: 'overflow', purpose: 'user', max_concurrency: 1 }, [], []);
+      await insertRun(
+        db,
+        { ...run, id: 'user-overflow', purpose: 'user', max_concurrency: 1 },
+        [],
+        []
+      );
+
+      apply(0);
+      apply(1);
+      rejects(2);
+      expect(lanes()).toEqual({ lanes: 250 });
+      expect(queries).toHaveLength(3);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('caps owner runs at 150 and leaves 100 lanes for platform runs', async () => {
+    const { sqlite, db, queries, apply, rejects, lanes } = admissionHarness();
+    try {
+      await insertRun(
+        db,
+        { ...run, id: 'user-full', purpose: 'user', max_concurrency: 150 },
+        [],
+        []
+      );
+      await insertRun(
+        db,
+        {
+          ...run,
+          id: 'user-overflow',
+          router: 'frontier',
+          purpose: 'user',
+          max_concurrency: 1,
+        },
+        [],
+        []
+      );
+      await insertRun(db, { ...run, id: 'platform-into-reserve', max_concurrency: 100 }, [], []);
+      await insertRun(
+        db,
+        { ...run, id: 'platform-past-reserve', router: 'frontier', max_concurrency: 1 },
+        [],
+        []
+      );
+
+      apply(0);
+      rejects(1);
+      apply(2);
+      rejects(3);
+      expect(lanes()).toEqual({ lanes: 250 });
+      expect(queries).toHaveLength(4);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('admits classifier runs without a container budget', async () => {
+    const { sqlite, db, queries, apply, lanes } = admissionHarness();
+    try {
+      await insertRun(db, { ...run, id: 'decider' }, [], []);
       await insertRun(
         db,
         { ...run, id: 'classifier', kind: 'classifier', max_concurrency: 200 },
         [],
         []
       );
-      for (const query of queries.slice(0, 2))
-        sqlite.prepare(query.sql).run(...(query.params as never[]));
-      const overflow = queries[2];
-      expect(() => sqlite.prepare(overflow.sql).run(...(overflow.params as never[]))).toThrow(
-        'NOT NULL constraint failed: benchmark_runs.max_concurrency'
-      );
-      const classifier = queries[3];
-      sqlite.prepare(classifier.sql).run(...(classifier.params as never[]));
+
+      apply(0);
+      apply(1);
       expect(sqlite.prepare('SELECT id FROM benchmark_runs ORDER BY id').all()).toEqual([
         { id: 'classifier' },
-        { id: 'efficient-running' },
-        { id: 'frontier-running' },
+        { id: 'decider' },
       ]);
+      // The classifier row records its OpenRouter fan-out, never container lanes.
+      expect(lanes()).toEqual({ lanes: 150 });
+      expect(queries).toHaveLength(2);
     } finally {
       sqlite.close();
     }

@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -86,9 +87,8 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
       return { reason: 'Card declined', credits_url: `${NEXTAUTH_URL}/credits?show-auto-top-up` };
     case 'codeReviewDisabled':
       return {
-        reason:
-          'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilo.ai for help, then enable Code Reviewer again.',
-        recovery_url: 'mailto:hi@kilo.ai?subject=Repository%20clone%20timeouts',
+        reason: `Code Reviewer was disabled after three repository clone timeouts today. Contact ${SUPPORT_EMAIL} for help, then enable Code Reviewer again.`,
+        recovery_url: `mailto:${SUPPORT_EMAIL}?subject=Repository%20clone%20timeouts`,
         recovery_label: 'Contact support',
       };
     case 'ossInviteNewUser':
@@ -250,7 +250,7 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         manage_url: `${NEXTAUTH_URL}/organizations/${orgId}/subscriptions/kilo-pass`,
       };
     case 'kiloPassDuplicateCardCanceled':
-      return { support_url: 'mailto:hi@kilo.ai' };
+      return { support_url: `mailto:${SUPPORT_EMAIL}` };
     case 'userDataExportReady':
       return {
         data_exports_url: `${NEXTAUTH_URL}/data-exports`,

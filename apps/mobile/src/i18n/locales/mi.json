@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Kua mutu te whakatū",
         "stoppedBody": "I mutu ohorere te tauira whakahaere o {{name}} i te wā o te whakatū.",
         "stalledTitle": "Kua tū te mahi",
-        "stalledBody": "Kāore i taea e mātou te whakaoti i te whakatū i a {{name}}. Whakamātau anō, tukuna rānei he īmēra ki hi@kilo.ai mēnā ka pēnei tonu.",
+        "stalledBody": "Kāore i taea e mātou te whakaoti i te whakatū i a {{name}}. Whakamātau anō, tukuna rānei he īmēra ki {{supportEmail}} mēnā ka pēnei tonu.",
         "timeoutTitle": "Kei te roa ake i te wā i whakaarotia",
         "timeoutBody": "Kei te roa ake te whakatū i a {{name}} i te wā o mua (neke atu i te {{displayMinutes}} meneti).",
         "continueInBackground": "Haere tonu i te papamuri",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Me arotake tō mahere uru moata e te tangata i mua i tō whakamahi i te taupānga pūkoro.",
       "iosTitle": "Kāore a KiloClaw e wātea ana i iOS",
       "iosBody": "Mō tēnei pūkete, kei waho i te taupānga iOS te whakahaere i te uru ki KiloClaw.",
-      "iosContact": "He pātai? Whakapā ki hi@kilo.ai.",
+      "iosContact": "He pātai? Whakapā ki {{supportEmail}}.",
       "quarantinedCta": "Tukua he īmēra ki tā mātou rōpū",
       "nonCanonicalEarlybirdCta": "Arotakehia tō mahere i kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Whakahoutia te taupānga GitHub"
       },
       "githubIpAllowList": {
-        "description": "I monoa te Kaiarotake waehere nā te mea e whakamahi ana tēnei rōpū GitHub i tētahi rārangi IP whakaaetia e ārai ana i a Kilo. Whakapā atu ki hi@kilo.ai mō te āwhina, kātahi ka whakahohe anō i te Kaiarotake waehere."
+        "description": "I monoa te Kaiarotake waehere nā te mea e whakamahi ana tēnei rōpū GitHub i tētahi rārangi IP whakaaetia e ārai ana i a Kilo. Whakapā atu ki {{supportEmail}} mō te āwhina, kātahi ka whakahohe anō i te Kaiarotake waehere."
       },
       "gitlabProjectAccessRequired": {
         "description": "I monoa te Kaiarotake waehere nā te mea kāore e taea e Kilo te hanga i tētahi tohu uru kaupapa GitLab mō tēnei kaupapa. Tukua te uru taumata kaitiaki, whakahohea rānei ngā tohu uru kaupapa, kātahi ka whakahohe anō i te Kaiarotake waehere.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Whakahoutia ngā tautuhinga Kaiarotake waehere"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "I monoa te Kaiarotake waehere i muri i te paunga o te wā mō ngā whakamātau tārua pūranga e toru i tēnei rā. Whakapā atu ki hi@kilo.ai mō te āwhina, kātahi ka whakahohe anō i te Kaiarotake waehere."
+        "description": "I monoa te Kaiarotake waehere i muri i te paunga o te wā mō ngā whakamātau tārua pūranga e toru i tēnei rā. Whakapā atu ki {{supportEmail}} mō te āwhina, kātahi ka whakahohe anō i te Kaiarotake waehere."
       },
       "title": "Me aro ki te kaiarotake waehere.",
       "recoveryLabel": "Whakapā ki te rōpū tautoko"

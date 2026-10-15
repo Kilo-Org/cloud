@@ -143,7 +143,11 @@ import {
   writeReportAnchor,
   type ReportOutbox,
 } from '../../sandbox-session/report-outbox.js';
-import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import {
+  CloudAgentRunContainerSchema,
+  type CloudAgentQueueReport,
+  type CloudAgentRunContainer,
+} from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
@@ -251,6 +255,7 @@ function persistedRouteView(
     state: 'preparing',
     attemptId: view.attemptId,
     ...(step === undefined ? {} : { step }),
+    ...(view.container === undefined ? {} : { container: view.container }),
   };
 }
 
@@ -346,7 +351,18 @@ type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 
 type TransportPass = { deadlineAt: number; scheduleRecovery: boolean };
 
+function parseStoredRunContainer(raw: string | null): CloudAgentRunContainer | undefined {
+  if (raw == null) return undefined;
+  try {
+    const parsed = CloudAgentRunContainerSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function rowToMessage(row: SessionMessageRow): SessionMessage {
+  const container = parseStoredRunContainer(row.container);
   return {
     messageId: row.message_id,
     intent: controlPlanePromptPayloadSchema.parse(JSON.parse(row.intent)),
@@ -355,6 +371,7 @@ function rowToMessage(row: SessionMessageRow): SessionMessage {
     acceptedAt: row.accepted_at,
     settledAt: row.settled_at,
     reason: row.reason,
+    ...(container === undefined ? {} : { container }),
   };
 }
 
@@ -367,6 +384,7 @@ function messageToRow(message: SessionMessage): SessionMessageRow {
     accepted_at: message.acceptedAt,
     settled_at: message.settledAt,
     reason: message.reason,
+    container: message.container === undefined ? null : JSON.stringify(message.container),
   };
 }
 
@@ -1020,8 +1038,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     await this.armAlarm();
     if (!this.messages.some(message => message.state === 'queued')) return 'ok';
-    if (this.route.state === 'ready') await this.deliverQueued(pass);
-    else {
+    if (this.route.state === 'ready') {
+      await this.persistQueuedContainer(this.route.container);
+      await this.deliverQueued(pass);
+    } else {
       const view = await this.prepareSandbox(pass);
       if (view !== null) await this.applyView(view, pass);
     }
@@ -1136,6 +1156,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       // A delete queued ahead of this notification wiped the session.
       if (this.registration === null) return;
+      if (parsed.state === 'lost' && parsed.attemptId === this.currentAttemptId()) {
+        await this.captureQueuedRouteContainer(parsed);
+      }
       if (
         this.messages.some(message => message.state === 'queued') &&
         (this.route.state === 'failed' ||
@@ -1290,6 +1313,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const now = Date.now();
       const due = dueBackstopMessages(this.messages, now, this.sessionTimers());
       if (due.length > 0) {
+        if (due.some(entry => entry.message.state === 'queued')) {
+          await this.captureQueuedRouteContainer(this.route);
+        }
         const byReason = new Map<string, string[]>();
         for (const entry of due) {
           const ids = byReason.get(entry.reason) ?? [];
@@ -1818,6 +1844,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // persisted view names the attempt that is open, so a transition closes it
     // even if this process lost its in-memory recorder map to eviction.
     const previous = this.route;
+    if (view.state === 'failed') await this.captureQueuedRouteContainer(view);
     const previousAttemptId = previous.state === 'unknown' ? undefined : previous.attemptId;
     const nextAttemptId = view.state === 'unknown' ? undefined : view.attemptId;
     if (
@@ -1887,6 +1914,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         return;
       }
       case 'ready': {
+        // Persist before the post-attach capture is scheduled, so the deliver RPC
+        // is not delayed behind a storage write and the prompt still goes first.
+        await this.persistQueuedContainer(route.container);
         // The attempt's preparation is done before its messages are delivered.
         if (this.worktreePreparationGeneration !== undefined) {
           this.worktreeChanges.attached(this.worktreePreparationGeneration);
@@ -1944,6 +1974,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.scheduleTransportRecovery(pass);
       return;
     }
+    const routeContainer = this.route.state === 'unknown' ? undefined : this.route.container;
     let result: ControlPlaneDeliverResult;
     try {
       result = await withDORetry(
@@ -1952,6 +1983,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           stub.deliver({
             sessionId: this.sessionId,
             messages: queued.map(message => message.intent),
+            ...(routeContainer?.allocationId === undefined
+              ? {}
+              : { allocationId: routeContainer.allocationId }),
           }),
         'session.deliver',
         this.sandboxRpcConfig(pass)
@@ -1996,6 +2030,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       return;
     }
     await this.applyView(view, pass);
+  }
+
+  private async persistQueuedContainer(
+    container: CloudAgentRunContainer | undefined
+  ): Promise<void> {
+    if (container === undefined) return;
+    const captured = this.messages
+      .filter(message => message.state === 'queued')
+      .map(message => ({ ...message, container }));
+    if (captured.length === 0) return;
+    await this.persistMessages(captured);
+    const byId = new Map(captured.map(message => [message.messageId, message]));
+    this.messages = this.messages.map(message => byId.get(message.messageId) ?? message);
+  }
+
+  private async captureQueuedRouteContainer(view: ControlPlaneRouteUpdate): Promise<void> {
+    if (view.state === 'unknown') return;
+    const previous = this.route;
+    if (previous.state === 'failed' && previous.attemptId === view.attemptId) return;
+    // A terminal view may describe a replacement, not the allocation that attempted this work.
+    const container =
+      previous.state === 'unknown' || previous.state === 'failed'
+        ? view.container
+        : (previous.container ??
+          (previous.attemptId === view.attemptId ? view.container : undefined));
+    await this.persistQueuedContainer(container);
   }
 
   private async failRetiredQueuedMessages(): Promise<boolean> {

@@ -1313,7 +1313,7 @@
         "stoppedTitle": "It-tħejjija waqfet",
         "stoppedBody": "L-istanza ta' {{name}} waqfet bla mistenni waqt it-tħejjija.",
         "stalledTitle": "Xi ħaġa weħlet",
-        "stalledBody": "Ma stajniex inlestu t-tħejjija ta' {{name}}. Erġa' pprova, jew ibgħat email lil hi@kilo.ai jekk dan ikompli jiġri.",
+        "stalledBody": "Ma stajniex inlestu t-tħejjija ta' {{name}}. Erġa' pprova, jew ibgħat email lil {{supportEmail}} jekk dan ikompli jiġri.",
         "timeoutTitle": "Qed jieħu aktar milli mistenni",
         "timeoutBody": "It-tħejjija ta' {{name}} qed tieħu aktar mis-soltu (aktar minn {{displayMinutes}} minuta).",
         "continueInBackground": "Kompli fl-isfond",
@@ -1371,7 +1371,7 @@
       "nonCanonicalEarlybirdBody": "Il-pjan ta' aċċess bikri tiegħek jeħtieġ reviżjoni manwali qabel ma jintuża fuq il-mowbajl.",
       "iosTitle": "KiloClaw mhux disponibbli fuq iOS",
       "iosBody": "Għal dan il-kont, l-aċċess għal KiloClaw jiġi mmaniġġjat barra mill-app ta' iOS.",
-      "iosContact": "Mistoqsijiet? Ikkuntattja hi@kilo.ai.",
+      "iosContact": "Mistoqsijiet? Ikkuntattja {{supportEmail}}.",
       "quarantinedCta": "Ibgħat email lit-tim tagħna",
       "nonCanonicalEarlybirdCta": "Irrevedi l-pjan tiegħek fuq kilo.ai"
     },
@@ -1609,7 +1609,7 @@
         "recoveryLabel": "Aġġorna l-app ta' GitHub"
       },
       "githubIpAllowList": {
-        "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex din l-organizzazzjoni ta' GitHub tuża lista ta' indirizzi IP permessi li timblokka lil Kilo. Ikkuntattja hi@kilo.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
+        "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex din l-organizzazzjoni ta' GitHub tuża lista ta' indirizzi IP permessi li timblokka lil Kilo. Ikkuntattja {{supportEmail}} għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
       },
       "gitlabProjectAccessRequired": {
         "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex Kilo ma jistax joħloq token ta' aċċess għall-proġett fuq GitLab. Agħti aċċess ta' manutentur jew attiva t-tokens ta' aċċess għall-proġett, imbagħad erġa' attiva r-reviżur tal-kodiċi.",
@@ -1624,7 +1624,7 @@
         "recoveryLabel": "Aġġorna l-issettjar tar-reviżur tal-kodiċi"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Ir-reviżur tal-kodiċi ġie diżattivat wara li l-klonazzjoni tar-repożitorju qabżet il-ħin permess tliet darbiet illum. Ikkuntattja hi@kilo.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
+        "description": "Ir-reviżur tal-kodiċi ġie diżattivat wara li l-klonazzjoni tar-repożitorju qabżet il-ħin permess tliet darbiet illum. Ikkuntattja {{supportEmail}} għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
       },
       "title": "Ir-reviżur tal-kodiċi jeħtieġ l-attenzjoni tiegħek.",
       "recoveryLabel": "Ikkuntattja l-appoġġ"

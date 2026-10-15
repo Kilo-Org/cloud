@@ -1259,7 +1259,7 @@
         "stoppedTitle": "ማዋቀር ቆሟል",
         "stoppedBody": "የ{{name}} ኢንስታንስ በማዋቀር ወቅት ባልተጠበቀ ሁኔታ ቆሟል።",
         "stalledTitle": "ማዋቀሩ ተቋርጧል",
-        "stalledBody": "{{name}}ን ማዋቀር ማጠናቀቅ አልቻልንም። እንደገና ሞክር፤ ችግሩ ከቀጠለ ወደ hi@kilo.ai ኢሜይል ላክ።",
+        "stalledBody": "{{name}}ን ማዋቀር ማጠናቀቅ አልቻልንም። እንደገና ሞክር፤ ችግሩ ከቀጠለ ወደ {{supportEmail}} ኢሜይል ላክ።",
         "timeoutTitle": "ከተጠበቀው በላይ ጊዜ እየወሰደ ነው",
         "timeoutBody": "የ{{name}} ማዋቀር ከወትሮው በላይ ጊዜ እየወሰደ ነው (ከ{{displayMinutes}} ደቂቃዎች በላይ)።",
         "continueInBackground": "ከበስተጀርባ ቀጥል",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "የቅድሚያ መዳረሻ ዕቅድህን በሞባይል ላይ ከመጠቀምህ በፊት በሰው መገምገም ያስፈልጋል።",
       "iosTitle": "KiloClaw በiOS አይገኝም",
       "iosBody": "ለዚህ መለያ የKiloClaw መዳረሻ ከiOS መተግበሪያ ውጭ ነው የሚተዳደረው።",
-      "iosContact": "ጥያቄ አለህ? ወደ hi@kilo.ai ጻፍ።",
+      "iosContact": "ጥያቄ አለህ? ወደ {{supportEmail}} ጻፍ።",
       "quarantinedCta": "ለቡድናችን ኢሜይል ላክ",
       "nonCanonicalEarlybirdCta": "ዕቅድህን በkilo.ai ላይ ገምግም"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "የGitHub መተግበሪያውን ያዘምኑ"
       },
       "githubIpAllowList": {
-        "description": "ይህ የGitHub ድርጅት Kiloን የሚያግድ የተፈቀዱ የIP አድራሻዎች ዝርዝር ስለሚጠቀም የኮድ ገምጋሚው ተሰናክሏል። ለእርዳታ በhi@kilo.ai ያግኙን፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።"
+        "description": "ይህ የGitHub ድርጅት Kiloን የሚያግድ የተፈቀዱ የIP አድራሻዎች ዝርዝር ስለሚጠቀም የኮድ ገምጋሚው ተሰናክሏል። ለእርዳታ በ{{supportEmail}} ያግኙን፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።"
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo ለዚህ ፕሮጀክት የGitLab ፕሮጀክት መዳረሻ ቶከን መፍጠር ስላልቻለ የኮድ ገምጋሚው ተሰናክሏል። የፕሮጀክት ተንከባካቢ ፈቃድ ይስጡ ወይም የፕሮጀክት መዳረሻ ቶከኖችን ያንቁ፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "የኮድ ገምጋሚ ቅንብሮችን ያዘምኑ"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "ዛሬ ማከማቻውን ለመቅዳት የተደረጉ ሦስት ሙከራዎች ከጊዜ ገደባቸው ስላለፉ የኮድ ገምጋሚው ተሰናክሏል። ለእርዳታ በhi@kilo.ai ያግኙን፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።"
+        "description": "ዛሬ ማከማቻውን ለመቅዳት የተደረጉ ሦስት ሙከራዎች ከጊዜ ገደባቸው ስላለፉ የኮድ ገምጋሚው ተሰናክሏል። ለእርዳታ በ{{supportEmail}} ያግኙን፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።"
       },
       "title": "የኮድ ገምጋሚው ትኩረትህን ይፈልጋል።",
       "recoveryLabel": "የድጋፍ ቡድኑን አግኝ"

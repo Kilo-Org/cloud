@@ -5,6 +5,7 @@ import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { getBillingContext } from '@kilocode/container-usage';
 import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
+import { CloudAgentRunContainerSchema } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -592,10 +593,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const allocation = owner === null ? null : await this.getAllocationState();
       return projectAllocationStatusSnapshot({
         allocation,
-        containersInstance:
-          this.providerPin?.configuration?.provider === 'cloudflare-containers'
-            ? this.providerPin.configuration.instance
-            : undefined,
         observedAt: Date.now(),
         inactivityTimeoutMs: this.sandboxTimers().idleMs,
       });
@@ -693,7 +690,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const route = await readRoute(this.db, parsed.sessionId);
       return {
         sessionId: parsed.sessionId,
-        view: routeView(route, state.kind === 'connected', sandboxPreparationProgress(state)),
+        view: await this.withContainer(
+          routeView(route, state.kind === 'connected', sandboxPreparationProgress(state)),
+          state
+        ),
       };
     });
   }
@@ -1748,9 +1748,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       now: () => Date.now(),
       routePreparationMs: this.sandboxTimers().routePreparationMs,
       sendPrepare: route => this.sendSessionPrepare(state, route),
-      notify: (sessionId, update) => {
-        this.notifications.enqueue(sessionId, { kind: 'route', payload: update });
-        return Promise.resolve();
+      notify: async (sessionId, update) => {
+        this.notifications.enqueue(sessionId, {
+          kind: 'route',
+          payload: await this.withContainer(update, state),
+        });
       },
       issueGrant: (spec, source) =>
         withTimeout(
@@ -1912,7 +1914,42 @@ export class SandboxControlV2 extends DurableObject<Env> {
         state = await this.readAllocation();
       }
     }
-    return routeView(route, state.kind === 'connected', sandboxPreparationProgress(state));
+    return this.withContainer(
+      routeView(route, state.kind === 'connected', sandboxPreparationProgress(state)),
+      state
+    );
+  }
+
+  private async withContainer<T extends ControlPlaneRouteUpdate>(
+    view: T,
+    state: AllocationState
+  ): Promise<T> {
+    if (view.state === 'unknown' || state.providerRef === null || state.allocationId === null) {
+      return view;
+    }
+    try {
+      const runtime = this.provider.describeRuntime?.(state.providerRef);
+      if (runtime === undefined) return view;
+      const launch = await readRepositoryLaunch(this.ctx.storage);
+      const startSource =
+        runtime.startSource ??
+        (launch?.allocationId === state.allocationId && launch.startSource !== undefined
+          ? launch.startSource === 'repository'
+            ? 'snapshot'
+            : 'image'
+          : undefined);
+      const container = CloudAgentRunContainerSchema.safeParse({
+        ...runtime,
+        allocationId: state.allocationId,
+        ...(startSource === undefined ? {} : { startSource }),
+      });
+      return container.success ? { ...view, container: container.data } : view;
+    } catch {
+      logger
+        .withFields({ sandboxId: this.sandboxId })
+        .warn('Sandbox runtime metadata could not be projected; the route is unaffected');
+      return view;
+    }
   }
 
   /** Stores the sandbox owner on first use and rejects a different one. */
@@ -2126,6 +2163,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const state = await this.readAllocation();
     const route = await readRoute(this.db, payload.sessionId);
     if (state.kind !== 'connected' || route === null || route.state !== 'ready') {
+      return 'not_ready';
+    }
+    if (payload.allocationId !== undefined && payload.allocationId !== state.allocationId) {
       return 'not_ready';
     }
     const socket = this.boundWrapperSocket(state);

@@ -35,8 +35,8 @@ design, invariants, and rollout/rollback.
 `router` is `efficient` or `frontier`; omitted API selectors default to `efficient`.
 Each router owns its saved decider model list, catalog-expanded effort entries, registry,
 runs, routing table, and publication cache key. Accuracy thresholds, `accuracyNoiseBand`,
-`frontierMinAccuracyDelta`, token profile, switch horizon and thresholds, and platform
-`maxConcurrency` are configured independently. The classifier and its winner remain shared:
+`frontierMinAccuracyDelta`, token profile, switch horizon and thresholds are configured
+independently. The classifier and its winner remain shared:
 classifier runs use the efficient configuration even when requested from the frontier view.
 Classifier inference billing is owned by the routing worker. Usage IDs and durable delivery
 objects include the router, so an otherwise identical call on another router cannot be
@@ -44,16 +44,50 @@ deduplicated as a retry of the first call.
 Capability lookups derive candidate IDs from the selected router's table; the capability
 cache remains a shared model-ID union because modalities and context limits belong to models.
 
+## System-optimal policy settings
+
+The daily platform sync recomputes each router's policy settings before publishing, and stores
+the result on the router's `benchmark_config` row (`policy_computed`) with its `computedAt`,
+`source`, and a short evidence string. The effective value of a setting is
+`override ?? computed ?? stored default`, so an admin override always wins and clearing it
+falls back to the system value. Publishing reads effective values only.
+
+- `minAccuracy` and `accuracyNoiseBand`: chosen from a grid over the registry's measured
+  summaries, scored on held-out cases (a deterministic sha256 train/held-out split of the case
+  ids). The objective is mean held-out accuracy per estimated request dollar, subject to a
+  quality floor, and the chosen point is the middle of the stable plateau rather than its edge.
+  Insufficient held-out data (`< 20` distinct graded held-out cases summed over routes, or `< 2`
+  evaluated routes) leaves the current value in place, as does a catalog or registry failure;
+  production-derived settings are still saved in that case.
+- `productionTokenProfile` and `switchHorizonTurns`: derived from production auto-request usage.
+  The worker has no Postgres access, so it reads mean uncached/cached input tokens and the
+  median requests per auto session from `GET /api/internal/auto-routing-benchmark/production-profile`
+  on apps/web over a 6-hour window, with a 10-second timeout. An unavailable or slow endpoint
+  leaves the previous computed values.
+- Each setting has its own value schema. `PUT /admin/config` rejects an override that does not
+  fit its setting (400), and stored overrides or computed values that do not fit are ignored.
+- `frontierMinAccuracyDelta`, `switchCostFactor`, `bestAccuracySwitchThreshold`,
+  `lowConfidenceThreshold`, classifier/decider repetitions, and `classifierMaxP95LatencyMs` are
+  fixed constants: the held-out benchmark scores single requests, so session-economics and
+  measurement-effort knobs have no measured basis for a daily recomputation. The Policy tab
+  shows their value and the reason they are read-only.
+
 Frontier initially has no saved configuration or published table. No default model pool or
 efficient table is fabricated for it. Before enabling frontier serving, administrators must
-split the existing container budgets, save a frontier configuration with its own decider
-models, benchmark those entries, and publish a complete frontier table.
+save a frontier configuration with its own decider models, benchmark those entries, and
+publish a complete frontier table.
 
-Efficient platform and owner budgets plus frontier's platform budget must total at most
-`BENCHMARK_CONTAINER_BUDGET` (200). Frontier ignores `userMaxConcurrency`, never registers owner
+Container lanes come from one shared budget: `BENCHMARK_CONTAINER_BUDGET` (250), sized per run
+against the lanes other running runs hold. Each queue job holds one container for its consumer
+invocation, so the budget equals Cloudflare's limit of 250 concurrent push-consumer invocations;
+wrangler's container `max_instances` and jobs consumer `max_concurrency` match it. Raising it needs
+a Cloudflare limit increase plus matching wrangler limits. User-queue runs stop at
+`BENCHMARK_USER_CONTAINER_LIMIT` (150), which keeps `BENCHMARK_PLATFORM_RESERVED_CONTAINERS`
+(100) available to platform runs, and a platform run takes half of what is free so the efficient
+and frontier platform queues share the pool. Frontier never registers owner
 custom pools, and has only a platform queue (`both` selects that queue; `user` is rejected).
-Saving configuration and starting decider runs enforce the shared cap. Scheduled drains and
-daily platform sync process both routers with their configured budgets.
+A run that does not fit waits: the drain logs `benchmark_queue_drain_skipped_no_capacity` and
+retries on the next tick. Scheduled drains and daily platform sync process both routers.
 
 Efficient publications invalidate `routing_table_v1`; frontier publications invalidate
 `routing_table_frontier_v1`. Router, engine/dataset identity, ranking settings, and contributing
@@ -72,7 +106,7 @@ measurements are included in routing-table version hashes.
 - Owner pools use the same model-level selection and all-efforts expansion.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
-The worker drains expanded entries in batches that fit the configured container budget.
+The worker drains expanded entries in batches that fit the shared container budget.
 New routing tables rank exact pairs and emit `variant`, not `reasoningEffort`.
 Legacy nullable effort storage columns remain. Router isolation requires D1 schema migration;
 existing rows stay in the efficient namespace, with noise band 0.05 and frontier delta 0.
@@ -85,8 +119,12 @@ Expand a route to inspect every ranked model/effort pair.
 
 - `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
 - A candidate competes within the router's `accuracyNoiseBand` of its effective `minAccuracy` (default noise band 0.05).
-- Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`; the delta defaults to 0.
+- Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`. The delta is fixed at 0, so the frontier router uses its own system-computed `minAccuracy`.
 - Both routers use the same best-value formula, selecting models and efforts from their own measured pools.
+- Daily re-evaluation: `minAccuracy`/`accuracyNoiseBand` come from a held-out grid over the
+  registry's measurements, `productionTokenProfile`/`switchHorizonTurns` from production auto
+  usage (mean uncached/cached input tokens per request, median requests per session), and the
+  rest are fixed constants. Admin overrides win over the computed values.
 - Competing candidates are ordered by `estimatedRequestCostUsd × effectiveLatency^1.5 / wilson^15`, lowest first. With known TTFT, `effectiveLatency = p50TtftMs + LATENCY_TOTAL_WEIGHT × p50LatencyMs`, where the exported `LATENCY_TOTAL_WEIGHT` is 0.15 (tuned on a fully streamed offline sweep); without TTFT, total `p50LatencyMs` alone preserves legacy ordering.
 - `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
 - `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.
@@ -273,6 +311,46 @@ files if the live inputs may change between builds. `benchmarkPerTaskUsdWeighted
 remains the benchmark-only cost and can move differently from this production-input
 estimate.
 
+### Shadow routing policy
+
+To evaluate an efficient-router candidate without routing traffic to it, put its JSON
+table in the shared `AUTO_ROUTING_CONFIG` namespace under `shadow_routing_table_v1`.
+It must validate against the same `RoutingTableSchema` as `routing_table_v1`.
+Delete the shadow key to disable evaluation; the live routing table is never changed.
+The shadow reader caches both present and absent values in the isolate for 60 seconds,
+in addition to KV's propagation delay. Invalid tables and read/computation failures
+are ignored.
+
+Classified efficient `/decide` requests evaluate the candidate with the same classifier
+result, incumbent, denied models, routing mode, constraints, and capability map as the
+live decision. Only the live decision is returned, stored, or billed. There are no extra
+classifier, capability, or benchmark calls and no shadow cache writes.
+Classifier failures have no classification to shadow-evaluate. Frontier requests do
+not evaluate the efficient shadow table.
+Existing sampled `auto_routing_decision` logs include `shadowModel`, `shadowVariant`,
+and `shadowDiffers`; a valid table with no eligible route records a null shadow model.
+
+Collect with `pnpm --filter auto-routing-benchmark scoreboard:prod --since 24 --out prod.json`,
+then pass that snapshot to `scoreboard build`. Both JSON reports include a `shadow`
+section with observed evaluation count, sampling-weighted divergence, and
+`outcomesByDecidedModel`: actual production request counts, error and abort rates,
+mean input/output/cache-read tokens, and mean cost in USD per request.
+The read-only Postgres join matches distinct observed session/model pairs to
+`microdollar_usage_metadata.session_id` and the actual `microdollar_usage.model`,
+within the collection window, for efficient and balanced auto requests.
+Repeated decision logs do not multiply usage rows. Raw session ids are used only
+in memory for the join and are never written to the reports.
+
+Outcome proxies describe the observed live-model session cohort, not the unserved
+shadow model's counterfactual quality or an exact per-decision request attribution.
+Missing status codes and cancellation flags are excluded from their respective rate
+denominators. Missing sources yield null metrics; no observed/joinable sessions yield
+an empty outcome map. Divergence weighting assumes the supplied/current
+`decision_log_sample_rate` stayed constant over the window; use `--sample-rate` when
+collecting a window with a known rate. This is observation only, not production A/B
+allocation; production ids are not silently bucketed.
+Divergence is unavailable when success sampling is disabled because always-logged
+switches alone cannot estimate population divergence.
 ## Candidate screening
 
 Screen inexpensive catalog models before an admin adds them to the platform pool:
@@ -350,7 +428,6 @@ Reports from the earlier sequential runner remain readable.
 Persisted in-flight reservations become conservative `unsettledCostUsd` charges
 on resume because their actual spend may be unknown; they are not discarded.
 A report with indeterminate grader spend cannot resume safely.
-
 ## Admin endpoints
 
 All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
@@ -396,12 +473,15 @@ row is global, so the pair is benchmarked once and serves both.
 | Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from owner pools (quota-charged) |
 | Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, 15-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
-| Container budget | `maxConcurrency` | `userMaxConcurrency` |
+| Container lanes | Half of the free lanes; the two routers split the platform pool | `BENCHMARK_USER_CONTAINER_LIMIT` (150), or the free lanes when fewer remain |
 | Slot | Its own; a running user-queue run never blocks it | Its own; a running platform-queue run never blocks it |
 
-The efficient platform and owner budgets plus the frontier platform budget must sum to at most
-`BENCHMARK_CONTAINER_BUDGET` (200, the wrangler `max_instances`). Split these budgets before
-saving frontier configuration; its owner budget is unused.
+Every router and queue shares one budget of `BENCHMARK_CONTAINER_BUDGET` (250, matching the
+Cloudflare concurrent-consumer limit and the wrangler limits). A run's lanes are recorded in
+`benchmark_runs.max_concurrency`, and the atomic insert refuses a run whose lanes would push the
+running total past 250, or the owner total past 150. A run that cannot fit waits for a running
+one to finish; the drain logs
+`benchmark_queue_drain_skipped_no_capacity` rather than reporting a failure.
 
 After any decider run completes, the worker assembles the platform table from ready, current registry entries for the current catalog pairs.
 If a desired pair remains pending or running, the previous table stays live.
@@ -451,7 +531,9 @@ trigger, and on the 15-minute cron):
 1. If that queue's run is already active → log and leave its pending rows alone.
    The other queue is unaffected.
 2. Else take that queue's pending current-engine rows oldest-`requested_at`-first,
-   capped by its own container budget (`entries × repetitions ≤ budget`).
+   capped by the lanes that queue may hold now (`entries × repetitions ≤ free lanes`).
+   With no lanes free, log `benchmark_queue_drain_skipped_no_capacity` and leave the
+   rows pending.
 3. `startRun(purpose: queue, entries: snapshot)`.
 
 A row wanted by both queues appears in both listings; whichever run claims it

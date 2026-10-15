@@ -2,7 +2,6 @@ import * as z from 'zod';
 import {
   AutoRouterSchema,
   DEFAULT_AUTO_ROUTER,
-  type BenchmarkConfig,
   BenchmarkConfigSchema,
   BenchmarkKindSchema,
   BenchmarkProfileStatusesRequestSchema,
@@ -12,12 +11,14 @@ import {
   RequeueBenchmarkRegistryRequestSchema,
   type BenchmarkRegistryQueue,
   resolveBenchmarkIdentity,
+  resolvePolicySettings,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
+  type BenchmarkRunProgress,
 } from '@kilocode/auto-routing-contracts';
-import { zodJsonValidator } from '@kilocode/worker-utils';
+import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
 import type { Context, Hono } from 'hono';
-import { BenchmarkConcurrencyBudgetError, getBenchmarkConfig, saveBenchmarkConfig } from './config';
+import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
 import { assembleCustomRoutingTable } from './custom-routing-table';
 import {
@@ -46,6 +47,7 @@ import {
   listRuns,
   requeueFailedCurrentProfiles,
 } from './db';
+import { loadRunProgress } from './run-progress';
 import type { HonoEnv } from './hono-env';
 import { fetchBenchmarkModelCatalog, platformRegistryEntries } from './platform-models';
 
@@ -70,9 +72,13 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
     await next();
   });
-  app.get('/admin/config', async c =>
-    c.json({ config: await getBenchmarkConfig(c.env.BENCH_DB, requestRouter(c)) })
-  );
+  app.get('/admin/config', async c => {
+    const config = await getBenchmarkConfig(c.env.BENCH_DB, requestRouter(c));
+    return c.json({
+      config,
+      policySettings: config ? resolvePolicySettings(config) : null,
+    });
+  });
 
   app.put(
     '/admin/config',
@@ -80,19 +86,11 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     async c => {
       const updatedBy = c.req.header('x-updated-by') ?? null;
       const router = AutoRouterSchema.parse(c.req.query('router') ?? c.req.valid('json').router);
-      let saved: BenchmarkConfig;
-      try {
-        saved = await saveBenchmarkConfig(
-          c.env.BENCH_DB,
-          { ...c.req.valid('json'), router },
-          updatedBy
-        );
-      } catch (error) {
-        if (error instanceof BenchmarkConcurrencyBudgetError) {
-          return c.json({ error: error.message }, 400);
-        }
-        throw error;
-      }
+      const saved = await saveBenchmarkConfig(
+        c.env.BENCH_DB,
+        { ...c.req.valid('json'), router },
+        updatedBy
+      );
       await syncPlatformRegistry(c.env, fetch, router);
       await publishPlatformRoutingTable(c.env, fetch, router).catch(error => {
         console.warn(
@@ -103,7 +101,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           })
         );
       });
-      return c.json({ config: saved });
+      return c.json({ config: saved, policySettings: resolvePolicySettings(saved) });
     }
   );
 
@@ -119,7 +117,22 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       purpose: purpose.success ? purpose.data : undefined,
       router: kind.success && kind.data === 'classifier' ? DEFAULT_AUTO_ROUTER : requestRouter(c),
     });
-    return c.json({ runs });
+    // Progress is display-only: a failed count query must not hide the run list.
+    const progressByRunId = await loadRunProgress(
+      c.env.BENCH_DB,
+      runs.filter(run => run.status === 'running').map(run => run.id)
+    ).catch((error: unknown) => {
+      console.warn(
+        JSON.stringify({ event: 'benchmark_run_progress_failed', ...formatError(error) })
+      );
+      return new Map<string, BenchmarkRunProgress>();
+    });
+    return c.json({
+      runs: runs.map(run => {
+        const progress = progressByRunId.get(run.id);
+        return progress ? { ...run, progress } : run;
+      }),
+    });
   });
 
   app.post(
@@ -155,10 +168,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         // another started is reported alongside the run that did start.
         if (started.length === 0 && drainErrors.length > 0) {
           const [first] = drainErrors;
-          if (
-            first instanceof BenchmarkRunConfigError ||
-            first instanceof BenchmarkConcurrencyBudgetError
-          )
+          if (first instanceof BenchmarkRunConfigError)
             return c.json({ error: first.message }, 400);
           throw first;
         }
@@ -180,10 +190,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         if (error instanceof RunAlreadyActiveError) {
           return c.json({ error: error.message }, 409);
         }
-        if (
-          error instanceof BenchmarkRunConfigError ||
-          error instanceof BenchmarkConcurrencyBudgetError
-        ) {
+        if (error instanceof BenchmarkRunConfigError) {
           return c.json({ error: error.message }, 400);
         }
         throw error;

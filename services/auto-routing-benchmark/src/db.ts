@@ -7,6 +7,8 @@ import type {
   BenchmarkRunPurpose,
   ClassifierWinner,
   RankedCandidate,
+  PolicySettingComputedMap,
+  PolicySettingOverrides,
   ProductionTokenProfile,
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
@@ -14,9 +16,11 @@ import { benchmarkPairKey, RoutingTableSchema } from '@kilocode/auto-routing-con
 import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import {
   BENCHMARK_CONTAINER_BUDGET,
+  BENCHMARK_USER_CONTAINER_LIMIT,
   BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH,
 } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
+import type { SQL } from 'drizzle-orm';
 import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import * as z from 'zod';
@@ -149,6 +153,16 @@ export async function getConfigRows(
   };
 }
 
+// Retired per-config lane budgets. Nothing in this worker reads them, but the
+// columns are NOT NULL and the previously deployed worker sizes runs from them
+// and rejects configs unless efficient max + efficient user + frontier max <=
+// 200. Writing today's production values on every save (80 + 40 + 80 = 200)
+// keeps that worker valid during rollout.
+const ROLLBACK_SAFE_LEGACY_LANE_BUDGETS = {
+  max_concurrency: 80,
+  user_max_concurrency: 40,
+};
+
 export async function replaceConfig(
   db: D1Database,
   config: {
@@ -160,13 +174,12 @@ export async function replaceConfig(
     production_token_profile?: ProductionTokenProfile | null;
     switch_horizon_turns?: number | null;
     low_confidence_threshold?: number | null;
-    max_concurrency: number;
-    user_max_concurrency: number;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
+    policy_overrides?: PolicySettingOverrides | null;
     updated_at: string;
     updated_by: string | null;
   },
@@ -178,10 +191,15 @@ export async function replaceConfig(
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm
       .insert(benchmarkConfig)
-      .values({ id: router === 'efficient' ? 1 : 2, ...config, router })
+      .values({
+        id: router === 'efficient' ? 1 : 2,
+        ...config,
+        ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
+        router,
+      })
       .onConflictDoUpdate({
         target: benchmarkConfig.router,
-        set: config,
+        set: { ...config, ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS },
       }),
     orm.delete(configClassifierModels).where(eq(configClassifierModels.router, router)),
     orm.delete(configDeciderModels).where(eq(configDeciderModels.router, router)),
@@ -198,6 +216,61 @@ export async function replaceConfig(
 /** Which registry queue a run drains: the platform decider list, or owner pools. */
 export type { BenchmarkRunPurpose };
 
+/**
+ * Record the daily system-optimal computation for one router. Only the computed
+ * map is written, so admin provenance (updated_at/updated_by) is untouched.
+ */
+export async function savePolicyComputed(
+  db: D1Database,
+  router: AutoRouter,
+  computed: PolicySettingComputedMap
+): Promise<void> {
+  await drizzle(db)
+    .update(benchmarkConfig)
+    .set({ policy_computed: computed })
+    .where(eq(benchmarkConfig.router, router));
+}
+
+/** Live decider lanes of every running run, the sum the admission guard reads. */
+const runningDeciderLanes = sql`(
+  SELECT COALESCE(SUM(${benchmarkRuns.max_concurrency}), 0)
+  FROM ${benchmarkRuns}
+  WHERE ${benchmarkRuns.kind} = 'decider' AND ${benchmarkRuns.status} = 'running'
+)`;
+
+/** Live decider lanes held by owner-queue runs. */
+const runningUserLanes = sql`(
+  SELECT COALESCE(SUM(${benchmarkRuns.max_concurrency}), 0)
+  FROM ${benchmarkRuns}
+  WHERE ${benchmarkRuns.kind} = 'decider'
+    AND ${benchmarkRuns.purpose} = 'user'
+    AND ${benchmarkRuns.status} = 'running'
+)`;
+
+/** Admission-guarded lane count for a new run, or NULL to reject the insert. */
+function containerLanesForAdmission(run: {
+  kind: BenchmarkKind;
+  purpose?: BenchmarkRunPurpose;
+  max_concurrency: number;
+}): SQL | number {
+  if (run.kind !== 'decider') return run.max_concurrency;
+  const withinBudget = sql`${runningDeciderLanes} + ${run.max_concurrency} <= ${BENCHMARK_CONTAINER_BUDGET}`;
+  if ((run.purpose ?? 'platform') === 'user') {
+    const withinReserve = sql`${runningUserLanes} + ${run.max_concurrency} <= ${BENCHMARK_USER_CONTAINER_LIMIT}`;
+    return sql`CASE WHEN ${withinReserve} AND ${withinBudget} THEN ${run.max_concurrency} ELSE NULL END`;
+  }
+  return sql`CASE WHEN ${withinBudget} THEN ${run.max_concurrency} ELSE NULL END`;
+}
+
+/**
+ * Container lanes live decider runs hold, summed across every router and queue.
+ * `startRun` sizes the next run against it; the insert guard re-reads the same
+ * rows atomically.
+ */
+export async function getLiveContainerLanes(db: D1Database): Promise<number> {
+  const row = await drizzle(db).select({ lanes: runningDeciderLanes }).from(benchmarkRuns).get();
+  return Number(row?.lanes ?? 0);
+}
 export async function insertRun(
   db: D1Database,
   run: {
@@ -233,16 +306,10 @@ export async function insertRun(
     min_accuracy: run.min_accuracy,
     switch_cost_factor: run.switch_cost_factor,
     best_accuracy_switch_threshold: run.best_accuracy_switch_threshold,
-    // A NOT NULL rejection rolls back the whole D1 batch, including model snapshots.
-    max_concurrency:
-      run.kind === 'decider'
-        ? sql`CASE WHEN (
-          SELECT COALESCE(SUM(${benchmarkRuns.max_concurrency}), 0)
-          FROM ${benchmarkRuns}
-          WHERE ${benchmarkRuns.kind} = 'decider' AND ${benchmarkRuns.status} = 'running'
-        ) + ${run.max_concurrency} <= ${BENCHMARK_CONTAINER_BUDGET}
-        THEN ${run.max_concurrency} ELSE NULL END`
-        : run.max_concurrency,
+    // A NOT NULL rejection rolls back the whole D1 batch, including model
+    // snapshots. Two caps: shared across every running decider run, and (for
+    // owner-queue runs) the slice that keeps the platform reserve intact.
+    max_concurrency: containerLanesForAdmission(run),
     benchmark_user_id: run.benchmark_user_id,
     benchmark_org_id: run.benchmark_org_id,
     repetitions: run.repetitions,
@@ -610,6 +677,61 @@ export async function listRuns(
   }
 
   return runRows.map(row => mapRunRow(row, summariesByRunId.get(row.id) ?? []));
+}
+
+export type RunProgressCountRow = {
+  runId: string;
+  kind: BenchmarkKind;
+  router: AutoRouter;
+  repetitions: number;
+  engineIdentity: string;
+  enqueuedModels: number;
+  completedCases: number;
+  failedCases: number;
+};
+
+/**
+ * Case tallies for every RUNNING run among `runIds` in one statement, so a page
+ * of runs costs one query instead of one per run. Terminal runs are filtered out
+ * in SQL: their counts are already final in their summaries.
+ */
+export async function listRunProgressCounts(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<RunProgressCountRow[]> {
+  if (runIds.length === 0) return [];
+  const rows = await drizzle(db)
+    .select({
+      runId: benchmarkRuns.id,
+      kind: benchmarkRuns.kind,
+      router: benchmarkRuns.router,
+      repetitions: benchmarkRuns.repetitions,
+      engineIdentity: benchmarkRuns.engine_identity,
+      enqueuedModels: sql<number>`(
+        SELECT COUNT(*) FROM ${runModels}
+        WHERE ${runModels.run_id} = ${benchmarkRuns.id} AND ${runModels.enqueued} = 1
+      )`,
+      completedCases: sql<number>`(
+        SELECT COUNT(*) FROM ${caseResults} WHERE ${caseResults.run_id} = ${benchmarkRuns.id}
+      )`,
+      failedCases: sql<number>`(
+        SELECT COUNT(*) FROM ${caseResults}
+        WHERE ${caseResults.run_id} = ${benchmarkRuns.id}
+          AND (${caseResults.error} IS NOT NULL OR ${caseResults.timed_out} = 1)
+      )`,
+    })
+    .from(benchmarkRuns)
+    .where(and(inArray(benchmarkRuns.id, [...runIds]), eq(benchmarkRuns.status, 'running')));
+  return rows.map(row => ({
+    runId: row.runId,
+    kind: row.kind,
+    router: row.router,
+    repetitions: row.repetitions,
+    engineIdentity: row.engineIdentity,
+    enqueuedModels: Number(row.enqueuedModels),
+    completedCases: Number(row.completedCases),
+    failedCases: Number(row.failedCases),
+  }));
 }
 
 export async function markRunCompleted(db: D1Database, runId: string): Promise<void> {

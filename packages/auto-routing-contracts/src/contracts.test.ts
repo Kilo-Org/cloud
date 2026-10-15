@@ -159,8 +159,6 @@ describe('BenchmarkConfigSchema defaults', () => {
       classifierModels: ['model/a'],
       deciderModels: [{ id: 'model/b' }],
       minAccuracy: 0.8,
-      maxConcurrency: 4,
-      userMaxConcurrency: 100,
       benchmarkUserId: null,
       benchmarkOrgId: null,
       switchCostFactor: 2,
@@ -181,8 +179,6 @@ describe('BenchmarkConfigSchema defaults', () => {
       classifierModels: ['model/a'],
       deciderModels: [{ id: 'model/b' }],
       minAccuracy: 0.8,
-      maxConcurrency: 4,
-      userMaxConcurrency: 100,
       benchmarkUserId: null,
       switchCostFactor: 2,
       updatedAt: null,
@@ -200,22 +196,6 @@ describe('BenchmarkConfigSchema defaults', () => {
     }
   });
 
-  it('accepts the benchmark maximum concurrency cap of 100', () => {
-    const result = BenchmarkConfigSchema.safeParse({
-      classifierModels: ['model/a'],
-      deciderModels: [{ id: 'model/b' }],
-      minAccuracy: 0.8,
-      maxConcurrency: 100,
-      userMaxConcurrency: 100,
-      benchmarkUserId: null,
-      benchmarkOrgId: null,
-      switchCostFactor: 2,
-      updatedAt: null,
-      updatedBy: null,
-    });
-    expect(result.success).toBe(true);
-  });
-
   it.each(['efficient', 'frontier'])(
     'strips retired auto decider fields for %s clients',
     router => {
@@ -230,8 +210,6 @@ describe('BenchmarkConfigSchema defaults', () => {
         autoDeciderMaxCostUsd: 20,
         minAccuracy: 0.7,
         switchCostFactor: 3,
-        maxConcurrency: 10,
-        userMaxConcurrency: 100,
         benchmarkUserId: null,
         benchmarkOrgId: null,
         updatedAt: null,
@@ -248,6 +226,28 @@ describe('BenchmarkConfigSchema defaults', () => {
       ]) {
         expect(result).not.toHaveProperty(field);
       }
+    }
+  );
+
+  it.each(['efficient', 'frontier'])(
+    'strips the retired concurrency knobs from %s payloads',
+    router => {
+      const result = BenchmarkConfigSchema.parse({
+        router,
+        classifierModels: ['model/a'],
+        deciderModels: [{ id: 'model/b' }],
+        minAccuracy: 0.7,
+        switchCostFactor: 3,
+        maxConcurrency: 100,
+        userMaxConcurrency: 100,
+        benchmarkUserId: null,
+        benchmarkOrgId: null,
+        updatedAt: null,
+        updatedBy: null,
+      });
+
+      expect(result).not.toHaveProperty('maxConcurrency');
+      expect(result).not.toHaveProperty('userMaxConcurrency');
     }
   );
 });
@@ -276,8 +276,6 @@ describe('resolveBenchmarkIdentity', () => {
 describe('BenchmarkConfigSchema duplicate model ids', () => {
   const base = {
     minAccuracy: 0.8,
-    maxConcurrency: 4,
-    userMaxConcurrency: 100,
     benchmarkUserId: null,
     benchmarkOrgId: null,
     switchCostFactor: 2,

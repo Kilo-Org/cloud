@@ -650,7 +650,7 @@
     "redeployTitle": "インスタンスを再デプロイ",
     "accessRequired": {
       "iosBody": "このアカウントでは、KiloClawへのアクセスはiOSアプリの外で管理されています。",
-      "iosContact": "ご不明な点はhi@kilo.aiまでお問い合わせください。",
+      "iosContact": "ご不明な点は{{supportEmail}}までお問い合わせください。",
       "iosTitle": "IOSではKiloClawを利用できません",
       "multipleCurrentConflictBody": "このアカウントに有効なサブスクリプションが複数見つかりました。二重請求を防ぐため、処理を一時停止しています。",
       "multipleCurrentConflictCta": "Kilo.aiで続行",
@@ -783,7 +783,7 @@
         "queryErrorBody": "{{name}}のセットアップ状況を確認中に接続が切れました。セットアップは続いている可能性があります。もう一度お試しいただくか、しばらくしてから確認してください。",
         "queryErrorTitle": "セットアップの状況を確認できませんでした",
         "settingUp": "{{name}}をセットアップ中",
-        "stalledBody": "{{name}}のセットアップを完了できませんでした。もう一度お試しください。問題が続く場合は、hi@kilo.aiまでメールでお問い合わせください。",
+        "stalledBody": "{{name}}のセットアップを完了できませんでした。もう一度お試しください。問題が続く場合は、{{supportEmail}}までメールでお問い合わせください。",
         "stalledTitle": "処理が進んでいません",
         "startingSandbox": "サンドボックスを起動中",
         "stoppedBody": "セットアップ中に{{name}}のインスタンスが予期せず停止しました。",
@@ -1040,7 +1040,7 @@
         "recoveryLabel": "GitHub Appを更新"
       },
       "githubIpAllowList": {
-        "description": "このGitHub組織のIP許可リストがKiloをブロックしているため、コードレビュアーを無効にしました。hi@kilo.aiにサポートを依頼してから、コードレビュアーを再度有効にしてください。"
+        "description": "このGitHub組織のIP許可リストがKiloをブロックしているため、コードレビュアーを無効にしました。{{supportEmail}}にサポートを依頼してから、コードレビュアーを再度有効にしてください。"
       },
       "gitlabProjectAccessRequired": {
         "description": "KiloがこのプロジェクトのGitLabプロジェクトアクセストークンを作成できないため、コードレビュアーを無効にしました。メンテナー権限を付与するか、プロジェクトアクセストークンを有効にしてから、コードレビュアーを再度有効にしてください。",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "コードレビュアーの設定を更新"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "今日、リポジトリのクローンが3回タイムアウトしたため、コードレビュアーを無効にしました。hi@kilo.aiにサポートを依頼してから、コードレビュアーを再度有効にしてください。"
+        "description": "今日、リポジトリのクローンが3回タイムアウトしたため、コードレビュアーを無効にしました。{{supportEmail}}にサポートを依頼してから、コードレビュアーを再度有効にしてください。"
       },
       "title": "コードレビュアーで対応が必要です。",
       "recoveryLabel": "サポートに連絡"

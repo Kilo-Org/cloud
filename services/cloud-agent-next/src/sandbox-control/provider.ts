@@ -1,4 +1,5 @@
 import type { SandboxBillingInput } from '../container-usage-context.js';
+import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { SessionCredentialGrant } from './session-credentials.js';
 import {
   CLOUDFLARE_CONTAINERS_INSTANCES,
@@ -103,6 +104,7 @@ export type ProviderLaunchResult = {
 };
 
 export type ProviderAdapter = {
+  describeRuntime?(ref: string): CloudAgentRunContainer | undefined;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(

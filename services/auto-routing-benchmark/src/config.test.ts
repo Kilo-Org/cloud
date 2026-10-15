@@ -5,8 +5,6 @@ const configRow = {
   min_accuracy: 0.85,
   switch_cost_factor: 3,
   best_accuracy_switch_threshold: 0.05,
-  max_concurrency: 8,
-  user_max_concurrency: 100,
   benchmark_user_id: 'user-123',
   benchmark_org_id: 'org-123',
   classifier_repetitions: 1,
@@ -83,5 +81,61 @@ describe('platform model configuration', () => {
     expect(mapConfigRows(null, ['classifier/model'], models)).toBeNull();
     expect(mapConfigRows(configRow, [], models)).toBeNull();
     expect(mapConfigRows(configRow, ['classifier/model'], [])).toBeNull();
+  });
+
+  it('maps policy override and computed columns, defaulting absent ones to null', () => {
+    const models = [{ model: 'manual/model', variant: null, reasoning_effort: null }];
+    expect(mapConfigRows(configRow, ['classifier/model'], models)).toMatchObject({
+      policyOverrides: null,
+      policyComputed: null,
+    });
+    expect(
+      mapConfigRows(
+        {
+          ...configRow,
+          policy_overrides: { minAccuracy: 0.9 },
+          policy_computed: {
+            accuracyNoiseBand: {
+              value: 0.08,
+              computedAt: '2026-06-01T00:00:00.000Z',
+              source: 'held-out-grid',
+              evidence: 'fixture',
+            },
+          },
+        },
+        ['classifier/model'],
+        models
+      )
+    ).toMatchObject({
+      policyOverrides: { minAccuracy: 0.9 },
+      policyComputed: {
+        accuracyNoiseBand: { value: 0.08, source: 'held-out-grid' },
+      },
+    });
+  });
+
+  it('drops stored policy entries that do not fit their setting', () => {
+    const models = [{ model: 'manual/model', variant: null, reasoning_effort: null }];
+    const config = mapConfigRows(
+      {
+        ...configRow,
+        policy_overrides: {
+          minAccuracy: { uncachedInputTokens: 1000, cachedInputTokens: 200 },
+          accuracyNoiseBand: 0.03,
+        },
+        policy_computed: {
+          minAccuracy: {
+            value: { uncachedInputTokens: 1000, cachedInputTokens: 200 },
+            computedAt: '2026-06-01T00:00:00.000Z',
+            source: 'held-out-grid',
+            evidence: 'fixture',
+          },
+        },
+      },
+      ['classifier/model'],
+      models
+    );
+    expect(config?.policyOverrides).toEqual({ accuracyNoiseBand: 0.03 });
+    expect(config?.policyComputed).toEqual({});
   });
 });

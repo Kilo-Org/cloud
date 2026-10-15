@@ -21,7 +21,6 @@ const VALID_TABS: readonly string[] = [
   'auto-free',
   'preferred-models',
   'unavailable-models',
-  'vercel-model-ids',
   'api-request-log',
 ];
 type Tab =
@@ -31,7 +30,6 @@ type Tab =
   | 'auto-free'
   | 'preferred-models'
   | 'unavailable-models'
-  | 'vercel-model-ids'
   | 'api-request-log';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
@@ -80,7 +78,7 @@ export default function AdminGatewayPage() {
               Custom LLMs
             </TabsTrigger>
             <TabsTrigger value="routing" className={tabTriggerClass}>
-              Routing
+              Vercel Routing
             </TabsTrigger>
             <TabsTrigger value="auto-free" className={tabTriggerClass}>
               Auto Free
@@ -90,9 +88,6 @@ export default function AdminGatewayPage() {
             </TabsTrigger>
             <TabsTrigger value="unavailable-models" className={tabTriggerClass}>
               Unavailable Models
-            </TabsTrigger>
-            <TabsTrigger value="vercel-model-ids" className={tabTriggerClass}>
-              Vercel Model IDs
             </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
@@ -104,8 +99,9 @@ export default function AdminGatewayPage() {
           <TabsContent value="custom-llms" className="mt-4">
             <CustomLlmsContent />
           </TabsContent>
-          <TabsContent value="routing" className="mt-4">
+          <TabsContent value="routing" className="mt-4 flex flex-col gap-y-6">
             <RoutingContent />
+            <VercelModelIdOverridesContent />
           </TabsContent>
           <TabsContent value="auto-free" className="mt-4">
             <AutoFreeContent />
@@ -140,9 +136,6 @@ export default function AdminGatewayPage() {
                 </>
               }
             />
-          </TabsContent>
-          <TabsContent value="vercel-model-ids" className="mt-4">
-            <VercelModelIdOverridesContent />
           </TabsContent>
           <TabsContent
             value="api-request-log"

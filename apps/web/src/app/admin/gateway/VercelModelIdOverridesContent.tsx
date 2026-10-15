@@ -129,7 +129,7 @@ export function VercelModelIdOverridesContent() {
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="flex flex-col gap-1.5">
-            <CardTitle>Vercel Model IDs</CardTitle>
+            <CardTitle>Model ID Overrides</CardTitle>
             <CardDescription>
               Overrides that map a full OpenRouter model ID to a full Vercel AI Gateway model ID,
               stored in the <code>vercel_model_id_overrides</code> table. The gateway does not read

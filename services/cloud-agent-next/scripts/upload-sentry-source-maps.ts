@@ -5,13 +5,7 @@ import {
   validateSentryArtifacts,
 } from './sentry-source-maps.js';
 
-if (
-  sentryUploadConfigured({
-    SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN,
-    SENTRY_ORG: process.env.SENTRY_ORG,
-    SENTRY_PROJECT: process.env.SENTRY_PROJECT,
-  })
-) {
+if (sentryUploadConfigured({ SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN })) {
   for (const [source, shipped] of [
     ['wrapper/dist/sentry', 'wrapper/dist/runtime'],
     ...(process.argv.includes('--wrapper') ? [] : [['dist/worker', 'dist/worker']]),
@@ -22,6 +16,10 @@ if (
       runSentryCli([
         'sourcemaps',
         'upload',
+        '--org',
+        'kilo-code',
+        '--project',
+        'kilo-cloud-agent',
         ...(artifact.release ? ['--release', artifact.release] : []),
         '--strict',
         '--validate',

@@ -20,6 +20,7 @@ import {
 const directories: string[] = [];
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   await Promise.all(
     directories.splice(0).map(directory => rm(directory, { recursive: true, force: true }))
   );
@@ -32,29 +33,52 @@ async function fixture(): Promise<string> {
 }
 
 describe('Cloud Agent Sentry build artifacts', () => {
-  it('explicitly skips unconfigured uploads and fails partially configured uploads', () => {
+  it('requires only the shared auth token to upload', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(sentryUploadConfigured({})).toBe(false);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining('Skipping'));
-    expect(sentryUploadConfigured({ SENTRY_AUTH_TOKEN: 'shared-web-token' })).toBe(false);
-    expect(log).toHaveBeenLastCalledWith(expect.stringContaining('org/project are not configured'));
-    expect(() => sentryUploadConfigured({ SENTRY_AUTH_TOKEN: 'token', SENTRY_ORG: 'org' })).toThrow(
-      'both SENTRY_ORG and SENTRY_PROJECT'
-    );
-    expect(() => sentryUploadConfigured({ SENTRY_PROJECT: 'project' })).toThrow(
-      'both SENTRY_ORG and SENTRY_PROJECT'
-    );
-    expect(sentryUploadConfigured({ SENTRY_ORG: 'org', SENTRY_PROJECT: 'project' })).toBe(false);
+    expect(sentryUploadConfigured({ SENTRY_AUTH_TOKEN: '' })).toBe(false);
+    expect(sentryUploadConfigured({ SENTRY_AUTH_TOKEN: ' \t ' })).toBe(false);
     expect(log).toHaveBeenLastCalledWith(
       expect.stringContaining('SENTRY_AUTH_TOKEN is not configured')
     );
-    expect(
-      sentryUploadConfigured({
-        SENTRY_AUTH_TOKEN: 'token',
-        SENTRY_ORG: 'org',
-        SENTRY_PROJECT: 'project',
-      })
-    ).toBe(true);
+    expect(sentryUploadConfigured({ SENTRY_AUTH_TOKEN: 'shared-web-token' })).toBe(true);
+  });
+
+  it('uploads Worker and wrapper maps to the fixed Cloud Agent project', async () => {
+    const sourceMaps = await import('./sentry-source-maps.js');
+    vi.stubEnv('SENTRY_AUTH_TOKEN', 'shared-web-token');
+    vi.stubEnv('SENTRY_ORG', 'unrelated-org');
+    vi.stubEnv('SENTRY_PROJECT', 'unrelated-project');
+    vi.spyOn(sourceMaps, 'validateSentryArtifacts').mockResolvedValue([
+      {
+        file: 'index.js',
+        sha256: 'a'.repeat(64),
+        mapSha256: 'b'.repeat(64),
+        debugId: '2f361bcc-1d43-4fa2-b8d4-c6db9a131c85',
+      },
+    ]);
+    const cli = vi.spyOn(sourceMaps, 'runSentryCli').mockImplementation(() => {});
+
+    await import('./upload-sentry-source-maps.js');
+
+    expect(cli).toHaveBeenCalledTimes(2);
+    for (const [index, directory] of ['wrapper/dist/sentry', 'dist/worker'].entries()) {
+      expect(cli).toHaveBeenNthCalledWith(index + 1, [
+        'sourcemaps',
+        'upload',
+        '--org',
+        'kilo-code',
+        '--project',
+        'kilo-cloud-agent',
+        '--strict',
+        '--validate',
+        '--no-rewrite',
+        '--wait-for',
+        '120',
+        resolve(directory, 'index.js'),
+        resolve(directory, 'index.js.map'),
+      ]);
+    }
   });
 
   it('uses a dry run with external maps and the actual target environment for the Worker build', () => {
@@ -317,6 +341,11 @@ console.log(JSON.stringify(events));
     }
     const workflow = await readFile(resolve('../../.github/workflows/deploy-workers.yml'), 'utf8');
     expect(workflow.match(/name: Upload Cloud Agent Sentry source maps/g)).toHaveLength(2);
+    expect(
+      workflow.match(/SENTRY_AUTH_TOKEN: \$\{\{ secrets\.SENTRY_AUTH_TOKEN \}\}/g)
+    ).toHaveLength(2);
+    expect(workflow).not.toContain('CLOUD_AGENT_SENTRY_ORG');
+    expect(workflow).not.toContain('CLOUD_AGENT_SENTRY_PROJECT');
     expect(
       workflow.match(/deploy dist\/worker\/index\.js --no-bundle --upload-source-maps/g)
     ).toHaveLength(4);

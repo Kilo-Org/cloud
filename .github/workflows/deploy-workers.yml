@@ -95,8 +95,6 @@ jobs:
         working-directory: ${{ inputs.worker }}
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ vars.CLOUD_AGENT_SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ vars.CLOUD_AGENT_SENTRY_PROJECT }}
         run: pnpm run sentry:sourcemaps
 
   detect-changes:
@@ -283,6 +281,4 @@ jobs:
         working-directory: ${{ matrix.worker }}
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ vars.CLOUD_AGENT_SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ vars.CLOUD_AGENT_SENTRY_PROJECT }}
         run: pnpm run sentry:sourcemaps

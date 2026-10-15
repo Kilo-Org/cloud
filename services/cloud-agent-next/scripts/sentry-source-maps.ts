@@ -88,24 +88,7 @@ export async function validateSentryArtifacts(
   return artifacts;
 }
 
-export function sentryUploadConfigured(env: {
-  SENTRY_AUTH_TOKEN?: string;
-  SENTRY_ORG?: string;
-  SENTRY_PROJECT?: string;
-}): boolean {
-  const org = env.SENTRY_ORG?.trim();
-  const project = env.SENTRY_PROJECT?.trim();
-  if (!org && !project) {
-    console.log(
-      'Skipping Cloud Agent Sentry source map upload: Cloud Agent Sentry org/project are not configured.'
-    );
-    return false;
-  }
-  if (!org || !project) {
-    throw new Error(
-      'Configure both SENTRY_ORG and SENTRY_PROJECT for Cloud Agent source map upload'
-    );
-  }
+export function sentryUploadConfigured(env: { SENTRY_AUTH_TOKEN?: string }): boolean {
   if (!env.SENTRY_AUTH_TOKEN?.trim()) {
     console.log(
       'Skipping Cloud Agent Sentry source map upload: SENTRY_AUTH_TOKEN is not configured.'

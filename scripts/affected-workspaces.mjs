@@ -31,11 +31,11 @@ const OWNED = [
   [/^tools\/(i18n|nativewind)\//, 'apps/mobile'],
 ];
 
-// [reader, workspace] reads that no source file shows.
-const EXTRA_READS = [
-  // The ai-gateway build copies the web app's .env files
-  // (apps/ai-gateway/scripts/dev.sh, the build-ai-gateway job in ci.yml).
-  ['apps/ai-gateway', 'apps/web'],
+// [pattern, workspace]: files outside a workspace that the workspace reads.
+const EXTRA_INPUTS = [
+  // The ai-gateway build copies these web app files (the build-ai-gateway job
+  // in ci.yml).
+  [/^apps\/web\/\.env(\.test)?$/, 'apps/ai-gateway'],
 ];
 
 // Root paths that no typecheck or lint reads.
@@ -134,9 +134,6 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
       dir
     );
   }
-  for (const [reader, dir] of EXTRA_READS) {
-    if (readers.has(reader) && readers.has(dir)) read(reader, dir);
-  }
   // Root paths (outside every workspace) that a workspace reads.
   const rootReads = [];
   for (const [file, target] of references) {
@@ -152,6 +149,9 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
     const dir = owner(dirs, file);
     if (dir) {
       if (!file.endsWith('.md')) changed.add(dir);
+      for (const [pattern, reader] of EXTRA_INPUTS) {
+        if (pattern.test(file) && readers.has(reader)) changed.add(reader);
+      }
       continue;
     }
     if (GLOBAL.some(pattern => pattern.test(file))) {

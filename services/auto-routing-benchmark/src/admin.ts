@@ -469,3 +469,5 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
   );
 }
+
+// ci-probe 1

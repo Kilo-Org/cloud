@@ -412,7 +412,6 @@ function ClassifierTab({
 
   return (
     <div className="flex flex-col gap-4">
-
       <Card className="rounded-lg">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
           <CardTitle className="text-base">Classifier model override</CardTitle>

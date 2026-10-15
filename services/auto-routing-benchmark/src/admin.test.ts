@@ -186,11 +186,11 @@ beforeEach(() => {
   tokenGet.mockResolvedValue('bench-token');
   vi.stubGlobal(
     'fetch',
-    vi
-      .fn<typeof fetch>()
-      .mockImplementation(async () =>
-        Response.json({ data: TEST_CONFIG.deciderModels.map(model => ({ id: model.id })) })
-      )
+    vi.fn<typeof fetch>().mockImplementation(async () =>
+      Response.json({
+        data: [...TEST_CONFIG.deciderModels.map(model => ({ id: model.id })), { id: 'a/b' }],
+      })
+    )
   );
   vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([]);
   vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
@@ -848,12 +848,103 @@ describe('GET /admin/classifier-winner', () => {
   });
 });
 
+function stubCatalog(): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>().mockImplementation(async () =>
+      Response.json({
+        data: [
+          {
+            id: 'a/b',
+            opencode: {
+              variants: {
+                low: { reasoning: { effort: 'low' } },
+                high: { reasoning: { effort: 'high' } },
+                fast: {},
+              },
+            },
+          },
+          { id: 'c/d' },
+          { id: '~a/latest', alias_target: 'a/b' },
+          { id: '~a/fast-latest', alias_target: 'a/b' },
+        ],
+      })
+    )
+  );
+}
+
+describe('owner model aliases', () => {
+  it.each(['register', 'status'])(
+    'shares concrete pairs and maps %s statuses back to each requested model',
+    async action => {
+      vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+      stubCatalog();
+      const statuses = [
+        { entry: { model: 'a/b', variant: 'low' }, status: 'ready' as const, failureReason: null },
+        {
+          entry: { model: 'a/b', variant: 'high' },
+          status: 'failed' as const,
+          failureReason: 'Benchmark failed',
+        },
+      ];
+      vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses });
+      vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({ statuses });
+      const entries = [{ model: '~a/latest' }, { model: '~a/fast-latest' }, { model: 'a/b' }];
+      const response = await authedPost(`/admin/profiles/${action}`, {
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries,
+        retryEntries: [{ model: '~a/latest' }],
+      });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        statuses: statuses.flatMap(status =>
+          entries.map(entry => ({ ...status, entry: { ...status.entry, model: entry.model } }))
+        ),
+      });
+      const pairs = [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+      ];
+      if (action === 'register') {
+        expect(registerProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+          ownerType: 'user',
+          ownerId: 'u1',
+          pairs,
+          retryPairs: pairs,
+        });
+      } else {
+        expect(lookupProfileStatuses).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+          pairs,
+        });
+      }
+    }
+  );
+
+  it('assembles custom tables from the resolved pairs of alias pool entries', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+    const response = await authedPost('/admin/custom-routing-table', {
+      entries: [{ model: '~a/latest' }, { model: 'a/b' }],
+    });
+    expect(response.status).toBe(200);
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+      ]
+    );
+  });
+});
+
 describe('POST /admin/profiles/register', () => {
   it('returns 400 when benchmark config is not set', async () => {
     const res = await authedPost('/admin/profiles/register', {
       ownerType: 'user',
       ownerId: 'u1',
-      entries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({
@@ -885,8 +976,8 @@ describe('POST /admin/profiles/register', () => {
     const res = await authedPost('/admin/profiles/register', {
       ownerType: 'user',
       ownerId: 'u1',
-      entries: [{ model: 'a/b', variant: null }],
-      retryEntries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
+      retryEntries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -900,10 +991,57 @@ describe('POST /admin/profiles/register', () => {
       expect.objectContaining({
         ownerType: 'user',
         ownerId: 'u1',
-        entries: [{ model: 'a/b', variant: null }],
-        retryEntries: [{ model: 'a/b', variant: null }],
+        pairs: [{ model: 'a/b', variant: null }],
+        retryPairs: [{ model: 'a/b', variant: null }],
       })
     );
+  });
+
+  it('expands each model to every catalog effort and retries only listed models', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+    vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses: [] });
+
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'org',
+      ownerId: 'o1',
+      entries: [{ model: 'a/b' }, { model: 'c/d' }],
+      retryEntries: [{ model: 'a/b' }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(registerProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      expect.objectContaining({
+        pairs: [
+          { model: 'a/b', variant: 'low' },
+          { model: 'a/b', variant: 'high' },
+          { model: 'c/d', variant: null },
+        ],
+        retryPairs: [
+          { model: 'a/b', variant: 'low' },
+          { model: 'a/b', variant: 'high' },
+        ],
+      })
+    );
+  });
+
+  it('rejects a model missing from the catalog with 400 before admission', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [{ model: 'a/b' }, { model: 'gone/model' }],
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Model is unavailable in the current catalog: gone/model',
+    });
+    expect(registerProfiles).not.toHaveBeenCalled();
   });
 
   it('returns 429 with retryAt when quota is exceeded', async () => {
@@ -919,7 +1057,7 @@ describe('POST /admin/profiles/register', () => {
     const res = await authedPost('/admin/profiles/register', {
       ownerType: 'org',
       ownerId: 'o1',
-      entries: [{ model: 'a/b', variant: 'xhigh' }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(429);
     await expect(res.json()).resolves.toEqual({
@@ -933,7 +1071,7 @@ describe('POST /admin/profiles/register', () => {
 describe('POST /admin/profiles/status', () => {
   it('returns 400 when benchmark config is not set', async () => {
     const res = await authedPost('/admin/profiles/status', {
-      entries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(400);
     expect(lookupProfileStatuses).not.toHaveBeenCalled();
@@ -946,12 +1084,102 @@ describe('POST /admin/profiles/status', () => {
     });
 
     const res = await authedPost('/admin/profiles/status', {
-      entries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       statuses: [{ entry: { model: 'a/b', variant: null }, status: 'ready', failureReason: null }],
     });
+  });
+
+  it('looks up every catalog effort and reports missing models as failed', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+    const statuses = [
+      { entry: { model: 'a/b', variant: 'low' }, status: 'ready' as const, failureReason: null },
+      { entry: { model: 'a/b', variant: 'high' }, status: 'pending' as const, failureReason: null },
+    ];
+    vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({ statuses });
+
+    const res = await authedPost('/admin/profiles/status', {
+      entries: [{ model: 'gone/model' }, { model: 'a/b' }],
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      statuses: [
+        ...statuses,
+        {
+          entry: { model: 'gone/model', variant: null },
+          status: 'failed',
+          failureReason: 'Model is unavailable in the current catalog.',
+        },
+      ],
+    });
+    expect(lookupProfileStatuses).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+      pairs: [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+      ],
+    });
+  });
+
+  it('skips lookup when every model is missing from the catalog', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+
+    const res = await authedPost('/admin/profiles/status', {
+      entries: [{ model: 'gone/model' }],
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      statuses: [
+        {
+          entry: { model: 'gone/model', variant: null },
+          status: 'failed',
+          failureReason: 'Model is unavailable in the current catalog.',
+        },
+      ],
+    });
+    expect(lookupProfileStatuses).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /admin/custom-routing-table', () => {
+  it('assembles from every catalog effort of the supported pool models', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValueOnce([]);
+
+    const res = await authedPost('/admin/custom-routing-table', {
+      entries: [{ model: 'a/b' }, { model: 'gone/model' }, { model: 'c/d' }],
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ table: null });
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ repetitions: TEST_CONFIG.deciderRepetitions }),
+      [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+        { model: 'c/d', variant: null },
+      ]
+    );
+  });
+
+  it('returns a null table without a registry read when no model is in the catalog', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+
+    const res = await authedPost('/admin/custom-routing-table', {
+      entries: [{ model: 'gone/model' }],
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ table: null });
+    expect(listReadyCurrentProfilesForEntries).not.toHaveBeenCalled();
   });
 });
 
@@ -1080,7 +1308,7 @@ describe('body router selection', () => {
       router: 'frontier',
       ownerType: 'user',
       ownerId: 'owner',
-      entries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
     });
     expect(response.status).toBe(400);
     expect(registerProfiles).not.toHaveBeenCalled();

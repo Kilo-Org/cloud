@@ -83,6 +83,57 @@ const catalog = BenchmarkModelCatalogSchema.parse({
 });
 
 describe('platform catalog expansion', () => {
+  it.each([
+    ['an alias and its concrete target', ['~vendor/latest', 'vendor/current']],
+    ['two aliases sharing a target', ['~vendor/latest', '~vendor/fast-latest']],
+  ])('deduplicates %s using the concrete target reasoning variants', (_label, ids) => {
+    const resolvedCatalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        {
+          id: '~vendor/latest',
+          alias_target: 'vendor/current',
+          opencode: { variants: { stale: { reasoning: { effort: 'low' } } } },
+        },
+        { id: '~vendor/fast-latest', alias_target: 'vendor/current' },
+        {
+          id: 'vendor/current',
+          opencode: { variants: { thinking: { reasoning: { effort: 'high' } } } },
+        },
+      ],
+    });
+    expect(
+      platformRegistryEntries({ deciderModels: ids.map(id => ({ id })) }, resolvedCatalog)
+    ).toEqual([{ model: 'vendor/current', variant: 'thinking' }]);
+  });
+
+  it('keeps an alias when its target is absent from the catalog', () => {
+    expect(
+      platformRegistryEntries(
+        { deciderModels: [{ id: '~vendor/latest' }] },
+        BenchmarkModelCatalogSchema.parse({
+          data: [{ id: '~vendor/latest', alias_target: 'vendor/missing' }],
+        })
+      )
+    ).toEqual([{ model: '~vendor/latest', variant: null }]);
+  });
+
+  it('requests a new concrete pair when an alias is retargeted', () => {
+    const config = { deciderModels: [{ id: '~vendor/latest' }] };
+    const entriesForTarget = (target: string) =>
+      platformRegistryEntries(
+        config,
+        BenchmarkModelCatalogSchema.parse({
+          data: [
+            { id: '~vendor/latest', alias_target: target },
+            { id: 'vendor/old' },
+            { id: 'vendor/new' },
+          ],
+        })
+      );
+    expect(entriesForTarget('vendor/old')).toEqual([{ model: 'vendor/old', variant: null }]);
+    expect(entriesForTarget('vendor/new')).toEqual([{ model: 'vendor/new', variant: null }]);
+  });
+
   it('expands manual and auto models into all and only explicit reasoning configurations', () => {
     expect(
       platformRegistryEntries(

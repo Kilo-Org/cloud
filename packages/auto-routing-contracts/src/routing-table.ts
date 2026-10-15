@@ -6,22 +6,21 @@ import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 /** Maximum Pool entries in an owner-configured Efficient model pool. */
 export const MAX_POOL_ENTRIES = 10;
 
-/**
- * One concrete managed model plus its canonical catalog variant key.
- * `variant` is null only for models that expose no variants; catalog
- * enforcement happens at the web boundary, not here.
- */
 export const PoolEntrySchema = z.object({
   model: z.string().trim().min(1),
-  variant: z.string().trim().min(1).nullable(),
 });
 export type PoolEntry = z.infer<typeof PoolEntrySchema>;
 
-/**
- * Collision-safe canonical key for a Pool entry. Prefer this over delimiter
- * concatenation so model/variant values cannot collide across encoding.
- */
+export const BenchmarkPairSchema = PoolEntrySchema.extend({
+  variant: z.string().trim().min(1).nullable(),
+});
+export type BenchmarkPair = z.infer<typeof BenchmarkPairSchema>;
+
 export function poolEntryKey(entry: PoolEntry): string {
+  return JSON.stringify([entry.model]);
+}
+
+export function benchmarkPairKey(entry: BenchmarkPair): string {
   return JSON.stringify([entry.model, entry.variant]);
 }
 
@@ -40,10 +39,7 @@ function addDuplicatePoolEntryIssues(entries: PoolEntry[], ctx: z.RefinementCtx)
   });
 }
 
-/**
- * Owner-configured Efficient model pool: 1–10 unique exact (model, variant)
- * pairs. A null configured pool means inherit; an empty array is invalid.
- */
+/** Owner-configured pool of unique models; null inherits the platform pool. */
 export const EfficientModelPoolSchema = z
   .array(PoolEntrySchema)
   .min(1)
@@ -52,6 +48,11 @@ export const EfficientModelPoolSchema = z
     addDuplicatePoolEntryIssues(entries, ctx);
   });
 export type EfficientModelPool = z.infer<typeof EfficientModelPoolSchema>;
+
+export const PersistedEfficientModelPoolSchema = z
+  .array(PoolEntrySchema)
+  .transform(entries => [...new Map(entries.map(entry => [entry.model, entry])).values()])
+  .pipe(EfficientModelPoolSchema);
 
 export const CandidatePricingSchema = z.object({
   promptUsdPerToken: z.number().nonnegative(),
@@ -78,7 +79,6 @@ export function estimateRequestCostUsd(
       (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken)
   );
 }
-
 /**
  * Reader precedence for candidate variant identity: prefer `variant`; when
  * absent, a valid legacy `reasoningEffort` string may be interpreted as the

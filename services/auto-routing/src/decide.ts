@@ -83,9 +83,9 @@ async function loadCustomRoutingTable(
   let cache = customTableLoaders.get(key);
   if (!cache) {
     const poolSnapshot = pool;
-    cache = ttlCached(CUSTOM_ROUTING_TABLE_CACHE_TTL_MS, async (e: Env) => {
-      return fetchCustomRoutingTable(e, poolSnapshot);
-    });
+    cache = ttlCached(CUSTOM_ROUTING_TABLE_CACHE_TTL_MS, (e: Env) =>
+      fetchCustomRoutingTable(e, poolSnapshot)
+    );
     customTableLoaders.set(key, cache);
   }
   return cache.get(env).catch((error: unknown) => {
@@ -412,8 +412,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   const constraints: RoutingConstraints | undefined = payload.constraints;
 
   const routingPrerequisites = (async () => {
-    // Resolve settings before the single capability load so custom-pool
-    // model ids are included. Classification does not depend on either.
     const settingsStartedAt = performance.now();
     const effectiveSettings = await getEffectiveAutoRoutingSettings(c.env, {
       userId: payload.userId,
@@ -421,18 +419,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     });
     timings.settingsMs = performance.now() - settingsStartedAt;
     const configuredPool = router === 'efficient' ? effectiveSettings.pool : null;
-    let capabilities: ModelCapabilitiesMap = new Map();
-    if (hasConstraints || configuredPool !== null) {
-      const capabilitiesStartedAt = performance.now();
-      capabilities = await getModelCapabilities(c.env, {
-        router,
-        waitUntil: promise => c.executionCtx.waitUntil(promise),
-        ...(configuredPool !== null
-          ? { additionalModelIds: configuredPool.map(entry => entry.model) }
-          : {}),
-      });
-      timings.capabilitiesMs = performance.now() - capabilitiesStartedAt;
-    }
 
     const tableStartedAt = performance.now();
     const [routingTable, shadowRoutingTable] = await Promise.all([
@@ -442,6 +428,26 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       router === 'efficient' ? getShadowRoutingTable(c.env) : null,
     ]);
     timings.tableMs = performance.now() - tableStartedAt;
+    let capabilities: ModelCapabilitiesMap = new Map();
+    if (hasConstraints || configuredPool !== null) {
+      const capabilitiesStartedAt = performance.now();
+      capabilities = await getModelCapabilities(c.env, {
+        router,
+        waitUntil: promise => c.executionCtx.waitUntil(promise),
+        ...(configuredPool !== null
+          ? {
+              additionalModelIds: [
+                ...new Set(
+                  Object.values(routingTable?.routes ?? {}).flatMap(candidates =>
+                    candidates.map(candidate => candidate.model)
+                  )
+                ),
+              ],
+            }
+          : {}),
+      });
+      timings.capabilitiesMs = performance.now() - capabilitiesStartedAt;
+    }
     return {
       configuredPool,
       routingMode: effectiveSettings.mode,

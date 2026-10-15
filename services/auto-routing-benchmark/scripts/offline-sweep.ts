@@ -3,7 +3,7 @@ import { readFile, rename, writeFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import * as z from 'zod';
-import { PoolEntrySchema, poolEntryKey } from '@kilocode/auto-routing-contracts';
+import { BenchmarkPairSchema, benchmarkPairKey } from '@kilocode/auto-routing-contracts';
 import type { DeciderCase } from '../src/datasets/decider-cases';
 import { materializeLongContext } from '../src/datasets/long-context';
 import { parseKiloRunEvents } from '../src/kilo-events';
@@ -109,10 +109,10 @@ async function main() {
     'X-Title': OPENROUTER_APP_TITLE,
   };
   const pairs = z
-    .array(PoolEntrySchema)
+    .array(BenchmarkPairSchema)
     .min(1)
     .parse(JSON.parse(await readFile(values.pairs, 'utf8')));
-  const pairKeys = new Set(pairs.map(poolEntryKey));
+  const pairKeys = new Set(pairs.map(benchmarkPairKey));
   if (pairKeys.size !== pairs.length) throw new Error('Pairs must be unique');
   const catalogPath = values.catalog ?? 'live';
   let catalog: z.infer<typeof catalogSchema>;
@@ -131,7 +131,7 @@ async function main() {
     if (!model) throw new Error(`Model missing from catalog: ${pair.model}`);
     if (pair.variant === null) return {};
     const fragment = model.opencode?.variants?.[pair.variant];
-    if (!fragment) throw new Error(`Variant missing from catalog: ${poolEntryKey(pair)}`);
+    if (!fragment) throw new Error(`Variant missing from catalog: ${benchmarkPairKey(pair)}`);
     return fragment;
   });
   const previous = values.resume
@@ -143,11 +143,11 @@ async function main() {
   if (
     previous &&
     (previous.pairs.length !== pairs.length ||
-      previous.pairs.some(pair => !pairKeys.has(poolEntryKey(pair))))
+      previous.pairs.some(pair => !pairKeys.has(benchmarkPairKey(pair))))
   ) {
     throw new Error('Resume sweep must have the same model/variant pairs');
   }
-  const previousPairs = new Map(previous?.pairs.map(pair => [poolEntryKey(pair), pair]) ?? []);
+  const previousPairs = new Map(previous?.pairs.map(pair => [benchmarkPairKey(pair), pair]) ?? []);
   const sweep: OfflineSweep = {
     startedAt: previous?.startedAt ?? new Date().toISOString(),
     suite,
@@ -156,7 +156,7 @@ async function main() {
     graderCostUsd: previous?.graderCostUsd ?? 0,
     pairs: pairs.map(pair => ({
       ...pair,
-      results: previousPairs.get(poolEntryKey(pair))?.results ?? [],
+      results: previousPairs.get(benchmarkPairKey(pair))?.results ?? [],
     })),
     summaries: [],
   };

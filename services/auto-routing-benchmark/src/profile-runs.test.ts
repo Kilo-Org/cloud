@@ -846,6 +846,83 @@ describe('sweepStaleRunsAndDrain', () => {
   });
 });
 
+describe('alias-resolved platform publication', () => {
+  it('publishes concrete pairs with their concrete catalog prices', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      config: configRow,
+      classifierModels: ['classifier/a'],
+      deciderModels: [
+        { model: '~vendor/latest', variant: null, reasoning_effort: null },
+        { model: 'vendor/current', variant: null, reasoning_effort: null },
+      ],
+    });
+    catalogFetch.mockImplementation(async () =>
+      Response.json({
+        data: [
+          {
+            id: '~vendor/latest',
+            alias_target: 'vendor/current',
+            pricing: { prompt: '0.01', completion: '0.02' },
+          },
+          { id: 'vendor/current', pricing: { prompt: '0.001', completion: '0.002' } },
+        ],
+      })
+    );
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'vendor/current', variant: '', run_id: 'concrete-run' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model: 'vendor/current',
+        variant: null,
+        runId: 'concrete-run',
+        routeKey,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+        accuracy: 0.9,
+        avgCostUsd: 0.001,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        p50TtftMs: null,
+      }))
+    );
+
+    await publishPlatformRoutingTable(env, catalogFetch);
+
+    expect(syncPlatformRegistryRows).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), [
+      { model: 'vendor/current', variant: null },
+    ]);
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      [{ model: 'vendor/current', variant: null }]
+    );
+    expect(saveRoutingTable).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({
+        routes: expect.objectContaining({
+          [TAXONOMY_ROUTE_KEYS[0]]: [
+            expect.objectContaining({
+              model: 'vendor/current',
+              variant: null,
+              pricing: {
+                promptUsdPerToken: 0.001,
+                completionUsdPerToken: 0.002,
+                cacheReadUsdPerToken: null,
+              },
+            }),
+          ],
+        }),
+      }),
+      expect.any(String),
+      'efficient'
+    );
+  });
+});
+
 describe('frontier router runs', () => {
   it('snapshots the router, uses its container budget, and queues only frontier cases', async () => {
     mockConfig({ router: 'frontier', frontier_min_accuracy_delta: 0.1 });

@@ -2,6 +2,7 @@
 
 import {
   AutoRoutingModeSchema,
+  getReasoningVariantKeys,
   isVirtualAutoModelId,
   MAX_POOL_ENTRIES,
   poolEntryKey,
@@ -19,7 +20,6 @@ import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { PoolModalityWarning } from './PoolModalityWarning';
 import { computePoolModalityCoverage } from '@/lib/auto-routing-pool-modality';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -92,7 +92,7 @@ export const ORGANIZATION_EMPTY_POOL_COPY =
   'No organization override. Members use their personal pool, or the platform model pool if they have none.';
 
 export const UNAVAILABLE_ENTRY_EXPLANATION =
-  'This model or variant is no longer available in your catalog and cannot be used for routing.';
+  'This model is no longer available in your catalog and cannot be used for routing.';
 
 export const SETTINGS_POLL_INTERVAL_MS = 15_000;
 
@@ -154,20 +154,12 @@ const modeOptions: Array<{ value: AutoRoutingMode; label: string; description: s
   },
 ];
 
-export function findStatusForEntry(
-  entry: PoolEntry,
-  poolStatuses: BenchmarkProfileEntryStatus[]
-): BenchmarkProfileEntryStatus | undefined {
-  const key = poolEntryKey(entry);
-  return poolStatuses.find(status => poolEntryKey(status.entry) === key);
-}
-
 export function mapPoolEntryDisplayStatus(params: {
   entry: PoolEntry;
   unavailable?: boolean;
   poolStatuses: BenchmarkProfileEntryStatus[];
-  /** When false, the pair exists only in the local draft and has no saved status. */
   isSaved?: boolean;
+  supportedEffortCount?: number;
 }): PoolEntryDisplayStatus {
   if (params.isSaved === false) {
     return { kind: 'not_saved', label: NOT_SAVED_ENTRY_LABEL };
@@ -181,16 +173,17 @@ export function mapPoolEntryDisplayStatus(params: {
     };
   }
 
-  const status = findStatusForEntry(params.entry, params.poolStatuses);
-  if (!status || status.status === 'pending' || status.status === 'running') {
+  const statuses = params.poolStatuses.filter(status => status.entry.model === params.entry.model);
+  if (
+    statuses.length === 0 ||
+    statuses.length < (params.supportedEffortCount ?? 0) ||
+    statuses.some(status => status.status === 'pending' || status.status === 'running')
+  ) {
     return { kind: 'benchmarking', label: 'Benchmarking' };
   }
-  if (status.status === 'failed') {
-    return {
-      kind: 'failed',
-      label: 'Failed',
-      failureReason: status.failureReason ?? null,
-    };
+  const failed = statuses.find(status => status.status === 'failed');
+  if (failed) {
+    return { kind: 'failed', label: 'Failed', failureReason: failed.failureReason ?? null };
   }
   return { kind: 'ready', label: 'Ready' };
 }
@@ -259,10 +252,16 @@ export function resolveEditableChrome(params: {
   };
 }
 
-/** True when any saved (non-unavailable) entry is still pending/running. */
+export function supportedBenchmarkEffortCount(
+  variants: Parameters<typeof getReasoningVariantKeys>[0]
+): number {
+  return Math.max(1, getReasoningVariantKeys(variants).length);
+}
+
 export function hasBenchmarkingEntries(
   configuredPool: PoolEntryWithAvailability[] | null,
-  poolStatuses: BenchmarkProfileEntryStatus[]
+  poolStatuses: BenchmarkProfileEntryStatus[],
+  supportedEffortCounts: Readonly<Record<string, number>> = {}
 ): boolean {
   if (!configuredPool || configuredPool.length === 0) return false;
   return configuredPool.some(entry => {
@@ -271,6 +270,7 @@ export function hasBenchmarkingEntries(
       entry,
       unavailable: entry.unavailable,
       poolStatuses,
+      supportedEffortCount: supportedEffortCounts[entry.model],
     });
     return display.kind === 'benchmarking';
   });
@@ -282,11 +282,12 @@ export function hasBenchmarkingEntries(
  * Never poll when the worker does not support pools (legacy fallback).
  */
 export function settingsRefetchInterval(
-  data: AutoRoutingSettingsApiResponse | undefined
+  data: AutoRoutingSettingsApiResponse | undefined,
+  supportedEffortCounts: Readonly<Record<string, number>> = {}
 ): number | false {
   if (!data) return false;
   if (data.poolSupported === false) return false;
-  return hasBenchmarkingEntries(data.configuredPool, data.poolStatuses)
+  return hasBenchmarkingEntries(data.configuredPool, data.poolStatuses, supportedEffortCounts)
     ? SETTINGS_POLL_INTERVAL_MS
     : false;
 }
@@ -320,7 +321,7 @@ export function buildRetryBody(params: {
   mode: ModeSelection;
   savedPool: PoolEntry[];
   retryEntry: PoolEntry;
-}): { mode: AutoRoutingMode | null; pool: PoolEntry[]; retryEntries: PoolEntry[] } {
+}): { mode: AutoRoutingMode | null; pool: PoolEntry[]; retryEntries: [PoolEntry] } {
   return {
     mode: params.mode === 'inherit' ? null : params.mode,
     pool: params.savedPool,
@@ -332,42 +333,20 @@ export type AddPoolEntryResult =
   | { ok: true; pool: PoolEntry[] }
   | {
       ok: false;
-      reason: 'duplicate' | 'missing_variant' | 'pool_full' | 'no_model';
+      reason: 'duplicate' | 'pool_full' | 'no_model';
       message: string;
     };
 
 export function tryAddPoolEntry(params: {
   draftPool: DraftPool;
   modelId: string | undefined;
-  variant: string | null | undefined;
-  modelVariants: string[] | undefined;
 }): AddPoolEntryResult {
   const modelId = params.modelId?.trim();
   if (!modelId) {
     return { ok: false, reason: 'no_model', message: 'Choose a model to add.' };
   }
 
-  const hasVariants = (params.modelVariants?.length ?? 0) > 0;
-  const variant =
-    params.variant === undefined || params.variant === null || params.variant === ''
-      ? null
-      : params.variant;
-
-  if (hasVariants && variant === null) {
-    return {
-      ok: false,
-      reason: 'missing_variant',
-      message: 'Choose a variant for this model.',
-    };
-  }
-  if (!hasVariants && variant !== null) {
-    // Models without variants always store null.
-  }
-
-  const entry: PoolEntry = {
-    model: modelId,
-    variant: hasVariants ? variant : null,
-  };
+  const entry: PoolEntry = { model: modelId };
 
   const current = params.draftPool ?? [];
   if (current.length >= MAX_POOL_ENTRIES) {
@@ -383,7 +362,7 @@ export function tryAddPoolEntry(params: {
     return {
       ok: false,
       reason: 'duplicate',
-      message: 'That model and variant pair is already in the pool.',
+      message: 'That model is already in the pool.',
     };
   }
 
@@ -465,16 +444,7 @@ export function toEligibleModelOptions(
         variants: variantKeys.length > 0 ? variantKeys : undefined,
       };
     })
-    .filter(model => {
-      // Keep models that still have at least one (model, variant) pair not in the draft.
-      // Models with no variants are excluded only when the null-variant pair is already drafted.
-      if (!model.variants || model.variants.length === 0) {
-        return !draftKeys.has(poolEntryKey({ model: model.id, variant: null }));
-      }
-      return model.variants.some(
-        variant => !draftKeys.has(poolEntryKey({ model: model.id, variant }))
-      );
-    });
+    .filter(model => !draftKeys.has(poolEntryKey({ model: model.id })));
 }
 
 export function formatSaveErrorMessage(body: unknown, status: number): string {
@@ -584,7 +554,7 @@ export function applyRetryMutationSuccess(params: {
 
 function savedPoolSnapshot(configuredPool: PoolEntryWithAvailability[] | null): DraftPool {
   if (!configuredPool) return null;
-  return configuredPool.map(({ model, variant }) => ({ model, variant }));
+  return [...new Map(configuredPool.map(({ model }) => [model, { model }])).values()];
 }
 
 function availabilityByKey(
@@ -680,26 +650,37 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
   const addErrorId = `${idPrefix}-add-error`;
   const loadErrorId = `${idPrefix}-load-error`;
   const saveErrorId = `${idPrefix}-save-error`;
+  const retryErrorId = `${idPrefix}-retry-error`;
   const addModelSectionRef = useRef<HTMLDivElement>(null);
+
+  const modelsQuery = useModelSelectorList(organizationId);
+  const supportedEffortCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        (modelsQuery.data?.data ?? []).map(model => [
+          model.id,
+          supportedBenchmarkEffortCount(model.opencode?.variants),
+        ])
+      ),
+    [modelsQuery.data]
+  );
 
   const query = useQuery({
     queryKey,
     queryFn: () => fetchSettings(organizationId),
-    refetchInterval: query => settingsRefetchInterval(query.state.data),
+    refetchInterval: query => settingsRefetchInterval(query.state.data, supportedEffortCounts),
     refetchOnWindowFocus: true,
   });
-
-  const modelsQuery = useModelSelectorList(organizationId);
 
   // Local draft overrides. `undefined` means "follow the latest server snapshot".
   // Polls/refetches update statuses via query.data without touching these.
   const [modeOverride, setModeOverride] = useState<ModeSelection | undefined>(undefined);
   const [poolOverride, setPoolOverride] = useState<DraftPool | undefined>(undefined);
   const [addModelId, setAddModelId] = useState<string | undefined>(undefined);
-  const [addVariant, setAddVariant] = useState<string | undefined>(undefined);
   const [addError, setAddError] = useState<string | null>(null);
   const [showAddFlow, setShowAddFlow] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<{ entry: PoolEntry; message: string } | null>(null);
   const [retryingKey, setRetryingKey] = useState<string | null>(null);
   // After a successful save, drop overrides once the query reflects the new snapshot.
   const clearOverridesAfterSaveRef = useRef(false);
@@ -796,9 +777,10 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     mutationFn: (payload: {
       mode: AutoRoutingMode | null;
       pool: PoolEntry[];
-      retryEntries: PoolEntry[];
+      retryEntries: [PoolEntry];
     }) => putSettings(organizationId, payload),
     onSuccess: data => {
+      setRetryError(null);
       applyRetryMutationSuccess({
         queryClient,
         queryKey,
@@ -807,9 +789,10 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
         toastSuccess: message => toast.success(message),
       });
     },
-    onError: error => {
+    onError: (error, payload) => {
       setRetryingKey(null);
       const message = error instanceof Error ? error.message : 'Failed to retry benchmark';
+      setRetryError({ entry: payload.retryEntries[0], message });
       toast.error(message);
     },
   });
@@ -832,10 +815,6 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
       }),
     [draftPool, catalogModels]
   );
-
-  const selectedAddModel = eligibleModels.find(model => model.id === addModelId);
-  const addModelVariants = selectedAddModel?.variants ?? [];
-
   const resetOption = unsetModeOption(organizationId);
   const selectedOption =
     selectedMode === 'inherit'
@@ -871,8 +850,6 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     const result = tryAddPoolEntry({
       draftPool,
       modelId: addModelId,
-      variant: addVariant,
-      modelVariants: addModelVariants,
     });
     if (!result.ok) {
       setAddError(result.message);
@@ -880,7 +857,6 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     }
     setPoolOverride(result.pool);
     setAddModelId(undefined);
-    setAddVariant(undefined);
     setAddError(null);
     setShowAddFlow(false);
   };
@@ -919,6 +895,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
 
   const handleRetryBenchmark = (entry: PoolEntry) => {
     if (!savedPool) return;
+    setRetryError(null);
     setRetryingKey(poolEntryKey(entry));
     retryMutation.mutate(
       buildRetryBody({
@@ -1026,7 +1003,8 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
               <h3 className="text-sm font-medium">Efficient model pool</h3>
               {poolSupported ? (
                 <p id={poolHelpId} className="text-muted-foreground text-sm">
-                  Up to {MAX_POOL_ENTRIES} exact model and variant pairs. Leave empty to inherit.
+                  Up to {MAX_POOL_ENTRIES} models. Every supported effort is benchmarked. Leave
+                  empty to inherit.
                 </p>
               ) : null}
             </div>
@@ -1092,11 +1070,16 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
                 const unavailable = availabilityMap.get(poolEntryKey(entry)) ?? false;
                 const isSaved =
                   savedPool?.some(saved => poolEntryKey(saved) === poolEntryKey(entry)) ?? false;
+                const model = modelsQuery.data?.data.find(model => model.id === entry.model);
+                const supportedEfforts = model
+                  ? supportedBenchmarkEffortCount(model.opencode?.variants)
+                  : poolStatuses.filter(status => status.entry.model === entry.model).length;
                 const display = mapPoolEntryDisplayStatus({
                   entry,
                   unavailable,
                   poolStatuses,
                   isSaved,
+                  supportedEffortCount: supportedEfforts,
                 });
 
                 return (
@@ -1109,8 +1092,25 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
                     <div className="min-w-0 space-y-1">
                       <p className="truncate font-mono text-sm">{entry.model}</p>
                       <p className="text-muted-foreground text-sm">
-                        Variant: {variantLabel(entry.variant)}
+                        {
+                          poolStatuses.filter(
+                            status =>
+                              status.entry.model === entry.model && status.status === 'ready'
+                          ).length
+                        }
+                        {' of '}
+                        {supportedEfforts}
+                        {' efforts ready'}
                       </p>
+                      <ul className="text-muted-foreground space-y-1 text-xs">
+                        {poolStatuses
+                          .filter(status => status.entry.model === entry.model)
+                          .map(status => (
+                            <li key={status.entry.variant ?? 'default'}>
+                              {variantLabel(status.entry.variant)}: {status.status}
+                            </li>
+                          ))}
+                      </ul>
                       <p className="text-sm" data-status={display.kind}>
                         <span
                           className={cn(
@@ -1157,7 +1157,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
                           size="icon"
                           className="size-8 shrink-0"
                           disabled={controlsDisabled}
-                          aria-label={`Remove ${entry.model} ${variantLabel(entry.variant)} from pool`}
+                          aria-label={`Remove ${entry.model} from pool`}
                           onClick={() => handleRemove(entry)}
                         >
                           <Trash2 className="size-4" aria-hidden />
@@ -1186,7 +1186,6 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
                     setShowAddFlow(false);
                     setAddError(null);
                     setAddModelId(undefined);
-                    setAddVariant(undefined);
                   }}
                 >
                   <X className="size-4" aria-hidden />
@@ -1200,7 +1199,6 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
                     value={addModelId}
                     onValueChange={value => {
                       setAddModelId(value);
-                      setAddVariant(undefined);
                       setAddError(null);
                     }}
                     isLoading={modelsQuery.isLoading}
@@ -1209,21 +1207,6 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
                     error={addError && !addModelId ? addError : undefined}
                   />
                 </div>
-                {addModelVariants.length > 0 ? (
-                  <div className="space-y-2 sm:w-44">
-                    <Label>Variant</Label>
-                    <VariantCombobox
-                      variants={addModelVariants}
-                      value={addVariant}
-                      onValueChange={value => {
-                        setAddVariant(value);
-                        setAddError(null);
-                      }}
-                      disabled={controlsDisabled || !addModelId}
-                      className="w-full"
-                    />
-                  </div>
-                ) : null}
                 <Button
                   type="button"
                   size="sm"
@@ -1243,6 +1226,26 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
             </div>
           ) : null}
         </div>
+
+        {retryError ? (
+          <Alert variant="destructive" id={retryErrorId}>
+            <AlertTitle>Could not retry benchmark</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>{retryError.message}</span>
+              {!readonly ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={controlsDisabled || retryMutation.isPending}
+                  onClick={() => handleRetryBenchmark(retryError.entry)}
+                >
+                  Retry benchmark
+                </Button>
+              ) : null}
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
         {saveError ? (
           <Alert variant="destructive" id={saveErrorId}>

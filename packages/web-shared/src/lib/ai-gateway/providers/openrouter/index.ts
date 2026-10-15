@@ -20,6 +20,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+import { withReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { AUTO_MODELS, type AutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -85,7 +86,7 @@ export function buildAutoModelCatalogEntry(m: AutoModel): OpenRouterModel {
     },
     context_length: m.context_length,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
-    opencode: m.opencode_settings,
+    opencode: m.opencode_settings && withReasoningOptions(m.opencode_settings),
   };
 }
 
@@ -145,7 +146,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           !unavailableModelIds.has(model.id) &&
           !model.id.endsWith(':batch')
       )
-      .map(model => {
+      .map((model): OpenRouterModel => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);
         const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
         const rawPricing = !preferredProvider
@@ -158,10 +159,14 @@ async function enhancedModelList(models: OpenRouterModel[]) {
             )?.pricing);
         const pricing = getModelDisplayPricing(rawPricing);
         const terminalBench = terminalBenchFor(summaries, model.id);
+        const aliasTarget = model.id.startsWith('~')
+          ? endpointsMetadata[model.id]?.alias_target?.slug
+          : undefined;
         return {
           ...model,
           ...(pricing && { pricing }),
           ...(terminalBench && { terminalBench }),
+          alias_target: aliasTarget,
         };
       })
       .concat(
@@ -179,6 +184,12 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
           : model.description;
         const isFree = isFreeModel(model.id);
+        const opencode =
+          model.opencode ??
+          (await getGatewayOpenCodeSettings(
+            model.id,
+            model.supported_parameters?.includes('reasoning') ?? false
+          ));
         return {
           ...model,
           name: formatName(model, preferredIndex),
@@ -187,12 +198,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           isFree: model.isFree ?? isFree,
           mayTrainOnYourPrompts:
             model.mayTrainOnYourPrompts ?? (isFree || dataCollectionRequiredModelIds.has(model.id)),
-          opencode:
-            model.opencode ??
-            (await getGatewayOpenCodeSettings(
-              model.id,
-              model.supported_parameters?.includes('reasoning') ?? false
-            )),
+          opencode: opencode && withReasoningOptions(opencode),
           architecture: addPdf
             ? {
                 ...model.architecture,

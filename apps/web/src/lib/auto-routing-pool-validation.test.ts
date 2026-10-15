@@ -75,7 +75,7 @@ describe('auto-routing-pool-validation', () => {
   });
 
   describe('validatePoolEntries', () => {
-    test('accepts eligible managed model with required catalog variant', async () => {
+    test('accepts eligible managed model whose efforts come from the catalog', async () => {
       mockedGetEnhanced.mockResolvedValue({
         data: [
           model('anthropic/claude-sonnet-4', {
@@ -88,16 +88,16 @@ describe('auto-routing-pool-validation', () => {
       const result = await validatePoolEntries({
         user: { id: 'user-1' },
         organizationId: null,
-        entries: [{ model: 'anthropic/claude-sonnet-4', variant: ' high ' }],
+        entries: [{ model: 'anthropic/claude-sonnet-4' }],
       });
 
       expect(result).toEqual({
         ok: true,
-        entries: [{ model: 'anthropic/claude-sonnet-4', variant: 'high' }],
+        entries: [{ model: 'anthropic/claude-sonnet-4' }],
       });
     });
 
-    test('accepts model with no variants when variant is null', async () => {
+    test('accepts a model with no reasoning variants', async () => {
       mockedGetEnhanced.mockResolvedValue({
         data: [model('google/gemini-2.5-flash')],
       });
@@ -105,16 +105,16 @@ describe('auto-routing-pool-validation', () => {
       const result = await validatePoolEntries({
         user: { id: 'user-1' },
         organizationId: null,
-        entries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        entries: [{ model: 'google/gemini-2.5-flash' }],
       });
 
       expect(result).toEqual({
         ok: true,
-        entries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        entries: [{ model: 'google/gemini-2.5-flash' }],
       });
     });
 
-    test('allows same model with different variants', async () => {
+    test('rejects duplicate models even when they support multiple efforts', async () => {
       mockedGetEnhanced.mockResolvedValue({
         data: [
           model('anthropic/claude-sonnet-4', {
@@ -127,13 +127,13 @@ describe('auto-routing-pool-validation', () => {
       const result = await validatePoolEntries({
         user: { id: 'user-1' },
         organizationId: null,
-        entries: [
-          { model: 'anthropic/claude-sonnet-4', variant: 'low' },
-          { model: 'anthropic/claude-sonnet-4', variant: 'high' },
-        ],
+        entries: [{ model: 'anthropic/claude-sonnet-4' }, { model: 'anthropic/claude-sonnet-4' }],
       });
 
-      expect(result.ok).toBe(true);
+      expect(result).toEqual({
+        ok: false,
+        error: expect.objectContaining({ reason: 'duplicate_model' }),
+      });
     });
 
     test('rejects virtual auto model ids', async () => {
@@ -144,7 +144,7 @@ describe('auto-routing-pool-validation', () => {
       const result = await validatePoolEntries({
         user: { id: 'user-1' },
         organizationId: null,
-        entries: [{ model: 'kilo-auto/efficient', variant: null }],
+        entries: [{ model: 'kilo-auto/efficient' }],
       });
 
       expect(result).toEqual({
@@ -164,7 +164,7 @@ describe('auto-routing-pool-validation', () => {
       const result = await validatePoolEntries({
         user: { id: 'user-1' },
         organizationId: null,
-        entries: [{ model: 'kilo/hidden-model', variant: null }],
+        entries: [{ model: 'kilo/hidden-model' }],
       });
 
       expect(result).toEqual({
@@ -183,7 +183,7 @@ describe('auto-routing-pool-validation', () => {
       const result = await validatePoolEntries({
         user: { id: 'user-1' },
         organizationId: null,
-        entries: [{ model: 'openai-codex/gpt-5', variant: null }],
+        entries: [{ model: 'openai-codex/gpt-5' }],
       });
 
       expect(result).toEqual({
@@ -206,7 +206,7 @@ describe('auto-routing-pool-validation', () => {
       const result = await validatePoolEntries({
         user: { id: 'user-1' },
         organizationId: 'org-1',
-        entries: [{ model: 'openai/gpt-4o', variant: null }],
+        entries: [{ model: 'openai/gpt-4o' }],
       });
 
       expect(mockedGetByokOrg).toHaveBeenCalledWith('org-1');
@@ -225,7 +225,7 @@ describe('auto-routing-pool-validation', () => {
       const result = await validatePoolEntries({
         user: { id: 'user-1' },
         organizationId: null,
-        entries: [{ model: 'totally/unknown', variant: null }],
+        entries: [{ model: 'totally/unknown' }],
       });
 
       expect(result).toEqual({
@@ -237,7 +237,7 @@ describe('auto-routing-pool-validation', () => {
       });
     });
 
-    test('rejects missing variant when model exposes variants', async () => {
+    test('rejects duplicate models', async () => {
       mockedGetEnhanced.mockResolvedValue({
         data: [model('anthropic/claude-sonnet-4', { high: {} })],
       });
@@ -245,77 +245,14 @@ describe('auto-routing-pool-validation', () => {
       const result = await validatePoolEntries({
         user: { id: 'user-1' },
         organizationId: null,
-        entries: [{ model: 'anthropic/claude-sonnet-4', variant: null }],
+        entries: [{ model: 'anthropic/claude-sonnet-4' }, { model: 'anthropic/claude-sonnet-4' }],
       });
 
       expect(result).toEqual({
         ok: false,
         error: expect.objectContaining({
-          reason: 'missing_variant',
-          message: poolValidationMessage('missing_variant'),
-        }),
-      });
-    });
-
-    test('rejects unknown variant keys', async () => {
-      mockedGetEnhanced.mockResolvedValue({
-        data: [model('anthropic/claude-sonnet-4', { high: {} })],
-      });
-
-      const result = await validatePoolEntries({
-        user: { id: 'user-1' },
-        organizationId: null,
-        entries: [{ model: 'anthropic/claude-sonnet-4', variant: 'max' }],
-      });
-
-      expect(result).toEqual({
-        ok: false,
-        error: expect.objectContaining({
-          reason: 'unknown_variant',
-          message: poolValidationMessage('unknown_variant'),
-        }),
-      });
-    });
-
-    test('rejects unexpected variant when model exposes none', async () => {
-      mockedGetEnhanced.mockResolvedValue({
-        data: [model('google/gemini-2.5-flash')],
-      });
-
-      const result = await validatePoolEntries({
-        user: { id: 'user-1' },
-        organizationId: null,
-        entries: [{ model: 'google/gemini-2.5-flash', variant: 'high' }],
-      });
-
-      expect(result).toEqual({
-        ok: false,
-        error: expect.objectContaining({
-          reason: 'unexpected_variant',
-          message: poolValidationMessage('unexpected_variant'),
-        }),
-      });
-    });
-
-    test('rejects duplicate exact pairs', async () => {
-      mockedGetEnhanced.mockResolvedValue({
-        data: [model('anthropic/claude-sonnet-4', { high: {} })],
-      });
-
-      const result = await validatePoolEntries({
-        user: { id: 'user-1' },
-        organizationId: null,
-        entries: [
-          { model: 'anthropic/claude-sonnet-4', variant: 'high' },
-          { model: 'anthropic/claude-sonnet-4', variant: 'high' },
-        ],
-      });
-
-      expect(result).toEqual({
-        ok: false,
-        error: expect.objectContaining({
-          reason: 'duplicate_pair',
-          message: poolValidationMessage('duplicate_pair'),
+          reason: 'duplicate_model',
+          message: poolValidationMessage('duplicate_model'),
         }),
       });
     });
@@ -326,10 +263,7 @@ describe('auto-routing-pool-validation', () => {
       });
 
       // Length is checked before catalog/duplicate logic.
-      const entries = Array.from({ length: 11 }, () => ({
-        model: 'google/gemini-2.5-flash',
-        variant: null as null,
-      }));
+      const entries = Array.from({ length: 11 }, () => ({ model: 'google/gemini-2.5-flash' }));
 
       const result = await validatePoolEntries({
         user: { id: 'user-1' },
@@ -372,14 +306,12 @@ describe('auto-routing-pool-validation', () => {
           'anthropic/claude-sonnet-4',
           {
             id: 'anthropic/claude-sonnet-4',
-            variantKeys: new Set(['high', 'low']),
           },
         ],
         [
           'google/gemini-2.5-flash',
           {
             id: 'google/gemini-2.5-flash',
-            variantKeys: null,
           },
         ],
       ]),
@@ -397,18 +329,16 @@ describe('auto-routing-pool-validation', () => {
       const annotated = annotatePoolAvailability({
         catalog,
         entries: [
-          { model: 'anthropic/claude-sonnet-4', variant: 'high' },
-          { model: 'anthropic/claude-sonnet-4', variant: 'max' },
-          { model: 'removed/model', variant: null },
-          { model: 'google/gemini-2.5-flash', variant: null },
+          { model: 'anthropic/claude-sonnet-4' },
+          { model: 'removed/model' },
+          { model: 'google/gemini-2.5-flash' },
         ],
       });
 
       expect(annotated).toEqual([
-        { model: 'anthropic/claude-sonnet-4', variant: 'high', unavailable: false },
-        { model: 'anthropic/claude-sonnet-4', variant: 'max', unavailable: true },
-        { model: 'removed/model', variant: null, unavailable: true },
-        { model: 'google/gemini-2.5-flash', variant: null, unavailable: false },
+        { model: 'anthropic/claude-sonnet-4', unavailable: false },
+        { model: 'removed/model', unavailable: true },
+        { model: 'google/gemini-2.5-flash', unavailable: false },
       ]);
     });
   });

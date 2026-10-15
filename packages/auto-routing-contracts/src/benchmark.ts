@@ -2,6 +2,7 @@ import * as z from 'zod';
 import {
   CustomRoutingTableSchema,
   EfficientModelPoolSchema,
+  BenchmarkPairSchema,
   PoolEntrySchema,
   poolEntryKey,
   RoutingTableSchema,
@@ -346,13 +347,13 @@ export const ClassifierWinnerResponseSchema = z.object({
 });
 export type ClassifierWinnerResponse = z.infer<typeof ClassifierWinnerResponseSchema>;
 
-// --- Benchmark profile registry (global per Pool entry + engine) ---
+// Benchmark profile registry (global per exact measurement pair + engine).
 
 /** Bounded failure text stored on failed profile rows. */
 export const BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH = 500;
 
 export const BenchmarkProfileEntryStatusSchema = z.object({
-  entry: PoolEntrySchema,
+  entry: BenchmarkPairSchema,
   status: BenchmarkProfileStatusSchema,
   failureReason: z.string().max(BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH).nullable().optional(),
 });

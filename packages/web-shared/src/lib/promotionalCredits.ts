@@ -112,13 +112,6 @@ export async function grantCreditForCategoryConfig(
   options: GrantCreditOptions,
   promotion: PromoCreditCategoryConfig
 ): Promise<GrantCreditResult> {
-  if (!options.dbOrTx) {
-    return await db.transaction(tx =>
-      grantCreditForCategoryConfig(entity, { ...options, dbOrTx: tx }, promotion)
-    );
-  }
-  const dbOrTx = options.dbOrTx;
-
   const user = entity.user;
   const organization_id = entity.organization?.id;
   if (options.counts_as_selfservice && !promotion.is_user_selfservicable) {
@@ -130,7 +123,10 @@ export async function grantCreditForCategoryConfig(
   }
 
   if (typeof promotion.total_redemptions_allowed === 'number') {
-    const totalRedemptions = await getTotalRedemptions(dbOrTx, promotion.credit_category);
+    const totalRedemptions = await getTotalRedemptions(
+      options.dbOrTx ?? db,
+      promotion.credit_category
+    );
     if (totalRedemptions >= promotion.total_redemptions_allowed) {
       return {
         success: false,
@@ -193,36 +189,83 @@ export async function grantCreditForCategoryConfig(
         ? new Date(policy.expiry_date)
         : null
       : getEarlierDate(explicit_expiry_date, expiryFromHours);
-    const current = await reconcileCreditExpirationsInTransaction(
-      organization_id
-        ? { type: 'organization', id: organization_id }
-        : { type: 'user', id: user.id },
-      dbOrTx
-    );
-    const baseline = Math.min(current.microdollars_used, current.total_microdollars_acquired);
+    const owner = organization_id
+      ? { type: 'organization' as const, id: organization_id }
+      : { type: 'user' as const, id: user.id };
     const new_credit_transaction_id = crypto.randomUUID();
-    const insertStatementBase = dbOrTx.insert(credit_transactions).values({
-      id: new_credit_transaction_id,
-      kilo_user_id: user.id,
-      organization_id: organization_id,
-      created_by_kilo_user_id: options.created_by_kilo_user_id,
-      is_free: options.creditKind !== 'paid',
-      credit_source: 'promotion',
-      ...policy,
-      amount_microdollars: toMicrodollars(amount_usd),
-      description: description,
-      credit_category: promotion.credit_category,
-      expiry_date: credit_expiry_date?.toISOString() || null,
-      expiration_baseline_microdollars_used: baseline,
-      original_baseline_microdollars_used: current.microdollars_used,
-      check_category_uniqueness: promotion.is_idempotent,
-    });
-    const insertResult = await (promotion.is_idempotent
-      ? insertStatementBase.onConflictDoNothing()
-      : insertStatementBase);
+    const writeGrant = async (tx: DrizzleTransaction) => {
+      const current = await reconcileCreditExpirationsInTransaction(owner, tx);
+      const baseline = Math.min(current.microdollars_used, current.total_microdollars_acquired);
+      const insertStatementBase = tx.insert(credit_transactions).values({
+        id: new_credit_transaction_id,
+        kilo_user_id: user.id,
+        organization_id: organization_id,
+        created_by_kilo_user_id: options.created_by_kilo_user_id,
+        is_free: options.creditKind !== 'paid',
+        credit_source: 'promotion',
+        ...policy,
+        amount_microdollars: toMicrodollars(amount_usd),
+        description: description,
+        credit_category: promotion.credit_category,
+        expiry_date: credit_expiry_date?.toISOString() || null,
+        expiration_baseline_microdollars_used: baseline,
+        original_baseline_microdollars_used: current.microdollars_used,
+        check_category_uniqueness: promotion.is_idempotent,
+      });
+      const insertResult = await (promotion.is_idempotent
+        ? insertStatementBase.onConflictDoNothing()
+        : insertStatementBase);
+      if (insertResult.rowCount === 0) return false;
 
-    // Check if any rows were inserted
-    if (insertResult.rowCount === 0) {
+      if (amount_usd > 0) {
+        await recordRefundDebtRepayment(tx, {
+          owner,
+          transactionId: new_credit_transaction_id,
+          priorAcquired: current.total_microdollars_acquired,
+          priorUsed: current.microdollars_used,
+          amountMicrodollars: toMicrodollars(amount_usd),
+        });
+      }
+
+      if (!organization_id) {
+        await tx
+          .update(kilocode_users)
+          .set({
+            total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${toMicrodollars(amount_usd)}`,
+            // Update next_credit_expiration_at to the earlier of current value and new expiry
+            ...(credit_expiry_date && {
+              next_credit_expiration_at: sql`COALESCE(LEAST(${kilocode_users.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
+            }),
+          })
+          .where(eq(kilocode_users.id, user.id));
+      } else {
+        await tx
+          .update(organizations)
+          .set({
+            total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${toMicrodollars(amount_usd)}`,
+            microdollars_balance: sql`${organizations.microdollars_balance} + ${toMicrodollars(amount_usd)}`,
+            ...(credit_expiry_date && {
+              next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
+            }),
+          })
+          .where(eq(organizations.id, organization_id));
+
+        await createAuditLog({
+          action: 'organization.promo_credit_granted',
+          actor_id: user.id,
+          actor_email: user.google_user_email,
+          actor_name: user.google_user_name,
+          organization_id: organization_id,
+          message: `Granted $${amount_usd} promotional credit: ${description}`,
+          tx,
+        });
+      }
+      return true;
+    };
+    const granted = options.dbOrTx
+      ? await writeGrant(options.dbOrTx)
+      : await db.transaction(writeGrant);
+    if (!granted) {
       return {
         success: false,
         message: promotion.is_idempotent
@@ -230,57 +273,11 @@ export async function grantCreditForCategoryConfig(
           : `FAIL: Code ${promotion.credit_category} not applied to ${entityName}.`,
       };
     }
-    if (amount_usd > 0) {
-      await recordRefundDebtRepayment(dbOrTx, {
-        owner: organization_id
-          ? { type: 'organization', id: organization_id }
-          : { type: 'user', id: user.id },
-        transactionId: new_credit_transaction_id,
-        priorAcquired: current.total_microdollars_acquired,
-        priorUsed: current.microdollars_used,
-        amountMicrodollars: toMicrodollars(amount_usd),
-      });
-    }
     logExceptInTest(
       !organization_id
         ? `Adding ${amount_usd} promotional credits to user ${user.id}, ID: ${new_credit_transaction_id}`
         : `Granting ${amount_usd} promotional credits to organization ${organization_id} for user ${user.id}, ID: ${new_credit_transaction_id}`
     );
-
-    if (!organization_id) {
-      await dbOrTx
-        .update(kilocode_users)
-        .set({
-          total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${toMicrodollars(amount_usd)}`,
-          // Update next_credit_expiration_at to the earlier of current value and new expiry
-          ...(credit_expiry_date && {
-            next_credit_expiration_at: sql`COALESCE(LEAST(${kilocode_users.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
-          }),
-        })
-        .where(eq(kilocode_users.id, user.id));
-    } else {
-      await dbOrTx
-        .update(organizations)
-        .set({
-          total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${toMicrodollars(amount_usd)}`,
-          microdollars_balance: sql`${organizations.microdollars_balance} + ${toMicrodollars(amount_usd)}`,
-          ...(credit_expiry_date && {
-            next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
-          }),
-        })
-        .where(eq(organizations.id, organization_id));
-
-      await createAuditLog({
-        action: 'organization.promo_credit_granted',
-        actor_id: user.id,
-        actor_email: user.google_user_email,
-        actor_name: user.google_user_name,
-        organization_id: organization_id,
-        message: `Granted $${amount_usd} promotional credit: ${description}`,
-        tx: dbOrTx,
-      });
-    }
-
     try {
       const org_props = entity.organization
         ? {

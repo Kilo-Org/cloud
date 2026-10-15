@@ -78,9 +78,10 @@ describe('adminGatewayModelListsRouter', () => {
     'stores, updates, and clears %s without touching other gateway config',
     async list => {
       const autoFree = { models: [{ model: 'provider/model-a:free', weight: 1, reasoning: {} }] };
-      await db
-        .insert(ai_gateway_config)
-        .values({ config: { vercel_routing_percentage: 10 }, auto_free: autoFree });
+      await db.insert(ai_gateway_config).values({
+        config: { vercel_routing_opt_out_models: ['provider/model-x'] },
+        auto_free: autoFree,
+      });
       const otherList = lists.find(other => other !== list) ?? list;
       const otherConfig: GatewayModelListConfig = { models: ['provider/other-model'] };
       const caller = await createCallerForUser(admin.id);
@@ -98,7 +99,7 @@ describe('adminGatewayModelListsRouter', () => {
 
       const [row] = await db.select().from(ai_gateway_config);
       expect(row).toMatchObject({
-        config: { vercel_routing_percentage: 10 },
+        config: { vercel_routing_opt_out_models: ['provider/model-x'] },
         auto_free: autoFree,
         [otherList]: otherConfig,
       });

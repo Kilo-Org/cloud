@@ -184,15 +184,13 @@ export type GetProviderInput = {
   organizationId: string | undefined;
   /** The platform caller for a service run; see `OpenAiChatGptRoutingInput`. */
   botId?: string | undefined;
-  taskId: string | undefined;
   /** Resolves organization/group provider policy only when selecting a managed
    * gateway. Direct BYOK and custom LLM routes remain exempt. */
   getRoutingProviderConfig?: () => Promise<OpenRouterProviderConfig | undefined>;
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
-  const { requestedModel, request, user, organizationId, botId, taskId, getRoutingProviderConfig } =
-    input;
+  const { requestedModel, request, user, organizationId, botId, getRoutingProviderConfig } = input;
 
   if (isLocalFakeLlmEnabled() && isLocalFakeDeterministicModel(requestedModel)) {
     const localFakeProvider = getLocalFakeLlmProvider();
@@ -256,12 +254,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   if (
     eligibleForVercelRouting &&
-    (await shouldRouteToVercel(
-      requestedModel,
-      request,
-      taskId || user.id,
-      resolveRoutingProviderConfig
-    ))
+    (await shouldRouteToVercel(requestedModel, resolveRoutingProviderConfig))
   ) {
     return {
       kind: 'provider',

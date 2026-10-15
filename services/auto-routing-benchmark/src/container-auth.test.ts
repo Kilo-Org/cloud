@@ -398,6 +398,40 @@ it('delivers rollout-orphaned outcomes to the worker before exiting', async () =
   expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
 });
 
+it('never reports a failure after the case started as not_started', async () => {
+  const delivered: unknown[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: RequestInit) => {
+      delivered.push(JSON.parse(init.body as string));
+      return new Response(null, { status: 204 });
+    })
+  );
+  await loadServer();
+  mocks.spawn.mockImplementationOnce(() => {
+    const child = createChild();
+    return Object.defineProperty(child, 'stdout', {
+      value: {
+        on: () => {
+          throw new Error('pipe unavailable');
+        },
+      },
+    });
+  });
+  const pending = request('/run', {
+    ...runBody,
+    resultCallback: {
+      url: 'https://bench.test/container/case-result',
+      execution: { runId: 'run', model: 'm', variant: 'high', rep: 0, caseId: 'lost', token: 't' },
+    },
+  });
+  pending.res.emit('close');
+  await flushServer();
+  expect(await pending.done).toMatchObject({ status: 500, body: { error: 'pipe unavailable' } });
+  await flushServer();
+  expect(delivered).toEqual([]);
+});
+
 it('waits for the shared local warmup during SIGTERM', async () => {
   await loadServer();
   const first = request('/warmup');

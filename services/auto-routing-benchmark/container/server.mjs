@@ -142,7 +142,13 @@ function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, varia
 }
 
 async function runCli({ args, env, timeoutMs, kiloToken }) {
-  const dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
+  let dir;
+  try {
+    dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
+  } catch (error) {
+    // No child exists yet, so this case never reached a provider.
+    throw new NotStartedError(error instanceof Error ? error.message : 'case workspace failed');
+  }
   const startedAt = Date.now();
   let result;
   try {
@@ -152,12 +158,18 @@ async function runCli({ args, env, timeoutMs, kiloToken }) {
       let stdoutTruncated = false;
       let stderrTail = '';
       // The kilo wrapper spawns a grandchild; timeout must kill its whole group.
-      const child = spawn('kilo', args, {
-        cwd: dir,
-        env,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true,
-      });
+      let child;
+      try {
+        child = spawn('kilo', args, {
+          cwd: dir,
+          env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          detached: true,
+        });
+      } catch (error) {
+        // A synchronous spawn failure creates no process, so no provider call happened.
+        throw new NotStartedError(error instanceof Error ? error.message : 'case process failed');
+      }
       let finished = false;
       let finishTimer;
       const finish = exitCode => {
@@ -310,8 +322,12 @@ const server = createServer(
             }),
           };
         } catch (err) {
-          outcome = { kind: 'not_started' };
-          if (!(err instanceof NotStartedError)) {
+          // A case may only be reported as never started when no child was spawned.
+          if (err instanceof NotStartedError) {
+            outcome = { kind: 'not_started' };
+            if (!stopRequested) failure = err.message;
+          } else {
+            outcome = { kind: 'failed' };
             failure = err instanceof Error ? err.message : 'run failed';
           }
         }
@@ -320,7 +336,11 @@ const server = createServer(
         else if (failure) sendJson(res, 500, { error: failure });
         else sendJson(res, 503, { error: 'container is stopping' });
         if (!callback) return;
-        if (outcome.kind === 'not_started' || stopRequested || !responseDelivered) {
+        const recoverable = outcome.kind === 'completed' || outcome.kind === 'not_started';
+        if (
+          recoverable &&
+          (outcome.kind === 'not_started' || stopRequested || !responseDelivered)
+        ) {
           await deliverResult(callback, outcome);
         }
         pendingDeliveries -= 1;

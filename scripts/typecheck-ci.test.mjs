@@ -8,22 +8,36 @@ import { fileURLToPath } from 'node:url';
 
 import { load } from 'js-yaml';
 
-const workflow = load(
-  readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
+const workflows = Object.fromEntries(
+  ['ci.yml', 'kilo-app-ci.yml'].map(file => [
+    file,
+    load(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')),
+  ])
 );
 const extension = JSON.parse(
   readFileSync(new URL('../apps/extension/package.json', import.meta.url), 'utf8')
 );
 const rootScript = fileURLToPath(new URL('./typecheck-all.sh', import.meta.url));
+const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
 
-for (const [name, command] of [
-  ['typecheck', 'scripts/typecheck-all.sh'],
-  ['lint', 'pnpm --filter @kilocode/harness-sdk run build'],
-  ['harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
-  ['workspace-tests', 'pnpm --filter @kilocode/harness-sdk run build'],
+for (const [file, name, command, condition] of [
+  ['ci.yml', 'typecheck', 'scripts/typecheck-all.sh'],
+  ['ci.yml', 'lint', harnessBuild],
+  ['ci.yml', 'harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
+  [
+    'ci.yml',
+    'workspace-tests',
+    harnessBuild,
+    "matrix.workspace.name == 'kilo-app' || matrix.workspace.name == '@kilocode/harness-sdk'",
+  ],
+  ...['typecheck', 'lint', 'i18n-leftover', 'check-unused', 'test'].map(name => [
+    'kilo-app-ci.yml',
+    name,
+    harnessBuild,
+  ]),
 ]) {
-  test(`${name} restores the compiler plugin cache after install and before use`, () => {
-    const steps = workflow.jobs[name].steps;
+  test(`${file} ${name} restores the compiler plugin cache after install and before use`, () => {
+    const steps = workflows[file].jobs[name].steps;
     const cacheIndex = steps.findIndex(step => step.name === 'Cache compiler plugins');
     const installIndex = steps.findIndex(step => step.run === 'pnpm install --frozen-lockfile');
     const buildIndex = steps.findIndex(step => step.run === command);
@@ -39,7 +53,7 @@ for (const [name, command] of [
       cache.with['restore-keys'].trim(),
       '${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-'
     );
-    assert.equal(cache.if, steps[buildIndex].if);
+    assert.equal(cache.if, condition ?? steps[buildIndex].if);
   });
 }
 

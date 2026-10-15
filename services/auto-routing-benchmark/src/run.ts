@@ -92,13 +92,14 @@ import {
 import { pickClassifierWinner } from './winner';
 import {
   beginPaidCase,
-  claimNextChunk,
+  claimScheduledChunks,
   clearUnbilledCase,
   cooldownProviders,
   deferChunk,
   failChunk,
   finishChunk,
   getChunk,
+  hasUnsettledChunks,
   recoverChunks,
   scheduleRunChunks,
   schedulerBackoffSeconds,
@@ -1026,9 +1027,8 @@ export async function dispatchScheduler(env: Env): Promise<void> {
   for (const run of settled.results) {
     await finalizeRunIfComplete(env, run.id, 'decider', await getRunState(env, run.id));
   }
-  for (let dispatched = 0; dispatched < config.slots; dispatched++) {
-    const claim = await claimNextChunk(env.BENCH_DB, config, Date.now(), crypto.randomUUID());
-    if (!claim) break;
+  const claims = await claimScheduledChunks(env.BENCH_DB, config, Date.now(), crypto.randomUUID());
+  for (const [index, claim] of claims.entries()) {
     try {
       await env.BENCH_QUEUE.send({
         runId: claim.run_id,
@@ -1038,7 +1038,9 @@ export async function dispatchScheduler(env: Env): Promise<void> {
         claimToken: claim.token,
       });
     } catch (error) {
-      await deferChunk(env.BENCH_DB, claim.id, claim.token, Date.now());
+      for (const unsent of claims.slice(index)) {
+        await deferChunk(env.BENCH_DB, unsent.id, unsent.token, Date.now());
+      }
       throw error;
     }
   }
@@ -1047,6 +1049,7 @@ export async function dispatchScheduler(env: Env): Promise<void> {
       event: 'benchmark_scheduler_dispatched',
       activeSlots: await getLiveContainerLanes(env.BENCH_DB),
       slots: config.slots,
+      claimed: claims.length,
     })
   );
 }
@@ -1140,7 +1143,12 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
     );
   }
   await dispatchScheduler(env);
-  if (state) await finalizeRunIfComplete(env, claim.run_id, 'decider', state);
+  // Run accounting reads every case result of the run, so it only runs once the
+  // run's scheduled work has settled. Dispatch's settled-run sweep and the
+  // dead-letter path stay responsible for settling runs that never complete.
+  if (state && !(await hasUnsettledChunks(env.BENCH_DB, claim.run_id))) {
+    await finalizeRunIfComplete(env, claim.run_id, 'decider', state);
+  }
 }
 
 export async function processJob(env: Env, rawMessage: unknown): Promise<void> {

@@ -141,6 +141,13 @@
       "when": 1792074152266,
       "tag": "0019_soft_brother_voodoo",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1792086908958,
+      "tag": "0020_nosy_lady_vermin",
+      "breakpoints": true
     }
   ]
 }

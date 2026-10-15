@@ -13,13 +13,14 @@ vi.mock('./scheduler', async importOriginal => {
   return {
     ...actual,
     beginPaidCase: vi.fn(),
-    claimNextChunk: vi.fn(),
+    claimScheduledChunks: vi.fn(),
     clearUnbilledCase: vi.fn(),
     cooldownProviders: vi.fn(),
     deferChunk: vi.fn(),
     failChunk: vi.fn(),
     finishChunk: vi.fn(),
     getChunk: vi.fn(),
+    hasUnsettledChunks: vi.fn(),
     recoverChunks: vi.fn(),
     scheduleRunChunks: vi.fn(),
     startChunk: vi.fn(),
@@ -116,13 +117,14 @@ import { createSystemOneClient } from './openrouter';
 import type { DeciderJudge } from './grading';
 import {
   beginPaidCase,
-  claimNextChunk,
+  claimScheduledChunks,
   clearUnbilledCase,
   cooldownProviders,
   deferChunk,
   failChunk,
   finishChunk,
   getChunk,
+  hasUnsettledChunks,
   recoverChunks,
   scheduleRunChunks,
   startChunk,
@@ -258,8 +260,9 @@ beforeEach(() => {
   queueSend.mockResolvedValue(undefined);
   vi.mocked(startChunk).mockResolvedValue(true);
   vi.mocked(beginPaidCase).mockResolvedValue(true);
-  vi.mocked(claimNextChunk).mockResolvedValue(null);
+  vi.mocked(claimScheduledChunks).mockResolvedValue([]);
   vi.mocked(recoverChunks).mockResolvedValue([]);
+  vi.mocked(hasUnsettledChunks).mockResolvedValue(false);
   mockClaim();
   vi.mocked(getBenchmarkConfig).mockResolvedValue({
     router: 'efficient',
@@ -381,7 +384,7 @@ describe('processJob — scheduler-owned execution', () => {
       })
     );
     expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
-    expect(claimNextChunk).toHaveBeenCalled();
+    expect(claimScheduledChunks).toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
     expect(destroyDeciderCliContainer).not.toHaveBeenCalled();
   });
@@ -405,7 +408,7 @@ describe('processJob — scheduler-owned execution', () => {
     expect(beginPaidCase).not.toHaveBeenCalled();
     expect(finishChunk).not.toHaveBeenCalled();
     expect(deferChunk).not.toHaveBeenCalled();
-    expect(claimNextChunk).not.toHaveBeenCalled();
+    expect(claimScheduledChunks).not.toHaveBeenCalled();
   });
 
   it('does not start a claim whose token ownership is absent', async () => {
@@ -468,7 +471,7 @@ describe('processJob — scheduler-owned execution', () => {
 
   it('dispatches a newly available claim instead of chaining model chunks', async () => {
     const next = { ...mockClaim(), id: 'next-chunk', token: 'next-token', model: 'other/model' };
-    vi.mocked(claimNextChunk).mockResolvedValueOnce(next).mockResolvedValue(null);
+    vi.mocked(claimScheduledChunks).mockResolvedValueOnce([next]).mockResolvedValue([]);
     await processJob(env, deciderMessage());
     expect(queueSend).toHaveBeenCalledWith({
       runId,
@@ -483,9 +486,26 @@ describe('processJob — scheduler-owned execution', () => {
   it('only dispatches on scheduler wakeups', async () => {
     await processJob(env, { runId, kind: 'decider', model, schedulerWake: true });
     expect(recoverChunks).toHaveBeenCalled();
-    expect(claimNextChunk).toHaveBeenCalled();
+    expect(claimScheduledChunks).toHaveBeenCalled();
     expect(startChunk).not.toHaveBeenCalled();
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+  });
+
+  it('releases every unsent claim when a queue send fails mid-batch', async () => {
+    const claims = ['a', 'b', 'c'].map(suffix =>
+      mockClaim({ id: `chunk-${suffix}`, token: `token-${suffix}`, model: `batch/${suffix}` })
+    );
+    vi.mocked(claimScheduledChunks).mockResolvedValue(claims);
+    queueSend
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('queue unavailable'));
+    await expect(
+      processJob(env, { runId, kind: 'decider', model, schedulerWake: true })
+    ).rejects.toThrow('queue unavailable');
+    expect(queueSend).toHaveBeenCalledTimes(2);
+    expect(deferChunk).toHaveBeenCalledTimes(2);
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-b', 'token-b', expect.any(Number));
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-c', 'token-c', expect.any(Number));
   });
 });
 
@@ -534,7 +554,7 @@ describe('processJob — legacy whole-run migration', () => {
         instanceName: `${runId}:${model}:${variant}:2:3`,
       });
     }
-    expect(claimNextChunk).toHaveBeenCalled();
+    expect(claimScheduledChunks).toHaveBeenCalled();
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
     expect(startChunk).not.toHaveBeenCalled();
@@ -545,7 +565,7 @@ describe('processJob — legacy whole-run migration', () => {
     await processJob(env, { runId, kind: 'decider', model, caseIds: [benchCase.id] });
     expect(scheduleRunChunks).not.toHaveBeenCalled();
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
-    expect(claimNextChunk).toHaveBeenCalled();
+    expect(claimScheduledChunks).toHaveBeenCalled();
   });
 
   it('still migrates and dispatches when legacy container teardown fails', async () => {
@@ -556,7 +576,7 @@ describe('processJob — legacy whole-run migration', () => {
         processJob(env, { runId, kind: 'decider', model, variant: null, shard: 1 })
       ).resolves.toBeUndefined();
       expect(scheduleRunChunks).toHaveBeenCalled();
-      expect(claimNextChunk).toHaveBeenCalled();
+      expect(claimScheduledChunks).toHaveBeenCalled();
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('benchmark_legacy_container_destroy_failed')
       );
@@ -844,6 +864,23 @@ describe('processJob — retryable rubric grading', () => {
         error: null,
       })
     );
+  });
+
+  it('skips run accounting while scheduled work is unsettled', async () => {
+    vi.mocked(hasUnsettledChunks).mockResolvedValue(true);
+    await processJob(env, deciderMessage());
+    expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(hasUnsettledChunks).toHaveBeenCalledWith(env.BENCH_DB, runId);
+    expect(countCaseResultsByLane).not.toHaveBeenCalled();
+    expect(getCaseResults).not.toHaveBeenCalled();
+    expect(markRunCompleted).not.toHaveBeenCalled();
+  });
+
+  it('runs run accounting once scheduled work has settled', async () => {
+    vi.mocked(hasUnsettledChunks).mockResolvedValue(false);
+    await processJob(env, deciderMessage());
+    expect(hasUnsettledChunks).toHaveBeenCalledWith(env.BENCH_DB, runId);
+    expect(countCaseResultsByLane).toHaveBeenCalled();
   });
 
   it('does not call the model or persist a zero when the judge client is unavailable', async () => {

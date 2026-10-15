@@ -105,6 +105,33 @@ recovers abandoned claims; completion refills slots immediately without waiting 
 Recovery and infrastructure/grader waits are bounded to six claims, with 15–300 second
 backoff. Capacity and unbilled provider-throttle waits do not create model-failure rows.
 
+A dispatch pass reads current occupancy and the next pending chunk of every lane — one
+`(run, model, variant, repetition)` chunk chain — and claims as many of those lanes as fit.
+Both reads are index seeks: occupancy is bounded by the slot budget, lane heads by the
+number of lanes, so cost does not grow with the pending backlog. Each claim is a
+conditional `UPDATE ... WHERE id = ? AND status = 'pending'` that assigns a free slot.
+Only one pass runs at a time; a pass holds a short lease row and a dispatcher that finds it
+held returns immediately, because the holding pass has already read that wake's
+completions. The per-minute tick is the backstop if a lease expires without a release, and
+the `(status, run_id, model, variant, repetition, chunk)` index bounds lane reads.
+
+A provider or model throttle records a cooldown deadline rather than stamping every
+pending row, so one throttle event costs a bounded write instead of rewriting the backlog.
+
+Materialization writes chunks in bounded batches, marks a batch complete when all of its
+cases already have results, and checks the run's status once per batch rather than per row.
+
+Run completion accounting reads every case result of the run, so it does not run per
+completed chunk. A completion first asks whether the run still has scheduled work — an
+index probe for a chunk that is pending, queued or active in a lane that has not
+dead-lettered — and only settled runs are accounted. Chunks of a dead-lettered lane never
+count as unsettled, so a run with a dead lane still settles once its live lanes finish, and
+runs with no scheduler chunks (legacy whole-run work) are always accounted. The dispatch
+sweep and the dead-letter path remain responsible for runs that settle without a train of
+completions. Chunk recovery and the 24-hour prune batches are likewise bounded: recovery
+completes only the runs that still hold unsettled chunks, and pruning is driven from the
+per-run scheduler markers instead of scanning the chunk, execution or run tables.
+
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger prevents automatic repetition if a worker disappears
 after inference may have started but before an output was saved. Such an ambiguous case

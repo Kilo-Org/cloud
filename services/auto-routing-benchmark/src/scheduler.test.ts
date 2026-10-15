@@ -6,18 +6,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import {
   beginPaidCase,
-  claimNextChunk,
+  claimScheduledChunks,
   clearUnbilledCase,
   cooldownProviders,
   deferChunk,
   finishChunk,
+  hasUnsettledChunks,
   recoverChunks,
   scheduleRunChunks,
   schedulerConfig,
   startChunk,
   SCHEDULER_ACTIVE_LEASE_MS,
+  SCHEDULER_DISPATCH_LEASE_MS,
+  SCHEDULER_LANE_HEADS_SQL,
+  SCHEDULER_LIVE_SQL,
   SCHEDULER_MAX_ATTEMPTS,
   SCHEDULER_QUEUE_LEASE_MS,
+  SCHEDULER_UNSETTLED_SQL,
 } from './scheduler';
 import type { SchedulerClaim, SchedulerConfig } from './scheduler';
 
@@ -79,12 +84,34 @@ async function claimMany(
   prefix: string,
   now = NOW
 ) {
-  const results = await Promise.all(
-    Array.from({ length: count }, (_, index) =>
-      claimNextChunk(db, config, now, `${prefix}-${index}`)
-    )
-  );
-  return results.filter((claim): claim is SchedulerClaim => claim !== null);
+  const claims: SchedulerClaim[] = [];
+  while (claims.length < count) {
+    const claimed = await claimScheduledChunks(db, config, now, `${prefix}-${claims.length}`);
+    if (claimed.length === 0) break;
+    claims.push(...claimed);
+  }
+  return claims;
+}
+
+function recordingD1(target: D1Database, statements: string[]): D1Database {
+  return {
+    prepare(sql: string) {
+      statements.push(sql);
+      return target.prepare(sql);
+    },
+    batch(list: D1PreparedStatement[]) {
+      return target.batch(list);
+    },
+    exec(sql: string) {
+      return target.exec(sql);
+    },
+  } as D1Database;
+}
+
+function explainPlan(sqlite: DatabaseSync, sql: string): string {
+  return (sqlite.prepare(`EXPLAIN QUERY PLAN ${sql}`).all() as { detail: string }[])
+    .map(row => row.detail)
+    .join('\n');
 }
 
 function paidCase(claim: SchedulerClaim, caseId: string) {
@@ -207,7 +234,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(storedChunks(sqlite).filter(row => row.status === 'pending')).toHaveLength(17);
   });
 
-  it('reserves at most the actual 250-slot ceiling under concurrent claim pressure', async () => {
+  it('reserves at most the actual 250-slot ceiling from one pass', async () => {
     insertRun(sqlite, 'ceiling');
     await scheduleRunChunks(db, {
       runId: 'ceiling',
@@ -230,6 +257,153 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(Math.max(...claims.map(claim => claim.slot))).toBe(249);
     expect(storedChunks(sqlite).filter(row => row.status === 'pending')).toHaveLength(10);
   }, 30_000);
+
+  it('fills one deep lane up to its model cap from a single pass', async () => {
+    insertRun(sqlite, 'deep-lane');
+    await scheduleRunChunks(db, {
+      runId: 'deep-lane',
+      entries: [{ model: 'deep/model', variant: '', providers: ['deepinfra'] }],
+      repetitions: 1,
+      caseIds: Array.from({ length: 12 }, (_, index) => `case-${index}`),
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":8,"modelConcurrency":8,"providerConcurrency":8}');
+    const claims = await claimScheduledChunks(db, config, NOW, 'deep-lane');
+    expect(claims).toHaveLength(8);
+    expect(claims.map(claim => claim.chunk)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(new Set(claims.map(claim => claim.slot)).size).toBe(8);
+    expect(await claimScheduledChunks(db, config, NOW, 'deep-lane-full')).toEqual([]);
+  });
+
+  it('runs one dispatch pass at a time through the shared lease and releases it', async () => {
+    insertRun(sqlite, 'serialized');
+    await scheduleRunChunks(db, {
+      runId: 'serialized',
+      entries: independentEntries(3),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":2}');
+    sqlite
+      .prepare('UPDATE scheduler_dispatch_lock SET token = ?, lease_until = ? WHERE id = 1')
+      .run('another-pass', NOW + SCHEDULER_DISPATCH_LEASE_MS);
+    expect(await claimScheduledChunks(db, config, NOW, 'blocked')).toEqual([]);
+    expect(liveChunks(sqlite)).toEqual([]);
+    expect(
+      sqlite.prepare('SELECT token, lease_until FROM scheduler_dispatch_lock WHERE id = 1').get()
+    ).toEqual({ token: 'another-pass', lease_until: NOW + SCHEDULER_DISPATCH_LEASE_MS });
+    const released = await claimMany(
+      db,
+      config,
+      2,
+      'after-expiry',
+      NOW + SCHEDULER_DISPATCH_LEASE_MS
+    );
+    expect(released).toHaveLength(2);
+    expect(released.map(claim => claim.token)).toEqual(['after-expiry-0', 'after-expiry-0']);
+    expect(
+      sqlite.prepare('SELECT token, lease_until FROM scheduler_dispatch_lock WHERE id = 1').get()
+    ).toEqual({ token: null, lease_until: 0 });
+  });
+
+  it('claims from a 100k-chunk backlog in one bounded pass', async () => {
+    const runs = [
+      { id: 'scale-efficient-platform', router: 'efficient', purpose: 'platform' },
+      { id: 'scale-frontier-platform', router: 'frontier', purpose: 'platform' },
+      { id: 'scale-efficient-user', router: 'efficient', purpose: 'user' },
+    ] as const;
+    const models = 100;
+    const perLaneChunks = 84;
+    const insert = sqlite.prepare(`
+      INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk, case_ids)
+      VALUES (?, ?, ?, ?, '["deepinfra"]', ?, ?, ?)
+    `);
+    sqlite.exec('BEGIN');
+    for (const run of runs) {
+      insertRun(sqlite, run.id, run);
+      sqlite.prepare('INSERT INTO scheduler_runs (run_id) VALUES (?)').run(run.id);
+      for (let model = 0; model < models; model++) {
+        for (const variant of ['', 'high']) {
+          for (const rep of [0, 1]) {
+            for (let chunk = 0; chunk < perLaneChunks; chunk++) {
+              insert.run(
+                JSON.stringify([run.id, `scale/model-${model}`, variant, rep, chunk]),
+                run.id,
+                `scale/model-${model}`,
+                variant,
+                rep,
+                chunk,
+                JSON.stringify([`case-${model}-${chunk}`])
+              );
+            }
+          }
+        }
+      }
+    }
+    const assigned = sqlite.prepare(`
+      UPDATE scheduler_chunks SET status = 'active', slot = ?, token = 'active',
+        lease_until = ? WHERE id = ?
+    `);
+    let slot = 0;
+    for (const run of runs) {
+      for (let model = 0; model < 83; model++) {
+        assigned.run(
+          slot++,
+          NOW + SCHEDULER_ACTIVE_LEASE_MS,
+          JSON.stringify([run.id, `scale/model-${model}`, '', 0, perLaneChunks - 1])
+        );
+      }
+    }
+    sqlite.exec('COMMIT');
+    expect(
+      sqlite.prepare("SELECT COUNT(*) AS n FROM scheduler_chunks WHERE status = 'pending'").get()
+    ).toEqual({ n: runs.length * models * 2 * 2 * perLaneChunks - 249 });
+
+    const plan = (sql: string) =>
+      (sqlite.prepare(`EXPLAIN QUERY PLAN ${sql}`).all() as { detail: string }[])
+        .map(row => row.detail)
+        .join('\n');
+    expect(plan(SCHEDULER_LIVE_SQL)).not.toContain('SCAN scheduler_chunks');
+    expect(plan(SCHEDULER_LANE_HEADS_SQL)).not.toContain('SCAN scheduler_chunks');
+    expect(plan(SCHEDULER_LANE_HEADS_SQL)).toContain('IX_scheduler_chunks_lane');
+
+    // Every model of the fixture shares one provider, so the default provider cap
+    // is already saturated: the pass must conclude that without walking the backlog.
+    const saturated = performance.now();
+    expect(await claimScheduledChunks(db, schedulerConfig(), NOW, 'scale-saturated')).toEqual([]);
+    expect(performance.now() - saturated).toBeLessThan(3_000);
+
+    const started = performance.now();
+    const claims = await claimScheduledChunks(
+      db,
+      schedulerConfig('{"providerConcurrency":250}'),
+      NOW,
+      'scale'
+    );
+    const elapsed = performance.now() - started;
+    expect(claims).toHaveLength(1);
+    expect(claims[0]?.slot).toBe(249);
+    expect(elapsed).toBeLessThan(3_000);
+
+    sqlite
+      .prepare(
+        "UPDATE scheduler_chunks SET status = 'pending', slot = NULL, token = NULL, lease_until = 0 WHERE status IN ('queued', 'active')"
+      )
+      .run();
+    const drainStarted = performance.now();
+    const drained = await claimScheduledChunks(
+      db,
+      schedulerConfig('{"providerConcurrency":250,"modelConcurrency":250}'),
+      NOW,
+      'scale-drain'
+    );
+    const drainElapsed = performance.now() - drainStarted;
+    expect(drained).toHaveLength(250);
+    expect(new Set(drained.map(claim => claim.slot)).size).toBe(250);
+    expect(new Set(drained.map(claim => claim.id)).size).toBe(250);
+    expect(drainElapsed).toBeLessThan(3_000);
+  }, 120_000);
 
   it('allows only one same-token redelivery to start the paid chunk', async () => {
     insertRun(sqlite, 'redelivery');
@@ -486,6 +660,26 @@ describe('scheduler (production migrations and real SQLite)', () => {
       });
     }
   );
+
+  it('continues a lane past a deferred head instead of stalling the whole lane', async () => {
+    insertRun(sqlite, 'lane-head');
+    await scheduleRunChunks(db, {
+      runId: 'lane-head',
+      entries: [{ model: 'lane/model', variant: '', providers: ['deepinfra'] }],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b', 'case-c'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [head] = await claimMany(db, config, 1, 'head');
+    if (!head) throw new Error('Expected the lane head');
+    expect(head.chunk).toBe(0);
+    await deferChunk(db, head.id, head.token, NOW + 60_000);
+    const [next] = await claimMany(db, config, 1, 'next');
+    expect(next).toMatchObject({ run_id: 'lane-head', chunk: 1, slot: head.slot });
+    expect(await claimMany(db, config, 1, 'while-deferred', NOW + 59_000)).toEqual([]);
+    expect(await startChunk(db, head.id, head.token, NOW + 60_000)).toBe(false);
+  });
 
   it('releases a deferred slot immediately but does not reclaim that chunk before available_at', async () => {
     insertRun(sqlite, 'deferred');
@@ -915,30 +1109,24 @@ describe('scheduler (production migrations and real SQLite)', () => {
     });
     const until = NOW + 1000;
     await cooldownProviders(db, throttled, until);
-    const cooledModels = [
-      'a/throttled',
-      'b/one-provider',
-      'c/second-provider',
-      'd/fallback',
-      'z/remote-fireworks',
-    ];
-    const cooled = storedChunks(sqlite).filter(
-      row => row.status === 'pending' && cooledModels.includes(row.model)
-    );
-    expect(cooled).toHaveLength(11);
-    expect(cooled.every(row => row.available_at === until)).toBe(true);
     expect(
-      storedChunks(sqlite)
-        .filter(row => row.model === 'e/unrelated' || row.model === 'f/unknown')
-        .every(row => row.available_at === 0)
-    ).toBe(true);
-    expect(storedChunk(sqlite, throttled.id).available_at).toBe(0);
+      sqlite.prepare('SELECT scope, key, until FROM scheduler_cooldowns ORDER BY scope, key').all()
+    ).toEqual([
+      { scope: 'model', key: 'a/throttled', until },
+      { scope: 'provider', key: 'deepinfra', until },
+      { scope: 'provider', key: 'fireworks', until },
+    ]);
+    // The throttled chunk keeps its own schedule: cooling is a dispatch filter, not
+    // a rewrite of every pending row that shares the model or a provider.
+    expect(storedChunks(sqlite).every(row => row.available_at === 0)).toBe(true);
     await cooldownProviders(db, throttled, NOW + 500);
     expect(
-      storedChunks(sqlite).filter(
-        row => row.status === 'pending' && cooledModels.includes(row.model)
-      )
-    ).toEqual(cooled);
+      sqlite.prepare('SELECT scope, key, until FROM scheduler_cooldowns ORDER BY scope, key').all()
+    ).toEqual([
+      { scope: 'model', key: 'a/throttled', until },
+      { scope: 'provider', key: 'deepinfra', until },
+      { scope: 'provider', key: 'fireworks', until },
+    ]);
     expect(await startChunk(db, throttled.id, throttled.token, NOW)).toBe(true);
     await finishChunk(db, throttled.id, throttled.token);
     for (let index = 0; index < 4; index++) {
@@ -952,7 +1140,16 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(await claimMany(db, config, 3, 'cooldown-wait', until - 1)).toEqual([]);
     const available = await claimMany(db, config, 1, 'cooldown-elapsed', until);
     expect(available).toHaveLength(1);
+    const cooledModels = [
+      'a/throttled',
+      'b/one-provider',
+      'c/second-provider',
+      'd/fallback',
+      'z/remote-fireworks',
+    ];
     expect(available.every(claim => cooledModels.includes(claim.model))).toBe(true);
+    expect(await recoverChunks(db, until)).toEqual([]);
+    expect(sqlite.prepare('SELECT * FROM scheduler_cooldowns').all()).toEqual([]);
   });
 
   it('clears only the exact unbilled admission token and cannot erase its replacement admission', async () => {
@@ -1075,5 +1272,118 @@ describe('scheduler (production migrations and real SQLite)', () => {
     ]);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM case_results').get()?.n).toBe(2);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM pending_decider_outputs').get()?.n).toBe(2);
+  });
+
+  it('completes only terminal runs when reclaiming stalled chunks', async () => {
+    for (const [runId, status, purpose] of [
+      ['running-backlog', 'running', 'platform'],
+      ['completed-backlog', 'completed', 'user'],
+    ] as const) {
+      insertRun(sqlite, runId, { purpose });
+      await scheduleRunChunks(db, {
+        runId,
+        entries: independentEntries(4),
+        repetitions: 1,
+        caseIds: ['case'],
+        chunkSize: 1,
+      });
+      sqlite
+        .prepare('UPDATE benchmark_runs SET status = ?, completed_at = ? WHERE id = ?')
+        .run(
+          status,
+          status === 'running' ? null : new Date(NOW - 5 * 86400_000).toISOString(),
+          runId
+        );
+    }
+    await recoverChunks(db, NOW);
+    expect(
+      storedChunks(sqlite)
+        .filter(row => row.run_id === 'running-backlog')
+        .every(row => row.status === 'pending')
+    ).toBe(true);
+    expect(
+      storedChunks(sqlite)
+        .filter(row => row.run_id === 'completed-backlog')
+        .every(row => row.status === 'completed')
+    ).toBe(true);
+  });
+
+  it('reports settled work without reading run case results', async () => {
+    insertRun(sqlite, 'settle');
+    sqlite.prepare('INSERT INTO scheduler_runs (run_id) VALUES (?)').run('settle');
+    const insertChunk = sqlite.prepare(`
+      INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk, case_ids,
+        status, slot, token, lease_until)
+      VALUES (?, 'settle', ?, ?, '["deepinfra"]', 0, ?, ?, ?, ?, ?, ?)`);
+    const insertResult = sqlite.prepare(`
+      INSERT INTO case_results (run_id, model, variant, case_id, score, latency_ms, rep, timed_out)
+      VALUES ('settle', ?, ?, ?, 1, 10, 0, 0)`);
+    sqlite.exec('BEGIN');
+    for (let model = 0; model < 100; model++) {
+      for (const variant of ['', 'high']) {
+        for (let chunk = 0; chunk < 250; chunk++) {
+          const live = model === 0 && variant === '';
+          insertChunk.run(
+            JSON.stringify(['settle', `settle/model-${model}`, variant, chunk]),
+            `settle/model-${model}`,
+            variant,
+            chunk,
+            JSON.stringify([`case-${chunk}`]),
+            live ? 'active' : 'pending',
+            live ? chunk : null,
+            live ? 'live-token' : null,
+            live ? NOW + SCHEDULER_ACTIVE_LEASE_MS : 0
+          );
+          insertResult.run(`settle/model-${model}`, variant, `case-${chunk}`);
+        }
+      }
+    }
+    sqlite.exec('COMMIT');
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM case_results').get()?.n).toBe(50_000);
+
+    expect(explainPlan(sqlite, SCHEDULER_UNSETTLED_SQL)).toContain('IX_scheduler_chunks_lane');
+    expect(explainPlan(sqlite, SCHEDULER_UNSETTLED_SQL)).not.toContain('SCAN scheduler_chunks');
+
+    const recorded: string[] = [];
+    const wrapped = recordingD1(db, recorded);
+    const started = performance.now();
+    const unsettled = await hasUnsettledChunks(wrapped, 'settle');
+    const elapsed = performance.now() - started;
+    expect(unsettled).toBe(true);
+    expect(recorded).toHaveLength(1);
+    expect(recorded.filter(sql => /case_results/i.test(sql))).toEqual([]);
+    expect(elapsed).toBeLessThan(50);
+
+    sqlite.prepare("UPDATE scheduler_chunks SET status = 'completed'").run();
+    expect(await hasUnsettledChunks(db, 'settle')).toBe(false);
+    expect(await hasUnsettledChunks(db, 'legacy-run-without-chunks')).toBe(false);
+  });
+
+  it('ignores chunks of a dead-lettered lane when deciding whether work has settled', async () => {
+    insertRun(sqlite, 'dead-lane-settle');
+    await scheduleRunChunks(db, {
+      runId: 'dead-lane-settle',
+      entries: [
+        { model: 'dead/model', variant: '', providers: ['deepinfra'] },
+        { model: 'live/model', variant: '', providers: ['fireworks'] },
+      ],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b'],
+      chunkSize: 1,
+    });
+    sqlite
+      .prepare(`INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, shard, failed_at)
+        VALUES ('dead-lane-settle', 'dead/model', '', 0, 0, 0, ?)`)
+      .run(new Date(NOW).toISOString());
+    expect(await hasUnsettledChunks(db, 'dead-lane-settle')).toBe(true);
+    sqlite
+      .prepare("UPDATE scheduler_chunks SET status = 'completed' WHERE model = 'live/model'")
+      .run();
+    expect(await hasUnsettledChunks(db, 'dead-lane-settle')).toBe(false);
+    expect(
+      storedChunks(sqlite)
+        .filter(row => row.model === 'dead/model')
+        .map(row => row.status)
+    ).toEqual(['pending', 'pending']);
   });
 });

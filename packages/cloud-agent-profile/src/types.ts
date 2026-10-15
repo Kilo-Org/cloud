@@ -103,6 +103,19 @@ export type ProfileKiloCommandResponse = {
   updatedAt: string;
 };
 
+/**
+ * Instruction response (as returned from the API). The name is the rules
+ * filename slug; the file is materialized as `.kilocode/rules/<name>.md`.
+ */
+export type ProfileInstructionResponse = {
+  id: string;
+  name: string;
+  content: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** Profile response type for list/get operations. */
 export type ProfileResponse = {
   id: string;
@@ -117,6 +130,7 @@ export type ProfileResponse = {
   skills: ProfileSkillResponse[];
   agents: ProfileAgentResponse[];
   kiloCommands: ProfileKiloCommandResponse[];
+  instructions: ProfileInstructionResponse[];
 };
 
 /** Profile response with owner type for combined listings. */
@@ -138,6 +152,7 @@ export type ProfileSummary = {
   skillCount: number;
   agentCount: number;
   kiloCommandCount: number;
+  instructionCount: number;
 };
 
 /** Profile summary with owner type for combined listings. */

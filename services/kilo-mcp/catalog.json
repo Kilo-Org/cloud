@@ -97,6 +97,92 @@
     ],
     "searchBlob": "activeSessions.widgetSnapshot Get the home widget snapshot of active agents and sessions for the current user, optionally scoped to an organization, for rendering a glanceable dashboard widget. Use this to fetch the widget's data payload. activesessions widgetsnapshot organizationid organizationId"
   },
+  "agentProfiles.applyConfigImport": {
+    "path": "agentProfiles.applyConfigImport",
+    "kind": "mutation",
+    "summary": "Import an agent configuration archive into a profile, creating its instructions. Fails if the archive has unresolved issues; use preview first.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "archive": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selection": {
+          "type": "object",
+          "properties": {
+            "agents": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "commands": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "skills": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "instructions": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
+          },
+          "required": [
+            "agents",
+            "commands",
+            "skills",
+            "instructions"
+          ]
+        }
+      },
+      "required": [
+        "profileId",
+        "archive",
+        "selection"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "applyconfigimport",
+      "profileid",
+      "organizationid",
+      "archive",
+      "selection"
+    ],
+    "searchBlob": "agentProfiles.applyConfigImport Import an agent configuration archive into a profile, creating its instructions. Fails if the archive has unresolved issues; use preview first. agentprofiles applyconfigimport profileid organizationid archive selection profileId organizationId archive selection"
+  },
   "agentProfiles.bindToRepo": {
     "path": "agentProfiles.bindToRepo",
     "kind": "mutation",
@@ -991,6 +1077,52 @@
     ],
     "searchBlob": "agentProfiles.createCustomSkill Add a custom skill to an agent profile by supplying its name, description, markdown instructions, and files. agentprofiles createcustomskill profileid organizationid name description rawmarkdown files enabled profileId organizationId name description rawMarkdown files enabled"
   },
+  "agentProfiles.createInstruction": {
+    "path": "agentProfiles.createInstruction",
+    "kind": "mutation",
+    "summary": "Add a new custom instruction or rule to an agent profile so the agent follows it. Creates an instruction with a name and content under a profile.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100000
+        }
+      },
+      "required": [
+        "profileId",
+        "name",
+        "content"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "createinstruction",
+      "profileid",
+      "organizationid",
+      "name",
+      "content"
+    ],
+    "searchBlob": "agentProfiles.createInstruction Add a new custom instruction or rule to an agent profile so the agent follows it. Creates an instruction with a name and content under a profile. agentprofiles createinstruction profileid organizationid name content profileId organizationId name content"
+  },
   "agentProfiles.createKiloCommand": {
     "path": "agentProfiles.createKiloCommand",
     "kind": "mutation",
@@ -1268,6 +1400,44 @@
     ],
     "searchBlob": "agentProfiles.deleteAgent Delete a subagent from an agent profile. agentprofiles deleteagent profileid organizationid agentid profileId organizationId agentId"
   },
+  "agentProfiles.deleteInstruction": {
+    "path": "agentProfiles.deleteInstruction",
+    "kind": "mutation",
+    "summary": "Remove an instruction from an agent profile permanently. Deletes a custom rule or guideline from a profile.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "instructionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId",
+        "instructionId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "deleteinstruction",
+      "profileid",
+      "organizationid",
+      "instructionid"
+    ],
+    "searchBlob": "agentProfiles.deleteInstruction Remove an instruction from an agent profile permanently. Deletes a custom rule or guideline from a profile. agentprofiles deleteinstruction profileid organizationid instructionid profileId organizationId instructionId"
+  },
   "agentProfiles.deleteKiloCommand": {
     "path": "agentProfiles.deleteKiloCommand",
     "kind": "mutation",
@@ -1520,6 +1690,43 @@
     ],
     "searchBlob": "agentProfiles.listRepoBindings List repository bindings that associate repos with agent profiles for the current user or an organization. agentprofiles listrepobindings organizationid organizationId"
   },
+  "agentProfiles.previewConfigImport": {
+    "path": "agentProfiles.previewConfigImport",
+    "kind": "mutation",
+    "summary": "Preview what an agent config archive would import into a profile before committing it. Shows parsed instructions and any issues without applying changes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "archive": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "profileId",
+        "archive"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "previewconfigimport",
+      "profileid",
+      "organizationid",
+      "archive"
+    ],
+    "searchBlob": "agentProfiles.previewConfigImport Preview what an agent config archive would import into a profile before committing it. Shows parsed instructions and any issues without applying changes. agentprofiles previewconfigimport profileid organizationid archive profileId organizationId archive"
+  },
   "agentProfiles.reorderKiloCommands": {
     "path": "agentProfiles.reorderKiloCommands",
     "kind": "mutation",
@@ -1632,6 +1839,49 @@
       "commands"
     ],
     "searchBlob": "agentProfiles.setCommands Set the commands of an agent profile, replacing all existing commands. agentprofiles setcommands profileid organizationid commands profileId organizationId commands"
+  },
+  "agentProfiles.setInstructionEnabled": {
+    "path": "agentProfiles.setInstructionEnabled",
+    "kind": "mutation",
+    "summary": "Turn a profile instruction on or off without deleting it. Enable or disable a custom rule so it is included or ignored.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "instructionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "profileId",
+        "instructionId",
+        "enabled"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "setinstructionenabled",
+      "profileid",
+      "organizationid",
+      "instructionid",
+      "enabled"
+    ],
+    "searchBlob": "agentProfiles.setInstructionEnabled Turn a profile instruction on or off without deleting it. Enable or disable a custom rule so it is included or ignored. agentprofiles setinstructionenabled profileid organizationid instructionid enabled profileId organizationId instructionId enabled"
   },
   "agentProfiles.setKiloCommandEnabled": {
     "path": "agentProfiles.setKiloCommandEnabled",
@@ -2611,6 +2861,57 @@
       "config"
     ],
     "searchBlob": "agentProfiles.updateAgent Edit an existing subagent in an agent profile, such as its name, slug, or configuration. agentprofiles updateagent profileid organizationid agentid slug name config profileId organizationId agentId slug name config"
+  },
+  "agentProfiles.updateInstruction": {
+    "path": "agentProfiles.updateInstruction",
+    "kind": "mutation",
+    "summary": "Edit the name or content of an existing instruction on an agent profile. Updates a custom rule's text in place.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "instructionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100000
+        }
+      },
+      "required": [
+        "profileId",
+        "instructionId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "updateinstruction",
+      "profileid",
+      "organizationid",
+      "instructionid",
+      "name",
+      "content"
+    ],
+    "searchBlob": "agentProfiles.updateInstruction Edit the name or content of an existing instruction on an agent profile. Updates a custom rule's text in place. agentprofiles updateinstruction profileid organizationid instructionid name content profileId organizationId instructionId name content"
   },
   "agentProfiles.updateKiloCommand": {
     "path": "agentProfiles.updateKiloCommand",

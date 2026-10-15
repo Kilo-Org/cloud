@@ -140,6 +140,7 @@ export function createVercelProviderAdapter(deps: {
    * must prevent the REST create.
    */
   readContainedGrants: () => Promise<readonly SessionCredentialGrant[]>;
+  readAcceptedRuntimeProxyHandles?: () => Promise<ReadonlyMap<string, readonly string[]>>;
 }): ProviderAdapter {
   const config = deps.config;
   if (!config) {
@@ -216,7 +217,10 @@ export function createVercelProviderAdapter(deps: {
       // Read the authoritative grants and build the policy before the REST
       // create: the sandbox must never open with an empty or stale policy, so a
       // reader failure prevents the create entirely.
-      const networkPolicy = buildControlNetworkPolicy(await deps.readContainedGrants());
+      const networkPolicy = buildControlNetworkPolicy(
+        await deps.readContainedGrants(),
+        await deps.readAcceptedRuntimeProxyHandles?.()
+      );
       const created = await restClient
         .createSandbox({
           name: intent.allocationName ?? deps.sandboxName,
@@ -373,7 +377,10 @@ export function createVercelProviderAdapter(deps: {
     async applyContainedCredentials(providerRef, grants) {
       const parsed = decodeOwnedProviderRef(providerRef);
       if (parsed === null) throw new Error('Invalid Vercel sandbox provider reference');
-      const networkPolicy = buildControlNetworkPolicy(grants);
+      const networkPolicy = buildControlNetworkPolicy(
+        grants,
+        await deps.readAcceptedRuntimeProxyHandles?.()
+      );
       const session = await restClient.updateNetworkPolicy(
         parsed.sessionId,
         parsed.sandboxName,

@@ -51,15 +51,15 @@ to send platform feedback and bug reports rather than a support channel.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**887 procedures** — **381 queries**, **506 mutations** — under **54 prefixes**.
+**892 procedures** — **380 queries**, **512 mutations** — under **54 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
 | `organizations` | 302 | 131 | 171 |
 | `kiloclaw` | 96 | 35 | 61 |
-| `user` | 41 | 16 | 25 |
+| `user` | 40 | 15 | 25 |
+| `agentProfiles` | 36 | 4 | 32 |
 | `cloudAgentNext` | 33 | 13 | 20 |
-| `agentProfiles` | 30 | 4 | 26 |
 | `securityAgent` | 26 | 15 | 11 |
 | `kiloPass` | 21 | 11 | 10 |
 | `githubPrReview` | 20 | 6 | 14 |

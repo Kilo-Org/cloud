@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import {
   beginPaidCase,
-  claimNextChunk,
+  claimScheduledChunks,
   finishChunk,
   scheduleRunChunks,
   schedulerConfig,
@@ -117,9 +117,8 @@ try {
   }
 
   while (true) {
-    for (let index = 0; index < config.slots; index++) {
-      const claim = await claimNextChunk(db, config, Date.now(), crypto.randomUUID());
-      if (!claim) break;
+    const claimed = await claimScheduledChunks(db, config, Date.now(), crypto.randomUUID());
+    for (const claim of claimed) {
       if (
         claim.run_id !== 'slow' &&
         events.some(event => event.event === 'finish' && event.run !== 'slow') &&
@@ -157,6 +156,37 @@ try {
     }, {}),
     { fast: 2, owner: 1, slow: 2 }
   );
+  sqlite
+    .prepare(
+      "UPDATE benchmark_runs SET status = 'completed', completed_at = ? WHERE status = 'running'"
+    )
+    .run(new Date(startedAt).toISOString());
+  sqlite
+    .prepare(`INSERT INTO benchmark_runs (
+      id, router, kind, purpose, status, started_at, min_accuracy, switch_cost_factor,
+      max_concurrency, repetitions, engine_identity
+    ) VALUES ('backlog', 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 0, 1, 'scheduler-smoke')`)
+    .run(new Date(startedAt).toISOString());
+  await scheduleRunChunks(db, {
+    runId: 'backlog',
+    entries: Array.from({ length: 200 }, (_, index) => ({
+      model: `backlog-${index}`,
+      variant: null,
+      providers: [`backlog-provider-${index}`],
+    })),
+    repetitions: 1,
+    caseIds: Array.from({ length: 60 }, (_, index) => `backlog-case-${index}`),
+    chunkSize: 1,
+  });
+  const backlogPending = sqlite
+    .prepare("SELECT COUNT(*) AS n FROM scheduler_chunks WHERE run_id = 'backlog'")
+    .get()?.n;
+  assert.equal(backlogPending, 12_000);
+  const backlogStarted = Date.now();
+  const backlogClaims = await claimScheduledChunks(db, config, Date.now(), crypto.randomUUID());
+  const backlogMs = Date.now() - backlogStarted;
+  assert.equal(backlogClaims.length, 5);
+  assert(backlogMs < 2_000, `Dispatch over ${backlogPending} pending chunks took ${backlogMs}ms`);
   console.log(
     JSON.stringify(
       {
@@ -167,6 +197,9 @@ try {
         borrowed,
         reusedBeforeSlowFinished,
         elapsedMs: Date.now() - startedAt,
+        backlogPending,
+        backlogClaims: backlogClaims.length,
+        backlogMs,
         events,
       },
       null,

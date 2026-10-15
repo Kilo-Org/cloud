@@ -4,9 +4,15 @@ import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detec
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { applyReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
-import { buildDirectProvider } from './build-direct-provider';
+import { buildDirectProvider, type DirectUpstreamAuth } from './build-direct-provider';
 
 type ChatCompletionRequest = Extract<GatewayRequest, { kind: 'chat_completions' }>;
+
+const API_KEY_AUTH: DirectUpstreamAuth = {
+  type: 'api_key',
+  apiKey: 'test-key',
+  apiKeyHeader: null,
+};
 
 async function transformRequest(
   request: GatewayRequest,
@@ -18,10 +24,9 @@ async function transformRequest(
     {
       internal_id: 'upstream-model',
       base_url: 'https://llm.example.com/v1',
-      api_key: 'test-key',
       ...options,
     },
-    null
+    API_KEY_AUTH
   );
 
   await provider.transformRequest({
@@ -108,10 +113,9 @@ describe('custom LLM endpoint configuration', () => {
       ['messages'],
       {
         base_url: 'https://llm.example.com/invoke',
-        api_key: 'test-key',
         disable_url_suffix,
       },
-      null
+      API_KEY_AUTH
     );
 
     expect(provider.disableUrlSuffix).toBe(expected);
@@ -190,10 +194,9 @@ describe('buildDirectProvider response transforms', () => {
       {
         internal_id: 'upstream-model',
         base_url: 'https://llm.example.com/v1',
-        api_key: 'test-key',
         reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
       },
-      null
+      API_KEY_AUTH
     );
 
     expect(provider.responseTransforms).toBe(ReasoningDetailsTransform.GeminiThought);
@@ -206,12 +209,60 @@ describe('buildDirectProvider response transforms', () => {
       {
         internal_id: 'upstream-model',
         base_url: 'https://llm.example.com/v1',
-        api_key: 'test-key',
       },
-      null
+      API_KEY_AUTH
     );
 
     expect(provider.responseTransforms).toBeNull();
+  });
+});
+
+describe('buildDirectProvider authentication', () => {
+  it('sends API keys straight to base_url', () => {
+    const provider = buildDirectProvider(
+      'custom',
+      ['chat_completions'],
+      { base_url: 'https://llm.example.com/v1' },
+      { type: 'api_key', apiKey: 'test-key', apiKeyHeader: 'x-api-key' }
+    );
+
+    expect(provider).toMatchObject({
+      apiUrl: 'https://llm.example.com/v1',
+      apiKey: 'test-key',
+      apiKeyHeader: 'x-api-key',
+    });
+    expect(provider.secureProxy).toBeUndefined();
+  });
+
+  it('routes secure proxy credentials through base_url to the configured upstream', () => {
+    const provider = buildDirectProvider(
+      'custom',
+      ['messages'],
+      { base_url: 'https://secure-proxy.example.com/api/proxy', disable_url_suffix: true },
+      {
+        type: 'secure_proxy',
+        credentials: {
+          type: 'secure_proxy',
+          proxy_secret: 'proxy-secret',
+          config: {
+            url: 'https://llm.example.com/invoke',
+            extra_headers: { authorization: 'Bearer upstream-key' },
+          },
+        },
+      }
+    );
+
+    expect(provider).toMatchObject({
+      apiUrl: 'https://llm.example.com/invoke',
+      disableUrlSuffix: true,
+      apiKey: '',
+      apiKeyHeader: null,
+      secureProxy: {
+        url: 'https://secure-proxy.example.com/api/proxy',
+        secret: 'proxy-secret',
+        upstreamAuthHeaders: { authorization: 'Bearer upstream-key' },
+      },
+    });
   });
 });
 

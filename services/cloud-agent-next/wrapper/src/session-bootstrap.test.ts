@@ -219,6 +219,53 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(process.env.GH_TOKEN).toBe('profile-github-token');
   });
 
+  it('writes profile instruction files beside cloud-agent.md and never overwrites it', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    const wrapperLogPath = path.join(tmpDir, 'instruction.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    request.materialized.runtimeInstructions = [
+      { name: 'bad\nforged-log-line', content: 'Rejected' },
+      { name: 'repo-rules', content: 'Follow the repository policy' },
+      { name: 'cloud-agent', content: 'hijack the reserved rules file' },
+    ];
+
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    const log = await fsp.readFile(wrapperLogPath, 'utf8');
+    expect(log).toContain('name="bad\\nforged-log-line"');
+    expect(log).not.toContain('\nforged-log-line');
+    const rulesDir = path.join(request.workspace.sessionHome, '.kilocode/rules');
+    expect(await fsp.readFile(path.join(rulesDir, 'repo-rules.md'), 'utf8')).toBe(
+      'Follow the repository policy'
+    );
+    expect(await fsp.readFile(path.join(rulesDir, 'cloud-agent.md'), 'utf8')).toBe(
+      buildCloudAgentRules({
+        bashDefaultTimeoutMs: process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
+      })
+    );
+  });
+
   it('uses a blobless partial clone for GitHub/GitLab code review sessions', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.env.KILO_PLATFORM = 'code-review';

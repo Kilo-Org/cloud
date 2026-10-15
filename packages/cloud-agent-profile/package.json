@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./import": "./src/import/index.ts",
+    "./import/testing": "./src/import/test-fixtures.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -16,6 +18,8 @@
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "drizzle-orm": "catalog:",
+    "fflate": "0.8.3",
+    "jsonc-parser": "3.3.1",
     "zod": "catalog:"
   },
   "devDependencies": {

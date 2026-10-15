@@ -400,6 +400,12 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_API_REQUEST_LOG_ACCESS_KEY_ID` - R2 access key ID used only for the `api_request_log` bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
 - `R2_API_REQUEST_LOG_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_API_REQUEST_LOG_ACCESS_KEY_ID`. `[SECRET]`
 
+## AI Gateway Secure Proxy (apps/ai-gateway-secure-proxy)
+
+Set manually on the `kilocode-ai-gateway-secure-proxy` Vercel project; not managed by `pnpm web:env`.
+
+- `KILO_AI_GATEWAY_SECURE_PROXY_SECRET` - Shared secret the gateway sends as `Authorization: Bearer <secret>`; read in `apps/ai-gateway-secure-proxy/src/lib/secure-proxy.ts`. Admins store the same value as `proxy_secret` in `secure_proxy` custom LLM credentials. When unset, the proxy rejects every request. `[SECRET]`
+
 ## Services
 
 ### Notifications Worker

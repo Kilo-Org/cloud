@@ -1,5 +1,5 @@
 {
-  "id": "81676b3f-6546-46ca-90c6-b6c67ffd66aa",
+  "id": "40367b11-de2c-44c0-a26d-a983f5f914b8",
   "prevId": "f8b451f3-429d-47f5-8951-fc356a41bd80",
   "version": "7",
   "dialect": "postgresql",
@@ -391,6 +391,104 @@
           "columns": [
             "profile_id",
             "sequence"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_instructions": {
+      "name": "agent_environment_profile_instructions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_instructions_profile_id": {
+          "name": "IDX_agent_env_profile_instructions_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_instructions_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_instructions_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_instructions",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_instructions_profile_name": {
+          "name": "UQ_agent_env_profile_instructions_profile_name",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "name"
           ]
         }
       },
@@ -10787,44 +10885,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "consumed_microdollars": {
-          "name": "consumed_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "retired_microdollars": {
-          "name": "retired_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "paid_credit_policy": {
-          "name": "paid_credit_policy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "credit_source": {
-          "name": "credit_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_transaction_id": {
-          "name": "source_transaction_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refund_principal_microdollars": {
-          "name": "refund_principal_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
         "is_free": {
           "name": "is_free",
           "type": "boolean",
@@ -11012,21 +11072,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_credit_transactions_source_transaction_id": {
-          "name": "IDX_credit_transactions_source_transaction_id",
-          "columns": [
-            {
-              "expression": "source_transaction_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -22789,22 +22834,6 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_kilocode_users_next_credit_expiration_at": {
-          "name": "IDX_kilocode_users_next_credit_expiration_at",
-          "columns": [
-            {
-              "expression": "next_credit_expiration_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"kilocode_users\".\"next_credit_expiration_at\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
         "IDX_kilocode_users_blocked_at": {
           "name": "IDX_kilocode_users_blocked_at",
           "columns": [
@@ -29643,22 +29672,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_organizations_next_credit_expiration_at": {
-          "name": "IDX_organizations_next_credit_expiration_at",
-          "columns": [
-            {
-              "expression": "next_credit_expiration_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"organizations\".\"next_credit_expiration_at\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

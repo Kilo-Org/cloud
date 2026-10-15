@@ -64,10 +64,16 @@ import { logRuntimeProxyRequestFailed } from './runtime-credential-proxy-diagnos
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
+  resolveRuntimeCredentialProxyScopeIngestRoute,
   resolveRuntimeCredentialProxyScopedIngestRoute,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
-import { forwardCloudAgentSessionScopeRequest } from './cloud-agent-session-scope-proxy.js';
+import {
+  encodeCloudAgentSessionScopeV2ViewHeaders,
+  forwardCloudAgentSessionScopeRequest,
+  forwardCloudAgentSessionScopeV2Request,
+} from './cloud-agent-session-scope-proxy.js';
+import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
@@ -487,6 +493,7 @@ async function forwardRuntimeCredentialProxy(
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+    scopeView?: ScopeGrantView;
   } | null;
   try {
     credential = await withDORetry(
@@ -500,30 +507,58 @@ async function forwardRuntimeCredentialProxy(
   if (!credential) return c.text('Unauthorized', 401);
   const targets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
   if (!targets.success) return c.text('Not found', 404);
-  const scopedUpstream = resolveRuntimeCredentialProxyScopedIngestRoute({
-    targets: targets.targets,
-    route,
-    method: c.req.method,
-    pathname: path,
-    search: new URL(c.req.url).search,
-    kiloSessionId: claims.kiloSessionId,
-    organizationId: credential.organizationId,
-    contentType: c.req.header('content-type'),
-    bodyText,
-  });
-  const upstream =
-    scopedUpstream ??
-    runtimeCredentialProxyUpstream(
-      targets.targets,
+
+  const search = new URL(c.req.url).search;
+  const scopeView = route === 'ingest' ? credential.scopeView : undefined;
+  let scopedV1 = false;
+  let scopedV2Headers: Record<string, string> | null = null;
+  let upstream: URL | null;
+  if (scopeView !== undefined) {
+    const adopted = resolveRuntimeCredentialProxyScopeIngestRoute({
+      targets: targets.targets,
       route,
-      c.req.method,
-      path,
-      new URL(c.req.url).search,
-      claims.kiloSessionId,
-      credential.organizationId,
-      c.req.header('content-type'),
-      bodyText
-    );
+      method: c.req.method,
+      pathname: path,
+      search,
+      memberRootKiloSessionIds: scopeView.memberRootKiloSessionIds,
+      organizationId: credential.organizationId,
+      contentType: c.req.header('content-type'),
+      bodyText,
+    });
+    if (adopted === null) return c.text('Not found', 404);
+    upstream = adopted.upstream;
+    if (adopted.kind === 'scoped') {
+      const v2Headers = encodeCloudAgentSessionScopeV2ViewHeaders(scopeView);
+      if (v2Headers === null) return c.text('Credential unavailable', 503);
+      scopedV2Headers = v2Headers;
+    }
+  } else {
+    const scopedUpstream = resolveRuntimeCredentialProxyScopedIngestRoute({
+      targets: targets.targets,
+      route,
+      method: c.req.method,
+      pathname: path,
+      search,
+      kiloSessionId: claims.kiloSessionId,
+      organizationId: credential.organizationId,
+      contentType: c.req.header('content-type'),
+      bodyText,
+    });
+    scopedV1 = scopedUpstream !== null;
+    upstream =
+      scopedUpstream ??
+      runtimeCredentialProxyUpstream(
+        targets.targets,
+        route,
+        c.req.method,
+        path,
+        search,
+        claims.kiloSessionId,
+        credential.organizationId,
+        c.req.header('content-type'),
+        bodyText
+      );
+  }
   if (!upstream) return c.text('Not found', 404);
   try {
     // The route allowlist is resolved above before a proof is issued.
@@ -541,16 +576,23 @@ async function forwardRuntimeCredentialProxy(
     const headers = runtimeProxyHeaders(c.req.raw, credential.token, credential.organizationId);
     headers.set(RUNTIME_PROXY_ATTESTATION_HEADER, proof);
     const request = createSanitizedForwardRequest(c.req.raw, upstream, headers, bodyText);
-    const response = scopedUpstream
-      ? await forwardCloudAgentSessionScopeRequest(request, c.env, {
-          authorization: `Bearer ${credential.token}`,
-          sessionIngestScope: {
-            cloudAgentSessionId: claims.sessionId,
-            rootKiloSessionId: claims.kiloSessionId,
-          },
-          runtimeProxyAttestation: proof,
-        })
-      : await fetch(request, { redirect: 'manual' });
+    const response =
+      scopedV2Headers !== null
+        ? await forwardCloudAgentSessionScopeV2Request(request, c.env, {
+            authorization: `Bearer ${credential.token}`,
+            scopeHeaders: scopedV2Headers,
+            runtimeProxyAttestation: proof,
+          })
+        : scopedV1
+          ? await forwardCloudAgentSessionScopeRequest(request, c.env, {
+              authorization: `Bearer ${credential.token}`,
+              sessionIngestScope: {
+                cloudAgentSessionId: claims.sessionId,
+                rootKiloSessionId: claims.kiloSessionId,
+              },
+              runtimeProxyAttestation: proof,
+            })
+          : await fetch(request, { redirect: 'manual' });
     if (!response.ok) {
       logRuntimeProxyRequestFailed({
         upstreamAttempted: true,

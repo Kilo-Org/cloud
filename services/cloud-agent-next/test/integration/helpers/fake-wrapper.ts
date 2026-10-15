@@ -1,3 +1,7 @@
+import {
+  WORKTREE_RUNTIME_HEADER,
+  WORKTREE_RUNTIME_VERSION,
+} from '../../../src/shared/control-plane-runtime-contract.js';
 import { SELF } from 'cloudflare:test';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -9,6 +13,7 @@ export type FakeWrapperConnectInput = {
   sandboxId: string;
   credential: string;
   path?: string;
+  runtimeContract?: 'legacy' | 'worktree';
 };
 
 export type FakeWrapperHelloInput = {
@@ -56,7 +61,13 @@ export class FakeWrapper {
   static async connect(input: FakeWrapperConnectInput): Promise<FakeWrapper> {
     const path = input.path ?? `/sandbox-control-v2/${encodeURIComponent(input.sandboxId)}`;
     const response = await SELF.fetch(`http://worker.test${path}`, {
-      headers: { Upgrade: 'websocket', Authorization: `Bearer ${input.credential}` },
+      headers: {
+        Upgrade: 'websocket',
+        Authorization: `Bearer ${input.credential}`,
+        ...(input.runtimeContract === 'legacy'
+          ? {}
+          : { [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION }),
+      },
     });
     if (response.status !== 101 || !response.webSocket) {
       throw new Error(`Unexpected sandbox control v2 upgrade: ${response.status}`);

@@ -330,3 +330,5 @@ export function createMcpAnalytics(deps: McpAnalyticsDeps): McpAnalytics {
 }
 
 // ci-probe 1
+
+// ci-probe 2

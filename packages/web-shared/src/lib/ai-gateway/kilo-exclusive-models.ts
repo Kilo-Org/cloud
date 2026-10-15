@@ -207,7 +207,7 @@ export const stepfun_5_preview_free_model: KiloExclusiveModel = {
     "Step 5 Preview is StepFun's flagship model for agentic work, with strong capabilities in software engineering, professional knowledge work, and finance. It natively supports text, image, and video input with a 1M-token context window and up to 64K output tokens. The model supports tool calling, structured outputs, and selectable reasoning levels (low/medium/high) for long-context research, coding, and multi-step workflows.",
   context_length: 1_000_000,
   max_completion_tokens: 64_000,
-  status: 'public',
+  status: 'disabled',
   flags: ['reasoning', 'vision'],
   provider: OPENROUTER,
   internal_id: 'stepfun/step-5-preview',

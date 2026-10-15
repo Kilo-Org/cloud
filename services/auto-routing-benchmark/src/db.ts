@@ -7,6 +7,8 @@ import type {
   BenchmarkRunPurpose,
   ClassifierWinner,
   RankedCandidate,
+  PolicySettingComputedMap,
+  PolicySettingOverrides,
   ProductionTokenProfile,
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
@@ -167,6 +169,7 @@ export async function replaceConfig(
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
+    policy_overrides?: PolicySettingOverrides | null;
     updated_at: string;
     updated_by: string | null;
   },
@@ -197,6 +200,21 @@ export async function replaceConfig(
 
 /** Which registry queue a run drains: the platform decider list, or owner pools. */
 export type { BenchmarkRunPurpose };
+
+/**
+ * Record the daily system-optimal computation for one router. Only the computed
+ * map is written, so admin provenance (updated_at/updated_by) is untouched.
+ */
+export async function savePolicyComputed(
+  db: D1Database,
+  router: AutoRouter,
+  computed: PolicySettingComputedMap
+): Promise<void> {
+  await drizzle(db)
+    .update(benchmarkConfig)
+    .set({ policy_computed: computed })
+    .where(eq(benchmarkConfig.router, router));
+}
 
 export async function insertRun(
   db: D1Database,

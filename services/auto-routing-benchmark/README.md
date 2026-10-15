@@ -44,6 +44,30 @@ deduplicated as a retry of the first call.
 Capability lookups derive candidate IDs from the selected router's table; the capability
 cache remains a shared model-ID union because modalities and context limits belong to models.
 
+## System-optimal policy settings
+
+The daily platform sync recomputes each router's policy settings before publishing, and stores
+the result on the router's `benchmark_config` row (`policy_computed`) with its `computedAt`,
+`source`, and a short evidence string. The effective value of a setting is
+`override ?? computed ?? stored default`, so an admin override always wins and clearing it
+falls back to the system value. Publishing reads effective values only.
+
+- `minAccuracy` and `accuracyNoiseBand`: chosen from a grid over the registry's measured
+  summaries, scored on held-out cases (a deterministic sha256 train/held-out split of the case
+  ids). The objective is mean held-out accuracy per estimated request dollar, subject to a
+  quality floor, and the chosen point is the middle of the stable plateau rather than its edge.
+  Insufficient held-out data (`< 20` graded cases or `< 2` evaluated routes) leaves the current
+  value in place.
+- `productionTokenProfile` and `switchHorizonTurns`: derived from production auto-request usage.
+  The worker has no Postgres access, so it reads mean uncached/cached input tokens and the
+  median requests per auto session from `GET /api/internal/auto-routing-benchmark/production-profile`
+  on apps/web over a 7-day window. An unavailable endpoint leaves the previous computed values.
+- `frontierMinAccuracyDelta`, `switchCostFactor`, `bestAccuracySwitchThreshold`,
+  `lowConfidenceThreshold`, classifier/decider repetitions, and `classifierMaxP95LatencyMs` are
+  fixed constants: the held-out benchmark scores single requests, so session-economics and
+  measurement-effort knobs have no measured basis for a daily recomputation. The Policy tab
+  shows their value and the reason they are read-only.
+
 Frontier initially has no saved configuration or published table. No default model pool or
 efficient table is fabricated for it. Before enabling frontier serving, administrators must
 split the existing container budgets, save a frontier configuration with its own decider
@@ -85,8 +109,12 @@ Expand a route to inspect every ranked model/effort pair.
 
 - `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
 - A candidate competes within the router's `accuracyNoiseBand` of its effective `minAccuracy` (default noise band 0.05).
-- Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`; the delta defaults to 0.
+- Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`. The delta is fixed at 0, so the frontier router uses its own system-computed `minAccuracy`.
 - Both routers use the same best-value formula, selecting models and efforts from their own measured pools.
+- Daily re-evaluation: `minAccuracy`/`accuracyNoiseBand` come from a held-out grid over the
+  registry's measurements, `productionTokenProfile`/`switchHorizonTurns` from production auto
+  usage (mean uncached/cached input tokens per request, median requests per session), and the
+  rest are fixed constants. Admin overrides win over the computed values.
 - Competing candidates are ordered by `estimatedRequestCostUsd × effectiveLatency^1.5 / wilson^15`, lowest first. With known TTFT, `effectiveLatency = p50TtftMs + LATENCY_TOTAL_WEIGHT × p50LatencyMs`, where the exported `LATENCY_TOTAL_WEIGHT` is 0.15 (tuned on a fully streamed offline sweep); without TTFT, total `p50LatencyMs` alone preserves legacy ordering.
 - `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
 - `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.

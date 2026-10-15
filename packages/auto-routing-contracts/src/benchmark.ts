@@ -10,6 +10,11 @@ import {
 import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { AutoRouterSchema, DEFAULT_AUTO_ROUTER } from './router';
+import {
+  PolicySettingComputedMapSchema,
+  PolicySettingOverridesSchema,
+  PolicySettingsStateSchema,
+} from './policy-settings';
 
 export { ReasoningEffortSchema } from './reasoning';
 export type { ReasoningEffort } from './reasoning';
@@ -136,6 +141,11 @@ export const BenchmarkConfigSchema = z
     // Maximum acceptable p95 latency for the classifier winner; null means no
     // constraint (cost-only selection).
     classifierMaxP95LatencyMs: z.number().int().positive().nullable().default(1000),
+    // Admin overrides for system-optimal policy settings. Null/absent entries
+    // mean "use the computed value". Server-owned: the computed map is never
+    // written through this schema.
+    policyOverrides: PolicySettingOverridesSchema.nullable().optional(),
+    policyComputed: PolicySettingComputedMapSchema.nullable().optional(),
     updatedAt: z.string().nullable(),
     updatedBy: z.string().nullable(),
   })
@@ -215,6 +225,9 @@ export const BenchmarkRunsResponseSchema = z.object({ runs: z.array(BenchmarkRun
 // default config, and runs cannot start without a saved one.
 export const BenchmarkConfigResponseSchema = z.object({
   config: BenchmarkConfigSchema.nullable(),
+  // Per-setting effective/computed/override resolution. Null when no config is
+  // saved; optional so PUT responses from an older worker still parse.
+  policySettings: PolicySettingsStateSchema.nullable().optional(),
 });
 export const StartBenchmarkRunRequestSchema = z.object({
   router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),

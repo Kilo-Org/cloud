@@ -22,6 +22,9 @@ import {
   type BenchmarkRegistryResponse,
   type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
+  type PolicySettingState,
+  type PolicySettingValue,
+  resolvePolicySettings,
   type RankedCandidate,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -84,6 +87,75 @@ export function costPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'a
 export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
   const value = costPerAccuracy(candidate);
   return Number.isFinite(value) ? formatUsd(value) : '—';
+}
+
+export function formatPolicyValue(value: PolicySettingValue): string {
+  if (value === null) return 'off';
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)));
+  }
+  return `${Math.round(value.uncachedInputTokens)} uncached / ${Math.round(value.cachedInputTokens)} cached tokens`;
+}
+
+// The four auto settings that accept an admin override, plus the two token
+// fields the profile override is entered through.
+type PolicyOverrideForm = {
+  minAccuracy: string;
+  accuracyNoiseBand: string;
+  switchHorizonTurns: string;
+  uncachedInputTokens: string;
+  cachedInputTokens: string;
+};
+
+function overrideNumberText(value: PolicySettingValue | undefined): string {
+  return typeof value === 'number' ? String(value) : '';
+}
+
+function overrideFormFromConfig(config: BenchmarkConfig | null): PolicyOverrideForm {
+  const overrides = config?.policyOverrides ?? null;
+  const profile = overrides?.productionTokenProfile ?? null;
+  return {
+    minAccuracy: overrideNumberText(overrides?.minAccuracy),
+    accuracyNoiseBand: overrideNumberText(overrides?.accuracyNoiseBand),
+    switchHorizonTurns: overrideNumberText(overrides?.switchHorizonTurns),
+    uncachedInputTokens:
+      profile !== null && typeof profile === 'object' ? String(profile.uncachedInputTokens) : '',
+    cachedInputTokens:
+      profile !== null && typeof profile === 'object' ? String(profile.cachedInputTokens) : '',
+  };
+}
+
+function parseBoundedOverride(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) && value >= 0 && value <= 1 ? value : null;
+}
+
+function parseTurnOverride(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return null;
+  const turns = Math.round(Number(trimmed));
+  return Number.isFinite(turns) && turns >= 1 ? turns : null;
+}
+
+export function policyOverridesFromForm(form: PolicyOverrideForm): BenchmarkConfig['policyOverrides'] {
+  const overrides: NonNullable<BenchmarkConfig['policyOverrides']> = {};
+  const minAccuracy = parseBoundedOverride(form.minAccuracy);
+  if (minAccuracy !== null) overrides.minAccuracy = minAccuracy;
+  const accuracyNoiseBand = parseBoundedOverride(form.accuracyNoiseBand);
+  if (accuracyNoiseBand !== null) overrides.accuracyNoiseBand = accuracyNoiseBand;
+  const switchHorizonTurns = parseTurnOverride(form.switchHorizonTurns);
+  if (switchHorizonTurns !== null) overrides.switchHorizonTurns = switchHorizonTurns;
+  const uncached = parseOptionalNumber(form.uncachedInputTokens);
+  const cached = parseOptionalNumber(form.cachedInputTokens);
+  if (uncached !== null || cached !== null) {
+    overrides.productionTokenProfile = {
+      uncachedInputTokens: uncached ?? 0,
+      cachedInputTokens: cached ?? 0,
+    };
+  }
+  return Object.keys(overrides).length > 0 ? overrides : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -238,7 +310,7 @@ function parseTokenProfile(state: {
   };
 }
 
-export function configToFormState(config: BenchmarkConfig | null): {
+export type BenchmarkConfigFormState = {
   classifierModels: string[];
   deciderModels: DeciderModelRow[];
   minAccuracy: number;
@@ -257,7 +329,10 @@ export function configToFormState(config: BenchmarkConfig | null): {
   cachedInputTokens: string;
   switchHorizonTurns: string;
   lowConfidenceThreshold: string;
-} {
+  policyOverrides: PolicyOverrideForm;
+};
+
+export function configToFormState(config: BenchmarkConfig | null): BenchmarkConfigFormState {
   if (config === null) {
     // No config saved yet: identity fields are overrides, so blank means the
     // worker uses its default benchmark user and org at run time.
@@ -280,6 +355,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
       cachedInputTokens: '',
       switchHorizonTurns: '',
       lowConfidenceThreshold: '',
+      policyOverrides: overrideFormFromConfig(null),
     };
   }
   return {
@@ -302,11 +378,12 @@ export function configToFormState(config: BenchmarkConfig | null): {
     cachedInputTokens: optionalNumberText(config.productionTokenProfile?.cachedInputTokens),
     switchHorizonTurns: optionalNumberText(config.switchHorizonTurns),
     lowConfidenceThreshold: optionalNumberText(config.lowConfidenceThreshold),
+    policyOverrides: overrideFormFromConfig(config),
   };
 }
 
 export function formStateToConfig(
-  state: ReturnType<typeof configToFormState>,
+  state: BenchmarkConfigFormState,
   base: BenchmarkConfig | null
 ): BenchmarkConfig {
   const classifierModels = state.classifierModels.map(id => id.trim()).filter(id => id.length > 0);
@@ -336,6 +413,7 @@ export function formStateToConfig(
     classifierRepetitions: state.classifierRepetitions,
     deciderRepetitions: state.deciderRepetitions,
     classifierMaxP95LatencyMs,
+    policyOverrides: policyOverridesFromForm(state.policyOverrides),
     updatedAt: base?.updatedAt ?? null,
     updatedBy: base?.updatedBy ?? null,
   };
@@ -351,6 +429,97 @@ function ConfigSectionHeading({ title, description }: { title: string; descripti
       <h3 className="text-sm font-semibold">{title}</h3>
       <p className="text-muted-foreground text-xs">{description}</p>
     </div>
+  );
+}
+
+function formatComputedAt(computedAt: string): string {
+  const date = new Date(computedAt);
+  return Number.isNaN(date.getTime()) ? computedAt : date.toLocaleString();
+}
+
+/**
+ * One policy setting on the Policy tab. Auto settings show the effective value,
+ * whether it comes from the system or an override, the last computed value and
+ * its evidence, and an override input with a reset. Fixed settings are read-only
+ * with the reason nobody should change them.
+ */
+function PolicySettingField({
+  state,
+  overridden,
+  help,
+  children,
+}: {
+  state: PolicySettingState;
+  overridden: boolean;
+  help?: string;
+  children?: React.ReactNode;
+}) {
+  const computed = state.computed;
+  if (state.kind === 'fixed') {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium">{state.label}</span>
+          <Badge variant="outline" className="text-[10px]">
+            Fixed
+          </Badge>
+          <span className="text-sm tabular-nums">{formatPolicyValue(state.effective)}</span>
+        </div>
+        {state.reason ? <p className="text-muted-foreground text-xs">{state.reason}</p> : null}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium">{state.label}</span>
+        <Badge variant={overridden ? 'default' : 'secondary'} className="text-[10px]">
+          {overridden ? 'Override' : 'System'}
+        </Badge>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          Effective {formatPolicyValue(state.effective)}
+        </span>
+      </div>
+      {computed ? (
+        <>
+          <p className="text-muted-foreground text-xs">
+            System {formatPolicyValue(computed.value)} · computed {formatComputedAt(computed.computedAt)}{' '}
+            · {computed.source}
+          </p>
+          <p className="text-muted-foreground text-xs">{computed.evidence}</p>
+        </>
+      ) : (
+        <p className="text-muted-foreground text-xs">
+          Not computed yet — the current value stands until the daily re-evaluation has data.
+        </p>
+      )}
+      {help ? <p className="text-muted-foreground text-xs">{help}</p> : null}
+      {children ? <div className="flex flex-wrap items-end gap-2">{children}</div> : null}
+    </div>
+  );
+}
+
+function UseSystemValueButton({
+  overridden,
+  onClick,
+  label,
+}: {
+  overridden: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-8"
+      disabled={!overridden}
+      onClick={onClick}
+      aria-label={label}
+    >
+      Use system value
+    </Button>
   );
 }
 
@@ -481,6 +650,38 @@ function BenchmarkConfigEditor({
   const handleSave = useCallback(() => {
     saveMutation.mutate(formStateToConfig(form, config));
   }, [form, config, saveMutation]);
+
+  // Effective/computed/override per policy setting, resolved from the live form
+  // so an unsaved override shows immediately, against the server's computed map.
+  const policyStates = useMemo(
+    () =>
+      resolvePolicySettings({
+        minAccuracy: form.minAccuracy,
+        accuracyNoiseBand: form.accuracyNoiseBand,
+        frontierMinAccuracyDelta: form.frontierMinAccuracyDelta,
+        productionTokenProfile: parseTokenProfile(form),
+        switchHorizonTurns: parseOptionalNumber(form.switchHorizonTurns),
+        switchCostFactor: form.switchCostFactor,
+        bestAccuracySwitchThreshold: form.bestAccuracySwitchThreshold,
+        lowConfidenceThreshold: parseOptionalNumber(form.lowConfidenceThreshold),
+        classifierRepetitions: form.classifierRepetitions,
+        deciderRepetitions: form.deciderRepetitions,
+        classifierMaxP95LatencyMs: parseOptionalNumber(form.classifierMaxP95LatencyMs),
+        policyOverrides: policyOverridesFromForm(form.policyOverrides),
+        policyComputed: config?.policyComputed ?? null,
+      }),
+    [form, config]
+  );
+
+  const setOverride = useCallback(
+    (patch: Partial<PolicyOverrideForm>) => {
+      updateForm(prev => ({
+        ...prev,
+        policyOverrides: { ...prev.policyOverrides, ...patch },
+      }));
+    },
+    [updateForm]
+  );
 
   return (
     <Card className="rounded-lg">
@@ -630,116 +831,109 @@ function BenchmarkConfigEditor({
           description="How candidates are filtered and costed before a routing table is published."
         />
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-min-accuracy" className="text-sm font-medium">
-              Min accuracy (0–1)
-            </Label>
-            <Input
-              id="benchmark-min-accuracy"
-              type="number"
-              min={0}
-              max={1}
-              step={0.05}
-              value={form.minAccuracy}
-              onChange={e =>
-                updateForm(prev => ({ ...prev, minAccuracy: parseFloat(e.target.value) || 0 }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
+          <div className="sm:col-span-2">
+            <PolicySettingField
+              state={policyStates.minAccuracy}
+              overridden={policyStates.minAccuracy.override !== null}
+              help="Chosen by a held-out grid over the measured registry: the middle of the stable plateau with the best accuracy per estimated request dollar."
+            >
+              <Input
+                id="benchmark-min-accuracy-override"
+                type="text"
+                inputMode="decimal"
+                value={form.policyOverrides.minAccuracy}
+                onChange={e => setOverride({ minAccuracy: e.target.value })}
+                className="h-8 w-28 tabular-nums"
+                placeholder={formatPolicyValue(
+                  policyStates.minAccuracy.computed?.value ?? policyStates.minAccuracy.effective
+                )}
+                aria-label="Minimum accuracy override"
+              />
+              <UseSystemValueButton
+                overridden={policyStates.minAccuracy.override !== null}
+                onClick={() => setOverride({ minAccuracy: '' })}
+                label="Use the system minimum accuracy"
+              />
+            </PolicySettingField>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-accuracy-noise-band" className="text-sm font-medium">
-              Accuracy noise band (0–1)
-            </Label>
-            <Input
-              id="benchmark-accuracy-noise-band"
-              type="number"
-              min={0}
-              max={1}
-              step={0.01}
-              value={form.accuracyNoiseBand}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  accuracyNoiseBand: parseFloat(e.target.value) || 0,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
+          <div className="sm:col-span-2">
+            <PolicySettingField
+              state={policyStates.accuracyNoiseBand}
+              overridden={policyStates.accuracyNoiseBand.override !== null}
+              help="Candidates within this band of the threshold compete on value. Chosen by the same held-out grid as the minimum accuracy."
+            >
+              <Input
+                id="benchmark-accuracy-noise-band-override"
+                type="text"
+                inputMode="decimal"
+                value={form.policyOverrides.accuracyNoiseBand}
+                onChange={e => setOverride({ accuracyNoiseBand: e.target.value })}
+                className="h-8 w-28 tabular-nums"
+                placeholder={formatPolicyValue(
+                  policyStates.accuracyNoiseBand.computed?.value ??
+                    policyStates.accuracyNoiseBand.effective
+                )}
+                aria-label="Accuracy noise band override"
+              />
+              <UseSystemValueButton
+                overridden={policyStates.accuracyNoiseBand.override !== null}
+                onClick={() => setOverride({ accuracyNoiseBand: '' })}
+                label="Use the system accuracy noise band"
+              />
+            </PolicySettingField>
           </div>
           {router === 'frontier' ? (
-            <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor="benchmark-frontier-min-accuracy-delta"
-                className="text-sm font-medium"
-              >
-                Frontier minimum accuracy delta (0–1)
-              </Label>
-              <Input
-                id="benchmark-frontier-min-accuracy-delta"
-                type="number"
-                min={0}
-                max={1}
-                step={0.01}
-                value={form.frontierMinAccuracyDelta}
-                onChange={e =>
-                  updateForm(prev => ({
-                    ...prev,
-                    frontierMinAccuracyDelta: parseFloat(e.target.value) || 0,
-                  }))
-                }
-                className="h-8 w-40 tabular-nums"
+            <div className="sm:col-span-2">
+              <PolicySettingField
+                state={policyStates.frontierMinAccuracyDelta}
+                overridden={false}
               />
             </div>
           ) : null}
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
-            <span className="text-sm font-medium">Production token profile</span>
-            <div className="flex flex-wrap gap-4">
+          <div className="sm:col-span-2">
+            <PolicySettingField
+              state={policyStates.productionTokenProfile}
+              overridden={policyStates.productionTokenProfile.override !== null}
+              help="Mean input tokens per production auto request, measured from real usage. Ranking adds their cost at each model's prompt and cache-read prices."
+            >
               <div className="flex flex-col gap-1.5">
                 <Label
-                  htmlFor="benchmark-uncached-input-tokens"
+                  htmlFor="benchmark-uncached-input-tokens-override"
                   className="text-muted-foreground text-xs"
                 >
                   Uncached input tokens
                 </Label>
                 <Input
-                  id="benchmark-uncached-input-tokens"
-                  type="number"
-                  min={0}
-                  step={100}
-                  value={form.uncachedInputTokens}
-                  onChange={e =>
-                    updateForm(prev => ({ ...prev, uncachedInputTokens: e.target.value }))
-                  }
+                  id="benchmark-uncached-input-tokens-override"
+                  type="text"
+                  inputMode="numeric"
+                  value={form.policyOverrides.uncachedInputTokens}
+                  onChange={e => setOverride({ uncachedInputTokens: e.target.value })}
                   className="h-8 w-40 tabular-nums"
-                  aria-describedby="benchmark-token-profile-help"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label
-                  htmlFor="benchmark-cached-input-tokens"
+                  htmlFor="benchmark-cached-input-tokens-override"
                   className="text-muted-foreground text-xs"
                 >
                   Cached input tokens
                 </Label>
                 <Input
-                  id="benchmark-cached-input-tokens"
-                  type="number"
-                  min={0}
-                  step={100}
-                  value={form.cachedInputTokens}
-                  onChange={e =>
-                    updateForm(prev => ({ ...prev, cachedInputTokens: e.target.value }))
-                  }
+                  id="benchmark-cached-input-tokens-override"
+                  type="text"
+                  inputMode="numeric"
+                  value={form.policyOverrides.cachedInputTokens}
+                  onChange={e => setOverride({ cachedInputTokens: e.target.value })}
                   className="h-8 w-40 tabular-nums"
-                  aria-describedby="benchmark-token-profile-help"
                 />
               </div>
-            </div>
-            <p id="benchmark-token-profile-help" className="text-muted-foreground text-xs">
-              Mean input tokens per production request. Ranking adds their cost at each model&apos;s
-              prompt and cache-read prices. Leave both empty to rank by benchmark cost only.
-            </p>
+              <UseSystemValueButton
+                overridden={policyStates.productionTokenProfile.override !== null}
+                onClick={() => setOverride({ uncachedInputTokens: '', cachedInputTokens: '' })}
+                label="Use the system production token profile"
+              />
+            </PolicySettingField>
           </div>
         </div>
 
@@ -748,91 +942,43 @@ function BenchmarkConfigEditor({
           description="When a session keeps its incumbent model instead of switching."
         />
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-switch-cost-factor" className="text-sm font-medium">
-              Switch cost factor (1–100)
-            </Label>
-            <Input
-              id="benchmark-switch-cost-factor"
-              type="number"
-              min={1}
-              max={100}
-              step={0.5}
-              value={form.switchCostFactor}
-              onChange={e =>
-                updateForm(prev => ({ ...prev, switchCostFactor: parseFloat(e.target.value) || 1 }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-switch-horizon-turns" className="text-sm font-medium">
-              Switch horizon (turns)
-            </Label>
-            <Input
-              id="benchmark-switch-horizon-turns"
-              type="number"
-              min={1}
-              step={1}
-              value={form.switchHorizonTurns}
-              onChange={e => updateForm(prev => ({ ...prev, switchHorizonTurns: e.target.value }))}
-              className="h-8 w-40 tabular-nums"
-              placeholder="(use switch cost factor)"
-              aria-describedby="benchmark-switch-horizon-turns-help"
-            />
-            <p id="benchmark-switch-horizon-turns-help" className="text-muted-foreground text-xs">
-              Switch to a cheaper model only when savings over this many turns exceed the lost
-              prompt cache. Empty uses the switch cost factor.
-            </p>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label
-              htmlFor="benchmark-best-accuracy-switch-threshold"
-              className="text-sm font-medium"
+          <div className="sm:col-span-2">
+            <PolicySettingField
+              state={policyStates.switchHorizonTurns}
+              overridden={policyStates.switchHorizonTurns.override !== null}
+              help="Switch to a cheaper model only when savings over this many turns exceed the lost prompt cache. Taken from the median number of requests in a production auto session."
             >
-              Best accuracy switch threshold (0–1)
-            </Label>
-            <Input
-              id="benchmark-best-accuracy-switch-threshold"
-              type="number"
-              min={0}
-              max={1}
-              step={0.01}
-              value={form.bestAccuracySwitchThreshold}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  bestAccuracySwitchThreshold: parseFloat(e.target.value) || 0,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
+              <Input
+                id="benchmark-switch-horizon-turns-override"
+                type="text"
+                inputMode="numeric"
+                value={form.policyOverrides.switchHorizonTurns}
+                onChange={e => setOverride({ switchHorizonTurns: e.target.value })}
+                className="h-8 w-28 tabular-nums"
+                placeholder={formatPolicyValue(
+                  policyStates.switchHorizonTurns.computed?.value ??
+                    policyStates.switchHorizonTurns.effective
+                )}
+                aria-label="Switch horizon override"
+              />
+              <UseSystemValueButton
+                overridden={policyStates.switchHorizonTurns.override !== null}
+                onClick={() => setOverride({ switchHorizonTurns: '' })}
+                label="Use the system switch horizon"
+              />
+            </PolicySettingField>
+          </div>
+          <div className="sm:col-span-2">
+            <PolicySettingField state={policyStates.switchCostFactor} overridden={false} />
+          </div>
+          <div className="sm:col-span-2">
+            <PolicySettingField
+              state={policyStates.bestAccuracySwitchThreshold}
+              overridden={false}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-low-confidence-threshold" className="text-sm font-medium">
-              Low-confidence threshold (0–1)
-            </Label>
-            <Input
-              id="benchmark-low-confidence-threshold"
-              type="number"
-              min={0}
-              max={1}
-              step={0.05}
-              value={form.lowConfidenceThreshold}
-              onChange={e =>
-                updateForm(prev => ({ ...prev, lowConfidenceThreshold: e.target.value }))
-              }
-              className="h-8 w-40 tabular-nums"
-              placeholder="(off)"
-              aria-describedby="benchmark-low-confidence-threshold-help"
-            />
-            <p
-              id="benchmark-low-confidence-threshold-help"
-              className="text-muted-foreground text-xs"
-            >
-              Classifications below this confidence pick the most accurate model. Empty turns it
-              off.
-            </p>
+          <div className="sm:col-span-2">
+            <PolicySettingField state={policyStates.lowConfidenceThreshold} overridden={false} />
           </div>
         </div>
 
@@ -895,45 +1041,11 @@ function BenchmarkConfigEditor({
               </p>
             </div>
           ) : null}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-classifier-repetitions" className="text-sm font-medium">
-              Classifier repetitions (1–5)
-            </Label>
-            <Input
-              id="benchmark-classifier-repetitions"
-              type="number"
-              min={1}
-              max={5}
-              step={1}
-              value={form.classifierRepetitions}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  classifierRepetitions: parseInt(e.target.value, 10) || 1,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
+          <div className="sm:col-span-2">
+            <PolicySettingField state={policyStates.classifierRepetitions} overridden={false} />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-decider-repetitions" className="text-sm font-medium">
-              Decider repetitions (1–5)
-            </Label>
-            <Input
-              id="benchmark-decider-repetitions"
-              type="number"
-              min={1}
-              max={5}
-              step={1}
-              value={form.deciderRepetitions}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  deciderRepetitions: parseInt(e.target.value, 10) || 1,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
+          <div className="sm:col-span-2">
+            <PolicySettingField state={policyStates.deciderRepetitions} overridden={false} />
           </div>
         </div>
 
@@ -972,24 +1084,7 @@ function BenchmarkConfigEditor({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="benchmark-classifier-max-p95-latency" className="text-sm font-medium">
-            Classifier max p95 latency (ms)
-          </Label>
-          <Input
-            id="benchmark-classifier-max-p95-latency"
-            type="number"
-            min={1}
-            step={1}
-            value={form.classifierMaxP95LatencyMs}
-            onChange={e =>
-              updateForm(prev => ({ ...prev, classifierMaxP95LatencyMs: e.target.value }))
-            }
-            className="h-8 w-40 tabular-nums"
-            placeholder="(no limit)"
-          />
-          <p className="text-muted-foreground text-xs">
-            Winner must classify under this p95 latency; empty disables the latency gate.
-          </p>
+          <PolicySettingField state={policyStates.classifierMaxP95LatencyMs} overridden={false} />
         </div>
       </CardContent>
 

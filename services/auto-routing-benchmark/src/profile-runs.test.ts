@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from './db';
 import type * as CliRunnerModule from './cli-runner';
 import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
+import type {
+  PolicySettingComputedMap,
+  PolicySettingOverrides,
+} from '@kilocode/auto-routing-contracts';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 import type { BenchmarkJobMessage } from './run';
 
@@ -118,6 +122,8 @@ const configRow = {
   decider_repetitions: 1,
   classifier_max_p95_latency_ms: 1000,
   user_max_concurrency: 100,
+  policy_overrides: null as PolicySettingOverrides | null,
+  policy_computed: null as PolicySettingComputedMap | null,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: null,
 };
@@ -867,7 +873,7 @@ describe('frontier router runs', () => {
     expect(insertRun).not.toHaveBeenCalled();
   });
 
-  it('publishes the frontier effective threshold and invalidates only its cache', async () => {
+  it('publishes the frontier router threshold from its effective policy values', async () => {
     mockConfig({ router: 'frontier', min_accuracy: 0.8, frontier_min_accuracy_delta: 0.1 });
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
       { model: 'platform/a', variant: '', run_id: 'frontier-measured' },
@@ -890,15 +896,99 @@ describe('frontier router runs', () => {
       }))
     );
     await publishPlatformRoutingTable(env, catalogFetch, 'frontier');
+    // frontierMinAccuracyDelta is fixed at 0, so the stored threshold applies.
     expect(saveRoutingTable).toHaveBeenCalledWith(
       env.BENCH_DB,
-      expect.objectContaining({ minAccuracy: 0.9 }),
+      expect.objectContaining({ minAccuracy: 0.8 }),
       expect.any(String),
       'frontier'
     );
     expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
     expect(kvDelete).toHaveBeenCalledWith('routing_table_frontier_v1');
     expect(kvDelete).not.toHaveBeenCalledWith('routing_table_v1');
+  });
+
+  it('publishes an admin override in place of the stored threshold', async () => {
+    mockConfig({
+      min_accuracy: 0.7,
+      policy_overrides: { minAccuracy: 0.9 },
+      policy_computed: {
+        minAccuracy: {
+          value: 0.6,
+          computedAt: '2026-06-01T00:00:00.000Z',
+          source: 'held-out-grid',
+          evidence: 'fixture',
+        },
+      },
+    });
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'platform/a', variant: '', run_id: 'efficient-measured' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model: 'platform/a',
+        variant: null,
+        runId: 'efficient-measured',
+        routeKey,
+        accuracy: 0.95,
+        avgCostUsd: 0.002,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+      }))
+    );
+    await publishPlatformRoutingTable(env, catalogFetch, 'efficient');
+    expect(saveRoutingTable).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ minAccuracy: 0.9 }),
+      expect.any(String),
+      'efficient'
+    );
+  });
+
+  it('publishes the daily computed threshold when no override is set', async () => {
+    mockConfig({
+      min_accuracy: 0.7,
+      policy_computed: {
+        minAccuracy: {
+          value: 0.6,
+          computedAt: '2026-06-01T00:00:00.000Z',
+          source: 'held-out-grid',
+          evidence: 'fixture',
+        },
+      },
+    });
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'platform/a', variant: '', run_id: 'efficient-measured' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model: 'platform/a',
+        variant: null,
+        runId: 'efficient-measured',
+        routeKey,
+        accuracy: 0.95,
+        avgCostUsd: 0.002,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+      }))
+    );
+    await publishPlatformRoutingTable(env, catalogFetch, 'efficient');
+    expect(saveRoutingTable).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ minAccuracy: 0.6 }),
+      expect.any(String),
+      'efficient'
+    );
   });
 });
 

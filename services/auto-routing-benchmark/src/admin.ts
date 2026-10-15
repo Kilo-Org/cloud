@@ -12,6 +12,7 @@ import {
   RequeueBenchmarkRegistryRequestSchema,
   type BenchmarkRegistryQueue,
   resolveBenchmarkIdentity,
+  resolvePolicySettings,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
 } from '@kilocode/auto-routing-contracts';
@@ -69,9 +70,13 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
     await next();
   });
-  app.get('/admin/config', async c =>
-    c.json({ config: await getBenchmarkConfig(c.env.BENCH_DB, requestRouter(c)) })
-  );
+  app.get('/admin/config', async c => {
+    const config = await getBenchmarkConfig(c.env.BENCH_DB, requestRouter(c));
+    return c.json({
+      config,
+      policySettings: config ? resolvePolicySettings(config) : null,
+    });
+  });
 
   app.put(
     '/admin/config',
@@ -102,7 +107,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           })
         );
       });
-      return c.json({ config: saved });
+      return c.json({ config: saved, policySettings: resolvePolicySettings(saved) });
     }
   );
 

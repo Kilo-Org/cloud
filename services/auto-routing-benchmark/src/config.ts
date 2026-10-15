@@ -2,6 +2,8 @@ import type {
   AutoRouter,
   BenchmarkConfig,
   BenchmarkPlatformModel,
+  PolicySettingComputedMap,
+  PolicySettingOverrides,
   ProductionTokenProfile,
 } from '@kilocode/auto-routing-contracts';
 import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
@@ -37,6 +39,8 @@ export function mapConfigRows(
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
+    policy_overrides?: PolicySettingOverrides | null;
+    policy_computed?: PolicySettingComputedMap | null;
     updated_at: string;
     updated_by: string | null;
   } | null,
@@ -68,6 +72,8 @@ export function mapConfigRows(
     classifierRepetitions: configRow.classifier_repetitions,
     deciderRepetitions: configRow.decider_repetitions,
     classifierMaxP95LatencyMs: configRow.classifier_max_p95_latency_ms,
+    policyOverrides: configRow.policy_overrides ?? null,
+    policyComputed: configRow.policy_computed ?? null,
     updatedAt: configRow.updated_at,
     updatedBy: configRow.updated_by,
   };
@@ -112,6 +118,7 @@ export async function saveBenchmarkConfig(
   await validateBenchmarkConcurrencyBudget(db, config);
   const updatedAt = new Date().toISOString();
   const stamped: BenchmarkConfig = { ...config, updatedAt, updatedBy };
+  const existing = await getBenchmarkConfig(db, config.router);
 
   const deciderModelRows = toDeciderModelRows(config.deciderModels);
 
@@ -133,6 +140,7 @@ export async function saveBenchmarkConfig(
       classifier_repetitions: config.classifierRepetitions,
       decider_repetitions: config.deciderRepetitions,
       classifier_max_p95_latency_ms: config.classifierMaxP95LatencyMs,
+      policy_overrides: config.policyOverrides ?? null,
       updated_at: updatedAt,
       updated_by: updatedBy,
     },
@@ -141,5 +149,6 @@ export async function saveBenchmarkConfig(
     config.router
   );
 
-  return stamped;
+  // The computed map is server-owned: an admin save must not clear it.
+  return { ...stamped, policyComputed: existing?.policyComputed ?? null };
 }

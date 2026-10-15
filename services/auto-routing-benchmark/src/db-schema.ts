@@ -18,6 +18,8 @@ import type {
   BenchmarkProfileStatus,
   BenchmarkRunPurpose,
   BenchmarkRunStatus,
+  PolicySettingComputedMap,
+  PolicySettingOverrides,
 } from '@kilocode/auto-routing-contracts';
 
 // Migrations are generated via `pnpm db:generate` (drizzle-kit) and applied
@@ -48,6 +50,10 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   classifier_repetitions: integer('classifier_repetitions').notNull().default(1),
   decider_repetitions: integer('decider_repetitions').notNull().default(1),
   classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
+  // Admin overrides for system-optimal policy settings; null when none are set.
+  policy_overrides: text('policy_overrides', { mode: 'json' }).$type<PolicySettingOverrides>(),
+  // Daily system-optimal computation, keyed by policy setting. Server-owned.
+  policy_computed: text('policy_computed', { mode: 'json' }).$type<PolicySettingComputedMap>(),
   updated_at: text('updated_at').notNull(),
   updated_by: text('updated_by'),
 });

@@ -84,4 +84,35 @@ describe('platform model configuration', () => {
     expect(mapConfigRows(configRow, [], models)).toBeNull();
     expect(mapConfigRows(configRow, ['classifier/model'], [])).toBeNull();
   });
+
+  it('maps policy override and computed columns, defaulting absent ones to null', () => {
+    const models = [{ model: 'manual/model', variant: null, reasoning_effort: null }];
+    expect(mapConfigRows(configRow, ['classifier/model'], models)).toMatchObject({
+      policyOverrides: null,
+      policyComputed: null,
+    });
+    expect(
+      mapConfigRows(
+        {
+          ...configRow,
+          policy_overrides: { minAccuracy: 0.9 },
+          policy_computed: {
+            accuracyNoiseBand: {
+              value: 0.08,
+              computedAt: '2026-06-01T00:00:00.000Z',
+              source: 'held-out-grid',
+              evidence: 'fixture',
+            },
+          },
+        },
+        ['classifier/model'],
+        models
+      )
+    ).toMatchObject({
+      policyOverrides: { minAccuracy: 0.9 },
+      policyComputed: {
+        accuracyNoiseBand: { value: 0.08, source: 'held-out-grid' },
+      },
+    });
+  });
 });

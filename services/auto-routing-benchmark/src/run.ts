@@ -9,6 +9,7 @@ import {
   AUTO_ROUTERS,
   type AutoRouter,
   resolveBenchmarkIdentity,
+  resolveEffectivePolicy,
   ComplexityLabelsSchema,
   type BenchmarkDeciderModel,
   type BenchmarkKind,
@@ -449,20 +450,21 @@ export async function publishPlatformRoutingTable(
     variant: entry.variant,
     reasoningEffort: null,
   }));
+  const policy = resolveEffectivePolicy(config);
   const minAccuracy = Math.min(
     1,
-    config.minAccuracy + (router === 'frontier' ? config.frontierMinAccuracyDelta : 0)
+    policy.minAccuracy + (router === 'frontier' ? policy.frontierMinAccuracyDelta : 0)
   );
   const table = buildRoutingTable({
     version: generatedAt,
     generatedAt,
     minAccuracy,
-    accuracyNoiseBand: config.accuracyNoiseBand,
-    switchCostFactor: config.switchCostFactor,
-    bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
-    productionTokenProfile: config.productionTokenProfile,
-    switchHorizonTurns: config.switchHorizonTurns,
-    lowConfidenceThreshold: config.lowConfidenceThreshold,
+    accuracyNoiseBand: policy.accuracyNoiseBand,
+    switchCostFactor: policy.switchCostFactor,
+    bestAccuracySwitchThreshold: policy.bestAccuracySwitchThreshold,
+    productionTokenProfile: policy.productionTokenProfile,
+    switchHorizonTurns: policy.switchHorizonTurns,
+    lowConfidenceThreshold: policy.lowConfidenceThreshold,
     prices,
     deciderModels,
     summaries: filterSummariesByProvenance(readyEntries, summaries),
@@ -474,14 +476,14 @@ export async function publishPlatformRoutingTable(
     {
       router,
       engineIdentity: current.engineIdentity,
-      accuracyNoiseBand: config.accuracyNoiseBand,
-      frontierMinAccuracyDelta: config.frontierMinAccuracyDelta,
+      accuracyNoiseBand: policy.accuracyNoiseBand,
+      frontierMinAccuracyDelta: policy.frontierMinAccuracyDelta,
       minAccuracy,
-      switchCostFactor: config.switchCostFactor,
-      bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
-      productionTokenProfile: config.productionTokenProfile,
-      switchHorizonTurns: config.switchHorizonTurns,
-      lowConfidenceThreshold: config.lowConfidenceThreshold,
+      switchCostFactor: policy.switchCostFactor,
+      bestAccuracySwitchThreshold: policy.bestAccuracySwitchThreshold,
+      productionTokenProfile: policy.productionTokenProfile,
+      switchHorizonTurns: policy.switchHorizonTurns,
+      lowConfidenceThreshold: policy.lowConfidenceThreshold,
       prices,
       summaries: filterSummariesByProvenance(readyEntries, summaries),
       effortByComplexity: table.effortByComplexity,

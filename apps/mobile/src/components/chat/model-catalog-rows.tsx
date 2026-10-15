@@ -41,13 +41,21 @@ export function RecommendedRow({
   const download = useCatalogDownload();
   const fit = deviceFit(downloadBytes(model), budget);
   const [, owner, repo] = new URL(model.url).pathname.split('/');
+  const displayName = model.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
   return (
     <View className="gap-2 rounded-xl border border-border bg-card p-4">
       <View className="flex-row items-start justify-between gap-3">
-        <Text className="min-w-0 shrink font-semibold">{model.name}</Text>
+        <Text className="min-w-0 shrink font-semibold">{displayName}</Text>
         <FitBadge fit={fit} />
       </View>
       <CatalogCapabilities images={model.projector !== undefined} />
+      <Text variant="muted" className="text-xs">
+        {t(
+          model.projector !== undefined
+            ? 'modelChat.catalog.listImagePurpose'
+            : 'modelChat.catalog.listTextPurpose'
+        )}
+      </Text>
       <Text variant="muted" className="text-xs">
         {t('modelChat.catalog.quantDetail', {
           size: formatFileSize(downloadBytes(model), i18n.language),

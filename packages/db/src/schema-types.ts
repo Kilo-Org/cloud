@@ -2143,8 +2143,11 @@ export type DirectByokModel = z.infer<typeof DirectByokModelSchema>;
 // models.dev `reasoning_options` format, consumed by Kilo CLI v2 to build its own
 // per-protocol reasoning variants.
 export const ReasoningOptionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('effort'), values: z.array(ReasoningEffortSchema) }),
   z.object({ type: z.literal('toggle') }),
+  z.object({
+    type: z.literal('effort'),
+    values: z.array(z.union([z.null(), ReasoningEffortSchema, z.literal('default')])),
+  }),
 ]);
 
 export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;

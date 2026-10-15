@@ -22,7 +22,10 @@ import {
 } from '@/components/agents/session-list-rows';
 import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
-import { SessionRowSkeleton } from '@/components/agents/session-list-skeleton-rows';
+import {
+  SessionRowSkeleton,
+  SessionSectionHeaderSkeleton,
+} from '@/components/agents/session-list-skeleton-rows';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { QueryError } from '@/components/query-error';
@@ -284,9 +287,18 @@ export function AgentSessionListContent({
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SessionListRow>) => {
       if (item.kind === 'skeleton') {
-        // Reserved cold-open slot in the stored row's own shape (eyebrow and
-        // title), so the rows swap into the reserved space without a jump.
-        return <SessionRowSkeleton index={item.index} subtitle={false} />;
+        // Reserved cold-open slot in the stored list's own shape (a date header
+        // above the first row, then eyebrow and title rows), so the rows swap
+        // into the reserved space without a jump.
+        const row = <SessionRowSkeleton index={item.index} subtitle={false} />;
+        return item.index === 0 ? (
+          <View>
+            <SessionSectionHeaderSkeleton />
+            {row}
+          </View>
+        ) : (
+          row
+        );
       }
       if (item.kind === 'section-header') {
         return <SessionListSectionHeader title={item.title} count={item.count} />;

@@ -43,12 +43,32 @@ export function SessionRowSkeleton({
   );
 }
 
-/** The live list's placeholder rows while the first load is pending. */
-export function SessionListSkeletonRows({
-  sidePadding,
-}: Readonly<{ sidePadding: { paddingLeft: number; paddingRight: number } }>) {
+/**
+ * The history list's date-header placeholder, in `SessionListSectionHeader`'s
+ * geometry, so the first stored rows land where the placeholders stood.
+ */
+export function SessionSectionHeaderSkeleton() {
   return (
-    <View className="pt-[18px]" style={sidePadding}>
+    <View className="px-[22px] pb-2 pt-[18px]">
+      <View className="h-[14px] flex-row items-center justify-between">
+        <Skeleton className="h-2 w-12 rounded-full" />
+        <Skeleton className="h-2 w-2 rounded-full" />
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The live list's placeholder rows while the first load is pending. The top
+ * padding stands in for the refresh-status line (`gap-2` + `min-h-5`) that
+ * `LiveSessionFeedback` reserves above loaded rows, and the side padding is the
+ * same landscape inset the loaded list's content carries.
+ */
+export function SessionListSkeletonRows({
+  insets,
+}: Readonly<{ insets: { left: number; right: number } }>) {
+  return (
+    <View className="pt-7" style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
         <SessionRowSkeleton key={i} index={i} subtitle />
       ))}

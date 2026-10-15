@@ -1332,7 +1332,7 @@
         "stoppedTitle": "Daeth y gosod i ben",
         "stoppedBody": "Stopiodd instans {{name}} yn annisgwyl wrth ei osod.",
         "stalledTitle": "Aeth rhywbeth yn sownd",
-        "stalledBody": "Ni lwyddwyd i orffen gosod {{name}}. Rhowch gynnig eto, neu anfonwch e-bost at hi@kilo.ai os bydd hyn yn dal i ddigwydd.",
+        "stalledBody": "Ni lwyddwyd i orffen gosod {{name}}. Rhowch gynnig eto, neu anfonwch e-bost at {{supportEmail}} os bydd hyn yn dal i ddigwydd.",
         "timeoutTitle": "Yn cymryd yn hirach na'r disgwyl",
         "timeoutBody": "Mae gosod {{name}} yn cymryd yn hirach nag arfer (dros {{displayMinutes}} munud).",
         "continueInBackground": "Parhau yn y cefndir",
@@ -1390,7 +1390,7 @@
       "nonCanonicalEarlybirdBody": "Rhaid i berson adolygu'ch cynllun mynediad cynnar cyn y gallwch ei ddefnyddio ar eich ffôn.",
       "iosTitle": "KiloClaw ddim ar gael ar iOS",
       "iosBody": "Ar gyfer y cyfrif hwn, rheolir mynediad at KiloClaw y tu allan i'r ap iOS.",
-      "iosContact": "Cwestiynau? Cysylltwch â hi@kilo.ai.",
+      "iosContact": "Cwestiynau? Cysylltwch â {{supportEmail}}.",
       "quarantinedCta": "Anfon e-bost i'n tîm",
       "nonCanonicalEarlybirdCta": "Adolygu eich cynllun ar kilo.ai"
     },
@@ -1629,7 +1629,7 @@
         "recoveryLabel": "Diweddaru ap GitHub"
       },
       "githubIpAllowList": {
-        "description": "Analluogwyd yr Adolygydd cod oherwydd bod y sefydliad GitHub hwn yn defnyddio rhestr cyfeiriadau IP a ganiateir sy'n rhwystro Kilo. Cysylltwch â hi@kilo.ai am gymorth, yna galluogwch yr Adolygydd cod eto."
+        "description": "Analluogwyd yr Adolygydd cod oherwydd bod y sefydliad GitHub hwn yn defnyddio rhestr cyfeiriadau IP a ganiateir sy'n rhwystro Kilo. Cysylltwch â {{supportEmail}} am gymorth, yna galluogwch yr Adolygydd cod eto."
       },
       "gitlabProjectAccessRequired": {
         "description": "Analluogwyd yr Adolygydd cod oherwydd na all Kilo greu tocyn mynediad prosiect GitLab ar gyfer y prosiect hwn. Rhowch fynediad cynhaliwr neu alluogwch docynnau mynediad prosiect, yna galluogwch yr Adolygydd cod eto.",
@@ -1644,7 +1644,7 @@
         "recoveryLabel": "Diweddaru gosodiadau'r Adolygydd cod"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Analluogwyd yr Adolygydd cod ar ôl i dair ymgais i glonio'r ystorfa fynd dros y terfyn amser heddiw. Cysylltwch â hi@kilo.ai am gymorth, yna galluogwch yr Adolygydd cod eto."
+        "description": "Analluogwyd yr Adolygydd cod ar ôl i dair ymgais i glonio'r ystorfa fynd dros y terfyn amser heddiw. Cysylltwch â {{supportEmail}} am gymorth, yna galluogwch yr Adolygydd cod eto."
       },
       "title": "Mae angen sylw ar yr adolygydd cod.",
       "recoveryLabel": "Cysylltu â'r tîm cymorth"

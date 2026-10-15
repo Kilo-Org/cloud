@@ -1,5 +1,6 @@
 'use client';
 
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { OpenInExtensionButton } from '@/components/auth/OpenInExtensionButton';
@@ -66,8 +67,8 @@ export function SupportCard({
       <CardContent className="space-y-4">
         <p className="text-muted-foreground text-sm">
           Need help? Have a feature request? Want to chat? Contact us at{' '}
-          <a href="mailto:hi@kilo.ai" className="text-primary font-medium hover:underline">
-            hi@kilo.ai
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary font-medium hover:underline">
+            {SUPPORT_EMAIL}
           </a>
         </p>
         <div className="border-muted-foreground/20 space-y-3 border-t pt-4">

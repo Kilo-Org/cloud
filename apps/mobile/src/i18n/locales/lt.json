@@ -1296,7 +1296,7 @@
         "stoppedTitle": "Sąranka sustabdyta",
         "stoppedBody": "Ruošiant {{name}} egzempliorių, jis netikėtai nustojo veikti.",
         "stalledTitle": "Sąranka užstrigo",
-        "stalledBody": "Nepavyko baigti ruošti {{name}}. Bandyk dar kartą. Jei problema kartojasi, parašyk adresu hi@kilo.ai.",
+        "stalledBody": "Nepavyko baigti ruošti {{name}}. Bandyk dar kartą. Jei problema kartojasi, parašyk adresu {{supportEmail}}.",
         "timeoutTitle": "Užtrunka ilgiau nei tikėtasi",
         "timeoutBody": "{{name}} sąranka trunka ilgiau nei įprastai (daugiau nei {{displayMinutes}} min.).",
         "continueInBackground": "Tęsti fone",
@@ -1354,7 +1354,7 @@
       "nonCanonicalEarlybirdBody": "Kad galėtum naudoti ankstyvosios prieigos planą mobiliajame įrenginyje, jį pirmiausia turi peržiūrėti specialistai.",
       "iosTitle": "KiloClaw nepasiekiamas iOS programėlėje",
       "iosBody": "Šios paskyros KiloClaw prieiga tvarkoma ne iOS programėlėje.",
-      "iosContact": "Turi klausimų? Parašyk adresu hi@kilo.ai.",
+      "iosContact": "Turi klausimų? Parašyk adresu {{supportEmail}}.",
       "quarantinedCta": "Rašyti mūsų komandai el. paštu",
       "nonCanonicalEarlybirdCta": "Peržiūrėti savo planą svetainėje kilo.ai"
     },
@@ -1591,7 +1591,7 @@
         "recoveryLabel": "Atnaujinti GitHub programėlę"
       },
       "githubIpAllowList": {
-        "description": "Kodo peržiūros agentas išjungtas, nes šios GitHub organizacijos leidžiamų IP adresų sąrašas blokuoja Kilo prieigą. Kreipkis pagalbos el. paštu hi@kilo.ai, tada vėl įjunk kodo peržiūros agentą."
+        "description": "Kodo peržiūros agentas išjungtas, nes šios GitHub organizacijos leidžiamų IP adresų sąrašas blokuoja Kilo prieigą. Kreipkis pagalbos el. paštu {{supportEmail}}, tada vėl įjunk kodo peržiūros agentą."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kodo peržiūros agentas išjungtas, nes Kilo negali sukurti šio GitLab projekto prieigos rakto. Suteik prižiūrėtojo teises arba įjunk projekto prieigos raktus, tada vėl įjunk kodo peržiūros agentą.",
@@ -1606,7 +1606,7 @@
         "recoveryLabel": "Atnaujinti kodo peržiūros agento nustatymus"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kodo peržiūros agentas išjungtas, nes šiandien tris kartus viršytas saugyklos klonavimui skirtas laikas. Kreipkis pagalbos el. paštu hi@kilo.ai, tada vėl įjunk kodo peržiūros agentą."
+        "description": "Kodo peržiūros agentas išjungtas, nes šiandien tris kartus viršytas saugyklos klonavimui skirtas laikas. Kreipkis pagalbos el. paštu {{supportEmail}}, tada vėl įjunk kodo peržiūros agentą."
       },
       "title": "Kodo peržiūros agentui reikia tavo dėmesio.",
       "recoveryLabel": "Kreiptis į pagalbos tarnybą"

@@ -302,5 +302,6 @@ export function buildScoreboard({
         : null,
     },
     routeMix,
+    shadow: prod?.shadow ?? null,
   };
 }

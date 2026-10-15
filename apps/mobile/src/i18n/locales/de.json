@@ -651,7 +651,7 @@
     "redeployTitle": "Instanz erneut bereitstellen",
     "accessRequired": {
       "iosBody": "Der KiloClaw-Zugriff wird für dieses Konto außerhalb der iOS-App verwaltet.",
-      "iosContact": "Fragen? Schreibe an hi@kilo.ai.",
+      "iosContact": "Fragen? Schreibe an {{supportEmail}}.",
       "iosTitle": "KiloClaw unter iOS nicht verfügbar",
       "multipleCurrentConflictBody": "Wir haben mehrere aktive Abos für dein Konto gefunden. Deshalb haben wir die Nutzung vorübergehend pausiert, um doppelte Abbuchungen zu vermeiden.",
       "multipleCurrentConflictCta": "Auf kilo.ai fortfahren",
@@ -784,7 +784,7 @@
         "queryErrorBody": "Beim Prüfen der Einrichtung von {{name}} wurde die Verbindung unterbrochen. Die Einrichtung läuft möglicherweise weiter. Versuche es erneut oder schau gleich noch einmal nach.",
         "queryErrorTitle": "Einrichtungsstatus nicht verfügbar",
         "settingUp": "{{name}} wird eingerichtet",
-        "stalledBody": "Wir konnten die Einrichtung von {{name}} nicht abschließen. Versuche es erneut. Falls das Problem weiter auftritt, schreibe an hi@kilo.ai.",
+        "stalledBody": "Wir konnten die Einrichtung von {{name}} nicht abschließen. Versuche es erneut. Falls das Problem weiter auftritt, schreibe an {{supportEmail}}.",
         "stalledTitle": "Einrichtung kommt nicht voran",
         "startingSandbox": "Sandbox wird gestartet",
         "stoppedBody": "Die Instanz von {{name}} wurde während der Einrichtung unerwartet gestoppt.",
@@ -1041,7 +1041,7 @@
         "recoveryLabel": "GitHub-App aktualisieren"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an hi@kilo.ai, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Code Reviewer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer wurde deaktiviert, weil Kilo für dieses GitLab-Projekt kein Projektzugriffstoken erstellen kann. Gewähre Zugriff mit der Rolle Maintainer oder aktiviere Projektzugriffstoken. Aktiviere Code Reviewer anschließend wieder.",
@@ -1056,7 +1056,7 @@
         "recoveryLabel": "Code-Reviewer-Einstellungen aktualisieren"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an hi@kilo.ai, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Code Reviewer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
       },
       "title": "Beim Code-Prüfer musst du eingreifen.",
       "recoveryLabel": "Support kontaktieren"

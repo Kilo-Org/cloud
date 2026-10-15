@@ -1260,7 +1260,7 @@
         "stoppedTitle": "Sozlash to'xtatildi",
         "stoppedBody": "{{name}} nusxasi sozlash paytida kutilmaganda to'xtadi.",
         "stalledTitle": "Sozlash to'xtab qoldi",
-        "stalledBody": "{{name}}ni sozlashni yakunlay olmadik. Qayta urinib ko'ring yoki bu takrorlansa, hi@kilo.ai ga yozing.",
+        "stalledBody": "{{name}}ni sozlashni yakunlay olmadik. Qayta urinib ko'ring yoki bu takrorlansa, {{supportEmail}} ga yozing.",
         "timeoutTitle": "Kutilganidan uzoq davom etyapti",
         "timeoutBody": "{{name}} uchun sozlash odatdagidan uzoqroq davom etmoqda ({{displayMinutes}} daqiqadan oshdi).",
         "continueInBackground": "Fonda davom ettirish",
@@ -1318,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Erta foydalanish tarifingizni mobil qurilmada ishlatishdan oldin mutaxassis tekshirishi kerak.",
       "iosTitle": "KiloClaw iOSda mavjud emas",
       "iosBody": "Bu hisobning KiloClawdan foydalanish huquqi iOS ilovasidan tashqarida boshqariladi.",
-      "iosContact": "Savollaringiz bormi? hi@kilo.ai ga murojaat qiling.",
+      "iosContact": "Savollaringiz bormi? {{supportEmail}} ga murojaat qiling.",
       "quarantinedCta": "Jamoamizga xat yuborish",
       "nonCanonicalEarlybirdCta": "Tarifingizni kilo.ai'da ko'rib chiqish"
     },
@@ -1553,7 +1553,7 @@
         "recoveryLabel": "GitHub ilovasini yangilash"
       },
       "githubIpAllowList": {
-        "description": "Bu GitHub tashkilotining ruxsat etilgan IP manzillari ro'yxati Kiloni bloklagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun hi@kilo.ai manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing."
+        "description": "Bu GitHub tashkilotining ruxsat etilgan IP manzillari ro'yxati Kiloni bloklagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun {{supportEmail}} manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo bu loyiha uchun GitLab loyihasiga kirish tokenini yarata olmagani sababli Kodni ko'rib chiquvchi o'chirildi. Loyihani boshqarish huquqini bering yoki loyihaga kirish tokenlarini yoqing, so'ng Kodni ko'rib chiquvchini qayta yoqing.",
@@ -1568,7 +1568,7 @@
         "recoveryLabel": "Kodni ko'rib chiquvchi sozlamalarini yangilash"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Bugun repozitoriyani klonlash uch marta belgilangan vaqtda tugamagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun hi@kilo.ai manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing."
+        "description": "Bugun repozitoriyani klonlash uch marta belgilangan vaqtda tugamagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun {{supportEmail}} manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing."
       },
       "title": "Kod tekshiruvchisida e’tibor talab qiladigan muammo bor.",
       "recoveryLabel": "Yordam xizmatiga murojaat qilish"

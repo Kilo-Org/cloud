@@ -1260,7 +1260,7 @@
         "stoppedTitle": "Käyttöönotto keskeytyi",
         "stoppedBody": "Instanssi {{name}} pysähtyi odottamatta käyttöönoton aikana.",
         "stalledTitle": "Käyttöönotto ei etene",
-        "stalledBody": "Käyttöönottoa ei voitu viimeistellä: {{name}}. Yritä uudelleen. Jos ongelma jatkuu, lähetä sähköpostia osoitteeseen hi@kilo.ai.",
+        "stalledBody": "Käyttöönottoa ei voitu viimeistellä: {{name}}. Yritä uudelleen. Jos ongelma jatkuu, lähetä sähköpostia osoitteeseen {{supportEmail}}.",
         "timeoutTitle": "Kestää odotettua kauemmin",
         "timeoutBody": "Käyttöönotto kestää tavallista kauemmin (yli {{displayMinutes}} minuuttia): {{name}}.",
         "continueInBackground": "Jatka taustalla",
@@ -1318,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Ennakkokäyttötilauksesi on tarkistettava manuaalisesti, ennen kuin voit käyttää sitä mobiililaitteella.",
       "iosTitle": "KiloClaw ei ole käytettävissä iOS:ssä",
       "iosBody": "Tämän tilin KiloClaw-käyttöoikeutta hallinnoidaan iOS-sovelluksen ulkopuolella.",
-      "iosContact": "Kysyttävää? Lähetä sähköpostia osoitteeseen hi@kilo.ai.",
+      "iosContact": "Kysyttävää? Lähetä sähköpostia osoitteeseen {{supportEmail}}.",
       "quarantinedCta": "Lähetä sähköpostia tiimillemme",
       "nonCanonicalEarlybirdCta": "Tarkista tilauksesi osoitteessa kilo.ai"
     },
@@ -1553,7 +1553,7 @@
         "recoveryLabel": "Päivitä GitHub-sovellus"
       },
       "githubIpAllowList": {
-        "description": "Koodikatselmoija poistettiin käytöstä, koska GitHub-organisaation sallittujen IP-osoitteiden luettelo estää Kilon pääsyn. Pyydä apua osoitteesta hi@kilo.ai ja ota sitten koodikatselmoija uudelleen käyttöön."
+        "description": "Koodikatselmoija poistettiin käytöstä, koska GitHub-organisaation sallittujen IP-osoitteiden luettelo estää Kilon pääsyn. Pyydä apua osoitteesta {{supportEmail}} ja ota sitten koodikatselmoija uudelleen käyttöön."
       },
       "gitlabProjectAccessRequired": {
         "description": "Koodikatselmoija poistettiin käytöstä, koska Kilo ei voi luoda tälle GitLab-projektille käyttöoikeustunnusta. Myönnä ylläpitäjän käyttöoikeus tai salli projektin käyttöoikeustunnukset ja ota sitten koodikatselmoija uudelleen käyttöön.",
@@ -1568,7 +1568,7 @@
         "recoveryLabel": "Päivitä koodikatselmoijan asetukset"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koodikatselmoija poistettiin käytöstä, koska tietovaraston kloonaus aikakatkaistiin tänään kolmesti. Pyydä apua osoitteesta hi@kilo.ai ja ota sitten koodikatselmoija uudelleen käyttöön."
+        "description": "Koodikatselmoija poistettiin käytöstä, koska tietovaraston kloonaus aikakatkaistiin tänään kolmesti. Pyydä apua osoitteesta {{supportEmail}} ja ota sitten koodikatselmoija uudelleen käyttöön."
       },
       "title": "Koodintarkistaja vaatii toimenpiteitä.",
       "recoveryLabel": "Ota yhteyttä tukeen"

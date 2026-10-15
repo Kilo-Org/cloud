@@ -1260,7 +1260,7 @@
         "stoppedTitle": "Qophiin dhaabbateera",
         "stoppedBody": "Naannoon hojii {{name}} yeroo qophii osoo hin eegamin dhaabbateera.",
         "stalledTitle": "Wanti tokko dhaabbate",
-        "stalledBody": "Qophii {{name}} xumuruu hin dandeenye. Irra deebi'ii yaali; yoo kun itti fufe hi@kilo.ai irratti imeelii ergi.",
+        "stalledBody": "Qophii {{name}} xumuruu hin dandeenye. Irra deebi'ii yaali; yoo kun itti fufe {{supportEmail}} irratti imeelii ergi.",
         "timeoutTitle": "Yeroo eegame caalaa fudhataa jira",
         "timeoutBody": "Qophiin {{name}} yeroo barame caalaa fudhataa jira (daqiiqaa {{displayMinutes}} ol).",
         "continueInBackground": "Duubaan itti fufi",
@@ -1318,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Karoorri kee kan dursanii fayyadamuu bilbila irratti hojiirra ooluu dura gamaaggama namaatiin godhamu barbaada.",
       "iosTitle": "KiloClaw iOS keessatti hin argamu",
       "iosBody": "Herrega kanaaf hayyamni KiloClaw fayyadamuu appii iOS ala bulfama.",
-      "iosContact": "Gaaffii qabdaa? hi@kilo.ai qunnami.",
+      "iosContact": "Gaaffii qabdaa? {{supportEmail}} qunnami.",
       "quarantinedCta": "Imeelii garee keenyaa ergi",
       "nonCanonicalEarlybirdCta": "Karoorra kee kilo.ai irratti ilaali"
     },
@@ -1553,7 +1553,7 @@
         "recoveryLabel": "Aplikeeshinii GitHub haaromsi"
       },
       "githubIpAllowList": {
-        "description": "Dhaabbanni GitHub kun tarree IP hayyamamanii kan Kilo ugguru waan fayyadamuuf Sakatta'aan koodii cufameera. Gargaarsaaf hi@kilo.ai qunnami; sana booda Sakatta'aa koodii irra deebi'ii bani."
+        "description": "Dhaabbanni GitHub kun tarree IP hayyamamanii kan Kilo ugguru waan fayyadamuuf Sakatta'aan koodii cufameera. Gargaarsaaf {{supportEmail}} qunnami; sana booda Sakatta'aa koodii irra deebi'ii bani."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo pirojektii kanaaf tokanii hayyama pirojektii GitLab uumuu waan hin dandeenyeef Sakatta'aan koodii cufameera. Hayyama kunuunsaa kenni ykn tokaniiwwan hayyama pirojektii bani; sana booda Sakatta'aa koodii irra deebi'ii bani.",
@@ -1568,7 +1568,7 @@
         "recoveryLabel": "Qindaa'ina Sakatta'aa koodii haaromsi"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Har'a kuusaa koodii garagalchuuf daangaan yeroo yeroo sadii erga darbee booda Sakatta'aan koodii cufameera. Gargaarsaaf hi@kilo.ai qunnami; sana booda Sakatta'aa koodii irra deebi'ii bani."
+        "description": "Har'a kuusaa koodii garagalchuuf daangaan yeroo yeroo sadii erga darbee booda Sakatta'aan koodii cufameera. Gargaarsaaf {{supportEmail}} qunnami; sana booda Sakatta'aa koodii irra deebi'ii bani."
       },
       "title": "Sakatta'aan koodii xiyyeeffannoo barbaada.",
       "recoveryLabel": "Deeggarsa qunnami"

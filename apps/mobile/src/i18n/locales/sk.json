@@ -1296,7 +1296,7 @@
         "stoppedTitle": "Nastavovanie sa zastavilo",
         "stoppedBody": "Inštancia {{name}} sa neočakávane zastavila počas nastavovania.",
         "stalledTitle": "Nastavovanie sa zaseklo",
-        "stalledBody": "Nepodarilo sa dokončiť nastavenie pre {{name}}. Skús to znova. Ak sa problém opakuje, napíš na hi@kilo.ai.",
+        "stalledBody": "Nepodarilo sa dokončiť nastavenie pre {{name}}. Skús to znova. Ak sa problém opakuje, napíš na {{supportEmail}}.",
         "timeoutTitle": "Trvá to dlhšie, než sa očakávalo",
         "timeoutBody": "Nastavovanie pre {{name}} trvá dlhšie než zvyčajne (viac než {{displayMinutes}} minút).",
         "continueInBackground": "Pokračovať na pozadí",
@@ -1354,7 +1354,7 @@
       "nonCanonicalEarlybirdBody": "Pred používaním v mobile musí tvoj program prednostného prístupu prejsť ručnou kontrolou.",
       "iosTitle": "KiloClaw nie je dostupný v systéme iOS",
       "iosBody": "Prístup k službe KiloClaw sa pre tento účet spravuje mimo aplikácie pre iOS.",
-      "iosContact": "Máš otázky? Napíš na hi@kilo.ai.",
+      "iosContact": "Máš otázky? Napíš na {{supportEmail}}.",
       "quarantinedCta": "Napísať nášmu tímu",
       "nonCanonicalEarlybirdCta": "Skontrolovať svoj program na kilo.ai"
     },
@@ -1591,7 +1591,7 @@
         "recoveryLabel": "Aktualizovať aplikáciu GitHub"
       },
       "githubIpAllowList": {
-        "description": "Kontrolór kódu bol vypnutý, pretože organizácia na platforme GitHub používa zoznam povolených IP adries, ktorý blokuje Kilo. Požiadajte o pomoc na hi@kilo.ai a potom kontrolóra kódu znova zapnite."
+        "description": "Kontrolór kódu bol vypnutý, pretože organizácia na platforme GitHub používa zoznam povolených IP adries, ktorý blokuje Kilo. Požiadajte o pomoc na {{supportEmail}} a potom kontrolóra kódu znova zapnite."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kontrolór kódu bol vypnutý, pretože Kilo nemôže vytvoriť prístupový token pre tento projekt na platforme GitLab. Udeľte rolu správcu alebo povoľte prístupové tokeny projektov a potom kontrolóra kódu znova zapnite.",
@@ -1606,7 +1606,7 @@
         "recoveryLabel": "Aktualizovať nastavenia kontrolóra kódu"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kontrolór kódu bol vypnutý, pretože klonovanie repozitára dnes trikrát prekročilo časový limit. Požiadajte o pomoc na hi@kilo.ai a potom kontrolóra kódu znova zapnite."
+        "description": "Kontrolór kódu bol vypnutý, pretože klonovanie repozitára dnes trikrát prekročilo časový limit. Požiadajte o pomoc na {{supportEmail}} a potom kontrolóra kódu znova zapnite."
       },
       "title": "Agent na kontrolu kódu vyžaduje tvoju pozornosť.",
       "recoveryLabel": "Kontaktovať podporu"

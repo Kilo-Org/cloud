@@ -1260,7 +1260,7 @@
         "stoppedTitle": "Persediaan dihentikan",
         "stoppedBody": "Tika {{name}} terhenti secara tidak dijangka semasa persediaan.",
         "stalledTitle": "Proses tergendala",
-        "stalledBody": "Kami tidak dapat menyiapkan {{name}}. Cuba lagi atau hantar e-mel ke hi@kilo.ai jika masalah ini berulang.",
+        "stalledBody": "Kami tidak dapat menyiapkan {{name}}. Cuba lagi atau hantar e-mel ke {{supportEmail}} jika masalah ini berulang.",
         "timeoutTitle": "Mengambil masa lebih lama daripada jangkaan",
         "timeoutBody": "Persediaan untuk {{name}} mengambil masa lebih lama daripada biasa (lebih daripada {{displayMinutes}} minit).",
         "continueInBackground": "Teruskan di latar belakang",
@@ -1318,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Pelan akses awal anda memerlukan semakan manual sebelum boleh digunakan pada peranti mudah alih.",
       "iosTitle": "KiloClaw tidak tersedia dalam iOS",
       "iosBody": "Akses KiloClaw diuruskan di luar apl iOS untuk akaun ini.",
-      "iosContact": "Ada soalan? Hubungi hi@kilo.ai.",
+      "iosContact": "Ada soalan? Hubungi {{supportEmail}}.",
       "quarantinedCta": "Hantar e-mel kepada pasukan kami",
       "nonCanonicalEarlybirdCta": "Semak pelan anda di kilo.ai"
     },
@@ -1553,7 +1553,7 @@
         "recoveryLabel": "Kemas kini apl GitHub"
       },
       "githubIpAllowList": {
-        "description": "Penyemak Kod dinyahdayakan kerana senarai alamat IP yang dibenarkan oleh organisasi GitHub ini menyekat Kilo. Hubungi hi@kilo.ai untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
+        "description": "Penyemak Kod dinyahdayakan kerana senarai alamat IP yang dibenarkan oleh organisasi GitHub ini menyekat Kilo. Hubungi {{supportEmail}} untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
       },
       "gitlabProjectAccessRequired": {
         "description": "Penyemak Kod dinyahdayakan kerana Kilo tidak dapat mencipta token akses projek GitLab untuk projek ini. Berikan akses penyelenggara atau dayakan token akses projek, kemudian dayakan Penyemak Kod semula.",
@@ -1568,7 +1568,7 @@
         "recoveryLabel": "Kemas kini tetapan Penyemak Kod"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Penyemak Kod dinyahdayakan selepas tiga percubaan mengklon repositori melebihi had masa hari ini. Hubungi hi@kilo.ai untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
+        "description": "Penyemak Kod dinyahdayakan selepas tiga percubaan mengklon repositori melebihi had masa hari ini. Hubungi {{supportEmail}} untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
       },
       "title": "Penyemak kod memerlukan perhatian anda.",
       "recoveryLabel": "Hubungi sokongan"

@@ -653,7 +653,7 @@
     "redeployTitle": "Volver a desplegar la instancia",
     "accessRequired": {
       "iosBody": "Para esta cuenta, el acceso a KiloClaw se gestiona fuera de la aplicación de iOS.",
-      "iosContact": "¿Tienes dudas? Escribe a hi@kilo.ai.",
+      "iosContact": "¿Tienes dudas? Escribe a {{supportEmail}}.",
       "iosTitle": "KiloClaw no disponible en iOS",
       "multipleCurrentConflictBody": "Hemos detectado más de una suscripción activa en tu cuenta. Hemos pausado el servicio para evitar cobrarte dos veces.",
       "multipleCurrentConflictCta": "Continuar en kilo.ai",
@@ -787,7 +787,7 @@
         "queryErrorBody": "Perdimos la conexión al comprobar la configuración de {{name}}. Es posible que la configuración siga en curso. Inténtalo de nuevo o vuelve dentro de un momento.",
         "queryErrorTitle": "No se pudo comprobar el progreso de la configuración",
         "settingUp": "Configurando {{name}}",
-        "stalledBody": "No pudimos terminar de configurar {{name}}. Inténtalo de nuevo o escribe a hi@kilo.ai si esto sigue ocurriendo.",
+        "stalledBody": "No pudimos terminar de configurar {{name}}. Inténtalo de nuevo o escribe a {{supportEmail}} si esto sigue ocurriendo.",
         "stalledTitle": "La configuración se ha bloqueado",
         "startingSandbox": "Iniciando el entorno aislado",
         "stoppedBody": "La instancia de {{name}} se detuvo de forma inesperada durante la configuración.",
@@ -1044,7 +1044,7 @@
         "recoveryLabel": "Actualizar la aplicación de GitHub"
       },
       "githubIpAllowList": {
-        "description": "El revisor de código se desactivó porque esta organización de GitHub usa una lista de direcciones IP permitidas que bloquea a Kilo. Escribe a hi@kilo.ai para obtener ayuda y vuelve a activar el revisor de código."
+        "description": "El revisor de código se desactivó porque esta organización de GitHub usa una lista de direcciones IP permitidas que bloquea a Kilo. Escribe a {{supportEmail}} para obtener ayuda y vuelve a activar el revisor de código."
       },
       "gitlabProjectAccessRequired": {
         "description": "El revisor de código se desactivó porque Kilo no puede crear un token de acceso al proyecto en GitLab. Concede el rol de responsable del mantenimiento o habilita los tokens de acceso al proyecto y vuelve a activar el revisor de código.",
@@ -1059,7 +1059,7 @@
         "recoveryLabel": "Actualizar los ajustes del revisor de código"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "El revisor de código se desactivó porque hoy se agotó el tiempo de espera al clonar el repositorio en tres ocasiones. Escribe a hi@kilo.ai para obtener ayuda y vuelve a activar el revisor de código."
+        "description": "El revisor de código se desactivó porque hoy se agotó el tiempo de espera al clonar el repositorio en tres ocasiones. Escribe a {{supportEmail}} para obtener ayuda y vuelve a activar el revisor de código."
       },
       "title": "El revisor de código requiere tu atención.",
       "recoveryLabel": "Contactar con soporte técnico"

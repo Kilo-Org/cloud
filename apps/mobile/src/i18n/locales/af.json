@@ -1260,7 +1260,7 @@
         "stoppedTitle": "Opstelling gestaak",
         "stoppedBody": "{{name}} se instansie het onverwags tydens die opstelling tot stilstand gekom.",
         "stalledTitle": "Iets het vasgesteek",
-        "stalledBody": "Ons kon nie {{name}} klaar opstel nie. Probeer weer of stuur 'n e-pos aan hi@kilo.ai as dit aanhou gebeur.",
+        "stalledBody": "Ons kon nie {{name}} klaar opstel nie. Probeer weer of stuur 'n e-pos aan {{supportEmail}} as dit aanhou gebeur.",
         "timeoutTitle": "Neem langer as verwag",
         "timeoutBody": "Die opstelling van {{name}} neem langer as gewoonlik (meer as {{displayMinutes}} minute).",
         "continueInBackground": "Gaan voort in die agtergrond",
@@ -1318,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Jou plan vir vroeë toegang moet deur 'n persoon hersien word voordat jy dit op jou foon kan gebruik.",
       "iosTitle": "KiloClaw nie op iOS beskikbaar nie",
       "iosBody": "KiloClaw-toegang vir hierdie rekening word buite die iOS-toep bestuur.",
-      "iosContact": "Vrae? Kontak hi@kilo.ai.",
+      "iosContact": "Vrae? Kontak {{supportEmail}}.",
       "quarantinedCta": "Stuur ons span 'n e-pos",
       "nonCanonicalEarlybirdCta": "Hersien jou plan op kilo.ai"
     },
@@ -1553,7 +1553,7 @@
         "recoveryLabel": "Werk die GitHub-app by"
       },
       "githubIpAllowList": {
-        "description": "Die Kodehersiener is gedeaktiveer omdat hierdie GitHub-organisasie 'n IP-toelatingslys gebruik wat Kilo blokkeer. Kontak hi@kilo.ai vir hulp en aktiveer die Kodehersiener daarna weer."
+        "description": "Die Kodehersiener is gedeaktiveer omdat hierdie GitHub-organisasie 'n IP-toelatingslys gebruik wat Kilo blokkeer. Kontak {{supportEmail}} vir hulp en aktiveer die Kodehersiener daarna weer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Die Kodehersiener is gedeaktiveer omdat Kilo nie 'n GitLab-projektoegangstoken vir hierdie projek kan skep nie. Verleen instandhouertoegang of aktiveer projektoegangstokens en aktiveer die Kodehersiener daarna weer.",
@@ -1568,7 +1568,7 @@
         "recoveryLabel": "Werk die Kodehersiener se instellings by"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Die Kodehersiener is gedeaktiveer omdat die kloning van die bewaarplek vandag drie keer die tydlimiet oorskry het. Kontak hi@kilo.ai vir hulp en aktiveer die Kodehersiener daarna weer."
+        "description": "Die Kodehersiener is gedeaktiveer omdat die kloning van die bewaarplek vandag drie keer die tydlimiet oorskry het. Kontak {{supportEmail}} vir hulp en aktiveer die Kodehersiener daarna weer."
       },
       "title": "Die kodehersiener het aandag nodig.",
       "recoveryLabel": "Kontak ondersteuning"

@@ -1260,7 +1260,7 @@
         "stoppedTitle": "Seadistamine peatati",
         "stoppedBody": "{{name}} eksemplar peatus seadistamise ajal ootamatult.",
         "stalledTitle": "Midagi takerdus",
-        "stalledBody": "Seadistust ei õnnestunud lõpule viia ({{name}}). Proovi uuesti. Kui probleem kordub, kirjuta aadressile hi@kilo.ai.",
+        "stalledBody": "Seadistust ei õnnestunud lõpule viia ({{name}}). Proovi uuesti. Kui probleem kordub, kirjuta aadressile {{supportEmail}}.",
         "timeoutTitle": "Võtab oodatust kauem aega",
         "timeoutBody": "{{name}} seadistamine võtab tavapärasest kauem aega (üle {{displayMinutes}} minuti).",
         "continueInBackground": "Jätka taustal",
@@ -1318,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Sinu varajase ligipääsu pakett vajab enne mobiilis kasutamist käsitsi kontrollimist.",
       "iosTitle": "KiloClaw pole iOS-is saadaval",
       "iosBody": "Selle konto juurdepääsu KiloClaw’ teenusele hallatakse väljaspool iOS-i rakendust.",
-      "iosContact": "Kas sul on küsimusi? Kirjuta aadressile hi@kilo.ai.",
+      "iosContact": "Kas sul on küsimusi? Kirjuta aadressile {{supportEmail}}.",
       "quarantinedCta": "Kirjuta meie meeskonnale",
       "nonCanonicalEarlybirdCta": "Vaata oma pakett üle kilo.ai-s"
     },
@@ -1553,7 +1553,7 @@
         "recoveryLabel": "Uuenda GitHubi rakendust"
       },
       "githubIpAllowList": {
-        "description": "Koodiülevaataja lülitati välja, sest selle GitHubi organisatsiooni lubatud IP-aadresside loend blokeerib Kilo. Küsi abi aadressil hi@kilo.ai ja lülita seejärel koodiülevaataja uuesti sisse."
+        "description": "Koodiülevaataja lülitati välja, sest selle GitHubi organisatsiooni lubatud IP-aadresside loend blokeerib Kilo. Küsi abi aadressil {{supportEmail}} ja lülita seejärel koodiülevaataja uuesti sisse."
       },
       "gitlabProjectAccessRequired": {
         "description": "Koodiülevaataja lülitati välja, sest Kilo ei saa luua sellele GitLabi projektile juurdepääsutunnust. Anna hooldaja õigused või luba projekti juurdepääsutunnused ja lülita koodiülevaataja uuesti sisse.",
@@ -1568,7 +1568,7 @@
         "recoveryLabel": "Uuenda koodiülevaataja seadeid"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil hi@kilo.ai ja lülita seejärel koodiülevaataja uuesti sisse."
+        "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil {{supportEmail}} ja lülita seejärel koodiülevaataja uuesti sisse."
       },
       "title": "Koodiülevaataja vajab tähelepanu.",
       "recoveryLabel": "Võta ühendust toega"

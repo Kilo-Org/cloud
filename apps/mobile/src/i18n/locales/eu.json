@@ -1260,7 +1260,7 @@
         "stoppedTitle": "Konfigurazioa gelditu da",
         "stoppedBody": "{{name}} izeneko instantzia ustekabean gelditu da konfiguratzean.",
         "stalledTitle": "Prozesua trabatu da",
-        "stalledBody": "Ezin izan dugu {{name}} konfiguratzen amaitu. Saiatu berriro. Arazoak jarraitzen badu, idatzi hi@kilo.ai helbidera.",
+        "stalledBody": "Ezin izan dugu {{name}} konfiguratzen amaitu. Saiatu berriro. Arazoak jarraitzen badu, idatzi {{supportEmail}} helbidera.",
         "timeoutTitle": "Uste baino denbora gehiago hartzen ari da",
         "timeoutBody": "{{name}} konfiguratzeko prozesuak ohi baino denbora gehiago behar du ({{displayMinutes}} minutu baino gehiago).",
         "continueInBackground": "Jarraitu atzealdean",
@@ -1318,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Zure sarbide aurreratuko plana eskuz berrikusi behar da mugikorrean erabili ahal izateko.",
       "iosTitle": "KiloClaw ez dago eskuragarri iOS-en",
       "iosBody": "KiloClaw sarbidea iOS aplikaziotik kanpo kudeatzen da kontu honetarako.",
-      "iosContact": "Galderarik? Jarri harremanetan hi@kilo.ai-rekin.",
+      "iosContact": "Galderarik? Jarri harremanetan {{supportEmail}}-rekin.",
       "quarantinedCta": "Idatzi gure taldeari",
       "nonCanonicalEarlybirdCta": "Berrikusi zure plana kilo.ai-n"
     },
@@ -1553,7 +1553,7 @@
         "recoveryLabel": "Eguneratu GitHub aplikazioa"
       },
       "githubIpAllowList": {
-        "description": "Kode-berrikuslea desgaitu da, GitHub-eko erakunde honek Kilo blokeatzen duen IP helbide baimenduen zerrenda erabiltzen duelako. Eskatu laguntza hi@kilo.ai helbidean, eta gaitu berriro kode-berrikuslea."
+        "description": "Kode-berrikuslea desgaitu da, GitHub-eko erakunde honek Kilo blokeatzen duen IP helbide baimenduen zerrenda erabiltzen duelako. Eskatu laguntza {{supportEmail}} helbidean, eta gaitu berriro kode-berrikuslea."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kode-berrikuslea desgaitu da, Kilok ezin duelako GitLab-en proiektu honetarako sarbide-token bat sortu. Eman mantentzaile-baimenak edo gaitu proiektuetarako sarbide-tokenak, eta gaitu berriro kode-berrikuslea.",
@@ -1568,7 +1568,7 @@
         "recoveryLabel": "Eguneratu kode-berrikuslearen ezarpenak"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kode-berrikuslea desgaitu da, gaur biltegia klonatzeko denbora-muga hiru aldiz gainditu delako. Eskatu laguntza hi@kilo.ai helbidean, eta gaitu berriro kode-berrikuslea."
+        "description": "Kode-berrikuslea desgaitu da, gaur biltegia klonatzeko denbora-muga hiru aldiz gainditu delako. Eskatu laguntza {{supportEmail}} helbidean, eta gaitu berriro kode-berrikuslea."
       },
       "title": "Kode-berrikusleak zure esku-hartzea behar du.",
       "recoveryLabel": "Jarri harremanetan laguntza-taldearekin"

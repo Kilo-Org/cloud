@@ -1260,7 +1260,7 @@
         "stoppedTitle": "Nijanona ny fanomanana",
         "stoppedBody": "Nijanona tampoka nandritra ny fanomanana ny milin'i {{name}}.",
         "stalledTitle": "Tsy mandroso ny fanomanana",
-        "stalledBody": "Tsy vitanay ny fanomanana an'i {{name}}. Andramo indray, na mandefasa mailaka any amin'ny hi@kilo.ai raha miverimberina izany.",
+        "stalledBody": "Tsy vitanay ny fanomanana an'i {{name}}. Andramo indray, na mandefasa mailaka any amin'ny {{supportEmail}} raha miverimberina izany.",
         "timeoutTitle": "Maharitra ela noho ny nandrasana",
         "timeoutBody": "Maharitra ela noho ny mahazatra ny fanomanana an'i {{name}} (mihoatra ny {{displayMinutes}} minitra).",
         "continueInBackground": "Tohizo any ambadika",
@@ -1318,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Mila dinihin'ny mpitantana ny tolotra fidirana mialoha anananao vao azo ampiasaina amin'ny finday.",
       "iosTitle": "Tsy azo ampiasaina ny KiloClaw amin'ny iOS",
       "iosBody": "Tantanana ivelan'ny rindranasa iOS ny fidirana amin'ny KiloClaw ho an'ity kaonty ity.",
-      "iosContact": "Fanontaniana? Mifandraisa amin'ny hi@kilo.ai.",
+      "iosContact": "Fanontaniana? Mifandraisa amin'ny {{supportEmail}}.",
       "quarantinedCta": "Alefaso mailaka ho an'ny ekipanay",
       "nonCanonicalEarlybirdCta": "Jereo ny tolotranao amin'ny kilo.ai"
     },
@@ -1553,7 +1553,7 @@
         "recoveryLabel": "Havaozy ny rindranasa GitHub"
       },
       "githubIpAllowList": {
-        "description": "Natsahatra ny Code Reviewer satria mampiasa lisitry ny adiresy IP ekena izay manakana an'i Kilo ity fikambanana GitHub ity. Mifandraisa amin'ny hi@kilo.ai raha mila fanampiana, dia alefaso indray ny Code Reviewer."
+        "description": "Natsahatra ny Code Reviewer satria mampiasa lisitry ny adiresy IP ekena izay manakana an'i Kilo ity fikambanana GitHub ity. Mifandraisa amin'ny {{supportEmail}} raha mila fanampiana, dia alefaso indray ny Code Reviewer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Natsahatra ny Code Reviewer satria tsy afaka mamorona mari-pidirana ho an'ity tetikasa GitLab ity i Kilo. Omeo alalana ho mpikojakoja izy na alefaso ny mari-pidirana ho an'ny tetikasa, dia alefaso indray ny Code Reviewer.",
@@ -1568,7 +1568,7 @@
         "recoveryLabel": "Havaozy ny fikiran'ny Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Natsahatra ny Code Reviewer rehefa nihoatra ny fotoana voafetra intelo androany ny fanaovana dika mitovy amin'ny tahirin-kaody. Mifandraisa amin'ny hi@kilo.ai raha mila fanampiana, dia alefaso indray ny Code Reviewer."
+        "description": "Natsahatra ny Code Reviewer rehefa nihoatra ny fotoana voafetra intelo androany ny fanaovana dika mitovy amin'ny tahirin-kaody. Mifandraisa amin'ny {{supportEmail}} raha mila fanampiana, dia alefaso indray ny Code Reviewer."
       },
       "title": "Mila jerena ny mpandinika kaody.",
       "recoveryLabel": "Mifandraisa amin'ny mpanohana"

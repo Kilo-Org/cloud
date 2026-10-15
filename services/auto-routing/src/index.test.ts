@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearClassifierConfigCache, getClassifierModel } from './classifier-config';
+import {
+  clearClassifierConfigCache,
+  getClassifierModel,
+  SHADOW_ROUTING_TABLE_CONFIG_KEY,
+} from './classifier-config';
+import * as classifierConfig from './classifier-config';
 import { clearRoutingTableCache } from './routing-table';
 import { clearModelCapabilitiesCache } from './model-capabilities';
 import type * as ModelCapabilitiesModule from './model-capabilities';
@@ -16,6 +21,7 @@ import type {
   EfficientModelPool,
   MirrorPayload,
   NormalizedClassifierInput,
+  RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { CLASSIFIER_WINNER_KV_KEY } from '@kilocode/auto-routing-contracts';
 import { computeContentHashes } from './conversation-identity';
@@ -377,6 +383,152 @@ describe('auto routing worker', () => {
     vi.restoreAllMocks();
   });
 
+  describe.each([false, true])('shadow routing (cacheHit=%s)', cacheHit => {
+    it.each(['model', 'variant', 'same', 'no_route'])(
+      'logs a %s shadow while preserving the response, writes, and billing',
+      async change => {
+        let shadow: unknown = null;
+        configGet.mockImplementation(async (key: string) => {
+          if (key === 'routing_table_v1') return JSON.stringify(benchmarkRoutingTable);
+          if (key === 'decision_log_sample_rate') return '1';
+          if (key === SHADOW_ROUTING_TABLE_CONFIG_KEY) {
+            return shadow === null ? null : JSON.stringify(shadow);
+          }
+          return null;
+        });
+        const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+        if (cacheHit) {
+          cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
+        }
+        const baseline = await (await decideRequest(mirrorPayload())).json();
+        await drainBackgroundTasks();
+        const baselineCalls = {
+          reads: cacheReadConversationState.mock.calls.length,
+          writes: cachePutEntry.mock.calls.length,
+          classifier: classifyNormalizedInput.mock.calls.length,
+          billing: cacheRecordClassifierUsage.mock.calls.length,
+          origin: benchmarkFetch.mock.calls.length,
+          metrics: writeDataPoint.mock.calls.length,
+        };
+        const model = change === 'model' ? 'fixture/shadow' : 'google/gemini-2.5-flash-lite';
+        const variant = change === 'variant' ? 'reasoning' : null;
+        shadow = {
+          ...benchmarkRoutingTable,
+          version: 'shadow-fixture',
+          routes:
+            change === 'no_route'
+              ? {}
+              : {
+                  'implementation/feature_development': [
+                    { model, variant, accuracy: 1, avgCostUsd: 0.001, meetsThreshold: true },
+                  ],
+                },
+        };
+        clearClassifierConfigCache();
+        log.mockClear();
+        cacheReadConversationState.mockClear();
+        cachePutEntry.mockClear();
+        classifyNormalizedInput.mockClear();
+        cacheRecordClassifierUsage.mockClear();
+        benchmarkFetch.mockClear();
+        writeDataPoint.mockClear();
+        configPut.mockClear();
+        if (cacheHit) {
+          cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
+        }
+
+        const response = await decideRequest(mirrorPayload());
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual(baseline);
+        await drainBackgroundTasks();
+        expect(cacheReadConversationState).toHaveBeenCalledTimes(baselineCalls.reads);
+        expect(cachePutEntry).toHaveBeenCalledTimes(baselineCalls.writes);
+        expect(classifyNormalizedInput).toHaveBeenCalledTimes(baselineCalls.classifier);
+        expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(baselineCalls.billing);
+        expect(benchmarkFetch).toHaveBeenCalledTimes(baselineCalls.origin);
+        expect(writeDataPoint).toHaveBeenCalledTimes(baselineCalls.metrics);
+        expect(configPut).not.toHaveBeenCalled();
+        expect(log).toHaveBeenCalledTimes(1);
+        expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+          event: 'auto_routing_decision',
+          decidedModel: 'google/gemini-2.5-flash-lite',
+          shadowModel: change === 'no_route' ? null : model,
+          shadowVariant: variant,
+          shadowDiffers: change !== 'same',
+        });
+        expect(
+          cachePutEntry.mock.calls.every(call => !JSON.stringify(call).includes('fixture/shadow'))
+        ).toBe(true);
+      }
+    );
+
+    it('swallows a shadow computation error without changing the response or stored decision', async () => {
+      configGet.mockImplementation(async (key: string) => {
+        if (key === 'routing_table_v1') return JSON.stringify(benchmarkRoutingTable);
+        if (key === 'decision_log_sample_rate') return '1';
+        return null;
+      });
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const brokenTable: RoutingTable = {
+        ...benchmarkRoutingTable,
+        source: 'benchmark',
+        get routes(): RoutingTable['routes'] {
+          throw new Error('shadow computation failed');
+        },
+      };
+      vi.spyOn(classifierConfig, 'getShadowRoutingTable').mockResolvedValue(brokenTable);
+      if (cacheHit) {
+        cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
+      }
+      const response = await decideRequest(mirrorPayload());
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        cost: 0,
+        decision: { model: 'google/gemini-2.5-flash-lite', tableVersion: 'bench-run-1' },
+      });
+      await drainBackgroundTasks();
+      expect(cacheReadConversationState).toHaveBeenCalledTimes(1);
+      expect(cachePutEntry).toHaveBeenCalledTimes(cacheHit ? 1 : 2);
+      expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(cacheHit ? 0 : 1);
+      expect(configPut).not.toHaveBeenCalled();
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(String(log.mock.calls[0]?.[0]))).not.toHaveProperty('shadowDiffers');
+    });
+
+    it.each(['absent', 'invalid', 'read_error'])(
+      'ignores %s shadow config without affecting the response',
+      async failure => {
+        configGet.mockImplementation(async (key: string) => {
+          if (key === 'routing_table_v1') return JSON.stringify(benchmarkRoutingTable);
+          if (key === 'decision_log_sample_rate') return '1';
+          if (key === SHADOW_ROUTING_TABLE_CONFIG_KEY) {
+            if (failure === 'read_error') throw new Error('shadow KV unavailable');
+            if (failure === 'invalid') return '{';
+          }
+          return null;
+        });
+        const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+        if (cacheHit) {
+          cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
+        }
+        const response = await decideRequest(mirrorPayload());
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+          cost: 0,
+          decision: { model: 'google/gemini-2.5-flash-lite', tableVersion: 'bench-run-1' },
+        });
+        await drainBackgroundTasks();
+        expect(classifyNormalizedInput).toHaveBeenCalledTimes(cacheHit ? 0 : 1);
+        expect(cacheReadConversationState).toHaveBeenCalledTimes(1);
+        expect(cachePutEntry).toHaveBeenCalledTimes(cacheHit ? 1 : 2);
+        expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(cacheHit ? 0 : 1);
+        expect(configPut).not.toHaveBeenCalled();
+        expect(log).toHaveBeenCalledTimes(1);
+        expect(JSON.parse(String(log.mock.calls[0]?.[0]))).not.toHaveProperty('shadowDiffers');
+      }
+    );
+  });
+
   it('defaults /decide to the efficient table and cache namespace', async () => {
     const response = await decideRequest(mirrorPayload());
     expect(response.status).toBe(200);
@@ -406,9 +558,12 @@ describe('auto routing worker', () => {
         ],
       },
     };
-    configGet.mockImplementation(async (key: string) =>
-      key === 'routing_table_frontier_v1' ? JSON.stringify(frontierTable) : null
-    );
+    configGet.mockImplementation(async (key: string) => {
+      if (key === 'routing_table_frontier_v1') return JSON.stringify(frontierTable);
+      if (key === SHADOW_ROUTING_TABLE_CONFIG_KEY) return JSON.stringify(benchmarkRoutingTable);
+      if (key === 'decision_log_sample_rate') return '1';
+      return null;
+    });
     dbWhereCaps.mockResolvedValue([
       {
         openrouterId: 'anthropic/claude-opus-4.6',
@@ -417,6 +572,7 @@ describe('auto routing worker', () => {
         isActive: true,
       },
     ]);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const response = await decideRequest(
       mirrorPayload({
         router: 'frontier',
@@ -426,6 +582,14 @@ describe('auto routing worker', () => {
     await expect(response.json()).resolves.toMatchObject({
       decision: { model: 'anthropic/claude-opus-4.6', tableVersion: 'frontier-table' },
     });
+    await drainBackgroundTasks();
+    const decisionLogs = log.mock.calls
+      .map(([value]) => value)
+      .filter((value): value is string => typeof value === 'string' && value.startsWith('{'))
+      .map(value => JSON.parse(value))
+      .filter(value => value.event === 'auto_routing_decision');
+    expect(decisionLogs).toHaveLength(1);
+    expect(decisionLogs[0]).not.toHaveProperty('shadowDiffers');
     expect(getModelCapabilitiesMock).toHaveBeenCalledWith(
       env,
       expect.objectContaining({ router: 'frontier' })
@@ -433,6 +597,7 @@ describe('auto routing worker', () => {
     expect(cacheIdFromName).toHaveBeenCalledWith('frontier:user:user-1:task:task-123');
     expect(cacheReadConversationState).toHaveBeenCalledWith(expect.stringMatching(/^frontier:/));
     expect(configGet).not.toHaveBeenCalledWith('routing_table_v1');
+    expect(configGet).not.toHaveBeenCalledWith(SHADOW_ROUTING_TABLE_CONFIG_KEY);
     expect(
       benchmarkFetch.mock.calls.some(
         ([url]) => typeof url === 'string' && url.includes('/admin/custom-routing-table')
@@ -460,7 +625,6 @@ describe('auto routing worker', () => {
     expect(response.status).toBe(400);
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
-
   describe.each([false, true])('classifier overlap (cached=%s)', cacheHit => {
     it.each(['settings', 'capabilities', 'routing-table'])(
       'prepares classification while %s is pending',

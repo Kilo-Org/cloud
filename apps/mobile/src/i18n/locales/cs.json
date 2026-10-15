@@ -1296,7 +1296,7 @@
         "stoppedTitle": "Nastavení zastaveno",
         "stoppedBody": "Instance {{name}} se během nastavení neočekávaně zastavila.",
         "stalledTitle": "Něco se zaseklo",
-        "stalledBody": "Nastavení pro {{name}} se nepodařilo dokončit. Zkus to znovu. Pokud se problém opakuje, napiš na hi@kilo.ai.",
+        "stalledBody": "Nastavení pro {{name}} se nepodařilo dokončit. Zkus to znovu. Pokud se problém opakuje, napiš na {{supportEmail}}.",
         "timeoutTitle": "Trvá to déle, než se očekávalo",
         "timeoutBody": "Nastavení {{name}} trvá déle než obvykle (přes {{displayMinutes}} minut).",
         "continueInBackground": "Pokračovat na pozadí",
@@ -1354,7 +1354,7 @@
       "nonCanonicalEarlybirdBody": "Než budeš moci svůj tarif s předběžným přístupem používat na mobilu, musí ho náš tým ručně zkontrolovat.",
       "iosTitle": "KiloClaw není v iOS dostupný",
       "iosBody": "Přístup ke KiloClaw se u tohoto účtu spravuje mimo aplikaci pro iOS.",
-      "iosContact": "Máš otázky? Napiš na hi@kilo.ai.",
+      "iosContact": "Máš otázky? Napiš na {{supportEmail}}.",
       "quarantinedCta": "Napsat našemu týmu",
       "nonCanonicalEarlybirdCta": "Zkontrolovat svůj tarif na kilo.ai"
     },
@@ -1591,7 +1591,7 @@
         "recoveryLabel": "Aktualizovat aplikaci GitHub"
       },
       "githubIpAllowList": {
-        "description": "Agent pro kontrolu kódu byl vypnut, protože seznam povolených IP adres této organizace na GitHubu blokuje Kilo. Požádejte o pomoc na hi@kilo.ai a pak agenta pro kontrolu kódu znovu zapněte."
+        "description": "Agent pro kontrolu kódu byl vypnut, protože seznam povolených IP adres této organizace na GitHubu blokuje Kilo. Požádejte o pomoc na {{supportEmail}} a pak agenta pro kontrolu kódu znovu zapněte."
       },
       "gitlabProjectAccessRequired": {
         "description": "Agent pro kontrolu kódu byl vypnut, protože Kilo nemůže pro tento projekt na GitLabu vytvořit přístupový token projektu. Udělte roli správce nebo povolte přístupové tokeny projektů a pak agenta pro kontrolu kódu znovu zapněte.",
@@ -1606,7 +1606,7 @@
         "recoveryLabel": "Aktualizovat nastavení agenta pro kontrolu kódu"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Agent pro kontrolu kódu byl vypnut, protože dnes klonování repozitáře třikrát překročilo časový limit. Požádejte o pomoc na hi@kilo.ai a pak agenta pro kontrolu kódu znovu zapněte."
+        "description": "Agent pro kontrolu kódu byl vypnut, protože dnes klonování repozitáře třikrát překročilo časový limit. Požádejte o pomoc na {{supportEmail}} a pak agenta pro kontrolu kódu znovu zapněte."
       },
       "title": "Kontrola kódu vyžaduje tvou pozornost.",
       "recoveryLabel": "Kontaktovat podporu"

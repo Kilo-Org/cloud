@@ -651,7 +651,7 @@
     "redeployTitle": "Terapkan ulang instans",
     "accessRequired": {
       "iosBody": "Akses KiloClaw dikelola di luar aplikasi iOS untuk akun ini.",
-      "iosContact": "Ada pertanyaan? Hubungi hi@kilo.ai.",
+      "iosContact": "Ada pertanyaan? Hubungi {{supportEmail}}.",
       "iosTitle": "KiloClaw tidak tersedia di iOS",
       "multipleCurrentConflictBody": "Kami menemukan lebih dari satu langganan aktif di akunmu. Layanan dihentikan sementara agar kamu tidak ditagih dua kali.",
       "multipleCurrentConflictCta": "Lanjutkan di kilo.ai",
@@ -784,7 +784,7 @@
         "queryErrorBody": "Koneksi terputus saat kami memeriksa penyiapan {{name}}. Proses penyiapan mungkin masih berjalan. Coba lagi atau periksa kembali sebentar lagi.",
         "queryErrorTitle": "Tidak dapat memeriksa status penyiapan",
         "settingUp": "Menyiapkan {{name}}",
-        "stalledBody": "Kami tidak dapat menyelesaikan penyiapan {{name}}. Coba lagi, atau kirim email ke hi@kilo.ai jika masalah ini terus terjadi.",
+        "stalledBody": "Kami tidak dapat menyelesaikan penyiapan {{name}}. Coba lagi, atau kirim email ke {{supportEmail}} jika masalah ini terus terjadi.",
         "stalledTitle": "Penyiapan macet",
         "startingSandbox": "Memulai lingkungan terisolasi",
         "stoppedBody": "Instans {{name}} berhenti secara tidak terduga selama penyiapan.",
@@ -1041,7 +1041,7 @@
         "recoveryLabel": "Perbarui aplikasi GitHub"
       },
       "githubIpAllowList": {
-        "description": "Peninjau kode dinonaktifkan karena organisasi GitHub ini membatasi akses berdasarkan daftar alamat IP yang memblokir Kilo. Hubungi hi@kilo.ai untuk mendapatkan bantuan, lalu aktifkan kembali Peninjau kode."
+        "description": "Peninjau kode dinonaktifkan karena organisasi GitHub ini membatasi akses berdasarkan daftar alamat IP yang memblokir Kilo. Hubungi {{supportEmail}} untuk mendapatkan bantuan, lalu aktifkan kembali Peninjau kode."
       },
       "gitlabProjectAccessRequired": {
         "description": "Peninjau kode dinonaktifkan karena Kilo tidak dapat membuat token akses proyek GitLab untuk proyek ini. Berikan akses pengelola atau aktifkan token akses proyek, lalu aktifkan kembali Peninjau kode.",
@@ -1056,7 +1056,7 @@
         "recoveryLabel": "Perbarui pengaturan Peninjau kode"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Peninjau kode dinonaktifkan setelah proses kloning repositori melewati batas waktu tiga kali hari ini. Hubungi hi@kilo.ai untuk mendapatkan bantuan, lalu aktifkan kembali Peninjau kode."
+        "description": "Peninjau kode dinonaktifkan setelah proses kloning repositori melewati batas waktu tiga kali hari ini. Hubungi {{supportEmail}} untuk mendapatkan bantuan, lalu aktifkan kembali Peninjau kode."
       },
       "title": "Peninjau kode perlu ditangani.",
       "recoveryLabel": "Hubungi tim dukungan"

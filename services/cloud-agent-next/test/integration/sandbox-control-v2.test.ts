@@ -470,66 +470,92 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 allocation lifecycle', () => {
-  it('streams the initial allocation, activity, and stopped state without changing idle timing', async () => {
-    const provider = createFakeProvider();
-    const stub = await startAllocation(provider);
-    await awaitStarting(provider, stub);
-    await runInDurableObject(stub, (_instance, state) =>
-      state.storage.put('control_plane_owner', 'owner-1')
-    );
-    const before = await readState(stub);
-    const alarm = await readAlarm(stub);
-    const url = 'https://sandbox.internal/status-stream?ownerId=owner-1&sessionId=workspace_status';
-    const response = await stub.fetch(new Request(url, { headers: { Upgrade: 'websocket' } }));
-    expect(response.status).toBe(101);
-    const socket = response.webSocket;
-    if (!socket) throw new Error('Missing status socket');
-    const frames: Array<{ sessionId: string; streamEventType: string; data: unknown }> = [];
-    socket.addEventListener('message', event => {
-      frames.push(JSON.parse(String(event.data)));
-    });
-    socket.accept();
-    await waitFor(() => expect(frames).toHaveLength(1));
-    expect(frames[0]).toMatchObject({
-      sessionId: 'workspace_status',
-      streamEventType: 'cloud.sandbox.status',
-      data: { status: 'starting' },
-    });
-    expect(SandboxStatusSnapshotSchema.safeParse(frames[0]?.data).success).toBe(true);
-    expect(await readState(stub)).toEqual(before);
-    expect(await readAlarm(stub)).toEqual(alarm);
-    socket.send('not-wrapper-activity');
-    const { wrapper } = await connectAndHello(provider, stub);
-    await waitFor(() => expect(frames.at(-1)?.data).toMatchObject({ status: 'active' }));
-    const active = SandboxStatusSnapshotSchema.parse(frames.at(-1)?.data);
-    expect(active.estimatedSleepAt).toBe((await readState(stub)).lastActivityAt! + TIMERS.idleMs);
-    wrapper.heartbeat(true);
-    await waitFor(() =>
-      expect(
-        SandboxStatusSnapshotSchema.parse(frames.at(-1)?.data).estimatedSleepAt
-      ).toBeGreaterThan(active.estimatedSleepAt!)
-    );
-    await evictAllDurableObjects();
-    await stub.reportProviderGone();
-    await waitFor(() =>
-      expect(frames.at(-1)?.data).toMatchObject({ status: 'sleeping', estimatedSleepAt: null })
-    );
-    socket.close();
-    const reconnect = await stub.fetch(new Request(url, { headers: { Upgrade: 'websocket' } }));
-    const reconnected = reconnect.webSocket;
-    if (!reconnected) throw new Error('Missing reconnected socket');
-    const snapshot = new Promise<unknown>(resolve =>
-      reconnected.addEventListener(
-        'message',
-        event => resolve(JSON.parse(String(event.data)).data),
-        { once: true }
-      )
-    );
-    reconnected.accept();
-    expect(await snapshot).toMatchObject({ status: 'sleeping' });
-    reconnected.close();
-    wrapper.close();
-  });
+  it.each([
+    { provider: 'cloudflare' },
+    { provider: 'cloudflare-containers' },
+    { provider: 'cloudflare-containers', instance: 'standard-3' },
+    { provider: 'cloudflare-containers', instance: 'standard-4' },
+  ] as const)(
+    'streams persisted $provider/$instance capacity across activity, eviction, and reconnect without changing idle timing',
+    async configuration => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider, {
+        provider: configuration.provider,
+        configuration,
+      });
+      await awaitStarting(provider, stub);
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.put('control_plane_owner', 'owner-1')
+      );
+      const before = await readState(stub);
+      expect(before.configuration).toEqual(configuration);
+      const pin = await readProviderPin(stub);
+      expect(pin === null ? null : JSON.parse(pin)).toMatchObject({ configuration });
+      const expectedRuntime = (await stub.getStatusSnapshot()).runtime;
+      const alarm = await readAlarm(stub);
+      const url =
+        'https://sandbox.internal/status-stream?ownerId=owner-1&sessionId=workspace_status';
+      const response = await stub.fetch(new Request(url, { headers: { Upgrade: 'websocket' } }));
+      expect(response.status).toBe(101);
+      const socket = response.webSocket;
+      if (!socket) throw new Error('Missing status socket');
+      const frames: Array<{ sessionId: string; streamEventType: string; data: unknown }> = [];
+      socket.addEventListener('message', event => {
+        frames.push(JSON.parse(String(event.data)));
+      });
+      socket.accept();
+      await waitFor(() => expect(frames).toHaveLength(1));
+      expect(frames[0]).toMatchObject({
+        sessionId: 'workspace_status',
+        streamEventType: 'cloud.sandbox.status',
+        data: { status: 'starting' },
+      });
+      expect(SandboxStatusSnapshotSchema.safeParse(frames[0]?.data).success).toBe(true);
+      expect(SandboxStatusSnapshotSchema.parse(frames[0]?.data).runtime).toEqual(expectedRuntime);
+      expect(await readState(stub)).toEqual(before);
+      expect(await readAlarm(stub)).toEqual(alarm);
+      socket.send('not-wrapper-activity');
+      const { wrapper } = await connectAndHello(provider, stub);
+      await waitFor(() => expect(frames.at(-1)?.data).toMatchObject({ status: 'active' }));
+      const active = SandboxStatusSnapshotSchema.parse(frames.at(-1)?.data);
+      expect(active.runtime).toEqual(expectedRuntime);
+      expect(active.estimatedSleepAt).toBe((await readState(stub)).lastActivityAt! + TIMERS.idleMs);
+      wrapper.heartbeat(true);
+      await waitFor(() =>
+        expect(
+          SandboxStatusSnapshotSchema.parse(frames.at(-1)?.data).estimatedSleepAt
+        ).toBeGreaterThan(active.estimatedSleepAt!)
+      );
+      await evictAllDurableObjects();
+      await stub.reportProviderGone();
+      await waitFor(() =>
+        expect(frames.at(-1)?.data).toMatchObject({ status: 'sleeping', estimatedSleepAt: null })
+      );
+      expect((await readState(stub)).configuration).toEqual(configuration);
+      expect(await readProviderPin(stub)).toBe(pin);
+      for (const frame of frames) {
+        expect(SandboxStatusSnapshotSchema.parse(frame.data).runtime).toEqual(expectedRuntime);
+      }
+      socket.close();
+      const reconnect = await stub.fetch(new Request(url, { headers: { Upgrade: 'websocket' } }));
+      const reconnected = reconnect.webSocket;
+      if (!reconnected) throw new Error('Missing reconnected socket');
+      const snapshot = new Promise<unknown>(resolve =>
+        reconnected.addEventListener(
+          'message',
+          event => resolve(JSON.parse(String(event.data)).data),
+          { once: true }
+        )
+      );
+      reconnected.accept();
+      const reconnectedSnapshot = SandboxStatusSnapshotSchema.parse(await snapshot);
+      expect(reconnectedSnapshot.status).toBe('sleeping');
+      expect(reconnectedSnapshot.runtime).toEqual(expectedRuntime);
+      expect((await stub.getStatusSnapshot()).runtime).toEqual(expectedRuntime);
+      reconnected.close();
+      wrapper.close();
+    }
+  );
 
   it('does not accept a status socket when reading allocation state fails', async () => {
     const stub = sandboxNamespace.getByName('sbx__status_read_failure');

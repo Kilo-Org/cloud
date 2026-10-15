@@ -651,7 +651,7 @@
     "redeployTitle": "인스턴스 다시 배포",
     "accessRequired": {
       "iosBody": "이 계정의 KiloClaw 이용 권한은 iOS 앱 외부에서 관리됩니다.",
-      "iosContact": "질문이 있으신가요? hi@kilo.ai로 문의하세요.",
+      "iosContact": "질문이 있으신가요? {{supportEmail}}로 문의하세요.",
       "iosTitle": "IOS에서 KiloClaw를 사용할 수 없음",
       "multipleCurrentConflictBody": "계정에서 이용 중인 구독이 두 개 이상 확인되었습니다. 중복 청구를 방지하기 위해 이용을 일시 중지했습니다.",
       "multipleCurrentConflictCta": "Kilo.ai에서 계속하기",
@@ -784,7 +784,7 @@
         "queryErrorBody": "{{name}}의 설정 진행 상황을 확인하다가 연결이 끊겼습니다. 설정은 계속 진행 중일 수 있습니다. 다시 시도하거나 잠시 후 확인하세요.",
         "queryErrorTitle": "설정 진행 상황 확인 불가",
         "settingUp": "{{name}} 설정 중",
-        "stalledBody": "{{name}} 설정을 완료하지 못했습니다. 다시 시도하세요. 문제가 계속되면 hi@kilo.ai로 이메일을 보내세요.",
+        "stalledBody": "{{name}} 설정을 완료하지 못했습니다. 다시 시도하세요. 문제가 계속되면 {{supportEmail}}로 이메일을 보내세요.",
         "stalledTitle": "설정 진행이 멈춤",
         "startingSandbox": "샌드박스 시작 중",
         "stoppedBody": "설정 중 {{name}}의 인스턴스가 예기치 않게 중지되었습니다.",
@@ -1041,7 +1041,7 @@
         "recoveryLabel": "GitHub 앱 업데이트"
       },
       "githubIpAllowList": {
-        "description": "이 GitHub 조직의 IP 허용 목록이 Kilo를 차단하여 코드 리뷰어가 비활성화되었습니다. hi@kilo.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
+        "description": "이 GitHub 조직의 IP 허용 목록이 Kilo를 차단하여 코드 리뷰어가 비활성화되었습니다. {{supportEmail}}에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo가 이 프로젝트의 GitLab 프로젝트 액세스 토큰을 생성할 수 없어 코드 리뷰어가 비활성화되었습니다. 유지보수 담당자 권한을 부여하거나 프로젝트 액세스 토큰을 활성화한 후 코드 리뷰어를 다시 활성화하세요.",
@@ -1056,7 +1056,7 @@
         "recoveryLabel": "코드 리뷰어 설정 업데이트"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "오늘 저장소 복제 중 시간 초과가 세 번 발생하여 코드 리뷰어가 비활성화되었습니다. hi@kilo.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
+        "description": "오늘 저장소 복제 중 시간 초과가 세 번 발생하여 코드 리뷰어가 비활성화되었습니다. {{supportEmail}}에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
       },
       "title": "코드 리뷰어에 조치가 필요합니다.",
       "recoveryLabel": "지원팀에 문의"

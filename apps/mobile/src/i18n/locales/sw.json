@@ -1260,7 +1260,7 @@
         "stoppedTitle": "Usanidi umesimamishwa",
         "stoppedBody": "Kizio cha {{name}} kilisimama bila kutarajiwa wakati wa usanidi.",
         "stalledTitle": "Kuna kitu kimekwama",
-        "stalledBody": "Hatukuweza kukamilisha usanidi wa {{name}}. Jaribu tena, au tuma barua pepe kwa hi@kilo.ai ikiwa tatizo hili linaendelea.",
+        "stalledBody": "Hatukuweza kukamilisha usanidi wa {{name}}. Jaribu tena, au tuma barua pepe kwa {{supportEmail}} ikiwa tatizo hili linaendelea.",
         "timeoutTitle": "Inachukua muda mrefu kuliko ilivyotarajiwa",
         "timeoutBody": "Usanidi wa {{name}} unachukua muda mrefu kuliko kawaida (zaidi ya dakika {{displayMinutes}}).",
         "continueInBackground": "Endelea chinichini",
@@ -1318,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Mpango wako wa ufikiaji wa mapema unahitaji kukaguliwa na mtu kabla ya kutumika kwenye simu.",
       "iosTitle": "KiloClaw haipatikani kwenye iOS",
       "iosBody": "Ufikiaji wa KiloClaw unasimamiwa nje ya programu ya iOS kwa akaunti hii.",
-      "iosContact": "Maswali? Wasiliana na hi@kilo.ai.",
+      "iosContact": "Maswali? Wasiliana na {{supportEmail}}.",
       "quarantinedCta": "Tuma barua pepe kwa timu yetu",
       "nonCanonicalEarlybirdCta": "Kagua mpango wako kwenye kilo.ai"
     },
@@ -1553,7 +1553,7 @@
         "recoveryLabel": "Sasisha programu ya GitHub"
       },
       "githubIpAllowList": {
-        "description": "Mkaguzi wa msimbo alizimwa kwa sababu shirika hili la GitHub linatumia orodha ya anwani za IP zinazoruhusiwa ambayo inazuia Kilo. Wasiliana na hi@kilo.ai kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
+        "description": "Mkaguzi wa msimbo alizimwa kwa sababu shirika hili la GitHub linatumia orodha ya anwani za IP zinazoruhusiwa ambayo inazuia Kilo. Wasiliana na {{supportEmail}} kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
       },
       "gitlabProjectAccessRequired": {
         "description": "Mkaguzi wa msimbo alizimwa kwa sababu Kilo haiwezi kuunda tokeni ya kufikia mradi huu wa GitLab. Toa ruhusa za mtunzaji wa mradi au uwashe tokeni za kufikia mradi, kisha uwashe mkaguzi wa msimbo tena.",
@@ -1568,7 +1568,7 @@
         "recoveryLabel": "Sasisha mipangilio ya mkaguzi wa msimbo"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Mkaguzi wa msimbo alizimwa baada ya kunakili hazina kuzidi muda uliowekwa mara tatu leo. Wasiliana na hi@kilo.ai kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
+        "description": "Mkaguzi wa msimbo alizimwa baada ya kunakili hazina kuzidi muda uliowekwa mara tatu leo. Wasiliana na {{supportEmail}} kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
       },
       "title": "Mkaguzi wa msimbo anahitaji uangalizi wako.",
       "recoveryLabel": "Wasiliana na timu ya usaidizi"

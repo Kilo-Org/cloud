@@ -49,7 +49,7 @@ describe('answerParts', () => {
       expect(completed).toHaveLength(1);
       expect(completed[0]).toMatchObject({
         id: pending[0]?.id,
-        state: { status: 'completed', title: '', time: { start: 2, end: 3 } },
+        state: { status: 'completed', title: name, time: { start: 2, end: 3 } },
       });
       const part = completed[0];
       if (part?.type !== 'tool') {

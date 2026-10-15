@@ -35,7 +35,7 @@ export function resolvedTool(part: ToolPart, result: ToolResult, end = 0): ToolP
           status: 'completed',
           input,
           output: result.body,
-          title: '',
+          title: part.tool,
           metadata: {},
           time: { start, end },
         },

@@ -568,10 +568,10 @@ async function grant(
       description: input.description,
       credit_category: input.identity,
       check_category_uniqueness: true,
+      ...(paidPolicy ?? {}),
       expiry_date: expiresAt ?? null,
       expiration_baseline_microdollars_used: expiresAt ? baseline : null,
       original_baseline_microdollars_used: organization.microdollars_used,
-      ...(paidPolicy ?? {}),
     })
     .returning({ id: credit_transactions.id });
   if (!credit) throw new Error('organization credit grant failed');

@@ -8,7 +8,7 @@ import {
   kilo_pass_org_qualifying_spend_events,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -540,5 +540,38 @@ describe('organization Pass consumption', () => {
       .where(eq(credit_transactions.original_transaction_id, expiringBonus.id));
     expect(expirations).toHaveLength(1);
     expect(expirations[0].amount_microdollars).toBe(-3_000_000);
+  });
+
+  it('records true usage as the original baseline when an indebted organization unlocks a bonus', async () => {
+    const { owner, organization } = await activePass();
+    await db
+      .update(organizations)
+      .set({ microdollars_used: sql`${organizations.microdollars_used} + 5000000` })
+      .where(eq(organizations.id, organization.id));
+    await db.transaction(tx =>
+      recordOrganizationConsumption(tx, {
+        organizationId: organization.id,
+        kiloUserId: owner.id,
+        amountMicrodollars: 19_000_000,
+        occurredAt: '2027-07-15T12:00:00.000Z',
+        source: 'exa',
+        sourceId: `indebted-unlock-${crypto.randomUUID()}`,
+      })
+    );
+
+    const [org] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, organization.id));
+    const credits = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.organization_id, organization.id));
+    const bonus = credits.find(credit => credit.credit_category?.startsWith('kpo:bonus-unlock:'));
+    if (!bonus) throw new Error('unlocked bonus credit was not created');
+    const acquiredBeforeBonus = org.total_microdollars_acquired - bonus.amount_microdollars;
+    expect(org.microdollars_used).toBeGreaterThan(acquiredBeforeBonus);
+    expect(bonus.original_baseline_microdollars_used).toBe(org.microdollars_used);
+    expect(bonus.expiration_baseline_microdollars_used).toBe(acquiredBeforeBonus);
   });
 });

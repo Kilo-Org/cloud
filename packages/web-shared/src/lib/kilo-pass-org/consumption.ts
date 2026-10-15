@@ -220,7 +220,7 @@ export async function recordOrganizationConsumption(
       .where(eq(organizations.id, input.organizationId))
       .for('update');
     if (!organization) throw new Error('organization disappeared during bonus unlock');
-    const baseline = Math.min(
+    const expirationBaseline = Math.min(
       organization.microdollarsUsed,
       organization.totalMicrodollarsAcquired
     );
@@ -238,8 +238,8 @@ export async function recordOrganizationConsumption(
         check_category_uniqueness: true,
         created_at: input.occurredAt,
         expiry_date: updated.window_end,
-        expiration_baseline_microdollars_used: baseline,
-        original_baseline_microdollars_used: baseline,
+        expiration_baseline_microdollars_used: expirationBaseline,
+        original_baseline_microdollars_used: organization.microdollarsUsed,
       })
       .onConflictDoNothing()
       .returning({ id: credit_transactions.id });

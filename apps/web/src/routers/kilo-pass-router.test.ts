@@ -5504,6 +5504,7 @@ describe('kiloPassRouter', () => {
           kiloUserId: user.id,
           tier: KiloPassTier.Tier19,
           cadence: KiloPassCadence.Monthly,
+          paid_credit_policy: 'legacy',
         },
       };
       stripeMock.checkout.sessions.create.mockResolvedValue(session);
@@ -5582,6 +5583,7 @@ describe('kiloPassRouter', () => {
               kiloUserId: user.id,
               tier: KiloPassTier.Tier19,
               cadence: KiloPassCadence.Monthly,
+              paid_credit_policy: 'legacy',
             },
           },
         ],
@@ -5622,6 +5624,7 @@ describe('kiloPassRouter', () => {
                 kiloUserId: user.id,
                 tier: KiloPassTier.Tier19,
                 cadence: KiloPassCadence.Monthly,
+                paid_credit_policy: 'legacy',
               },
               status: 'open',
               url: 'https://stripe.example.test/checkout/existing',
@@ -5857,6 +5860,43 @@ describe('kiloPassRouter', () => {
         }),
         { timeout: 10_000 }
       );
+    });
+
+    it('reuses an open checkout only when it captured the current paid credit terms', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-create-session-terms@example.com',
+      });
+      const openSession = (id: string, paidCreditPolicy: string) => ({
+        id,
+        url: `https://stripe.example.test/${id}`,
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: user.id,
+          tier: 'tier_49',
+          cadence: 'yearly',
+          paid_credit_policy: paidCreditPolicy,
+        },
+      });
+      stripeMock.checkout.sessions.list.mockResolvedValue({
+        data: [
+          openSession('cs_one_year_terms', 'one_year'),
+          openSession('cs_legacy_terms', 'legacy'),
+        ],
+        has_more: false,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.createCheckoutSession({
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+      });
+
+      expect(result).toEqual({ url: 'https://stripe.example.test/cs_legacy_terms' });
+      expect(stripeMock.checkout.sessions.expire).toHaveBeenCalledWith('cs_one_year_terms', {
+        timeout: 10_000,
+      });
+      expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
     });
 
     it.each([

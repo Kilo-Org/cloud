@@ -1,5 +1,6 @@
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import type { PaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -1258,8 +1259,9 @@ export async function createPersonalKiloPassCheckoutSession(params: {
   affiliateTrackingId: string;
   priceId: string;
   deps?: PersonalKiloPassCheckoutDependencies;
+  paidCreditTerms?: PaidCreditTerms;
 }): Promise<CheckoutSessionLike & { amountCents: number }> {
-  const paidCreditTerms = getPaidCreditTerms('pass', params.deps?.now);
+  const paidCreditTerms = params.paidCreditTerms ?? getPaidCreditTerms('pass', params.deps?.now);
   const deps = {
     ...createDefaultPersonalKiloPassCheckoutDependencies(),
     ...params.deps,
@@ -2796,12 +2798,14 @@ export const kiloPassRouter = createTRPCRouter({
 
       const priceId = getStripePriceIdForKiloPass({ tier, cadence });
       const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
+      const paidCreditTerms = getPaidCreditTerms('pass');
       const sessionMetadata = {
         type: 'kilo-pass',
         kiloUserId: ctx.user.id,
         tier,
         cadence,
         affiliateTrackingId: attribution?.tracking_id ?? '',
+        paid_credit_policy: paidCreditTerms,
       };
 
       return createOrReuseKiloPassCheckoutSession({
@@ -2816,6 +2820,7 @@ export const kiloPassRouter = createTRPCRouter({
             cadence,
             affiliateTrackingId: attribution?.tracking_id ?? '',
             priceId,
+            paidCreditTerms,
           }),
         // Enqueue inside the checkout transaction for the charged session, created or reused. The
         // stable id derived from the session id makes a retry or reuse idempotent.

@@ -188,6 +188,34 @@ describe('createOrReuseKiloPassCheckoutSession durable reporting', () => {
     expect(rows[0].event_id).toBe('kilo-pass-checkout:cs_created');
   });
 
+  it('expires an open session that captured different paid credit terms', async () => {
+    const user = await insertOwner();
+    mockListSessions.mockResolvedValue({
+      data: [
+        stripeSession('cs_legacy_terms', {
+          metadata: { ...METADATA, kiloUserId: user.id, paid_credit_policy: 'legacy' },
+        }),
+      ],
+      has_more: false,
+    });
+    const createSession = jest.fn<CreateSessionMock>(async () =>
+      stripeSession('cs_one_year_terms', {
+        metadata: { ...METADATA, kiloUserId: user.id, paid_credit_policy: 'one_year' },
+      })
+    );
+
+    const result = await createOrReuseKiloPassCheckoutSession({
+      userId: user.id,
+      stripeCustomerId: 'cus_test',
+      metadata: { ...METADATA, kiloUserId: user.id, paid_credit_policy: 'one_year' },
+      createSession,
+    });
+
+    expect(mockExpireSession).toHaveBeenCalledWith('cs_legacy_terms', expect.anything());
+    expect(createSession).toHaveBeenCalledTimes(1);
+    expect(result.url).toBe('https://checkout.stripe.test/cs_one_year_terms');
+  });
+
   it('rolls back a failed enqueue and recovers exactly one row when the session is reused', async () => {
     const user = await insertOwner();
     mockListSessions.mockResolvedValueOnce({ data: [], has_more: false });

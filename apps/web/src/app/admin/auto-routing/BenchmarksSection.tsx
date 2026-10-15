@@ -22,6 +22,7 @@ import {
   type BenchmarkRegistryResponse,
   type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
+  type BenchmarkRunProgress,
   type RankedCandidate,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -38,6 +39,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -75,10 +77,59 @@ export function formatUsd(n: number | null): string {
   return `$${trimmed}`;
 }
 
-export function costPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
+export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
   return candidate.accuracy > 0
     ? candidate.avgCostUsd / candidate.accuracy
     : Number.POSITIVE_INFINITY;
+}
+
+// Below this share of the expected cases the completion rate is still noise, so
+// no finish time is projected from it.
+const ETA_MIN_PERCENT = 5;
+
+export type RunProgressDisplay = {
+  /** Null when the run's expected total is unknown; render counts without a bar. */
+  percent: number | null;
+  counts: string;
+  eta: string | null;
+};
+
+function formatDuration(ms: number): string {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return '<1 min';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
+export function formatRunProgress(
+  progress: BenchmarkRunProgress,
+  startedAt: string,
+  now: number = Date.now()
+): RunProgressDisplay {
+  const { completedCases, totalCases } = progress;
+  const failed = progress.failedCases > 0 ? ` · ${progress.failedCases} failed` : '';
+  if (totalCases === null || totalCases <= 0) {
+    return { percent: null, counts: `${completedCases} / ? cases${failed}`, eta: null };
+  }
+  const percent = Math.min(100, (completedCases / totalCases) * 100);
+  const startedMs = Date.parse(startedAt);
+  const elapsedMs = now - startedMs;
+  const remainingCases = totalCases - completedCases;
+  const eta =
+    completedCases > 0 &&
+    remainingCases > 0 &&
+    percent >= ETA_MIN_PERCENT &&
+    Number.isFinite(startedMs) &&
+    elapsedMs > 0
+      ? formatDuration((elapsedMs / completedCases) * remainingCases)
+      : null;
+  return {
+    percent,
+    counts: `${completedCases} / ${totalCases} cases${failed}`,
+    eta,
+  };
 }
 
 export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
@@ -1122,6 +1173,27 @@ function statusBadgeVariant(
   return 'destructive';
 }
 
+function RunProgress({
+  progress,
+  startedAt,
+}: {
+  progress: BenchmarkRunProgress;
+  startedAt: string;
+}) {
+  const { percent, counts, eta } = formatRunProgress(progress, startedAt);
+  return (
+    <div className="mt-1.5 flex w-40 flex-col gap-1">
+      {percent === null ? null : (
+        <Progress value={percent} className="h-1.5" aria-label={`Benchmark progress: ${counts}`} />
+      )}
+      <span className="text-muted-foreground text-[11px] tabular-nums">
+        {counts}
+        {eta === null ? '' : ` · ETA ${eta}`}
+      </span>
+    </div>
+  );
+}
+
 function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -1185,6 +1257,9 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
                 <Badge variant={statusBadgeVariant(run.status)} className="capitalize">
                   {run.status}
                 </Badge>
+                {run.progress ? (
+                  <RunProgress progress={run.progress} startedAt={run.startedAt} />
+                ) : null}
               </TableCell>
               <TableCell className="py-2 text-xs tabular-nums">{run.startedAt}</TableCell>
               <TableCell className="py-2 text-xs tabular-nums">{run.completedAt ?? '—'}</TableCell>
@@ -1545,6 +1620,9 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
         </TabsTrigger>
         <TabsTrigger value="benchmarks" className="px-2.5 text-xs">
           Benchmarks
+          {hasRunningRun ? (
+            <span className="text-primary ml-1.5 text-[10px] font-medium">Running</span>
+          ) : null}
         </TabsTrigger>
       </TabsList>
 

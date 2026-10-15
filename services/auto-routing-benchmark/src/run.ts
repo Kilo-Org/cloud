@@ -132,6 +132,15 @@ export function deciderCasesForRouter(router: AutoRouter = 'efficient') {
   return router === 'frontier' ? FRONTIER_CASES : DECIDER_CASES;
 }
 
+/**
+ * Cases one model repetition runs for a run kind: the length of the dataset
+ * that kind selects. Shared with run progress so a displayed total cannot
+ * disagree with the count run completion waits for.
+ */
+export function expectedCaseCount(kind: BenchmarkKind, router: AutoRouter): number {
+  return kind === 'classifier' ? CLASSIFIER_CASES.length : deciderCasesForRouter(router).length;
+}
+
 // Decider cases run through the real `kilo` CLI in a container (up to ~3 min
 // each). Chunking caps how many cases a single queue invocation processes so
 // each stays well under CF's wall-clock limit.
@@ -1671,8 +1680,7 @@ async function finalizeRunIfComplete(
   state: RunState
 ): Promise<void> {
   const enqueuedModels = state.models.filter(m => m.enqueued);
-  const caseCount =
-    kind === 'classifier' ? CLASSIFIER_CASES.length : deciderCasesForRouter(state.router).length;
+  const caseCount = expectedCaseCount(kind, state.router);
 
   // The run finalizes once every lane is accounted for, so one dead lane no
   // longer wedges the run until the stale sweep.

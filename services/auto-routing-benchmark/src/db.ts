@@ -612,6 +612,61 @@ export async function listRuns(
   return runRows.map(row => mapRunRow(row, summariesByRunId.get(row.id) ?? []));
 }
 
+export type RunProgressCountRow = {
+  runId: string;
+  kind: BenchmarkKind;
+  router: AutoRouter;
+  repetitions: number;
+  engineIdentity: string;
+  enqueuedModels: number;
+  completedCases: number;
+  failedCases: number;
+};
+
+/**
+ * Case tallies for every RUNNING run among `runIds` in one statement, so a page
+ * of runs costs one query instead of one per run. Terminal runs are filtered out
+ * in SQL: their counts are already final in their summaries.
+ */
+export async function listRunProgressCounts(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<RunProgressCountRow[]> {
+  if (runIds.length === 0) return [];
+  const rows = await drizzle(db)
+    .select({
+      runId: benchmarkRuns.id,
+      kind: benchmarkRuns.kind,
+      router: benchmarkRuns.router,
+      repetitions: benchmarkRuns.repetitions,
+      engineIdentity: benchmarkRuns.engine_identity,
+      enqueuedModels: sql<number>`(
+        SELECT COUNT(*) FROM ${runModels}
+        WHERE ${runModels.run_id} = ${benchmarkRuns.id} AND ${runModels.enqueued} = 1
+      )`,
+      completedCases: sql<number>`(
+        SELECT COUNT(*) FROM ${caseResults} WHERE ${caseResults.run_id} = ${benchmarkRuns.id}
+      )`,
+      failedCases: sql<number>`(
+        SELECT COUNT(*) FROM ${caseResults}
+        WHERE ${caseResults.run_id} = ${benchmarkRuns.id}
+          AND (${caseResults.error} IS NOT NULL OR ${caseResults.timed_out} = 1)
+      )`,
+    })
+    .from(benchmarkRuns)
+    .where(and(inArray(benchmarkRuns.id, [...runIds]), eq(benchmarkRuns.status, 'running')));
+  return rows.map(row => ({
+    runId: row.runId,
+    kind: row.kind,
+    router: row.router,
+    repetitions: row.repetitions,
+    engineIdentity: row.engineIdentity,
+    enqueuedModels: Number(row.enqueuedModels),
+    completedCases: Number(row.completedCases),
+    failedCases: Number(row.failedCases),
+  }));
+}
+
 export async function markRunCompleted(db: D1Database, runId: string): Promise<void> {
   await drizzle(db)
     .update(benchmarkRuns)

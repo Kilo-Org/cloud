@@ -4,12 +4,15 @@ import {
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   type BenchmarkConfig,
+  type BenchmarkRun,
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { app } from './index';
 import type * as DbModule from './db';
 import type * as ProfilesModule from './profiles';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
+import { DECIDER_CASES } from './datasets/decider-cases';
+import { computeEngineIdentity } from './run';
 
 const TEST_CONFIG: BenchmarkConfig = {
   router: 'efficient',
@@ -75,6 +78,7 @@ vi.mock('./db', async importOriginal => {
     getConfigRows: vi.fn(),
     replaceConfig: vi.fn(),
     listRuns: vi.fn(),
+    listRunProgressCounts: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     getClassifierWinner: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
@@ -122,6 +126,7 @@ import {
   listCurrentPlatformProfileStatuses,
   countCurrentProfilesByStatus,
   listRuns,
+  listRunProgressCounts,
   listStaleRunningDeciderRuns,
   markStaleRunsFailed,
   replaceConfig,
@@ -194,6 +199,7 @@ beforeEach(() => {
   });
   vi.mocked(replaceConfig).mockResolvedValue(undefined);
   vi.mocked(listRuns).mockResolvedValue([]);
+  vi.mocked(listRunProgressCounts).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getClassifierWinner).mockResolvedValue(null);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
@@ -371,6 +377,52 @@ describe('GET /admin/runs', () => {
     await authedGet('/admin/runs');
     // sweepStaleRuns → markStaleRunsFailed runs on list, independent of starting.
     expect(markStaleRunsFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it('attaches live progress to running runs only', async () => {
+    const running: BenchmarkRun = {
+      id: 'decider-2026-06-15T00-00-00-000Z',
+      router: 'efficient',
+      kind: 'decider',
+      purpose: 'platform',
+      status: 'running',
+      startedAt: '2026-06-15T00:00:00.000Z',
+      completedAt: null,
+      error: null,
+      summaries: [],
+    };
+    const completed: BenchmarkRun = {
+      ...running,
+      id: 'decider-2026-06-14T00-00-00-000Z',
+      status: 'completed',
+      completedAt: '2026-06-14T01:00:00.000Z',
+    };
+    vi.mocked(listRuns).mockResolvedValue([running, completed]);
+    vi.mocked(listRunProgressCounts).mockResolvedValue([
+      {
+        runId: running.id,
+        kind: 'decider',
+        router: 'efficient',
+        repetitions: 2,
+        engineIdentity: computeEngineIdentity('decider', 'efficient'),
+        enqueuedModels: 3,
+        completedCases: 40,
+        failedCases: 3,
+      },
+    ]);
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: BenchmarkRun[] };
+    expect(body.runs[0].progress).toEqual({
+      completedCases: 40,
+      failedCases: 3,
+      totalCases: 3 * DECIDER_CASES.length * 2,
+    });
+    expect(body.runs[1].progress).toBeUndefined();
+    // Only runs that can still change are tallied.
+    expect(listRunProgressCounts).toHaveBeenCalledWith(env.BENCH_DB, [running.id]);
   });
 });
 

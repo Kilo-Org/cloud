@@ -9,6 +9,7 @@ import {
   configToFormState,
   effortCoverageForModel,
   formStateToConfig,
+  formatRunProgress,
   RoutingTableView,
 } from './BenchmarksSection';
 
@@ -214,5 +215,87 @@ describe('compact route rankings', () => {
     const html = renderToStaticMarkup(React.createElement(RoutingTableView, { data }));
     expect(html).toContain('legacy · low');
     expect(html).toContain('Below threshold');
+  });
+});
+
+describe('benchmark run progress', () => {
+  const startedAt = '2026-06-15T00:00:00.000Z';
+  const tenMinutesLater = Date.parse('2026-06-15T00:10:00.000Z');
+
+  it('shows counts without a percentage when the expected total is unknown', () => {
+    expect(
+      formatRunProgress({ completedCases: 12, totalCases: null, failedCases: 0 }, startedAt)
+    ).toEqual({ percent: null, counts: '12 / ? cases', eta: null });
+  });
+
+  it('reports the completed share, failed cases, and a finish estimate', () => {
+    expect(
+      formatRunProgress(
+        { completedCases: 40, totalCases: 200, failedCases: 3 },
+        startedAt,
+        tenMinutesLater
+      )
+    ).toEqual({ percent: 20, counts: '40 / 200 cases · 3 failed', eta: '40 min' });
+  });
+
+  it('projects a finish time as soon as 5% is done', () => {
+    expect(
+      formatRunProgress(
+        { completedCases: 10, totalCases: 200, failedCases: 0 },
+        startedAt,
+        tenMinutesLater
+      )
+    ).toEqual({ percent: 5, counts: '10 / 200 cases', eta: '3 h 10 min' });
+  });
+
+  it('withholds a finish estimate below 5% done and before the run has started', () => {
+    expect(
+      formatRunProgress(
+        { completedCases: 9, totalCases: 200, failedCases: 0 },
+        startedAt,
+        tenMinutesLater
+      ).eta
+    ).toBeNull();
+    expect(
+      formatRunProgress(
+        { completedCases: 0, totalCases: 200, failedCases: 0 },
+        startedAt,
+        tenMinutesLater
+      )
+    ).toEqual({ percent: 0, counts: '0 / 200 cases', eta: null });
+    expect(
+      formatRunProgress(
+        { completedCases: 50, totalCases: 100, failedCases: 0 },
+        startedAt,
+        Date.parse('2026-06-14T23:00:00.000Z')
+      ).eta
+    ).toBeNull();
+  });
+
+  it('clamps a run whose completed cases already cover the expected total', () => {
+    expect(
+      formatRunProgress(
+        { completedCases: 200, totalCases: 200, failedCases: 0 },
+        startedAt,
+        tenMinutesLater
+      )
+    ).toEqual({ percent: 100, counts: '200 / 200 cases', eta: null });
+    expect(
+      formatRunProgress(
+        { completedCases: 225, totalCases: 200, failedCases: 0 },
+        startedAt,
+        tenMinutesLater
+      )
+    ).toEqual({ percent: 100, counts: '225 / 200 cases', eta: null });
+  });
+
+  it('rounds a sub-minute finish estimate instead of reporting zero', () => {
+    expect(
+      formatRunProgress(
+        { completedCases: 199, totalCases: 200, failedCases: 0 },
+        startedAt,
+        Date.parse('2026-06-15T00:00:30.000Z')
+      ).eta
+    ).toBe('<1 min');
   });
 });

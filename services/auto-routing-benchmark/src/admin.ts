@@ -46,6 +46,7 @@ import {
   listRuns,
   requeueFailedCurrentProfiles,
 } from './db';
+import { loadRunProgress } from './run-progress';
 import type { HonoEnv } from './hono-env';
 
 const DebugCliRequestSchema = z.object({
@@ -118,7 +119,16 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       purpose: purpose.success ? purpose.data : undefined,
       router: kind.success && kind.data === 'classifier' ? DEFAULT_AUTO_ROUTER : requestRouter(c),
     });
-    return c.json({ runs });
+    const progressByRunId = await loadRunProgress(
+      c.env.BENCH_DB,
+      runs.filter(run => run.status === 'running').map(run => run.id)
+    );
+    return c.json({
+      runs: runs.map(run => {
+        const progress = progressByRunId.get(run.id);
+        return progress ? { ...run, progress } : run;
+      }),
+    });
   });
 
   app.post(

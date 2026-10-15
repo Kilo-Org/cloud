@@ -2429,6 +2429,7 @@
       "title": "एजेन्टलाई उत्तर चाहिएको छ",
       "skipQuestionsTitle": "प्रश्नहरू छोड्ने?",
       "skipQuestionsMessage": "एजेन्टले यो चरण छोड्नेछ।",
+      "answerProgress": "{{total}} मध्ये {{answered}} को उत्तर दिइयो",
       "selectAllThatApply": "लागू हुने सबै विकल्प चयन गर्नुहोस्।",
       "option": "{{label}}",
       "optionSelected": "{{label}}, चयन गरिएको",

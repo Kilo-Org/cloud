@@ -2429,6 +2429,7 @@
       "title": "एजंटला तुमचे उत्तर हवे आहे",
       "skipQuestionsTitle": "प्रश्न वगळायचे?",
       "skipQuestionsMessage": "एजंट ही पायरी वगळेल.",
+      "answerProgress": "{{total}} पैकी {{answered}} ची उत्तरे दिली",
       "selectAllThatApply": "लागू असलेले सर्व पर्याय निवडा.",
       "option": "पर्याय: {{label}}",
       "optionSelected": "{{label}}, निवडलेला पर्याय",

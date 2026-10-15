@@ -16,6 +16,7 @@ const onClose = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({
   Modal: 'Modal',
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',

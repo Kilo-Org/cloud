@@ -1981,6 +1981,7 @@
       "title": "الوكيل بحاجة إلى إجابتك",
       "skipQuestionsTitle": "تخطي الأسئلة؟",
       "skipQuestionsMessage": "سيتخطى الوكيل هذه الخطوة.",
+      "answerProgress": "تمت الإجابة عن {{answered}} من {{total}}",
       "selectAllThatApply": "حدد كل الخيارات التي تنطبق.",
       "option": "الخيار: {{label}}",
       "optionSelected": "{{label}}، محدد",

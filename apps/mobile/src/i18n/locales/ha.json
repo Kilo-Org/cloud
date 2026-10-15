@@ -2429,6 +2429,7 @@
       "title": "Wakili yana buƙatar bayani",
       "skipQuestionsTitle": "Tsallake tambayoyi?",
       "skipQuestionsMessage": "Wakilin zai tsallake wannan mataki.",
+      "answerProgress": "An amsa {{answered}} daga cikin {{total}}",
       "selectAllThatApply": "Zaɓi duk amsoshin da suka dace.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, an zaɓa",

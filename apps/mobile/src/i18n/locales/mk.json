@@ -2429,6 +2429,7 @@
       "title": "Агентот чека одговор",
       "skipQuestionsTitle": "Да се прескокнат прашањата?",
       "skipQuestionsMessage": "Агентот ќе го прескокне овој чекор.",
+      "answerProgress": "Одговорени {{answered}} од {{total}}",
       "selectAllThatApply": "Избери ги сите соодветни одговори.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, избрано",

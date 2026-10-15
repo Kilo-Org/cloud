@@ -424,7 +424,10 @@ jobs:
   test-scripts:
     needs: changes
     if: needs.changes.outputs.kilocode_backend == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    # The Postgres regressions ran on the large runner in the job this one
+    # replaces. The builder cleanup test drives two claims against the same
+    # rows, so keep the runner it was written for.
+    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
 
     services:

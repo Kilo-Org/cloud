@@ -22,6 +22,7 @@ vi.mock('./db', async importOriginal => {
     getConfigRows: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
     getRunningRun: vi.fn(),
+    getLiveContainerLanes: vi.fn(),
     insertRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
     listStaleRunningDeciderRuns: vi.fn(),
@@ -61,6 +62,7 @@ import {
   getExistingCaseResultIds,
   getLatestSummariesByModel,
   getRunningRun,
+  getLiveContainerLanes,
   getRunWithModels,
   getSummaries,
   getSummariesForRuns,
@@ -87,6 +89,7 @@ import {
   syncPlatformRegistryRows,
 } from './db';
 import {
+  BenchmarkCapacityError,
   NoEntriesClaimedError,
   drainQueue,
   drainQueues,
@@ -160,6 +163,7 @@ beforeEach(() => {
     })
   );
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
   vi.mocked(insertRun).mockResolvedValue(undefined);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
@@ -221,7 +225,9 @@ function runningRun(id: string, purpose: 'platform' | 'user') {
 
 describe('all-effort platform scheduling', () => {
   it('schedules every exact effort over bounded registry batches', async () => {
-    mockConfig({ max_concurrency: 2 });
+    // A nearly committed shared budget bounds each batch: 4 free lanes, and a
+    // platform run takes half of them, so floor(2 / 1 repetition) = 2 entries.
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(496);
     const variants = ['none', 'low', 'medium', 'high', 'max'];
     catalogFetch.mockImplementation(async () =>
       Response.json({
@@ -311,19 +317,36 @@ describe('startRun — registry-backed decider runs', () => {
     expect(getLatestSummariesByModel).not.toHaveBeenCalled();
   });
 
-  it('uses each queue its own container budget', async () => {
-    // Platform budget 4, user budget 9, repetitions 1 → the run row snapshots
-    // the budget of the queue it belongs to.
-    mockConfig({ max_concurrency: 4, user_max_concurrency: 9 });
+  it('sizes each queue from the shared budget and keeps the platform reserve', async () => {
+    // Nothing live: a platform run takes half the free lanes, a user run takes
+    // its full limit — 400 of 500, so 100 always stay available to platform runs.
     await startRun(env, 'decider', {
       purpose: 'platform',
       entries: [{ model: 'p/a', variant: null }],
     });
-    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(4);
+    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(250);
 
     vi.mocked(insertRun).mockClear();
     await startRun(env, 'decider', { purpose: 'user', entries: [{ model: 'u/a', variant: null }] });
-    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(9);
+    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(400);
+
+    vi.mocked(insertRun).mockClear();
+    // A user run holding its limit leaves 100 lanes, and a platform run splits
+    // those with the other router rather than taking all of them.
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(400);
+    await startRun(env, 'decider', {
+      purpose: 'platform',
+      entries: [{ model: 'p/b', variant: null }],
+    });
+    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(50);
+  });
+
+  it('refuses a decider run with no free lanes as capacity, not a config fault', async () => {
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(500);
+    await expect(
+      startRun(env, 'decider', { purpose: 'platform', entries: [{ model: 'p/a', variant: null }] })
+    ).rejects.toThrow(BenchmarkCapacityError);
+    expect(insertRun).not.toHaveBeenCalled();
   });
 
   it('rejects decider runs without a registry entry snapshot', async () => {
@@ -688,19 +711,36 @@ describe('drainQueue', () => {
     expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('platform');
   });
 
-  it('caps the batch by the queue container budget', async () => {
-    // user budget 4, repetitions 2 → max entries = floor(4/2) = 2
-    mockConfig({ max_concurrency: 100, user_max_concurrency: 4, decider_repetitions: 2 });
-    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
-      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
-      { model: 'm/2', variant: '', requested_at: '2026-06-01T00:00:01.000Z' },
-      { model: 'm/3', variant: '', requested_at: '2026-06-01T00:00:02.000Z' },
-      { model: 'm/4', variant: '', requested_at: '2026-06-01T00:00:03.000Z' },
-    ]);
+  it('caps the user batch at the user container limit', async () => {
+    // User lanes stop at 400; repetitions 5 → floor(400 / 5) = 80 entries.
+    mockConfig({ decider_repetitions: 5 });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue(
+      Array.from({ length: 100 }, (_, i) => ({
+        model: `m/${i}`,
+        variant: '',
+        requested_at: `2026-06-01T00:00:${String(i % 60).padStart(2, '0')}.000Z`,
+      }))
+    );
     const result = await drainQueue(env, 'user');
-    expect(result!.entryCount).toBe(2);
+    expect(result!.entryCount).toBe(80);
     const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
-    expect(modelRows.map(m => m.model)).toEqual(['m/1', 'm/2']);
+    expect(modelRows).toHaveLength(80);
+    expect(modelRows[0].model).toBe('m/0');
+  });
+
+  it('skips a queue quietly while the shared budget is fully committed', async () => {
+    const infoLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(500);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/pending', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    await expect(drainQueue(env, 'platform')).resolves.toBeNull();
+
+    expect(insertRun).not.toHaveBeenCalled();
+    expect(infoLog.mock.calls.flat().join('\n')).toContain(
+      'benchmark_queue_drain_skipped_no_capacity'
+    );
   });
 
   it("drainQueues('both') starts one run per queue", async () => {
@@ -793,7 +833,7 @@ describe('sweepStaleRunsAndDrain', () => {
 
 describe('frontier router runs', () => {
   it('snapshots the router, uses its container budget, and queues only frontier cases', async () => {
-    mockConfig({ router: 'frontier', max_concurrency: 3, frontier_min_accuracy_delta: 0.1 });
+    mockConfig({ router: 'frontier', frontier_min_accuracy_delta: 0.1 });
     const entries = [{ model: 'platform/a', variant: null }];
     const result = await startRun(env, 'decider', { router: 'frontier', entries });
     expect(result.runId).toMatch(/^frontier-decider-/);
@@ -801,7 +841,9 @@ describe('frontier router runs', () => {
       env.BENCH_DB,
       expect.objectContaining({
         router: 'frontier',
-        max_concurrency: 3,
+        // Half of the free shared budget: the platform pool is split between the
+        // two routers so neither one's long run can starve the other.
+        max_concurrency: 250,
         frontier_min_accuracy_delta: 0.1,
         engine_identity: expect.stringMatching(/^frontier:v1:/),
       }),
@@ -847,24 +889,23 @@ describe('frontier router runs', () => {
     );
   });
 
-  it('rejects decider admission when aggregate saved router budgets exceed the physical cap', async () => {
+  it('starts a frontier platform run without consulting the efficient lane budgets', async () => {
     vi.mocked(getConfigRows).mockImplementation(async (_db, router = 'efficient') => ({
-      config: {
-        ...configRow,
-        router,
-        max_concurrency: 80,
-        user_max_concurrency: 80,
-      },
+      config: { ...configRow, router },
       classifierModels: ['classifier/a'],
       deciderModels: [{ model: 'platform/a', variant: null, reasoning_effort: null }],
     }));
-    await expect(
-      startRun(env, 'decider', {
-        router: 'frontier',
-        entries: [{ model: 'platform/a', variant: null }],
-      })
-    ).rejects.toThrow('must total at most 200');
-    expect(insertRun).not.toHaveBeenCalled();
+    // The efficient run holds most of the budget; the platform pool is split, so
+    // frontier still gets a share instead of waiting for it to finish.
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(300);
+
+    const result = await startRun(env, 'decider', {
+      router: 'frontier',
+      entries: [{ model: 'platform/a', variant: null }],
+    });
+
+    expect(result.runId).toMatch(/^frontier-decider-/);
+    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(100);
   });
 
   it('publishes the frontier effective threshold and invalidates only its cache', async () => {
@@ -903,7 +944,7 @@ describe('frontier router runs', () => {
 });
 
 describe('live container admission refusal', () => {
-  it('releases registry claims and surfaces a budget error when the atomic run insert rejects', async () => {
+  it('releases registry claims and reports capacity when the atomic run insert rejects', async () => {
     mockConfig({ router: 'frontier' });
     vi.mocked(insertRun).mockRejectedValue(
       new Error('Failed query', {
@@ -915,11 +956,29 @@ describe('live container admission refusal', () => {
         router: 'frontier',
         entries: [{ model: 'platform/a', variant: null }],
       })
-    ).rejects.toThrow('must total at most 200');
+    ).rejects.toThrow(BenchmarkCapacityError);
     expect(releaseProfileClaims).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.stringMatching(/^frontier-/)
     );
     expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('turns losing the race for lanes into a quiet drain skip', async () => {
+    const infoLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.mocked(insertRun).mockRejectedValue(
+      new Error('Failed query', {
+        cause: new Error('D1_ERROR: NOT NULL constraint failed: benchmark_runs.max_concurrency'),
+      })
+    );
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    await expect(drainQueue(env, 'platform')).resolves.toBeNull();
+
+    expect(infoLog.mock.calls.flat().join('\n')).toContain(
+      'benchmark_queue_drain_skipped_no_capacity'
+    );
   });
 });

@@ -5,8 +5,6 @@ const configRow = {
   min_accuracy: 0.85,
   switch_cost_factor: 3,
   best_accuracy_switch_threshold: 0.05,
-  max_concurrency: 8,
-  user_max_concurrency: 100,
   benchmark_user_id: 'user-123',
   benchmark_org_id: 'org-123',
   classifier_repetitions: 1,

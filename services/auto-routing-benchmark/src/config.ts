@@ -4,7 +4,6 @@ import type {
   BenchmarkPlatformModel,
   ProductionTokenProfile,
 } from '@kilocode/auto-routing-contracts';
-import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
 import { getConfigRows, replaceConfig, type ConfigDeciderModelRow } from './db';
 
 // Retain nullable legacy columns for rolling deploys, but never read saved efforts.
@@ -30,8 +29,6 @@ export function mapConfigRows(
     production_token_profile?: ProductionTokenProfile | null;
     switch_horizon_turns?: number | null;
     low_confidence_threshold?: number | null;
-    max_concurrency: number;
-    user_max_concurrency: number;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
     classifier_repetitions: number;
@@ -61,8 +58,6 @@ export function mapConfigRows(
     productionTokenProfile: configRow.production_token_profile ?? null,
     switchHorizonTurns: configRow.switch_horizon_turns ?? null,
     lowConfidenceThreshold: configRow.low_confidence_threshold ?? null,
-    maxConcurrency: configRow.max_concurrency,
-    userMaxConcurrency: configRow.user_max_concurrency,
     benchmarkUserId: configRow.benchmark_user_id,
     benchmarkOrgId: configRow.benchmark_org_id,
     classifierRepetitions: configRow.classifier_repetitions,
@@ -71,29 +66,6 @@ export function mapConfigRows(
     updatedAt: configRow.updated_at,
     updatedBy: configRow.updated_by,
   };
-}
-
-export class BenchmarkConcurrencyBudgetError extends Error {
-  constructor() {
-    super(
-      `Efficient platform + owner and frontier platform concurrency must total at most ${BENCHMARK_CONTAINER_BUDGET}`
-    );
-    this.name = 'BenchmarkConcurrencyBudgetError';
-  }
-}
-
-export async function validateBenchmarkConcurrencyBudget(
-  db: D1Database,
-  config: BenchmarkConfig
-): Promise<void> {
-  const otherRouter = config.router === 'frontier' ? 'efficient' : 'frontier';
-  const other = await getBenchmarkConfig(db, otherRouter);
-  const efficient = config.router === 'efficient' ? config : other;
-  const frontier = config.router === 'frontier' ? config : other;
-  const total =
-    (efficient ? efficient.maxConcurrency + efficient.userMaxConcurrency : 0) +
-    (frontier?.maxConcurrency ?? 0);
-  if (total > BENCHMARK_CONTAINER_BUDGET) throw new BenchmarkConcurrencyBudgetError();
 }
 
 export async function getBenchmarkConfig(
@@ -109,7 +81,6 @@ export async function saveBenchmarkConfig(
   config: BenchmarkConfig,
   updatedBy: string | null
 ): Promise<BenchmarkConfig> {
-  await validateBenchmarkConcurrencyBudget(db, config);
   const updatedAt = new Date().toISOString();
   const stamped: BenchmarkConfig = { ...config, updatedAt, updatedBy };
 
@@ -126,8 +97,6 @@ export async function saveBenchmarkConfig(
       production_token_profile: config.productionTokenProfile,
       switch_horizon_turns: config.switchHorizonTurns,
       low_confidence_threshold: config.lowConfidenceThreshold,
-      max_concurrency: config.maxConcurrency,
-      user_max_concurrency: config.userMaxConcurrency,
       benchmark_user_id: config.benchmarkUserId,
       benchmark_org_id: config.benchmarkOrgId,
       classifier_repetitions: config.classifierRepetitions,

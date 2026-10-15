@@ -4,12 +4,15 @@ import {
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   type BenchmarkConfig,
+  type BenchmarkRun,
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { app } from './index';
 import type * as DbModule from './db';
 import type * as ProfilesModule from './profiles';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
+import { DECIDER_CASES } from './datasets/decider-cases';
+import { computeEngineIdentity } from './run';
 
 const TEST_CONFIG: BenchmarkConfig = {
   router: 'efficient',
@@ -23,8 +26,6 @@ const TEST_CONFIG: BenchmarkConfig = {
   productionTokenProfile: null,
   switchHorizonTurns: null,
   lowConfidenceThreshold: null,
-  maxConcurrency: 40,
-  userMaxConcurrency: 40,
   benchmarkUserId: null,
   benchmarkOrgId: null,
   classifierRepetitions: 1,
@@ -47,8 +48,8 @@ const TEST_CONFIG_ROWS = {
     production_token_profile: null,
     switch_horizon_turns: null,
     low_confidence_threshold: null,
-    max_concurrency: TEST_CONFIG.maxConcurrency,
-    user_max_concurrency: TEST_CONFIG.userMaxConcurrency,
+    max_concurrency: 500,
+    user_max_concurrency: 400,
     benchmark_user_id: TEST_CONFIG.benchmarkUserId,
     benchmark_org_id: TEST_CONFIG.benchmarkOrgId,
     classifier_repetitions: TEST_CONFIG.classifierRepetitions,
@@ -75,6 +76,7 @@ vi.mock('./db', async importOriginal => {
     getConfigRows: vi.fn(),
     replaceConfig: vi.fn(),
     listRuns: vi.fn(),
+    listRunProgressCounts: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     getClassifierWinner: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
@@ -93,6 +95,7 @@ vi.mock('./db', async importOriginal => {
     markProfilesRunningForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
     getRunningRun: vi.fn(),
+    getLiveContainerLanes: vi.fn(),
     existsNewerCompletedRun: vi.fn(),
   };
 });
@@ -112,6 +115,7 @@ import {
   getLatestRoutingTable,
   getLatestSummariesByModel,
   getRunningRun,
+  getLiveContainerLanes,
   existsNewerCompletedRun,
   insertRun,
   listPendingCurrentProfiles,
@@ -122,6 +126,7 @@ import {
   listCurrentPlatformProfileStatuses,
   countCurrentProfilesByStatus,
   listRuns,
+  listRunProgressCounts,
   listStaleRunningDeciderRuns,
   markStaleRunsFailed,
   replaceConfig,
@@ -194,6 +199,7 @@ beforeEach(() => {
   });
   vi.mocked(replaceConfig).mockResolvedValue(undefined);
   vi.mocked(listRuns).mockResolvedValue([]);
+  vi.mocked(listRunProgressCounts).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getClassifierWinner).mockResolvedValue(null);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
@@ -208,6 +214,7 @@ beforeEach(() => {
   vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
   vi.mocked(registerProfiles).mockReset();
   vi.mocked(lookupProfileStatuses).mockReset();
@@ -371,6 +378,52 @@ describe('GET /admin/runs', () => {
     await authedGet('/admin/runs');
     // sweepStaleRuns → markStaleRunsFailed runs on list, independent of starting.
     expect(markStaleRunsFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it('attaches live progress to running runs only', async () => {
+    const running: BenchmarkRun = {
+      id: 'decider-2026-06-15T00-00-00-000Z',
+      router: 'efficient',
+      kind: 'decider',
+      purpose: 'platform',
+      status: 'running',
+      startedAt: '2026-06-15T00:00:00.000Z',
+      completedAt: null,
+      error: null,
+      summaries: [],
+    };
+    const completed: BenchmarkRun = {
+      ...running,
+      id: 'decider-2026-06-14T00-00-00-000Z',
+      status: 'completed',
+      completedAt: '2026-06-14T01:00:00.000Z',
+    };
+    vi.mocked(listRuns).mockResolvedValue([running, completed]);
+    vi.mocked(listRunProgressCounts).mockResolvedValue([
+      {
+        runId: running.id,
+        kind: 'decider',
+        router: 'efficient',
+        repetitions: 2,
+        engineIdentity: computeEngineIdentity('decider', 'efficient'),
+        enqueuedModels: 3,
+        completedCases: 40,
+        failedCases: 3,
+      },
+    ]);
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: BenchmarkRun[] };
+    expect(body.runs[0].progress).toEqual({
+      completedCases: 40,
+      failedCases: 3,
+      totalCases: 3 * DECIDER_CASES.length * 2,
+    });
+    expect(body.runs[1].progress).toBeUndefined();
+    // Only runs that can still change are tallied.
+    expect(listRunProgressCounts).toHaveBeenCalledWith(env.BENCH_DB, [running.id]);
   });
 });
 
@@ -541,32 +594,9 @@ describe('POST /admin/runs', () => {
     expect(insertRun).not.toHaveBeenCalled();
   });
 
-  it('caps a queue batch by that queue container budget', async () => {
-    // user budget 4, repetitions 2 → floor(4/2) = 2 entries per run.
-    vi.mocked(getConfigRows).mockResolvedValue({
-      ...TEST_CONFIG_ROWS,
-      config: {
-        ...TEST_CONFIG_ROWS.config,
-        user_max_concurrency: 4,
-        decider_repetitions: 2,
-      },
-    });
-    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
-      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
-      { model: 'm/2', variant: '', requested_at: '2026-06-01T00:00:01.000Z' },
-      { model: 'm/3', variant: '', requested_at: '2026-06-01T00:00:02.000Z' },
-    ]);
-
-    await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
-
-    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
-    expect(modelRows.map(m => m.model)).toEqual(['m/1', 'm/2']);
-  });
-
-  it('reports a queue that cannot start instead of claiming there is nothing to run', async () => {
-    // One repetition per live container is the floor. Below it no batch fits,
-    // and drains swallow their own errors — so without this the panel would
-    // answer 200 "nothing pending" for a queue full of pending work.
+  it('caps a queue batch at the shared container budget', async () => {
+    // A stale saved lane budget must not size the batch: user lanes stop at 400,
+    // so with 5 repetitions each run may claim floor(400 / 5) = 80 entries.
     vi.mocked(getConfigRows).mockResolvedValue({
       ...TEST_CONFIG_ROWS,
       config: {
@@ -575,38 +605,44 @@ describe('POST /admin/runs', () => {
         decider_repetitions: 5,
       },
     });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue(
+      Array.from({ length: 100 }, (_, i) => ({
+        model: `m/${i}`,
+        variant: '',
+        requested_at: `2026-06-01T00:00:${String(i % 60).padStart(2, '0')}.000Z`,
+      }))
+    );
+
+    await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
+    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
+    expect(modelRows).toHaveLength(80);
+    expect(modelRows[0].model).toBe('m/0');
+  });
+
+  it('reports a fully committed budget as a wait, not a queue failure', async () => {
+    // Every lane is committed to runs already going. Waiting is the correct
+    // outcome: the panel must not claim the queue failed, and must not pretend
+    // a run started.
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(500);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
-    expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toMatchObject({
-      error: expect.stringContaining('requires at least one live container lane'),
-    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ startedRuns: [], drainErrors: [] });
     expect(insertRun).not.toHaveBeenCalled();
   });
 
   it('reports a wedged queue alongside the queue that did start', async () => {
-    // The platform budget fits one entry per repetition; the user budget does
-    // not. Hiding the user queue's failure behind the platform run would leave
-    // its pending work looking like an empty queue.
-    const configRows = {
-      ...TEST_CONFIG_ROWS,
-      config: {
-        ...TEST_CONFIG_ROWS.config,
-        max_concurrency: 100,
-        user_max_concurrency: 4,
-        decider_repetitions: 5,
-      },
-    };
-    vi.mocked(getConfigRows).mockImplementation(async (_db, router) =>
-      router === 'frontier' ? { ...TEST_CONFIG_ROWS, config: null } : configRows
-    );
-    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
-      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
-    ]);
+    // The platform queue starts; the user queue's registry read fails. Hiding
+    // that behind the started run would leave its pending work looking absent.
+    vi.mocked(listPendingCurrentProfiles).mockImplementation(async (_db, _filter, purpose) => {
+      if (purpose === 'user') throw new Error('registry unavailable');
+      return [{ model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' }];
+    });
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'both' });
 
@@ -616,8 +652,7 @@ describe('POST /admin/runs', () => {
       drainErrors: string[];
     };
     expect(body.startedRuns.map(r => r.purpose)).toEqual(['platform']);
-    expect(body.drainErrors).toHaveLength(1);
-    expect(body.drainErrors[0]).toContain('requires at least one live container lane');
+    expect(body.drainErrors).toEqual(['registry unavailable']);
   });
 });
 
@@ -925,15 +960,18 @@ describe('router selection', () => {
   });
 });
 
-describe('shared concurrency cap', () => {
-  it('returns HTTP 400 rather than HTTP 500 when saving overcommits the combined budget', async () => {
+describe('retired concurrency knobs', () => {
+  it('saves a config from a previous admin UI without the retired knobs', async () => {
     const response = await authedPut('/admin/config', {
       ...TEST_CONFIG,
       maxConcurrency: 150,
       userMaxConcurrency: 100,
     });
-    expect(response.status).toBe(400);
-    expect(replaceConfig).not.toHaveBeenCalled();
+
+    expect(response.status).toBe(200);
+    const [, saved] = vi.mocked(replaceConfig).mock.calls[0];
+    expect(saved).not.toHaveProperty('maxConcurrency');
+    expect(saved).not.toHaveProperty('userMaxConcurrency');
   });
 });
 

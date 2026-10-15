@@ -22,6 +22,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 const theme = vi.hoisted(() => ({ colors: { card: '#1F1F24' } }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => theme.colors }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View' }));
 
 // Models the parts of `@expo/ui/community/bottom-sheet` this suite depends on:
 // `index` drives a native presentation, a dismissal reports through a guard that

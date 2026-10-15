@@ -2429,6 +2429,7 @@
       "title": "Agenteak zure erantzuna behar du",
       "skipQuestionsTitle": "Saltatu galderak?",
       "skipQuestionsMessage": "Agenteak urrats hau saltatuko du.",
+      "answerProgress": "{{total}} galderatik {{answered}} erantzunda",
       "selectAllThatApply": "Hautatu dagozkion aukera guztiak.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, hautatuta",

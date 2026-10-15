@@ -2493,6 +2493,7 @@
       "title": "Agentui reikia atsakymo",
       "skipQuestionsTitle": "Praleisti klausimus?",
       "skipQuestionsMessage": "Agentas praleis šį veiksmą.",
+      "answerProgress": "Atsakyta {{answered}} iš {{total}}",
       "selectAllThatApply": "Pasirinkite visus tinkamus variantus.",
       "option": "Parinktis: {{label}}",
       "optionSelected": "{{label}}, pasirinkta",

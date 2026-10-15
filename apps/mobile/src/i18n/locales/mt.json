@@ -2525,6 +2525,7 @@
       "title": "L-aġent jeħtieġ it-tweġiba tiegħek",
       "skipQuestionsTitle": "Taqbeż il-mistoqsijiet?",
       "skipQuestionsMessage": "L-aġent se jaqbeż dan il-pass.",
+      "answerProgress": "{{answered}} minn {{total}} imwieġba",
       "selectAllThatApply": "Agħżel kulma japplika.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, magħżul",

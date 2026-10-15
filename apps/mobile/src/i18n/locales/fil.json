@@ -2429,6 +2429,7 @@
       "title": "Kailangan ng ahente ng sagot",
       "skipQuestionsTitle": "Laktawan ang mga tanong?",
       "skipQuestionsMessage": "Lalaktawan ng ahente ang hakbang na ito.",
+      "answerProgress": "{{answered}} sa {{total}} ang nasagot",
       "selectAllThatApply": "Piliin ang lahat ng naaangkop.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, napili",

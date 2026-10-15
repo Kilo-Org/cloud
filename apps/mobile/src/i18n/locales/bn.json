@@ -2429,6 +2429,7 @@
       "title": "এজেন্টের আপনার উত্তর প্রয়োজন",
       "skipQuestionsTitle": "প্রশ্নগুলো এড়িয়ে যাবেন?",
       "skipQuestionsMessage": "এজেন্ট এই ধাপটি এড়িয়ে যাবে।",
+      "answerProgress": "{{total}}টির মধ্যে {{answered}}টির উত্তর দেওয়া হয়েছে",
       "selectAllThatApply": "প্রযোজ্য সবগুলো নির্বাচন করুন।",
       "option": "বিকল্প: {{label}}",
       "optionSelected": "{{label}}, নির্বাচিত",

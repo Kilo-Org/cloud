@@ -2429,6 +2429,7 @@
       "title": "Wakala anahitaji jibu",
       "skipQuestionsTitle": "Ungependa kuruka maswali?",
       "skipQuestionsMessage": "Wakala ataruka hatua hii.",
+      "answerProgress": "{{answered}} kati ya {{total}} yamejibiwa",
       "selectAllThatApply": "Chagua majibu yote yanayofaa.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, imechaguliwa",

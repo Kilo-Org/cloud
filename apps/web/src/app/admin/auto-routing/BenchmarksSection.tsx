@@ -2,6 +2,7 @@
 
 import {
   BENCHMARK_CONTAINER_BUDGET,
+  BENCHMARK_PLATFORM_RESERVED_CONTAINERS,
   DEFAULT_AUTO_ROUTER,
   type AutoRouter,
   BenchmarkConfigResponseSchema,
@@ -246,8 +247,6 @@ export function configToFormState(config: BenchmarkConfig | null): {
   frontierMinAccuracyDelta: number;
   switchCostFactor: number;
   bestAccuracySwitchThreshold: number;
-  maxConcurrency: number;
-  userMaxConcurrency: number;
   benchmarkUserId: string;
   benchmarkOrgId: string;
   classifierRepetitions: number;
@@ -269,8 +268,6 @@ export function configToFormState(config: BenchmarkConfig | null): {
       frontierMinAccuracyDelta: 0,
       switchCostFactor: 3,
       bestAccuracySwitchThreshold: 0.05,
-      maxConcurrency: BENCHMARK_CONTAINER_BUDGET / 2,
-      userMaxConcurrency: BENCHMARK_CONTAINER_BUDGET / 2,
       benchmarkUserId: '',
       benchmarkOrgId: '',
       classifierRepetitions: 1,
@@ -290,8 +287,6 @@ export function configToFormState(config: BenchmarkConfig | null): {
     frontierMinAccuracyDelta: config.frontierMinAccuracyDelta,
     switchCostFactor: config.switchCostFactor,
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
-    maxConcurrency: config.maxConcurrency,
-    userMaxConcurrency: config.userMaxConcurrency,
     benchmarkUserId: config.benchmarkUserId ?? '',
     benchmarkOrgId: config.benchmarkOrgId ?? '',
     classifierRepetitions: config.classifierRepetitions,
@@ -329,8 +324,6 @@ export function formStateToConfig(
     productionTokenProfile: parseTokenProfile(state),
     switchHorizonTurns: parseOptionalNumber(state.switchHorizonTurns),
     lowConfidenceThreshold: parseOptionalNumber(state.lowConfidenceThreshold),
-    maxConcurrency: state.maxConcurrency,
-    userMaxConcurrency: state.userMaxConcurrency,
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
     benchmarkOrgId: benchmarkOrgId.length > 0 ? benchmarkOrgId : null,
     classifierRepetitions: state.classifierRepetitions,
@@ -838,63 +831,19 @@ function BenchmarkConfigEditor({
 
         <ConfigSectionHeading
           title="Benchmark runs"
-          description="Queue concurrency, repetitions, run identity, and the latency gate."
+          description="Container budget, repetitions, run identity, and the latency gate."
         />
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-max-concurrency" className="text-sm font-medium">
-              Platform max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
-            </Label>
-            <Input
-              id="benchmark-max-concurrency"
-              type="number"
-              min={1}
-              max={BENCHMARK_CONTAINER_BUDGET}
-              step={1}
-              value={form.maxConcurrency}
-              onChange={e =>
-                updateForm(prev => ({ ...prev, maxConcurrency: parseInt(e.target.value, 10) || 1 }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <span className="text-sm font-medium">Shared container budget</span>
             <p className="text-muted-foreground text-xs">
-              Live containers a platform-queue run may hold. Classifier runs use it for parallel
-              OpenRouter calls.
+              {BENCHMARK_CONTAINER_BUDGET} benchmark containers are shared by every queue and both
+              routers. User-queue runs use at most{' '}
+              {BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS}; the remaining{' '}
+              {BENCHMARK_PLATFORM_RESERVED_CONTAINERS} stay reserved for platform runs, which split
+              the free lanes with the other router.
             </p>
           </div>
-          {router === 'efficient' ? (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="benchmark-user-max-concurrency" className="text-sm font-medium">
-                User max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
-              </Label>
-              <Input
-                id="benchmark-user-max-concurrency"
-                type="number"
-                min={1}
-                max={BENCHMARK_CONTAINER_BUDGET}
-                step={1}
-                value={form.userMaxConcurrency}
-                onChange={e =>
-                  updateForm(prev => ({
-                    ...prev,
-                    userMaxConcurrency: parseInt(e.target.value, 10) || 1,
-                  }))
-                }
-                className="h-8 w-40 tabular-nums"
-              />
-              <p
-                className={
-                  form.maxConcurrency + form.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET
-                    ? 'text-destructive text-xs'
-                    : 'text-muted-foreground text-xs'
-                }
-              >
-                Live containers a user-queue run may hold. The two queues run at the same time, so
-                both budgets together must stay at or under {BENCHMARK_CONTAINER_BUDGET} (currently{' '}
-                {form.maxConcurrency + form.userMaxConcurrency}).
-              </p>
-            </div>
-          ) : null}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-classifier-repetitions" className="text-sm font-medium">
               Classifier repetitions (1–5)

@@ -556,8 +556,8 @@ describe('decider message fan-out', () => {
   });
 
   it('computeDeciderShardCount maximizes shard lanes under the live container cap', () => {
-    // No explicit budget → the full container cap.
-    expect(computeDeciderShardCount({ modelCount: 2, repetitions: 3, chunkCount: 36 })).toBe(33);
+    // No explicit budget → the full shared container budget (500).
+    expect(computeDeciderShardCount({ modelCount: 20, repetitions: 3, chunkCount: 36 })).toBe(8);
     expect(
       computeDeciderShardCount({
         modelCount: 2,

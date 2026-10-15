@@ -14,9 +14,11 @@ import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contrac
 import type { PoolEntry } from '@kilocode/auto-routing-contracts';
 import {
   BENCHMARK_CONTAINER_BUDGET,
+  BENCHMARK_USER_CONTAINER_LIMIT,
   BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH,
 } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
+import type { SQL } from 'drizzle-orm';
 import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import * as z from 'zod';
@@ -149,6 +151,14 @@ export async function getConfigRows(
   };
 }
 
+// The retired per-config lane budgets are no longer admin input, but the
+// columns are NOT NULL and a deployed worker still reads them, so every save
+// writes the shared-budget constants instead of saved values.
+const LEGACY_CONFIG_LANE_BUDGETS = {
+  max_concurrency: BENCHMARK_CONTAINER_BUDGET,
+  user_max_concurrency: BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS,
+};
+
 export async function replaceConfig(
   db: D1Database,
   config: {
@@ -160,8 +170,6 @@ export async function replaceConfig(
     production_token_profile?: ProductionTokenProfile | null;
     switch_horizon_turns?: number | null;
     low_confidence_threshold?: number | null;
-    max_concurrency: number;
-    user_max_concurrency: number;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
     classifier_repetitions: number;
@@ -178,10 +186,15 @@ export async function replaceConfig(
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm
       .insert(benchmarkConfig)
-      .values({ id: router === 'efficient' ? 1 : 2, ...config, router })
+      .values({
+        id: router === 'efficient' ? 1 : 2,
+        ...config,
+        ...LEGACY_CONFIG_LANE_BUDGETS,
+        router,
+      })
       .onConflictDoUpdate({
         target: benchmarkConfig.router,
-        set: config,
+        set: { ...config, ...LEGACY_CONFIG_LANE_BUDGETS },
       }),
     orm.delete(configClassifierModels).where(eq(configClassifierModels.router, router)),
     orm.delete(configDeciderModels).where(eq(configDeciderModels.router, router)),
@@ -197,6 +210,47 @@ export async function replaceConfig(
 
 /** Which registry queue a run drains: the platform decider list, or owner pools. */
 export type { BenchmarkRunPurpose };
+
+/** Live decider lanes of every running run, the sum the admission guard reads. */
+const runningDeciderLanes = sql`(
+  SELECT COALESCE(SUM(${benchmarkRuns.max_concurrency}), 0)
+  FROM ${benchmarkRuns}
+  WHERE ${benchmarkRuns.kind} = 'decider' AND ${benchmarkRuns.status} = 'running'
+)`;
+
+/** Live decider lanes held by owner-queue runs. */
+const runningUserLanes = sql`(
+  SELECT COALESCE(SUM(${benchmarkRuns.max_concurrency}), 0)
+  FROM ${benchmarkRuns}
+  WHERE ${benchmarkRuns.kind} = 'decider'
+    AND ${benchmarkRuns.purpose} = 'user'
+    AND ${benchmarkRuns.status} = 'running'
+)`;
+
+/** Admission-guarded lane count for a new run, or NULL to reject the insert. */
+function containerLanesForAdmission(run: {
+  kind: BenchmarkKind;
+  purpose?: BenchmarkRunPurpose;
+  max_concurrency: number;
+}): SQL | number {
+  if (run.kind !== 'decider') return run.max_concurrency;
+  const withinBudget = sql`${runningDeciderLanes} + ${run.max_concurrency} <= ${BENCHMARK_CONTAINER_BUDGET}`;
+  if ((run.purpose ?? 'platform') === 'user') {
+    const withinReserve = sql`${runningUserLanes} + ${run.max_concurrency} <= ${BENCHMARK_USER_CONTAINER_LIMIT}`;
+    return sql`CASE WHEN ${withinReserve} AND ${withinBudget} THEN ${run.max_concurrency} ELSE NULL END`;
+  }
+  return sql`CASE WHEN ${withinBudget} THEN ${run.max_concurrency} ELSE NULL END`;
+}
+
+/**
+ * Container lanes live decider runs hold, summed across every router and queue.
+ * `startRun` sizes the next run against it; the insert guard re-reads the same
+ * rows atomically.
+ */
+export async function getLiveContainerLanes(db: D1Database): Promise<number> {
+  const row = await drizzle(db).select({ lanes: runningDeciderLanes }).from(benchmarkRuns).get();
+  return Number(row?.lanes ?? 0);
+}
 
 export async function insertRun(
   db: D1Database,
@@ -233,16 +287,10 @@ export async function insertRun(
     min_accuracy: run.min_accuracy,
     switch_cost_factor: run.switch_cost_factor,
     best_accuracy_switch_threshold: run.best_accuracy_switch_threshold,
-    // A NOT NULL rejection rolls back the whole D1 batch, including model snapshots.
-    max_concurrency:
-      run.kind === 'decider'
-        ? sql`CASE WHEN (
-          SELECT COALESCE(SUM(${benchmarkRuns.max_concurrency}), 0)
-          FROM ${benchmarkRuns}
-          WHERE ${benchmarkRuns.kind} = 'decider' AND ${benchmarkRuns.status} = 'running'
-        ) + ${run.max_concurrency} <= ${BENCHMARK_CONTAINER_BUDGET}
-        THEN ${run.max_concurrency} ELSE NULL END`
-        : run.max_concurrency,
+    // A NOT NULL rejection rolls back the whole D1 batch, including model
+    // snapshots. Two caps: shared across every running decider run, and (for
+    // owner-queue runs) the slice that keeps the platform reserve intact.
+    max_concurrency: containerLanesForAdmission(run),
     benchmark_user_id: run.benchmark_user_id,
     benchmark_org_id: run.benchmark_org_id,
     repetitions: run.repetitions,

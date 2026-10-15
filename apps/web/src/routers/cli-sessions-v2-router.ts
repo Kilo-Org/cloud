@@ -80,6 +80,7 @@ import {
   recheckWatchPr,
   watchPrEnableSchema,
   watchPrMutationSchema,
+  watchPrQuerySchema,
 } from '@/lib/cloud-agent/watch-pr';
 
 /**
@@ -968,14 +969,14 @@ function joinWithAnd(fragments: SQL[]): SQL {
  */
 export const cliSessionsV2Router = createTRPCRouter({
   getPrWatchOptions: baseProcedure
-    .input(z.object({ sessionId: z.string().min(1) }))
-    .query(({ ctx, input }) => getPrWatchOptions(ctx, input.sessionId)),
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getPrWatchOptions(ctx, input)),
   enableWatchPr: baseProcedure
     .input(watchPrEnableSchema)
     .mutation(({ ctx, input }) => enableWatchPr(ctx, input)),
   getWatchPr: baseProcedure
-    .input(z.object({ sessionId: z.string().min(1) }))
-    .query(({ ctx, input }) => getWatchPr(ctx, input.sessionId)),
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getWatchPr(ctx, input)),
   pauseWatchPr: baseProcedure
     .input(watchPrMutationSchema)
     .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'pause')),

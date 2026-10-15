@@ -1,4 +1,27 @@
 import type { WatchPrProjection } from '@/lib/cloud-agent/watch-pr-events';
+import { parsePullRequestUrl } from '@/lib/integrations/platforms/github/pr-link-identity';
+import type { AssociatedPr } from './github-pr-link';
+
+export function watchPrQueryInput(
+  sessionId: string,
+  pr: Pick<AssociatedPr, 'url' | 'number' | 'platform'>
+) {
+  const parsed = parsePullRequestUrl(pr.url);
+  if (pr.platform !== 'github' || parsed?.host !== 'github.com' || parsed.number !== pr.number)
+    return null;
+  return { sessionId, expectedRepoUrl: parsed.repoUrl, expectedPrNumber: parsed.number };
+}
+
+export function watchPrMatchesIdentity(
+  watch: { repo_url: string; pr_number: number },
+  input: ReturnType<typeof watchPrQueryInput>
+) {
+  return (
+    input !== null &&
+    watch.repo_url === input.expectedRepoUrl &&
+    watch.pr_number === input.expectedPrNumber
+  );
+}
 
 export function canEnablePrWatch(pr: { platform: string; state: string }, canEnable: boolean) {
   return pr.platform === 'github' && (pr.state === 'open' || pr.state === 'draft') && canEnable;

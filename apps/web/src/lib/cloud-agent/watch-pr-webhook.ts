@@ -19,6 +19,7 @@ import {
   watchPrEventMatches,
   watchPrProjectionSchema,
 } from './watch-pr-events';
+import { replayWatchPrCiEvents, retainWatchPrCiEvent } from './watch-pr-ci-inbox';
 
 export async function observeWatchPrWebhook(input: {
   eventType: string;
@@ -28,6 +29,9 @@ export async function observeWatchPrWebhook(input: {
 }): Promise<void> {
   const event = normalizeWatchPrEvent(input.eventType, input.payload);
   if (!event) return;
+  if (event.kind === 'check' || event.kind === 'status') {
+    await retainWatchPrCiEvent({ event, deliveryId: input.deliveryId, appType: input.appType });
+  }
   const target =
     event.kind === 'pull_request' || event.kind === 'feedback'
       ? eq(cloud_agent_pr_watches.pr_number, event.prNumber)
@@ -41,7 +45,7 @@ export async function observeWatchPrWebhook(input: {
               eq(cloud_agent_pr_watches.head_sha, event.sha),
               inArray(cloud_agent_pr_watches.pr_number, event.prNumbers)
             )
-          : undefined;
+          : eq(cloud_agent_pr_watches.head_sha, event.sha);
   const candidates = await db
     .select({
       watch: cloud_agent_pr_watches,
@@ -119,7 +123,7 @@ export async function observeWatchPrWebhook(input: {
         input.appType === 'standard'
           ? [process.env.NODE_ENV === 'development' ? '242397087' : '240665456']
           : [];
-      const next =
+      let next =
         new Date(current.expires_at).getTime() <= Date.now()
           ? {
               ...current,
@@ -133,6 +137,9 @@ export async function observeWatchPrWebhook(input: {
               },
             }
           : projectWatchPrEvent(current, event, current.generation, selfActorIds);
+      if (next.status !== 'finished' && next.head_sha !== current.head_sha) {
+        next = await replayWatchPrCiEvents(tx, current, next, input.appType);
+      }
       await tx.insert(cloud_agent_pr_watch_activity).values({
         watch_id: current.id,
         generation: current.generation,

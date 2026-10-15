@@ -1,4 +1,4 @@
-import { emptyWatchPrProjection } from './watch-pr-events';
+import { emptyWatchPrProjection, normalizeWatchPrEvent } from './watch-pr-events';
 
 const mockCandidates = jest.fn();
 const mockLockedWatch = jest.fn();
@@ -8,6 +8,15 @@ const mockUpdate = jest.fn();
 const mockTransaction = jest.fn();
 const mockFlag = jest.fn();
 const mockAuthorize = jest.fn();
+const mockRetainCi = jest.fn();
+const mockReadCi = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: {
+    eval: (...args: unknown[]) => mockRetainCi(...args),
+    zrange: (...args: unknown[]) => mockReadCi(...args),
+  },
+}));
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
@@ -72,6 +81,7 @@ const watch = {
   projection: emptyWatchPrProjection(),
   lifecycle_reason: null,
   expires_at: '2099-10-14 12:00:00+00',
+  created_at: '2026-10-14 00:00:00+00',
   policy: {
     version: 1,
     categories: { reviews: true, failedChecks: true, baseUpdates: true },
@@ -104,10 +114,18 @@ describe('awaited watch PR durable observation', () => {
     mockUpdate.mockResolvedValue(undefined);
     mockFlag.mockResolvedValue(true);
     mockAuthorize.mockResolvedValue(undefined);
+    mockRetainCi.mockResolvedValue(1);
+    mockReadCi.mockResolvedValue([]);
     mockTransaction.mockImplementation(async callback =>
       callback({
         select: () => ({
-          from: () => ({ where: () => ({ for: mockLockedWatch, limit: mockReceipt }) }),
+          from: () => ({
+            where: () => ({
+              for: mockLockedWatch,
+              limit: mockReceipt,
+              then: (resolve: (rows: unknown) => unknown) => mockReceipt().then(resolve),
+            }),
+          }),
         }),
         insert: () => ({ values: mockInsert }),
         update: () => ({ set: (values: unknown) => ({ where: () => mockUpdate(values) }) }),
@@ -118,7 +136,7 @@ describe('awaited watch PR durable observation', () => {
   it('matches exact installation/app/repository in SQL and authorizes the exact agent-only connection', async () => {
     await observeWatchPrWebhook(input);
     const query = new PgDialect().sqlToQuery(mockCandidates.mock.calls[0][0]);
-    expect(query.params).toEqual(['123', 'standard', '456', 'finished']);
+    expect(query.params).toEqual(['123', 'standard', '456', 'finished', head]);
     expect(mockFlag).toHaveBeenCalledWith('cloud-agent-watch-pr', 'oauth/owner');
     expect(mockAuthorize).toHaveBeenCalledWith(
       '123',
@@ -166,22 +184,136 @@ describe('awaited watch PR durable observation', () => {
     );
   });
 
-  it('retains early empty-association checks without making off-head failures pending', async () => {
+  it('retains early empty-association checks once without writing to unrelated watches', async () => {
     const earlyHead = 'b'.repeat(40);
+    mockCandidates.mockResolvedValue([]);
     await observeWatchPrWebhook({
       ...input,
       payload: { ...input.payload, check_run: { ...input.payload.check_run, head_sha: earlyHead } },
     });
+    const query = new PgDialect().sqlToQuery(mockCandidates.mock.calls[0][0]);
+    expect(query.params).toEqual(['123', 'standard', '456', 'finished', earlyHead]);
+    expect(mockRetainCi).toHaveBeenCalledTimes(1);
+    expect(mockRetainCi.mock.calls[0][1]).toEqual(['watch-pr-ci:v1:123:standard:456']);
+    expect(mockAuthorize).not.toHaveBeenCalled();
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('uses the head-SHA predicate for status events too', async () => {
+    mockCandidates.mockResolvedValue([]);
+    await observeWatchPrWebhook({
+      ...input,
+      eventType: 'status',
+      payload: {
+        installation: { id: 123 },
+        repository: { id: 456 },
+        id: 11,
+        sha: head,
+        context: 'ci',
+        state: 'failure',
+        updated_at: '2026-10-14T12:01:00Z',
+      },
+    });
+    const query = new PgDialect().sqlToQuery(mockCandidates.mock.calls[0][0]);
+    expect(query.params).toEqual(['123', 'standard', '456', 'finished', head]);
+    expect(mockRetainCi).toHaveBeenCalledTimes(1);
+    expect(mockTransaction).not.toHaveBeenCalled();
+  });
+
+  it.each(['push', 'pull_request'])(
+    'joins early checks only when %s establishes their head SHA',
+    async eventType => {
+      const earlyHead = 'b'.repeat(40);
+      const earlyEvent = normalizeWatchPrEvent('check_run', {
+        ...input.payload,
+        check_run: { ...input.payload.check_run, head_sha: earlyHead },
+      });
+      mockReadCi.mockResolvedValue([JSON.stringify({ deliveryId: 'early-ci', event: earlyEvent })]);
+      await observeWatchPrWebhook({
+        ...input,
+        eventType,
+        payload:
+          eventType === 'push'
+            ? {
+                installation: { id: 123 },
+                repository: { id: 456 },
+                ref: 'refs/heads/feature',
+                before: head,
+                after: earlyHead,
+                deleted: false,
+              }
+            : {
+                installation: { id: 123 },
+                repository: { id: 456 },
+                action: 'synchronize',
+                before: head,
+                pull_request: {
+                  number: 42,
+                  state: 'open',
+                  updated_at: '2026-10-14T12:02:00Z',
+                  head: { ref: 'feature', sha: earlyHead, repo: { id: 456 } },
+                  base: { ref: 'main', sha: 'c'.repeat(40), repo: { id: 456 } },
+                },
+              },
+      });
+      expect(mockReadCi).toHaveBeenCalledTimes(1);
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          head_sha: earlyHead,
+          projection: expect.objectContaining({
+            pending: [{ key: `check:7:run:10:tests:${earlyHead}`, reason: 'failed_check' }],
+            truncated: false,
+          }),
+        })
+      );
+      expect(mockInsert).toHaveBeenCalledWith([
+        expect.objectContaining({ delivery_id: 'early-ci' }),
+      ]);
+    }
+  );
+
+  it('does not replay preexisting deliveries or unrelated commits into a new head', async () => {
+    const nextHead = 'b'.repeat(40);
+    mockReceipt.mockResolvedValueOnce([]).mockResolvedValueOnce([{ deliveryId: 'early-ci' }]);
+    mockReadCi.mockResolvedValue([
+      JSON.stringify({
+        deliveryId: 'early-ci',
+        event: normalizeWatchPrEvent('check_run', {
+          ...input.payload,
+          check_run: { ...input.payload.check_run, head_sha: nextHead },
+        }),
+      }),
+      JSON.stringify({
+        deliveryId: 'unrelated',
+        event: normalizeWatchPrEvent('check_run', input.payload),
+      }),
+    ]);
+    await observeWatchPrWebhook({
+      ...input,
+      eventType: 'push',
+      payload: {
+        installation: { id: 123 },
+        repository: { id: 456 },
+        ref: 'refs/heads/feature',
+        before: head,
+        after: nextHead,
+        deleted: false,
+      },
+    });
+    expect(mockInsert).toHaveBeenCalledTimes(1);
     expect(mockUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        head_sha: head,
-        pending_revision: 0,
-        projection: expect.objectContaining({
-          pending: [],
-          evidence: [expect.objectContaining({ sha: earlyHead, kind: 'check' })],
-        }),
+        head_sha: nextHead,
+        projection: expect.objectContaining({ pending: [], evidence: [] }),
       })
     );
+  });
+
+  it('propagates inbox failures before acknowledging CI delivery', async () => {
+    mockRetainCi.mockRejectedValue(new Error('inbox unavailable'));
+    await expect(observeWatchPrWebhook(input)).rejects.toThrow('inbox unavailable');
+    expect(mockCandidates).not.toHaveBeenCalled();
   });
 
   it('retains the PR/head index predicate for checks carrying explicit associations', async () => {

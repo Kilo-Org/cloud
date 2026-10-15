@@ -79,6 +79,34 @@ const pushPayload = envelope.extend({
 });
 
 type EventIdentity = { installationId: string; repositoryId: string };
+export const watchPrCiEventSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('check'),
+    installationId: id,
+    repositoryId: id,
+    prNumbers: z.array(z.number().int().positive()).max(100),
+    key: z.string().max(1200),
+    objectId: id,
+    sha,
+    updatedAt: timestamp.nullable(),
+    startedAt: timestamp.nullable(),
+    attempt: z.number().int().positive(),
+    state: z.string().max(100),
+    conclusion: z.string().max(100).nullable(),
+  }),
+  z.object({
+    kind: z.literal('status'),
+    installationId: id,
+    repositoryId: id,
+    key: z.string().max(1200),
+    objectId: id,
+    sha,
+    updatedAt: timestamp,
+    state: z.string().max(100),
+  }),
+]);
+export type WatchPrCiEvent = z.infer<typeof watchPrCiEventSchema>;
+
 export type WatchPrEvent = EventIdentity &
   (
     | {
@@ -107,26 +135,7 @@ export type WatchPrEvent = EventIdentity &
         body: string;
         state: string;
       }
-    | {
-        kind: 'check';
-        prNumbers: number[];
-        key: string;
-        objectId: string;
-        sha: string;
-        updatedAt: string | null;
-        startedAt: string | null;
-        attempt: number;
-        state: string;
-        conclusion: string | null;
-      }
-    | {
-        kind: 'status';
-        key: string;
-        objectId: string;
-        sha: string;
-        updatedAt: string;
-        state: string;
-      }
+    | WatchPrCiEvent
     | { kind: 'push'; ref: string; before: string; after: string; deleted: boolean }
   );
 

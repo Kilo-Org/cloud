@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,11 +29,23 @@ import {
   validWatchPrPreferences,
   watchPrObservationLabel,
   watchPrProblemLabels,
+  watchPrMatchesIdentity,
+  watchPrQueryInput,
 } from './utils/watch-pr-view';
 
 type WatchPrDialogProps = { sessionId: string; pr: AssociatedPr };
 
 export function WatchPrDialog({ sessionId, pr }: WatchPrDialogProps) {
+  return (
+    <WatchPrDialogContent
+      key={JSON.stringify([sessionId, pr.url, pr.number])}
+      sessionId={sessionId}
+      pr={pr}
+    />
+  );
+}
+
+function WatchPrDialogContent({ sessionId, pr }: WatchPrDialogProps) {
   const [open, setOpen] = useState(false);
   const [model, setModel] = useState('');
   const [integrationId, setIntegrationId] = useState<string | null>(null);
@@ -50,15 +62,20 @@ export function WatchPrDialog({ sessionId, pr }: WatchPrDialogProps) {
   const id = useId();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const queryInput = watchPrQueryInput(sessionId, pr);
   const options = useQuery({
-    ...trpc.cliSessionsV2.getPrWatchOptions.queryOptions({ sessionId }),
+    ...trpc.cliSessionsV2.getPrWatchOptions.queryOptions(queryInput ?? skipToken),
     enabled: open,
   });
   const summary = useQuery({
-    ...trpc.cliSessionsV2.getWatchPr.queryOptions({ sessionId }),
+    ...trpc.cliSessionsV2.getWatchPr.queryOptions(queryInput ?? skipToken),
     enabled: open,
   });
-  const watch = summary.data;
+  const identityError =
+    !queryInput || (summary.data && !watchPrMatchesIdentity(summary.data, queryInput))
+      ? 'PR identity changed; refresh the PR badge before retrying'
+      : null;
+  const watch = identityError ? null : summary.data;
   const selectedIntegration = integrationId ?? options.data?.defaultIntegrationId ?? '';
   const invalidate = async () => {
     await Promise.all([
@@ -99,7 +116,10 @@ export function WatchPrDialog({ sessionId, pr }: WatchPrDialogProps) {
   const busy =
     enable.isPending || pause.isPending || resume.isPending || stop.isPending || recheck.isPending;
   const fresh = !watch || watch.status === 'finished';
-  const eligible = canEnablePrWatch(pr, options.data?.canEnable === true);
+  const eligible = canEnablePrWatch(
+    pr,
+    options.data?.canEnable === true && !options.error && !summary.error && !identityError
+  );
   const canSubmit =
     eligible &&
     consent &&
@@ -152,12 +172,12 @@ export function WatchPrDialog({ sessionId, pr }: WatchPrDialogProps) {
           <p>No compute is kept idle and this milestone incurs no agent usage charges.</p>
         </div>
 
-        {(options.error || summary.error || error) && (
+        {(identityError || options.error || summary.error || error) && (
           <div
             role="alert"
             className="border-destructive/50 space-y-2 rounded-md border p-3 text-sm break-words"
           >
-            <p>{error ?? summary.error?.message ?? options.error?.message}</p>
+            <p>{identityError ?? error ?? summary.error?.message ?? options.error?.message}</p>
             <Button variant="outline" size="sm" onClick={retry} disabled={busy}>
               Refresh and retry
             </Button>
@@ -310,14 +330,14 @@ export function WatchPrDialog({ sessionId, pr }: WatchPrDialogProps) {
           </section>
         )}
 
-        {fresh && summary.isSuccess && (
+        {fresh && summary.isSuccess && !identityError && (
           <form
             className="space-y-4"
             onSubmit={event => {
               event.preventDefault();
-              if (!canSubmit || busy || options.isFetching || !options.data) return;
+              if (!canSubmit || busy || options.isFetching || !options.data || !queryInput) return;
               enable.mutate({
-                sessionId,
+                ...queryInput,
                 integrationId: selectedIntegration,
                 expiresAt: new Date(Date.now() + hours * 60 * 60 * 1000).toISOString(),
                 policy: {

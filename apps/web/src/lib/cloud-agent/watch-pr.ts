@@ -33,11 +33,19 @@ import {
   projectWatchPrEvent,
   watchPrProjectionSchema,
 } from './watch-pr-events';
+import { replayWatchPrCiEvents } from './watch-pr-ci-inbox';
 
 type WatchContext = Parameters<typeof ensureOrganizationAccess>[0];
 
-export const watchPrEnableSchema = z.object({
+export const watchPrQuerySchema = z.object({
   sessionId: z.string().min(1),
+  expectedRepoUrl: z.string().refine(value => {
+    const repo = parseRepoReference(value);
+    return repo?.host === 'github.com' && repo.url === value;
+  }, 'Expected a canonical GitHub repository URL'),
+  expectedPrNumber: z.number().int().positive(),
+});
+export const watchPrEnableSchema = watchPrQuerySchema.extend({
   integrationId: z.string().uuid(),
   policy: watchPrPolicySchema,
   expiresAt: z.string().datetime(),
@@ -131,6 +139,22 @@ export function assertWatchPrSource(session: CliSessionV2) {
   };
 }
 
+function assertExpectedPr(session: CliSessionV2, input: z.infer<typeof watchPrQuerySchema>) {
+  const repo = parseRepoReference(session.git_url);
+  const pr = parsePullRequestUrl(session.pr_url);
+  if (
+    repo?.url !== input.expectedRepoUrl ||
+    pr?.repoUrl !== input.expectedRepoUrl ||
+    pr.number !== input.expectedPrNumber ||
+    session.pr_number !== input.expectedPrNumber
+  ) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Session PR changed; refresh the PR badge before retrying',
+    });
+  }
+}
+
 async function verifySource(
   ctx: WatchContext,
   session: CliSessionV2,
@@ -210,12 +234,13 @@ async function verifySource(
     integration.id,
     'agent'
   );
-  const { data: pr } = await new Octokit({ auth: token.token }).pulls.get({
+  const octokit = new Octokit({ auth: token.token });
+  const { data: pr } = await octokit.pulls.get({
     owner: source.repo.owner,
     repo: source.repo.repo,
     pull_number: source.prNumber,
   });
-  const verification = verifySessionPullRequestLink({
+  const verificationInput = {
     sessionRepo: { gitUrl: session.git_url, gitBranch: session.git_branch },
     link: {
       prUrl: session.pr_url,
@@ -230,7 +255,29 @@ async function verifySource(
       headRef: pr.head.ref,
       headSha: pr.head.sha,
     },
-  });
+  };
+  let verification = verifySessionPullRequestLink(verificationInput);
+  if (!verification.verified && verification.reason === 'head_sha_mismatch' && !existingWatch) {
+    const commitsPerPage = 100;
+    const maxCommitPages = 10;
+    for (let page = 1; page <= maxCommitPages; page += 1) {
+      const { data: commits } = await octokit.pulls.listCommits({
+        owner: source.repo.owner,
+        repo: source.repo.repo,
+        pull_number: source.prNumber,
+        per_page: commitsPerPage,
+        page,
+      });
+      verification = verifySessionPullRequestLink({
+        ...verificationInput,
+        pullRequest: {
+          ...verificationInput.pullRequest,
+          commitShas: commits.map(commit => commit.sha),
+        },
+      });
+      if (verification.verified || commits.length < commitsPerPage) break;
+    }
+  }
   const repositoryAllowed =
     integration.repository_access === 'all' ||
     (integration.repository_access === 'selected' &&
@@ -255,8 +302,12 @@ async function verifySource(
   return { source, integration, appType, pr };
 }
 
-export async function getPrWatchOptions(ctx: WatchContext, sessionId: string) {
-  const session = await ownedSession(ctx, sessionId);
+export async function getPrWatchOptions(
+  ctx: WatchContext,
+  input: z.infer<typeof watchPrQuerySchema>
+) {
+  const session = await ownedSession(ctx, input.sessionId);
+  assertExpectedPr(session, input);
   const enabled = await isReleaseToggleEnabled('cloud-agent-watch-pr', ctx.user.id);
   const integrationOptions: {
     integrationId: string;
@@ -365,6 +416,7 @@ export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof wat
   await requireRelease(ctx);
   assertWatchPrExpiry(input.expiresAt);
   const session = await ownedSession(ctx, input.sessionId);
+  assertExpectedPr(session, input);
   const { source, integration, appType, pr } = await verifySource(
     ctx,
     session,
@@ -513,8 +565,9 @@ async function settleUnavailableWatch(watch: CloudAgentPrWatch) {
   });
 }
 
-export async function getWatchPr(ctx: WatchContext, sessionId: string) {
-  const session = await ownedSession(ctx, sessionId);
+export async function getWatchPr(ctx: WatchContext, input: z.infer<typeof watchPrQuerySchema>) {
+  const session = await ownedSession(ctx, input.sessionId);
+  assertExpectedPr(session, input);
   let source: ReturnType<typeof assertWatchPrSource>;
   try {
     source = assertWatchPrSource(session);
@@ -684,7 +737,7 @@ export async function recheckWatchPr(
         code: 'CONFLICT',
         message: 'GitHub read conflicts with newer observations; retry later',
       });
-    const next = projectWatchPrEvent(
+    let next = projectWatchPrEvent(
       {
         ...current,
         projection: {
@@ -713,6 +766,9 @@ export async function recheckWatchPr(
       current.generation,
       []
     );
+    if (next.status !== 'finished' && next.head_sha !== current.head_sha) {
+      next = await replayWatchPrCiEvents(tx, current, next, current.github_app_type);
+    }
     const [updated] = await tx
       .update(cloud_agent_pr_watches)
       .set({

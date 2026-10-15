@@ -19,8 +19,11 @@ import {
   getPrWatchOptions,
   recheckWatchPr,
   serializeWatchPr,
+  watchPrEnableSchema,
+  watchPrQuerySchema,
 } from './watch-pr';
 import { emptyWatchPrProjection } from './watch-pr-events';
+import { replayWatchPrCiEvents } from './watch-pr-ci-inbox';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
@@ -48,6 +51,9 @@ jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
 }));
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   generateGitHubInstallationToken: jest.fn(),
+}));
+jest.mock('./watch-pr-ci-inbox', () => ({
+  replayWatchPrCiEvents: jest.fn(async (_tx, _watch, next) => next),
 }));
 
 const ctx = { user: { id: 'oauth/github|watch-owner' } } as Parameters<typeof enableWatchPr>[0];
@@ -107,13 +113,19 @@ const watch = {
   updated_at: '2026-10-14 01:16:12.945+00',
   last_event_at: '2026-10-14 01:17:12.945+00',
 } as CloudAgentPrWatch;
-const input = {
+const queryInput = {
   sessionId: session.session_id,
+  expectedRepoUrl: watch.repo_url,
+  expectedPrNumber: watch.pr_number,
+};
+const input = {
+  ...queryInput,
   integrationId: watch.integration_id,
   policy,
   expiresAt: new Date(Date.now() + 3600000).toISOString(),
 };
 const prGet = jest.fn();
+const prListCommits = jest.fn();
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -138,7 +150,12 @@ beforeEach(() => {
   jest
     .mocked(generateGitHubInstallationToken)
     .mockResolvedValue({ token: 'test', expires_at: null });
-  jest.mocked(Octokit).mockImplementation(() => ({ pulls: { get: prGet } }) as unknown as Octokit);
+  jest
+    .mocked(Octokit)
+    .mockImplementation(
+      () => ({ pulls: { get: prGet, listCommits: prListCommits } }) as unknown as Octokit
+    );
+  prListCommits.mockResolvedValue({ data: [] });
   prGet.mockResolvedValue({
     data: {
       number: 12,
@@ -152,6 +169,20 @@ beforeEach(() => {
 });
 
 describe('watch consent and source boundaries', () => {
+  it('requires explicit canonical repository and PR identity for queries and enablement', () => {
+    expect(watchPrQuerySchema.safeParse(queryInput).success).toBe(true);
+    expect(watchPrEnableSchema.safeParse(input).success).toBe(true);
+    for (const override of [
+      { expectedRepoUrl: undefined },
+      { expectedPrNumber: undefined },
+      { expectedRepoUrl: 'https://github.com/Kilo/Widgets' },
+      { expectedRepoUrl: 'https://gitlab.com/kilo/widgets' },
+      { expectedPrNumber: 0 },
+    ]) {
+      expect(watchPrQuerySchema.safeParse({ ...queryInput, ...override }).success).toBe(false);
+      expect(watchPrEnableSchema.safeParse({ ...input, ...override }).success).toBe(false);
+    }
+  });
   it('normalizes production PostgreSQL timestamps and explicitly reports observation-only limitations', () => {
     expect(serializeWatchPr(watch)).toMatchObject({
       created_at: '2026-10-14T01:16:12.945Z',
@@ -202,7 +233,7 @@ describe('watch consent and source boundaries', () => {
 describe('watch options', () => {
   it('returns release availability even before a watch exists without GitHub reads', async () => {
     jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
-    await expect(getPrWatchOptions(ctx, session.session_id)).resolves.toMatchObject({
+    await expect(getPrWatchOptions(ctx, queryInput)).resolves.toMatchObject({
       enabled: false,
       canEnable: false,
       integrationOptions: [],
@@ -216,7 +247,7 @@ describe('watch options', () => {
 
   it('rejects unknown owners before returning options', async () => {
     jest.mocked(db.query.cli_sessions_v2.findFirst).mockResolvedValue(undefined);
-    await expect(getPrWatchOptions(ctx, session.session_id)).rejects.toMatchObject({
+    await expect(getPrWatchOptions(ctx, queryInput)).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
     expect(isReleaseToggleEnabled).not.toHaveBeenCalled();
@@ -226,7 +257,7 @@ describe('watch options', () => {
     jest
       .mocked(db.query.cli_sessions_v2.findFirst)
       .mockResolvedValue({ ...session, cloud_agent_session_id: 'legacy' });
-    await expect(getPrWatchOptions(ctx, session.session_id)).resolves.toMatchObject({
+    await expect(getPrWatchOptions(ctx, queryInput)).resolves.toMatchObject({
       enabled: true,
       canEnable: false,
     });
@@ -255,7 +286,7 @@ describe('watch options', () => {
       .mocked(assertGitHubInstallationRuntimeAuthorized)
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new GitHubRuntimeAuthorizationError());
-    await expect(getPrWatchOptions(ctx, session.session_id)).resolves.toMatchObject({
+    await expect(getPrWatchOptions(ctx, queryInput)).resolves.toMatchObject({
       enabled: true,
       canEnable: true,
       defaultIntegrationId: watch.integration_id,
@@ -284,7 +315,7 @@ describe('watch lookup identity', () => {
         pr_url: 'https://github.com/KILO/Widgets/pull/12',
       });
       jest.mocked(db.query.cloud_agent_pr_watches.findFirst).mockResolvedValue(undefined);
-      await expect(getWatchPr(ctx, session.session_id)).resolves.toBeNull();
+      await expect(getWatchPr(ctx, queryInput)).resolves.toBeNull();
       const where = jest.mocked(db.query.cloud_agent_pr_watches.findFirst).mock.calls[0]?.[0]
         ?.where;
       if (!where || typeof where === 'function') throw new Error('Expected SQL predicate');
@@ -305,24 +336,23 @@ describe('watch lookup identity', () => {
     }
   );
 
-  it.each([
-    { pr_url: null, pr_number: null },
-    { pr_link_verified_at: null },
-    { pr_url: 'https://github.com/kilo/widgets/pull/99' },
-    { pr_url: 'https://github.com/other/widgets/pull/12' },
-    { cloud_agent_worktree_id: null },
-  ])('does not fall back to another worktree watch for invalid link %j', async override => {
-    jest.mocked(db.query.cli_sessions_v2.findFirst).mockResolvedValue({ ...session, ...override });
-    await expect(getWatchPr(ctx, session.session_id)).resolves.toBeNull();
-    expect(db.query.cloud_agent_pr_watches.findFirst).not.toHaveBeenCalled();
-    expect(db.select).not.toHaveBeenCalled();
-  });
+  it.each([{ pr_link_verified_at: null }, { cloud_agent_worktree_id: null }])(
+    'does not fall back to another worktree watch for invalid link %j',
+    async override => {
+      jest
+        .mocked(db.query.cli_sessions_v2.findFirst)
+        .mockResolvedValue({ ...session, ...override });
+      await expect(getWatchPr(ctx, queryInput)).resolves.toBeNull();
+      expect(db.query.cloud_agent_pr_watches.findFirst).not.toHaveBeenCalled();
+      expect(db.select).not.toHaveBeenCalled();
+    }
+  );
 
   it('queries PR A rather than the newer PR B in the same worktree', async () => {
     jest.mocked(db.select).mockReturnValue({
       from: () => ({ where: () => ({ orderBy: () => ({ limit: () => Promise.resolve([]) }) }) }),
     } as never);
-    await expect(getWatchPr(ctx, session.session_id)).resolves.toMatchObject({ pr_number: 12 });
+    await expect(getWatchPr(ctx, queryInput)).resolves.toMatchObject({ pr_number: 12 });
     const firstWhere = jest.mocked(db.query.cloud_agent_pr_watches.findFirst).mock.calls[0]?.[0]
       ?.where;
     if (!firstWhere || typeof firstWhere === 'function') throw new Error('Expected SQL predicate');
@@ -333,12 +363,72 @@ describe('watch lookup identity', () => {
       pr_number: 13,
     });
     jest.mocked(db.query.cloud_agent_pr_watches.findFirst).mockResolvedValue(undefined);
-    await expect(getWatchPr(ctx, session.session_id)).resolves.toBeNull();
+    await expect(getWatchPr(ctx, { ...queryInput, expectedPrNumber: 13 })).resolves.toBeNull();
     const secondWhere = jest.mocked(db.query.cloud_agent_pr_watches.findFirst).mock.calls[1]?.[0]
       ?.where;
     if (!secondWhere || typeof secondWhere === 'function')
       throw new Error('Expected SQL predicate');
     expect(new PgDialect().sqlToQuery(secondWhere).params).toContain(13);
+  });
+
+  it.each([
+    { pr_url: null, pr_number: null },
+    { pr_url: 'https://github.com/kilo/widgets/pull/99' },
+    { pr_url: 'https://github.com/other/widgets/pull/12' },
+    { pr_url: 'https://github.com/kilo/widgets/pull/13', pr_number: 13 },
+    {
+      git_url: 'https://github.com/kilo/other',
+      pr_url: 'https://github.com/kilo/other/pull/12',
+    },
+  ])('rejects stale displayed PR identity %j before queries or enablement', async override => {
+    jest.mocked(db.query.cli_sessions_v2.findFirst).mockResolvedValue({ ...session, ...override });
+    await expect(getWatchPr(ctx, queryInput)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+    });
+    await expect(getPrWatchOptions(ctx, queryInput)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+    });
+    await expect(enableWatchPr(ctx, input)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+    });
+    expect(db.query.cloud_agent_pr_watches.findFirst).not.toHaveBeenCalled();
+    expect(db.query.cloud_agent_worktrees.findFirst).not.toHaveBeenCalled();
+    expect(db.query.platform_integrations.findMany).not.toHaveBeenCalled();
+    expect(generateGitHubInstallationToken).not.toHaveBeenCalled();
+    expect(db.select).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects stale identity even when enablement is disabled', async () => {
+    jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
+    await expect(
+      getPrWatchOptions(ctx, { ...queryInput, expectedPrNumber: 13 })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
+  it('rejects the old displayed PR after switching to a session linked to another PR', async () => {
+    const switchedInput = { ...queryInput, sessionId: 'ses_other' };
+    jest.mocked(db.query.cli_sessions_v2.findFirst).mockResolvedValue({
+      ...session,
+      session_id: switchedInput.sessionId,
+      pr_url: 'https://github.com/kilo/widgets/pull/13',
+      pr_number: 13,
+    });
+    await expect(getWatchPr(ctx, switchedInput)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+    });
+    await expect(getPrWatchOptions(ctx, switchedInput)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+    });
+    await expect(enableWatchPr(ctx, { ...input, ...switchedInput })).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+    });
+    const where = jest.mocked(db.query.cli_sessions_v2.findFirst).mock.calls[0]?.[0]?.where;
+    if (!where || typeof where === 'function') throw new Error('Expected SQL predicate');
+    expect(new PgDialect().sqlToQuery(where).params).toEqual(['ses_other', ctx.user.id]);
+    expect(db.query.cloud_agent_pr_watches.findFirst).not.toHaveBeenCalled();
+    expect(generateGitHubInstallationToken).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
   });
 });
 
@@ -394,6 +484,7 @@ describe('manual PR recheck and resume', () => {
       generation: 2,
     });
     expect(prGet).toHaveBeenCalledTimes(1);
+    expect(replayWatchPrCiEvents).not.toHaveBeenCalled();
     expect(set).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'paused',
@@ -409,12 +500,18 @@ describe('manual PR recheck and resume', () => {
     const pr = (await prGet()).data;
     pr.head.sha = 'c'.repeat(40);
     prGet.mockClear().mockResolvedValue({ data: pr });
-    const { set } = mockWatchTransaction(watch, { ...watch, generation: 2, head_sha: pr.head.sha });
+    const { tx, set } = mockWatchTransaction(watch, { ...watch, generation: 2, head_sha: pr.head.sha });
     await recheckWatchPr(ctx, { watchId: watch.id, generation: 1 });
     expect(set).toHaveBeenCalledWith(
       expect.objectContaining({ head_sha: pr.head.sha, generation: 2 })
     );
     expect(prGet).toHaveBeenCalledTimes(1);
+    expect(replayWatchPrCiEvents).toHaveBeenCalledWith(
+      tx,
+      watch,
+      expect.objectContaining({ head_sha: pr.head.sha }),
+      'standard'
+    );
   });
 
   it('does not overwrite a concurrent webhook observation', async () => {
@@ -836,11 +933,130 @@ describe('watch lifecycle authorization', () => {
     jest.mocked(db.select).mockReturnValue({
       from: () => ({ where: () => ({ orderBy: () => ({ limit: () => Promise.resolve([]) }) }) }),
     } as never);
-    await expect(getWatchPr(ctx, session.session_id)).resolves.toMatchObject({
+    await expect(getWatchPr(ctx, queryInput)).resolves.toMatchObject({
       automaticRepairsAvailable: false,
       activity: [],
     });
     expect(isReleaseToggleEnabled).not.toHaveBeenCalled();
     expect(prGet).not.toHaveBeenCalled();
+  });
+});
+
+describe('initial watch PR ancestry', () => {
+  const advancedHeadSha = 'c'.repeat(40);
+  const fullCommitPage = Array.from({ length: 100 }, () => ({ sha: 'd'.repeat(40) }));
+  const watchValues = jest.fn();
+
+  beforeEach(() => {
+    watchValues.mockReturnValue({
+      onConflictDoNothing: () => ({
+        returning: () => Promise.resolve([{ ...watch, head_sha: advancedHeadSha }]),
+      }),
+    });
+    const tx = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            for: () => Promise.resolve([{ organization_id: null, deletion_started_at: null }]),
+          }),
+        }),
+      }),
+      update: () => ({ set: () => ({ where: () => ({ returning: () => Promise.resolve([]) }) }) }),
+      insert: jest
+        .fn()
+        .mockReturnValueOnce({ values: watchValues })
+        .mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
+    };
+    jest.mocked(db.transaction).mockImplementation(async callback => callback(tx as never));
+  });
+
+  it('skips commit reads when the session SHA is still the PR head', async () => {
+    await enableWatchPr(ctx, input);
+    expect(prListCommits).not.toHaveBeenCalled();
+    expect(prGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a verified ancestor on a later page and stops before reading more pages', async () => {
+    const pr = (await prGet()).data;
+    pr.head.sha = advancedHeadSha;
+    prGet.mockResolvedValue({ data: pr });
+    prGet.mockClear();
+    prListCommits.mockResolvedValueOnce({ data: fullCommitPage }).mockResolvedValueOnce({
+      data: [{ sha: `  ${session.pr_head_sha?.toUpperCase()}  ` }, ...fullCommitPage.slice(1)],
+    });
+
+    await expect(enableWatchPr(ctx, input)).resolves.toMatchObject({ head_sha: advancedHeadSha });
+
+    expect(prListCommits).toHaveBeenCalledTimes(2);
+    expect(prListCommits).toHaveBeenNthCalledWith(2, {
+      owner: 'kilo',
+      repo: 'widgets',
+      pull_number: 12,
+      per_page: 100,
+      page: 2,
+    });
+    expect(prGet).toHaveBeenCalledTimes(1);
+    expect(watchValues).toHaveBeenCalledWith(
+      expect.objectContaining({ head_sha: advancedHeadSha, pr_number: 12 })
+    );
+  });
+
+  it('rejects an unrelated SHA after the final partial commit page', async () => {
+    const pr = (await prGet()).data;
+    pr.head.sha = advancedHeadSha;
+    prGet.mockResolvedValue({ data: pr });
+    prListCommits.mockResolvedValueOnce({ data: [{ sha: advancedHeadSha }] });
+
+    await expect(enableWatchPr(ctx, input)).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+    expect(prListCommits).toHaveBeenCalledTimes(1);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('bounds ancestry verification to ten commit pages and fails closed', async () => {
+    const pr = (await prGet()).data;
+    pr.head.sha = advancedHeadSha;
+    prGet.mockResolvedValue({ data: pr });
+    prListCommits.mockResolvedValue({ data: fullCommitPage });
+
+    await expect(enableWatchPr(ctx, input)).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+    expect(prListCommits).toHaveBeenCalledTimes(10);
+    expect(prListCommits).toHaveBeenLastCalledWith(
+      expect.objectContaining({ per_page: 100, page: 10 })
+    );
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it.each(['number', 'base repository', 'fork', 'branch'])(
+    'does not use ancestry to bypass mismatched %s identity',
+    async mismatch => {
+      const pr = (await prGet()).data;
+      pr.head.sha = advancedHeadSha;
+      if (mismatch === 'number') pr.number = 13;
+      if (mismatch === 'base repository') pr.base.repo.full_name = 'Other/Widgets';
+      if (mismatch === 'fork') pr.head.repo = { id: 2, full_name: 'Other/Widgets' };
+      if (mismatch === 'branch') pr.head.ref = 'unrelated';
+      prGet.mockResolvedValue({ data: pr });
+      prListCommits.mockResolvedValue({ data: [{ sha: session.pr_head_sha }] });
+
+      await expect(enableWatchPr(ctx, input)).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+      });
+
+      expect(prListCommits).not.toHaveBeenCalled();
+      expect(db.transaction).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not create a watch when ancestry cannot be fetched', async () => {
+    const pr = (await prGet()).data;
+    pr.head.sha = advancedHeadSha;
+    prGet.mockResolvedValue({ data: pr });
+    prListCommits.mockRejectedValueOnce(new Error('GitHub unavailable'));
+
+    await expect(enableWatchPr(ctx, input)).rejects.toThrow('GitHub unavailable');
+
+    expect(db.transaction).not.toHaveBeenCalled();
   });
 });

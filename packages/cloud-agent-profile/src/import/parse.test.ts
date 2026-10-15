@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { kiloCommandCreateInputSchema } from '../contracts/kilo-commands';
 import { collectImportItems, parseLocalConfigArchive, type ImportPreview } from './index';
 import { buildRepresentativeImportArchive, buildStoredZip, buildZip } from './test-fixtures';
+import { MAX_IMPORT_ENTRY_EXPANDED_BYTES } from './limits';
 
 function parseFiles(files: Record<string, string | Uint8Array>): ImportPreview {
   return parseLocalConfigArchive(buildZip(files));
@@ -283,6 +284,50 @@ describe('parseLocalConfigArchive', () => {
     });
     expect(preview.issues).toEqual([]);
     expect(preview.config.agents.map(agent => agent.slug)).toEqual(['reviewer']);
+  });
+
+  test.each([
+    'agent/notes.txt',
+    'agents/sub/x.md',
+    'command/notes.txt',
+    'commands/sub/x.md',
+    'instructions/notes.txt',
+    'skills/README.md',
+    'rules/notes.txt',
+  ])('ignores unreadable and oversized ignored files at %s', path => {
+    for (const content of [
+      new Uint8Array([0xff, 0xfe, 0x00, 0x01]),
+      'x'.repeat(MAX_IMPORT_ENTRY_EXPANDED_BYTES + 1),
+    ]) {
+      const preview = parseFiles({
+        'kilo.json': JSON.stringify({ instructions: ['rules/*'] }),
+        'agent/reviewer.md': 'Review.',
+        [path]: content,
+      });
+      expect(preview.issues).toEqual([]);
+      expect(preview.hasErrors).toBe(false);
+      expect(preview.config.agents.map(agent => agent.slug)).toEqual(['reviewer']);
+    }
+  });
+
+  test.each([
+    'Agent/reviewer.MD',
+    'agents/reviewer.md',
+    'Command/review.MD',
+    'commands/review.md',
+    'Instructions/nested/style.MD',
+    'rules/style.md',
+  ])('reports unreadable and oversized imported files at %s', path => {
+    for (const [content, code] of [
+      [new Uint8Array([0xff, 0xfe, 0x00, 0x01]), 'unreadable-entry'],
+      ['x'.repeat(MAX_IMPORT_ENTRY_EXPANDED_BYTES + 1), 'entry-too-large'],
+    ] as const) {
+      const preview = parseFiles({
+        'kilo.json': JSON.stringify({ instructions: ['rules/*'] }),
+        [path]: content,
+      });
+      expect(preview.issues).toContainEqual(expect.objectContaining({ code, path }));
+    }
   });
 
   test('reports a skill whose only file is unreadable', () => {

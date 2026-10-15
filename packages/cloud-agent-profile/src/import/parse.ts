@@ -23,12 +23,6 @@ const AGENT_DIRECTORY_NAMES = new Set(['agent', 'agents']);
 const COMMAND_DIRECTORY_NAMES = new Set(['command', 'commands']);
 const SKILLS_DIRECTORY_NAME = 'skills';
 const INSTRUCTIONS_DIRECTORY_NAME = 'instructions';
-const DEFINITION_DIRECTORY_NAMES = new Set([
-  ...AGENT_DIRECTORY_NAMES,
-  ...COMMAND_DIRECTORY_NAMES,
-  SKILLS_DIRECTORY_NAME,
-  INSTRUCTIONS_DIRECTORY_NAME,
-]);
 
 /**
  * Agents the Kilo CLI defines itself. A local entry for one of them tunes the
@@ -301,7 +295,15 @@ function parseInstructionGlobs(globs: string[], entries: ArchiveEntry[], state: 
 function isImportablePath(path: string, globs: string[]): boolean {
   const segments = path.split('/');
   if (segments.length === 1 && CONFIG_FILE_NAMES.has(path.toLowerCase())) return true;
-  if (segments.length > 1 && DEFINITION_DIRECTORY_NAMES.has(segments[0].toLowerCase())) return true;
+  const directory = segments[0].toLowerCase();
+  if (segments.length >= 3 && directory === SKILLS_DIRECTORY_NAME) return true;
+  if (!path.toLowerCase().endsWith('.md')) return false;
+  if (
+    segments.length === 2 &&
+    (AGENT_DIRECTORY_NAMES.has(directory) || COMMAND_DIRECTORY_NAMES.has(directory))
+  )
+    return true;
+  if (segments.length >= 2 && directory === INSTRUCTIONS_DIRECTORY_NAME) return true;
   return globs.some(glob => matchesGlob(glob, path));
 }
 

@@ -35,11 +35,15 @@ function onlyFetchCall(fetchMock: jest.Mock<typeof fetch>) {
 describe('handleSecureProxyRequest', () => {
   beforeEach(() => {
     process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = PROXY_SECRET;
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
     process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = originalSecret;
+    jest.restoreAllMocks();
   });
 
   it.each([
@@ -166,5 +170,31 @@ describe('handleSecureProxyRequest', () => {
 
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toEqual({ error: 'Upstream request failed' });
+  });
+
+  it('logs fetch failures with the upstream host only', async () => {
+    const cause = Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
+    global.fetch = jest
+      .fn<typeof fetch>()
+      .mockRejectedValue(new TypeError('fetch failed', { cause }));
+
+    await handleSecureProxyRequest(
+      proxyRequest({
+        kilo_secure_proxy: {
+          url: 'https://llm.example.com/v1/chat/completions?key=query-secret',
+          headers: { authorization: 'Bearer upstream-key' },
+        },
+      })
+    );
+
+    expect(console.error).toHaveBeenCalledWith('[secure-proxy] Upstream request failed', {
+      upstreamHost: 'llm.example.com',
+      errorName: 'TypeError',
+      causeName: 'Error',
+      causeCode: 'ECONNREFUSED',
+    });
+    const logged = JSON.stringify(jest.mocked(console.error).mock.calls);
+    expect(logged).not.toContain('query-secret');
+    expect(logged).not.toContain('upstream-key');
   });
 });

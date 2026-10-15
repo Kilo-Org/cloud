@@ -972,17 +972,21 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         {lockScreenCard(card)}
       </VStack>
     ),
-    // The Apple Watch and CarPlay small family: the status line and Approve.
+    // The Apple Watch and CarPlay small family: the Lock Screen card on black.
+    // Neither host adds margins, so the card pads itself and fills the slot.
+    // CarPlay shows Approve but disables it; Apple Watch lets it act.
     bannerSmall: (
-      <VStack alignment="leading" spacing={6}>
-        <HStack alignment="center" spacing={10}>
-          {statusLine(island, true)}
-          {canApprove && !approving ? <Button label={COPY.approve} target="approve" /> : null}
-          <Spacer />
-        </HStack>
-        <VStack modifiers={[frame({ height: 18 })]}>
-          {notice === null ? null : text(notice, 13, island.warn, 'semibold')}
-        </VStack>
+      <VStack
+        alignment="leading"
+        spacing={0}
+        modifiers={[
+          padding({ all: 16 }),
+          frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'leading' }),
+          environment({ key: 'locale', value: locale }),
+          opacity(dimmed ? 0.72 : 1),
+        ]}
+      >
+        {lockScreenCard(island)}
       </VStack>
     ),
     compactLeading: mark(18),

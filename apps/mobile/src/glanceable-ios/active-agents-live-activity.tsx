@@ -413,18 +413,30 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       </VStack>
     ),
     // The Apple Watch and CarPlay small family draws this section, not the
-    // phone `banner`: one compact status row plus the Approve control, and the
-    // failure line in a reserved row below so a failed press cannot move the
-    // count or its retry control.
+    // phone `banner`. Neither host adds margins, so the card pads itself and
+    // fills the slot: the mark and checked time, the status row with Approve,
+    // and a reserved line row so a failed press cannot move the count. CarPlay
+    // shows Approve but disables it; Apple Watch lets it act.
     bannerSmall: (
-      <VStack alignment="leading" spacing={6}>
-        <HStack alignment="center" spacing={10}>
-          {statusBlock({ ...island, countSize: 20 })}
-          {canApprove && !approving ? <Button label={COPY.approve} target="approve" /> : null}
-          <Spacer />
+      <VStack
+        alignment="leading"
+        spacing={0}
+        modifiers={[
+          padding({ all: 16 }),
+          frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'topLeading' }),
+          environment({ key: 'locale', value: locale }),
+        ]}
+      >
+        {header(island)}
+        <Spacer minLength={8} />
+        <HStack alignment="center" spacing={0}>
+          {statusBlock({ ...island, countSize: 28 })}
+          <Spacer minLength={10} />
+          {approveControl(island)}
         </HStack>
-        <VStack modifiers={[frame({ height: 18 })]}>
-          {notice === null ? null : text(notice, 13, island.warn, 'semibold')}
+        <Spacer minLength={6} />
+        <VStack alignment="leading" spacing={0} modifiers={[frame({ height: 16 })]}>
+          {islandLine}
         </VStack>
       </VStack>
     ),

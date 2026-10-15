@@ -207,6 +207,7 @@ import {
   finishWorktreeDeletion,
   loadWorktreeDeletionJournal,
   persistWorktreeDeletionManifest,
+  WORKTREE_DELETION_PREFIX,
   WorktreeDeletionIncompleteError,
   worktreeOwnedRoutes,
   type ControlPlaneWorktreeDeletionInput,
@@ -217,6 +218,17 @@ import { createSandboxNotificationDispatcher, type SandboxNotification } from '.
 import { resolvePreviewTarget, type PreviewTargetResult } from './preview-target.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
+import {
+  createSharedWorktreeChanges,
+  type SharedWorktreeChangesInput,
+} from './worktree-changes.js';
+import type {
+  GetWorktreeChangesOutput,
+  GetWorktreeFileOutput,
+  RefreshWorktreeChangesOutput,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import type { WorktreeChangesReady, WorktreeRecovery } from '../../shared/worktree-changes-wire.js';
+import type { WorktreeChangesContext } from '../../sandbox-session/worktree-changes.js';
 import { buildNativeEgressAllowlist } from '../../sandbox-control/egress-policy.js';
 import { nativeEgressAllowlistSchema } from '../../sandbox-containers/egress-policy.js';
 
@@ -297,6 +309,7 @@ export type ControlPlaneSessionPeer = {
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   onEvents(notification: ControlPlaneEventsNotification): Promise<void>;
   onOutcome(outcome: ControlPlaneOutcome): Promise<void>;
+  onWorktreeChangesReady(notification: WorktreeChangesReady): Promise<void>;
   /**
    * R1: the Session DO owns the grant and mints the runtime credential proxy
    * handle. The Sandbox DO passes its own allocation fence so the Session DO
@@ -471,6 +484,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     string,
     { allocationId: string | null; ok?: boolean }
   >();
+  private readonly worktreeChanges = createSharedWorktreeChanges({
+    storage: this.ctx.storage,
+    capture: input => this.worktreeCapture(input),
+    onSnapshot: (context, revision) =>
+      this.ctx.waitUntil(this.notifyWorktreeChangesReady(context, revision)),
+  });
   private readonly billingSchedule: BillingScheduleTable;
   /** Vercel metered-billing runtime; reads live pin/storage, never frozen config. */
   private readonly billingRuntime: VercelBillingRuntime;
@@ -779,6 +798,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           throw new WorktreeDeletionIncompleteError('Shared worktree cleanup is not confirmed');
         }
         await this.revokeWorktreeRoutes(handoff.targetSessionIds);
+        this.worktreeChanges.purge(parsed.worktreeId);
         const journal = await finishWorktreeDeletion(
           this.ctx.storage,
           parsed.worktreeId,
@@ -804,6 +824,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // Revoke the worktree's routes/grants even for a confirmed stop, so a
       // failed route cannot keep the sandbox looking shared forever.
       await this.revokeWorktreeRoutes(handoff.targetSessionIds);
+      this.worktreeChanges.purge(parsed.worktreeId);
       if (handoff.plan.action === 'stop') {
         // Fence by allocation identity: a sibling prepare may have created a new
         // allocation while the provider stop ran off-queue.
@@ -905,10 +926,82 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   // --- worktree changes (B10) -------------------------------------------------
 
+  private async notifyWorktreeChangesReady(
+    context: WorktreeChangesContext,
+    revision: number
+  ): Promise<void> {
+    const worktreeId = context.worktreeId;
+    if (!worktreeId) return;
+    const sessionIds = new Set([context.session.sessionId]);
+    for (const [, sessionId] of this.ctx.storage.kv.list({
+      prefix: `worktree_changes/${worktreeId}/subscribers/`,
+    })) {
+      sessionIds.add(z.string().parse(sessionId));
+    }
+    for (const route of await listRoutes(this.db)) {
+      if (
+        route.credentialSource?.scopeId === worktreeId ||
+        route.spec.directory === context.session.directory
+      ) {
+        sessionIds.add(route.sessionId);
+      }
+    }
+    for (const sessionId of sessionIds) {
+      this.notifications.enqueue(sessionId, {
+        kind: 'worktree_changes',
+        payload: { worktreeId, revision },
+      });
+    }
+  }
+
+  private subscribeToWorktreeChanges(context: WorktreeChangesContext): void {
+    const { worktreeId, session } = context;
+    if (
+      !worktreeId ||
+      this.ctx.storage.kv.get(`${WORKTREE_DELETION_PREFIX}${worktreeId}`) !== undefined
+    ) {
+      return;
+    }
+    const key = `worktree_changes/${worktreeId}/subscribers/${session.sessionId}`;
+    if (this.ctx.storage.kv.get(key) === undefined) {
+      this.ctx.storage.kv.put(key, session.sessionId);
+    }
+  }
+
+  async getWorktreeChanges(input: SharedWorktreeChangesInput): Promise<GetWorktreeChangesOutput> {
+    await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
+    return this.worktreeChanges.get(input);
+  }
+
+  async getWorktreeFile(
+    input: SharedWorktreeChangesInput,
+    query: unknown
+  ): Promise<GetWorktreeFileOutput> {
+    await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
+    return this.worktreeChanges.getFile(input, query);
+  }
+
+  async refreshWorktreeChanges(
+    input: SharedWorktreeChangesInput
+  ): Promise<RefreshWorktreeChangesOutput> {
+    await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
+    return this.worktreeChanges.refresh(input);
+  }
+
+  async getWorktreeRecovery(
+    input: SharedWorktreeChangesInput
+  ): Promise<WorktreeRecovery | undefined> {
+    await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
+    return this.worktreeChanges.recovery(input);
+  }
+
   /**
    * Session DO -> Sandbox DO (spec §10). Forwards one worktree-change request
-   * to the wrapper and returns its result. The Sandbox DO owns no snapshot
-   * state; the Session DO validates ownership and persists the capture.
+   * to the wrapper and returns its result.
    */
   async worktreeCapture(
     input: ControlPlaneWorktreeCaptureInput
@@ -2911,6 +3004,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
             return target.onRoute(notification.payload);
           case 'outcome':
             return target.onOutcome(notification.payload);
+          case 'worktree_changes':
+            return target.onWorktreeChangesReady(notification.payload);
         }
       },
       `notification.${notification.kind}`,

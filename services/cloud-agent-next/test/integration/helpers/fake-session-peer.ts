@@ -12,6 +12,7 @@ import type {
   ControlPlaneRouteUpdate,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { Env } from '../../../src/types.js';
+import type { WorktreeChangesReady } from '../../../src/shared/worktree-changes-wire.js';
 
 export type RecordedRouteUpdate = { sessionId: string; update: ControlPlaneRouteUpdate };
 export type RecordedEvents = { sessionId: string; notification: ControlPlaneEventsNotification };
@@ -24,8 +25,12 @@ export class FakeSessionPeer {
   readonly routeUpdates: RecordedRouteUpdate[] = [];
   readonly events: RecordedEvents[] = [];
   readonly outcomes: ControlPlaneOutcome[] = [];
+  readonly worktreeChanges: Array<{ sessionId: string; notification: WorktreeChangesReady }> = [];
   /** Every notification in arrival order, across kinds. */
-  readonly received: Array<{ kind: 'route' | 'events' | 'outcome'; sessionId: string }> = [];
+  readonly received: Array<{
+    kind: 'route' | 'events' | 'outcome' | 'worktree_changes';
+    sessionId: string;
+  }> = [];
 
   forSession(sessionId: string): ControlPlaneSessionPeer {
     return {
@@ -40,6 +45,10 @@ export class FakeSessionPeer {
       onOutcome: async outcome => {
         this.received.push({ kind: 'outcome', sessionId });
         this.outcomes.push(outcome);
+      },
+      onWorktreeChangesReady: async notification => {
+        this.received.push({ kind: 'worktree_changes', sessionId });
+        this.worktreeChanges.push({ sessionId, notification });
       },
       issueRuntimeCredentialProxyGrant: async () => null,
     };
@@ -65,6 +74,7 @@ export function createRuntimeProxyMintingPeer(
     onRoute: async () => undefined,
     onEvents: async () => undefined,
     onOutcome: async () => undefined,
+    onWorktreeChangesReady: async () => undefined,
     issueRuntimeCredentialProxyGrant: async (fence: ControlRuntimeCredentialProxyFence) => {
       const { userId, kiloSessionId } = identity(sessionId);
       const now = Date.now();

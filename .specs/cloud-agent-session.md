@@ -243,6 +243,40 @@ repository.
     Incomplete cleanup MUST remain recoverable, MUST NOT report success, and
     MUST NOT permit late creation or ingestion to resurrect the worktree.
 
+### Watch PR (Observation-Only Pilot)
+
+1. An eligible verified GitHub PR MUST offer an accessible watch control without
+   requiring hover. Enabling a watch MUST require a writable grouped Cloud Agent
+   worktree, current repository access, an open same-repository PR, and pilot
+   enablement. Arbitrary PR URLs, fork PRs, and legacy ungrouped sessions MUST NOT
+   be eligible.
+2. The confirmation MUST state that this pilot observes future delivered webhook
+   events only. Pre-existing reviews and checks MAY be missing. It MUST clearly
+   state that no automatic repair, agent run, edit, or push occurs. Saved repair
+   preferences MUST NOT authorize present or future automatic writes, and MUST
+   NOT hide observed problems.
+3. Watch state and observations MUST survive closing the browser and sleeping
+   compute. Waiting MUST NOT start or keep an environment awake or incur agent
+   usage charges. Watching MUST NOT promise complete GitHub delivery coverage or
+   merge readiness.
+4. Details MUST distinguish Watching, Paused, Finished, observed problems, and
+   observations needing attention. Empty evidence MAY say **No observed problems**
+   only alongside future-event coverage and last-received timing. Pending,
+   ambiguous, and truncated evidence MUST NOT be presented as merge readiness.
+5. The user MUST be able to Pause, Resume when pilot enablement permits it, Stop
+   watching, and inspect recent activity. Pause MUST preserve observations and
+   MUST NOT cause automated execution. Stop, confirmed PR closure/merge, expiry,
+   and source worktree deletion MUST fence further watch work. A finished watch
+   MUST NOT restart from a delayed webhook or PR reopen event.
+6. **Recheck PR lifecycle** MUST be an explicit user action. This pilot's recheck
+   MUST state that it verifies PR identity and open/closed/merged lifecycle only,
+   not review or check completeness. Refreshing the watch display MUST NOT fetch
+   GitHub state. Existing watches MUST remain manageable when new enablement is
+   disabled.
+7. One PR's control MUST NOT display or mutate a different PR's watch, including
+   sibling chats and worktrees reused for another PR. Stale controls MUST fail
+   visibly and allow refreshing rather than silently overwriting newer state.
+
 ### Sandbox Status
 
 1. Eligible owned control-plane Cloud Agent web chats MUST show a compact,
@@ -429,6 +463,13 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-10-15 -- Observation-only Watch PR pilot
+
+- Added the flagged observation-only contract, lifecycle controls, future-event
+  coverage, and lifecycle-only manual recheck. Automatic repairs remain blocked
+  on exclusive runtime admission and revocable publication enforcement; this is
+  not the automatic-repair MVP in `docs/plans/cloud-agent-watch-pr.md`.
 
 ### 2026-09-26 -- Bounded workspace control recovery
 

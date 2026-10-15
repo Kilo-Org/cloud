@@ -54,6 +54,7 @@ import {
   materializeGitHubInstallationIdentity,
   releaseGitHubInstallationDelivery,
 } from '@/lib/integrations/db/github-installations';
+import { observeWatchPrWebhook } from '@/lib/cloud-agent/watch-pr-webhook';
 
 /**
  * A retained but unhealthy association (locally disconnected, suspended, or
@@ -160,6 +161,8 @@ export async function handleGitHubWebhook(
         { status: 400 }
       );
     }
+
+    await observeWatchPrWebhook({ eventType, payload, deliveryId: eventSignature, appType });
 
     const logWebhook = async (
       integration: { owned_by_organization_id: string | null; owned_by_user_id: string | null },

@@ -3,10 +3,13 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 import {
   cli_sessions_v2,
+  cloud_agent_pr_watch_activity,
+  cloud_agent_pr_watches,
   cloud_agent_worktrees,
   organization_memberships,
   operation_ledgers,
   type CloudAgentWorktree,
+  type CloudAgentPrWatch,
 } from '@kilocode/db/schema';
 import {
   cloudAgentWorktreeDeletionManifestSchema,
@@ -66,6 +69,107 @@ function worktree(values: Partial<CloudAgentWorktree> = {}): CloudAgentWorktree 
   };
 }
 
+describe('watch settlement at the deletion fence', () => {
+  it.each([null, organizationId])(
+    'finishes only associated live watches atomically for tenant %s',
+    async tenant => {
+      const f = database();
+      f.worktrees[0].organization_id = tenant;
+      f.members[0].organizationId = tenant;
+      const source = {
+        id: 'watch-source',
+        worktree_id: worktreeId,
+        kilo_user_id: userId,
+        organization_id: tenant,
+        status: 'watching' as const,
+        generation: 4,
+        lifecycle_reason: null,
+        projection: { pending: [{ key: 'failure' }], needsAttention: true },
+      };
+      f.watches.push(
+        source,
+        { ...source, id: 'paused', status: 'paused' },
+        { ...source, id: 'other-worktree', worktree_id: otherWorktreeId },
+        { ...source, id: 'other-owner', kilo_user_id: 'other-owner' },
+        { ...source, id: 'other-tenant', organization_id: tenant ? null : organizationId },
+        { ...source, id: 'finished', status: 'finished' }
+      );
+      const untouched = structuredClone(f.watches.slice(2));
+      const input = { ...params, ...(tenant ? { organizationId: tenant } : {}) };
+      await beginWorktreeDeletion(env, input);
+      expect(f.watches.slice(0, 2)).toEqual([
+        expect.objectContaining({
+          id: 'watch-source',
+          generation: 5,
+          status: 'finished',
+          lifecycle_reason: 'source_worktree_deleted',
+          projection: { pending: [], needsAttention: false },
+        }),
+        expect.objectContaining({
+          id: 'paused',
+          generation: 5,
+          status: 'finished',
+          lifecycle_reason: 'source_worktree_deleted',
+          projection: { pending: [], needsAttention: false },
+        }),
+      ]);
+      expect(f.watches.slice(2)).toEqual(untouched);
+      expect(f.watchActivity).toEqual(
+        ['watch-source', 'paused'].map(watch_id => ({
+          watch_id,
+          generation: 5,
+          kind: 'finished',
+          reason: 'source_worktree_deleted',
+        }))
+      );
+      const update = f.watchUpdates[0];
+      const dialect = new PgDialect();
+      const query = dialect.sqlToQuery(update.condition);
+      expect(query.params).toEqual([worktreeId, userId, ...(tenant ? [tenant] : [])]);
+      expect(query.sql).toContain('"status" != \'finished\'');
+      expect(query.sql).toContain(tenant ? '"organization_id" =' : '"organization_id" is null');
+      expect(dialect.sqlToQuery(update.values.generation as SQL).sql).toContain('"generation" + 1');
+      expect(dialect.sqlToQuery(update.values.projection as SQL).sql).toContain(
+        "'{pending}', '[]'::jsonb"
+      );
+      expect(dialect.sqlToQuery(update.values.projection as SQL).sql).toContain(
+        "'{needsAttention}', 'false'::jsonb"
+      );
+      expect(f.events.indexOf('lockWorktree')).toBeLessThan(f.events.indexOf('finishWatches'));
+      expect(f.events.indexOf('updateWorktree')).toBeLessThan(f.events.indexOf('finishWatches'));
+      expect(f.events.indexOf('watchActivity')).toBeLessThan(f.events.indexOf('commit'));
+      await beginWorktreeDeletion(env, input);
+      expect(f.watchActivity).toHaveLength(2);
+      expect(f.watches[0].generation).toBe(5);
+    }
+  );
+
+  it('rolls back both the deletion manifest and watch settlement when commit fails', async () => {
+    const f = database();
+    f.watches.push({
+      id: 'watch',
+      worktree_id: worktreeId,
+      kilo_user_id: userId,
+      organization_id: null,
+      status: 'watching',
+      generation: 1,
+      lifecycle_reason: null,
+      projection: { pending: [{ key: 'failure' }], needsAttention: true },
+    });
+    const before = structuredClone(f.watches);
+    f.failCommit(new Error('commit failed'));
+    await expect(beginWorktreeDeletion(env, params)).rejects.toThrow('commit failed');
+    expect(f.worktrees[0].deletion_started_at).toBeNull();
+    expect(f.worktrees[0].deletion_manifest).toBeNull();
+    expect(f.watches).toEqual(before);
+    expect(f.watchActivity).toEqual([]);
+    f.failCommit();
+    await beginWorktreeDeletion(env, params);
+    expect(f.watches[0]).toMatchObject({ status: 'finished', generation: 2 });
+    expect(f.watchActivity).toHaveLength(1);
+  });
+});
+
 type Member = {
   sessionId: string;
   cloudAgentSessionId: string | null;
@@ -82,6 +186,19 @@ type Member = {
 
 function database(rootCount = 1, descendantCount = 0) {
   const worktrees: CloudAgentWorktree[] = [worktree()];
+  const watches: Pick<
+    CloudAgentPrWatch,
+    | 'id'
+    | 'worktree_id'
+    | 'kilo_user_id'
+    | 'organization_id'
+    | 'status'
+    | 'generation'
+    | 'lifecycle_reason'
+    | 'projection'
+  >[] = [];
+  const watchActivity: (typeof cloud_agent_pr_watch_activity.$inferInsert)[] = [];
+  const watchUpdates: { condition: SQL; values: Record<string, unknown> }[] = [];
   const members: Member[] = [
     ...Array.from({ length: rootCount }, (_, index) => ({
       sessionId: kiloId(index),
@@ -215,46 +332,92 @@ function database(rootCount = 1, descendantCount = 0) {
     };
     return query;
   };
-  const insert = () => ({
-    values: (values: typeof cloud_agent_worktrees.$inferInsert) => ({
-      onConflictDoNothing: async () => {
-        if (!worktrees.some(row => row.worktree_id === values.worktree_id))
-          worktrees.push(worktree({ name: null, runtime_locations: [], ...values }));
-      },
-    }),
-  });
-  const update = (table: unknown) => ({
-    set: (
-      values: Partial<CloudAgentWorktree> & {
-        parent_session_id?: string;
-        cloud_agent_session_scope_id?: string;
-        cloud_agent_worktree_id?: string;
-      }
+  const insert = (table: unknown) => ({
+    values: (
+      values:
+        | typeof cloud_agent_worktrees.$inferInsert
+        | (typeof cloud_agent_pr_watch_activity.$inferInsert)[]
     ) => {
-      const query = {
-        where: (condition: SQL) => {
-          if (table === cli_sessions_v2) {
-            for (const row of members.filter(
-              member => member.userId === userId && valuesOf(condition).includes(member.sessionId)
-            )) {
-              row.parentSessionId = values.parent_session_id ?? row.parentSessionId;
-              row.cloudAgentSessionScopeId =
-                values.cloud_agent_session_scope_id ?? row.cloudAgentSessionScopeId;
-              row.worktreeId = values.cloud_agent_worktree_id ?? row.worktreeId;
-              if (values.organization_id !== undefined) row.organizationId = values.organization_id;
-            }
-          } else {
-            Object.assign(worktrees[0], values);
-            events.push('updateWorktree');
-          }
-          return query;
+      if (table === cloud_agent_pr_watch_activity && Array.isArray(values)) {
+        watchActivity.push(...values);
+        events.push('watchActivity');
+        return Promise.resolve();
+      }
+      if (Array.isArray(values)) throw new Error('Unexpected insert values');
+      return {
+        onConflictDoNothing: async () => {
+          if (!worktrees.some(row => row.worktree_id === values.worktree_id))
+            worktrees.push(worktree({ name: null, runtime_locations: [], ...values }));
         },
-        returning: async () => [worktrees[0]],
-        then: (resolve: (result: undefined) => unknown) => resolve(undefined),
       };
-      return query;
     },
   });
+  const update = (table: unknown) => {
+    if (table === cloud_agent_pr_watches) {
+      return {
+        set: (values: Record<string, unknown>) => ({
+          where: (condition: SQL) => ({
+            returning: async () => {
+              watchUpdates.push({ condition, values });
+              const query = new PgDialect().sqlToQuery(condition);
+              const finished = watches.filter(
+                watch =>
+                  watch.worktree_id === query.params[0] &&
+                  watch.kilo_user_id === query.params[1] &&
+                  watch.organization_id === (query.params[2] ?? null) &&
+                  watch.status !== 'finished'
+              );
+              for (const watch of finished) {
+                watch.status = 'finished';
+                watch.generation += 1;
+                watch.lifecycle_reason = 'source_worktree_deleted';
+                watch.projection = {
+                  ...(watch.projection as object),
+                  pending: [],
+                  needsAttention: false,
+                };
+              }
+              events.push('finishWatches');
+              return finished;
+            },
+          }),
+        }),
+      };
+    }
+    return {
+      set: (
+        values: Partial<CloudAgentWorktree> & {
+          parent_session_id?: string;
+          cloud_agent_session_scope_id?: string;
+          cloud_agent_worktree_id?: string;
+        }
+      ) => {
+        const query = {
+          where: (condition: SQL) => {
+            if (table === cli_sessions_v2) {
+              for (const row of members.filter(
+                member => member.userId === userId && valuesOf(condition).includes(member.sessionId)
+              )) {
+                row.parentSessionId = values.parent_session_id ?? row.parentSessionId;
+                row.cloudAgentSessionScopeId =
+                  values.cloud_agent_session_scope_id ?? row.cloudAgentSessionScopeId;
+                row.worktreeId = values.cloud_agent_worktree_id ?? row.worktreeId;
+                if (values.organization_id !== undefined)
+                  row.organizationId = values.organization_id;
+              }
+            } else {
+              Object.assign(worktrees[0], values);
+              events.push('updateWorktree');
+            }
+            return query;
+          },
+          returning: async () => [worktrees[0]],
+          then: (resolve: (result: undefined) => unknown) => resolve(undefined),
+        };
+        return query;
+      },
+    };
+  };
   const remove = () => ({
     where: (condition: SQL) => ({
       returning: async () => {
@@ -329,6 +492,8 @@ function database(rootCount = 1, descendantCount = 0) {
     transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => {
       const previousWorktrees = structuredClone(worktrees);
       const previousMembers = structuredClone(members);
+      const previousWatches = structuredClone(watches);
+      const previousActivity = structuredClone(watchActivity);
       try {
         const result = await callback(tx);
         if (commitError) throw commitError;
@@ -337,6 +502,8 @@ function database(rootCount = 1, descendantCount = 0) {
       } catch (error) {
         worktrees.splice(0, worktrees.length, ...previousWorktrees);
         members.splice(0, members.length, ...previousMembers);
+        watches.splice(0, watches.length, ...previousWatches);
+        watchActivity.splice(0, watchActivity.length, ...previousActivity);
         throw error;
       }
     },
@@ -392,6 +559,9 @@ function database(rootCount = 1, descendantCount = 0) {
     db,
     tx,
     worktrees,
+    watches,
+    watchActivity,
+    watchUpdates,
     members,
     allocations,
     events,

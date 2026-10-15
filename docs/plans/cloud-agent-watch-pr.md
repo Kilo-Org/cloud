@@ -1,7 +1,60 @@
 # Cloud Agent Watch PR MVP
 
 Date: 2026-10-14
-Status: Proposed implementation plan; no implementation included.
+Status: Observation-only foundation implemented; automatic-repair MVP blocked on
+runtime safety prerequisites. Not ready for the MVP release gate.
+
+## Implementation status (2026-10-15)
+
+The first deliverable is deliberately observation-only behind the
+`cloud-agent-watch-pr` release toggle. It does not issue execution credentials,
+queue repair prompts, create repair chats, edit files, or push commits.
+
+Implemented:
+
+- PostgreSQL watch state, global live-PR uniqueness, generation-fenced controls,
+  bounded observation projection, activity history, and user-deletion cleanup.
+- Enablement from a verified grouped Cloud Agent session, with exact tenant,
+  installation, repository, and open same-repository PR validation.
+- Signed payload-first PR, review, inline comment, check, status, and branch-push
+  observations. Receipt and projection commit together before webhook success;
+  admission failures return a retryable response. No deferred repair dispatch is
+  represented as durable delivery.
+- Semantic observation ordering, current-head check failures, bounded early-SHA
+  evidence, independent check identities, and ambiguity instead of guessed success.
+- Accessible watch controls beside the PR badge, pause/resume/stop, activity, and
+  an explicit manual recheck of PR identity/lifecycle only. Recheck does not scan
+  checks or reviews. Enablement covers future events, not existing problems.
+- Worktree deletion finishes associated watches in the deletion transaction.
+  Expiry is enforced on event admission and lifecycle access; no expiry scheduler
+  or recurring GitHub observation job is introduced in this milestone.
+
+Automatic repairs remain unavailable because the existing asynchronous prompt
+path is not an exclusive shared-worktree repair boundary, and existing writable
+SCM credentials cannot enforce revocation or restrict publication to an authorized
+attempt/ref. Prompt instructions and a pre-dispatch token check are insufficient.
+The existing background automation issuer and idempotent sibling-creation ledger
+are reusable, but do not independently provide these guarantees.
+
+Before implementing dispatch, complete and test:
+
+- Atomic runtime worktree reservation and safe-boundary handoff, including native
+  sibling activity, questions, preparation, finalization, and cancellation.
+- Non-bypassable, revocable publication authority, exact branch/lease enforcement,
+  and structured push evidence. Direct Git/REST writes must not bypass it.
+- Attempt-scoped background delegation, an internal idempotent repair-chat path,
+  exact-message terminal notifications independent of drained session callbacks,
+  and durable repair queue delivery/coalescing with finite retries.
+- Trusted reviewer verification, bounded diagnostics, repairs for all three
+  categories, rate-limit handling, competing-writer coordination, and live pilot
+  verification. Saved preferences in the current UI grant no automatic-write
+  authority; execution will require separate consent.
+
+Operational prerequisites: apply the generated migration before enabling the
+toggle, and configure/verify the GitHub App event subscriptions and grants. This
+change does not update remote GitHub App configuration or deploy services. The
+observation-only implementation does not fulfill sections 14-15's repair/runtime
+acceptance criteria.
 
 ## 1. Goal and agreed constraints
 
@@ -574,8 +627,9 @@ Deliverable: release decision based on observed behavior, not only mocked tests.
 
 Use focused web/unit tests, Worker integration tests, and the Cloud Agent fake-LLM
 harness for runtime transitions. Follow `repository-verification` and the relevant
-package manifests when implementation begins. This documentation-only change does
-not require application builds or deployments.
+package manifests when validating implementation. The observation-only foundation
+needs focused web and worktree-deletion tests; the runtime/repair acceptance cases
+remain unimplemented and must not be reported as passing.
 
 ## 15. MVP release gate
 

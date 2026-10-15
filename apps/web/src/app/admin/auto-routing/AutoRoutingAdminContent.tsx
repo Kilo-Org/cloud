@@ -8,10 +8,10 @@ import {
   type AutoRoutingClassifierModelResponse,
 } from '@kilocode/auto-routing-contracts';
 import React, { useEffect, useState, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { BarChart3, Clock3, DollarSign, HelpCircle, RefreshCw, Route, Save } from 'lucide-react';
-import { ModelCombobox } from '@/components/shared/ModelCombobox';
+import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,8 +25,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { BenchmarksSection, pinnedModelFor } from './BenchmarksSection';
+import { pinnedModelFor, RouterBenchmarksSection } from './BenchmarksSection';
 import { parseAdminResponse } from './admin-fetch';
 import { useSystemOneModelOptions } from './system-one-models';
 
@@ -350,20 +351,21 @@ export function AutoRoutingBreakdownTables({
   );
 }
 
-export function AutoRoutingAdminContent() {
+function ClassifierTab({
+  classifierModelQuery,
+  systemOneModelsQuery,
+  analyticsQuery,
+  period,
+  onPeriodChange,
+}: {
+  classifierModelQuery: UseQueryResult<AutoRoutingClassifierModelResponse, Error>;
+  systemOneModelsQuery: UseQueryResult<ModelOption[], Error>;
+  analyticsQuery: UseQueryResult<AutoRoutingClassifierAnalyticsResponse, Error>;
+  period: AutoRoutingAnalyticsPeriod;
+  onPeriodChange: (period: AutoRoutingAnalyticsPeriod) => void;
+}) {
   const [selectedModel, setSelectedModel] = useState('');
-  const [period, setPeriod] = useState<AutoRoutingAnalyticsPeriod>('24h');
   const queryClient = useQueryClient();
-
-  const classifierModelQuery = useQuery({
-    queryKey: ['auto-routing', 'classifier-model'],
-    queryFn: fetchClassifierModel,
-  });
-  const analyticsQuery = useQuery({
-    queryKey: ['auto-routing', 'classifier-analytics', period],
-    queryFn: () => fetchClassifierAnalytics(period),
-  });
-  const systemOneModelsQuery = useSystemOneModelOptions();
 
   useEffect(() => {
     const override = classifierModelQuery.data?.override;
@@ -389,8 +391,6 @@ export function AutoRoutingAdminContent() {
     },
   });
 
-  const isRefreshing =
-    classifierModelQuery.isFetching || analyticsQuery.isFetching || systemOneModelsQuery.isFetching;
   const classifierModelError =
     classifierModelQuery.error instanceof Error ? classifierModelQuery.error.message : undefined;
   const systemOneModelsError =
@@ -411,32 +411,7 @@ export function AutoRoutingAdminContent() {
   const hasInitialAnalyticsError = analyticsQuery.isError && !analyticsQuery.data;
 
   return (
-    <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Auto Routing</h1>
-          <p className="text-muted-foreground text-sm">
-            Classifier configuration and routing telemetry.
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            void classifierModelQuery.refetch();
-            void analyticsQuery.refetch();
-            void systemOneModelsQuery.refetch();
-            // Invalidate the shared selector catalog the benchmark pickers read
-            // from (query key prefix ['openrouter-models']).
-            void queryClient.invalidateQueries({ queryKey: ['openrouter-models'] });
-          }}
-          disabled={isRefreshing}
-          className="w-fit"
-        >
-          <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
-          Refresh
-        </Button>
-      </div>
+    <div className="flex flex-col gap-4">
 
       <Card className="rounded-lg">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
@@ -533,7 +508,7 @@ export function AutoRoutingAdminContent() {
               size="sm"
               variant={period === option.value ? 'secondary' : 'ghost'}
               aria-pressed={period === option.value}
-              onClick={() => setPeriod(option.value)}
+              onClick={() => onPeriodChange(option.value)}
               className="h-8 px-3"
             >
               {option.label}
@@ -605,8 +580,80 @@ export function AutoRoutingAdminContent() {
           />
         </>
       )}
+    </div>
+  );
+}
 
-      <BenchmarksSection />
+export function AutoRoutingAdminContent() {
+  const [period, setPeriod] = useState<AutoRoutingAnalyticsPeriod>('24h');
+  const queryClient = useQueryClient();
+
+  const classifierModelQuery = useQuery({
+    queryKey: ['auto-routing', 'classifier-model'],
+    queryFn: fetchClassifierModel,
+  });
+  const analyticsQuery = useQuery({
+    queryKey: ['auto-routing', 'classifier-analytics', period],
+    queryFn: () => fetchClassifierAnalytics(period),
+  });
+  const systemOneModelsQuery = useSystemOneModelOptions();
+
+  const isRefreshing =
+    classifierModelQuery.isFetching || analyticsQuery.isFetching || systemOneModelsQuery.isFetching;
+
+  return (
+    <div className="flex w-full flex-col gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Auto Routing</h1>
+          <p className="text-muted-foreground text-sm">
+            Classifier telemetry plus per-router policy, benchmarks and routing tables.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            void classifierModelQuery.refetch();
+            void analyticsQuery.refetch();
+            void systemOneModelsQuery.refetch();
+            // Invalidate the shared selector catalog the benchmark pickers read
+            // from (query key prefix ['openrouter-models']).
+            void queryClient.invalidateQueries({ queryKey: ['openrouter-models'] });
+          }}
+          disabled={isRefreshing}
+          className="w-fit"
+        >
+          <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
+          Refresh
+        </Button>
+      </div>
+
+      <Tabs defaultValue="classifier">
+        <TabsList>
+          <TabsTrigger value="classifier">Classifier</TabsTrigger>
+          <TabsTrigger value="efficient">Efficient</TabsTrigger>
+          <TabsTrigger value="frontier">Frontier</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="classifier" className="mt-4">
+          <ClassifierTab
+            classifierModelQuery={classifierModelQuery}
+            systemOneModelsQuery={systemOneModelsQuery}
+            analyticsQuery={analyticsQuery}
+            period={period}
+            onPeriodChange={setPeriod}
+          />
+        </TabsContent>
+
+        <TabsContent value="efficient" className="mt-4">
+          <RouterBenchmarksSection key="efficient" router="efficient" />
+        </TabsContent>
+
+        <TabsContent value="frontier" className="mt-4">
+          <RouterBenchmarksSection key="frontier" router="frontier" />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

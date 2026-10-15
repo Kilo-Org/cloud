@@ -2,8 +2,6 @@
 
 import {
   BENCHMARK_CONTAINER_BUDGET,
-  AUTO_ROUTERS,
-  AutoRouterSchema,
   DEFAULT_AUTO_ROUTER,
   type AutoRouter,
   BenchmarkConfigResponseSchema,
@@ -48,6 +46,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -346,6 +345,15 @@ export function formStateToConfig(
 // Config editor sub-component
 // ---------------------------------------------------------------------------
 
+function ConfigSectionHeading({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="mt-4 flex flex-col gap-0.5">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <p className="text-muted-foreground text-xs">{description}</p>
+    </div>
+  );
+}
+
 function BenchmarkConfigEditor({
   router,
   config,
@@ -480,7 +488,10 @@ function BenchmarkConfigEditor({
         <CardTitle className="text-base">Benchmark Config</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 p-4 pt-0">
-        {/* Classifier models */}
+        <ConfigSectionHeading
+          title="Models"
+          description="Classifier and decider models measured by the benchmark queues."
+        />
         <div className="flex flex-col gap-1.5">
           <Label className="text-sm font-medium">Classifier models</Label>
           <div className="rounded-md border">
@@ -614,7 +625,10 @@ function BenchmarkConfigEditor({
           </Button>
         </div>
 
-        {/* Numeric inputs */}
+        <ConfigSectionHeading
+          title="Ranking"
+          description="How candidates are filtered and costed before a routing table is published."
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-min-accuracy" className="text-sm font-medium">
@@ -678,92 +692,6 @@ function BenchmarkConfigEditor({
               />
             </div>
           ) : null}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-switch-cost-factor" className="text-sm font-medium">
-              Switch cost factor (1–100)
-            </Label>
-            <Input
-              id="benchmark-switch-cost-factor"
-              type="number"
-              min={1}
-              max={100}
-              step={0.5}
-              value={form.switchCostFactor}
-              onChange={e =>
-                updateForm(prev => ({ ...prev, switchCostFactor: parseFloat(e.target.value) || 1 }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label
-              htmlFor="benchmark-best-accuracy-switch-threshold"
-              className="text-sm font-medium"
-            >
-              Best accuracy switch threshold (0–1)
-            </Label>
-            <Input
-              id="benchmark-best-accuracy-switch-threshold"
-              type="number"
-              min={0}
-              max={1}
-              step={0.01}
-              value={form.bestAccuracySwitchThreshold}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  bestAccuracySwitchThreshold: parseFloat(e.target.value) || 0,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-switch-horizon-turns" className="text-sm font-medium">
-              Switch horizon (turns)
-            </Label>
-            <Input
-              id="benchmark-switch-horizon-turns"
-              type="number"
-              min={1}
-              step={1}
-              value={form.switchHorizonTurns}
-              onChange={e => updateForm(prev => ({ ...prev, switchHorizonTurns: e.target.value }))}
-              className="h-8 w-40 tabular-nums"
-              placeholder="(use switch cost factor)"
-              aria-describedby="benchmark-switch-horizon-turns-help"
-            />
-            <p id="benchmark-switch-horizon-turns-help" className="text-muted-foreground text-xs">
-              Switch to a cheaper model only when savings over this many turns exceed the lost
-              prompt cache. Empty uses the switch cost factor.
-            </p>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-low-confidence-threshold" className="text-sm font-medium">
-              Low-confidence threshold (0–1)
-            </Label>
-            <Input
-              id="benchmark-low-confidence-threshold"
-              type="number"
-              min={0}
-              max={1}
-              step={0.05}
-              value={form.lowConfidenceThreshold}
-              onChange={e =>
-                updateForm(prev => ({ ...prev, lowConfidenceThreshold: e.target.value }))
-              }
-              className="h-8 w-40 tabular-nums"
-              placeholder="(off)"
-              aria-describedby="benchmark-low-confidence-threshold-help"
-            />
-            <p
-              id="benchmark-low-confidence-threshold-help"
-              className="text-muted-foreground text-xs"
-            >
-              Classifications below this confidence pick the most accurate model. Empty turns it
-              off.
-            </p>
-          </div>
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <span className="text-sm font-medium">Production token profile</span>
             <div className="flex flex-wrap gap-4">
@@ -813,6 +741,106 @@ function BenchmarkConfigEditor({
               prompt and cache-read prices. Leave both empty to rank by benchmark cost only.
             </p>
           </div>
+        </div>
+
+        <ConfigSectionHeading
+          title="Switching"
+          description="When a session keeps its incumbent model instead of switching."
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-switch-cost-factor" className="text-sm font-medium">
+              Switch cost factor (1–100)
+            </Label>
+            <Input
+              id="benchmark-switch-cost-factor"
+              type="number"
+              min={1}
+              max={100}
+              step={0.5}
+              value={form.switchCostFactor}
+              onChange={e =>
+                updateForm(prev => ({ ...prev, switchCostFactor: parseFloat(e.target.value) || 1 }))
+              }
+              className="h-8 w-40 tabular-nums"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-switch-horizon-turns" className="text-sm font-medium">
+              Switch horizon (turns)
+            </Label>
+            <Input
+              id="benchmark-switch-horizon-turns"
+              type="number"
+              min={1}
+              step={1}
+              value={form.switchHorizonTurns}
+              onChange={e => updateForm(prev => ({ ...prev, switchHorizonTurns: e.target.value }))}
+              className="h-8 w-40 tabular-nums"
+              placeholder="(use switch cost factor)"
+              aria-describedby="benchmark-switch-horizon-turns-help"
+            />
+            <p id="benchmark-switch-horizon-turns-help" className="text-muted-foreground text-xs">
+              Switch to a cheaper model only when savings over this many turns exceed the lost
+              prompt cache. Empty uses the switch cost factor.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label
+              htmlFor="benchmark-best-accuracy-switch-threshold"
+              className="text-sm font-medium"
+            >
+              Best accuracy switch threshold (0–1)
+            </Label>
+            <Input
+              id="benchmark-best-accuracy-switch-threshold"
+              type="number"
+              min={0}
+              max={1}
+              step={0.01}
+              value={form.bestAccuracySwitchThreshold}
+              onChange={e =>
+                updateForm(prev => ({
+                  ...prev,
+                  bestAccuracySwitchThreshold: parseFloat(e.target.value) || 0,
+                }))
+              }
+              className="h-8 w-40 tabular-nums"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-low-confidence-threshold" className="text-sm font-medium">
+              Low-confidence threshold (0–1)
+            </Label>
+            <Input
+              id="benchmark-low-confidence-threshold"
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={form.lowConfidenceThreshold}
+              onChange={e =>
+                updateForm(prev => ({ ...prev, lowConfidenceThreshold: e.target.value }))
+              }
+              className="h-8 w-40 tabular-nums"
+              placeholder="(off)"
+              aria-describedby="benchmark-low-confidence-threshold-help"
+            />
+            <p
+              id="benchmark-low-confidence-threshold-help"
+              className="text-muted-foreground text-xs"
+            >
+              Classifications below this confidence pick the most accurate model. Empty turns it
+              off.
+            </p>
+          </div>
+        </div>
+
+        <ConfigSectionHeading
+          title="Benchmark runs"
+          description="Queue concurrency, repetitions, run identity, and the latency gate."
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-max-concurrency" className="text-sm font-medium">
               Platform max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
@@ -943,7 +971,6 @@ function BenchmarkConfigEditor({
           </div>
         </div>
 
-        {/* Classifier max p95 latency */}
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="benchmark-classifier-max-p95-latency" className="text-sm font-medium">
             Classifier max p95 latency (ms)
@@ -964,35 +991,34 @@ function BenchmarkConfigEditor({
             Winner must classify under this p95 latency; empty disables the latency gate.
           </p>
         </div>
+      </CardContent>
 
-        {/* Actions + metadata */}
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" onClick={handleSave} disabled={saveMutation.isPending}>
-              <Save className="size-4" />
-              Save config
-            </Button>
-            {dirty ? (
-              <>
-                <Button type="button" variant="outline" onClick={handleReload}>
-                  Discard &amp; reload
-                </Button>
-                <span className="text-muted-foreground text-xs">Unsaved changes</span>
-              </>
-            ) : null}
-          </div>
-          {config === null ? (
-            <p className="text-muted-foreground text-xs">
-              No config saved yet — runs cannot start until one is saved.
-            </p>
-          ) : config.updatedAt ? (
-            <p className="text-muted-foreground text-xs">
-              Last updated {config.updatedAt}
-              {config.updatedBy ? ` by ${config.updatedBy}` : ''}
-            </p>
+      <div className="bg-card sticky bottom-0 flex flex-col gap-2 rounded-b-xl border-t p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" onClick={handleSave} disabled={saveMutation.isPending}>
+            <Save className="size-4" />
+            Save config
+          </Button>
+          {dirty ? (
+            <>
+              <Button type="button" variant="outline" onClick={handleReload}>
+                Discard &amp; reload
+              </Button>
+              <span className="text-muted-foreground text-xs">Unsaved changes</span>
+            </>
           ) : null}
         </div>
-      </CardContent>
+        {config === null ? (
+          <p className="text-muted-foreground text-xs">
+            No config saved yet — runs cannot start until one is saved.
+          </p>
+        ) : config.updatedAt ? (
+          <p className="text-muted-foreground text-xs">
+            Last updated {config.updatedAt}
+            {config.updatedBy ? ` by ${config.updatedBy}` : ''}
+          </p>
+        ) : null}
+      </div>
     </Card>
   );
 }
@@ -1181,6 +1207,36 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
 // Routing table view
 // ---------------------------------------------------------------------------
 
+function RoutingTableSummary({ table }: { table: BenchmarkRoutingTableResponse['table'] }) {
+  if (!table) return null;
+
+  const tokenProfile = table.productionTokenProfile;
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+      <dt className="text-muted-foreground">Version</dt>
+      <dd className="font-mono">{table.version}</dd>
+      <dt className="text-muted-foreground">Generated at</dt>
+      <dd className="tabular-nums">{table.generatedAt}</dd>
+      <dt className="text-muted-foreground">Min accuracy</dt>
+      <dd className="tabular-nums">{formatAccuracy(table.minAccuracy)}</dd>
+      <dt className="text-muted-foreground">Switch horizon</dt>
+      <dd className="tabular-nums">
+        {table.switchHorizonTurns != null
+          ? `${table.switchHorizonTurns} turns`
+          : `cost factor ${table.switchCostFactor}`}
+      </dd>
+      <dt className="text-muted-foreground">Token profile</dt>
+      <dd className="tabular-nums">
+        {tokenProfile
+          ? `${tokenProfile.uncachedInputTokens} uncached / ${tokenProfile.cachedInputTokens} cached`
+          : 'not set'}
+      </dd>
+      <dt className="text-muted-foreground">Source</dt>
+      <dd className="capitalize">{table.source}</dd>
+    </dl>
+  );
+}
+
 export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
   if (!data.table) {
     return <p className="text-muted-foreground text-sm">No routing table published yet.</p>;
@@ -1191,17 +1247,6 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-muted-foreground text-xs flex flex-wrap gap-x-4 gap-y-1">
-        <span>
-          Version: <span className="font-mono">{table.version}</span>
-        </span>
-        <span>Generated: {table.generatedAt}</span>
-        <span>Min accuracy: {formatAccuracy(table.minAccuracy)}</span>
-        <span>
-          Source: <span className="capitalize">{table.source}</span>
-        </span>
-      </div>
-
       {routeEntries.map(([routeKey, candidates]) => {
         const first = candidates[0];
         return (
@@ -1348,31 +1393,7 @@ function RegistrySummary({
 // Main exported section component
 // ---------------------------------------------------------------------------
 
-export function BenchmarksSection() {
-  const [router, setRouter] = useState<AutoRouter>(DEFAULT_AUTO_ROUTER);
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="benchmark-router">Router</Label>
-        <Select value={router} onValueChange={value => setRouter(AutoRouterSchema.parse(value))}>
-          <SelectTrigger id="benchmark-router" className="h-9 w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {AUTO_ROUTERS.map(value => (
-              <SelectItem key={value} value={value}>
-                {value === 'efficient' ? 'Efficient' : 'Frontier'}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <RouterBenchmarksSection key={router} router={router} />
-    </div>
-  );
-}
-
-function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
+export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
   const queryClient = useQueryClient();
   const [forceRerun, setForceRerun] = useState(false);
   const [runFilter, setRunFilter] = useState<RunFilter>('all');
@@ -1514,230 +1535,239 @@ function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-lg font-semibold">Benchmarks</h2>
-        <p className="text-muted-foreground text-sm">
-          Benchmark configuration, runs, and published routing table.
-        </p>
-      </div>
+    <Tabs defaultValue="policy">
+      <TabsList className="h-8">
+        <TabsTrigger value="policy" className="px-2.5 text-xs">
+          Policy
+        </TabsTrigger>
+        <TabsTrigger value="routing-table" className="px-2.5 text-xs">
+          Routing table
+        </TabsTrigger>
+        <TabsTrigger value="benchmarks" className="px-2.5 text-xs">
+          Benchmarks
+        </TabsTrigger>
+      </TabsList>
 
-      {/* Config editor */}
-      {configQuery.isLoading ? (
+      <TabsContent value="policy" className="mt-4">
+        {configQuery.isLoading ? (
+          <Card className="rounded-lg">
+            <CardContent className="p-4">
+              <Skeleton className="h-48 w-full" />
+            </CardContent>
+          </Card>
+        ) : configQuery.error ? (
+          <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
+            {configQuery.error instanceof Error
+              ? configQuery.error.message
+              : 'Failed to load benchmark config'}
+          </div>
+        ) : configQuery.data ? (
+          <BenchmarkConfigEditor
+            router={router}
+            config={configQuery.data.config}
+            onSaved={handleConfigSaved}
+            modelOptions={modelOptions}
+            modelsLoading={modelsQuery.isLoading}
+            modelsError={modelsError}
+            registryEntries={registryQuery.data?.platformEntries}
+            classifierModelOptions={systemOneModelsQuery.data ?? []}
+            classifierModelsLoading={systemOneModelsQuery.isLoading}
+            classifierModelsError={systemOneModelsError}
+          />
+        ) : null}
+      </TabsContent>
+
+      <TabsContent value="benchmarks" className="mt-4 flex flex-col gap-4">
         <Card className="rounded-lg">
-          <CardContent className="p-4">
-            <Skeleton className="h-48 w-full" />
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">Decider Registry</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 p-4 pt-0">
+            <p className="text-muted-foreground text-xs">
+              Measurements and published tables are isolated for the selected router. Classifier
+              measurements are shared. Custom owner pools use the efficient router only.
+            </p>
+            {registryQuery.isLoading ? (
+              <Skeleton className="h-20 w-full" />
+            ) : registryQuery.error ? (
+              <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
+                {registryQuery.error instanceof Error
+                  ? registryQuery.error.message
+                  : 'Failed to load registry'}
+              </div>
+            ) : registryQuery.data ? (
+              <RegistrySummary data={registryQuery.data} router={router} />
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={startRunMutation.isPending}
+                onClick={() =>
+                  startRunMutation.mutate({ kind: 'decider', force: false, queue: 'platform' })
+                }
+              >
+                <Play className="size-4" />
+                Run platform queue
+              </Button>
+              {router === 'efficient' ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={startRunMutation.isPending}
+                    onClick={() =>
+                      startRunMutation.mutate({ kind: 'decider', force: false, queue: 'user' })
+                    }
+                  >
+                    <Play className="size-4" />
+                    Run user queue
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={startRunMutation.isPending}
+                    onClick={() =>
+                      startRunMutation.mutate({ kind: 'decider', force: false, queue: 'both' })
+                    }
+                  >
+                    <Play className="size-4" />
+                    Run both queues
+                  </Button>
+                </>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={requeueMutation.isPending}
+                onClick={() => requeueMutation.mutate(router === 'efficient' ? 'both' : 'platform')}
+              >
+                <RotateCcw className="size-4" />
+                Requeue failed
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Queues also drain on a timer. A queue whose run is already active is skipped.
+            </p>
           </CardContent>
         </Card>
-      ) : configQuery.error ? (
-        <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
-          {configQuery.error instanceof Error
-            ? configQuery.error.message
-            : 'Failed to load benchmark config'}
-        </div>
-      ) : configQuery.data ? (
-        <BenchmarkConfigEditor
-          router={router}
-          config={configQuery.data.config}
-          onSaved={handleConfigSaved}
-          modelOptions={modelOptions}
-          modelsLoading={modelsQuery.isLoading}
-          modelsError={modelsError}
-          registryEntries={registryQuery.data?.platformEntries}
-          classifierModelOptions={systemOneModelsQuery.data ?? []}
-          classifierModelsLoading={systemOneModelsQuery.isLoading}
-          classifierModelsError={systemOneModelsError}
-        />
-      ) : null}
 
-      {/* Registry + run controls */}
-      <Card className="rounded-lg">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">Decider Registry</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 p-4 pt-0">
-          <p className="text-muted-foreground text-xs">
-            Measurements and published tables are isolated for the selected router. Classifier
-            measurements are shared. Custom owner pools use the efficient router only.
-          </p>
-          {registryQuery.isLoading ? (
-            <Skeleton className="h-20 w-full" />
-          ) : registryQuery.error ? (
-            <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
-              {registryQuery.error instanceof Error
-                ? registryQuery.error.message
-                : 'Failed to load registry'}
+        <Card className="rounded-lg">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">Run Classifier Benchmark</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 p-4 pt-0">
+            <p className="text-muted-foreground text-xs">
+              Classifier candidates are not registry-tracked: models with existing results are
+              skipped unless "Re-run models with existing results" is checked.
+            </p>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="force-rerun"
+                checked={forceRerun}
+                onCheckedChange={checked => setForceRerun(checked === true)}
+              />
+              <Label htmlFor="force-rerun" className="text-sm font-normal cursor-pointer">
+                Re-run models with existing results
+              </Label>
             </div>
-          ) : registryQuery.data ? (
-            <RegistrySummary data={registryQuery.data} router={router} />
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={startRunMutation.isPending}
-              onClick={() =>
-                startRunMutation.mutate({ kind: 'decider', force: false, queue: 'platform' })
-              }
-            >
-              <Play className="size-4" />
-              Run platform queue
-            </Button>
-            {router === 'efficient' ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={startRunMutation.isPending}
+                onClick={() =>
+                  startRunMutation.mutate({
+                    kind: 'classifier',
+                    force: forceRerun,
+                    queue: 'platform',
+                  })
+                }
+              >
+                <Play className="size-4" />
+                Run classifier benchmark
+              </Button>
+              {hasRunningRun ? (
+                <p className="text-muted-foreground self-center text-xs">
+                  A benchmark is running — refreshing every 30 s
+                </p>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 pb-2">
+            <CardTitle className="text-base">Benchmark Runs</CardTitle>
+            <Select value={runFilter} onValueChange={value => setRunFilter(value as RunFilter)}>
+              <SelectTrigger className="h-8 w-44 text-xs" aria-label="Filter runs by type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(router === 'efficient'
+                  ? (['all', 'classifier', 'platform', 'user'] as const)
+                  : (['all', 'classifier', 'platform'] as const)
+                ).map(value => (
+                  <SelectItem key={value} value={value}>
+                    {RUN_FILTER_LABELS[value]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            {runsQuery.isLoading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : runsQuery.error ? (
+              <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
+                {runsQuery.error instanceof Error
+                  ? runsQuery.error.message
+                  : 'Failed to load benchmark runs'}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8" />
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Started</TableHead>
+                    <TableHead>Completed</TableHead>
+                    <TableHead>Error</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <BenchmarkRunsTable runs={runsQuery.data?.runs ?? []} />
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="routing-table" className="mt-4">
+        <Card className="rounded-lg">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">Published Routing Table</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 p-4 pt-0">
+            {routingTableQuery.isLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : routingTableQuery.error ? (
+              <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
+                {routingTableQuery.error instanceof Error
+                  ? routingTableQuery.error.message
+                  : 'Failed to load routing table'}
+              </div>
+            ) : routingTableQuery.data ? (
               <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={startRunMutation.isPending}
-                  onClick={() =>
-                    startRunMutation.mutate({ kind: 'decider', force: false, queue: 'user' })
-                  }
-                >
-                  <Play className="size-4" />
-                  Run user queue
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={startRunMutation.isPending}
-                  onClick={() =>
-                    startRunMutation.mutate({ kind: 'decider', force: false, queue: 'both' })
-                  }
-                >
-                  <Play className="size-4" />
-                  Run both queues
-                </Button>
+                <RoutingTableSummary table={routingTableQuery.data.table} />
+                <RoutingTableView data={routingTableQuery.data} />
               </>
             ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              disabled={requeueMutation.isPending}
-              onClick={() => requeueMutation.mutate(router === 'efficient' ? 'both' : 'platform')}
-            >
-              <RotateCcw className="size-4" />
-              Requeue failed
-            </Button>
-          </div>
-          <p className="text-muted-foreground text-xs">
-            Queues also drain on a timer. A queue whose run is already active is skipped.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Classifier run controls */}
-      <Card className="rounded-lg">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">Run Classifier Benchmark</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 p-4 pt-0">
-          <p className="text-muted-foreground text-xs">
-            Classifier candidates are not registry-tracked: models with existing results are skipped
-            unless "Re-run models with existing results" is checked.
-          </p>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="force-rerun"
-              checked={forceRerun}
-              onCheckedChange={checked => setForceRerun(checked === true)}
-            />
-            <Label htmlFor="force-rerun" className="text-sm font-normal cursor-pointer">
-              Re-run models with existing results
-            </Label>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={startRunMutation.isPending}
-              onClick={() =>
-                startRunMutation.mutate({
-                  kind: 'classifier',
-                  force: forceRerun,
-                  queue: 'platform',
-                })
-              }
-            >
-              <Play className="size-4" />
-              Run classifier benchmark
-            </Button>
-            {hasRunningRun ? (
-              <p className="text-muted-foreground self-center text-xs">
-                A benchmark is running — refreshing every 30 s
-              </p>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Runs table */}
-      <Card className="rounded-lg">
-        <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 pb-2">
-          <CardTitle className="text-base">Benchmark Runs</CardTitle>
-          <Select value={runFilter} onValueChange={value => setRunFilter(value as RunFilter)}>
-            <SelectTrigger className="h-8 w-44 text-xs" aria-label="Filter runs by type">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(router === 'efficient'
-                ? (['all', 'classifier', 'platform', 'user'] as const)
-                : (['all', 'classifier', 'platform'] as const)
-              ).map(value => (
-                <SelectItem key={value} value={value}>
-                  {RUN_FILTER_LABELS[value]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          {runsQuery.isLoading ? (
-            <Skeleton className="h-24 w-full" />
-          ) : runsQuery.error ? (
-            <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
-              {runsQuery.error instanceof Error
-                ? runsQuery.error.message
-                : 'Failed to load benchmark runs'}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8" />
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead>Completed</TableHead>
-                  <TableHead>Error</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <BenchmarkRunsTable runs={runsQuery.data?.runs ?? []} />
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Routing table */}
-      <Card className="rounded-lg">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">Published Routing Table</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          {routingTableQuery.isLoading ? (
-            <Skeleton className="h-32 w-full" />
-          ) : routingTableQuery.error ? (
-            <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
-              {routingTableQuery.error instanceof Error
-                ? routingTableQuery.error.message
-                : 'Failed to load routing table'}
-            </div>
-          ) : routingTableQuery.data ? (
-            <RoutingTableView data={routingTableQuery.data} />
-          ) : null}
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
   );
 }

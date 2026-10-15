@@ -6,18 +6,8 @@ import {
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
-import {
-  ReasoningEffortSchema,
-  ReasoningOptionSchema,
-  VerbositySchema,
-  type OpenCodeSettings,
-  type ReasoningOption,
-} from '@kilocode/db/schema-types';
-import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
-import {
-  getFallbackModelVariants,
-  REASONING_VARIANTS_BINARY,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/variants';
+import { ReasoningOptionSchema, type ReasoningOption } from '@kilocode/db/schema-types';
+import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
@@ -76,7 +66,7 @@ type RawModel = {
   max_completion_tokens?: number;
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
   flags?: ReadonlyArray<DirectByokModelFlag>;
-  variants?: OpenCodeSettings['variants'];
+  reasoning_options?: ReasoningOption[];
 };
 
 type SyncContext = {
@@ -129,45 +119,12 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
     }));
 }
 
-function modelsDevReasoningOptionsToVariants(
-  options: ReadonlyArray<ReasoningOption>
-): OpenCodeSettings['variants'] {
-  const hasToggle = options.some(option => option.type === 'toggle');
-  const effortVariants: NonNullable<OpenCodeSettings['variants']> = {};
-  for (const option of options) {
-    if (option.type !== 'effort') continue;
-    for (const value of option.values) {
-      const effort = ReasoningEffortSchema.safeParse(value);
-      if (!effort.success) continue;
-      effortVariants[effort.data] = {
-        reasoning: { enabled: effort.data !== 'none', effort: effort.data },
-      };
-    }
-  }
-
-  if (Object.keys(effortVariants).length > 0) {
-    return hasToggle && !effortVariants.none
-      ? { none: { reasoning: { enabled: false, effort: 'none' } }, ...effortVariants }
-      : effortVariants;
-  }
-  if (hasToggle) {
-    return REASONING_VARIANTS_BINARY;
-  }
-  return undefined;
-}
-
-function addAnthropicVariantVerbosity(
-  variants: OpenCodeSettings['variants'],
-  aiSdkProvider: OpenCodeSettings['ai_sdk_provider']
-): OpenCodeSettings['variants'] {
-  if (aiSdkProvider !== 'anthropic' || !variants) return variants;
-
-  return Object.fromEntries(
-    Object.entries(variants).map(([name, variant]) => {
-      const verbosity = VerbositySchema.safeParse(variant.reasoning?.effort);
-      return [name, verbosity.success ? { ...variant, verbosity: verbosity.data } : variant];
-    })
-  );
+// models.dev `[]` and effort values the gateway cannot send are treated as unknown, so that
+// reasoning models fall back to the model-name defaults when served.
+function supportedReasoningOptions(
+  options: ReasoningOption[] | undefined
+): ReasoningOption[] | undefined {
+  return options?.length && toLegacyVariants(options, undefined) ? options : undefined;
 }
 
 export function parseModelsDevProviderModels(
@@ -186,11 +143,6 @@ export function parseModelsDevProviderModels(
         (!model.modalities?.input || model.modalities.input.includes('text'))
     )
     .map(model => {
-      const modelId = `${providerId}/${model.id}`.toLowerCase();
-      const aiSdkProvider = getAiSdkProvider(modelId, providerId);
-      const variants =
-        modelsDevReasoningOptionsToVariants(model.reasoning_options ?? []) ??
-        (model.reasoning ? getFallbackModelVariants(modelId) : undefined);
       return {
         id: model.id,
         name: shortenDisplayName(model.name),
@@ -198,7 +150,7 @@ export function parseModelsDevProviderModels(
         max_completion_tokens: model.limit?.output,
         input_modalities: model.modalities?.input,
         flags: model.reasoning ? ['reasoning'] : undefined,
-        variants: addAnthropicVariantVerbosity(variants, aiSdkProvider),
+        reasoning_options: supportedReasoningOptions(model.reasoning_options),
       };
     });
 }
@@ -310,7 +262,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       flags: flags.size > 0 ? [...flags] : undefined,
       context_length,
       max_completion_tokens,
-      variants: raw.variants,
+      reasoning_options: raw.reasoning_options,
     });
   }
 

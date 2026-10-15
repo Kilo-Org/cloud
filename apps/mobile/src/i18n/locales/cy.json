@@ -2775,7 +2775,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Nid yw maint y ffenestr gyd-destun ar gael",
-      "pillLabel": "Cyd-destun · {{value}}",
       "tapToViewDetails": "Tapio i weld manylion y cyd-destun.",
       "costSuffix": ", cost: {{cost}}",
       "tokensWindowUnavailable": "Cyd-destun: {{used}} tocyn, nid yw maint y ffenestr ar gael",

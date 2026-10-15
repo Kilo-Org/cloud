@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Контекстийн багтаамж тодорхойгүй",
-      "pillLabel": "Нөхцөл байдал · {{value}}",
       "tapToViewDetails": "Контекстийн дэлгэрэнгүйг харахын тулд товшино уу.",
       "costSuffix": ", зардал {{cost}}",
       "tokensWindowUnavailable": "Контекст: {{used}} токен, багтаамж тодорхойгүй",

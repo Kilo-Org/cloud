@@ -155,7 +155,6 @@ describe('ReasoningPartRenderer mounted', () => {
       throw new Error('row not found');
     }
     expect(row.props.label).toBe('Thought');
-    expect(row.props.labelKind).toBe('eyebrow');
     expect(row.props.variant).toBe('dashed');
     expect(row.props.accessibilityLabel).toBe('Thought');
 

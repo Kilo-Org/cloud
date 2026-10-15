@@ -2703,7 +2703,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Velikost kontextového okna není k dispozici",
-      "pillLabel": "Kontext · {{value}}",
       "tapToViewDetails": "Klepnutím zobrazíte podrobnosti kontextu.",
       "costSuffix": ", náklady {{cost}}",
       "tokensWindowUnavailable": "Kontext: {{used}} tokenů, velikost kontextového okna není k dispozici",

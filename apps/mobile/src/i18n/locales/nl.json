@@ -2119,7 +2119,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Grootte van het contextvenster niet beschikbaar",
-      "pillLabel": "Context · {{value}}",
       "tapToViewDetails": "Tik om contextdetails te bekijken.",
       "costSuffix": ", kosten {{cost}}",
       "tokensWindowUnavailable": "Context: {{used}} tokens, grootte van het contextvenster niet beschikbaar",

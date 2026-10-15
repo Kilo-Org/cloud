@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Umkhawulo womongo awutholakali",
-      "pillLabel": "Umongo · {{value}}",
       "tapToViewDetails": "Thepha ukuze ubone imininingwane yomongo.",
       "costSuffix": ", izindleko {{cost}}",
       "tokensWindowUnavailable": "Umongo: amathokheni angu-{{used}}, umkhawulo awutholakali",

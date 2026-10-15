@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Saiz tetingkap konteks tidak tersedia",
-      "pillLabel": "Konteks · {{value}}",
       "tapToViewDetails": "Ketik untuk melihat butiran konteks.",
       "costSuffix": ", kos {{cost}}",
       "tokensWindowUnavailable": "Konteks menggunakan {{used}} token, saiz tetingkap tidak tersedia",

@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "ไม่ทราบความจุบริบท",
-      "pillLabel": "บริบท · {{value}}",
       "tapToViewDetails": "แตะเพื่อดูรายละเอียดบริบท",
       "costSuffix": ", ค่าใช้จ่าย {{cost}}",
       "tokensWindowUnavailable": "ใช้บริบท {{used}} โทเคน ไม่ทราบความจุบริบท",

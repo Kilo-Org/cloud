@@ -12,8 +12,8 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
-import { getFallbackModelVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/variants';
-import { withReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
+import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
+import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();
@@ -62,11 +62,11 @@ function convertModel(
     default_parameters: {},
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
-    opencode: withReasoningOptions({
+    opencode: withLegacyVariants({
       ai_sdk_provider: getAiSdkProvider(id, provider.id),
-      variants:
-        model.variants ??
-        (model.flags?.includes('reasoning') ? getFallbackModelVariants(id) : undefined),
+      reasoning_options:
+        model.reasoning_options ??
+        (model.flags?.includes('reasoning') ? getFallbackReasoningOptions(id) : undefined),
     }),
   };
 }

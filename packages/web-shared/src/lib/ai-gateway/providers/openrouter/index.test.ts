@@ -8,7 +8,6 @@ import {
   shouldSuppressOpenRouterModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import type { StoredModel } from '@kilocode/db/schema-types';
-import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   createMockResponse,
   mockOpenRouterModels,
@@ -500,7 +499,7 @@ describe('reasoning options', () => {
     const opencode = await getCatalog();
 
     expect(opencode('vendor/no-reasoning')?.variants).toBeUndefined();
-    expect(opencode('vendor/no-reasoning')).not.toHaveProperty('reasoning_options');
+    expect(opencode('vendor/no-reasoning')?.reasoning_options).toBeUndefined();
   });
 
   it('omits reasoning options for kilo-auto models', async () => {

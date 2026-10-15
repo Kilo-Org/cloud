@@ -2159,7 +2159,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Размер контекстного окна неизвестен",
-      "pillLabel": "Контекст · {{value}}",
       "tapToViewDetails": "Нажмите, чтобы просмотреть сведения о контексте.",
       "costSuffix": ", стоимость {{cost}}",
       "tokensWindowUnavailable": "Токенов в контексте: {{used}}, размер контекстного окна неизвестен",

@@ -2667,7 +2667,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Veličina kontekstnog prozora nije dostupna",
-      "pillLabel": "Kontekst · {{value}}",
       "tapToViewDetails": "Dodirni da prikažeš detalje konteksta.",
       "costSuffix": ", trošak {{cost}}",
       "tokensWindowUnavailable": "Kontekst: {{used}} tokena, veličina kontekstnog prozora nije dostupna",

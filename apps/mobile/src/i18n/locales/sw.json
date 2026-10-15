@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Ukubwa wa dirisha la muktadha haupatikani",
-      "pillLabel": "Muktadha · {{value}}",
       "tapToViewDetails": "Gusa ili uone maelezo ya muktadha.",
       "costSuffix": ", gharama {{cost}}",
       "tokensWindowUnavailable": "Muktadha: tokeni {{used}}, ukubwa wa dirisha haupatikani",

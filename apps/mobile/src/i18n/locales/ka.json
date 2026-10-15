@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "კონტექსტის ფანჯრის ზომა მიუწვდომელია",
-      "pillLabel": "კონტექსტი · {{value}}",
       "tapToViewDetails": "შეეხეთ კონტექსტის დეტალების სანახავად.",
       "costSuffix": ", ღირებულება {{cost}}",
       "tokensWindowUnavailable": "კონტექსტი: {{used}} ტოკენი, ფანჯრის ზომა უცნობია",

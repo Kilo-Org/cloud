@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Kontekst pəncərəsinin ölçüsü əlçatan deyil",
-      "pillLabel": "Kontekst · {{value}}",
       "tapToViewDetails": "Kontekstin təfərrüatlarına baxmaq üçün toxun.",
       "costSuffix": ", xərc {{cost}}",
       "tokensWindowUnavailable": "Kontekstdə {{used}} token var, pəncərənin ölçüsü əlçatan deyil",

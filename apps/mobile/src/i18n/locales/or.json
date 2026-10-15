@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "ପ୍ରସଙ୍ଗ ୱିଣ୍ଡୋର ଆକାର ଉପଲବ୍ଧ ନାହିଁ",
-      "pillLabel": "ପ୍ରସଙ୍ଗ · {{value}}",
       "tapToViewDetails": "ପ୍ରସଙ୍ଗ ବିବରଣୀ ଦେଖିବାକୁ ଟାପ୍ କରନ୍ତୁ।",
       "costSuffix": ", ଖର୍ଚ୍ଚ {{cost}}",
       "tokensWindowUnavailable": "ପ୍ରସଙ୍ଗରେ {{used}} ଟୋକନ୍, ୱିଣ୍ଡୋର ଆକାର ଉପଲବ୍ଧ ନାହିଁ",

@@ -4,7 +4,6 @@ import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
-import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
@@ -19,21 +18,11 @@ type FixedPartRowProps = {
   icon?: LucideIcon;
   /** Primary text: `display.subtitle ?? display.title`. */
   label: string;
-  /** 'text' for tools, 'eyebrow' for reasoning. */
-  labelKind?: 'text' | 'eyebrow';
   badge?: string;
   /** Absent for reasoning rows. */
   status?: 'pending' | 'running' | 'completed' | 'error';
   /** 'solid' tools, 'dashed' reasoning. */
   variant?: 'solid' | 'dashed';
-  /**
-   * A control-sized row instead of a full-width one. Reasoning rows use it: a
-   * folded thought is a small affordance beside the answer, not a line of the
-   * transcript, and a full-width row for every one of them read as noise above
-   * short answers. The row keeps a 44pt iOS / 48dp Android tap area through its
-   * own minimum height plus hit slop. Tool rows keep the default.
-   */
-  compact?: boolean;
   /** Presence makes the row pressable and adds the chevron and details hint. */
   onPress?: () => void;
   /**
@@ -62,11 +51,9 @@ type FixedPartRowProps = {
 export function FixedPartRow({
   icon: Icon,
   label,
-  labelKind = 'text',
   badge,
   status,
   variant = 'solid',
-  compact = false,
   onPress,
   translatable = true,
   accessibilityLabel,
@@ -86,16 +73,12 @@ export function FixedPartRow({
   return (
     <View
       className={cn(
-        'overflow-hidden border border-border',
-        compact ? 'self-start rounded-full' : 'rounded-lg',
+        'overflow-hidden rounded-lg border border-border',
         variant === 'dashed' && 'border-dashed'
       )}
     >
       <Pressable
-        className={cn(
-          'flex-row items-center active:bg-secondary',
-          compact ? 'min-h-[48px] min-w-[48px] gap-1.5 px-2.5' : 'gap-2 px-3 py-2'
-        )}
+        className="flex-row items-center gap-2 px-3 py-2 active:bg-secondary"
         onPress={onPress}
         onLongPress={messageLongPress ?? undefined}
         disabled={!onPress}
@@ -119,16 +102,10 @@ export function FixedPartRow({
 
         {/* Baseline, not center: the label is text-sm and the badge text-xs, so
             centering the line boxes drops the badge below the label. */}
-        <View className={cn('flex-row items-baseline gap-1.5', !compact && 'flex-1')}>
-          {labelKind === 'eyebrow' ? (
-            <Eyebrow className="shrink" numberOfLines={1}>
-              {shownLabel}
-            </Eyebrow>
-          ) : (
-            <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
-              {shownLabel}
-            </Text>
-          )}
+        <View className="flex-1 flex-row items-baseline gap-1.5">
+          <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
+            {shownLabel}
+          </Text>
           {badge ? (
             <Text className="text-xs text-muted-foreground" numberOfLines={1}>
               {badge}

@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Oke ozi ntụaka adịghị",
-      "pillLabel": "Ọdịnaya · {{value}}",
       "tapToViewDetails": "Pịa ka ị lee nkọwa ozi ntụaka.",
       "costSuffix": ", ọnụ ahịa {{cost}}",
       "tokensWindowUnavailable": "Tokin {{used}} nke ozi ntụaka, oke adịghị",

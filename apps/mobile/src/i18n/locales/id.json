@@ -2119,7 +2119,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Ukuran jendela konteks tidak tersedia",
-      "pillLabel": "Konteks · {{value}}",
       "tapToViewDetails": "Ketuk untuk melihat detail konteks.",
       "costSuffix": ", biaya {{cost}}",
       "tokensWindowUnavailable": "Konteks menggunakan {{used}} token, ukuran jendela konteks tidak tersedia",

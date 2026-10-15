@@ -1,7 +1,7 @@
 import { custom_llm2 } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
-import { withReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
+import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { orderOpenCodeSettings } from './order-opencode-variants';
 import { hasCustomLlmAccess } from './access';
 
@@ -44,7 +44,7 @@ function convert(publicId: string, model: CustomLlmDefinition) {
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
     mayTrainOnYourPrompts: true,
-    opencode: opencode && withReasoningOptions(opencode),
+    opencode: opencode && withLegacyVariants(opencode),
   };
 }
 

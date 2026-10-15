@@ -14,13 +14,8 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { benchmarkPairKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
-import {
-  BENCHMARK_CONTAINER_BUDGET,
-  BENCHMARK_USER_CONTAINER_LIMIT,
-  BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH,
-} from '@kilocode/auto-routing-contracts';
+import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import type { SQL } from 'drizzle-orm';
 import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import * as z from 'zod';
@@ -231,46 +226,13 @@ export async function savePolicyComputed(
     .where(eq(benchmarkConfig.router, router));
 }
 
-/** Live decider lanes of every running run, the sum the admission guard reads. */
-const runningDeciderLanes = sql`(
-  SELECT COALESCE(SUM(${benchmarkRuns.max_concurrency}), 0)
-  FROM ${benchmarkRuns}
-  WHERE ${benchmarkRuns.kind} = 'decider' AND ${benchmarkRuns.status} = 'running'
-)`;
-
-/** Live decider lanes held by owner-queue runs. */
-const runningUserLanes = sql`(
-  SELECT COALESCE(SUM(${benchmarkRuns.max_concurrency}), 0)
-  FROM ${benchmarkRuns}
-  WHERE ${benchmarkRuns.kind} = 'decider'
-    AND ${benchmarkRuns.purpose} = 'user'
-    AND ${benchmarkRuns.status} = 'running'
-)`;
-
-/** Admission-guarded lane count for a new run, or NULL to reject the insert. */
-function containerLanesForAdmission(run: {
-  kind: BenchmarkKind;
-  purpose?: BenchmarkRunPurpose;
-  max_concurrency: number;
-}): SQL | number {
-  if (run.kind !== 'decider') return run.max_concurrency;
-  const withinBudget = sql`${runningDeciderLanes} + ${run.max_concurrency} <= ${BENCHMARK_CONTAINER_BUDGET}`;
-  if ((run.purpose ?? 'platform') === 'user') {
-    const withinReserve = sql`${runningUserLanes} + ${run.max_concurrency} <= ${BENCHMARK_USER_CONTAINER_LIMIT}`;
-    return sql`CASE WHEN ${withinReserve} AND ${withinBudget} THEN ${run.max_concurrency} ELSE NULL END`;
-  }
-  return sql`CASE WHEN ${withinBudget} THEN ${run.max_concurrency} ELSE NULL END`;
-}
-
-/**
- * Container lanes live decider runs hold, summed across every router and queue.
- * `startRun` sizes the next run against it; the insert guard re-reads the same
- * rows atomically.
- */
 export async function getLiveContainerLanes(db: D1Database): Promise<number> {
-  const row = await drizzle(db).select({ lanes: runningDeciderLanes }).from(benchmarkRuns).get();
-  return Number(row?.lanes ?? 0);
+  const row = await db
+    .prepare("SELECT COUNT(*) AS lanes FROM scheduler_chunks WHERE status IN ('queued', 'active')")
+    .first<{ lanes: number }>();
+  return row?.lanes ?? 0;
 }
+
 export async function insertRun(
   db: D1Database,
   run: {
@@ -306,10 +268,7 @@ export async function insertRun(
     min_accuracy: run.min_accuracy,
     switch_cost_factor: run.switch_cost_factor,
     best_accuracy_switch_threshold: run.best_accuracy_switch_threshold,
-    // A NOT NULL rejection rolls back the whole D1 batch, including model
-    // snapshots. Two caps: shared across every running decider run, and (for
-    // owner-queue runs) the slice that keeps the platform reserve intact.
-    max_concurrency: containerLanesForAdmission(run),
+    max_concurrency: run.max_concurrency,
     benchmark_user_id: run.benchmark_user_id,
     benchmark_org_id: run.benchmark_org_id,
     repetitions: run.repetitions,
@@ -854,7 +813,13 @@ export async function markStaleRunsFailed(db: D1Database, olderThanIso: string):
   await drizzle(db)
     .update(benchmarkRuns)
     .set({ status: 'failed', error: 'timed out' })
-    .where(and(eq(benchmarkRuns.status, 'running'), lt(benchmarkRuns.started_at, olderThanIso)));
+    .where(
+      and(
+        eq(benchmarkRuns.status, 'running'),
+        lt(benchmarkRuns.started_at, olderThanIso),
+        sql`NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = ${benchmarkRuns.id})`
+      )
+    );
 }
 
 // The currently-running run of a (kind, purpose), if any (used for the
@@ -1540,7 +1505,8 @@ export async function listStaleRunningDeciderRuns(
       and(
         eq(benchmarkRuns.kind, 'decider'),
         eq(benchmarkRuns.status, 'running'),
-        lt(benchmarkRuns.started_at, olderThanIso)
+        lt(benchmarkRuns.started_at, olderThanIso),
+        sql`NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = ${benchmarkRuns.id})`
       )
     );
   return rows.map(r => ({ id: r.id, purpose: r.purpose === 'user' ? 'user' : 'platform' }));

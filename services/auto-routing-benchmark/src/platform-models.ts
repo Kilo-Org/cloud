@@ -21,6 +21,7 @@ export const BenchmarkModelCatalogSchema = z.object({
     z.object({
       id: z.string().trim().min(1),
       alias_target: z.string().trim().min(1).optional(),
+      inference_provider_ids: z.array(z.string()).optional(),
       opencode: z.object({ variants: BenchmarkCatalogVariantsSchema.optional() }).optional(),
       pricing: z
         .object({
@@ -45,6 +46,14 @@ function resolveCatalogModel(
   return model?.id.startsWith('~') && model.alias_target
     ? (modelsById.get(model.alias_target) ?? model)
     : model;
+}
+
+export function catalogModelProviders(
+  catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
+  modelId: string
+): string[] {
+  const modelsById = new Map(catalog.data.map(model => [model.id, model]));
+  return [...new Set(resolveCatalogModel(modelId, modelsById)?.inference_provider_ids ?? [])];
 }
 
 export function mapProfileStatusesToRequestedModels(

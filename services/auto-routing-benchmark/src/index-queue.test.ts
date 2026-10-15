@@ -61,7 +61,7 @@ describe('queue handler — DLQ branch', () => {
     expect(messages[0].ack).toHaveBeenCalled();
   });
 
-  it('retries a failed finalization without acknowledging its lane death', async () => {
+  it('retries failed scheduler reconciliation without acknowledging the dead letter', async () => {
     vi.mocked(processDeadLetter).mockRejectedValueOnce(new Error('D1 transient'));
     const { batch, messages } = fakeBatch('auto-routing-benchmark-dlq', [{ runId: 'r1' }]);
     await worker.queue(batch, env);
@@ -71,7 +71,33 @@ describe('queue handler — DLQ branch', () => {
 });
 
 describe('queue handler — jobs branch', () => {
-  it('defers capacity waits without consuming the lane retry budget', async () => {
+  it('acknowledges a token-owned claim after scheduler execution settles', async () => {
+    const body = {
+      runId: 'r1',
+      kind: 'decider',
+      model: 'm/x',
+      claimId: 'chunk-1',
+      claimToken: 'token-1',
+    };
+    const { batch, messages } = fakeBatch('auto-routing-benchmark-jobs', [body]);
+    await worker.queue(batch, env);
+    expect(processJob).toHaveBeenCalledWith(env, body);
+    expect(messages[0].ack).toHaveBeenCalledOnce();
+    expect(messages[0].retry).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges scheduler wakeups without applying queue-level capacity redelivery', async () => {
+    const body = { runId: 'r1', kind: 'decider', model: 'm/x', schedulerWake: true };
+    const { batch, messages } = fakeBatch('auto-routing-benchmark-jobs', [body]);
+    await worker.queue(batch, env);
+    expect(processJob).toHaveBeenCalledWith(env, body);
+    expect(messages[0].ack).toHaveBeenCalledOnce();
+    expect(messages[0].retry).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('retains queue-level capacity compatibility for uncaught infrastructure waits', async () => {
     const body = { runId: 'r1', kind: 'decider', model: 'm/x' };
     vi.mocked(processJob).mockRejectedValueOnce(
       new Error('container /warmup failed: HTTP 503 capacity')

@@ -17,6 +17,7 @@ const SCHEMA_SQL = `
     status TEXT NOT NULL, started_at TEXT NOT NULL, completed_at TEXT,
     error TEXT, engine_identity TEXT NOT NULL, repetitions INTEGER NOT NULL
   );
+  CREATE TABLE scheduler_runs (run_id TEXT PRIMARY KEY);
   CREATE TABLE case_results (
     run_id TEXT NOT NULL, model TEXT NOT NULL, variant TEXT NOT NULL,
     case_id TEXT NOT NULL, route_key TEXT, score REAL NOT NULL,

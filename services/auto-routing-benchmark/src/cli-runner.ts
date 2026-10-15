@@ -97,13 +97,29 @@ export async function runDeciderCaseViaCli(
 
   const body = (await response.json()) as ContainerRunResponse;
   const { text, costUsd, eventCount, lastEventTypes } = parseKiloRunEvents(body.stdoutLines ?? []);
+  const providerThrottled = (body.stdoutLines ?? []).some(line => {
+    try {
+      const event: unknown = JSON.parse(line);
+      return (
+        typeof event === 'object' &&
+        event !== null &&
+        'type' in event &&
+        event.type === 'error' &&
+        /(?:\b429\b|rate.?limit|throttl)/i.test(line)
+      );
+    } catch {
+      return false;
+    }
+  });
 
   return {
     text,
     costUsd,
     latencyMs: body.durationMs ?? Date.now() - startedAt,
     exitCode: body.exitCode,
-    stderrTail: body.stderrTail ?? '',
+    stderrTail: providerThrottled
+      ? `${body.stderrTail ?? ''}\nHTTP 429 provider throttle`
+      : (body.stderrTail ?? ''),
     eventCount,
     lastEventTypes,
     timedOut: body.timedOut ?? false,

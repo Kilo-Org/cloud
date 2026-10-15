@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from './db';
 import type * as CliRunnerModule from './cli-runner';
+import type * as SchedulerModule from './scheduler';
 import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
 import type {
   PolicySettingComputedMap,
@@ -8,6 +9,24 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 import type { BenchmarkJobMessage } from './run';
+import {
+  claimNextChunk,
+  finishChunk,
+  getChunk,
+  recoverChunks,
+  scheduleRunChunks,
+  startChunk,
+} from './scheduler';
+
+vi.mock('./scheduler', async importOriginal => ({
+  ...(await importOriginal<typeof SchedulerModule>()),
+  claimNextChunk: vi.fn(),
+  finishChunk: vi.fn(),
+  getChunk: vi.fn(),
+  recoverChunks: vi.fn(),
+  scheduleRunChunks: vi.fn(),
+  startChunk: vi.fn(),
+}));
 
 vi.mock('./cli-runner', async importOriginal => {
   const actual = await importOriginal<typeof CliRunnerModule>();
@@ -95,7 +114,6 @@ import {
   syncPlatformRegistryRows,
 } from './db';
 import {
-  BenchmarkCapacityError,
   NoEntriesClaimedError,
   drainQueue,
   drainQueues,
@@ -107,6 +125,17 @@ import {
 } from './run';
 
 const queueSendBatch = vi.fn<(messages: { body: BenchmarkJobMessage }[]) => Promise<void>>();
+const queueSend = vi.fn();
+
+function schedulerDatabase(): D1Database {
+  const statement = {
+    bind: vi.fn().mockReturnThis(),
+    first: vi.fn().mockResolvedValue(null),
+    all: vi.fn().mockResolvedValue({ results: [] }),
+    run: vi.fn().mockResolvedValue({ meta: { changes: 0 } }),
+  };
+  return { prepare: vi.fn(() => statement) } as unknown as D1Database;
+}
 const kvDelete = vi.fn();
 
 const configRow = {
@@ -134,8 +163,9 @@ const configRow = {
 };
 
 const env = {
-  BENCH_DB: {} as D1Database,
-  BENCH_QUEUE: { sendBatch: queueSendBatch },
+  BENCH_DB: schedulerDatabase(),
+  BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
+  BENCHMARK_SCHEDULER_CONFIG: '{}',
   AUTO_ROUTING_CONFIG: { delete: kvDelete },
   INTERNAL_API_SECRET_PROD: { get: async () => 'secret' },
   KILO_WEB_API_BASE_URL: 'https://app.test',
@@ -173,7 +203,35 @@ beforeEach(() => {
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
-  vi.mocked(insertRun).mockResolvedValue(undefined);
+  vi.mocked(insertRun).mockReset().mockResolvedValue(undefined);
+  vi.mocked(getRunWithModels)
+    .mockReset()
+    .mockImplementation(async (_db, id) => {
+      const inserted = vi.mocked(insertRun).mock.calls.find(([, run]) => run.id === id);
+      if (!inserted) return null;
+      const [, run, models] = inserted;
+      return {
+        run: {
+          ...run,
+          started_at: run.startedAt,
+          router: run.router ?? 'efficient',
+          purpose: run.purpose ?? 'platform',
+          accuracy_noise_band: run.accuracy_noise_band ?? 0.05,
+          frontier_min_accuracy_delta: run.frontier_min_accuracy_delta ?? 0,
+          status: 'running',
+          completed_at: null,
+          error: null,
+        },
+        models,
+      };
+    });
+  vi.mocked(scheduleRunChunks).mockReset().mockResolvedValue(undefined);
+  vi.mocked(claimNextChunk).mockReset().mockResolvedValue(null);
+  vi.mocked(recoverChunks).mockReset().mockResolvedValue([]);
+  vi.mocked(startChunk).mockReset().mockResolvedValue(true);
+  vi.mocked(getChunk).mockReset().mockResolvedValue(null);
+  vi.mocked(finishChunk).mockReset().mockResolvedValue(undefined);
+  queueSend.mockReset().mockResolvedValue(undefined);
   vi.mocked(reuseDeciderCaseResults).mockReset().mockResolvedValue(0);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
@@ -233,9 +291,7 @@ function runningRun(id: string, purpose: 'platform' | 'user') {
 }
 
 describe('all-effort platform scheduling', () => {
-  it('schedules every exact effort over bounded registry batches', async () => {
-    // A nearly committed shared budget bounds each batch: 4 free lanes, and a
-    // platform run takes half of them, so floor(2 / 1 repetition) = 2 entries.
+  it('admits every exact effort together even when live slots are nearly full', async () => {
     vi.mocked(getLiveContainerLanes).mockResolvedValue(246);
     const variants = ['none', 'low', 'medium', 'high', 'max'];
     catalogFetch.mockImplementation(async () =>
@@ -265,10 +321,18 @@ describe('all-effort platform scheduling', () => {
       );
       return [...entries];
     });
-    while (pending.length > 0) await drainQueue(env, 'platform');
+    await drainQueue(env, 'platform');
+    expect(pending).toEqual([]);
     const batches = vi.mocked(insertRun).mock.calls.map(call => call[2]);
-    expect(batches.map(batch => batch.length)).toEqual([1, 1, 1, 1, 1]);
+    expect(batches.map(batch => batch.length)).toEqual([5]);
     expect(batches.flat().map(row => row.variant)).toEqual(variants);
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: expect.any(String),
+      entries: variants.map(variant => ({ model: 'platform/a', variant, providers: [] })),
+      repetitions: 1,
+      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
   });
 
   it('does not claim stale platform efforts when catalog refresh fails', async () => {
@@ -304,7 +368,14 @@ describe('startRun — registry-backed decider runs', () => {
       entries,
       expect.objectContaining({ repetitions: 1 })
     );
-    expect(queueSendBatch).toHaveBeenCalled();
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: result.runId,
+      entries: entries.map(entry => ({ ...entry, providers: [] })),
+      repetitions: 1,
+      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
+    expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
   it('claims registry rows for platform-queue runs too, and never carries prior summaries', async () => {
@@ -326,44 +397,37 @@ describe('startRun — registry-backed decider runs', () => {
     expect(getLatestSummariesByModel).not.toHaveBeenCalled();
   });
 
-  it('sizes each queue from the shared budget and keeps the platform reserve', async () => {
-    // Nothing live: a platform run takes half the free lanes, a user run takes
-    // its full limit — 150 of 250, so 100 always stay available to platform runs.
-    await startRun(env, 'decider', {
+  it.each(['platform', 'user'] as const)(
+    'snapshots zero reserved concurrency for a %s run',
+    async purpose => {
+      await startRun(env, 'decider', {
+        purpose,
+        entries: [{ model: 'p/a', variant: null }],
+      });
+      expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(0);
+    }
+  );
+
+  it('admits a decider run even when all live slots are occupied', async () => {
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(250);
+    const result = await startRun(env, 'decider', {
       purpose: 'platform',
       entries: [{ model: 'p/a', variant: null }],
     });
-    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(125);
-
-    vi.mocked(insertRun).mockClear();
-    await startRun(env, 'decider', { purpose: 'user', entries: [{ model: 'u/a', variant: null }] });
-    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(150);
-
-    vi.mocked(insertRun).mockClear();
-    // A user run holding its limit leaves 100 lanes, and a platform run splits
-    // those with the other router rather than taking all of them.
-    vi.mocked(getLiveContainerLanes).mockResolvedValue(150);
-    await startRun(env, 'decider', {
-      purpose: 'platform',
-      entries: [{ model: 'p/b', variant: null }],
-    });
-    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(50);
+    expect(result.enqueuedModels).toBe(1);
+    expect(scheduleRunChunks).toHaveBeenCalledOnce();
+    expect(claimNextChunk).toHaveBeenCalled();
+    expect(queueSend).not.toHaveBeenCalled();
   });
 
-  it('refuses a decider run with no free lanes as capacity, not a config fault', async () => {
-    vi.mocked(getLiveContainerLanes).mockResolvedValue(250);
-    await expect(
-      startRun(env, 'decider', { purpose: 'platform', entries: [{ model: 'p/a', variant: null }] })
-    ).rejects.toThrow(BenchmarkCapacityError);
-    expect(insertRun).not.toHaveBeenCalled();
-  });
-
-  it('reports the actual free lanes separately from the run share', async () => {
-    // 10 lanes free; a platform run may take half, so 6 model repetitions wait.
+  it('plans every admitted entry without dividing free lanes between runs', async () => {
     vi.mocked(getLiveContainerLanes).mockResolvedValue(240);
     const entries = Array.from({ length: 6 }, (_, i) => ({ model: `p/${i}`, variant: null }));
-    await expect(startRun(env, 'decider', { purpose: 'platform', entries })).rejects.toThrow(
-      '10 of 250 are free and a platform run may claim 5 of them now'
+    const result = await startRun(env, 'decider', { purpose: 'platform', entries });
+    expect(result.enqueuedModels).toBe(6);
+    expect(scheduleRunChunks).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ entries: entries.map(entry => ({ ...entry, providers: [] })) })
     );
   });
 
@@ -477,24 +541,29 @@ describe('decider run completion', () => {
     }));
   }
 
-  /**
-   * Drive finalization through a chunk that has no follow-up work. `variant` is
-   * the application form here (null = default), not the '' storage form.
-   */
   async function finalizeVia(runId: string, model: string, variant: string | null) {
-    const { DECIDER_CASES } = await import('./datasets/decider-cases');
     vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set([DECIDER_CASES[0].id]));
+    vi.mocked(getChunk).mockResolvedValue({
+      id: 'completion-claim',
+      run_id: runId,
+      model,
+      variant: variant ?? '',
+      providers: '[]',
+      rep: 0,
+      chunk: 0,
+      case_ids: JSON.stringify([DECIDER_CASES[0].id]),
+      slot: 0,
+      token: 'completion-token',
+      attempts: 1,
+    });
     await processJob(env, {
       runId,
       kind: 'decider',
       model,
-      variant,
-      caseIds: [DECIDER_CASES[0].id],
-      chunk: 9999,
-      shard: 0,
-      shardCount: 1,
-      rep: 0,
+      claimId: 'completion-claim',
+      claimToken: 'completion-token',
     });
+    expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'completion-claim', 'completion-token');
   }
 
   it('marks registry rows ready and republishes the platform table from the registry', async () => {
@@ -729,7 +798,7 @@ describe('drainQueue', () => {
     expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('platform');
   });
 
-  it('uses more shards per entry instead of serializing a large owner batch', async () => {
+  it('plans all entries and repetitions in a large owner batch without fixed shards', async () => {
     mockConfig({ decider_repetitions: 5 });
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue(
       Array.from({ length: 100 }, (_, i) => ({
@@ -739,31 +808,30 @@ describe('drainQueue', () => {
       }))
     );
     const result = await drainQueue(env, 'user');
-    expect(result!.entryCount).toBe(2);
+    expect(result!.entryCount).toBe(100);
     const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
-    expect(modelRows).toHaveLength(2);
-    const seeded = queueSendBatch.mock.calls.flatMap(([messages]) => messages);
-    const shards = new Set(seeded.map(message => message.body.shard));
-    expect(shards.size).toBe(15);
-    expect(
-      seeded.every(message => message.body.chunkSize === 2 && message.body.caseIds?.length === 2)
-    ).toBe(true);
+    expect(modelRows).toHaveLength(100);
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: result!.runId,
+      entries: modelRows.map(row => ({ model: row.model, variant: null, providers: [] })),
+      repetitions: 5,
+      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
+    expect(queueSendBatch).not.toHaveBeenCalled();
     expect(modelRows[0].model).toBe('m/0');
   });
 
-  it('skips a queue quietly while the shared budget is fully committed', async () => {
-    const infoLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+  it('admits pending profiles while the shared scheduler has no free slots', async () => {
     vi.mocked(getLiveContainerLanes).mockResolvedValue(250);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/pending', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
 
-    await expect(drainQueue(env, 'platform')).resolves.toBeNull();
-
-    expect(insertRun).not.toHaveBeenCalled();
-    expect(infoLog.mock.calls.flat().join('\n')).toContain(
-      'benchmark_queue_drain_skipped_no_capacity'
-    );
+    await expect(drainQueue(env, 'platform')).resolves.toMatchObject({ entryCount: 1 });
+    expect(insertRun).toHaveBeenCalledOnce();
+    expect(scheduleRunChunks).toHaveBeenCalledOnce();
+    expect(queueSend).not.toHaveBeenCalled();
   });
 
   it("drainQueues('both') starts one run per queue", async () => {
@@ -932,7 +1000,7 @@ describe('alias-resolved platform publication', () => {
 });
 
 describe('frontier router runs', () => {
-  it('snapshots the router, uses its container budget, and queues only frontier cases', async () => {
+  it('snapshots the router and plans only frontier cases without reserving slots', async () => {
     mockConfig({ router: 'frontier', frontier_min_accuracy_delta: 0.1 });
     const entries = [{ model: 'platform/a', variant: null }];
     const result = await startRun(env, 'decider', { router: 'frontier', entries });
@@ -941,9 +1009,7 @@ describe('frontier router runs', () => {
       env.BENCH_DB,
       expect.objectContaining({
         router: 'frontier',
-        // Half of the free shared budget: the platform pool is split between the
-        // two routers so neither one's long run can starve the other.
-        max_concurrency: 125,
+        max_concurrency: 0,
         frontier_min_accuracy_delta: 0.1,
         engine_identity: expect.stringMatching(/^frontier:v1:/),
       }),
@@ -956,12 +1022,14 @@ describe('frontier router runs', () => {
       entries,
       expect.objectContaining({ router: 'frontier' })
     );
-    const messages = queueSendBatch.mock.calls.flatMap(([batch]) => batch);
-    const caseIds = messages.flatMap(message => message.body.caseIds ?? []);
-    expect(caseIds.length).toBeGreaterThan(0);
-    const frontierIds = new Set(FRONTIER_CASES.map(c => c.id));
-    const efficientIds = new Set(DECIDER_CASES.map(c => c.id));
-    expect(caseIds.every(id => frontierIds.has(id) && !efficientIds.has(id))).toBe(true);
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: result.runId,
+      entries: [{ model: 'platform/a', variant: null, providers: [] }],
+      repetitions: 1,
+      caseIds: FRONTIER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
+    expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
   it('rejects frontier owner queues before any profile claim', async () => {
@@ -995,8 +1063,6 @@ describe('frontier router runs', () => {
       classifierModels: ['classifier/a'],
       deciderModels: [{ model: 'platform/a', variant: null, reasoning_effort: null }],
     }));
-    // The efficient runs hold 150 of 250 lanes; the platform pool is split, so
-    // frontier still gets a share instead of waiting for them to finish.
     vi.mocked(getLiveContainerLanes).mockResolvedValue(150);
 
     const result = await startRun(env, 'decider', {
@@ -1005,7 +1071,7 @@ describe('frontier router runs', () => {
     });
 
     expect(result.runId).toMatch(/^frontier-decider-/);
-    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(50);
+    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(0);
   });
 
   it('publishes the frontier router threshold from its effective policy values', async () => {
@@ -1127,76 +1193,106 @@ describe('frontier router runs', () => {
   });
 });
 
-describe('live container admission refusal', () => {
-  it('releases registry claims and reports capacity when the atomic run insert rejects', async () => {
+describe('run insert failures', () => {
+  it('releases registry claims and preserves the database error when inserting a run fails', async () => {
     mockConfig({ router: 'frontier' });
-    vi.mocked(insertRun).mockRejectedValue(
-      new Error('Failed query', {
-        cause: new Error('D1_ERROR: NOT NULL constraint failed: benchmark_runs.max_concurrency'),
-      })
-    );
+    const error = new Error('D1 write unavailable');
+    vi.mocked(insertRun).mockRejectedValue(error);
     await expect(
       startRun(env, 'decider', {
         router: 'frontier',
         entries: [{ model: 'platform/a', variant: null }],
       })
-    ).rejects.toThrow(BenchmarkCapacityError);
+    ).rejects.toBe(error);
     expect(releaseProfileClaims).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.stringMatching(/^frontier-/)
     );
-    expect(queueSendBatch).not.toHaveBeenCalled();
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    expect(queueSend).not.toHaveBeenCalled();
   });
 
-  it('turns losing the race for lanes into a quiet drain skip', async () => {
-    const infoLog = vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.mocked(insertRun).mockRejectedValue(
-      new Error('Failed query', {
-        cause: new Error('D1_ERROR: NOT NULL constraint failed: benchmark_runs.max_concurrency'),
-      })
-    );
+  it('propagates registry run insert failures rather than hiding them as capacity waits', async () => {
+    vi.mocked(insertRun).mockRejectedValue(new Error('D1 write unavailable'));
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
-
-    await expect(drainQueue(env, 'platform')).resolves.toBeNull();
-
-    expect(infoLog.mock.calls.flat().join('\n')).toContain(
-      'benchmark_queue_drain_skipped_no_capacity'
-    );
+    await expect(drainQueue(env, 'platform')).rejects.toThrow('D1 write unavailable');
+    expect(releaseProfileClaims).toHaveBeenCalled();
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
   });
 });
 
-it('starts each resumed shard at its first missing chunk and snapshots only imported chunks', async () => {
+it('reuses prior cases before delegating the complete durable chunk plan', async () => {
   vi.mocked(reuseDeciderCaseResults).mockResolvedValue(4);
-  const imported = new Set([
-    ...DECIDER_CASES.slice(0, 2).map(c => c.id),
-    ...DECIDER_CASES.slice(250, 252).map(c => c.id),
-  ]);
-  vi.mocked(getExistingCaseResultIds).mockImplementation(
-    async (_db, params) => new Set(params.caseIds.filter(id => imported.has(id)))
-  );
-  await startRun(env, 'decider', { entries: [{ model: 'platform/a', variant: null }] });
-  const messages = queueSendBatch.mock.calls.flatMap(([batch]) => batch);
-  const shard = messages.find(message => message.body.shard === 0)?.body;
-  expect(shard).toMatchObject({
-    chunk: 250,
-    shardCount: 125,
-    importedChunks: [0, 125],
-    caseIds: DECIDER_CASES.slice(500, 502).map(c => c.id),
+  const result = await startRun(env, 'decider', {
+    entries: [{ model: 'platform/a', variant: null }],
   });
-  expect(messages.every(message => message.body.caseIds?.every(id => !imported.has(id)))).toBe(
-    true
+  expect(reuseDeciderCaseResults).toHaveBeenCalledWith(
+    env.BENCH_DB,
+    expect.objectContaining({
+      runId: result.runId,
+      entries: [{ model: 'platform/a', variant: null }],
+    })
   );
+  expect(vi.mocked(reuseDeciderCaseResults).mock.invocationCallOrder[0]).toBeLessThan(
+    vi.mocked(scheduleRunChunks).mock.invocationCallOrder[0]
+  );
+  expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+    runId: result.runId,
+    entries: [{ model: 'platform/a', variant: null, providers: [] }],
+    repetitions: 1,
+    caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+    chunkSize: 1,
+  });
+  expect(queueSendBatch).not.toHaveBeenCalled();
 });
 
 it('settles a failed resume plan without dispatching or stranding registry claims', async () => {
   vi.mocked(reuseDeciderCaseResults).mockResolvedValue(1);
-  vi.mocked(getExistingCaseResultIds).mockRejectedValueOnce(new Error('D1 read unavailable'));
+  vi.mocked(scheduleRunChunks).mockRejectedValueOnce(new Error('D1 read unavailable'));
   await expect(
     startRun(env, 'decider', { entries: [{ model: 'platform/a', variant: null }] })
   ).rejects.toThrow('D1 read unavailable');
   expect(queueSendBatch).not.toHaveBeenCalled();
   expect(markRunFailed).toHaveBeenCalled();
   expect(markProfilesFailedForRun).toHaveBeenCalled();
+});
+
+it('dispatches only token-owned claims up to the scheduler slot limit', async () => {
+  vi.mocked(claimNextChunk).mockResolvedValue({
+    id: 'claim-1',
+    run_id: 'user-existing',
+    model: 'platform/a',
+    variant: 'high',
+    providers: '[]',
+    rep: 2,
+    chunk: 10,
+    case_ids: JSON.stringify([DECIDER_CASES[10].id]),
+    slot: 1,
+    token: 'claim-token',
+    attempts: 1,
+  });
+  const result = await startRun({ ...env, BENCHMARK_SCHEDULER_CONFIG: '{"slots":2}' }, 'decider', {
+    purpose: 'user',
+    entries: [{ model: 'platform/a', variant: 'high' }],
+  });
+  expect(result.enqueuedModels).toBe(1);
+  expect(recoverChunks).toHaveBeenCalledWith(env.BENCH_DB, expect.any(Number));
+  expect(claimNextChunk).toHaveBeenCalledTimes(2);
+  expect(claimNextChunk).toHaveBeenCalledWith(
+    env.BENCH_DB,
+    expect.objectContaining({ slots: 2 }),
+    expect.any(Number),
+    expect.any(String)
+  );
+  expect(queueSend).toHaveBeenCalledTimes(2);
+  expect(queueSend).toHaveBeenCalledWith({
+    runId: 'user-existing',
+    kind: 'decider',
+    model: 'platform/a',
+    claimId: 'claim-1',
+    claimToken: 'claim-token',
+  });
+  expect(queueSendBatch).not.toHaveBeenCalled();
 });

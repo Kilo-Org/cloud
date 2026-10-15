@@ -16,6 +16,7 @@ import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   convertFromKiloExclusiveModel,
+  getInferenceProvider,
   type KiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
@@ -24,7 +25,10 @@ import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { AUTO_MODELS, type AutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  getDataCollectionRequiredModelIds,
+  getProviderSlugsForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { getPreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
@@ -178,6 +182,20 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       .map(applyCustomPricingToModel)
       .map(async (model: OpenRouterModel) => {
         const preferredIndex = preferredModels.indexOf(model.id);
+        const exclusive = kiloExclusiveModels.find(
+          entry => entry.status === 'public' && entry.public_id === model.id
+        );
+        const exclusiveProvider = exclusive && getInferenceProvider(exclusive);
+        const providerIds = exclusiveProvider
+          ? [exclusiveProvider.slug]
+          : exclusive && exclusive.inference_provider_restriction.length > 0
+            ? exclusive.inference_provider_restriction
+            : await getProviderSlugsForModel(
+                exclusive?.internal_id ?? model.alias_target ?? model.id
+              );
+        const inferenceProviderIds = [
+          ...new Set([...providerIds].map(id => normalizeInferenceProviderId(id))),
+        ];
         const addPdf =
           isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
         const description = isFreeNemotronModel(model.id)
@@ -186,6 +204,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         const isFree = isFreeModel(model.id);
         return {
           ...model,
+          inference_provider_ids: inferenceProviderIds,
           name: formatName(model, preferredIndex),
           description,
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,

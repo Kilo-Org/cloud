@@ -51,21 +51,6 @@ export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema
  */
 export const BENCHMARK_CONTAINER_BUDGET = 250;
 
-/**
- * Containers withheld from owner-queue runs. User-queue runs stop at
- * BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS, and a
- * platform run may claim the whole budget minus the user lanes already live, so
- * these containers are always available to platform runs.
- */
-export const BENCHMARK_PLATFORM_RESERVED_CONTAINERS = 100;
-
-/**
- * Containers owner-queue runs may hold. User runs wait for platform runs once
- * they hold this many, so the platform reserve always stays available.
- */
-export const BENCHMARK_USER_CONTAINER_LIMIT =
-  BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS;
-
 /** Exact model/effort identity in persisted benchmark run snapshots. */
 export const BenchmarkDeciderModelSchema = z
   .object({

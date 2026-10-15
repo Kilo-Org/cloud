@@ -98,6 +98,32 @@ describe('runDeciderCaseViaCli', () => {
     const request = fetch.mock.calls[0]?.[0];
     await expect(readJsonBody(request)).resolves.toMatchObject({ variant: 'high' });
   });
+
+  it('surfaces structured CLI rate-limit events without changing the measured result', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({
+        exitCode: 0,
+        durationMs: 37,
+        stdoutLines: [JSON.stringify({ type: 'error', error: { data: { statusCode: 429 } } })],
+        stderrTail: '',
+      })
+    );
+    const { env } = createEnv(fetch);
+    const result = await runDeciderCaseViaCli(env, {
+      instanceName: 'benchmark-slot:0',
+      model: 'vendor/model',
+      benchCase,
+      kiloToken: 'fake-token',
+      kiloApiUrl: 'http://isolated.invalid',
+    });
+    expect(result).toMatchObject({
+      exitCode: 0,
+      text: '',
+      costUsd: null,
+      latencyMs: 37,
+      stderrTail: '\nHTTP 429 provider throttle',
+    });
+  });
 });
 
 describe('warmUpCliContainer', () => {

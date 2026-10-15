@@ -6,9 +6,27 @@ import { DECIDER_CASES } from './datasets/decider-cases';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import type * as ConfigModule from './config';
 
+import type * as SchedulerModule from './scheduler';
+
+vi.mock('./scheduler', async importOriginal => {
+  const actual = await importOriginal<typeof SchedulerModule>();
+  return {
+    ...actual,
+    beginPaidCase: vi.fn(),
+    claimNextChunk: vi.fn(),
+    clearUnbilledCase: vi.fn(),
+    cooldownProviders: vi.fn(),
+    deferChunk: vi.fn(),
+    failChunk: vi.fn(),
+    finishChunk: vi.fn(),
+    getChunk: vi.fn(),
+    recoverChunks: vi.fn(),
+    scheduleRunChunks: vi.fn(),
+    startChunk: vi.fn(),
+  };
+});
 vi.mock('./decider-judge', () => ({ createDeciderJudge: vi.fn() }));
 vi.mock('./openrouter', () => ({ createSystemOneClient: vi.fn() }));
-// Publishing reads live config to learn which pairs the platform table wants.
 vi.mock('./config', async importOriginal => {
   const actual = await importOriginal<typeof ConfigModule>();
   return { ...actual, getBenchmarkConfig: vi.fn() };
@@ -96,9 +114,35 @@ import { processJob } from './run';
 import { createDeciderJudge } from './decider-judge';
 import { createSystemOneClient } from './openrouter';
 import type { DeciderJudge } from './grading';
+import {
+  beginPaidCase,
+  claimNextChunk,
+  clearUnbilledCase,
+  cooldownProviders,
+  deferChunk,
+  failChunk,
+  finishChunk,
+  getChunk,
+  recoverChunks,
+  scheduleRunChunks,
+  startChunk,
+  type SchedulerClaim,
+} from './scheduler';
 
 const tokenGet = vi.fn<() => Promise<string>>();
 const queueSendBatch = vi.fn<(messages: unknown[]) => Promise<void>>();
+const queueSend = vi.fn();
+const schedulerFirst = vi.fn();
+const schedulerAll = vi.fn();
+const schedulerRun = vi.fn();
+const schedulerPrepare = vi.fn(() => {
+  const statement = {
+    first: schedulerFirst,
+    all: schedulerAll,
+    run: schedulerRun,
+  };
+  return { ...statement, bind: vi.fn(() => statement) };
+});
 const kvDelete = vi.fn();
 const model = 'qwen/qwen3-coder-next';
 const runId = 'decider-test-run';
@@ -119,10 +163,30 @@ const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
   KILO_CLI_API_URL: 'http://host.docker.internal:3000',
   KILO_WEB_API_BASE_URL: 'http://host.docker.internal:3000',
-  BENCH_DB: {} as D1Database,
-  BENCH_QUEUE: { sendBatch: queueSendBatch },
+  BENCH_DB: { prepare: schedulerPrepare } as unknown as D1Database,
+  BENCH_QUEUE: { send: queueSend, sendBatch: queueSendBatch },
+  BENCHMARK_SCHEDULER_CONFIG: '{}',
   AUTO_ROUTING_CONFIG: { delete: kvDelete },
 } as unknown as Env;
+
+function mockClaim(overrides: Partial<SchedulerClaim> = {}): SchedulerClaim {
+  const claim = {
+    id: 'chunk-1',
+    token: 'token-1',
+    run_id: runId,
+    model,
+    variant: '',
+    providers: '["qwen"]',
+    rep: 0,
+    chunk: 0,
+    case_ids: JSON.stringify([benchCase.id]),
+    slot: 7,
+    attempts: 1,
+    ...overrides,
+  };
+  vi.mocked(getChunk).mockResolvedValue(claim);
+  return claim;
+}
 
 function mockRunSnapshot(
   models: Array<{
@@ -176,20 +240,27 @@ it('retries completed classifier publication without repeating classifier cases'
   expect(upsertCaseResult).not.toHaveBeenCalled();
 });
 
-function deciderMessage(overrides: { variant?: string | null } = {}) {
+function deciderMessage() {
   return {
     runId,
     kind: 'decider' as const,
     model,
-    caseIds: [benchCase.id],
-    chunk: 0,
-    rep: 0,
-    ...overrides,
+    claimId: 'chunk-1',
+    claimToken: 'token-1',
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  schedulerFirst.mockResolvedValue(null);
+  schedulerAll.mockResolvedValue({ results: [] });
+  schedulerRun.mockResolvedValue({ meta: { changes: 0 } });
+  queueSend.mockResolvedValue(undefined);
+  vi.mocked(startChunk).mockResolvedValue(true);
+  vi.mocked(beginPaidCase).mockResolvedValue(true);
+  vi.mocked(claimNextChunk).mockResolvedValue(null);
+  vi.mocked(recoverChunks).mockResolvedValue([]);
+  mockClaim();
   vi.mocked(getBenchmarkConfig).mockResolvedValue({
     router: 'efficient',
     accuracyNoiseBand: 0.05,
@@ -251,101 +322,234 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('processJob — decider exact-pair snapshot resolution', () => {
-  it('throws when an explicit-variant message has no exact snapshot row', async () => {
+describe('processJob — scheduler-owned execution', () => {
+  it('uses the stored exact pair, slot, repetition and input rather than message ownership', async () => {
     mockRunSnapshot([
       { model, variant: 'high', reasoning_effort: 'high' },
       { model, variant: 'low', reasoning_effort: 'low' },
     ]);
+    mockClaim({ variant: 'low', rep: 2 });
 
-    await expect(processJob(env, deciderMessage({ variant: 'medium' }))).rejects.toThrow(
-      /no snapshot row for model/
-    );
+    await processJob(env, {
+      ...deciderMessage(),
+      model: 'untrusted/message-model',
+      variant: 'high',
+      rep: 8,
+      caseIds: ['not-owned'],
+      shard: 99,
+    });
 
-    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
-    expect(upsertCaseResult).not.toHaveBeenCalled();
-  });
-
-  it('resolves the exact snapshot row for an explicit (model, variant) pair', async () => {
-    mockRunSnapshot([
-      { model, variant: 'high', reasoning_effort: 'high' },
-      { model, variant: 'low', reasoning_effort: 'low' },
-    ]);
-
-    await processJob(env, deciderMessage({ variant: 'low' }));
-
-    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
+    expect(startChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    expect(getChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(warmUpCliContainer).toHaveBeenCalledWith(
       env,
       expect.objectContaining({
+        instanceName: 'benchmark-slot:7',
         model,
-        variant: 'low',
-        instanceName: `${runId}:${model}:low:0:0`,
+        kiloApiUrl: env.KILO_CLI_API_URL,
+        orgId: 'benchmark-org',
       })
     );
+    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(env, {
+      instanceName: 'benchmark-slot:7',
+      model,
+      variant: 'low',
+      benchCase,
+      kiloToken: 'kilo-user-token',
+      kiloApiUrl: env.KILO_CLI_API_URL,
+      orgId: 'benchmark-org',
+    });
+    expect(beginPaidCase).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId,
+      model,
+      variant: 'low',
+      rep: 2,
+      caseId: benchCase.id,
+      token: 'token-1',
+    });
     expect(upsertCaseResult).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({
         model,
         variant: 'low',
+        rep: 2,
+        case_id: benchCase.id,
+        latency_ms: 25,
+        cost_usd: null,
+        exit_code: 0,
+        output_prefix: successfulCliResult.text,
       })
     );
+    expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(claimNextChunk).toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
+    expect(destroyDeciderCliContainer).not.toHaveBeenCalled();
   });
 
-  it('legacy no-variant message resolves the unique snapshot row for the model', async () => {
+  it('defers a claim whose exact pair is missing rather than executing another variant', async () => {
     mockRunSnapshot([{ model, variant: 'high', reasoning_effort: 'high' }]);
+    mockClaim({ variant: 'medium' });
+    await processJob(env, deciderMessage());
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    expect(finishChunk).not.toHaveBeenCalled();
+  });
 
-    // Omit variant entirely (legacy pre-deploy message shape).
+  it('makes redelivery with an already-started or stale token a no-op', async () => {
+    vi.mocked(startChunk).mockResolvedValue(false);
+    await processJob(env, deciderMessage());
+    expect(getChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(getRunWithModels).not.toHaveBeenCalled();
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(beginPaidCase).not.toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(claimNextChunk).not.toHaveBeenCalled();
+  });
+
+  it('does not start a claim whose token ownership is absent', async () => {
+    vi.mocked(getChunk).mockResolvedValue(null);
+    await processJob(env, deciderMessage());
+    expect(startChunk).not.toHaveBeenCalled();
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
+  });
+
+  it('defers a transient run-snapshot read failure instead of parking an active slot', async () => {
+    vi.mocked(getRunWithModels).mockRejectedValueOnce(new Error('D1 temporary read failure'));
+    await processJob(env, deciderMessage());
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    expect(queueSend).toHaveBeenCalledWith(
+      { runId, kind: 'decider', model, schedulerWake: true },
+      { delaySeconds: 15 }
+    );
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+  });
+
+  it('checks existing results for every claimed case and skips only completed cases', async () => {
+    const cases = DECIDER_CASES.slice(0, 3);
+    mockClaim({ case_ids: JSON.stringify(cases.map(c => c.id)) });
+    vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set([cases[0].id]));
+
+    await processJob(env, deciderMessage());
+
+    expect(getExistingCaseResultIds).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId,
+      model,
+      variant: null,
+      rep: 0,
+      caseIds: cases.map(c => c.id),
+    });
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(2);
+    for (const c of cases.slice(1)) {
+      expect(getPendingDeciderOutput).toHaveBeenCalledWith(env.BENCH_DB, {
+        run_id: runId,
+        model,
+        variant: '',
+        rep: 0,
+        case_id: c.id,
+      });
+    }
+    expect(finishChunk).toHaveBeenCalled();
+  });
+
+  it('finishes an already-written claim without warming or paying again', async () => {
+    vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set([benchCase.id]));
+    await processJob(env, deciderMessage());
+    expect(warmUpCliContainer).not.toHaveBeenCalled();
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(beginPaidCase).not.toHaveBeenCalled();
+    expect(finishChunk).toHaveBeenCalled();
+    expect(countCaseResultsByLane).toHaveBeenCalled();
+    expect(destroyDeciderCliContainer).not.toHaveBeenCalled();
+  });
+
+  it('dispatches a newly available claim instead of chaining model chunks', async () => {
+    const next = { ...mockClaim(), id: 'next-chunk', token: 'next-token', model: 'other/model' };
+    vi.mocked(claimNextChunk).mockResolvedValueOnce(next).mockResolvedValue(null);
+    await processJob(env, deciderMessage());
+    expect(queueSend).toHaveBeenCalledWith({
+      runId,
+      kind: 'decider',
+      model: 'other/model',
+      claimId: 'next-chunk',
+      claimToken: 'next-token',
+    });
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('only dispatches on scheduler wakeups', async () => {
+    await processJob(env, { runId, kind: 'decider', model, schedulerWake: true });
+    expect(recoverChunks).toHaveBeenCalled();
+    expect(claimNextChunk).toHaveBeenCalled();
+    expect(startChunk).not.toHaveBeenCalled();
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+  });
+});
+
+describe('processJob — legacy whole-run migration', () => {
+  it('initializes every snapshot entry and repetition, ignoring legacy chunk ownership', async () => {
+    mockRunSnapshot([
+      { model, variant: 'high', reasoning_effort: 'high' },
+      { model, variant: 'low', reasoning_effort: 'low' },
+      { model: 'not/enqueued', variant: '', enqueued: false },
+    ]);
+    const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+    if (!snapshot) throw new Error('Run snapshot missing');
+    vi.mocked(getRunWithModels).mockResolvedValue({
+      ...snapshot,
+      run: { ...snapshot.run, repetitions: 3 },
+    });
+
     await processJob(env, {
       runId,
       kind: 'decider',
       model,
-      caseIds: [benchCase.id],
-      chunk: 0,
-      rep: 0,
+      caseIds: ['obsolete-case'],
+      chunk: 999,
+      shard: 3,
+      shardCount: 4,
+      rep: 2,
+      importedChunks: [0, 1],
     });
 
-    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
-      env,
-      expect.objectContaining({
-        model,
-        variant: 'high',
-        instanceName: `${runId}:${model}:high:0:0`,
-      })
+    expect(schedulerPrepare).toHaveBeenCalledWith(
+      'SELECT run_id FROM scheduler_runs WHERE run_id = ?'
     );
-    expect(upsertCaseResult).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.objectContaining({
-        model,
-        variant: 'high',
-      })
-    );
-  });
-
-  it('throws when a legacy no-variant message has multiple snapshot rows for the model', async () => {
-    mockRunSnapshot([
-      { model, variant: 'high', reasoning_effort: 'high' },
-      { model, variant: 'low', reasoning_effort: 'low' },
-    ]);
-
-    await expect(
-      processJob(env, {
-        runId,
-        kind: 'decider',
-        model,
-        caseIds: [benchCase.id],
-        chunk: 0,
-        rep: 0,
-      })
-    ).rejects.toThrow(/requires exactly one snapshot row/);
-
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId,
+      entries: [
+        { model, variant: 'high', providers: [] },
+        { model, variant: 'low', providers: [] },
+      ],
+      repetitions: 3,
+      caseIds: DECIDER_CASES.map(c => c.id),
+      chunkSize: 1,
+    });
+    expect(destroyDeciderCliContainer).toHaveBeenCalledTimes(2);
+    for (const variant of ['high', 'low']) {
+      expect(destroyDeciderCliContainer).toHaveBeenCalledWith(env, {
+        instanceName: `${runId}:${model}:${variant}:2:3`,
+      });
+    }
+    expect(claimNextChunk).toHaveBeenCalled();
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(startChunk).not.toHaveBeenCalled();
   });
-});
 
-describe('processJob — terminal runs', () => {
+  it('does not initialize a legacy run already registered with the scheduler', async () => {
+    schedulerFirst.mockResolvedValue({ run_id: runId });
+    await processJob(env, { runId, kind: 'decider', model, caseIds: [benchCase.id] });
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(claimNextChunk).toHaveBeenCalled();
+  });
+
   it.each(['completed', 'failed'] as const)(
-    'drops messages of a %s run without spending or chaining',
+    'never migrates or executes a %s legacy run',
     async status => {
       const snapshot = await getRunWithModels(env.BENCH_DB, runId);
       if (!snapshot) throw new Error('Run snapshot missing');
@@ -353,267 +557,144 @@ describe('processJob — terminal runs', () => {
         ...snapshot,
         run: { ...snapshot.run, status },
       });
-      await processJob(env, deciderMessage({ variant: null }));
+      await processJob(env, { runId, kind: 'decider', model });
+      expect(scheduleRunChunks).not.toHaveBeenCalled();
       expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
-      expect(warmUpCliContainer).not.toHaveBeenCalled();
       expect(upsertCaseResult).not.toHaveBeenCalled();
-      expect(queueSendBatch).not.toHaveBeenCalled();
-      expect(destroyDeciderCliContainer).toHaveBeenCalledWith(env, {
-        instanceName: `${runId}:${model}::0:0`,
-      });
     }
   );
-  it('drops a terminal message even when its container is already unavailable', async () => {
-    const snapshot = await getRunWithModels(env.BENCH_DB, runId);
-    if (!snapshot) throw new Error('Run snapshot missing');
-    vi.mocked(getRunWithModels).mockResolvedValue({
-      ...snapshot,
-      run: { ...snapshot.run, status: 'completed' },
-    });
-    vi.mocked(destroyDeciderCliContainer).mockRejectedValueOnce(new Error('already stopped'));
-    await processJob(env, deciderMessage({ variant: null }));
-    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
-    expect(upsertCaseResult).not.toHaveBeenCalled();
-    expect(queueSendBatch).not.toHaveBeenCalled();
-  });
 });
 
-describe('processJob — decider container availability failures', () => {
+describe('processJob — scheduler waits and paid-call safety', () => {
   it.each([
     'container /run failed: HTTP 503 There is no Container instance available at this time. This is likely because you have reached your max concurrent instance count.',
     'container /run failed: HTTP 503 Maximum number of running container instances exceeded',
     'container /run failed: HTTP 503 There is no container instance that can be provided to this Durable Object, try again later',
-  ])('lets the queue retry %s', async message => {
+  ])('defers capacity without writing a model failure: %s', async message => {
     vi.mocked(runDeciderCaseViaCli).mockRejectedValueOnce(new Error(message));
-
-    await expect(processJob(env, deciderMessage())).rejects.toThrow(message);
-
+    await processJob(env, deciderMessage());
+    expect(clearUnbilledCase).toHaveBeenCalled();
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    expect(queueSend).toHaveBeenCalledWith(
+      { runId, kind: 'decider', model, schedulerWake: true },
+      { delaySeconds: 15 }
+    );
     expect(upsertCaseResult).not.toHaveBeenCalled();
-    expect(countCaseResultsByLane).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
   });
 
-  it('lets the queue retry warmup capacity failures before running cases', async () => {
-    const message =
-      'container /warmup failed: HTTP 503 There is no Container instance available at this time';
-    vi.mocked(warmUpCliContainer).mockRejectedValueOnce(new Error(message));
-
-    await expect(processJob(env, deciderMessage())).rejects.toThrow(message);
-
+  it('defers warmup capacity before beginning a paid case', async () => {
+    vi.mocked(warmUpCliContainer).mockRejectedValueOnce(
+      new Error(
+        'container /warmup failed: HTTP 503 There is no Container instance available at this time'
+      )
+    );
+    await processJob(env, deciderMessage());
+    expect(beginPaidCase).not.toHaveBeenCalled();
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
-    expect(countCaseResultsByLane).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(deferChunk).toHaveBeenCalled();
   });
-});
 
-describe('processJob — decider chunk chaining', () => {
-  it('runs a chunk on the model-repetition shard container and enqueues the next chunk', async () => {
-    const message = {
-      ...deciderMessage(),
-      caseIds: DECIDER_CASES.slice(0, 5).map(c => c.id),
+  it('cools down provider 429s without saving a zero or a lane failure', async () => {
+    const claim = mockClaim();
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      exitCode: 1,
+      costUsd: 0,
+      stderrTail: 'HTTP 429 rate limited',
+    });
+    await processJob(env, deciderMessage());
+    expect(clearUnbilledCase).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId,
+      model,
+      variant: '',
+      rep: 0,
+      caseId: benchCase.id,
+      token: claim.token,
+    });
+    expect(cooldownProviders).toHaveBeenCalledWith(env.BENCH_DB, claim, expect.any(Number));
+    expect(deferChunk).toHaveBeenCalled();
+    expect(savePendingDeciderOutput).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+  });
+
+  it('refuses duplicate inference when a prior paid execution has no recoverable output', async () => {
+    vi.mocked(beginPaidCase).mockResolvedValue(false);
+    await processJob(env, deciderMessage());
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(recordLaneFailure).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId,
+      model,
+      variant: '',
+      rep: 0,
+      chunk: 0,
+      shard: 0,
+    });
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
+  });
+
+  it('persists raw failed output and CLI diagnostics before saving its grade', async () => {
+    const result = {
+      ...successfulCliResult,
+      text: '',
+      exitCode: 1,
+      costUsd: 0.01,
+      stderrTail: 'CLI failed',
+      latencyMs: 987,
+      timedOut: true,
     };
-
-    await processJob(env, message);
-
-    // Instance names include the stored variant segment ('' → empty between colons).
-    const instanceName = `${runId}:${model}::0:0`;
-    expect(warmUpCliContainer).toHaveBeenCalledWith(
-      env,
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce(result);
+    await processJob(env, deciderMessage());
+    expect(savePendingDeciderOutput).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      { run_id: runId, model, variant: '', rep: 0, case_id: benchCase.id },
+      { result, retried: false }
+    );
+    expect(vi.mocked(savePendingDeciderOutput).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(upsertCaseResult).mock.invocationCallOrder[0]
+    );
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
       expect.objectContaining({
-        instanceName,
-        kiloApiUrl: 'http://host.docker.internal:3000',
-        orgId: 'benchmark-org',
+        score: 0,
+        error: 'CLI failed',
+        latency_ms: 987,
+        cost_usd: 0.01,
+        exit_code: 1,
+        timed_out: 1,
       })
     );
-    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
-      env,
-      expect.objectContaining({
-        instanceName,
-        kiloApiUrl: 'http://host.docker.internal:3000',
-        orgId: 'benchmark-org',
-      })
-    );
-    expect(queueSendBatch).toHaveBeenCalledWith([
-      {
-        body: {
-          runId,
-          kind: 'decider',
-          model,
-          variant: null,
-          chunk: 1,
-          shard: 0,
-          shardCount: 1,
-          rep: 0,
-          caseIds: DECIDER_CASES.slice(5, 10).map(c => c.id),
-        },
-      },
-    ]);
-    expect(countCaseResultsByLane).not.toHaveBeenCalled();
   });
 
-  it('enqueues the next chunk assigned to the same shard lane', async () => {
-    const chunk = 2;
-    const shard = 2;
-    const shardCount = 8;
-    const currentCaseIds = DECIDER_CASES.slice(chunk * 5, chunk * 5 + 5).map(c => c.id);
-    const nextChunk = chunk + shardCount;
-    const nextCaseIds = DECIDER_CASES.slice(nextChunk * 5, nextChunk * 5 + 5).map(c => c.id);
-
-    await processJob(env, {
-      ...deciderMessage(),
-      chunk,
-      shard,
-      shardCount,
-      caseIds: currentCaseIds,
-    });
-
-    expect(warmUpCliContainer).toHaveBeenCalledWith(
-      env,
-      expect.objectContaining({ instanceName: `${runId}:${model}::0:2` })
-    );
-    expect(queueSendBatch).toHaveBeenCalledWith([
-      {
-        body: {
-          runId,
-          kind: 'decider',
-          model,
-          variant: null,
-          chunk: nextChunk,
-          shard,
-          shardCount,
-          rep: 0,
-          caseIds: nextCaseIds,
-        },
-      },
-    ]);
-    expect(countCaseResultsByLane).not.toHaveBeenCalled();
-  });
-
-  it('skips completed chunks and finds the next unfinished chunk in the lane', async () => {
-    const currentCaseIds = DECIDER_CASES.slice(0, 5).map(c => c.id);
-    vi.mocked(getExistingCaseResultIds)
-      .mockResolvedValueOnce(new Set(currentCaseIds))
-      .mockResolvedValueOnce(new Set());
-
-    await processJob(env, { ...deciderMessage(), caseIds: currentCaseIds, importedChunks: [0, 1] });
-
-    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+  it('retains an ambiguous paid execution when pending-output persistence fails', async () => {
+    vi.mocked(savePendingDeciderOutput).mockRejectedValueOnce(new Error('D1 unavailable'));
+    await processJob(env, deciderMessage());
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    expect(deferChunk).toHaveBeenCalled();
+    expect(clearUnbilledCase).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
-    expect(queueSendBatch).toHaveBeenCalledWith([
-      {
-        body: expect.objectContaining({
-          chunk: 2,
-          caseIds: DECIDER_CASES.slice(10, 15).map(c => c.id),
-        }),
-      },
-    ]);
-  });
 
-  it('does not spawn a parallel chain when an old chunk is redelivered', async () => {
-    const current = DECIDER_CASES.slice(0, 5).map(c => c.id);
-    const next = DECIDER_CASES.slice(5, 10).map(c => c.id);
-    vi.mocked(getExistingCaseResultIds)
-      .mockResolvedValueOnce(new Set(current))
-      .mockResolvedValueOnce(new Set(next));
-    await processJob(env, { ...deciderMessage(), caseIds: current });
-    expect(queueSendBatch).not.toHaveBeenCalled();
-    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
-  });
+    vi.mocked(beginPaidCase).mockResolvedValue(false);
+    await processJob(env, deciderMessage());
 
-  it('re-enqueues a partially completed next chunk so DLQ leftovers cannot strand a run', async () => {
-    const currentCaseIds = DECIDER_CASES.slice(0, 5).map(c => c.id);
-    const nextCaseIds = DECIDER_CASES.slice(5, 10).map(c => c.id);
-    vi.mocked(getExistingCaseResultIds)
-      .mockResolvedValueOnce(new Set(currentCaseIds))
-      .mockResolvedValueOnce(new Set([nextCaseIds[0]]));
-
-    await processJob(env, { ...deciderMessage(), caseIds: currentCaseIds });
-
-    expect(warmUpCliContainer).not.toHaveBeenCalled();
-    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
     expect(upsertCaseResult).not.toHaveBeenCalled();
-    expect(queueSendBatch).toHaveBeenCalledWith([
-      {
-        body: {
-          runId,
-          kind: 'decider',
-          model,
-          variant: null,
-          chunk: 1,
-          shard: 0,
-          shardCount: 1,
-          rep: 0,
-          caseIds: nextCaseIds,
-        },
-      },
-    ]);
-  });
-
-  it('preserves the smaller chunk layout across chained messages', async () => {
-    await processJob(env, {
-      ...deciderMessage(),
-      chunkSize: 2,
-      shardCount: 3,
-      caseIds: DECIDER_CASES.slice(0, 2).map(c => c.id),
-    });
-    expect(queueSendBatch).toHaveBeenCalledWith([
-      {
-        body: expect.objectContaining({
-          chunk: 3,
-          chunkSize: 2,
-          caseIds: DECIDER_CASES.slice(6, 8).map(c => c.id),
-        }),
-      },
-    ]);
-  });
-
-  it('destroys the model-repetition shard container after the terminal chunk', async () => {
-    const terminalChunk = Math.floor((DECIDER_CASES.length - 1) / 5);
-    const terminalCaseIds = DECIDER_CASES.slice(terminalChunk * 5).map(c => c.id);
-
-    await processJob(env, {
-      ...deciderMessage(),
-      chunk: terminalChunk,
-      shard: 3,
-      shardCount: 4,
-      caseIds: terminalCaseIds,
-    });
-
-    expect(queueSendBatch).not.toHaveBeenCalled();
-    expect(destroyDeciderCliContainer).toHaveBeenCalledWith(env, {
-      instanceName: `${runId}:${model}::0:3`,
-    });
-    expect(countCaseResultsByLane).toHaveBeenCalled();
-  });
-
-  it('finalizes terminal chunks even when best-effort container destroy fails', async () => {
-    const terminalChunk = Math.floor((DECIDER_CASES.length - 1) / 5);
-    const terminalCaseIds = DECIDER_CASES.slice(terminalChunk * 5).map(c => c.id);
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.mocked(destroyDeciderCliContainer).mockRejectedValueOnce(new Error('already stopped'));
-
-    await processJob(env, {
-      ...deciderMessage(),
-      chunk: terminalChunk,
-      shard: 3,
-      shardCount: 4,
-      caseIds: terminalCaseIds,
-    });
-
-    expect(destroyDeciderCliContainer).toHaveBeenCalledWith(env, {
-      instanceName: `${runId}:${model}::0:3`,
-    });
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('benchmark_container_destroy_failed')
-    );
-    expect(countCaseResultsByLane).toHaveBeenCalled();
-    warn.mockRestore();
   });
 });
 
 describe('processJob — canonical registry publication', () => {
-  // A completed registry profile keeps its non-enum catalog key in publication.
   function mockPublishHarness(variant: string, reasoningEffort: string | null) {
     mockRunSnapshot([{ model, variant, enqueued: true, reasoning_effort: reasoningEffort }]);
+    mockClaim({ variant });
     vi.mocked(countCaseResultsByLane).mockResolvedValue([
       { model, variant, rep: 0, n: DECIDER_CASES.length },
     ]);
@@ -640,8 +721,6 @@ describe('processJob — canonical registry publication', () => {
       }))
     );
     vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set([benchCase.id]));
-    // Publishing reads the registry, not this run's own summaries: the entry is
-    // ready with this run as its provenance, and the platform queue is settled.
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
       { model, variant, run_id: runId },
     ]);
@@ -673,7 +752,7 @@ describe('processJob — canonical registry publication', () => {
     mockPublishHarness('max', null);
     await seedRegistrySummaries('max');
 
-    await processJob(env, { ...deciderMessage({ variant: 'max' }), chunk: 9999 });
+    await processJob(env, deciderMessage());
 
     expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
     const table = vi.mocked(saveRoutingTable).mock.calls[0]?.[1];
@@ -696,7 +775,8 @@ describe('processJob — retryable rubric grading', () => {
   const judgedCase = DECIDER_CASES.find(c => c.check.kind === 'judged');
   function judgedMessage() {
     if (!judgedCase) throw new Error('Expected a judged decider case');
-    return { ...deciderMessage(), caseIds: [judgedCase.id], chunk: 9999 };
+    mockClaim({ case_ids: JSON.stringify([judgedCase.id]) });
+    return deciderMessage();
   }
 
   it('retries grading without repeating model calls or losing their cost', async () => {
@@ -714,7 +794,20 @@ describe('processJob — retryable rubric grading', () => {
     });
     vi.mocked(getPendingDeciderOutput).mockImplementation(async () => pending);
 
-    await expect(processJob(env, judgedMessage())).rejects.toThrow('Decider judge failed');
+    await processJob(env, judgedMessage());
+    expect(deferChunk).toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
+    expect(savePendingDeciderOutput).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ case_id: judgedCase?.id }),
+      expect.objectContaining({
+        result: expect.objectContaining({ text: 'A complete answer', costUsd: 0.03 }),
+        retried: true,
+      })
+    );
+    expect(vi.mocked(savePendingDeciderOutput).mock.invocationCallOrder[0]).toBeLessThan(
+      judge.mock.invocationCallOrder[0]
+    );
     expect(upsertCaseResult).not.toHaveBeenCalled();
     expect(markRunCompleted).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
@@ -722,6 +815,9 @@ describe('processJob — retryable rubric grading', () => {
     await processJob(env, judgedMessage());
     expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(2);
     expect(judge).toHaveBeenCalledTimes(2);
+    expect(beginPaidCase).toHaveBeenCalledTimes(1);
+    expect(savePendingDeciderOutput).toHaveBeenCalledTimes(1);
+    expect(finishChunk).toHaveBeenCalled();
     expect(upsertCaseResult).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({
@@ -735,9 +831,10 @@ describe('processJob — retryable rubric grading', () => {
 
   it('does not call the model or persist a zero when the judge client is unavailable', async () => {
     vi.mocked(createSystemOneClient).mockRejectedValueOnce(new Error('Missing credentials'));
-    await expect(processJob(env, judgedMessage())).rejects.toThrow(
-      'Decider judge client initialization failed'
-    );
+    await processJob(env, judgedMessage());
+    expect(deferChunk).toHaveBeenCalled();
+    expect(beginPaidCase).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
   });

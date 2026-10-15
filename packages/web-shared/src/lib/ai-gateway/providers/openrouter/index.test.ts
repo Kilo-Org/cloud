@@ -20,13 +20,19 @@ import {
   isDisabledKiloExclusiveModel,
   kiloExclusiveModels,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  getInferenceProvider,
+  type KiloExclusiveModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   AUTO_MODELS,
   KILO_AUTO_EFFICIENT_MODEL,
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  getDataCollectionRequiredModelIds,
+  getProviderSlugsForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 
@@ -38,6 +44,7 @@ jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
   () => ({
     getDataCollectionRequiredModelIds: jest.fn(() => Promise.resolve(new Set())),
+    getProviderSlugsForModel: jest.fn(() => Promise.resolve(new Set())),
   })
 );
 
@@ -198,6 +205,7 @@ describe('shouldSuppressOpenRouterModel', () => {
 
 describe('auto models', () => {
   beforeEach(() => {
+    jest.mocked(getProviderSlugsForModel).mockResolvedValue(new Set());
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
@@ -289,6 +297,11 @@ describe('auto models', () => {
         alias_target: { slug: 'vendor/ignored' },
       },
     });
+    jest
+      .mocked(getProviderSlugsForModel)
+      .mockImplementation(async id =>
+        id === target.id ? new Set(['Google-Vertex', 'google-ai-studio']) : new Set(['deepinfra'])
+      );
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
@@ -305,6 +318,52 @@ describe('auto models', () => {
     const response = OpenRouterModelsResponseSchema.parse(await getEnhancedOpenRouterModels());
     expect(response.data.find(model => model.id === alias.id)?.alias_target).toBe(target.id);
     expect(response.data.find(model => model.id === target.id)?.alias_target).toBeUndefined();
+    expect(response.data.find(model => model.id === alias.id)?.inference_provider_ids).toEqual([
+      'google-vertex',
+      'google-ai-studio',
+    ]);
+    expect(response.data.find(model => model.id === target.id)?.inference_provider_ids).toEqual([
+      'google-vertex',
+      'google-ai-studio',
+    ]);
+  });
+
+  it('publishes normalized endpoint identities and preserves the public schema field', async () => {
+    jest
+      .mocked(getProviderSlugsForModel)
+      .mockResolvedValue(new Set(['DeepInfra/fp8', 'Fireworks', 'Together', 'deepinfra']));
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+    ) as typeof fetch;
+
+    const response = OpenRouterModelsResponseSchema.parse(await getEnhancedOpenRouterModels());
+    expect(
+      response.data.find(model => model.id === 'vendor/model')?.inference_provider_ids
+    ).toEqual(['deepinfra', 'fireworks', 'together']);
+  });
+
+  it('does not infer an upstream from the model author when metadata is missing', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+    ) as typeof fetch;
+
+    const response = await getEnhancedOpenRouterModels();
+    expect(
+      response.data.find(model => model.id === 'vendor/model')?.inference_provider_ids
+    ).toEqual([]);
+  });
+
+  it('publishes authoritative exclusive model inference providers', async () => {
+    const response = await getEnhancedOpenRouterModels();
+    const models = kiloExclusiveModels.filter(model => model.status === 'public');
+    expect(models.length).toBeGreaterThan(0);
+    for (const model of models) {
+      const provider = getInferenceProvider(model);
+      if (!provider) continue;
+      expect(
+        response.data.find(entry => entry.id === model.public_id)?.inference_provider_ids
+      ).toEqual([provider.slug]);
+    }
   });
 
   it('excludes OpenRouter batch variants from the public model list', async () => {

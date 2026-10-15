@@ -119,7 +119,7 @@ export function FixedPartRow({
 
         {/* Baseline, not center: the label is text-sm and the badge text-xs, so
             centering the line boxes drops the badge below the label. */}
-        <View className="flex-1 flex-row items-baseline gap-1.5">
+        <View className={cn('flex-row items-baseline gap-1.5', !compact && 'flex-1')}>
           {labelKind === 'eyebrow' ? (
             <Eyebrow className="shrink" numberOfLines={1}>
               {shownLabel}

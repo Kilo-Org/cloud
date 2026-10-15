@@ -315,14 +315,24 @@ its own; the command's live native execution decides it. An accepted UI turn alo
 A session blocked only on questions or permissions does not need compute. Pending requests
 are tracked separately; answering one does not clear another, and an independent runnable
 tool still counts. A parent waiting on a blocked child can sleep, while another working
-session or descendant retains compute. After 1 minute without activity the Sandbox DO
-stops an unattended-only sandbox. A sandbox with any interactive web session, a route
-with no recorded origin, or no routes retains the 10-minute idle window. Active
-heartbeats renew the provider lease (`ensureLeaseAtLeast`), using the idle window plus
-1 minute; initial launch and native runtime reconstruction retain their conservative
+session or descendant retains compute. Only interactive origins (`cloud-agent-web`) keep
+the 10-minute idle window. A sandbox with at least one interactive route, or with no
+routes, keeps it; every other sandbox, including routes with an unrecognized or missing
+origin, stops after 1 minute without activity. An unreadable stored origin keeps the
+10-minute window. The Sandbox DO derives the policy from its routes on every lookup.
+Active heartbeats renew the provider lease (`ensureLeaseAtLeast`), using the idle window
+plus 1 minute; initial launch and native runtime reconstruction retain their conservative
 provider backstops. The Sandbox DO owns the origin-specific idle stop.
 Inactive heartbeats still prove wrapper liveness. Native supervision does not schedule
 future wakeups after compute has stopped.
+
+A disconnect neither extends nor shortens these windows. A disconnected sandbox that was
+idle at its last heartbeat stops at the earlier of its idle deadline (`sandbox_stopped`)
+and the 90-second reconnect window (`connection_lost`). A sandbox that was active at its
+last heartbeat waits for the whole reconnect window, even when its idle window is
+shorter, and is lost as `connection_lost`. When it reconnects it gets one heartbeat
+deadline (45 s) to report activity before the idle deadline can stop it; a later
+reconnect without an active heartbeat in between gets no further grace.
 
 ### Billing, credentials and deletion
 

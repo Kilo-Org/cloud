@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CONTROL_PLANE_TIMERS } from '../../shared/control-plane-timers.js';
+import {
+  CONTROL_PLANE_TIMERS,
+  resolveControlPlaneTimers,
+} from '../../shared/control-plane-timers.js';
 import {
   initialAllocationState,
   nextAllocationAlarmAt,
@@ -145,6 +148,104 @@ describe('allocation idle deadline while disconnected', () => {
     );
     // Socket closed at 0: reconnect (90 s) is earlier than idle (10 min).
     expect(nextAllocationAlarmAt(disconnectedState(0, 0), TIMERS)).toBe(TIMERS.reconnectMs);
+  });
+});
+
+describe('allocation short idle window around a disconnect', () => {
+  const SHORT = resolveControlPlaneTimers({}, 'unattended').sandbox;
+
+  function tick(state: AllocationState, at: number) {
+    return reduceAllocation(
+      state,
+      { type: 'tick', at, nextAllocationId: 'alloc-2', retryAllowed: false },
+      SHORT
+    );
+  }
+
+  function reconnect(state: AllocationState, at: number): AllocationState {
+    return reduceAllocation(
+      state,
+      {
+        type: 'hello-accepted',
+        at,
+        allocationId: 'alloc-1',
+        connectionId: 'conn-2',
+        wrapperId: 'wr-2',
+      },
+      SHORT
+    ).state;
+  }
+
+  it('keeps the idle window shorter than the reconnect window', () => {
+    expect(SHORT.idleMs).toBeLessThan(SHORT.reconnectMs);
+  });
+
+  it('gives a session active at its last frame the whole reconnect window', () => {
+    const state = disconnectedState(0, 0);
+    expect(nextAllocationAlarmAt(state, SHORT)).toBe(SHORT.reconnectMs);
+    expect(tick(state, SHORT.idleMs).state.kind).toBe('disconnected');
+    expect(tick(state, SHORT.reconnectMs - 1).state.kind).toBe('disconnected');
+    const due = tick(state, SHORT.reconnectMs);
+    expect(due.state.kind).toBe('stopping');
+    expect(due.stopReason).toBe('connection_lost');
+  });
+
+  it('stops a session idle at its last frame on the idle deadline', () => {
+    const state = disconnectedState(0, 30_000);
+    expect(nextAllocationAlarmAt(state, SHORT)).toBe(SHORT.idleMs);
+    expect(tick(state, SHORT.idleMs - 1).state.kind).toBe('disconnected');
+    const due = tick(state, SHORT.idleMs);
+    expect(due.state.kind).toBe('stopping');
+    expect(due.stopReason).toBe('sandbox_stopped');
+  });
+
+  it('lets an active session report activity after a late reconnect', () => {
+    const reconnectAt = SHORT.idleMs + 10_000;
+    const connected = reconnect(disconnectedState(0, 0), reconnectAt);
+    expect(connected.kind).toBe('connected');
+    expect(connected.lastActivityAt).toBe(reconnectAt + SHORT.heartbeatMs - SHORT.idleMs);
+    expect(nextAllocationAlarmAt(connected, SHORT)).toBe(reconnectAt + SHORT.heartbeatMs);
+    expect(tick(connected, reconnectAt).state.kind).toBe('connected');
+
+    const active = reduceAllocation(
+      connected,
+      {
+        type: 'heartbeat',
+        at: reconnectAt + 5_000,
+        allocationId: 'alloc-1',
+        connectionId: 'conn-2',
+        active: true,
+      },
+      SHORT
+    ).state;
+    expect(active.lastActivityAt).toBe(reconnectAt + 5_000);
+  });
+
+  it('does not extend the idle window when an idle session reconnects', () => {
+    const connected = reconnect(disconnectedState(0, 30_000), 40_000);
+    expect(connected.lastActivityAt).toBe(0);
+  });
+
+  it('grants the reconnect grace only once to a wrapper that never heartbeats', () => {
+    const reconnectAt = SHORT.idleMs + 10_000;
+    const connected = reconnect(disconnectedState(0, 0), reconnectAt);
+    const closed = reduceAllocation(
+      connected,
+      {
+        type: 'socket-closed',
+        at: reconnectAt + 1_000,
+        allocationId: 'alloc-1',
+        connectionId: 'conn-2',
+        origin: 'peer',
+      },
+      SHORT
+    ).state;
+    const idleAt = (connected.lastActivityAt ?? 0) + SHORT.idleMs;
+    expect(nextAllocationAlarmAt(closed, SHORT)).toBe(idleAt);
+    expect(reconnect(closed, idleAt - 1).lastActivityAt).toBe(connected.lastActivityAt);
+    const due = tick(closed, idleAt);
+    expect(due.state.kind).toBe('stopping');
+    expect(due.stopReason).toBe('sandbox_stopped');
   });
 });
 

@@ -6,7 +6,7 @@ import { getBillingContext } from '@kilocode/container-usage';
 import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import { CloudAgentRunContainerSchema } from '@kilocode/worker-utils/cloud-agent-queue-report';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import {
@@ -105,7 +105,6 @@ import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
   controlPlaneAnswerPayloadSchema,
-  controlPlaneCredentialSourceSchema,
   controlPlaneDeliverPayloadSchema,
   controlPlanePrepareInputSchema,
   controlPlaneRouteSpecSchema,
@@ -137,8 +136,9 @@ import {
 import {
   CONTROL_PLANE_TIMERS,
   resolveControlPlaneTimers,
+  sandboxIdlePolicyForOrigins,
+  type SandboxIdlePolicy,
 } from '../../shared/control-plane-timers.js';
-import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import {
   controlPlaneSandboxSelectionSchema,
   type ControlPlanePrepareInputWithSelection,
@@ -469,7 +469,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private provider: ProviderAdapter;
   private providerPin: StoredProviderPin | null = null;
   private createInFlight = false;
-  private cachedSandboxTimers: SandboxTimers | undefined;
   private readonly repositoryCaptures = new Map<
     string,
     { allocationId: string | null; ok?: boolean }
@@ -673,7 +672,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.notifications.retire(parsed.sessionId);
       this.repositoryCaptures.delete(parsed.sessionId);
       await deleteRoute(this.db, parsed.sessionId);
-      this.cachedSandboxTimers = undefined;
       // Rebuild the policy inside the queue; if it cannot apply, stop the
       // sandbox as a platform failure so the alias is not left injected.
       await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
@@ -1796,7 +1794,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (deletionJournal !== undefined && !deletionJournal.completed) {
       this.notifications.retire(spec.sessionId);
       await deleteRoute(this.db, spec.sessionId);
-      this.cachedSandboxTimers = undefined;
       return {
         state: 'failed',
         attemptId: crypto.randomUUID(),
@@ -1836,7 +1833,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
         attemptId,
         'invalid_configuration'
       );
-      this.cachedSandboxTimers = undefined;
       return routeView(route, state.kind === 'connected');
     }
     // H1: apply the Worker-selected provider pin before the first attempt. The
@@ -1903,14 +1899,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
             billingReason,
             'billing_admission'
           );
-          this.cachedSandboxTimers = undefined;
           return { state: 'failed', attemptId: route.attemptId, reason: billingReason };
         }
       }
     }
     const repoKey = await this.repoKeyFor(spec, source);
     const { route, started } = await ensureRoute(this.routeContext(state), spec, source, repoKey);
-    if (started) this.cachedSandboxTimers = undefined;
     if (route.state !== 'failed') {
       if (started) await this.armAlarm(state);
       if (state.kind === 'stopped') {
@@ -2116,7 +2110,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (route.grant !== null) writeScopeGrant(tx, route.grant);
       writeRoute(tx, route);
     });
-    this.cachedSandboxTimers = undefined;
   }
 
   private applyCandidateGrantPolicy(candidate: SessionCredentialGrant): Promise<boolean> {
@@ -2473,7 +2466,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // The reducer owns the cause; ready routes must not re-derive it.
       if (stopReason !== undefined) {
         await dropReadyRoutes(this.routeContext(next), stopReason);
-        this.cachedSandboxTimers = undefined;
         // The sandbox is already stopping; refresh best-effort.
         await this.refreshVercelNetworkPolicy();
       }
@@ -2496,7 +2488,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (previous.kind !== 'stopping') {
       // A direct `provider-gone` keeps ready routes; they lose the sandbox.
       await dropReadyRoutes(ctx, 'sandbox_lost');
-      this.cachedSandboxTimers = undefined;
     }
     // A preparing route with attempt time left keeps its deadline across the
     // reallocation (spec §6).
@@ -3463,7 +3454,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     for (const sessionId of sessionIds) {
       this.notifications.retire(sessionId);
       await deleteRoute(this.db, sessionId);
-      this.cachedSandboxTimers = undefined;
     }
   }
 
@@ -4201,26 +4191,28 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private sandboxTimers(): SandboxTimers {
-    if (this.cachedSandboxTimers !== undefined) return this.cachedSandboxTimers;
+    return resolveControlPlaneTimers(
+      this.env as unknown as Record<string, string | undefined>,
+      this.sandboxIdlePolicy()
+    ).sandbox;
+  }
+
+  /**
+   * Derived from the routes table on every lookup, so no route write can leave
+   * it stale. SQLite extracts only the origin; an unreadable credential source
+   * keeps the longer interactive window.
+   */
+  private sandboxIdlePolicy(): SandboxIdlePolicy {
+    const source = routesTable.credential_source;
     const routes = this.db
-      .select({ credentialSource: routesTable.credential_source })
+      .select({
+        readable: sql<number>`coalesce(json_valid(${source}), 1)`,
+        origin: sql<unknown>`case when json_valid(${source}) then json_extract(${source}, '$.createdOnPlatform') end`,
+      })
       .from(routesTable)
       .all();
-    const unattended =
-      routes.length > 0 &&
-      routes.every(route => {
-        if (route.credentialSource === null) return false;
-        const source = controlPlaneCredentialSourceSchema.parse(JSON.parse(route.credentialSource));
-        return (
-          source.createdOnPlatform !== undefined &&
-          !isInteractiveSessionOrigin(source.createdOnPlatform)
-        );
-      });
-    this.cachedSandboxTimers = resolveControlPlaneTimers(
-      this.env as unknown as Record<string, string | undefined>,
-      unattended
-    ).sandbox;
-    return this.cachedSandboxTimers;
+    if (routes.some(route => route.readable === 0)) return 'interactive';
+    return sandboxIdlePolicyForOrigins(routes.map(route => route.origin));
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {

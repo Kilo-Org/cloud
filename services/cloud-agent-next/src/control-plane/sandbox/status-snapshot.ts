@@ -19,8 +19,8 @@ export type AllocationStatusSnapshotInput = {
   /** Snapshot creation time; the value of `observedAt`. */
   observedAt: number;
   /**
-   * The applicable sandbox inactivity bound, from
-   * `resolveControlPlaneTimers(env).sandbox.idleMs`.
+   * The applicable sandbox inactivity bound: the Sandbox DO's `idleMs` for its
+   * current route origins (`SandboxIdlePolicy`).
    */
   inactivityTimeoutMs: number;
 };

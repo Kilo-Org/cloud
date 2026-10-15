@@ -314,8 +314,19 @@ export function reduceAllocation(
         lastFrameAt: event.at,
       };
       // M3: the first connect (creating or starting) starts the idle clock; a
-      // reconnect refreshes liveness but must not extend the idle window.
-      if (state.kind === 'creating' || state.kind === 'starting') next.lastActivityAt = event.at;
+      // reconnect refreshes liveness but must not extend the idle window of a
+      // sandbox that was idle. One that was active when its socket dropped gets
+      // one heartbeat deadline to report activity, so a short idle window cannot
+      // stop it before its first heartbeat. The grace is not activity at the
+      // last frame, so a reconnect cannot earn it twice.
+      if (state.kind === 'creating' || state.kind === 'starting') {
+        next.lastActivityAt = event.at;
+      } else if (state.lastActivityAt !== null && activeAtLastFrame(state)) {
+        next.lastActivityAt = Math.max(
+          state.lastActivityAt,
+          event.at + timers.heartbeatMs - timers.idleMs
+        );
+      }
       return { state: next, effects: NO_EFFECTS };
     }
 
@@ -417,15 +428,8 @@ function reduceTick(
     }
 
     case 'disconnected': {
-      // The idle deadline still governs after a socket close: a disconnect must
-      // not extend the idle window (M3), or a sandbox that stops itself at the
-      // idle boundary would hold its allocation for the whole reconnect wait.
-      if (
-        state.lastActivityAt !== null &&
-        event.at >= state.lastActivityAt + timers.idleMs &&
-        (state.lastFrameAt === null ||
-          state.lastActivityAt + timers.idleMs <= state.lastFrameAt + timers.reconnectMs)
-      ) {
+      const idleAt = disconnectedIdleDeadlineAt(state, timers);
+      if (idleAt !== null && event.at >= idleAt) {
         return enterStopping(state, event.at, timers, 'sandbox_stopped');
       }
       if (state.lastFrameAt === null || event.at < state.lastFrameAt + timers.reconnectMs) {
@@ -475,7 +479,8 @@ export function nextAllocationAlarmAt(
     }
     case 'disconnected': {
       const candidates: number[] = [];
-      if (state.lastActivityAt !== null) candidates.push(state.lastActivityAt + timers.idleMs);
+      const idleAt = disconnectedIdleDeadlineAt(state, timers);
+      if (idleAt !== null) candidates.push(idleAt);
       if (state.lastFrameAt !== null) candidates.push(state.lastFrameAt + timers.reconnectMs);
       return candidates.length === 0 ? null : Math.min(...candidates);
     }
@@ -484,4 +489,25 @@ export function nextAllocationAlarmAt(
     default:
       return null;
   }
+}
+
+/** Activity was reported by the last frame: the session was working when it arrived. */
+function activeAtLastFrame(state: AllocationState): boolean {
+  return state.lastActivityAt !== null && state.lastActivityAt === state.lastFrameAt;
+}
+
+/**
+ * The idle deadline of a disconnected allocation, or null when the reconnect
+ * window governs alone. M3: a disconnect must not extend the idle window, or a
+ * sandbox that stops itself at the idle boundary would hold its allocation for
+ * the whole reconnect wait. It must not shorten the reconnect window either: a
+ * session active at its last frame was hidden by the disconnect, not idle, so
+ * it waits for the reconnect and is lost as `connection_lost`.
+ */
+function disconnectedIdleDeadlineAt(state: AllocationState, timers: SandboxTimers): number | null {
+  if (state.lastActivityAt === null) return null;
+  const idleAt = state.lastActivityAt + timers.idleMs;
+  if (state.lastFrameAt === null) return idleAt;
+  if (activeAtLastFrame(state)) return null;
+  return idleAt <= state.lastFrameAt + timers.reconnectMs ? idleAt : null;
 }

@@ -74,7 +74,10 @@ export type ControlPlaneTimers = {
 // session, the pause before a failed create is retried, clone/runtime/session
 // bounds, SSE silence (Kilo heartbeats every 10-15 s), health request, the
 // real-SSE reconnect window, credential grants and the provider stop ladder.
-function buildControlPlaneTimers(divisor: number, unattended = false): ControlPlaneTimers {
+function buildControlPlaneTimers(
+  divisor: number,
+  idlePolicy: SandboxIdlePolicy
+): ControlPlaneTimers {
   const ms = (value: number): number => Math.max(1, Math.round(value / divisor));
   const sandbox = {
     providerCreateMs: 2 * MINUTE_MS,
@@ -84,7 +87,7 @@ function buildControlPlaneTimers(divisor: number, unattended = false): ControlPl
     heartbeatMs: ms(45_000),
     reconnectMs: ms(90_000),
     routePreparationMs: 12 * MINUTE_MS,
-    idleMs: ms(unattended ? MINUTE_MS : 10 * MINUTE_MS),
+    idleMs: ms(idlePolicy === 'unattended' ? MINUTE_MS : 10 * MINUTE_MS),
     // Bounds one Sandbox -> Session notification; real (not scaled) like the
     // other bounds on external work.
     sessionNotifyDeadlineMs: 2_000,
@@ -143,15 +146,41 @@ function buildControlPlaneTimers(divisor: number, unattended = false): ControlPl
   };
 }
 
-export const CONTROL_PLANE_TIMERS: ControlPlaneTimers = buildControlPlaneTimers(1);
+export const CONTROL_PLANE_TIMERS: ControlPlaneTimers = buildControlPlaneTimers(1, 'interactive');
+const UNATTENDED_CONTROL_PLANE_TIMERS = buildControlPlaneTimers(1, 'unattended');
+
+/**
+ * `interactive` keeps the 10-minute sandbox idle window; `unattended` uses 1
+ * minute. Only the idle window and the provider lease derived from it differ.
+ */
+export type SandboxIdlePolicy = 'interactive' | 'unattended';
+
+// Origins whose users come back to a warm sandbox. Every other origin, and a
+// route without one, is unattended.
+const INTERACTIVE_SANDBOX_ORIGINS: ReadonlySet<string> = new Set(['cloud-agent-web']);
+
+/**
+ * The idle policy for a sandbox from its routes' session origins. A sandbox
+ * without routes keeps the interactive window so a released route (session
+ * deletion, runtime-authorization refresh) does not stop a sandbox the next
+ * prepare could reuse.
+ */
+export function sandboxIdlePolicyForOrigins(origins: readonly unknown[]): SandboxIdlePolicy {
+  if (origins.length === 0) return 'interactive';
+  return origins.some(
+    origin => typeof origin === 'string' && INTERACTIVE_SANDBOX_ORIGINS.has(origin)
+  )
+    ? 'interactive'
+    : 'unattended';
+}
 
 // Positive integer divisor that shortens internal deadline timers for local E2E. Pass `env` on the Worker/DO side or `process.env` in the wrapper. Development-only by absence from production config; do not add it to wrangler.jsonc.
 export function resolveControlPlaneTimers(
   source: Record<string, string | undefined>,
-  unattended = false
+  idlePolicy: SandboxIdlePolicy = 'interactive'
 ): ControlPlaneTimers {
   const raw = source[CONTROL_PLANE_TIMER_OVERRIDE_ENV];
   const divisor = raw !== undefined && /^\d+$/.test(raw) ? Number(raw) : 1;
-  if (!unattended && divisor <= 1) return CONTROL_PLANE_TIMERS;
-  return buildControlPlaneTimers(divisor >= 1 ? divisor : 1, unattended);
+  if (divisor > 1) return buildControlPlaneTimers(divisor, idlePolicy);
+  return idlePolicy === 'unattended' ? UNATTENDED_CONTROL_PLANE_TIMERS : CONTROL_PLANE_TIMERS;
 }

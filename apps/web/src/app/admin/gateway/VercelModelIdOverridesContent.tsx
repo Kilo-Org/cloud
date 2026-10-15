@@ -198,7 +198,9 @@ export function VercelModelIdOverridesContent() {
         <DialogContent>
           <form className="flex flex-col gap-4" onSubmit={handleSave}>
             <DialogHeader>
-              <DialogTitle>{editor.mode === 'create' ? 'Add override' : 'Edit override'}</DialogTitle>
+              <DialogTitle>
+                {editor.mode === 'create' ? 'Add override' : 'Edit override'}
+              </DialogTitle>
               <DialogDescription>
                 Use full model IDs, for example <code>meta/muse-wonder</code> →{' '}
                 <code>meta/muse-wonder-1.0</code>.

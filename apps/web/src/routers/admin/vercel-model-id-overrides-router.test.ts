@@ -42,16 +42,16 @@ describe('adminVercelModelIdOverridesRouter', () => {
       vercel_model_id: 'alibaba/qwen-3-32b-custom',
     });
     await caller.admin.vercelModelIdOverrides.upsert({
-      openrouter_model_id: 'meta/muse-wonder',
-      vercel_model_id: 'meta/muse-wonder-1.0',
+      openrouter_model_id: 'example/unmapped-model',
+      vercel_model_id: 'example/unmapped-model-1.0',
     });
 
     const { items } = await caller.admin.vercelModelIdOverrides.list();
     expect(items).toEqual([
       {
-        openrouter_model_id: 'meta/muse-wonder',
-        vercel_model_id: 'meta/muse-wonder-1.0',
-        builtin_vercel_model_id: 'meta/muse-wonder',
+        openrouter_model_id: 'example/unmapped-model',
+        vercel_model_id: 'example/unmapped-model-1.0',
+        builtin_vercel_model_id: 'example/unmapped-model',
         updated_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
       },
       {

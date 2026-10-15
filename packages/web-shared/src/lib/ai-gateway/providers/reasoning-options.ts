@@ -1,31 +1,10 @@
-import * as z from 'zod';
 import {
-  OpenCodeSettingsSchema,
   ReasoningEffortSchema,
   type OpenCodeSettings,
   type OpenCodeVariant,
   type ReasoningEffort,
+  type ReasoningOption,
 } from '@kilocode/db/schema-types';
-
-// models.dev `reasoning_options` format, consumed by Kilo CLI v2 to build its own
-// per-protocol reasoning variants. https://github.com/anomalyco/models.dev
-export const ReasoningOptionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('effort'), values: z.array(ReasoningEffortSchema) }),
-  z.object({ type: z.literal('toggle') }),
-  z.object({
-    type: z.literal('budget_tokens'),
-    min: z.number().optional(),
-    max: z.number().optional(),
-  }),
-]);
-
-export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
-
-export const CatalogOpenCodeSettingsSchema = OpenCodeSettingsSchema.extend({
-  reasoning_options: z.array(ReasoningOptionSchema).optional(),
-});
-
-export type CatalogOpenCodeSettings = z.infer<typeof CatalogOpenCodeSettingsSchema>;
 
 // The binary variant sets name their enabled variant `thinking` rather than after its effort.
 const TOGGLE_ON_VARIANT = 'thinking';
@@ -62,7 +41,7 @@ export function getReasoningOptions(
   ];
 }
 
-export function withReasoningOptions(settings: OpenCodeSettings): CatalogOpenCodeSettings {
+export function withReasoningOptions(settings: OpenCodeSettings): OpenCodeSettings {
   const reasoning_options = getReasoningOptions(settings.variants);
   return reasoning_options ? { ...settings, reasoning_options } : settings;
 }

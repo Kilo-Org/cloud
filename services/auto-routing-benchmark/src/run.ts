@@ -31,6 +31,7 @@ import {
   existsNewerCompletedRun,
   getCaseResults,
   getExistingCaseResultIds,
+  reuseDeciderCaseResults,
   getPendingDeciderOutput,
   savePendingDeciderOutput,
   getLatestSummariesByModel,
@@ -111,6 +112,7 @@ export type BenchmarkJobMessage = {
   chunk?: number;
   shard?: number;
   shardCount?: number;
+  chunkSize?: number;
   // Repetition index (0-based).
   rep?: number;
 };
@@ -124,6 +126,7 @@ export const BenchmarkJobMessageSchema = z.object({
   chunk: z.number().int().min(0).optional(),
   shard: z.number().int().min(0).optional(),
   shardCount: z.number().int().min(1).optional(),
+  chunkSize: z.number().int().min(1).max(5).optional(),
   rep: z.number().int().min(0).optional(),
 });
 
@@ -140,10 +143,10 @@ export function expectedCaseCount(kind: BenchmarkKind, router: AutoRouter): numb
   return kind === 'classifier' ? CLASSIFIER_CASES.length : deciderCasesForRouter(router).length;
 }
 
-// Decider cases run through the real `kilo` CLI in a container (up to ~3 min
-// each). Chunking caps how many cases a single queue invocation processes so
-// each stays well under CF's wall-clock limit.
-const DECIDER_CHUNK_SIZE = 5;
+// Two cases leave room for empty-output retries within Queues' 15-minute limit.
+const DECIDER_CHUNK_SIZE = 2;
+const LEGACY_DECIDER_CHUNK_SIZE = 5;
+const DECIDER_TARGET_CASES_PER_LANE = 48;
 
 // Classifier calls are OpenRouter System One HTTP requests. Each queue
 // invocation owns exactly one case, so a slow request cannot push a batch past
@@ -569,7 +572,8 @@ export function buildDeciderMessages(
   models: readonly (string | RunModelEntry)[],
   repetitions: number,
   chunks: readonly (readonly { id: string }[])[],
-  maxLiveContainers: number = BENCHMARK_CONTAINER_BUDGET
+  maxLiveContainers: number = BENCHMARK_CONTAINER_BUDGET,
+  chunkSize: number = LEGACY_DECIDER_CHUNK_SIZE
 ): { body: BenchmarkJobMessage }[] {
   const entries = normalizeRunModelEntries(models);
   const shardCount = computeDeciderShardCount({
@@ -594,6 +598,7 @@ export function buildDeciderMessages(
               chunk: shard,
               shard,
               shardCount,
+              chunkSize,
               rep,
               caseIds: chunkCases.map(c => c.id),
             } satisfies BenchmarkJobMessage,
@@ -937,6 +942,22 @@ export async function startRun(
     }
     throw error;
   }
+  if (kind === 'decider') {
+    try {
+      await reuseDeciderCaseResults(env.BENCH_DB, {
+        runId,
+        router,
+        engineIdentity,
+        repetitions,
+        entries: enqueuedRunEntries,
+      });
+    } catch (error) {
+      const reason = `case reuse failed: ${formatError(error).error}`;
+      await markRunFailed(env.BENCH_DB, runId, reason);
+      await markProfilesFailedForRun(env.BENCH_DB, runId, reason);
+      throw error;
+    }
+  }
 
   console.log(
     JSON.stringify({
@@ -988,7 +1009,8 @@ export async function startRun(
     enqueuedRunEntries,
     repetitions,
     chunks,
-    laneBudget
+    laneBudget,
+    DECIDER_CHUNK_SIZE
   );
   await enqueueRunMessages(env, runId, messages);
   return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
@@ -1032,10 +1054,12 @@ export async function drainQueue(
   const engineIdentity = computeEngineIdentity('decider', router);
   const repetitions = config.deciderRepetitions;
   const liveLanes = await getLiveContainerLanes(env.BENCH_DB);
-  // Oldest-first (query already ordered by requested_at). Cap by the lanes this
-  // queue may hold now: modelCount * repetitions <= lanes.
   const maxLive = benchmarkLaneBudget(queue, liveLanes);
+  const targetShards = Math.ceil(
+    deciderCasesForRouter(router).length / DECIDER_TARGET_CASES_PER_LANE
+  );
   const maxEntries = Math.floor(maxLive / Math.max(1, repetitions));
+  const parallelEntries = Math.max(1, Math.floor(maxLive / (repetitions * targetShards)));
   if (maxEntries < 1) {
     // Every lane is committed to runs already going. That is a wait, not a
     // fault: the next tick retries once one of them finishes.
@@ -1058,7 +1082,7 @@ export async function drainQueue(
   );
   if (pending.length === 0) return null;
 
-  const batch = pending.slice(0, maxEntries);
+  const batch = pending.slice(0, Math.min(maxEntries, parallelEntries));
   const entries: RunModelEntry[] = batch.map(row => ({
     model: row.model,
     variant: variantFromStorage(row.variant),
@@ -1128,6 +1152,20 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
 
   const message = parsed.data;
   const state = await getRunState(env, message.runId);
+  if (state.status !== 'running') {
+    if (message.kind === 'decider') {
+      const variant =
+        message.variant !== undefined
+          ? message.variant
+          : variantFromStorage(
+              state.models.find(row => row.model === message.model)?.variant ?? ''
+            );
+      await destroyDeciderCliContainer(env, {
+        instanceName: getDeciderContainerInstanceName({ ...message, variant }),
+      });
+    }
+    return;
+  }
 
   let shouldFinalize = true;
   if (message.kind === 'classifier') {
@@ -1577,37 +1615,40 @@ async function enqueueNextDeciderChunkIfNeeded(
   shardCount: number,
   router: AutoRouter
 ): Promise<boolean> {
-  const chunks = chunkArray(deciderCasesForRouter(router), DECIDER_CHUNK_SIZE);
-  const nextChunkIndex = chunk + shardCount;
-  const nextChunk = chunks[nextChunkIndex];
-  if (!nextChunk) return false;
+  const chunks = chunkArray(
+    deciderCasesForRouter(router),
+    message.chunkSize ?? LEGACY_DECIDER_CHUNK_SIZE
+  );
+  for (
+    let nextChunkIndex = chunk + shardCount;
+    nextChunkIndex < chunks.length;
+    nextChunkIndex += shardCount
+  ) {
+    const nextCaseIds = chunks[nextChunkIndex].map(c => c.id);
+    const existingNextCaseIds = await getExistingCaseResultIds(env.BENCH_DB, {
+      runId: message.runId,
+      model: message.model,
+      variant: message.variant ?? null,
+      rep,
+      caseIds: nextCaseIds,
+    });
+    if (existingNextCaseIds.size >= nextCaseIds.length) continue;
 
-  const nextCaseIds = nextChunk.map(c => c.id);
-  const existingNextCaseIds = await getExistingCaseResultIds(env.BENCH_DB, {
-    runId: message.runId,
-    model: message.model,
-    variant: message.variant ?? null,
-    rep,
-    caseIds: nextCaseIds,
-  });
-  if (existingNextCaseIds.size >= nextCaseIds.length) return true;
-
-  await env.BENCH_QUEUE.sendBatch([
-    {
-      body: {
-        runId: message.runId,
-        kind: 'decider',
-        model: message.model,
-        variant: message.variant ?? null,
-        chunk: nextChunkIndex,
-        shard,
-        shardCount,
-        rep,
-        caseIds: nextCaseIds,
-      } satisfies BenchmarkJobMessage,
-    },
-  ]);
-  return true;
+    await env.BENCH_QUEUE.sendBatch([
+      {
+        body: {
+          ...message,
+          chunk: nextChunkIndex,
+          shard,
+          shardCount,
+          rep,
+          caseIds: nextCaseIds,
+        } satisfies BenchmarkJobMessage,
+      },
+    ]);
+    return true;
+  }
+  return false;
 }
 
 const TokenResponseSchema = z.object({ token: z.string().min(1), expiresAt: z.string() });

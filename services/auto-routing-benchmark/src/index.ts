@@ -5,6 +5,7 @@ import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
 import type { HonoEnv } from './hono-env';
 import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './system-optimal';
+import { isRetryableContainerAvailabilityError } from './cli-runner';
 import {
   processDeadLetter,
   processJob,
@@ -125,27 +126,33 @@ export default {
     if (errors.length > 0) throw new AggregateError(errors, 'Benchmark scheduled routers failed');
   },
   async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
-    // Dead-lettered messages: record the lane death and try to finalize the
-    // run. Same retry contract as the jobs branch: a throw (transient D1
-    // failure after the death was recorded) skips the ack so the message
-    // retries and finalization is re-attempted. A message still failing after
-    // max_retries is dropped (the DLQ has no DLQ); the stale sweep remains
-    // the backstop for runs that never finalize.
-    if (batch.queue === DLQ_NAME) {
-      for (const message of batch.messages) {
-        await processDeadLetter(env, message.body);
-        message.ack();
-      }
-      return;
-    }
     for (const message of batch.messages) {
-      // Deliberately no try/catch: a throw from processJob (transient token,
-      // D1 or container failures) must skip the ack so the queue retries the
-      // whole (run, model, rep, chunk) unit, dead-lettering after max_retries.
-      // Case-level failures are recorded as failed rows inside processJob and
-      // do not throw. Swallowing the throw here would silently drop chunks.
-      await processJob(env, message.body);
-      message.ack();
+      try {
+        if (batch.queue === DLQ_NAME) {
+          await processDeadLetter(env, message.body);
+        } else {
+          await processJob(env, message.body);
+        }
+        message.ack();
+      } catch (error) {
+        if (batch.queue !== DLQ_NAME && isRetryableContainerAvailabilityError(error)) {
+          try {
+            await env.BENCH_QUEUE.send(message.body, { delaySeconds: 30 });
+            message.ack();
+            continue;
+          } catch (dispatchError) {
+            console.error(
+              JSON.stringify({
+                event: 'benchmark_capacity_requeue_failed',
+                error: String(dispatchError),
+              })
+            );
+          }
+        }
+        console.error(JSON.stringify({ event: 'benchmark_job_retry', error: String(error) }));
+        // Explicit retry preserves redelivery without reducing Queue consumer concurrency.
+        message.retry();
+      }
     }
   },
 };

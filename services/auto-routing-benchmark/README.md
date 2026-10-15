@@ -88,6 +88,10 @@ and frontier platform queues share the pool. Frontier never registers owner
 custom pools, and has only a platform queue (`both` selects that queue; `user` is rejected).
 A run that does not fit waits: the drain logs `benchmark_queue_drain_skipped_no_capacity` and
 retries on the next tick. Scheduled drains and daily platform sync process both routers.
+Drains admit smaller oldest-first batches so each entry receives multiple shard lanes.
+This reduces long serial runs without increasing the shared container budget.
+Each new message carries its chunk size; queued messages retain their original layout.
+
 
 Efficient publications invalidate `routing_table_v1`; frontier publications invalidate
 `routing_table_frontier_v1`. Router, engine/dataset identity, ranking settings, and contributing
@@ -627,12 +631,14 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 
 ## Debugging container (decider) failures
 
-- Each decider run seeds bounded shard lanes across the configured models and
-  repetitions. A lane uses one stable container instance
-  (`runId:model:rep:shard`) and processes chunk `N`, then `N+shardCount`, and
-  so on. CLI runs are serialized per instance because its sqlite state is not
-  safe under concurrent first runs. A `/warmup` call absorbs the one-time sqlite
-  migration before the case loop.
+- Each decider run seeds bounded shard lanes across the configured models and repetitions.
+  A lane reuses its container across chunks assigned by `shardCount`.
+  CLI runs remain serialized because they share SQLite state.
+- `/warmup` initializes the local CLI database once per container without making an inference request.
+- The server handles SIGTERM and drains accepted CLI jobs before exiting.
+  Idle containers therefore release capacity instead of ignoring the inactivity stop.
+- Completed or failed runs reject queued work before starting another CLI case.
+- Smaller chunks leave time for an empty-output retry within the queue invocation limit.
 - `case_results` rows carry diagnostics: CLI exit code, output prefix, and an
   event tail — start there for a failing case.
 - `POST /admin/debug-cli {model, prompt}` runs one prompt through the container
@@ -650,6 +656,10 @@ Failed queue messages land in `auto-routing-benchmark-dlq` after `max_retries`
 (model, repetition, shard, chunk) job, and later chunks are chained from it —
 so a DLQ'd message kills its lane's remaining cases.
 
+The handler uses explicit message retries so infrastructure failures do not reduce consumer concurrency.
+Container-capacity waits defer the same job without consuming its failure retry budget.
+If deferred dispatch fails, the original message retries instead of being acknowledged.
+
 The worker consumes the DLQ itself: each dead message is recorded in
 `run_lane_failures`, and run finalization is lane-aware. A run completes once
 every (model, variant, rep) lane has either all its case rows or a recorded
@@ -666,6 +676,13 @@ lane death — a single dead model can no longer wedge the whole run.
 - **Backstop**: the 6h stale sweep *salvages* a wedged decider run rather than
   failing it wholesale — lanes with a full set of case rows are settled `ready`,
   and only the unfinished lanes' entries go `failed`.
+
+Retries reuse successful graded cases from compatible terminal runs.
+The router, benchmark engine, repetitions, concrete model, variant, case, and repetition index must match.
+The newest compatible case wins; existing destination results and source rows remain unchanged.
+Failed or timed-out CLI cases run again; a successful zero score remains a valid measurement.
+Pending successful CLI outputs also survive terminal transitions so rubric grading can resume without another model call.
+Historical alias-keyed results remain stored but cannot be reused because their concrete target was not recorded.
 
 To inspect:
 

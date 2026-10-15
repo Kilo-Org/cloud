@@ -1,66 +1,384 @@
 import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+
+type ContainerChild = EventEmitter & {
+  pid: number;
+  stdout: EventEmitter;
+  stderr: EventEmitter;
+  kill: (signal: string) => void;
+};
 
 const mocks = vi.hoisted(() => ({
   handler: undefined as undefined | ((req: unknown, res: unknown) => void),
+  sigterm: undefined as undefined | (() => void),
   spawn: vi.fn(),
+  mkdtemp: vi.fn(),
+  rm: vi.fn(),
+  close: vi.fn(),
+  exit: vi.fn<typeof process.exit>(),
+  kill: vi.fn<typeof process.kill>(),
+  children: [] as ContainerChild[],
 }));
 
 vi.mock('node:http', () => ({
   createServer: (handler: typeof mocks.handler) => {
     mocks.handler = handler;
-    return { listen: vi.fn() };
+    return { listen: vi.fn(), close: mocks.close };
   },
 }));
 vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
 vi.mock('node:fs/promises', () => ({
-  mkdtemp: async () => '/tmp/benchmark-auth-test',
-  rm: vi.fn(async () => {}),
+  mkdtemp: mocks.mkdtemp,
+  rm: mocks.rm,
 }));
+
+function createChild() {
+  const child = Object.assign(new EventEmitter(), {
+    pid: 12345,
+    stdout: new EventEmitter(),
+    stderr: new EventEmitter(),
+    kill: vi.fn(),
+  });
+  mocks.children.push(child);
+  return child;
+}
+
+const runBody = {
+  model: 'test-model',
+  prompt: 'test prompt',
+  kiloToken: 'test-benchmark-token',
+  kiloApiUrl: 'https://example.test',
+  orgId: 'test-org',
+  variant: 'high',
+};
+
+type ContainerResponse = {
+  status: number;
+  body: {
+    exitCode?: number;
+    durationMs?: number;
+    stderrTail?: string;
+    timedOut?: boolean;
+    error?: string;
+  };
+};
+
+function request(url: string, body?: unknown, stream?: Readable) {
+  const req = Object.assign(
+    stream ?? Readable.from(body === undefined ? [] : [Buffer.from(JSON.stringify(body))]),
+    { method: 'POST', url }
+  );
+  let status = 0;
+  const res = Object.assign(new EventEmitter(), {
+    writeHead: vi.fn((code: number) => {
+      status = code;
+    }),
+    end: vi.fn((payload: string) => {
+      res.emit('result', { status, body: JSON.parse(payload) });
+    }),
+  });
+  const done = new Promise<ContainerResponse>(resolve => res.once('result', resolve));
+  if (!mocks.handler) throw new Error('Container handler was not installed');
+  mocks.handler(req, res);
+  return { req, res, done };
+}
+
+async function loadServer() {
+  const serverPath = '../container/server.mjs';
+  // Each test imports fresh module state to exercise process startup and shutdown.
+  await import(serverPath);
+}
+
+async function flushServer() {
+  await new Promise<void>(resolve => setImmediate(resolve));
+}
+
+function stopServer() {
+  if (!mocks.sigterm) throw new Error('SIGTERM handler was not installed');
+  mocks.sigterm();
+}
 
 beforeEach(() => {
   vi.resetModules();
-  mocks.spawn.mockReset();
-  mocks.spawn.mockImplementation(() => {
-    const child = Object.assign(new EventEmitter(), {
-      stdout: new EventEmitter(),
-      stderr: new EventEmitter(),
-    });
-    setTimeout(() => child.emit('close', 0), 0);
-    return child;
+  mocks.handler = undefined;
+  mocks.sigterm = undefined;
+  mocks.children = [];
+  mocks.spawn.mockReset().mockImplementation(createChild);
+  mocks.mkdtemp.mockReset().mockResolvedValue('/tmp/benchmark-auth-test');
+  mocks.rm.mockReset().mockResolvedValue(undefined);
+  mocks.close.mockReset();
+  mocks.exit.mockReset();
+  vi.spyOn(process, 'exit').mockImplementation(mocks.exit);
+  mocks.kill.mockReset().mockReturnValue(true);
+  vi.spyOn(process, 'kill').mockImplementation(mocks.kill);
+  const originalOn = process.on.bind(process);
+  vi.spyOn(process, 'on').mockImplementation((event, listener) => {
+    if (event === 'SIGTERM') {
+      mocks.sigterm = listener;
+      return process;
+    }
+    return originalOn(event, listener);
   });
 });
 
-it.each(['/warmup', '/run'])(
-  '%s disables automatic ingest while preserving API/gateway authentication',
-  async url => {
-    const serverPath = '../container/server.mjs';
-    await import(serverPath);
-    const req = Object.assign(
-      Readable.from([
-        Buffer.from(
-          JSON.stringify({
-            model: 'test-model',
-            prompt: 'test prompt',
-            kiloToken: 'test-benchmark-token',
-            kiloApiUrl: 'https://example.test',
-            orgId: 'test-org',
-          })
-        ),
-      ]),
-      { method: 'POST', url }
-    );
-    await new Promise<void>(resolve => {
-      if (!mocks.handler) throw new Error('Container handler was not installed');
-      mocks.handler(req, { writeHead: vi.fn(), end: () => resolve() });
+afterEach(async () => {
+  mocks.spawn.mockImplementation(() => {
+    throw new Error('test cleanup');
+  });
+  for (const child of mocks.children) child.emit('close', 0);
+  await flushServer();
+  vi.useRealTimers();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
+
+it('/run disables automatic ingest while preserving API/gateway authentication', async () => {
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  expect(mocks.spawn.mock.calls[0][0]).toBe('kilo');
+  expect(mocks.spawn.mock.calls[0][1]).toEqual([
+    'run',
+    '--format',
+    'json',
+    '--auto',
+    '-m',
+    'kilo/test-model',
+    '--variant',
+    'high',
+    'test prompt',
+  ]);
+  const options = mocks.spawn.mock.calls[0][2];
+  expect(options.env.KILO_DISABLE_SESSION_INGEST).toBe('1');
+  expect(options.env.KILO_API_URL).toBe('https://example.test');
+  expect(options.env.KILO_ORG_ID).toBe('test-org');
+  expect(JSON.parse(options.env.KILO_AUTH_CONTENT)).toEqual({
+    kilo: { type: 'api', key: 'test-benchmark-token', organizationId: 'test-org' },
+  });
+  mocks.children[0].emit('close', 0);
+  expect((await pending.done).status).toBe(200);
+});
+
+it('/warmup only initializes the local database once, including concurrent callers', async () => {
+  vi.stubEnv('KILO_AUTH_CONTENT', 'inherited-auth');
+  vi.stubEnv('KILO_API_URL', 'https://inherited-provider.test');
+  vi.stubEnv('KILO_ORG_ID', 'inherited-org');
+  await loadServer();
+  const first = request('/warmup', runBody);
+  const second = request('/warmup');
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  expect(mocks.spawn.mock.calls[0][0]).toBe('kilo');
+  expect(mocks.spawn.mock.calls[0][1]).toEqual(['db', 'path']);
+  const { env } = mocks.spawn.mock.calls[0][2];
+  expect(env.KILO_DISABLE_SESSION_INGEST).toBe('1');
+  expect(env.KILO_AUTH_CONTENT).toBeUndefined();
+  expect(env.KILO_API_URL).toBeUndefined();
+  expect(env.KILO_ORG_ID).toBeUndefined();
+  mocks.children[0].emit('close', 0);
+  const result = await first.done;
+  expect(result).toEqual({
+    status: 200,
+    body: { exitCode: 0, durationMs: expect.any(Number) },
+  });
+  expect(await second.done).toEqual(result);
+  expect(await request('/warmup').done).toEqual(result);
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+});
+
+it('retries a failed database initialization instead of caching its failure', async () => {
+  await loadServer();
+  const first = request('/warmup');
+  await flushServer();
+  mocks.children[0].emit('close', 1);
+  expect((await first.done).body.exitCode).toBe(1);
+  const retry = request('/warmup');
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledTimes(2);
+  mocks.children[1].emit('close', 0);
+  expect((await retry.done).body.exitCode).toBe(0);
+  expect((await request('/warmup').done).body.exitCode).toBe(0);
+  expect(mocks.spawn).toHaveBeenCalledTimes(2);
+});
+
+it.each(['mkdtemp', 'spawn'] as const)(
+  'settles a warmup %s rejection and lets the next request retry',
+  async failure => {
+    await loadServer();
+    if (failure === 'mkdtemp') {
+      mocks.mkdtemp.mockRejectedValueOnce(new Error('initialization failed'));
+    } else {
+      mocks.spawn.mockImplementationOnce(() => {
+        throw new Error('initialization failed');
+      });
+    }
+    expect(await request('/warmup').done).toEqual({
+      status: 500,
+      body: { error: 'initialization failed' },
     });
-    expect(mocks.spawn).toHaveBeenCalledOnce();
-    const options = mocks.spawn.mock.calls[0][2];
-    expect(options.env.KILO_DISABLE_SESSION_INGEST).toBe('1');
-    expect(options.env.KILO_API_URL).toBe('https://example.test');
-    expect(JSON.parse(options.env.KILO_AUTH_CONTENT)).toEqual({
-      kilo: { type: 'api', key: 'test-benchmark-token', organizationId: 'test-org' },
-    });
+    if (failure === 'spawn') {
+      expect(mocks.rm).toHaveBeenCalledWith('/tmp/benchmark-auth-test', {
+        recursive: true,
+        force: true,
+      });
+    }
+    const retry = request('/warmup');
+    await flushServer();
+    expect(mocks.children).toHaveLength(1);
+    mocks.children[0].emit('close', 0);
+    expect((await retry.done).body.exitCode).toBe(0);
   }
 );
+
+it.each(['mkdtemp', 'spawn'] as const)(
+  'settles a case %s rejection and drains the next queued case during shutdown',
+  async failure => {
+    await loadServer();
+    if (failure === 'mkdtemp') {
+      mocks.mkdtemp.mockRejectedValueOnce(new Error('case startup failed'));
+    } else {
+      mocks.spawn.mockImplementationOnce(() => {
+        throw new Error('case startup failed');
+      });
+    }
+    const first = request('/run', runBody);
+    const second = request('/run', runBody);
+    expect(await first.done).toEqual({
+      status: 500,
+      body: { error: 'case startup failed' },
+    });
+    await flushServer();
+    expect(mocks.children).toHaveLength(1);
+    stopServer();
+    expect(mocks.exit).not.toHaveBeenCalled();
+    mocks.children[0].emit('close', 0);
+    expect((await second.done).body.exitCode).toBe(0);
+    await flushServer();
+    expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+  }
+);
+
+it('settles an asynchronous spawn error once and redacts case authentication', async () => {
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  mocks.children[0].emit('error', new Error(`cannot spawn: ${runBody.kiloToken}`));
+  mocks.children[0].emit('close', -1);
+  expect(await pending.done).toMatchObject({
+    status: 200,
+    body: {
+      exitCode: -1,
+      stderrTail: '\nspawn error: cannot spawn: [redacted]',
+      timedOut: false,
+    },
+  });
+  expect(pending.res.end).toHaveBeenCalledOnce();
+  expect(mocks.rm).toHaveBeenCalledOnce();
+});
+
+it('keeps local warmup and real cases in the same serialized CLI lane', async () => {
+  await loadServer();
+  const warmup = request('/warmup');
+  const run = request('/run', runBody);
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  expect(mocks.spawn.mock.calls[0][1]).toEqual(['db', 'path']);
+  mocks.children[0].emit('close', 0);
+  await warmup.done;
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledTimes(2);
+  expect(mocks.spawn.mock.calls[1][1][0]).toBe('run');
+  mocks.children[1].emit('close', 0);
+  await run.done;
+});
+
+it('exits cleanly on idle SIGTERM without registering a real signal listener', async () => {
+  const listeners = process.listeners('SIGTERM');
+  await loadServer();
+  expect(process.listeners('SIGTERM')).toEqual(listeners);
+  stopServer();
+  expect(mocks.close).toHaveBeenCalledOnce();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+  expect(await request('/warmup').done).toEqual({
+    status: 503,
+    body: { error: 'container is stopping' },
+  });
+  expect(mocks.spawn).not.toHaveBeenCalled();
+});
+
+it('drains running and queued cases after SIGTERM even when clients disconnect', async () => {
+  await loadServer();
+  const first = request('/run', runBody);
+  const second = request('/run', runBody);
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  first.res.emit('close');
+  second.res.emit('close');
+  stopServer();
+  expect(mocks.exit).not.toHaveBeenCalled();
+  expect((await request('/run', runBody).done).status).toBe(503);
+  expect((await request('/warmup').done).status).toBe(503);
+  mocks.children[0].emit('close', 0);
+  await first.done;
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledTimes(2);
+  expect(mocks.exit).not.toHaveBeenCalled();
+  mocks.children[1].emit('close', 0);
+  await second.done;
+  await flushServer();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});
+
+it('waits for the shared local warmup during SIGTERM', async () => {
+  await loadServer();
+  const first = request('/warmup');
+  const second = request('/warmup');
+  await flushServer();
+  stopServer();
+  expect(mocks.exit).not.toHaveBeenCalled();
+  mocks.children[0].emit('close', 0);
+  await Promise.all([first.done, second.done]);
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});
+
+it('rejects a request whose body finishes after shutdown begins', async () => {
+  await loadServer();
+  const active = request('/run', runBody);
+  await flushServer();
+  const stream = new Readable({ read() {} });
+  const pending = request('/run', undefined, stream);
+  stopServer();
+  stream.push(Buffer.from(JSON.stringify(runBody)));
+  stream.push(null);
+  expect((await pending.done).status).toBe(503);
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  mocks.children[0].emit('close', 0);
+  await active.done;
+  await flushServer();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});
+
+it('keeps the case timeout and bounds shutdown if the child never closes its pipes', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  await loadServer();
+  const pending = request('/run', runBody);
+  await flushServer();
+  stopServer();
+  await vi.advanceTimersByTimeAsync(179_999);
+  expect(mocks.kill).not.toHaveBeenCalled();
+  expect(mocks.exit).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(mocks.kill).toHaveBeenCalledExactlyOnceWith(-12345, 'SIGKILL');
+  expect(mocks.exit).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(5_000);
+  expect(await pending.done).toMatchObject({
+    status: 200,
+    body: { exitCode: -1, timedOut: true },
+  });
+  await flushServer();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});

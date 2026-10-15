@@ -529,14 +529,6 @@ describe('summarize — p95 and timeouts', () => {
 });
 
 describe('decider message fan-out', () => {
-  it('DECIDER_CHUNK_SIZE is 5', () => {
-    const chunks = chunkArray(
-      Array.from({ length: 76 }, (_, i) => String(i)),
-      5
-    );
-    expect(chunks).toHaveLength(16);
-  });
-
   it('message schema accepts and defaults rep', () => {
     const msg = BenchmarkJobMessageSchema.parse({ runId: 'r1', kind: 'classifier', model: 'm1' });
     expect(msg.rep).toBeUndefined();

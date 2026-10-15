@@ -131,6 +131,7 @@ function mockRunSnapshot(
   vi.mocked(getRunWithModels).mockResolvedValue({
     run: {
       max_concurrency: 4,
+      status: 'running',
       min_accuracy: 0.7,
       switch_cost_factor: 3,
       best_accuracy_switch_threshold: 0.05,
@@ -316,6 +317,28 @@ describe('processJob — decider exact-pair snapshot resolution', () => {
   });
 });
 
+describe('processJob — terminal runs', () => {
+  it.each(['completed', 'failed'] as const)(
+    'drops messages of a %s run without spending or chaining',
+    async status => {
+      const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+      if (!snapshot) throw new Error('Run snapshot missing');
+      vi.mocked(getRunWithModels).mockResolvedValue({
+        ...snapshot,
+        run: { ...snapshot.run, status },
+      });
+      await processJob(env, deciderMessage({ variant: null }));
+      expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+      expect(warmUpCliContainer).not.toHaveBeenCalled();
+      expect(upsertCaseResult).not.toHaveBeenCalled();
+      expect(queueSendBatch).not.toHaveBeenCalled();
+      expect(destroyDeciderCliContainer).toHaveBeenCalledWith(env, {
+        instanceName: `${runId}:${model}::0:0`,
+      });
+    }
+  );
+});
+
 describe('processJob — decider container availability failures', () => {
   it.each([
     'container /run failed: HTTP 503 There is no Container instance available at this time. This is likely because you have reached your max concurrent instance count.',
@@ -426,19 +449,26 @@ describe('processJob — decider chunk chaining', () => {
     expect(countCaseResultsByLane).not.toHaveBeenCalled();
   });
 
-  it('does not rerun completed chunk cases or enqueue a fully completed next chunk', async () => {
+  it('skips completed chunks and finds the next unfinished chunk in the lane', async () => {
     const currentCaseIds = DECIDER_CASES.slice(0, 5).map(c => c.id);
     const nextCaseIds = DECIDER_CASES.slice(5, 10).map(c => c.id);
     vi.mocked(getExistingCaseResultIds)
       .mockResolvedValueOnce(new Set(currentCaseIds))
-      .mockResolvedValueOnce(new Set(nextCaseIds));
+      .mockResolvedValueOnce(new Set(nextCaseIds))
+      .mockResolvedValueOnce(new Set());
 
     await processJob(env, { ...deciderMessage(), caseIds: currentCaseIds });
 
-    expect(warmUpCliContainer).not.toHaveBeenCalled();
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
-    expect(queueSendBatch).not.toHaveBeenCalled();
+    expect(queueSendBatch).toHaveBeenCalledWith([
+      {
+        body: expect.objectContaining({
+          chunk: 2,
+          caseIds: DECIDER_CASES.slice(10, 15).map(c => c.id),
+        }),
+      },
+    ]);
   });
 
   it('re-enqueues a partially completed next chunk so DLQ leftovers cannot strand a run', async () => {
@@ -466,6 +496,24 @@ describe('processJob — decider chunk chaining', () => {
           rep: 0,
           caseIds: nextCaseIds,
         },
+      },
+    ]);
+  });
+
+  it('preserves the smaller chunk layout across chained messages', async () => {
+    await processJob(env, {
+      ...deciderMessage(),
+      chunkSize: 2,
+      shardCount: 3,
+      caseIds: DECIDER_CASES.slice(0, 2).map(c => c.id),
+    });
+    expect(queueSendBatch).toHaveBeenCalledWith([
+      {
+        body: expect.objectContaining({
+          chunk: 3,
+          chunkSize: 2,
+          caseIds: DECIDER_CASES.slice(6, 8).map(c => c.id),
+        }),
       },
     ]);
   });

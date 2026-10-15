@@ -41,6 +41,7 @@ vi.mock('./db', async importOriginal => {
     listLaneFailures: vi.fn(),
     getCaseResults: vi.fn(),
     getExistingCaseResultIds: vi.fn(),
+    reuseDeciderCaseResults: vi.fn(),
     getSummaries: vi.fn(),
     replaceModelSummaries: vi.fn(),
     saveRoutingTable: vi.fn(),
@@ -64,6 +65,7 @@ import {
   getCaseResults,
   getConfigRows,
   getExistingCaseResultIds,
+  reuseDeciderCaseResults,
   getLatestSummariesByModel,
   getRunningRun,
   getLiveContainerLanes,
@@ -172,6 +174,7 @@ beforeEach(() => {
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
   vi.mocked(insertRun).mockResolvedValue(undefined);
+  vi.mocked(reuseDeciderCaseResults).mockReset().mockResolvedValue(0);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
@@ -264,7 +267,7 @@ describe('all-effort platform scheduling', () => {
     });
     while (pending.length > 0) await drainQueue(env, 'platform');
     const batches = vi.mocked(insertRun).mock.calls.map(call => call[2]);
-    expect(batches.map(batch => batch.length)).toEqual([2, 2, 1]);
+    expect(batches.map(batch => batch.length)).toEqual([1, 1, 1, 1, 1]);
     expect(batches.flat().map(row => row.variant)).toEqual(variants);
   });
 
@@ -726,8 +729,7 @@ describe('drainQueue', () => {
     expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('platform');
   });
 
-  it('caps the user batch at the user container limit', async () => {
-    // User lanes stop at 150; repetitions 5 → floor(150 / 5) = 30 entries.
+  it('uses more shards per entry instead of serializing a large owner batch', async () => {
     mockConfig({ decider_repetitions: 5 });
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue(
       Array.from({ length: 100 }, (_, i) => ({
@@ -737,9 +739,15 @@ describe('drainQueue', () => {
       }))
     );
     const result = await drainQueue(env, 'user');
-    expect(result!.entryCount).toBe(30);
+    expect(result!.entryCount).toBe(2);
     const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
-    expect(modelRows).toHaveLength(30);
+    expect(modelRows).toHaveLength(2);
+    const seeded = queueSendBatch.mock.calls.flatMap(([messages]) => messages);
+    const shards = new Set(seeded.map(message => message.body.shard));
+    expect(shards.size).toBe(15);
+    expect(
+      seeded.every(message => message.body.chunkSize === 2 && message.body.caseIds?.length === 2)
+    ).toBe(true);
     expect(modelRows[0].model).toBe('m/0');
   });
 

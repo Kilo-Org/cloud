@@ -23,3 +23,5 @@ export function splitByContiguousPrefix<T>(
     dynamicItems: items.slice(lastCompleteIndex + 1),
   };
 }
+
+// ci-probe 1

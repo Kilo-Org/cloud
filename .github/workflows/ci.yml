@@ -869,22 +869,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # kilo-app builds the harness SDK below; the harness SDK's own vitest run
-      # compiles the same typia plugin through @ttsc/unplugin.
+      # The harness SDK's own vitest run compiles the typia plugin through
+      # @ttsc/unplugin. kilo-app is not in this matrix: its sharded suite runs
+      # in kilo-app CI.
       - name: Cache compiler plugins
-        if: matrix.workspace.name == 'kilo-app' || matrix.workspace.name == '@kilocode/harness-sdk'
+        if: matrix.workspace.name == '@kilocode/harness-sdk'
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: node_modules/.cache/ttsc/plugins
           key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
-      # apps/mobile tests the app against the built harness SDK, the way it
-      # already runs against built trpc types.
-      - name: Build harness SDK
-        if: matrix.workspace.name == 'kilo-app'
-        run: pnpm --filter @kilocode/harness-sdk run build
 
       - name: Run tests
         run: pnpm --filter ${{ matrix.workspace.name }} test

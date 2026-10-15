@@ -76,6 +76,9 @@ export type SharedGatewayRequestProperties = {
 export type GatewayResponsesRequest = SharedGatewayRequestProperties &
   OpenAI.Responses.ResponseCreateParams;
 
+export type GatewayResponsesCompactRequest = SharedGatewayRequestProperties &
+  OpenAI.Responses.ResponseCompactParams;
+
 export type GatewayMessagesRequest = SharedGatewayRequestProperties &
   Anthropic.MessageCreateParams & {
     user?: string;
@@ -105,6 +108,7 @@ export type MessageWithReasoning = {
 export type GatewayRequest =
   | { kind: 'chat_completions'; body: OpenRouterChatCompletionRequest }
   | { kind: 'responses'; body: GatewayResponsesRequest }
+  | { kind: 'responses_compact'; body: GatewayResponsesCompactRequest }
   | { kind: 'messages'; body: GatewayMessagesRequest };
 
 export type OpenRouterGeneration = {

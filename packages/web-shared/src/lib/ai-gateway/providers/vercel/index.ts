@@ -11,6 +11,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
   GatewayRequest,
+  GatewayResponsesCompactRequest,
   OpenRouterProviderConfig,
   VercelInferenceProviderConfig,
   VercelProviderConfig,
@@ -25,6 +26,7 @@ import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 import { passesRoutingPercentage } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-percentage';
+import { VERCEL_COMPACTION_INFERENCE_PROVIDER } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/responses-compaction';
 
 export function hasCompatibleVercelInferenceProvider(
   openRouterInferenceProviders: string[],
@@ -69,12 +71,39 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
   return optOutModels.has(requestedModel);
 }
 
+/**
+ * Vercel forwards compaction to OpenAI only, so it serves models with an OpenAI
+ * endpoint when the routing preferences allow OpenAI.
+ */
+async function canRouteCompactionToVercel(
+  requestedModel: string,
+  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
+) {
+  const vercelModelId = await mapModelIdToVercel(requestedModel);
+  const vercelInferenceProviders = await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
+  if (!vercelInferenceProviders?.includes(VERCEL_COMPACTION_INFERENCE_PROVIDER)) {
+    console.debug('[shouldRouteToVercel] model has no OpenAI endpoint on Vercel for compaction');
+    return false;
+  }
+  const provider = await getRoutingProviderConfig();
+  return (
+    getVercelInferenceProvidersExcludingIgnored(provider?.ignore ?? [], provider?.only, [
+      VERCEL_COMPACTION_INFERENCE_PROVIDER,
+    ]).length > 0
+  );
+}
+
 export async function shouldRouteToVercel(
   requestedModel: string,
   request: GatewayRequest,
   randomSeed: string,
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ) {
+  // Only Vercel serves compaction, so it skips the opt-out and the rollout percentage.
+  if (request.kind === 'responses_compact') {
+    return canRouteCompactionToVercel(requestedModel, getRoutingProviderConfig);
+  }
+
   const routingConfig = await getRuntimeGatewayRoutingConfig();
   if (isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels)) {
     console.debug(`[shouldRouteToVercel] model ${requestedModel} opted out of Vercel routing`);
@@ -133,6 +162,22 @@ export async function shouldRouteToVercel(
   }
 
   return true;
+}
+
+/**
+ * Vercel forwards compaction to OpenAI unchanged apart from the model id, and
+ * OpenAI rejects the gateway routing fields. Compaction is priced at standard
+ * rates, so a requested service tier is dropped.
+ */
+export async function applyVercelResponsesCompactSettings(
+  requestedModel: string,
+  requestToMutate: GatewayResponsesCompactRequest
+) {
+  requestToMutate.model = await mapModelIdToVercel(requestedModel);
+  delete requestToMutate.provider;
+  delete requestToMutate.providerOptions;
+  delete requestToMutate.models;
+  delete requestToMutate.service_tier;
 }
 
 function convertProviderSort(

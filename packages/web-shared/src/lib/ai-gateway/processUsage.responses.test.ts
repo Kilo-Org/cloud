@@ -1,6 +1,7 @@
 import { test, describe, expect } from '@jest/globals';
 import {
   extractResponsesPromptInfo,
+  parseResponsesCompactionUsageFromString,
   parseResponsesMicrodollarUsageFromStream,
   parseResponsesMicrodollarUsageFromString,
   processResponsesApiUsage,
@@ -296,5 +297,45 @@ describe('parseMicrodollarUsageFromString approval tests', () => {
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
+  });
+});
+
+describe('parseResponsesCompactionUsageFromString', () => {
+  const compaction = {
+    id: 'resp_1',
+    object: 'response.compaction',
+    created_at: 1,
+    output: [{ type: 'compaction', id: 'cmp_1', encrypted_content: 'opaque' }],
+    usage: {
+      input_tokens: 118,
+      input_tokens_details: { cache_write_tokens: 0, cached_tokens: 18 },
+      output_tokens: 2255,
+      output_tokens_details: { reasoning_tokens: 1984 },
+      total_tokens: 2373,
+    },
+  };
+
+  test('reads tokens and leaves the cost for the caller', () => {
+    expect(parseResponsesCompactionUsageFromString(JSON.stringify(compaction), 200)).toMatchObject({
+      messageId: 'resp_1',
+      hasError: false,
+      model: null,
+      responseContent: '',
+      inputTokens: 118,
+      cacheHitTokens: 18,
+      outputTokens: 2255,
+      cost_mUsd: 0,
+      streamed: false,
+      status_code: 200,
+    });
+  });
+
+  test('marks upstream errors', () => {
+    const error = { error: { message: 'Unknown parameter', type: 'invalid_request_error' } };
+    expect(parseResponsesCompactionUsageFromString(JSON.stringify(error), 400)).toMatchObject({
+      hasError: true,
+      inputTokens: 0,
+      outputTokens: 0,
+    });
   });
 });

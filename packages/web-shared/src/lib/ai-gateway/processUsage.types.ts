@@ -135,6 +135,8 @@ export type MicrodollarUsageContext = {
   max_tokens: number | null;
   has_middle_out_transform: boolean | null;
   isStreaming: boolean;
+  /** Set for `POST /responses/compact`, whose response carries no cost or generation id. */
+  isResponsesCompaction?: boolean;
   prior_microdollar_usage: number;
   /** User email for authenticated users - used as PostHog distinctId. Undefined for anonymous users. */
   posthog_distinct_id?: string;

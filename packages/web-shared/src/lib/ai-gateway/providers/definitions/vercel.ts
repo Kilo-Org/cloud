@@ -8,7 +8,7 @@ export const VERCEL_AI_GATEWAY = {
   disableUrlSuffix: false,
   apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
   apiKeyHeader: null,
-  supportedChatApis: ['chat_completions', 'messages', 'responses'],
+  supportedChatApis: ['chat_completions', 'messages', 'responses', 'responses_compact'],
   responseTransforms: null,
   async transformRequest() {},
 } as const satisfies Provider;

@@ -72,6 +72,12 @@ export function applyTrackingIds(
         request.body.session_id = taskHash;
       }
     }
+  } else if (request.kind === 'responses_compact') {
+    // The compact endpoint rejects safety_identifier; the session cache key
+    // still lets compaction reuse the prompt cache of the session's requests.
+    if (taskHash) {
+      request.body.prompt_cache_key = taskHash;
+    }
   } else {
     if (taskHash) {
       request.body.prompt_cache_key = taskHash;

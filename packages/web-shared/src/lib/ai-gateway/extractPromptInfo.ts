@@ -8,7 +8,7 @@ export function extractPromptInfo(requestBodyParsed: GatewayRequest): PromptInfo
   if (requestBodyParsed.kind === 'messages') {
     return extractMessagesPromptInfo(requestBodyParsed.body);
   }
-  if (requestBodyParsed.kind === 'responses') {
+  if (requestBodyParsed.kind === 'responses' || requestBodyParsed.kind === 'responses_compact') {
     return extractResponsesPromptInfo(requestBodyParsed.body);
   }
   return extractChatCompletionsPromptInfo(requestBodyParsed.body);

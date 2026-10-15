@@ -254,6 +254,25 @@ export function apiKindNotSupportedResponse(
   );
 }
 
+function compactionNotSupportedResponse(error: string) {
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.api_kind_not_supported, message: error },
+    { status: 400 }
+  );
+}
+
+export function autoModelCompactionNotSupportedResponse() {
+  return compactionNotSupportedResponse(
+    'The responses_compact API is not supported for auto models. Request the model that will continue the conversation.'
+  );
+}
+
+export function byokCompactionNotSupportedResponse() {
+  return compactionNotSupportedResponse(
+    'The responses_compact API is not supported with BYOK credentials.'
+  );
+}
+
 async function redactedErrorResponse(response: Response) {
   const error = 'The upstream provider was unable to process the request';
   warnExceptInTest(`Responding with ${response.status} ${error}`);
@@ -698,7 +717,9 @@ type PromptBearingRequest = {
  * request carries no user text.
  */
 export function lastUserPromptText(request: PromptBearingRequest): string | null {
-  if (request.kind === 'responses') return lastUserTurnText(request.body.input);
+  if (request.kind === 'responses' || request.kind === 'responses_compact') {
+    return lastUserTurnText(request.body.input);
+  }
   if (request.kind === 'fim_completions') {
     return typeof request.body.prompt === 'string' ? request.body.prompt : null;
   }

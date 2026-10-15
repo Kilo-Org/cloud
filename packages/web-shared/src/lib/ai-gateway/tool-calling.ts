@@ -1,6 +1,7 @@
 import type {
   GatewayMessagesRequest,
   GatewayRequest,
+  GatewayResponsesCompactRequest,
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -36,7 +37,7 @@ export function normalizeToolCallIds(
 
   if (requestToMutate.kind === 'chat_completions') {
     normalizeChatCompletionsToolCallIds(requestToMutate.body, normalize);
-  } else if (requestToMutate.kind === 'responses') {
+  } else if (requestToMutate.kind === 'responses' || requestToMutate.kind === 'responses_compact') {
     normalizeResponsesToolCallIds(requestToMutate.body, normalize);
   } else {
     normalizeMessagesToolCallIds(requestToMutate.body, normalize);
@@ -60,7 +61,7 @@ function normalizeChatCompletionsToolCallIds(
 }
 
 function normalizeResponsesToolCallIds(
-  body: GatewayResponsesRequest,
+  body: GatewayResponsesRequest | GatewayResponsesCompactRequest,
   normalize: (toolCallId: string) => string
 ) {
   if (!Array.isArray(body.input)) return;
@@ -197,7 +198,7 @@ const SANITIZED_TOOL_NAME = 'read';
 export function sanitizeBinaryToolResults(request: GatewayRequest): void {
   if (request.kind === 'chat_completions') {
     sanitizeChatCompletionsToolResults(request.body);
-  } else if (request.kind === 'responses') {
+  } else if (request.kind === 'responses' || request.kind === 'responses_compact') {
     sanitizeResponsesToolResults(request.body);
   } else {
     sanitizeMessagesToolResults(request.body);
@@ -237,7 +238,9 @@ function sanitizeChatCompletionsToolResults(body: OpenRouterChatCompletionReques
   }
 }
 
-function sanitizeResponsesToolResults(body: GatewayResponsesRequest): void {
+function sanitizeResponsesToolResults(
+  body: GatewayResponsesRequest | GatewayResponsesCompactRequest
+): void {
   if (!Array.isArray(body.input)) return;
 
   const toolNameById = new Map<string, string>();

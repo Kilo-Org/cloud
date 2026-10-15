@@ -2208,3 +2208,135 @@ describe('auto-routing shadow classifier', () => {
     expect(mockedAfter).toHaveBeenCalledWith(expect.any(Function));
   });
 });
+
+describe('POST /api/v1/responses/compact', () => {
+  const vercelProvider = {
+    ...provider,
+    id: 'vercel',
+    apiUrl: 'https://ai-gateway.vercel.sh/v1',
+    supportedChatApis: ['chat_completions', 'messages', 'responses', 'responses_compact'],
+  } satisfies Provider;
+
+  const compactionInput = [
+    { role: 'user', content: 'Refactor the auth module.' },
+    { role: 'assistant', content: 'Done.' },
+  ];
+
+  function makeCompactRequest(body: Record<string, unknown>, headers?: HeadersInit) {
+    return makeRequest(
+      { model: 'openai/gpt-5.4', input: compactionInput, ...body },
+      headers,
+      '/responses/compact',
+      '/api/v1'
+    );
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: vercelProvider,
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({
+        id: 'resp_1',
+        object: 'response.compaction',
+        output: [{ type: 'compaction', id: 'cmp_1', encrypted_content: 'opaque' }],
+        usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
+      }),
+    });
+  });
+
+  it('sends the compaction to Vercel without gateway routing fields', async () => {
+    const response = await handleLlmProxyRequest(
+      makeCompactRequest(
+        { provider: { order: ['openai'] }, models: ['openai/gpt-5.4'], service_tier: 'priority' },
+        { 'x-kilocode-taskid': 'task-1' }
+      )
+    );
+
+    expect(response.status).toBe(200);
+    const upstream = mockedUpstreamRequest.mock.calls[0]?.[0];
+    expect(upstream?.chatApi).toBe('responses_compact');
+    expect(upstream?.body).toEqual({
+      model: 'openai/gpt-5.4',
+      input: compactionInput,
+      prompt_cache_key: expect.any(String),
+    });
+  });
+
+  it('bills the compaction as a non-streaming Responses call', async () => {
+    await handleLlmProxyRequest(makeCompactRequest({}));
+
+    const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
+    expect(usageContext).toMatchObject({
+      api_kind: 'responses',
+      isResponsesCompaction: true,
+      isStreaming: false,
+      provider: 'vercel',
+      requested_model: 'openai/gpt-5.4',
+    });
+  });
+
+  it('rejects auto models before routing', async () => {
+    const response = await handleLlmProxyRequest(
+      makeCompactRequest({ model: 'kilo-auto/frontier' })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_type: 'api_kind_not_supported' });
+    expect(mockedApplyResolvedAutoModel).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects BYOK because Vercel cannot attach the credential to a compaction', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: vercelProvider,
+      userByok: [{ decryptedAPIKey: 'sk-user', providerId: 'openai' }],
+      bypassAccessCheck: false,
+    });
+
+    const response = await handleLlmProxyRequest(makeCompactRequest({}));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_type: 'api_kind_not_supported' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects providers that do not serve compaction', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+
+    const response = await handleLlmProxyRequest(makeCompactRequest({}));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_type: 'api_kind_not_supported' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects previous_response_id', async () => {
+    const response = await handleLlmProxyRequest(
+      makeCompactRequest({ previous_response_id: 'resp_0' })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_type: 'unsupported_field' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed input', async () => {
+    const response = await handleLlmProxyRequest(makeCompactRequest({ input: 42 }));
+
+    expect(response.status).toBe(400);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+});

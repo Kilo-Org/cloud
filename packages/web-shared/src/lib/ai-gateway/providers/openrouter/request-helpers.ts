@@ -10,6 +10,9 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 export function getMaxTokens(request: GatewayRequest) {
+  if (request.kind === 'responses_compact') {
+    return null;
+  }
   if (request.kind === 'responses') {
     return request.body.max_output_tokens ?? null;
   }
@@ -20,6 +23,9 @@ export function getMaxTokens(request: GatewayRequest) {
 }
 
 export function getReasoningEffort(request: GatewayRequest) {
+  if (request.kind === 'responses_compact') {
+    return null;
+  }
   if (request.kind === 'messages') {
     return request.body.output_config?.effort ?? null;
   }
@@ -339,6 +345,9 @@ export function scrubOpenCodeSpecificProperties(request: OpenRouterChatCompletio
 }
 
 export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
+  if (request.kind === 'responses_compact') {
+    return false;
+  }
   if (request.kind === 'messages') {
     return request.body.thinking?.type === 'disabled';
   }

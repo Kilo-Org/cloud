@@ -50,6 +50,7 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { extractReasoningSetting } from './llm-proxy-helpers';
+import { getVercelCompactionPricingTiers } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/responses-compaction';
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
@@ -65,6 +66,14 @@ jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   deliverUsageEventWireBody: jest.fn(async () => ({ delivered: true, status: 204 })),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/responses-compaction', () => ({
+  ...(jest.requireActual(
+    '@kilocode/web-shared/lib/ai-gateway/providers/vercel/responses-compaction'
+  ) as Record<string, unknown>),
+  getVercelCompactionPricingTiers: jest.fn(async () => null),
+}));
+
+const mockedGetVercelCompactionPricingTiers = jest.mocked(getVercelCompactionPricingTiers);
 const mockedReportUsageEvent = jest.mocked(reportUsageEvent);
 const mockedDeliverUsageEventWireBody = jest.mocked(deliverUsageEventWireBody);
 
@@ -1703,5 +1712,119 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     );
 
     expect(metadata.api_kind).toBe('audio_transcriptions');
+  });
+});
+
+describe('countAndStoreUsage for responses compaction', () => {
+  function compactionResponse(status = 200) {
+    return new Response(
+      JSON.stringify({
+        id: `resp_compaction_${status}`,
+        object: 'response.compaction',
+        created_at: 1,
+        output: [{ type: 'compaction', id: 'cmp_1', encrypted_content: 'opaque' }],
+        usage: {
+          input_tokens: 1000,
+          input_tokens_details: { cached_tokens: 400, cache_write_tokens: 0 },
+          output_tokens: 200,
+          output_tokens_details: { reasoning_tokens: 150 },
+          total_tokens: 1200,
+        },
+      }),
+      { status, headers: { 'content-type': 'application/json' } }
+    );
+  }
+
+  function compactionUsageContext(user: User): MicrodollarUsageContext {
+    return {
+      api_kind: 'responses',
+      isResponsesCompaction: true,
+      kiloUserId: user.id,
+      prior_microdollar_usage: user.microdollars_used,
+      provider: 'vercel',
+      fraudHeaders: getFraudDetectionHeaders(new Headers()),
+      isStreaming: false,
+      project_id: null,
+      requested_model: 'openai/gpt-5.4',
+      promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
+      max_tokens: null,
+      has_middle_out_transform: null,
+      status_code: 200,
+      editor_name: null,
+      machine_id: null,
+      user_byok: false,
+      has_tools: false,
+      feature: null,
+      session_id: null,
+      mode: null,
+      auto_model: null,
+      reasoning_setting: null,
+      ttfb_ms: null,
+    };
+  }
+
+  beforeEach(() => {
+    mockedGetVercelCompactionPricingTiers.mockClear();
+    mockedGetVercelCompactionPricingTiers.mockResolvedValue([
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 2.5,
+          completion_per_million: 15,
+          input_cache_read_per_million: 0.25,
+          input_cache_write_per_million: null,
+        },
+      },
+    ]);
+  });
+
+  test('charges the compaction at the endpoint price without a generation lookup', async () => {
+    const user = await insertTestUser({
+      id: 'test-compaction-user',
+      microdollars_used: 0,
+      google_user_email: 'compaction@example.com',
+    });
+
+    const result = await countAndStoreUsage(
+      compactionResponse(),
+      compactionUsageContext(user),
+      undefined
+    );
+
+    // 600 uncached * $2.5/M + 400 cached * $0.25/M + 200 output * $15/M
+    const expectedCost = 1500 + 100 + 3000;
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result!.usageId),
+    });
+    expect(usageRecord).toMatchObject({
+      cost: expectedCost,
+      input_tokens: 1000,
+      cache_hit_tokens: 400,
+      output_tokens: 200,
+      provider: 'vercel',
+      model: 'openai/gpt-5.4',
+      has_error: false,
+    });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(expectedCost);
+  });
+
+  test('does not charge a failed compaction', async () => {
+    const user = await insertTestUser({
+      id: 'test-compaction-error-user',
+      microdollars_used: 0,
+      google_user_email: 'compaction-error@example.com',
+    });
+
+    const result = await countAndStoreUsage(
+      compactionResponse(500),
+      { ...compactionUsageContext(user), status_code: 500 },
+      undefined
+    );
+
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result!.usageId),
+    });
+    expect(usageRecord).toMatchObject({ cost: 0, has_error: true });
+    expect(mockedGetVercelCompactionPricingTiers).not.toHaveBeenCalled();
   });
 });

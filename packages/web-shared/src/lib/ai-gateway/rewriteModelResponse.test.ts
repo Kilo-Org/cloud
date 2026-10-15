@@ -1320,6 +1320,28 @@ describe('redactApiRequestLogRequest', () => {
 });
 
 describe('rewriteModelResponse', () => {
+  test('passes a compaction response through as JSON', async () => {
+    const compaction = {
+      id: 'resp_1',
+      object: 'response.compaction',
+      created_at: 1,
+      output: [{ type: 'compaction', id: 'cmp_1', encrypted_content: 'opaque' }],
+      usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+    };
+
+    const result = await rewriteModelResponse({
+      response: jsonResponse(compaction),
+      model: 'openai/gpt-5.4',
+      providerId: 'vercel',
+      kind: 'responses_compact',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual(compaction);
+  });
+
   test('rewrites paid-model Kilo organization traffic without stripping cost', async () => {
     const result = await rewriteModelResponse({
       response: jsonResponse({

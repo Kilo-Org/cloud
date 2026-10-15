@@ -55,6 +55,7 @@ describe('session tracking identifiers', () => {
     { kind: 'chat_completions', body: { model: 'test-model', messages: [] } },
     { kind: 'messages', body: { model: 'test-model', messages: [], max_tokens: 100 } },
     { kind: 'responses', body: { model: 'test-model', input: 'Hello' } },
+    { kind: 'responses_compact', body: { model: 'test-model', input: 'Hello' } },
   ];
 
   it.each(requests)('uses the shared session hash for $kind tracking', request => {
@@ -77,6 +78,17 @@ describe('session tracking identifiers', () => {
         ? trackedRequest.body.session_id
         : trackedRequest.body.prompt_cache_key;
     expect(trackedSession).toBeUndefined();
+  });
+
+  it('omits the safety identifier the compact endpoint rejects', () => {
+    const request: GatewayRequest = {
+      kind: 'responses_compact',
+      body: { model: 'test-model', input: 'Hello' },
+    };
+    applyTrackingIds(request, OPENROUTER, userId, sessionId);
+
+    expect(request.body).not.toHaveProperty('safety_identifier');
+    expect(request.body).not.toHaveProperty('user');
   });
 });
 

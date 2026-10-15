@@ -239,6 +239,7 @@ export function detectToolCallArgumentErrors(
   responseText: string,
   request: GatewayRequest
 ): ApiRequestLogError | null {
+  if (request.kind === 'responses_compact') return null;
   const lines = parseSseDataLines(responseText);
   if (lines.length === 0) return null;
 

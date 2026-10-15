@@ -5,6 +5,7 @@ export function isKimiModel(model: string) {
 }
 
 export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {
+  if (requestToMutate.kind === 'responses_compact') return;
   // Moonshot models don't support the temperature parameter
   delete requestToMutate.body.temperature;
   // Kimi models only accept top_p=0.95; any other value causes a 400 error

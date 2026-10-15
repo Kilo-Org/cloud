@@ -74,7 +74,7 @@ function isObjectEntry<T>(value: T): value is T & object {
 }
 
 export function getToolsAvailable(request: GatewayRequest): string[] {
-  if (!Array.isArray(request.body.tools)) return [];
+  if (request.kind === 'responses_compact' || !Array.isArray(request.body.tools)) return [];
 
   if (request.kind === 'responses') {
     return request.body.tools.flatMap((tool): string[] => {
@@ -101,7 +101,7 @@ export function getToolsAvailable(request: GatewayRequest): string[] {
 }
 
 export function getToolsUsed(request: GatewayRequest): string[] {
-  if (request.kind === 'responses') {
+  if (request.kind === 'responses' || request.kind === 'responses_compact') {
     const { input } = request.body;
     if (!Array.isArray(input)) return [];
 

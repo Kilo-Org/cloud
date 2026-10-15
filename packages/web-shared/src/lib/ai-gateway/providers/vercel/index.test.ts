@@ -1,6 +1,7 @@
 import { afterEach, describe, it, expect, jest } from '@jest/globals';
 
 import {
+  applyVercelResponsesCompactSettings,
   applyVercelSettings,
   convertProviderOptions,
   getAnthropicProviderOptionsForVercel,
@@ -375,6 +376,79 @@ describe('shouldRouteToVercel', () => {
   });
 });
 
+describe('shouldRouteToVercel for compaction', () => {
+  const compaction: GatewayRequest = {
+    kind: 'responses_compact',
+    body: { model: 'openai/gpt-5.4', input: 'hello' },
+  };
+
+  async function loadShouldRouteToVercel(inferenceProviders: string[] | null) {
+    jest.resetModules();
+    // Disable the rollout and opt the model out: compaction must ignore both.
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
+      getRuntimeGatewayRoutingConfig: jest.fn(async () => ({
+        vercelPaid: 0,
+        vercelFree: 0,
+        vercelOptOutModels: new Set(['openai/gpt-5.4']),
+      })),
+    }));
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getVercelModelsFromDatabase: jest.fn(async () => new Set(['openai/gpt-5.4'])),
+      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => inferenceProviders),
+    }));
+    return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
+      .shouldRouteToVercel;
+  }
+
+  it('routes models with an OpenAI endpoint regardless of the rollout', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel(['azure', 'openai']);
+
+    await expect(
+      shouldRouteToVercel('openai/gpt-5.4', compaction, 'seed', async () => undefined)
+    ).resolves.toBe(true);
+  });
+
+  it.each([
+    { name: 'no OpenAI endpoint', providers: ['azure'] },
+    { name: 'unknown endpoints', providers: null },
+  ])('does not route models with $name', async ({ providers }) => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel(providers);
+
+    await expect(
+      shouldRouteToVercel('openai/gpt-5.4', compaction, 'seed', async () => undefined)
+    ).resolves.toBe(false);
+  });
+
+  it.each<OpenRouterProviderConfig>([{ only: ['azure'] }, { ignore: ['openai'] }])(
+    'respects provider policy %j that excludes OpenAI',
+    async policy => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel(['azure', 'openai']);
+
+      await expect(
+        shouldRouteToVercel('openai/gpt-5.4', compaction, 'seed', async () => policy)
+      ).resolves.toBe(false);
+    }
+  );
+});
+
+describe('applyVercelResponsesCompactSettings', () => {
+  it('maps the model and removes fields OpenAI rejects or that change the price', async () => {
+    const body: Extract<GatewayRequest, { kind: 'responses_compact' }>['body'] = {
+      model: 'openai/gpt-5.4',
+      input: 'hello',
+      prompt_cache_key: 'session',
+      provider: { order: ['openai'] },
+      providerOptions: { gateway: { only: ['openai'] } },
+      models: ['openai/gpt-5.4'],
+      service_tier: 'priority',
+    };
+
+    await applyVercelResponsesCompactSettings('gpt-5.4', body);
+
+    expect(body).toEqual({ model: 'openai/gpt-5.4', input: 'hello', prompt_cache_key: 'session' });
+  });
+});
+
 describe('applyVercelSettings BYOK pinning', () => {
   function byokRequest(ignore: string[]): GatewayRequest {
     return {
@@ -632,7 +706,10 @@ describe('applyVercelSettings managed requests', () => {
     };
   }
 
-  function managedRequestForApi(kind: GatewayRequest['kind'], model: string): GatewayRequest {
+  function managedRequestForApi(
+    kind: Exclude<GatewayRequest['kind'], 'responses_compact'>,
+    model: string
+  ): GatewayRequest {
     const provider = { ignore: ['openai'] };
     if (kind === 'responses') {
       return { kind, body: { model, input: 'hello', provider } };

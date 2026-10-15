@@ -3,10 +3,8 @@ import { fetchWithBackoff } from '../../fetchWithBackoff';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type {
-  GatewayResponsesRequest,
-  OpenRouterChatCompletionRequest,
+  GatewayRequest,
   OpenRouterGeneration,
-  GatewayMessagesRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getReasoningEffortTimeoutSuggestion } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
@@ -79,6 +77,7 @@ const GENERATION_FETCH_MAX_DELAY_MS = 75 * 1000;
 const CHAT_API_PATHS = {
   chat_completions: '/chat/completions',
   responses: '/responses',
+  responses_compact: '/responses/compact',
   messages: '/messages',
 } as const satisfies Record<GatewayChatApiKind, string>;
 
@@ -266,7 +265,7 @@ export async function upstreamRequest({
   chatApi: GatewayChatApiKind;
   search: string;
   method: string;
-  body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
+  body: GatewayRequest['body'];
   extraHeaders: Record<string, string>;
   provider: Provider;
   signal?: AbortSignal;

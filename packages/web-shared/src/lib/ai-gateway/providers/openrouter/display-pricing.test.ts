@@ -23,6 +23,27 @@ describe('undoPricingDiscount', () => {
     }
   });
 
+  it('reverses the discount on input-length tiers', () => {
+    expect(
+      undoPricingDiscount({
+        prompt: '0.000001',
+        completion: '0.000004',
+        prompt_tiers: [
+          { cost: '0.000001', min: 0, max: 272000 },
+          { cost: '0.000002', min: 272000 },
+        ],
+        discount: 0.5,
+      })
+    ).toEqual({
+      prompt: '0.000002000000',
+      completion: '0.000008000000',
+      prompt_tiers: [
+        { cost: '0.000002000000', min: 0, max: 272000 },
+        { cost: '0.000004000000', min: 272000 },
+      ],
+    });
+  });
+
   it('leaves pricing untouched when there is no discount', () => {
     const pricing = { prompt: '0.000001', completion: '0.000005' };
     expect(undoPricingDiscount(pricing)).toBe(pricing);

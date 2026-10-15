@@ -2345,6 +2345,15 @@ export const ModelSchema = z.object({
 
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 
+// Vercel prices some models by input length; each tier's per-token cost applies
+// from `min` input tokens. OpenRouter does not list tiers.
+const EndpointPriceTiersSchema = z
+  .array(z.object({ cost: z.string(), min: z.number(), max: z.number().optional() }))
+  .optional()
+  .catch(undefined);
+
+export type EndpointPriceTiers = z.infer<typeof EndpointPriceTiersSchema>;
+
 export const EndpointSchema = z.object({
   tag: z.string().optional(),
   provider_name: z.string().optional(),
@@ -2360,6 +2369,10 @@ export const EndpointSchema = z.object({
       web_search: z.string().optional(),
       internal_reasoning: z.string().optional(),
       discount: z.number().optional(),
+      prompt_tiers: EndpointPriceTiersSchema,
+      completion_tiers: EndpointPriceTiersSchema,
+      input_cache_read_tiers: EndpointPriceTiersSchema,
+      input_cache_write_tiers: EndpointPriceTiersSchema,
     })
     .optional(),
 });

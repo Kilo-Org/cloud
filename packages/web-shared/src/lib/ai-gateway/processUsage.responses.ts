@@ -11,7 +11,10 @@ import type {
   PromptInfo,
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import type { GatewayResponsesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayResponsesCompactRequest,
+  GatewayResponsesRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   computeOpenRouterCostFields,
   computeVercelCostMicrodollars,
@@ -258,6 +261,41 @@ export function parseResponsesMicrodollarUsageFromString(
   return { ...coreProps, ...costs };
 }
 
+type ResponsesCompactionApiResponse = Partial<OpenAI.Responses.CompactedResponse> & {
+  usage?: ResponsesApiUsage | null;
+};
+
+/**
+ * Parses a `POST /responses/compact` body. It names no model and carries no
+ * cost, so the cost is left at zero for the caller to price.
+ */
+export function parseResponsesCompactionUsageFromString(
+  fullResponse: string,
+  statusCode: number
+): MicrodollarUsageStats {
+  const responseJson = JSON.parse(fullResponse) as ResponsesCompactionApiResponse | null;
+
+  const coreProps = {
+    messageId: responseJson?.id ?? null,
+    hasError: statusCode >= 400 || responseJson?.object !== 'response.compaction',
+    model: null,
+    // The compacted window is opaque encrypted content.
+    responseContent: '',
+    inference_provider: null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: false,
+    cancelled: null,
+    status_code: statusCode,
+  } satisfies NotYetCostedUsageStats;
+
+  const costs = processResponsesApiUsage(responseJson?.usage, null, coreProps);
+  return { ...coreProps, ...costs };
+}
+
 export function extractInputItemTextContent(
   item: unknown,
   roles: ReadonlySet<string>
@@ -285,7 +323,9 @@ export function extractInputItemTextContent(
   return null;
 }
 
-export function extractResponsesPromptInfo(body: GatewayResponsesRequest): PromptInfo {
+export function extractResponsesPromptInfo(
+  body: GatewayResponsesRequest | GatewayResponsesCompactRequest
+): PromptInfo {
   const input = Array.isArray(body.input) ? body.input : [];
   const systemRoles = new Set(['system', 'developer']);
   const userRoles = new Set(['user']);

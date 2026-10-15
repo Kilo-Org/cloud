@@ -46,12 +46,15 @@ import {
 import { getModelVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 
+// A compaction must run on the model that consumes it, so it never resolves an auto model.
+export type AutoModelRequest = Exclude<GatewayRequest, { kind: 'responses_compact' }>;
+
 type ResolveAutoModelParams = {
   model: string;
   modeHeader: string | null;
   featureHeader: FeatureValue | null;
   sessionId: string | null;
-  apiKind: GatewayRequest['kind'] | null;
+  apiKind: AutoModelRequest['kind'] | null;
   clientIp: string | null;
   isAutoFreeCandidateAllowed: ((modelId: string) => Promise<boolean>) | null;
   // Decisions are lazy so only the selected router captures the request body.
@@ -357,7 +360,7 @@ export async function resolveAutoModel(
 
 export async function applyResolvedAutoModel(
   params: ResolveAutoModelParams,
-  request: GatewayRequest,
+  request: AutoModelRequest,
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ): Promise<ResolveAutoModelResult> {

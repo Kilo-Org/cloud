@@ -976,7 +976,7 @@ export async function rewriteModelResponse({
       responseTransforms,
     });
   }
-  if (kind === 'responses') {
+  if (kind === 'responses' || kind === 'responses_compact') {
     return rewriteModelResponse_Responses({
       response,
       removeCost: requiresCostRemoval,

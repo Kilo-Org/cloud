@@ -11,7 +11,10 @@ import {
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import {
+  applyVercelResponsesCompactSettings,
+  applyVercelSettings,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   applyKiloExclusiveModelSettings,
   type KiloExclusiveModel,
@@ -302,6 +305,26 @@ export async function applyProviderSpecificLogic(
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
+
+  // The compact endpoint takes a narrow parameter set, so none of the
+  // model-specific generation settings below apply to it.
+  if (requestToMutate.kind === 'responses_compact') {
+    if (provider.id === 'vercel') {
+      await applyVercelResponsesCompactSettings(requestedModel, requestToMutate.body);
+    }
+    await provider.transformRequest({
+      provider,
+      model: requestedModel,
+      request: requestToMutate,
+      originalHeaders,
+      extraHeaders,
+      userByok,
+      kilo_user_id: userId,
+      organization_id: organizationId,
+      session_id: sessionId,
+    });
+    return;
+  }
 
   if (isGeminiModel(requestedModel)) {
     sanitizeJsonRefToolResults(requestToMutate);

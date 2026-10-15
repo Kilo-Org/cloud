@@ -13,6 +13,7 @@ import {
 import type {
   OpenRouterChatCompletionRequest,
   GatewayResponsesRequest,
+  GatewayResponsesCompactRequest,
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -64,6 +65,8 @@ import {
   unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
+  autoModelCompactionNotSupportedResponse,
+  byokCompactionNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
@@ -166,7 +169,7 @@ function stripRequiredPrefix(str: string, prefix: string): string | null {
 function validatePath(
   url: URL
 ):
-  | { path: '/chat/completions' | '/responses' | '/messages' }
+  | { path: '/chat/completions' | '/responses' | '/responses/compact' | '/messages' }
   | { errorResponse: ReturnType<typeof invalidPathResponse> } {
   const pathSuffix =
     stripRequiredPrefix(url.pathname, '/api/gateway/v1') ??
@@ -179,6 +182,7 @@ function validatePath(
   if (
     pathSuffix === '/chat/completions' ||
     pathSuffix === '/responses' ||
+    pathSuffix === '/responses/compact' ||
     pathSuffix === '/messages'
   ) {
     return { path: pathSuffix };
@@ -273,6 +277,9 @@ export async function handleLlmProxyRequest(
     } else if (path === '/messages') {
       const body: GatewayMessagesRequest = JSON.parse(requestBodyText);
       requestBodyParsed = { kind: 'messages', body };
+    } else if (path === '/responses/compact') {
+      const body: GatewayResponsesCompactRequest = JSON.parse(requestBodyText);
+      requestBodyParsed = { kind: 'responses_compact', body };
     } else {
       const body: GatewayResponsesRequest = JSON.parse(requestBodyText);
       requestBodyParsed = { kind: 'responses', body };
@@ -302,12 +309,16 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  if (requestBodyParsed.kind === 'responses') {
+  if (requestBodyParsed.kind === 'responses' || requestBodyParsed.kind === 'responses_compact') {
     const { input } = requestBodyParsed.body;
     if (input != null && typeof input !== 'string' && !Array.isArray(input)) {
       return invalidRequestResponse();
     }
   }
+
+  // Compaction is a Responses API call, and usage records only know that kind.
+  const usageApiKind =
+    requestBodyParsed.kind === 'responses_compact' ? 'responses' : requestBodyParsed.kind;
 
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
@@ -404,6 +415,10 @@ export async function handleLlmProxyRequest(
   // auto-routing error instead of the generic model-not-allowed error.
   let isAutoEfficientRequest = false;
   if (isKiloAutoModel(requestedModelLowerCased)) {
+    if (requestBodyParsed.kind === 'responses_compact') {
+      return autoModelCompactionNotSupportedResponse();
+    }
+    const autoModelRequest = requestBodyParsed;
     autoModel = requestedModelLowerCased;
     const isAutoEfficientId =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
@@ -438,8 +453,8 @@ export async function handleLlmProxyRequest(
       ];
       const result = await fetchEfficientAutoDecision({
         ...(router === 'frontier' ? { router } : {}),
-        apiKind: requestBodyParsed.kind,
-        body: requestBodyParsed.body,
+        apiKind: autoModelRequest.kind,
+        body: autoModelRequest.body,
         requestedModel,
         providerHints: autoRoutingProviderHints,
         bodyBytes: Buffer.byteLength(requestBodyText),
@@ -467,7 +482,7 @@ export async function handleLlmProxyRequest(
         modeHeader,
         featureHeader: feature,
         sessionId: taskId ?? null,
-        apiKind: requestBodyParsed.kind,
+        apiKind: autoModelRequest.kind,
         clientIp: ipAddress ?? null,
         efficientDecision,
         frontierDecision,
@@ -477,7 +492,7 @@ export async function handleLlmProxyRequest(
           return policy ? (await getEffectiveModelDecision(policy, modelId)).allowed : true;
         },
       },
-      requestBodyParsed,
+      autoModelRequest,
       authPromise.then(res => res.user),
       balanceAndSettingsPromise.then(res => res.balance)
     );
@@ -664,7 +679,7 @@ export async function handleLlmProxyRequest(
             is_byok: false,
           };
           const classifierContext: MicrodollarUsageContext = {
-            api_kind: requestBodyParsed.kind,
+            api_kind: usageApiKind,
             kiloUserId: user.id,
             fraudHeaders,
             organizationId,
@@ -711,8 +726,9 @@ export async function handleLlmProxyRequest(
   }
 
   if (
-    requestBodyParsed.kind === 'responses' &&
-    (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
+    (requestBodyParsed.kind === 'responses' && requestBodyParsed.body.store) ||
+    ((requestBodyParsed.kind === 'responses' || requestBodyParsed.kind === 'responses_compact') &&
+      requestBodyParsed.body.previous_response_id)
   ) {
     return storeAndPreviousResponseIdIsNotSupported();
   }
@@ -819,6 +835,12 @@ export async function handleLlmProxyRequest(
     );
   }
 
+  // Vercel forwards compaction to OpenAI without its provider options, so a
+  // BYOK credential cannot be attached and Kilo's account would pay instead.
+  if (requestBodyParsed.kind === 'responses_compact' && effectiveProviderContext.userByok) {
+    return byokCompactionNotSupportedResponse();
+  }
+
   // Large responses may run longer than the 800s serverless function timeout.
   const requestMaxTokens = getMaxTokens(requestBodyParsed);
   if (requestMaxTokens && requestMaxTokens > MAX_TOKENS_LIMIT) {
@@ -875,8 +897,10 @@ export async function handleLlmProxyRequest(
 
   // Extract properties for usage context after final provider selection.
   const promptInfo = extractPromptInfo(requestBodyParsed);
+  const isStreaming =
+    requestBodyParsed.kind !== 'responses_compact' && requestBodyParsed.body.stream === true;
   const usageContext: MicrodollarUsageContext = {
-    api_kind: requestBodyParsed.kind,
+    api_kind: usageApiKind,
     kiloUserId: user.id,
     provider: effectiveProviderContext.provider.id,
     requested_model: effectiveModelIdLowerCased,
@@ -885,7 +909,8 @@ export async function handleLlmProxyRequest(
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
     reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
     fraudHeaders,
-    isStreaming: requestBodyParsed.body.stream === true,
+    isStreaming,
+    isResponsesCompaction: requestBodyParsed.kind === 'responses_compact',
     organizationId,
     prior_microdollar_usage: user.microdollars_used,
     posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
@@ -894,7 +919,9 @@ export async function handleLlmProxyRequest(
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
     machine_id: machineIdHeader,
     user_byok: !!effectiveProviderContext.userByok,
-    has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
+    has_tools:
+      requestBodyParsed.kind !== 'responses_compact' &&
+      (requestBodyParsed.body.tools?.length ?? 0) > 0,
     botId,
     tokenSource,
     feature,
@@ -995,7 +1022,7 @@ export async function handleLlmProxyRequest(
       kiloUserId: user.id,
       organizationId,
       isAnonymous: isAnonymousContext(user),
-      isStreaming: requestBodyParsed.body.stream === true,
+      isStreaming,
       userByok: !!effectiveProviderContext.userByok,
       mode: modeHeader || undefined,
       provider: effectiveProviderContext.provider.id,

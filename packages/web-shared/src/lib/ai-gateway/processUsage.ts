@@ -74,8 +74,13 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
   parseResponsesMicrodollarUsageFromStream,
+  parseResponsesCompactionUsageFromString,
   parseResponsesMicrodollarUsageFromString,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.responses';
+import {
+  getVercelCompactionPricingTiers,
+  VERCEL_COMPACTION_INFERENCE_PROVIDER,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/responses-compaction';
 import {
   parseMessagesMicrodollarUsageFromStream,
   parseMessagesMicrodollarUsageFromString,
@@ -1026,7 +1031,11 @@ export function countAndStoreUsage(
   };
 
   if (clonedReponse.body) {
-    if (usageContext.api_kind === 'responses') {
+    if (usageContext.isResponsesCompaction) {
+      usageStatsPromise = parseResponseText(content =>
+        parseResponsesCompactionUsageFromString(content, clonedReponse.status)
+      ).then(usageStats => usageStats && priceResponsesCompaction(usageStats, usageContext));
+    } else if (usageContext.api_kind === 'responses') {
       usageStatsPromise = usageContext.isStreaming
         ? parseResponsesMicrodollarUsageFromStream(
             clonedReponse.body,
@@ -1271,6 +1280,37 @@ export function parseMicrodollarUsageFromString(
   return { ...coreProps, ...costs };
 }
 
+async function priceResponsesCompaction(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext
+): Promise<MicrodollarUsageStats> {
+  const priced = { ...usageStats, inference_provider: VERCEL_COMPACTION_INFERENCE_PROVIDER };
+  if (usageStats.hasError) return priced;
+  const pricingTiers = await getVercelCompactionPricingTiers(usageContext.requested_model);
+  if (!pricingTiers) {
+    captureMessage('SUSPICIOUS: no Vercel pricing for responses compaction', {
+      level: 'error',
+      tags: { source: 'usage_processing' },
+      extra: { model: usageContext.requested_model },
+    });
+    return priced;
+  }
+  const uncachedInputTokens =
+    usageStats.inputTokens - usageStats.cacheHitTokens - usageStats.cacheWriteTokens;
+  priced.cost_mUsd = Math.round(
+    calculateCost_mUsd(
+      {
+        uncachedInputTokens: Math.max(0, uncachedInputTokens),
+        totalOutputTokens: usageStats.outputTokens,
+        cacheHitTokens: usageStats.cacheHitTokens,
+        cacheWriteTokens: usageStats.cacheWriteTokens,
+      },
+      pricingTiers
+    )
+  );
+  return priced;
+}
+
 export function calculateKiloExclusiveCost_mUsd(
   model: KiloExclusiveModel,
   usage: JustTheCostsUsageStats
@@ -1477,7 +1517,8 @@ async function getGenerationLookupProvider(
         ? VERCEL_AI_GATEWAY
         : undefined;
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
-  if (!provider || !isSuccessStatusCode) {
+  // A compaction response has no generation id to look up.
+  if (!provider || !isSuccessStatusCode || usageContext.isResponsesCompaction) {
     return undefined;
   }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;

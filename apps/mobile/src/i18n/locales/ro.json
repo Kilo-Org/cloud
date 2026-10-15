@@ -2667,7 +2667,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Dimensiunea ferestrei de context nu este disponibilă",
-      "pillLabel": "Context · {{value}}",
       "tapToViewDetails": "Atinge pentru a vedea detaliile contextului.",
       "costSuffix": ", costul {{cost}}",
       "tokensWindowUnavailable": "Context: {{used}} tokenuri, dimensiunea ferestrei nu este disponibilă",

@@ -7,10 +7,11 @@
     "cf-typegen": "wrangler types --include-runtime=false --env-interface CloudflareBindings",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "test:integration": "vitest run --config vitest.workers.config.ts",
     "test:integration:watch": "vitest --config vitest.workers.config.ts",
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/session-ingest/src"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/session-ingest/src services/session-ingest/test/postgres"
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",

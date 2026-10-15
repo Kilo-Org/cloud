@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   estimateRequestCostUsd,
-  poolEntryKey,
+  benchmarkPairKey,
   ProductionAutoMetricsResponseSchema,
   rankCandidates,
   resolveEffectivePolicy,
@@ -116,7 +116,7 @@ export function optimizeThresholdPolicy(params: {
   >();
   let evaluableRoutes = 0;
   for (const summary of summaries) {
-    const key = poolEntryKey({ model: summary.model, variant: summary.variant });
+    const key = benchmarkPairKey({ model: summary.model, variant: summary.variant });
     let candidates = byRoute.get(summary.routeKey);
     if (!candidates) {
       candidates = new Map();
@@ -171,7 +171,7 @@ export function optimizeThresholdPolicy(params: {
         })[0];
         if (!pick) continue;
         const heldOut = candidates.get(
-          poolEntryKey({ model: pick.model, variant: pick.variant ?? null })
+          benchmarkPairKey({ model: pick.model, variant: pick.variant ?? null })
         )?.heldOut;
         if (!heldOut || heldOut.cases === 0 || heldOut.accuracy === null) continue;
         scoreSum += heldOut.accuracy * heldOut.cases;

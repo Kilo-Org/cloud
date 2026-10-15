@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "قەبارەی پەنجەرەی کۆنتێکست بەردەست نییە",
-      "pillLabel": "چوارچێوە · {{value}}",
       "tapToViewDetails": "بۆ بینینی وردەکارییەکانی کۆنتێکست، لێی بدە.",
       "costSuffix": "، تێچوون {{cost}}",
       "tokensWindowUnavailable": "کۆنتێکست: {{used}} تۆکن، قەبارەی پەنجەرە بەردەست نییە",

@@ -4,6 +4,8 @@ import {
   EfficientModelPoolSchema,
   MAX_POOL_ENTRIES,
   poolEntryKey,
+  benchmarkPairKey,
+  PersistedEfficientModelPoolSchema,
   rankCandidates,
   RankedCandidateSchema,
   RoutingTableSchema,
@@ -409,21 +411,29 @@ describe('CustomRoutingTableSchema', () => {
 });
 
 describe('EfficientModelPoolSchema', () => {
-  it('rejects duplicate exact pairs', () => {
+  it('rejects duplicate models', () => {
+    expect(EfficientModelPoolSchema.safeParse([{ model: 'a/b' }, { model: 'a/b' }]).success).toBe(
+      false
+    );
+  });
+
+  it('rejects the same model with different legacy variants', () => {
     expect(
       EfficientModelPoolSchema.safeParse([
         { model: 'a/b', variant: 'xhigh' },
-        { model: 'a/b', variant: 'xhigh' },
+        { model: 'a/b', variant: 'max' },
       ]).success
     ).toBe(false);
   });
 
-  it('accepts the same model with different variants', () => {
-    const parsed = EfficientModelPoolSchema.parse([
-      { model: 'a/b', variant: 'xhigh' },
-      { model: 'a/b', variant: 'max' },
-    ]);
-    expect(parsed).toHaveLength(2);
+  it('dedupes legacy stored variants into model-only entries', () => {
+    expect(
+      PersistedEfficientModelPoolSchema.parse([
+        { model: 'a/b', variant: 'xhigh' },
+        { model: 'a/b', variant: 'max' },
+        { model: 'c/d', variant: null },
+      ])
+    ).toEqual([{ model: 'a/b' }, { model: 'c/d' }]);
   });
 
   it('rejects zero entries', () => {
@@ -433,7 +443,6 @@ describe('EfficientModelPoolSchema', () => {
   it('rejects more than MAX_POOL_ENTRIES entries', () => {
     const entries = Array.from({ length: MAX_POOL_ENTRIES + 1 }, (_, i) => ({
       model: `model/${i}`,
-      variant: null,
     }));
     expect(EfficientModelPoolSchema.safeParse(entries).success).toBe(false);
   });
@@ -445,27 +454,30 @@ describe('EfficientModelPoolSchema', () => {
   it('accepts the maximum of 10 unique entries', () => {
     const entries = Array.from({ length: MAX_POOL_ENTRIES }, (_, i) => ({
       model: `model/${i}`,
-      variant: null as string | null,
     }));
     expect(EfficientModelPoolSchema.safeParse(entries).success).toBe(true);
   });
 });
 
-describe('poolEntryKey', () => {
+describe('benchmarkPairKey', () => {
   it('distinguishes xhigh, max, and null variants of one model', () => {
     const model = 'provider/model';
     const keys = [
-      poolEntryKey({ model, variant: 'xhigh' }),
-      poolEntryKey({ model, variant: 'max' }),
-      poolEntryKey({ model, variant: null }),
+      benchmarkPairKey({ model, variant: 'xhigh' }),
+      benchmarkPairKey({ model, variant: 'max' }),
+      benchmarkPairKey({ model, variant: null }),
     ];
     expect(new Set(keys).size).toBe(3);
   });
 
   it('round-trips through JSON as a collision-safe encoding', () => {
     const entry = { model: 'provider/model', variant: 'xhigh' as string | null };
-    const key = poolEntryKey(entry);
+    const key = benchmarkPairKey(entry);
     expect(JSON.parse(key)).toEqual([entry.model, entry.variant]);
-    expect(poolEntryKey({ model: entry.model, variant: entry.variant })).toBe(key);
+    expect(benchmarkPairKey(entry)).toBe(key);
   });
+});
+
+it('keys pool membership by model alone', () => {
+  expect(JSON.parse(poolEntryKey({ model: 'provider/model' }))).toEqual(['provider/model']);
 });

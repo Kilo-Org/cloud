@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Cabbirka daaqadda macnaha guud lama heli karo",
-      "pillLabel": "Xaalad · {{value}}",
       "tapToViewDetails": "Taabo si aad u aragto faahfaahinta macnaha guud.",
       "costSuffix": ", kharash {{cost}}",
       "tokensWindowUnavailable": "Macnaha guud: {{used}} halbeeg qoraal, cabbirka daaqadda lama heli karo",

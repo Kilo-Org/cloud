@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Големината на контекстниот прозорец не е достапна",
-      "pillLabel": "Контекст · {{value}}",
       "tapToViewDetails": "Допри за да ги видиш деталите за контекстот.",
       "costSuffix": ", трошок {{cost}}",
       "tokensWindowUnavailable": "Контекст: {{used}} токени, големината на контекстниот прозорец не е достапна",

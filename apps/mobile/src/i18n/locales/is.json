@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Stærð samhengisglugga ekki tiltæk",
-      "pillLabel": "Samhengi · {{value}}",
       "tapToViewDetails": "Ýttu til að sjá upplýsingar um samhengið.",
       "costSuffix": ", kostnaður {{cost}}",
       "tokensWindowUnavailable": "Samhengi: {{used}} tókar, stærð samhengisglugga ekki tiltæk",

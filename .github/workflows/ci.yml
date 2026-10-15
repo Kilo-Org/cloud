@@ -539,9 +539,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build wrapper bundle
-        working-directory: services/cloud-agent-next/wrapper
-        run: bun run build.ts
+      - name: Build wrapper bundles with isolated production dependencies
+        run: |
+          build_dir=$(mktemp -d "$RUNNER_TEMP/wrapper-build.XXXXXX")
+          trap 'rm -rf "$build_dir"' EXIT
+
+          # Match Dockerfile inputs without access to workspace node_modules.
+          tar -C services/cloud-agent-next --exclude=node_modules --exclude=dist \
+            -cf - wrapper src/shared | tar -C "$build_dir" -xf -
+          cd "$build_dir/wrapper"
+          bun install --production
+          ln -sfn "$build_dir/wrapper/node_modules" "$build_dir/node_modules"
+          bun run build.ts --install-dir "$build_dir/bin"
 
       - name: Test cloud-agent-next checkers
         run: pnpm --filter cloud-agent-next test:checkers

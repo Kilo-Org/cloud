@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "কনটেক্সট উইন্ডোর আকার জানা যাচ্ছে না",
-      "pillLabel": "প্রসঙ্গ · {{value}}",
       "tapToViewDetails": "কনটেক্সটের বিস্তারিত দেখতে ট্যাপ করুন।",
       "costSuffix": ", খরচ {{cost}}",
       "tokensWindowUnavailable": "কনটেক্সটে {{used}}টি টোকেন, উইন্ডোর আকার জানা যাচ্ছে না",

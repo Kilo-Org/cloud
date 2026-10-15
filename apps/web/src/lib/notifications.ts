@@ -73,15 +73,6 @@ export const normalUnconditionalNotifications: KiloNotification[] = [
     },
     showIn: ['extension', 'cli'],
   },
-  {
-    id: 'stepfun-step-5-preview-free-oct-8',
-    title: 'StepFun Step 5 Preview is free in Kilo!',
-    message:
-      'StepFun Step 5 Preview is now free to use in Kilo — a flagship agentic coding model with a 1M-token context window, tool calling, and image and video input.',
-    suggestModelId: 'stepfun/step-5-preview-free',
-    showIn: ['extension', 'cli'],
-    expiresAt: '2026-10-22T08:00:00Z',
-  },
 ];
 
 export async function generateUserNotifications(

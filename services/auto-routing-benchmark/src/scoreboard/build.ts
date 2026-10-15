@@ -1,6 +1,6 @@
 import {
   estimateRequestCostUsd,
-  poolEntryKey,
+  benchmarkPairKey,
   rankCandidates,
   type CandidatePricing,
   type ComplexityLabels,
@@ -55,7 +55,7 @@ export function buildScoreboard({
     variant?: string | null;
     reasoningEffort?: string | null;
   }) =>
-    poolEntryKey({
+    benchmarkPairKey({
       model: candidate.model,
       variant: candidate.variant ?? candidate.reasoningEffort ?? null,
     });

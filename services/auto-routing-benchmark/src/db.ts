@@ -12,8 +12,8 @@ import type {
   ProductionTokenProfile,
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
-import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
-import type { PoolEntry } from '@kilocode/auto-routing-contracts';
+import { benchmarkPairKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
+import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import {
   BENCHMARK_CONTAINER_BUDGET,
   BENCHMARK_USER_CONTAINER_LIMIT,
@@ -427,7 +427,7 @@ export async function getCaseResults(db: D1Database, runId: string): Promise<Cas
 
 export async function getRoutingCaseResultsForEntries(
   db: D1Database,
-  entries: readonly { entry: PoolEntry; runId: string }[]
+  entries: readonly { entry: BenchmarkPair; runId: string }[]
 ): Promise<OfflineSweep['pairs']> {
   const pairs = new Map<string, OfflineSweep['pairs'][number]>();
   const orm = drizzle(db);
@@ -460,7 +460,7 @@ export async function getRoutingCaseResultsForEntries(
     for (const row of rows) {
       if (row.routeKey === null) continue;
       const variant = variantFromStorage(row.variant);
-      const key = poolEntryKey({ model: row.model, variant });
+      const key = benchmarkPairKey({ model: row.model, variant });
       let pair = pairs.get(key);
       if (!pair) {
         pair = { model: row.model, variant, results: [] };
@@ -835,16 +835,16 @@ function boundProfileFailureReason(reason: string): string {
 export async function markProfilesRunningForRun(
   db: D1Database,
   runId: string,
-  entries: readonly PoolEntry[],
+  entries: readonly BenchmarkPair[],
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
   nowIso: string = new Date().toISOString()
-): Promise<PoolEntry[]> {
+): Promise<BenchmarkPair[]> {
   if (entries.length === 0) return [];
   const orm = drizzle(db);
   // Returns the entries this run actually claimed. An entry already claimed by
   // the other queue's run updates 0 rows and is dropped, so the pair is
   // measured once instead of being benchmarked (and billed) twice.
-  const claimed: PoolEntry[] = [];
+  const claimed: BenchmarkPair[] = [];
   for (const entry of entries) {
     const result = await orm
       .update(benchmarkProfiles)
@@ -1298,7 +1298,7 @@ export function clearPlatformRequestedStatement(
 export async function listReadyCurrentProfilesForEntries(
   db: D1Database,
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
-  entries: readonly PoolEntry[]
+  entries: readonly BenchmarkPair[]
 ): Promise<Array<{ model: string; variant: string; run_id: string | null }>> {
   if (entries.length === 0) return [];
   const models = [...new Set(entries.map(e => e.model))];
@@ -1450,7 +1450,7 @@ export async function listStaleRunningDeciderRuns(
   return rows.map(r => ({ id: r.id, purpose: r.purpose === 'user' ? 'user' : 'platform' }));
 }
 
-// What the most recent completed run measured for an exact Pool entry, plus
+// What the most recent completed run measured for an exact benchmark pair, plus
 // the benchmark identity it was measured under. startRun carries these
 // summaries into a new run only when the identity (engine + repetitions +
 // exact variant) still matches; otherwise the entry is re-benchmarked.
@@ -1469,13 +1469,13 @@ export type PriorModelResult = {
 
 /**
  * Canonical map key for an exact (model, variant) pair. Uses the shared
- * poolEntryKey contract helper so keys stay collision-safe.
+ * benchmarkPairKey contract helper so keys stay collision-safe.
  */
 export function exactPairKey(model: string, variant: string | null | undefined): string {
-  return poolEntryKey({ model, variant: variant ?? null });
+  return benchmarkPairKey({ model, variant: variant ?? null });
 }
 
-// Latest summaries per exact Pool entry for a benchmark kind: for each
+// Latest summaries per exact benchmark pair for a benchmark kind: for each
 // (model, variant), all routes from the most recent COMPLETED run that
 // included that pair (mixing routes across runs would pair incomparable numbers).
 export async function getLatestSummariesByModel(

@@ -157,10 +157,7 @@ describe('/api/auto-routing/settings', () => {
     mockedGetAutoRoutingSettings.mockResolvedValue({
       status: 200,
       body: settingsBody({
-        configuredPool: [
-          { model: 'anthropic/claude-sonnet-4', variant: 'high' },
-          { model: 'removed/model', variant: null },
-        ],
+        configuredPool: [{ model: 'anthropic/claude-sonnet-4' }, { model: 'removed/model' }],
         poolStatuses: [
           {
             entry: { model: 'anthropic/claude-sonnet-4', variant: 'high' },
@@ -181,8 +178,8 @@ describe('/api/auto-routing/settings', () => {
       expect.objectContaining({
         poolSupported: true,
         configuredPool: [
-          { model: 'anthropic/claude-sonnet-4', variant: 'high', unavailable: false },
-          { model: 'removed/model', variant: null, unavailable: true },
+          { model: 'anthropic/claude-sonnet-4', unavailable: false },
+          { model: 'removed/model', unavailable: true },
         ],
       })
     );
@@ -277,7 +274,7 @@ describe('/api/auto-routing/settings', () => {
         ownerType: 'org',
         ownerId: ORGANIZATION_ID,
         configuredMode: null,
-        configuredPool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        configuredPool: [{ model: 'google/gemini-2.5-flash' }],
         poolStatuses: [
           {
             entry: { model: 'google/gemini-2.5-flash', variant: null },
@@ -290,7 +287,7 @@ describe('/api/auto-routing/settings', () => {
     const response = await PUT(
       makeRequest(`/api/auto-routing/settings?organizationId=${ORGANIZATION_ID}`, {
         mode: null,
-        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        pool: [{ model: 'google/gemini-2.5-flash' }],
       })
     );
 
@@ -299,7 +296,7 @@ describe('/api/auto-routing/settings', () => {
       ownerType: 'org',
       ownerId: ORGANIZATION_ID,
       mode: null,
-      pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+      pool: [{ model: 'google/gemini-2.5-flash' }],
     });
   });
 
@@ -329,7 +326,7 @@ describe('/api/auto-routing/settings', () => {
       body: settingsBody({
         configuredMode: 'best_accuracy',
         mode: 'best_accuracy',
-        configuredPool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        configuredPool: [{ model: 'google/gemini-2.5-flash' }],
         poolStatuses: [
           {
             entry: { model: 'google/gemini-2.5-flash', variant: null },
@@ -342,7 +339,7 @@ describe('/api/auto-routing/settings', () => {
     const response = await PUT(
       makeRequest('/api/auto-routing/settings', {
         mode: 'best_accuracy',
-        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        pool: [{ model: 'google/gemini-2.5-flash' }],
       })
     );
 
@@ -354,7 +351,7 @@ describe('/api/auto-routing/settings', () => {
       ownerType: 'user',
       ownerId: USER_ID,
       mode: 'best_accuracy',
-      pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+      pool: [{ model: 'google/gemini-2.5-flash' }],
     });
     expect(mockedRequireActiveSubscriptionOrTrial).not.toHaveBeenCalled();
   });
@@ -368,15 +365,15 @@ describe('/api/auto-routing/settings', () => {
       name: 'non-null pool',
       body: {
         mode: null,
-        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        pool: [{ model: 'google/gemini-2.5-flash' }],
       },
     },
     {
       name: 'retryEntries',
       body: {
         mode: null,
-        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
-        retryEntries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        pool: [{ model: 'google/gemini-2.5-flash' }],
+        retryEntries: [{ model: 'google/gemini-2.5-flash' }],
       },
     },
   ])('PUT with $name returns 503 when settings endpoint is 404', async ({ body }) => {
@@ -422,7 +419,7 @@ describe('/api/auto-routing/settings', () => {
     const response = await PUT(
       makeRequest('/api/auto-routing/settings', {
         mode: null,
-        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        pool: [{ model: 'google/gemini-2.5-flash' }],
       })
     );
 
@@ -436,7 +433,7 @@ describe('/api/auto-routing/settings', () => {
   test.each([
     {
       name: 'virtual model',
-      entry: { model: 'kilo-auto/efficient', variant: null },
+      entry: { model: 'kilo-auto/efficient' },
       reason: 'virtual_model' as const,
       setup: () => {
         mockedGetEnhanced.mockResolvedValue({
@@ -446,7 +443,7 @@ describe('/api/auto-routing/settings', () => {
     },
     {
       name: 'hidden model',
-      entry: { model: 'kilo/hidden-model', variant: null },
+      entry: { model: 'kilo/hidden-model' },
       reason: 'hidden_model' as const,
       setup: () => {
         mockedGetEnhanced.mockResolvedValue({
@@ -456,7 +453,7 @@ describe('/api/auto-routing/settings', () => {
     },
     {
       name: 'BYOK-only model',
-      entry: { model: 'openai-codex/gpt-5', variant: null },
+      entry: { model: 'openai-codex/gpt-5' },
       reason: 'byok_only_model' as const,
       setup: () => {
         mockedGetByokUser.mockResolvedValue([model('openai-codex/gpt-5')]);
@@ -495,7 +492,7 @@ describe('/api/auto-routing/settings', () => {
     const response = await PUT(
       makeRequest(`/api/auto-routing/settings?organizationId=${ORGANIZATION_ID}`, {
         mode: null,
-        pool: [{ model: 'openai/gpt-4o', variant: null }],
+        pool: [{ model: 'openai/gpt-4o' }],
       })
     );
 
@@ -508,60 +505,8 @@ describe('/api/auto-routing/settings', () => {
     );
   });
 
-  test('rejects missing variant when model exposes variants', async () => {
-    const response = await PUT(
-      makeRequest('/api/auto-routing/settings', {
-        mode: null,
-        pool: [{ model: 'anthropic/claude-sonnet-4', variant: null }],
-      })
-    );
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual(
-      expect.objectContaining({
-        reason: 'missing_variant',
-        error: poolValidationMessage('missing_variant'),
-      })
-    );
-  });
-
-  test('rejects unknown variant keys', async () => {
-    const response = await PUT(
-      makeRequest('/api/auto-routing/settings', {
-        mode: null,
-        pool: [{ model: 'anthropic/claude-sonnet-4', variant: 'max' }],
-      })
-    );
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual(
-      expect.objectContaining({
-        reason: 'unknown_variant',
-      })
-    );
-  });
-
-  test('rejects unexpected variant on models without variants', async () => {
-    const response = await PUT(
-      makeRequest('/api/auto-routing/settings', {
-        mode: null,
-        pool: [{ model: 'google/gemini-2.5-flash', variant: 'high' }],
-      })
-    );
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual(
-      expect.objectContaining({
-        reason: 'unexpected_variant',
-      })
-    );
-  });
-
   test('rejects more than 10 entries', async () => {
-    const pool = Array.from({ length: 11 }, (_, i) => ({
-      model: `provider/model-${i}`,
-      variant: null,
-    }));
+    const pool = Array.from({ length: 11 }, (_, i) => ({ model: `provider/model-${i}` }));
 
     const response = await PUT(
       makeRequest('/api/auto-routing/settings', {
@@ -579,49 +524,16 @@ describe('/api/auto-routing/settings', () => {
     );
   });
 
-  test('rejects duplicate exact pairs but allows same model with different variants', async () => {
+  test('rejects duplicate models', async () => {
     const duplicate = await PUT(
       makeRequest('/api/auto-routing/settings', {
         mode: null,
-        pool: [
-          { model: 'anthropic/claude-sonnet-4', variant: 'high' },
-          { model: 'anthropic/claude-sonnet-4', variant: 'high' },
-        ],
+        pool: [{ model: 'anthropic/claude-sonnet-4' }, { model: 'anthropic/claude-sonnet-4' }],
       })
     );
     expect(duplicate.status).toBe(400);
     await expect(duplicate.json()).resolves.toEqual(
-      expect.objectContaining({ reason: 'duplicate_pair' })
-    );
-
-    mockedUpdateAutoRoutingSettings.mockResolvedValue({
-      status: 200,
-      body: settingsBody({
-        configuredPool: [
-          { model: 'anthropic/claude-sonnet-4', variant: 'high' },
-          { model: 'anthropic/claude-sonnet-4', variant: 'low' },
-        ],
-        poolStatuses: [],
-      }),
-    });
-
-    const allowed = await PUT(
-      makeRequest('/api/auto-routing/settings', {
-        mode: null,
-        pool: [
-          { model: 'anthropic/claude-sonnet-4', variant: 'high' },
-          { model: 'anthropic/claude-sonnet-4', variant: 'low' },
-        ],
-      })
-    );
-    expect(allowed.status).toBe(200);
-    expect(mockedUpdateAutoRoutingSettings).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pool: [
-          { model: 'anthropic/claude-sonnet-4', variant: 'high' },
-          { model: 'anthropic/claude-sonnet-4', variant: 'low' },
-        ],
-      })
+      expect.objectContaining({ reason: 'duplicate_model' })
     );
   });
 
@@ -629,7 +541,7 @@ describe('/api/auto-routing/settings', () => {
     mockedUpdateAutoRoutingSettings.mockResolvedValue({
       status: 200,
       body: settingsBody({
-        configuredPool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        configuredPool: [{ model: 'google/gemini-2.5-flash' }],
         poolStatuses: [
           {
             entry: { model: 'google/gemini-2.5-flash', variant: null },
@@ -642,8 +554,8 @@ describe('/api/auto-routing/settings', () => {
     const response = await PUT(
       makeRequest('/api/auto-routing/settings', {
         mode: null,
-        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
-        retryEntries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        pool: [{ model: 'google/gemini-2.5-flash' }],
+        retryEntries: [{ model: 'google/gemini-2.5-flash' }],
       })
     );
 
@@ -652,8 +564,8 @@ describe('/api/auto-routing/settings', () => {
       ownerType: 'user',
       ownerId: USER_ID,
       mode: null,
-      pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
-      retryEntries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+      pool: [{ model: 'google/gemini-2.5-flash' }],
+      retryEntries: [{ model: 'google/gemini-2.5-flash' }],
     });
   });
 
@@ -662,7 +574,7 @@ describe('/api/auto-routing/settings', () => {
       makeRequest('/api/auto-routing/settings', {
         mode: null,
         pool: null,
-        retryEntries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        retryEntries: [{ model: 'google/gemini-2.5-flash' }],
       })
     );
 
@@ -680,8 +592,8 @@ describe('/api/auto-routing/settings', () => {
     const response = await PUT(
       makeRequest('/api/auto-routing/settings', {
         mode: null,
-        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
-        retryEntries: [{ model: 'anthropic/claude-sonnet-4', variant: 'high' }],
+        pool: [{ model: 'google/gemini-2.5-flash' }],
+        retryEntries: [{ model: 'anthropic/claude-sonnet-4' }],
       })
     );
 

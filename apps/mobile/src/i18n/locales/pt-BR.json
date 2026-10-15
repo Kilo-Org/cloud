@@ -2108,7 +2108,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Tamanho da janela de contexto indisponível",
-      "pillLabel": "Contexto · {{value}}",
       "tapToViewDetails": "Toque para ver os detalhes do contexto.",
       "costSuffix": ", custo {{cost}}",
       "tokensWindowUnavailable": "Contexto: {{used}} tokens, tamanho da janela indisponível",

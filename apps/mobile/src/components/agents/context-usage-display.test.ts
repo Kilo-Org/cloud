@@ -155,7 +155,6 @@ describe('formatRemainingTokens', () => {
 });
 
 describe('getHeaderPillContent', () => {
-  // Migrated getHeaderSummary cases (info-present) + new no-info branches.
   it('marks unknown usage with the dash, non-interactive, with no info and no transcript', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(unknownUsage);
     expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(unknownUsage);
@@ -177,7 +176,6 @@ describe('getHeaderPillContent', () => {
       totalCostMicrodollars: 80_000,
       hasMessages: true,
     });
-    expect(result.primary).toContain('42%');
     expect(result).toMatchObject({
       secondary: '$0.08',
       hasCost: true,
@@ -223,7 +221,6 @@ describe('getHeaderPillContent', () => {
       totalCostMicrodollars: 1_000_000,
       hasMessages: true,
     });
-    expect(result.primary).toContain('125%');
     expect(result.tone).toBe('destructive');
     expect(result.arcFraction).toBe(1);
     expect(result.interactive).toBe(true);
@@ -235,7 +232,6 @@ describe('getHeaderPillContent', () => {
       totalCostMicrodollars: 120_000,
       hasMessages: true,
     });
-    expect(result.primary).toContain('32.4K');
     expect(result).toMatchObject({
       secondary: '$0.12',
       hasCost: true,

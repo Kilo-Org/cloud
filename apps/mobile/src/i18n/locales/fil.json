@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Hindi makuha ang kapasidad ng konteksto",
-      "pillLabel": "Konteksto · {{value}}",
       "tapToViewDetails": "I-tap para tingnan ang mga detalye ng konteksto.",
       "costSuffix": ", gastos {{cost}}",
       "tokensWindowUnavailable": "Konteksto: {{used}} na token, hindi makuha ang kapasidad",

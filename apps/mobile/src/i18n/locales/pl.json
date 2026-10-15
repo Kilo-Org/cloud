@@ -2159,7 +2159,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Rozmiar okna kontekstu niedostępny",
-      "pillLabel": "Kontekst · {{value}}",
       "tapToViewDetails": "Dotknij, aby zobaczyć szczegóły kontekstu.",
       "costSuffix": ", koszt {{cost}}",
       "tokensWindowUnavailable": "Kontekst: {{used}} tokenów, rozmiar okna niedostępny",

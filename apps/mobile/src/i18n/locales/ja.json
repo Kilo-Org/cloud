@@ -2119,7 +2119,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "コンテキストウィンドウのサイズは不明",
-      "pillLabel": "コンテキスト · {{value}}",
       "tapToViewDetails": "タップするとコンテキストの詳細を表示します。",
       "costSuffix": "、コスト {{cost}}",
       "tokensWindowUnavailable": "コンテキストは{{used}}トークン使用、ウィンドウのサイズは不明",

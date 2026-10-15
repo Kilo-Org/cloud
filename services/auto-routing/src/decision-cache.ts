@@ -1,4 +1,5 @@
 import {
+  BenchmarkPairSchema,
   ClassifierOutputSchema,
   DEFAULT_AUTO_ROUTER,
   type AutoRouter,
@@ -212,8 +213,7 @@ export function getHotCachedClassification(
   return entry.value;
 }
 
-const StickyDecisionSchema = z.object({
-  model: z.string().min(1),
+const StickyDecisionSchema = BenchmarkPairSchema.extend({
   // Taxonomy route the model was decided on, for route-change telemetry.
   // Nullable/defaulted so entries written before the field existed parse.
   routeKey: z.string().min(1).nullish().default(null),

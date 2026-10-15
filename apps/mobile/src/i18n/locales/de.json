@@ -2119,7 +2119,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Größe des Kontextfensters nicht verfügbar",
-      "pillLabel": "Kontext · {{value}}",
       "tapToViewDetails": "Tippe, um Kontextdetails anzusehen.",
       "costSuffix": ", kosten {{cost}}",
       "tokensWindowUnavailable": "Kontext: {{used}} Tokens, Größe des Kontextfensters nicht verfügbar",

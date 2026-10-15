@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "સંદર્ભ વિન્ડોનું કદ ઉપલબ્ધ નથી",
-      "pillLabel": "સંદર્ભ · {{value}}",
       "tapToViewDetails": "સંદર્ભની વિગતો જોવા ટેપ કરો.",
       "costSuffix": ", ખર્ચ {{cost}}",
       "tokensWindowUnavailable": "સંદર્ભમાં {{used}} ટોકન, વિન્ડોનું કદ ઉપલબ્ધ નથી",

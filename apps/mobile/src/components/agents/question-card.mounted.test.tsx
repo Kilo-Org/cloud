@@ -22,11 +22,6 @@ vi.mock('react-native', () => ({
   TextInput: MockTextInput,
   View: 'View',
 }));
-// `@/components/ui/dialog` reaches `DestructiveConfirmDialog`, which reads the
-// bottom inset; the native module cannot load under this partial RN mock.
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 24, left: 0, right: 0, top: 0 }),
-}));
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(),
   ImpactFeedbackStyle: { Light: 'light' },

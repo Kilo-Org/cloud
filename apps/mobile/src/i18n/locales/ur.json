@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "سیاق و سباق کی گنجائش دستیاب نہیں",
-      "pillLabel": "سیاق · {{value}}",
       "tapToViewDetails": "سیاق و سباق کی تفصیلات دیکھنے کے لیے ٹیپ کریں۔",
       "costSuffix": "، لاگت {{cost}}",
       "tokensWindowUnavailable": "سیاق و سباق: {{used}} ٹوکن، گنجائش دستیاب نہیں",

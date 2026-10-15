@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Tsy fantatra ny fetra ho an'ny angon'ny resaka",
-      "pillLabel": "Tontolon-kevitra · {{value}}",
       "tapToViewDetails": "Tsindrio hahitana ny antsipirian'ny angon'ny resaka.",
       "costSuffix": ", vidiny {{cost}}",
       "tokensWindowUnavailable": "Sombin-tsoratra {{used}} ao amin'ny angon'ny resaka, tsy fantatra ny fetra",

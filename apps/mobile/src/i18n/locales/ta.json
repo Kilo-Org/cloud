@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "சூழல் சாளரத்தின் அளவு கிடைக்கவில்லை",
-      "pillLabel": "சூழல் · {{value}}",
       "tapToViewDetails": "சூழல் விவரங்களைப் பார்க்கத் தட்டவும்.",
       "costSuffix": ", செலவு {{cost}}",
       "tokensWindowUnavailable": "சூழலில் {{used}} டோக்கன்கள், சாளரத்தின் அளவு கிடைக்கவில்லை",

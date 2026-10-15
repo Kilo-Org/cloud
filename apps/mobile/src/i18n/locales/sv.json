@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Kontextfönstrets storlek är inte tillgänglig",
-      "pillLabel": "Kontext · {{value}}",
       "tapToViewDetails": "Tryck för att visa kontextdetaljer.",
       "costSuffix": ", kostnad {{cost}}",
       "tokensWindowUnavailable": "Kontext: {{used}} token, fönstrets storlek är inte tillgänglig",

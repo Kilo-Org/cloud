@@ -23,8 +23,8 @@ import { createConnectionTicket } from '../dos/connection-ticket';
 import { getSessionExport } from '../services/session-export';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
-import { isDefaultSessionTitle } from '../ingest/default-session-title';
 import { resolveAccessibleKiloSession } from '../services/session-access';
+import { applyReportedSessionTitle, reportSessionTitleSchema } from '../services/session-title';
 import { signSessionShareToken } from '../services/session-share-token';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
 import { isWorktreeSessionDeleting } from '../services/worktree-deletion';
@@ -820,11 +820,6 @@ api.post('/session/:sessionId/unshare', async c => {
   return c.json({ success: true }, 200);
 });
 
-const reportSessionTitleSchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  generated: z.boolean(),
-});
-
 api.post('/session/:sessionId/rename-notify', async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
@@ -867,66 +862,26 @@ api.post('/session/:sessionId/title', async c => {
 
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
-  const { title, generated } = bodyParse.data;
 
-  const existingRows = await db
-    .select()
-    .from(cli_sessions_v2)
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    )
-    .limit(1);
-
-  const existing = existingRows[0];
-  if (!existing) {
+  const result = await applyReportedSessionTitle(db, {
+    sessionId: parsed.data,
+    kiloUserId,
+    input: bodyParse.data,
+  });
+  if (result.kind === 'not_found') {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
-
-  // generated: true applies only over NULL or default-pattern titles (Decision 8).
-  // generated: false is last-write-wins.
-  if (generated && !isDefaultSessionTitle(existing.title)) {
+  if (result.kind === 'refused') {
     return c.json({ applied: false }, 200);
   }
 
-  // Ownership filter shared by both paths. For generated writes, also CAS on the
-  // title observed at read time so a concurrent rename (or other non-default write)
-  // between select and update cannot be clobbered — Decision 8 must hold at write time.
-  const ownership = and(
-    eq(cli_sessions_v2.session_id, parsed.data),
-    eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-  );
-  const writeWhere = generated
-    ? and(
-        ownership,
-        existing.title == null
-          ? isNull(cli_sessions_v2.title)
-          : eq(cli_sessions_v2.title, existing.title)
-      )
-    : ownership;
-
-  // Preserve updated_at so title-only writes do not reorder activity lists
-  // (same as the web rename path).
-  const [updatedRow] = await db
-    .update(cli_sessions_v2)
-    .set({ title, updated_at: existing.updated_at })
-    .where(writeWhere)
-    .returning();
-
-  if (!updatedRow) {
-    // Generated CAS miss (intervening rename / non-default write) → refused, not 404.
-    if (generated) {
-      return c.json({ applied: false }, 200);
-    }
-    return c.json({ success: false, error: 'session_not_found' }, 404);
-  }
-
-  const session = mapSessionEventRow(updatedRow);
+  const session = mapSessionEventRow(result.row);
   notifyUserSessionEventFromContext(c, kiloUserId, {
     type: 'session.updated',
     data: { source: 'v2', session, changedAt: session.updatedAt },
   });
 
-  return c.json({ title: session.title ?? title, applied: true }, 200);
+  return c.json({ title: session.title ?? bodyParse.data.title, applied: true }, 200);
 });
 
 api.get('/sessions/active', async c => {

@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Madhësia e dritares së kontekstit nuk është e disponueshme",
-      "pillLabel": "Konteksti · {{value}}",
       "tapToViewDetails": "Prek për të parë detajet e kontekstit.",
       "costSuffix": ", kostoja {{cost}}",
       "tokensWindowUnavailable": "Konteksti: {{used}} tokenë, madhësia e dritares nuk është e disponueshme",

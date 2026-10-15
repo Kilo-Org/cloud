@@ -3,6 +3,7 @@
  * Intentionally does NOT mock drizzle — these tests fail if charged-event
  * column counts drift or the NOT EXISTS guard is missing.
  */
+import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { drizzle } from 'drizzle-orm/d1';
@@ -348,5 +349,41 @@ describe('claimUserRequestedStatement (real SQLite)', () => {
       .prepare(`SELECT user_requested FROM benchmark_profiles WHERE variant = 'high'`)
       .get() as { user_requested: number };
     expect(row.user_requested).toBe(0);
+  });
+
+  it('marks only requested pairs of an expanded pool through one JSON parameter', () => {
+    const efforts = ['', 'low', 'medium', 'high', 'xhigh'];
+    const models = Array.from({ length: 10 }, (_, i) => `vendor/m-${i}`);
+    for (const model of models) {
+      for (const variant of efforts) {
+        execSql(
+          db,
+          `INSERT INTO benchmark_profiles
+             (model, variant, engine_identity, repetitions, status, requested_at, updated_at,
+              platform_requested, user_requested)
+           VALUES (?, ?, ?, 1, 'ready', ?, ?, 1, 0)`,
+          [model, variant, current.engineIdentity, NOW, NOW]
+        );
+      }
+    }
+    const requested: BenchmarkPair[] = [
+      { model: 'vendor/m-0', variant: null },
+      ...models.flatMap(model => ['low', 'high'].map(variant => ({ model, variant }))),
+    ];
+
+    const q = toSql(claimUserRequestedStatement(orm, requested, current, NOW));
+    expect(q.sql.toLowerCase()).toContain('json_each');
+    expect(q.params.length).toBeLessThan(10);
+    runQuery(db, q);
+
+    const marked = db
+      .prepare(
+        `SELECT model, variant FROM benchmark_profiles WHERE user_requested = 1 ORDER BY model, variant`
+      )
+      .all() as Array<{ model: string; variant: string }>;
+    const expected = requested
+      .map(pair => ({ model: pair.model, variant: pair.variant ?? '' }))
+      .sort((a, b) => a.model.localeCompare(b.model) || a.variant.localeCompare(b.variant));
+    expect(marked).toEqual(expected);
   });
 });

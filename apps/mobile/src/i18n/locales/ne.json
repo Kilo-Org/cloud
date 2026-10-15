@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "सन्दर्भ विन्डोको आकार उपलब्ध छैन",
-      "pillLabel": "सन्दर्भ · {{value}}",
       "tapToViewDetails": "सन्दर्भ विवरण हेर्न ट्याप गर्नुहोस्।",
       "costSuffix": ", लागत {{cost}}",
       "tokensWindowUnavailable": "सन्दर्भमा {{used}} टोकन, विन्डोको आकार उपलब्ध छैन",

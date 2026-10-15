@@ -8,8 +8,8 @@ import {
   BenchmarkCatalogVariantsSchema,
   estimateRequestCostUsd,
   getReasoningVariantKeys,
-  PoolEntrySchema,
-  poolEntryKey,
+  BenchmarkPairSchema,
+  benchmarkPairKey,
   ProductionTokenProfileSchema,
   rankCandidates,
   rankValue,
@@ -17,7 +17,7 @@ import {
   RoutingTableSchema,
   wilsonLowerBound,
   type CandidatePricing,
-  type PoolEntry,
+  type BenchmarkPair,
   type ProductionTokenProfile,
   type RankedCandidate,
 } from '@kilocode/auto-routing-contracts';
@@ -54,7 +54,7 @@ const ScreeningModelSchema = BenchmarkModelCatalogSchema.shape.data.element.exte
 export const ScreeningCatalogSchema = z.object({ data: z.array(ScreeningModelSchema) });
 type ScreeningModel = z.infer<typeof ScreeningModelSchema>;
 type Result = OfflineSweep['pairs'][number]['results'][number];
-export type ScreenMeasurement = PoolEntry & { results: Result[] };
+export type ScreenMeasurement = BenchmarkPair & { results: Result[] };
 
 export const ScreenResumeSchema = z.object({
   startedAt: z.iso.datetime({ offset: true }),
@@ -124,7 +124,7 @@ export function restoreScreenMeasurements(
     if (savedModels.has(model.model)) throw new Error('Resume screen has duplicate models');
     savedModels.add(model.model);
     for (const variant of model.variants) {
-      const key = poolEntryKey({ model: model.model, variant: variant.variant });
+      const key = benchmarkPairKey({ model: model.model, variant: variant.variant });
       if (savedPairs.has(key)) throw new Error('Resume screen has duplicate model/variant pairs');
       const completed = new Set<string>();
       for (const result of variant.results) {
@@ -145,12 +145,12 @@ export function restoreScreenMeasurements(
   }
   if (
     savedPairs.size !== measurements.length ||
-    measurements.some(pair => !savedPairs.has(poolEntryKey(pair))) ||
+    measurements.some(pair => !savedPairs.has(benchmarkPairKey(pair))) ||
     savedModels.size !== new Set(measurements.map(pair => pair.model)).size
   ) {
     throw new Error('Resume screen must use the same candidate models and variants');
   }
-  for (const pair of measurements) pair.results = savedPairs.get(poolEntryKey(pair)) ?? [];
+  for (const pair of measurements) pair.results = savedPairs.get(benchmarkPairKey(pair)) ?? [];
 }
 
 export type ScreenMetrics = {
@@ -232,7 +232,7 @@ export function recordScreenModelCost(
 
 export function selectScreenCandidates(
   catalog: z.infer<typeof ScreeningCatalogSchema>,
-  pairs: readonly PoolEntry[],
+  pairs: readonly BenchmarkPair[],
   maxPromptUsdPerMtok: number,
   maxModels?: number
 ): ScreeningModel[] {
@@ -300,7 +300,10 @@ export function sampleScreenCases(cases: readonly DeciderCase[], casesPerRoute: 
     );
 }
 
-export function* screenCandidateJobs(pairs: readonly PoolEntry[], cases: readonly DeciderCase[]) {
+export function* screenCandidateJobs(
+  pairs: readonly BenchmarkPair[],
+  cases: readonly DeciderCase[]
+) {
   const pairIndicesByModel = new Map<string, number[]>();
   let rounds = 0;
   for (const [index, pair] of pairs.entries()) {
@@ -474,7 +477,9 @@ async function main() {
     values['max-models'] === undefined
       ? undefined
       : z.coerce.number().int().positive().parse(values['max-models']);
-  const pairs = z.array(PoolEntrySchema).parse(JSON.parse(await readFile(values.pairs, 'utf8')));
+  const pairs = z
+    .array(BenchmarkPairSchema)
+    .parse(JSON.parse(await readFile(values.pairs, 'utf8')));
   const table = RoutingTableSchema.parse(JSON.parse(await readFile(values.table, 'utf8')));
   const profile = values['cost-profile']
     ? ProductionTokenProfileSchema.parse(JSON.parse(await readFile(values['cost-profile'], 'utf8')))

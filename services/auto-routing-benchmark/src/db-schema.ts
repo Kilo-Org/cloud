@@ -250,7 +250,7 @@ export const routingTableCandidates = sqliteTable(
 );
 
 /**
- * Global Benchmark-profile registry: one current row per exact Pool entry per
+ * Global Benchmark-profile registry: one current row per exact benchmark pair per
  * engine identity + repetitions. Old-engine rows remain as history; currency
  * is decided by matching the live decider engine identity and repetitions.
  */
@@ -288,8 +288,8 @@ export const benchmarkProfiles = sqliteTable(
 
 /**
  * Rolling owner admission ledger for the 24h profile request quota. One row
- * per charged admission (new under current engine, or explicit failed retry).
- * Stale engine-drift re-admissions are free and do not insert here.
+ * per charged model admission (new under current engine, or explicit failed
+ * retry). Stale engine-drift re-admissions are free and do not insert here.
  */
 export const profileRequestEvents = sqliteTable(
   'profile_request_events',

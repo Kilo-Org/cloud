@@ -152,7 +152,7 @@ These changes will allow you to do local testing with a fake account.
 
 #### c. Add or rotate shared web environment variables
 
-Use the repository workflow instead of editing Vercel projects independently. It updates `kilocode-app`, `kilocode-global-app`, and `kilocode-ai-gateway` together for Development, Staging, and Production. `kilocode-global-app` is being phased out and no traffic is deliberately routed to it; it is updated only to keep it consistent until it is removed. A project that does not exist in Vercel yet is skipped and listed in the plan:
+Use the repository workflow instead of editing Vercel projects independently. It updates `kilocode-app` and `kilocode-ai-gateway` together for Development, Staging, and Production. A project that does not exist in Vercel yet is skipped and listed in the plan:
 
 ```bash
 pnpm web:env set EXAMPLE_API_TOKEN

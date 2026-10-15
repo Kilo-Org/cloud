@@ -35,6 +35,11 @@ jobs:
       # Detected by its own step pair for the same reason as harness_sdk.
       ai_gateway_secure_proxy: ${{ steps.filter_secure_proxy.outputs.ai_gateway_secure_proxy || steps.filter_secure_proxy_retry.outputs.ai_gateway_secure_proxy }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
+      # JSON from scripts/affected-workspaces.mjs, and the typecheck and lint
+      # groups it needs.
+      affected: ${{ steps.affected.outputs.affected }}
+      typecheck_groups: ${{ steps.affected.outputs.typecheck_groups }}
+      lint_groups: ${{ steps.affected.outputs.lint_groups }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
@@ -56,6 +61,9 @@ jobs:
 
       - name: Test dependency change detection
         run: node --test scripts/changed-dependencies.test.mjs
+
+      - name: Test affected workspace detection
+        run: node --test scripts/affected-workspaces.test.mjs
 
       - name: Test changes-filter retry wiring
         run: node --test scripts/changes-filter-retry.test.mjs
@@ -215,8 +223,40 @@ jobs:
           matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
-  typecheck:
+      # Pull requests check only the workspaces a change can affect. Main
+      # pushes and the merge queue pass no base, which selects every workspace.
+      - name: Detect affected workspaces
+        id: affected
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+        run: |
+          affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA")
+          jq . <<< "$affected"
+          typecheck_groups=$(jq -c '
+            .packages as $p | [
+              (select(.full or ($p | index("web")) or ($p | index("@kilocode/storybook"))) | "web"),
+              (select(.build | index("@kilocode/trpc")) | "trpc"),
+              (select(.full or ($p - ["web", "@kilocode/trpc", "@kilocode/storybook", "kilo-app", "kilo-extension"] | length > 0)) | "packages")
+            ]' <<< "$affected")
+          lint_groups=$(jq -c '
+            .dirs as $d | [
+              (select(.full or ($d | index("apps/mobile")) or ($d | index("apps/extension"))) | "trpc"),
+              (select(.full or ($d - ["apps/mobile", "apps/extension"] | length > 0)) | "rest")
+            ]' <<< "$affected")
+          {
+            echo "affected=$(jq -c . <<< "$affected")"
+            echo "typecheck_groups=$typecheck_groups"
+            echo "lint_groups=$lint_groups"
+          } >> "$GITHUB_OUTPUT"
+
+  typecheck-groups:
     needs: changes
+    if: needs.changes.outputs.typecheck_groups != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJSON(needs.changes.outputs.typecheck_groups) }}
+    name: typecheck (${{ matrix.group }})
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -243,6 +283,26 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+
+      - name: Typecheck
+        env:
+          KILO_AFFECTED: ${{ needs.changes.outputs.affected }}
+        run: scripts/typecheck-all.sh --group ${{ matrix.group }}
+
+  # Required check. Skipped groups (nothing affected) pass; a failed or
+  # cancelled group fails this job.
+  typecheck:
+    needs: [changes, typecheck-groups]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
 
       - name: Plugin shared-schemas sync check
         run: bash scripts/sync-plugin-shared.sh --check
@@ -250,11 +310,23 @@ jobs:
       - name: Plugin openclaw peer-dep pin check
         run: bash scripts/check-plugin-openclaw-pin.sh
 
-      - name: Typecheck
-        run: scripts/typecheck-all.sh
+      - name: Check typecheck results
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
+            exit 1
+          fi
 
-  lint:
+  lint-groups:
     needs: changes
+    if: needs.changes.outputs.lint_groups != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJSON(needs.changes.outputs.lint_groups) }}
+    name: lint (${{ matrix.group }})
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -275,6 +347,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Cache compiler plugins
+        if: matrix.group == 'trpc'
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: node_modules/.cache/ttsc/plugins
@@ -282,14 +355,37 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
+      # The mobile and extension sources lint against the built tRPC and
+      # harness SDK types.
       - name: Build trpc types
+        if: matrix.group == 'trpc'
         run: pnpm --filter @kilocode/trpc run build
 
       - name: Build harness SDK
+        if: matrix.group == 'trpc'
         run: pnpm --filter @kilocode/harness-sdk run build
 
       - name: Lint
-        run: scripts/lint-all.sh
+        env:
+          KILO_AFFECTED: ${{ needs.changes.outputs.affected }}
+        run: scripts/lint-all.sh --group ${{ matrix.group }}
+
+  # Required check. Skipped groups (nothing affected) pass; a failed or
+  # cancelled group fails this job.
+  lint:
+    needs: [changes, lint-groups]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Check lint results
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
+            exit 1
+          fi
 
   format-check:
     needs: changes

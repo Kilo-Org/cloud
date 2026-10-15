@@ -21,8 +21,8 @@ const rootScript = fileURLToPath(new URL('./typecheck-all.sh', import.meta.url))
 const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
 
 for (const [file, name, command, condition] of [
-  ['ci.yml', 'typecheck', 'scripts/typecheck-all.sh'],
-  ['ci.yml', 'lint', harnessBuild],
+  ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],
+  ['ci.yml', 'lint-groups', harnessBuild],
   ['ci.yml', 'harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
   [
     'ci.yml',

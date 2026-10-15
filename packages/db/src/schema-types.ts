@@ -2123,23 +2123,6 @@ export const OpenCodeVariantSchema = z.object({
 
 export type OpenCodeVariant = z.infer<typeof OpenCodeVariantSchema>;
 
-export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
-
-export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
-
-export const DirectByokModelSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
-  context_length: z.number(),
-  max_completion_tokens: z.number(),
-  variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
-});
-
-export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
-
-export type DirectByokModel = z.infer<typeof DirectByokModelSchema>;
-
 // models.dev `reasoning_options` format, consumed by Kilo CLI v2 to build its own
 // per-protocol reasoning variants.
 export const ReasoningOptionSchema = z.discriminatedUnion('type', [
@@ -2151,6 +2134,23 @@ export const ReasoningOptionSchema = z.discriminatedUnion('type', [
 ]);
 
 export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
+
+export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
+
+export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
+
+export const DirectByokModelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
+  context_length: z.number(),
+  max_completion_tokens: z.number(),
+  reasoning_options: z.array(ReasoningOptionSchema).optional(),
+});
+
+export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
+
+export type DirectByokModel = z.infer<typeof DirectByokModelSchema>;
 
 export const OpenCodeSettingsSchema = z.object({
   ai_sdk_provider: CustomLlmProviderSchema.optional(),

@@ -19,8 +19,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/model-settings', () => 
   getAiSdkProvider: jest.fn(),
 }));
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/variants', () => ({
-  getFallbackModelVariants: jest.fn(),
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options', () => ({
+  getFallbackReasoningOptions: jest.fn(),
 }));
 
 jest.mock('./direct-byok-definitions', () => ({
@@ -37,9 +37,7 @@ jest.mock('./direct-byok-definitions', () => ({
           flags: ['reasoning'],
           context_length: 4096,
           max_completion_tokens: 1024,
-          variants: {
-            high: { reasoning: { enabled: true, effort: 'high' } },
-          },
+          reasoning_options: [{ type: 'effort', values: ['high'] }],
         },
         {
           id: 'non-reasoning-model',
@@ -192,19 +190,18 @@ describe('getDirectByokModel', () => {
       high: { reasoning: { enabled: true, effort: 'high' } },
     });
     expect(models[0].opencode.reasoning_options).toEqual([{ type: 'effort', values: ['high'] }]);
-    expect(models[1].opencode).not.toHaveProperty('reasoning_options');
+    expect(models[1].opencode.reasoning_options).toBeUndefined();
   });
 
   test('does not fall back to model-name variants when reasoning is unsupported', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
     const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
-    const { getFallbackModelVariants } =
-      await import('@kilocode/web-shared/lib/ai-gateway/providers/variants');
-    const fallback = { thinking: { reasoning: { enabled: true, effort: 'high' as const } } };
+    const { getFallbackReasoningOptions } =
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options');
     jest
       .mocked(getBYOKforUser)
       .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
-    jest.mocked(getFallbackModelVariants).mockReturnValue(fallback);
+    jest.mocked(getFallbackReasoningOptions).mockReturnValue([{ type: 'toggle' }]);
 
     const models = await getDirectByokModelsForUser('user-id');
 
@@ -212,6 +209,7 @@ describe('getDirectByokModel', () => {
       high: { reasoning: { enabled: true, effort: 'high' } },
     });
     expect(models[1].opencode.variants).toBeUndefined();
-    expect(getFallbackModelVariants).not.toHaveBeenCalled();
+    expect(models[1].opencode.reasoning_options).toBeUndefined();
+    expect(getFallbackReasoningOptions).not.toHaveBeenCalled();
   });
 });

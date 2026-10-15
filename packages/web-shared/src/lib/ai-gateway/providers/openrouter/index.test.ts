@@ -501,7 +501,7 @@ describe('reasoning options', () => {
     const opencode = await getCatalog();
 
     expect(opencode('vendor/no-reasoning')?.variants).toBeUndefined();
-    expect(opencode('vendor/no-reasoning')).not.toHaveProperty('reasoning_options');
+    expect(opencode('vendor/no-reasoning')?.reasoning_options).toBeUndefined();
   });
 
   it('omits reasoning options for kilo-auto models', async () => {

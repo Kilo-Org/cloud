@@ -4,9 +4,9 @@ import type {
   DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
-  REASONING_VARIANTS_BINARY,
-  REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/variants';
+  effortOptions,
+  REASONING_TOGGLE,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 
 export const BYTEPLUS_CODING_PROVIDER_ID = 'byteplus-coding';
 
@@ -21,7 +21,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['recommended', 'vision', 'reasoning'],
     context_length: 262144,
     max_completion_tokens: 32768,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'kimi-k2.5',
@@ -31,7 +31,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['reasoning'],
     context_length: 262144,
     max_completion_tokens: 32768,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'glm-5.1',
@@ -41,7 +41,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['reasoning'],
     context_length: 204800,
     max_completion_tokens: 131072,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'glm-5.2',
@@ -50,7 +50,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['reasoning'],
     context_length: 204800,
     max_completion_tokens: 131072,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'deepseek-v4-flash',
@@ -59,7 +59,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['reasoning'],
     context_length: 128000,
     max_completion_tokens: 65536,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'deepseek-v4-pro',
@@ -68,7 +68,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['reasoning'],
     context_length: 128000,
     max_completion_tokens: 65536,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'gpt-oss-120b',
@@ -86,7 +86,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['vision', 'reasoning'],
     context_length: 262144,
     max_completion_tokens: 131072,
-    variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+    reasoning_options: effortOptions('minimal', 'low', 'medium', 'high'),
   },
   {
     id: 'dola-seed-2.0-pro',
@@ -96,7 +96,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['vision', 'reasoning'],
     context_length: 262144,
     max_completion_tokens: 131072,
-    variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+    reasoning_options: effortOptions('minimal', 'low', 'medium', 'high'),
   },
   {
     id: 'dola-seed-2.0-lite',
@@ -106,7 +106,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['vision', 'reasoning'],
     context_length: 262144,
     max_completion_tokens: 131072,
-    variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+    reasoning_options: effortOptions('minimal', 'low', 'medium', 'high'),
   },
 ] as const satisfies ReadonlyArray<BytePlusCodingModel>;
 

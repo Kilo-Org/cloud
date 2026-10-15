@@ -46,3 +46,5 @@ export function parentBadgeBucketFor(badgeBucket: string): string {
     ? badgeBucketForInstance(parsed.sandboxId)
     : badgeBucket;
 }
+
+// ci-probe 1

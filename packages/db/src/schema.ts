@@ -137,6 +137,7 @@ import type {
   CustomLlmDefinition,
   AutoFreeConfig,
   GatewayModelListConfig,
+  SyncProvidersRefreshFailures,
   KiloClawAdminAuditAction,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
@@ -5791,8 +5792,15 @@ export const ai_gateway_sync_providers_state = pgTable(
   'ai_gateway_sync_providers_state',
   {
     id: integer().primaryKey().default(1),
+    /**
+     * Every catalog entry has been refreshed at or after this time. Entries served from
+     * the previous snapshot hold it back to when they first failed to refresh.
+     */
     last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
     stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_failed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_failure_message: text(),
+    refresh_failures: jsonb().$type<SyncProvidersRefreshFailures>().notNull().default({}),
   },
   table => [check('ai_gateway_sync_providers_state_singleton', sql`${table.id} = 1`)]
 );

@@ -37,6 +37,8 @@ describe('GET /api/cron/sync-providers', () => {
       id: 1,
       generated_at: '2026-07-20T00:00:00.000Z',
       completed_at: '2026-07-20T00:05:00.000Z',
+      refreshed_through: '2026-07-20T00:05:00.000Z',
+      refresh_failure_count: 2,
       total_models: 42,
       total_providers: 12,
       direct_byok_model_counts: {},
@@ -58,6 +60,7 @@ describe('GET /api/cron/sync-providers', () => {
       outcome: 'succeeded',
       total_provider_count: 12,
       total_model_count: 42,
+      refresh_failure_count: 2,
     });
   });
 
@@ -68,6 +71,8 @@ describe('GET /api/cron/sync-providers', () => {
       id: 1,
       generated_at: '2026-07-20T00:00:00.000Z',
       completed_at: '2026-07-20T00:05:00.000Z',
+      refreshed_through: '2026-07-20T00:05:00.000Z',
+      refresh_failure_count: 2,
       total_models: 42,
       total_providers: 12,
       direct_byok_model_counts: {},

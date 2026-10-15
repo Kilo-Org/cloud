@@ -28,6 +28,11 @@ const STALE_SYNC = new Date(NOW.getTime() - SYNC_PROVIDERS_STALE_AFTER_MS);
 const OLDER_ALERT = new Date(STALE_SYNC.getTime() - 60_000);
 const NEWER_ALERT = new Date(STALE_SYNC.getTime() + 60_000);
 const EXPIRED_ALERT = new Date(NOW.getTime() - SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS * 1000);
+const noFailureDetails = async () => ({
+  lastFailedAt: null,
+  lastFailureMessage: null,
+  refreshFailures: {},
+});
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -169,6 +174,67 @@ describe('buildStaleSyncAlertNotification', () => {
 
     expect(notification.text).toContain('never recorded');
   });
+
+  it('includes the latest failed run when it happened after the last full refresh', () => {
+    const notification = buildStaleSyncAlertNotification({
+      lastCompletedAt: STALE_SYNC,
+      now: NOW,
+      details: {
+        lastFailedAt: NEWER_ALERT,
+        lastFailureMessage: '80 of 669 openrouter model endpoint requests failed <to refresh>',
+        refreshFailures: {},
+      },
+    });
+
+    expect(notification.text).toContain('No full sync has completed within the past hour');
+    expect(notification.text).toContain(
+      `Latest failed run: ${NEWER_ALERT.toISOString()}: 80 of 669 openrouter model endpoint requests failed <to refresh>.`
+    );
+    expect(JSON.stringify(notification.blocks)).toContain(
+      `*Latest failed run:* ${NEWER_ALERT.toISOString()}: 80 of 669 openrouter model endpoint requests failed &lt;to refresh&gt;`
+    );
+  });
+
+  it('omits a failed run that predates the last full refresh', () => {
+    const notification = buildStaleSyncAlertNotification({
+      lastCompletedAt: STALE_SYNC,
+      now: NOW,
+      details: {
+        lastFailedAt: OLDER_ALERT,
+        lastFailureMessage: 'old failure',
+        refreshFailures: {},
+      },
+    });
+
+    expect(notification.text).not.toContain('old failure');
+  });
+
+  it('names entries that have been served from previous data, oldest first', () => {
+    const refreshFailures = Object.fromEntries(
+      Array.from({ length: 7 }, (_, index) => [
+        `openrouter endpoints for test/model-${index}`,
+        {
+          since: new Date(STALE_SYNC.getTime() + (6 - index) * 60_000).toISOString(),
+          error: '408',
+        },
+      ])
+    );
+
+    const notification = buildStaleSyncAlertNotification({
+      lastCompletedAt: STALE_SYNC,
+      now: NOW,
+      details: { lastFailedAt: null, lastFailureMessage: null, refreshFailures },
+    });
+    const blocks = JSON.stringify(notification.blocks);
+
+    expect(notification.text).toContain(
+      'Some catalog entries have not refreshed within the past hour; their previous data remains in use.'
+    );
+    expect(blocks).toContain('*Entries using previous data (7):*');
+    expect(blocks.indexOf('test/model-6 since')).toBeLessThan(blocks.indexOf('test/model-5 since'));
+    expect(blocks).not.toContain('test/model-1 since');
+    expect(blocks).toContain('…and 2 more');
+  });
 });
 
 describe('sendStaleSyncAlertNotification', () => {
@@ -240,6 +306,7 @@ describe('alertIfSyncProvidersStale', () => {
       now: () => NOW,
       getLastCompletedAt: async () => STALE_SYNC.toISOString(),
       getLastAlertAt: async () => null,
+      getFailureDetails: noFailureDetails,
       setLastAlertAt,
       sendNotification,
     });
@@ -251,6 +318,40 @@ describe('alertIfSyncProvidersStale', () => {
     expect(setLastAlertAt).toHaveBeenCalledWith(NOW.toISOString());
     expect(SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS).toBe(3 * 24 * 60 * 60);
     expect(SYNC_PROVIDERS_STALE_AFTER_MS).toBe(60 * 60 * 1000);
+  });
+
+  it('includes stored failure details in the posted alert', async () => {
+    const sendNotification = jest.fn(
+      async (_notification: AdminSlackNotification) => 'posted' as const
+    );
+    const refreshFailures = {
+      'models for provider Together': { since: STALE_SYNC.toISOString(), error: '408' },
+    };
+
+    await alertIfSyncProvidersStale({
+      now: () => NOW,
+      getLastCompletedAt: async () => STALE_SYNC.toISOString(),
+      getLastAlertAt: async () => null,
+      getFailureDetails: async () => ({
+        lastFailedAt: '2026-08-12 11:55:00.000+00',
+        lastFailureMessage: 'Fetching OpenRouter providers failed: 524',
+        refreshFailures,
+      }),
+      setLastAlertAt: async () => 'OK',
+      sendNotification,
+    });
+
+    expect(sendNotification).toHaveBeenCalledWith(
+      buildStaleSyncAlertNotification({
+        lastCompletedAt: STALE_SYNC,
+        now: NOW,
+        details: {
+          lastFailedAt: new Date('2026-08-12T11:55:00.000Z'),
+          lastFailureMessage: 'Fetching OpenRouter providers failed: 524',
+          refreshFailures,
+        },
+      })
+    );
   });
 
   it('does not post when a later alert already exists', async () => {
@@ -299,6 +400,7 @@ describe('alertIfSyncProvidersStale', () => {
         now: () => NOW,
         getLastCompletedAt: async () => STALE_SYNC.toISOString(),
         getLastAlertAt: async () => null,
+        getFailureDetails: noFailureDetails,
         setLastAlertAt,
         sendNotification: async () => {
           throw new Error('slack down');
@@ -318,6 +420,7 @@ describe('alertIfSyncProvidersStale', () => {
       now: () => NOW,
       getLastCompletedAt: async () => STALE_SYNC.toISOString(),
       getLastAlertAt: async () => null,
+      getFailureDetails: noFailureDetails,
       setLastAlertAt,
       sendNotification,
     });
@@ -337,6 +440,7 @@ describe('postTestStaleSyncAlert', () => {
       postTestStaleSyncAlert({
         now: () => NOW,
         getLastCompletedAt: async () => STALE_SYNC.toISOString(),
+        getFailureDetails: noFailureDetails,
         sendNotification,
       })
     ).resolves.toBe('posted');

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
 import { ai_gateway_sync_providers_state } from '@kilocode/db/schema';
+import type { SyncProvidersRefreshFailures } from '@kilocode/db/schema-types';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -16,6 +17,8 @@ const SYNC_PROVIDERS_STALE_ALERT_TTL_MS = SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS
 
 const STALE_WINDOW_LABEL = 'hour';
 const STATUS_COPY = `No full sync has completed within the past ${STALE_WINDOW_LABEL}.`;
+const STALE_ENTRIES_STATUS_COPY = `Some catalog entries have not refreshed within the past ${STALE_WINDOW_LABEL}; their previous data remains in use.`;
+const MAX_LISTED_REFRESH_FAILURES = 5;
 const IMPACT_COPY =
   'New providers and models may take longer to appear; existing catalog data remains available.';
 const URGENCY_COPY = 'Important, not urgent. Some delay is acceptable.';
@@ -51,15 +54,77 @@ export function shouldPostStaleSyncAlert(input: {
   return true;
 }
 
+export type SyncFailureDetails = {
+  lastFailedAt: Date | null;
+  lastFailureMessage: string | null;
+  refreshFailures: SyncProvidersRefreshFailures;
+};
+
+const NO_FAILURE_DETAILS: SyncFailureDetails = {
+  lastFailedAt: null,
+  lastFailureMessage: null,
+  refreshFailures: {},
+};
+
+function escapeSlackText(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+function describeFailures(input: {
+  lastCompletedAt: Date | null;
+  now: Date;
+  details: SyncFailureDetails;
+}) {
+  const { lastCompletedAt, now, details } = input;
+  const latestFailedRun =
+    details.lastFailedAt &&
+    details.lastFailureMessage &&
+    (lastCompletedAt === null || details.lastFailedAt > lastCompletedAt)
+      ? `${details.lastFailedAt.toISOString()}: ${details.lastFailureMessage}`
+      : null;
+
+  const refreshFailures = Object.entries(details.refreshFailures)
+    .map(([entry, failure]) => ({ entry, ...failure, sinceDate: parseIsoTimestamp(failure.since) }))
+    .sort((a, b) => (a.sinceDate?.getTime() ?? 0) - (b.sinceDate?.getTime() ?? 0));
+  const hasStaleEntries = refreshFailures.some(
+    failure =>
+      failure.sinceDate !== null &&
+      now.getTime() - failure.sinceDate.getTime() >= SYNC_PROVIDERS_STALE_AFTER_MS
+  );
+  const listedRefreshFailures = refreshFailures
+    .slice(0, MAX_LISTED_REFRESH_FAILURES)
+    .map(
+      failure =>
+        `${failure.entry} since ${failure.sinceDate?.toISOString() ?? failure.since}: ${failure.error}`
+    );
+  const unlistedCount = refreshFailures.length - listedRefreshFailures.length;
+
+  return {
+    status: hasStaleEntries ? STALE_ENTRIES_STATUS_COPY : STATUS_COPY,
+    latestFailedRun,
+    refreshFailureCount: refreshFailures.length,
+    listedRefreshFailures: [
+      ...listedRefreshFailures,
+      ...(unlistedCount > 0 ? [`…and ${unlistedCount} more`] : []),
+    ],
+  };
+}
+
 export function buildStaleSyncAlertNotification(input: {
   lastCompletedAt: Date | null;
   now: Date;
   kind?: 'live' | 'test';
+  details?: SyncFailureDetails;
 }): AdminSlackNotification {
   const kind = input.kind ?? 'live';
   const lastCompletedLabel = input.lastCompletedAt
     ? input.lastCompletedAt.toISOString()
     : 'never recorded';
+  const failures = describeFailures({
+    lastCompletedAt: input.lastCompletedAt,
+    now: input.now,
+    details: input.details ?? NO_FAILURE_DETAILS,
+  });
   const headline =
     kind === 'test'
       ? '[TEST] Provider/model catalog sync delay notification.'
@@ -67,8 +132,14 @@ export function buildStaleSyncAlertNotification(input: {
   const text = [
     headline,
     ...(kind === 'test' ? [TEST_COPY] : []),
-    STATUS_COPY,
-    `Last completed: ${lastCompletedLabel}.`,
+    failures.status,
+    `Last full refresh: ${lastCompletedLabel}.`,
+    ...(failures.latestFailedRun ? [`Latest failed run: ${failures.latestFailedRun}.`] : []),
+    ...(failures.refreshFailureCount > 0
+      ? [
+          `Entries using previous data (${failures.refreshFailureCount}): ${failures.listedRefreshFailures.join('; ')}.`,
+        ]
+      : []),
     IMPACT_COPY,
     URGENCY_COPY,
     INVESTIGATION_COPY,
@@ -93,8 +164,17 @@ export function buildStaleSyncAlertNotification(input: {
           type: 'mrkdwn',
           text: [
             ...(kind === 'test' ? [`*Test only:* ${TEST_COPY}`] : []),
-            `*Status:* ${STATUS_COPY}`,
-            `*Last completed:* ${lastCompletedLabel}`,
+            `*Status:* ${failures.status}`,
+            `*Last full refresh:* ${lastCompletedLabel}`,
+            ...(failures.latestFailedRun
+              ? [`*Latest failed run:* ${escapeSlackText(failures.latestFailedRun)}`]
+              : []),
+            ...(failures.refreshFailureCount > 0
+              ? [
+                  `*Entries using previous data (${failures.refreshFailureCount}):*`,
+                  ...failures.listedRefreshFailures.map(line => `• ${escapeSlackText(line)}`),
+                ]
+              : []),
             `*Impact:* ${IMPACT_COPY}`,
             `*Urgency:* ${URGENCY_COPY}`,
             `*Follow-up:* ${INVESTIGATION_COPY}`,
@@ -163,9 +243,36 @@ type StaleAlertDependencies = {
   now?: () => Date;
   getLastCompletedAt?: () => Promise<string | null>;
   getLastAlertAt?: () => Promise<string | null>;
+  getFailureDetails?: () => Promise<StoredSyncFailureDetails>;
   setLastAlertAt?: (iso: string) => Promise<unknown>;
   sendNotification?: SendStaleAlertNotification;
 };
+
+type StoredSyncFailureDetails = {
+  lastFailedAt: string | null;
+  lastFailureMessage: string | null;
+  refreshFailures: SyncProvidersRefreshFailures;
+};
+
+async function defaultGetFailureDetails(): Promise<StoredSyncFailureDetails> {
+  const [row] = await db
+    .select({
+      lastFailedAt: ai_gateway_sync_providers_state.last_failed_at,
+      lastFailureMessage: ai_gateway_sync_providers_state.last_failure_message,
+      refreshFailures: ai_gateway_sync_providers_state.refresh_failures,
+    })
+    .from(ai_gateway_sync_providers_state)
+    .where(eq(ai_gateway_sync_providers_state.id, 1))
+    .limit(1);
+  return row ?? { lastFailedAt: null, lastFailureMessage: null, refreshFailures: {} };
+}
+
+async function getParsedFailureDetails(
+  getFailureDetails: () => Promise<StoredSyncFailureDetails>
+): Promise<SyncFailureDetails> {
+  const details = await getFailureDetails();
+  return { ...details, lastFailedAt: parseIsoTimestamp(details.lastFailedAt) };
+}
 
 async function defaultGetLastCompletedAt(): Promise<string | null> {
   const [row] = await db
@@ -209,6 +316,7 @@ export async function postStaleSyncAlert(input: {
   lastCompletedAt: Date | null;
   now?: Date;
   kind?: 'live' | 'test';
+  details?: SyncFailureDetails;
   sendNotification?: SendStaleAlertNotification;
 }): Promise<StaleAlertDelivery> {
   const now = input.now ?? new Date();
@@ -218,6 +326,7 @@ export async function postStaleSyncAlert(input: {
       lastCompletedAt: input.lastCompletedAt,
       now,
       kind: input.kind,
+      details: input.details,
     })
   );
 }
@@ -225,17 +334,22 @@ export async function postStaleSyncAlert(input: {
 export async function postTestStaleSyncAlert({
   now: nowFn = () => new Date(),
   getLastCompletedAt = defaultGetLastCompletedAt,
+  getFailureDetails = defaultGetFailureDetails,
   sendNotification = sendTestStaleSyncAlertNotification,
 }: Pick<
   StaleAlertDependencies,
-  'now' | 'getLastCompletedAt' | 'sendNotification'
+  'now' | 'getLastCompletedAt' | 'getFailureDetails' | 'sendNotification'
 > = {}): Promise<StaleAlertDelivery> {
   const now = nowFn();
-  const lastCompletedAt = parseIsoTimestamp(await getLastCompletedAt());
+  const [lastCompletedRaw, details] = await Promise.all([
+    getLastCompletedAt(),
+    getParsedFailureDetails(getFailureDetails),
+  ]);
   return postStaleSyncAlert({
-    lastCompletedAt,
+    lastCompletedAt: parseIsoTimestamp(lastCompletedRaw),
     now,
     kind: 'test',
+    details,
     sendNotification,
   });
 }
@@ -244,6 +358,7 @@ export async function alertIfSyncProvidersStale({
   now: nowFn = () => new Date(),
   getLastCompletedAt = defaultGetLastCompletedAt,
   getLastAlertAt = defaultGetLastAlertAt,
+  getFailureDetails = defaultGetFailureDetails,
   setLastAlertAt = defaultSetLastAlertAt,
   sendNotification = sendStaleSyncAlertNotification,
 }: StaleAlertDependencies = {}): Promise<void> {
@@ -257,7 +372,8 @@ export async function alertIfSyncProvidersStale({
     const lastAlertAt = parseIsoTimestamp(lastAlertRaw);
     if (!shouldPostStaleSyncAlert({ lastCompletedAt, lastAlertAt, now })) return;
 
-    const delivery = await postStaleSyncAlert({ lastCompletedAt, now, sendNotification });
+    const details = await getParsedFailureDetails(getFailureDetails);
+    const delivery = await postStaleSyncAlert({ lastCompletedAt, now, details, sendNotification });
     if (delivery !== 'posted') return;
     await setLastAlertAt(now.toISOString());
   } catch (error) {

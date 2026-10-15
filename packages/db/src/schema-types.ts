@@ -2302,6 +2302,9 @@ export const GatewayModelListConfigSchema = z.object({
 
 export type GatewayModelListConfig = z.infer<typeof GatewayModelListConfigSchema>;
 
+/** Catalog entries currently served from the previous snapshot, keyed by entry label. */
+export type SyncProvidersRefreshFailures = Record<string, { since: string; error: string }>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({

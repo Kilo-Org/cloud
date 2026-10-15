@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
       buildScheduledJobSuccessEvent(run, {
         total_provider_count: summary.total_providers,
         total_model_count: summary.total_models,
+        refresh_failure_count: summary.refresh_failure_count,
       })
     );
 

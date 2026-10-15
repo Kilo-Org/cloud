@@ -24,8 +24,9 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type { StoredModel, SyncProvidersRefreshFailures } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
+import { describeEntryFailure, fetchSyncJson } from '@/lib/providers/openrouter/sync-fetch';
 import { syncDirectByokModels } from '@/lib/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
@@ -47,55 +48,105 @@ import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/o
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
-export async function fetchGatewayModels(gateway: Provider, modelsPath: string) {
+/**
+ * Upper bound on the share of per-model or per-provider requests that may be served from
+ * the previous snapshot in one run. Beyond it the upstream is treated as broken and the run
+ * fails, rather than publishing a snapshot that is mostly stale.
+ */
+export const MAX_REFRESH_FAILURE_RATIO = 0.1;
+
+const MAX_REFRESH_FAILURE_ERROR_LENGTH = 300;
+const MAX_SYNC_FAILURE_MESSAGE_LENGTH = 500;
+
+/** A catalog entry that could not be refreshed in this run. `entry` is stable across runs. */
+export type CatalogEntryFailure = { entry: string; error: string };
+
+type PreviousSnapshot = {
+  data: NormalizedOpenRouterResponse;
+  openrouter: Record<string, StoredModel> | null;
+  vercel: Record<string, StoredModel> | null;
+};
+
+function assertFewRefreshFailures(
+  description: string,
+  failures: CatalogEntryFailure[],
+  total: number
+) {
+  const allowed = Math.max(1, Math.floor(total * MAX_REFRESH_FAILURE_RATIO));
+  if (failures.length <= allowed) return;
+  throw new Error(
+    `${failures.length} of ${total} ${description} failed to refresh; first: ${failures[0]?.entry}: ${failures[0]?.error}`
+  );
+}
+
+function warnAboutRefreshFailures(failures: CatalogEntryFailure[]) {
+  if (failures.length === 0) return;
+  console.warn(
+    `[sync-providers] using previous data for ${failures.length} entries: ${failures
+      .map(failure => `${failure.entry} (${failure.error})`)
+      .join('; ')}`
+  );
+}
+
+export async function fetchGatewayModels(
+  gateway: Provider,
+  modelsPath: string,
+  getPreviousModels: () => Promise<Record<string, StoredModel> | null | undefined>
+): Promise<{ models: Record<string, StoredModel>; failures: CatalogEntryFailure[] }> {
   const headers = {
     ...ATTRIBUTION_HEADERS,
     authorization: `Bearer ${gateway.apiKey}`,
   };
 
-  const modelsResponse = await fetch(`${gateway.apiUrl}${modelsPath}`, {
-    method: 'GET',
-    headers,
-  });
-  if (!modelsResponse.ok) {
-    throw new Error(`Fetching models from ${gateway.id} failed: ${modelsResponse.status}`);
-  }
-  const models = ModelsSchema.parse(await modelsResponse.json());
+  const models = ModelsSchema.parse(
+    await fetchSyncJson(`Fetching models from ${gateway.id}`, `${gateway.apiUrl}${modelsPath}`, {
+      method: 'GET',
+      headers,
+    })
+  );
 
   const limit = pLimit(8);
   const result: Record<string, StoredModel> = {};
   const modelsWithoutEndpoints: string[] = [];
+  const failedModels: Array<{ id: string; failure: CatalogEntryFailure }> = [];
   await Promise.all(
     models.data.map(model =>
       limit(async () => {
-        const endpointsResponse = await fetch(`${gateway.apiUrl}/models/${model.id}/endpoints`, {
-          method: 'GET',
-          headers,
-        });
-        // Gateways list some models (e.g. Vercel's `*-batch` variants) that have no endpoints resource.
-        if (endpointsResponse.status === 404) {
-          modelsWithoutEndpoints.push(model.id);
-          return;
-        }
-        if (!endpointsResponse.ok) {
-          throw new Error(
-            `Fetching model endpoints for ${gateway.id}/${model.id} failed: ${endpointsResponse.status}`
+        try {
+          const body = await fetchSyncJson(
+            `Fetching model endpoints for ${gateway.id}/${model.id}`,
+            `${gateway.apiUrl}/models/${model.id}/endpoints`,
+            { method: 'GET', headers },
+            // Gateways list some models (e.g. Vercel's `*-batch` variants) that have no endpoints resource.
+            { allowNotFound: true }
           );
-        }
-        const endpoints = EndpointsSchema.parse(await endpointsResponse.json());
-        const { reasoning, ...modelMetadata } = model;
-        result[model.id] = {
-          ...modelMetadata,
-          ...(reasoning && {
-            reasoning: {
-              mandatory: reasoning.mandatory,
-              ...(reasoning.supported_efforts && {
-                supported_efforts: reasoning.supported_efforts,
-              }),
+          if (body === null) {
+            modelsWithoutEndpoints.push(model.id);
+            return;
+          }
+          const endpoints = EndpointsSchema.parse(body);
+          const { reasoning, ...modelMetadata } = model;
+          result[model.id] = {
+            ...modelMetadata,
+            ...(reasoning && {
+              reasoning: {
+                mandatory: reasoning.mandatory,
+                ...(reasoning.supported_efforts && {
+                  supported_efforts: reasoning.supported_efforts,
+                }),
+              },
+            }),
+            endpoints: endpoints.data.endpoints,
+          };
+        } catch (error) {
+          failedModels.push({
+            id: model.id,
+            failure: {
+              entry: `${gateway.id} endpoints for ${model.id}`,
+              error: describeEntryFailure(error),
             },
-          }),
-          endpoints: endpoints.data.endpoints,
-        };
+          });
+        }
       })
     )
   );
@@ -106,30 +157,36 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
     );
   }
 
+  const failures = failedModels.map(({ failure }) => failure);
+  assertFewRefreshFailures(`${gateway.id} model endpoint requests`, failures, models.data.length);
+  if (failedModels.length > 0) {
+    const previousModels = (await getPreviousModels()) ?? {};
+    for (const { id } of failedModels) {
+      const previousModel = previousModels[id];
+      if (previousModel) result[id] = previousModel;
+    }
+  }
+
   const count = Object.keys(result).length;
   if (count < 100) {
     throw new Error(`Suspicious: total number of ${gateway.id} models is ${count} < 100`);
   }
   console.debug(`[fetchGatewayModels] fetched ${count} models from ${gateway.id}`);
 
-  return result;
+  return { models: result, failures };
 }
 
 async function fetchProviders(): Promise<OpenRouterProvider[]> {
   console.log('Fetching OpenRouter providers from frontend endpoint...');
 
-  const response = await fetch(`https://openrouter.ai/api/frontend/v1/all-providers`, {
-    method: 'GET',
-    headers: ATTRIBUTION_HEADERS,
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch OpenRouter providers: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const rawData = await response.json();
+  const rawData = await fetchSyncJson(
+    'Fetching OpenRouter providers',
+    'https://openrouter.ai/api/frontend/v1/all-providers',
+    {
+      method: 'GET',
+      headers: ATTRIBUTION_HEADERS,
+    }
+  );
   console.log(
     'Raw response structure:',
     JSON.stringify(rawData, null, 2).substring(0, 500) + '...'
@@ -144,41 +201,72 @@ async function fetchProviders(): Promise<OpenRouterProvider[]> {
   return providers;
 }
 
-async function syncProviders(params: {
-  providers: OpenRouterProvider[];
-  openRouterModels: Record<string, StoredModel>;
-  openRouterCatalogModels: CatalogModel[];
-  vercelModels: Record<string, StoredModel>;
-}) {
-  const { providers, openRouterModels, openRouterCatalogModels, vercelModels } = params;
-  if (providers.length === 0) {
-    throw new Error('No providers found in OpenRouter response');
-  }
-
+/**
+ * Fetches each provider's model list. A provider whose request fails keeps its models from
+ * the previous snapshot. Those already went through the injection and data-policy steps in
+ * `syncProviders`, which skip or deduplicate models that are already present and only ever
+ * worsen data policies, so running them again is safe.
+ */
+export async function fetchProviderModels(
+  providers: OpenRouterProvider[],
+  getPreviousProviders: () => Promise<NormalizedProvider[] | undefined>
+): Promise<{
+  providerModelData: Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>;
+  failures: CatalogEntryFailure[];
+}> {
   // Limit concurrent requests to 3
   const limit = pLimit(3);
   let processedCount = 0;
 
   console.log('Fetching models for all providers...');
 
-  // Fetch models for each provider and collect relationships
-  const providerModelData = await Promise.all(
+  const failures: CatalogEntryFailure[] = [];
+  const results = await Promise.all(
     providers.map(provider =>
       limit(async () => {
-        const models = await fetchModelsForProvider(provider);
+        let models: OpenRouterModel[] | null;
+        try {
+          models = await fetchModelsForProvider(provider);
+        } catch (error) {
+          failures.push({
+            entry: `models for provider ${provider.name}`,
+            error: describeEntryFailure(error),
+          });
+          models = null;
+        }
 
         processedCount++;
         if (processedCount % 10 === 0) {
           console.log(`Processed ${processedCount}/${providers.length} providers...`);
         }
 
-        return {
-          provider,
-          models,
-        };
+        return { provider, models };
       })
     )
   );
+
+  assertFewRefreshFailures('provider model requests', failures, providers.length);
+  const previousProviders = failures.length > 0 ? ((await getPreviousProviders()) ?? []) : [];
+  const providerModelData = results.map(({ provider, models }) => ({
+    provider,
+    models:
+      models ??
+      structuredClone(
+        previousProviders.find(previous => previous.slug === provider.slug)?.models
+      ) ??
+      [],
+  }));
+
+  return { providerModelData, failures };
+}
+
+async function syncProviders(params: {
+  providerModelData: Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>;
+  openRouterModels: Record<string, StoredModel>;
+  openRouterCatalogModels: CatalogModel[];
+  vercelModels: Record<string, StoredModel>;
+}) {
+  const { providerModelData, openRouterModels, openRouterCatalogModels, vercelModels } = params;
   const unavailableModelIds = await getUnavailableModelIds();
   const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(
     providerModelData,
@@ -393,12 +481,112 @@ export async function applySnapshotChangesAndAudit(params: {
   return { id: row.id, data: row.data, previousSnapshot };
 }
 
+/**
+ * Carries each entry's first failure time across consecutive failing runs. Entries that
+ * refreshed in this run are dropped.
+ */
+export function mergeRefreshFailures(
+  previous: SyncProvidersRefreshFailures,
+  failures: CatalogEntryFailure[],
+  now: Date
+): SyncProvidersRefreshFailures {
+  return Object.fromEntries(
+    failures.map(({ entry, error }) => [
+      entry,
+      {
+        since: previous[entry]?.since ?? now.toISOString(),
+        error: error.slice(0, MAX_REFRESH_FAILURE_ERROR_LENGTH),
+      },
+    ])
+  );
+}
+
+/** Every entry has been refreshed at or after the returned time. */
+export function getRefreshedThrough(failures: SyncProvidersRefreshFailures, now: Date): string {
+  const failingSince = Object.values(failures)
+    .map(failure => new Date(failure.since).getTime())
+    .filter(Number.isFinite);
+  return new Date(Math.min(now.getTime(), ...failingSince)).toISOString();
+}
+
+export async function recordSyncCompleted(failures: CatalogEntryFailure[]) {
+  return db.transaction(async tx => {
+    await tx.insert(ai_gateway_sync_providers_state).values({ id: 1 }).onConflictDoNothing();
+    const [row] = await tx
+      .select({ refreshFailures: ai_gateway_sync_providers_state.refresh_failures })
+      .from(ai_gateway_sync_providers_state)
+      .where(eq(ai_gateway_sync_providers_state.id, 1))
+      .for('update');
+    if (!row) throw new Error('Sync-providers state row is missing');
+
+    const now = new Date();
+    const refreshFailures = mergeRefreshFailures(row.refreshFailures, failures, now);
+    const refreshedThrough = getRefreshedThrough(refreshFailures, now);
+    await tx
+      .update(ai_gateway_sync_providers_state)
+      .set({ last_completed_at: refreshedThrough, refresh_failures: refreshFailures })
+      .where(eq(ai_gateway_sync_providers_state.id, 1));
+    return { completedAt: now.toISOString(), refreshedThrough };
+  });
+}
+
+export async function recordSyncFailure(error: unknown) {
+  const failedAt = new Date().toISOString();
+  const message = (error instanceof Error ? error.message : String(error)).slice(
+    0,
+    MAX_SYNC_FAILURE_MESSAGE_LENGTH
+  );
+  await db
+    .insert(ai_gateway_sync_providers_state)
+    .values({ id: 1, last_failed_at: failedAt, last_failure_message: message })
+    .onConflictDoUpdate({
+      target: ai_gateway_sync_providers_state.id,
+      set: { last_failed_at: failedAt, last_failure_message: message },
+    });
+}
+
 export async function syncAndStoreProviders() {
+  try {
+    return await syncAndStoreProvidersOnce();
+  } catch (error) {
+    try {
+      await recordSyncFailure(error);
+    } catch (recordError) {
+      console.error('[sync-providers] recording sync failure failed', recordError);
+    }
+    throw error;
+  }
+}
+
+async function syncAndStoreProvidersOnce() {
   const startTime = performance.now();
 
+  let previousSnapshot: Promise<PreviousSnapshot | undefined> | undefined;
+  const getPreviousSnapshot = () =>
+    (previousSnapshot ??= db
+      .select({
+        data: modelsByProvider.data,
+        openrouter: modelsByProvider.openrouter,
+        vercel: modelsByProvider.vercel,
+      })
+      .from(modelsByProvider)
+      .orderBy(desc(modelsByProvider.id))
+      .limit(1)
+      .then(([row]) => row));
+
   // The default OpenRouter list only has text-output models; System One models output decisions.
-  const openrouter_data = await fetchGatewayModels(OPENROUTER, '/models?output_modalities=all');
-  const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY, '/models');
+  const openrouter = await fetchGatewayModels(
+    OPENROUTER,
+    '/models?output_modalities=all',
+    async () => (await getPreviousSnapshot())?.openrouter
+  );
+  const vercel = await fetchGatewayModels(
+    VERCEL_AI_GATEWAY,
+    '/models',
+    async () => (await getPreviousSnapshot())?.vercel
+  );
+  const openrouter_data = openrouter.models;
+  const vercel_data = vercel.models;
 
   const openrouterProviders = await fetchProviders();
   if (openrouterProviders.length < 10) {
@@ -407,10 +595,15 @@ export async function syncAndStoreProviders() {
     );
   }
 
+  const providerModels = await fetchProviderModels(
+    openrouterProviders,
+    async () => (await getPreviousSnapshot())?.data.providers
+  );
+
   const openRouterCatalog = await getRawOpenRouterModels();
 
   const providers = await syncProviders({
-    providers: openrouterProviders,
+    providerModelData: providerModels.providerModelData,
     openRouterModels: openrouter_data,
     openRouterCatalogModels: openRouterCatalog.data,
     vercelModels: vercel_data,
@@ -433,27 +626,16 @@ export async function syncAndStoreProviders() {
   const direct_byok_model_counts = await syncDirectByokModels();
   console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
 
-  const completed_at = await db.transaction(async tx => {
-    await tx.insert(ai_gateway_sync_providers_state).values({ id: 1 }).onConflictDoNothing();
-    const [row] = await tx
-      .select({ id: ai_gateway_sync_providers_state.id })
-      .from(ai_gateway_sync_providers_state)
-      .where(eq(ai_gateway_sync_providers_state.id, 1))
-      .for('update');
-    if (!row) throw new Error('Sync-providers state row is missing');
-
-    const completedAt = new Date().toISOString();
-    await tx
-      .update(ai_gateway_sync_providers_state)
-      .set({ last_completed_at: completedAt })
-      .where(eq(ai_gateway_sync_providers_state.id, 1));
-    return completedAt;
-  });
+  const refreshFailures = [...openrouter.failures, ...vercel.failures, ...providerModels.failures];
+  warnAboutRefreshFailures(refreshFailures);
+  const { completedAt, refreshedThrough } = await recordSyncCompleted(refreshFailures);
 
   return {
     id: result.id,
     generated_at: result.data.generated_at,
-    completed_at,
+    completed_at: completedAt,
+    refreshed_through: refreshedThrough,
+    refresh_failure_count: refreshFailures.length,
     total_models: result.data.total_models,
     total_providers: result.data.total_providers,
     direct_byok_model_counts,

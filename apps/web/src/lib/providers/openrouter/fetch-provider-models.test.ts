@@ -83,7 +83,7 @@ describe('fetchModelsForProvider', () => {
     expect(await fetchModelsForProvider(provider)).toEqual([entry]);
   });
 
-  it('uses the requested provider and attribution headers', async () => {
+  it('uses the requested provider, attribution headers, and a request deadline', async () => {
     const mockFetch = mockModels([]);
 
     await fetchModelsForProvider({ ...provider, name: 'Amazon Bedrock' });
@@ -93,6 +93,7 @@ describe('fetchModelsForProvider', () => {
       {
         method: 'GET',
         headers: { 'HTTP-Referer': 'https://kilocode.ai', 'X-Title': 'Kilo Code' },
+        signal: expect.any(AbortSignal),
       }
     );
   });
@@ -106,7 +107,19 @@ describe('fetchModelsForProvider', () => {
     );
 
     await expect(fetchModelsForProvider(provider)).rejects.toThrow(
-      'Failed to fetch models for provider OpenAI: 503 Service Unavailable'
+      'Fetching models for provider OpenAI failed: 503 Service Unavailable'
+    );
+  });
+
+  it('reports a request that exceeds its deadline as a timeout', async () => {
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(
+        new DOMException('The operation was aborted due to timeout', 'TimeoutError')
+      );
+
+    await expect(fetchModelsForProvider(provider)).rejects.toThrow(
+      'Fetching models for provider OpenAI failed: timed out after 20s'
     );
   });
 

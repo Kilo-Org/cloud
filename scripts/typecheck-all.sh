@@ -35,7 +35,6 @@ if [ -n "$group" ]; then
   affects() {
     [ "$full" = true ] || jq -e --arg name "$1" '.packages | index($name)' <<< "$affected" > /dev/null
   }
-  trpc_apps=(kilo-app kilo-extension)
   case "$group" in
     web)
       if affects web; then
@@ -47,22 +46,25 @@ if [ -n "$group" ]; then
       fi
       ;;
     trpc)
+      # kilo-app typechecks in kilo-app CI, which runs whenever kilo-app is
+      # affected. The extension has no other job that typechecks it outside its
+      # own workflow, which skips unrelated PRs.
       pnpm --filter @kilocode/trpc run build
       export KILO_TYPECHECK_TRPC_BUILT=1
-      if affects kilo-app; then
-        pnpm --filter @kilocode/harness-sdk run build
-      fi
-      filters=()
-      for name in "${trpc_apps[@]}"; do
-        if affects "$name"; then filters+=(--filter "$name"); fi
-      done
-      if [ ${#filters[@]} -gt 0 ]; then
-        pnpm -r "${filters[@]}" run typecheck
+      if affects kilo-extension; then
+        pnpm --filter kilo-extension run typecheck
       fi
       ;;
     packages)
-      excluded=(--filter '!@kilocode/storybook')
-      for name in "${trpc_apps[@]}"; do excluded+=(--filter "!$name"); done
+      # The web, trpc and extension checks belong to their own groups.
+      # kilo-app typechecks in kilo-app CI, which runs whenever kilo-app is
+      # affected; its typecheck needs the compiled harness SDK, which this
+      # group does not build.
+      excluded=(
+        --filter '!@kilocode/storybook'
+        --filter '!kilo-app'
+        --filter '!kilo-extension'
+      )
       if [ "$full" = true ]; then
         pnpm -r "${workspace_typecheck_filters[@]}" "${excluded[@]}" run typecheck
         exit 0

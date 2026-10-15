@@ -237,6 +237,54 @@ describe('applyProviderSpecificLogic recursive tool schemas', () => {
   });
 });
 
+describe('applyProviderSpecificLogic top-level tool schema combinators', () => {
+  async function applyToInputSchema(model: string) {
+    const request = makeMessagesRequest(model);
+    request.body.tools = [
+      {
+        name: 'nteract_create_cell',
+        input_schema: {
+          type: 'object',
+          properties: { notebook_id: { type: ['string', 'null'] } },
+          oneOf: [{ required: ['notebook_id'] }],
+        },
+      },
+    ];
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    const tool = request.body.tools[0];
+    return tool && 'input_schema' in tool ? tool.input_schema : undefined;
+  }
+
+  it('removes top-level combinators for Claude models', async () => {
+    const inputSchema = await applyToInputSchema('anthropic/claude-opus-5.5');
+
+    expect(inputSchema).toEqual({
+      type: 'object',
+      properties: { notebook_id: { type: ['string', 'null'] } },
+    });
+  });
+
+  it('preserves top-level combinators for other models', async () => {
+    const inputSchema = await applyToInputSchema('vendor/model');
+
+    expect(inputSchema?.oneOf).toEqual([{ required: ['notebook_id'] }]);
+  });
+});
+
 describe('applyReasoningDetailsTransform', () => {
   function makeReasoningRequest(): Extract<GatewayRequest, { kind: 'chat_completions' }> {
     return {

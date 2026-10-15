@@ -1219,6 +1219,14 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
             );
       await destroyDeciderCliContainer(env, {
         instanceName: getDeciderContainerInstanceName({ ...message, variant }),
+      }).catch(error => {
+        console.warn(
+          JSON.stringify({
+            event: 'benchmark_terminal_container_destroy_failed',
+            runId: message.runId,
+            ...formatError(error),
+          })
+        );
       });
     }
     return;

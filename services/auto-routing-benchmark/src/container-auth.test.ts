@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import type { ServerOptions } from 'node:http';
 import { Readable } from 'node:stream';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -12,6 +13,7 @@ type ContainerChild = EventEmitter & {
 const mocks = vi.hoisted(() => ({
   handler: undefined as undefined | ((req: unknown, res: unknown) => void),
   sigterm: undefined as undefined | (() => void),
+  serverOptions: undefined as undefined | ServerOptions,
   spawn: vi.fn(),
   mkdtemp: vi.fn(),
   rm: vi.fn(),
@@ -22,7 +24,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('node:http', () => ({
-  createServer: (handler: typeof mocks.handler) => {
+  createServer: (options: ServerOptions, handler: typeof mocks.handler) => {
+    mocks.serverOptions = options;
     mocks.handler = handler;
     return { listen: vi.fn(), close: mocks.close };
   },
@@ -64,7 +67,12 @@ type ContainerResponse = {
   };
 };
 
-function request(url: string, body?: unknown, stream?: Readable) {
+function request(
+  url: string,
+  body?: unknown,
+  stream?: Readable,
+  { autoFinish = true }: { autoFinish?: boolean } = {}
+) {
   const req = Object.assign(
     stream ?? Readable.from(body === undefined ? [] : [Buffer.from(JSON.stringify(body))]),
     { method: 'POST', url }
@@ -76,6 +84,7 @@ function request(url: string, body?: unknown, stream?: Readable) {
     }),
     end: vi.fn((payload: string) => {
       res.emit('result', { status, body: JSON.parse(payload) });
+      if (autoFinish) res.emit('finish');
     }),
   });
   const done = new Promise<ContainerResponse>(resolve => res.once('result', resolve));
@@ -103,6 +112,7 @@ beforeEach(() => {
   vi.resetModules();
   mocks.handler = undefined;
   mocks.sigterm = undefined;
+  mocks.serverOptions = undefined;
   mocks.children = [];
   mocks.spawn.mockReset().mockImplementation(createChild);
   mocks.mkdtemp.mockReset().mockResolvedValue('/tmp/benchmark-auth-test');
@@ -342,6 +352,45 @@ it('waits for the shared local warmup during SIGTERM', async () => {
   await Promise.all([first.done, second.done]);
   await flushServer();
   expect(mocks.spawn).toHaveBeenCalledOnce();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});
+
+it('finishes a late-body shutdown response before exiting with no CLI work', async () => {
+  await loadServer();
+  expect(mocks.serverOptions).toMatchObject({
+    requestTimeout: 30_000,
+    headersTimeout: 10_000,
+    connectionsCheckingInterval: 1_000,
+  });
+  const stream = new Readable({ read() {} });
+  const pending = request('/run', undefined, stream, { autoFinish: false });
+  stopServer();
+  expect(mocks.exit).not.toHaveBeenCalled();
+  stream.push(Buffer.from(JSON.stringify(runBody)));
+  stream.push(null);
+  expect(await pending.done).toEqual({
+    status: 503,
+    body: { error: 'container is stopping' },
+  });
+  expect(mocks.spawn).not.toHaveBeenCalled();
+  expect(mocks.exit).not.toHaveBeenCalled();
+  pending.res.emit('finish');
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+  pending.res.emit('close');
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});
+
+it('releases a disconnected HTTP request without waiting for its pending body', async () => {
+  await loadServer();
+  const stream = new Readable({ read() {} });
+  const pending = request('/run', undefined, stream);
+  stopServer();
+  expect(mocks.exit).not.toHaveBeenCalled();
+  pending.res.emit('close');
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+  stream.push(null);
+  await pending.done;
+  expect(mocks.spawn).not.toHaveBeenCalled();
   expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
 });
 

@@ -7,8 +7,9 @@ import {
   markRunFailed,
   markStaleRunsFailed,
   reuseDeciderCaseResults,
+  upsertCaseResult,
 } from './db';
-import type { PendingDeciderOutput } from './db';
+import type { CaseResultRow, PendingDeciderOutput } from './db';
 
 const SCHEMA_SQL = `
   CREATE TABLE benchmark_runs (
@@ -171,6 +172,27 @@ const reuseParams = {
   entries: [{ model: 'concrete/model', variant: 'high' }],
 } as const;
 
+const gradedCaseResult: CaseResultRow = {
+  run_id: 'destination',
+  model: 'concrete/model',
+  variant: 'high',
+  case_id: 'graded',
+  route_key: 'implementation/code_generation',
+  score: 0.8,
+  latency_ms: 123,
+  cost_usd: 0.0123,
+  error: null,
+  fallback_reason: null,
+  route_hit: null,
+  retried: true,
+  exit_code: 0,
+  output_prefix: 'graded output',
+  event_count: 2,
+  last_event_types: '["text","completion"]',
+  rep: 0,
+  timed_out: 0,
+};
+
 function results(db: DatabaseSync, runId: string) {
   return db
     .prepare('SELECT * FROM case_results WHERE run_id = ? ORDER BY model, variant, case_id, rep')
@@ -197,6 +219,60 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
   });
 
   afterEach(() => sqlite.close());
+
+  it('atomically removes only the exact pending payload after inserts and updates', async () => {
+    insertPending(sqlite, 'destination', 'graded');
+    insertPending(sqlite, 'destination', 'graded', undefined, { rep: 1 });
+    insertPending(sqlite, 'destination', 'graded', undefined, { variant: 'low' });
+    insertPending(sqlite, 'destination', 'ungraded');
+
+    await upsertCaseResult(adapter.binding, gradedCaseResult);
+    expect(results(sqlite, 'destination').map(row => row.score)).toEqual([0.8]);
+    const remaining = pending(sqlite, 'destination');
+    expect(remaining).toHaveLength(3);
+    expect(remaining.map(row => [row.case_id, row.variant, row.rep])).toEqual(
+      expect.arrayContaining([
+        ['graded', 'high', 1],
+        ['graded', 'low', 0],
+        ['ungraded', 'high', 0],
+      ])
+    );
+
+    insertPending(sqlite, 'destination', 'graded');
+    await upsertCaseResult(adapter.binding, { ...gradedCaseResult, score: 0 });
+    expect(results(sqlite, 'destination').map(row => row.score)).toEqual([0]);
+    expect(pending(sqlite, 'destination')).toEqual(remaining);
+  });
+
+  it('retains pending output and existing grades if persisting the grade fails', async () => {
+    insertPending(sqlite, 'destination', 'graded');
+    insertCase(sqlite, 'destination', 'graded', { score: 0.3 });
+    const originalPending = pending(sqlite, 'destination');
+    const originalResults = results(sqlite, 'destination');
+    sqlite.exec(`
+      CREATE TRIGGER reject_case_write BEFORE INSERT ON case_results
+      BEGIN SELECT RAISE(ABORT, 'case write failed'); END;
+    `);
+
+    await expect(upsertCaseResult(adapter.binding, gradedCaseResult)).rejects.toThrow();
+    expect(pending(sqlite, 'destination')).toEqual(originalPending);
+    expect(results(sqlite, 'destination')).toEqual(originalResults);
+  });
+
+  it('rolls back the grade if deleting its pending payload fails', async () => {
+    insertPending(sqlite, 'destination', 'graded');
+    insertCase(sqlite, 'destination', 'graded', { score: 0.3 });
+    const originalPending = pending(sqlite, 'destination');
+    const originalResults = results(sqlite, 'destination');
+    sqlite.exec(`
+      CREATE TRIGGER reject_pending_delete BEFORE DELETE ON pending_decider_outputs
+      BEGIN SELECT RAISE(ABORT, 'pending delete failed'); END;
+    `);
+
+    await expect(upsertCaseResult(adapter.binding, gradedCaseResult)).rejects.toThrow();
+    expect(pending(sqlite, 'destination')).toEqual(originalPending);
+    expect(results(sqlite, 'destination')).toEqual(originalResults);
+  });
 
   it('combines partial runs, ranks each case/rep, preserves zero scores and all diagnostics', async () => {
     insertRun(sqlite, 'old');
@@ -341,8 +417,43 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
         rep: 0,
       })
     ).toEqual(pendingPayload('new-z'));
-    expect(['old', 'new-a', 'new-z'].map(id => pending(sqlite, id))).toEqual(sourcePending);
+    expect(['old', 'new-a', 'new-z'].map(id => pending(sqlite, id))).toEqual(
+      sourcePending.map(rows => rows.filter(row => row.case_id !== 'source-graded'))
+    );
     expect(await reuseDeciderCaseResults(adapter.binding, reuseParams)).toBe(0);
+  });
+
+  it('cleans legacy graded payloads only for the requested exact pair and full case key', async () => {
+    insertRun(sqlite, 'old', { status: 'failed' });
+    insertRun(sqlite, 'another');
+    insertCase(sqlite, 'old', 'graded');
+    insertPending(sqlite, 'old', 'graded');
+    insertPending(sqlite, 'old', 'graded', undefined, { rep: 1 });
+    insertPending(sqlite, 'old', 'graded', undefined, { variant: 'low' });
+    insertPending(sqlite, 'old', 'graded', undefined, { model: 'different/model' });
+    insertPending(sqlite, 'old', 'ungraded');
+    insertCase(sqlite, 'another', 'ungraded');
+    insertCase(sqlite, 'old', 'other-variant', { variant: 'low' });
+    insertPending(sqlite, 'old', 'other-variant', undefined, { variant: 'low' });
+    insertCase(sqlite, 'old', 'other-model', { model: 'different/model' });
+    insertPending(sqlite, 'old', 'other-model', undefined, { model: 'different/model' });
+    const originalPending = pending(sqlite, 'old');
+    const originalResults = results(sqlite, 'old');
+
+    expect(await reuseDeciderCaseResults(adapter.binding, reuseParams)).toBe(2);
+    expect(pending(sqlite, 'old')).toEqual(
+      originalPending.filter(
+        row =>
+          row.model !== 'concrete/model' ||
+          row.variant !== 'high' ||
+          row.case_id !== 'graded' ||
+          row.rep !== 0
+      )
+    );
+    expect(results(sqlite, 'old')).toEqual(originalResults);
+    expect(pending(sqlite, 'destination').map(row => [row.case_id, row.rep])).toEqual([
+      ['graded', 1],
+    ]);
   });
 
   it('leaves persisted payload schema validation to the existing loader', async () => {
@@ -378,10 +489,10 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
     expect(await reuseDeciderCaseResults(adapter.binding, { ...reuseParams, entries })).toBe(35);
     expect(results(sqlite, 'destination')).toHaveLength(35);
     expect(pending(sqlite, 'destination')).toHaveLength(35);
-    expect(adapter.batchSizes).toEqual([20, 20, 20, 10]);
+    expect(adapter.batchSizes).toEqual([30, 30, 30, 15]);
     expect(Math.max(...adapter.boundCounts)).toBeLessThanOrEqual(100);
     expect(await reuseDeciderCaseResults(adapter.binding, { ...reuseParams, entries: [] })).toBe(0);
-    expect(adapter.batchSizes).toEqual([20, 20, 20, 10]);
+    expect(adapter.batchSizes).toEqual([30, 30, 30, 15]);
   });
 
   it('retains pending outputs when runs complete, fail or become stale', async () => {

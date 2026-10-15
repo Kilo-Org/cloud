@@ -33,17 +33,18 @@ async function readBody(req) {
 // The CLI's sqlite state is shared by every invocation in this instance.
 let runChain = Promise.resolve();
 let activeCliJobs = 0;
+let activeHttpRequests = 0;
 let stopRequested = false;
 
 function exitWhenIdle() {
-  if (stopRequested && activeCliJobs === 0) process.exit(0);
+  if (stopRequested && activeCliJobs === 0 && activeHttpRequests === 0) process.exit(0);
 }
 
 function serializeCli(run) {
   activeCliJobs += 1;
   const next = runChain.then(run).finally(() => {
     activeCliJobs -= 1;
-    if (stopRequested) setImmediate(exitWhenIdle);
+    exitWhenIdle();
   });
   runChain = next.catch(() => {});
   return next;
@@ -183,85 +184,98 @@ async function runCli({ args, env, timeoutMs, kiloToken }) {
   return result;
 }
 
-const server = createServer((req, res) => {
-  void (async () => {
-    if (stopRequested) {
-      sendJson(res, 503, { error: 'container is stopping' });
-      return;
-    }
-    if (req.method === 'GET' && req.url === '/health') {
-      sendJson(res, 200, { ok: true });
-      return;
-    }
-
-    if (req.method === 'POST' && req.url === '/warmup') {
-      req.resume();
-      const result = await warmUpOnce();
-      sendJson(res, 200, { exitCode: result.exitCode, durationMs: result.durationMs });
-      return;
-    }
-
-    if (req.method === 'POST' && req.url === '/run') {
-      let parsed;
-      try {
-        parsed = JSON.parse(await readBody(req));
-      } catch {
-        sendJson(res, 400, { error: 'invalid JSON body' });
-        return;
-      }
-
+const server = createServer(
+  { requestTimeout: 30_000, headersTimeout: 10_000, connectionsCheckingInterval: 1_000 },
+  (req, res) => {
+    activeHttpRequests += 1;
+    let responseFinished = false;
+    const finishRequest = () => {
+      if (responseFinished) return;
+      responseFinished = true;
+      activeHttpRequests -= 1;
+      exitWhenIdle();
+    };
+    res.once('finish', finishRequest);
+    res.once('close', finishRequest);
+    void (async () => {
       if (stopRequested) {
         sendJson(res, 503, { error: 'container is stopping' });
         return;
       }
-      const { model, prompt, kiloToken, kiloApiUrl, orgId, variant } = parsed ?? {};
-      const timeoutMs =
-        typeof parsed?.timeoutMs === 'number' && parsed.timeoutMs > 0
-          ? parsed.timeoutMs
-          : DEFAULT_TIMEOUT_MS;
-
-      if (
-        typeof model !== 'string' ||
-        typeof prompt !== 'string' ||
-        typeof kiloToken !== 'string' ||
-        typeof kiloApiUrl !== 'string'
-      ) {
-        sendJson(res, 400, {
-          error: 'model, prompt, kiloToken and kiloApiUrl are required strings',
-        });
-        return;
-      }
-      if (orgId !== undefined && orgId !== null && typeof orgId !== 'string') {
-        sendJson(res, 400, { error: 'orgId must be a string when provided' });
+      if (req.method === 'GET' && req.url === '/health') {
+        sendJson(res, 200, { ok: true });
         return;
       }
 
-      try {
-        if (variant !== undefined && variant !== null && typeof variant !== 'string') {
-          sendJson(res, 400, { error: 'variant must be a string when provided' });
+      if (req.method === 'POST' && req.url === '/warmup') {
+        req.resume();
+        const result = await warmUpOnce();
+        sendJson(res, 200, { exitCode: result.exitCode, durationMs: result.durationMs });
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/run') {
+        let parsed;
+        try {
+          parsed = JSON.parse(await readBody(req));
+        } catch {
+          sendJson(res, 400, { error: 'invalid JSON body' });
           return;
         }
-        const result = await runCaseSerialized({
-          model,
-          prompt,
-          kiloToken,
-          kiloApiUrl,
-          orgId,
-          timeoutMs,
-          variant,
-        });
-        sendJson(res, 200, result);
-      } catch (err) {
-        sendJson(res, 500, { error: err instanceof Error ? err.message : 'run failed' });
-      }
-      return;
-    }
 
-    sendJson(res, 404, { error: 'not found' });
-  })().catch(error => {
-    sendJson(res, 500, { error: error instanceof Error ? error.message : 'run failed' });
-  });
-});
+        if (stopRequested) {
+          sendJson(res, 503, { error: 'container is stopping' });
+          return;
+        }
+        const { model, prompt, kiloToken, kiloApiUrl, orgId, variant } = parsed ?? {};
+        const timeoutMs =
+          typeof parsed?.timeoutMs === 'number' && parsed.timeoutMs > 0
+            ? parsed.timeoutMs
+            : DEFAULT_TIMEOUT_MS;
+
+        if (
+          typeof model !== 'string' ||
+          typeof prompt !== 'string' ||
+          typeof kiloToken !== 'string' ||
+          typeof kiloApiUrl !== 'string'
+        ) {
+          sendJson(res, 400, {
+            error: 'model, prompt, kiloToken and kiloApiUrl are required strings',
+          });
+          return;
+        }
+        if (orgId !== undefined && orgId !== null && typeof orgId !== 'string') {
+          sendJson(res, 400, { error: 'orgId must be a string when provided' });
+          return;
+        }
+
+        try {
+          if (variant !== undefined && variant !== null && typeof variant !== 'string') {
+            sendJson(res, 400, { error: 'variant must be a string when provided' });
+            return;
+          }
+          const result = await runCaseSerialized({
+            model,
+            prompt,
+            kiloToken,
+            kiloApiUrl,
+            orgId,
+            timeoutMs,
+            variant,
+          });
+          sendJson(res, 200, result);
+        } catch (err) {
+          sendJson(res, 500, { error: err instanceof Error ? err.message : 'run failed' });
+        }
+        return;
+      }
+
+      sendJson(res, 404, { error: 'not found' });
+    })().catch(error => {
+      sendJson(res, 500, { error: error instanceof Error ? error.message : 'run failed' });
+    });
+  }
+);
 
 server.listen(PORT, () => {
   console.log(`decider-benchmark runner listening on :${PORT}`);

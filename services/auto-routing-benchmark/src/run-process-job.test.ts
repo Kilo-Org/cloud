@@ -363,6 +363,19 @@ describe('processJob — terminal runs', () => {
       });
     }
   );
+  it('drops a terminal message even when its container is already unavailable', async () => {
+    const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+    if (!snapshot) throw new Error('Run snapshot missing');
+    vi.mocked(getRunWithModels).mockResolvedValue({
+      ...snapshot,
+      run: { ...snapshot.run, status: 'completed' },
+    });
+    vi.mocked(destroyDeciderCliContainer).mockRejectedValueOnce(new Error('already stopped'));
+    await processJob(env, deciderMessage({ variant: null }));
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
 });
 
 describe('processJob — decider container availability failures', () => {

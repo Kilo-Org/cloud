@@ -372,7 +372,8 @@ export async function getRunWithModels(
 }
 
 export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Promise<void> {
-  await drizzle(db)
+  const orm = drizzle(db);
+  const upsert = orm
     .insert(caseResults)
     .values(row)
     .onConflictDoUpdate({
@@ -400,6 +401,10 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
         timed_out: row.timed_out,
       },
     });
+  await orm.batch([
+    upsert,
+    orm.delete(pendingDeciderOutputs).where(pendingDeciderOutputPredicate(row)),
+  ]);
 }
 
 export async function reuseDeciderCaseResults(
@@ -488,12 +493,25 @@ export async function reuseDeciderCaseResults(
           )
           ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
         `)
-          .bind(...bindings, params.runId)
+          .bind(...bindings, params.runId),
+        db
+          .prepare(`
+            DELETE FROM pending_decider_outputs
+            WHERE model = ? AND variant = ? AND EXISTS (
+              SELECT 1 FROM case_results AS graded
+              WHERE graded.run_id = pending_decider_outputs.run_id
+                AND graded.model = pending_decider_outputs.model
+                AND graded.variant = pending_decider_outputs.variant
+                AND graded.case_id = pending_decider_outputs.case_id
+                AND graded.rep = pending_decider_outputs.rep
+            )
+          `)
+          .bind(entry.model, variantToStorage(entry.variant))
       );
     }
     if (statements.length === 0) continue;
     const results = await db.batch(statements);
-    for (let index = 0; index < results.length; index += 2) {
+    for (let index = 0; index < results.length; index += 3) {
       copied += results[index].meta.changes ?? 0;
     }
   }

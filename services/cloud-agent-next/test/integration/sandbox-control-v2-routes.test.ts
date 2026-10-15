@@ -913,25 +913,38 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect((await readState(stub)).lastActivityAt).toBeGreaterThan(stale ?? 0);
   });
 
-  it('fails a preparing route at its attempt deadline', async () => {
-    const provider = createFakeProvider();
-    const { stub, peer } = await setup(provider);
-    await stub.prepare(prepareInput(SESSION));
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+  it.each(['connected', 'connecting'])(
+    'cancels an expired route while %s and starts a new attempt',
+    async connectionState => {
+      const provider = createFakeProvider();
+      const { stub, peer } = await setup(provider);
+      await stub.prepare(prepareInput(SESSION));
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const connection =
+        connectionState === 'connected' ? await connectAndHello(provider) : undefined;
+      if (connection) await connection.wrapper.next();
 
-    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
-    await setRouteDeadline(stub, SESSION, Date.now() - 1);
-    await runAlarm(stub);
+      const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+      await setRouteDeadline(stub, SESSION, Date.now() - 1);
+      await runAlarm(stub);
+      const { wrapper } = connection ?? (await connectAndHello(provider));
+      expect(await wrapper.next()).toMatchObject({ type: 'session.release', sessionId: SESSION });
 
-    await waitFor(() =>
-      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
-        state: 'failed',
-        attemptId,
-        reason: 'preparation_timeout',
-      })
-    );
-    expect((await readRouteRow(stub, SESSION))?.state).toBe('failed');
-  });
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+          state: 'failed',
+          attemptId,
+          reason: 'preparation_timeout',
+        })
+      );
+      expect((await readRouteRow(stub, SESSION))?.state).toBe('failed');
+      await stub.prepare(prepareInput(SESSION));
+      const retried = await wrapper.next();
+      expect(retried).toMatchObject({ type: 'session.prepare', spec: { sessionId: SESSION } });
+      if (retried?.type !== 'session.prepare') throw new Error('expected preparation');
+      expect(retried.spec.attemptId).not.toBe(attemptId);
+    }
+  );
 
   it('records route lifecycle diagnostics at the route decision owner', async () => {
     const provider = createFakeProvider();
@@ -948,6 +961,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
         now: () => 5_000,
         routePreparationMs: 1_000,
         sendPrepare: () => {},
+        releasePreparation: () => {},
         notify: async () => {},
         issueGrant: async () => {
           throw new Error('unused');

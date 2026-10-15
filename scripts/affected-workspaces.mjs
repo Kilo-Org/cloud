@@ -31,6 +31,13 @@ const OWNED = [
   [/^tools\/(i18n|nativewind)\//, 'apps/mobile'],
 ];
 
+// [reader, workspace] reads that no source file shows.
+const EXTRA_READS = [
+  // The ai-gateway build copies the web app's .env files
+  // (apps/ai-gateway/scripts/dev.sh, the build-ai-gateway job in ci.yml).
+  ['apps/ai-gateway', 'apps/web'],
+];
+
 // Root paths that no typecheck or lint reads.
 const NEUTRAL = [
   /\.md$/,
@@ -126,6 +133,9 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
       ),
       dir
     );
+  }
+  for (const [reader, dir] of EXTRA_READS) {
+    if (readers.has(reader) && readers.has(dir)) read(reader, dir);
   }
   // Root paths (outside every workspace) that a workspace reads.
   const rootReads = [];

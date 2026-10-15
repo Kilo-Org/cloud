@@ -31,6 +31,16 @@ test('a leaf change selects only the leaf', () => {
   });
 });
 
+test('a web .env change selects ai-gateway, which builds with those files', () => {
+  const result = selectAffected({
+    items: [...items, workspace('ai-gateway', 'apps/ai-gateway')],
+    changedFiles: ['apps/web/.env.test'],
+    lockfileDirs: [],
+    references: [],
+  });
+  assert.ok(result.packages.includes('ai-gateway'));
+});
+
 test('a change reaches workspace dependents and relative-import readers', () => {
   const { packages, build } = select(['packages/db/src/schema.ts']);
   assert.deepEqual(packages, ['@kilocode/db', '@kilocode/trpc', 'kilo-app', 'web']);

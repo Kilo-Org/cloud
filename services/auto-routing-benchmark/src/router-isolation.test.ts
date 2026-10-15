@@ -134,6 +134,12 @@ describe('router contracts and database isolation', () => {
         expect(query.sql).toContain('"router"');
         expect(query.params).toContain(router);
       }
+      // Values the previously deployed worker accepts (80 + 40 + 80 = 200 across
+      // both routers), never the shared budget, so a rollback stays valid.
+      const configInsert = queries.find(
+        query => query.sql.startsWith('insert') && query.sql.includes('"benchmark_config"')
+      );
+      expect(configInsert?.params).toEqual(expect.arrayContaining([80, 40]));
     }
   );
 
@@ -198,7 +204,7 @@ describe('atomic running-container admission', () => {
     min_accuracy: 0.9,
     switch_cost_factor: 3,
     best_accuracy_switch_threshold: 0.05,
-    max_concurrency: 300,
+    max_concurrency: 150,
     benchmark_user_id: null,
     benchmark_org_id: null,
     repetitions: 1,
@@ -232,7 +238,7 @@ describe('atomic running-container admission', () => {
       await insertRun(db, { ...run, id: 'efficient-platform' }, [], []);
       await insertRun(
         db,
-        { ...run, id: 'frontier-platform', router: 'frontier', max_concurrency: 200 },
+        { ...run, id: 'frontier-platform', router: 'frontier', max_concurrency: 100 },
         [],
         []
       );
@@ -246,19 +252,19 @@ describe('atomic running-container admission', () => {
       apply(0);
       apply(1);
       rejects(2);
-      expect(lanes()).toEqual({ lanes: 500 });
+      expect(lanes()).toEqual({ lanes: 250 });
       expect(queries).toHaveLength(3);
     } finally {
       sqlite.close();
     }
   });
 
-  it('caps owner runs at 400 and leaves 100 lanes for platform runs', async () => {
+  it('caps owner runs at 150 and leaves 100 lanes for platform runs', async () => {
     const { sqlite, db, queries, apply, rejects, lanes } = admissionHarness();
     try {
       await insertRun(
         db,
-        { ...run, id: 'user-full', purpose: 'user', max_concurrency: 400 },
+        { ...run, id: 'user-full', purpose: 'user', max_concurrency: 150 },
         [],
         []
       );
@@ -277,7 +283,7 @@ describe('atomic running-container admission', () => {
       await insertRun(db, { ...run, id: 'platform-into-reserve', max_concurrency: 100 }, [], []);
       await insertRun(
         db,
-        { ...run, id: 'platform-past-reserve', router: 'frontier', max_concurrency: 101 },
+        { ...run, id: 'platform-past-reserve', router: 'frontier', max_concurrency: 1 },
         [],
         []
       );
@@ -286,7 +292,7 @@ describe('atomic running-container admission', () => {
       rejects(1);
       apply(2);
       rejects(3);
-      expect(lanes()).toEqual({ lanes: 500 });
+      expect(lanes()).toEqual({ lanes: 250 });
       expect(queries).toHaveLength(4);
     } finally {
       sqlite.close();
@@ -311,7 +317,7 @@ describe('atomic running-container admission', () => {
         { id: 'decider' },
       ]);
       // The classifier row records its OpenRouter fan-out, never container lanes.
-      expect(lanes()).toEqual({ lanes: 300 });
+      expect(lanes()).toEqual({ lanes: 150 });
       expect(queries).toHaveLength(2);
     } finally {
       sqlite.close();

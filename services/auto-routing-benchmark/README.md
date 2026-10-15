@@ -49,9 +49,12 @@ efficient table is fabricated for it. Before enabling frontier serving, administ
 save a frontier configuration with its own decider models, benchmark those entries, and
 publish a complete frontier table.
 
-Container lanes come from one shared budget: `BENCHMARK_CONTAINER_BUDGET` (500, the wrangler
-`max_instances`), sized per run against the lanes other running runs hold. User-queue runs stop
-at `BENCHMARK_USER_CONTAINER_LIMIT` (400), which keeps `BENCHMARK_PLATFORM_RESERVED_CONTAINERS`
+Container lanes come from one shared budget: `BENCHMARK_CONTAINER_BUDGET` (250), sized per run
+against the lanes other running runs hold. Each queue job holds one container for its consumer
+invocation, so the budget equals Cloudflare's limit of 250 concurrent push-consumer invocations;
+wrangler's container `max_instances` and jobs consumer `max_concurrency` match it. Raising it needs
+a Cloudflare limit increase plus matching wrangler limits. User-queue runs stop at
+`BENCHMARK_USER_CONTAINER_LIMIT` (150), which keeps `BENCHMARK_PLATFORM_RESERVED_CONTAINERS`
 (100) available to platform runs, and a platform run takes half of what is free so the efficient
 and frontier platform queues share the pool. Frontier never registers owner
 custom pools, and has only a platform queue (`both` selects that queue; `user` is rejected).
@@ -397,13 +400,14 @@ row is global, so the pair is benchmarked once and serves both.
 | Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from owner pools (quota-charged) |
 | Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, 15-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
-| Container lanes | Half of the free lanes; the two routers split the platform pool | `BENCHMARK_USER_CONTAINER_LIMIT` (400), or the free lanes when fewer remain |
+| Container lanes | Half of the free lanes; the two routers split the platform pool | `BENCHMARK_USER_CONTAINER_LIMIT` (150), or the free lanes when fewer remain |
 | Slot | Its own; a running user-queue run never blocks it | Its own; a running platform-queue run never blocks it |
 
-Every router and queue shares one budget of `BENCHMARK_CONTAINER_BUDGET` (500, the wrangler
-`max_instances`). A run's lanes are recorded in `benchmark_runs.max_concurrency`, and the atomic
-insert refuses a run whose lanes would push the running total past 500, or the owner total past
-400. A run that cannot fit waits for a running one to finish; the drain logs
+Every router and queue shares one budget of `BENCHMARK_CONTAINER_BUDGET` (250, matching the
+Cloudflare concurrent-consumer limit and the wrangler limits). A run's lanes are recorded in
+`benchmark_runs.max_concurrency`, and the atomic insert refuses a run whose lanes would push the
+running total past 250, or the owner total past 150. A run that cannot fit waits for a running
+one to finish; the drain logs
 `benchmark_queue_drain_skipped_no_capacity` rather than reporting a failure.
 
 After any decider run completes, the worker assembles the platform table from ready, current registry entries for the current catalog pairs.

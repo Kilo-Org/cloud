@@ -37,7 +37,7 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   low_confidence_threshold: real('low_confidence_threshold'),
   // Legacy lane-budget columns: never read by this worker, but still read by
   // the previously deployed one, so they stay until a cleanup migration drops
-  // both. replaceConfig writes the shared-budget constants; the user default is
+  // both. replaceConfig writes values the old worker accepts; the user default is
   // migration 0010's stored default, kept so the column definition is unchanged.
   max_concurrency: integer('max_concurrency').notNull(),
   user_max_concurrency: integer('user_max_concurrency').notNull().default(100),

@@ -487,6 +487,23 @@ describe('processJob — scheduler-owned execution', () => {
     expect(startChunk).not.toHaveBeenCalled();
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
   });
+
+  it('releases every unsent claim when a queue send fails mid-batch', async () => {
+    const claims = ['a', 'b', 'c'].map(suffix =>
+      mockClaim({ id: `chunk-${suffix}`, token: `token-${suffix}`, model: `batch/${suffix}` })
+    );
+    vi.mocked(claimScheduledChunks).mockResolvedValue(claims);
+    queueSend
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('queue unavailable'));
+    await expect(
+      processJob(env, { runId, kind: 'decider', model, schedulerWake: true })
+    ).rejects.toThrow('queue unavailable');
+    expect(queueSend).toHaveBeenCalledTimes(2);
+    expect(deferChunk).toHaveBeenCalledTimes(2);
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-b', 'token-b', expect.any(Number));
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-c', 'token-c', expect.any(Number));
+  });
 });
 
 describe('processJob — legacy whole-run migration', () => {

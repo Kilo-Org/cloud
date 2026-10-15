@@ -1027,7 +1027,7 @@ export async function dispatchScheduler(env: Env): Promise<void> {
     await finalizeRunIfComplete(env, run.id, 'decider', await getRunState(env, run.id));
   }
   const claims = await claimScheduledChunks(env.BENCH_DB, config, Date.now(), crypto.randomUUID());
-  for (const claim of claims) {
+  for (const [index, claim] of claims.entries()) {
     try {
       await env.BENCH_QUEUE.send({
         runId: claim.run_id,
@@ -1037,7 +1037,9 @@ export async function dispatchScheduler(env: Env): Promise<void> {
         claimToken: claim.token,
       });
     } catch (error) {
-      await deferChunk(env.BENCH_DB, claim.id, claim.token, Date.now());
+      for (const unsent of claims.slice(index)) {
+        await deferChunk(env.BENCH_DB, unsent.id, unsent.token, Date.now());
+      }
       throw error;
     }
   }

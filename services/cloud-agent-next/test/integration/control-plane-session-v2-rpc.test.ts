@@ -223,9 +223,13 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 worker RPC surface', () => {
-  it.each([undefined, false, true])(
-    'retains audit %s after eviction and rejects changed or contradictory registration replays',
-    async egressAudit => {
+  it.each(
+    ([undefined, 'unrestricted', 'allowlist'] as const).flatMap(egressMode =>
+      [undefined, false, true].map(egressAudit => ({ egressMode, egressAudit }))
+    )
+  )(
+    'retains audit policy %j after eviction and rejects changed or contradictory registration replays',
+    async ({ egressMode, egressAudit }) => {
       const sessionId = newSessionId();
       const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
       let stub = sessions.getByName(sessionId);
@@ -234,14 +238,14 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         kiloSessionId: kiloSessionId(),
         sandboxId,
         sandboxProvider: 'cloudflare-containers',
-        egressMode: 'allowlist',
+        egressMode,
         egressAudit,
       });
       const input = {
         metadata: registered,
         sandboxSelection: {
           provider: 'cloudflare-containers' as const,
-          egressMode: 'allowlist' as const,
+          egressMode,
           egressAudit,
         },
       };

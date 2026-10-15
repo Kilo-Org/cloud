@@ -759,16 +759,20 @@ describe('prepare session sandbox selection', () => {
   const organizationInput = { ...baseInput, organizationId: MESSAGE_UUID };
   it.each([
     { egressAudit: false },
+    { egressAudit: true },
     { egressMode: 'unrestricted', egressAudit: false },
+    { egressMode: 'unrestricted', egressAudit: true },
     { egressMode: 'allowlist', egressAudit: false },
     { egressMode: 'allowlist', egressAudit: true },
   ])('preserves personal and organization audit opt-ins: %j', policy => {
-    expect(personalPrepareSessionNextSchema.parse({ ...baseInput, ...policy }).egressAudit).toBe(
-      policy.egressAudit
-    );
-    expect(
-      organizationPrepareSessionNextSchema.parse({ ...organizationInput, ...policy }).egressAudit
-    ).toBe(policy.egressAudit);
+    for (const parsed of [
+      personalPrepareSessionNextSchema.parse({ ...baseInput, ...policy }),
+      organizationPrepareSessionNextSchema.parse({ ...organizationInput, ...policy }),
+    ]) {
+      expect(parsed.egressAudit).toBe(policy.egressAudit);
+      expect(parsed.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+      expect(parsed.egressAllowlist).toBeUndefined();
+    }
   });
   it.each([[], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'preserves canonical API-only policy %j',
@@ -811,8 +815,6 @@ describe('prepare session sandbox selection', () => {
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'deny-all' },
     { egressMode: null },
-    { egressAudit: true },
-    { egressMode: 'unrestricted', egressAudit: true },
     { egressMode: 'allowlist', egressAudit: null },
     { egressMode: 'allowlist', egressAudit: 'true' },
   ])('rejects ambiguous or unsupported egress policies: %j', policy => {

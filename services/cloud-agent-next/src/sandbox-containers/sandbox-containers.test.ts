@@ -53,7 +53,7 @@ type StoredRecord = {
   billingConfigured?: true;
   wrapperAttempt?: string;
   repositoryStartFailures?: { snapshotId: string; attempts: number };
-  egressPolicy?: { allocationRef: string; allowlist: string[]; egressAudit?: boolean };
+  egressPolicy?: { allocationRef: string; allowlist?: string[]; egressAudit?: boolean };
 };
 
 const idleRecord: StoredRecord = {
@@ -403,67 +403,89 @@ function sleepPreExec(record?: StoredRecord) {
 }
 
 describe('SandboxContainers egress enforcement', () => {
-  it('binds audit identity through trusted outbound props and retains it after reconstruction and stop', async () => {
-    const initial = setup();
-    const initialOutbound = attachOutbound(initial.instance);
-    const allocationRef = encodeCloudflareProviderRef({
-      sandboxId: `ses-${'a'.repeat(48)}`,
-      containment: false,
-      instanceId: 'audit-allocation',
-    });
-    const input = {
-      allocationRef,
-      env: { EGRESS_AUDIT: 'false', ALLOCATION_REF: 'sandbox-forged' },
-      instance: 'lite' as const,
-      egressAllowlist: ['example.com'],
-      egressAudit: true,
-    };
-    await initial.instance.launchWrapper(input);
-    expect(initialOutbound).toHaveBeenCalledWith({
-      props: {
-        containerId: 'do-id',
+  it.each([undefined, ['example.com']])(
+    'binds audit identity and retains it after reconstruction and stop with allowlist %j',
+    async egressAllowlist => {
+      const initial = setup();
+      const initialOutbound = attachOutbound(initial.instance);
+      const allocationRef = encodeCloudflareProviderRef({
+        sandboxId: `ses-${'a'.repeat(48)}`,
+        containment: false,
+        instanceId: 'audit-allocation',
+      });
+      const input = {
         allocationRef,
-        egressAllowlist: ['example.com'],
+        env: { EGRESS_AUDIT: 'false', ALLOCATION_REF: 'sandbox-forged' },
+        instance: 'lite' as const,
+        egressAllowlist,
         egressAudit: true,
-      },
-    });
-    expect(initial.readRecord().egressPolicy).toEqual({
-      allocationRef,
-      allowlist: ['example.com'],
-      egressAudit: true,
-    });
-    const restored = initial.reconstruct();
-    const restoredOutbound = attachOutbound(restored);
-    await restored.launchWrapper(input);
-    expect(restoredOutbound).toHaveBeenCalledWith({
-      props: {
-        containerId: 'do-id',
+      };
+      await initial.instance.launchWrapper(input);
+      expect(initialOutbound).toHaveBeenCalledWith({
+        props: {
+          containerId: 'do-id',
+          allocationRef,
+          ...(egressAllowlist === undefined ? {} : { egressAllowlist }),
+          egressAudit: true,
+        },
+      });
+      expect(initial.readRecord().egressPolicy).toEqual({
         allocationRef,
-        egressAllowlist: ['example.com'],
+        allowlist: egressAllowlist,
         egressAudit: true,
-      },
-    });
-    await restored.stop(allocationRef);
-    expect(initial.readRecord().egressPolicy?.egressAudit).toBe(true);
-    await expect(restored.launchWrapper({ ...input, egressAudit: false })).rejects.toThrow(
-      'egress policy cannot change'
-    );
-  });
+      });
+      expect(initial.container.calls).toEqual([
+        'https-intercept',
+        'http-intercept',
+        'start',
+        'exec:cat',
+      ]);
+      expect(initial.container.startCalls[0]).toMatchObject({
+        enableInternet: egressAllowlist === undefined,
+        env: {
+          SANDBOX_INTERCEPT_HTTPS: '1',
+          NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt',
+        },
+      });
+      const restored = initial.reconstruct();
+      const restoredOutbound = attachOutbound(restored);
+      await restored.launchWrapper(input);
+      expect(restoredOutbound).toHaveBeenCalledWith({
+        props: {
+          containerId: 'do-id',
+          allocationRef,
+          ...(egressAllowlist === undefined ? {} : { egressAllowlist }),
+          egressAudit: true,
+        },
+      });
+      await restored.stop(allocationRef);
+      expect(initial.readRecord().egressPolicy?.egressAudit).toBe(true);
+      await expect(restored.launchWrapper({ ...input, egressAudit: false })).rejects.toThrow(
+        'egress policy cannot change'
+      );
+    }
+  );
 
-  it.each([
-    { storedAudit: true, incomingAudit: undefined },
-    { storedAudit: true, incomingAudit: false },
-    { storedAudit: undefined, incomingAudit: true },
-    { storedAudit: false, incomingAudit: true },
-  ])(
+  it.each(
+    [undefined, []].flatMap(allowlist =>
+      [
+        { storedAudit: true, incomingAudit: undefined },
+        { storedAudit: true, incomingAudit: false },
+        { storedAudit: undefined, incomingAudit: true },
+        { storedAudit: false, incomingAudit: true },
+      ].map(policy => ({ ...policy, allowlist }))
+    )
+  )(
     'rejects audit policy changes within an allocation: %j',
-    async ({ storedAudit, incomingAudit }) => {
+    async ({ storedAudit, incomingAudit, allowlist }) => {
       const state = setup({
         record: {
           ...idleRecord,
           state: 'running',
           allocationRef: REF_A,
-          egressPolicy: { allocationRef: REF_A, allowlist: [], egressAudit: storedAudit },
+          ...(allowlist !== undefined || storedAudit === true
+            ? { egressPolicy: { allocationRef: REF_A, allowlist, egressAudit: storedAudit } }
+            : {}),
         },
         running: true,
       });
@@ -472,7 +494,7 @@ describe('SandboxContainers egress enforcement', () => {
           allocationRef: REF_A,
           env: {},
           instance: 'lite',
-          egressAllowlist: [],
+          egressAllowlist: allowlist,
           egressAudit: incomingAudit,
         })
       ).rejects.toThrow('egress policy cannot change');
@@ -480,31 +502,72 @@ describe('SandboxContainers egress enforcement', () => {
     }
   );
 
-  it('retains accepted audit policy if interception setup fails before physical start', async () => {
-    const state = setup();
-    attachOutbound(state.instance);
-    vi.spyOn(state.container, 'interceptOutboundHttps').mockRejectedValueOnce(
-      new Error('unavailable')
-    );
-    const input = {
-      allocationRef: REF_A,
-      env: {},
-      instance: 'lite' as const,
-      egressAllowlist: [],
-      egressAudit: true,
-    };
-    await expect(state.instance.launchWrapper(input)).rejects.toThrow('unavailable');
-    const restored = state.reconstruct();
-    attachOutbound(restored);
-    await expect(restored.launchWrapper({ ...input, egressAudit: false })).rejects.toThrow(
-      'egress policy cannot change'
-    );
-    await expect(restored.launchWrapper(input)).resolves.toMatchObject({ started: true });
-  });
+  it.each([undefined, []])(
+    'retains accepted audit policy if interception setup fails with allowlist %j',
+    async egressAllowlist => {
+      const state = setup();
+      attachOutbound(state.instance);
+      vi.spyOn(state.container, 'interceptOutboundHttps').mockRejectedValueOnce(
+        new Error('unavailable')
+      );
+      const input = {
+        allocationRef: REF_A,
+        env: {},
+        instance: 'lite' as const,
+        egressAllowlist,
+        egressAudit: true,
+      };
+      await expect(state.instance.launchWrapper(input)).rejects.toThrow('unavailable');
+      const restored = state.reconstruct();
+      attachOutbound(restored);
+      await expect(restored.launchWrapper({ ...input, egressAudit: false })).rejects.toThrow(
+        'egress policy cannot change'
+      );
+      await expect(restored.launchWrapper(input)).resolves.toMatchObject({ started: true });
+    }
+  );
 
   it.each([
-    { egressAudit: true },
+    { wrapperAttempt: 'not_started', running: false },
+    { wrapperAttempt: 'not_started', running: true },
+    { wrapperAttempt: 'exec_pending', running: true },
+  ])(
+    'reinstalls unrestricted auditing when recovering a launch: %j',
+    async ({ wrapperAttempt, running }) => {
+      const state = setup({
+        record: {
+          ...idleRecord,
+          state: 'launching',
+          allocationRef: REF_A,
+          wrapperAttempt,
+          egressPolicy: { allocationRef: REF_A, egressAudit: true },
+        },
+        running,
+      });
+      const outbound = attachOutbound(state.instance);
+      await state.instance.launchWrapper({
+        allocationRef: REF_A,
+        env: {},
+        instance: 'lite',
+        egressAudit: true,
+      });
+      expect(state.container.calls.slice(0, 2)).toEqual(['https-intercept', 'http-intercept']);
+      expect(outbound).toHaveBeenCalledWith({
+        props: { containerId: 'do-id', allocationRef: REF_A, egressAudit: true },
+      });
+      expect(state.readRecord().egressPolicy).toEqual({ allocationRef: REF_A, egressAudit: true });
+      if (!running) {
+        expect(state.container.startCalls[0]).toMatchObject({
+          enableInternet: true,
+          env: { SANDBOX_INTERCEPT_HTTPS: '1' },
+        });
+      }
+    }
+  );
+
+  it.each([
     { egressAudit: 'true', egressAllowlist: [] },
+    { egressAudit: true, allocationRef: undefined },
     { egressAudit: true, allocationRef: '', egressAllowlist: [] },
   ])('fails closed before any physical calls for invalid audit input: %j', async invalid => {
     const state = setup();
@@ -542,7 +605,6 @@ describe('SandboxContainers egress enforcement', () => {
       allocationRef: REF_A,
       env: {},
       instance: 'lite',
-      egressAllowlist: ['example.com'],
       egressAudit: true,
     });
     const restored = state.reconstruct();
@@ -678,18 +740,21 @@ describe('SandboxContainers egress enforcement', () => {
     expect(container.calls).toEqual([]);
   });
 
-  it('rejects restricted fresh launches when an unowned physical container is already running', async () => {
-    const { instance, container } = setup({ running: true });
-    await expect(
-      instance.launchWrapper({
-        allocationRef: REF_A,
-        env: {},
-        instance: 'lite',
-        egressAllowlist: [],
-      })
-    ).rejects.toThrow('unowned running container');
-    expect(container.calls).toEqual([]);
-  });
+  it.each([{ egressAllowlist: [] }, { egressAudit: true }])(
+    'rejects policy changes when an unowned physical container is already running: %j',
+    async policy => {
+      const { instance, container } = setup({ running: true });
+      await expect(
+        instance.launchWrapper({
+          allocationRef: REF_A,
+          env: {},
+          instance: 'lite',
+          ...policy,
+        })
+      ).rejects.toThrow('unowned running container');
+      expect(container.calls).toEqual([]);
+    }
+  );
 
   it.each(
     [null, '*', ['*.example.com'], ['127.0.0.1']].map(egressAllowlist => ({ egressAllowlist }))
@@ -706,19 +771,22 @@ describe('SandboxContainers egress enforcement', () => {
     expect(container.calls).toEqual([]);
   });
 
-  it('fails closed for invalid persisted policy instead of re-registering unrestricted props', async () => {
-    const { instance, container } = setup({
-      record: {
-        ...idleRecord,
-        allocationRef: REF_A,
-        state: 'running',
-        egressPolicy: { allocationRef: REF_A, allowlist: ['*'] },
-      },
-      running: true,
-    });
-    await expect(launch(instance, REF_A)).rejects.toThrow();
-    expect(container.calls).toEqual([]);
-  });
+  it.each([{ allowlist: ['*'] }, {}, { egressAudit: false }])(
+    'fails closed for invalid persisted policy %j instead of re-registering unrestricted props',
+    async policy => {
+      const { instance, container } = setup({
+        record: {
+          ...idleRecord,
+          allocationRef: REF_A,
+          state: 'running',
+          egressPolicy: { allocationRef: REF_A, ...policy },
+        },
+        running: true,
+      });
+      await expect(launch(instance, REF_A)).rejects.toThrow();
+      expect(container.calls).toEqual([]);
+    }
+  );
 
   it('retains policy after an ambiguous native start and rejects removal before adoption', async () => {
     const { instance, container, readRecord } = setup();

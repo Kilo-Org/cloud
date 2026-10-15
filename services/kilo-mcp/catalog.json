@@ -7914,7 +7914,7 @@
               }
             },
             "egressAudit": {
-              "description": "Opt in to egress auditing; true requires explicit allowlist mode.",
+              "description": "Opt in to egress auditing in any egress mode.",
               "type": "boolean"
             }
           }
@@ -20868,7 +20868,7 @@
                   }
                 },
                 "egressAudit": {
-                  "description": "Opt in to egress auditing; true requires explicit allowlist mode.",
+                  "description": "Opt in to egress auditing in any egress mode.",
                   "type": "boolean"
                 }
               }

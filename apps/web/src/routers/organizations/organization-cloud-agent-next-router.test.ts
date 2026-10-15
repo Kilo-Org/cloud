@@ -1943,7 +1943,9 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
 
   it.each([
     { egressAudit: false },
+    { egressAudit: true },
     { egressMode: 'unrestricted' as const, egressAudit: false },
+    { egressMode: 'unrestricted' as const, egressAudit: true },
     { egressMode: 'allowlist' as const, egressAudit: true },
   ])('forwards organization prepare audit settings: %j', async policy => {
     const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
@@ -1956,17 +1958,6 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
       expect.objectContaining({ ...policy, kilocodeOrganizationId: ORGANIZATION_ID })
     );
   });
-
-  it.each([undefined, 'unrestricted'] as const)(
-    'rejects organization audit without allowlist mode: %s',
-    async egressMode => {
-      const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
-      await expect(
-        caller.prepareSession({ ...sandboxInput, egressMode, egressAudit: true })
-      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-      expect(mockPrepareSession).not.toHaveBeenCalled();
-    }
-  );
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
     'forwards the normalized legacy organization sandbox preset %s',

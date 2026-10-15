@@ -52,7 +52,6 @@ export function createSessionEgressAuditHandlers() {
               }
               if (
                 workspace.sandboxProvider !== 'cloudflare-containers' ||
-                workspace.egressMode !== 'allowlist' ||
                 workspace.sandboxRoute !== undefined ||
                 (workspace.sandboxKind !== undefined
                   ? workspace.sandboxKind !== 'isolated'

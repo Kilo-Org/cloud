@@ -191,7 +191,7 @@ function assertEgressPolicyAllocation(
     'cloudAgentSessionId' | 'sandboxProvider' | 'sandboxRoute' | 'sandboxKind'
   >
 ): void {
-  if (input.runtime?.egressMode !== 'allowlist') return;
+  if (input.runtime?.egressMode !== 'allowlist' && input.runtime?.egressAudit !== true) return;
   if (
     !allocation.cloudAgentSessionId.startsWith('workspace_') ||
     allocation.sandboxProvider !== 'cloudflare-containers' ||
@@ -200,8 +200,7 @@ function assertEgressPolicyAllocation(
   ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
-      message:
-        'Deny-by-default egress requires an isolated control-plane Cloudflare containers sandbox',
+      message: 'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
     });
   }
 }
@@ -1830,7 +1829,9 @@ export async function sessionCreateIntentFingerprint(
       repository: repositoryCreateIntent(input.repository),
       finalization: input.finalization,
       runtime:
-        input.runtime?.sandboxAllocation || input.runtime?.egressMode === 'allowlist'
+        input.runtime?.sandboxAllocation ||
+        input.runtime?.egressMode === 'allowlist' ||
+        input.runtime?.egressAudit === true
           ? {
               ...(input.runtime.sandboxAllocation
                 ? { sandboxAllocation: input.runtime.sandboxAllocation }
@@ -1841,9 +1842,9 @@ export async function sessionCreateIntentFingerprint(
                     egressAllowlist: egressAllowlistSchema.parse(
                       input.runtime.egressAllowlist ?? []
                     ),
-                    ...(input.runtime.egressAudit === true ? { egressAudit: true } : {}),
                   }
                 : {}),
+              ...(input.runtime.egressAudit === true ? { egressAudit: true } : {}),
             }
           : undefined,
       options: input.options
@@ -1888,7 +1889,9 @@ async function assertCreateIntentUnchanged(
   if (
     !recorded.success ||
     !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement) ||
-    ((selectable !== undefined || input.runtime?.egressMode === 'allowlist') &&
+    ((selectable !== undefined ||
+      input.runtime?.egressMode === 'allowlist' ||
+      input.runtime?.egressAudit === true) &&
       (typeof stored !== 'string' || stored.length === 0))
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });

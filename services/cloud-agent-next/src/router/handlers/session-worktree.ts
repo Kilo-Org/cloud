@@ -279,9 +279,9 @@ async function worktreeIntentFingerprint(
         ? {
             egressMode: source.workspace.egressMode,
             egressAllowlist: source.workspace.egressAllowlist ?? [],
-            ...(source.workspace.egressAudit === true ? { egressAudit: true } : {}),
           }
         : {}),
+      ...(source.workspace.egressAudit === true ? { egressAudit: true } : {}),
     })
   );
 }

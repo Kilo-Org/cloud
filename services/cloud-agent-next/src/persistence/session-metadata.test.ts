@@ -31,12 +31,17 @@ const profile = {
 
 describe('session metadata boundary', () => {
   it.each(
-    [undefined, [], ['Z.Example.COM.', 'EXAMPLE.COM', 'example.com']].flatMap(egressAllowlist =>
-      [undefined, false, true].map(egressAudit => ({ egressAllowlist, egressAudit }))
-    )
+    [
+      { egressMode: undefined, egressAllowlist: undefined },
+      { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+      ...[undefined, [], ['Z.Example.COM.', 'EXAMPLE.COM', 'example.com']].map(egressAllowlist => ({
+        egressMode: 'allowlist' as const,
+        egressAllowlist,
+      })),
+    ].flatMap(policy => [undefined, false, true].map(egressAudit => ({ ...policy, egressAudit })))
   )(
     'preserves canonical egress policy through serialization: %j',
-    ({ egressAllowlist, egressAudit }) => {
+    ({ egressMode, egressAllowlist, egressAudit }) => {
       const metadata = parseSessionMetadata({
         metadataSchemaVersion: 2,
         identity: { sessionId: 'workspace_test', userId: 'user' },
@@ -44,7 +49,7 @@ describe('session metadata boundary', () => {
         workspace: {
           sandboxId: 'ses-0123456789abcdef',
           sandboxProvider: 'cloudflare-containers',
-          egressMode: 'allowlist',
+          egressMode,
           egressAllowlist,
           egressAudit,
         },
@@ -57,13 +62,13 @@ describe('session metadata boundary', () => {
             ? []
             : ['example.com', 'z.example.com'];
       expect(metadata.workspace?.egressAllowlist).toEqual(expected);
-      expect(metadata.workspace?.egressMode).toBe('allowlist');
+      expect(metadata.workspace?.egressMode).toBe(egressMode);
       expect(metadata.workspace?.egressAudit).toBe(egressAudit);
       expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAudit).toBe(
         egressAudit
       );
       expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressMode).toBe(
-        'allowlist'
+        egressMode
       );
       expect(
         parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAllowlist
@@ -93,7 +98,12 @@ describe('session metadata boundary', () => {
   ])(
     'rejects unsupported egress placement %j',
     ({ sessionId, provider, sandboxId, ...workspace }) => {
-      for (const egressAllowlist of [undefined, []]) {
+      for (const policy of [
+        { egressMode: 'allowlist', egressAllowlist: undefined },
+        { egressMode: 'allowlist', egressAllowlist: [] },
+        { egressAudit: true },
+        { egressMode: 'unrestricted', egressAudit: true },
+      ]) {
         expect(
           CurrentSessionMetadataSchema.safeParse({
             metadataSchemaVersion: 2,
@@ -103,8 +113,7 @@ describe('session metadata boundary', () => {
               ...workspace,
               sandboxId,
               sandboxProvider: provider,
-              egressMode: 'allowlist',
-              egressAllowlist,
+              ...policy,
             },
             lifecycle: { version: 1, timestamp: 1 },
           }).success
@@ -159,8 +168,6 @@ describe('session metadata boundary', () => {
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'invalid' },
     { egressMode: null },
-    { egressAudit: true },
-    { egressMode: 'unrestricted', egressAudit: true },
     { egressMode: 'allowlist', egressAudit: null },
   ])('rejects invalid persisted egress policy %j', policy => {
     expect(

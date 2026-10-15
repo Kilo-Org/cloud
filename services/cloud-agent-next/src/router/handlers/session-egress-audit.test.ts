@@ -302,6 +302,21 @@ describe('Worker getEgressAudit', () => {
     expect(harness.containers.getByName).not.toHaveBeenCalled();
   });
 
+  it.each([undefined, 'unrestricted', 'allowlist'] as const)(
+    'returns audit history independently of egress mode: %s',
+    async egressMode => {
+      const harness = setup();
+      harness.sessionStub.getMetadata.mockResolvedValue({
+        ...harness.metadata,
+        workspace: { ...harness.metadata.workspace, egressMode },
+      });
+      await expect(
+        harness.caller.getEgressAudit({ cloudAgentSessionId: sessionId })
+      ).resolves.toEqual(audit);
+      expect(harness.containers.getByName).toHaveBeenCalledWith(sandboxId);
+    }
+  );
+
   it.each([
     { sandboxKind: 'shared', sandboxId: sharedSandboxId },
     { sandboxKind: undefined, sandboxId: sharedSandboxId },
@@ -309,8 +324,6 @@ describe('Worker getEgressAudit', () => {
     { sandboxRoute: { kind: 'shared', routeKey: sharedSandboxId } },
     { sandboxProvider: 'cloudflare' },
     { sandboxProvider: 'vercel' },
-    { egressMode: 'unrestricted' },
-    { egressMode: undefined },
   ] satisfies Partial<NonNullable<SessionMetadata['workspace']>>[])(
     'rejects unsupported or shared placement %j without a container RPC',
     async workspace => {

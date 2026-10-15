@@ -1339,24 +1339,15 @@ describe('cloudAgentNextRouter.prepareSession', () => {
 
   it.each([
     { egressAudit: false },
+    { egressAudit: true },
     { egressMode: 'unrestricted' as const, egressAudit: false },
+    { egressMode: 'unrestricted' as const, egressAudit: true },
     { egressMode: 'allowlist' as const, egressAudit: true },
   ])('forwards personal prepare audit settings: %j', async policy => {
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
     await caller.prepareSession({ ...sandboxInput, ...policy });
     expect(mockPrepareSession).toHaveBeenCalledWith(expect.objectContaining(policy));
   });
-
-  it.each([undefined, 'unrestricted'] as const)(
-    'rejects personal audit without allowlist mode: %s',
-    async egressMode => {
-      const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
-      await expect(
-        caller.prepareSession({ ...sandboxInput, egressMode, egressAudit: true })
-      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-      expect(mockPrepareSession).not.toHaveBeenCalled();
-    }
-  );
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
     'forwards the normalized legacy personal sandbox preset %s',

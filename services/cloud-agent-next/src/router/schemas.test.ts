@@ -54,15 +54,21 @@ const baseStartInput = {
 describe('grouped unified session input contracts', () => {
   it.each([
     { egressAudit: false },
+    { egressAudit: true },
     { egressMode: 'unrestricted', egressAudit: false },
+    { egressMode: 'unrestricted', egressAudit: true },
     { egressMode: 'allowlist', egressAudit: false },
     { egressMode: 'allowlist', egressAudit: true },
   ])('preserves audit settings at grouped and legacy boundaries: %j', policy => {
     expect(StartSessionInput.parse({ ...baseStartInput, runtime: policy }).runtime).toEqual(policy);
-    expect(
-      PrepareSessionInput.parse({ ...basePromptInput, githubRepo: 'acme/repo', ...policy })
-        .egressAudit
-    ).toBe(policy.egressAudit);
+    const legacy = PrepareSessionInput.parse({
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      ...policy,
+    });
+    expect(legacy.egressAudit).toBe(policy.egressAudit);
+    expect(legacy.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+    expect(legacy.egressAllowlist).toBeUndefined();
   });
 
   it.each(
@@ -111,8 +117,6 @@ describe('grouped unified session input contracts', () => {
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'deny-all' },
     { egressMode: null },
-    { egressAudit: true },
-    { egressMode: 'unrestricted', egressAudit: true },
     { egressMode: 'allowlist', egressAudit: null },
     { egressMode: 'allowlist', egressAudit: 'true' },
   ])('rejects ambiguous or unsupported egress policies: %j', policy => {

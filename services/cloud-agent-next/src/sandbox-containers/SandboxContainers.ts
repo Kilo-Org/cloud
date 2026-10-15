@@ -274,9 +274,6 @@ export class SandboxContainers extends DurableObject<Env> {
     }
     if (input.egressAudit === true) {
       EgressAuditRequestSchema.shape.allocationRef.parse(input.allocationRef);
-      if (input.egressAllowlist === undefined) {
-        throw new Error('Egress audit requires an egress allowlist');
-      }
     }
     input = {
       ...input,
@@ -337,7 +334,7 @@ export class SandboxContainers extends DurableObject<Env> {
     const sameRef = stored.allocationRef === ref;
     const phase = readWrapperAttempt(stored);
     if (stored.state === 'running' && sameRef) {
-      if (input.egressAllowlist !== undefined) {
+      if (input.egressAllowlist !== undefined || input.egressAudit === true) {
         await this.installOutboundProxy(this.requiredContainer(), input);
       }
       // A pending (or unknown) phase means a bun exec may still be starting; the
@@ -373,13 +370,13 @@ export class SandboxContainers extends DurableObject<Env> {
     if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
       throw new WrapperExecTimeoutError();
     }
-    if (input.egressAllowlist !== undefined && container.running) {
+    if ((input.egressAllowlist !== undefined || input.egressAudit === true) && container.running) {
       throw new Error('Cannot apply an egress policy to an unowned running container');
     }
     // Persist the accepted physical instance before any early return or physical
     // operation, so a resumed launch whose exec fails still records its size.
     let record = await this.installLaunchInstance(stored, input.instance);
-    if (input.egressAllowlist !== undefined) {
+    if (input.egressAllowlist !== undefined || input.egressAudit === true) {
       record = {
         ...record,
         egressPolicy: {
@@ -390,7 +387,11 @@ export class SandboxContainers extends DurableObject<Env> {
       };
       await this.writeRecord(record);
     }
-    if (input.containment === true || input.egressAllowlist !== undefined) {
+    if (
+      input.containment === true ||
+      input.egressAllowlist !== undefined ||
+      input.egressAudit === true
+    ) {
       await this.installOutboundProxy(container, input);
     }
     const start = await this.resolveStart(input, true);
@@ -419,7 +420,7 @@ export class SandboxContainers extends DurableObject<Env> {
       wrapperAttempt: 'exec_pending',
       startSource: start.source,
     };
-    if (input.egressAllowlist === undefined) {
+    if (input.egressAllowlist === undefined && input.egressAudit !== true) {
       delete launching.egressPolicy;
     } else {
       launching.egressPolicy = {
@@ -462,7 +463,9 @@ export class SandboxContainers extends DurableObject<Env> {
         input.instance,
         this.nativeLaunchEnv(
           input.env,
-          input.containment === true || input.egressAllowlist !== undefined
+          input.containment === true ||
+            input.egressAllowlist !== undefined ||
+            input.egressAudit === true
         ),
         input.egressAllowlist
       ),
@@ -510,7 +513,9 @@ export class SandboxContainers extends DurableObject<Env> {
         input.instance,
         this.nativeLaunchEnv(
           input.env,
-          input.containment === true || input.egressAllowlist !== undefined
+          input.containment === true ||
+            input.egressAllowlist !== undefined ||
+            input.egressAudit === true
         ),
         input.egressAllowlist,
         entry.snapshotId
@@ -804,7 +809,10 @@ export class SandboxContainers extends DurableObject<Env> {
     input: ContainersLaunchInput
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
-    const interception = input.containment === true || input.egressAllowlist !== undefined;
+    const interception =
+      input.containment === true ||
+      input.egressAllowlist !== undefined ||
+      input.egressAudit === true;
     if (interception) await this.installOutboundProxy(container, input);
     if (!container.running) {
       const start = await this.resolveStart(input, record.startSource === 'repository');
@@ -879,7 +887,11 @@ export class SandboxContainers extends DurableObject<Env> {
     if (container.running !== true) {
       throw new Error('Container wrapper start is pending and the container is not running');
     }
-    if (input.containment === true || input.egressAllowlist !== undefined) {
+    if (
+      input.containment === true ||
+      input.egressAllowlist !== undefined ||
+      input.egressAudit === true
+    ) {
       await this.installOutboundProxy(container, input);
     }
     if ((await this.settleRunningMainProcess(stored, ref)) === 'supervisor') {

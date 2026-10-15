@@ -110,6 +110,27 @@ describe('ContainersOutbound egress enforcement', () => {
     expect(JSON.stringify(recordEgressRequest.mock.calls)).not.toMatch(/secret|user|private|token/);
   });
 
+  it.each([
+    'https://outside.test/private?token=secret',
+    'http://127.0.0.1/',
+    'https://example.com:8443/',
+  ])('audits unrestricted requests without imposing an allowlist: %s', async url => {
+    const { props, env, recordEgressRequest } = auditFixture();
+    const request = new Request(url);
+    recordEgressRequest.mockImplementationOnce(async () => {
+      expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+    });
+    const response = await outbound({ ...props, egressAllowlist: undefined }, env).fetch(request);
+    expect(response.status).toBe(200);
+    expect(recordEgressRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: new URL(url).hostname, decision: 'allowed' })
+    );
+    expect(JSON.stringify(recordEgressRequest.mock.calls)).not.toMatch(/secret|private|token/);
+    expect(handleManagedScmOutbound).toHaveBeenCalledWith(request, env, {
+      containerId: 'container-1',
+    });
+  });
+
   it('keeps the same request identity and obtains a fresh physical DO stub on retry', async () => {
     const { worker, recordEgressRequest, get } = auditFixture();
     recordEgressRequest.mockRejectedValueOnce(
@@ -122,20 +143,19 @@ describe('ContainersOutbound egress enforcement', () => {
     expect(handleManagedScmOutbound).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['https://example.com/', 'https://evil.test/'])(
-    'fails closed after bounded retry exhaustion for %s',
-    async url => {
-      const { worker, recordEgressRequest } = auditFixture();
-      recordEgressRequest.mockRejectedValue(
-        Object.assign(new Error('secret'), { retryable: true })
-      );
-      const response = await worker.fetch(new Request(url));
-      expect(response.status).toBe(502);
-      expect(await response.text()).toBe('Egress audit unavailable');
-      expect(recordEgressRequest).toHaveBeenCalledTimes(3);
-      expect(handleManagedScmOutbound).not.toHaveBeenCalled();
-    }
-  );
+  it.each([
+    { url: 'https://example.com/', egressAllowlist: ['example.com'] },
+    { url: 'https://evil.test/', egressAllowlist: ['example.com'] },
+    { url: 'https://outside.test/', egressAllowlist: undefined },
+  ])('fails closed after bounded retry exhaustion for %s', async ({ url, egressAllowlist }) => {
+    const { props, env, recordEgressRequest } = auditFixture();
+    recordEgressRequest.mockRejectedValue(Object.assign(new Error('secret'), { retryable: true }));
+    const response = await outbound({ ...props, egressAllowlist }, env).fetch(new Request(url));
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe('Egress audit unavailable');
+    expect(recordEgressRequest).toHaveBeenCalledTimes(3);
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+  });
 
   it('bounds stalled persistence and never forwards while storage is pending', async () => {
     vi.useFakeTimers();
@@ -149,20 +169,19 @@ describe('ContainersOutbound egress enforcement', () => {
     expect(handleManagedScmOutbound).not.toHaveBeenCalled();
   });
 
-  it.each([
-    { allocationRef: undefined },
-    { allocationRef: '' },
-    { egressAllowlist: undefined },
-    { egressAudit: 'true' },
-  ])('rejects incomplete or invalid trusted audit props: %j', async invalid => {
-    const { props, env, recordEgressRequest } = auditFixture();
-    const response = await outbound({ ...props, ...invalid } as ContainersOutboundProps, env).fetch(
-      new Request('https://example.com/')
-    );
-    expect(response.status).toBe(502);
-    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
-    expect(recordEgressRequest).not.toHaveBeenCalled();
-  });
+  it.each([{ allocationRef: undefined }, { allocationRef: '' }, { egressAudit: 'true' }])(
+    'rejects incomplete or invalid trusted audit props: %j',
+    async invalid => {
+      const { props, env, recordEgressRequest } = auditFixture();
+      const response = await outbound(
+        { ...props, ...invalid } as ContainersOutboundProps,
+        env
+      ).fetch(new Request('https://example.com/'));
+      expect(response.status).toBe(502);
+      expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+      expect(recordEgressRequest).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not enable auditing from sandbox-controlled headers', async () => {
     const { env, recordEgressRequest } = auditFixture();
@@ -174,38 +193,42 @@ describe('ContainersOutbound egress enforcement', () => {
     expect(recordEgressRequest).not.toHaveBeenCalled();
   });
 
-  it('preserves streamed request and response bodies and manual redirects while auditing', async () => {
-    const { worker } = auditFixture();
-    const responseBody = new ReadableStream({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode('response-stream'));
-        controller.close();
-      },
-    });
-    const forwardedResponse = new Response(responseBody, {
-      status: 302,
-      headers: { Location: 'https://evil.test/' },
-    });
-    vi.mocked(handleManagedScmOutbound).mockResolvedValueOnce(forwardedResponse);
-    const request = new Request('https://example.com/upload', {
-      method: 'POST',
-      body: new ReadableStream({
+  it.each([undefined, ['example.com']])(
+    'preserves streamed bodies and redirects while auditing with allowlist %j',
+    async egressAllowlist => {
+      const { props, env } = auditFixture();
+      const worker = outbound({ ...props, egressAllowlist }, env);
+      const responseBody = new ReadableStream({
         start(controller) {
-          controller.enqueue(new TextEncoder().encode('request-stream'));
+          controller.enqueue(new TextEncoder().encode('response-stream'));
           controller.close();
         },
-      }),
-      duplex: 'half',
-    } as RequestInit);
-    const response = await worker.fetch(request);
-    const forwarded = vi.mocked(handleManagedScmOutbound).mock.calls[0]?.[0];
-    expect(forwarded?.redirect).toBe('manual');
-    expect(forwarded?.bodyUsed).toBe(false);
-    expect(response).toBe(forwardedResponse);
-    expect(response.bodyUsed).toBe(false);
-    expect(await forwarded?.text()).toBe('request-stream');
-    expect(await response.text()).toBe('response-stream');
-  });
+      });
+      const forwardedResponse = new Response(responseBody, {
+        status: 302,
+        headers: { Location: 'https://evil.test/' },
+      });
+      vi.mocked(handleManagedScmOutbound).mockResolvedValueOnce(forwardedResponse);
+      const request = new Request('https://example.com/upload', {
+        method: 'POST',
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('request-stream'));
+            controller.close();
+          },
+        }),
+        duplex: 'half',
+      } as RequestInit);
+      const response = await worker.fetch(request);
+      const forwarded = vi.mocked(handleManagedScmOutbound).mock.calls[0]?.[0];
+      expect(forwarded?.redirect).toBe(egressAllowlist === undefined ? request.redirect : 'manual');
+      expect(forwarded?.bodyUsed).toBe(false);
+      expect(response).toBe(forwardedResponse);
+      expect(response.bodyUsed).toBe(false);
+      expect(await forwarded?.text()).toBe('request-stream');
+      expect(await response.text()).toBe('response-stream');
+    }
+  );
 
   it('leaves unrestricted requests and credential handling unchanged', async () => {
     const request = new Request('https://example.com:8443/');

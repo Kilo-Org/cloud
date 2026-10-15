@@ -61,33 +61,39 @@ describe.each([
     }
   });
 
-  it('publishes optional boolean auditing for new and cloned prepared sessions', () => {
-    const row = catalog[`${prefix}.prepareSession`];
-    const validator = new Validator(row.inputSchema as Schema, '2020-12');
-    const input = {
-      ...scope,
-      githubRepo: 'Kilo-Org/kilocode',
-      mode: 'code',
-      model: 'anthropic/claude-sonnet-4.5',
-      egressMode: 'allowlist',
-    };
+  it.each([{}, { egressMode: 'unrestricted' }, { egressMode: 'allowlist' }])(
+    'publishes optional boolean auditing for new and cloned prepared sessions in any mode: %j',
+    policy => {
+      const row = catalog[`${prefix}.prepareSession`];
+      const validator = new Validator(row.inputSchema as Schema, '2020-12');
+      const input = {
+        ...scope,
+        githubRepo: 'Kilo-Org/kilocode',
+        mode: 'code',
+        model: 'anthropic/claude-sonnet-4.5',
+        ...policy,
+      };
 
-    expect(row.kind).toBe('mutation');
-    expect(row.tags).toContain('egressaudit');
-    expect(row.searchBlob).toContain('egressAudit');
+      expect(row.kind).toBe('mutation');
+      expect(row.tags).toContain('egressaudit');
+      expect(row.searchBlob).toContain('egressAudit');
+      expect(JSON.stringify(row.inputSchema)).toContain(
+        'Opt in to egress auditing in any egress mode.'
+      );
 
-    for (const variant of [
-      { prompt: 'Inspect the repository' },
-      {
-        cloneFromKiloSessionId: `ses_${'a'.repeat(26)}`,
-        autoInitiate: true,
-        operationKey: organizationId,
-      },
-    ]) {
-      expect(validator.validate({ ...input, ...variant }).valid).toBe(true);
-      expect(validator.validate({ ...input, ...variant, egressAudit: true }).valid).toBe(true);
-      expect(validator.validate({ ...input, ...variant, egressAudit: false }).valid).toBe(true);
-      expect(validator.validate({ ...input, ...variant, egressAudit: 'true' }).valid).toBe(false);
+      for (const variant of [
+        { prompt: 'Inspect the repository' },
+        {
+          cloneFromKiloSessionId: `ses_${'a'.repeat(26)}`,
+          autoInitiate: true,
+          operationKey: organizationId,
+        },
+      ]) {
+        expect(validator.validate({ ...input, ...variant }).valid).toBe(true);
+        expect(validator.validate({ ...input, ...variant, egressAudit: true }).valid).toBe(true);
+        expect(validator.validate({ ...input, ...variant, egressAudit: false }).valid).toBe(true);
+        expect(validator.validate({ ...input, ...variant, egressAudit: 'true' }).valid).toBe(false);
+      }
     }
-  });
+  );
 });

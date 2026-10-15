@@ -68,7 +68,9 @@ describe('egressPolicySchema', () => {
     { egressMode: 'allowlist', egressAllowlist: [] },
     { egressMode: 'allowlist', egressAllowlist: ['example.com'] },
     { egressAudit: false },
+    { egressAudit: true },
     { egressMode: 'unrestricted', egressAudit: false },
+    { egressMode: 'unrestricted', egressAudit: true },
     { egressMode: 'allowlist', egressAudit: false },
     { egressMode: 'allowlist', egressAudit: true },
   ])('preserves an explicit policy without inferring a mode: %j', policy => {
@@ -76,8 +78,6 @@ describe('egressPolicySchema', () => {
   });
 
   it.each([
-    { egressAudit: true },
-    { egressMode: 'unrestricted', egressAudit: true },
     { egressMode: 'allowlist', egressAudit: null },
     { egressMode: 'allowlist', egressAudit: 'true' },
     { egressMode: 'allowlist', egressAudit: 1 },
@@ -108,6 +108,8 @@ describe('egressPolicySchema', () => {
     { egressAllowlist: ['example.com'] },
     { egressMode: 'unrestricted', egressAllowlist: [] },
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
+    { egressAllowlist: [], egressAudit: true },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'], egressAudit: true },
   ])('rejects lists unless allowlist is explicit: %j', policy => {
     const result = egressPolicySchema.safeParse(policy);
     expect(result.success).toBe(false);

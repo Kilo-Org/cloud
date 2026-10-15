@@ -51,7 +51,7 @@ describe('buildControlPlaneCreateInput', () => {
       { egressMode: 'allowlist' as const, egressAllowlist: [] },
       { egressMode: 'allowlist' as const, egressAllowlist: ['Z.Example.COM.', 'example.com'] },
     ].flatMap(policy =>
-      [undefined, false, ...(policy.egressMode === 'allowlist' ? [true] : [])].map(egressAudit => ({
+      [undefined, false, true].map(egressAudit => ({
         ...policy,
         egressAudit,
       }))

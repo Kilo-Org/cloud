@@ -79,6 +79,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('native egress policy forwarding', () => {
   it.each([
     { egressAllowlist: undefined },
+    { egressAllowlist: undefined, egressAudit: true },
     { egressAllowlist: [] },
     { egressAllowlist: ['agent.example.com', 'github.com'] },
     { egressAllowlist: ['agent.example.com'], egressAudit: true },

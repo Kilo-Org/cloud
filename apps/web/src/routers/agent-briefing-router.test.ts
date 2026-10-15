@@ -169,6 +169,72 @@ describe('agent briefing ownership and lifecycle', () => {
     });
     expect(facts.scorecard.spendMicrodollars).toBe(290_000);
   });
+  it('loads only active sessions with their ancestors and derives blocker coverage from status provenance', async () => {
+    const now = Date.now();
+    const start = new Date(now - 12 * 3600_000).toISOString();
+    const cutoff = new Date(now - 1800_000).toISOString();
+    await db.insert(agent_briefing_preferences).values({
+      kilo_user_id: user.id,
+      timezone: 'UTC',
+      next_run_at: new Date().toISOString(),
+      created_at: new Date(now - 24 * 3600_000).toISOString(),
+    });
+    const rootId = 'ses_ancestor_root';
+    const childId = 'ses_ancestor_child';
+    const unrelatedId = 'ses_unrelated_old';
+    await db.insert(cli_sessions_v2).values([
+      {
+        session_id: rootId,
+        kilo_user_id: user.id,
+        title: 'Ancestor root',
+        created_on_platform: 'cli',
+      },
+      {
+        session_id: childId,
+        kilo_user_id: user.id,
+        parent_session_id: rootId,
+        title: 'Child',
+        created_on_platform: 'cli',
+        status: 'busy',
+        status_updated_at: new Date(now - 3 * 3600_000).toISOString(),
+        status_transition_id: null,
+      },
+      {
+        session_id: unrelatedId,
+        kilo_user_id: user.id,
+        title: 'Old work',
+        created_on_platform: 'cli',
+      },
+    ]);
+    await db.insert(agent_briefing_events).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: user.id,
+      session_id: childId,
+      kind: 'activity',
+      occurred_at: new Date(now - 2 * 3600_000).toISOString(),
+    });
+    const collect = () => collectBriefingEvidence(user.id, null, start, cutoff);
+
+    const legacy = await collect();
+    expect(legacy.sessions.map(session => session.sessionId)).toEqual([rootId]);
+    expect(legacy.sessions[0]?.title).toBe('Ancestor root');
+    expect(legacy.coverage.blockers).toBe('partial');
+
+    await db
+      .update(cli_sessions_v2)
+      .set({ status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FA1' })
+      .where(eq(cli_sessions_v2.session_id, childId));
+    expect((await collect()).coverage.blockers).toBe('complete');
+
+    await db
+      .update(cli_sessions_v2)
+      .set({
+        status_transition_id: null,
+        status_updated_at: new Date(now - 20 * 3600_000).toISOString(),
+      })
+      .where(eq(cli_sessions_v2.session_id, childId));
+    expect((await collect()).coverage.blockers).toBe('complete');
+  });
   it.each(['ready', 'running'] as const)(
     'clears %s AI content when the sweep removes a deleted source before a read',
     async status => {

@@ -6,10 +6,9 @@ import type { agent_briefing_events } from '@kilocode/db/schema';
 const start = '2026-10-14T22:00:00.000Z';
 const cutoff = '2026-10-15T08:00:00.000Z';
 const night = '2026-10-15T02:00:00.000Z';
-const sessionStatus = { status: null, status_updated_at: null, status_transition_id: null };
 const rows = [
-  { session_id: 'root', parent_session_id: null, title: 'Root', ...sessionStatus },
-  { session_id: 'child', parent_session_id: 'root', title: 'Child', ...sessionStatus },
+  { session_id: 'root', parent_session_id: null, title: 'Root' },
+  { session_id: 'child', parent_session_id: 'root', title: 'Child' },
 ];
 const collectedBeforeNight = '2026-10-14T12:00:00.000Z';
 function event(
@@ -261,6 +260,45 @@ describe('aggregateBriefingEvidence', () => {
     expect(report.sources[0]?.excerpt).not.toMatch(/person@example.com|token=secret/);
   });
 
+  it('derives the group status from every merged session, preferring a blocked child', () => {
+    const base = (id: string, sessionId: string, status: string, at: string) =>
+      event(id, { kind: 'status', session_id: sessionId, status, occurred_at: at });
+    const blockedChild = aggregateBriefingEvidence(
+      rows,
+      [
+        base('root-idle', 'root', 'idle', '2026-10-15T03:00:00.000Z'),
+        {
+          ...base('child-blocked', 'child', 'question', '2026-10-15T02:00:00.000Z'),
+          payload: { previousStatus: 'busy', previousStatusKnown: true },
+        },
+      ],
+      [],
+      start,
+      cutoff
+    );
+    expect(blockedChild.scorecard.blockers).toBe(1);
+    expect(blockedChild.sessions[0]?.status).toBe('question');
+    const childOnly = aggregateBriefingEvidence(
+      rows,
+      [base('child-busy', 'child', 'busy', night)],
+      [],
+      start,
+      cutoff
+    );
+    expect(childOnly.sessions[0]?.status).toBe('busy');
+    const newest = aggregateBriefingEvidence(
+      rows,
+      [
+        base('root-busy', 'root', 'busy', '2026-10-15T01:00:00.000Z'),
+        base('child-idle', 'child', 'idle', '2026-10-15T03:00:00.000Z'),
+      ],
+      [],
+      start,
+      cutoff
+    );
+    expect(newest.sessions[0]?.status).toBe('idle');
+  });
+
   describe('coverage', () => {
     const charged = { id: 'charge', sessionId: 'root', cost: 290_000, occurredAt: night };
     const timestampedBlocker = event('blocked', {
@@ -272,16 +310,17 @@ describe('aggregateBriefingEvidence', () => {
         transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FA1',
       },
     });
+    const aggregate = (
+      events: Parameters<typeof aggregateBriefingEvidence>[1],
+      usage: Parameters<typeof aggregateBriefingEvidence>[2] = [charged],
+      context: Parameters<typeof aggregateBriefingEvidence>[5] = {
+        collectionStartedAt: collectedBeforeNight,
+      },
+      sessionRows: Parameters<typeof aggregateBriefingEvidence>[0] = rows
+    ) => aggregateBriefingEvidence(sessionRows, events, usage, start, cutoff, context);
 
     it('is complete when collection was live before the night and every source is attributed', () => {
-      const report = aggregateBriefingEvidence(
-        rows,
-        [event('activity'), timestampedBlocker],
-        [charged],
-        start,
-        cutoff,
-        collectedBeforeNight
-      );
+      const report = aggregate([event('activity'), timestampedBlocker]);
       expect(report.coverage).toEqual({
         activity: 'complete',
         spend: 'complete',
@@ -293,15 +332,10 @@ describe('aggregateBriefingEvidence', () => {
 
     it('stays partial when collection started during the night or is unknown', () => {
       for (const collectionStartedAt of [null, '2026-10-15T01:00:00.000Z']) {
-        const report = aggregateBriefingEvidence(
-          rows,
-          [event('activity'), timestampedBlocker],
-          [charged],
-          start,
-          cutoff,
-          collectionStartedAt
-        );
-        expect(report.coverage).toEqual({
+        expect(
+          aggregate([event('activity'), timestampedBlocker], [charged], { collectionStartedAt })
+            .coverage
+        ).toEqual({
           activity: 'partial',
           spend: 'partial',
           blockers: 'partial',
@@ -319,100 +353,48 @@ describe('aggregateBriefingEvidence', () => {
           transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FA2',
         },
       ]) {
-        const report = aggregateBriefingEvidence(
-          rows,
-          [event('activity'), event('legacy', { kind: 'status', status: 'question', payload })],
-          [charged],
-          start,
-          cutoff,
-          collectedBeforeNight
-        );
+        const report = aggregate([
+          event('activity'),
+          event('legacy', { kind: 'status', status: 'question', payload }),
+        ]);
         expect(report.coverage.blockers).toBe('partial');
         expect(report.coverage.activity).toBe('complete');
       }
     });
 
     it('keeps server-observed status resets complete', () => {
-      const report = aggregateBriefingEvidence(
-        rows,
-        [event('activity'), event('reset', { kind: 'status', status: 'retry', payload: null })],
-        [charged],
-        start,
-        cutoff,
-        collectedBeforeNight
-      );
+      const report = aggregate([
+        event('activity'),
+        event('reset', { kind: 'status', status: 'retry', payload: null }),
+      ]);
       expect(report.coverage.blockers).toBe('complete');
     });
 
-    it('marks blockers partial when a legacy untimestamped status was projected during the night', () => {
-      const legacyRows = [
-        rows[0],
-        {
-          ...rows[1],
-          status: 'question',
-          status_updated_at: '2026-10-15T03:00:00.000Z',
-          status_transition_id: null,
-        },
-      ];
-      const report = aggregateBriefingEvidence(
-        legacyRows,
-        [event('activity')],
-        [charged],
-        start,
-        cutoff,
-        collectedBeforeNight
-      );
-      expect(report.coverage.blockers).toBe('partial');
-      const priorLegacyRows = [
-        rows[0],
-        { ...legacyRows[1], status_updated_at: '2026-10-14T20:00:00.000Z' },
-      ];
+    it('marks blockers partial when the collector saw a legacy untimestamped status in the night', () => {
       expect(
-        aggregateBriefingEvidence(
-          priorLegacyRows,
-          [event('activity')],
-          [charged],
-          start,
-          cutoff,
-          collectedBeforeNight
-        ).coverage.blockers
-      ).toBe('complete');
+        aggregate([event('activity')], [charged], {
+          collectionStartedAt: collectedBeforeNight,
+          legacyStatusInWindow: true,
+        }).coverage.blockers
+      ).toBe('partial');
     });
 
     it('marks spend partial when an active session has no attributed usage', () => {
-      const report = aggregateBriefingEvidence(
-        [
-          ...rows,
-          { session_id: 'other', parent_session_id: null, title: 'Other', ...sessionStatus },
-        ],
+      const report = aggregate(
         [event('activity'), event('uncharged', { session_id: 'other' })],
         [charged],
-        start,
-        cutoff,
-        collectedBeforeNight
+        { collectionStartedAt: collectedBeforeNight },
+        [...rows, { session_id: 'other', parent_session_id: null, title: 'Other' }]
       );
       expect(report.coverage.spend).toBe('partial');
     });
 
     it('is unavailable only when no usage exists for active sessions', () => {
+      expect(aggregate([event('activity')], []).coverage.spend).toBe('unavailable');
       expect(
-        aggregateBriefingEvidence(
-          rows,
-          [event('activity')],
-          [],
-          start,
-          cutoff,
-          collectedBeforeNight
-        ).coverage.spend
-      ).toBe('unavailable');
-      expect(
-        aggregateBriefingEvidence(
-          rows,
+        aggregate(
           [event('pr', { kind: 'pull_request', url: 'https://github.com/kilo/repo/pull/9' })],
-          [],
-          start,
-          cutoff,
-          collectedBeforeNight
+          []
         ).coverage.spend
       ).toBe('complete');
     });

@@ -1,6 +1,48 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
-import { activityEvidence, statusEvidence } from './briefing-evidence';
+import { getWorkerDb } from '@kilocode/db/client';
+import { activityEvidence, persistBriefingEvidence, statusEvidence } from './briefing-evidence';
+
+describe('persistBriefingEvidence', () => {
+  const events = [{ identity: 'message:m:1', occurredAt: '2026-07-24T07:59:00.000Z' }];
+  function fakeTransaction(session: { organizationId: string | null } | undefined) {
+    const onConflictDoNothing = vi.fn(async () => undefined);
+    const values = vi.fn(() => ({ onConflictDoNothing }));
+    const insert = vi.fn(() => ({ values }));
+    const query = {
+      from: () => query,
+      where: () => query,
+      for: () => query,
+      limit: async () => (session ? [session] : []),
+    };
+    vi.mocked(getWorkerDb).mockReturnValue({
+      transaction: async (run: (tx: unknown) => Promise<void>) =>
+        run({ select: () => query, insert }),
+    } as never);
+    return { insert, values };
+  }
+
+  it('stores nothing and does not fail when the owning session was deleted', async () => {
+    const { insert } = fakeTransaction(undefined);
+    await expect(
+      persistBriefingEvidence('postgres://test', 'usr_1', 'ses_deleted', events)
+    ).resolves.toBeUndefined();
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('attributes evidence to the locked session organization', async () => {
+    const { values } = fakeTransaction({ organizationId: 'org_1' });
+    await persistBriefingEvidence('postgres://test', 'usr_1', 'ses_live', events);
+    expect(values).toHaveBeenCalledWith([
+      expect.objectContaining({
+        kilo_user_id: 'usr_1',
+        session_id: 'ses_live',
+        organization_id: 'org_1',
+        kind: 'activity',
+      }),
+    ]);
+  });
+});
 
 describe('statusEvidence', () => {
   it('preserves every original timestamp and source predecessor instead of a final snapshot', () => {

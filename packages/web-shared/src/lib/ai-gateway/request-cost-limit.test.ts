@@ -85,6 +85,25 @@ describe('request cost admission', () => {
       enforceRequestCostLimit('2000000', model.id, expensiveBlocks, 2_000_000)
     ).resolves.toMatch(/spend safeguard/);
   });
+  it('counts prompt text carried outside messages so it cannot bypass the ceiling', async () => {
+    for (const extra of [
+      { system: 'x'.repeat(600_000) },
+      { instructions: 'x'.repeat(600_000) },
+      { metadata: { note: 'x'.repeat(600_000) } },
+    ]) {
+      await expect(
+        enforceRequestCostLimit('2000000', model.id, { ...body, ...extra }, 2_000_000)
+      ).resolves.toMatch(/spend safeguard/);
+    }
+    await expect(
+      enforceRequestCostLimit(
+        '2000000',
+        model.id,
+        { ...body, system: 'Short system prompt.' },
+        2_000_000
+      )
+    ).resolves.toBeNull();
+  });
   it('rejects non-text content blocks instead of ignoring their costs', async () => {
     for (const block of [
       { type: 'image_url', image_url: { url: 'https://example.com/private.png' } },

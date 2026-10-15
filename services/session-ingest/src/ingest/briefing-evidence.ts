@@ -131,6 +131,8 @@ export async function persistBriefingEvidence(
       )
       .for('update')
       .limit(1);
+    // Ingest only runs for sessions that already have a row, so a missing row means the
+    // session was deleted and its evidence cascades away; there is nothing to retry.
     if (!session) return;
     await tx
       .insert(agent_briefing_events)

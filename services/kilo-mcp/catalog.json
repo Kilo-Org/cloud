@@ -168,36 +168,6 @@
     ],
     "searchBlob": "agentBriefing.estimateSummary Estimate the cost and availability of generating an AI briefing summary before turning it on. agentbriefing estimatesummary organizationid model maxspendmicrodollars maxdurationseconds reportid organizationId model maxSpendMicrodollars maxDurationSeconds reportId"
   },
-  "agentBriefing.generateSummary": {
-    "path": "agentBriefing.generateSummary",
-    "kind": "mutation",
-    "summary": "Generate an AI summary for a briefing report using a verified cost estimate.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "reportId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "estimateToken": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "reportId",
-        "estimateToken"
-      ]
-    },
-    "tags": [
-      "agentbriefing",
-      "generatesummary",
-      "reportid",
-      "estimatetoken"
-    ],
-    "searchBlob": "agentBriefing.generateSummary Generate an AI summary for a briefing report using a verified cost estimate. agentbriefing generatesummary reportid estimatetoken reportId estimateToken"
-  },
   "agentBriefing.get": {
     "path": "agentBriefing.get",
     "kind": "query",
@@ -322,87 +292,6 @@
       "reportid"
     ],
     "searchBlob": "agentBriefing.read Mark an agent briefing report as read. agentbriefing read reportid reportId"
-  },
-  "agentBriefing.retrySummary": {
-    "path": "agentBriefing.retrySummary",
-    "kind": "mutation",
-    "summary": "Retry generating an AI summary for a briefing report that previously failed.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "reportId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "estimateToken": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "reportId",
-        "estimateToken"
-      ]
-    },
-    "tags": [
-      "agentbriefing",
-      "retrysummary",
-      "reportid",
-      "estimatetoken"
-    ],
-    "searchBlob": "agentBriefing.retrySummary Retry generating an AI summary for a briefing report that previously failed. agentbriefing retrysummary reportid estimatetoken reportId estimateToken"
-  },
-  "agentBriefing.updateContextPreferences": {
-    "path": "agentBriefing.updateContextPreferences",
-    "kind": "mutation",
-    "summary": "Enable or disable AI-generated summaries for a briefing context and set the model, spend cap, and duration limits, verifying the cost estimate first.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "aiEnabled": {
-          "type": "boolean"
-        },
-        "model": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 200
-        },
-        "maxSpendMicrodollars": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
-        },
-        "maxDurationSeconds": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 600
-        },
-        "estimateToken": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "aiEnabled"
-      ]
-    },
-    "tags": [
-      "agentbriefing",
-      "updatecontextpreferences",
-      "organizationid",
-      "aienabled",
-      "model",
-      "maxspendmicrodollars",
-      "maxdurationseconds",
-      "estimatetoken"
-    ],
-    "searchBlob": "agentBriefing.updateContextPreferences Enable or disable AI-generated summaries for a briefing context and set the model, spend cap, and duration limits, verifying the cost estimate first. agentbriefing updatecontextpreferences organizationid aienabled model maxspendmicrodollars maxdurationseconds estimatetoken organizationId aiEnabled model maxSpendMicrodollars maxDurationSeconds estimateToken"
   },
   "agentBriefing.updatePreferences": {
     "path": "agentBriefing.updatePreferences",

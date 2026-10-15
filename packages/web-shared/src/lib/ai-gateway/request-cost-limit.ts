@@ -47,6 +47,13 @@ export function textRequestPriceCeiling(metadata: StoredModel) {
   }
   return { inputRate, outputRate, requestCost };
 }
+function requestTextBytes(value: unknown): number {
+  if (typeof value === 'string') return Buffer.byteLength(value, 'utf8');
+  if (Array.isArray(value)) return value.reduce((sum, item) => sum + requestTextBytes(item), 0);
+  if (value !== null && typeof value === 'object')
+    return Object.values(value).reduce((sum, item) => sum + requestTextBytes(item), 0);
+  return 0;
+}
 export async function enforceRequestCostLimit(
   header: string | null,
   model: string,
@@ -94,17 +101,7 @@ export async function enforceRequestCostLimit(
   if (!metadata.success) return 'Current model pricing is unavailable for bounded spending';
   try {
     const price = textRequestPriceCeiling(metadata.data);
-    const inputTokenCeiling =
-      Buffer.byteLength(
-        parsed.data.messages
-          .map(message =>
-            typeof message.content === 'string'
-              ? message.content
-              : message.content.map(block => block.text).join('\n')
-          )
-          .join('\n'),
-        'utf8'
-      ) + 2048;
+    const inputTokenCeiling = requestTextBytes(body) + 2048;
     const bound = Math.ceil(
       (inputTokenCeiling * price.inputRate +
         parsed.data.max_tokens * price.outputRate +

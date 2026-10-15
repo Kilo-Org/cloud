@@ -40,9 +40,17 @@ export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-rou
 /**
  * Exact procedure paths withheld from MCP even though no segment is internal.
  * `activeSessions.widgetCredential` mints a 30-day Home widget bearer and only
- * native device sessions may call it, so no MCP credential can use it.
+ * native device sessions may call it, so no MCP credential can use it. The
+ * `agentBriefing` generation and consent mutations spend the context's balance
+ * behind a cost disclosure that only a person in the app can acknowledge; an MCP
+ * agent could otherwise mint the estimate token itself and bypass that consent.
  */
-const NATIVE_ONLY_PATHS: Record<string, true> = { 'activeSessions.widgetCredential': true };
+const NATIVE_ONLY_PATHS: Record<string, true> = {
+  'activeSessions.widgetCredential': true,
+  'agentBriefing.generateSummary': true,
+  'agentBriefing.retrySummary': true,
+  'agentBriefing.updateContextPreferences': true,
+};
 
 /**
  * Whether a procedure path is internal-only. A path is internal when it is in

@@ -1471,16 +1471,22 @@ export class SessionIngestDO extends DurableObject<Env> {
         .where(sql`${ingestMeta.key} LIKE 'briefingEvidence:%'`)
         .all();
       if (pendingEvidence.length === 0) {
-        if (readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt') === null) return;
+        const retryArmed = readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt') !== null;
         this.db
           .delete(ingestMeta)
           .where(
-            inArray(ingestMeta.key, ['briefingEvidenceRetryAt', 'briefingEvidenceRetryAttempt'])
+            inArray(ingestMeta.key, [
+              'briefingEvidencePending',
+              'briefingEvidenceRetryAt',
+              'briefingEvidenceRetryAttempt',
+            ])
           )
           .run();
-        await this.scheduleAlarm();
+        if (retryArmed) await this.scheduleAlarm();
         return;
       }
+      const retryAt = readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt');
+      if (retryAt !== null && retryAt > Date.now()) return;
       if (
         readIngestMetaNumber(this.db, 'metricsAlarmAt') === null &&
         readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt') === null
@@ -1572,12 +1578,19 @@ export class SessionIngestDO extends DurableObject<Env> {
         .where(sql`${ingestMeta.key} LIKE 'briefingEvidence:%'`)
         .limit(1)
         .all();
-      if (remaining.length > 0) return;
+      const drained = remaining.length === 0;
       this.db
         .delete(ingestMeta)
-        .where(inArray(ingestMeta.key, ['briefingEvidenceRetryAt', 'briefingEvidenceRetryAttempt']))
+        .where(
+          inArray(ingestMeta.key, [
+            'briefingEvidenceRetryAt',
+            'briefingEvidenceRetryAttempt',
+            ...(drained ? (['briefingEvidencePending'] as const) : []),
+          ])
+        )
         .run();
       await this.scheduleAlarm();
+      if (!drained) await this.flushBriefingEvidence(kiloUserId, sessionId);
     } catch (error) {
       console.error('SessionIngestDO failed to flush briefing evidence', {
         kiloUserId,

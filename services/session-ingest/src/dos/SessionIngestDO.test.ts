@@ -1459,6 +1459,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
       expect(harness.meta.get('briefingEvidenceRetryAttempt')).toBe('1');
       expect(outboxKeys(harness.meta)).toHaveLength(2);
 
+      harness.meta.set('briefingEvidenceRetryAt', String(Date.now() - 1));
       await harness.durableObject.alarm();
       expect(harness.ingestSessionMetrics).not.toHaveBeenCalled();
       expect(harness.meta.get('metricsEmitted')).toBeUndefined();
@@ -1475,6 +1476,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
       const harness = await ingestWithFailedEvidence();
       const metricsAlarmAt = harness.meta.get('metricsAlarmAt');
       harness.evidenceLedger.setError(undefined);
+      harness.meta.set('briefingEvidenceRetryAt', String(Date.now() - 1));
       await harness.durableObject.alarm();
       expect(harness.evidenceLedger.events.size).toBe(2);
       expect(outboxKeys(harness.meta)).toEqual([]);
@@ -1483,6 +1485,71 @@ describe('SessionIngestDO live activity + cost persist', () => {
       expect(harness.meta.get('metricsAlarmAt')).toBe(metricsAlarmAt);
       expect(harness.alarmAt).toBe(Number(metricsAlarmAt));
       expect(harness.ingestSessionMetrics).not.toHaveBeenCalled();
+    });
+
+    it('does not retry the external write on a fresh ingest inside the backoff window', async () => {
+      const harness = await ingestWithFailedEvidence();
+      const attempts = harness.evidenceLedger.transaction.mock.calls.length;
+      await harness.durableObject.ingest(
+        [assistantItem('inside-window', 0.2)],
+        'usr_live',
+        'ses_live',
+        1,
+        20_000
+      );
+      await harness.settle();
+      expect(harness.evidenceLedger.transaction).toHaveBeenCalledTimes(attempts);
+      expect(outboxKeys(harness.meta).length).toBeGreaterThan(2);
+      expect(harness.meta.get('briefingEvidenceRetryAttempt')).toBe('1');
+
+      harness.evidenceLedger.setError(undefined);
+      harness.meta.set('briefingEvidenceRetryAt', String(Date.now() - 1));
+      await harness.durableObject.alarm();
+      expect(outboxKeys(harness.meta)).toEqual([]);
+      expect(harness.evidenceLedger.events.size).toBeGreaterThan(2);
+    });
+
+    it('clears the pending flag once the outbox drains so later ingests skip the scan', async () => {
+      const harness = makeLiveHarness();
+      await harness.durableObject.ingest(
+        [assistantItem('drains', 0.1)],
+        'usr_live',
+        'ses_live',
+        1,
+        10_000
+      );
+      await harness.settle();
+      expect(outboxKeys(harness.meta)).toEqual([]);
+      expect(harness.meta.has('briefingEvidencePending')).toBe(false);
+      expect(harness.meta.has('briefingEvidenceRetryAt')).toBe(false);
+
+      const failing = await ingestWithFailedEvidence();
+      expect(failing.meta.get('briefingEvidencePending')).toBe('true');
+    });
+
+    it('flushes evidence staged while a flush was in flight without waiting for the backoff', async () => {
+      const gate = Promise.withResolvers<void>();
+      const harness = makeLiveHarness({ evidenceGate: gate.promise });
+      await harness.durableObject.ingest(
+        [assistantItem('first', 0.1)],
+        'usr_live',
+        'ses_live',
+        1,
+        10_000
+      );
+      await harness.durableObject.ingest(
+        [assistantItem('second', 0.2)],
+        'usr_live',
+        'ses_live',
+        1,
+        20_000
+      );
+      gate.resolve();
+      await harness.settle();
+      expect(outboxKeys(harness.meta)).toEqual([]);
+      expect(harness.meta.has('briefingEvidencePending')).toBe(false);
+      expect(harness.meta.has('briefingEvidenceRetryAt')).toBe(false);
+      expect(harness.evidenceLedger.events.size).toBeGreaterThanOrEqual(2);
     });
 
     it('still emits due metrics while evidence keeps failing and keeps the retry armed', async () => {

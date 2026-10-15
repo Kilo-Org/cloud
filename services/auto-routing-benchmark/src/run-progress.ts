@@ -13,11 +13,13 @@ export async function loadRunProgress(
   const rows = await listRunProgressCounts(db, runIds);
   const progress = new Map<string, BenchmarkRunProgress>();
   for (const row of rows) {
-    // The stored engine identity hashes the dataset contents. A mismatch means
-    // the dataset changed after the run started (mid-rollout), so the current
-    // dataset's length is not this run's length — report no total rather than a
-    // number that would leave the bar short of (or past) 100%.
-    const datasetChanged = row.engineIdentity !== computeEngineIdentity(row.kind, row.router);
+    // The identity ends with a hash of the dataset contents. A different hash
+    // means the dataset changed after the run started, so the current dataset's
+    // length is not this run's length. An engine-version bump alone keeps the
+    // dataset, so the total stays known.
+    const datasetChanged =
+      datasetHashOf(row.engineIdentity) !==
+      datasetHashOf(computeEngineIdentity(row.kind, row.router));
     progress.set(row.runId, {
       completedCases: row.completedCases,
       totalCases: datasetChanged
@@ -27,4 +29,8 @@ export async function loadRunProgress(
     });
   }
   return progress;
+}
+
+function datasetHashOf(engineIdentity: string): string {
+  return engineIdentity.slice(engineIdentity.lastIndexOf(':') + 1);
 }

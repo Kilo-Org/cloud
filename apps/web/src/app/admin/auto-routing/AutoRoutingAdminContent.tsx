@@ -635,7 +635,7 @@ export function AutoRoutingAdminContent() {
           <TabsTrigger value="frontier">Frontier</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="classifier" className="mt-4">
+        <TabsContent value="classifier" forceMount className="mt-4 data-[state=inactive]:hidden">
           <ClassifierTab
             classifierModelQuery={classifierModelQuery}
             systemOneModelsQuery={systemOneModelsQuery}

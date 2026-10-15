@@ -3,6 +3,7 @@ import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
 import type * as CliRunnerModule from './cli-runner';
 import type * as DbModule from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
+import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import type * as ConfigModule from './config';
 
 vi.mock('./decider-judge', () => ({ createDeciderJudge: vi.fn() }));
@@ -68,6 +69,8 @@ import {
 import {
   countCaseResultsByLane,
   getCaseResults,
+  getSummaries,
+  existsNewerCompletedRun,
   getExistingCaseResultIds,
   getPendingDeciderOutput,
   savePendingDeciderOutput,
@@ -96,6 +99,7 @@ import type { DeciderJudge } from './grading';
 
 const tokenGet = vi.fn<() => Promise<string>>();
 const queueSendBatch = vi.fn<(messages: unknown[]) => Promise<void>>();
+const kvDelete = vi.fn();
 const model = 'qwen/qwen3-coder-next';
 const runId = 'decider-test-run';
 const [benchCase] = DECIDER_CASES;
@@ -117,7 +121,7 @@ const env = {
   KILO_WEB_API_BASE_URL: 'http://host.docker.internal:3000',
   BENCH_DB: {} as D1Database,
   BENCH_QUEUE: { sendBatch: queueSendBatch },
-  AUTO_ROUTING_CONFIG: { delete: vi.fn() },
+  AUTO_ROUTING_CONFIG: { delete: kvDelete },
 } as unknown as Env;
 
 function mockRunSnapshot(
@@ -149,6 +153,28 @@ function mockRunSnapshot(
     })),
   } as never);
 }
+
+it('retries completed classifier publication without repeating classifier cases', async () => {
+  const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+  if (!snapshot) throw new Error('Run snapshot missing');
+  vi.mocked(getRunWithModels).mockResolvedValue({
+    ...snapshot,
+    run: { ...snapshot.run, status: 'completed' },
+  });
+  vi.mocked(countCaseResultsByLane).mockResolvedValue([
+    { model, variant: '', rep: 0, n: CLASSIFIER_CASES.length },
+  ]);
+  vi.mocked(getCaseResults).mockResolvedValue([]);
+  vi.mocked(getSummaries).mockResolvedValue([]);
+  vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
+  kvDelete.mockRejectedValueOnce(new Error('KV unavailable'));
+  const message = { runId, kind: 'classifier', model, rep: 0 };
+  await expect(processJob(env, message)).rejects.toThrow('KV unavailable');
+  await processJob(env, message);
+  expect(kvDelete).toHaveBeenCalledTimes(2);
+  expect(createSystemOneClient).not.toHaveBeenCalled();
+  expect(upsertCaseResult).not.toHaveBeenCalled();
+});
 
 function deciderMessage(overrides: { variant?: string | null } = {}) {
   return {
@@ -451,13 +477,11 @@ describe('processJob — decider chunk chaining', () => {
 
   it('skips completed chunks and finds the next unfinished chunk in the lane', async () => {
     const currentCaseIds = DECIDER_CASES.slice(0, 5).map(c => c.id);
-    const nextCaseIds = DECIDER_CASES.slice(5, 10).map(c => c.id);
     vi.mocked(getExistingCaseResultIds)
       .mockResolvedValueOnce(new Set(currentCaseIds))
-      .mockResolvedValueOnce(new Set(nextCaseIds))
       .mockResolvedValueOnce(new Set());
 
-    await processJob(env, { ...deciderMessage(), caseIds: currentCaseIds });
+    await processJob(env, { ...deciderMessage(), caseIds: currentCaseIds, importedChunks: [0, 1] });
 
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
@@ -469,6 +493,17 @@ describe('processJob — decider chunk chaining', () => {
         }),
       },
     ]);
+  });
+
+  it('does not spawn a parallel chain when an old chunk is redelivered', async () => {
+    const current = DECIDER_CASES.slice(0, 5).map(c => c.id);
+    const next = DECIDER_CASES.slice(5, 10).map(c => c.id);
+    vi.mocked(getExistingCaseResultIds)
+      .mockResolvedValueOnce(new Set(current))
+      .mockResolvedValueOnce(new Set(next));
+    await processJob(env, { ...deciderMessage(), caseIds: current });
+    expect(queueSendBatch).not.toHaveBeenCalled();
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
   });
 
   it('re-enqueues a partially completed next chunk so DLQ leftovers cannot strand a run', async () => {

@@ -1166,3 +1166,37 @@ describe('live container admission refusal', () => {
     );
   });
 });
+
+it('starts each resumed shard at its first missing chunk and snapshots only imported chunks', async () => {
+  vi.mocked(reuseDeciderCaseResults).mockResolvedValue(4);
+  const imported = new Set([
+    ...DECIDER_CASES.slice(0, 2).map(c => c.id),
+    ...DECIDER_CASES.slice(250, 252).map(c => c.id),
+  ]);
+  vi.mocked(getExistingCaseResultIds).mockImplementation(
+    async (_db, params) => new Set(params.caseIds.filter(id => imported.has(id)))
+  );
+  await startRun(env, 'decider', { entries: [{ model: 'platform/a', variant: null }] });
+  const messages = queueSendBatch.mock.calls.flatMap(([batch]) => batch);
+  const shard = messages.find(message => message.body.shard === 0)?.body;
+  expect(shard).toMatchObject({
+    chunk: 250,
+    shardCount: 125,
+    importedChunks: [0, 125],
+    caseIds: DECIDER_CASES.slice(500, 502).map(c => c.id),
+  });
+  expect(messages.every(message => message.body.caseIds?.every(id => !imported.has(id)))).toBe(
+    true
+  );
+});
+
+it('settles a failed resume plan without dispatching or stranding registry claims', async () => {
+  vi.mocked(reuseDeciderCaseResults).mockResolvedValue(1);
+  vi.mocked(getExistingCaseResultIds).mockRejectedValueOnce(new Error('D1 read unavailable'));
+  await expect(
+    startRun(env, 'decider', { entries: [{ model: 'platform/a', variant: null }] })
+  ).rejects.toThrow('D1 read unavailable');
+  expect(queueSendBatch).not.toHaveBeenCalled();
+  expect(markRunFailed).toHaveBeenCalled();
+  expect(markProfilesFailedForRun).toHaveBeenCalled();
+});

@@ -113,6 +113,7 @@ export type BenchmarkJobMessage = {
   shard?: number;
   shardCount?: number;
   chunkSize?: number;
+  importedChunks?: number[];
   // Repetition index (0-based).
   rep?: number;
 };
@@ -127,6 +128,7 @@ export const BenchmarkJobMessageSchema = z.object({
   shard: z.number().int().min(0).optional(),
   shardCount: z.number().int().min(1).optional(),
   chunkSize: z.number().int().min(1).max(5).optional(),
+  importedChunks: z.array(z.number().int().min(0)).optional(),
   rep: z.number().int().min(0).optional(),
 });
 
@@ -942,9 +944,10 @@ export async function startRun(
     }
     throw error;
   }
+  let reusedCases = 0;
   if (kind === 'decider') {
     try {
-      await reuseDeciderCaseResults(env.BENCH_DB, {
+      reusedCases = await reuseDeciderCaseResults(env.BENCH_DB, {
         runId,
         router,
         engineIdentity,
@@ -1012,7 +1015,57 @@ export async function startRun(
     laneBudget,
     DECIDER_CHUNK_SIZE
   );
-  await enqueueRunMessages(env, runId, messages);
+  const messagesToDispatch: { body: BenchmarkJobMessage }[] = [];
+  try {
+    for (const message of messages) {
+      if (reusedCases === 0) {
+        messagesToDispatch.push(message);
+        continue;
+      }
+      const body = message.body;
+      const laneChunks = chunks
+        .map((cases, index) => ({ cases, index }))
+        .filter(({ index }) => index % (body.shardCount ?? 1) === body.shard);
+      const existingIds = new Set<string>();
+      const laneIds = laneChunks.flatMap(({ cases }) => cases.map(c => c.id));
+      for (const caseIds of chunkArray(laneIds, 40)) {
+        const found = await getExistingCaseResultIds(env.BENCH_DB, {
+          runId,
+          model: body.model,
+          variant: body.variant,
+          rep: body.rep ?? 0,
+          caseIds,
+        });
+        for (const id of found) existingIds.add(id);
+      }
+      // Only imported chunks can be skipped. Skipping a normally completed
+      // successor on redelivery would fork its already-dispatched live chain.
+      const importedChunks = laneChunks
+        .filter(({ cases }) => cases.every(c => existingIds.has(c.id)))
+        .map(({ index }) => index);
+      const firstMissing = laneChunks.find(({ index }) => !importedChunks.includes(index));
+      if (firstMissing) {
+        messagesToDispatch.push({
+          body: {
+            ...body,
+            importedChunks,
+            chunk: firstMissing.index,
+            caseIds: firstMissing.cases.map(c => c.id),
+          },
+        });
+      }
+    }
+  } catch (error) {
+    const reason = `case resume planning failed: ${formatError(error).error}`;
+    await markRunFailed(env.BENCH_DB, runId, reason);
+    await markProfilesFailedForRun(env.BENCH_DB, runId, reason);
+    throw error;
+  }
+  if (messagesToDispatch.length === 0) {
+    await finalizeRunIfComplete(env, runId, kind, await getRunState(env, runId));
+  } else {
+    await enqueueRunMessages(env, runId, messagesToDispatch);
+  }
   return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
 }
 
@@ -1153,6 +1206,10 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
   const message = parsed.data;
   const state = await getRunState(env, message.runId);
   if (state.status !== 'running') {
+    if (message.kind === 'classifier' && state.status === 'completed') {
+      await finalizeRunIfComplete(env, message.runId, message.kind, state);
+      return;
+    }
     if (message.kind === 'decider') {
       const variant =
         message.variant !== undefined
@@ -1624,6 +1681,7 @@ async function enqueueNextDeciderChunkIfNeeded(
     nextChunkIndex < chunks.length;
     nextChunkIndex += shardCount
   ) {
+    if (message.importedChunks?.includes(nextChunkIndex)) continue;
     const nextCaseIds = chunks[nextChunkIndex].map(c => c.id);
     const existingNextCaseIds = await getExistingCaseResultIds(env.BENCH_DB, {
       runId: message.runId,
@@ -1632,7 +1690,7 @@ async function enqueueNextDeciderChunkIfNeeded(
       rep,
       caseIds: nextCaseIds,
     });
-    if (existingNextCaseIds.size >= nextCaseIds.length) continue;
+    if (existingNextCaseIds.size >= nextCaseIds.length) return true;
 
     await env.BENCH_QUEUE.sendBatch([
       {

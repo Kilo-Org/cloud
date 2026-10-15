@@ -20,6 +20,12 @@ describe('computePoolModalityCoverage', () => {
     expect(coverage).toEqual({ status: 'covered' });
   });
 
+  it('reports pending, not unknown, while the catalog is loading or failed to load', () => {
+    expect(computePoolModalityCoverage({ poolModelIds: ['b'], catalog: null })).toEqual({
+      status: 'pending',
+    });
+  });
+
   it('reports covered for an empty pool (inherits the platform pool)', () => {
     expect(
       computePoolModalityCoverage({ poolModelIds: [], catalog: [model('a', ['text', 'image'])] })

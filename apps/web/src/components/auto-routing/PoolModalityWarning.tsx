@@ -10,7 +10,7 @@ import {
 } from '@/lib/auto-routing-pool-modality';
 
 export function PoolModalityWarning({ coverage }: { coverage: PoolModalityCoverage }) {
-  if (coverage.status === 'covered') return null;
+  if (coverage.status === 'covered' || coverage.status === 'pending') return null;
 
   if (coverage.status === 'unknown') {
     return (

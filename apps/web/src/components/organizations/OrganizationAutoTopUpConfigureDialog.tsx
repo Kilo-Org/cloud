@@ -28,6 +28,10 @@ import {
   type OrgAutoTopUpAmountCents,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { formatCents, formatPaymentMethodDescription } from '@/lib/utils';
+import {
+  CreditExpiryNotice,
+  usePaidCreditPolicyReady,
+} from '@/components/payment/CreditExpiryNotice';
 
 type Props = {
   organizationId: string;
@@ -40,16 +44,18 @@ export function OrganizationAutoTopUpConfigureDialog({
   open,
   onOpenChange,
 }: Props) {
+  const policyReady = usePaidCreditPolicyReady();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { data: configData } = useQuery(
+  const { data: configData, isSuccess: configReady } = useQuery(
     trpc.organizations.autoTopUp.getConfig.queryOptions({ organizationId })
   );
 
   const currentAmount = configData?.amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
   const paymentMethodInfo = configData?.paymentMethod ?? null;
   const hasExistingPaymentMethod = paymentMethodInfo && paymentMethodInfo.stripePaymentMethodId;
+  const canEnableAutoTopUp = policyReady || (configReady && !hasExistingPaymentMethod);
 
   const [selectedAmount, setSelectedAmount] = useState<OrgAutoTopUpAmountCents>(currentAmount);
 
@@ -96,6 +102,7 @@ export function OrganizationAutoTopUpConfigureDialog({
   );
 
   const handleEnableAutoTopUp = () => {
+    if (!canEnableAutoTopUp) return;
     onOpenChange(false);
     toggleMutation.mutate({ organizationId, currentEnabled: false, amountCents: selectedAmount });
   };
@@ -124,8 +131,9 @@ export function OrganizationAutoTopUpConfigureDialog({
                   </li>
                 )}
                 <li>
-                  When your organization balance falls below ${ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS},
-                  we&apos;ll automatically charge your payment method.
+                  When usage or a requested service brings your organization balance below $
+                  {ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS}, we&apos;ll automatically charge your payment
+                  method. Viewing the balance or credit expiration does not trigger a payment.
                 </li>
                 <li>
                   If a payment ever fails, we'll email you and pause auto top ups to prevent repeat
@@ -136,6 +144,7 @@ export function OrganizationAutoTopUpConfigureDialog({
             </div>
           </DialogDescription>
         </DialogHeader>
+        <CreditExpiryNotice />
 
         <div className="flex items-center gap-3 py-2">
           <Label htmlFor="topup-amount-dialog">Top up amount:</Label>
@@ -170,7 +179,7 @@ export function OrganizationAutoTopUpConfigureDialog({
                 </span>
                 <Button
                   onClick={handleEnableAutoTopUp}
-                  disabled={isPending}
+                  disabled={isPending || !canEnableAutoTopUp}
                   data-ph-action="enable-org-autotopup"
                 >
                   Enable automatic top up
@@ -201,7 +210,7 @@ export function OrganizationAutoTopUpConfigureDialog({
               </span>
               <Button
                 onClick={handleEnableAutoTopUp}
-                disabled={isPending}
+                disabled={isPending || !canEnableAutoTopUp}
                 data-ph-action="enable-org-autotopup"
               >
                 Enable automatic top up

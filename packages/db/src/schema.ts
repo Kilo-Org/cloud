@@ -359,6 +359,12 @@ export const credit_transactions = pgTable(
     amount_microdollars: bigint({ mode: 'number' }).notNull(),
     expiration_baseline_microdollars_used: bigint({ mode: 'number' }),
     original_baseline_microdollars_used: bigint({ mode: 'number' }),
+    consumed_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    retired_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    paid_credit_policy: text(),
+    credit_source: text(),
+    source_transaction_id: uuid(),
+    refund_principal_microdollars: bigint({ mode: 'number' }),
     is_free: boolean().notNull(),
     description: text(),
     original_transaction_id: uuid(), // Links expiration records to their original credit transaction
@@ -384,6 +390,9 @@ export const credit_transactions = pgTable(
       table.coinbase_credit_block_id
     ),
     index('IDX_credit_transactions_organization_id').on(table.organization_id),
+    index('IDX_credit_transactions_source_transaction_id')
+      .on(table.source_transaction_id)
+      .concurrently(),
     uniqueIndex('IDX_credit_transactions_unique_category')
       .on(table.kilo_user_id, table.credit_category)
       .where(sql`${table.check_category_uniqueness} = TRUE`),
@@ -517,6 +526,10 @@ export const kilocode_users = pgTable(
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
     index('IDX_kilocode_users_signup_ip_created_at').on(table.signup_ip, table.created_at),
+    index('IDX_kilocode_users_next_credit_expiration_at')
+      .on(table.next_credit_expiration_at)
+      .where(sql`${table.next_credit_expiration_at} IS NOT NULL`)
+      .concurrently(),
     index('IDX_kilocode_users_blocked_at').on(table.blocked_at),
     index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
     // Prevent empty strings
@@ -3308,6 +3321,10 @@ export const organizations = pgTable(
     ),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
     index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
+    index('IDX_organizations_next_credit_expiration_at')
+      .on(table.next_credit_expiration_at)
+      .where(sql`${table.next_credit_expiration_at} IS NOT NULL`)
+      .concurrently(),
     uniqueIndex('UQ_organizations_live_sales_demo_per_owner')
       .on(table.created_by_kilo_user_id)
       .where(

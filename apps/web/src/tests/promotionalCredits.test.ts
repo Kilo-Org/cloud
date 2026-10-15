@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest } from '@jest/globals';
 import {
   grantCreditForCategory,
   grantCreditForCategoryConfig,
@@ -11,6 +11,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, desc } from 'drizzle-orm';
 import { millisecondsInDay, millisecondsInHour } from 'date-fns/constants';
 import { assertNoError } from '@kilocode/web-shared/lib/maybe-result';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 
 describe('grantCreditForCategory', () => {
   const mockUser: User = defineTestUser({});
@@ -31,7 +32,7 @@ describe('grantCreditForCategory', () => {
   });
 
   it('should successfully grant credits for valid category', async () => {
-    const result = await grantCreditForCategory(mockUser, {
+    const result = await grantCreditForCategory(await insertTestUser(), {
       credit_category: 'vibeday',
       counts_as_selfservice: false,
     });
@@ -50,7 +51,7 @@ describe('grantCreditForCategory', () => {
   });
 
   it('should grant custom category with amount', async () => {
-    const result = await grantCreditForCategory(mockUser, {
+    const result = await grantCreditForCategory(await insertTestUser(), {
       credit_category: 'custom',
       amount_usd: 25,
       counts_as_selfservice: false,
@@ -99,6 +100,35 @@ describe('grantCreditForCategory', () => {
         },
       ])
     );
+  });
+
+  it('checks grant requirements before opening the grant transaction', async () => {
+    const owner = await insertTestUser();
+    const organization = await createOrganization(
+      `promo-requirement-${crypto.randomUUID()}`,
+      owner.id
+    );
+    const transaction = jest.spyOn(db, 'transaction');
+    let transactionsOpenedDuringRequirement: number | undefined;
+    try {
+      const result = await grantCreditForCategoryConfig(
+        { organization, user: owner },
+        { credit_category: 'ORG_REQUIREMENT_OUTSIDE_TX', counts_as_selfservice: false },
+        {
+          credit_category: 'ORG_REQUIREMENT_OUTSIDE_TX',
+          amount_usd: 5,
+          organization_requirement: async () => {
+            transactionsOpenedDuringRequirement = transaction.mock.calls.length;
+            return { success: true };
+          },
+        }
+      );
+      assertNoError(result);
+      expect(transactionsOpenedDuringRequirement).toBe(0);
+      expect(transaction).toHaveBeenCalledTimes(1);
+    } finally {
+      transaction.mockRestore();
+    }
   });
 
   it('should grant valid self-serviceable promo codes', async () => {

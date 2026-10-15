@@ -219,7 +219,6 @@
     "hideBalance": "Amaga el saldo",
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
-    "bonusCreditsExpiring": "{{amount}} en crèdits de bonificació caduquen el {{date}}.",
     "signOutTitle": "Vols tancar la sessió?",
     "signOutMessage": "Hauràs de tornar a iniciar la sessió per accedir al teu espai de treball.",
     "deleteAccountTitle": "Vols eliminar el compte?",
@@ -3023,7 +3022,7 @@
     "creditActivity": {
       "emptyDescription": "Aquí apareixeran les compres, el consum i els ajustos de crèdits d'aquesta organització a mesura que es produeixin.",
       "emptyTitle": "No hi ha moviments de crèdits",
-      "expires": "Caduca el {{date}}",
+      "expiresUtc": "Caduca el {{date}} (UTC)",
       "title": "Moviments de crèdits",
       "transactionFallback": "Transacció de crèdits",
       "category": {
@@ -3748,6 +3747,10 @@
   "credits": {
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
+    "nextExpiry": "{{amount}} en crèdits caduquen el {{date}} (UTC). Els crèdits amb la caducitat més propera s'utilitzen primer.",
+    "appStoreExpiry": "Els crèdits comprats a l'App Store no caduquen.",
+    "playOneYearExpiry": "Aquests crèdits caduquen un any natural després de la compra.",
+    "playNonexpiring": "Aquests crèdits no caduquen.",
     "packLabel": "Afegeix {{amount}} en crèdits",
     "priceUnavailable": "Preu no disponible",
     "purchased": "S'han afegit crèdits al teu saldo.",

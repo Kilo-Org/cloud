@@ -96,7 +96,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
 
   const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-    await getBalanceAndOrgSettings(organizationId, user);
+    await getBalanceAndOrgSettings(organizationId, user, undefined, 'usage');
   if (balance <= 0) {
     return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
   }

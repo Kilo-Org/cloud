@@ -1,4 +1,5 @@
 import 'server-only';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
@@ -5319,6 +5320,7 @@ export const kiloclawRouter = createTRPCRouter({
         cadence: kiloPassCadence,
       });
       const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
+      const paidCreditTerms = getPaidCreditTerms('pass');
       const sessionMetadata = {
         type: 'kilo-pass',
         kiloUserId: ctx.user.id,
@@ -5328,6 +5330,7 @@ export const kiloclawRouter = createTRPCRouter({
         kiloclawHostingPlan: input.hostingPlan,
         kiloclawInstanceId: anchorInstance.id,
         kiloclawPriceVersion: intendedPriceVersion,
+        paid_credit_policy: paidCreditTerms,
       };
 
       return createOrReuseKiloPassCheckoutSession({
@@ -5338,6 +5341,14 @@ export const kiloclawRouter = createTRPCRouter({
           stripe.checkout.sessions.create(
             {
               mode: 'subscription',
+              ...(paidCreditTerms === 'one_year' && {
+                custom_text: {
+                  submit: {
+                    message:
+                      'Each monthly base-credit allotment expires one year after issuance. Bonus-credit deadlines are unchanged.',
+                  },
+                },
+              }),
               customer: stripeCustomerId,
               allow_promotion_codes: true,
               billing_address_collection: 'required',

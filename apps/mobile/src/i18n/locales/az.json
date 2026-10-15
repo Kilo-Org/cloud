@@ -219,7 +219,6 @@
     "hideBalance": "Balansı gizlət",
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",
-    "bonusCreditsExpiring": "{{amount}} məbləğində bonus kreditin müddəti {{date}} tarixində bitir.",
     "signOutTitle": "Hesabdan çıxılsın?",
     "signOutMessage": "İş sahənə daxil olmaq üçün hesabına yenidən giriş etməlisən.",
     "deleteAccountTitle": "Hesab silinsin?",
@@ -2983,7 +2982,7 @@
     "creditActivity": {
       "emptyDescription": "Bu təşkilatın alışları, kredit istifadəsi və kredit düzəlişləri baş verdikcə burada görünəcək.",
       "emptyTitle": "Kredit əməliyyatı yoxdur",
-      "expires": "{{date}} tarixində müddəti bitir",
+      "expiresUtc": "{{date}} (UTC) tarixində müddəti bitir",
       "title": "Kredit əməliyyatları",
       "transactionFallback": "Kredit əməliyyatı",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Kredit al",
     "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
+    "nextExpiry": "{{amount}} məbləğində kreditin müddəti {{date}} (UTC) tarixində bitir. Müddəti ən tez bitən kreditlər ilk istifadə olunur.",
+    "appStoreExpiry": "App Store vasitəsilə alınan kreditlərin müddəti bitmir.",
+    "playOneYearExpiry": "Bu kreditlərin müddəti alışdan bir təqvim ili sonra bitir.",
+    "playNonexpiring": "Bu kreditlərin müddəti bitmir.",
     "packLabel": "{{amount}} dəyərində kredit əlavə et",
     "priceUnavailable": "Qiymət mövcud deyil",
     "purchased": "Kredit balansına əlavə edildi.",

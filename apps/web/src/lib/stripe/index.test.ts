@@ -2890,6 +2890,55 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     listCheckoutSessionsSpy?.mockRestore();
   });
 
+  test.each([
+    { organization: false, terms: undefined },
+    { organization: false, terms: 'legacy' },
+    { organization: false, terms: 'one_year' },
+    { organization: true, terms: undefined },
+    { organization: true, terms: 'legacy' },
+    { organization: true, terms: 'one_year' },
+  ])(
+    'settles captured $terms paid policy for organization=$organization',
+    async ({ organization, terms }) => {
+      const user = await insertTestUser();
+      const org = organization
+        ? await createOrganization(`Org-policy-${crypto.randomUUID()}`, user.id)
+        : null;
+      const chargeId = `ch_policy_${crypto.randomUUID()}`;
+      const paymentIntentId = `pi_policy_${crypto.randomUUID()}`;
+      const charge = {
+        ...makeCharge({ id: chargeId, amount: 10_500, customer: user.stripe_customer_id }),
+        created: new Date('2028-02-29T09:00:00.000Z').getTime() / 1000,
+      };
+      await handleSuccessfulChargeWithPayment(
+        charge,
+        makePaymentIntent({
+          id: paymentIntentId,
+          metadata: withTopUpPrincipalMetadata(
+            {
+              type: 'stripe-checkout-topup',
+              kiloUserId: user.id,
+              ...(org ? { organizationId: org.id } : {}),
+              ...(terms ? { paid_credit_policy: terms } : {}),
+            },
+            10_000
+          ),
+        })
+      );
+      const credit = await db.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.stripe_payment_id, org ? paymentIntentId : chargeId),
+      });
+      expect(credit).toMatchObject({
+        amount_microdollars: 100_000_000,
+        credit_source: 'stripe',
+        paid_credit_policy: terms === 'one_year' ? 'one_year' : 'legacy',
+      });
+      expect(credit?.expiry_date ? new Date(credit.expiry_date).toISOString() : null).toBe(
+        terms === 'one_year' ? '2029-02-28T09:00:00.000Z' : null
+      );
+    }
+  );
+
   test('both organizationId and kiloUserId: processes organization top-up; uses kiloUserId', async () => {
     const user = await insertTestUser();
     const org = await createOrganization('Org-Both', user.id);
@@ -2965,7 +3014,16 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       org.id,
       amountInCents,
       { type: 'stripe', stripe_payment_id: paymentIntentId },
-      { isAutoTopUp: true, serviceFeeCents: 0, grossPaidCents: amountInCents }
+      {
+        isAutoTopUp: true,
+        serviceFeeCents: 0,
+        grossPaidCents: amountInCents,
+        paidCredit: {
+          source: 'stripe',
+          terms: 'legacy',
+          purchasedAt: new Date(SERVICE_FEE_ACTIVATION_UNIX_SECONDS * 1000),
+        },
+      }
     );
   });
 
@@ -3441,7 +3499,16 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         org.id,
         5000,
         { type: 'stripe', stripe_payment_id: orgChargeId },
-        { isAutoTopUp: true, serviceFeeCents: 0, grossPaidCents: 5000 }
+        {
+          isAutoTopUp: true,
+          serviceFeeCents: 0,
+          grossPaidCents: 5000,
+          paidCredit: {
+            source: 'stripe',
+            terms: 'legacy',
+            purchasedAt: new Date((SERVICE_FEE_ACTIVATION_UNIX_SECONDS - 1) * 1000),
+          },
+        }
       );
     } finally {
       processOrgTopUpMock.mockRestore();
@@ -3484,7 +3551,16 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         org.id,
         principalMinor,
         { type: 'stripe', stripe_payment_id: paymentIntentId },
-        { isAutoTopUp: false, serviceFeeCents: 0, grossPaidCents: grossPaidMinor }
+        {
+          isAutoTopUp: false,
+          serviceFeeCents: 0,
+          grossPaidCents: grossPaidMinor,
+          paidCredit: {
+            source: 'stripe',
+            terms: 'legacy',
+            purchasedAt: new Date(SERVICE_FEE_ACTIVATION_UNIX_SECONDS * 1000),
+          },
+        }
       );
     } finally {
       processOrgTopUpMock.mockRestore();
@@ -3526,7 +3602,16 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         expect.objectContaining({ id: user.id }),
         principalMinor,
         { type: 'stripe', stripe_payment_id: invoiceChargeId },
-        { isAutoTopUp: true, serviceFeeCents: 0, grossPaidCents: grossPaidMinor }
+        {
+          isAutoTopUp: true,
+          serviceFeeCents: 0,
+          grossPaidCents: grossPaidMinor,
+          paidCredit: {
+            source: 'stripe',
+            terms: 'legacy',
+            purchasedAt: new Date(SERVICE_FEE_ACTIVATION_UNIX_SECONDS * 1000),
+          },
+        }
       );
     } finally {
       processTopUpMock.mockRestore();

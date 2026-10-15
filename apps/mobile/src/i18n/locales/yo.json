@@ -219,7 +219,6 @@
     "hideBalance": "Fi owó tó kù pamọ́",
     "showBalance": "Fi owó tó kù hàn",
     "balanceHidden": "Owó tó kù ti pamọ́",
-    "bonusCreditsExpiring": "Kirẹ́dítì ẹ̀bùn {{amount}} yóò dópin {{date}}.",
     "signOutTitle": "Jáde?",
     "signOutMessage": "O máa nílò láti tún wọlé kí o lè lo àyè iṣẹ́ rẹ.",
     "deleteAccountTitle": "Pa àkọọ́lẹ̀ rẹ́?",
@@ -2983,7 +2982,7 @@
     "creditActivity": {
       "emptyDescription": "Àwọn ìrà, lílo àti àtúnṣe kirẹ́dítì àjọ yìí yóò hàn níbí bí wọ́n ṣe ń ṣẹlẹ̀.",
       "emptyTitle": "Kò sí ìṣe kirẹ́dítì",
-      "expires": "Yóò dópin {{date}}",
+      "expiresUtc": "Yóò dópin {{date}} (UTC)",
       "title": "Àwọn ìṣe kirẹ́dítì",
       "transactionFallback": "Ìdúnàádúrà kirẹ́dítì",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Ra kírẹ́dítì",
     "description": "Kírẹ́dítì jẹ́ rírà ẹ̀ẹ̀kan tí a fi kún iwọntunwọnsi Kilo rẹ fún ṣíṣe àwọn ìpàdé kíkọ kóòdù AI nínú Kilo App. Ṣọ́ọ̀bù gba owó láti inú àkọọ́lẹ̀ rẹ, a sì fi kírẹ́dítì kún un lẹ́yìn tí ṣọ́ọ̀bù bá fọwọ́sí ìsanwó.",
+    "nextExpiry": "Kírẹ́dítì {{amount}} yóò dópin {{date}} (UTC). A máa kọ́kọ́ lo kírẹ́dítì tí yóò tètè dópin.",
+    "appStoreExpiry": "Kírẹ́dítì tí a rà nípasẹ̀ App Store kì í dópin.",
+    "playOneYearExpiry": "Àwọn kírẹ́dítì wọ̀nyí yóò dópin ní ọdún kàlẹ́ńdà kan lẹ́yìn ríra.",
+    "playNonexpiring": "Àwọn kírẹ́dítì wọ̀nyí kì í dópin.",
     "packLabel": "Fi kírẹ́dítì tó tó {{amount}} kún un",
     "priceUnavailable": "Owó kò sí",
     "purchased": "A ti fi kírẹ́dítì kún iwọntunwọnsi rẹ.",

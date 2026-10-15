@@ -3,7 +3,6 @@ import {
   processOrganizationExpirations,
   processOrganizationExpirationsBatch,
   fetchExpiringTransactionsForOrganization,
-  closeOutExpiringOrganizationCredits,
 } from './creditExpiration';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -325,7 +324,7 @@ describe('processOrganizationExpirations', () => {
     expect(expirations).toHaveLength(1);
   });
 
-  it('handles concurrent execution — one succeeds, other returns null', async () => {
+  it('returns current state to overlapping callers and inserts one closure', async () => {
     await db.insert(creditTransactionsTable).values({
       kilo_user_id: ownerId,
       organization_id: orgId,
@@ -350,10 +349,8 @@ describe('processOrganizationExpirations', () => {
       processOrganizationExpirations(orgInput, now),
     ]);
 
-    const successes = [r1, r2].filter(r => r !== null);
-    const nulls = [r1, r2].filter(r => r === null);
-    expect(successes).toHaveLength(1);
-    expect(nulls).toHaveLength(1);
+    expect(r1).toEqual(r2);
+    expect(r1?.microdollars_used).toBe(3_000_000);
 
     const expirations = await db
       .select()
@@ -373,8 +370,11 @@ describe('processOrganizationExpirations', () => {
       original_baseline_microdollars_used: 0,
       description: 'Partial expiry',
     });
+    await db
+      .update(organizations)
+      .set({ microdollars_used: 7_000_000, microdollars_balance: 3_000_000 })
+      .where(eq(organizations.id, orgId));
 
-    // org has used 7M of 10M, so 3M should expire
     const result = await processOrganizationExpirations(
       {
         id: orgId,
@@ -396,7 +396,7 @@ describe('processOrganizationExpirations', () => {
     expect(expirations[0].amount_microdollars).toBe(-3_000_000);
   });
 
-  it('creates zero-amount expiration when credits fully consumed', async () => {
+  it('creates zero-amount expiration and returns the refreshed pointer when credits are fully consumed', async () => {
     await db.insert(creditTransactionsTable).values({
       kilo_user_id: ownerId,
       organization_id: orgId,
@@ -407,8 +407,11 @@ describe('processOrganizationExpirations', () => {
       original_baseline_microdollars_used: 0,
       description: 'Fully consumed',
     });
+    await db
+      .update(organizations)
+      .set({ microdollars_used: 8_000_000, microdollars_balance: 2_000_000 })
+      .where(eq(organizations.id, orgId));
 
-    // microdollars_used >= amount, so nothing to expire
     const result = await processOrganizationExpirations(
       {
         id: orgId,
@@ -419,9 +422,17 @@ describe('processOrganizationExpirations', () => {
       new Date('2024-01-15T00:00:00Z')
     );
 
-    expect(result).not.toBeNull();
-    // total_acquired unchanged since expiration amount is 0
-    expect(result!.total_microdollars_acquired).toBe(10_000_000);
+    expect(result).toEqual({
+      total_microdollars_acquired: 10_000_000,
+      microdollars_used: 8_000_000,
+      next_credit_expiration_at: null,
+    });
+    const org = await db.query.organizations.findFirst({ where: eq(organizations.id, orgId) });
+    expect(org).toMatchObject({
+      total_microdollars_acquired: 10_000_000,
+      microdollars_balance: 2_000_000,
+      next_credit_expiration_at: null,
+    });
 
     const expirations = await db
       .select()
@@ -721,117 +732,5 @@ describe('processOrganizationExpirationsBatch', () => {
       total_microdollars_acquired: 10_000_000,
       next_credit_expiration_at: expect.any(String),
     });
-  });
-});
-
-describe('closeOutExpiringOrganizationCredits', () => {
-  let ownerId: string;
-  let orgId: string;
-
-  beforeAll(async () => {
-    const owner = await insertTestUser({
-      google_user_email: `close-out-exp-org-${Date.now()}@example.com`,
-    });
-    ownerId = owner.id;
-  });
-
-  beforeEach(async () => {
-    const org = await createTestOrg(ownerId);
-    orgId = org!.id;
-  });
-
-  afterEach(async () => {
-    await db
-      .delete(creditTransactionsTable)
-      .where(eq(creditTransactionsTable.organization_id, orgId));
-    await db.delete(organizations).where(eq(organizations.id, orgId));
-  });
-
-  it('does nothing when there are no open expiring transactions', async () => {
-    const closedOut = await db.transaction(tx => closeOutExpiringOrganizationCredits(orgId, 0, tx));
-
-    expect(closedOut).toBe(0);
-    const expirations = await db
-      .select()
-      .from(creditTransactionsTable)
-      .where(eq(creditTransactionsTable.organization_id, orgId));
-    expect(expirations).toHaveLength(0);
-  });
-
-  it('closes out an unclaimed grant regardless of its expiry_date', async () => {
-    const txnId = randomUUID();
-    await db.insert(creditTransactionsTable).values({
-      id: txnId,
-      kilo_user_id: ownerId,
-      organization_id: orgId,
-      amount_microdollars: 10_000_000,
-      is_free: true,
-      expiry_date: '2030-01-01T00:00:00Z', // far in the future, not yet due
-      expiration_baseline_microdollars_used: 0,
-      original_baseline_microdollars_used: 0,
-      description: 'Still-open grant',
-    });
-
-    const closedOut = await db.transaction(tx => closeOutExpiringOrganizationCredits(orgId, 0, tx));
-
-    expect(closedOut).toBe(-10_000_000);
-
-    const expirations = await db
-      .select()
-      .from(creditTransactionsTable)
-      .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
-    expect(expirations).toHaveLength(1);
-    expect(expirations[0].amount_microdollars).toBe(-10_000_000);
-    expect(expirations[0].original_transaction_id).toBe(txnId);
-
-    // Once closed out, it is no longer reported as an open expiring transaction.
-    const stillOpen = await fetchExpiringTransactionsForOrganization(orgId);
-    expect(stillOpen).toHaveLength(0);
-  });
-
-  it('only closes out the unclaimed portion of a partially-used grant', async () => {
-    const txnId = randomUUID();
-    await db.insert(creditTransactionsTable).values({
-      id: txnId,
-      kilo_user_id: ownerId,
-      organization_id: orgId,
-      amount_microdollars: 10_000_000,
-      is_free: true,
-      expiry_date: '2030-01-01T00:00:00Z',
-      expiration_baseline_microdollars_used: 0,
-      original_baseline_microdollars_used: 0,
-      description: 'Partially used grant',
-    });
-
-    const closedOut = await db.transaction(tx =>
-      closeOutExpiringOrganizationCredits(orgId, 4_000_000, tx)
-    );
-
-    expect(closedOut).toBe(-6_000_000);
-  });
-
-  it('is idempotent — a second call finds nothing left to close out', async () => {
-    await db.insert(creditTransactionsTable).values({
-      kilo_user_id: ownerId,
-      organization_id: orgId,
-      amount_microdollars: 10_000_000,
-      is_free: true,
-      expiry_date: '2030-01-01T00:00:00Z',
-      expiration_baseline_microdollars_used: 0,
-      original_baseline_microdollars_used: 0,
-      description: 'Grant',
-    });
-
-    await db.transaction(tx => closeOutExpiringOrganizationCredits(orgId, 0, tx));
-    const secondCall = await db.transaction(tx =>
-      closeOutExpiringOrganizationCredits(orgId, 0, tx)
-    );
-
-    expect(secondCall).toBe(0);
-    const expirations = await db
-      .select()
-      .from(creditTransactionsTable)
-      .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
-    expect(expirations).toHaveLength(1);
   });
 });

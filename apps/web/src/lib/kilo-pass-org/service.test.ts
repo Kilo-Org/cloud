@@ -11,7 +11,10 @@ import {
   organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
-import { KiloPassOrgAgreementState } from '@kilocode/db/schema-types';
+import {
+  KiloPassOrgAgreementState,
+  KiloPassOrgProcessingCondition,
+} from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -58,6 +61,123 @@ describe('Kilo Pass organization agreement service', () => {
       .set({ parent_organization_id: null })
       .where(inArray(organizations.id, ids));
     await db.delete(organizations).where(inArray(organizations.id, ids));
+  });
+
+  it.each(['legacy', 'one_year'] as const)(
+    'classifies direct free-flagged base grants as paid %s principal',
+    async terms => {
+      const owner = await insertTestUser();
+      const parent = await createOrganization(`kpo-policy-${crypto.randomUUID()}`, owner.id);
+      organizationIds.push(parent.id);
+      await db
+        .update(organizations)
+        .set({
+          total_microdollars_acquired: 0,
+          microdollars_used: 5_000_000,
+        })
+        .where(eq(organizations.id, parent.id));
+      const pending = await createPendingAgreement({
+        parentOrganizationId: parent.id,
+        actorUserId: owner.id,
+        tier: 'tier_19',
+        cadence: 'yearly',
+        paidSeatCount: 1,
+        issuanceAnchorAt: window.start,
+        providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+        providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+        initialAllocations: [],
+      });
+      await activatePaidAgreement({
+        agreementId: pending.agreementId,
+        recipientUserId: owner.id,
+        paidFrom: window.start,
+        paidUntil: new Date('2027-07-01T00:00:00.000Z'),
+        paidSeatCount: 1,
+        firstWindow: window,
+        isBridge: false,
+        paidCreditTerms: terms,
+      });
+      const [base] = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.organization_id, parent.id),
+            eq(credit_transactions.description, 'Kilo Pass organization base issuance')
+          )
+        );
+      expect(base).toMatchObject({
+        is_free: true,
+        credit_source: 'pass',
+        paid_credit_policy: terms,
+        expiration_baseline_microdollars_used: terms === 'one_year' ? 0 : null,
+      });
+      expect(base?.expiry_date && new Date(base.expiry_date).toISOString()).toBe(
+        terms === 'one_year' ? '2027-07-01T00:00:00.000Z' : null
+      );
+      await runOrganizationPassIssuanceCron(db, new Date('2026-08-01T00:00:00.000Z'));
+      const credits = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.organization_id, parent.id),
+            eq(credit_transactions.description, 'Kilo Pass organization base issuance')
+          )
+        );
+      expect(credits.every(credit => credit.paid_credit_policy === terms)).toBe(true);
+    }
+  );
+
+  it('keeps captured paid terms through a snapshotless manual activation and recovery', async () => {
+    const owner = await insertTestUser();
+    const parent = await createOrganization(`kpo-manual-policy-${crypto.randomUUID()}`, owner.id);
+    organizationIds.push(parent.id);
+    const pending = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'yearly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: window.start,
+      providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [],
+    });
+    await db
+      .update(kilo_pass_org_agreements)
+      .set({
+        processing_condition: KiloPassOrgProcessingCondition.Manual,
+      })
+      .where(eq(kilo_pass_org_agreements.id, pending.agreementId));
+    await activatePaidAgreement({
+      agreementId: pending.agreementId,
+      recipientUserId: owner.id,
+      paidFrom: window.start,
+      paidUntil: new Date('2027-07-01T00:00:00.000Z'),
+      paidSeatCount: 1,
+      firstWindow: window,
+      isBridge: false,
+      paidCreditTerms: 'one_year',
+    });
+    await db
+      .update(kilo_pass_org_agreements)
+      .set({
+        processing_condition: KiloPassOrgProcessingCondition.Ready,
+      })
+      .where(eq(kilo_pass_org_agreements.id, pending.agreementId));
+    await runOrganizationPassIssuanceCron(db, window.start);
+    const [base] = await db
+      .select()
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.organization_id, parent.id),
+          eq(credit_transactions.description, 'Kilo Pass organization base issuance')
+        )
+      );
+    expect(base?.paid_credit_policy).toBe('one_year');
+    expect(new Date(base?.expiry_date ?? '').toISOString()).toBe('2027-07-01T00:00:00.000Z');
   });
 
   it('seeds concrete immutable standard terms and activates exactly once with parent remainder', async () => {

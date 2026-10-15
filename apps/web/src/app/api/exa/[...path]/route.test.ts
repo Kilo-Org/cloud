@@ -280,7 +280,8 @@ describe('POST /api/exa/[...path]', () => {
       expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledWith(
         undefined,
         expect.objectContaining({ id: 'user-123' }),
-        expect.anything()
+        expect.anything(),
+        'usage'
       );
     });
 
@@ -313,7 +314,8 @@ describe('POST /api/exa/[...path]', () => {
       expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledWith(
         orgId,
         expect.objectContaining({ id: 'user-123' }),
-        expect.anything()
+        expect.anything(),
+        'usage'
       );
     });
   });

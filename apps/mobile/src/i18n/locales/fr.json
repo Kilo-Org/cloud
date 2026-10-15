@@ -219,7 +219,6 @@
     "hideBalance": "Masquer le solde",
     "showBalance": "Afficher le solde",
     "balanceHidden": "Solde masqué",
-    "bonusCreditsExpiring": "{{amount}} de crédits bonus expirent le {{date}}.",
     "signOutTitle": "Se déconnecter ?",
     "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail.",
     "deleteAccountTitle": "Supprimer le compte ?",
@@ -3015,7 +3014,7 @@
     "creditActivity": {
       "emptyDescription": "Les achats, la consommation et les ajustements de crédits de cette organisation apparaîtront ici au fur et à mesure.",
       "emptyTitle": "Aucun mouvement de crédits",
-      "expires": "Expire le {{date}}",
+      "expiresUtc": "Expire le {{date}} (UTC)",
       "title": "Mouvements de crédits",
       "transactionFallback": "Mouvement de crédits",
       "category": {
@@ -3748,6 +3747,10 @@
   "credits": {
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
+    "nextExpiry": "{{amount}} de crédits expirent le {{date}} (UTC). Les crédits dont l'expiration est la plus proche sont utilisés en premier.",
+    "appStoreExpiry": "Les crédits achetés via l'App Store n'expirent pas.",
+    "playOneYearExpiry": "Ces crédits expirent une année civile après l'achat.",
+    "playNonexpiring": "Ces crédits n'expirent pas.",
     "packLabel": "Ajouter {{amount}} en crédits",
     "priceUnavailable": "Prix indisponible",
     "purchased": "Des crédits ont été ajoutés à votre solde.",

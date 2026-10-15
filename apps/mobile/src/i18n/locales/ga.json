@@ -219,7 +219,6 @@
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
-    "bonusCreditsExpiring": "Rachaidh {{amount}} de chreidmheasanna bónais in éag {{date}}.",
     "signOutTitle": "Ar mhaith leat síniú amach?",
     "signOutMessage": "Beidh ort síniú isteach arís chun rochtain a fháil ar do spás oibre.",
     "deleteAccountTitle": "An scriosfar an cuntas?",
@@ -3103,7 +3102,7 @@
     "creditActivity": {
       "emptyDescription": "Beidh ceannacháin, úsáid agus coigeartuithe creidmheasa na heagraíochta seo le feiceáil anseo de réir mar a tharlaíonn siad.",
       "emptyTitle": "Níl aon ghníomhaíocht creidmheasa",
-      "expires": "In éag: {{date}}",
+      "expiresUtc": "In éag: {{date}} (UTC)",
       "title": "Gníomhaíocht creidmheasa",
       "transactionFallback": "Idirbheart creidmheasa",
       "category": {
@@ -3830,6 +3829,10 @@
   "credits": {
     "title": "Ceannaigh creidmheasanna",
     "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",
+    "nextExpiry": "Rachaidh {{amount}} de chreidmheasanna in éag {{date}} (UTC). Úsáidtear na creidmheasanna is luaithe a rachaidh in éag ar dtús.",
+    "appStoreExpiry": "Ní théann creidmheasanna a ceannaíodh tríd an App Store in éag.",
+    "playOneYearExpiry": "Rachaidh na creidmheasanna seo in éag bliain féilire amháin tar éis an cheannaigh.",
+    "playNonexpiring": "Ní théann na creidmheasanna seo in éag.",
     "packLabel": "Cuir {{amount}} i gcreidmheasanna leis",
     "priceUnavailable": "Praghas gan fáil",
     "purchased": "Cuireadh creidmheasanna le do chothromas.",

@@ -219,7 +219,6 @@
     "hideBalance": "Balansni yashirish",
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
-    "bonusCreditsExpiring": "{{amount}} miqdoridagi bonus kreditlarning muddati {{date}} sanasida tugaydi.",
     "signOutTitle": "Tizimdan chiqilsinmi?",
     "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi.",
     "deleteAccountTitle": "Hisob o'chirilsinmi?",
@@ -2983,7 +2982,7 @@
     "creditActivity": {
       "emptyDescription": "Bu yerda tashkilotning kredit xaridlari, sarfi va kreditlar miqdoridagi o'zgarishlar ko'rsatiladi.",
       "emptyTitle": "Kreditlar bo'yicha amallar yo'q",
-      "expires": "Amal qilish muddati: {{date}}",
+      "expiresUtc": "Amal qilish muddati: {{date}} (UTC)",
       "title": "Kreditlar tarixi",
       "transactionFallback": "Kredit amali",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
+    "nextExpiry": "{{amount}} miqdoridagi kreditlarning muddati {{date}} (UTC) sanasida tugaydi. Muddati eng erta tugaydigan kreditlar birinchi sarflanadi.",
+    "appStoreExpiry": "App Store orqali sotib olingan kreditlarning muddati tugamaydi.",
+    "playOneYearExpiry": "Bu kreditlarning muddati xariddan bir kalendar yil o'tgach tugaydi.",
+    "playNonexpiring": "Bu kreditlarning muddati tugamaydi.",
     "packLabel": "{{amount}} qiymatidagi kredit qo'shish",
     "priceUnavailable": "Narx mavjud emas",
     "purchased": "Kreditlar balansingizga qo'shildi.",

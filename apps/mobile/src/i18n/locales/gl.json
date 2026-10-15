@@ -219,7 +219,6 @@
     "hideBalance": "Agochar o saldo",
     "showBalance": "Amosar o saldo",
     "balanceHidden": "Saldo agochado",
-    "bonusCreditsExpiring": "Tes {{amount}} en créditos extra que caducan o {{date}}.",
     "signOutTitle": "Pechar sesión?",
     "signOutMessage": "Terás que iniciar sesión de novo para acceder ao teu espazo de traballo.",
     "deleteAccountTitle": "Eliminar a conta?",
@@ -2983,7 +2982,7 @@
     "creditActivity": {
       "emptyDescription": "Aquí aparecerán as compras, o consumo e os axustes de créditos desta organización a medida que se produzan.",
       "emptyTitle": "Non hai movementos de créditos",
-      "expires": "Caduca o {{date}}",
+      "expiresUtc": "Caduca o {{date}} (UTC)",
       "title": "Movementos de créditos",
       "transactionFallback": "Movemento de créditos",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Mercar créditos",
     "description": "Os créditos son unha compra única que se engade ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo. A tenda cobra na túa conta e os créditos engádense despois de que a tenda confirme o pagamento.",
+    "nextExpiry": "{{amount}} en créditos caducan o {{date}} (UTC). Os créditos coa caducidade máis próxima úsanse primeiro.",
+    "appStoreExpiry": "Os créditos mercados a través da App Store non caducan.",
+    "playOneYearExpiry": "Estes créditos caducan un ano natural despois da compra.",
+    "playNonexpiring": "Estes créditos non caducan.",
     "packLabel": "Engadir {{amount}} en créditos",
     "priceUnavailable": "Prezo non dispoñible",
     "purchased": "Engadíronse créditos ao teu saldo.",

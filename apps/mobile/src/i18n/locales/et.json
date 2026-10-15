@@ -219,7 +219,6 @@
     "hideBalance": "Peida saldo",
     "showBalance": "Näita saldot",
     "balanceHidden": "Saldo on peidetud",
-    "bonusCreditsExpiring": "Boonuskrediit summas {{amount}} aegub {{date}}.",
     "signOutTitle": "Kas logida välja?",
     "signOutMessage": "Tööruumi kasutamiseks pead uuesti sisse logima.",
     "deleteAccountTitle": "Kas kustutada konto?",
@@ -2983,7 +2982,7 @@
     "creditActivity": {
       "emptyDescription": "Siin kuvatakse selle organisatsiooni ostud, krediidikasutus ja krediidi korrigeerimised kohe, kui need toimuvad.",
       "emptyTitle": "Krediiditehinguid pole",
-      "expires": "Aegub {{date}}",
+      "expiresUtc": "Aegub {{date}} (UTC)",
       "title": "Krediiditehingud",
       "transactionFallback": "Krediiditehing",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",
+    "nextExpiry": "Krediit summas {{amount}} aegub {{date}} (UTC). Esmalt kasutatakse kõige varem aeguvaid krediite.",
+    "appStoreExpiry": "App Store'i kaudu ostetud krediidid ei aegu.",
+    "playOneYearExpiry": "Need krediidid aeguvad üks kalendriaasta pärast ostu.",
+    "playNonexpiring": "Need krediidid ei aegu.",
     "packLabel": "Lisa {{amount}} krediiti",
     "priceUnavailable": "Hind pole saadaval",
     "purchased": "Krediit on sinu saldole lisatud.",

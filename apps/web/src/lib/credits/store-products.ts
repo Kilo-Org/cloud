@@ -1,5 +1,6 @@
 import type { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 
 /**
  * One-off credit packs sold through the App Store and Google Play.
@@ -15,6 +16,7 @@ export type StoreCreditProduct = {
   amountMicrodollars: number;
   appleProductId: string;
   googleProductId: string;
+  creditExpiryPolicy: 'never' | 'one_year';
 };
 
 function storeCreditProduct(
@@ -27,6 +29,7 @@ function storeCreditProduct(
     amountMicrodollars: toMicrodollars(amountUsd),
     appleProductId,
     googleProductId,
+    creditExpiryPolicy: 'never',
   };
 }
 
@@ -37,6 +40,20 @@ export const STORE_CREDIT_PRODUCTS: StoreCreditProduct[] = [
   storeCreditProduct(500, 'credits.usd500.v1', 'credits_usd500'),
 ];
 
+export const EXPIRING_GOOGLE_CREDIT_PRODUCTS: StoreCreditProduct[] = STORE_CREDIT_PRODUCTS.map(
+  product => ({
+    ...product,
+    googleProductId: `${product.googleProductId}_1year_v2`,
+    creditExpiryPolicy: 'one_year',
+  })
+);
+
+export function getMobileCreditProducts(supportsCreditExpiry = false) {
+  return supportsCreditExpiry && getPaidCreditTerms('google_play') === 'one_year'
+    ? EXPIRING_GOOGLE_CREDIT_PRODUCTS
+    : STORE_CREDIT_PRODUCTS;
+}
+
 export function getStoreCreditProductByAppleProductId(
   appleProductId: string
 ): StoreCreditProduct | undefined {
@@ -46,7 +63,9 @@ export function getStoreCreditProductByAppleProductId(
 export function getStoreCreditProductByGoogleProductId(
   googleProductId: string
 ): StoreCreditProduct | undefined {
-  return STORE_CREDIT_PRODUCTS.find(product => product.googleProductId === googleProductId);
+  return [...STORE_CREDIT_PRODUCTS, ...EXPIRING_GOOGLE_CREDIT_PRODUCTS].find(
+    product => product.googleProductId === googleProductId
+  );
 }
 
 /**

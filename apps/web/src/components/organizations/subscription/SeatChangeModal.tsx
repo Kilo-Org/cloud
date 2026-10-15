@@ -21,6 +21,10 @@ import { toast } from 'sonner';
 import type { Stripe } from '@stripe/stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { STRIPE_PUBLISHABLE_KEY } from '@kilocode/web-shared/lib/constants';
+import {
+  CreditExpiryNotice,
+  usePaidCreditPolicyReady,
+} from '@/components/payment/CreditExpiryNotice';
 
 // Cache the Stripe promise to avoid recreating it on each render
 let stripePromise: Promise<Stripe | null> | null = null;
@@ -44,6 +48,7 @@ export function SeatChangeModal({
   organizationId: string;
   price: number;
 }) {
+  const policyReady = usePaidCreditPolicyReady();
   const [newSeatCount, setNewSeatCount] = useState(currentSeatCount);
   const [inputValue, setInputValue] = useState(currentSeatCount.toString());
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -170,6 +175,7 @@ export function SeatChangeModal({
 
   const handleUpdateSeats = async () => {
     if (!isInputValid || !hasChanges) return;
+    if (newSeatCount > currentSeatCount && !policyReady) return;
 
     setPaymentError(null);
     try {
@@ -335,6 +341,7 @@ export function SeatChangeModal({
                         seat
                         {newSeatCount - currentSeatCount > 1 ? 's' : ''} immediately.
                       </div>
+                      <CreditExpiryNotice purchase="pass" />
                     </>
                   ) : (
                     <>
@@ -377,7 +384,12 @@ export function SeatChangeModal({
             </Button>
             <Button
               onClick={handleUpdateSeats}
-              disabled={!hasChanges || !isInputValid || isLoading}
+              disabled={
+                !hasChanges ||
+                !isInputValid ||
+                isLoading ||
+                (newSeatCount > currentSeatCount && !policyReady)
+              }
             >
               {isAuthenticating
                 ? 'Verifying payment...'

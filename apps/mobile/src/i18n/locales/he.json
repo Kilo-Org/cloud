@@ -219,7 +219,6 @@
     "hideBalance": "הסתר יתרה",
     "showBalance": "הצג יתרה",
     "balanceHidden": "היתרה מוסתרת",
-    "bonusCreditsExpiring": "תוקפם של קרדיטי בונוס בסך {{amount}} יפוג ב-{{date}}.",
     "signOutTitle": "להתנתק?",
     "signOutMessage": "כדי לגשת לסביבת העבודה שלך, צריך להתחבר שוב.",
     "deleteAccountTitle": "למחוק את החשבון?",
@@ -3015,7 +3014,7 @@
     "creditActivity": {
       "emptyDescription": "כאן יופיעו רכישות, שימוש ועדכוני יתרת קרדיטים של הארגון, עם ביצועם.",
       "emptyTitle": "אין תנועות בקרדיטים",
-      "expires": "בתוקף עד {{date}}",
+      "expiresUtc": "בתוקף עד {{date}} (UTC)",
       "title": "תנועות בקרדיטים",
       "transactionFallback": "תנועה בקרדיטים",
       "category": {
@@ -3748,6 +3747,10 @@
   "credits": {
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
+    "nextExpiry": "תוקפם של קרדיטים בסך {{amount}} יפוג ב-{{date}} (UTC). קרדיטים שתוקפם יפוג ראשון מנוצלים קודם.",
+    "appStoreExpiry": "קרדיטים שנרכשו דרך App Store אינם פגים.",
+    "playOneYearExpiry": "תוקפם של קרדיטים אלה יפוג שנה קלנדרית אחת לאחר הרכישה.",
+    "playNonexpiring": "קרדיטים אלה אינם פגים.",
     "packLabel": "הוספת {{amount}} בקרדיטים",
     "priceUnavailable": "המחיר אינו זמין",
     "purchased": "הקרדיטים נוספו ליתרה שלך.",

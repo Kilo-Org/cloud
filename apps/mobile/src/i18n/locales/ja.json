@@ -219,7 +219,6 @@
     "hideBalance": "残高を非表示",
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
-    "bonusCreditsExpiring": "{{amount}}のボーナスクレジットが{{date}}に失効します。",
     "signOutTitle": "サインアウトしますか？",
     "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
     "deleteAccountTitle": "アカウントを削除しますか？",
@@ -2975,7 +2974,7 @@
     "creditActivity": {
       "emptyDescription": "この組織でクレジットの購入、利用、残高調整があると、ここに表示されます。",
       "emptyTitle": "クレジットの履歴はありません",
-      "expires": "有効期限：{{date}}",
+      "expiresUtc": "有効期限：{{date}}（UTC）",
       "title": "クレジットの履歴",
       "transactionFallback": "クレジット取引",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
+    "nextExpiry": "{{amount}}のクレジットが{{date}}（UTC）に失効します。有効期限が早いクレジットから先に使用されます。",
+    "appStoreExpiry": "App Storeで購入したクレジットは失効しません。",
+    "playOneYearExpiry": "これらのクレジットは購入から1暦年後に失効します。",
+    "playNonexpiring": "これらのクレジットは失効しません。",
     "packLabel": "{{amount}}分のクレジットを追加",
     "priceUnavailable": "価格を取得できません",
     "purchased": "クレジットを残高に追加しました。",

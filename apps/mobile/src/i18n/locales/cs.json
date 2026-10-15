@@ -219,7 +219,6 @@
     "hideBalance": "Skrýt zůstatek",
     "showBalance": "Zobrazit zůstatek",
     "balanceHidden": "Zůstatek je skrytý",
-    "bonusCreditsExpiring": "Platnost bonusových kreditů v hodnotě {{amount}} vyprší {{date}}.",
     "signOutTitle": "Odhlásit se?",
     "signOutMessage": "Pro přístup do pracovního prostoru se budeš muset znovu přihlásit.",
     "deleteAccountTitle": "Smazat účet?",
@@ -3063,7 +3062,7 @@
     "creditActivity": {
       "emptyDescription": "Zde se budou průběžně zobrazovat nákupy, čerpání a úpravy kreditů této organizace.",
       "emptyTitle": "Žádné pohyby kreditů",
-      "expires": "Platnost do {{date}}",
+      "expiresUtc": "Platnost do {{date}} (UTC)",
       "title": "Pohyby kreditů",
       "transactionFallback": "Transakce s kredity",
       "category": {
@@ -3789,6 +3788,10 @@
   "credits": {
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
+    "nextExpiry": "Platnost kreditů v hodnotě {{amount}} vyprší {{date}} (UTC). Nejdříve se čerpají kredity s nejbližším datem vypršení.",
+    "appStoreExpiry": "Kredity zakoupené přes App Store nevyprší.",
+    "playOneYearExpiry": "Platnost těchto kreditů vyprší jeden kalendářní rok po nákupu.",
+    "playNonexpiring": "Platnost těchto kreditů nevyprší.",
     "packLabel": "Přidat {{amount}} v kreditech",
     "priceUnavailable": "Cena není k dispozici",
     "purchased": "Kredity byly přidány do vašeho zůstatku.",

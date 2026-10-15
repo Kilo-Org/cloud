@@ -219,7 +219,6 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
-    "bonusCreditsExpiring": "{{amount}} i bonuskreditter utløper {{date}}.",
     "signOutTitle": "Logge ut?",
     "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
     "deleteAccountTitle": "Slette kontoen?",
@@ -2983,7 +2982,7 @@
     "creditActivity": {
       "emptyDescription": "Kjøp, forbruk og justeringer av kreditter for denne organisasjonen vises her etter hvert.",
       "emptyTitle": "Ingen kredittbevegelser",
-      "expires": "Utløper {{date}}",
+      "expiresUtc": "Utløper {{date}} (UTC)",
       "title": "Kredittbevegelser",
       "transactionFallback": "Kreditttransaksjon",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
+    "nextExpiry": "{{amount}} i kreditter utløper {{date}} (UTC). Kreditter med tidligst utløpsdato brukes først.",
+    "appStoreExpiry": "Kreditter kjøpt via App Store utløper ikke.",
+    "playOneYearExpiry": "Disse kredittene utløper ett kalenderår etter kjøpet.",
+    "playNonexpiring": "Disse kredittene utløper ikke.",
     "packLabel": "Legg til {{amount}} i kreditter",
     "priceUnavailable": "Prisen er ikke tilgjengelig",
     "purchased": "Kreditter er lagt til saldoen din.",

@@ -219,7 +219,6 @@
     "hideBalance": "Bakiyeyi gizle",
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",
-    "bonusCreditsExpiring": "{{amount}} tutarındaki bonus kredinin süresi {{date}} tarihinde dolacak.",
     "signOutTitle": "Oturum kapatılsın mı?",
     "signOutMessage": "Çalışma alanına erişmek için tekrar oturum açman gerekecek.",
     "deleteAccountTitle": "Hesap silinsin mi?",
@@ -2975,7 +2974,7 @@
     "creditActivity": {
       "emptyDescription": "Bu kuruluşun satın alımları, kullanımı ve kredi düzeltmeleri gerçekleştikçe burada görünür.",
       "emptyTitle": "Kredi hareketi yok",
-      "expires": "Son kullanma tarihi: {{date}}",
+      "expiresUtc": "Son kullanma tarihi: {{date}} (UTC)",
       "title": "Kredi hareketleri",
       "transactionFallback": "Kredi işlemi",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
+    "nextExpiry": "{{amount}} tutarındaki kredinin süresi {{date}} (UTC) tarihinde dolacak. Süresi en erken dolan krediler önce kullanılır.",
+    "appStoreExpiry": "App Store üzerinden satın alınan kredilerin süresi dolmaz.",
+    "playOneYearExpiry": "Bu kredilerin süresi satın alma tarihinden bir takvim yılı sonra dolar.",
+    "playNonexpiring": "Bu kredilerin süresi dolmaz.",
     "packLabel": "{{amount}} değerinde kredi ekle",
     "priceUnavailable": "Fiyat kullanılamıyor",
     "purchased": "Krediler bakiyenize eklendi.",

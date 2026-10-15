@@ -219,7 +219,6 @@
     "hideBalance": "Cuddio'r balans",
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",
-    "bonusCreditsExpiring": "Mae {{amount}} o gredydau bonws yn dod i ben ar {{date}}.",
     "signOutTitle": "Allgofnodi?",
     "signOutMessage": "Bydd angen i ti fewngofnodi eto i gael mynediad i dy weithle.",
     "deleteAccountTitle": "Dileu cyfrif?",
@@ -3143,7 +3142,7 @@
     "creditActivity": {
       "emptyDescription": "Bydd pryniannau, defnydd ac addasiadau credyd y sefydliad hwn yn ymddangos yma wrth iddynt ddigwydd.",
       "emptyTitle": "Dim gweithgaredd credyd",
-      "expires": "Yn dod i ben {{date}}",
+      "expiresUtc": "Yn dod i ben {{date}} (UTC)",
       "title": "Gweithgaredd credyd",
       "transactionFallback": "Trafodiad credyd",
       "category": {
@@ -3871,6 +3870,10 @@
   "credits": {
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
+    "nextExpiry": "Mae {{amount}} o gredydau yn dod i ben ar {{date}} (UTC). Defnyddir y credydau sy'n dod i ben gyntaf yn gyntaf.",
+    "appStoreExpiry": "Nid yw credydau a brynwyd drwy'r App Store yn dod i ben.",
+    "playOneYearExpiry": "Mae'r credydau hyn yn dod i ben un flwyddyn galendr ar ôl eu prynu.",
+    "playNonexpiring": "Nid yw'r credydau hyn yn dod i ben.",
     "packLabel": "Ychwanegu {{amount}} o gredydau",
     "priceUnavailable": "Pris ddim ar gael",
     "purchased": "Ychwanegwyd credydau at eich balans.",

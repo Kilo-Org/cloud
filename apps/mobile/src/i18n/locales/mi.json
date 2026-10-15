@@ -219,7 +219,6 @@
     "hideBalance": "Hunaia te toenga",
     "showBalance": "Whakaaturia te toenga",
     "balanceHidden": "Kua huna te toenga",
-    "bonusCreditsExpiring": "Ka mōnehu ā te {{date}} ngā moni tōmua tāpiri {{amount}}.",
     "signOutTitle": "Takiputa?",
     "signOutMessage": "Me takiuru anō koe kia uru ki tō wāhi mahi.",
     "deleteAccountTitle": "Mukua te pūkete?",
@@ -2983,7 +2982,7 @@
     "creditActivity": {
       "emptyDescription": "Ka puta ki konei ngā hokonga, te whakamahinga me ngā whakatikatika moni tōmua o tēnei rōpū i te wā e mahia ana.",
       "emptyTitle": "Kāore he tauwhitinga moni tōmua",
-      "expires": "Ka mōnehu ā te {{date}}",
+      "expiresUtc": "Ka mōnehu ā te {{date}} (UTC)",
       "title": "Ngā tauwhitinga moni tōmua",
       "transactionFallback": "Tauwhitinga moni tōmua",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Hoko whiwhinga",
     "description": "He hokonga kotahi ngā whiwhinga ka tāpirihia ki tō toenga Kilo hei whakahaere i ngā wātū whakawaehere AI i te Taupānga Kilo. Ka utu te toa i tō pūkete, ā, ka tāpirihia ngā whiwhinga i muri i te whakamanatanga a te toa i te utu.",
+    "nextExpiry": "Ka mōnehu ā te {{date}} (UTC) ngā whiwhinga {{amount}}. Ka whakamahia tuatahitia ngā whiwhinga ka mōnehu tuatahi.",
+    "appStoreExpiry": "Kāore e mōnehu ngā whiwhinga i hokona mā te App Store.",
+    "playOneYearExpiry": "Ka mōnehu ēnei whiwhinga kotahi tau maramataka i muri i te hokonga.",
+    "playNonexpiring": "Kāore e mōnehu ēnei whiwhinga.",
     "packLabel": "Tāpirihia {{amount}} whiwhinga",
     "priceUnavailable": "Kāore te utu e wātea",
     "purchased": "Kua tāpirihia ngā whiwhinga ki tō toenga.",

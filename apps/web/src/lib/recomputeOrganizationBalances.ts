@@ -22,7 +22,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and, asc, gt } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
+import { computeExpiration } from '@kilocode/db/credit-expiration';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
 import { mergeSortedByCreatedAt } from '@/lib/user/recompute-balances';
 
@@ -114,6 +114,9 @@ export async function recomputeOrganizationBalances(args: {
       description: credit_transactions.description,
       is_free: credit_transactions.is_free,
       original_transaction_id: credit_transactions.original_transaction_id,
+      consumed_microdollars: credit_transactions.consumed_microdollars,
+      retired_microdollars: credit_transactions.retired_microdollars,
+      credit_source: credit_transactions.credit_source,
     })
     .from(credit_transactions)
     .where(eq(credit_transactions.organization_id, args.organizationId))
@@ -130,7 +133,12 @@ export async function recomputeOrganizationBalances(args: {
       cumulativeUsage += usageRecords[usageIdx].cost;
       usageIdx++;
     }
-    computedOriginalBaselines.set(txn.id, cumulativeUsage);
+    computedOriginalBaselines.set(
+      txn.id,
+      txn.credit_source !== null
+        ? (txn.original_baseline_microdollars_used ?? cumulativeUsage)
+        : cumulativeUsage
+    );
   }
   while (usageIdx < usageRecords.length) {
     cumulativeUsage += usageRecords[usageIdx].cost;
@@ -142,7 +150,10 @@ export async function recomputeOrganizationBalances(args: {
     .filter(t => t.expiry_date != null)
     .map(t => ({
       ...t,
-      expiration_baseline_microdollars_used: computedOriginalBaselines.get(t.id) ?? 0,
+      expiration_baseline_microdollars_used:
+        t.credit_source !== null
+          ? t.expiration_baseline_microdollars_used
+          : (computedOriginalBaselines.get(t.id) ?? 0),
     }));
 
   const lastExpirationTime = creditTransactions
@@ -171,7 +182,7 @@ export async function recomputeOrganizationBalances(args: {
     .filter(t => t.baseline !== t.db);
 
   const updatesForExpirationBaseline = creditTransactions
-    .filter(t => t.expiry_date != null)
+    .filter(t => t.expiry_date != null && t.credit_source === null)
     .map(t => ({
       id: t.id,
       baseline: computedExpirationBaselines.get(t.id) ?? 0,

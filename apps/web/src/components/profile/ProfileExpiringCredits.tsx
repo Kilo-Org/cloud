@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils';
+import { formatDollars } from '@/lib/utils';
 import { Clock, ChevronRight } from 'lucide-react';
 import { CardLinkFooter } from '@/components/ui/card.client';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -29,7 +29,10 @@ export default function ProfileExpiringCredits() {
         {expiringCreditGroups.map(group => (
           <div key={group.expiry_date}>
             {formatDollars(fromMicrodollars(group.balance_mUsd))} credits expire at{' '}
-            {formatIsoDateTime_IsoOrderNoSeconds(group.expiry_date)}
+            {new Date(group.expiry_date).toLocaleString('en-US', {
+              timeZone: 'UTC',
+              timeZoneName: 'short',
+            })}
           </div>
         ))}
       </div>

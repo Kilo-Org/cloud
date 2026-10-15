@@ -27,6 +27,7 @@ type CreditHistoryEntry = {
   amountUsd: number;
   kind: string;
   description: string;
+  expiryDate: string | null;
 };
 
 export function CreditHistory({
@@ -53,12 +54,13 @@ export function CreditHistory({
               <TableHead className={headerCellClassName}>Type</TableHead>
               <TableHead className={headerCellClassName}>Amount</TableHead>
               <TableHead className={headerCellClassName}>Description</TableHead>
+              <TableHead className={headerCellClassName}>Expires</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground px-4 py-10 text-center">
+                <TableCell colSpan={5} className="text-muted-foreground px-4 py-10 text-center">
                   No credit issuances yet.
                 </TableCell>
               </TableRow>
@@ -76,6 +78,16 @@ export function CreditHistory({
                   </TableCell>
                   <TableCell className={bodyCellClassName}>
                     {humanizeCreditDescription(entry.description)}
+                  </TableCell>
+                  <TableCell className={bodyCellClassName}>
+                    {entry.amountUsd <= 0
+                      ? '—'
+                      : entry.expiryDate
+                        ? new Date(entry.expiryDate).toLocaleString('en-US', {
+                            timeZone: 'UTC',
+                            timeZoneName: 'short',
+                          })
+                        : 'Does not expire'}
                   </TableCell>
                 </TableRow>
               ))

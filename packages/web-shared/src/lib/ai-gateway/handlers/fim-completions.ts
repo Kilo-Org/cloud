@@ -218,9 +218,12 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   };
 
   setTag('ui.ai_model', requestBody.model);
-  // Use read replica for balance check - this is a read-only operation that can tolerate
-  // slight replication lag, and provides lower latency for US users
-  const { balance, plan, payer } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  const { balance, plan, payer } = await getBalanceAndOrgSettings(
+    organizationId,
+    user,
+    readDb,
+    isFreeModel(requestBody.model) ? undefined : 'usage'
+  );
 
   if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(

@@ -219,7 +219,6 @@
     "hideBalance": "Ficha salio",
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",
-    "bonusCreditsExpiring": "Muda wa salio la bonasi la {{amount}} unaisha {{date}}.",
     "signOutTitle": "Ungependa kutoka kwenye akaunti?",
     "signOutMessage": "Utahitaji kuingia tena ili kufikia eneo lako la kazi.",
     "deleteAccountTitle": "Ungependa kufuta akaunti?",
@@ -2983,7 +2982,7 @@
     "creditActivity": {
       "emptyDescription": "Ununuzi, matumizi, na marekebisho ya salio kwa shirika hili yataonekana hapa yanapotokea.",
       "emptyTitle": "Hakuna shughuli za salio",
-      "expires": "Muda unaisha {{date}}",
+      "expiresUtc": "Muda unaisha {{date}} (UTC)",
       "title": "Shughuli za salio",
       "transactionFallback": "Muamala wa salio",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",
+    "nextExpiry": "Muda wa salio la {{amount}} unaisha {{date}} (UTC). Salio linaloisha muda mapema zaidi hutumika kwanza.",
+    "appStoreExpiry": "Salio lililonunuliwa kupitia App Store halina muda wa kuisha.",
+    "playOneYearExpiry": "Muda wa salio hili unaisha mwaka mmoja wa kalenda baada ya ununuzi.",
+    "playNonexpiring": "Salio hili halina muda wa kuisha.",
     "packLabel": "Ongeza salio la {{amount}}",
     "priceUnavailable": "Bei haipatikani",
     "purchased": "Salio limeongezwa kwenye usawa wako.",

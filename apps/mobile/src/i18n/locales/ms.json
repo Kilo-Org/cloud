@@ -219,7 +219,6 @@
     "hideBalance": "Sembunyikan baki",
     "showBalance": "Tunjukkan baki",
     "balanceHidden": "Baki disembunyikan",
-    "bonusCreditsExpiring": "Kredit bonus sebanyak {{amount}} akan tamat tempoh pada {{date}}.",
     "signOutTitle": "Log keluar?",
     "signOutMessage": "Anda perlu log masuk semula untuk mengakses ruang kerja anda.",
     "deleteAccountTitle": "Padam akaun?",
@@ -2983,7 +2982,7 @@
     "creditActivity": {
       "emptyDescription": "Pembelian, penggunaan dan pelarasan kredit organisasi ini akan dipaparkan di sini apabila berlaku.",
       "emptyTitle": "Tiada aktiviti kredit",
-      "expires": "Tamat tempoh pada {{date}}",
+      "expiresUtc": "Tamat tempoh pada {{date}} (UTC)",
       "title": "Aktiviti kredit",
       "transactionFallback": "Transaksi kredit",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
+    "nextExpiry": "Kredit sebanyak {{amount}} akan tamat tempoh pada {{date}} (UTC). Kredit yang paling awal tamat tempoh digunakan dahulu.",
+    "appStoreExpiry": "Kredit yang dibeli melalui App Store tidak tamat tempoh.",
+    "playOneYearExpiry": "Kredit ini tamat tempoh satu tahun kalendar selepas pembelian.",
+    "playNonexpiring": "Kredit ini tidak tamat tempoh.",
     "packLabel": "Tambah kredit {{amount}}",
     "priceUnavailable": "Harga tidak tersedia",
     "purchased": "Kredit telah ditambah pada baki anda.",

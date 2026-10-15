@@ -219,7 +219,6 @@
     "hideBalance": "Haftee dhoksi",
     "showBalance": "Haftee agarsiisi",
     "balanceHidden": "Hafteen dhokateera",
-    "bonusCreditsExpiring": "Kiriiditiin badhaasaa {{amount}} gaafa {{date}} yeroon isaa darba.",
     "signOutTitle": "Keessaa baataa?",
     "signOutMessage": "Iddoo hojii keetti deebi'uuf ammas seenuu qabda.",
     "deleteAccountTitle": "Herrega haqxaa?",
@@ -2983,7 +2982,7 @@
     "creditActivity": {
       "emptyDescription": "Bittaan, fayyadamni fi sirreeffamni kiriiditii dhaabbata kanaa yeroo raawwataman asitti mul'atu.",
       "emptyTitle": "Sochii kiriiditii hin jiru",
-      "expires": "{{date}} irratti yeroon isaa darba",
+      "expiresUtc": "{{date}} (UTC) irratti yeroon isaa darba",
       "title": "Sochii kiriiditii",
       "transactionFallback": "Daddabarsa kiriiditii",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
+    "nextExpiry": "Kireeditiin {{amount}} gaafa {{date}} (UTC) yeroon isaa darba. Kireeditiin dursee yeroon isaa darbu dursa itti fayyadamama.",
+    "appStoreExpiry": "Kireeditiin App Store irraa bitame yeroon isaa hin darbu.",
+    "playOneYearExpiry": "Kireeditiin kun bittaa irraa eegalee waggaa kaalaandarii tokko booda yeroon isaa darba.",
+    "playNonexpiring": "Kireeditiin kun yeroon isaa hin darbu.",
     "packLabel": "Kireedita {{amount}} dabali",
     "priceUnavailable": "Gatii hin argamu",
     "purchased": "Kireeditiin baalansii kee irratti dabalameera.",

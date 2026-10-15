@@ -29,8 +29,12 @@ import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
 import { sendBalanceAlertEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchLowBalancePush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { after } from 'next/server';
-import { subHours } from 'date-fns';
-import { maybePerformOrganizationAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+
+import {
+  maybePerformAutoTopUp,
+  maybePerformOrganizationAutoTopUp,
+  type AutoTopUpOrganization,
+} from '@kilocode/web-shared/lib/autoTopUp';
 
 /**
  * The paying account's row as the balance check read it: the user for a personal request, the
@@ -58,11 +62,12 @@ type BalanceAndOrgSettings = {
 export async function getBalanceAndOrgSettings(
   organizationId: string | undefined,
   user: User,
-  fromDb: typeof db = db
+  fromDb: typeof db = db,
+  funding?: 'usage'
 ): Promise<BalanceAndOrgSettings> {
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
   const result = organizationId
-    ? await getBalanceForOrganizationUser(organizationId, user.id, { fromDb })
+    ? await getBalanceForOrganizationUser(organizationId, user.id, { fromDb, funding })
     : {
         ...(await getBalanceForUser(user)),
         balanceLimitedByUserAllowance: false,
@@ -72,6 +77,14 @@ export async function getBalanceAndOrgSettings(
           totalMicrodollarsAcquired: user.total_microdollars_acquired,
         },
       };
+  if (!organizationId && funding === 'usage' && user.auto_top_up_enabled) {
+    after(() =>
+      maybePerformAutoTopUp({
+        ...user,
+        total_microdollars_acquired: result.balance * 1_000_000 + user.microdollars_used,
+      })
+    );
+  }
   balanceSpan.end();
   return result;
 }
@@ -84,9 +97,10 @@ export async function getBalanceForOrganizationUser(
     limitType?: OrganizationUserLimitType;
     /** Database instance to use (defaults to primary db, pass readDb for replica) */
     fromDb?: typeof db;
+    funding?: 'usage';
   } = {}
 ): Promise<BalanceAndOrgSettings> {
-  const { limitType = 'daily', fromDb = db } = options;
+  const { limitType = 'daily', fromDb = db, funding } = options;
   const startTime = performance.now();
   logExceptInTest(
     `[getBalanceForOrganizationUser] Starting balance check for user ${userId} in org ${organizationId}`
@@ -150,7 +164,7 @@ export async function getBalanceForOrganizationUser(
     microdollar_limit,
     microdollar_usage,
     total_microdollars_acquired: initial_total_microdollars_acquired,
-    microdollars_used,
+    microdollars_used: initial_microdollars_used,
     settings,
     require_seats,
     plan,
@@ -160,10 +174,10 @@ export async function getBalanceForOrganizationUser(
   } = result[0];
 
   let total_microdollars_acquired = initial_total_microdollars_acquired;
+  let microdollars_used = initial_microdollars_used;
   let organization_balance = total_microdollars_acquired - microdollars_used;
 
-  // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
-  const expireBefore = subHours(new Date(), Math.random());
+  const expireBefore = new Date();
   const needsExpirationComputation =
     next_credit_expiration_at && expireBefore >= new Date(next_credit_expiration_at);
 
@@ -179,19 +193,25 @@ export async function getBalanceForOrganizationUser(
     );
     if (expiryResult) {
       total_microdollars_acquired = expiryResult.total_microdollars_acquired;
+      microdollars_used = expiryResult.microdollars_used;
       organization_balance = total_microdollars_acquired - microdollars_used;
     }
   }
 
-  // Trigger org auto-top-up after expiration check so it receives post-expiry values
-  after(() =>
-    maybePerformOrganizationAutoTopUp({
-      id: organizationId,
-      auto_top_up_enabled,
-      total_microdollars_acquired,
-      microdollars_used,
-    })
-  );
+  if (
+    funding === 'usage' &&
+    auto_top_up_enabled &&
+    (require_seats || microdollar_limit == null || microdollar_limit > (microdollar_usage || 0))
+  ) {
+    after(() =>
+      maybePerformOrganizationAutoTopUp({
+        id: organizationId,
+        auto_top_up_enabled,
+        total_microdollars_acquired,
+        microdollars_used,
+      })
+    );
+  }
 
   const payer: BalancePayer = {
     createdAt: created_at,
@@ -262,6 +282,7 @@ export type OrganizationUsageMutationResult = {
   crossedMinimumBalance: boolean;
   recipients: string[];
   minimumBalanceMicrodollars: number | null;
+  autoTopUpOrganization?: AutoTopUpOrganization;
 };
 
 const NO_ORGANIZATION_BALANCE_ALERT: OrganizationUsageMutationResult = {
@@ -332,6 +353,7 @@ export async function mutateOrganizationUsage(
       ),
       new_microdollars_used: organizations.microdollars_used,
       settings: organizations.settings,
+      auto_top_up_enabled: organizations.auto_top_up_enabled,
     });
 
   if (!orgData) return NO_ORGANIZATION_BALANCE_ALERT;
@@ -351,6 +373,16 @@ export async function mutateOrganizationUsage(
     crossedMinimumBalance,
     recipients,
     minimumBalanceMicrodollars: minimumBalance,
+    ...(cost > 0 && orgData.auto_top_up_enabled
+      ? {
+          autoTopUpOrganization: {
+            id: organization_id,
+            auto_top_up_enabled: orgData.auto_top_up_enabled,
+            total_microdollars_acquired: orgData.total_microdollars_acquired,
+            microdollars_used: orgData.new_microdollars_used,
+          },
+        }
+      : {}),
   };
 }
 
@@ -418,10 +450,18 @@ export function scheduleOrganizationLowBalanceAlert(
   });
 }
 
+export function scheduleOrganizationUsageAutoTopUp(result: OrganizationUsageMutationResult): void {
+  const organization = result.autoTopUpOrganization;
+  if (organization) {
+    after(() => maybePerformOrganizationAutoTopUp(organization));
+  }
+}
+
 export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Promise<void> {
   if (!usage.organization_id) return;
   const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
   scheduleOrganizationLowBalanceAlert(usage.organization_id, result);
+  scheduleOrganizationUsageAutoTopUp(result);
 }
 
 const MAX_DAILY_LIMIT_USD = 2000;

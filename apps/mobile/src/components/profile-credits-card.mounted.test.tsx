@@ -491,6 +491,29 @@ describe('CreditsCard balance state', () => {
 
     unmount();
   });
+
+  it('shows the nearest paid or bonus deadline and hides it with the balance', async () => {
+    currentUser.userId = 'user-A';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 65 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [
+        { balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' },
+        { balance_mUsd: 5_000_000, expiry_date: '2027-10-15T00:00:00Z' },
+        { balance_mUsd: 50_000_000, expiry_date: '2028-10-15T00:00:00Z' },
+      ],
+    });
+    const { renderer, texts, unmount } = await mountCard();
+    await waitFor(() => texts().some(text => text.includes('$15.00 in credits expires')));
+    expect(texts().some(text => text.includes('$65.00 in credits expires'))).toBe(false);
+    expect(texts().some(text => text.includes('bonus credits'))).toBe(false);
+
+    const hide = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
+    await act(() => {
+      (hide.props.onPress as () => void)();
+    });
+    expect(texts().some(text => text.includes('in credits expires'))).toBe(false);
+    unmount();
+  });
 });
 
 describe('CreditsCard add-credits entry point', () => {

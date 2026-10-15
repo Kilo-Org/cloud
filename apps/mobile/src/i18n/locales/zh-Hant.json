@@ -219,7 +219,6 @@
     "hideBalance": "隱藏餘額",
     "showBalance": "顯示餘額",
     "balanceHidden": "餘額已隱藏",
-    "bonusCreditsExpiring": "{{amount}} 的加贈點數將於 {{date}} 到期。",
     "signOutTitle": "登出？",
     "signOutMessage": "登出後，你需要重新登入才能存取工作區。",
     "deleteAccountTitle": "刪除帳戶？",
@@ -2975,7 +2974,7 @@
     "creditActivity": {
       "emptyDescription": "此組織的購買、用量與點數調整記錄都會顯示在這裡。",
       "emptyTitle": "尚無點數記錄",
-      "expires": "{{date}} 到期",
+      "expiresUtc": "{{date}}（UTC） 到期",
       "title": "點數記錄",
       "transactionFallback": "點數交易",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
+    "nextExpiry": "{{amount}} 的點數將於 {{date}}（UTC）到期。最早到期的點數會優先使用。",
+    "appStoreExpiry": "透過 App Store 購買的點數不會過期。",
+    "playOneYearExpiry": "這些點數將在購買滿一個日曆年後過期。",
+    "playNonexpiring": "這些點數不會過期。",
     "packLabel": "新增 {{amount}} 點數",
     "priceUnavailable": "價格無法取得",
     "purchased": "點數已加入你的餘額。",

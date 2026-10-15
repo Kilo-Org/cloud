@@ -219,7 +219,6 @@
     "hideBalance": "Versteek saldo",
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
-    "bonusCreditsExpiring": "Bonuskrediete ter waarde van {{amount}} verval op {{date}}.",
     "signOutTitle": "Teken uit?",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry.",
     "deleteAccountTitle": "Skrap rekening?",
@@ -2983,7 +2982,7 @@
     "creditActivity": {
       "emptyDescription": "Aankope, gebruik en kredietaanpassings vir hierdie organisasie sal hier verskyn namate dit plaasvind.",
       "emptyTitle": "Geen kredietaktiwiteit nie",
-      "expires": "Verval op {{date}}",
+      "expiresUtc": "Verval op {{date}} (UTC)",
       "title": "Kredietaktiwiteit",
       "transactionFallback": "Krediettransaksie",
       "category": {
@@ -3707,6 +3706,10 @@
   "credits": {
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
+    "nextExpiry": "{{amount}} aan krediete verval op {{date}} (UTC). Krediete met die vroegste vervaldatum word eerste gebruik.",
+    "appStoreExpiry": "Krediete wat deur die App Store gekoop is, verval nie.",
+    "playOneYearExpiry": "Hierdie krediete verval een kalenderjaar na aankoop.",
+    "playNonexpiring": "Hierdie krediete verval nie.",
     "packLabel": "Voeg {{amount}} se krediete by",
     "priceUnavailable": "Prys nie beskikbaar nie",
     "purchased": "Krediete is by jou saldo gevoeg.",

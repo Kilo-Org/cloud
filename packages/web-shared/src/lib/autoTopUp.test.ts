@@ -1,3 +1,4 @@
+import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   auto_top_up_configs,
@@ -36,6 +37,7 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import crypto from 'node:crypto';
 import Stripe from 'stripe';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 
 // Convert dollars to microdollars
 const toMicrodollars = (dollars: number) => dollars * 1_000_000;
@@ -715,6 +717,7 @@ describe('invoice metadata includes traceId', () => {
         metadata: expect.objectContaining({
           traceId: expect.stringMatching(uuidPattern),
           type: 'auto-topup',
+          paid_credit_policy: getPaidCreditTerms('stripe', new Date()),
           serviceFeePrincipalMinor: '5000',
           serviceFeeFlow: 'personal_auto_top_up',
         }),
@@ -725,6 +728,7 @@ describe('invoice metadata includes traceId', () => {
       expect.objectContaining({
         metadata: expect.objectContaining({
           serviceFeePrincipalMinor: '5000',
+          paid_credit_policy: getPaidCreditTerms('stripe', new Date()),
           serviceFeeAssessmentKey: expect.stringMatching(/^invoice:inv_trace_test$/),
         }),
       })
@@ -843,4 +847,53 @@ describe('auto top-up failed email recipients for organizations', () => {
     expect(recipients).toEqual([owner.google_user_email, billingManager.google_user_email].sort());
     expect(recipients).not.toContain(member.google_user_email);
   });
+});
+
+describe('deferred funding opt-out', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    jest.clearAllMocks();
+  });
+
+  test.each(['user', 'organization'] as const)(
+    'honors a fresh %s opt-out after an opted-in usage snapshot',
+    async type => {
+      const user = await insertTestUser({
+        auto_top_up_enabled: false,
+        stripe_customer_id: 'cus_opt_out',
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
+      });
+      const organization =
+        type === 'organization'
+          ? await createOrganization('Opted out funding', user.id)
+          : undefined;
+      const [config] = await db
+        .insert(auto_top_up_configs)
+        .values({
+          ...(organization
+            ? { owned_by_organization_id: organization.id }
+            : { owned_by_user_id: user.id }),
+          stripe_payment_method_id: 'pm_opt_out',
+          amount_cents: 5000,
+        })
+        .returning();
+
+      if (organization) {
+        await maybePerformOrganizationAutoTopUp({
+          ...organization,
+          auto_top_up_enabled: true,
+        });
+      } else {
+        await maybePerformAutoTopUp({ ...user, auto_top_up_enabled: true });
+      }
+
+      expect(client.invoices.create).not.toHaveBeenCalled();
+      const savedConfig = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.id, config.id),
+      });
+      expect(savedConfig?.attempt_started_at).toBeNull();
+      expect(sendAutoTopUpFailedEmail).not.toHaveBeenCalled();
+    }
+  );
 });

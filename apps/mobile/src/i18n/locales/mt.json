@@ -219,7 +219,6 @@
     "hideBalance": "Aħbi l-bilanċ",
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
-    "bonusCreditsExpiring": "{{amount}} fi krediti bonus jiskadu: {{date}}.",
     "signOutTitle": "Toħroġ mill-kont?",
     "signOutMessage": "Ikollok terġa' tidħol biex taċċessa l-ispazju tax-xogħol tiegħek.",
     "deleteAccountTitle": "Tħassar il-kont?",
@@ -3103,7 +3102,7 @@
     "creditActivity": {
       "emptyDescription": "Ix-xiri, l-użu u l-aġġustamenti tal-krediti ta' din l-organizzazzjoni se jidhru hawn hekk kif iseħħu.",
       "emptyTitle": "L-ebda attività tal-krediti",
-      "expires": "Jiskadi: {{date}}",
+      "expiresUtc": "Jiskadi: {{date}} (UTC)",
       "title": "Attività tal-krediti",
       "transactionFallback": "Tranżazzjoni tal-krediti",
       "category": {
@@ -3830,6 +3829,10 @@
   "credits": {
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
+    "nextExpiry": "{{amount}} fi krediti jiskadu: {{date}} (UTC). Il-krediti li jiskadu l-ewwel jintużaw l-ewwel.",
+    "appStoreExpiry": "Il-krediti mixtrija permezz tal-App Store ma jiskadux.",
+    "playOneYearExpiry": "Dawn il-krediti jiskadu sena kalendarja wara x-xiri.",
+    "playNonexpiring": "Dawn il-krediti ma jiskadux.",
     "packLabel": "Żid {{amount}} f'krediti",
     "priceUnavailable": "Prezz mhux disponibbli",
     "purchased": "Il-krediti ġew miżjuda mal-bilanċ tiegħek.",

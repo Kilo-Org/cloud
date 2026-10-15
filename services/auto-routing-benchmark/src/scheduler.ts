@@ -1,10 +1,17 @@
-import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
+import {
+  BENCHMARK_CONTAINER_BUDGET,
+  BenchmarkSchedulerLimitSchema,
+  type BenchmarkSchedulerConfigResponse,
+  type BenchmarkSchedulerOverrides,
+  type BenchmarkSchedulerSetting,
+  type BenchmarkSchedulerSettingKey,
+} from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
 
-const positiveLimit = z.number().int().min(1).max(BENCHMARK_CONTAINER_BUDGET);
+const positiveLimit = BenchmarkSchedulerLimitSchema;
 const SchedulerConfigSchema = z.object({
   slots: positiveLimit.default(BENCHMARK_CONTAINER_BUDGET),
-  modelConcurrency: positiveLimit.default(4),
+  modelConcurrency: positiveLimit.default(12),
   providerConcurrency: positiveLimit.default(16),
   unknownProviderConcurrency: positiveLimit.default(2),
   modelLimits: z.record(z.string(), positiveLimit).default({}),
@@ -21,6 +28,113 @@ const SchedulerConfigSchema = z.object({
 export type SchedulerConfig = z.infer<typeof SchedulerConfigSchema>;
 export function schedulerConfig(raw?: string): SchedulerConfig {
   return SchedulerConfigSchema.parse(raw ? JSON.parse(raw) : {});
+}
+
+type ResolvedSchedulerConfig = {
+  config: SchedulerConfig;
+  settings: BenchmarkSchedulerConfigResponse['settings'];
+};
+
+/** Each overridable limit resolves admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then default. */
+export function resolveSchedulerConfig(
+  envConfig: string | undefined,
+  overrides: BenchmarkSchedulerOverrides
+): ResolvedSchedulerConfig {
+  const env = z.record(z.string(), z.unknown()).parse(envConfig ? JSON.parse(envConfig) : {});
+  const fallback = SchedulerConfigSchema.parse(env);
+  const setting = (key: BenchmarkSchedulerSettingKey): BenchmarkSchedulerSetting => {
+    const override = overrides[key];
+    return {
+      effective: override ?? fallback[key],
+      source: override !== null ? 'admin' : key in env ? 'env' : 'default',
+      override,
+      fallback: fallback[key],
+    };
+  };
+  const settings = {
+    slots: setting('slots'),
+    modelConcurrency: setting('modelConcurrency'),
+    providerConcurrency: setting('providerConcurrency'),
+    unknownProviderConcurrency: setting('unknownProviderConcurrency'),
+  };
+  return {
+    config: {
+      ...fallback,
+      slots: settings.slots.effective,
+      modelConcurrency: settings.modelConcurrency.effective,
+      providerConcurrency: settings.providerConcurrency.effective,
+      unknownProviderConcurrency: settings.unknownProviderConcurrency.effective,
+    },
+    settings,
+  };
+}
+
+type StoredSchedulerOverrides = {
+  overrides: BenchmarkSchedulerOverrides;
+  updatedAt: string | null;
+  updatedBy: string | null;
+};
+
+type SchedulerSettingsRow = {
+  slots: unknown;
+  model_concurrency: unknown;
+  provider_concurrency: unknown;
+  unknown_provider_concurrency: unknown;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+// A stored limit above a since-lowered container budget is ignored, not enforced.
+function storedLimit(value: unknown): number | null {
+  const parsed = BenchmarkSchedulerLimitSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+export async function getSchedulerOverrides(db: D1Database): Promise<StoredSchedulerOverrides> {
+  const row = await db
+    .prepare(`
+    SELECT slots, model_concurrency, provider_concurrency, unknown_provider_concurrency,
+      updated_at, updated_by
+    FROM scheduler_settings WHERE id = 1
+  `)
+    .first<SchedulerSettingsRow>();
+  return {
+    overrides: {
+      slots: storedLimit(row?.slots),
+      modelConcurrency: storedLimit(row?.model_concurrency),
+      providerConcurrency: storedLimit(row?.provider_concurrency),
+      unknownProviderConcurrency: storedLimit(row?.unknown_provider_concurrency),
+    },
+    updatedAt: row?.updated_at ?? null,
+    updatedBy: row?.updated_by ?? null,
+  };
+}
+
+export async function saveSchedulerOverrides(
+  db: D1Database,
+  overrides: BenchmarkSchedulerOverrides,
+  updatedBy: string | null
+): Promise<StoredSchedulerOverrides> {
+  const updatedAt = new Date().toISOString();
+  await db
+    .prepare(`
+    INSERT INTO scheduler_settings (
+      id, slots, model_concurrency, provider_concurrency, unknown_provider_concurrency,
+      updated_at, updated_by
+    ) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6)
+    ON CONFLICT (id) DO UPDATE SET slots = ?1, model_concurrency = ?2, provider_concurrency = ?3,
+      unknown_provider_concurrency = ?4, updated_at = ?5, updated_by = ?6
+  `)
+    .bind(
+      overrides.slots,
+      overrides.modelConcurrency,
+      overrides.providerConcurrency,
+      overrides.unknownProviderConcurrency,
+      updatedAt,
+      updatedBy
+    )
+    .run();
+  return { overrides, updatedAt, updatedBy };
 }
 
 export const SCHEDULER_ACTIVE_LEASE_MS = 20 * 60_000;

@@ -303,6 +303,20 @@ export const schedulerCooldowns = sqliteTable(
   table => [primaryKey({ columns: [table.scope, table.key] })]
 );
 
+/**
+ * Single row (id = 1) of admin scheduler overrides. A null limit falls back to
+ * `BENCHMARK_SCHEDULER_CONFIG`, then the default. Dispatch reads it by primary key.
+ */
+export const schedulerSettings = sqliteTable('scheduler_settings', {
+  id: integer('id').primaryKey(),
+  slots: integer('slots'),
+  model_concurrency: integer('model_concurrency'),
+  provider_concurrency: integer('provider_concurrency'),
+  unknown_provider_concurrency: integer('unknown_provider_concurrency'),
+  updated_at: text('updated_at').notNull(),
+  updated_by: text('updated_by'),
+});
+
 export const routingTables = sqliteTable('routing_tables', {
   run_id: text('run_id').primaryKey(),
   router: text('router').$type<AutoRouter>().notNull().default('efficient'),

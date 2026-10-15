@@ -99,11 +99,12 @@ import {
   failChunk,
   finishChunk,
   getChunk,
+  getSchedulerOverrides,
   hasUnsettledChunks,
   recoverChunks,
+  resolveSchedulerConfig,
   scheduleRunChunks,
   schedulerBackoffSeconds,
-  schedulerConfig,
   startChunk,
   SCHEDULER_MAX_ATTEMPTS,
   type SchedulerClaim,
@@ -1000,7 +1001,10 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<void> {
 }
 
 export async function dispatchScheduler(env: Env): Promise<void> {
-  const config = schedulerConfig(env.BENCHMARK_SCHEDULER_CONFIG);
+  const { config } = resolveSchedulerConfig(
+    env.BENCHMARK_SCHEDULER_CONFIG,
+    (await getSchedulerOverrides(env.BENCH_DB)).overrides
+  );
   const failed = await recoverChunks(env.BENCH_DB, Date.now());
   for (const claim of failed) {
     await recordLaneFailure(env.BENCH_DB, {

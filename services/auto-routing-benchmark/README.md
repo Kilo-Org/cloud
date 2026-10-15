@@ -88,7 +88,7 @@ the queue invocation deadline; prompts, variants, CLI timeouts, repetitions, cos
 and CLI-reported latency remain unchanged.
 
 `BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250`,
-`modelConcurrency: 4`, `providerConcurrency: 16`, and `unknownProviderConcurrency: 2`.
+`modelConcurrency: 12`, `providerConcurrency: 16`, and `unknownProviderConcurrency: 2`.
 Optional `modelLimits` and `providerLimits` objects override those defaults by exact identity.
 `shares` defaults to `{"efficient/platform":2,"frontier/platform":2,"efficient/user":1}`.
 The least-occupied weighted share receives the next eligible claim; unused shares are
@@ -97,6 +97,25 @@ Provider identities come from the catalog's optional `inference_provider_ids`, w
 the existing gateway provider index. Every possible provider is conservatively counted;
 missing metadata shares a small unknown-provider bucket. Model-name prefixes are never
 treated as serving providers. Frontier has no owner queue.
+
+Admins can override `slots`, `modelConcurrency`, `providerConcurrency`, and
+`unknownProviderConcurrency` at runtime, without a deploy, from the Scheduler card on the
+admin panel's Benchmarks tab or with `PUT /admin/scheduler-config`. Each limit resolves
+admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then the default. Overrides live in the
+single-row `scheduler_settings` D1 table; each dispatch pass reads it once by primary key, so
+a change applies on the next completion or one-minute tick. The PUT body replaces the whole
+override set: a missing or `null` limit clears that override. Values must be integers from 1
+to `BENCHMARK_CONTAINER_BUDGET`; anything else, including an unknown key, is a 400.
+`modelLimits` and `providerLimits` still come only from the env config and take precedence
+over `modelConcurrency` and `providerConcurrency` for their exact identities.
+`GET /admin/scheduler-config` returns each limit's `effective` value, its `source`
+(`admin`, `env`, or `default`), the `override`, and the `fallback` used without one.
+
+```sh
+curl -s -X PUT "$WORKER_URL/admin/scheduler-config" \
+  -H "Authorization: Bearer $INTERNAL_API_SECRET_PROD" -H 'content-type: application/json' \
+  -H 'x-updated-by: you@kilocode.ai' -d '{"modelConcurrency":12}'
+```
 
 Claims carry fencing tokens. Redelivery cannot start an already executing claim, and
 stale tokens cannot release newer ownership. A queued lease lasts 30 minutes; an executing
@@ -507,6 +526,7 @@ endpoints reject frontier. The classifier-winner endpoint returns the shared win
 | Endpoint | Purpose |
 |---|---|
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`) |
+| `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots`, `modelConcurrency`, `providerConcurrency`, `unknownProviderConcurrency` |
 | `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |

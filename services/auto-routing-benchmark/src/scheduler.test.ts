@@ -157,7 +157,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
   it('uses safe defaults and rejects a configured budget above the container ceiling', () => {
     expect(schedulerConfig()).toEqual({
       slots: 250,
-      modelConcurrency: 4,
+      modelConcurrency: 12,
       providerConcurrency: 16,
       unknownProviderConcurrency: 2,
       modelLimits: {},

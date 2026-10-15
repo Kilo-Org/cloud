@@ -77,7 +77,7 @@ export function formatUsd(n: number | null): string {
   return `$${trimmed}`;
 }
 
-export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
+export function costPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
   return candidate.accuracy > 0
     ? candidate.avgCostUsd / candidate.accuracy
     : Number.POSITIVE_INFINITY;

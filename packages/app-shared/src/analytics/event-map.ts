@@ -374,3 +374,5 @@ export type TerminalOutcomeEventName = (typeof TERMINAL_PHASE_EVENTS)[number];
 export type AcceptedPhaseEventName = Exclude<keyof AnalyticsEventMap, TerminalOutcomeEventName>;
 
 // ci-probe 1
+
+// ci-probe 2

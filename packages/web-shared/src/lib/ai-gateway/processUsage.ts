@@ -658,31 +658,30 @@ function organizationUsageMutationTask(
   };
 }
 
+function scheduleUsageAutoTopUp(usage: MicrodollarUsage, result: UsageStatementResult): void {
+  if (usage.cost <= 0) return;
+  try {
+    if (result.organizationUsage) {
+      scheduleOrganizationUsageAutoTopUp(result.organizationUsage);
+    } else if (result.autoTopUpUser) {
+      const user = result.autoTopUpUser;
+      after(() => maybePerformAutoTopUp(user));
+    }
+  } catch {
+    console.warn('usage auto-top-up unavailable', {
+      usageId: usage.id,
+      reason: 'registration_failed',
+    });
+  }
+}
+
 async function runPostCommitUsageWork(
   usage: MicrodollarUsage,
   result: UsageStatementResult
 ): Promise<void> {
   const tasks = [organizationUsageMutationTask(usage, result)].filter(task => task !== null);
-  if (usage.cost > 0) {
-    tasks.push({
-      run: async () => {
-        if (result.organizationUsage) {
-          scheduleOrganizationUsageAutoTopUp(result.organizationUsage);
-        } else if (result.autoTopUpUser) {
-          const user = result.autoTopUpUser;
-          after(() => maybePerformAutoTopUp(user));
-        }
-      },
-      reportError: error =>
-        reportPostCommitFailure(
-          'post-commit usage auto-top-up failed',
-          error,
-          { source: 'postCommitUsageAutoTopUp' },
-          usage.id
-        ),
-    });
-  }
   await runBestEffortPostCommitTasks(tasks);
+  scheduleUsageAutoTopUp(usage, result);
 }
 
 function scheduleKiloPassBonusIfNeeded(

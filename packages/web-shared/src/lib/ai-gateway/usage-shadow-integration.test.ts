@@ -11,6 +11,7 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   isUSRegion: () => process.env.VERCEL_REGION === 'sfo1',
@@ -72,6 +73,9 @@ jest.mock('@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox', () => 
 jest.mock('@kilocode/db/bouncer-usage-event-outbox', () => ({
   enqueueBouncerUsageEvent: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/autoTopUp', () => ({
+  maybePerformAutoTopUp: jest.fn(async () => {}),
+}));
 
 // Next's installed runtime uses this global when constructing request async stores.
 globalThis.AsyncLocalStorage = AsyncLocalStorage;
@@ -111,6 +115,10 @@ const bouncer = jest.requireMock<{ deliverBouncerUsageEventNow: jest.Mock }>(
 const outbox = jest.requireMock<{ enqueueBouncerUsageEvent: jest.Mock }>(
   '@kilocode/db/bouncer-usage-event-outbox'
 );
+const autoTopUp = jest.requireMock<{ maybePerformAutoTopUp: jest.Mock }>(
+  '@kilocode/web-shared/lib/autoTopUp'
+);
+const sentry = jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs');
 
 const stats: MicrodollarUsageStats = {
   messageId: 'synthetic-message',
@@ -174,6 +182,15 @@ let sent: UsageRecordRequest[];
 let queries: { sql: string; params: unknown[] }[];
 let info: jest.SpiedFunction<typeof console.info>;
 let warn: jest.SpiedFunction<typeof console.warn>;
+let autoTopUpUser: UserForBalance | null;
+const enabledAutoTopUpUser: UserForBalance = {
+  id: 'oauth/synthetic',
+  total_microdollars_acquired: 5_000_000,
+  microdollars_used: 1334,
+  next_credit_expiration_at: null,
+  updated_at: '2026-04-29T01:16:12.945Z',
+  auto_top_up_enabled: true,
+};
 
 function requestLifetime(waitUntilAvailable = true) {
   const pending: Promise<unknown>[] = [];
@@ -224,6 +241,7 @@ beforeEach(() => {
   process.env.VERCEL_REGION = 'fra1';
   sent = [];
   queries = [];
+  autoTopUpUser = null;
   info = jest.spyOn(console, 'info').mockImplementation(() => {});
   warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
@@ -243,6 +261,7 @@ beforeEach(() => {
                 usage_created_at: '2026-04-29 01:16:12.945+00',
                 new_microdollars_used: 1334,
                 kilo_pass_threshold: null,
+                auto_top_up_user: autoTopUpUser,
               },
             ],
           };
@@ -319,6 +338,38 @@ describe('gateway shadow background integration', () => {
       });
     }
   );
+
+  test.each(['no_scope', 'no_wait_until'])(
+    '%s skips usage auto-top-up without reporting a post-commit failure',
+    async missing => {
+      config.USAGE_SHADOW_PUBLISH_ENABLED = false;
+      autoTopUpUser = enabledAutoTopUpUser;
+      const work = () => logMicrodollarUsage({ ...stats }, { ...context });
+      const result = await (missing === 'no_scope' ? work() : requestLifetime(false).run(work));
+      expect(result).not.toBeNull();
+      expect(autoTopUp.maybePerformAutoTopUp).not.toHaveBeenCalled();
+      expect(sentry.captureException).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith('usage auto-top-up unavailable', {
+        usageId: result?.usageId,
+        reason: 'registration_failed',
+      });
+    }
+  );
+
+  test('schedules usage auto-top-up after the response inside a request scope', async () => {
+    config.USAGE_SHADOW_PUBLISH_ENABLED = false;
+    autoTopUpUser = enabledAutoTopUpUser;
+    const lifecycle = requestLifetime();
+    expect(
+      await lifecycle.run(() => logMicrodollarUsage({ ...stats }, { ...context }))
+    ).not.toBeNull();
+    expect(autoTopUp.maybePerformAutoTopUp).not.toHaveBeenCalled();
+    lifecycle.close();
+    await lifecycle.drain();
+    expect(autoTopUp.maybePerformAutoTopUp).toHaveBeenCalledWith(enabledAutoTopUpUser);
+    expect(warn).not.toHaveBeenCalled();
+    expect(lifecycle.errors).toEqual([]);
+  });
 
   test.each(['fra1', 'sfo1'])(
     '%s sends the exact finalized event once, with one ID and complete bouncer data',

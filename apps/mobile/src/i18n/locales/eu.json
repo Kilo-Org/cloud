@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Testuinguru-leihoaren tamaina ez dago erabilgarri",
-      "pillLabel": "Testuingurua · {{value}}",
       "tapToViewDetails": "Sakatu testuinguruaren xehetasunak ikusteko.",
       "costSuffix": ", kostua {{cost}}",
       "tokensWindowUnavailable": "Testuinguruan {{used}} token, leihoaren tamaina ez dago erabilgarri",

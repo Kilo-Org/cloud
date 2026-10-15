@@ -865,11 +865,79 @@ function stubCatalog(): void {
             },
           },
           { id: 'c/d' },
+          { id: '~a/latest', alias_target: 'a/b' },
+          { id: '~a/fast-latest', alias_target: 'a/b' },
         ],
       })
     )
   );
 }
+
+describe('owner model aliases', () => {
+  it.each(['register', 'status'])(
+    'shares concrete pairs and maps %s statuses back to each requested model',
+    async action => {
+      vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+      stubCatalog();
+      const statuses = [
+        { entry: { model: 'a/b', variant: 'low' }, status: 'ready' as const, failureReason: null },
+        {
+          entry: { model: 'a/b', variant: 'high' },
+          status: 'failed' as const,
+          failureReason: 'Benchmark failed',
+        },
+      ];
+      vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses });
+      vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({ statuses });
+      const entries = [{ model: '~a/latest' }, { model: '~a/fast-latest' }, { model: 'a/b' }];
+      const response = await authedPost(`/admin/profiles/${action}`, {
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries,
+        retryEntries: [{ model: '~a/latest' }],
+      });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        statuses: statuses.flatMap(status =>
+          entries.map(entry => ({ ...status, entry: { ...status.entry, model: entry.model } }))
+        ),
+      });
+      const pairs = [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+      ];
+      if (action === 'register') {
+        expect(registerProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+          ownerType: 'user',
+          ownerId: 'u1',
+          pairs,
+          retryPairs: pairs,
+        });
+      } else {
+        expect(lookupProfileStatuses).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+          pairs,
+        });
+      }
+    }
+  );
+
+  it('assembles custom tables from the resolved pairs of alias pool entries', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+    const response = await authedPost('/admin/custom-routing-table', {
+      entries: [{ model: '~a/latest' }, { model: 'a/b' }],
+    });
+    expect(response.status).toBe(200);
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+      ]
+    );
+  });
+});
 
 describe('POST /admin/profiles/register', () => {
   it('returns 400 when benchmark config is not set', async () => {

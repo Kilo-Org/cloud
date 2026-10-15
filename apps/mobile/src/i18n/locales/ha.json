@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Ba a samun iyakar mahalli",
-      "pillLabel": "Mahallin · {{value}}",
       "tapToViewDetails": "Danna don duba cikakkun bayanan mahallin.",
       "costSuffix": ", kuɗi {{cost}}",
       "tokensWindowUnavailable": "Mahalli: guntayen rubutu {{used}}, ba a samun iyaka",

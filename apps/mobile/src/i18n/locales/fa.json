@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "اندازه پنجره زمینه در دسترس نیست",
-      "pillLabel": "زمینه · {{value}}",
       "tapToViewDetails": "برای مشاهدهٔ جزئیات زمینه، بزنید.",
       "costSuffix": "، هزینه {{cost}}",
       "tokensWindowUnavailable": "زمینه: {{used}} توکن، اندازهٔ پنجره در دسترس نیست",

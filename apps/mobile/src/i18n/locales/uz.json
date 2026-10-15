@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Kontekst oynasining hajmi noma'lum",
-      "pillLabel": "Kontekst · {{value}}",
       "tapToViewDetails": "Kontekst tafsilotlarini ko'rish uchun bosing.",
       "costSuffix": ", xarajat {{cost}}",
       "tokensWindowUnavailable": "Kontekst: {{used}} ta token, oyna hajmi noma'lum",

@@ -2667,7 +2667,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Konteksta loga lielums nav pieejams",
-      "pillLabel": "Konteksts · {{value}}",
       "tapToViewDetails": "Pieskaries, lai skatītu detalizētu informāciju par kontekstu.",
       "costSuffix": ", izmaksas {{cost}}",
       "tokensWindowUnavailable": "Kontekstā izmantotie tokeni: {{used}}, konteksta loga lielums nav pieejams",

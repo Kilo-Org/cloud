@@ -289,6 +289,8 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
     expect(document).toContain('https://client.example/callback?source=mcp&amp;mode=desktop');
     expect(document).toContain('Deny access');
     expect(document).toContain('Allow access');
+    expect(document).toContain('--primary: #ffdd00;');
+    expect(document).toContain('--primary-hover: #edcd00;');
     expect(document).not.toContain('<script>alert(1)</script>');
     expect(document).not.toContain('Codex');
     expect(document).not.toContain('These scope labels do not currently limit');

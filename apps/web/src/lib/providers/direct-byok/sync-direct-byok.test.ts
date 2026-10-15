@@ -129,11 +129,10 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: 32_000,
         input_modalities: ['text', 'image'],
         flags: ['reasoning'],
-        variants: {
-          none: { reasoning: { enabled: false, effort: 'none' } },
-          high: { reasoning: { enabled: true, effort: 'high' } },
-          max: { reasoning: { enabled: true, effort: 'max' } },
-        },
+        reasoning_options: [
+          { type: 'toggle' },
+          { type: 'effort', values: ['high', 'max', 'default', null] },
+        ],
       },
       {
         id: 'alpha',
@@ -142,10 +141,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: ['reasoning'],
-        variants: {
-          instant: { reasoning: { enabled: false, effort: 'none' } },
-          thinking: { reasoning: { enabled: true, effort: 'high' } },
-        },
+        reasoning_options: [{ type: 'toggle' }],
       },
       {
         id: 'claude-beta',
@@ -154,7 +150,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
-        variants: undefined,
+        reasoning_options: undefined,
       },
       {
         id: 'unknown-status',
@@ -163,7 +159,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
-        variants: undefined,
+        reasoning_options: undefined,
       },
     ]);
   });
@@ -186,51 +182,26 @@ describe('parseModelsDevProviderModels', () => {
       id: 'future-control',
       flags: ['reasoning'],
     });
-    expect(models[0].variants).toBeUndefined();
+    expect(models[0].reasoning_options).toBeUndefined();
   });
 
-  test('sets verbosity from effort for Anthropic-backed models', () => {
+  test('leaves reasoning options without sendable controls to the model-name fallback', () => {
     const models = parseModelsDevProviderModels(
       {
         models: {
-          qwen: {
-            id: 'qwen-test',
+          alwaysOn: { id: 'always-on', reasoning: true, reasoning_options: [] },
+          defaultOnly: {
+            id: 'default-only',
             reasoning: true,
-            reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['low', 'high'] }],
+            reasoning_options: [{ type: 'effort', values: ['default', null] }],
           },
         },
       },
-      'opencode-go'
+      'alibaba-token-plan'
     );
 
-    expect(models[0].variants).toEqual({
-      none: { reasoning: { enabled: false, effort: 'none' } },
-      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
-      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-    });
-  });
-
-  test('sets verbosity on fallback variants for Anthropic-backed models', () => {
-    const models = parseModelsDevProviderModels(
-      {
-        models: {
-          qwen: {
-            id: 'qwen-test',
-            reasoning: true,
-            reasoning_options: [{ type: 'toggle' }, { type: 'budget_tokens', max: 32_000 }],
-          },
-        },
-      },
-      'opencode-go'
-    );
-
-    expect(models[0].variants).toEqual({
-      minimal: { reasoning: { enabled: true, effort: 'minimal' } },
-      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
-      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
-      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-      xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
-    });
+    expect(models.map(model => model.reasoning_options)).toEqual([undefined, undefined]);
+    expect(models.map(model => model.flags)).toEqual([['reasoning'], ['reasoning']]);
   });
 
   test('excludes models missing from the provider model list', () => {
@@ -291,11 +262,7 @@ describe('parseModelsDevProviderModels', () => {
         id: 'nvidia/chat',
         context_length: 128000,
         flags: ['reasoning'],
-        variants: {
-          none: { reasoning: { enabled: false, effort: 'none' } },
-          high: { reasoning: { enabled: true, effort: 'high' } },
-          max: { reasoning: { enabled: true, effort: 'max' } },
-        },
+        reasoning_options: [{ type: 'effort', values: ['none', 'high', 'max'] }],
       }),
       expect.objectContaining({
         id: 'nvidia/vision',
@@ -329,11 +296,7 @@ describe('syncDirectByokModels database snapshots', () => {
       flags: ['reasoning', 'vision'],
       context_length: 16_000,
       max_completion_tokens: 16_000,
-      variants: {
-        none: { reasoning: { enabled: false, effort: 'none' } },
-        high: { reasoning: { enabled: true, effort: 'high' } },
-        max: { reasoning: { enabled: true, effort: 'max' } },
-      },
+      reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['high', 'max'] }],
     },
     {
       id: 'nvidia/defaults',
@@ -397,7 +360,7 @@ describe('syncDirectByokModels database snapshots', () => {
       .where(eq(direct_byok_model_lists.provider_id, providerId));
   }
 
-  test('persists the normalized download, defaults, and nested variants in PostgreSQL', async () => {
+  test('persists the normalized download, defaults, and reasoning options in PostgreSQL', async () => {
     const startedAt = Date.now();
     const counts = await syncDirectByokModels();
     const snapshot = await readSnapshot();

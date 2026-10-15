@@ -2703,7 +2703,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Konteksto lango dydis nežinomas",
-      "pillLabel": "Kontekstas · {{value}}",
       "tapToViewDetails": "Bakstelėkite, kad pamatytumėte konteksto informaciją.",
       "costSuffix": ", kaina {{cost}}",
       "tokensWindowUnavailable": "Konteksto žetonų: {{used}}, lango dydis nežinomas",

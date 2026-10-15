@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Kāore e wātea ana te rahi o te matapihi horopaki",
-      "pillLabel": "Horopaki · {{value}}",
       "tapToViewDetails": "Pāwhiria hei tiro i ngā taipitopito o te horopaki.",
       "costSuffix": ", utu {{cost}}",
       "tokensWindowUnavailable": "Horopaki: {{used}} tōkena, kāore e wātea ana te rahi o te matapihi",

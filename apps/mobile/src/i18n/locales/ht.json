@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Gwosè fenèt kontèks la pa disponib",
-      "pillLabel": "Kontèks · {{value}}",
       "tapToViewDetails": "Peze pou wè detay kontèks la.",
       "costSuffix": ", pri {{cost}}",
       "tokensWindowUnavailable": "Kontèks: {{used}} jeton, gwosè fenèt la pa disponib",

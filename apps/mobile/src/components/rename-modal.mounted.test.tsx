@@ -20,11 +20,6 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-// `@/components/ui/dialog` reaches `DestructiveConfirmDialog`, which reads the
-// bottom inset; the native module cannot load under this partial RN mock.
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 24, left: 0, right: 0, top: 0 }),
-}));
 // `withUiDeadline` reads its timeout copy from here; the field contract under
 // test never reaches it.
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));

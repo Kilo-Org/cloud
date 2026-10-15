@@ -2119,7 +2119,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "無法取得上下文視窗大小",
-      "pillLabel": "上下文 · {{value}}",
       "tapToViewDetails": "點一下即可檢視上下文詳細資料。",
       "costSuffix": "，費用 {{cost}}",
       "tokensWindowUnavailable": "上下文已用 {{used}} 個詞元，無法取得視窗大小",

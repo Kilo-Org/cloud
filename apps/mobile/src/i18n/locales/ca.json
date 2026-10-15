@@ -2667,7 +2667,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Mida de la finestra de context no disponible",
-      "pillLabel": "Context · {{value}}",
       "tapToViewDetails": "Toca per veure els detalls del context.",
       "costSuffix": ", amb un cost de {{cost}}",
       "tokensWindowUnavailable": "Context: {{used}} tòkens, mida de la finestra no disponible",

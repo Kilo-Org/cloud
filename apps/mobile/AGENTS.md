@@ -204,6 +204,11 @@ The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds t
 
 **A conversation can move, and the screen follows the state rather than a return value.** Switching models clones the conversation onto a new session, and the mover is not always the screen: a question typed on another model while an answer was arriving moves the chat from inside the registry. So the chat that was left points at the one it became, and `useChat` follows that.
 
+Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
+
+The header usage pill shows its percentage or token count without a visible Context prefix. Its accessibility label names the context.
+Collapsed reasoning uses the tool row's full-width shape, padding and text style, with a dashed border.
+
 A chat is opened with the SDK's `time` tool and no other. A model has no clock, so it answers a dated question from its training date, confidently and wrong. The other three tools the SDK ships stay off: the composer is already how a person is asked something, a subagent costs a second session, and a to-do list is working memory for a run a chat does not have.
 
 **Prove a chat change against the same eleven models the SDK's live runs use.** The list is in `packages/harness-sdk/e2e/setup.ts`, and `pnpm --filter @kilocode/harness-sdk test:e2e:time full` is the sweep across all of them. Take one of those models through the app itself on the simulator as well: the sweep proves what the models do, the simulator proves this app's wiring, and neither proves the other. Both cost real money, so run the sweep when the tool set or the system prompt changes, not for a change to a screen.

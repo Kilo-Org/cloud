@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Կոնտեքստի պատուհանի չափը հասանելի չէ",
-      "pillLabel": "Համատեքստ · {{value}}",
       "tapToViewDetails": "Հպեք՝ կոնտեքստի մանրամասները տեսնելու համար։",
       "costSuffix": ", արժեքը {{cost}}",
       "tokensWindowUnavailable": "Կոնտեքստ՝ {{used}} տոկեն, պատուհանի չափն անհասանելի է",

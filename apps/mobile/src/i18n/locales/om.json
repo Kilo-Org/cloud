@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Hammi daangaa odeeffannoo haalaa hin argamu",
-      "pillLabel": "Kontekstiin · {{value}}",
       "tapToViewDetails": "Ibsa odeeffannoo haalaa ilaaluuf tuqi.",
       "costSuffix": ", baasii {{cost}}",
       "tokensWindowUnavailable": "Odeeffannoo haalaa tookanoota {{used}}, daangaan hin argamu",

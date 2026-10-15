@@ -2631,7 +2631,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Ìwọ̀n ààlà àyíká ìjíròrò kò sí",
-      "pillLabel": "Àyíká · {{value}}",
       "tapToViewDetails": "Tẹ̀ ẹ́ láti wo àlàyé àyíká ìjíròrò.",
       "costSuffix": ", iye owó {{cost}}",
       "tokensWindowUnavailable": "Àyíká ìjíròrò: ìpín ọ̀rọ̀ {{used}}, ààlà kò sí",

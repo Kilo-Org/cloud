@@ -2159,7 +2159,6 @@
     },
     "contextUsage": {
       "windowUnavailable": "Розмір контекстного вікна невідомий",
-      "pillLabel": "Контекст · {{value}}",
       "tapToViewDetails": "Торкніться, щоб переглянути відомості про контекст.",
       "costSuffix": ", вартість {{cost}}",
       "tokensWindowUnavailable": "Токенів у контексті: {{used}}, розмір вікна невідомий",

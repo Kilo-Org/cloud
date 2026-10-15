@@ -22,6 +22,7 @@ import {
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { formatCents, formatPaymentMethodDescription } from '@/lib/utils';
 import { OrganizationAutoTopUpConfigureDialog } from './OrganizationAutoTopUpConfigureDialog';
+import { CreditExpiryNotice } from '@/components/payment/CreditExpiryNotice';
 
 type Props = {
   organizationId: string;
@@ -131,9 +132,11 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
     return (
       <div className="mt-1 space-y-4">
         <p className="text-muted-foreground text-sm">
-          Automatically top up your organization balance when it drops below $
-          {ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS}.
+          Automatically top up when usage or a requested service brings your organization balance
+          below ${ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS}. Viewing the balance or credit expiration does
+          not trigger a payment.
         </p>
+        <CreditExpiryNotice />
         <Button
           variant="primary"
           onClick={() => setConfigureModalOpen(true)}
@@ -182,11 +185,13 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
       </div>
       <p className="text-muted-foreground text-sm">
         You can disable automatic top ups at any time. If a payment fails, automatic top up will be
-        disabled to prevent repeated charges.
+        disabled to prevent repeated charges. Viewing the balance or credit expiration does not
+        trigger a payment.
         {paymentMethodInfo && paymentMethodInfo.type && (
           <> Top ups use your {formatPaymentMethodDescription(paymentMethodInfo)}.</>
         )}
       </p>
+      <CreditExpiryNotice />
       {paymentMethodInfo && paymentMethodInfo.type && (
         <div className="text-muted-foreground flex items-center gap-3 text-sm">
           <Button

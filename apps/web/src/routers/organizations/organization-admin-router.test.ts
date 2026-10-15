@@ -342,6 +342,26 @@ describe('organization admin router', () => {
         .where(eq(credit_transactions.organization_id, testOrganization.id));
     });
 
+    it('marks explicitly paid grants as principal and ignores promotional expiry overrides', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 10,
+        creditKind: 'paid',
+        expiry_date: '2030-01-01T00:00:00.000Z',
+        expiry_hours: 1,
+      });
+      const credit = await db.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.organization_id, testOrganization.id),
+      });
+      expect(credit).toMatchObject({
+        is_free: false,
+        credit_source: 'admin',
+        paid_credit_policy: 'legacy',
+        expiry_date: null,
+      });
+    });
+
     it('should successfully grant positive credits', async () => {
       const caller = await createCallerForUser(adminUser.id);
       const amount = 10;
@@ -529,14 +549,14 @@ describe('organization admin router', () => {
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 5,
-        expiry_date: '2024-02-01T00:00:00.000Z',
+        expiry_date: '2030-02-01T00:00:00.000Z',
       });
 
       // Second grant with later expiry
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 5,
-        expiry_date: '2024-06-01T00:00:00.000Z',
+        expiry_date: '2030-06-01T00:00:00.000Z',
       });
 
       const [updatedOrg] = await db
@@ -546,7 +566,7 @@ describe('organization admin router', () => {
 
       // Should still be the earlier date
       expect(new Date(updatedOrg.next_credit_expiration_at!).toISOString()).toBe(
-        '2024-02-01T00:00:00.000Z'
+        '2030-02-01T00:00:00.000Z'
       );
     });
 
@@ -833,7 +853,7 @@ describe('organization admin router', () => {
       expect(creditBlocks.totalBalance_mUsd).toBe(40_000_000);
     });
 
-    it('closes out multiple still-open grants on nullification', async () => {
+    it('retires multiple still-open grants on nullification', async () => {
       const caller = await createCallerForUser(adminUser.id);
 
       await caller.organizations.admin.grantCredit({
@@ -852,7 +872,15 @@ describe('organization admin router', () => {
       });
 
       const expiring = await fetchExpiringTransactionsForOrganization(testOrganization.id);
-      expect(expiring).toHaveLength(0);
+      expect(
+        expiring.every(
+          lot =>
+            lot.amount_microdollars -
+              (lot.retired_microdollars ?? 0) -
+              (lot.consumed_microdollars ?? 0) ===
+            0
+        )
+      ).toBe(true);
 
       const creditBlocks = await caller.organizations.getCreditBlocks({
         organizationId: testOrganization.id,

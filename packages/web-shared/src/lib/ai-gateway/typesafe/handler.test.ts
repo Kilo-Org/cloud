@@ -630,7 +630,7 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(creditsBlockedResponse).mockResolvedValue(blockedResponse);
 
     expect(await handleSystemOneRequest(makeRequest())).toBe(blockedResponse);
-    expect(getBalanceAndOrgSettings).toHaveBeenCalledWith('org-123', user);
+    expect(getBalanceAndOrgSettings).toHaveBeenCalledWith('org-123', user, undefined, 'usage');
     expect(creditsBlockedResponse).toHaveBeenCalledWith({
       user,
       balance,

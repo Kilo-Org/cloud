@@ -2,6 +2,7 @@ import { eq, desc, and, isNull, gt, notExists, or, notLike } from 'drizzle-orm';
 import { db, readDb, sql } from './drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import { credit_transactions, kilo_pass_issuance_items, kilocode_users } from '@kilocode/db/schema';
+import { isPaidCreditReportingSql, paidCreditPrincipalSql } from './paidCreditReporting';
 
 export type CreditSummary = {
   total_promotional_musd: number;
@@ -15,8 +16,8 @@ export async function getCreditTransactionsSummaryByUserId(
   const { rows } = await db.execute(
     sql`
     select
-      coalesce(sum(amount_microdollars) filter (where is_free),0) :: bigint  total_promotional_musd,
-      coalesce(sum(amount_microdollars) filter (where not is_free),0) :: bigint  total_purchased_musd,
+      coalesce(sum(amount_microdollars) filter (where is_free and paid_credit_policy is null),0) :: bigint total_promotional_musd,
+      coalesce(sum(${paidCreditPrincipalSql}) filter (where ${isPaidCreditReportingSql}),0) :: bigint total_purchased_musd,
       count(*) as credit_transaction_count
     from public.credit_transactions
     where kilo_user_id = ${kiloUserId}
@@ -41,8 +42,8 @@ export async function getCreditTransactionsSummaryForOrganization(
   const { rows } = await db.execute(
     sql`
     select
-      coalesce(sum(amount_microdollars) filter (where is_free),0) :: bigint  total_promotional_musd,
-      coalesce(sum(amount_microdollars) filter (where not is_free),0) :: bigint  total_purchased_musd,
+      coalesce(sum(amount_microdollars) filter (where is_free and paid_credit_policy is null),0) :: bigint total_promotional_musd,
+      coalesce(sum(${paidCreditPrincipalSql}) filter (where ${isPaidCreditReportingSql}),0) :: bigint total_purchased_musd,
       count(*) as credit_transaction_count
     from public.credit_transactions
     where organization_id = ${organizationId}
@@ -103,6 +104,11 @@ export async function getCreditTransactionsForOrganization(organizationId: Organ
       expiration_baseline_microdollars_used:
         credit_transactions.expiration_baseline_microdollars_used,
       original_baseline_microdollars_used: credit_transactions.original_baseline_microdollars_used,
+      consumed_microdollars: credit_transactions.consumed_microdollars,
+      retired_microdollars: credit_transactions.retired_microdollars,
+      paid_credit_policy: credit_transactions.paid_credit_policy,
+      credit_source: credit_transactions.credit_source,
+      source_transaction_id: credit_transactions.source_transaction_id,
       is_free: credit_transactions.is_free,
       description: credit_transactions.description,
       original_transaction_id: credit_transactions.original_transaction_id,
@@ -179,6 +185,11 @@ export async function getCreditTransactionsForOrganizationPage(
           credit_transactions.expiration_baseline_microdollars_used,
         original_baseline_microdollars_used:
           credit_transactions.original_baseline_microdollars_used,
+        consumed_microdollars: credit_transactions.consumed_microdollars,
+        retired_microdollars: credit_transactions.retired_microdollars,
+        paid_credit_policy: credit_transactions.paid_credit_policy,
+        credit_source: credit_transactions.credit_source,
+        source_transaction_id: credit_transactions.source_transaction_id,
         is_free: credit_transactions.is_free,
         description: credit_transactions.description,
         original_transaction_id: credit_transactions.original_transaction_id,
@@ -232,6 +243,8 @@ export async function getAdminCreditTransactionsForOrganization(
       expiration_baseline_microdollars_used:
         credit_transactions.expiration_baseline_microdollars_used,
       is_free: credit_transactions.is_free,
+      paid_credit_policy: credit_transactions.paid_credit_policy,
+      credit_source: credit_transactions.credit_source,
       description: credit_transactions.description,
       stripe_payment_id: credit_transactions.stripe_payment_id,
       credit_category: credit_transactions.credit_category,

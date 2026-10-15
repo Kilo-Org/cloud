@@ -16,7 +16,7 @@ import {
 import { eq, and, isNull, gt, asc } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
-import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
+import { computeExpiration } from '@kilocode/db/credit-expiration';
 
 export type MigrationResult = Result<UserBalanceUpdates, string>;
 
@@ -134,6 +134,9 @@ async function fetchUserBalanceData(userId: string) {
       description: credit_transactions.description,
       is_free: credit_transactions.is_free,
       original_transaction_id: credit_transactions.original_transaction_id,
+      consumed_microdollars: credit_transactions.consumed_microdollars,
+      retired_microdollars: credit_transactions.retired_microdollars,
+      credit_source: credit_transactions.credit_source,
     })
     .from(credit_transactions)
     .where(
@@ -161,7 +164,12 @@ export function computeUserBalanceUpdates(
       cumulativeUsage += usageRecords[usageIdx].cost;
       usageIdx++;
     }
-    computedOriginalBaselines.set(txn.id, cumulativeUsage);
+    computedOriginalBaselines.set(
+      txn.id,
+      txn.credit_source !== null
+        ? (txn.original_baseline_microdollars_used ?? cumulativeUsage)
+        : cumulativeUsage
+    );
   }
   // finally also accumulate over usage after the last transaction
   while (usageIdx < usageRecords.length) {
@@ -175,7 +183,10 @@ export function computeUserBalanceUpdates(
     .filter(t => t.expiry_date != null)
     .map(t => ({
       ...t,
-      expiration_baseline_microdollars_used: computedOriginalBaselines.get(t.id) ?? 0,
+      expiration_baseline_microdollars_used:
+        t.credit_source !== null
+          ? t.expiration_baseline_microdollars_used
+          : (computedOriginalBaselines.get(t.id) ?? 0),
     }));
 
   // Use the latest expiration event time (max created_at of records with original_transaction_id)
@@ -207,7 +218,7 @@ export function computeUserBalanceUpdates(
     .filter(t => t.baseline !== t.db);
 
   const updatesForExpirationBaseline = creditTransactions
-    .filter(t => t.expiry_date != null)
+    .filter(t => t.expiry_date != null && t.credit_source === null)
     .map(t => ({
       id: t.id,
       baseline: computedExpirationBaselines.get(t.id) ?? 0,

@@ -1,6 +1,7 @@
 import 'server-only';
 import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 import {
   ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
@@ -50,6 +51,7 @@ export async function createOrgAutoTopUpSetupCheckoutSession(
   amountCents: number = DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS
 ): Promise<string | null> {
   const amountDollars = amountCents / 100;
+  const paidCreditTerms = getPaidCreditTerms('stripe');
   const feeDeps = createOrgAutoTopUpFeeDeps();
   const prepared = await prepareTopUpCheckoutFee({
     flow: 'organization_auto_top_up_setup',
@@ -65,6 +67,14 @@ export async function createOrgAutoTopUpSetupCheckoutSession(
     prepared,
     buildSessionParams: feeLine => ({
       mode: 'payment',
+      ...(paidCreditTerms === 'one_year' && {
+        custom_text: {
+          submit: {
+            message:
+              'Purchased credits expire one year after purchase. Existing credits keep their current terms. Promotional and bonus credits may expire sooner.',
+          },
+        },
+      }),
       customer: stripeCustomerId,
       billing_address_collection: 'required',
       line_items: [
@@ -95,7 +105,12 @@ export async function createOrgAutoTopUpSetupCheckoutSession(
       success_url: `${APP_URL}/organizations/${organizationId}/payment-details?auto_topup_setup=success`,
       cancel_url: `${APP_URL}/organizations/${organizationId}/payment-details?auto_topup_setup=cancelled`,
       metadata: mergeServiceFeeCommercialMetadata(
-        { type: 'org-auto-topup-setup', kiloUserId, organizationId },
+        {
+          type: 'org-auto-topup-setup',
+          kiloUserId,
+          organizationId,
+          paid_credit_policy: paidCreditTerms,
+        },
         prepared.commercialMetadata
       ),
       payment_intent_data: {
@@ -105,6 +120,7 @@ export async function createOrgAutoTopUpSetupCheckoutSession(
             kiloUserId,
             organizationId,
             amountCents: String(amountCents),
+            paid_credit_policy: paidCreditTerms,
           },
           prepared.commercialMetadata
         ),

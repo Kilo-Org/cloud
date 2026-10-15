@@ -3,6 +3,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 
 import type Stripe from 'stripe';
+import type { PaidCreditGrant } from '@kilocode/web-shared/lib/paidCreditPolicy';
 
 import {
   sendMissedServiceFeeAlert,
@@ -143,6 +144,7 @@ export type TopUpSettlementResult = {
   grossPaidMinor: number;
   assessment: ServiceFeeAssessmentRecord | null;
   shouldCredit: boolean;
+  paidCredit: PaidCreditGrant;
 };
 
 type FeeLineIdentity = {
@@ -567,6 +569,7 @@ export async function settleTrustedTopUpCharge(params: {
   const metadataPrincipal = parseMinor(metadata.serviceFeePrincipalMinor);
   const amountCentsPrincipal = parseMinor(metadata.amountCents);
   const grossPaidMinor = params.charge.amount;
+  const paidCredit = stripePaidCreditGrant(metadata, params.charge.created);
 
   if (assessmentKey) {
     const assessment = await params.deps.store.findByAssessmentKey(assessmentKey);
@@ -586,6 +589,7 @@ export async function settleTrustedTopUpCharge(params: {
       const principalMinor = metadataPrincipal ?? amountCentsPrincipal;
       return {
         principalMinor: principalMinor ?? 0,
+        paidCredit,
         chargedFeeMinor: 0,
         grossPaidMinor,
         assessment: null,
@@ -618,6 +622,7 @@ export async function settleTrustedTopUpCharge(params: {
 
     return {
       principalMinor,
+      paidCredit,
       chargedFeeMinor: settled.chargedFeeMinor,
       grossPaidMinor: settled.grossPaidMinor,
       assessment: settled,
@@ -640,6 +645,7 @@ export async function settleTrustedTopUpCharge(params: {
   if (isLegacyPreActivation) {
     return {
       principalMinor: params.charge.amount,
+      paidCredit,
       chargedFeeMinor: 0,
       grossPaidMinor,
       assessment: null,
@@ -665,6 +671,7 @@ export async function settleTrustedTopUpCharge(params: {
     }
     return {
       principalMinor: trustedPrincipal,
+      paidCredit,
       chargedFeeMinor: 0,
       grossPaidMinor,
       assessment: null,
@@ -687,6 +694,7 @@ export async function settleTrustedTopUpCharge(params: {
 
   return {
     principalMinor: 0,
+    paidCredit,
     chargedFeeMinor: 0,
     grossPaidMinor,
     assessment: null,
@@ -716,6 +724,13 @@ export async function settleTrustedAutoTopUpInvoice(params: {
     unixToDate(params.invoice.status_transitions?.paid_at) ??
     unixToDate(params.invoice.created) ??
     now;
+  const paidCredit = stripePaidCreditGrant(
+    metadata,
+    (
+      unixToDate(params.invoice.status_transitions?.paid_at) ??
+      new Date(params.invoice.created * 1000)
+    ).getTime() / 1000
+  );
 
   if (assessmentKey) {
     const assessment = await params.deps.store.findByAssessmentKey(assessmentKey);
@@ -736,6 +751,7 @@ export async function settleTrustedAutoTopUpInvoice(params: {
       });
       return {
         principalMinor,
+        paidCredit,
         chargedFeeMinor: settled.chargedFeeMinor,
         grossPaidMinor: settled.grossPaidMinor,
         assessment: settled,
@@ -748,6 +764,7 @@ export async function settleTrustedAutoTopUpInvoice(params: {
   if (invoiceCreated < SERVICE_FEE_ACTIVATION_UNIX_SECONDS) {
     return {
       principalMinor: params.invoice.amount_paid,
+      paidCredit,
       chargedFeeMinor: 0,
       grossPaidMinor,
       assessment: null,
@@ -770,6 +787,7 @@ export async function settleTrustedAutoTopUpInvoice(params: {
     });
     return {
       principalMinor: metadataPrincipal,
+      paidCredit,
       chargedFeeMinor: 0,
       grossPaidMinor,
       assessment: null,
@@ -792,10 +810,23 @@ export async function settleTrustedAutoTopUpInvoice(params: {
 
   return {
     principalMinor: 0,
+    paidCredit,
     chargedFeeMinor: 0,
     grossPaidMinor,
     assessment: null,
     shouldCredit: false,
+  };
+}
+
+function stripePaidCreditGrant(
+  metadata: Stripe.Metadata,
+  purchasedAtUnix: number
+): PaidCreditGrant {
+  const terms = metadata.paid_credit_policy;
+  return {
+    source: 'stripe',
+    purchasedAt: new Date(purchasedAtUnix * 1000),
+    terms: terms === 'one_year' ? 'one_year' : 'legacy',
   };
 }
 

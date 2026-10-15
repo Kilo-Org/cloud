@@ -219,7 +219,6 @@
     "hideBalance": "Nascondi saldo",
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",
-    "bonusCreditsExpiring": "{{amount}} di crediti bonus scadono il {{date}}.",
     "signOutTitle": "Uscire?",
     "signOutMessage": "Per tornare al tuo spazio di lavoro, dovrai effettuare di nuovo l'accesso.",
     "deleteAccountTitle": "Eliminare l'account?",
@@ -3014,7 +3013,7 @@
     "creditActivity": {
       "emptyDescription": "Qui vedrai gli acquisti, i consumi e le rettifiche dei crediti dell'organizzazione man mano che avvengono.",
       "emptyTitle": "Nessun movimento dei crediti",
-      "expires": "Scade il {{date}}",
+      "expiresUtc": "Scade il {{date}} (UTC)",
       "title": "Movimenti dei crediti",
       "transactionFallback": "Movimento dei crediti",
       "category": {
@@ -3747,6 +3746,10 @@
   "credits": {
     "title": "Acquista crediti",
     "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",
+    "nextExpiry": "{{amount}} di crediti scadono il {{date}} (UTC). I crediti con la scadenza più vicina vengono usati per primi.",
+    "appStoreExpiry": "I crediti acquistati tramite l'App Store non scadono.",
+    "playOneYearExpiry": "Questi crediti scadono un anno solare dopo l'acquisto.",
+    "playNonexpiring": "Questi crediti non scadono.",
     "packLabel": "Aggiungi {{amount}} in crediti",
     "priceUnavailable": "Prezzo non disponibile",
     "purchased": "I crediti sono stati aggiunti al tuo saldo.",

@@ -14,7 +14,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
-import { type StoreCreditProduct } from '@/lib/credits/store-products';
+import {
+  getStoreCreditExpiryMessageKey,
+  type StoreCreditProduct,
+} from '@/lib/credits/store-products';
 import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
@@ -24,6 +27,7 @@ import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { useCreditNativeIap } from './credit-native-iap-owner';
+import { CreditExpiryNote } from './credit-expiry-note';
 
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
@@ -67,6 +71,7 @@ export function CreditPurchaseScreen() {
     placeholderData: keepPreviousData,
   });
   const refetchBalance = balanceQuery.refetch;
+  const creditBlocksQuery = useQuery(trpc.user.getCreditBlocks.queryOptions({}));
 
   const [privacyPolicyLink, termsOfUseLink] = getStoreLegalLinks(WEB_BASE_URL);
 
@@ -140,6 +145,9 @@ export function CreditPurchaseScreen() {
               {t('profile.credits')}
             </Text>
             {renderBalanceValue()}
+            {!balancePending && !balanceFailed && (
+              <CreditExpiryNote creditBlocks={creditBlocksQuery.data?.creditBlocks ?? []} />
+            )}
           </View>
 
           {/* The purchase error is rendered inline (the store sheet has just
@@ -181,15 +189,12 @@ export function CreditPurchaseScreen() {
 
           {isLoading &&
             Array.from({ length: PACK_SKELETON_ROWS }, (_, index) => (
-              // Mirror the pack row's own shell (p-5 + one text-base line) so
-              // the placeholder and the row it swaps with are the same height.
-              // Kilo Pass's 112px placeholder is two lines tall; reusing it
-              // here would drop the legal copy ~192px when the rows arrive.
               <View key={index} className="rounded-xl border border-border bg-card p-5">
                 <View className="flex-row items-start justify-between gap-4">
                   <Skeleton className="h-6 flex-1 rounded" />
                   <Skeleton className="h-6 w-16 rounded" />
                 </View>
+                <Skeleton className="mt-2 h-8 w-full rounded" />
               </View>
             ))}
 
@@ -198,6 +203,8 @@ export function CreditPurchaseScreen() {
               const packLabel = t('credits.packLabel', {
                 amount: formatUsd(pack.backend.amountUsd, i18n.language),
               });
+              const expiryMessageKey = getStoreCreditExpiryMessageKey(pack.backend, storefront);
+              const expiryMessage = expiryMessageKey ? t(expiryMessageKey) : undefined;
               const hasStorePrice = pack.storeProductId !== null && pack.displayPrice !== null;
               const rowCompleting =
                 completingProductId !== null && completingProductId === pack.storeProductId;
@@ -211,7 +218,9 @@ export function CreditPurchaseScreen() {
               // The row is one accessible element: the explicit label replaces
               // its children, so the charge and the disabled reason must be in
               // the label itself (the canonical Kilo Pass row does the same).
-              const rowAccessibilityLabel = [packLabel, priceLabel].join(', ');
+              const rowAccessibilityLabel = [packLabel, priceLabel, expiryMessage]
+                .filter(Boolean)
+                .join(', ');
 
               return (
                 <Pressable
@@ -234,6 +243,9 @@ export function CreditPurchaseScreen() {
                       {priceLabel}
                     </Text>
                   </View>
+                  {expiryMessage && (
+                    <Text className="mt-2 text-xs text-muted-foreground">{expiryMessage}</Text>
+                  )}
                 </Pressable>
               );
             })}

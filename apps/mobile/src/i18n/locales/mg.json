@@ -219,7 +219,6 @@
     "hideBalance": "Afeno ny ambim-bola",
     "showBalance": "Aseho ny ambim-bola",
     "balanceHidden": "Voafeno ny ambim-bola",
-    "bonusCreditsExpiring": "Kireditra fanampiny {{amount}} ho lany daty amin'ny {{date}}.",
     "signOutTitle": "Hivoaka ve?",
     "signOutMessage": "Mila miditra indray ianao vao afaka mampiasa ny sehatra fiasanao.",
     "deleteAccountTitle": "Hofafana ve ny kaonty?",
@@ -2982,7 +2981,7 @@
     "creditActivity": {
       "emptyDescription": "Hiseho eto ny fividianana, ny fampiasana ary ny fanitsiana kireditra ho an'ity fikambanana ity rehefa mitranga.",
       "emptyTitle": "Tsy misy hetsika momba ny kireditra",
-      "expires": "Lany daty amin'ny {{date}}",
+      "expiresUtc": "Lany daty amin'ny {{date}} (UTC)",
       "title": "Hetsika momba ny kireditra",
       "transactionFallback": "Fifanakalozana kireditra",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
+    "nextExpiry": "Kireditra {{amount}} ho lany daty amin'ny {{date}} (UTC). Ny kireditra ho lany daty voalohany no ampiasaina aloha.",
+    "appStoreExpiry": "Tsy lany daty ny kireditra novidiana tamin'ny App Store.",
+    "playOneYearExpiry": "Lany daty herintaona ara-kalandrie aorian'ny fividianana ireo kireditra ireo.",
+    "playNonexpiring": "Tsy lany daty ireo kireditra ireo.",
     "packLabel": "Ampio kireditra {{amount}}",
     "priceUnavailable": "Tsy misy ny vidiny",
     "purchased": "Nampiana tao amin'ny balananao ny kireditra.",

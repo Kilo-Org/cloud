@@ -214,6 +214,12 @@ describe('recomputeUserBalances', () => {
     expect(adjustmentTx).toBeUndefined();
   });
 
+  const ledgerDefaults = {
+    consumed_microdollars: 0,
+    retired_microdollars: 0,
+    credit_source: null,
+  };
+
   test('should skip baseline updates when values already match', () => {
     const usageDate = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
     const creditDate = new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString();
@@ -238,6 +244,7 @@ describe('recomputeUserBalances', () => {
           description: null,
           is_free: true,
           original_transaction_id: null,
+          ...ledgerDefaults,
         },
       ],
     });
@@ -270,6 +277,7 @@ describe('recomputeUserBalances', () => {
           description: null,
           is_free: true,
           original_transaction_id: null,
+          ...ledgerDefaults,
         },
       ],
     });
@@ -302,6 +310,7 @@ describe('recomputeUserBalances', () => {
           description: 'Purchase',
           is_free: false,
           original_transaction_id: null,
+          ...ledgerDefaults,
         },
       ],
     });
@@ -356,6 +365,7 @@ describe('recomputeUserBalances', () => {
           description: 'Grant A',
           is_free: true,
           original_transaction_id: null,
+          ...ledgerDefaults,
         },
         {
           id: 'grant-b',
@@ -367,6 +377,7 @@ describe('recomputeUserBalances', () => {
           description: 'Grant B',
           is_free: true,
           original_transaction_id: null,
+          ...ledgerDefaults,
         },
         {
           id: 'exp-a',
@@ -378,6 +389,7 @@ describe('recomputeUserBalances', () => {
           description: 'Expired: Grant A',
           is_free: true,
           original_transaction_id: 'grant-a',
+          ...ledgerDefaults,
         },
         {
           id: 'exp-b',
@@ -389,6 +401,7 @@ describe('recomputeUserBalances', () => {
           description: 'Expired: Grant B',
           is_free: true,
           original_transaction_id: 'grant-b',
+          ...ledgerDefaults,
         },
         {
           id: 'grant-c',
@@ -400,6 +413,7 @@ describe('recomputeUserBalances', () => {
           description: 'Grant C',
           is_free: true,
           original_transaction_id: null,
+          ...ledgerDefaults,
         },
         {
           id: 'grant-d',
@@ -411,6 +425,7 @@ describe('recomputeUserBalances', () => {
           description: 'Grant D',
           is_free: true,
           original_transaction_id: null,
+          ...ledgerDefaults,
         },
       ],
     });
@@ -554,6 +569,7 @@ describe('recomputeUserBalances', () => {
           description: 'Purchase',
           is_free: false,
           original_transaction_id: null,
+          ...ledgerDefaults,
         },
       ],
     });

@@ -672,6 +672,7 @@ type BaseSendCreditsTopUpEmailProps = {
   grossPaidCents: number;
   creditsCents: number;
   purchaseDate: Date;
+  creditExpiryDate?: Date | null;
   receiptUrl?: string | null;
 };
 
@@ -744,6 +745,33 @@ export function buildCreditsTopUpCreditsRowSection(params: {
   return new RawHtml(buildCreditsTopUpInfoRow('Credits', `$${formatUsd(params.creditsCents)} USD`));
 }
 
+export function buildCreditsTopUpExpirySection(creditExpiryDate: Date | null | undefined): RawHtml {
+  if (creditExpiryDate === undefined) return new RawHtml('');
+  if (creditExpiryDate === null) {
+    return new RawHtml(
+      buildCreditsTopUpInfoRow(
+        'Purchased credits',
+        'No expiration. Promotional and bonus credits may have their own deadlines.'
+      )
+    );
+  }
+  const deadline = creditExpiryDate.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  });
+  return new RawHtml(
+    buildCreditsTopUpInfoRow(
+      'Purchased credits expire',
+      `${deadline}. Promotional and bonus credits may have earlier deadlines.`
+    )
+  );
+}
+
 function formatDate(date: Date): string {
   // Dates surfaced to end-users; the server locale is stable (UTC in prod) so
   // explicit en-US formatting avoids surprise month-name changes in tests.
@@ -788,6 +816,7 @@ export async function sendCreditsTopUpEmail(
         hasServiceFee,
       }),
       purchase_date: formatDate(props.purchaseDate),
+      credit_expiry_section: buildCreditsTopUpExpirySection(props.creditExpiryDate),
       credits_url,
       receipt_section: buildCreditsTopUpReceiptSection(props.receiptUrl),
     },

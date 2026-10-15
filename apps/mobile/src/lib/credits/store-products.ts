@@ -29,6 +29,22 @@ export type StoreCreditProduct = {
   displayPrice: string | null;
 };
 
+export function getStoreCreditExpiryMessageKey(
+  product: BackendStoreCreditProduct,
+  storefront: 'app_store' | 'play'
+) {
+  if (storefront === 'app_store') {
+    return 'credits.appStoreExpiry';
+  }
+  if (product.creditExpiryPolicy === 'one_year') {
+    return 'credits.playOneYearExpiry';
+  }
+  if (product.creditExpiryPolicy === 'never') {
+    return 'credits.playNonexpiring';
+  }
+  return undefined;
+}
+
 export function joinStoreCreditProducts(params: {
   /**
    * Part of the loader contract this mirrors from the Kilo Pass join. The

@@ -219,7 +219,6 @@
     "hideBalance": "隐藏余额",
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",
-    "bonusCreditsExpiring": "{{amount}} 的奖励额度将于 {{date}} 到期。",
     "signOutTitle": "退出登录？",
     "signOutMessage": "退出后，需要重新登录才能访问工作区。",
     "deleteAccountTitle": "删除账户？",
@@ -2974,7 +2973,7 @@
     "creditActivity": {
       "emptyDescription": "此组织的充值、用量和额度调整记录将在这里显示。",
       "emptyTitle": "暂无额度变动记录",
-      "expires": "{{date}} 到期",
+      "expiresUtc": "{{date}}（UTC） 到期",
       "title": "额度明细",
       "transactionFallback": "额度交易",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
+    "nextExpiry": "{{amount}} 的额度将于 {{date}}（UTC）到期。最早到期的额度会优先使用。",
+    "appStoreExpiry": "通过 App Store 购买的额度不会过期。",
+    "playOneYearExpiry": "这些额度将在购买一个日历年后过期。",
+    "playNonexpiring": "这些额度不会过期。",
     "packLabel": "添加 {{amount}} 额度",
     "priceUnavailable": "价格不可用",
     "purchased": "额度已添加到你的余额。",

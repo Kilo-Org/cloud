@@ -219,7 +219,6 @@
     "hideBalance": "Ascunde soldul",
     "showBalance": "Afișează soldul",
     "balanceHidden": "Sold ascuns",
-    "bonusCreditsExpiring": "Creditele bonus în valoare de {{amount}} expiră la {{date}}.",
     "signOutTitle": "Te deconectezi?",
     "signOutMessage": "Va trebui să te autentifici din nou pentru a accesa spațiul tău de lucru.",
     "deleteAccountTitle": "Ștergi contul?",
@@ -3022,7 +3021,7 @@
     "creditActivity": {
       "emptyDescription": "Achizițiile, consumul și ajustările de credite ale acestei organizații vor apărea aici pe măsură ce au loc.",
       "emptyTitle": "Nicio operațiune cu credite",
-      "expires": "Expiră la {{date}}",
+      "expiresUtc": "Expiră la {{date}} (UTC)",
       "title": "Istoricul creditelor",
       "transactionFallback": "Tranzacție cu credite",
       "category": {
@@ -3747,6 +3746,10 @@
   "credits": {
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",
+    "nextExpiry": "Creditele în valoare de {{amount}} expiră la {{date}} (UTC). Creditele cu cea mai apropiată dată de expirare sunt folosite primele.",
+    "appStoreExpiry": "Creditele cumpărate prin App Store nu expiră.",
+    "playOneYearExpiry": "Aceste credite expiră la un an calendaristic după achiziție.",
+    "playNonexpiring": "Aceste credite nu expiră.",
     "packLabel": "Adaugă {{amount}} în credite",
     "priceUnavailable": "Preț indisponibil",
     "purchased": "Creditele au fost adăugate la soldul tău.",

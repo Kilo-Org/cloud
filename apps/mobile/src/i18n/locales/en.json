@@ -219,7 +219,6 @@
     "hideBalance": "Hide balance",
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
-    "bonusCreditsExpiring": "{{amount}} in bonus credits expiring {{date}}",
     "signOutTitle": "Sign out?",
     "signOutMessage": "You will need to sign in again to access your workspace.",
     "deleteAccountTitle": "Delete account?",
@@ -2995,7 +2994,7 @@
     "creditActivity": {
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",
       "emptyTitle": "No credit activity",
-      "expires": "Expires {{date}}",
+      "expiresUtc": "Expires {{date}} (UTC)",
       "title": "Credit activity",
       "transactionFallback": "Credit transaction",
       "truncated": "Older credit activity is available.",
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",
+    "nextExpiry": "{{amount}} in credits expires {{date}} (UTC). Credits with the earliest expiry are used first.",
+    "appStoreExpiry": "Credits purchased through the App Store do not expire.",
+    "playOneYearExpiry": "These credits expire one calendar year after purchase.",
+    "playNonexpiring": "These credits do not expire.",
     "packLabel": "Add {{amount}} of credits",
     "priceUnavailable": "Price unavailable",
     "purchased": "Credits added to your balance.",

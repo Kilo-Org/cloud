@@ -92,7 +92,7 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
         fetchStoreProducts: options.fetchStoreProducts,
         loadBackendProducts: async () => {
           const backendResponse = await queryClient.fetchQuery(
-            trpc.credits.getMobileStoreProducts.queryOptions()
+            trpc.credits.getMobileStoreProducts.queryOptions({ supportsCreditExpiry: true })
           );
           return backendResponse;
         },
@@ -134,7 +134,7 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   // the pack amounts to render. The loader reads the same query through the
   // cache, so this is a subscription, not a second fetch.
   const backendProductsQuery = useQuery({
-    ...trpc.credits.getMobileStoreProducts.queryOptions(),
+    ...trpc.credits.getMobileStoreProducts.queryOptions({ supportsCreditExpiry: true }),
     enabled: userId != null,
   });
 

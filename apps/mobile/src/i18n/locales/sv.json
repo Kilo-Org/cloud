@@ -219,7 +219,6 @@
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
-    "bonusCreditsExpiring": "{{amount}} i bonuskrediter går ut {{date}}.",
     "signOutTitle": "Logga ut?",
     "signOutMessage": "Du måste logga in igen för att komma åt din arbetsyta.",
     "deleteAccountTitle": "Ta bort konto?",
@@ -2982,7 +2981,7 @@
     "creditActivity": {
       "emptyDescription": "Här visas organisationens köp, användning och kreditjusteringar efter hand.",
       "emptyTitle": "Inga kredittransaktioner",
-      "expires": "Går ut {{date}}",
+      "expiresUtc": "Går ut {{date}} (UTC)",
       "title": "Kredithistorik",
       "transactionFallback": "Kredittransaktion",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Köp krediter",
     "description": "Krediter är ett engångsköp som läggs till på ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen. Butiken debiterar ditt konto och krediterna läggs till efter att butiken bekräftar betalningen.",
+    "nextExpiry": "{{amount}} i krediter går ut {{date}} (UTC). Krediter som går ut först används först.",
+    "appStoreExpiry": "Krediter som köpts via App Store går inte ut.",
+    "playOneYearExpiry": "Dessa krediter går ut ett kalenderår efter köpet.",
+    "playNonexpiring": "Dessa krediter går inte ut.",
     "packLabel": "Lägg till {{amount}} i krediter",
     "priceUnavailable": "Priset är inte tillgängligt",
     "purchased": "Krediter har lagts till på ditt saldo.",

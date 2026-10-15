@@ -219,7 +219,6 @@
     "hideBalance": "Ɓoye ragowar kuɗi",
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
-    "bonusCreditsExpiring": "Kuɗin amfani na kyauta {{amount}} za su ƙare {{date}}.",
     "signOutTitle": "Fita?",
     "signOutMessage": "Za ka buƙaci sake shiga don samun damar wurin aikinka.",
     "deleteAccountTitle": "Share asusu?",
@@ -2982,7 +2981,7 @@
     "creditActivity": {
       "emptyDescription": "Sayayya, amfani da kuɗi, da gyaran kuɗin amfani na wannan ƙungiyar za su bayyana a nan yayin da suke faruwa.",
       "emptyTitle": "Babu ma'amalar kuɗin amfani",
-      "expires": "Zai ƙare {{date}}",
+      "expiresUtc": "Zai ƙare {{date}} (UTC)",
       "title": "Ma'amalolin kuɗin amfani",
       "transactionFallback": "Ma'amalar kuɗin amfani",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
+    "nextExpiry": "Kuɗin amfani {{amount}} za su ƙare {{date}} (UTC). Ana fara amfani da kuɗin amfani da za su fi saurin ƙarewa.",
+    "appStoreExpiry": "Kuɗin amfani da aka saya ta App Store ba sa ƙarewa.",
+    "playOneYearExpiry": "Waɗannan kuɗin amfani za su ƙare shekara ɗaya ta kalanda bayan saya.",
+    "playNonexpiring": "Waɗannan kuɗin amfani ba sa ƙarewa.",
     "packLabel": "Ƙara kuɗin amfani na {{amount}}",
     "priceUnavailable": "Farashi ba ya nan",
     "purchased": "An ƙara kuɗin amfani a ma'auninka.",

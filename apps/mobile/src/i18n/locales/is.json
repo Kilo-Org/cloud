@@ -219,7 +219,6 @@
     "hideBalance": "Fela inneign",
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",
-    "bonusCreditsExpiring": "Bónusinneign að upphæð {{amount}} rennur út {{date}}.",
     "signOutTitle": "Skrá út?",
     "signOutMessage": "Þú þarft að skrá þig aftur inn til að fá aðgang að vinnusvæðinu þínu.",
     "deleteAccountTitle": "Eyða reikningi?",
@@ -2982,7 +2981,7 @@
     "creditActivity": {
       "emptyDescription": "Kaup, notkun og leiðréttingar á inneign félagsins birtast hér jafnóðum.",
       "emptyTitle": "Engar inneignarfærslur",
-      "expires": "Rennur út {{date}}",
+      "expiresUtc": "Rennur út {{date}} (UTC)",
       "title": "Inneignarfærslur",
       "transactionFallback": "Inneignarfærsla",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
+    "nextExpiry": "Inneign að upphæð {{amount}} rennur út {{date}} (UTC). Inneign sem rennur fyrst út er notuð fyrst.",
+    "appStoreExpiry": "Inneign sem keypt er í App Store rennur ekki út.",
+    "playOneYearExpiry": "Þessi inneign rennur út einu almanaksári eftir kaup.",
+    "playNonexpiring": "Þessi inneign rennur ekki út.",
     "packLabel": "Bæta við {{amount}} í inneign",
     "priceUnavailable": "Verð ekki tiltækt",
     "purchased": "Inneign hefur verið bætt við stöðuna þína.",

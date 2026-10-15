@@ -219,7 +219,6 @@
     "hideBalance": "Qari hadhaaga",
     "showBalance": "Muuji hadhaaga",
     "balanceHidden": "Hadhaaga waa la qariyay",
-    "bonusCreditsExpiring": "Lacag gunno ah oo dhan {{amount}} ayaa dhacaysa {{date}}.",
     "signOutTitle": "Ma ka baxaysaa?",
     "signOutMessage": "Si aad goobtaada shaqada u isticmaasho, waa inaad mar kale soo gashaa.",
     "deleteAccountTitle": "Ma tirtiraysaa akoonka?",
@@ -2982,7 +2981,7 @@
     "creditActivity": {
       "emptyDescription": "Iibsiyada, isticmaalka iyo wax ka beddelka lacagta isticmaalka ee ururkan ayaa halkan ka soo muuqan doona marka ay dhacaan.",
       "emptyTitle": "Wax dhaqdhaqaaq ah kuma jiro lacagta isticmaalka",
-      "expires": "Waxay dhacaysaa {{date}}",
+      "expiresUtc": "Waxay dhacaysaa {{date}} (UTC)",
       "title": "Dhaqdhaqaaqa lacagta isticmaalka",
       "transactionFallback": "Macaamilka lacagta isticmaalka",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Iibso lacag adeeg",
     "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",
+    "nextExpiry": "Lacag adeeg ah oo dhan {{amount}} ayaa dhacaysa {{date}} (UTC). Lacagta adeegga ee ugu horreysa ee dhacaysa ayaa marka hore la isticmaalaa.",
+    "appStoreExpiry": "Lacagta adeegga ee laga iibsaday App Store ma dhacdo.",
+    "playOneYearExpiry": "Lacagtan adeeggu waxay dhacaysaa hal sano oo kalandar ah kadib iibsashada.",
+    "playNonexpiring": "Lacagtan adeeggu ma dhacdo.",
     "packLabel": "Ku dar {{amount}} oo lacag adeeg ah",
     "priceUnavailable": "Qiimaha lama heli karo",
     "purchased": "Lacag adeeg ayaa lagu daray dheelitirkaaga.",

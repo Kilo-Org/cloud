@@ -11,6 +11,7 @@ import {
   subjects,
   creditsVars,
   buildCreditsTopUpCreditsRowSection,
+  buildCreditsTopUpExpirySection,
   buildCreditsTopUpReceiptSection,
   buildCreditsTopUpServiceFeeSection,
   RawHtml,
@@ -233,6 +234,9 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
           hasServiceFee: false,
         }),
         purchase_date: formatDate(new Date()),
+        credit_expiry_section: buildCreditsTopUpExpirySection(
+          new Date(Date.now() + 365 * 86_400_000)
+        ),
         credits_url: `${NEXTAUTH_URL}/credits`,
         receipt_section: buildCreditsTopUpReceiptSection('https://pay.stripe.com/receipts/test'),
       };

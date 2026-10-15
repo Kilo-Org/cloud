@@ -1,4 +1,5 @@
 import 'server-only';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 
 import { randomUUID } from 'node:crypto';
 import type Stripe from 'stripe';
@@ -1214,6 +1215,7 @@ export async function createOrganizationKiloPassCheckout(input: {
         kiloUserId: input.actorUserId,
         tier: input.tier,
         cadence,
+        paid_credit_policy: getPaidCreditTerms('pass'),
       },
       expand: ['latest_invoice.confirmation_secret', 'latest_invoice.lines'],
     });
@@ -1467,6 +1469,15 @@ export async function handleOrganizationKiloPassInvoicePaid(params: {
     firstWindow,
     isBridge,
     paidBridgeInterval: isBridge ? paidPeriod : undefined,
+    paidCreditTerms:
+      agreement.state === KiloPassOrgAgreementState.PendingPayment
+        ? params.invoice.parent?.subscription_details?.metadata?.paid_credit_policy === 'one_year'
+          ? 'one_year'
+          : 'legacy'
+        : getPaidCreditTerms(
+            'pass',
+            new Date(Math.min(params.invoice.created, paidPeriod.start.getTime() / 1000) * 1000)
+          ),
   });
   if (
     agreement.state === KiloPassOrgAgreementState.Active &&
@@ -1480,7 +1491,9 @@ export async function handleOrganizationKiloPassInvoicePaid(params: {
       window: firstWindow,
       paidSeatCount: seats,
       providerInvoiceLineId: line.id,
-      now: new Date(),
+      now: new Date(
+        (params.invoice.status_transitions?.paid_at ?? paidPeriod.start.getTime() / 1000) * 1000
+      ),
     });
   }
   return true;

@@ -317,6 +317,8 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
 - `dispatch-bouncer-credit-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-credit-event-outbox`) that drains the Bouncer credit-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
 - `dispatch-bouncer-usage-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-usage-event-outbox`) that retries the Bouncer usage-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
+- `expire-credits` - Vercel cron path (`/api/cron/expire-credits`) that expires due personal and organization credit grants every 5 minutes; reuses `CRON_SECRET` for auth. It never triggers auto-top-up. [SERVER]
+- `PAID_CREDIT_EXPIRATION_EFFECTIVE_AT` - ISO-8601 instant when new paid credits start receiving a one-calendar-year expiry. Unset or invalid keeps every new purchase non-expiring. Terms are captured at checkout or term start, so pending purchases and annual terms paid earlier keep legacy terms. Apple in-app purchases never expire. Create the `_1year_v2` Google Play credit products before setting it. [SERVER]
 - `WORKOS_API_KEY` - WorkOS API key for enterprise SSO. `[SECRET]`
 - `WORKOS_CLIENT_ID` - WorkOS client ID for enterprise SSO. [PUBLIC]
 

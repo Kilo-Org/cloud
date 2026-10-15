@@ -2,6 +2,7 @@ import { and, asc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } f
 import { addMonths, format } from 'date-fns';
 
 import type { WorkerDb } from '@kilocode/db';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
 import {
   countUnresolvedTerminalRenewalFailures,
   findLatestPreCutoffUserCommitSwitchQualification,
@@ -1848,6 +1849,7 @@ async function processCreditRenewalRow(
     await tx.execute(
       sql`SELECT ${kilocode_users.id} FROM ${kilocode_users} WHERE ${kilocode_users.id} = ${row.user_id} FOR UPDATE`
     );
+    await reconcileCreditExpirationsInTransaction({ type: 'user', id: row.user_id }, tx);
 
     const current = await fetchLockedCreditRenewalItemRow(tx, row.id, renewalAt, row.user_id);
     if (!current || current.user_id !== row.user_id || isSoftDeletedUserEmail(current.email)) {

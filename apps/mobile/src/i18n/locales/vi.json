@@ -219,7 +219,6 @@
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
-    "bonusCreditsExpiring": "Khoản tiền thưởng {{amount}} sẽ hết hạn vào {{date}}.",
     "signOutTitle": "Đăng xuất?",
     "signOutMessage": "Bạn cần đăng nhập lại để truy cập không gian làm việc của mình.",
     "deleteAccountTitle": "Xóa tài khoản?",
@@ -2974,7 +2973,7 @@
     "creditActivity": {
       "emptyDescription": "Các khoản nạp tiền, chi phí sử dụng và điều chỉnh số dư của tổ chức sẽ xuất hiện tại đây khi phát sinh.",
       "emptyTitle": "Chưa có biến động số dư",
-      "expires": "Hết hạn vào {{date}}",
+      "expiresUtc": "Hết hạn vào {{date}} (UTC)",
       "title": "Biến động số dư",
       "transactionFallback": "Giao dịch số dư",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",
+    "nextExpiry": "Khoản tín dụng {{amount}} sẽ hết hạn vào {{date}} (UTC). Tín dụng hết hạn sớm nhất sẽ được dùng trước.",
+    "appStoreExpiry": "Tín dụng mua qua App Store không hết hạn.",
+    "playOneYearExpiry": "Số tín dụng này hết hạn sau một năm dương lịch kể từ ngày mua.",
+    "playNonexpiring": "Số tín dụng này không hết hạn.",
     "packLabel": "Thêm {{amount}} tín dụng",
     "priceUnavailable": "Không có giá",
     "purchased": "Đã thêm tín dụng vào số dư của bạn.",

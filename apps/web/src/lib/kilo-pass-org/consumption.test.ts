@@ -8,7 +8,7 @@ import {
   kilo_pass_org_qualifying_spend_events,
   organizations,
 } from '@kilocode/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -435,7 +435,12 @@ describe('organization Pass consumption', () => {
     const repairs = await db
       .select()
       .from(kilo_pass_org_audit_records)
-      .where(eq(kilo_pass_org_audit_records.agreement_id, snapshot.agreement_id));
+      .where(
+        and(
+          eq(kilo_pass_org_audit_records.agreement_id, snapshot.agreement_id),
+          eq(kilo_pass_org_audit_records.action, 'bonus_missed_after_expiry')
+        )
+      );
     expect(repairs).toHaveLength(1);
     const bonusCredits = await db
       .select()

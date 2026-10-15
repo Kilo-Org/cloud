@@ -289,24 +289,46 @@ describe('organization funds router', () => {
       expect(balanceOf(await getOrg(unrelatedOrg.id))).toBe(0);
     });
 
-    it('rejects while the parent has expiring credits', async () => {
+    it('distributes expiring lots without changing deadlines or paid cohorts', async () => {
       const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      await db
-        .update(organizations)
-        .set({ next_credit_expiration_at: future })
-        .where(eq(organizations.id, parentOrg.id));
-
-      const caller = await createCallerForUser(ownerUser.id);
-
-      await expect(
-        caller.organizations.funds.distribute({
-          organizationId: parentOrg.id,
-          allocations: [{ childOrganizationId: childA.id, amountMicrodollars: 1_000_000 }],
+      await setBalance(parentOrg.id, 5_000_000, 1_000_000);
+      const [source] = await db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: ownerUser.id,
+          organization_id: parentOrg.id,
+          amount_microdollars: 5_000_000,
+          is_free: false,
+          paid_credit_policy: 'one_year',
+          credit_source: 'stripe',
+          expiry_date: future,
+          original_baseline_microdollars_used: 0,
+          expiration_baseline_microdollars_used: 0,
         })
-      ).rejects.toThrow('expiring credits');
-
-      expect(balanceOf(await getOrg(parentOrg.id))).toBe(5_000_000);
-      expect(balanceOf(await getOrg(childA.id))).toBe(0);
+        .returning();
+      const caller = await createCallerForUser(ownerUser.id);
+      await caller.organizations.funds.distribute({
+        organizationId: parentOrg.id,
+        allocations: [{ childOrganizationId: childA.id, amountMicrodollars: 2_000_000 }],
+      });
+      expect(balanceOf(await getOrg(parentOrg.id))).toBe(2_000_000);
+      expect(balanceOf(await getOrg(childA.id))).toBe(2_000_000);
+      const [incoming] = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.organization_id, childA.id),
+            eq(credit_transactions.credit_category, 'parent_to_child_transfer_in')
+          )
+        );
+      expect(new Date(incoming.expiry_date ?? '').toISOString()).toBe(future);
+      expect(incoming).toMatchObject({
+        source_transaction_id: source.id,
+        paid_credit_policy: 'one_year',
+        credit_source: 'stripe',
+        is_free: true,
+      });
     });
   });
 

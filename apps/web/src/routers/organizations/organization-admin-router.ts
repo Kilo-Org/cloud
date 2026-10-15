@@ -1,6 +1,11 @@
 import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { resolvePaidCreditPolicy } from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import { retireCreditBalance } from '@kilocode/web-shared/lib/creditAdjustments';
+import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
 import {
   organizations,
   organization_memberships,
@@ -60,7 +65,6 @@ import {
   fetchExpiringTransactionsForOrganization,
   computeNextExpirationAmount,
   processOrganizationExpirations,
-  closeOutExpiringOrganizationCredits,
 } from '@kilocode/web-shared/lib/creditExpiration';
 import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
@@ -242,6 +246,7 @@ const GrantCreditInputSchema = z
     organizationId: z.uuid(),
     amount_usd: z.number().refine(n => n !== 0, 'Amount cannot be zero'),
     description: z.string().optional(),
+    creditKind: z.enum(['paid', 'promotional']).default('promotional'),
     expiry_date: z.string().datetime().nullable().optional(),
     expiry_hours: z.number().positive().nullable().optional(),
   })
@@ -758,6 +763,15 @@ export const organizationAdminRouter = createTRPCRouter({
       }
 
       const amountMicrodollars = toMicrodollars(amount_usd);
+      const issuedAt = new Date();
+      const paidPolicy =
+        input.creditKind === 'paid' && amount_usd > 0
+          ? resolvePaidCreditPolicy({
+              source: 'admin',
+              purchasedAt: issuedAt,
+              terms: getPaidCreditTerms('admin', issuedAt),
+            })
+          : null;
 
       const explicit_expiry_date = input.expiry_date ? new Date(input.expiry_date) : null;
       const expiryFromHours = input.expiry_hours
@@ -765,34 +779,59 @@ export const organizationAdminRouter = createTRPCRouter({
         : null;
       // Negative grants must not expire (expiring a negative would mint credits)
       const credit_expiry_date =
-        amount_usd < 0
+        amount_usd < 0 || paidPolicy
           ? null
           : explicit_expiry_date && expiryFromHours
             ? explicit_expiry_date < expiryFromHours
               ? explicit_expiry_date
               : expiryFromHours
             : (explicit_expiry_date ?? expiryFromHours);
+      const expiresAt = paidPolicy?.expiry_date ?? credit_expiry_date?.toISOString() ?? null;
 
       await db.transaction(async tx => {
-        const [org] = await tx
-          .select({ microdollars_used: organizations.microdollars_used })
-          .from(organizations)
-          .where(eq(organizations.id, organizationId))
-          .for('update');
+        if (amountMicrodollars < 0) {
+          await retireCreditBalance(tx, {
+            owner: { type: 'organization', id: organizationId },
+            actorId: user.id,
+            creditCategory: `organization_custom:${crypto.randomUUID()}`,
+            description: description?.trim() || 'Admin credit debit',
+            amountMicrodollars: -amountMicrodollars,
+            now: issuedAt,
+          });
+          return;
+        }
+        const org = await reconcileCreditExpirationsInTransaction(
+          { type: 'organization', id: organizationId },
+          tx,
+          issuedAt
+        );
 
-        await tx.insert(credit_transactions).values({
-          kilo_user_id: user.id,
-          created_by_kilo_user_id: user.id,
-          is_free: true,
-          amount_microdollars: amountMicrodollars,
-          description: description?.trim() || 'Admin credit grant',
-          credit_category: 'organization_custom',
-          expiry_date: credit_expiry_date?.toISOString() ?? null,
-          organization_id: organizationId,
-          original_baseline_microdollars_used: org?.microdollars_used ?? 0,
-          expiration_baseline_microdollars_used: credit_expiry_date
-            ? (org?.microdollars_used ?? 0)
-            : null,
+        const [grant] = await tx
+          .insert(credit_transactions)
+          .values({
+            kilo_user_id: user.id,
+            created_by_kilo_user_id: user.id,
+            is_free: input.creditKind !== 'paid',
+            amount_microdollars: amountMicrodollars,
+            description: description?.trim() || 'Admin credit grant',
+            credit_category: 'organization_custom',
+            ...(paidPolicy ?? {}),
+            expiry_date: expiresAt,
+            organization_id: organizationId,
+            original_baseline_microdollars_used: org.microdollars_used,
+            expiration_baseline_microdollars_used: Math.min(
+              org.microdollars_used,
+              org.total_microdollars_acquired
+            ),
+          })
+          .returning({ id: credit_transactions.id });
+        if (!grant) throw new Error('Organization grant insertion failed');
+        await recordRefundDebtRepayment(tx, {
+          owner: { type: 'organization', id: organizationId },
+          transactionId: grant.id,
+          priorAcquired: org.total_microdollars_acquired,
+          priorUsed: org.microdollars_used,
+          amountMicrodollars,
         });
 
         await tx
@@ -800,8 +839,8 @@ export const organizationAdminRouter = createTRPCRouter({
           .set({
             total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${amountMicrodollars}`,
             microdollars_balance: sql`${organizations.microdollars_balance} + ${amountMicrodollars}`,
-            ...(credit_expiry_date && {
-              next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
+            ...(expiresAt && {
+              next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${expiresAt}), ${expiresAt})`,
             }),
           })
           .where(eq(organizations.id, organizationId));
@@ -838,52 +877,22 @@ export const organizationAdminRouter = createTRPCRouter({
           });
         }
 
-        const currentBalance = lockedOrg.total_microdollars_acquired - lockedOrg.microdollars_used;
-
-        if (currentBalance <= 0) {
+        const retired = await retireCreditBalance(tx, {
+          owner: { type: 'organization', id: organizationId },
+          actorId: user.id,
+          creditCategory: 'organization_custom',
+          description: description?.trim() || 'Admin credit nullification',
+        });
+        if (retired <= 0) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Organization has no credits to nullify',
           });
         }
 
-        // Close out any still-open expiring grants first, so their expiry claim
-        // can never be counted again (e.g. by the Balance page's "credits
-        // expiring soon" total) once this organization's credits are re-granted
-        // later with a different expiration date.
-        const closedOutExpiring = await closeOutExpiringOrganizationCredits(
-          organizationId,
-          lockedOrg.microdollars_used,
-          tx
-        );
-        const remainingToOffset = Math.max(0, currentBalance + closedOutExpiring);
-
-        if (remainingToOffset > 0) {
-          await tx.insert(credit_transactions).values({
-            kilo_user_id: user.id,
-            created_by_kilo_user_id: user.id,
-            is_free: true,
-            amount_microdollars: -remainingToOffset,
-            description: description?.trim() || 'Admin credit nullification',
-            credit_category: 'organization_custom',
-            expiry_date: null,
-            organization_id: organizationId,
-            original_baseline_microdollars_used: lockedOrg.microdollars_used,
-          });
-        }
-
-        await tx
-          .update(organizations)
-          .set({
-            total_microdollars_acquired: sql`${organizations.microdollars_used}`,
-            microdollars_balance: 0,
-            next_credit_expiration_at: null,
-          })
-          .where(eq(organizations.id, organizationId));
-
         return {
           orgName: lockedOrg.name,
-          amountUsdNullified: currentBalance / 1_000_000,
+          amountUsdNullified: retired / 1_000_000,
         };
       });
 

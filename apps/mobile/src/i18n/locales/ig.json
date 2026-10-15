@@ -219,7 +219,6 @@
     "hideBalance": "Zoo ego fọdụrụ",
     "showBalance": "Gosi ego fọdụrụ",
     "balanceHidden": "Ezoro ego fọdụrụ",
-    "bonusCreditsExpiring": "Ego ojiji mgbakwunye {{amount}} ga-agwụ na {{date}}.",
     "signOutTitle": "Pụọ?",
     "signOutMessage": "Ị ga-abanyerịrị ọzọ iji nweta ebe ọrụ gị.",
     "deleteAccountTitle": "Hichapụ akaụntụ?",
@@ -2982,7 +2981,7 @@
     "creditActivity": {
       "emptyDescription": "Ịzụta ego ojiji, iji ya eme ihe, na mgbanwe e mere na ya maka ụlọ ọrụ a ga-apụta ebe a.",
       "emptyTitle": "Enweghị ihe mere na ego ojiji",
-      "expires": "Oge ya ga-agwụ na {{date}}",
+      "expiresUtc": "Oge ya ga-agwụ na {{date}} (UTC)",
       "title": "Ndekọ ego ojiji",
       "transactionFallback": "Azụmahịa ego ojiji",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
+    "nextExpiry": "Ego ojiji ruru {{amount}} ga-agwụ na {{date}} (UTC). A na-ebu ụzọ jiri ego ojiji nke ga-akacha agwụ ngwa ngwa.",
+    "appStoreExpiry": "Ego ojiji e ji App Store zụta anaghị agwụ.",
+    "playOneYearExpiry": "Ego ojiji ndị a ga-agwụ otu afọ kalenda mgbe ịzụrụ ha.",
+    "playNonexpiring": "Ego ojiji ndị a anaghị agwụ.",
     "packLabel": "Tinye ego ojiji ruru {{amount}}",
     "priceUnavailable": "Ọnụ ahịa adịghị",
     "purchased": "E tinyela ego ojiji na nguzozi gị.",

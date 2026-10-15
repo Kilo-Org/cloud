@@ -30,17 +30,20 @@ import {
   type AutoTopUpAmountCents,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { formatCents, formatPaymentMethodDescription } from '@/lib/utils';
+import { CreditExpiryNotice, usePaidCreditPolicyReady } from './CreditExpiryNotice';
 
 export function AutoTopUpToggle() {
+  const policyReady = usePaidCreditPolicyReady();
   const [configureModalOpen, setConfigureModalOpen] = useState(false);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { data: autoTopUpInfo } = useQuery({
+  const { data: autoTopUpInfo, isSuccess: autoTopUpConfigReady } = useQuery({
     ...trpc.user.getAutoTopUpPaymentMethod.queryOptions(),
   });
   const enabled = autoTopUpInfo?.enabled ?? false;
   const currentAmount = autoTopUpInfo?.amountCents ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
   const paymentMethodInfo = autoTopUpInfo?.paymentMethod;
+  const canEnableAutoTopUp = policyReady || (autoTopUpConfigReady && !paymentMethodInfo);
   const [selectedAmount, setSelectedAmount] = useState<AutoTopUpAmountCents>(currentAmount);
 
   // Sync selectedAmount when modal opens (to pick up server value)
@@ -119,6 +122,7 @@ export function AutoTopUpToggle() {
   };
 
   const handleEnableAutoTopUp = () => {
+    if (!canEnableAutoTopUp) return;
     setConfigureModalOpen(false);
     toggleMutation.mutate({ currentEnabled: false, amountCents: selectedAmount });
   };
@@ -147,7 +151,9 @@ export function AutoTopUpToggle() {
     return (
       <div className="mt-1 space-y-4">
         <p className="text-muted-foreground text-sm">
-          Automatically add credits when your balance falls below ${AUTO_TOP_UP_THRESHOLD_DOLLARS}.
+          Automatically add credits when usage or a requested service brings your balance below $
+          {AUTO_TOP_UP_THRESHOLD_DOLLARS}. Viewing your balance or credit expiration does not
+          trigger a payment.
         </p>
 
         <Dialog open={configureModalOpen} onOpenChange={handleOpenChange}>
@@ -176,8 +182,9 @@ export function AutoTopUpToggle() {
                       </li>
                     )}
                     <li>
-                      When your balance falls below ${AUTO_TOP_UP_THRESHOLD_DOLLARS}, we&apos;ll
-                      automatically charge your payment method.
+                      When usage or a requested service brings your balance below $
+                      {AUTO_TOP_UP_THRESHOLD_DOLLARS}, we&apos;ll automatically charge your payment
+                      method. Viewing your balance or credit expiration does not trigger a payment.
                     </li>
                     <li>
                       If a payment ever fails, we'll email you and pause auto top ups to prevent
@@ -188,6 +195,7 @@ export function AutoTopUpToggle() {
                 </div>
               </DialogDescription>
             </DialogHeader>
+            <CreditExpiryNotice />
 
             <div className="flex items-center gap-3 py-2">
               <Label htmlFor="topup-amount">Top up amount:</Label>
@@ -223,7 +231,7 @@ export function AutoTopUpToggle() {
                     </span>
                     <Button
                       onClick={handleEnableAutoTopUp}
-                      disabled={isPending}
+                      disabled={isPending || !canEnableAutoTopUp}
                       data-ph-action="enable-autotopup"
                     >
                       Enable automatic top up
@@ -254,7 +262,7 @@ export function AutoTopUpToggle() {
                   </span>
                   <Button
                     onClick={handleEnableAutoTopUp}
-                    disabled={isPending}
+                    disabled={isPending || !canEnableAutoTopUp}
                     data-ph-action="enable-autotopup"
                   >
                     Enable automatic top up
@@ -303,11 +311,13 @@ export function AutoTopUpToggle() {
       </div>
       <p className="text-muted-foreground text-sm">
         You can disable automatic top ups at any time. If a payment fails, automatic top up will be
-        disabled to prevent repeated charges.
+        disabled to prevent repeated charges. Viewing your balance or credit expiration does not
+        trigger a payment.
         {paymentMethodInfo && paymentMethodInfo.type && (
           <> Top ups use your {formatPaymentMethodDescription(paymentMethodInfo)}.</>
         )}
       </p>
+      <CreditExpiryNotice />
       {paymentMethodInfo && paymentMethodInfo.type && (
         <div className="text-muted-foreground flex items-center gap-3 text-sm">
           <Button

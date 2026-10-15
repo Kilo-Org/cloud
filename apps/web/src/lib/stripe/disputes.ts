@@ -6,7 +6,6 @@ import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   auto_top_up_configs,
   coding_plan_subscriptions,
-  credit_transactions,
   kilocode_users,
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -43,6 +42,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import { blockUser } from '@/lib/user/block';
+import { retireCreditBalance } from '@kilocode/web-shared/lib/creditAdjustments';
 
 type StripeReference = string | { id: string } | null | undefined;
 
@@ -608,28 +608,13 @@ async function resetUserCreditBalanceForAcceptedDispute(params: {
       return null;
     }
 
-    const balanceMicrodollars = user.total_microdollars_acquired - user.microdollars_used;
-    if (balanceMicrodollars <= 0) {
-      return 0;
-    }
-
-    await tx.insert(credit_transactions).values({
-      kilo_user_id: userId,
-      organization_id: null,
-      is_free: true,
-      amount_microdollars: -balanceMicrodollars,
-      credit_category: 'stripe-dispute-enforcement',
+    const retired = await retireCreditBalance(tx, {
+      owner: { type: 'user', id: userId },
+      actorId: userId,
+      creditCategory: 'stripe-dispute-enforcement',
       description: `Balance zeroed after accepting Stripe dispute ${params.caseRow.stripe_dispute_id}`,
-      original_baseline_microdollars_used: user.microdollars_used,
     });
-    await tx
-      .update(kilocode_users)
-      .set({
-        total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${balanceMicrodollars}`,
-      })
-      .where(eq(kilocode_users.id, userId));
-
-    return fromMicrodollars(balanceMicrodollars);
+    return fromMicrodollars(retired);
   });
 
   if (resetAmountUsd === null) {

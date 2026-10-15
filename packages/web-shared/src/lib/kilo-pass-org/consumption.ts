@@ -17,6 +17,7 @@ import {
   mutateOrganizationUsage,
   type OrganizationUsageMutationResult,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
 
 export type OrganizationConsumptionSource = 'ai-gateway' | 'exa';
 
@@ -211,11 +212,18 @@ export async function recordOrganizationConsumption(
     }
 
     const [organization] = await tx
-      .select({ microdollarsUsed: organizations.microdollars_used })
+      .select({
+        microdollarsUsed: organizations.microdollars_used,
+        totalMicrodollarsAcquired: organizations.total_microdollars_acquired,
+      })
       .from(organizations)
       .where(eq(organizations.id, input.organizationId))
       .for('update');
     if (!organization) throw new Error('organization disappeared during bonus unlock');
+    const baseline = Math.min(
+      organization.microdollarsUsed,
+      organization.totalMicrodollarsAcquired
+    );
     const bonusIdentity = `kpo:bonus-unlock:${updated.id}`;
     const [bonus] = await tx
       .insert(credit_transactions)
@@ -224,18 +232,26 @@ export async function recordOrganizationConsumption(
         organization_id: input.organizationId,
         amount_microdollars: updated.bonus_credit_microdollars,
         is_free: true,
+        credit_source: 'promotion',
         description: 'Kilo Pass organization earned bonus',
         credit_category: bonusIdentity,
         check_category_uniqueness: true,
         created_at: input.occurredAt,
         expiry_date: updated.window_end,
-        expiration_baseline_microdollars_used: organization.microdollarsUsed,
-        original_baseline_microdollars_used: organization.microdollarsUsed,
+        expiration_baseline_microdollars_used: baseline,
+        original_baseline_microdollars_used: baseline,
       })
       .onConflictDoNothing()
       .returning({ id: credit_transactions.id });
     if (!bonus)
       throw new Error('organization pass bonus identity already exists without a snapshot unlock');
+    await recordRefundDebtRepayment(tx, {
+      owner: { type: 'organization', id: input.organizationId },
+      transactionId: bonus.id,
+      priorAcquired: organization.totalMicrodollarsAcquired,
+      priorUsed: organization.microdollarsUsed,
+      amountMicrodollars: updated.bonus_credit_microdollars,
+    });
 
     await tx
       .update(organizations)

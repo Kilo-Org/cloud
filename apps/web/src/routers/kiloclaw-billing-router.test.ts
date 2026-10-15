@@ -28,7 +28,7 @@ import {
   user_affiliate_attributions,
   user_affiliate_events,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { sandboxIdFromUserId } from '@kilocode/worker-utils/sandbox-id';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -5194,6 +5194,36 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
       instance_id: newInstance.id,
       kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
     });
+    const [settlement] = await db
+      .select()
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, user.id),
+          eq(credit_transactions.description, 'KiloClaw standard settlement')
+        )
+      );
+    expect(settlement).toMatchObject({
+      paid_credit_policy: 'settlement',
+      credit_source: 'settlement',
+      expiry_date: null,
+      amount_microdollars: 9_000_000,
+    });
+    const [deduction] = await db
+      .select()
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, user.id),
+          eq(credit_transactions.description, 'KiloClaw standard period deduction')
+        )
+      );
+    expect(deduction).toMatchObject({
+      paid_credit_policy: 'settlement',
+      credit_source: 'settlement',
+      expiry_date: null,
+      amount_microdollars: -9_000_000,
+    });
   });
 
   it('settles zero-dollar invoice.paid without emitting revenue events', async () => {
@@ -7560,6 +7590,34 @@ describe('enrollWithCredits', () => {
       .from(credit_transactions)
       .where(eq(credit_transactions.kilo_user_id, user.id));
     expect(transactions).toHaveLength(0);
+  });
+
+  it('rejects enrollment funded only by expired principal without a prior balance read', async () => {
+    await createCreditEnrollmentAnchor(user.id);
+    await giveUserCredits(user.id, 60_000_000);
+    const expiry = new Date(Date.now() - 60_000).toISOString();
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: 60_000_000,
+      is_free: false,
+      expiry_date: expiry,
+      expiration_baseline_microdollars_used: 0,
+      original_baseline_microdollars_used: 0,
+      description: 'Expired KiloClaw enrollment funds',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ next_credit_expiration_at: expiry })
+      .where(eq(kilocode_users.id, user.id));
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
+      'Insufficient credit balance'
+    );
+    const payer = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(payer?.microdollars_used).toBe(0);
   });
 
   it('rejects current standard enrollment when balance only covers legacy pricing', async () => {

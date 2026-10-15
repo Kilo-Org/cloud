@@ -219,7 +219,6 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "Tienes {{amount}} en créditos de bonificación que caducan el {{date}}.",
     "signOutTitle": "¿Cerrar sesión?",
     "signOutMessage": "Tendrás que iniciar sesión de nuevo para acceder a tu espacio de trabajo.",
     "deleteAccountTitle": "¿Eliminar cuenta?",
@@ -3014,7 +3013,7 @@
     "creditActivity": {
       "emptyDescription": "Aquí aparecerán las compras, el consumo y los ajustes de créditos de esta organización a medida que se registren.",
       "emptyTitle": "Sin movimientos de créditos",
-      "expires": "Caduca el {{date}}",
+      "expiresUtc": "Caduca el {{date}} (UTC)",
       "title": "Movimientos de créditos",
       "transactionFallback": "Transacción de créditos",
       "category": {
@@ -3747,6 +3746,10 @@
   "credits": {
     "title": "Comprar créditos",
     "description": "Los créditos son una compra única que se añade a tu saldo de Kilo para ejecutar sesiones de codificación con IA en Kilo App. La tienda cobra en tu cuenta y los créditos se añaden cuando la tienda confirma el pago.",
+    "nextExpiry": "{{amount}} en créditos caducan el {{date}} (UTC). Los créditos con la caducidad más próxima se usan primero.",
+    "appStoreExpiry": "Los créditos comprados a través de la App Store no caducan.",
+    "playOneYearExpiry": "Estos créditos caducan un año natural después de la compra.",
+    "playNonexpiring": "Estos créditos no caducan.",
     "packLabel": "Añadir {{amount}} en créditos",
     "priceUnavailable": "Precio no disponible",
     "purchased": "Se han añadido créditos a tu saldo.",

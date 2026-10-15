@@ -31,6 +31,10 @@ export default function TopUpThankYouPage() {
                   Gemini 3.1, and hundreds more
                 </p>
               </div>
+              <p className="text-muted-foreground text-sm">
+                Your purchase history shows the expiration date for each credit purchase.
+                Promotional and bonus credits may have separate deadlines.
+              </p>
 
               <div className="flex gap-4 pt-4">
                 <Button asChild variant="primary" className="flex-1">

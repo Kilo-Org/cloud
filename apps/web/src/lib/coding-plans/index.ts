@@ -22,6 +22,7 @@ import {
 } from '@/lib/coding-plans/pricing';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   byok_api_keys,
@@ -194,6 +195,7 @@ export async function subscribeToCodingPlan(
 
   const requestKey = idempotencyFingerprint(idempotencyKey);
   const outcome = await db.transaction(async tx => {
+    await reconcileCreditExpirationsInTransaction({ type: 'user', id: userId }, tx);
     const { rows: lockedUsers } = await tx.execute<{
       total_microdollars_acquired: number;
       microdollars_used: number;

@@ -1,9 +1,8 @@
 import 'server-only';
 
 import type Stripe from 'stripe';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import {
-  credit_transactions,
   kilo_pass_scheduled_changes,
   kilo_pass_subscriptions,
   kilocode_users,
@@ -17,6 +16,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import { blockUser } from '@/lib/user/block';
+import { retireCreditBalance } from '@kilocode/web-shared/lib/creditAdjustments';
 
 type Db = typeof defaultDb;
 
@@ -206,41 +206,15 @@ export async function cancelAndRefundKiloPassForUser({
       dbOrTx: tx,
     });
 
-    const freshUserRows = await tx
-      .select({
-        microdollars_used: kilocode_users.microdollars_used,
-        total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
-      })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, userId))
-      .for('update')
-      .limit(1);
-    const freshUser = freshUserRows[0];
-    const currentBalanceMicrodollars = freshUser
-      ? freshUser.total_microdollars_acquired - freshUser.microdollars_used
-      : 0;
-
-    let balanceReset: number | null = null;
-    if (currentBalanceMicrodollars > 0 && freshUser) {
-      await tx.insert(credit_transactions).values({
-        kilo_user_id: userId,
-        organization_id: null,
-        is_free: true,
-        amount_microdollars: -currentBalanceMicrodollars,
-        credit_category: refundLatestPayment
-          ? 'admin-cancel-refund-kilo-pass'
-          : 'admin-cancel-kilo-pass-no-refund',
-        description: `Balance zeroed by admin: ${reason}`,
-        original_baseline_microdollars_used: freshUser.microdollars_used,
-      });
-      await tx
-        .update(kilocode_users)
-        .set({
-          total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${currentBalanceMicrodollars}`,
-        })
-        .where(eq(kilocode_users.id, userId));
-      balanceReset = fromMicrodollars(currentBalanceMicrodollars);
-    }
+    const retired = await retireCreditBalance(tx, {
+      owner: { type: 'user', id: userId },
+      actorId: adminKiloUserId,
+      creditCategory: refundLatestPayment
+        ? 'admin-cancel-refund-kilo-pass'
+        : 'admin-cancel-kilo-pass-no-refund',
+      description: `Balance zeroed by admin: ${reason}`,
+    });
+    const balanceReset = retired > 0 ? fromMicrodollars(retired) : null;
 
     const noteParts = [
       refundLatestPayment

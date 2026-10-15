@@ -32,7 +32,7 @@ export function getPreviousIssueMonth(issueMonth: string): string {
  * the actual service period being billed. invoice.period_start is NOT suitable
  * because Stripe documents it as looking back one period for subscription invoices.
  */
-function getSubscriptionLineItemPeriodStart(invoice: Stripe.Invoice): number | null {
+export function getSubscriptionLineItemPeriodStart(invoice: Stripe.Invoice): number | null {
   const lines = invoice.lines?.data ?? [];
   for (const line of lines) {
     const details = line.parent?.subscription_item_details;

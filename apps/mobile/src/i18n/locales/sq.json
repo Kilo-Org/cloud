@@ -219,7 +219,6 @@
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
-    "bonusCreditsExpiring": "Kredite bonus në vlerën {{amount}} skadojnë më {{date}}.",
     "signOutTitle": "Do të dalësh nga llogaria?",
     "signOutMessage": "Do të duhet të hysh përsëri për të pasur qasje në hapësirën tënde të punës.",
     "deleteAccountTitle": "Të fshihet llogaria?",
@@ -2982,7 +2981,7 @@
     "creditActivity": {
       "emptyDescription": "Blerjet, përdorimi dhe rregullimet e krediteve të kësaj organizate do të shfaqen këtu sapo të ndodhin.",
       "emptyTitle": "Nuk ka aktivitet kreditesh",
-      "expires": "Skadon më {{date}}",
+      "expiresUtc": "Skadon më {{date}} (UTC)",
       "title": "Aktiviteti i krediteve",
       "transactionFallback": "Transaksion kreditesh",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
+    "nextExpiry": "Kredite në vlerën {{amount}} skadojnë më {{date}} (UTC). Kreditet që skadojnë më herët përdoren të parat.",
+    "appStoreExpiry": "Kreditet e blera përmes App Store nuk skadojnë.",
+    "playOneYearExpiry": "Këto kredite skadojnë një vit kalendarik pas blerjes.",
+    "playNonexpiring": "Këto kredite nuk skadojnë.",
     "packLabel": "Shto {{amount}} në kredite",
     "priceUnavailable": "Çmimi nuk disponohet",
     "purchased": "Kreditet u shtuan në bilancin tuaj.",

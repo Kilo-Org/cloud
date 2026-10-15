@@ -198,7 +198,7 @@ export function OrgKiloPassDetailView({
           <AlertTitle>Cancellation scheduled</AlertTitle>
           <AlertDescription>
             Kilo Pass for Organizations stays active through {cancellationEffectiveAt}. Monthly
-            Credits continue until then, and Credits already added remain available.
+            Credits continue until then. Credits already added keep their existing expiration terms.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -243,6 +243,12 @@ export function OrgKiloPassDetailView({
               Credits already added for this monthly period stay with the organizations that
               received them.
             </p>
+            <Link
+              href={`/organizations/${organizationId}/payment-details`}
+              className="type-label text-muted-foreground mt-2 inline-block underline underline-offset-4"
+            >
+              View credit balances and expiration dates
+            </Link>
           </CardContent>
         </Card>
       ) : (
@@ -322,7 +328,8 @@ export function OrgKiloPassDetailView({
             <AlertDialogTitle>Cancel Kilo Pass for Organizations?</AlertDialogTitle>
             <AlertDialogDescription>
               Kilo Pass remains active through {paidThrough}. Monthly Credits continue until then,
-              and Credits already added remain available. Billing stops after that date.
+              and Credits already added keep their existing expiration terms. Billing stops after
+              that date.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -348,8 +355,8 @@ export function OrgKiloPassDetailView({
           </CardHeader>
           <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="type-body text-muted-foreground">
-              No new monthly Credits are scheduled. Credits already added remain available. Add Kilo
-              Pass again to restart monthly Credits for your paid seats.
+              No new monthly Credits are scheduled. Credits already added keep their existing
+              expiration terms. Add Kilo Pass again to restart monthly Credits for your paid seats.
             </p>
             <Button asChild className="shrink-0">
               <Link href={restartHref}>

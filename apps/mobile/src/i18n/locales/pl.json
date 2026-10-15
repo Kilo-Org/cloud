@@ -219,7 +219,6 @@
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
-    "bonusCreditsExpiring": "Środki promocyjne w kwocie {{amount}} stracą ważność {{date}}.",
     "signOutTitle": "Wylogować się?",
     "signOutMessage": "Aby wrócić do swojego obszaru roboczego, musisz zalogować się ponownie.",
     "deleteAccountTitle": "Usunąć konto?",
@@ -3054,7 +3053,7 @@
     "creditActivity": {
       "emptyDescription": "Tutaj na bieżąco pojawiają się doładowania, zużycie środków i korekty salda tej organizacji.",
       "emptyTitle": "Brak operacji na saldzie",
-      "expires": "Wygasa {{date}}",
+      "expiresUtc": "Wygasa {{date}} (UTC)",
       "title": "Historia salda",
       "transactionFallback": "Operacja na saldzie",
       "category": {
@@ -3788,6 +3787,10 @@
   "credits": {
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",
+    "nextExpiry": "Kredyty w kwocie {{amount}} stracą ważność {{date}} (UTC). Najpierw wykorzystywane są kredyty z najwcześniejszym terminem ważności.",
+    "appStoreExpiry": "Kredyty kupione przez App Store nie tracą ważności.",
+    "playOneYearExpiry": "Te kredyty tracą ważność rok kalendarzowy po zakupie.",
+    "playNonexpiring": "Te kredyty nie tracą ważności.",
     "packLabel": "Dodaj {{amount}} w kredytach",
     "priceUnavailable": "Cena niedostępna",
     "purchased": "Kredyty zostały dodane do Twojego salda.",

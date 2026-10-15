@@ -219,7 +219,6 @@
     "hideBalance": "Itago ang balanse",
     "showBalance": "Ipakita ang balanse",
     "balanceHidden": "Nakatago ang balanse",
-    "bonusCreditsExpiring": "Mawawalan ng bisa sa {{date}} ang {{amount}} na bonus na kredito.",
     "signOutTitle": "Mag-sign out?",
     "signOutMessage": "Kailangan mong mag-sign in muli para mabuksan ang workspace mo.",
     "deleteAccountTitle": "Burahin ang akawnt?",
@@ -2982,7 +2981,7 @@
     "creditActivity": {
       "emptyDescription": "Lalabas dito ang mga pagbili, paggamit, at pagsasaayos ng kredito para sa organisasyong ito habang nangyayari ang mga ito.",
       "emptyTitle": "Walang aktibidad sa kredito",
-      "expires": "Mawawalan ng bisa sa {{date}}",
+      "expiresUtc": "Mawawalan ng bisa sa {{date}} (UTC)",
       "title": "Aktibidad sa kredito",
       "transactionFallback": "Transaksyon sa kredito",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
+    "nextExpiry": "Mawawalan ng bisa sa {{date}} (UTC) ang {{amount}} na kredito. Unang ginagamit ang mga kreditong pinakamaagang mawawalan ng bisa.",
+    "appStoreExpiry": "Hindi nawawalan ng bisa ang mga kreditong binili sa App Store.",
+    "playOneYearExpiry": "Mawawalan ng bisa ang mga kreditong ito isang taon ng kalendaryo pagkatapos ng pagbili.",
+    "playNonexpiring": "Hindi nawawalan ng bisa ang mga kreditong ito.",
     "packLabel": "Magdagdag ng {{amount}} na kredito",
     "priceUnavailable": "Hindi available ang presyo",
     "purchased": "Naidagdag na ang kredito sa iyong balance.",

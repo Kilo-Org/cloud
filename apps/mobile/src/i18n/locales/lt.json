@@ -219,7 +219,6 @@
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
-    "bonusCreditsExpiring": "Papildomi kreditai ({{amount}}) galioja iki {{date}}.",
     "signOutTitle": "Atsijungti?",
     "signOutMessage": "Kad galėtum pasiekti savo darbo sritį, turėsi prisijungti iš naujo.",
     "deleteAccountTitle": "Ištrinti paskyrą?",
@@ -3062,7 +3061,7 @@
     "creditActivity": {
       "emptyDescription": "Čia bus rodomi šios organizacijos kreditų pirkimai, naudojimas ir koregavimai.",
       "emptyTitle": "Kreditų operacijų nėra",
-      "expires": "Baigia galioti {{date}}",
+      "expiresUtc": "Baigia galioti {{date}} (UTC)",
       "title": "Kreditų operacijos",
       "transactionFallback": "Kreditų operacija",
       "category": {
@@ -3788,6 +3787,10 @@
   "credits": {
     "title": "Pirkti kreditus",
     "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",
+    "nextExpiry": "Kreditai ({{amount}}) baigia galioti {{date}} (UTC). Pirmiausia naudojami anksčiausiai baigiantys galioti kreditai.",
+    "appStoreExpiry": "Per App Store įsigyti kreditai nenustoja galioti.",
+    "playOneYearExpiry": "Šie kreditai nustoja galioti praėjus vieniems kalendoriniams metams po pirkimo.",
+    "playNonexpiring": "Šie kreditai nenustoja galioti.",
     "packLabel": "Pridėti {{amount}} kreditų",
     "priceUnavailable": "Kaina neprieinama",
     "purchased": "Kreditai pridėti prie jūsų balanso.",

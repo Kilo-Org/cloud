@@ -219,7 +219,6 @@
     "hideBalance": "Skrij stanje",
     "showBalance": "Prikaži stanje",
     "balanceHidden": "Stanje je skrito",
-    "bonusCreditsExpiring": "Veljavnost dodatnih kreditov v vrednosti {{amount}} poteče {{date}}.",
     "signOutTitle": "Želiš se odjaviti?",
     "signOutMessage": "Za dostop do delovnega prostora se moraš znova prijaviti.",
     "deleteAccountTitle": "Želiš izbrisati račun?",
@@ -3062,7 +3061,7 @@
     "creditActivity": {
       "emptyDescription": "Tukaj se sproti prikazujejo nakupi, poraba in prilagoditve kreditov te organizacije.",
       "emptyTitle": "Ni transakcij s krediti",
-      "expires": "Poteče {{date}}",
+      "expiresUtc": "Poteče {{date}} (UTC)",
       "title": "Transakcije s krediti",
       "transactionFallback": "Transakcija s krediti",
       "category": {
@@ -3788,6 +3787,10 @@
   "credits": {
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",
+    "nextExpiry": "Veljavnost kreditov v vrednosti {{amount}} poteče {{date}} (UTC). Najprej se porabijo krediti z najzgodnejšim potekom veljavnosti.",
+    "appStoreExpiry": "Krediti, kupljeni prek trgovine App Store, ne potečejo.",
+    "playOneYearExpiry": "Ti krediti potečejo eno koledarsko leto po nakupu.",
+    "playNonexpiring": "Ti krediti ne potečejo.",
     "packLabel": "Dodaj {{amount}} kreditov",
     "priceUnavailable": "Cena ni na voljo",
     "purchased": "Krediti so bili dodani tvojemu stanju.",

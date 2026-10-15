@@ -219,7 +219,6 @@
     "hideBalance": "ቀሪ ሂሳብ ደብቅ",
     "showBalance": "ቀሪ ሂሳብ አሳይ",
     "balanceHidden": "ቀሪ ሂሳብ ተደብቋል",
-    "bonusCreditsExpiring": "{{amount}} የጉርሻ ክሬዲት በ{{date}} ጊዜው ያበቃል።",
     "signOutTitle": "ከመለያዎ መውጣት ይፈልጋሉ?",
     "signOutMessage": "የሥራ ቦታህን ለመጠቀም እንደገና መግባት ያስፈልግሃል።",
     "deleteAccountTitle": "መለያዎን መሰረዝ ይፈልጋሉ?",
@@ -2982,7 +2981,7 @@
     "creditActivity": {
       "emptyDescription": "የዚህ ድርጅት ግዢዎች፣ አጠቃቀም እና የክሬዲት ማስተካከያዎች ሲኖሩ እዚህ ይታያሉ።",
       "emptyTitle": "ምንም የክሬዲት እንቅስቃሴ የለም",
-      "expires": "በ{{date}} ጊዜው ያበቃል",
+      "expiresUtc": "በ{{date}} (UTC) ጊዜው ያበቃል",
       "title": "የክሬዲት እንቅስቃሴ",
       "transactionFallback": "የክሬዲት ግብይት",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
+    "nextExpiry": "{{amount}} ክሬዲት በ{{date}} (UTC) ጊዜው ያበቃል። ቀድሞ ጊዜው የሚያበቃው ክሬዲት መጀመሪያ ጥቅም ላይ ይውላል።",
+    "appStoreExpiry": "በApp Store የተገዙ ክሬዲቶች ጊዜያቸው አያበቃም።",
+    "playOneYearExpiry": "እነዚህ ክሬዲቶች ከተገዙ ከአንድ የቀን መቁጠሪያ ዓመት በኋላ ጊዜያቸው ያበቃል።",
+    "playNonexpiring": "እነዚህ ክሬዲቶች ጊዜያቸው አያበቃም።",
     "packLabel": "የ{{amount}} ክሬዲት ያክሉ",
     "priceUnavailable": "ዋጋ አይገኝም",
     "purchased": "ክሬዲት ወደ ቀሪ ሂሳብዎ ተጨምሯል።",

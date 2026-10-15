@@ -281,7 +281,9 @@ export async function handleAudioTranscriptionsRequest(
 
   const { balance, plan, balanceLimitedByUserAllowance, payer } = await getBalanceAndOrgSettings(
     organizationId,
-    user
+    user,
+    undefined,
+    isFreeModel(requestedModelLowerCased) ? undefined : 'usage'
   );
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them

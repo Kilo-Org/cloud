@@ -153,6 +153,19 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
     threshold reachable when the pre-grant balance is negative. The threshold belongs to the user, not to one
     subscription or issuance. A later qualifying base grant MAY replace an earlier threshold.
 
+### Paid Base-Credit Expiry (approved target behavior)
+
+These rules extend rules 8-12 and take effect only after `PAID_CREDIT_EXPIRATION_EFFECTIVE_AT` is set.
+
+- A base grant issued under `one_year` terms MUST expire one calendar year (UTC) after its own issuance. February 29
+  MUST clamp to February 28. Yearly cadence anchors each monthly allotment to its issuance, not to the annual payment.
+- Terms MUST come from the subscription term captured at checkout or renewal, never from the setting at webhook or cron
+  time. Annual terms paid before activation MUST keep legacy (non-expiring) base credits until renewal.
+- Base credits from App Store subscriptions MUST NOT expire.
+- Bonus, welcome-promo, and referral deadlines are unchanged by these rules.
+- Credits with the earliest deadline MUST be consumed first; non-expiring credits last. Expiration alone MUST NOT trigger
+  automatic top-up.
+
 ### Monthly Ramp and Welcome Promo
 
 13. For monthly cadence, the default bonus percent for streak month `n` MUST be `min(40%, 5% + 5% * (n - 1))`.

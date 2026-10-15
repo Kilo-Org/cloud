@@ -19,6 +19,12 @@ function makeTransaction(overrides: Partial<CreditTransaction> = {}): CreditTran
     organization_id: null,
     created_by_kilo_user_id: null,
     check_category_uniqueness: false,
+    paid_credit_policy: 'legacy',
+    credit_source: null,
+    source_transaction_id: null,
+    retired_microdollars: 0,
+    consumed_microdollars: 0,
+    refund_principal_microdollars: null,
     ...overrides,
   };
 }
@@ -36,7 +42,9 @@ describe('getRedirectUrl', () => {
         makeTransaction({ organization_id: '66333c77-6ac2-4a14-9278-3d45d67e87ec' }),
         null
       )
-    ).toBe('/organizations/66333c77-6ac2-4a14-9278-3d45d67e87ec?topup-amount-usd=20');
+    ).toBe(
+      '/organizations/66333c77-6ac2-4a14-9278-3d45d67e87ec?topup-amount-usd=20&topup-transaction-id=9a89e8e5-7c15-4d43-9fc1-24a97970f989'
+    );
   });
 
   it('shows pending status when the ledger transaction is delayed', () => {

@@ -219,7 +219,6 @@
     "hideBalance": "Guthaben ausblenden",
     "showBalance": "Guthaben anzeigen",
     "balanceHidden": "Guthaben ausgeblendet",
-    "bonusCreditsExpiring": "Dein Bonusguthaben von {{amount}} verfällt am {{date}}.",
     "signOutTitle": "Abmelden?",
     "signOutMessage": "Du musst dich erneut anmelden, um auf deinen Arbeitsbereich zuzugreifen.",
     "deleteAccountTitle": "Konto löschen?",
@@ -2974,7 +2973,7 @@
     "creditActivity": {
       "emptyDescription": "Hier erscheinen Käufe, Verbrauch und Guthabenanpassungen dieser Organisation, sobald sie erfasst werden.",
       "emptyTitle": "Noch keine Guthabenbewegungen",
-      "expires": "Verfällt am {{date}}",
+      "expiresUtc": "Verfällt am {{date}} (UTC)",
       "title": "Guthabenverlauf",
       "transactionFallback": "Guthabenbuchung",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Guthaben kaufen",
     "description": "Guthaben ist ein einmaliger Kauf, der deinem Kilo-Guthaben für AI-Codierungssitzungen in der Kilo App hinzugefügt wird. Der Store belastet dein Konto, und das Guthaben wird gutgeschrieben, sobald der Store die Zahlung bestätigt.",
+    "nextExpiry": "{{amount}} Guthaben verfällt am {{date}} (UTC). Guthaben mit dem frühesten Ablaufdatum wird zuerst verbraucht.",
+    "appStoreExpiry": "Über den App Store gekauftes Guthaben verfällt nicht.",
+    "playOneYearExpiry": "Dieses Guthaben verfällt ein Kalenderjahr nach dem Kauf.",
+    "playNonexpiring": "Dieses Guthaben verfällt nicht.",
     "packLabel": "{{amount}} Guthaben hinzufügen",
     "priceUnavailable": "Preis nicht verfügbar",
     "purchased": "Guthaben wurde deinem Kontostand hinzugefügt.",

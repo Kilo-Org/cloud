@@ -219,7 +219,6 @@
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
-    "bonusCreditsExpiring": "Bonusa kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}}.",
     "signOutTitle": "Izrakstīties?",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz.",
     "deleteAccountTitle": "Dzēst kontu?",
@@ -3022,7 +3021,7 @@
     "creditActivity": {
       "emptyDescription": "Šeit parādīsies informācija par šīs organizācijas kredītu pirkumiem, patēriņu un korekcijām.",
       "emptyTitle": "Nav kredītu darījumu",
-      "expires": "Derīguma termiņš: {{date}}",
+      "expiresUtc": "Derīguma termiņš: {{date}} (UTC)",
       "title": "Kredītu darījumi",
       "transactionFallback": "Kredītu darījums",
       "category": {
@@ -3747,6 +3746,10 @@
   "credits": {
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
+    "nextExpiry": "Kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}} (UTC). Vispirms tiek izmantoti kredīti ar agrāko derīguma termiņu.",
+    "appStoreExpiry": "Ar App Store starpniecību iegādātajiem kredītiem nav derīguma termiņa.",
+    "playOneYearExpiry": "Šo kredītu derīguma termiņš beidzas vienu kalendāro gadu pēc pirkuma.",
+    "playNonexpiring": "Šiem kredītiem nav derīguma termiņa.",
     "packLabel": "Pievienot {{amount}} kredītos",
     "priceUnavailable": "Cena nav pieejama",
     "purchased": "Kredīti ir pievienoti tavai bilancei.",

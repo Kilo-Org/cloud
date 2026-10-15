@@ -319,7 +319,12 @@ export async function handleLlmProxyRequest(
 
   const balanceAndSettingsPromise = authPromise.then(res =>
     res.user
-      ? getBalanceAndOrgSettings(res.organizationId, res.user, readDb)
+      ? getBalanceAndOrgSettings(
+          res.organizationId,
+          res.user,
+          readDb,
+          isFreeModel(requestedModelLowerCased) ? undefined : 'usage'
+        )
       : { balance: 0, settings: undefined, plan: undefined }
   );
   const organizationContextPromise = Promise.all([authPromise, balanceAndSettingsPromise]).then(

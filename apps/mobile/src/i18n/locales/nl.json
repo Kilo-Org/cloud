@@ -219,7 +219,6 @@
     "hideBalance": "Saldo verbergen",
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",
-    "bonusCreditsExpiring": "{{amount}} aan bonustegoed verloopt op {{date}}.",
     "signOutTitle": "Afmelden?",
     "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "deleteAccountTitle": "Account verwijderen?",
@@ -2974,7 +2973,7 @@
     "creditActivity": {
       "emptyDescription": "Hier verschijnen aankopen, verbruik en aanpassingen van het tegoed van deze organisatie zodra ze plaatsvinden.",
       "emptyTitle": "Geen tegoedtransacties",
-      "expires": "Verloopt op {{date}}",
+      "expiresUtc": "Verloopt op {{date}} (UTC)",
       "title": "Tegoedtransacties",
       "transactionFallback": "Tegoedtransactie",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
+    "nextExpiry": "{{amount}} aan credits verloopt op {{date}} (UTC). Credits die het eerst verlopen, worden eerst gebruikt.",
+    "appStoreExpiry": "Credits die via de App Store zijn gekocht, verlopen niet.",
+    "playOneYearExpiry": "Deze credits verlopen één kalenderjaar na aankoop.",
+    "playNonexpiring": "Deze credits verlopen niet.",
     "packLabel": "{{amount}} aan credits toevoegen",
     "priceUnavailable": "Prijs niet beschikbaar",
     "purchased": "Er zijn credits aan je saldo toegevoegd.",

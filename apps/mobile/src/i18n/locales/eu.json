@@ -219,7 +219,6 @@
     "hideBalance": "Ezkutatu saldoa",
     "showBalance": "Erakutsi saldoa",
     "balanceHidden": "Saldoa ezkutatuta dago",
-    "bonusCreditsExpiring": "{{amount}} hobari-kreditu iraungiko dira data honetan: {{date}}.",
     "signOutTitle": "Itxi saioa?",
     "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa.",
     "deleteAccountTitle": "Ezabatu kontua?",
@@ -2982,7 +2981,7 @@
     "creditActivity": {
       "emptyDescription": "Erakunde honen erosketak, erabilera eta kreditu-doikuntzak hemen agertuko dira gertatu ahala.",
       "emptyTitle": "Ez dago kreditu-jarduerarik",
-      "expires": "Iraungitze-data: {{date}}",
+      "expiresUtc": "Iraungitze-data: {{date}} (UTC)",
       "title": "Kreditu-jarduera",
       "transactionFallback": "Kreditu-transakzioa",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
+    "nextExpiry": "{{amount}} kreditu iraungiko dira data honetan: {{date}} (UTC). Lehenago iraungitzen diren kredituak erabiltzen dira lehenik.",
+    "appStoreExpiry": "App Store bidez erositako kredituak ez dira iraungitzen.",
+    "playOneYearExpiry": "Kreditu hauek erosi eta urte natural batera iraungitzen dira.",
+    "playNonexpiring": "Kreditu hauek ez dira iraungitzen.",
     "packLabel": "Gehitu {{amount}} kreditutan",
     "priceUnavailable": "Prezioa ez dago erabilgarri",
     "purchased": "Kredituak zure saldoari gehitu zaizkio.",

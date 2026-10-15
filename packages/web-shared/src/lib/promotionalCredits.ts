@@ -12,6 +12,10 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { millisecondsInHour } from 'date-fns/constants';
 import { successResult, type CustomResult } from '@kilocode/web-shared/lib/maybe-result';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { resolvePaidCreditPolicy } from './paidCreditPolicy';
+import { getPaidCreditTerms } from './paidCreditPolicy.server';
+import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
 
 export type CreditEntity = { user: User; organization: Organization | null };
 
@@ -19,12 +23,13 @@ export type DbOrTx = typeof db | DrizzleTransaction;
 
 export type GrantCreditOptions = Pick<PromoCreditCategoryConfig, 'credit_category'> & {
   counts_as_selfservice: boolean;
+  creditKind?: 'paid' | 'promotional';
   /**
    * Optional transaction handle.
    *
    * When provided, all DB writes are executed on this transaction.
    */
-  dbOrTx?: DbOrTx;
+  dbOrTx?: DrizzleTransaction;
   created_by_kilo_user_id?: User['id'];
 } & Partial<
     Pick<
@@ -107,7 +112,12 @@ export async function grantCreditForCategoryConfig(
   options: GrantCreditOptions,
   promotion: PromoCreditCategoryConfig
 ): Promise<GrantCreditResult> {
-  const dbOrTx = options.dbOrTx ?? db;
+  if (!options.dbOrTx) {
+    return await db.transaction(tx =>
+      grantCreditForCategoryConfig(entity, { ...options, dbOrTx: tx }, promotion)
+    );
+  }
+  const dbOrTx = options.dbOrTx;
 
   const user = entity.user;
   const organization_id = entity.organization?.id;
@@ -170,26 +180,41 @@ export async function grantCreditForCategoryConfig(
     const explicit_expiry_date = options.credit_expiry_date ?? promotion.credit_expiry_date;
     const expiry_hours = options.expiry_hours ?? promotion.expiry_hours;
     const expiryFromHours = computeExpiryDateFromHours(expiry_hours);
-    const credit_expiry_date = getEarlierDate(explicit_expiry_date, expiryFromHours);
+    const policy =
+      options.creditKind === 'paid'
+        ? resolvePaidCreditPolicy({
+            source: 'admin',
+            purchasedAt: new Date(),
+            terms: getPaidCreditTerms('admin'),
+          })
+        : null;
+    const credit_expiry_date = policy
+      ? policy.expiry_date
+        ? new Date(policy.expiry_date)
+        : null
+      : getEarlierDate(explicit_expiry_date, expiryFromHours);
+    const current = await reconcileCreditExpirationsInTransaction(
+      organization_id
+        ? { type: 'organization', id: organization_id }
+        : { type: 'user', id: user.id },
+      dbOrTx
+    );
+    const baseline = Math.min(current.microdollars_used, current.total_microdollars_acquired);
     const new_credit_transaction_id = crypto.randomUUID();
     const insertStatementBase = dbOrTx.insert(credit_transactions).values({
       id: new_credit_transaction_id,
       kilo_user_id: user.id,
       organization_id: organization_id,
       created_by_kilo_user_id: options.created_by_kilo_user_id,
-      is_free: true,
+      is_free: options.creditKind !== 'paid',
+      credit_source: 'promotion',
+      ...policy,
       amount_microdollars: toMicrodollars(amount_usd),
       description: description,
       credit_category: promotion.credit_category,
       expiry_date: credit_expiry_date?.toISOString() || null,
-      expiration_baseline_microdollars_used: credit_expiry_date
-        ? organization_id
-          ? (entity.organization?.microdollars_used ?? 0)
-          : user.microdollars_used
-        : null,
-      original_baseline_microdollars_used: organization_id
-        ? (entity.organization?.microdollars_used ?? 0)
-        : user.microdollars_used,
+      expiration_baseline_microdollars_used: baseline,
+      original_baseline_microdollars_used: current.microdollars_used,
       check_category_uniqueness: promotion.is_idempotent,
     });
     const insertResult = await (promotion.is_idempotent
@@ -204,6 +229,17 @@ export async function grantCreditForCategoryConfig(
           ? `Code ${promotion.credit_category} ${GRANT_MSG_ALREADY_APPLIED} to ${entityName}.`
           : `FAIL: Code ${promotion.credit_category} not applied to ${entityName}.`,
       };
+    }
+    if (amount_usd > 0) {
+      await recordRefundDebtRepayment(dbOrTx, {
+        owner: organization_id
+          ? { type: 'organization', id: organization_id }
+          : { type: 'user', id: user.id },
+        transactionId: new_credit_transaction_id,
+        priorAcquired: current.total_microdollars_acquired,
+        priorUsed: current.microdollars_used,
+        amountMicrodollars: toMicrodollars(amount_usd),
+      });
     }
     logExceptInTest(
       !organization_id
@@ -241,6 +277,7 @@ export async function grantCreditForCategoryConfig(
         actor_name: user.google_user_name,
         organization_id: organization_id,
         message: `Granted $${amount_usd} promotional credit: ${description}`,
+        tx: dbOrTx,
       });
     }
 

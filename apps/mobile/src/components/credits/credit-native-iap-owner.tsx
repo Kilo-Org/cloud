@@ -154,14 +154,19 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
 
   // Server-backed catalog: its account token is the one the store purchase must
   // carry, and its product ids drive recovery even when the store fetch failed.
-  const serverProductsQuery = useQuery(trpc.credits.getMobileStoreProducts.queryOptions());
+  const serverProductsQuery = useQuery(
+    trpc.credits.getMobileStoreProducts.queryOptions({ supportsCreditExpiry: true })
+  );
   const appAccountToken = serverProductsQuery.data?.appAccountToken ?? '';
   const creditPackAppleProductIds = useMemo(
     () => serverProductsQuery.data?.products.map(product => product.appleProductId) ?? [],
     [serverProductsQuery.data]
   );
   const creditPackGoogleProductIds = useMemo(
-    () => serverProductsQuery.data?.products.map(product => product.googleProductId) ?? [],
+    () =>
+      serverProductsQuery.data?.recoveryGoogleProductIds ??
+      serverProductsQuery.data?.products.map(product => product.googleProductId) ??
+      [],
     [serverProductsQuery.data]
   );
 

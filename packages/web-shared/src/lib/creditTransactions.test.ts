@@ -64,6 +64,50 @@ describe('Credit Transactions', () => {
       expect(summary.credit_transaction_count).toBe(4);
     });
 
+    test('reports refund principal without counting expiration or internal movements as payments', async () => {
+      const user = await insertTestUser();
+      await db.insert(credit_transactions).values([
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: 100_000_000,
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: -60_000_000,
+          credit_category: 'credits_expired',
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: 0,
+          refund_principal_microdollars: -10_000_000,
+          source_transaction_id: crypto.randomUUID(),
+          credit_category: 'store-credit-refund:google_play:synthetic',
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: 100_000_000,
+          paid_credit_policy: 'settlement',
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: true,
+          amount_microdollars: 100_000_000,
+          paid_credit_policy: 'one_year',
+          source_transaction_id: crypto.randomUUID(),
+          credit_category: 'parent_to_child_transfer_in',
+        },
+      ]);
+
+      const summary = await getCreditTransactionsSummaryByUserId(user.id);
+      expect(summary.total_purchased_musd).toBe(90_000_000);
+      expect(summary.total_promotional_musd).toBe(0);
+      expect(summary.credit_transaction_count).toBe(5);
+    });
+
     test('should return zeros for user with no transactions', async () => {
       const user = await insertTestUser();
 

@@ -5792,6 +5792,7 @@ describe('kiloPassRouter', () => {
               tier: 'tier_49',
               cadence: 'yearly',
               affiliateTrackingId: '',
+              paid_credit_policy: 'legacy',
             },
           },
           metadata: expect.objectContaining({
@@ -5842,6 +5843,7 @@ describe('kiloPassRouter', () => {
               tier: 'tier_49',
               cadence: 'yearly',
               affiliateTrackingId: 'impact-click-123',
+              paid_credit_policy: 'legacy',
             },
           },
           metadata: expect.objectContaining({
@@ -6016,6 +6018,7 @@ describe('kiloPassRouter', () => {
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Monthly,
         affiliateTrackingId: 'impact-click-123',
+        paid_credit_policy: 'legacy',
       });
 
       const record = await store.findByAssessmentKey(assessmentKey);

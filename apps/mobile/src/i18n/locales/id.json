@@ -219,7 +219,6 @@
     "hideBalance": "Sembunyikan saldo",
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
-    "bonusCreditsExpiring": "Kredit bonus senilai {{amount}} akan kedaluwarsa pada {{date}}.",
     "signOutTitle": "Keluar?",
     "signOutMessage": "Kamu perlu masuk lagi untuk mengakses ruang kerjamu.",
     "deleteAccountTitle": "Hapus akun?",
@@ -2974,7 +2973,7 @@
     "creditActivity": {
       "emptyDescription": "Setiap pembelian, penggunaan, dan penyesuaian kredit organisasi ini akan ditampilkan di sini.",
       "emptyTitle": "Belum ada aktivitas kredit",
-      "expires": "Kedaluwarsa pada {{date}}",
+      "expiresUtc": "Kedaluwarsa pada {{date}} (UTC)",
       "title": "Aktivitas kredit",
       "transactionFallback": "Transaksi kredit",
       "category": {
@@ -3706,6 +3705,10 @@
   "credits": {
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
+    "nextExpiry": "Kredit senilai {{amount}} akan kedaluwarsa pada {{date}} (UTC). Kredit dengan masa berlaku paling awal digunakan lebih dulu.",
+    "appStoreExpiry": "Kredit yang dibeli melalui App Store tidak kedaluwarsa.",
+    "playOneYearExpiry": "Kredit ini kedaluwarsa satu tahun kalender setelah pembelian.",
+    "playNonexpiring": "Kredit ini tidak kedaluwarsa.",
     "packLabel": "Tambahkan kredit {{amount}}",
     "priceUnavailable": "Harga tidak tersedia",
     "purchased": "Kredit telah ditambahkan ke saldo Anda.",

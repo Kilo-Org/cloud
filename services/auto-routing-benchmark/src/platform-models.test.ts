@@ -2,9 +2,57 @@ import { createServer } from 'node:http';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BenchmarkModelCatalogSchema,
+  catalogCandidatePrices,
   fetchPlatformRegistryEntries,
   platformRegistryEntries,
 } from './platform-models';
+
+describe('catalog candidate pricing', () => {
+  it('keeps normal models usable alongside variable-price virtual models', () => {
+    const catalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        { id: 'synthetic/virtual', pricing: { prompt: '-1', completion: '-1' } },
+        {
+          id: 'synthetic/normal',
+          pricing: { prompt: '0.002', completion: '0.003', input_cache_read: '-1' },
+        },
+        { id: 'synthetic/malformed', pricing: 'unavailable' },
+      ],
+    });
+    const prices = catalogCandidatePrices(catalog);
+    expect(prices.get('synthetic/virtual')).toBeNull();
+    expect(prices.get('synthetic/normal')).toEqual({
+      promptUsdPerToken: 0.002,
+      completionUsdPerToken: 0.003,
+      cacheReadUsdPerToken: null,
+    });
+    expect(prices.get('synthetic/malformed')).toBeNull();
+  });
+
+  it('keeps USD-per-token catalog prices and treats missing or invalid prices as unpriced', () => {
+    const prices = catalogCandidatePrices(
+      BenchmarkModelCatalogSchema.parse({
+        data: [
+          {
+            id: 'synthetic/priced',
+            pricing: { prompt: '0.002', completion: '0.003', input_cache_read: '0.0001' },
+          },
+          { id: 'synthetic/uncached', pricing: { prompt: '0.002', completion: '0.003' } },
+          { id: 'synthetic/missing' },
+          { id: 'synthetic/invalid', pricing: { prompt: 'invalid', completion: '0.003' } },
+        ],
+      })
+    );
+    expect(prices.get('synthetic/priced')).toEqual({
+      promptUsdPerToken: 0.002,
+      completionUsdPerToken: 0.003,
+      cacheReadUsdPerToken: 0.0001,
+    });
+    expect(prices.get('synthetic/uncached')?.cacheReadUsdPerToken).toBeNull();
+    expect(prices.get('synthetic/missing')).toBeNull();
+    expect(prices.get('synthetic/invalid')).toBeNull();
+  });
+});
 
 const catalog = BenchmarkModelCatalogSchema.parse({
   data: [
@@ -35,6 +83,57 @@ const catalog = BenchmarkModelCatalogSchema.parse({
 });
 
 describe('platform catalog expansion', () => {
+  it.each([
+    ['an alias and its concrete target', ['~vendor/latest', 'vendor/current']],
+    ['two aliases sharing a target', ['~vendor/latest', '~vendor/fast-latest']],
+  ])('deduplicates %s using the concrete target reasoning variants', (_label, ids) => {
+    const resolvedCatalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        {
+          id: '~vendor/latest',
+          alias_target: 'vendor/current',
+          opencode: { variants: { stale: { reasoning: { effort: 'low' } } } },
+        },
+        { id: '~vendor/fast-latest', alias_target: 'vendor/current' },
+        {
+          id: 'vendor/current',
+          opencode: { variants: { thinking: { reasoning: { effort: 'high' } } } },
+        },
+      ],
+    });
+    expect(
+      platformRegistryEntries({ deciderModels: ids.map(id => ({ id })) }, resolvedCatalog)
+    ).toEqual([{ model: 'vendor/current', variant: 'thinking' }]);
+  });
+
+  it('keeps an alias when its target is absent from the catalog', () => {
+    expect(
+      platformRegistryEntries(
+        { deciderModels: [{ id: '~vendor/latest' }] },
+        BenchmarkModelCatalogSchema.parse({
+          data: [{ id: '~vendor/latest', alias_target: 'vendor/missing' }],
+        })
+      )
+    ).toEqual([{ model: '~vendor/latest', variant: null }]);
+  });
+
+  it('requests a new concrete pair when an alias is retargeted', () => {
+    const config = { deciderModels: [{ id: '~vendor/latest' }] };
+    const entriesForTarget = (target: string) =>
+      platformRegistryEntries(
+        config,
+        BenchmarkModelCatalogSchema.parse({
+          data: [
+            { id: '~vendor/latest', alias_target: target },
+            { id: 'vendor/old' },
+            { id: 'vendor/new' },
+          ],
+        })
+      );
+    expect(entriesForTarget('vendor/old')).toEqual([{ model: 'vendor/old', variant: null }]);
+    expect(entriesForTarget('vendor/new')).toEqual([{ model: 'vendor/new', variant: null }]);
+  });
+
   it('expands manual and auto models into all and only explicit reasoning configurations', () => {
     expect(
       platformRegistryEntries(

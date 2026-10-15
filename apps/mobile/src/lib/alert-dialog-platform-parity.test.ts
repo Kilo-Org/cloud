@@ -90,7 +90,7 @@ describe('one implementation for both platforms on the alert dialog path', () =>
     });
     // Mirrors src/global.css `--popover` and `--primary` (dark).
     expect(colorValue(night, 'app_dialog_background')).toBe('#1F1F24');
-    expect(colorValue(night, 'app_dialog_action')).toBe('#E8F27A');
+    expect(colorValue(night, 'app_dialog_action')).toBe('#FFDD00');
   });
 
   it('overlays only the alert dialog theme on the activity theme', async () => {

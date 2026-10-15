@@ -3,19 +3,11 @@ import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getEffectiveModelDecision,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
-
-// Keep in sync with services/auto-routing/src/coding-plan-preference.ts.
-// /decide can short-circuit to these without consulting the routing table.
-const CODING_PLAN_DEFAULT_MODEL_IDS = [
-  MINIMAX_CURRENT_MODEL_ID,
-  'byteplus-coding/bytedance-seed-code',
-] as const;
 
 export type AutoRoutingOwner = {
   userId: string;
@@ -39,11 +31,7 @@ export function candidateModelIdsFromSources(
     Object.values(table?.routes ?? {}).flatMap(candidates =>
       candidates.map(candidate => candidate.model)
     );
-  return [
-    ...new Set(
-      [...fromPoolOrTable, ...CODING_PLAN_DEFAULT_MODEL_IDS].filter(id => !isVirtualAutoModelId(id))
-    ),
-  ];
+  return [...new Set(fromPoolOrTable.filter(id => !isVirtualAutoModelId(id)))];
 }
 
 export function deniedModelIdsForCandidates(

@@ -30,6 +30,10 @@
         "class_name": "SandboxSessionV2",
         "name": "SANDBOX_SESSION",
       },
+      {
+        "class_name": "PreviewPortTestDO",
+        "name": "PREVIEW_PORT_TEST",
+      },
     ],
   },
   "migrations": [
@@ -52,6 +56,10 @@
     {
       "new_sqlite_classes": ["SandboxSessionV2"],
       "tag": "v10",
+    },
+    {
+      "new_classes": ["PreviewPortTestDO"],
+      "tag": "v11",
     },
   ],
   "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],

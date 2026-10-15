@@ -33,20 +33,33 @@ describe('resolveChatComposerControlState', () => {
     });
   });
 
-  it('collapses send, voice, and toolbar when disabled or sending', () => {
-    for (const override of [
-      { disabled: true, isSending: false },
-      { disabled: false, isSending: true },
-    ]) {
-      const state = resolveChatComposerControlState({ ...baseInput, ...override, hasText: true });
+  it('collapses send, voice, the toolbar and the input when the composer is disabled', () => {
+    const state = resolveChatComposerControlState({ ...baseInput, disabled: true, hasText: true });
 
-      expect(state.canSend).toBe(false);
-      expect(state.hasSendableContent).toBe(true);
-      expect(state.toolbarDisabled).toBe(true);
-      expect(state.voiceDisabled).toBe(true);
-      expect(state.inputEditable).toBe(false);
-      expect(state.inputAccessibilityDisabled).toBe(true);
-    }
+    expect(state.canSend).toBe(false);
+    expect(state.hasSendableContent).toBe(true);
+    expect(state.toolbarDisabled).toBe(true);
+    expect(state.voiceDisabled).toBe(true);
+    expect(state.inputEditable).toBe(false);
+    expect(state.inputAccessibilityDisabled).toBe(true);
+  });
+
+  // A non-editable TextInput resigns first responder on both platforms, which
+  // drops the keyboard while the send is still in flight and leaves the reader
+  // to reopen it to keep typing (video V1 ~4.4s and ~18.9s). The composer's own
+  // in-flight send gates send, voice, the toolbar and the paperclip; a second
+  // message is kept out by the submit lock, not by taking the input away.
+  it('keeps the input editable while the composer is sending', () => {
+    const state = resolveChatComposerControlState({ ...baseInput, isSending: true, hasText: true });
+
+    expect(state.canSend).toBe(false);
+    expect(state.hasSendableContent).toBe(true);
+    expect([state.inputEditable, state.inputAccessibilityDisabled]).toEqual([true, false]);
+    expect([state.toolbarDisabled, state.voiceDisabled, state.paperclipDisabled]).toEqual([
+      true,
+      true,
+      true,
+    ]);
   });
 
   it('keeps the input editable, hides the toolbar, and gates send while the session cannot send', () => {

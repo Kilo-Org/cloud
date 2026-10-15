@@ -66,12 +66,7 @@ test('successful main CI selects the tested deployment SHA', () => {
   );
   assert.equal(ci.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
 
-  for (const job of [
-    'check-production-db-startup',
-    'run-migrations',
-    'stage-app',
-    'stage-global-app',
-  ]) {
+  for (const job of ['check-production-db-startup', 'run-migrations', 'stage-app']) {
     assert.equal(production.jobs[job].needs, 'check-changes');
     assert.match(production.jobs[job].if, /should_deploy == 'true'/);
   }
@@ -79,7 +74,6 @@ test('successful main CI selects the tested deployment SHA', () => {
     'check-staging-db-startup',
     'run-migrations',
     'deploy-app',
-    'deploy-global-app',
     'deploy-workers',
   ]) {
     assert.match(staging.jobs[job].if, /should_deploy == 'true'/);

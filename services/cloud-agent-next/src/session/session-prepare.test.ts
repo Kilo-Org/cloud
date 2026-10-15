@@ -43,6 +43,7 @@ import {
   assertSessionOperationIdentity,
   createSessionWithLedger,
   registerNewSession,
+  startNewSession,
   sessionCreateIntentFingerprint,
   SESSION_CREATE_ABANDON_AFTER_SECONDS,
   SESSION_CREATE_ABANDONED_OUTCOME_CODE,
@@ -54,7 +55,7 @@ import {
   type SessionRegistrationContext,
 } from './session-registration.js';
 import { prepareInputToSessionCreateRequest } from '../router/handlers/session-prepare.js';
-import { StartSessionInput } from '../router/schemas.js';
+import { PrepareSessionInput, StartSessionInput } from '../router/schemas.js';
 
 const {
   admitOperationMock,
@@ -488,6 +489,299 @@ describe('explicit sandbox session creation', () => {
     });
     settleOperationMock.mockResolvedValue({ settled: true });
     recordOperationProgressMock.mockResolvedValue(undefined);
+  });
+
+  it.each(
+    [undefined, [], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({ egressAllowlist }))
+  )('preserves start policy %j', async ({ egressAllowlist }) => {
+    const doStub = makeDoStub();
+    const request = requestFromStructuredAllocation('cloudflare-containers-standard-3');
+    request.runtime = { ...request.runtime, egressMode: 'allowlist', egressAllowlist };
+    await runCreate(selectedContext(doStub), request);
+    const expected = !egressAllowlist?.length ? [] : ['example.com', 'z.example.com'];
+    expect(createdMetadata(doStub)?.workspace?.egressMode).toBe('allowlist');
+    expect(createdMetadata(doStub)?.workspace?.egressAllowlist).toEqual(expected);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sandboxSelection: expect.objectContaining({
+          egressMode: 'allowlist',
+          egressAllowlist: expected,
+        }),
+      })
+    );
+  });
+
+  it.each(['vercel-small', 'cloudflare-shared', 'isolated-standard'] as const)(
+    'rejects egress policy on resolved %s before ownership creation',
+    async sandboxAllocation => {
+      const doStub = makeDoStub();
+      const request = requestForPreset(sandboxAllocation);
+      request.runtime = { sandboxAllocation, egressMode: 'allowlist' };
+      await expect(runCreate(selectedContext(doStub), request)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    }
+  );
+
+  it('accepts a supported resolved native replacement of cloudflare-single', async () => {
+    const doStub = makeDoStub();
+    const request = requestForPreset('cloudflare-single');
+    request.runtime = { sandboxAllocation: 'cloudflare-single', egressMode: 'allowlist' };
+    await runCreate(selectedContext(doStub), request);
+    expect(createdMetadata(doStub)?.workspace).toMatchObject({
+      sandboxProvider: 'cloudflare-containers',
+      egressMode: 'allowlist',
+      egressAllowlist: [],
+    });
+  });
+
+  it('forwards the policy on legacy registration-only creation', async () => {
+    const doStub = makeDoStub();
+    const request = requestForPreset('cloudflare-containers-standard-3');
+    request.runtime = { ...request.runtime, egressMode: 'allowlist' };
+    await registerNewSession(request, selectedContext(doStub));
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          workspace: expect.objectContaining({
+            egressMode: 'allowlist',
+            egressAllowlist: [],
+          }),
+        }),
+        sandboxSelection: expect.objectContaining({
+          egressMode: 'allowlist',
+          egressAllowlist: [],
+        }),
+      })
+    );
+  });
+
+  it.each(['vercel-small', 'cloudflare-shared'] as const)(
+    'rejects an unsupported saved %s policy allocation',
+    async savedSandboxAllocation => {
+      const doStub = makeDoStub();
+      await expect(
+        runCreate(selectedContext(doStub), {
+          ...requestForPreset(savedSandboxAllocation),
+          runtime: { egressMode: 'allowlist' },
+          savedSandboxAllocation,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects legacy-plane policy admission', async () => {
+    const doStub = makeDoStub();
+    generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
+    await expect(
+      startNewSession(
+        {
+          ...requestForPreset('cloudflare-single'),
+          runtime: { sandboxAllocation: 'cloudflare-single', egressMode: 'allowlist' },
+        },
+        selectedContext(doStub)
+      )
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('forwards legacy prepare mode-only input without an explicit allocation', () => {
+    const request = prepareInputToSessionCreateRequest(
+      PrepareSessionInput.parse({
+        prompt: 'hello',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        egressMode: 'allowlist',
+      })
+    );
+    expect(request.runtime?.egressMode).toBe('allowlist');
+    expect(request.runtime?.egressAllowlist).toBeUndefined();
+    expect(request.runtime?.sandboxAllocation).toBeUndefined();
+  });
+
+  it('fingerprints canonical deny policy independently of optional list presence', async () => {
+    const request = requestForPreset('cloudflare-containers-standard-3');
+    const fingerprint = (egressAllowlist?: string[]) =>
+      sessionCreateIntentFingerprint({
+        ...request,
+        runtime: {
+          ...request.runtime,
+          egressMode: 'allowlist',
+          ...(egressAllowlist === undefined ? {} : { egressAllowlist }),
+        },
+      });
+    expect(await fingerprint(['Z.Example.COM.', 'example.com'])).toBe(
+      await fingerprint(['example.com', 'z.example.com'])
+    );
+    expect(await fingerprint()).toBe(await fingerprint([]));
+    expect(await fingerprint(['example.com'])).not.toBe(await fingerprint(['other.example.com']));
+  });
+
+  it('fingerprints unrestricted and omitted mode as equivalent, distinct from allowlist mode', async () => {
+    for (const runtime of [
+      undefined,
+      { sandboxAllocation: 'cloudflare-containers-standard-3' as const },
+    ]) {
+      const request = { ...requestForPreset('cloudflare-containers-standard-3'), runtime };
+      const implicit = await sessionCreateIntentFingerprint(request);
+      expect(
+        await sessionCreateIntentFingerprint({
+          ...request,
+          runtime: { ...runtime, egressMode: 'unrestricted' },
+        })
+      ).toBe(implicit);
+      expect(
+        await sessionCreateIntentFingerprint({
+          ...request,
+          runtime: { ...runtime, egressMode: 'allowlist' },
+        })
+      ).not.toBe(implicit);
+    }
+  });
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'invalid' },
+  ])('rejects invalid internal egress policy before allocating: %j', async runtime => {
+    const doStub = makeDoStub();
+    const request = requestForPreset('cloudflare-containers-standard-3');
+    await expect(
+      runCreate(selectedContext(doStub), { ...request, runtime } as SessionCreateRequest)
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'Invalid egress policy' });
+    expectNoAllocation(doStub);
+  });
+
+  it.each(['vercel-small', 'cloudflare-shared', 'isolated-standard'] as const)(
+    'allows explicit unrestricted mode on %s',
+    async sandboxAllocation => {
+      const doStub = makeDoStub();
+      const request = requestForPreset(sandboxAllocation);
+      request.runtime = { sandboxAllocation, egressMode: 'unrestricted' };
+      await runCreate(selectedContext(doStub), request);
+      expect(createdMetadata(doStub)?.workspace?.egressMode).toBe('unrestricted');
+      expect(createdMetadata(doStub)?.workspace?.egressAllowlist).toBeUndefined();
+    }
+  );
+
+  it.each([
+    {},
+    { egressMode: 'unrestricted' as const },
+    { egressMode: 'allowlist' as const },
+    { egressMode: 'allowlist' as const, egressAllowlist: [] },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['other.example.com'] },
+  ])('rejects a changed policy on ledger replay: %j', async policy => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = {
+      ...requestForPreset('cloudflare-containers-standard-3'),
+      runtime: {
+        sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+        egressMode: 'allowlist' as const,
+        egressAllowlist: ['example.com'],
+      },
+    };
+    await runCreate(ctx, request);
+    const progress = Object.assign(
+      {},
+      ...recordOperationProgressMock.mock.calls.map(call => call[2])
+    );
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: makeLedgerRow({
+        organization_id: orgId,
+        status: 'completed',
+        canonical_result: progress,
+      }),
+    });
+    await expect(
+      runCreate(ctx, {
+        ...request,
+        runtime: { sandboxAllocation: request.runtime.sandboxAllocation, ...policy },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { egressMode: 'allowlist' as const, egressAllowlist: [] },
+    { egressMode: 'allowlist' as const },
+  ])(
+    'replays baseline-only allowlist requests with equivalent optional lists: %j',
+    async policy => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      const request = {
+        ...requestForPreset('cloudflare-containers-standard-3'),
+        runtime: {
+          sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+          egressMode: 'allowlist' as const,
+        },
+      };
+      const created = await runCreate(ctx, request);
+      const progress = Object.assign(
+        {},
+        ...recordOperationProgressMock.mock.calls.map(call => call[2])
+      );
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: makeLedgerRow({
+          organization_id: orgId,
+          status: 'completed',
+          canonical_result: progress,
+        }),
+      });
+      await expect(
+        runCreate(ctx, { ...request, runtime: { ...request.runtime, ...policy } })
+      ).resolves.toEqual({ ...created, replayed: true });
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('rejects a recovered registration that dropped the persisted policy', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = {
+      ...requestForPreset('cloudflare-containers-standard-3'),
+      runtime: {
+        sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+        egressMode: 'allowlist' as const,
+        egressAllowlist: [],
+      },
+    };
+    await runCreate(ctx, request);
+    const progress = Object.assign(
+      {},
+      ...recordOperationProgressMock.mock.calls.map(call => call[2])
+    );
+    const stored = createdMetadata(doStub);
+    if (!stored) throw new Error('Missing registered metadata');
+    doStub.getMetadata.mockResolvedValueOnce({
+      ...stored,
+      workspace: { ...stored.workspace, egressMode: undefined, egressAllowlist: undefined },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [{ sessionId: KILO_SESSION_ID }]]));
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        organization_id: orgId,
+        status: 'reconcile_pending',
+        canonical_result: progress,
+      }),
+    });
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
+    });
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(doStub.getMessageResult).not.toHaveBeenCalled();
   });
 
   it.each(

@@ -496,6 +496,16 @@ describe('repository snapshot launch', () => {
         detail: 'Snapshot startup failed. Retrying without a snapshot.',
       })
     );
+    const updates = peer.routeUpdatesFor(SESSION);
+    const fallbackIndex = updates.findIndex(
+      update => update.state === 'preparing' && update.step === 'snapshot_fallback'
+    );
+    expect(updates[fallbackIndex + 1]).toMatchObject({
+      state: 'preparing',
+      attemptId: expect.any(String),
+      step: 'sandbox_start',
+      detail: 'Starting sandbox without a snapshot',
+    });
   });
 
   it('reports a snapshot fallback when a previous failed snapshot start is skipped', async () => {

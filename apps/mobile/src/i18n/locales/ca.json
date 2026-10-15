@@ -133,6 +133,7 @@
     "status": "Estat",
     "truncated": "Truncat",
     "updated": "Actualitzat",
+    "generating": "Generant…",
     "working": "En curs",
     "yourOwnRepositories": "Els teus repositoris",
     "dismissed": "Descartat",
@@ -1277,7 +1278,7 @@
         "stoppedTitle": "Configuració aturada",
         "stoppedBody": "La instància de {{name}} s'ha aturat inesperadament durant la configuració.",
         "stalledTitle": "Alguna cosa s'ha encallat",
-        "stalledBody": "No hem pogut acabar de configurar {{name}}. Torna-ho a provar o escriu a hi@kilo.ai si el problema persisteix.",
+        "stalledBody": "No hem pogut acabar de configurar {{name}}. Torna-ho a provar o escriu a {{supportEmail}} si el problema persisteix.",
         "timeoutTitle": "Tarda més del previst",
         "timeoutBody": "La configuració de {{name}} tarda més del normal (més de {{displayMinutes}} minuts).",
         "continueInBackground": "Continua en segon pla",
@@ -1335,7 +1336,7 @@
       "nonCanonicalEarlybirdBody": "El teu pla d'accés anticipat requereix una revisió manual abans de poder-se utilitzar al mòbil.",
       "iosTitle": "KiloClaw no està disponible a iOS",
       "iosBody": "L'accés d'aquest compte a KiloClaw es gestiona fora de l'aplicació per a iOS.",
-      "iosContact": "Tens preguntes? Contacta amb hi@kilo.ai.",
+      "iosContact": "Tens preguntes? Contacta amb {{supportEmail}}.",
       "quarantinedCta": "Escriu al nostre equip",
       "nonCanonicalEarlybirdCta": "Revisa el teu pla a kilo.ai"
     },
@@ -1571,7 +1572,7 @@
         "recoveryLabel": "Actualitza l'aplicació de GitHub"
       },
       "githubIpAllowList": {
-        "description": "El revisor de codi s'ha desactivat perquè aquesta organització de GitHub utilitza una llista d'adreces IP permeses que bloqueja Kilo. Contacta amb hi@kilocode.ai per demanar ajuda i torna a activar el revisor de codi."
+        "description": "El revisor de codi s'ha desactivat perquè aquesta organització de GitHub utilitza una llista d'adreces IP permeses que bloqueja Kilo. Contacta amb {{supportEmail}} per demanar ajuda i torna a activar el revisor de codi."
       },
       "gitlabProjectAccessRequired": {
         "description": "El revisor de codi s'ha desactivat perquè Kilo no pot crear un testimoni d'accés per a aquest projecte de GitLab. Concedeix accés de mantenidor o activa els testimonis d'accés al projecte i torna a activar el revisor de codi.",
@@ -1586,7 +1587,7 @@
         "recoveryLabel": "Actualitza la configuració del revisor de codi"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "El revisor de codi s'ha desactivat perquè avui s'ha superat tres cops el temps límit per clonar el repositori. Contacta amb hi@kilocode.ai per demanar ajuda i torna a activar el revisor de codi."
+        "description": "El revisor de codi s'ha desactivat perquè avui s'ha superat tres cops el temps límit per clonar el repositori. Contacta amb {{supportEmail}} per demanar ajuda i torna a activar el revisor de codi."
       },
       "title": "El revisor de codi necessita la teva atenció.",
       "recoveryLabel": "Contacta amb l'equip de suport"
@@ -3363,6 +3364,10 @@
     },
     "backends": {
       "title": "Servidors de xat",
+      "providersTitle": "Proveïdors de xat",
+      "cloud": "Al núvol",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Els models de Kilo no estan disponibles ara mateix. Comprova la connexió.",
       "manage": "Gestiona els servidors",
       "defaultKilo": "$t(consent.kilo) (predeterminat)",
       "kiloHelp": "El servidor integrat utilitza el teu compte de Kilo i no es pot editar ni eliminar.",
@@ -3422,7 +3427,6 @@
     "gguf": {
       "title": "Models descarregables",
       "help": "Descarrega un model obert i executa'l en aquest telèfon amb llama.cpp. Les teves peticions i respostes es queden al dispositiu. Els models són grans, així que fes servir Wi-Fi.",
-      "details": "{{size}} · Llicència: {{license}}",
       "download": "Descarrega el model",
       "pause": "Pausa la descàrrega",
       "resume": "Reprèn la descàrrega",
@@ -3434,6 +3438,8 @@
       "url": "Enllaç de descàrrega directa",
       "urlHelp": "Enganxa un enllaç HTTPS a un fitxer .gguf, com ara un enllaç resolve de Hugging Face. Descarrega models només de fonts de confiança.",
       "downloadUrl": "Descarrega des de l'enllaç",
+      "advanced": "Avançat",
+      "localPurpose": "S'executa en aquest dispositiu amb llama.cpp. Les indicacions i les respostes es queden al dispositiu.",
       "deleteTitle": "Vols eliminar aquest model?",
       "deleteMessage": "Vols eliminar {{name}} d'aquest dispositiu? Els xats que el fan servir necessiten un altre model abans de poder continuar.",
       "errors": {
@@ -3462,8 +3468,17 @@
         "fits": "Hi cap",
         "tight": "Just",
         "tooLarge": "Massa gran",
-        "noStorage": "No hi ha prou espai"
+        "noStorage": "No hi ha prou espai",
+        "unknown": "Encaix desconegut"
       },
+      "recommendationsHelp": "Una llista que aquesta aplicació fixa: un fitxer per model, d'un editor que declara una llicència. No es classifica res més.",
+      "compatibilityHelp": "L'encaix compara el fitxer del model amb la memòria i l'emmagatzematge lliure d'aquest dispositiu. La xifra de memòria és una estimació, no una mesura.",
+      "text": "Text",
+      "listTextPurpose": "Només indicacions de text.",
+      "listImagePurpose": "Llegeix imatges i també text.",
+      "smallestDownload": "Descàrrega més petita: {{size}} · uns {{memory}} de memòria",
+      "fullFileName": "Fitxer: {{name}}",
+      "memoryEstimateNote": "Les xifres de memòria són estimacions, no mesures.",
       "parameters": "Paràmetres: {{value}}",
       "downloads": "Baixades: {{value}}",
       "likes": "M'agrada: {{value}}",
@@ -3488,7 +3503,8 @@
     },
     "localModels": {
       "title": "Models al dispositiu",
-      "help": "Els models al dispositiu s'executen en aquest telèfon. Les teves peticions i respostes es queden al dispositiu, i aquests models no poden fer servir eines.",
+      "help": "Els models al dispositiu s'executen en aquest telèfon. Les teves peticions i respostes es queden al dispositiu.",
+      "systemPurpose": "El model integrat al sistema d'aquest dispositiu. S'executa al dispositiu.",
       "apple": "Apple Intelligence (al dispositiu)",
       "checking": "S'està comprovant la disponibilitat…",
       "ready": "A punt per fer servir",
@@ -3793,12 +3809,26 @@
       "startNow": "Inicia sense revisió",
       "startNowHint": "Mantén premut per iniciar sense revisió",
       "titleLabel": "Títol de la tasca",
+      "renameTitle": "Canvia el nom de la tasca",
       "notes": "Notes",
-      "notesPlaceholder": "Afegeix notes en Markdown",
+      "addNotes": "Afegeix notes",
+      "notesPrompt": "Afegeix context, requisits o criteris d'acceptació.",
+      "markdownSupported": "Markdown compatible",
       "sessions": "Sessions vinculades",
       "noSessions": "Encara no hi ha sessions",
+      "untitledLinkedSession": "Sessió enllaçada",
+      "sessionNeedsInput": "La sessió necessita entrada",
+      "sessionRunning": "Sessió en marxa",
+      "sessionFinished": "Sessió acabada",
+      "sessionPullRequest": "PR de la sessió",
+      "sessionPullRequestNumber": "PR de la sessió #{{number}}",
+      "openSessionHint": "Obre la sessió.",
+      "unlinkSessionAction": "Desenllaça la sessió",
+      "unlinkConfirmTitle": "Vols desenllaçar {{title}}?",
+      "unlinkConfirmMessage": "La sessió en si no se suprimeix. Només se'n treu l'enllaç amb aquesta tasca.",
+      "startNewSession": "Inicia una sessió nova",
+      "startNewSessionHint": "Mantén premut per iniciar una sessió nova.",
       "linkSession": "Vincula una sessió",
-      "unlinkSession": "Desvincula {{title}}",
       "linkFailed": "No s'ha pogut vincular la sessió a la tasca"
     },
     "linkSession": {

@@ -180,6 +180,63 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
   });
 });
 
+describe('applyProviderSpecificLogic recursive tool schemas', () => {
+  async function applyToToolParameters(model: string) {
+    const request: Extract<GatewayRequest, { kind: 'responses' }> = {
+      kind: 'responses',
+      body: {
+        model,
+        input: 'hello',
+        tools: [
+          {
+            type: 'function',
+            name: 'filter',
+            strict: false,
+            parameters: {
+              type: 'object',
+              properties: { filters: { $ref: '#/$defs/filters' } },
+              $defs: {
+                filters: { type: 'array', items: { $ref: '#/$defs/filters' } },
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    const tool = request.body.tools?.[0];
+    return tool?.type === 'function' ? tool.parameters : undefined;
+  }
+
+  it('removes recursive refs for Muse models', async () => {
+    const parameters = await applyToToolParameters('meta/muse-spark-1.3');
+
+    expect(parameters?.$defs).toEqual({ filters: { type: 'array', items: { type: 'array' } } });
+  });
+
+  it('preserves recursive refs for other models', async () => {
+    const parameters = await applyToToolParameters('vendor/model');
+
+    expect(parameters?.$defs).toEqual({
+      filters: { type: 'array', items: { $ref: '#/$defs/filters' } },
+    });
+  });
+});
+
 describe('applyReasoningDetailsTransform', () => {
   function makeReasoningRequest(): Extract<GatewayRequest, { kind: 'chat_completions' }> {
     return {

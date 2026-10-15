@@ -90,6 +90,71 @@ describe('fetchEfficientAutoDecision', () => {
     expect(result).toEqual({ decision: validDecision, costUsd: 0.001 });
   });
 
+  it('keeps the omitted router on the efficient default payload', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    await fetchEfficientAutoDecision(makeParams(), options);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).not.toHaveProperty('router');
+  });
+
+  it('sends frontier independently with privacy hints and denied models', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    await fetchEfficientAutoDecision(
+      {
+        ...makeParams(),
+        router: 'frontier',
+        requestedModel: 'kilo-auto/frontier',
+        providerHints: { provider: { data_collection: 'deny' }, providerOptions: null },
+        deniedModelIds: ['openai/gpt-4o'],
+      },
+      options
+    );
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).toMatchObject({
+      router: 'frontier',
+      input: {
+        requestedModel: 'kilo-auto/frontier',
+        providerHints: { provider: { data_collection: 'deny' }, providerOptions: null },
+      },
+      routingPolicy: { deniedModelIds: ['openai/gpt-4o'] },
+    });
+  });
+
+  it('returns a null frontier decision when its table is missing', async () => {
+    mockedFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ cost: 0, decision: null, classifierResult: null }), {
+        status: 200,
+      })
+    );
+
+    expect(
+      await fetchEfficientAutoDecision(
+        { ...makeParams(), router: 'frontier', requestedModel: 'kilo-auto/frontier' },
+        options
+      )
+    ).toEqual({ decision: null, costUsd: 0 });
+  });
+
+  it('preserves zero classifier cost for worker-owned billing', async () => {
+    mockedFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...validResponse,
+          cost: 0,
+        }),
+        { status: 200 }
+      )
+    );
+    expect(await fetchEfficientAutoDecision(makeParams(), options)).toEqual({
+      decision: validDecision,
+      costUsd: 0,
+    });
+  });
+
   it('allows the current worker miss path five seconds to complete', () => {
     expect(EFFICIENT_DECISION_TIMEOUT_MS).toBe(5_000);
   });

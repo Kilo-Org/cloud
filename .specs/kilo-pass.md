@@ -249,6 +249,10 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 
 ### Projections and UI
 
+Credit-expiration summaries MUST group positive remaining balances by expiration instant.
+They MUST exclude non-expiring and exhausted blocks and show each group in chronological order.
+Summaries MUST NOT label all dated credits as bonus credits.
+
 38. The Kilo Pass state read path MUST keep actual issuance amounts and projected amounts separate. It MUST compute
     current-period and next-period projections from tier, cadence, streak, first-time-subscriber status, provider, and
     stored initial welcome-promo reason.

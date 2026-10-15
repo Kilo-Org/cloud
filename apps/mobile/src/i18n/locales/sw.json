@@ -133,6 +133,7 @@
     "status": "Hali",
     "truncated": "Imepunguzwa",
     "updated": "Imesasishwa",
+    "generating": "Inatengeneza…",
     "working": "Inafanya kazi",
     "yourOwnRepositories": "Hazina zako mwenyewe",
     "dismissed": "Imepuuzwa",
@@ -1259,7 +1260,7 @@
         "stoppedTitle": "Usanidi umesimamishwa",
         "stoppedBody": "Kizio cha {{name}} kilisimama bila kutarajiwa wakati wa usanidi.",
         "stalledTitle": "Kuna kitu kimekwama",
-        "stalledBody": "Hatukuweza kukamilisha usanidi wa {{name}}. Jaribu tena, au tuma barua pepe kwa hi@kilo.ai ikiwa tatizo hili linaendelea.",
+        "stalledBody": "Hatukuweza kukamilisha usanidi wa {{name}}. Jaribu tena, au tuma barua pepe kwa {{supportEmail}} ikiwa tatizo hili linaendelea.",
         "timeoutTitle": "Inachukua muda mrefu kuliko ilivyotarajiwa",
         "timeoutBody": "Usanidi wa {{name}} unachukua muda mrefu kuliko kawaida (zaidi ya dakika {{displayMinutes}}).",
         "continueInBackground": "Endelea chinichini",
@@ -1317,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Mpango wako wa ufikiaji wa mapema unahitaji kukaguliwa na mtu kabla ya kutumika kwenye simu.",
       "iosTitle": "KiloClaw haipatikani kwenye iOS",
       "iosBody": "Ufikiaji wa KiloClaw unasimamiwa nje ya programu ya iOS kwa akaunti hii.",
-      "iosContact": "Maswali? Wasiliana na hi@kilo.ai.",
+      "iosContact": "Maswali? Wasiliana na {{supportEmail}}.",
       "quarantinedCta": "Tuma barua pepe kwa timu yetu",
       "nonCanonicalEarlybirdCta": "Kagua mpango wako kwenye kilo.ai"
     },
@@ -1552,7 +1553,7 @@
         "recoveryLabel": "Sasisha programu ya GitHub"
       },
       "githubIpAllowList": {
-        "description": "Mkaguzi wa msimbo alizimwa kwa sababu shirika hili la GitHub linatumia orodha ya anwani za IP zinazoruhusiwa ambayo inazuia Kilo. Wasiliana na hi@kilocode.ai kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
+        "description": "Mkaguzi wa msimbo alizimwa kwa sababu shirika hili la GitHub linatumia orodha ya anwani za IP zinazoruhusiwa ambayo inazuia Kilo. Wasiliana na {{supportEmail}} kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
       },
       "gitlabProjectAccessRequired": {
         "description": "Mkaguzi wa msimbo alizimwa kwa sababu Kilo haiwezi kuunda tokeni ya kufikia mradi huu wa GitLab. Toa ruhusa za mtunzaji wa mradi au uwashe tokeni za kufikia mradi, kisha uwashe mkaguzi wa msimbo tena.",
@@ -1567,7 +1568,7 @@
         "recoveryLabel": "Sasisha mipangilio ya mkaguzi wa msimbo"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Mkaguzi wa msimbo alizimwa baada ya kunakili hazina kuzidi muda uliowekwa mara tatu leo. Wasiliana na hi@kilocode.ai kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
+        "description": "Mkaguzi wa msimbo alizimwa baada ya kunakili hazina kuzidi muda uliowekwa mara tatu leo. Wasiliana na {{supportEmail}} kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
       },
       "title": "Mkaguzi wa msimbo anahitaji uangalizi wako.",
       "recoveryLabel": "Wasiliana na timu ya usaidizi"
@@ -3322,6 +3323,10 @@
     },
     "backends": {
       "title": "Huduma za gumzo",
+      "providersTitle": "Watoa huduma za gumzo",
+      "cloud": "Katika wingu",
+      "cloudModel": "Modeli: {{model}}",
+      "cloudUnavailable": "Modeli za Kilo hazipatikani kwa sasa. Angalia muunganisho wako.",
       "manage": "Dhibiti huduma za gumzo",
       "defaultKilo": "$t(consent.kilo) (chaguo-msingi)",
       "kiloHelp": "Huduma iliyojengwa ndani hutumia akaunti yako ya Kilo na haiwezi kuhaririwa au kufutwa.",
@@ -3381,7 +3386,6 @@
     "gguf": {
       "title": "Modeli zinazoweza kupakuliwa",
       "help": "Pakua modeli huria na uiendeshe kwenye simu hii kwa llama.cpp. Maombi na majibu yako hubaki kwenye kifaa. Modeli ni kubwa, kwa hivyo tumia Wi-Fi.",
-      "details": "{{size}} · Leseni: {{license}}",
       "download": "Pakua modeli",
       "pause": "Simamisha upakuaji",
       "resume": "Endeleza upakuaji",
@@ -3393,6 +3397,8 @@
       "url": "Kiungo cha kupakua moja kwa moja",
       "urlHelp": "Bandika kiungo cha HTTPS kwa faili ya .gguf, kama vile kiungo cha resolve cha Hugging Face. Pakua modeli kutoka vyanzo unavyoamini pekee.",
       "downloadUrl": "Pakua kutoka kwenye kiungo",
+      "advanced": "Ya juu",
+      "localPurpose": "Inafanya kazi kwenye kifaa hiki kwa llama.cpp. Maombi na majibu hubaki kwenye kifaa.",
       "deleteTitle": "Ungependa kufuta modeli hii?",
       "deleteMessage": "Ungependa kufuta {{name}} kwenye kifaa hiki? Gumzo zinazotumia modeli hii zinahitaji modeli nyingine kabla ya kuendelea.",
       "errors": {
@@ -3421,8 +3427,17 @@
         "fits": "Inatosha",
         "tight": "Inatosha kwa shida",
         "tooLarge": "Kubwa mno",
-        "noStorage": "Hifadhi haitoshi"
+        "noStorage": "Hifadhi haitoshi",
+        "unknown": "Ulinganifu haujulikani"
       },
+      "recommendationsHelp": "Orodha fupi ambayo programu hii inabandika: faili moja kwa kila modeli, kutoka kwa mchapishaji anayetaja leseni. Hakuna kingine kinachopangwa.",
+      "compatibilityHelp": "Ulinganifu hulinganisha faili ya modeli na kumbukumbu ya kifaa hiki na hifadhi iliyobaki. Kipimo cha kumbukumbu ni kadirio, si kipimo halisi.",
+      "text": "Maandishi",
+      "listTextPurpose": "Maombi ya maandishi pekee.",
+      "listImagePurpose": "Husoma picha na maandishi pia.",
+      "smallestDownload": "Upakuaji mdogo zaidi: {{size}} · takriban {{memory}} ya kumbukumbu",
+      "fullFileName": "Faili: {{name}}",
+      "memoryEstimateNote": "Vipimo vya kumbukumbu ni makadirio, si vipimo halisi.",
       "parameters": "Vigezo: {{value}}",
       "downloads": "Vipakuliwa: {{value}}",
       "likes": "Zilizopendwa: {{value}}",
@@ -3447,7 +3462,8 @@
     },
     "localModels": {
       "title": "Modeli za kwenye kifaa",
-      "help": "Modeli za kwenye kifaa hufanya kazi kwenye simu hii. Maombi na majibu yako hubaki kwenye kifaa, na modeli hizi haziwezi kutumia zana.",
+      "help": "Modeli za kwenye kifaa hufanya kazi kwenye simu hii. Maombi na majibu yako hubaki kwenye kifaa.",
+      "systemPurpose": "Modeli iliyojengwa ndani ya mfumo wa kifaa hiki. Hufanya kazi kwenye kifaa.",
       "apple": "Apple Intelligence (kwenye kifaa)",
       "checking": "Inakagua upatikanaji…",
       "ready": "Iko tayari kutumika",
@@ -3748,12 +3764,26 @@
       "startNow": "Anza bila ukaguzi",
       "startNowHint": "Bonyeza kwa muda mrefu ili kuanza bila ukaguzi",
       "titleLabel": "Kichwa cha kazi",
+      "renameTitle": "Badilisha jina la kazi",
       "notes": "Madokezo",
-      "notesPlaceholder": "Ongeza madokezo kwa Markdown",
+      "addNotes": "Ongeza madokezo",
+      "notesPrompt": "Ongeza muktadha, mahitaji, au vigezo vya kukubali.",
+      "markdownSupported": "Markdown inatumika",
       "sessions": "Vikao vilivyounganishwa",
       "noSessions": "Hakuna vikao bado",
+      "untitledLinkedSession": "Kikao kilichounganishwa",
+      "sessionNeedsInput": "Kikao kinahitaji ingizo",
+      "sessionRunning": "Kikao kinaendelea",
+      "sessionFinished": "Kikao kimekamilika",
+      "sessionPullRequest": "PR ya kikao",
+      "sessionPullRequestNumber": "PR ya kikao #{{number}}",
+      "openSessionHint": "Hufungua kikao.",
+      "unlinkSessionAction": "Tenganisha kikao",
+      "unlinkConfirmTitle": "Tenganisha {{title}}?",
+      "unlinkConfirmMessage": "Kikao chenyewe hakifutwa. Kiungo chake kwa kazi hii pekee ndicho kinachoondolewa.",
+      "startNewSession": "Anza kikao kipya",
+      "startNewSessionHint": "Bonyeza kwa muda mrefu kuanza kikao kipya.",
       "linkSession": "Unganisha kikao",
-      "unlinkSession": "Tenganisha {{title}}",
       "linkFailed": "Imeshindikana kuunganisha kikao na kazi"
     },
     "linkSession": {

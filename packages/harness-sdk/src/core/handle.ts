@@ -64,6 +64,8 @@ interface SessionHandle {
   readonly history: Effect.Effect<readonly Turn[]>;
   /** The counts of every call so far. Pass to `hitRatio` for the cache share. */
   readonly usage: Effect.Effect<ModelUsage>;
+  /** Every completed call, including summaries, grouped by served model or requested fallback. */
+  readonly usageByModel: Effect.Effect<ReadonlyMap<string, ModelUsage>>;
   /**
    * Replaces the conversation with a summary of itself, now, whatever the
    * window says. A session does this on its own when it fills the window; this
@@ -113,6 +115,7 @@ const handleOf = (wiring: Wiring): Effect.Effect<SessionHandle> =>
     background: (callId: string) => backgroundNow(wiring, callId),
     history: Effect.map(Ref.get(wiring.state), session => session.turns),
     usage: Ref.get(wiring.totals),
+    usageByModel: Ref.get(wiring.modelTotals),
     compact: whileFree(wiring, compactSession(wiring)),
     continued: continuedOf(wiring),
   });

@@ -128,6 +128,8 @@ import {
   type ControlPlaneWorktreeChanges,
 } from './worktree-changes.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
+import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
+import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';
 import { readWorktreeChildSessions } from './worktree-child-sessions.js';
 import {
   buildControlPlaneMessageReport,
@@ -141,7 +143,11 @@ import {
   writeReportAnchor,
   type ReportOutbox,
 } from '../../sandbox-session/report-outbox.js';
-import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import {
+  CloudAgentRunContainerSchema,
+  type CloudAgentQueueReport,
+  type CloudAgentRunContainer,
+} from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
@@ -158,6 +164,7 @@ import {
 import {
   controlPlaneSandboxSelectionSchema,
   type ControlPlanePrepareInputWithSelection,
+  type ControlPlaneSandboxSelection,
 } from './sandbox-selection.js';
 import type { ControlRuntimeCredentialProxyFence } from '../sandbox/sandbox-do.js';
 import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
@@ -209,7 +216,7 @@ const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
 
 const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'Creating sandbox',
-  sandbox_start: 'Starting sandbox from snapshot',
+  sandbox_start: 'Starting sandbox',
   snapshot_fallback: 'Retrying without a snapshot',
   clone: 'Cloning repository',
   restore: 'Updating repository',
@@ -248,6 +255,7 @@ function persistedRouteView(
     state: 'preparing',
     attemptId: view.attemptId,
     ...(step === undefined ? {} : { step }),
+    ...(view.container === undefined ? {} : { container: view.container }),
   };
 }
 
@@ -330,6 +338,8 @@ export type ControlPlaneSandboxPeer = {
   worktreeCapture(input: ControlPlaneWorktreeCaptureInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one terminal request to the wrapper. */
   terminal(input: ControlPlaneTerminalInput): Promise<ControlPlaneControlResult>;
+  /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
+  previewTarget(sessionId: string): Promise<PreviewTargetResult>;
   /** B10: the wrapper identity bound to the connected allocation. */
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
@@ -341,7 +351,18 @@ type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 
 type TransportPass = { deadlineAt: number; scheduleRecovery: boolean };
 
+function parseStoredRunContainer(raw: string | null): CloudAgentRunContainer | undefined {
+  if (raw == null) return undefined;
+  try {
+    const parsed = CloudAgentRunContainerSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function rowToMessage(row: SessionMessageRow): SessionMessage {
+  const container = parseStoredRunContainer(row.container);
   return {
     messageId: row.message_id,
     intent: controlPlanePromptPayloadSchema.parse(JSON.parse(row.intent)),
@@ -350,6 +371,7 @@ function rowToMessage(row: SessionMessageRow): SessionMessage {
     acceptedAt: row.accepted_at,
     settledAt: row.settled_at,
     reason: row.reason,
+    ...(container === undefined ? {} : { container }),
   };
 }
 
@@ -362,6 +384,7 @@ function messageToRow(message: SessionMessage): SessionMessageRow {
     accepted_at: message.acceptedAt,
     settled_at: message.settledAt,
     reason: message.reason,
+    container: message.container === undefined ? null : JSON.stringify(message.container),
   };
 }
 
@@ -468,6 +491,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private readonly worktreeChanges: ControlPlaneWorktreeChanges;
   /** Terminal records and the browser/wrapper bridge (plan B10). */
   private readonly terminals: ControlPlaneTerminals;
+  /** Preview eligibility and target resolution through the Sandbox DO. */
+  private readonly preview: ControlPlanePreview;
   /** Generation of the in-flight preparation, for the worktree-change hooks. */
   private worktreePreparationGeneration: number | undefined;
   /**
@@ -534,6 +559,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       isRouteReady: () => this.route.state === 'ready',
       request: (sandboxId, input) => this.terminalRequest(sandboxId, input),
     });
+    this.preview = createControlPlanePreview({
+      getMetadata: () => this.metadata,
+      resolveTarget: sandboxId => this.previewTargetFor(sandboxId),
+    });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
 
@@ -549,6 +578,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       };
     }
     return peer.terminal(input);
+  }
+
+  private async previewTargetFor(sandboxId: string): Promise<PreviewTargetResult> {
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      return { status: 'not_running' };
+    }
+    return withDORetry(
+      () => this.sandboxPeerFor(sandboxId) ?? peer,
+      stub => stub.previewTarget(this.sessionId),
+      'previewTarget'
+    );
   }
 
   private async currentWrapperId(): Promise<string | undefined> {
@@ -651,7 +692,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const { metadata, message, sandboxSelection, runtimeAuthorizationSeal } = parsed.data;
 
     if (this.metadata !== null && this.registration !== null) {
-      if (!this.matchesExistingRegistration(metadata, message.messageId)) {
+      if (!this.matchesExistingRegistration(metadata, message.messageId, sandboxSelection)) {
         return createFailure(
           'BAD_REQUEST',
           'Registration does not match the existing session intent'
@@ -726,7 +767,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // seal) must not touch the seal again. Match the stored intent and replay
     // success before unsealing; a different intent is rejected.
     if (this.metadata !== null && this.registration !== null) {
-      if (!this.matchesExistingRegistration(metadata, undefined)) {
+      if (!this.matchesExistingRegistration(metadata, undefined, sandboxSelection)) {
         return createFailure(
           'BAD_REQUEST',
           'Registration does not match the existing session intent'
@@ -887,7 +928,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   private matchesExistingRegistration(
     metadata: SessionMetadata,
-    messageId: string | undefined
+    messageId: string | undefined,
+    sandboxSelection: ControlPlaneSandboxSelection
   ): boolean {
     const existing = this.metadata;
     if (existing === null || this.registration === null) return false;
@@ -896,6 +938,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
       sameRepository(existing.repository, metadata.repository) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
+      (existing.workspace?.egressMode ?? 'unrestricted') ===
+        (metadata.workspace?.egressMode ?? 'unrestricted') &&
+      (this.registration.sandboxSelection?.egressMode ?? 'unrestricted') ===
+        (sandboxSelection.egressMode ?? 'unrestricted') &&
+      JSON.stringify(existing.workspace?.egressAllowlist ?? []) ===
+        JSON.stringify(metadata.workspace?.egressAllowlist ?? []) &&
+      JSON.stringify(this.registration.sandboxSelection?.egressAllowlist ?? []) ===
+        JSON.stringify(sandboxSelection.egressAllowlist ?? []) &&
       (existing.initialMessage?.id ?? null) === (messageId ?? null) &&
       (existing.clone?.cloneUpToMessageId ?? null) === (metadata.clone?.cloneUpToMessageId ?? null)
     );
@@ -988,8 +1038,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     await this.armAlarm();
     if (!this.messages.some(message => message.state === 'queued')) return 'ok';
-    if (this.route.state === 'ready') await this.deliverQueued(pass);
-    else {
+    if (this.route.state === 'ready') {
+      await this.persistQueuedContainer(this.route.container);
+      await this.deliverQueued(pass);
+    } else {
       const view = await this.prepareSandbox(pass);
       if (view !== null) await this.applyView(view, pass);
     }
@@ -1104,6 +1156,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       // A delete queued ahead of this notification wiped the session.
       if (this.registration === null) return;
+      if (parsed.state === 'lost' && parsed.attemptId === this.currentAttemptId()) {
+        await this.captureQueuedRouteContainer(parsed);
+      }
       if (
         this.messages.some(message => message.state === 'queued') &&
         (this.route.state === 'failed' ||
@@ -1258,6 +1313,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const now = Date.now();
       const due = dueBackstopMessages(this.messages, now, this.sessionTimers());
       if (due.length > 0) {
+        if (due.some(entry => entry.message.state === 'queued')) {
+          await this.captureQueuedRouteContainer(this.route);
+        }
         const byReason = new Map<string, string[]>();
         for (const entry of due) {
           const ids = byReason.get(entry.reason) ?? [];
@@ -1691,6 +1749,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.terminals.close(input);
   }
 
+  // --- preview ----------------------------------------------------------------
+
+  /**
+   * Worker-facing preview resolver (spec §10). Runs on the RPC path, not the
+   * operation queue, so a preview never waits behind queued messages. It owns
+   * only eligibility and routing; the provider coordinates come from the
+   * Sandbox DO's off-queue `previewTarget` read.
+   */
+  async resolvePreviewTarget(): Promise<ResolvedPreviewTarget> {
+    await this.initialized;
+    return this.preview.resolve();
+  }
+
   // --- stream -----------------------------------------------------------------
 
   async fetch(request: Request): Promise<Response> {
@@ -1773,6 +1844,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // persisted view names the attempt that is open, so a transition closes it
     // even if this process lost its in-memory recorder map to eviction.
     const previous = this.route;
+    if (view.state === 'failed') await this.captureQueuedRouteContainer(view);
     const previousAttemptId = previous.state === 'unknown' ? undefined : previous.attemptId;
     const nextAttemptId = view.state === 'unknown' ? undefined : view.attemptId;
     if (
@@ -1842,6 +1914,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         return;
       }
       case 'ready': {
+        // Persist before the post-attach capture is scheduled, so the deliver RPC
+        // is not delayed behind a storage write and the prompt still goes first.
+        await this.persistQueuedContainer(route.container);
         // The attempt's preparation is done before its messages are delivered.
         if (this.worktreePreparationGeneration !== undefined) {
           this.worktreeChanges.attached(this.worktreePreparationGeneration);
@@ -1899,6 +1974,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.scheduleTransportRecovery(pass);
       return;
     }
+    const routeContainer = this.route.state === 'unknown' ? undefined : this.route.container;
     let result: ControlPlaneDeliverResult;
     try {
       result = await withDORetry(
@@ -1907,6 +1983,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           stub.deliver({
             sessionId: this.sessionId,
             messages: queued.map(message => message.intent),
+            ...(routeContainer?.allocationId === undefined
+              ? {}
+              : { allocationId: routeContainer.allocationId }),
           }),
         'session.deliver',
         this.sandboxRpcConfig(pass)
@@ -1951,6 +2030,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       return;
     }
     await this.applyView(view, pass);
+  }
+
+  private async persistQueuedContainer(
+    container: CloudAgentRunContainer | undefined
+  ): Promise<void> {
+    if (container === undefined) return;
+    const captured = this.messages
+      .filter(message => message.state === 'queued')
+      .map(message => ({ ...message, container }));
+    if (captured.length === 0) return;
+    await this.persistMessages(captured);
+    const byId = new Map(captured.map(message => [message.messageId, message]));
+    this.messages = this.messages.map(message => byId.get(message.messageId) ?? message);
+  }
+
+  private async captureQueuedRouteContainer(view: ControlPlaneRouteUpdate): Promise<void> {
+    if (view.state === 'unknown') return;
+    const previous = this.route;
+    if (previous.state === 'failed' && previous.attemptId === view.attemptId) return;
+    // A terminal view may describe a replacement, not the allocation that attempted this work.
+    const container =
+      previous.state === 'unknown' || previous.state === 'failed'
+        ? view.container
+        : (previous.container ??
+          (previous.attemptId === view.attemptId ? view.container : undefined));
+    await this.persistQueuedContainer(container);
   }
 
   private async failRetiredQueuedMessages(): Promise<boolean> {
@@ -2148,17 +2253,34 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const attemptId = this.route.attemptId;
     const attempt = readPreparationAttempt(this.eventQueries, attemptId);
     if (attempt?.status !== 'running') return;
+    let steps = readPreparationSteps(this.eventQueries, attemptId);
+    let phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+    const latestPhase = steps.findLast(step => step.kind === 'phase');
+    if (
+      phase === undefined ||
+      (phase.id !== latestPhase?.id &&
+        (event.type === CONTROL_PLANE_SETUP_EVENTS.started ||
+          event.type === CONTROL_PLANE_SETUP_EVENTS.output))
+    ) {
+      this.preparationRecorder(attemptId, attempt.triggerMessageId).onProgress(
+        'setup_commands',
+        'Running setup commands'
+      );
+      steps = readPreparationSteps(this.eventQueries, attemptId);
+      phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+    }
+    if (phase === undefined) return;
     const command = event.properties.command;
-    const stepId = `setup_command:${command - 1}`;
-    const existingStep = readPreparationSteps(this.eventQueries, attemptId).find(
-      step => step.id === stepId
-    );
+    const commandId = `setup_command:${command - 1}`;
+    const stepId = phase.id === 'phase:setup_commands' ? commandId : `${phase.id}:${commandId}`;
+    const existingStep = steps.find(step => step.id === stepId);
     if (existingStep !== undefined && existingStep.status !== 'running') return;
     const base = {
       version: 2 as const,
       attemptId,
       triggerMessageId: attempt.triggerMessageId,
-      revision: attempt.revision + 1,
+      revision:
+        (readPreparationAttempt(this.eventQueries, attemptId)?.revision ?? attempt.revision) + 1,
       timestamp: Date.now(),
       step: 'setup_commands' as const,
     };
@@ -2181,6 +2303,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           kind: 'setup_command',
           label,
           commandIndex: command - 1,
+          parentStepId: phase.id,
           ...(event.type === CONTROL_PLANE_SETUP_EVENTS.started
             ? { commandCount: event.properties.commandCount }
             : {}),

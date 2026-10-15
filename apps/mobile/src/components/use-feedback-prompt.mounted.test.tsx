@@ -29,11 +29,6 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
-// The dialog reached through `@/components/ui/dialog` reads the bottom inset;
-// the native module cannot load under this partial RN mock.
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 24, left: 0, right: 0, top: 0 }),
-}));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));

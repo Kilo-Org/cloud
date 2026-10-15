@@ -35,6 +35,7 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -320,7 +321,7 @@ export function ChatComposer({
   const restoreFocusOnActiveRef = useRef(false);
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasText, setHasText] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const keyboardHeight = useKeyboardState(state => state.height);
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
   // Inline validation feedback for a rejected slash-command submission. A
   // transient toast (sonner-native) renders outside the accessibility /
@@ -427,21 +428,9 @@ export function ChatComposer({
     absoluteMaxHeight: COMPOSER_INPUT_MAX_HEIGHT * fontScale,
   });
 
-  // Track the keyboard's reported height so the remaining-space cap follows it.
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const show = Keyboard.addListener(showEvent, event => {
-      setKeyboardHeight(Math.max(event.endCoordinates.height, 0));
-    });
-    const hide = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
-    });
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
+  // The provider's keyboard height caps the remaining space and keeps the
+  // toolbar row in place while the IME still owns the bottom of the screen.
+  const keyboardVisible = keyboardHeight > 0;
 
   // The mirror measurement lives in `ChatComposerMeasure`, a leaf that owns the
   // per-keystroke text state. It publishes the height and the line-snapped cap
@@ -798,6 +787,12 @@ export function ChatComposer({
     voiceInputActive: voiceInput.isActive,
   });
 
+  // The model chip's row and the input are separate rows, and the chip's row
+  // keeps its space for as long as the keyboard has any claim on the composer:
+  // losing it in the same frames the keyboard moved collapsed the chip through
+  // the message field (video V1 ~4.5s and ~19s).
+  const showToolbarRow = control.showToolbar || keyboardVisible;
+
   const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
       await upload.addCandidates([file]);
@@ -1107,9 +1102,15 @@ export function ChatComposer({
                   // The optimistic row is already in the transcript. Clear the
                   // draft and chips (non-destructively) and stop the spinner so
                   // the prompt never renders in both the transcript and the input.
-                  clearDraft();
+                  // Only the draft that was actually sent is cleared: text typed
+                  // while the send was in flight is the next message, and the
+                  // keyboard is left exactly where the person had it — dismissing
+                  // it here took the focused input away on every send (video V1
+                  // ~4.4s and ~18.9s).
+                  if (textRef.current.trim() === trimmed) {
+                    clearDraft();
+                  }
                   upload.clearOptimistic();
-                  Keyboard.dismiss();
                   setIsSending(false);
                 },
               });
@@ -1330,10 +1331,23 @@ export function ChatComposer({
 
         {suggestionRow}
 
-        {!suggestionRow && control.showToolbar ? (
+        {!suggestionRow && showToolbarRow ? (
           <Animated.View
-            entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-            exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
+            // The row is never animated out. An exit animation leaves its
+            // snapshot painted while the input row has already moved up into
+            // that space, so the collapsing model chip drew over the message
+            // field (video V1 ~4.5s and ~19s). The chip and the field stay in
+            // separate rows, and when the row does go there is nothing left to
+            // paint through the input.
+            entering={
+              control.showToolbar
+                ? selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))
+                : undefined
+            }
+            pointerEvents={control.showToolbar ? 'auto' : 'none'}
+            accessibilityElementsHidden={!control.showToolbar}
+            importantForAccessibility={control.showToolbar ? 'auto' : 'no-hide-descendants'}
+            className={control.showToolbar ? undefined : 'opacity-0'}
           >
             <ChatToolbar
               modeControl={modeControl}

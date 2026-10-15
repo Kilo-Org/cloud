@@ -133,6 +133,7 @@
     "status": "Toestand",
     "truncated": "Ingekort",
     "updated": "Bijgewerkt",
+    "generating": "Genereren…",
     "working": "Bezig",
     "yourOwnRepositories": "Je eigen coderepository's",
     "dismissed": "Genegeerd",
@@ -650,7 +651,7 @@
     "redeployTitle": "Instantie opnieuw uitrollen",
     "accessRequired": {
       "iosBody": "KiloClaw-toegang wordt voor dit account buiten de iOS-app beheerd.",
-      "iosContact": "Vragen? Neem contact op via hi@kilo.ai.",
+      "iosContact": "Vragen? Neem contact op via {{supportEmail}}.",
       "iosTitle": "KiloClaw niet beschikbaar op iOS",
       "multipleCurrentConflictBody": "We hebben meerdere actieve abonnementen voor je account gevonden. Daarom hebben we alles gepauzeerd om te voorkomen dat je dubbel betaalt.",
       "multipleCurrentConflictCta": "Doorgaan op kilo.ai",
@@ -783,7 +784,7 @@
         "queryErrorBody": "De verbinding viel weg terwijl we de installatie van {{name}} controleerden. De installatie loopt mogelijk nog. Probeer het opnieuw of kijk over een moment nog eens.",
         "queryErrorTitle": "Installatiestatus niet beschikbaar",
         "settingUp": "{{name}} instellen",
-        "stalledBody": "We konden {{name}} niet volledig instellen. Probeer het opnieuw of stuur een e-mail naar hi@kilo.ai als dit blijft gebeuren.",
+        "stalledBody": "We konden {{name}} niet volledig instellen. Probeer het opnieuw of stuur een e-mail naar {{supportEmail}} als dit blijft gebeuren.",
         "stalledTitle": "Iets is vastgelopen",
         "startingSandbox": "Sandbox starten",
         "stoppedBody": "De instantie van {{name}} is onverwacht gestopt tijdens de installatie.",
@@ -1040,7 +1041,7 @@
         "recoveryLabel": "GitHub-app bijwerken"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer is uitgeschakeld omdat deze GitHub-organisatie een IP-toegangslijst gebruikt die Kilo blokkeert. Neem contact op met hi@kilocode.ai voor hulp en schakel Code Reviewer vervolgens weer in."
+        "description": "Code Reviewer is uitgeschakeld omdat deze GitHub-organisatie een IP-toegangslijst gebruikt die Kilo blokkeert. Neem contact op met {{supportEmail}} voor hulp en schakel Code Reviewer vervolgens weer in."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer is uitgeschakeld omdat Kilo geen toegangstoken voor dit GitLab-project kan aanmaken. Verleen toegang met de rol Maintainer of schakel toegangstokens voor projecten in. Schakel daarna Code Reviewer weer in.",
@@ -1055,7 +1056,7 @@
         "recoveryLabel": "Instellingen van Code Reviewer bijwerken"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer is uitgeschakeld na drie time-outs bij het klonen van de repository vandaag. Neem contact op met hi@kilocode.ai voor hulp en schakel Code Reviewer vervolgens weer in."
+        "description": "Code Reviewer is uitgeschakeld na drie time-outs bij het klonen van de repository vandaag. Neem contact op met {{supportEmail}} voor hulp en schakel Code Reviewer vervolgens weer in."
       },
       "title": "De codebeoordelaar heeft je aandacht nodig.",
       "recoveryLabel": "Contact opnemen met de helpdesk"
@@ -3322,6 +3323,10 @@
     },
     "backends": {
       "title": "Chatservers",
+      "providersTitle": "Chatproviders",
+      "cloud": "In de cloud",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo-modellen zijn nu niet beschikbaar. Controleer je verbinding.",
       "manage": "Chatservers beheren",
       "defaultKilo": "$t(consent.kilo) (standaard)",
       "kiloHelp": "De ingebouwde chatserver gebruikt je Kilo-account en kan niet worden bewerkt of verwijderd.",
@@ -3381,7 +3386,6 @@
     "gguf": {
       "title": "Downloadbare modellen",
       "help": "Download een open model en draai het op deze telefoon met llama.cpp. Je prompts en antwoorden blijven op het apparaat. Modellen zijn groot, dus gebruik Wi-Fi.",
-      "details": "{{size}} · Licentie: {{license}}",
       "download": "Model downloaden",
       "pause": "Download pauzeren",
       "resume": "Download hervatten",
@@ -3393,6 +3397,8 @@
       "url": "Directe downloadlink",
       "urlHelp": "Plak een HTTPS-link naar een .gguf-bestand, zoals een Hugging Face resolve-link. Download alleen modellen van bronnen die je vertrouwt.",
       "downloadUrl": "Downloaden via link",
+      "advanced": "Geavanceerd",
+      "localPurpose": "Draait op dit apparaat met llama.cpp. Prompts en antwoorden blijven op het apparaat.",
       "deleteTitle": "Dit model verwijderen?",
       "deleteMessage": "{{name}} van dit apparaat verwijderen? Chats die het gebruiken hebben een ander model nodig voordat ze verder kunnen.",
       "errors": {
@@ -3421,8 +3427,17 @@
         "fits": "Past",
         "tight": "Past krap",
         "tooLarge": "Te groot",
-        "noStorage": "Onvoldoende opslag"
+        "noStorage": "Onvoldoende opslag",
+        "unknown": "Geschiktheid onbekend"
       },
+      "recommendationsHelp": "Een shortlist die deze app vastzet: één bestand per model, van een uitgever die een licentie vermeldt. Niets anders wordt gerangschikt.",
+      "compatibilityHelp": "Geschiktheid vergelijkt het modelbestand met het geheugen en de vrije opslag van dit apparaat. Het geheugencijfer is een schatting, geen meting.",
+      "text": "Tekst",
+      "listTextPurpose": "Alleen tekstprompts.",
+      "listImagePurpose": "Leest zowel afbeeldingen als tekst.",
+      "smallestDownload": "Kleinste download: {{size}} · ongeveer {{memory}} geheugen",
+      "fullFileName": "Bestand: {{name}}",
+      "memoryEstimateNote": "Geheugencijfers zijn schattingen, geen metingen.",
       "parameters": "Parameters: {{value}}",
       "downloads": "Downloads: {{value}}",
       "likes": "Likes: {{value}}",
@@ -3447,7 +3462,8 @@
     },
     "localModels": {
       "title": "Modellen op het apparaat",
-      "help": "Modellen op het apparaat draaien op deze telefoon. Je prompts en antwoorden blijven op het apparaat, en deze modellen kunnen geen tools gebruiken.",
+      "help": "Modellen op het apparaat draaien op deze telefoon. Je prompts en antwoorden blijven op het apparaat.",
+      "systemPurpose": "Het model dat in het systeem van dit apparaat is ingebouwd. Het draait op het apparaat.",
       "apple": "Apple Intelligence (op het apparaat)",
       "checking": "Beschikbaarheid controleren…",
       "ready": "Klaar voor gebruik",
@@ -3748,12 +3764,26 @@
       "startNow": "Starten zonder beoordeling",
       "startNowHint": "Houd ingedrukt om te starten zonder beoordeling",
       "titleLabel": "Titel van de taak",
+      "renameTitle": "Taak hernoemen",
       "notes": "Notities",
-      "notesPlaceholder": "Notities in Markdown toevoegen",
+      "addNotes": "Notities toevoegen",
+      "notesPrompt": "Voeg context, vereisten of acceptatiecriteria toe.",
+      "markdownSupported": "Markdown ondersteund",
       "sessions": "Gekoppelde sessies",
       "noSessions": "Nog geen sessies",
+      "untitledLinkedSession": "Gekoppelde sessie",
+      "sessionNeedsInput": "Sessie heeft invoer nodig",
+      "sessionRunning": "Sessie actief",
+      "sessionFinished": "Sessie voltooid",
+      "sessionPullRequest": "PR van sessie",
+      "sessionPullRequestNumber": "PR van sessie #{{number}}",
+      "openSessionHint": "Opent de sessie.",
+      "unlinkSessionAction": "Sessie ontkoppelen",
+      "unlinkConfirmTitle": "{{title}} ontkoppelen?",
+      "unlinkConfirmMessage": "De sessie zelf wordt niet verwijderd. Alleen de koppeling met deze taak wordt verwijderd.",
+      "startNewSession": "Nieuwe sessie starten",
+      "startNewSessionHint": "Houd ingedrukt om een nieuwe sessie te starten.",
       "linkSession": "Sessie koppelen",
-      "unlinkSession": "{{title}} ontkoppelen",
       "linkFailed": "De sessie kon niet aan de taak worden gekoppeld"
     },
     "linkSession": {

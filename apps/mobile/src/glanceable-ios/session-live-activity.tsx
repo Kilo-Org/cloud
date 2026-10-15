@@ -110,7 +110,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         good: '#5FCB8E',
         info: '#60A5FA',
         idle: '#56544F',
-        primary: '#E8F27A',
+        primary: '#FFDD00',
         primaryFg: '#1A1A10',
         secondary: '#26262B',
         track: '#3A3A40',
@@ -182,7 +182,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     warn: '#F2B05F',
     // The same green the dark palette uses for the added-lines line.
     good: '#5FCB8E',
-    primary: '#E8F27A',
+    primary: '#FFDD00',
     primaryFg: '#1A1A10',
     secondary: '#26262B',
     track: '#3A3A40',

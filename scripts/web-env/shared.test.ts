@@ -463,7 +463,7 @@ if (command === 'whoami') {
   process.exitCode = 1;
 } else if (command === 'api' && /^\\/v9\\/projects\\/[a-z-]+\\?/.test(endpoint)) {
   respond({ id: 'project-id' });
-} else if (command === 'api' && endpoint.startsWith('/v10/projects/kilocode-global-app/env?')) {
+} else if (command === 'api' && endpoint.startsWith('/v10/projects/kilocode-app/env?')) {
   respond({
     envs: [
       { id: 'env-1', key: 'PLAIN_VALUE', type: 'plain', value: 'visible', target: ['production'] },
@@ -486,11 +486,11 @@ if (command === 'whoami') {
     ],
     pagination: { count: 2, next: null, prev: null }
   });
-} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-global-app/env/env-1?')) {
+} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-app/env/env-1?')) {
   respond({ id: 'env-1', type: 'encrypted', decrypted: true, value: 'decrypted-value' });
-} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-global-app/env/env-2?')) {
+} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-app/env/env-2?')) {
   respond({ id: 'env-2', type: 'sensitive', decrypted: false });
-} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-global-app/env/env-3?')) {
+} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-app/env/env-3?')) {
   respond({ id: 'env-3', type: 'encrypted', decrypted: true, value: '' });
 } else if (command === 'api' && endpoint.startsWith('/v1/integrations/configuration/icfg_sentry?')) {
   respond({ id: 'icfg_sentry', slug: 'sentry' });
@@ -530,7 +530,7 @@ void test('resolveVercelContexts skips projects that do not exist in Vercel yet'
     const { contexts, missingProjects } = resolveVercelContexts(directory);
     assert.deepEqual(
       contexts.map(context => context.project),
-      ['kilocode-app', 'kilocode-global-app']
+      ['kilocode-app']
     );
     assert.deepEqual(missingProjects, ['kilocode-ai-gateway']);
     const apiCalls = readFileSync(logFile, 'utf8')
@@ -542,7 +542,6 @@ void test('resolveVercelContexts skips projects that do not exist in Vercel yet'
       apiCalls.map(args => args[3]),
       [
         '/v9/projects/kilocode-app?teamId=team-id',
-        '/v9/projects/kilocode-global-app?teamId=team-id',
         '/v9/projects/kilocode-ai-gateway?teamId=team-id',
       ]
     );
@@ -552,7 +551,7 @@ void test('resolveVercelContexts skips projects that do not exist in Vercel yet'
 void test('listEnvRecords keeps only plain values and normalizes string and array targets', async () => {
   await withFakeVercel(directory => {
     assert.deepEqual(
-      listEnvRecords({ project: 'kilocode-global-app', orgId: 'team-id', cwd: directory }),
+      listEnvRecords({ project: 'kilocode-app', orgId: 'team-id', cwd: directory }),
       [
         {
           id: 'env-1',
@@ -602,10 +601,12 @@ void test('listEnvRecords keeps only plain values and normalizes string and arra
 void test('decryptedEnvValues returns only values Vercel decrypted', async () => {
   await withFakeVercel(async directory => {
     assert.deepEqual(
-      await decryptedEnvValues(
-        { project: 'kilocode-global-app', orgId: 'team-id', cwd: directory },
-        ['env-1', 'env-2', 'env-3', 'env-1']
-      ),
+      await decryptedEnvValues({ project: 'kilocode-app', orgId: 'team-id', cwd: directory }, [
+        'env-1',
+        'env-2',
+        'env-3',
+        'env-1',
+      ]),
       new Map([
         ['env-1', 'decrypted-value'],
         ['env-3', ''],
@@ -617,7 +618,7 @@ void test('decryptedEnvValues returns only values Vercel decrypted', async () =>
 void test('integrationSlugs names configurations and keeps the ID of a deleted one', async () => {
   await withFakeVercel(directory => {
     assert.deepEqual(
-      integrationSlugs({ project: 'kilocode-global-app', orgId: 'team-id', cwd: directory }, [
+      integrationSlugs({ project: 'kilocode-app', orgId: 'team-id', cwd: directory }, [
         'icfg_sentry',
         'icfg_removed',
         'icfg_sentry',

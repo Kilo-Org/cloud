@@ -1,4 +1,5 @@
 import Mailgun from 'mailgun.js';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import FormData from 'form-data';
 import * as z from 'zod';
 import { MAILGUN_API_KEY, MAILGUN_DOMAIN } from '@kilocode/web-shared/lib/config.server';
@@ -100,7 +101,7 @@ export async function sendViaMailgun(params: OutboundEmailParams): Promise<boole
   });
   await client.messages.create(MAILGUN_DOMAIN, {
     from: 'Kilo Code <hi@app.kilocode.ai>',
-    'h:Reply-To': replyTo ?? 'hi@kilocode.ai',
+    'h:Reply-To': replyTo ?? SUPPORT_EMAIL,
     to,
     subject,
     html: params.html,

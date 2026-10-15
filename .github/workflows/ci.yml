@@ -57,6 +57,9 @@ jobs:
       - name: Test changes-filter retry wiring
         run: node --test scripts/changes-filter-retry.test.mjs
 
+      - name: Test typecheck CI wiring
+        run: node --test scripts/typecheck-ci.test.mjs
+
       - name: Test scheduled deployment wiring
         run: node --test scripts/deployment-workflows.test.mjs
 
@@ -206,6 +209,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Cache compiler plugins
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+
       - name: Plugin shared-schemas sync check
         run: bash scripts/sync-plugin-shared.sh --check
 
@@ -235,6 +246,14 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Cache compiler plugins
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build
@@ -520,9 +539,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build wrapper bundle
-        working-directory: services/cloud-agent-next/wrapper
-        run: bun run build.ts
+      - name: Build wrapper bundles with isolated production dependencies
+        run: |
+          build_dir=$(mktemp -d "$RUNNER_TEMP/wrapper-build.XXXXXX")
+          trap 'rm -rf "$build_dir"' EXIT
+
+          # Match Dockerfile inputs without access to workspace node_modules.
+          tar -C services/cloud-agent-next --exclude=node_modules --exclude=dist \
+            -cf - wrapper src/shared | tar -C "$build_dir" -xf -
+          cd "$build_dir/wrapper"
+          bun install --production
+          ln -sfn "$build_dir/wrapper/node_modules" "$build_dir/node_modules"
+          bun run build.ts --install-dir "$build_dir/bin"
 
       - name: Test cloud-agent-next checkers
         run: pnpm --filter cloud-agent-next test:checkers
@@ -558,6 +586,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Cache compiler plugins
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+
       # Everything but the timing gate, which needs a machine nobody else is
       # using. The migration check is why this job exists: the store's SQL is
       # inlined into the bundle, and nothing at run time notices when the
@@ -591,6 +627,17 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # kilo-app builds the harness SDK below; the harness SDK's own vitest run
+      # compiles the same typia plugin through @ttsc/unplugin.
+      - name: Cache compiler plugins
+        if: matrix.workspace.name == 'kilo-app' || matrix.workspace.name == '@kilocode/harness-sdk'
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
       # apps/mobile tests the app against the built harness SDK, the way it
       # already runs against built trpc types.

@@ -34,6 +34,7 @@ import { partSettledAt } from './part-utils';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
 import type { SessionStorage } from './storage/types';
+import { orderMessageIds } from './storage/helpers';
 import type { CloudAgentApi, CloudAgentStreamTicketResult } from './transport';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import type {
@@ -1129,12 +1130,27 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     return true;
   }
 
+  let previousOrderedMessageIds: readonly string[] = [];
+  const orderedMessageIdsAtom = atom(get => {
+    const storage = get(sessionStorageAtom);
+    const next = storage
+      ? orderMessageIds(get(storage.atoms.messageIds), get(storage.atoms.messages))
+      : [];
+    if (
+      next.length === previousOrderedMessageIds.length &&
+      next.every((id, index) => id === previousOrderedMessageIds[index])
+    ) {
+      return previousOrderedMessageIds;
+    }
+    previousOrderedMessageIds = next;
+    return next;
+  });
   let previousMessagesList: StoredMessage[] | null = null;
   const messagesListAtom = atom<StoredMessage[]>(get => {
     const storage = get(sessionStorageAtom);
     const out: StoredMessage[] = [];
     if (storage) {
-      const ids = get(storage.atoms.messageIds);
+      const ids = get(orderedMessageIdsAtom);
       const msgMap = get(storage.atoms.messages);
       const partsMap = get(storage.atoms.parts);
       get(storage.atoms.partsRevision);
@@ -1197,7 +1213,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       childMessagesGetter = EMPTY_CHILD_MESSAGES_GETTER;
       return EMPTY_CHILD_MESSAGES_GETTER;
     }
-    const ids = get(storage.atoms.messageIds);
+    const ids = get(orderedMessageIdsAtom);
     const msgMap = get(storage.atoms.messages);
     const partsMap = get(storage.atoms.parts);
     get(storage.atoms.partsRevision);

@@ -133,6 +133,7 @@
     "status": "Haala",
     "truncated": "Gabaabfame",
     "updated": "Haaromfame",
+    "generating": "Uumaa jira…",
     "working": "Hojjechaa jira",
     "yourOwnRepositories": "Kuusaalee koodii mataa keetii",
     "dismissed": "Dhiifame",
@@ -1259,7 +1260,7 @@
         "stoppedTitle": "Qophiin dhaabbateera",
         "stoppedBody": "Naannoon hojii {{name}} yeroo qophii osoo hin eegamin dhaabbateera.",
         "stalledTitle": "Wanti tokko dhaabbate",
-        "stalledBody": "Qophii {{name}} xumuruu hin dandeenye. Irra deebi'ii yaali; yoo kun itti fufe hi@kilo.ai irratti imeelii ergi.",
+        "stalledBody": "Qophii {{name}} xumuruu hin dandeenye. Irra deebi'ii yaali; yoo kun itti fufe {{supportEmail}} irratti imeelii ergi.",
         "timeoutTitle": "Yeroo eegame caalaa fudhataa jira",
         "timeoutBody": "Qophiin {{name}} yeroo barame caalaa fudhataa jira (daqiiqaa {{displayMinutes}} ol).",
         "continueInBackground": "Duubaan itti fufi",
@@ -1317,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Karoorri kee kan dursanii fayyadamuu bilbila irratti hojiirra ooluu dura gamaaggama namaatiin godhamu barbaada.",
       "iosTitle": "KiloClaw iOS keessatti hin argamu",
       "iosBody": "Herrega kanaaf hayyamni KiloClaw fayyadamuu appii iOS ala bulfama.",
-      "iosContact": "Gaaffii qabdaa? hi@kilo.ai qunnami.",
+      "iosContact": "Gaaffii qabdaa? {{supportEmail}} qunnami.",
       "quarantinedCta": "Imeelii garee keenyaa ergi",
       "nonCanonicalEarlybirdCta": "Karoorra kee kilo.ai irratti ilaali"
     },
@@ -1552,7 +1553,7 @@
         "recoveryLabel": "Aplikeeshinii GitHub haaromsi"
       },
       "githubIpAllowList": {
-        "description": "Dhaabbanni GitHub kun tarree IP hayyamamanii kan Kilo ugguru waan fayyadamuuf Sakatta'aan koodii cufameera. Gargaarsaaf hi@kilocode.ai qunnami; sana booda Sakatta'aa koodii irra deebi'ii bani."
+        "description": "Dhaabbanni GitHub kun tarree IP hayyamamanii kan Kilo ugguru waan fayyadamuuf Sakatta'aan koodii cufameera. Gargaarsaaf {{supportEmail}} qunnami; sana booda Sakatta'aa koodii irra deebi'ii bani."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo pirojektii kanaaf tokanii hayyama pirojektii GitLab uumuu waan hin dandeenyeef Sakatta'aan koodii cufameera. Hayyama kunuunsaa kenni ykn tokaniiwwan hayyama pirojektii bani; sana booda Sakatta'aa koodii irra deebi'ii bani.",
@@ -1567,7 +1568,7 @@
         "recoveryLabel": "Qindaa'ina Sakatta'aa koodii haaromsi"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Har'a kuusaa koodii garagalchuuf daangaan yeroo yeroo sadii erga darbee booda Sakatta'aan koodii cufameera. Gargaarsaaf hi@kilocode.ai qunnami; sana booda Sakatta'aa koodii irra deebi'ii bani."
+        "description": "Har'a kuusaa koodii garagalchuuf daangaan yeroo yeroo sadii erga darbee booda Sakatta'aan koodii cufameera. Gargaarsaaf {{supportEmail}} qunnami; sana booda Sakatta'aa koodii irra deebi'ii bani."
       },
       "title": "Sakatta'aan koodii xiyyeeffannoo barbaada.",
       "recoveryLabel": "Deeggarsa qunnami"
@@ -3322,6 +3323,10 @@
     },
     "backends": {
       "title": "Sirnoota duubaa chaat",
+      "providersTitle": "Dhiyeessitoota haasawa",
+      "cloud": "Duumessa keessa",
+      "cloudModel": "Moodela: {{model}}",
+      "cloudUnavailable": "Moodeelonni Kilo amma hin jiran. Walqunnamtii kee ilaali.",
       "manage": "Sirnoota duubaa bulchi",
       "defaultKilo": "$t(consent.kilo) (durtii)",
       "kiloHelp": "Sirni duubaa keessatti ijaarame herrega Kilo kee fayyadama; sirreessuun ykn haquun hin danda'amu.",
@@ -3381,7 +3386,6 @@
     "gguf": {
       "title": "Moodeelota buufamuu danda'an",
       "help": "Moodeela banaa buufiitii bilbila kana irratti llama.cpp waliin hojjedhu. Gaaffiin keessanii fi deebiin meeshaa kana irra turu. Moodeelonni gurguddoo waan ta'aniif, Wi-Fi fayyadamaa.",
-      "details": "{{size}} · Hayyama: {{license}}",
       "download": "Moodeela buufi",
       "pause": "Buufinsa dhaabi",
       "resume": "Buufinsa itti fufi",
@@ -3393,6 +3397,8 @@
       "url": "Liinkii buufinsa kallattii",
       "urlHelp": "Liinkii HTTPS faayilii .gguf tiif maxxansi, akka liinkii resolve Hugging Face. Moodeelota maddawwan amantaa qabdan irraa qofa buufadhaa.",
       "downloadUrl": "Liinkii irraa buufi",
+      "advanced": "Olaanaa",
+      "localPurpose": "llama.cpp waliin meeshaa kana irratti hojjeta. Gaaffileen fi deebiin meeshaa kana irratti hafu.",
       "deleteTitle": "Moodeela kana haqi?",
       "deleteMessage": "{{name}} meeshaa kana irraa haqi? Haasawaawwan isa fayyadaman itti fufuuf moodeela biraa barbaadu.",
       "errors": {
@@ -3421,8 +3427,17 @@
         "fits": "Ni ta'a",
         "tight": "Dhiphaan ta'a",
         "tooLarge": "Baay'ee guddaa",
-        "noStorage": "Kuusaan gahaan hin jiru"
+        "noStorage": "Kuusaan gahaan hin jiru",
+        "unknown": "Walsimannaa hin beekamne"
       },
+      "recommendationsHelp": "Listii gabaabaa app kun maxxanse: moodela tokkoof faayilii tokko, maxxansa hayyama ibsu irraa. Kanneen biroo hin tartiibfamu.",
+      "compatibilityHelp": "Walsimannaan faayilii moodelaa yaadannoo meeshaa kanaa fi kuusaa duwwaa waliin madaala. Lakkoofsi yaadannoo tilmaama, safartuu miti.",
+      "text": "Barruu",
+      "listTextPurpose": "Gaaffii barruu qofa.",
+      "listImagePurpose": "Suuraa akkasumas barruu dubbisa.",
+      "smallestDownload": "Buufannoo xiqqaa: {{size}} · gara {{memory}} yaadannoo",
+      "fullFileName": "Faayilii: {{name}}",
+      "memoryEstimateNote": "Lakkoofsi yaadannoo tilmaama, safartuu miti.",
       "parameters": "Paraameetiroota: {{value}}",
       "downloads": "Buufamni: {{value}}",
       "likes": "Jaalatamni: {{value}}",
@@ -3447,7 +3462,8 @@
     },
     "localModels": {
       "title": "Moodeelota meeshaa irratti",
-      "help": "Moodeelonni meeshaa irratti bilbila kana irratti hojjetu. Gaaffiin keessanii fi deebiin meeshaa kana irra turu, moodeelonni kunis meeshaalee fayyadamuu hin danda'an.",
+      "help": "Moodeelonni meeshaa irratti bilbila kana irratti hojjetu. Gaaffiin keessanii fi deebiin meeshaa kana irra turu.",
+      "systemPurpose": "Moodeela sirna meeshaa kanaa keessatti ijaarame. Meeshaa irratti hojjeta.",
       "apple": "Apple Intelligence (meeshaa irratti)",
       "checking": "Argamuu isaa mirkaneessaa jira…",
       "ready": "Fayyadamuuf qophaa'eera",
@@ -3748,12 +3764,26 @@
       "startNow": "Sakatta'iinsa malee jalqabi",
       "startNowHint": "Sakatta'iinsa malee jalqabuuf dheerefii tuqi",
       "titleLabel": "Mata duree hojii",
+      "renameTitle": "Hojii maqaa jijjiiri",
       "notes": "Yaadanno",
-      "notesPlaceholder": "Yaadannoo Markdown keessatti dabali",
+      "addNotes": "Yaadannoowwan dabali",
+      "notesPrompt": "Kontekstitii, gaaffii, yookaan ulaagaa fudhannaa dabali.",
+      "markdownSupported": "Markdown deeggarama",
       "sessions": "Turtiiwwan walitti hidhaman",
       "noSessions": "Turtii hin jiru",
+      "untitledLinkedSession": "Seeshinii hidhame",
+      "sessionNeedsInput": "Seeshiniin galtee barbaada",
+      "sessionRunning": "Seeshiniin hojjechaa jira",
+      "sessionFinished": "Seeshiniin xumurame",
+      "sessionPullRequest": "Seeshinii gaaffii walitti makuu",
+      "sessionPullRequestNumber": "Seeshinii PR #{{number}}",
+      "openSessionHint": "Seeshinii bana.",
+      "unlinkSessionAction": "Seeshinii hiiki",
+      "unlinkConfirmTitle": "{{title}} hiikuu?",
+      "unlinkConfirmMessage": "Seeshiniin mataa isaa hin haqamu. Hidhaan isaa hojii kana waliin qofa haqama.",
+      "startNewSession": "Seeshinii haaraa jalqabi",
+      "startNewSessionHint": "Seeshinii haaraa jalqabuuf yeroo dheeraa tuqi.",
       "linkSession": "Turtii walitti hidhi",
-      "unlinkSession": "{{title}} walitti hidhaa hiiki",
       "linkFailed": "Turtii hojii waliin walitti hidhuun hin danda'amne"
     },
     "linkSession": {

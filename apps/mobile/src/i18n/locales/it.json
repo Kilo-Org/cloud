@@ -133,6 +133,7 @@
     "status": "Stato",
     "truncated": "Troncato",
     "updated": "Aggiornato",
+    "generating": "Generazione…",
     "working": "In corso",
     "yourOwnRepositories": "I tuoi repository",
     "dismissed": "Ignorato",
@@ -621,7 +622,7 @@
     "redeployTitle": "Ridistribuire l'istanza?",
     "accessRequired": {
       "iosBody": "L'accesso a KiloClaw per questo account è gestito al di fuori dell'app iOS.",
-      "iosContact": "Hai domande? Scrivi a hi@kilo.ai.",
+      "iosContact": "Hai domande? Scrivi a {{supportEmail}}.",
       "iosTitle": "KiloClaw non disponibile su iOS",
       "multipleCurrentConflictBody": "Abbiamo trovato più di un abbonamento attivo sul tuo account, quindi abbiamo sospeso tutto per evitare doppi addebiti.",
       "multipleCurrentConflictCta": "Continua su kilo.ai",
@@ -755,7 +756,7 @@
         "queryErrorBody": "La connessione si è interrotta durante la verifica della configurazione di {{name}}. La configurazione potrebbe essere ancora in corso. Riprova o ricontrolla tra poco.",
         "queryErrorTitle": "Verifica della configurazione non riuscita",
         "settingUp": "Configurazione di {{name}}",
-        "stalledBody": "Non siamo riusciti a completare la configurazione di {{name}}. Riprova oppure scrivi a hi@kilo.ai se il problema persiste.",
+        "stalledBody": "Non siamo riusciti a completare la configurazione di {{name}}. Riprova oppure scrivi a {{supportEmail}} se il problema persiste.",
         "stalledTitle": "Qualcosa si è bloccato",
         "startingSandbox": "Avvio della sandbox",
         "stoppedBody": "L'istanza di {{name}} si è arrestata in modo imprevisto durante la configurazione.",
@@ -1012,7 +1013,7 @@
         "recoveryLabel": "Aggiorna l'app GitHub"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer è stato disattivato perché l'elenco degli indirizzi IP consentiti di questa organizzazione GitHub blocca Kilo. Contatta hi@kilocode.ai per assistenza, poi riattiva Code Reviewer."
+        "description": "Code Reviewer è stato disattivato perché l'elenco degli indirizzi IP consentiti di questa organizzazione GitHub blocca Kilo. Contatta {{supportEmail}} per assistenza, poi riattiva Code Reviewer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer è stato disattivato perché Kilo non può creare un token di accesso per questo progetto GitLab. Concedi il ruolo Maintainer o attiva i token di accesso al progetto, poi riattiva Code Reviewer.",
@@ -1027,7 +1028,7 @@
         "recoveryLabel": "Aggiorna le impostazioni di Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer è stato disattivato perché oggi la clonazione del repository ha superato il tempo limite tre volte. Contatta hi@kilocode.ai per assistenza, poi riattiva Code Reviewer."
+        "description": "Code Reviewer è stato disattivato perché oggi la clonazione del repository ha superato il tempo limite tre volte. Contatta {{supportEmail}} per assistenza, poi riattiva Code Reviewer."
       },
       "title": "Il revisore di codice richiede un intervento.",
       "recoveryLabel": "Contatta l'assistenza"
@@ -3363,6 +3364,10 @@
     },
     "backends": {
       "title": "Servizi di chat",
+      "providersTitle": "Provider di chat",
+      "cloud": "Nel cloud",
+      "cloudModel": "Modello: {{model}}",
+      "cloudUnavailable": "I modelli Kilo non sono disponibili al momento. Controlla la connessione.",
       "manage": "Gestisci i servizi",
       "defaultKilo": "$t(consent.kilo) (predefinito)",
       "kiloHelp": "Il servizio integrato usa il tuo account Kilo e non può essere modificato né eliminato.",
@@ -3422,7 +3427,6 @@
     "gguf": {
       "title": "Modelli scaricabili",
       "help": "Scarica un modello aperto e eseguilo su questo telefono con llama.cpp. I tuoi prompt e le risposte restano sul dispositivo. I modelli sono di grandi dimensioni, quindi usa il Wi-Fi.",
-      "details": "{{size}} · Licenza: {{license}}",
       "download": "Scarica modello",
       "pause": "Metti in pausa il download",
       "resume": "Riprendi il download",
@@ -3434,6 +3438,8 @@
       "url": "Link di download diretto",
       "urlHelp": "Incolla un link HTTPS a un file .gguf, ad esempio un link resolve di Hugging Face. Scarica i modelli solo da fonti affidabili.",
       "downloadUrl": "Scarica dal link",
+      "advanced": "Avanzate",
+      "localPurpose": "Funziona su questo dispositivo con llama.cpp. I prompt e le risposte restano sul dispositivo.",
       "deleteTitle": "Eliminare questo modello?",
       "deleteMessage": "Eliminare {{name}} da questo dispositivo? Le chat che lo usano necessitano di un altro modello prima di poter continuare.",
       "errors": {
@@ -3462,8 +3468,17 @@
         "fits": "Adatto",
         "tight": "Al limite",
         "tooLarge": "Troppo grande",
-        "noStorage": "Spazio insufficiente"
+        "noStorage": "Spazio insufficiente",
+        "unknown": "Compatibilità sconosciuta"
       },
+      "recommendationsHelp": "Una selezione fissata da questa app: un file per modello, da un editore che dichiara una licenza. Nient'altro è classificato.",
+      "compatibilityHelp": "La compatibilità confronta il file del modello con la memoria e lo spazio libero di questo dispositivo. Il valore di memoria è una stima, non una misurazione.",
+      "text": "Testo",
+      "listTextPurpose": "Solo prompt di testo.",
+      "listImagePurpose": "Legge immagini oltre al testo.",
+      "smallestDownload": "Download più piccolo: {{size}} · circa {{memory}} di memoria",
+      "fullFileName": "File: {{name}}",
+      "memoryEstimateNote": "I valori di memoria sono stime, non misurazioni.",
       "parameters": "Parametri: {{value}}",
       "downloads": "Download: {{value}}",
       "likes": "Mi piace: {{value}}",
@@ -3488,7 +3503,8 @@
     },
     "localModels": {
       "title": "Modelli sul dispositivo",
-      "help": "I modelli sul dispositivo vengono eseguiti su questo telefono. I tuoi prompt e le risposte restano sul dispositivo e questi modelli non possono usare strumenti.",
+      "help": "I modelli sul dispositivo vengono eseguiti su questo telefono. I tuoi prompt e le risposte restano sul dispositivo.",
+      "systemPurpose": "Il modello integrato nel sistema di questo dispositivo. Viene eseguito sul dispositivo.",
       "apple": "Apple Intelligence (sul dispositivo)",
       "checking": "Verifica disponibilità…",
       "ready": "Pronto all'uso",
@@ -3793,12 +3809,26 @@
       "startNow": "Avvia senza revisione",
       "startNowHint": "Tieni premuto per avviare senza revisione",
       "titleLabel": "Titolo dell'attività",
+      "renameTitle": "Rinomina attività",
       "notes": "Note",
-      "notesPlaceholder": "Aggiungi note in Markdown",
+      "addNotes": "Aggiungi note",
+      "notesPrompt": "Aggiungi contesto, requisiti o criteri di accettazione.",
+      "markdownSupported": "Markdown supportato",
       "sessions": "Sessioni collegate",
       "noSessions": "Ancora nessuna sessione",
+      "untitledLinkedSession": "Sessione collegata",
+      "sessionNeedsInput": "La sessione richiede input",
+      "sessionRunning": "Sessione in corso",
+      "sessionFinished": "Sessione terminata",
+      "sessionPullRequest": "Pull request della sessione",
+      "sessionPullRequestNumber": "PR della sessione #{{number}}",
+      "openSessionHint": "Apre la sessione.",
+      "unlinkSessionAction": "Scollega sessione",
+      "unlinkConfirmTitle": "Scollegare {{title}}?",
+      "unlinkConfirmMessage": "La sessione in sé non viene eliminata. Viene rimosso solo il suo collegamento a questa attività.",
+      "startNewSession": "Avvia nuova sessione",
+      "startNewSessionHint": "Tieni premuto per avviare una nuova sessione.",
       "linkSession": "Collega sessione",
-      "unlinkSession": "Scollega {{title}}",
       "linkFailed": "Impossibile collegare la sessione all'attività"
     },
     "linkSession": {

@@ -3,7 +3,7 @@ import React from 'react';
 const mockGetUserForCredentialIssuance = jest.fn();
 const mockGenerateApiToken = jest.fn();
 const mockGetCustomerInfo = jest.fn();
-const mockIntegrationsCard = jest.fn(() => null);
+const mockSupportCard = jest.fn(() => null);
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
@@ -35,8 +35,8 @@ jest.mock('@/components/cloud-agent/MessageErrorBoundary', () => ({
 jest.mock('@/components/SurveyCredits', () => ({ SurveyCredits: () => null }));
 jest.mock('@/components/profile/RedeemPromoCode', () => ({ RedeemPromoCode: () => null }));
 jest.mock('@/components/payment/AutoTopUpToggle', () => ({ AutoTopUpToggle: () => null }));
-jest.mock('@/components/profile/IntegrationsCard', () => ({
-  IntegrationsCard: mockIntegrationsCard,
+jest.mock('@/components/support/SupportCard', () => ({
+  SupportCard: mockSupportCard,
 }));
 jest.mock('@/components/profile/ProfileOrganizationsSection', () => ({
   ProfileOrganizationsSection: () => null,
@@ -96,7 +96,7 @@ describe('ProfilePage', () => {
       const cards: unknown[] = [];
       function collectCards(node: React.ReactNode) {
         if (!React.isValidElement<{ children?: React.ReactNode }>(node)) return;
-        if (node.type === mockIntegrationsCard) cards.push(node.props);
+        if (node.type === mockSupportCard) cards.push(node.props);
         React.Children.forEach(node.props.children, collectCards);
       }
       collectCards(page);

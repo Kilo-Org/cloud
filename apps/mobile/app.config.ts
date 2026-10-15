@@ -232,7 +232,7 @@ const config: ExpoConfig = {
     googleServicesFile: './google-services.json',
     package: 'com.kilocode.kiloapp',
     adaptiveIcon: {
-      backgroundColor: '#FAF74F',
+      backgroundColor: '#FFDD00',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-foreground.png',
@@ -368,7 +368,7 @@ const config: ExpoConfig = {
       'expo-notifications',
       {
         icon: './assets/images/android-notification-icon.png',
-        color: '#FAF74F',
+        color: '#FFDD00',
         // Name the channel Firebase falls back to when a message omits
         // `channel_id`. Without it FirebaseMessaging logs "Missing Default
         // Notification Channel metadata in AndroidManifest" on every message.
@@ -407,7 +407,7 @@ const config: ExpoConfig = {
       './plugins/withBrandedSplash',
       {
         image: './assets/images/logo-mark.png',
-        backgroundColor: '#FAF74F',
+        backgroundColor: '#FFDD00',
         imageWidth: 100,
       },
     ],

@@ -133,6 +133,7 @@
     "status": "Trạng thái",
     "truncated": "Đã cắt bớt",
     "updated": "Đã cập nhật",
+    "generating": "Đang tạo…",
     "working": "Đang xử lý",
     "yourOwnRepositories": "Kho mã nguồn của riêng bạn",
     "dismissed": "Đã bỏ qua",
@@ -650,7 +651,7 @@
     "redeployTitle": "Triển khai lại phiên chạy",
     "accessRequired": {
       "iosBody": "Quyền truy cập KiloClaw cho tài khoản này được quản lý bên ngoài ứng dụng iOS.",
-      "iosContact": "Nếu có thắc mắc, hãy liên hệ hi@kilo.ai.",
+      "iosContact": "Nếu có thắc mắc, hãy liên hệ {{supportEmail}}.",
       "iosTitle": "KiloClaw không khả dụng trên iOS",
       "multipleCurrentConflictBody": "Tài khoản của bạn có nhiều gói đăng ký còn hiệu lực. Chúng tôi đã tạm dừng dịch vụ để tránh tính phí trùng lặp.",
       "multipleCurrentConflictCta": "Tiếp tục trên kilo.ai",
@@ -783,7 +784,7 @@
         "queryErrorBody": "Kết nối bị mất khi kiểm tra tiến độ thiết lập {{name}}. Quá trình thiết lập có thể vẫn đang chạy. Thử lại hoặc quay lại kiểm tra sau một lát.",
         "queryErrorTitle": "Không thể kiểm tra tiến độ thiết lập",
         "settingUp": "Đang thiết lập {{name}}",
-        "stalledBody": "Chúng tôi không thể hoàn tất thiết lập {{name}}. Hãy thử lại hoặc gửi email đến hi@kilo.ai nếu sự cố vẫn tiếp diễn.",
+        "stalledBody": "Chúng tôi không thể hoàn tất thiết lập {{name}}. Hãy thử lại hoặc gửi email đến {{supportEmail}} nếu sự cố vẫn tiếp diễn.",
         "stalledTitle": "Quá trình thiết lập bị gián đoạn",
         "startingSandbox": "Đang khởi động môi trường cô lập",
         "stoppedBody": "Phiên chạy của {{name}} đã dừng đột ngột trong quá trình thiết lập.",
@@ -1040,7 +1041,7 @@
         "recoveryLabel": "Cập nhật ứng dụng GitHub"
       },
       "githubIpAllowList": {
-        "description": "Trình rà soát mã đã bị tắt vì danh sách địa chỉ IP được phép của tổ chức GitHub này chặn Kilo. Hãy liên hệ hi@kilocode.ai để được hỗ trợ rồi bật lại Trình rà soát mã."
+        "description": "Trình rà soát mã đã bị tắt vì danh sách địa chỉ IP được phép của tổ chức GitHub này chặn Kilo. Hãy liên hệ {{supportEmail}} để được hỗ trợ rồi bật lại Trình rà soát mã."
       },
       "gitlabProjectAccessRequired": {
         "description": "Trình rà soát mã đã bị tắt vì Kilo không thể tạo mã truy cập dự án trên GitLab cho dự án này. Hãy cấp quyền người bảo trì hoặc cho phép tạo mã truy cập dự án rồi bật lại Trình rà soát mã.",
@@ -1055,7 +1056,7 @@
         "recoveryLabel": "Cập nhật cài đặt Trình rà soát mã"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Trình rà soát mã đã bị tắt sau ba lần sao chép kho lưu trữ quá thời gian chờ trong hôm nay. Hãy liên hệ hi@kilocode.ai để được hỗ trợ rồi bật lại Trình rà soát mã."
+        "description": "Trình rà soát mã đã bị tắt sau ba lần sao chép kho lưu trữ quá thời gian chờ trong hôm nay. Hãy liên hệ {{supportEmail}} để được hỗ trợ rồi bật lại Trình rà soát mã."
       },
       "title": "Trợ lý rà soát mã cần bạn xử lý sự cố.",
       "recoveryLabel": "Liên hệ hỗ trợ"
@@ -3322,6 +3323,10 @@
     },
     "backends": {
       "title": "Máy chủ trò chuyện",
+      "providersTitle": "Nhà cung cấp trò chuyện",
+      "cloud": "Trên đám mây",
+      "cloudModel": "Mô hình: {{model}}",
+      "cloudUnavailable": "Mô hình Kilo hiện không khả dụng. Hãy kiểm tra kết nối của bạn.",
       "manage": "Quản lý máy chủ",
       "defaultKilo": "$t(consent.kilo) (mặc định)",
       "kiloHelp": "Máy chủ tích hợp sẵn sử dụng tài khoản Kilo của bạn và không thể sửa hoặc xóa.",
@@ -3381,7 +3386,6 @@
     "gguf": {
       "title": "Mô hình có thể tải xuống",
       "help": "Tải xuống một mô hình mở và chạy nó ngay trên điện thoại này bằng llama.cpp. Lời nhắc và câu trả lời của bạn được giữ trên thiết bị. Mô hình có kích thước lớn, nên hãy dùng Wi-Fi.",
-      "details": "{{size}} · Giấy phép: {{license}}",
       "download": "Tải mô hình xuống",
       "pause": "Tạm dừng tải xuống",
       "resume": "Tiếp tục tải xuống",
@@ -3393,6 +3397,8 @@
       "url": "Liên kết tải xuống trực tiếp",
       "urlHelp": "Dán liên kết HTTPS đến tệp .gguf, chẳng hạn như liên kết resolve của Hugging Face. Chỉ tải mô hình từ những nguồn bạn tin cậy.",
       "downloadUrl": "Tải xuống từ liên kết",
+      "advanced": "Nâng cao",
+      "localPurpose": "Chạy trên thiết bị này bằng llama.cpp. Câu lệnh và trả lời vẫn ở trên thiết bị.",
       "deleteTitle": "Xóa mô hình này?",
       "deleteMessage": "Xóa {{name}} khỏi thiết bị này? Các cuộc trò chuyện sử dụng mô hình này cần một mô hình khác trước khi có thể tiếp tục.",
       "errors": {
@@ -3421,8 +3427,17 @@
         "fits": "Phù hợp",
         "tight": "Vừa sát",
         "tooLarge": "Quá lớn",
-        "noStorage": "Không đủ dung lượng"
+        "noStorage": "Không đủ dung lượng",
+        "unknown": "Không rõ độ phù hợp"
       },
+      "recommendationsHelp": "Danh sách rút gọn mà ứng dụng này ghim: một tệp cho mỗi mô hình, từ nhà phát hành có nêu giấy phép. Không có gì khác được xếp hạng.",
+      "compatibilityHelp": "Độ phù hợp so sánh tệp mô hình với bộ nhớ và dung lượng trống của thiết bị này. Con số bộ nhớ là ước tính, không phải phép đo.",
+      "text": "Văn bản",
+      "listTextPurpose": "Chỉ nhận câu lệnh văn bản.",
+      "listImagePurpose": "Đọc được cả hình ảnh lẫn văn bản.",
+      "smallestDownload": "Tải nhỏ nhất: {{size}} · khoảng {{memory}} bộ nhớ",
+      "fullFileName": "Tệp: {{name}}",
+      "memoryEstimateNote": "Các con số bộ nhớ là ước tính, không phải phép đo.",
       "parameters": "Tham số: {{value}}",
       "downloads": "Lượt tải xuống: {{value}}",
       "likes": "Lượt thích: {{value}}",
@@ -3447,7 +3462,8 @@
     },
     "localModels": {
       "title": "Mô hình trên thiết bị",
-      "help": "Mô hình trên thiết bị chạy ngay trên điện thoại này. Lời nhắc và câu trả lời của bạn được giữ trên thiết bị, và các mô hình này không thể dùng công cụ.",
+      "help": "Mô hình trên thiết bị chạy ngay trên điện thoại này. Lời nhắc và câu trả lời của bạn được giữ trên thiết bị.",
+      "systemPurpose": "Mô hình tích hợp sẵn trong hệ thống của thiết bị này. Mô hình chạy ngay trên thiết bị.",
       "apple": "Apple Intelligence (trên thiết bị)",
       "checking": "Đang kiểm tra khả dụng…",
       "ready": "Sẵn sàng sử dụng",
@@ -3748,12 +3764,26 @@
       "startNow": "Bắt đầu không cần rà soát",
       "startNowHint": "Nhấn giữ để bắt đầu không cần rà soát",
       "titleLabel": "Tiêu đề việc cần làm",
+      "renameTitle": "Đổi tên tác vụ",
       "notes": "Ghi chú",
-      "notesPlaceholder": "Thêm ghi chú bằng Markdown",
+      "addNotes": "Thêm ghi chú",
+      "notesPrompt": "Thêm ngữ cảnh, yêu cầu hoặc tiêu chí chấp nhận.",
+      "markdownSupported": "Hỗ trợ Markdown",
       "sessions": "Phiên đã liên kết",
       "noSessions": "Chưa có phiên nào",
+      "untitledLinkedSession": "Phiên được liên kết",
+      "sessionNeedsInput": "Phiên cần nhập liệu",
+      "sessionRunning": "Phiên đang chạy",
+      "sessionFinished": "Phiên đã kết thúc",
+      "sessionPullRequest": "PR của phiên",
+      "sessionPullRequestNumber": "PR của phiên #{{number}}",
+      "openSessionHint": "Mở phiên.",
+      "unlinkSessionAction": "Bỏ liên kết phiên",
+      "unlinkConfirmTitle": "Bỏ liên kết {{title}}?",
+      "unlinkConfirmMessage": "Bản thân phiên không bị xóa. Chỉ liên kết của nó với việc cần làm này bị gỡ bỏ.",
+      "startNewSession": "Bắt đầu phiên mới",
+      "startNewSessionHint": "Nhấn giữ để bắt đầu phiên mới.",
       "linkSession": "Liên kết phiên",
-      "unlinkSession": "Bỏ liên kết {{title}}",
       "linkFailed": "Không thể liên kết phiên với việc cần làm"
     },
     "linkSession": {

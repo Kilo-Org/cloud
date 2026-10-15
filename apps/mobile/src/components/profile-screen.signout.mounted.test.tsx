@@ -165,13 +165,26 @@ describe('ProfileScreen sign-out confirmation', () => {
     alertFn.mockReset();
   });
 
+  /**
+   * Calls one of a mounted element's own props inside `act`. The test renderer
+   * leaves `props` untyped, and this suite only ever calls handlers it would
+   * otherwise fire by hand, so the shape is guarded here instead of assumed.
+   */
+  function callProp(node: TestRenderer.ReactTestInstance, name: string): void {
+    const prop = node.props[name] as (() => void) | undefined;
+    if (typeof prop !== 'function') {
+      throw new TypeError(`The element has no callable ${name}`);
+    }
+    act(() => {
+      prop();
+    });
+  }
+
   function pressSignOutTile(renderer: TestRenderer.ReactTestRenderer) {
     const tile = renderer.root.find(
       node => isType(node, 'ActionTile') && node.props.label === 'Sign out'
     );
-    act(() => {
-      (tile.props as { onPress?: () => void }).onPress?.();
-    });
+    callProp(tile, 'onPress');
   }
 
   function dialogButton(
@@ -179,6 +192,16 @@ describe('ProfileScreen sign-out confirmation', () => {
     variant: 'outline' | 'destructive'
   ) {
     return renderer.root.find(node => isType(node, 'Button') && node.props.variant === variant);
+  }
+
+  /**
+   * Reports the native sheet's own dismissal. The confirm is a native sheet, so
+   * a press only starts the dismissal and the chosen action runs when the sheet
+   * reports it, exactly as it does on device.
+   */
+  function dismissDialogSheet(renderer: TestRenderer.ReactTestRenderer) {
+    const sheet = renderer.root.find(node => isType(node, 'BottomSheet'));
+    callProp(sheet, 'onDismiss');
   }
 
   // The request names no platform, so one destructive confirm serves both: the
@@ -200,17 +223,23 @@ describe('ProfileScreen sign-out confirmation', () => {
       // Opening the confirmation signs nobody out.
       expect(signOutFn).not.toHaveBeenCalled();
 
-      // Cancel keeps the user signed in.
-      act(() => {
-        (dialogButton(renderer, 'outline').props as { onPress?: () => void }).onPress?.();
-      });
+      // Cancel keeps the user signed in. The confirm stays on screen while the
+      // sheet dismisses, and the safe choice runs only once that dismissal
+      // reports.
+      callProp(dialogButton(renderer, 'outline'), 'onPress');
       expect(signOutFn).not.toHaveBeenCalled();
 
-      // Reopen: only the destructive control signs out.
+      dismissDialogSheet(renderer);
+      expect(signOutFn).not.toHaveBeenCalled();
+
+      // Reopen: only the destructive control signs out, and only after the
+      // native sheet has finished dismissing the confirmation.
       pressSignOutTile(renderer);
-      act(() => {
-        (dialogButton(renderer, 'destructive').props as { onPress?: () => void }).onPress?.();
-      });
+      callProp(dialogButton(renderer, 'destructive'), 'onPress');
+      expect(dialogButton(renderer, 'destructive')).toBeDefined();
+      expect(signOutFn).not.toHaveBeenCalled();
+
+      dismissDialogSheet(renderer);
       expect(signOutFn).toHaveBeenCalledTimes(1);
 
       unmount();

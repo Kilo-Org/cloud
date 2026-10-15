@@ -133,6 +133,7 @@
     "status": "Staða",
     "truncated": "Stytt",
     "updated": "Uppfært",
+    "generating": "Bý til…",
     "working": "Í vinnslu",
     "yourOwnRepositories": "Þín eigin kóðasöfn",
     "dismissed": "Vísað frá",
@@ -1259,7 +1260,7 @@
         "stoppedTitle": "Uppsetning stöðvuð",
         "stoppedBody": "Tilvikið fyrir {{name}} stöðvaðist óvænt við uppsetningu.",
         "stalledTitle": "Uppsetning stöðnuð",
-        "stalledBody": "Ekki tókst að ljúka uppsetningu fyrir {{name}}. Reyndu aftur eða sendu tölvupóst á hi@kilo.ai ef þetta endurtekur sig.",
+        "stalledBody": "Ekki tókst að ljúka uppsetningu fyrir {{name}}. Reyndu aftur eða sendu tölvupóst á {{supportEmail}} ef þetta endurtekur sig.",
         "timeoutTitle": "Tekur lengri tíma en búist var við",
         "timeoutBody": "Uppsetning fyrir {{name}} tekur lengri tíma en venjulega (yfir {{displayMinutes}} mínútur).",
         "continueInBackground": "Halda áfram í bakgrunni",
@@ -1317,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Yfirfara þarf áskriftina þína með snemmbúnum aðgangi handvirkt áður en hægt er að nota hana í símanum.",
       "iosTitle": "KiloClaw ekki fáanlegt í iOS",
       "iosBody": "Fyrir þennan reikning er aðgangi að KiloClaw stýrt utan iOS-appsins.",
-      "iosContact": "Spurningar? Sendu tölvupóst á hi@kilo.ai.",
+      "iosContact": "Spurningar? Sendu tölvupóst á {{supportEmail}}.",
       "quarantinedCta": "Sendu tölvupóst á teymið okkar",
       "nonCanonicalEarlybirdCta": "Skoðaðu áskriftina þína á kilo.ai"
     },
@@ -1552,7 +1553,7 @@
         "recoveryLabel": "Uppfæra GitHub-forrit"
       },
       "githubIpAllowList": {
-        "description": "Kóðarýnirinn var gerður óvirkur því þetta GitHub-fyrirtæki notar IP-leyfislista sem hindrar aðgang Kilo. Fáðu aðstoð á hi@kilocode.ai og virkjaðu svo kóðarýninn aftur."
+        "description": "Kóðarýnirinn var gerður óvirkur því þetta GitHub-fyrirtæki notar IP-leyfislista sem hindrar aðgang Kilo. Fáðu aðstoð á {{supportEmail}} og virkjaðu svo kóðarýninn aftur."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kóðarýnirinn var gerður óvirkur því Kilo getur ekki búið til GitLab-aðgangstóka fyrir þetta verkefni. Veittu viðhaldsaðilaheimildir eða virkjaðu aðgangstóka verkefna og virkjaðu svo kóðarýninn aftur.",
@@ -1567,7 +1568,7 @@
         "recoveryLabel": "Uppfæra stillingar kóðarýnis"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kóðarýnirinn var gerður óvirkur eftir að klónun geymslunnar rann þrisvar út á tíma í dag. Fáðu aðstoð á hi@kilocode.ai og virkjaðu svo kóðarýninn aftur."
+        "description": "Kóðarýnirinn var gerður óvirkur eftir að klónun geymslunnar rann þrisvar út á tíma í dag. Fáðu aðstoð á {{supportEmail}} og virkjaðu svo kóðarýninn aftur."
       },
       "title": "Kóðarýnirinn þarfnast athygli.",
       "recoveryLabel": "Hafa samband við þjónustuver"
@@ -3322,6 +3323,10 @@
     },
     "backends": {
       "title": "Bakendar spjalls",
+      "providersTitle": "Spjallveitur",
+      "cloud": "Í skýinu",
+      "cloudModel": "Líkan: {{model}}",
+      "cloudUnavailable": "Kilo-líkan er ekki tiltækt núna. Athugaðu tenginguna.",
       "manage": "Stjórna bakendum",
       "defaultKilo": "$t(consent.kilo) (sjálfgefið)",
       "kiloHelp": "Innbyggði bakendinn notar Kilo-reikninginn þinn og ekki er hægt að breyta honum eða eyða honum.",
@@ -3381,7 +3386,6 @@
     "gguf": {
       "title": "Líkön til niðurhals",
       "help": "Sæktu opið líkan og keyrðu það í þessum síma með llama.cpp. Fyrirmæli þín og svör verða eftir í tækinu. Líkönin eru stór, svo notaðu Wi-Fi.",
-      "details": "{{size}} · Leyfi: {{license}}",
       "download": "Sækja líkan",
       "pause": "Gera hlé á niðurhali",
       "resume": "Halda niðurhali áfram",
@@ -3393,6 +3397,8 @@
       "url": "Beinn niðurhalstengill",
       "urlHelp": "Límdu HTTPS-tengil á .gguf-skrá, til dæmis Hugging Face resolve-tengil. Sæktu aðeins líkön frá heimildum sem þú treystir.",
       "downloadUrl": "Sækja af tengli",
+      "advanced": "Ítarlegt",
+      "localPurpose": "Keyrir á þessu tæki með llama.cpp. Fyrirspurnir og svör verða á tækinu.",
       "deleteTitle": "Eyða þessu líkani?",
       "deleteMessage": "Eyða {{name}} af þessu tæki? Spjöll sem nota það þurfa annað líkan áður en þau geta haldið áfram.",
       "errors": {
@@ -3421,8 +3427,17 @@
         "fits": "Passar",
         "tight": "Passar naumlega",
         "tooLarge": "Of stórt",
-        "noStorage": "Ekki nóg geymslupláss"
+        "noStorage": "Ekki nóg geymslupláss",
+        "unknown": "Hæfi óþekkt"
       },
+      "recommendationsHelp": "Stuttur listi sem þetta forrit festir: ein skrá á hvert líkan, frá útgefanda sem tilgreinir leyfi. Ekkert annað er raðað.",
+      "compatibilityHelp": "Hæfi ber saman líkunarskrána við minni og laust geymslupláss þessa tækis. Minnesstalan er áætlun, ekki mæling.",
+      "text": "Texti",
+      "listTextPurpose": "Aðeins textafyrirspurnir.",
+      "listImagePurpose": "Les myndir auk texta.",
+      "smallestDownload": "Minnsta niðurhal: {{size}} · um {{memory}} af minni",
+      "fullFileName": "Skrá: {{name}}",
+      "memoryEstimateNote": "Minnistölur eru áætlanir, ekki mælingar.",
       "parameters": "Færibreytur: {{value}}",
       "downloads": "Niðurhöl: {{value}}",
       "likes": "Líkar: {{value}}",
@@ -3447,7 +3462,8 @@
     },
     "localModels": {
       "title": "Líkön í tækinu",
-      "help": "Líkön í tækinu keyra á þessum síma. Fyrirmæli þín og svör verða eftir í tækinu og þessi líkön geta ekki notað verkfæri.",
+      "help": "Líkön í tækinu keyra á þessum síma. Fyrirmæli þín og svör verða eftir í tækinu.",
+      "systemPurpose": "Líkanið sem er innbyggt í kerfi þessa tækis. Það keyrir í tækinu.",
       "apple": "Apple Intelligence (í tækinu)",
       "checking": "Athugar framboð…",
       "ready": "Tilbúið til notkunar",
@@ -3748,12 +3764,26 @@
       "startNow": "Byrja án rýni",
       "startNowHint": "Haltu inni til að byrja án rýni",
       "titleLabel": "Heiti verkefnis",
+      "renameTitle": "Endurnefna verk",
       "notes": "Minnispunktar",
-      "notesPlaceholder": "Bæta við minnispunktum í Markdown",
+      "addNotes": "Bæta við athugasemdum",
+      "notesPrompt": "Bættu við samhengi, kröfum eða samþykkisskilyrðum.",
+      "markdownSupported": "Markdown stutt",
       "sessions": "Tengdar lotur",
       "noSessions": "Engar lotur enn",
+      "untitledLinkedSession": "Tengd lota",
+      "sessionNeedsInput": "Lota þarf inntak",
+      "sessionRunning": "Lota í gangi",
+      "sessionFinished": "Lotu lokið",
+      "sessionPullRequest": "Pull request lotu",
+      "sessionPullRequestNumber": "PR lotu #{{number}}",
+      "openSessionHint": "Opnar lotuna.",
+      "unlinkSessionAction": "Aftengja lotu",
+      "unlinkConfirmTitle": "Aftengja {{title}}?",
+      "unlinkConfirmMessage": "Lotunni sjálfri er ekki eytt. Aðeins tenglinum hennar við þetta verkefni er fjarlægður.",
+      "startNewSession": "Byrja nýja lotu",
+      "startNewSessionHint": "Haltu inni til að byrja nýja lotu.",
       "linkSession": "Tengja lotu",
-      "unlinkSession": "Aftengja {{title}}",
       "linkFailed": "Ekki tókst að tengja lotuna við verkefnið"
     },
     "linkSession": {

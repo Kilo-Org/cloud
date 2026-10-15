@@ -8,7 +8,7 @@ import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 type TodosInputs = inferRouterInputs<MobileRouter>['todos'];
-type TodoTrpcQueries = {
+export type TodoTrpcQueries = {
   todos: { pathFilter: () => Parameters<QueryClient['invalidateQueries']>[0] };
 };
 type MoveInput = { id: string; beforeId?: string | null; afterId?: string | null };
@@ -305,29 +305,4 @@ export function useTodoItemMutations(listId: string) {
   );
 
   return { create, update, move, linkSession, unlinkSession, removeWithUndo };
-}
-
-/**
- * Link a session that was just started from a to-do. The session already
- * exists, so a failure only toasts; one retry covers a dropped request.
- */
-export async function linkStartedTodoSession(input: {
-  queryClient: QueryClient;
-  trpc: TodoTrpcQueries;
-  todoId: string;
-  sessionId: string;
-}): Promise<void> {
-  const { queryClient, trpc, todoId, sessionId } = input;
-  const link = { id: todoId, sessionId, origin: 'started' as const };
-  try {
-    await trpcClient.todos.items.linkSession.mutate(link);
-  } catch {
-    try {
-      await trpcClient.todos.items.linkSession.mutate(link);
-    } catch {
-      toast.error(i18n.t('todos.item.linkFailed'));
-      return;
-    }
-  }
-  await invalidateTodoQueries(queryClient, trpc);
 }

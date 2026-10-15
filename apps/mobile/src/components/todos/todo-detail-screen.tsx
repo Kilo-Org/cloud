@@ -74,7 +74,9 @@ function TodoDonePrompt({ todo }: Readonly<{ todo: TodoItemDetail }>) {
         className="flex-row items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 active:opacity-70"
       >
         <CircleCheck size={14} color={colors.primaryForeground} />
-        <Text>{t('todos.item.markDonePrompt')}</Text>
+        <Text className="text-sm font-medium text-primary-foreground">
+          {t('todos.item.markDonePrompt')}
+        </Text>
       </Pressable>
     </View>
   );

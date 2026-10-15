@@ -125,7 +125,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     rememberModelFacts(models);
   }, [models]);
 
-  const selectModel = (modelId: string, variantId: string) => {
+  const selectModel = (modelId: string, variantId: string | null) => {
     const accept = () => {
       setPicked(modelId);
       setPickedVariant(variantId);
@@ -158,7 +158,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   // picks no thinking variant, so the chat's stored effort resolves the variant
   // the chosen model offers.
   const selectProviderModel = (modelId: string) => {
-    selectModel(modelId, '');
+    selectModel(modelId, null);
   };
 
   const messages = asMessages(state);

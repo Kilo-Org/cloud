@@ -15,7 +15,6 @@ import {
   type GgufDownloadProblem,
   type GgufDownloadsSnapshot,
 } from '@/lib/chat/gguf-records';
-import { hfModelName } from '@/lib/chat/hf-catalog';
 import { formatFileSize } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -229,7 +228,7 @@ export function GgufModelSection({
         <View key={row.fileId} className="gap-2 rounded-xl border border-border p-4">
           <BackendProviderChoice
             {...selection}
-            name={hfModelName(row.name)}
+            name={row.name}
             description={t('modelChat.gguf.localPurpose')}
             modelId={
               snapshot.models.some(model => model.fileId === row.fileId)

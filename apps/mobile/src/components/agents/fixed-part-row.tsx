@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
-import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 import { cn } from '@/lib/utils';
@@ -95,11 +94,8 @@ export function FixedPartRow({
       <Pressable
         className={cn(
           'flex-row items-center active:bg-secondary',
-          compact ? 'min-h-[32px] gap-1.5 px-2.5' : 'gap-2 px-3 py-2'
+          compact ? 'min-h-[48px] min-w-[48px] gap-1.5 px-2.5' : 'gap-2 px-3 py-2'
         )}
-        // The compact row is control-height, so its reach comes from the shared
-        // compact hit slop: it reaches the 44pt / 48dp minimum either way.
-        hitSlop={compact ? COMPACT_CONTROL_HIT_SLOP_DP : undefined}
         onPress={onPress}
         onLongPress={messageLongPress ?? undefined}
         disabled={!onPress}

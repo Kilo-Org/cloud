@@ -294,37 +294,6 @@ describe('FixedPartRow mounted', () => {
     expect(className).not.toContain('rounded-xl');
     expect(className).not.toContain('border-[1.5px]');
   });
-
-  it('renders the compact control as its own sized pill with a full tap reach', async () => {
-    const renderer = await renderRow({
-      compact: true,
-      label: 'Thought',
-      labelKind: 'eyebrow',
-      variant: 'dashed',
-      onPress: () => undefined,
-      accessibilityLabel: 'Thought',
-    });
-
-    const outerView = findHost(renderer.root, 'View').find(
-      node =>
-        typeof node.props.className === 'string' && node.props.className.includes('rounded-full')
-    );
-    if (!outerView) {
-      throw new Error('compact outer view not found');
-    }
-    const className = outerView.props.className as string;
-    expect(className).toContain('self-start');
-    expect(className).toContain('border-dashed');
-
-    const pressable = findHost(renderer.root, 'Pressable')[0];
-    if (!pressable) {
-      throw new Error('pressable not found');
-    }
-    // A 32dp row plus 8dp of slop per side reaches 48dp, above the 44pt iOS
-    // minimum the shared compact control uses.
-    expect(pressable.props.className).toContain('min-h-[32px]');
-    expect(pressable.props.hitSlop).toBe(8);
-  });
 });
 
 const MODEL = { id: 'kilo-auto/small', name: 'Auto Small' };

@@ -28,3 +28,5 @@ export function sessionHasTerminal(
 }
 
 // ci-probe 1
+
+// ci-probe 2

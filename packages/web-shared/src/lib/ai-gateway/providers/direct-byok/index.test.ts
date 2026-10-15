@@ -191,6 +191,8 @@ describe('getDirectByokModel', () => {
     expect(models[0].opencode.variants).toEqual({
       high: { reasoning: { enabled: true, effort: 'high' } },
     });
+    expect(models[0].opencode.reasoning_options).toEqual([{ type: 'effort', values: ['high'] }]);
+    expect(models[1].opencode).not.toHaveProperty('reasoning_options');
   });
 
   test('uses the default AI SDK provider unless a model-specific provider applies', async () => {

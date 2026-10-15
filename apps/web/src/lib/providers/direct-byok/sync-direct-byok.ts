@@ -8,8 +8,10 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import {
   ReasoningEffortSchema,
+  ReasoningOptionSchema,
   VerbositySchema,
   type OpenCodeSettings,
+  type ReasoningOption,
 } from '@kilocode/db/schema-types';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import {
@@ -38,19 +40,11 @@ const OpenAICompatibleModelsResponseSchema = z.object({
   ),
 });
 
-const ModelsDevReasoningOptionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('toggle') }),
-  z.object({
-    type: z.literal('effort'),
-    values: z.array(z.union([z.null(), ReasoningEffortSchema, z.literal('default')])),
-  }),
-]);
-
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
   reasoning: z.boolean().optional(),
-  reasoning_options: z.array(ModelsDevReasoningOptionSchema).optional().catch(undefined),
+  reasoning_options: z.array(ReasoningOptionSchema).optional().catch(undefined),
   status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
   limit: z
     .object({
@@ -136,7 +130,7 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
 }
 
 function modelsDevReasoningOptionsToVariants(
-  options: ReadonlyArray<z.infer<typeof ModelsDevReasoningOptionSchema>>
+  options: ReadonlyArray<ReasoningOption>
 ): OpenCodeSettings['variants'] {
   const hasToggle = options.some(option => option.type === 'toggle');
   const effortVariants: NonNullable<OpenCodeSettings['variants']> = {};

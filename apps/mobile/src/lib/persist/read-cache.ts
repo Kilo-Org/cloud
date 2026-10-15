@@ -96,9 +96,37 @@ type AllowedProcedure = {
 const DEFAULT_SESSION_LIST_INPUT = buildAgentSessionListInput({ organizationId: null });
 const DEFAULT_SESSION_LIST_KEY_COUNT = Object.keys(DEFAULT_SESSION_LIST_INPUT).length;
 
+const briefingListCacheInputSchema = z
+  .object({
+    scope: z.enum(['all', 'personal', 'organization']).optional(),
+    organizationId: z.string().min(1).optional(),
+    currentOnly: z.boolean(),
+    limit: z.union([z.literal(1), z.literal(30), z.literal(100)]),
+    cursor: z.undefined().optional(),
+  })
+  .strict()
+  .refine(input =>
+    input.scope === 'organization'
+      ? input.organizationId !== undefined
+      : input.organizationId === undefined
+  );
+const briefingDetailCacheInputSchema = z.object({ reportId: z.string().min(1) }).strict();
+
 // Initial allowlist. Verified against the mobile tRPC router
 // (`packages/trpc/src/mobile.ts`) before coding.
 const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
+  {
+    path: 'agentBriefing.list',
+    isAllowedInput: meta => briefingListCacheInputSchema.safeParse(metaInput(meta)).success,
+  },
+  {
+    path: 'agentBriefing.get',
+    isAllowedInput: meta => briefingDetailCacheInputSchema.safeParse(metaInput(meta)).success,
+  },
+  {
+    path: 'agentBriefing.preferences',
+    isAllowedInput: () => true,
+  },
   {
     path: 'user.getMe',
     isAllowedInput: meta => metaInput(meta) === undefined,

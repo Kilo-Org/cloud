@@ -76,10 +76,6 @@ import {
   waitForCloudAgentPublicTunnelCapture,
 } from './runner';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 type PortScanOptions = {
@@ -371,10 +367,6 @@ function determineEnabledGroups(serviceNames: string[]): string[] {
   return enabled;
 }
 
-// ---------------------------------------------------------------------------
-// ANSI helpers
-// ---------------------------------------------------------------------------
-
 const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
@@ -385,10 +377,6 @@ function isCaptureServiceRunning(sessionName: string, serviceName: string): bool
   const pane = findServicePane(sessionName, serviceName);
   return pane !== undefined && paneHasRunningService(sessionName, pane);
 }
-
-// ---------------------------------------------------------------------------
-// Commands
-// ---------------------------------------------------------------------------
 
 /**
  * Infra ports of `serviceNames` that a *different* compose project publishes.
@@ -444,7 +432,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     arg => arg !== '--no-attach' && arg !== '--reuse-running' && !arg.startsWith('--without=')
   );
 
-  // --- Preflight checks ---
   if (!isTmuxAvailable()) {
     console.error('tmux is not installed. Install it with: brew install tmux');
     process.exit(1);
@@ -469,7 +456,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     console.warn('  To sync from Vercel: vercel env pull .env.local');
   }
 
-  // --- Resolve targets ---
   // Always start core (always-on) groups; additional targets are merged in
   const coreServices = resolveGroups(getAlwaysOnGroupIds());
   const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
@@ -497,7 +483,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     sessionAlreadyRunning = false;
   }
 
-  // --- Pick a free port offset before anything derives URLs from ports ---
   // An explicit KILO_PORT_OFFSET is honored as-is. Otherwise, when the
   // hash/persisted offset's ports are held by a foreign occupant (another
   // worktree's stack, macOS AirPlay on 5000/7000), probe +100 candidate
@@ -529,10 +514,8 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     removeStaleComposeProject(repoRoot, previousOffset);
   }
 
-  // --- Export port offset for child processes (e.g. scripts/dev.sh) ---
   process.env.KILO_PORT_OFFSET = String(portOffset);
 
-  // --- Publish this worktree's Compose project and infra endpoints ---
   // After the offset is final: Compose and the app env must name the same
   // database. An offset worktree runs its own containers on its own ports.
   for (const line of syncInfraEnv(repoRoot)) console.log(`${DIM}${line}${RESET}`);
@@ -594,7 +577,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     }
   }
 
-  // --- Check for existing session ---
   if (sessionAlreadyRunning) {
     for (const name of serviceNames) {
       const service = getService(name);
@@ -649,7 +631,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     return noAttach ? undefined : sessionName;
   }
 
-  // --- Check for socat when kiloclaw-docker-tcp is requested ---
   if (serviceNames.includes('kiloclaw-docker-tcp')) {
     try {
       execSync('which socat', { stdio: 'ignore' });
@@ -659,7 +640,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     }
   }
 
-  // --- Skip Stripe webhook forwarding when the optional Stripe CLI is absent ---
   if (serviceNames.includes('stripe')) {
     try {
       execSync('stripe --version', { stdio: 'ignore' });
@@ -670,7 +650,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     }
   }
 
-  // --- Warn if grafana is enabled but CF_AE_TOKEN is not set ---
   // Grafana boots fine without the token; only dashboard queries fail. Treat
   // this as advisory so devs poking around the repo don't get blocked. Check
   // .env.local in addition to the shell so the warning doesn't fire when the
@@ -686,7 +665,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     }
   }
 
-  // --- Start Docker infra ---
   const hasInfra = serviceNames.some(name => getService(name).type === 'infra');
   if (hasInfra) {
     for (const line of collidingInfraPorts(repoRoot, serviceNames)) {
@@ -697,10 +675,8 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     console.log();
   }
 
-  // --- Prepare log directory ---
   clearDevLogs(repoRoot);
 
-  // --- Create tmux session ---
   // Pass critical runtime env into the session so panes see this worktree's
   // values even when an existing tmux server is shared with sibling worktrees.
   const wranglerRegistryPath = getWranglerRegistryPath(repoRoot);
@@ -766,10 +742,8 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   if (e2eInternalSecretEnv) Object.assign(sessionEnv, e2eInternalSecretEnv);
   createSession(sessionName, sessionEnv);
 
-  // --- Start each service in its own tmux window ---
   const SIDEBAR_WIDTH = 40;
 
-  // --- Start capture services first (tunnel, stripe) and wait for output ---
   // The fake-LLM Worker is a capture service too: the public-tunnel service
   // probes it before publishing and exits if it is not answering, so it must be
   // started and ready before the tunnel capture runs.
@@ -1000,9 +974,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     console.warn('Start or restart these services after the tunnel URL is ready.');
   }
 
-  // --- Set up split layout in window 0: left=sidebar, right=service terminal ---
-  // Join the preferred service's pane into window 0 as pane 1 (right column).
-  // join-pane moves the pane process — no ghost shells.
   let initialViewedService = '';
   if (startedServices.length > 0) {
     const preferred = startedServices.includes('nextjs') ? 'nextjs' : startedServices[0];
@@ -1013,20 +984,16 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       initialViewedService = preferred;
     }
   } else {
-    // No services — create an empty right pane so window 0 has a split
     splitWindowHorizontal(sessionName, 0);
   }
 
-  // Use main-vertical layout so the sidebar stays at SIDEBAR_WIDTH even after terminal resizes.
   setMainLeftLayout(sessionName, 0, SIDEBAR_WIDTH);
 
-  // Show service names in pane border titles
   enablePaneBorders(sessionName, 0);
   if (initialViewedService) {
     setPaneTitle(sessionName, 0, 1, initialViewedService);
   }
 
-  // --- Start sidebar TUI in left pane (0.0) ---
   const enabledGroupIds = determineEnabledGroups(startedServices);
   const dashboardArgs = [
     JSON.stringify(startedServices),
@@ -1036,11 +1003,9 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   const dashboardCmd = `tsx dev/local/dashboard.tsx ${dashboardArgs.map(a => JSON.stringify(a)).join(' ')}`;
   sendKeys(sessionName, 0, dashboardCmd, 0);
 
-  // --- Focus sidebar pane and attach ---
   selectPane(sessionName, 0, 0);
   selectWindow(sessionName, 0);
 
-  // --- Write manifest for agents ---
   writeManifest(repoRoot, sessionName, wranglerRegistryPath, startedServices);
 
   console.log(
@@ -1500,10 +1465,6 @@ async function cmdEnv(args: string[], repoRoot: string): Promise<void> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Usage
-// ---------------------------------------------------------------------------
-
 function printUsage(): void {
   console.log(`
 Usage:
@@ -1533,10 +1494,6 @@ Usage:
 Targets: app, app-builder, agents, code-review, security-agent, mobile, all, or any service/group name
 Multiple targets can be specified: dev:start kiloclaw security-agent`);
 }
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
 
 async function main() {
   const args = process.argv.slice(2);

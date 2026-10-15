@@ -5,10 +5,6 @@ import { serviceUrl } from '../mobile-env';
 import { services } from '../services';
 import type { Annotation, ExampleEntry, ResolvedValueSource } from './types';
 
-// ---------------------------------------------------------------------------
-// JSONC parsing (handles // comments, /* */ comments, trailing commas)
-// ---------------------------------------------------------------------------
-
 function stripJsoncComments(text: string): string {
   let result = '';
   let i = 0;
@@ -52,10 +48,6 @@ function parseJsonc(content: string): unknown {
   return JSON.parse(stripJsoncComments(content));
 }
 
-// ---------------------------------------------------------------------------
-// Env file parsing
-// ---------------------------------------------------------------------------
-
 function stripEnvQuotes(value: string): string {
   if (value.startsWith('"') && value.endsWith('"')) {
     return value
@@ -97,10 +89,6 @@ function readEnvFile(filePath: string): Map<string, string> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Annotation parser
-// ---------------------------------------------------------------------------
-
 const KNOWN_DIRECTIVES = new Set(['override', 'url', 'from', 'pkcs8', 'exec']);
 
 function parseAnnotation(directive: string, args: string): Annotation | undefined {
@@ -137,28 +125,22 @@ function parseExampleFile(content: string): ExampleEntry[] {
   for (const rawLine of content.split('\n')) {
     const line = rawLine.trim();
 
-    // Blank lines clear pending annotations
     if (line === '') {
       pendingAnnotation = undefined;
       continue;
     }
 
-    // Comment lines
     if (line.startsWith('#')) {
-      // Commented-out keys like #KILOCODE_TOKEN_OVERRIDE=... are just comments
       const directiveMatch = line.match(/^#\s*@(\w+)\s*(.*)$/);
       if (directiveMatch) {
         const [, directive, args] = directiveMatch;
         if (KNOWN_DIRECTIVES.has(directive)) {
           pendingAnnotation = parseAnnotation(directive, args);
         }
-        // Unknown @directives are treated as regular comments (no effect)
       }
-      // Regular comments without @directive don't affect pending annotations
       continue;
     }
 
-    // KEY=VALUE line
     const eqIdx = line.indexOf('=');
     if (eqIdx === -1) {
       pendingAnnotation = undefined;
@@ -180,17 +162,9 @@ function parseExampleFile(content: string): ExampleEntry[] {
   return entries;
 }
 
-// ---------------------------------------------------------------------------
-// Service port resolution (single source of truth: services.ts)
-// ---------------------------------------------------------------------------
-
 function servicePort(name: string): number | undefined {
   return services.get(name)?.port;
 }
-
-// ---------------------------------------------------------------------------
-// PKCS#1 → PKCS#8 conversion
-// ---------------------------------------------------------------------------
 
 function toPkcs8IfNeeded(pem: string): string {
   if (!pem || !pem.includes('-----BEGIN RSA PRIVATE KEY-----')) return pem;
@@ -201,10 +175,6 @@ function toPkcs8IfNeeded(pem: string): string {
     return pem;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Annotation-based value resolution
-// ---------------------------------------------------------------------------
 
 const WORKER_LOCALHOST_URL_KEYS = new Set(['KILOCODE_BACKEND_BASE_URL', 'KILO_OPENROUTER_BASE']);
 
@@ -278,7 +248,6 @@ function resolveAnnotatedValue(
       if (resolvedParts.length > 0) {
         return { value: resolvedParts.join(','), resolved: true, source: 'generated' };
       }
-      // All services unknown — fall back to default
       if (entry.defaultValue) {
         return { value: entry.defaultValue, resolved: true, source: 'default' };
       }
@@ -321,10 +290,6 @@ function resolveAnnotatedValue(
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// File generation utilities
-// ---------------------------------------------------------------------------
 
 function needsQuoting(value: string): boolean {
   return (

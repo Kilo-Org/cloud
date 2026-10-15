@@ -30,10 +30,6 @@ import {
   generateDevVars,
 } from './parse';
 
-// ---------------------------------------------------------------------------
-// Auto-created local secrets
-// ---------------------------------------------------------------------------
-
 const FLY_TOKEN_ENV_KEY = 'FLY_API_TOKEN';
 const FLY_ORG_SLUG_ENV_KEY = 'FLY_ORG_SLUG';
 const DEFAULT_FLY_ORG_SLUG = 'kilo-dev';
@@ -71,10 +67,6 @@ function maybeAddEnvLocalAutoCreate(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Source key derivation (for cross-worker consistency checks)
-// ---------------------------------------------------------------------------
-
 function getEnvLocalSourceKey(key: string, annotation: Annotation): string | undefined {
   switch (annotation.type) {
     case 'from':
@@ -90,10 +82,6 @@ function getEnvLocalSourceKey(key: string, annotation: Annotation): string | und
       return undefined;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Discovery
-// ---------------------------------------------------------------------------
 
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -130,10 +118,6 @@ function findDevVarsExamples(repoRoot: string): string[] {
   return results.sort();
 }
 
-// ---------------------------------------------------------------------------
-// Wrangler env detection from package.json dev script
-// ---------------------------------------------------------------------------
-
 function detectWranglerEnv(repoRoot: string, workerDir: string): string | undefined {
   const pkgPath = path.join(repoRoot, workerDir, 'package.json');
   if (!fs.existsSync(pkgPath)) return undefined;
@@ -147,10 +131,6 @@ function detectWranglerEnv(repoRoot: string, workerDir: string): string | undefi
     return undefined;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Wrangler config: extract vars and secrets_store_secrets bindings
-// ---------------------------------------------------------------------------
 
 type JsonObject = Record<string, unknown>;
 
@@ -373,10 +353,6 @@ function extractSecretsStoreBindings(repoRoot: string, workerDir: string): Secre
   return bindings;
 }
 
-// ---------------------------------------------------------------------------
-// Local secrets store check (via wrangler CLI)
-// ---------------------------------------------------------------------------
-
 const execFileAsync = promisify(execFile);
 
 type SecretsStoreQuery = {
@@ -552,10 +528,6 @@ function collectLocalSecretSources(
   return sources;
 }
 
-// ---------------------------------------------------------------------------
-// Plan computation
-// ---------------------------------------------------------------------------
-
 function computePlan(
   repoRoot: string,
   serviceFilter?: Set<string>,
@@ -581,7 +553,6 @@ function computePlan(
   const envLocal = parseEnvFile(fs.readFileSync(envLocalPath, 'utf-8'));
   const allWorkerDirs = findDevVarsExamples(repoRoot);
 
-  // Build dir→useLanIp lookup
   const dirUsesLanIp = new Map<string, boolean>();
   for (const [, svc] of services) {
     if (svc.useLanIp) {
@@ -597,7 +568,6 @@ function computePlan(
     dirUsesLanIp
   );
 
-  // When filtering by service, only process dirs belonging to targeted services
   let workerDirs: string[];
   if (serviceFilter) {
     const allowedDirs = new Set<string>();
@@ -610,7 +580,6 @@ function computePlan(
     workerDirs = allWorkerDirs;
   }
 
-  // --- .dev.vars changes ---
   const devVarsChanges: DevVarsFileChange[] = [];
   const envLocalAutoCreates: EnvLocalAutoCreate[] = [];
   const execWarnings: ExecWarning[] = [];
@@ -630,9 +599,7 @@ function computePlan(
     let existingContent: string | null = null;
     try {
       existingContent = fs.readFileSync(devVarsPath, 'utf-8');
-    } catch {
-      // File doesn't exist yet
-    }
+    } catch {}
     const oldVars =
       existingContent !== null ? parseEnvFile(existingContent) : new Map<string, string>();
 
@@ -747,7 +714,6 @@ function computePlan(
     }
   }
 
-  // --- .env.development.local changes ---
   const envDevLocalChanges: EnvDevLocalChange[] = [];
   // apps/ai-gateway runs with the web app's env files (see its scripts/dev.sh).
   const processEnvDevLocal =
@@ -784,11 +750,9 @@ function computePlan(
 
       if (!resolved) continue;
 
-      // Effective value: .env.development.local overrides .env.local
       const effectiveValue = envDevLocal.get(entry.key) ?? envLocal.get(entry.key);
       const isMissing = !envDevLocal.has(entry.key);
 
-      // Add change if: (1) key is missing from file, or (2) value differs from expected
       if (isMissing || effectiveValue !== expectedValue) {
         envDevLocalChanges.push({
           key: entry.key,
@@ -799,10 +763,8 @@ function computePlan(
     }
   }
 
-  // --- Secrets store warnings ---
   const secretStoreWarnings: SecretStoreWarning[] = [];
   const secretStoreAutoCreates: SecretStoreAutoCreate[] = [];
-  // Cache keyed by workerDir+storeId — wrangler scopes secret visibility per worker locally
   const storeOutputCache = new Map(prefetchedStoreOutputs);
 
   for (const [name, svc] of services) {
@@ -843,7 +805,6 @@ function computePlan(
           value: source.value,
         });
       } else if (!output.includes(b.secret_name)) {
-        // Missing and no source value - warn
         missingBindings.push(b);
       }
     }
@@ -853,7 +814,6 @@ function computePlan(
     }
   }
 
-  // --- Cross-worker shared secret consistency ---
   const sharedSecretMap = new Map<
     string,
     { workerDir: string; workerKey: string; value: string }[]

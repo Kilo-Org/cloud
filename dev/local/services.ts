@@ -551,10 +551,6 @@ export function resolveE2eInternalSecretSessionEnv(args: {
   return { E2E_INTERNAL_API_SECRET: resolveE2eInternalSecret(env) };
 }
 
-// ---------------------------------------------------------------------------
-// Wrangler config discovery
-// ---------------------------------------------------------------------------
-
 function stripJsonComments(text: string): string {
   let result = '';
   let i = 0;
@@ -613,10 +609,6 @@ export function resolveFakeLlmWorkerPort(): number {
     ) + portOffset
   );
 }
-
-// ---------------------------------------------------------------------------
-// Build service definitions from serviceMeta + wrangler.jsonc
-// ---------------------------------------------------------------------------
 
 // Base host ports for the Compose stack. A worktree with a port offset runs its
 // own Compose project on offset host ports, so its database, its data, and its

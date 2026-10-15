@@ -3,10 +3,6 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 
-// ---------------------------------------------------------------------------
-// ANSI color constants
-// ---------------------------------------------------------------------------
-
 const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
@@ -15,10 +11,6 @@ const YELLOW = '\x1b[33m';
 const RED = '\x1b[31m';
 const CYAN = '\x1b[36m';
 const WHITE = '\x1b[37m';
-
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
 
 const REPO_ROOT_MARKER = 'kilocode-monorepo';
 
@@ -52,10 +44,6 @@ const CI_PLACEHOLDER_VALUES: Record<string, string> = {
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_setup_smoke_placeholder',
 };
 
-// ---------------------------------------------------------------------------
-// Repo root detection (reuses `findRepoRoot` convention from dev/local/cli.ts)
-// ---------------------------------------------------------------------------
-
 function findRepoRoot(): string {
   let dir = import.meta.dirname;
   for (let i = 0; i < 20; i++) {
@@ -64,9 +52,7 @@ function findRepoRoot(): string {
       try {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
         if (pkg.name === REPO_ROOT_MARKER) return dir;
-      } catch {
-        // Not valid JSON, keep walking
-      }
+      } catch {}
     }
     const parent = path.dirname(dir);
     if (parent === dir) break;
@@ -74,10 +60,6 @@ function findRepoRoot(): string {
   }
   throw new Error(`Could not find repo root (package.json with name '${REPO_ROOT_MARKER}')`);
 }
-
-// ---------------------------------------------------------------------------
-// .env.local.example parsing
-// ---------------------------------------------------------------------------
 
 function parseExampleFile(content: string): Map<string, string> {
   const values = new Map<string, string>();
@@ -109,10 +91,7 @@ function parseExampleFile(content: string): Map<string, string> {
   return values;
 }
 
-// ---------------------------------------------------------------------------
-// Env value formatting (mirrors dev/local/env-sync/parse.ts)
-// ---------------------------------------------------------------------------
-
+// Mirrors dev/local/env-sync/parse.ts; keep the two in sync.
 function needsQuoting(value: string): boolean {
   return (
     value.includes('\n') ||
@@ -129,10 +108,6 @@ function formatValue(value: string): string {
   const escaped = value.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/"/g, '\\"');
   return `"${escaped}"`;
 }
-
-// ---------------------------------------------------------------------------
-// Secret generation
-// ---------------------------------------------------------------------------
 
 function generateSecret(): string {
   const result = spawnSync('openssl', ['rand', '-base64', '32'], {
@@ -161,10 +136,6 @@ const KEY_DESCRIPTIONS: Record<string, string> = {
     'Stripe publishable key — get test keys at https://dashboard.stripe.com/test/apikeys',
 };
 
-// ---------------------------------------------------------------------------
-// Key-specific descriptions
-// ---------------------------------------------------------------------------
-
 function buildDescription(key: string): string | undefined {
   return KEY_DESCRIPTIONS[key];
 }
@@ -177,10 +148,6 @@ function collectCiValue(key: string, defaultValue: string, isSecret: boolean): s
   if (isSecret) return generateSecret();
   return CI_PLACEHOLDER_VALUES[key] ?? defaultValue;
 }
-
-// ---------------------------------------------------------------------------
-// User interaction
-// ---------------------------------------------------------------------------
 
 function confirm(question: string): Promise<boolean> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -216,10 +183,6 @@ async function promptForValue(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
 async function main(): Promise<void> {
   const ciMode = isCiMode();
   const repoRoot = findRepoRoot();
@@ -233,10 +196,6 @@ async function main(): Promise<void> {
 
   const exampleContent = fs.readFileSync(examplePath, 'utf-8');
   const exampleValues = parseExampleFile(exampleContent);
-
-  // -----------------------------------------------------------------------
-  // Step 1: Check for existing .env.local
-  // -----------------------------------------------------------------------
 
   let envLocalExists = false;
   if (fs.existsSync(envLocalPath)) {
@@ -270,10 +229,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Step 2 & 3: Collect values, then write once
-  // -----------------------------------------------------------------------
-
   const collected = new Map<string, string>();
 
   for (const key of REQUIRED_KEYS) {
@@ -299,10 +254,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Step 6: Build final content and write atomically once
-  // -----------------------------------------------------------------------
-
   let finalContent = exampleContent;
   for (const [key, value] of collected) {
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -322,15 +273,9 @@ async function main(): Promise<void> {
   } catch (err) {
     try {
       if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-    } catch {
-      // ignore cleanup failure
-    }
+    } catch {}
     throw err;
   }
-
-  // -----------------------------------------------------------------------
-  // Post-setup guidance
-  // -----------------------------------------------------------------------
 
   console.log();
   console.log(`${GREEN}${BOLD}✓ Wrote .env.local${RESET}`);

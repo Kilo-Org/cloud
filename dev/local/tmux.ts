@@ -3,18 +3,10 @@ import * as path from 'node:path';
 
 import { hasRunningService } from './process-tree';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 type WindowInfo = {
   index: number;
   name: string;
 };
-
-// ---------------------------------------------------------------------------
-// Worktree root (cached)
-// ---------------------------------------------------------------------------
 
 let cachedWorktreeRoot: string | undefined;
 
@@ -31,10 +23,6 @@ function worktreeEnvironment(
 ): Record<string, string> {
   return { ...env, PWD: repoRoot };
 }
-
-// ---------------------------------------------------------------------------
-// Session management
-// ---------------------------------------------------------------------------
 
 function getSessionName(): string {
   const root = getWorktreeRoot();
@@ -62,7 +50,6 @@ function findOtherKiloDevSessions(): string[] {
     if (output === '') return [];
     return output.split('\n').filter(name => name.startsWith('kilo-dev-') && name !== ownSession);
   } catch {
-    // tmux server not running or other error
     return [];
   }
 }
@@ -102,12 +89,8 @@ function createSession(sessionName: string, env?: Record<string, string>): void 
     `tmux set-hook -t ${sessionName} client-attached "set-option -t ${sessionName} destroy-unattached on"`,
     { stdio: 'ignore' }
   );
-  // Enable mouse so clicking the status-bar window tabs works
-  execSync(`tmux set-option -t ${sessionName} mouse on`, { stdio: 'ignore' });
   // Enable focus events so tmux detects terminal tab switches (needed for client-focus-in hook)
   execSync(`tmux set-option -t ${sessionName} focus-events on`, { stdio: 'ignore' });
-  // Copy tmux selection to system clipboard (macOS pbcopy)
-  execSync(`tmux set-option -t ${sessionName} set-clipboard on`, { stdio: 'ignore' });
   execSync(
     `tmux bind-key -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"`,
     { stdio: 'ignore' }
@@ -116,7 +99,6 @@ function createSession(sessionName: string, env?: Record<string, string>): void 
     `tmux bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"`,
     { stdio: 'ignore' }
   );
-  // Show window list in status bar with more visible formatting
   execSync(`tmux set-option -t ${sessionName} status-position bottom`, { stdio: 'ignore' });
   execSync(`tmux set-option -t ${sessionName} window-status-format " #I:#W "`, { stdio: 'ignore' });
   execSync(`tmux set-option -t ${sessionName} window-status-current-format " #I:#W "`, {
@@ -133,18 +115,12 @@ function setSessionEnvironment(sessionName: string, env: Record<string, string>)
 function killSession(sessionName: string): void {
   try {
     execSync(`tmux kill-session -t '=${sessionName}'`, { stdio: 'ignore' });
-  } catch {
-    // Session doesn't exist — that's fine
-  }
+  } catch {}
 }
 
 function attachSession(sessionName: string): void {
   execFileSync('tmux', ['attach-session', '-t', sessionName], { stdio: 'inherit' });
 }
-
-// ---------------------------------------------------------------------------
-// Window management
-// ---------------------------------------------------------------------------
 
 function createWindow(
   sessionName: string,
@@ -265,15 +241,10 @@ function renameWindow(sessionName: string, windowTarget: string | number, newNam
   });
 }
 
-// ---------------------------------------------------------------------------
-// Pane management
-// ---------------------------------------------------------------------------
-
 function splitWindowHorizontal(sessionName: string, windowTarget: string | number): void {
   execSync(`tmux split-window -h -t ${sessionName}:${windowTarget}`, { stdio: 'ignore' });
 }
 
-/** Split a specific pane top/bottom (vertical split = new pane below). Returns the new pane index. */
 function splitPaneVertical(
   sessionName: string,
   windowTarget: string | number,
@@ -314,13 +285,10 @@ function setMainLeftLayout(
   mainPaneWidth: number
 ): void {
   const target = `${sessionName}:${windowTarget}`;
-  // Tell main-vertical how wide pane 0 should be
   execSync(`tmux set-window-option -t ${target} main-pane-width ${mainPaneWidth}`, {
     stdio: 'ignore',
   });
-  // Apply: pane 0 = mainPaneWidth cols, right-column panes equally share the rest
   execSync(`tmux select-layout -t ${target} main-vertical`, { stdio: 'ignore' });
-  // Force pane 0 back to the fixed width on resize and on terminal tab switch
   const resizeCmd = `resize-pane -t ${target}.0 -x ${mainPaneWidth}`;
   execSync(`tmux set-hook -t ${sessionName} client-resized "${resizeCmd}"`, { stdio: 'ignore' });
   execSync(`tmux set-hook -t ${sessionName} client-focus-in "${resizeCmd}"`, { stdio: 'ignore' });
@@ -343,7 +311,6 @@ function killWindow(sessionName: string, windowTarget: string | number): void {
   execSync(`tmux kill-window -t ${sessionName}:${windowTarget}`, { stdio: 'ignore' });
 }
 
-/** Kill a single pane (kills the process running in it). */
 function killPane(sessionName: string, windowTarget: string | number, pane: number): void {
   execSync(`tmux kill-pane -t ${sessionName}:${windowTarget}.${pane}`, { stdio: 'ignore' });
 }
@@ -384,7 +351,7 @@ function breakPane(
     )} -P -F "#{window_id}"`,
     { encoding: 'utf-8' }
   ).trim();
-  const windowId = output; // e.g., "@8" — globally unique window ID
+  const windowId = output;
 
   // break-pane may create the new window in the attached session instead
   // of the source pane's session when the process inherits TMUX from its
@@ -415,7 +382,6 @@ function breakPane(
   return parseInt(indexOutput, 10);
 }
 
-/** Count panes in a window */
 function countPanes(sessionName: string, windowTarget: string | number): number {
   try {
     const output = execSync(
@@ -454,11 +420,9 @@ function findServicePane(sessionName: string, serviceName: string): PaneInfo | u
         return { windowIndex: Number(windowIndex), paneIndex: Number(paneIndex) };
       }
     }
-    // Check named windows first (service in its own window)
     const windows = listWindows(sessionName);
     const win = windows.find(w => w.name === serviceName);
     if (win) return { windowIndex: win.index, paneIndex: 0 };
-    // Not in a named window — check window 0 panes by title
     const output = execSync(
       `tmux list-panes -t ${sessionName}:0 -F "#{pane_index}:#{pane_title}"`,
       { encoding: 'utf-8' }
@@ -538,7 +502,6 @@ function selectPane(sessionName: string, windowTarget: string | number, pane: nu
   execSync(`tmux select-pane -t ${sessionName}:${windowTarget}.${pane}`, { stdio: 'ignore' });
 }
 
-/** Set a specific pane's title (shown in pane border when pane-border-status is enabled). */
 function setPaneTitle(
   sessionName: string,
   windowTarget: string | number,
@@ -551,7 +514,6 @@ function setPaneTitle(
   );
 }
 
-/** Enable pane border titles on a window. Each pane shows its title in the top border line. */
 function enablePaneBorders(sessionName: string, windowTarget: string | number): void {
   const target = `${sessionName}:${windowTarget}`;
   execSync(`tmux set-window-option -t ${target} pane-border-status top`, { stdio: 'ignore' });
@@ -565,10 +527,6 @@ function enablePaneBorders(sessionName: string, windowTarget: string | number): 
     // Older tmux versions do not support this cosmetic option.
   }
 }
-
-// ---------------------------------------------------------------------------
-// Pane logging
-// ---------------------------------------------------------------------------
 
 function pipePane(
   sessionName: string,
@@ -592,10 +550,6 @@ function closePipePane(sessionName: string, windowTarget: string | number, pane:
   }
 }
 
-// ---------------------------------------------------------------------------
-// Utility
-// ---------------------------------------------------------------------------
-
 function isTmuxAvailable(): boolean {
   try {
     execSync('which tmux', { stdio: 'ignore' });
@@ -609,14 +563,9 @@ function isInsideTmux(): boolean {
   return process.env.TMUX !== undefined && process.env.TMUX !== '';
 }
 
-// Shell-escape a string for use in tmux send-keys
 function escapeForShell(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
 }
-
-// ---------------------------------------------------------------------------
-// Exports
-// ---------------------------------------------------------------------------
 
 export {
   getSessionName,

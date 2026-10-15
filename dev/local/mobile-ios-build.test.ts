@@ -96,8 +96,6 @@ function sharedResult<T>(initialValue: T): { set: (value: T) => void; read: () =
   };
 }
 
-// ── Fingerprint options ──────────────────────────────────────────────
-
 test('fingerprint options include iOS platform and only skip the Expo extra section beyond defaults', () => {
   const options = buildFingerprintOptions();
   assert.deepEqual(options.platforms, ['ios']);
@@ -111,7 +109,6 @@ test('fingerprint options include iOS platform and only skip the Expo extra sect
     'modules/*/src/**',
     'modules/**/*.test.ts',
   ]);
-  // SourceSkips.ExpoConfigExtraSection === 4096
   assert.equal(options.sourceSkips & 4096, 4096);
   assert.deepEqual(
     options.extraSources.map(source =>
@@ -181,8 +178,6 @@ test('fingerprint changes for iOS module and extension sources and ignores unrel
   }
 });
 
-// ── Compatibility key ────────────────────────────────────────────────
-
 test('buildCompatibilityKey is stable for identical dimensions and changes on each dimension', () => {
   const dimensions = fixedDimensions();
   const keyA = buildCompatibilityKey(dimensions);
@@ -200,8 +195,6 @@ test('buildCompatibilityKey is stable for identical dimensions and changes on ea
   }
 });
 
-// ── Cache root resolution ────────────────────────────────────────────
-
 test('resolveCacheRoot prefers macOS Library/Caches/Kilo with XDG fallback chain', () => {
   assert.equal(
     resolveCacheRoot({ home: '/Users/test', platform: 'darwin', env: {} }),
@@ -216,8 +209,6 @@ test('resolveCacheRoot prefers macOS Library/Caches/Kilo with XDG fallback chain
     '/home/test/.cache/Kilo/mobile-ios-builds'
   );
 });
-
-// ── Artifact checksum ────────────────────────────────────────────────
 
 test('computeArtifactChecksum is deterministic and content-sensitive', async () => {
   const dir = makeTempDir('checksum');
@@ -234,8 +225,6 @@ test('computeArtifactChecksum is deterministic and content-sensitive', async () 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
-
-// ── Concurrency: withFingerprintLock ─────────────────────────────────
 
 test('withFingerprintLock runs producer once for matching concurrent callers', async () => {
   const cacheRoot = makeTempDir('lock-once');
@@ -361,8 +350,6 @@ test('withFingerprintLock bounds wait when an active lock holds the producer', a
   }
 });
 
-// ── Cache lookup ─────────────────────────────────────────────────────
-
 test('cache hit returns the published manifest and avoids the producer', async () => {
   const cacheRoot = makeTempDir('hit');
   const key = 'k-hit';
@@ -479,8 +466,6 @@ test('cache miss when the entry is missing the app bundle directory', async () =
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
 
-// ── Simulator claim validation ───────────────────────────────────────
-
 test('validateSimulatorClaim accepts the current worktree and rejects foreign worktrees', () => {
   const claimRoot = makeTempDir('claims');
   const worktree = makeTempDir('wt');
@@ -506,8 +491,6 @@ test('validateSimulatorClaim accepts the current worktree and rejects foreign wo
   }
 });
 
-// ── Install command ──────────────────────────────────────────────────
-
 test('buildInstallCommand uses xcrun simctl install with the cached bundle', () => {
   const command = buildInstallCommand('UDID-1234', '/cache/key/Kilo.app');
   assert.deepEqual(command, {
@@ -515,8 +498,6 @@ test('buildInstallCommand uses xcrun simctl install with the cached bundle', () 
     args: ['simctl', 'install', 'UDID-1234', '/cache/key/Kilo.app'],
   });
 });
-
-// ── Pruning ──────────────────────────────────────────────────────────
 
 test('pruneCache removes entries older than the threshold and protects active locks', async () => {
   const cacheRoot = makeTempDir('prune');
@@ -568,8 +549,6 @@ test('pruneCache removes entries older than the threshold and protects active lo
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
 
-// ── CLI parsing ──────────────────────────────────────────────────────
-
 test('parseCliArgs supports fingerprint, build, and prune subcommands', () => {
   assert.deepEqual(parseCliArgs(['fingerprint']), { command: 'fingerprint' });
   assert.deepEqual(parseCliArgs(['build', 'UDID-1']), { command: 'build', udid: 'UDID-1' });
@@ -578,8 +557,6 @@ test('parseCliArgs supports fingerprint, build, and prune subcommands', () => {
   assert.throws(() => parseCliArgs(['build']), /Usage/);
   assert.throws(() => parseCliArgs(['unknown']), /Usage/);
 });
-
-// ── Publication boundary ─────────────────────────────────────────────
 
 test('withFingerprintLock does not publish a usable entry when the producer throws', async () => {
   const cacheRoot = makeTempDir('lock-publish-fail');
@@ -610,9 +587,6 @@ test('withFingerprintLock does not publish a usable entry when the producer thro
         }),
       /producer boom/
     );
-    // The on-disk entry must not be installable: either the entry is
-    // removed or the manifest is missing/corrupt. We assert that
-    // lookupCache reports a miss.
     const result = await lookupCache({
       env: fixedEnv({ cacheRoot }),
       key: 'k',
@@ -649,7 +623,6 @@ test('withFingerprintLock publishes atomically via a temp directory rename', asy
       fs.mkdirSync(path.join(stage, 'Kilo.app'), { recursive: true });
       fs.writeFileSync(path.join(stage, 'Kilo.app', 'Info.plist'), '<plist/>');
       stagedDirs.push(stage);
-      // Simulate atomic publish: rename stage → final.
       fs.mkdirSync(path.dirname(entriesDir), { recursive: true });
       fs.renameSync(stage, entriesDir);
       fs.writeFileSync(
@@ -680,8 +653,6 @@ test('withFingerprintLock publishes atomically via a temp directory rename', asy
   assert.equal(fs.existsSync(entriesDir), true);
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
-
-// ── xcodebuild command ──────────────────────────────────────────────
 
 test('validateXcodeWorkspace accepts the generated workspace and rejects missing', () => {
   const mobileRoot = makeTempDir('ws-ok');
@@ -786,8 +757,6 @@ test('locateProducedApp throws when the canonical .app is missing', () => {
     fs.rmSync(derived, { recursive: true, force: true });
   }
 });
-
-// ── runBuild orchestration ──────────────────────────────────────────
 
 function makeBuildDeps(overrides: Partial<BuildDeps> = {}): BuildDeps {
   return {
@@ -949,7 +918,6 @@ test('runBuild on miss invokes the builder once, publishes, and installs', async
     claimRoot,
     build: async ({ derivedDataPath, udid: buildUdid }) => {
       builderCalls += 1;
-      // Simulate xcodebuild output: create Kilo.app at canonical path.
       const app = path.join(
         derivedDataPath,
         'Build',
@@ -979,7 +947,6 @@ test('runBuild on miss invokes the builder once, publishes, and installs', async
       buildMode: 'debug-dev-client',
     });
     assert.equal(installs[0].app, path.join(cacheRoot, 'entries', key, 'Kilo.app'));
-    // Cache entry must be valid.
     const hit = await lookupCache({
       env: fixedEnv({ cacheRoot }),
       key,
@@ -1225,7 +1192,6 @@ test('runBuild builder failure does not publish a cache entry or install', async
   try {
     await assert.rejects(() => runBuild(udid, deps), /xcodebuild failed/);
     assert.equal(installCount, 0);
-    // No cache entry should exist.
     const entries = path.join(cacheRoot, 'entries');
     if (fs.existsSync(entries)) {
       assert.equal(fs.readdirSync(entries).length, 0);
@@ -1383,8 +1349,6 @@ test('runBuild installs via the exact xcrun simctl install command shape', async
   }
 });
 
-// ── runFingerprint orchestration ────────────────────────────────────
-
 test('runFingerprint prints sanitized compatibility dimensions and key only', async () => {
   const outputs: string[] = [];
   const write = (chunk: string): void => {
@@ -1426,8 +1390,6 @@ test('runFingerprint prints sanitized compatibility dimensions and key only', as
   );
 });
 
-// ── runPrune orchestration ──────────────────────────────────────────
-
 test('runPrune reports the removed count and keeps the rest', async () => {
   const cacheRoot = makeTempDir('prune-run');
   const entriesRoot = path.join(cacheRoot, 'entries');
@@ -1463,8 +1425,6 @@ test('runPrune reports the removed count and keeps the rest', async () => {
   }
 });
 
-// ── Spec-review findings ────────────────────────────────────────────
-
 test('atomic lock takeover: two simultaneous adopters produce exactly once', async () => {
   const cacheRoot = makeTempDir('lock-atomic-takeover');
   const lockRoot = path.join(cacheRoot, 'locks');
@@ -1482,7 +1442,6 @@ test('atomic lock takeover: two simultaneous adopters produce exactly once', asy
   const lockDeps: CacheLockDeps = {
     env: fixedEnv({ cacheRoot }),
     sleep: (ms: number) => new Promise(resolve => setTimeout(resolve, Math.max(ms, 1))),
-    // The stale lock has pid 99999; the winner will have process.pid.
     pidAlive: (pid: number) => pid === process.pid,
     processIdentity: (pid: number) =>
       pid === process.pid ? `live-identity-${process.pid}` : 'dead-identity',
@@ -1576,7 +1535,6 @@ test('lookupCache misses when app present but manifest absent', async () => {
   const keyDir = path.join(cacheRoot, 'entries', key);
   fs.mkdirSync(keyDir, { recursive: true });
   fs.mkdirSync(path.join(keyDir, 'Kilo.app'), { recursive: true });
-  // No manifest.json
   let onMissCalled = false;
   const result = await lookupCache({
     env: fixedEnv({ cacheRoot }),
@@ -1710,7 +1668,6 @@ test('runBuild revalidates on-disk entry after lock result', async () => {
     await runBuild(udid, deps);
     assert.equal(buildInvocations, 1);
     assert.equal(installs.length, 1);
-    // Verify the installed path is the on-disk cache entry, not a staging path
     const key = buildCompatibilityKey({
       nativeHash: 'native-hash',
       xcodeBuildVersion: '16A0000',
@@ -1730,7 +1687,6 @@ test('runBuild revalidates on-disk entry after lock result', async () => {
 test('computeArtifactChecksum distinguishes nested paths (a/file vs b/file)', async () => {
   const dir = makeTempDir('checksum-nested');
   try {
-    // Create a/file with content1 and b/file with content2 in the SAME directory
     fs.mkdirSync(path.join(dir, 'a'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'a', 'file'), 'content1');
     fs.mkdirSync(path.join(dir, 'b'), { recursive: true });
@@ -1738,7 +1694,6 @@ test('computeArtifactChecksum distinguishes nested paths (a/file vs b/file)', as
 
     const checksum = await computeArtifactChecksum(dir);
 
-    // Create a different structure with same filenames but different content
     const dir2 = makeTempDir('checksum-nested-2');
     fs.mkdirSync(path.join(dir2, 'a'), { recursive: true });
     fs.writeFileSync(path.join(dir2, 'a', 'file'), 'content2');
@@ -1747,7 +1702,6 @@ test('computeArtifactChecksum distinguishes nested paths (a/file vs b/file)', as
 
     const checksum2 = await computeArtifactChecksum(dir2);
 
-    // These should be different because the content is swapped between a/ and b/
     assert.notEqual(checksum, checksum2, 'swapped content should produce different checksums');
 
     fs.rmSync(dir2, { recursive: true, force: true });
@@ -1760,13 +1714,10 @@ test('computeArtifactChecksum rejects symlinks outside root', async () => {
   const dir = makeTempDir('checksum-symlink');
   const outsideDir = makeTempDir('checksum-outside');
   try {
-    // Create a file outside the root
     fs.writeFileSync(path.join(outsideDir, 'secret'), 'secret-content');
 
-    // Create a symlink inside the root pointing outside
     fs.symlinkSync(path.join(outsideDir, 'secret'), path.join(dir, 'link'));
 
-    // The checksum should reject the symlink
     await assert.rejects(
       () => computeArtifactChecksum(dir),
       /symlink|link/i,
@@ -1777,8 +1728,6 @@ test('computeArtifactChecksum rejects symlinks outside root', async () => {
     fs.rmSync(outsideDir, { recursive: true, force: true });
   }
 });
-
-// ── Review findings ────────────────────────────────────────────────
 
 test('tryAdoptLock does not steal a lock that has been replaced by a fresh active record', async () => {
   const cacheRoot = makeTempDir('lock-steal-toctou');
@@ -1867,7 +1816,6 @@ test('staging directory is created under cacheRoot so publication rename is same
       return fs.mkdtempSync(prefix);
     },
     build: async ({ stagingDir, derivedDataPath }) => {
-      // Ensure the staging dir is inside the cache root.
       assert.ok(
         stagingDir.startsWith(cacheRoot),
         `stagingDir ${stagingDir} must be under cacheRoot ${cacheRoot}`
@@ -1918,7 +1866,6 @@ test('pruneCache removes stale lock artifacts and orphan quarantines', async () 
     path.join(oldDir, 'manifest.json'),
     JSON.stringify(fakeManifest({ key: oldKey, createdAt: '2026-06-01T00:00:00.000Z' }))
   );
-  // Inactive lock artifacts for the old entry
   const oldLockDir = path.join(locksRoot, `${oldKey}.lock`);
   fs.mkdirSync(oldLockDir, { recursive: true });
   fs.writeFileSync(
@@ -1927,7 +1874,6 @@ test('pruneCache removes stale lock artifacts and orphan quarantines', async () 
   );
   fs.writeFileSync(path.join(oldLockDir, 'result.json'), '{}');
 
-  // Active lock artifacts must be protected
   const activeKey = 'active';
   const activeDir = path.join(entriesRoot, activeKey);
   fs.mkdirSync(activeDir, { recursive: true });
@@ -1975,7 +1921,6 @@ test('computeArtifactChecksum is async and streams files without loading entire 
     fs.writeFileSync(path.join(dir, 'b', 'file'), 'chunk-2');
     const checksum = await computeArtifactChecksum(dir);
     assert.equal(checksum.length, 64);
-    // Same content produces same checksum
     const checksum2 = await computeArtifactChecksum(dir);
     assert.equal(checksum, checksum2);
   } finally {
@@ -1998,10 +1943,8 @@ test('computeArtifactChecksum rejects symlinks when streaming', async () => {
 
 test('mobileRoot is resolved from import.meta.dirname, not process.cwd', () => {
   const actual = mobileRoot();
-  // The module is at dev/local/mobile-ios-build.ts; two levels up is repo root.
   const expected = path.resolve(import.meta.dirname, '..', '..', 'apps', 'mobile');
   assert.equal(actual, expected);
-  // The current working directory must not influence the result.
   assert.doesNotMatch(actual, /apps\/mobile\/apps\/mobile/);
 });
 
@@ -2011,7 +1954,6 @@ test('validateSimulatorClaim enforces worktree ownership and rejects corrupt rec
   const other = makeTempDir('wt-other');
   const udid = 'UDID-ready';
   try {
-    // Claim owned by this worktree
     fs.writeFileSync(
       path.join(claimRoot, `${udid}.json`),
       JSON.stringify({
@@ -2022,18 +1964,15 @@ test('validateSimulatorClaim enforces worktree ownership and rejects corrupt rec
     );
     assert.doesNotThrow(() => validateSimulatorClaim(udid, worktree, claimRoot));
 
-    // Corrupt record (no worktreeRoot)
     fs.writeFileSync(
       path.join(claimRoot, `${udid}.json`),
       JSON.stringify({ deviceId: udid, claimedAt: new Date().toISOString() })
     );
     assert.throws(() => validateSimulatorClaim(udid, worktree, claimRoot), /corrupt/i);
 
-    // Unparseable record
     fs.writeFileSync(path.join(claimRoot, `${udid}.json`), 'not json');
     assert.throws(() => validateSimulatorClaim(udid, worktree, claimRoot), /corrupt/i);
 
-    // Foreign claim
     fs.writeFileSync(
       path.join(claimRoot, `${udid}.json`),
       JSON.stringify({
@@ -2056,7 +1995,6 @@ test('defaultIsLockActive requires both pidAlive and processIdentity match', () 
   // default probe reports it dead on both — a low "dead" pid is alive on Linux.
   const deadRecord: LockRecord = { key: 'k', pid: 9999999, identity: 'b', startedAt: '' };
 
-  // Both probes agree: active
   let active = defaultIsLockActive({
     env: fixedEnv(),
     pidAlive: () => true,
@@ -2064,7 +2002,6 @@ test('defaultIsLockActive requires both pidAlive and processIdentity match', () 
   });
   assert.equal(active(aliveRecord), true);
 
-  // PID alive but identity mismatch: inactive
   active = defaultIsLockActive({
     env: fixedEnv(),
     pidAlive: () => true,
@@ -2141,7 +2078,6 @@ test('computeArtifactChecksum streams large files in chunks without loading full
     fs.writeFileSync(path.join(dir, 'large.bin'), large);
     const checksum = await computeArtifactChecksum(dir);
     assert.equal(checksum.length, 64);
-    // Same content produces same checksum
     const checksum2 = await computeArtifactChecksum(dir);
     assert.equal(checksum, checksum2);
     // Different content produces different checksum

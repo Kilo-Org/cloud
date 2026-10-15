@@ -139,8 +139,6 @@ export type CliArgs =
   | { command: 'build'; udid: string }
   | { command: 'prune' };
 
-// ── Fingerprint ──────────────────────────────────────────────────────
-
 // Build the option bag used to compute the native project hash. Only
 // the Expo `extra` section is skipped beyond the library defaults —
 // versions, schemes, bundle ID, plugins, assets, permissions, and
@@ -193,8 +191,6 @@ export function buildCompatibilityKey(dimensions: CompatibilityDimensions): stri
   return createHash('sha256').update(JSON.stringify(ordered)).digest('hex');
 }
 
-// ── Cache root ───────────────────────────────────────────────────────
-
 export type ResolveCacheRootArgs = {
   home: string;
   platform: NodeJS.Platform;
@@ -211,8 +207,6 @@ export function resolveCacheRoot(args: ResolveCacheRootArgs): string {
   }
   return path.join(args.home, '.cache/Kilo/mobile-ios-builds');
 }
-
-// ── Artifact checksum ───────────────────────────────────────────────
 
 // Deterministic directory hash. Walks the directory recursively,
 // reading each file in order, and feeds its relative path + contents
@@ -287,8 +281,6 @@ function hashFileChunks(filePath: string, hash: ReturnType<typeof createHash>): 
   });
 }
 
-// ── Manifest validation ──────────────────────────────────────────────
-
 // Strict manifest check. Returns true iff every field is present and
 // well-typed. Bundle ID, key, and build mode must match the
 // requested values. The producer worktree is recorded for audit but
@@ -316,8 +308,6 @@ export function isValidManifest(
   if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString() !== o.createdAt) return false;
   return true;
 }
-
-// ── Cache lookup ─────────────────────────────────────────────────────
 
 // Returns the cached entry iff the manifest is well-formed, the
 // bundle id matches, and the artifact checksum is current. On any
@@ -351,8 +341,6 @@ export async function lookupCache(args: LookupCacheArgs): Promise<LookupCacheRes
   }
   return { manifest, appPath };
 }
-
-// ── Producer lock ────────────────────────────────────────────────────
 
 // Run `producer` under a fingerprint-specific host lock. Exactly one
 // concurrent caller becomes the producer; the rest wait for the
@@ -398,7 +386,6 @@ export async function withFingerprintLock<T>(args: WithFingerprintLockArgs<T>): 
     await sleep(pollIntervalMs);
     const record = readLockRecord(lockFile);
     if (record && isActive(record)) {
-      // Active producer: wait for its completion/error signal.
       const published = readLockResult(resultFile);
       if (published.kind === 'done') return args.readResult();
       if (published.kind === 'error') throw published.error;
@@ -547,7 +534,6 @@ function tryAdoptLock(
     }
     throw error;
   }
-  // Winner: write fresh lock record
   try {
     const record: LockRecord = createLockRecord(key, identity);
     fs.writeFileSync(lockFile, JSON.stringify(record), { flag: 'wx' });
@@ -667,8 +653,6 @@ function defaultProcessIdentity(pid: number): string | undefined {
   }
 }
 
-// ── Simulator claim validation ───────────────────────────────────────
-
 // Read-only validation of a claim recorded by the simulator
 // wrapper. Accepts the caller's current worktree as the exclusive
 // owner; any other recorded worktree is rejected.
@@ -705,16 +689,12 @@ export function validateSimulatorClaim(
   }
 }
 
-// ── Install command ──────────────────────────────────────────────────
-
 export function buildInstallCommand(udid: string, appPath: string): BuildInstallCommand {
   return {
     command: 'xcrun',
     args: ['simctl', 'install', udid, appPath],
   };
 }
-
-// ── Pruning ──────────────────────────────────────────────────────────
 
 export async function pruneCache(args: PruneCacheArgs): Promise<PruneResult> {
   const entriesRoot = path.join(args.env.cacheRoot, 'entries');
@@ -731,9 +711,6 @@ export async function pruneCache(args: PruneCacheArgs): Promise<PruneResult> {
       kept.push(key);
       continue;
     }
-    // Active locks (those with a real lock record) protect entries
-    // from pruning. A missing lock record means the entry is not
-    // currently being produced and is eligible for age-based pruning.
     const lockDir = path.join(locksRoot, `${key}.lock`);
     const lockFile = path.join(lockDir, 'lock.json');
     const lockRecord = readLockRecord(lockFile);
@@ -801,8 +778,6 @@ function removeLockArtifacts(lockDir: string): void {
   }
 }
 
-// ── CLI ──────────────────────────────────────────────────────────────
-
 export function parseCliArgs(argv: readonly string[]): CliArgs {
   const [command, ...rest] = argv;
   if (command === 'fingerprint') {
@@ -819,8 +794,6 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   }
   throw new Error('Usage: pnpm dev:mobile:ios [fingerprint|build <udid>|prune]');
 }
-
-// ── Xcode workspace and build command ───────────────────────────────
 
 // Check that the generated native project exists. Expo generates
 // `apps/mobile/ios/Kilo.xcworkspace` via `npx expo prebuild --platform
@@ -899,8 +872,6 @@ export function locateProducedApp(derivedDataPath: string): string {
   return app;
 }
 
-// ── Build flow types ────────────────────────────────────────────────
-
 // All side-effecting boundaries the build flow needs. Tests inject
 // stubs; production wires real implementations.
 export type BuildDeps = {
@@ -956,8 +927,6 @@ export type RunPruneDeps = {
   isLockActive?: (record: LockRecord) => boolean;
   write: (chunk: string) => void;
 };
-
-// ── Publish flow ────────────────────────────────────────────────────
 
 // Build, verify, and atomically publish a cache entry. Called as the
 // sole producer inside the fingerprint lock. On entry, the cache is
@@ -1068,8 +1037,6 @@ export async function publishCacheEntry(args: {
   }
 }
 
-// ── Build orchestration ─────────────────────────────────────────────
-
 // Run the full `build <udid>` flow. On a cache hit, install without
 // building. On a miss, enter the fingerprint lock; the sole producer
 // publishes a validated entry, and all callers (including waiters)
@@ -1144,10 +1111,8 @@ async function tryRemotePublish(args: {
 }
 
 export async function runBuild(udid: string, deps: BuildDeps): Promise<void> {
-  // 1. Validate exclusive claim for the current worktree.
   deps.validateClaim(udid, deps.worktreeRoot, deps.claimRoot);
 
-  // 2. Compute compatibility dimensions and key.
   const nativeHash = await deps.fingerprint(deps.mobileRoot, buildFingerprintOptions());
   const compatibility: CompatibilityDimensions = {
     nativeHash,
@@ -1159,7 +1124,6 @@ export async function runBuild(udid: string, deps: BuildDeps): Promise<void> {
   const key = buildCompatibilityKey(compatibility);
   validateKey(key);
 
-  // 3. Pre-lock lookup. A hit here avoids the lock entirely.
   const preHit = await lookupCache({
     env: deps.env,
     key,
@@ -1170,9 +1134,6 @@ export async function runBuild(udid: string, deps: BuildDeps): Promise<void> {
     return;
   }
 
-  // 4. Miss: enter the fingerprint lock. publishCacheEntry
-  // re-checks the cache (covers abandoned-lock + valid-entry) and
-  // publishes a validated entry for the sole producer.
   const lockRoot = path.join(deps.env.cacheRoot, 'locks');
   const lockDeps: CacheLockDeps = {
     env: deps.env,
@@ -1214,11 +1175,6 @@ export async function runBuild(udid: string, deps: BuildDeps): Promise<void> {
       }),
   });
 
-  // 5. Re-validate from disk (requirement 7). Both the producer
-  // (who built and published) and the waiter (who observed the
-  // result file) must observe the same validated on-disk entry.
-  // readResult already performs this, and we repeat it here so
-  // runBuild owns the final install decision.
   const revalidated = await lookupCache({
     env: deps.env,
     key,
@@ -1231,8 +1187,6 @@ export async function runBuild(udid: string, deps: BuildDeps): Promise<void> {
   }
   deps.install(udid, revalidated.appPath);
 }
-
-// ── Fingerprint orchestration ───────────────────────────────────────
 
 // Print sanitized compatibility dimensions and the cache key. No
 // environment values, no source lists, no secrets. Uses the injected
@@ -1260,14 +1214,10 @@ export async function runFingerprint(deps: RunFingerprintDeps): Promise<void> {
   deps.write(`${JSON.stringify(sanitized, null, 2)}\n`);
 }
 
-// ── Prune orchestration ─────────────────────────────────────────────
-
 export async function runPrune(deps: RunPruneDeps): Promise<void> {
   const result = await pruneCache({ env: deps.env, isLockActive: deps.isLockActive });
   deps.write(`${JSON.stringify(result, null, 2)}\n`);
 }
-
-// ── Main entry point ─────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   const parsed = parseCliArgs(process.argv.slice(2));

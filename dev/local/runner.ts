@@ -23,10 +23,6 @@ import {
   closePipePane,
 } from './tmux';
 
-// ---------------------------------------------------------------------------
-// Repo root
-// ---------------------------------------------------------------------------
-
 export function findRepoRoot(): string {
   let dir = import.meta.dirname;
   for (let i = 0; i < 20; i++) {
@@ -35,9 +31,7 @@ export function findRepoRoot(): string {
       try {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
         if (pkg.name === 'kilocode-monorepo') return dir;
-      } catch {
-        // Not valid JSON, keep walking
-      }
+      } catch {}
     }
     const parent = path.dirname(dir);
     if (parent === dir) break;
@@ -45,10 +39,6 @@ export function findRepoRoot(): string {
   }
   throw new Error("Could not find repo root (package.json with name 'kilocode-monorepo')");
 }
-
-// ---------------------------------------------------------------------------
-// Port probing
-// ---------------------------------------------------------------------------
 
 export function probePort(port: number, timeoutMs = 500): Promise<boolean> {
   return new Promise(resolve => {
@@ -83,10 +73,6 @@ export async function waitForPort(port: number, name: string, maxWaitMs: number)
   console.warn(`⚠ ${name} on port ${port} did not become ready within ${maxWaitMs / 1000}s`);
 }
 
-// ---------------------------------------------------------------------------
-// Command building
-// ---------------------------------------------------------------------------
-
 export function buildStartCommand(serviceName: string, serviceNames?: readonly string[]): string {
   const svc = getService(serviceName);
   const command = serviceNames ? serviceCommand(serviceName, serviceNames) : svc.command;
@@ -105,10 +91,6 @@ export function buildStartCommand(serviceName: string, serviceNames?: readonly s
 
   return parts.join(' && ');
 }
-
-// ---------------------------------------------------------------------------
-// Tmux service lifecycle
-// ---------------------------------------------------------------------------
 
 export function startServiceInTmux(
   sessionName: string,
@@ -269,18 +251,15 @@ function setRightPanes(
   serviceNames: string[],
   currentPaneNames: string
 ): string[] {
-  // Break all current right-side panes (>= 1) back to their own named windows
   const total = countPanes(sessionName, 0);
   const current = currentPaneNames ? currentPaneNames.split(',') : [];
   // Break in reverse order to avoid index shifts
   for (let i = total - 1; i >= 1; i--) {
     const name = current[i - 1];
     if (name) {
-      // Service pane — break back to its named window
       try {
         breakPane(sessionName, 0, i, name);
       } catch {
-        // If break fails, just kill the pane
         try {
           killPane(sessionName, 0, i);
         } catch {
@@ -288,7 +267,6 @@ function setRightPanes(
         }
       }
     } else {
-      // Empty shell from initial startup split — just kill it
       try {
         killPane(sessionName, 0, i);
       } catch {
@@ -299,33 +277,26 @@ function setRightPanes(
 
   if (serviceNames.length === 0) return [];
 
-  // Join first service horizontally (right of sidebar pane 0)
   const firstWin = listWindows(sessionName).find(w => w.name === serviceNames[0]);
   if (!firstWin) return [];
   joinPane(sessionName, firstWin.index, 0, 0, 0, 'h');
   const joinedServiceNames = [serviceNames[0]];
 
-  // Join subsequent services vertically below pane 1 (stacked in the right column)
   for (let i = 1; i < serviceNames.length; i++) {
     const win = listWindows(sessionName).find(w => w.name === serviceNames[i]);
     if (!win) continue;
     try {
       joinPane(sessionName, win.index, 0, 0, i, 'v');
       joinedServiceNames.push(serviceNames[i]);
-    } catch {
-      // skip service if join fails
-    }
+    } catch {}
   }
 
-  // main-vertical keeps sidebar as the fixed left column with fixed width;
-  // distributes right-column panes equally in height
   try {
     setMainLeftLayout(sessionName, 0, SIDEBAR_WIDTH);
   } catch {
     // best-effort
   }
 
-  // Label each right-side pane so pane border titles show the service name
   for (let i = 0; i < joinedServiceNames.length; i++) {
     try {
       setPaneTitle(sessionName, 0, i + 1, joinedServiceNames[i]);
@@ -502,10 +473,6 @@ export function restartServiceInTmux(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Infrastructure
-// ---------------------------------------------------------------------------
-
 /**
  * Build `docker compose down` argv with `--profile` flags for every known
  * infra profile so profile-gated services (e.g. grafana) are torn down
@@ -631,10 +598,6 @@ export async function startInfra(repoRoot: string, serviceNames: string[]): Prom
     await waitForPort(svc.port, name, maxWait);
   }
 }
-
-// ---------------------------------------------------------------------------
-// Env value helpers (used for capture-service coordination)
-// ---------------------------------------------------------------------------
 
 export function readEnvValue(filePath: string, key: string): string | undefined {
   let content: string;

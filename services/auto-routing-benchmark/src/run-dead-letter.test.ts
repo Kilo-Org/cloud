@@ -21,7 +21,7 @@ vi.mock('./scheduler', async importOriginal => {
   const actual = await importOriginal<typeof SchedulerModule>();
   return {
     ...actual,
-    claimNextChunk: vi.fn(),
+    claimScheduledChunks: vi.fn(),
     deferChunk: vi.fn(),
     getChunk: vi.fn(),
     recoverChunks: vi.fn(),
@@ -39,7 +39,7 @@ import {
   recordLaneFailure,
 } from './db';
 import {
-  claimNextChunk,
+  claimScheduledChunks,
   deferChunk,
   getChunk,
   recoverChunks,
@@ -100,7 +100,7 @@ beforeEach(() => {
   queueSend.mockResolvedValue(undefined);
   vi.mocked(getChunk).mockResolvedValue(claim);
   vi.mocked(deferChunk).mockResolvedValue(undefined);
-  vi.mocked(claimNextChunk).mockResolvedValue(null);
+  vi.mocked(claimScheduledChunks).mockResolvedValue([]);
   vi.mocked(recoverChunks).mockResolvedValue([]);
   vi.mocked(scheduleRunChunks).mockResolvedValue(undefined);
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
@@ -126,7 +126,7 @@ describe('processDeadLetter — scheduler claims', () => {
       true
     );
     expect(recoverChunks).toHaveBeenCalledWith(env.BENCH_DB, expect.any(Number));
-    expect(claimNextChunk).toHaveBeenCalled();
+    expect(claimScheduledChunks).toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
     expectNoDirectLaneDeath();
   });
@@ -142,13 +142,13 @@ describe('processDeadLetter — scheduler claims', () => {
       expect.any(Number),
       true
     );
-    expect(claimNextChunk).toHaveBeenCalled();
+    expect(claimScheduledChunks).toHaveBeenCalled();
     expectNoDirectLaneDeath();
   });
 
   it('dispatches a replacement using the newly claimed token rather than the dead message', async () => {
     const next = { ...claim, id: 'next-chunk', token: 'fresh-token', model: 'other/model' };
-    vi.mocked(claimNextChunk).mockResolvedValueOnce(next).mockResolvedValue(null);
+    vi.mocked(claimScheduledChunks).mockResolvedValueOnce([next]).mockResolvedValue([]);
     await processDeadLetter(env, deadLetterMessage());
     expect(queueSend).toHaveBeenCalledWith({
       runId,
@@ -163,7 +163,7 @@ describe('processDeadLetter — scheduler claims', () => {
   it('propagates reconciliation failures so the DLQ message can be retried', async () => {
     vi.mocked(recoverChunks).mockRejectedValueOnce(new Error('D1 transient'));
     await expect(processDeadLetter(env, deadLetterMessage())).rejects.toThrow('D1 transient');
-    expect(claimNextChunk).not.toHaveBeenCalled();
+    expect(claimScheduledChunks).not.toHaveBeenCalled();
     expectNoDirectLaneDeath();
   });
 
@@ -173,7 +173,7 @@ describe('processDeadLetter — scheduler claims', () => {
       await processDeadLetter(env, { nope: true });
       expect(getChunk).not.toHaveBeenCalled();
       expect(deferChunk).not.toHaveBeenCalled();
-      expect(claimNextChunk).not.toHaveBeenCalled();
+      expect(claimScheduledChunks).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('benchmark_deadletter_invalid_message')
       );
@@ -236,7 +236,7 @@ describe('processDeadLetter — legacy migration', () => {
         chunkSize: 1,
       });
       expect(deferChunk).not.toHaveBeenCalled();
-      expect(claimNextChunk).toHaveBeenCalled();
+      expect(claimScheduledChunks).toHaveBeenCalled();
       expectNoDirectLaneDeath();
     } finally {
       fetcher.mockRestore();
@@ -247,7 +247,7 @@ describe('processDeadLetter — legacy migration', () => {
     mockRun(status);
     await processDeadLetter(env, { runId, kind: 'decider', model: 'b/dead' });
     expect(scheduleRunChunks).not.toHaveBeenCalled();
-    expect(claimNextChunk).toHaveBeenCalled();
+    expect(claimScheduledChunks).toHaveBeenCalled();
     expectNoDirectLaneDeath();
   });
 });

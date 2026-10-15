@@ -594,63 +594,76 @@ describe('createWorktreeChat request validation and authorization', () => {
 });
 
 describe('createWorktreeChat sandbox preset inheritance', () => {
-  it.each([undefined, [], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
-    'inherits the native allocation policy %j',
-    async ({ egressAllowlist }) => {
-      const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
-      metadata.workspace = {
-        ...metadata.workspace,
-        egressMode: 'allowlist',
-        egressAllowlist,
-      };
-      const { caller, input, destinationStub } = fixture({
-        metadata,
-        organizationId: ORGANIZATION_ID,
-      });
-      await caller.createWorktreeChat(input);
-      expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadata: expect.objectContaining({
-            workspace: expect.objectContaining({ egressMode: 'allowlist', egressAllowlist }),
-          }),
-          sandboxSelection: expect.objectContaining({ egressMode: 'allowlist' }),
-        })
-      );
-      const registered = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
-      expect(registered?.sandboxSelection.egressAllowlist).toEqual(egressAllowlist);
-    }
-  );
-
-  it('rejects a changed inherited policy on same-key replay', async () => {
+  it.each(
+    [undefined, [], ['example.com']].flatMap(egressAllowlist =>
+      [undefined, false, true].map(egressAudit => ({ egressAllowlist, egressAudit }))
+    )
+  )('inherits the native allocation policy %j', async ({ egressAllowlist, egressAudit }) => {
     const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
     metadata.workspace = {
       ...metadata.workspace,
       egressMode: 'allowlist',
-      egressAllowlist: [],
+      egressAllowlist,
+      egressAudit,
     };
-    const source = ownershipRow({ organizationId: ORGANIZATION_ID });
     const { caller, input, destinationStub } = fixture({
       metadata,
       organizationId: ORGANIZATION_ID,
-      ownershipResults: [[source], [source]],
     });
     await caller.createWorktreeChat(input);
-    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
-    metadata.workspace = { ...metadata.workspace, egressAllowlist: ['example.com'] };
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: ledgerRow({
-        organization_id: ORGANIZATION_ID,
-        status: 'completed',
-        canonical_result: progress,
-      }),
-    });
-    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
-      code: 'CONFLICT',
-      message: 'operation_key_reuse_mismatch',
-    });
-    expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
+    expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          workspace: expect.objectContaining({
+            egressMode: 'allowlist',
+            egressAllowlist,
+            egressAudit,
+          }),
+        }),
+        sandboxSelection: expect.objectContaining({ egressMode: 'allowlist' }),
+      })
+    );
+    const registered = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+    expect(registered?.sandboxSelection.egressAllowlist).toEqual(egressAllowlist);
+    expect(registered?.sandboxSelection.egressAudit).toBe(egressAudit);
   });
+
+  it.each(['allowlist', 'audit'] as const)(
+    'rejects a changed inherited %s on same-key replay',
+    async changed => {
+      const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
+      metadata.workspace = {
+        ...metadata.workspace,
+        egressMode: 'allowlist',
+        egressAllowlist: [],
+      };
+      const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+      const { caller, input, destinationStub } = fixture({
+        metadata,
+        organizationId: ORGANIZATION_ID,
+        ownershipResults: [[source], [source]],
+      });
+      await caller.createWorktreeChat(input);
+      const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+      metadata.workspace = {
+        ...metadata.workspace,
+        ...(changed === 'audit' ? { egressAudit: true } : { egressAllowlist: ['example.com'] }),
+      };
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: ledgerRow({
+          organization_id: ORGANIZATION_ID,
+          status: 'completed',
+          canonical_result: progress,
+        }),
+      });
+      await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'operation_key_reuse_mismatch',
+      });
+      expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
     'inherits %s after control-plane and selection rollouts are disabled',

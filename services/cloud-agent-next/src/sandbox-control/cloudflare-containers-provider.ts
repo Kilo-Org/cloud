@@ -51,6 +51,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
   allocationName: string;
   instance?: ContainerInstanceSize;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
 }): ProviderAdapter {
   const instance = deps.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
@@ -146,6 +147,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
         instance,
         containment: owned.containment,
         ...(deps.egressAllowlist === undefined ? {} : { egressAllowlist: deps.egressAllowlist }),
+        ...(deps.egressAudit === true ? { egressAudit: true } : {}),
         ...(options?.repoKey === undefined ? {} : { repoKey: options.repoKey }),
         ...(options?.skipRepository === true ? { skipRepository: true as const } : {}),
         ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),

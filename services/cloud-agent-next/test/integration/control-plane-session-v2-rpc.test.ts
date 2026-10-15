@@ -99,6 +99,7 @@ function metadata(input: {
   workspacePath?: string;
   egressMode?: EgressMode;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
 }) {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
@@ -124,6 +125,7 @@ function metadata(input: {
       sandboxProvider: input.sandboxProvider ?? 'cloudflare',
       ...(input.egressMode === undefined ? {} : { egressMode: input.egressMode }),
       ...(input.egressAllowlist === undefined ? {} : { egressAllowlist: input.egressAllowlist }),
+      ...(input.egressAudit === undefined ? {} : { egressAudit: input.egressAudit }),
       ...(input.worktreeId ? { worktreeId: input.worktreeId } : {}),
       ...(input.workspacePath ? { workspacePath: input.workspacePath } : {}),
     },
@@ -208,6 +210,7 @@ async function readRegistration(stub: DurableObjectStub<SandboxSessionV2>): Prom
         allocationName?: string;
         egressMode?: EgressMode;
         egressAllowlist?: string[];
+        egressAudit?: boolean;
       };
     }
   | undefined
@@ -220,6 +223,57 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 worker RPC surface', () => {
+  it.each([undefined, false, true])(
+    'retains audit %s after eviction and rejects changed or contradictory registration replays',
+    async egressAudit => {
+      const sessionId = newSessionId();
+      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      let stub = sessions.getByName(sessionId);
+      const registered = metadata({
+        sessionId,
+        kiloSessionId: kiloSessionId(),
+        sandboxId,
+        sandboxProvider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAudit,
+      });
+      const input = {
+        metadata: registered,
+        sandboxSelection: {
+          provider: 'cloudflare-containers' as const,
+          egressMode: 'allowlist' as const,
+          egressAudit,
+        },
+      };
+      await expect(stub.registerSessionFromMetadata(input)).resolves.toEqual({ success: true });
+      await evictAllDurableObjects();
+      stub = sessions.getByName(sessionId);
+      expect((await stub.getMetadata())?.workspace?.egressAudit).toBe(egressAudit);
+      expect((await readRegistration(stub))?.sandboxSelection?.egressAudit).toBe(egressAudit);
+      await expect(stub.registerSessionFromMetadata(input)).resolves.toEqual({ success: true });
+      for (const changed of [undefined, false, true]) {
+        const changedMetadata = {
+          ...registered,
+          workspace: { ...registered.workspace, egressAudit: changed },
+        };
+        const changedSelection = { ...input.sandboxSelection, egressAudit: changed };
+        const expected =
+          (changed ?? false) === (egressAudit ?? false)
+            ? { success: true }
+            : { success: false, code: 'BAD_REQUEST', failureBoundary: 'registration' };
+        for (const replay of [
+          { metadata: changedMetadata, sandboxSelection: changedSelection },
+          { metadata: registered, sandboxSelection: changedSelection },
+          { metadata: changedMetadata, sandboxSelection: input.sandboxSelection },
+        ]) {
+          await expect(stub.registerSessionFromMetadata(replay)).resolves.toMatchObject(expected);
+        }
+      }
+      expect((await stub.getMetadata())?.workspace?.egressAudit).toBe(egressAudit);
+      expect((await readRegistration(stub))?.sandboxSelection?.egressAudit).toBe(egressAudit);
+    }
+  );
+
   it.each([undefined, [], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'retains registration policy after eviction and rejects changed replays %j',
     async ({ egressAllowlist }) => {
@@ -333,6 +387,13 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     await expect(stub.createSessionWithInitialAdmission(input)).resolves.toMatchObject({
       success: true,
     });
+    await expect(
+      stub.createSessionWithInitialAdmission({
+        ...input,
+        metadata: { ...registered, workspace: { ...registered.workspace, egressAudit: true } },
+        sandboxSelection: { ...input.sandboxSelection, egressAudit: true },
+      })
+    ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
     await expect(stub.createSessionWithInitialAdmission(input)).resolves.toMatchObject({
       success: true,
     });

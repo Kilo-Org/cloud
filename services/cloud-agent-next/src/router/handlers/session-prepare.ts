@@ -125,11 +125,13 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     runtime:
       input.sandboxAllocation !== undefined ||
       input.egressMode !== undefined ||
-      input.egressAllowlist !== undefined
+      input.egressAllowlist !== undefined ||
+      input.egressAudit !== undefined
         ? {
             sandboxAllocation: input.sandboxAllocation,
             egressMode: input.egressMode,
             egressAllowlist: input.egressAllowlist,
+            egressAudit: input.egressAudit,
           }
         : undefined,
     clone: input.cloneFromKiloSessionId

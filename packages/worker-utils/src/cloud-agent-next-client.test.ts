@@ -24,6 +24,100 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('CloudAgentNextFetchClient getEgressAudit', () => {
+  const input = { cloudAgentSessionId: 'workspace_test', cursor: 6, limit: 10 };
+  const audit = {
+    records: [
+      {
+        id: 7,
+        requestId: '12345678-1234-4234-9234-123456789abc',
+        allocationRef: 'allocation:1',
+        timestamp: '2026-10-15T12:00:00.000Z',
+        method: 'GET',
+        hostname: 'example.com',
+        protocol: 'https:',
+        port: 443,
+        decision: 'denied',
+      },
+    ],
+    nextCursor: 7,
+  };
+
+  it.each([audit, { records: [], nextCursor: null }])(
+    'retrieves and validates an audit page with a GET query',
+    async output => {
+      const fetchMock = mockFetch(200, { result: { data: output } });
+      vi.stubGlobal('fetch', fetchMock);
+      const headers = { Authorization: 'Bearer token' };
+      await expect(
+        createCloudAgentNextFetchClient(BASE_URL).getEgressAudit(headers, input)
+      ).resolves.toEqual(output);
+      const expectedUrl = new URL(`${BASE_URL}/trpc/getEgressAudit`);
+      expectedUrl.searchParams.set('input', JSON.stringify(input));
+      expect(fetchMock).toHaveBeenCalledExactlyOnceWith(expectedUrl.toString(), {
+        method: 'GET',
+        headers,
+      });
+    }
+  );
+
+  it.each([null, {}, { result: null }, { result: {} }, { result: { data: null } }])(
+    'rejects a malformed tRPC response envelope: %j',
+    async envelope => {
+      vi.stubGlobal('fetch', mockFetch(200, envelope));
+      await expect(
+        createCloudAgentNextFetchClient(BASE_URL).getEgressAudit({}, input)
+      ).rejects.toThrow();
+    }
+  );
+
+  it.each([
+    { records: [] },
+    { records: [], nextCursor: 0 },
+    { records: [{ ...audit.records[0], decision: 'unknown' }], nextCursor: null },
+    { records: [{ ...audit.records[0], port: 65536 }], nextCursor: null },
+    { records: Array.from({ length: 101 }, () => audit.records[0]), nextCursor: null },
+  ])('rejects invalid audit page data: %j', async output => {
+    vi.stubGlobal('fetch', mockFetch(200, { result: { data: output } }));
+    await expect(
+      createCloudAgentNextFetchClient(BASE_URL).getEgressAudit({}, input)
+    ).rejects.toThrow();
+  });
+
+  it('strips private fields from the response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        result: {
+          data: {
+            ...audit,
+            sandboxId: 'private-sandbox',
+            records: audit.records.map(record => ({ ...record, headers: { secret: 'private' } })),
+          },
+        },
+      })
+    );
+    await expect(
+      createCloudAgentNextFetchClient(BASE_URL).getEgressAudit({}, input)
+    ).resolves.toEqual(audit);
+  });
+
+  it.each([401, 403, 412, 503])(
+    'preserves HTTP %s failures and procedure metadata',
+    async status => {
+      vi.stubGlobal('fetch', mockFetch(status, 'Audit unavailable'));
+      await expect(
+        createCloudAgentNextFetchClient(BASE_URL).getEgressAudit({}, input)
+      ).rejects.toMatchObject({
+        name: 'CloudAgentNextError',
+        procedure: 'getEgressAudit',
+        status,
+        body: 'Audit unavailable',
+      });
+    }
+  );
+});
+
 describe('CloudAgentNextFetchClient prepareSession', () => {
   it.each([
     {},
@@ -31,6 +125,10 @@ describe('CloudAgentNextFetchClient prepareSession', () => {
     { egressMode: 'allowlist' as const },
     { egressMode: 'allowlist' as const, egressAllowlist: [] },
     { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'] },
+    { egressAudit: false },
+    { egressMode: 'unrestricted' as const, egressAudit: false },
+    { egressMode: 'allowlist' as const, egressAudit: true },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'], egressAudit: true },
   ])('posts an API-only egress policy unchanged: %j', async policy => {
     const fetchMock = mockFetch(200, {
       result: { data: { cloudAgentSessionId: 'workspace_test', kiloSessionId: 'ses_test' } },

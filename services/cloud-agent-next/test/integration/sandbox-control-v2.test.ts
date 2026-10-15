@@ -2959,7 +2959,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
 
   function prepareInput(
     sessionId: string,
-    policy: { egressMode?: EgressMode; egressAllowlist?: string[] } = {},
+    policy: { egressMode?: EgressMode; egressAllowlist?: string[]; egressAudit?: boolean } = {},
     repositoryUrl = 'https://git.example.com/acme/widgets.git'
   ): Parameters<DurableObjectStub<SandboxControlV2>['prepare']>[0] {
     const kiloSessionId =
@@ -3069,13 +3069,17 @@ describe('SandboxControlV2 allocation egress policy', () => {
         prepareInput(firstSessionId, {
           egressMode: 'allowlist',
           egressAllowlist: ['packages.example.com'],
+          egressAudit: true,
         })
       )
     ).toMatchObject({ state: 'preparing' });
     await awaitStarting(provider, stub);
     const expected = [...baseline, 'git.example.com', 'packages.example.com'].sort();
     const rawPin = await readProviderPin(stub);
-    expect(JSON.parse(rawPin ?? '{}')).toMatchObject({ egressAllowlist: expected });
+    expect(JSON.parse(rawPin ?? '{}')).toMatchObject({
+      egressAllowlist: expected,
+      egressAudit: true,
+    });
     const before = await readState(stub);
 
     await evictDurableObject(stub);
@@ -3089,6 +3093,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
         providerPin: StoredProviderPin;
       };
       expect(reconstructed.providerPin.egressAllowlist).toEqual(expected);
+      expect(reconstructed.providerPin.egressAudit).toBe(true);
       Object.assign(instance, {
         env: {
           ...instance.env,
@@ -3115,6 +3120,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     });
     expect(launches).toHaveLength(1);
     expect(launches[0]?.egressAllowlist).toEqual(expected);
+    expect(launches[0]?.egressAudit).toBe(true);
     expect(provider.createCalls).toBe(1);
     expect(provider.stopCalls).toEqual([]);
   });
@@ -3128,6 +3134,8 @@ describe('SandboxControlV2 allocation egress policy', () => {
     'mode-only-introduced',
     'mode-only-removed',
     'unrestricted',
+    'audit-enabled',
+    'audit-disabled',
   ] as const)(
     'rejects a %s active prepare policy immediately without disturbing a ready sibling',
     async mismatch => {
@@ -3138,6 +3146,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
           ? {}
           : {
               egressMode: 'allowlist' as const,
+              ...(mismatch === 'audit-disabled' ? { egressAudit: true } : {}),
               ...(mismatch === 'mode-only-removed'
                 ? {}
                 : { egressAllowlist: ['packages.example.com'] }),
@@ -3179,6 +3188,13 @@ describe('SandboxControlV2 allocation egress policy', () => {
           ...initialPolicy,
         };
       if (mismatch === 'selection-omitted') delete input.sandboxSelection;
+      if (mismatch === 'audit-enabled' || mismatch === 'audit-disabled') {
+        input.sandboxSelection = {
+          provider: 'cloudflare-containers',
+          ...initialPolicy,
+          egressAudit: mismatch === 'audit-enabled',
+        };
+      }
 
       const result = await stub.prepare(input);
 

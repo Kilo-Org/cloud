@@ -31,37 +31,45 @@ const profile = {
 
 describe('session metadata boundary', () => {
   it.each(
-    [undefined, [], ['Z.Example.COM.', 'EXAMPLE.COM', 'example.com']].map(egressAllowlist => ({
-      egressAllowlist,
-    }))
-  )('preserves canonical egress policy through serialization: %j', ({ egressAllowlist }) => {
-    const metadata = parseSessionMetadata({
-      metadataSchemaVersion: 2,
-      identity: { sessionId: 'workspace_test', userId: 'user' },
-      auth: {},
-      workspace: {
-        sandboxId: 'ses-0123456789abcdef',
-        sandboxProvider: 'cloudflare-containers',
-        egressMode: 'allowlist',
-        egressAllowlist,
-      },
-      lifecycle: { version: 1, timestamp: 1 },
-    });
-    const expected =
-      egressAllowlist === undefined
-        ? undefined
-        : egressAllowlist.length === 0
-          ? []
-          : ['example.com', 'z.example.com'];
-    expect(metadata.workspace?.egressAllowlist).toEqual(expected);
-    expect(metadata.workspace?.egressMode).toBe('allowlist');
-    expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressMode).toBe(
-      'allowlist'
-    );
-    expect(
-      parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAllowlist
-    ).toEqual(expected);
-  });
+    [undefined, [], ['Z.Example.COM.', 'EXAMPLE.COM', 'example.com']].flatMap(egressAllowlist =>
+      [undefined, false, true].map(egressAudit => ({ egressAllowlist, egressAudit }))
+    )
+  )(
+    'preserves canonical egress policy through serialization: %j',
+    ({ egressAllowlist, egressAudit }) => {
+      const metadata = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist,
+          egressAudit,
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      const expected =
+        egressAllowlist === undefined
+          ? undefined
+          : egressAllowlist.length === 0
+            ? []
+            : ['example.com', 'z.example.com'];
+      expect(metadata.workspace?.egressAllowlist).toEqual(expected);
+      expect(metadata.workspace?.egressMode).toBe('allowlist');
+      expect(metadata.workspace?.egressAudit).toBe(egressAudit);
+      expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAudit).toBe(
+        egressAudit
+      );
+      expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressMode).toBe(
+        'allowlist'
+      );
+      expect(
+        parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAllowlist
+      ).toEqual(expected);
+    }
+  );
 
   it.each([
     {
@@ -116,11 +124,13 @@ describe('session metadata boundary', () => {
           sandboxId: 'ses-0123456789abcdef',
           sandboxProvider,
           egressMode: 'unrestricted',
+          egressAudit: false,
         },
         lifecycle: { version: 1, timestamp: 1 },
       });
       expect(metadata.workspace?.egressMode).toBe('unrestricted');
       expect(metadata.workspace?.egressAllowlist).toBeUndefined();
+      expect(metadata.workspace?.egressAudit).toBe(false);
       expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace).toEqual(
         metadata.workspace
       );
@@ -149,6 +159,9 @@ describe('session metadata boundary', () => {
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'invalid' },
     { egressMode: null },
+    { egressAudit: true },
+    { egressMode: 'unrestricted', egressAudit: true },
+    { egressMode: 'allowlist', egressAudit: null },
   ])('rejects invalid persisted egress policy %j', policy => {
     expect(
       CurrentSessionMetadataSchema.safeParse({

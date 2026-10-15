@@ -11,3 +11,5 @@ export async function register() {
 export const onRequestError = captureRequestError;
 
 // ci-probe 1
+
+// ci-probe 2

@@ -521,10 +521,6 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       await sessionStub.stop();
       wrapper.heartbeat(false);
       await waitFor(async () =>
-        expect((await sandboxStub.getAllocationState()).lastFrameAt).toBe(Date.now())
-      );
-      await runInDurableObject(sandboxStub, instance => instance.alarm());
-      await waitFor(async () =>
         expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
       );
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();

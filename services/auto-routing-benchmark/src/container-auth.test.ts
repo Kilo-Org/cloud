@@ -243,7 +243,7 @@ it.each(['mkdtemp', 'spawn'] as const)(
 );
 
 it.each(['mkdtemp', 'spawn'] as const)(
-  'settles a case %s rejection and drains the next queued case during shutdown',
+  'settles a case %s rejection and refuses a queued case once shutdown begins',
   async failure => {
     await loadServer();
     if (failure === 'mkdtemp') {
@@ -255,6 +255,7 @@ it.each(['mkdtemp', 'spawn'] as const)(
     }
     const first = request('/run', runBody);
     const second = request('/run', runBody);
+    const third = request('/run', runBody);
     expect(await first.done).toEqual({
       status: 500,
       body: { error: 'case startup failed' },
@@ -265,7 +266,9 @@ it.each(['mkdtemp', 'spawn'] as const)(
     expect(mocks.exit).not.toHaveBeenCalled();
     mocks.children[0].emit('close', 0);
     expect((await second.done).body.exitCode).toBe(0);
+    expect(await third.done).toEqual({ status: 503, body: { error: 'container is stopping' } });
     await flushServer();
+    expect(mocks.children).toHaveLength(1);
     expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
   }
 );
@@ -318,7 +321,7 @@ it('exits cleanly on idle SIGTERM without registering a real signal listener', a
   expect(mocks.spawn).not.toHaveBeenCalled();
 });
 
-it('drains running and queued cases after SIGTERM even when clients disconnect', async () => {
+it('finishes the running case after SIGTERM and never starts a queued one', async () => {
   await loadServer();
   const first = request('/run', runBody);
   const second = request('/run', runBody);
@@ -332,11 +335,65 @@ it('drains running and queued cases after SIGTERM even when clients disconnect',
   expect((await request('/warmup').done).status).toBe(503);
   mocks.children[0].emit('close', 0);
   await first.done;
+  expect((await second.done).status).toBe(503);
   await flushServer();
-  expect(mocks.spawn).toHaveBeenCalledTimes(2);
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});
+
+it('delivers rollout-orphaned outcomes to the worker before exiting', async () => {
+  const delivered: unknown[] = [];
+  let releaseDelivery = () => {};
+  const deliveryGate = new Promise<void>(resolve => {
+    releaseDelivery = resolve;
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: RequestInit) => {
+      delivered.push(JSON.parse(String(init.body)));
+      await deliveryGate;
+      return new Response(null, { status: 204 });
+    })
+  );
+  const callback = (caseId: string) => ({
+    url: 'https://bench.test/container/case-result',
+    execution: { runId: 'run', model: 'm', variant: 'high', rep: 0, caseId, token: 't' },
+  });
+  await loadServer();
+  const running = request('/run', { ...runBody, resultCallback: callback('running') });
+  const queued = request('/run', { ...runBody, resultCallback: callback('queued') });
+  await flushServer();
+  running.res.emit('close');
+  queued.res.emit('close');
+  stopServer();
+  mocks.children[0].stdout.emit(
+    'data',
+    Buffer.from('{"type":"text","part":{"text":"42","time":{"end":1}}}\n')
+  );
+  mocks.children[0].emit('close', 0);
+  await running.done;
+  await queued.done;
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  expect(delivered).toEqual([
+    {
+      execution: callback('running').execution,
+      outcome: {
+        kind: 'completed',
+        response: {
+          exitCode: 0,
+          durationMs: expect.any(Number),
+          stdoutLines: ['{"type":"text","part":{"text":"42","time":{"end":1}}}'],
+          stderrTail: '',
+          timedOut: false,
+        },
+      },
+    },
+    { execution: callback('queued').execution, outcome: { kind: 'not_started' } },
+  ]);
   expect(mocks.exit).not.toHaveBeenCalled();
-  mocks.children[1].emit('close', 0);
-  await second.done;
+  releaseDelivery();
+  await flushServer();
   await flushServer();
   expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
 });

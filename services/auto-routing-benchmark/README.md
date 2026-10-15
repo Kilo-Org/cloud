@@ -153,11 +153,19 @@ per-run scheduler markers instead of scanning the chunk, execution or run tables
 
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger prevents automatic repetition if a worker disappears
-after inference may have started but before an output was saved. Such an ambiguous case
-fails its measurement lane as infrastructure uncertainty instead of inventing a score or
-issuing another paid call. Manual requeue creates a new run and may repeat that unknown
+after inference may have started but before an output was saved. A *planned* rollout no
+longer reaches that outcome: the container finishes the case it already accepted, posts
+the output back to the worker, and refuses the cases it had not started, so an
+interrupted lane resumes from recoverable output or repeats a case that provably made no
+paid call. The chunk keeps its slot lease while the outcome is in doubt, and lease
+recovery re-dispatches it, which then reuses the delivered output. Only a container that
+dies mid-flight without delivering (a hard kill, or a connection lost past the drain
+window) leaves the case genuinely ambiguous; a case that reaches the ledger without
+recoverable output by the time the chunk is recovered fails its measurement lane as
+infrastructure uncertainty instead of inventing a score or issuing another paid call.
+Manual requeue creates a new run and may repeat that unknown
 case; compatible completed cases and pending successful outputs are still reused.
-An ambiguous transport failure retains the slot/provider lease until expiry, because the
+An ambiguous case retains the slot/provider lease until expiry, because the
 container may still be finishing its request. This quarantine cannot oversubscribe providers.
 Terminal scheduler rows are pruned in bounded batches after 24 hours. Benchmark history,
 completed case results, and pending outputs remain available for compatible reuse.
@@ -709,8 +717,15 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
   The D1 live-slot uniqueness constraint and claim tokens protect container ownership.
   CLI runs remain serialized because they share SQLite state.
 - `/warmup` initializes the local CLI database once per container without making an inference request.
-- The server handles SIGTERM and drains accepted CLI jobs before exiting.
-  Idle containers therefore release capacity instead of ignoring the inactivity stop.
+- The server handles SIGTERM and drains the CLI case it already accepted, then exits.
+  A case still queued when SIGTERM arrives is refused with `503` instead of starting a new
+  paid call, so a rollout is never charged for work it interrupts. Idle containers therefore
+  release capacity instead of ignoring the inactivity stop.
+- A drained case whose caller disappeared (a rollout tears the queue invocation's connection
+  down) is posted to the worker's `/container/case-result` route, which stores it as pending
+  output. The route is authenticated by the paid-execution claim token instead of the backend
+  secret, which a container never holds, and it only records outcomes for a claim token that
+  actually opened the execution.
 - Completed or failed runs reject queued work before starting another CLI case.
 - Smaller chunks leave time for an empty-output retry within the queue invocation limit.
 - `case_results` rows carry diagnostics: CLI exit code, output prefix, and an

@@ -8,6 +8,15 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
 
+export type PaidExecutionKey = {
+  runId: string;
+  model: string;
+  variant: string;
+  rep: number;
+  caseId: string;
+  token: string;
+};
+
 const positiveLimit = BenchmarkSchedulerLimitSchema;
 const SchedulerConfigSchema = z.object({
   slots: positiveLimit.default(BENCHMARK_CONTAINER_BUDGET),
@@ -700,14 +709,7 @@ export async function hasUnsettledChunks(db: D1Database, runId: string): Promise
 
 export async function beginPaidCase(
   db: D1Database,
-  key: {
-    runId: string;
-    model: string;
-    variant: string;
-    rep: number;
-    caseId: string;
-    token: string;
-  },
+  key: PaidExecutionKey,
   now: number = Date.now()
 ): Promise<boolean> {
   const result = await db
@@ -739,13 +741,22 @@ export async function beginPaidCase(
   return result.meta.changes > 0;
 }
 
+export async function hasPaidCase(db: D1Database, key: PaidExecutionKey): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT 1 FROM scheduler_executions
+    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)
+    .bind(key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
+    .first();
+  return row !== null;
+}
+
 export function schedulerBackoffSeconds(attempts: number): number {
   return Math.min(300, 15 * 2 ** Math.min(attempts - 1, 5));
 }
 
 export async function clearUnbilledCase(
   db: D1Database,
-  key: { runId: string; model: string; variant: string; rep: number; caseId: string; token: string }
+  key: PaidExecutionKey
 ): Promise<void> {
   await db
     .prepare(`DELETE FROM scheduler_executions

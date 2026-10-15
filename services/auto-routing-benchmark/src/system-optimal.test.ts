@@ -105,12 +105,13 @@ describe('optimizeThresholdPolicy', () => {
     });
 
     // Every grid point produces the same table, so the plateau spans the whole
-    // grid: the chosen point is its middle, not 0.5 / band 0.
+    // grid: the chosen point is its middle, not 0.5 / band 0. The evaluated
+    // cases are the picked model's held-out cases: 12 per route on 2 routes.
     expect(optimization).toMatchObject({
       minAccuracy: 0.7,
       accuracyNoiseBand: 0.05,
       heldOutAccuracy: 1,
-      heldOutCases: 48,
+      heldOutCases: 24,
       routes: 2,
     });
   });

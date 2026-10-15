@@ -1483,6 +1483,37 @@ describe('Kilo hang restart under memory pressure', () => {
     await runtime.shutdown();
   });
 
+  it('bounds sustained memory pressure to a 30-second hold with production timers', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const memoryHolds: boolean[] = [];
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed: createFeedFactory(),
+      probe: createProbe(false),
+      scheduler,
+      timers: CONTROL_PLANE_TIMERS,
+      sampleMemory: reclaimingAtCap(),
+      memoryHolds,
+    });
+    try {
+      await runtime.ensure();
+      scheduleSilence(scheduler, CONTROL_PLANE_TIMERS);
+      await waitFor(() => memoryHolds.length === 1);
+      scheduler.advance(29_999);
+      scheduler.fire();
+      await Bun.sleep(1);
+      expect(spawner.spawnCount()).toBe(1);
+      scheduler.advance(1);
+      scheduler.fire();
+      await waitFor(() => spawner.spawnCount() === 2);
+      expect(restarts).toEqual([{ reason: 'hang', outcomeReason: 'sandbox_out_of_memory' }]);
+      expect(memoryHolds).toEqual([true, false]);
+    } finally {
+      await runtime.shutdown();
+    }
+  });
+
   it('holds failed activity observation once, then restarts at kiloMemoryHoldMs', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();

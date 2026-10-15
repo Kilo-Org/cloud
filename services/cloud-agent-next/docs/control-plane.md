@@ -655,6 +655,13 @@ native activity plus the existing Cloud-work and PTY protections.
   check, 15 s after the reconnect. Kilo sends heartbeats every 10–15 s, so silence means a real
   fault. Local runs on Kilo 7.6.2 and 7.8.1 show an intermittent hang after a prompt is accepted:
   Kilo stops emitting, never calls the model and does not answer HTTP.
+- Tool memory isolation: the workload reserves 1 GiB for the wrapper and keeps the tool cap
+  1.5 GiB below the shared workload cap. Kilo has OOM protection. Its tool descendants inherit
+  that protection, so the process sweep removes it before attempting tool cgroup migration.
+  This adjustment does not depend on migration success and retries for existing group members.
+  A failed move must not leave an oversized tool immune to OOM kills at the shared cap.
+  Memory allocated before migration stays charged to the original group; server-group memory
+  and OOM counters therefore do not identify the Kilo process itself.
 - Memory hold: the wrapper samples the shared workload cgroup at every 5 s check. Usage within
   256 MiB of `memory.max` with the `memory.events` `max` count risen since the previous sample
   means Kilo is stalled in reclaim, not hung. Before a hang restart (no health answer, the
@@ -662,9 +669,10 @@ native activity plus the existing Cloud-work and PTY protections.
   decides again at each check; an answer reconnects the stream as above, and failed observation
   keeps reading snapshots. The hold ends as recovered once Kilo delivers events and its activity
   is observable. It ends with the restart as above after two quiet samples in a row while Kilo is
-  still unhealthy, or after 10 minutes; one episode holds at most 10 minutes. A cap that is full
+  still unhealthy, or after 30 seconds; one episode holds at most 30 seconds. A cap that is full
   of idle page cache does not raise the count, so it does not hold a restart. The cost: a genuine
-  hang during real memory pressure waits up to 10 minutes. While held, the runtime's executions
+  hang during real memory pressure waits up to 30 extra seconds. This permits transient recovery
+  but bounds the wait when pressure cannot clear. While held, the runtime's executions
   pause their no-progress clocks, and the 120 s prompt delivery deadline does not run; it starts
   again when the hold ends. Each turn on the held runtime, including one that starts during the
   hold, gets a non-fatal `error` event saying Kilo is not responding while the sandbox is low on
@@ -782,7 +790,7 @@ them through one development-only override.
 | Socket drops, wrapper returns | Sandbox DO | Wrapper reconnects | None |
 | Socket down 90 s | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |
 | Wrapper crash | Supervisor | Restart wrapper; routes re-prepared | Accepted fail (`agent_restarted`) |
-| Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s; up to 10 min while the workload reclaims at its memory cap | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
+| Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s; up to 30 extra seconds while the workload reclaims at its memory cap | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
 | Kilo crash | Wrapper | Restart Kilo, at most 3 in 10 min | Same as Kilo hang, but the reason is `agent_restarted` |
 | Dead event stream (Kilo still answers health) | Wrapper, after 6 reconnects in 2 min | Restart Kilo, at most 3 in 10 min | Same as Kilo hang (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
 | Kilo restart budget used up | Wrapper | None until the next message | Queued and accepted fail (`agent_unavailable`) |

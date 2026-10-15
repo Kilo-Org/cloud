@@ -18043,6 +18043,26 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
+            }
+          ]
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
             }
           ]
         }
@@ -18056,9 +18076,10 @@
       "autotopup",
       "changepaymentmethod",
       "organizationid",
-      "amountcents"
+      "amountcents",
+      "thresholdcents"
     ],
-    "searchBlob": "organizations.autoTopUp.changePaymentMethod Start the flow to set a new payment method for an organization's automatic top-up. Use to replace the card on file. organizations autotopup changepaymentmethod organizationid amountcents organizationId amountCents"
+    "searchBlob": "organizations.autoTopUp.changePaymentMethod Start the flow to set a new payment method for an organization's automatic top-up. Use to replace the card on file. organizations autotopup changepaymentmethod organizationid amountcents thresholdcents organizationId amountCents thresholdCents"
   },
   "organizations.autoTopUp.getConfig": {
     "path": "organizations.autoTopUp.getConfig",
@@ -18141,6 +18162,26 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
+            }
+          ]
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
             }
           ]
         }
@@ -18156,9 +18197,10 @@
       "toggle",
       "organizationid",
       "currentenabled",
-      "amountcents"
+      "amountcents",
+      "thresholdcents"
     ],
-    "searchBlob": "organizations.autoTopUp.toggle Turn automatic balance top-up on or off for an organization, or start payment-method setup. Use to enable or disable auto top-up. organizations autotopup toggle organizationid currentenabled amountcents organizationId currentEnabled amountCents"
+    "searchBlob": "organizations.autoTopUp.toggle Turn automatic balance top-up on or off for an organization, or start payment-method setup. Use to enable or disable auto top-up. organizations autotopup toggle organizationid currentenabled amountcents thresholdcents organizationId currentEnabled amountCents thresholdCents"
   },
   "organizations.autoTopUp.updateAmount": {
     "path": "organizations.autoTopUp.updateAmount",
@@ -18186,6 +18228,10 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
             }
           ]
         }
@@ -18203,6 +18249,50 @@
       "amountcents"
     ],
     "searchBlob": "organizations.autoTopUp.updateAmount Set the amount an organization automatically tops up when its balance is low. Use to change the auto top-up amount. organizations autotopup updateamount organizationid amountcents organizationId amountCents"
+  },
+  "organizations.autoTopUp.updateThreshold": {
+    "path": "organizations.autoTopUp.updateThreshold",
+    "kind": "mutation",
+    "summary": "Set the balance threshold that triggers automatic top-up for an organization, so credit is refilled when it falls below the configured amount. Use to change when auto-recharge kicks in for a team or organization account.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "thresholdCents"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "autotopup",
+      "updatethreshold",
+      "organizationid",
+      "thresholdcents"
+    ],
+    "searchBlob": "organizations.autoTopUp.updateThreshold Set the balance threshold that triggers automatic top-up for an organization, so credit is refilled when it falls below the configured amount. Use to change when auto-recharge kicks in for a team or organization account. organizations autotopup updatethreshold organizationid thresholdcents organizationId thresholdCents"
   },
   "organizations.autoTriage.getAutoTriageConfig": {
     "path": "organizations.autoTriage.getAutoTriageConfig",

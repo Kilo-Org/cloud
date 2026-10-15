@@ -72,6 +72,14 @@ const nextConfig = {
   // and applies its own proxied-request timeout to external rewrites.
   experimental: {
     proxyTimeout: 800_000,
+    // `next dev` on this monorepo holds ~5 GiB of anonymous heap after compiling
+    // a handful of routes, which is most of a memory-capped dev sandbox's
+    // budget. Eviction writes Turbopack's cache to disk (already enabled for
+    // dev) and reloads it on demand, trading rebuild latency for a much lower
+    // steady-state footprint. `auto` was not reclaiming enough under cgroup
+    // pressure.
+    turbopackFileSystemCacheForDev: true,
+    turbopackMemoryEviction: 'full',
   },
 
   async rewrites() {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { handleSecureProxyRequest } from './secure-proxy';
 
 const originalFetch = global.fetch;
@@ -21,12 +21,12 @@ function proxyRequest(body: unknown, headers: Record<string, string> = {}) {
 }
 
 function mockUpstream(response: Response) {
-  const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(response);
+  const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response);
   global.fetch = fetchMock;
   return fetchMock;
 }
 
-function onlyFetchCall(fetchMock: jest.Mock<typeof fetch>) {
+function onlyFetchCall(fetchMock: Mock<typeof fetch>) {
   expect(fetchMock).toHaveBeenCalledTimes(1);
   const [url, init] = fetchMock.mock.calls[0];
   return { url, init, headers: new Headers(init?.headers) };
@@ -35,15 +35,15 @@ function onlyFetchCall(fetchMock: jest.Mock<typeof fetch>) {
 describe('handleSecureProxyRequest', () => {
   beforeEach(() => {
     process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = PROXY_SECRET;
-    jest.spyOn(console, 'log').mockImplementation(() => {});
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
     process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET = originalSecret;
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it.each([
@@ -162,7 +162,7 @@ describe('handleSecureProxyRequest', () => {
   });
 
   it('returns 502 without details when the upstream fetch fails', async () => {
-    global.fetch = jest
+    global.fetch = vi
       .fn<typeof fetch>()
       .mockRejectedValue(new Error('connect ECONNREFUSED https://llm.example.com'));
 
@@ -174,7 +174,7 @@ describe('handleSecureProxyRequest', () => {
 
   it('logs fetch failures with the upstream host only', async () => {
     const cause = Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
-    global.fetch = jest
+    global.fetch = vi
       .fn<typeof fetch>()
       .mockRejectedValue(new TypeError('fetch failed', { cause }));
 
@@ -193,7 +193,7 @@ describe('handleSecureProxyRequest', () => {
       causeName: 'Error',
       causeCode: 'ECONNREFUSED',
     });
-    const logged = JSON.stringify(jest.mocked(console.error).mock.calls);
+    const logged = JSON.stringify(vi.mocked(console.error).mock.calls);
     expect(logged).not.toContain('query-secret');
     expect(logged).not.toContain('upstream-key');
   });

@@ -21,5 +21,5 @@ functions run in `sfo1` only (`vercel.json`), via the manually triggered
   shared with the gateway (`packages/web-shared/src/lib/ai-gateway/providers/secure-proxy.ts`).
 - Keep it dependency-free: no database, Redis, Sentry, or workspace packages
   other than the contracts package.
-- Tests run in the `apps/web` Jest suite, which includes this app as a root. Use
-  relative imports in tests; `@/` resolves to `apps/web` there.
+- Tests use Vitest (`pnpm --filter ai-gateway-secure-proxy test`) and run in
+  CI's per-workspace test job, independent of the `apps/web` Jest suite.

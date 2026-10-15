@@ -196,7 +196,9 @@ function parseTurnOverride(text: string): number | null {
   return Number.isFinite(turns) && turns >= 1 ? turns : null;
 }
 
-export function policyOverridesFromForm(form: PolicyOverrideForm): BenchmarkConfig['policyOverrides'] {
+export function policyOverridesFromForm(
+  form: PolicyOverrideForm
+): BenchmarkConfig['policyOverrides'] {
   const overrides: NonNullable<BenchmarkConfig['policyOverrides']> = {};
   const minAccuracy = parseBoundedOverride(form.minAccuracy);
   if (minAccuracy !== null) overrides.minAccuracy = minAccuracy;
@@ -532,8 +534,8 @@ function PolicySettingField({
       {computed ? (
         <>
           <p className="text-muted-foreground text-xs">
-            System {formatPolicyValue(computed.value)} · computed {formatComputedAt(computed.computedAt)}{' '}
-            · {computed.source}
+            System {formatPolicyValue(computed.value)} · computed{' '}
+            {formatComputedAt(computed.computedAt)} · {computed.source}
           </p>
           <p className="text-muted-foreground text-xs">{computed.evidence}</p>
         </>

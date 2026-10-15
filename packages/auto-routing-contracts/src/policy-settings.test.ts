@@ -32,7 +32,12 @@ describe('policy setting resolution', () => {
       policyOverrides: { minAccuracy: 0.95 },
       policyComputed: {
         minAccuracy: { value: 0.6, computedAt, source: 'held-out-grid', evidence: 'fixture' },
-        accuracyNoiseBand: { value: 0.02, computedAt, source: 'held-out-grid', evidence: 'fixture' },
+        accuracyNoiseBand: {
+          value: 0.02,
+          computedAt,
+          source: 'held-out-grid',
+          evidence: 'fixture',
+        },
       },
     });
 
@@ -46,9 +51,9 @@ describe('policy setting resolution', () => {
     expect(states.productionTokenProfile).toMatchObject({ kind: 'auto', effective: null });
     expect(states.switchHorizonTurns).toMatchObject({ kind: 'auto', effective: null });
 
-    expect(resolveEffectivePolicy({ ...base, policyOverrides: { minAccuracy: 0.95 } })).toMatchObject(
-      { minAccuracy: 0.95, accuracyNoiseBand: 0.05 }
-    );
+    expect(
+      resolveEffectivePolicy({ ...base, policyOverrides: { minAccuracy: 0.95 } })
+    ).toMatchObject({ minAccuracy: 0.95, accuracyNoiseBand: 0.05 });
   });
 
   it('treats a null override as cleared and keeps fixed settings fixed', () => {
@@ -61,7 +66,11 @@ describe('policy setting resolution', () => {
     });
 
     expect(states.minAccuracy).toMatchObject({ effective: 0.6, override: null });
-    expect(states.switchCostFactor).toMatchObject({ kind: 'fixed', effective: 3, reason: expect.any(String) });
+    expect(states.switchCostFactor).toMatchObject({
+      kind: 'fixed',
+      effective: 3,
+      reason: expect.any(String),
+    });
     expect(states.frontierMinAccuracyDelta).toMatchObject({ kind: 'fixed', effective: 0 });
   });
 

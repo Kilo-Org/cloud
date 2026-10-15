@@ -17,7 +17,11 @@ import {
   listReadyCurrentProfilesForEntries,
   savePolicyComputed,
 } from './db';
-import { catalogCandidatePrices, fetchBenchmarkModelCatalog, platformRegistryEntries } from './platform-models';
+import {
+  catalogCandidatePrices,
+  fetchBenchmarkModelCatalog,
+  platformRegistryEntries,
+} from './platform-models';
 import { variantFromStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
 import { summarizeSweep } from './scoreboard/sweep';
@@ -89,7 +93,10 @@ export function optimizeThresholdPolicy(params: {
     }))
   );
 
-  const byRoute = new Map<string, Map<string, { train?: OfflineSweepSummary; heldOut?: OfflineSweepSummary }>>();
+  const byRoute = new Map<
+    string,
+    Map<string, { train?: OfflineSweepSummary; heldOut?: OfflineSweepSummary }>
+  >();
   let heldOutCases = 0;
   let evaluableRoutes = 0;
   for (const summary of summaries) {
@@ -154,8 +161,10 @@ export function optimizeThresholdPolicy(params: {
         if (!heldOut || heldOut.cases === 0 || heldOut.accuracy === null) continue;
         scoreSum += heldOut.accuracy * heldOut.cases;
         costSum +=
-          estimateRequestCostUsd({ avgCostUsd: pick.avgCostUsd, pricing: pick.pricing ?? null }, params.profile) *
-          heldOut.cases;
+          estimateRequestCostUsd(
+            { avgCostUsd: pick.avgCostUsd, pricing: pick.pricing ?? null },
+            params.profile
+          ) * heldOut.cases;
         cases += heldOut.cases;
         routes += 1;
       }
@@ -179,15 +188,21 @@ export function optimizeThresholdPolicy(params: {
   const floor = maxAccuracy - ACCURACY_FLOOR_MARGIN;
   const eligible = points.filter(point => point.accuracy >= floor);
   const bestObjective = Math.max(...eligible.map(point => point.objective));
-  const plateau = eligible.filter(point => point.objective >= bestObjective * (1 - PLATEAU_TOLERANCE));
+  const plateau = eligible.filter(
+    point => point.objective >= bestObjective * (1 - PLATEAU_TOLERANCE)
+  );
 
-  const accuracyValues = [...new Set(plateau.map(point => point.minAccuracy))].sort((a, b) => a - b);
+  const accuracyValues = [...new Set(plateau.map(point => point.minAccuracy))].sort(
+    (a, b) => a - b
+  );
   const chosenMinAccuracy = closestTo(
     accuracyValues,
     (accuracyValues[0] + accuracyValues[accuracyValues.length - 1]) / 2
   );
   const bandPoints = plateau.filter(point => point.minAccuracy === chosenMinAccuracy);
-  const bandValues = [...new Set(bandPoints.map(point => point.accuracyNoiseBand))].sort((a, b) => a - b);
+  const bandValues = [...new Set(bandPoints.map(point => point.accuracyNoiseBand))].sort(
+    (a, b) => a - b
+  );
   const chosenBand = closestTo(bandValues, (bandValues[0] + bandValues[bandValues.length - 1]) / 2);
   const chosen = bandPoints.find(point => point.accuracyNoiseBand === chosenBand) ?? bandPoints[0];
   if (!chosen) return null;

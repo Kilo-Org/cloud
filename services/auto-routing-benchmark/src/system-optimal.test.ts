@@ -3,7 +3,11 @@ import type { BenchmarkConfig } from '@kilocode/auto-routing-contracts';
 import type * as DbModule from './db';
 import type * as ConfigModule from './config';
 import type { OfflineSweep } from './scoreboard/schema';
-import { caseSplitForId, optimizeThresholdPolicy, reevaluateSystemOptimalSettings } from './system-optimal';
+import {
+  caseSplitForId,
+  optimizeThresholdPolicy,
+  reevaluateSystemOptimalSettings,
+} from './system-optimal';
 
 vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
@@ -61,7 +65,11 @@ function resultsFor(
 }
 
 function pairsFor(
-  models: { model: string; train: { score: number; costUsd: number }; heldOut: { score: number; costUsd: number } }[],
+  models: {
+    model: string;
+    train: { score: number; costUsd: number };
+    heldOut: { score: number; costUsd: number };
+  }[],
   routes: readonly string[] = ROUTES,
   cases = 12
 ): OfflineSweep['pairs'] {
@@ -81,8 +89,16 @@ describe('optimizeThresholdPolicy', () => {
   it('picks the middle of a stable plateau instead of its edge', () => {
     const optimization = optimizeThresholdPolicy({
       pairs: pairsFor([
-        { model: 'strong', train: { score: 1, costUsd: 0.001 }, heldOut: { score: 1, costUsd: 0.001 } },
-        { model: 'also-strong', train: { score: 1, costUsd: 0.01 }, heldOut: { score: 1, costUsd: 0.01 } },
+        {
+          model: 'strong',
+          train: { score: 1, costUsd: 0.001 },
+          heldOut: { score: 1, costUsd: 0.001 },
+        },
+        {
+          model: 'also-strong',
+          train: { score: 1, costUsd: 0.01 },
+          heldOut: { score: 1, costUsd: 0.01 },
+        },
       ]),
       profile: null,
       pricing: noPricing,
@@ -103,8 +119,16 @@ describe('optimizeThresholdPolicy', () => {
     const optimization = optimizeThresholdPolicy({
       pairs: pairsFor(
         [
-          { model: 'strong', train: { score: 1, costUsd: 0.001 }, heldOut: { score: 1, costUsd: 0.001 } },
-          { model: 'also-strong', train: { score: 1, costUsd: 0.01 }, heldOut: { score: 1, costUsd: 0.01 } },
+          {
+            model: 'strong',
+            train: { score: 1, costUsd: 0.001 },
+            heldOut: { score: 1, costUsd: 0.001 },
+          },
+          {
+            model: 'also-strong',
+            train: { score: 1, costUsd: 0.01 },
+            heldOut: { score: 1, costUsd: 0.01 },
+          },
         ],
         ROUTES,
         1
@@ -120,8 +144,16 @@ describe('optimizeThresholdPolicy', () => {
     const optimization = optimizeThresholdPolicy({
       pairs: pairsFor(
         [
-          { model: 'strong', train: { score: 1, costUsd: 0.001 }, heldOut: { score: 1, costUsd: 0.001 } },
-          { model: 'also-strong', train: { score: 1, costUsd: 0.01 }, heldOut: { score: 1, costUsd: 0.01 } },
+          {
+            model: 'strong',
+            train: { score: 1, costUsd: 0.001 },
+            heldOut: { score: 1, costUsd: 0.001 },
+          },
+          {
+            model: 'also-strong',
+            train: { score: 1, costUsd: 0.01 },
+            heldOut: { score: 1, costUsd: 0.01 },
+          },
         ],
         ROUTES.slice(0, 1)
       ),
@@ -145,8 +177,6 @@ const baseConfig: BenchmarkConfig = {
   productionTokenProfile: null,
   switchHorizonTurns: null,
   lowConfidenceThreshold: null,
-  maxConcurrency: 4,
-  userMaxConcurrency: 100,
   benchmarkUserId: null,
   benchmarkOrgId: null,
   classifierRepetitions: 1,
@@ -217,7 +247,11 @@ describe('reevaluateSystemOptimalSettings', () => {
     vi.mocked(getRoutingCaseResultsForEntries).mockResolvedValue(
       pairsFor(
         [
-          { model: 'strong', train: { score: 1, costUsd: 0.001 }, heldOut: { score: 1, costUsd: 0.001 } },
+          {
+            model: 'strong',
+            train: { score: 1, costUsd: 0.001 },
+            heldOut: { score: 1, costUsd: 0.001 },
+          },
         ],
         ROUTES,
         1

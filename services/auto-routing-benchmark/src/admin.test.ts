@@ -327,7 +327,10 @@ describe('GET /admin/config', () => {
       policySettings: Record<string, { effective: number; override: number | null }>;
     };
     expect(body.policySettings.minAccuracy).toMatchObject({ effective: 0.95, override: 0.95 });
-    expect(body.policySettings.accuracyNoiseBand).toMatchObject({ effective: 0.08, override: null });
+    expect(body.policySettings.accuracyNoiseBand).toMatchObject({
+      effective: 0.08,
+      override: null,
+    });
   });
 });
 

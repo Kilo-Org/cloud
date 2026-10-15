@@ -687,6 +687,28 @@ async function writeCloudAgentRules(request: WrapperSessionReadyRequest): Promis
   });
 }
 
+function isSafeInstructionName(name: string): boolean {
+  // The profile validator owns the reserved-name decision; this guard keeps a
+  // bypassing caller from overwriting the Cloud-Agent-owned rules file.
+  return name !== 'cloud-agent' && /^[a-z0-9][a-z0-9-]*$/.test(name);
+}
+
+async function writeRuntimeInstructions(request: WrapperSessionReadyRequest): Promise<void> {
+  const instructions = request.materialized.runtimeInstructions;
+  if (!instructions?.length) return;
+
+  const rulesDir = path.join(request.workspace.sessionHome, '.kilocode/rules');
+  await fs.mkdir(rulesDir, { recursive: true });
+
+  for (const instruction of instructions) {
+    if (!isSafeInstructionName(instruction.name)) {
+      logToFile(`bootstrap rejected unsafe instruction name=${JSON.stringify(instruction.name)}`);
+      continue;
+    }
+    await fs.writeFile(path.join(rulesDir, `${instruction.name}.md`), instruction.content);
+  }
+}
+
 async function bootstrapEmptyKiloSession(
   request: WrapperSessionReadyRequest,
   restore: typeof restoreSession
@@ -1236,6 +1258,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     }
 
     await writeCloudAgentRules(request);
+    await writeRuntimeInstructions(request);
 
     if (workspaceWasWarm) {
       logToFile(

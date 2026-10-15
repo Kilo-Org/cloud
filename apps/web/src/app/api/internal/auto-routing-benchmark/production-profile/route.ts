@@ -58,6 +58,9 @@ export async function GET(req: NextRequest) {
     .where(
       and(
         eq(auto_model.auto_model, AUTO_MODEL_ID),
+        // The metadata bound is what makes this query use an index; without it the
+        // scan times out. Rows with a null metadata timestamp are dropped, a small
+        // sample loss accepted for a query that finishes.
         sql`${microdollar_usage_metadata.created_at} >= ${windowStart}`,
         sql`${microdollar_usage.created_at} >= ${windowStart}`
       )

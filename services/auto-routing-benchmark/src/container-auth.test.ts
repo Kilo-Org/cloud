@@ -350,7 +350,7 @@ it('delivers rollout-orphaned outcomes to the worker before exiting', async () =
   vi.stubGlobal(
     'fetch',
     vi.fn(async (_url: string, init: RequestInit) => {
-      delivered.push(JSON.parse(String(init.body)));
+      delivered.push(JSON.parse(init.body as string));
       await deliveryGate;
       return new Response(null, { status: 204 });
     })

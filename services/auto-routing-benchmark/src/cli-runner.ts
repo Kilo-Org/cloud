@@ -99,7 +99,7 @@ export async function runDeciderCaseViaCli(
     throw new Error(`container /run failed: HTTP ${response.status} ${detail}`);
   }
 
-  return parseContainerRunResponse((await response.json()) as ContainerRunResponse, startedAt);
+  return parseContainerRunResponse(await response.json(), startedAt);
 }
 
 export function parseContainerRunResponse(

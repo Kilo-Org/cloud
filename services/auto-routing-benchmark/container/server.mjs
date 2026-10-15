@@ -38,12 +38,7 @@ let stopRequested = false;
 let pendingDeliveries = 0;
 
 function exitWhenIdle() {
-  if (
-    stopRequested &&
-    activeCliJobs === 0 &&
-    activeHttpRequests === 0 &&
-    pendingDeliveries === 0
-  ) {
+  if (stopRequested && activeCliJobs === 0 && activeHttpRequests === 0 && pendingDeliveries === 0) {
     process.exit(0);
   }
 }

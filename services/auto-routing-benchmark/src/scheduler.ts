@@ -754,10 +754,7 @@ export function schedulerBackoffSeconds(attempts: number): number {
   return Math.min(300, 15 * 2 ** Math.min(attempts - 1, 5));
 }
 
-export async function clearUnbilledCase(
-  db: D1Database,
-  key: PaidExecutionKey
-): Promise<void> {
+export async function clearUnbilledCase(db: D1Database, key: PaidExecutionKey): Promise<void> {
   await db
     .prepare(`DELETE FROM scheduler_executions
     WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)

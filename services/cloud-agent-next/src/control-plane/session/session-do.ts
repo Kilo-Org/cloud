@@ -129,7 +129,12 @@ import { messageFailureText } from './failure-messages.js';
 import {
   createControlPlaneWorktreeChanges,
   type ControlPlaneWorktreeChanges,
+  type SharedWorktreeChangesPeer,
 } from './worktree-changes.js';
+import {
+  worktreeChangesReadySchema,
+  type WorktreeChangesReady,
+} from '../../shared/worktree-changes-wire.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
 import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';
@@ -330,7 +335,7 @@ export type ControlPlaneSessionSnapshot =
  * Session DO -> Sandbox DO (spec §10). Resolved from the production
  * `SANDBOX_CONTROL` binding; tests may inject a fake through `sandboxPeerFor`.
  */
-export type ControlPlaneSandboxPeer = {
+export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   status(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneStatusResult>;
   prepare(input: ControlPlanePrepareInputWithSelection): Promise<ControlPlaneRouteView>;
   deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult>;
@@ -572,6 +577,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       broadcast: event => this.broadcast(event),
       getMetadata: () => this.metadata,
       getDirectory: () => this.registration?.spec.directory,
+      getSharedPeer: sandboxId => this.sandboxPeerFor(sandboxId),
       capture: (sandboxId, input) => this.captureWorktreeChanges(sandboxId, input),
       waitUntil: promise => this.ctx.waitUntil(promise),
     });
@@ -1502,12 +1508,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
+  async onWorktreeChangesReady(notification: WorktreeChangesReady): Promise<void> {
+    await this.initialized;
+    const parsed = worktreeChangesReadySchema.parse(notification);
+    await this.enqueue(async () => {
+      if (this.metadata?.workspace?.worktreeId !== parsed.worktreeId) return;
+      this.worktreeChanges.ready(parsed.revision);
+    });
+  }
+
   async getWorktreeChanges(): Promise<GetWorktreeChangesOutput> {
     await this.initialized;
     return this.worktreeChanges.get();
   }
 
-  getWorktreeFile(input: unknown): GetWorktreeFileOutput {
+  async getWorktreeFile(input: unknown): Promise<GetWorktreeFileOutput> {
+    await this.initialized;
     return this.worktreeChanges.getFile(input);
   }
 
@@ -2349,9 +2365,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     try {
       return await withDORetry(
         () => this.sandboxPeer() ?? peer,
-        stub =>
+        async stub =>
           stub.prepare({
-            spec: { ...registration.spec, worktreeRecovery: this.worktreeChanges.recovery() },
+            spec: { ...registration.spec, worktreeRecovery: await this.worktreeChanges.recovery() },
             credentials: registration.credentials,
             ...(registration.sandboxSelection
               ? { sandboxSelection: registration.sandboxSelection }

@@ -3,6 +3,7 @@ import type {
   ControlPlaneOutcome,
   ControlPlaneRouteUpdate,
 } from '../../shared/control-plane-protocol.js';
+import type { WorktreeChangesReady } from '../../shared/worktree-changes-wire.js';
 
 export const SANDBOX_NOTIFICATION_LIMITS = {
   count: 1_000,
@@ -13,7 +14,8 @@ export const SANDBOX_NOTIFICATION_LIMITS = {
 export type SandboxNotification =
   | { kind: 'events'; payload: ControlPlaneEventsNotification }
   | { kind: 'route'; payload: ControlPlaneRouteUpdate }
-  | { kind: 'outcome'; payload: ControlPlaneOutcome };
+  | { kind: 'outcome'; payload: ControlPlaneOutcome }
+  | { kind: 'worktree_changes'; payload: WorktreeChangesReady };
 
 type DropCause = 'capacity' | 'expired' | 'failed' | 'retired' | 'wrapper';
 export type NotificationLoss = {

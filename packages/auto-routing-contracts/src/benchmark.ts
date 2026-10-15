@@ -68,7 +68,7 @@ export const BenchmarkPlatformModelSchema = z.object({
 });
 export type BenchmarkPlatformModel = z.infer<typeof BenchmarkPlatformModelSchema>;
 
-export const DEFAULT_BENCHMARK_USER_ID = 'ce12ef3d-ae95-4d77-b4f0-23735f0a0591';
+export const DEFAULT_BENCHMARK_USER_ID = '1f7125a8-351a-45a5-af1f-2b7c24ca7dc3';
 export const DEFAULT_BENCHMARK_ORG_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 
 // Flags each list entry whose (trimmed) id already appeared earlier in the

@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Preparasyon an sispann",
         "stoppedBody": "Enstans {{name}} lan sispann sanzatann pandan preparasyon an.",
         "stalledTitle": "Yon bagay bloke",
-        "stalledBody": "Nou pa t ka fini prepare {{name}}. Eseye ankò, oswa voye yon imèl bay hi@kilo.ai si sa kontinye rive.",
+        "stalledBody": "Nou pa t ka fini prepare {{name}}. Eseye ankò, oswa voye yon imèl bay {{supportEmail}} si sa kontinye rive.",
         "timeoutTitle": "Ap pran plis tan pase sa nou te prevwa",
         "timeoutBody": "Preparasyon {{name}} ap pran plis tan pase nòmal (plis pase {{displayMinutes}} minit).",
         "continueInBackground": "Kontinye an aryèplan",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Yon moun dwe revize plan aksè bonè ou a anvan ou ka itilize li sou mobil.",
       "iosTitle": "KiloClaw pa disponib sou iOS",
       "iosBody": "Pou kont sa a, jesyon aksè KiloClaw la fèt deyò aplikasyon iOS la.",
-      "iosContact": "Kesyon? Kontakte hi@kilo.ai.",
+      "iosContact": "Kesyon? Kontakte {{supportEmail}}.",
       "quarantinedCta": "Voye imel pou ekip nou an",
       "nonCanonicalEarlybirdCta": "Gade plan ou sou kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Mete aplikasyon GitHub la ajou"
       },
       "githubIpAllowList": {
-        "description": "Revizè kòd la dezaktive paske òganizasyon GitHub sa a sèvi ak yon lis adrès IP otorize ki bloke Kilo. Kontakte hi@kilocode.ai pou jwenn èd, epi aktive Revizè kòd la ankò."
+        "description": "Revizè kòd la dezaktive paske òganizasyon GitHub sa a sèvi ak yon lis adrès IP otorize ki bloke Kilo. Kontakte {{supportEmail}} pou jwenn èd, epi aktive Revizè kòd la ankò."
       },
       "gitlabProjectAccessRequired": {
         "description": "Revizè kòd la dezaktive paske Kilo pa ka kreye yon jeton aksè GitLab pou pwojè sa a. Bay aksè kòm responsab antretyen oswa aktive jeton aksè pwojè yo, epi aktive Revizè kòd la ankò.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Mete paramèt Revizè kòd la ajou"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Revizè kòd la dezaktive apre klonaj depo a depase delè li twa fwa jodi a. Kontakte hi@kilocode.ai pou jwenn èd, epi aktive Revizè kòd la ankò."
+        "description": "Revizè kòd la dezaktive apre klonaj depo a depase delè li twa fwa jodi a. Kontakte {{supportEmail}} pou jwenn èd, epi aktive Revizè kòd la ankò."
       },
       "title": "Revizè kòd la bezwen atansyon ou.",
       "recoveryLabel": "Kontakte ekip sipò a"

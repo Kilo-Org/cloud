@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Saitin ya tsaya",
         "stoppedBody": "Muhallin aikin {{name}} ya tsaya ba zato ba tsammani yayin saiti.",
         "stalledTitle": "Wani abu ya tsaya",
-        "stalledBody": "Ba mu iya gama saitin {{name}} ba. Sake gwadawa, ko aika imel zuwa hi@kilo.ai idan wannan ya ci gaba da faruwa.",
+        "stalledBody": "Ba mu iya gama saitin {{name}} ba. Sake gwadawa, ko aika imel zuwa {{supportEmail}} idan wannan ya ci gaba da faruwa.",
         "timeoutTitle": "Yana ɗaukar lokaci fiye da yadda ake tsammani",
         "timeoutBody": "Saitin {{name}} yana ɗaukar lokaci fiye da yadda aka saba (sama da mintuna {{displayMinutes}}).",
         "continueInBackground": "Ci gaba a baya",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Dole mutum ya yi bitar tsarin samun damar amfani da wuri da kake da shi kafin a yi amfani da shi a waya.",
       "iosTitle": "KiloClaw ba ya samuwa a cikin iOS",
       "iosBody": "Ana sarrafa damar amfani da KiloClaw ga wannan asusun a wajen manhajar iOS.",
-      "iosContact": "Tambayoyi? Tuntuɓi hi@kilo.ai.",
+      "iosContact": "Tambayoyi? Tuntuɓi {{supportEmail}}.",
       "quarantinedCta": "Aika imel ga tawagar mu",
       "nonCanonicalEarlybirdCta": "Bitar da tsarinka a kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Sabunta manhajar GitHub"
       },
       "githubIpAllowList": {
-        "description": "An kashe Mai bitar lamba saboda jerin adiresoshin IP da wannan ƙungiyar GitHub ta amince da su yana hana Kilo shiga. Tuntuɓi hi@kilocode.ai don taimako, sannan ka sake kunna Mai bitar lamba."
+        "description": "An kashe Mai bitar lamba saboda jerin adiresoshin IP da wannan ƙungiyar GitHub ta amince da su yana hana Kilo shiga. Tuntuɓi {{supportEmail}} don taimako, sannan ka sake kunna Mai bitar lamba."
       },
       "gitlabProjectAccessRequired": {
         "description": "An kashe Mai bitar lamba saboda Kilo ba zai iya ƙirƙirar lambar izinin shiga wannan aikin GitLab ba. Ba da izinin mai kula da aikin ko kunna lambobin izinin shiga aikin, sannan ka sake kunna Mai bitar lamba.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Sabunta saitunan Mai bitar lamba"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "An kashe Mai bitar lamba bayan kwafin ma'ajiyar ya kasa ƙarewa cikin lokacin da aka ba shi sau uku yau. Tuntuɓi hi@kilocode.ai don taimako, sannan ka sake kunna Mai bitar lamba."
+        "description": "An kashe Mai bitar lamba bayan kwafin ma'ajiyar ya kasa ƙarewa cikin lokacin da aka ba shi sau uku yau. Tuntuɓi {{supportEmail}} don taimako, sannan ka sake kunna Mai bitar lamba."
       },
       "title": "Mai bitar lambar shiri yana buƙatar kulawa.",
       "recoveryLabel": "Tuntuɓi masu tallafi"

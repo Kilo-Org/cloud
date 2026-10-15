@@ -1,18 +1,20 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { extname, join, relative } from 'path';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 
 const REPOSITORY_ROOT = join(process.cwd(), '../..');
-// packages/web-shared holds server code moved out of apps/web; scan both.
 const SOURCE_ROOTS = [join(process.cwd(), 'src'), join(REPOSITORY_ROOT, 'packages/web-shared/src')];
+const SUPPORT_SOURCE_ROOTS = [
+  ...SOURCE_ROOTS,
+  join(REPOSITORY_ROOT, 'apps/mobile/src'),
+  join(REPOSITORY_ROOT, 'packages/app-shared/src'),
+];
 
 const EMAIL_REGEX = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.mdx']);
 const ALLOWED_EMAILS = new Set([
   'sales@kilocode.ai',
-  'teams@kilocode.ai',
-  'hi@kilocode.ai',
   'hi@app.kilocode.ai',
-  'hi@kilo.ai',
   'admin@kilocode.ai',
   'git@github.com',
   'git@gitlab.com',
@@ -31,7 +33,7 @@ const MAILGUN_ACCESS_PATTERNS = [
   /messages\.create\s*\(/,
 ];
 
-function listProductionSourceFiles(dir: string): string[] {
+function listProductionSourceFiles(dir: string, extensions = SOURCE_EXTENSIONS): string[] {
   const entries = readdirSync(dir);
   const files: string[] = [];
 
@@ -40,13 +42,13 @@ function listProductionSourceFiles(dir: string): string[] {
     const stats = statSync(path);
     if (stats.isDirectory()) {
       if (!EXCLUDED_PATH_PARTS.has(entry)) {
-        files.push(...listProductionSourceFiles(path));
+        files.push(...listProductionSourceFiles(path, extensions));
       }
       continue;
     }
 
-    if (!SOURCE_EXTENSIONS.has(extname(path))) continue;
-    if (path.endsWith('.test.ts') || path.endsWith('.test.tsx')) continue;
+    if (!extensions.has(extname(path))) continue;
+    if (/\.(test|spec)\.[cm]?[jt]sx?$/.test(path)) continue;
     files.push(path);
   }
 
@@ -83,13 +85,30 @@ function isAllowedEmail(email: string): boolean {
 
 describe('email literal guardrail', () => {
   it('keeps production source email literals limited to placeholders and approved aliases', () => {
-    const findings = SOURCE_ROOTS.flatMap(listProductionSourceFiles).flatMap(file => {
+    const findings = SOURCE_ROOTS.flatMap(root => listProductionSourceFiles(root)).flatMap(file => {
       const content = readFileSync(file, 'utf8');
       return Array.from(content.matchAll(EMAIL_REGEX))
         .map(match => match[0])
         .filter(email => !isAllowedEmail(email))
         .map(email => `${relative(REPOSITORY_ROOT, file)}: ${email}`);
     });
+
+    expect(findings).toEqual([]);
+  });
+
+  it('defines the support email only in the shared support module', () => {
+    const extensions = new Set([...SOURCE_EXTENSIONS, '.html', '.json']);
+    const definition = join(REPOSITORY_ROOT, 'packages/app-shared/src/support.ts');
+    const findings = SUPPORT_SOURCE_ROOTS.flatMap(root =>
+      listProductionSourceFiles(root, extensions)
+    )
+      .filter(file => file !== definition)
+      .flatMap(file => {
+        const emails = Array.from(readFileSync(file, 'utf8').matchAll(EMAIL_REGEX));
+        return emails
+          .filter(match => match[0].toLowerCase() === SUPPORT_EMAIL.toLowerCase())
+          .map(match => `${relative(REPOSITORY_ROOT, file)}: ${match[0]}`);
+      });
 
     expect(findings).toEqual([]);
   });

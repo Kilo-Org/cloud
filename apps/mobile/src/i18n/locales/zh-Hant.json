@@ -650,7 +650,7 @@
     "redeployTitle": "重新部署執行個體",
     "accessRequired": {
       "iosBody": "此帳戶的 KiloClaw 存取權限需在 iOS 應用程式外管理。",
-      "iosContact": "有問題嗎？請聯絡 hi@kilo.ai。",
+      "iosContact": "有問題嗎？請聯絡 {{supportEmail}}。",
       "iosTitle": "無法在 iOS 上使用 KiloClaw",
       "multipleCurrentConflictBody": "你的帳戶有多個有效訂閱。為避免重複收費，我們已暫停服務。",
       "multipleCurrentConflictCta": "前往 kilo.ai 繼續操作",
@@ -783,7 +783,7 @@
         "queryErrorBody": "查詢 {{name}} 的設定進度時，連線中斷了。設定可能仍在進行，請再試一次或稍後查看。",
         "queryErrorTitle": "無法確認設定進度",
         "settingUp": "正在設定 {{name}}",
-        "stalledBody": "無法完成 {{name}} 的設定。請再試一次；如果問題持續發生，請寄信至 hi@kilo.ai。",
+        "stalledBody": "無法完成 {{name}} 的設定。請再試一次；如果問題持續發生，請寄信至 {{supportEmail}}。",
         "stalledTitle": "設定卡住了",
         "startingSandbox": "正在啟動沙箱",
         "stoppedBody": "{{name}} 的執行個體在設定過程中意外停止。",
@@ -1040,7 +1040,7 @@
         "recoveryLabel": "更新 GitHub App"
       },
       "githubIpAllowList": {
-        "description": "程式碼審查員已停用，因為此 GitHub 組織使用會封鎖 Kilo 的 IP 允許清單。請聯絡 hi@kilocode.ai 尋求協助，然後重新啟用程式碼審查員。"
+        "description": "程式碼審查員已停用，因為此 GitHub 組織使用會封鎖 Kilo 的 IP 允許清單。請聯絡 {{supportEmail}} 尋求協助，然後重新啟用程式碼審查員。"
       },
       "gitlabProjectAccessRequired": {
         "description": "程式碼審查員已停用，因為 Kilo 無法為此專案建立 GitLab 專案存取權杖。請授予維護者權限或啟用專案存取權杖，再重新啟用程式碼審查員。",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "更新程式碼審查員設定"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "今天複製存放庫時已發生三次逾時，因此程式碼審查員已停用。請聯絡 hi@kilocode.ai 尋求協助，再重新啟用程式碼審查員。"
+        "description": "今天複製存放庫時已發生三次逾時，因此程式碼審查員已停用。請聯絡 {{supportEmail}} 尋求協助，再重新啟用程式碼審查員。"
       },
       "title": "程式碼審查助手有問題需要處理。",
       "recoveryLabel": "聯絡客服"

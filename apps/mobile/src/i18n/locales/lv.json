@@ -1277,7 +1277,7 @@
         "stoppedTitle": "Iestatīšana apturēta",
         "stoppedBody": "Iestatīšanas laikā {{name}} vide negaidīti apstājās.",
         "stalledTitle": "Iestatīšana ir iestrēgusi",
-        "stalledBody": "Neizdevās pabeigt {{name}} iestatīšanu. Mēģini vēlreiz vai, ja problēma atkārtojas, raksti uz hi@kilo.ai.",
+        "stalledBody": "Neizdevās pabeigt {{name}} iestatīšanu. Mēģini vēlreiz vai, ja problēma atkārtojas, raksti uz {{supportEmail}}.",
         "timeoutTitle": "Aizņem ilgāk, nekā gaidīts",
         "timeoutBody": "{{name}} iestatīšana aizņem ilgāk nekā parasti. Pagājušais laiks minūtēs: vairāk nekā {{displayMinutes}}.",
         "continueInBackground": "Turpināt fonā",
@@ -1335,7 +1335,7 @@
       "nonCanonicalEarlybirdBody": "Pirms tavu agrīnās piekļuves plānu var izmantot mobilajā ierīcē, speciālistam tas jāpārbauda.",
       "iosTitle": "KiloClaw nav pieejams iOS",
       "iosBody": "KiloClaw piekļuve šim kontam tiek pārvaldīta ārpus iOS lietotnes.",
-      "iosContact": "Ir jautājumi? Raksti uz hi@kilo.ai.",
+      "iosContact": "Ir jautājumi? Raksti uz {{supportEmail}}.",
       "quarantinedCta": "Rakstīt mūsu komandai",
       "nonCanonicalEarlybirdCta": "Pārskatīt savu plānu vietnē kilo.ai"
     },
@@ -1571,7 +1571,7 @@
         "recoveryLabel": "Atjaunināt GitHub lietotni"
       },
       "githubIpAllowList": {
-        "description": "Koda pārskatītājs tika atspējots, jo šī GitHub organizācija izmanto atļauto IP adrešu sarakstu, kas bloķē Kilo. Raksti uz hi@kilocode.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
+        "description": "Koda pārskatītājs tika atspējots, jo šī GitHub organizācija izmanto atļauto IP adrešu sarakstu, kas bloķē Kilo. Raksti uz {{supportEmail}}, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
       },
       "gitlabProjectAccessRequired": {
         "description": "Koda pārskatītājs tika atspējots, jo Kilo nevar izveidot GitLab projekta piekļuves pilnvaru šim projektam. Piešķir uzturētāja piekļuves tiesības vai iespējo projekta piekļuves pilnvaras un vēlreiz iespējo koda pārskatītāju.",
@@ -1586,7 +1586,7 @@
         "recoveryLabel": "Atjaunināt koda pārskatītāja iestatījumus"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koda pārskatītājs tika atspējots, jo šodien trīs reizes tika pārsniegts repozitorija klonēšanai atvēlētais laiks. Raksti uz hi@kilocode.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
+        "description": "Koda pārskatītājs tika atspējots, jo šodien trīs reizes tika pārsniegts repozitorija klonēšanai atvēlētais laiks. Raksti uz {{supportEmail}}, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
       },
       "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
       "recoveryLabel": "Sazināties ar atbalsta dienestu"

@@ -621,7 +621,7 @@
     "redeployTitle": "Redéployer l'instance",
     "accessRequired": {
       "iosBody": "L'accès à KiloClaw pour ce compte se gère en dehors de l'application iOS.",
-      "iosContact": "Des questions ? Contactez hi@kilo.ai.",
+      "iosContact": "Des questions ? Contactez {{supportEmail}}.",
       "iosTitle": "KiloClaw indisponible sur iOS",
       "multipleCurrentConflictBody": "Nous avons trouvé plusieurs abonnements actifs sur votre compte. Nous avons donc tout mis en pause pour éviter une double facturation.",
       "multipleCurrentConflictCta": "Continuer sur kilo.ai",
@@ -755,7 +755,7 @@
         "queryErrorBody": "Nous avons perdu la connexion pendant la vérification de la configuration de {{name}}. Elle est peut-être encore en cours. Réessayez ou revenez dans un instant.",
         "queryErrorTitle": "Impossible de vérifier l'avancement",
         "settingUp": "Configuration de {{name}}",
-        "stalledBody": "Nous n'avons pas pu terminer la configuration de {{name}}. Réessayez, ou écrivez à hi@kilo.ai si cela se reproduit.",
+        "stalledBody": "Nous n'avons pas pu terminer la configuration de {{name}}. Réessayez, ou écrivez à {{supportEmail}} si cela se reproduit.",
         "stalledTitle": "Configuration bloquée",
         "startingSandbox": "Démarrage du bac à sable",
         "stoppedBody": "L'instance de {{name}} s'est arrêtée de façon inattendue pendant la configuration.",
@@ -1012,7 +1012,7 @@
         "recoveryLabel": "Mettre à jour l'application GitHub"
       },
       "githubIpAllowList": {
-        "description": "L'agent de revue de code a été désactivé, car cette organisation GitHub utilise une liste d'adresses IP autorisées qui bloque Kilo. Contactez hi@kilocode.ai pour obtenir de l'aide, puis réactivez l'agent de revue de code."
+        "description": "L'agent de revue de code a été désactivé, car cette organisation GitHub utilise une liste d'adresses IP autorisées qui bloque Kilo. Contactez {{supportEmail}} pour obtenir de l'aide, puis réactivez l'agent de revue de code."
       },
       "gitlabProjectAccessRequired": {
         "description": "L'agent de revue de code a été désactivé, car Kilo ne peut pas créer de jeton d'accès au projet GitLab. Accordez le rôle de responsable du projet ou activez les jetons d'accès au projet, puis réactivez l'agent de revue de code.",
@@ -1027,7 +1027,7 @@
         "recoveryLabel": "Modifier les paramètres de l'agent de revue de code"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "L'agent de revue de code a été désactivé après trois tentatives de clonage du dépôt ayant dépassé le délai imparti aujourd'hui. Contactez hi@kilocode.ai pour obtenir de l'aide, puis réactivez l'agent de revue de code."
+        "description": "L'agent de revue de code a été désactivé après trois tentatives de clonage du dépôt ayant dépassé le délai imparti aujourd'hui. Contactez {{supportEmail}} pour obtenir de l'aide, puis réactivez l'agent de revue de code."
       },
       "title": "L'agent de revue de code nécessite votre intervention.",
       "recoveryLabel": "Contacter l'assistance"

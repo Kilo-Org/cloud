@@ -652,7 +652,7 @@
     "redeployTitle": "פריסה מחדש של המופע",
     "accessRequired": {
       "iosBody": "בחשבון הזה, הגישה ל-KiloClaw מנוהלת מחוץ לאפליקציה ל-iOS.",
-      "iosContact": "שאלות? צור קשר בכתובת hi@kilo.ai.",
+      "iosContact": "שאלות? צור קשר בכתובת {{supportEmail}}.",
       "iosTitle": "KiloClaw אינו זמין ב-iOS",
       "multipleCurrentConflictBody": "מצאנו יותר ממינוי פעיל אחד בחשבון שלך, ולכן השהינו את הפעילות כדי למנוע חיוב כפול.",
       "multipleCurrentConflictCta": "המשך באתר kilo.ai",
@@ -786,7 +786,7 @@
         "queryErrorBody": "החיבור נותק בזמן בדיקת ההגדרה של {{name}}. ייתכן שההגדרה עדיין מתבצעת. נסה שוב או חזור לבדוק בעוד רגע.",
         "queryErrorTitle": "לא ניתן היה לבדוק את התקדמות ההגדרה",
         "settingUp": "הגדרת {{name}}",
-        "stalledBody": "לא הצלחנו להשלים את ההגדרה של {{name}}. נסה שוב, ואם הבעיה חוזרת, שלח אימייל ל-hi@kilo.ai.",
+        "stalledBody": "לא הצלחנו להשלים את ההגדרה של {{name}}. נסה שוב, ואם הבעיה חוזרת, שלח אימייל ל-{{supportEmail}}.",
         "stalledTitle": "משהו נתקע",
         "startingSandbox": "הפעלת הסביבה המבודדת",
         "stoppedBody": "המופע של {{name}} נעצר באופן בלתי צפוי במהלך ההגדרה.",
@@ -1043,7 +1043,7 @@
         "recoveryLabel": "עדכון אפליקציית GitHub"
       },
       "githubIpAllowList": {
-        "description": "סוקר הקוד הושבת כי רשימת כתובות ה-IP המורשות בארגון הזה ב-GitHub חוסמת את Kilo. פנה לעזרה בכתובת hi@kilocode.ai והפעל שוב את סוקר הקוד."
+        "description": "סוקר הקוד הושבת כי רשימת כתובות ה-IP המורשות בארגון הזה ב-GitHub חוסמת את Kilo. פנה לעזרה בכתובת {{supportEmail}} והפעל שוב את סוקר הקוד."
       },
       "gitlabProjectAccessRequired": {
         "description": "סוקר הקוד הושבת כי Kilo לא יכול ליצור אסימון גישה לפרויקט הזה ב-GitLab. תן הרשאת מתחזק או אפשר יצירת אסימוני גישה לפרויקט, והפעל שוב את סוקר הקוד.",
@@ -1058,7 +1058,7 @@
         "recoveryLabel": "עדכון הגדרות סוקר הקוד"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "סוקר הקוד הושבת לאחר ששלושה ניסיונות לשכפול המאגר חרגו היום מהזמן המוקצב. פנה לעזרה בכתובת hi@kilocode.ai והפעל שוב את סוקר הקוד."
+        "description": "סוקר הקוד הושבת לאחר ששלושה ניסיונות לשכפול המאגר חרגו היום מהזמן המוקצב. פנה לעזרה בכתובת {{supportEmail}} והפעל שוב את סוקר הקוד."
       },
       "title": "נדרש טיפול בסוקר הקוד.",
       "recoveryLabel": "פנייה לתמיכה"

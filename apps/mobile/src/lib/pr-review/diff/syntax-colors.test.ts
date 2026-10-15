@@ -24,8 +24,8 @@ const MIN_TEXT_RATIO = 4.5;
 // the composite, not the bare bubble. Mirrors how the palette paints it.
 const KILO_CHAT_LIGHT_CODE_TINT = 'rgba(255, 255, 255, 0.1)';
 const KILO_CHAT_LIGHT_CARD = compositeOver(KILO_CHAT_LIGHT_CODE_TINT, '#4F5A10');
-const LIME_CODE_TINT = 'rgba(26, 26, 16, 0.1)';
-const LIME_CARD = compositeOver(LIME_CODE_TINT, '#E8F27A');
+const YELLOW_CODE_TINT = 'rgba(26, 26, 16, 0.1)';
+const YELLOW_CARD = compositeOver(YELLOW_CODE_TINT, '#FFDD00');
 
 function contrastRatio(foreground: string, background: string): number {
   const foregroundLuminance = relativeLuminance(foreground);
@@ -40,7 +40,7 @@ function contrastRatio(foreground: string, background: string): number {
 
 describe('tokenColorFor', () => {
   it('returns the light color for a known class in light mode', () => {
-    expect(tokenColorFor('keyword', false)).toBe('#7B2CBF');
+    expect(tokenColorFor('keyword', false)).toBe('#772BB9');
   });
 
   it('returns the dark color for a known class in dark mode', () => {
@@ -81,7 +81,7 @@ describe('compositeOver', () => {
   });
 
   it('blends an 8-digit hex tint and returns opaque hex', () => {
-    expect(compositeOver('#1A1A101a', '#E8F27A')).toBe('#d3dc6f');
+    expect(compositeOver('#1A1A101a', '#FFDD00')).toBe('#e8c902');
   });
 
   it('returns an opaque color unchanged and passes through unparseable input', () => {
@@ -91,8 +91,8 @@ describe('compositeOver', () => {
 });
 
 describe('tokenSchemeForSurface', () => {
-  it('treats the bright lime user and kilo-chat card as onLight', () => {
-    expect(tokenSchemeForSurface('#E8F27A')).toBe('onLight');
+  it('treats the bright yellow user and kilo-chat card as onLight', () => {
+    expect(tokenSchemeForSurface('#FFDD00')).toBe('onLight');
   });
 
   it('treats the light theme kilo-chat olive card as onDark', () => {
@@ -146,13 +146,13 @@ describe('syntax tokens on their code-card surfaces (WCAG AA text)', () => {
     default: DEFAULT_TOKEN_COLOR.dark,
   };
 
-  // Bright code cards: the assistant `muted` card, the app card, and the lime
+  // Bright code cards: the assistant `muted` card, the app card, and the yellow
   // user/kilo-chat bubble — plus the 10% dark-ink code tint the bubble paints.
   const brightCards = {
     assistant: '#F0EEE6',
     card: '#FFFFFF',
-    lime: '#E8F27A',
-    limeTint: LIME_CARD,
+    yellow: '#FFDD00',
+    yellowTint: YELLOW_CARD,
   } as const;
 
   // Dim code cards: the dark-theme assistant `muted` and `card`, and the

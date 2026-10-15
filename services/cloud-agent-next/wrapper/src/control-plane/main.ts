@@ -37,6 +37,10 @@ import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
 import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
+import {
+  CONTROL_SANDBOX_PROVIDER_ENV,
+  parseAgentSandboxProvider,
+} from '../../../src/shared/sandbox-provider.js';
 
 const DIAGNOSTICS_FINALIZE_TIMEOUT_MS = 4_000;
 const FILE_LOG_FINALIZE_TIMEOUT_MS = 5_000;
@@ -277,8 +281,15 @@ export async function runControlPlaneWrapper(
   const worktreeDeletionRef: {
     current?: ReturnType<typeof createControlPlaneWorktreeDeletion>;
   } = {};
+  const sandboxProvider = parseAgentSandboxProvider(env[CONTROL_SANDBOX_PROVIDER_ENV]);
   const host = createControlPlaneSessionHost({
-    runtime: { timers, log: logToFile, workload, onNativeDiagnostic: projector },
+    runtime: {
+      timers,
+      ...(sandboxProvider ? { sandboxProvider } : {}),
+      log: logToFile,
+      workload,
+      onNativeDiagnostic: projector,
+    },
     turn: {
       emit: frame => connection.send(frame),
       log: logToFile,
@@ -409,7 +420,7 @@ export async function runControlPlaneWrapper(
     clients: directory =>
       runtimes
         .runtimesForDirectory(directory)
-        .map(runtime => createWorktreeKiloCleanupClient(runtime.client.serverUrl)),
+        .map(runtime => createWorktreeKiloCleanupClient(runtime.client.server)),
     retireDirectory: directory => runtimes.retireDirectory(directory),
     detachTerminals: directory =>
       terminalsRef.current?.detachDirectory(directory) ?? Promise.resolve(),

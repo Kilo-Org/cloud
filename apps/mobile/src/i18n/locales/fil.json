@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Huminto ang pag-setup",
         "stoppedBody": "Biglang huminto ang instance ni {{name}} habang sine-set up.",
         "stalledTitle": "May hindi umuusad",
-        "stalledBody": "Hindi namin natapos ang pag-setup kay {{name}}. Subukan muli, o mag-email sa hi@kilo.ai kung paulit-ulit itong nangyayari.",
+        "stalledBody": "Hindi namin natapos ang pag-setup kay {{name}}. Subukan muli, o mag-email sa {{supportEmail}} kung paulit-ulit itong nangyayari.",
         "timeoutTitle": "Mas tumatagal kaysa inaasahan",
         "timeoutBody": "Mas matagal kaysa karaniwan ang pag-setup kay {{name}} (mahigit {{displayMinutes}} minuto na).",
         "continueInBackground": "Magpatuloy sa background",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Kailangang suriin ng tao ang plano mo para sa maagang pag-access bago ito magamit sa mobile.",
       "iosTitle": "Hindi magagamit ang KiloClaw sa iOS",
       "iosBody": "Pinamamahalaan ang access sa KiloClaw sa labas ng iOS app para sa account na ito.",
-      "iosContact": "May mga tanong? Makipag-ugnayan sa hi@kilo.ai.",
+      "iosContact": "May mga tanong? Makipag-ugnayan sa {{supportEmail}}.",
       "quarantinedCta": "Mag-email sa aming team",
       "nonCanonicalEarlybirdCta": "Suriin ang iyong plano sa kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "I-update ang GitHub App"
       },
       "githubIpAllowList": {
-        "description": "Hindi pinagana ang Code Reviewer dahil hinaharangan ang Kilo ng listahan ng mga pinapayagang IP ng organisasyong ito sa GitHub. Makipag-ugnayan sa hi@kilocode.ai para sa tulong, saka paganahin muli ang Code Reviewer."
+        "description": "Hindi pinagana ang Code Reviewer dahil hinaharangan ang Kilo ng listahan ng mga pinapayagang IP ng organisasyong ito sa GitHub. Makipag-ugnayan sa {{supportEmail}} para sa tulong, saka paganahin muli ang Code Reviewer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Hindi pinagana ang Code Reviewer dahil hindi makagawa ang Kilo ng token para sa access sa proyektong ito sa GitLab. Magbigay ng access bilang tagapangalaga o payagan ang mga token para sa access sa proyekto, saka paganahin muli ang Code Reviewer.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "I-update ang mga setting ng Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Hindi pinagana ang Code Reviewer dahil tatlong beses na lumampas sa takdang oras ang pag-clone ng repository ngayong araw. Makipag-ugnayan sa hi@kilocode.ai para sa tulong, saka paganahin muli ang Code Reviewer."
+        "description": "Hindi pinagana ang Code Reviewer dahil tatlong beses na lumampas sa takdang oras ang pag-clone ng repository ngayong araw. Makipag-ugnayan sa {{supportEmail}} para sa tulong, saka paganahin muli ang Code Reviewer."
       },
       "title": "Kailangang asikasuhin ang tagasuri ng code.",
       "recoveryLabel": "Makipag-ugnayan sa suporta"

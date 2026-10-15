@@ -3,6 +3,7 @@ import { getSandbox, type Sandbox } from '@cloudflare/sandbox';
 import { z } from 'zod';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { getBillingContext } from '@kilocode/container-usage';
+import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -131,7 +132,10 @@ import {
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWrapperFrame,
 } from '../../shared/control-plane-protocol.js';
-import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
+import {
+  CONTROL_PLANE_TIMERS,
+  resolveControlPlaneTimers,
+} from '../../shared/control-plane-timers.js';
 import {
   controlPlaneSandboxSelectionSchema,
   type ControlPlanePrepareInputWithSelection,
@@ -209,8 +213,11 @@ import {
 } from './worktree-deletion.js';
 import { projectAllocationStatusSnapshot } from './status-snapshot.js';
 import { createSandboxNotificationDispatcher, type SandboxNotification } from './notifications.js';
+import { resolvePreviewTarget, type PreviewTargetResult } from './preview-target.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
+import { buildNativeEgressAllowlist } from '../../sandbox-control/egress-policy.js';
+import { nativeEgressAllowlistSchema } from '../../sandbox-containers/egress-policy.js';
 
 const GENERATION_KEY = 'control_plane_generation';
 const GENERATION = 2;
@@ -229,6 +236,7 @@ export type StoredProviderPin = {
   containment: CredentialContainmentRequirements | null;
   /** Stored kind of a placed key. Legacy prefixed keys have none. */
   sandboxKind?: SandboxKind;
+  egressAllowlist?: string[];
 };
 
 export type EnsureAllocationInput = {
@@ -239,6 +247,8 @@ export type EnsureAllocationInput = {
   billing?: SandboxBillingInput;
   containment?: CredentialContainmentRequirements;
   sandboxKind?: SandboxKind;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 const wrapperSocketAttachmentSchema = z.object({
@@ -945,6 +955,31 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.beginWrapperControlRequest(terminalRequestFrame(crypto.randomUUID(), input));
   }
 
+  // --- preview ----------------------------------------------------------------
+
+  /**
+   * Off-queue read the Session DO uses to resolve one preview's provider
+   * coordinates. It never enqueues, so a preview never waits behind the control
+   * operation queue. The allocation and route are two separate reads, not one
+   * snapshot. A target that changes before the upstream fetch is fenced
+   * downstream: SandboxContainers checks `allocationRef` and state, and the
+   * remaining race is an accepted residual (control-plane.md, Preview).
+   */
+  async previewTarget(sessionId: string): Promise<PreviewTargetResult> {
+    await this.initialized;
+    const allocation = await this.readAllocation();
+    const route = await readRoute(this.db, sessionId);
+    return resolvePreviewTarget({
+      routeState: route?.state ?? null,
+      allocationKind: allocation.kind,
+      providerRef: allocation.providerRef,
+      provider: this.currentProvider(),
+      pinnedAllocationName: this.providerPin?.allocationName ?? this.sandboxId,
+      sandboxKind: this.providerPin?.sandboxKind,
+      logicalSandboxId: this.sandboxId,
+    });
+  }
+
   /**
    * Binds one request frame to the connected socket under the serial queue and
    * registers it in the pending map. The wrapper's reply is resolved on the raw
@@ -1541,11 +1576,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  private pinFromInput(input: EnsureAllocationInput): StoredProviderPin {
+  private pinFromInput(
+    input: EnsureAllocationInput,
+    repositoryUrl?: string,
+    kiloToken?: string
+  ): StoredProviderPin {
+    const policy = egressPolicySchema.safeParse(input);
+    if (!policy.success) throw new ProviderCreationError('invalid_configuration');
     if (!sandboxKindMatchesKey(this.sandboxId, input.sandboxKind)) {
       throw new Error('Sandbox selection kind does not match the sandbox key');
     }
     const provider = input.provider ?? 'cloudflare';
+    if (
+      policy.data.egressMode === 'allowlist' &&
+      (provider !== 'cloudflare-containers' ||
+        (input.sandboxKind === undefined
+          ? !this.sandboxId.startsWith('ses-')
+          : input.sandboxKind !== 'isolated'))
+    ) {
+      throw new ProviderCreationError('invalid_configuration');
+    }
     return {
       provider,
       allocationName: input.allocationName ?? this.sandboxId,
@@ -1554,6 +1604,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
       billing: input.billing ?? null,
       containment: input.containment ?? null,
       ...(input.sandboxKind ? { sandboxKind: input.sandboxKind } : {}),
+      ...(policy.data.egressMode !== 'allowlist'
+        ? {}
+        : {
+            egressAllowlist: buildNativeEgressAllowlist({
+              allowlist: policy.data.egressAllowlist ?? [],
+              env: this.env,
+              repositoryUrl,
+              kiloToken,
+            }),
+          }),
     };
   }
 
@@ -1736,11 +1796,46 @@ export class SandboxControlV2 extends DurableObject<Env> {
         reason: 'workspace_setup_failed',
       };
     }
+    let selectedPin: StoredProviderPin | undefined;
+    try {
+      if (
+        sandboxSelection !== undefined &&
+        (state.kind === 'stopped' ||
+          sandboxSelection.egressMode === 'allowlist' ||
+          this.providerPin?.egressAllowlist !== undefined)
+      ) {
+        const repository = source.repository;
+        selectedPin = this.pinFromInput(
+          sandboxSelection,
+          repository && repository.type !== 'github' ? repository.url : undefined,
+          source.kiloToken
+        );
+      }
+      if (
+        state.kind !== 'stopped' &&
+        (selectedPin?.egressAllowlist !== undefined ||
+          this.providerPin?.egressAllowlist !== undefined) &&
+        JSON.stringify(selectedPin?.egressAllowlist) !==
+          JSON.stringify(this.providerPin?.egressAllowlist)
+      ) {
+        throw new ProviderCreationError('invalid_configuration');
+      }
+    } catch (error) {
+      if (!(error instanceof ProviderCreationError)) throw error;
+      const attemptId = crypto.randomUUID();
+      const route = await failRoute(
+        this.routeContext(state),
+        { ...spec, attemptId },
+        attemptId,
+        'invalid_configuration'
+      );
+      return routeView(route, state.kind === 'connected');
+    }
     // H1: apply the Worker-selected provider pin before the first attempt. The
     // pin is only mutable while stopped; once an allocation exists its provider
     // is fixed and a repeated prepare must not re-decide it.
-    if (sandboxSelection !== undefined && state.kind === 'stopped') {
-      const pin = this.pinFromInput(sandboxSelection);
+    if (selectedPin !== undefined && state.kind === 'stopped') {
+      const pin = selectedPin;
       await this.writeProviderPin(pin);
       this.providerPin = pin;
       this.provider = this.createProviderAdapter(pin);
@@ -2845,13 +2940,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
       try {
         const credential = generateSandboxCredential();
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
-        const launchEnv = await this.wrapperLaunchEnv(credential, allocationId);
         const pin = this.providerPin ?? this.defaultPin('cloudflare');
+        const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
         if (pin.billing) {
           await assertContainerCapacity(this.env, {
             subject: pin.billing.subject,
             instanceId: pin.billing.sandboxId,
             checkpoint: 'control-plane-create',
+            billingOrigin: pin.billing.metadata?.origin,
           });
         }
         const createDeadline =
@@ -2990,7 +3086,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         if (launched.snapshotFailed) {
           const imageCredential = generateSandboxCredential();
-          const imageLaunchEnv = await this.wrapperLaunchEnv(imageCredential, allocationId);
+          const imageLaunchEnv = await this.wrapperLaunchEnv(
+            imageCredential,
+            allocationId,
+            pin.provider
+          );
           const imageCredentialHash = await hashSandboxCredential(imageCredential);
           const ownsCleanup = await this.enqueue(async () => {
             const latest = await this.readAllocation();
@@ -3022,6 +3122,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
           await notifyPreparingRoutes(this.routeContext(afterCleanup), {
             step: 'snapshot_fallback',
             detail: 'Snapshot startup failed. Retrying without a snapshot.',
+          });
+          await notifyPreparingRoutes(this.routeContext(afterCleanup), {
+            step: 'sandbox_start',
+            detail: 'Starting sandbox without a snapshot',
           });
           launched = await withTimeout(
             this.provider.launch(createdRef, imageLaunchEnv, {
@@ -3637,11 +3741,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const route = await readRoute(this.db, frame.sessionId);
       repoKeyPrefix = route?.repoKey?.slice(0, 16) ?? undefined;
       const provider = this.provider;
+      const timers = CONTROL_PLANE_TIMERS.wrapper;
+      const captureBudgetMs =
+        Math.max(REPOSITORY_CAPTURE_CALL_MS, timers.captureMs) +
+        timers.kiloRuntimeStartMs +
+        timers.kiloSessionMs;
       if (route === null) reason = 'no_route';
       else if (route.state !== 'preparing') reason = 'route_not_preparing';
       else if (route.repoKey === null) reason = 'no_repo_key';
       else if (provider.captureRepository === undefined) reason = 'provider_no_capture';
       else if (state.providerRef === null) reason = 'no_provider_ref';
+      else if (route.attemptDeadlineAt - Date.now() <= captureBudgetMs)
+        reason = 'insufficient_preparation_budget';
       else {
         reason = 'capture_declined';
         ok = await withTimeout(
@@ -3736,7 +3847,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async wrapperLaunchEnv(
     credential: string,
-    allocationId: string
+    allocationId: string,
+    provider: AgentSandboxProvider
   ): Promise<Record<string, string>> {
     const signingSecret = await withTimeout(
       resolveSecret(this.env.NEXTAUTH_SECRET),
@@ -3754,6 +3866,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...buildControlWrapperLaunchEnv({
         workerUrl: this.env.WORKER_URL,
         sandboxId: this.sandboxId,
+        provider,
         credential: launchCredential,
         diagnostics: { allocationId, signingSecret },
         ...(typeof workloadCgroup === 'string' ? { workloadCgroup } : {}),
@@ -3858,6 +3971,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           logicalSandboxId: this.sandboxId,
           allocationName,
           ...(instance === undefined ? {} : { instance }),
+          ...(pin.egressAllowlist === undefined ? {} : { egressAllowlist: pin.egressAllowlist }),
           getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
         });
       }
@@ -3981,11 +4095,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
       .where(eq(allocationTable.id, ALLOCATION_ROW_ID));
     const raw = rows[0]?.pin;
     if (typeof raw !== 'string') return null;
+    let pin: StoredProviderPin;
     try {
-      return JSON.parse(raw) as StoredProviderPin;
+      pin = JSON.parse(raw) as StoredProviderPin;
     } catch {
       return null;
     }
+    if (pin.egressAllowlist !== undefined) {
+      pin.egressAllowlist = nativeEgressAllowlistSchema.parse(pin.egressAllowlist);
+      if (
+        pin.provider !== 'cloudflare-containers' ||
+        (pin.sandboxKind === undefined
+          ? !this.sandboxId.startsWith('ses-')
+          : pin.sandboxKind !== 'isolated')
+      ) {
+        throw new ProviderCreationError('invalid_configuration');
+      }
+    }
+    return pin;
   }
 
   private async writeProviderPin(pin: StoredProviderPin): Promise<void> {

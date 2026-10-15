@@ -650,7 +650,7 @@
     "redeployTitle": "Triển khai lại phiên chạy",
     "accessRequired": {
       "iosBody": "Quyền truy cập KiloClaw cho tài khoản này được quản lý bên ngoài ứng dụng iOS.",
-      "iosContact": "Nếu có thắc mắc, hãy liên hệ hi@kilo.ai.",
+      "iosContact": "Nếu có thắc mắc, hãy liên hệ {{supportEmail}}.",
       "iosTitle": "KiloClaw không khả dụng trên iOS",
       "multipleCurrentConflictBody": "Tài khoản của bạn có nhiều gói đăng ký còn hiệu lực. Chúng tôi đã tạm dừng dịch vụ để tránh tính phí trùng lặp.",
       "multipleCurrentConflictCta": "Tiếp tục trên kilo.ai",
@@ -783,7 +783,7 @@
         "queryErrorBody": "Kết nối bị mất khi kiểm tra tiến độ thiết lập {{name}}. Quá trình thiết lập có thể vẫn đang chạy. Thử lại hoặc quay lại kiểm tra sau một lát.",
         "queryErrorTitle": "Không thể kiểm tra tiến độ thiết lập",
         "settingUp": "Đang thiết lập {{name}}",
-        "stalledBody": "Chúng tôi không thể hoàn tất thiết lập {{name}}. Hãy thử lại hoặc gửi email đến hi@kilo.ai nếu sự cố vẫn tiếp diễn.",
+        "stalledBody": "Chúng tôi không thể hoàn tất thiết lập {{name}}. Hãy thử lại hoặc gửi email đến {{supportEmail}} nếu sự cố vẫn tiếp diễn.",
         "stalledTitle": "Quá trình thiết lập bị gián đoạn",
         "startingSandbox": "Đang khởi động môi trường cô lập",
         "stoppedBody": "Phiên chạy của {{name}} đã dừng đột ngột trong quá trình thiết lập.",
@@ -1040,7 +1040,7 @@
         "recoveryLabel": "Cập nhật ứng dụng GitHub"
       },
       "githubIpAllowList": {
-        "description": "Trình rà soát mã đã bị tắt vì danh sách địa chỉ IP được phép của tổ chức GitHub này chặn Kilo. Hãy liên hệ hi@kilocode.ai để được hỗ trợ rồi bật lại Trình rà soát mã."
+        "description": "Trình rà soát mã đã bị tắt vì danh sách địa chỉ IP được phép của tổ chức GitHub này chặn Kilo. Hãy liên hệ {{supportEmail}} để được hỗ trợ rồi bật lại Trình rà soát mã."
       },
       "gitlabProjectAccessRequired": {
         "description": "Trình rà soát mã đã bị tắt vì Kilo không thể tạo mã truy cập dự án trên GitLab cho dự án này. Hãy cấp quyền người bảo trì hoặc cho phép tạo mã truy cập dự án rồi bật lại Trình rà soát mã.",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "Cập nhật cài đặt Trình rà soát mã"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Trình rà soát mã đã bị tắt sau ba lần sao chép kho lưu trữ quá thời gian chờ trong hôm nay. Hãy liên hệ hi@kilocode.ai để được hỗ trợ rồi bật lại Trình rà soát mã."
+        "description": "Trình rà soát mã đã bị tắt sau ba lần sao chép kho lưu trữ quá thời gian chờ trong hôm nay. Hãy liên hệ {{supportEmail}} để được hỗ trợ rồi bật lại Trình rà soát mã."
       },
       "title": "Trợ lý rà soát mã cần bạn xử lý sự cố.",
       "recoveryLabel": "Liên hệ hỗ trợ"

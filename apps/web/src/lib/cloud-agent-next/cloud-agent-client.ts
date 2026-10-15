@@ -5,6 +5,7 @@ import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
   sandboxSelectionCapabilitiesSchema,
   type SandboxAllocationInput,
@@ -28,7 +29,10 @@ import {
   type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
-import { baseGetMessageResultNextOutputSchema } from '@/routers/cloud-agent-next-schemas';
+import {
+  baseGetMessageResultNextOutputSchema,
+  workerPreviewOptionsSchema,
+} from '@/routers/cloud-agent-next-schemas';
 import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
@@ -180,6 +184,8 @@ type PrepareSessionSharedFields = {
   /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 /** Non-clone prepare input: required `prompt` and the current optional initial fields. */
@@ -381,6 +387,7 @@ export type GetSessionOutput = {
   model?: string;
   autoCommit?: boolean;
   upstreamBranch?: string;
+  branchName?: string;
 
   /** Custom agents stored on this session (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{
@@ -661,6 +668,9 @@ type CloudAgentNextTRPCClient = {
   };
   getSandboxSelectionOptions: {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
+  };
+  getPreviewOptions: {
+    query: (input: { cloudAgentSessionId: string; organizationId?: string }) => Promise<unknown>;
   };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
@@ -983,6 +993,13 @@ export class CloudAgentNextClient {
     return sandboxSelectionCapabilitiesSchema.parse(
       await this.client.getSandboxSelectionOptions.query(input)
     );
+  }
+
+  async getPreviewOptions(input: {
+    cloudAgentSessionId: string;
+    organizationId?: string;
+  }): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
+    return workerPreviewOptionsSchema.parse(await this.client.getPreviewOptions.query(input));
   }
 
   /**

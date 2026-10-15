@@ -488,10 +488,8 @@ function ResourceLink({
       onClick={onClick}
       className="group/rlink mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors hover:bg-white/[0.04]"
     >
-      <LinkIcon className="size-3 text-[color:oklch(95%_0.15_108_/_0.6)]" />
-      <span className={`text-[color:oklch(95%_0.15_108)] ${mono ? 'font-mono text-[11px]' : ''}`}>
-        {label}
-      </span>
+      <LinkIcon className="size-3 text-primary/60" />
+      <span className={`text-primary ${mono ? 'font-mono text-[11px]' : ''}`}>{label}</span>
       <ChevronRight className="size-3 text-white/15 transition-colors group-hover/rlink:text-white/30" />
     </button>
   );
@@ -517,7 +515,7 @@ function LinkCell({
         <CellIcon className="size-3" />
         {label}
       </div>
-      <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-[color:oklch(95%_0.15_108)]">
+      <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-primary">
         <span>{value}</span>
         <ChevronRight className="size-3 shrink-0 text-white/15 transition-colors group-hover/link:text-white/30" />
       </div>

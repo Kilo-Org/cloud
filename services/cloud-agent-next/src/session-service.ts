@@ -793,7 +793,11 @@ export async function writeGlobalRules(
 
   await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
 
-  await sandbox.writeFile(rulesPath, buildCloudAgentRules(bashDefaultTimeoutMs));
+  // This legacy writer always runs on a Cloudflare Sandbox (`SandboxInstance`).
+  await sandbox.writeFile(
+    rulesPath,
+    buildCloudAgentRules({ bashDefaultTimeoutMs, sandboxProvider: 'cloudflare' })
+  );
 }
 
 function shortHash(input: string): string {

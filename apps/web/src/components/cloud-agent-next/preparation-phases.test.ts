@@ -1,5 +1,6 @@
 import type { PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 import {
+  commandsForPhase,
   formatAttemptDuration,
   humanizePhaseLabel,
   phaseStatus,
@@ -47,9 +48,56 @@ describe('phaseStatus', () => {
   });
 });
 
+describe('commandsForPhase', () => {
+  it('keeps retried setup commands and errors under their own phase', () => {
+    const firstPhase = step({ id: 'setup-1', key: 'setup_commands', status: 'completed' });
+    const retryPhase = step({ id: 'setup-2', key: 'setup_commands', status: 'completed' });
+    const firstCommand = step({
+      id: 'command-1',
+      kind: 'setup_command',
+      parentStepId: firstPhase.id,
+      status: 'failed',
+      outputTail: 'Snapshot setup failed',
+    });
+    const retryCommand = step({
+      id: 'command-2',
+      kind: 'setup_command',
+      parentStepId: retryPhase.id,
+      status: 'completed',
+      outputTail: 'Fresh setup completed',
+    });
+    const steps = [firstPhase, firstCommand, retryPhase, retryCommand];
+
+    expect(commandsForPhase(firstPhase, steps)).toEqual([firstCommand]);
+    expect(commandsForPhase(retryPhase, steps)).toEqual([retryCommand]);
+    expect(phaseStatus(firstPhase, commandsForPhase(firstPhase, steps))).toBe('failed');
+    expect(phaseStatus(retryPhase, commandsForPhase(retryPhase, steps))).toBe('completed');
+    expect(commandsForPhase(step({ key: 'sandbox_boot' }), steps)).toEqual([]);
+  });
+
+  it('shows legacy commands once, under the first setup phase', () => {
+    const firstPhase = step({ id: 'setup-1', key: 'setup_commands' });
+    const retryPhase = step({ id: 'setup-2', key: 'setup_commands' });
+    const command = step({ kind: 'setup_command' });
+    const steps = [firstPhase, command, retryPhase];
+
+    expect(commandsForPhase(firstPhase, steps)).toEqual([command]);
+    expect(commandsForPhase(retryPhase, steps)).toEqual([]);
+  });
+});
+
 describe('formatAttemptDuration', () => {
   it('returns undefined while the attempt is still running', () => {
     expect(formatAttemptDuration({ startedAt: 1000 })).toBeUndefined();
+  });
+
+  it('formats elapsed time when the current time is supplied', () => {
+    expect(formatAttemptDuration({ startedAt: 1000 }, 13_400)).toBe('12s');
+    expect(formatAttemptDuration({ startedAt: 1000 }, 126_000)).toBe('2m 5s');
+  });
+
+  it('uses the completion time instead of the current time for finished steps', () => {
+    expect(formatAttemptDuration({ startedAt: 1000, completedAt: 13_400 }, 126_000)).toBe('12s');
   });
 
   it('formats sub-minute durations as seconds', () => {

@@ -7,7 +7,6 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   configToFormState,
-  effectiveDeciderModels,
   effortCoverageForModel,
   formStateToConfig,
   RoutingTableView,
@@ -16,38 +15,54 @@ import {
 const baseConfig: BenchmarkConfig = {
   ...formStateToConfig(configToFormState(null), null),
   classifierModels: ['classifier'],
-  deciderModels: [{ id: 'manual' }, { id: 'auto' }],
-  manualDeciderModels: [{ id: 'manual' }],
-  autoDeciderModels: [
-    { id: 'auto', avgAttemptCostUsd: 21 },
-    { id: 'excluded', avgAttemptCostUsd: 18 },
-  ],
-  excludedAutoDeciderModels: ['excluded'],
+  deciderModels: [{ id: 'selected-model' }],
 };
 
 describe('platform model selection', () => {
-  it('round-trips model-level selections without adding an effort', () => {
-    const state = configToFormState(baseConfig);
-    expect(state.deciderModels).toEqual([{ id: 'manual' }]);
-    const result = formStateToConfig(state, baseConfig);
-    expect(result.manualDeciderModels).toEqual([{ id: 'manual' }]);
-    expect(result.deciderModels).toEqual([{ id: 'manual' }, { id: 'auto' }]);
-    expect(result.autoDeciderModels).toEqual(baseConfig.autoDeciderModels);
-    expect(result.excludedAutoDeciderModels).toEqual(['excluded']);
+  it('defaults to efficient and preserves router-specific accuracy settings', () => {
+    expect(formStateToConfig(configToFormState(null), null)).toMatchObject({
+      router: 'efficient',
+      accuracyNoiseBand: 0.05,
+      frontierMinAccuracyDelta: 0,
+    });
+    const config: BenchmarkConfig = {
+      ...baseConfig,
+      router: 'frontier',
+      accuracyNoiseBand: 0.02,
+      frontierMinAccuracyDelta: 0.1,
+    };
+    expect(formStateToConfig(configToFormState(config), config)).toMatchObject({
+      router: 'frontier',
+      accuracyNoiseBand: 0.02,
+      frontierMinAccuracyDelta: 0.1,
+      minAccuracy: config.minAccuracy,
+    });
   });
 
-  it('drops blank selections, trims ids, and preserves manual precedence over auto exclusions', () => {
+  it('preserves the configured confidence threshold when saving unrelated form changes', () => {
+    const config = { ...baseConfig, lowConfidenceThreshold: 0.8 };
+    const state = configToFormState(config);
+    expect(formStateToConfig({ ...state, minAccuracy: 0.9 }, config).lowConfidenceThreshold).toBe(
+      0.8
+    );
+    expect(formStateToConfig(configToFormState(null), null).lowConfidenceThreshold).toBeNull();
+  });
+
+  it('round-trips model-level selections without adding an effort', () => {
+    const state = configToFormState(baseConfig);
+    expect(state.deciderModels).toEqual([{ id: 'selected-model' }]);
+    const result = formStateToConfig(state, baseConfig);
+    expect(result.deciderModels).toEqual([{ id: 'selected-model' }]);
+  });
+
+  it('drops blank selections and trims ids', () => {
+    const state = configToFormState(baseConfig);
     expect(
-      effectiveDeciderModels({
-        manualDeciderModels: [{ id: '  manual  ' }, { id: 'duplicate' }, { id: ' ' }],
-        autoDeciderModels: [
-          { id: 'duplicate', avgAttemptCostUsd: 20 },
-          { id: 'included', avgAttemptCostUsd: 22 },
-          { id: 'excluded', avgAttemptCostUsd: 23 },
-        ],
-        excludedAutoDeciderModels: ['duplicate', 'excluded'],
-      })
-    ).toEqual([{ id: 'manual' }, { id: 'duplicate' }, { id: 'included' }]);
+      formStateToConfig(
+        { ...state, deciderModels: [{ id: '  selected-model  ' }, { id: ' ' }] },
+        baseConfig
+      ).deciderModels
+    ).toEqual([{ id: 'selected-model' }]);
   });
 
   it('does not infer reasoning coverage from arbitrary catalog presets or missing models', () => {

@@ -111,6 +111,23 @@ export function extractVercelUpstreamId(
   return attempt?.providerRequestId ?? attempt?.providerResponseId ?? null;
 }
 
+/**
+ * Derives `generation_time` in milliseconds from the `startTime`/`endTime` of
+ * the provider attempt that served the request, so Vercel AI Gateway usage gets
+ * it without a `/generation` lookup. Returns `null` when either timestamp is
+ * missing or the interval is negative.
+ */
+export function extractVercelGenerationTime(
+  vercelProviderMetadata: VercelProviderMetaData | undefined | null
+): number | null {
+  const attempt = findVercelServingProviderAttempt(vercelProviderMetadata?.gateway);
+  const startTime = attempt?.startTime;
+  const endTime = attempt?.endTime;
+  if (typeof startTime !== 'number' || typeof endTime !== 'number') return null;
+  const generationTime = endTime - startTime;
+  return Number.isFinite(generationTime) && generationTime >= 0 ? generationTime : null;
+}
+
 export function isResponseInterruptedError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null || !('name' in error)) return false;
   return error.name === 'ResponseAborted' || error.name === 'TimeoutError';

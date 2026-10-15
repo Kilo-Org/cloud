@@ -1295,7 +1295,7 @@
         "stoppedTitle": "Nastavitev je ustavljena",
         "stoppedBody": "Primerek {{name}} se je med nastavljanjem nepričakovano ustavil.",
         "stalledTitle": "Nekaj se je zataknilo",
-        "stalledBody": "Nastavitve za {{name}} ni bilo mogoče dokončati. Poskusi znova. Če se težava ponavlja, piši na hi@kilo.ai.",
+        "stalledBody": "Nastavitve za {{name}} ni bilo mogoče dokončati. Poskusi znova. Če se težava ponavlja, piši na {{supportEmail}}.",
         "timeoutTitle": "Traja dlje od pričakovanega",
         "timeoutBody": "Nastavitev za {{name}} traja dlje kot običajno (več kot {{displayMinutes}} minut).",
         "continueInBackground": "Nadaljuj v ozadju",
@@ -1353,7 +1353,7 @@
       "nonCanonicalEarlybirdBody": "Pred uporabo v mobilni aplikaciji je treba ročno pregledati tvoj paket za zgodnji dostop.",
       "iosTitle": "KiloClaw ni na voljo v sistemu iOS",
       "iosBody": "Dostop do KiloClaw za ta račun se upravlja zunaj aplikacije za iOS.",
-      "iosContact": "Imaš vprašanja? Piši na hi@kilo.ai.",
+      "iosContact": "Imaš vprašanja? Piši na {{supportEmail}}.",
       "quarantinedCta": "Pošlji e-pošto naši ekipi",
       "nonCanonicalEarlybirdCta": "Preglej svoj paket na kilo.ai"
     },
@@ -1590,7 +1590,7 @@
         "recoveryLabel": "Posodobi aplikacijo GitHub"
       },
       "githubIpAllowList": {
-        "description": "Pregledovalnik kode je bil onemogočen, ker ta organizacija na platformi GitHub uporablja seznam dovoljenih naslovov IP, ki blokira Kilo. Za pomoč piši na hi@kilocode.ai in nato znova omogoči pregledovalnik kode."
+        "description": "Pregledovalnik kode je bil onemogočen, ker ta organizacija na platformi GitHub uporablja seznam dovoljenih naslovov IP, ki blokira Kilo. Za pomoč piši na {{supportEmail}} in nato znova omogoči pregledovalnik kode."
       },
       "gitlabProjectAccessRequired": {
         "description": "Pregledovalnik kode je bil onemogočen, ker Kilo za ta projekt na platformi GitLab ne more ustvariti žetona za dostop do projekta. Dodeli dostop vzdrževalca ali omogoči žetone za dostop do projektov in nato znova omogoči pregledovalnik kode.",
@@ -1605,7 +1605,7 @@
         "recoveryLabel": "Posodobi nastavitve pregledovalnika kode"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Pregledovalnik kode je bil onemogočen, ker je kloniranje skladišča danes trikrat preseglo časovno omejitev. Za pomoč piši na hi@kilocode.ai in nato znova omogoči pregledovalnik kode."
+        "description": "Pregledovalnik kode je bil onemogočen, ker je kloniranje skladišča danes trikrat preseglo časovno omejitev. Za pomoč piši na {{supportEmail}} in nato znova omogoči pregledovalnik kode."
       },
       "title": "Pri pregledovalcu kode je potrebno ukrepanje.",
       "recoveryLabel": "Obrni se na podporo"

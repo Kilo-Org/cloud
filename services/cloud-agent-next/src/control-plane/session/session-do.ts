@@ -128,6 +128,8 @@ import {
   type ControlPlaneWorktreeChanges,
 } from './worktree-changes.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
+import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
+import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';
 import { readWorktreeChildSessions } from './worktree-child-sessions.js';
 import {
   buildControlPlaneMessageReport,
@@ -158,6 +160,7 @@ import {
 import {
   controlPlaneSandboxSelectionSchema,
   type ControlPlanePrepareInputWithSelection,
+  type ControlPlaneSandboxSelection,
 } from './sandbox-selection.js';
 import type { ControlRuntimeCredentialProxyFence } from '../sandbox/sandbox-do.js';
 import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
@@ -209,7 +212,7 @@ const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
 
 const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'Creating sandbox',
-  sandbox_start: 'Starting sandbox from snapshot',
+  sandbox_start: 'Starting sandbox',
   snapshot_fallback: 'Retrying without a snapshot',
   clone: 'Cloning repository',
   restore: 'Updating repository',
@@ -330,6 +333,8 @@ export type ControlPlaneSandboxPeer = {
   worktreeCapture(input: ControlPlaneWorktreeCaptureInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one terminal request to the wrapper. */
   terminal(input: ControlPlaneTerminalInput): Promise<ControlPlaneControlResult>;
+  /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
+  previewTarget(sessionId: string): Promise<PreviewTargetResult>;
   /** B10: the wrapper identity bound to the connected allocation. */
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
@@ -468,6 +473,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private readonly worktreeChanges: ControlPlaneWorktreeChanges;
   /** Terminal records and the browser/wrapper bridge (plan B10). */
   private readonly terminals: ControlPlaneTerminals;
+  /** Preview eligibility and target resolution through the Sandbox DO. */
+  private readonly preview: ControlPlanePreview;
   /** Generation of the in-flight preparation, for the worktree-change hooks. */
   private worktreePreparationGeneration: number | undefined;
   /**
@@ -534,6 +541,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       isRouteReady: () => this.route.state === 'ready',
       request: (sandboxId, input) => this.terminalRequest(sandboxId, input),
     });
+    this.preview = createControlPlanePreview({
+      getMetadata: () => this.metadata,
+      resolveTarget: sandboxId => this.previewTargetFor(sandboxId),
+    });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
 
@@ -549,6 +560,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       };
     }
     return peer.terminal(input);
+  }
+
+  private async previewTargetFor(sandboxId: string): Promise<PreviewTargetResult> {
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      return { status: 'not_running' };
+    }
+    return withDORetry(
+      () => this.sandboxPeerFor(sandboxId) ?? peer,
+      stub => stub.previewTarget(this.sessionId),
+      'previewTarget'
+    );
   }
 
   private async currentWrapperId(): Promise<string | undefined> {
@@ -651,7 +674,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const { metadata, message, sandboxSelection, runtimeAuthorizationSeal } = parsed.data;
 
     if (this.metadata !== null && this.registration !== null) {
-      if (!this.matchesExistingRegistration(metadata, message.messageId)) {
+      if (!this.matchesExistingRegistration(metadata, message.messageId, sandboxSelection)) {
         return createFailure(
           'BAD_REQUEST',
           'Registration does not match the existing session intent'
@@ -726,7 +749,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // seal) must not touch the seal again. Match the stored intent and replay
     // success before unsealing; a different intent is rejected.
     if (this.metadata !== null && this.registration !== null) {
-      if (!this.matchesExistingRegistration(metadata, undefined)) {
+      if (!this.matchesExistingRegistration(metadata, undefined, sandboxSelection)) {
         return createFailure(
           'BAD_REQUEST',
           'Registration does not match the existing session intent'
@@ -887,7 +910,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   private matchesExistingRegistration(
     metadata: SessionMetadata,
-    messageId: string | undefined
+    messageId: string | undefined,
+    sandboxSelection: ControlPlaneSandboxSelection
   ): boolean {
     const existing = this.metadata;
     if (existing === null || this.registration === null) return false;
@@ -896,6 +920,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
       sameRepository(existing.repository, metadata.repository) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
+      (existing.workspace?.egressMode ?? 'unrestricted') ===
+        (metadata.workspace?.egressMode ?? 'unrestricted') &&
+      (this.registration.sandboxSelection?.egressMode ?? 'unrestricted') ===
+        (sandboxSelection.egressMode ?? 'unrestricted') &&
+      JSON.stringify(existing.workspace?.egressAllowlist ?? []) ===
+        JSON.stringify(metadata.workspace?.egressAllowlist ?? []) &&
+      JSON.stringify(this.registration.sandboxSelection?.egressAllowlist ?? []) ===
+        JSON.stringify(sandboxSelection.egressAllowlist ?? []) &&
       (existing.initialMessage?.id ?? null) === (messageId ?? null) &&
       (existing.clone?.cloneUpToMessageId ?? null) === (metadata.clone?.cloneUpToMessageId ?? null)
     );
@@ -1691,6 +1723,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.terminals.close(input);
   }
 
+  // --- preview ----------------------------------------------------------------
+
+  /**
+   * Worker-facing preview resolver (spec §10). Runs on the RPC path, not the
+   * operation queue, so a preview never waits behind queued messages. It owns
+   * only eligibility and routing; the provider coordinates come from the
+   * Sandbox DO's off-queue `previewTarget` read.
+   */
+  async resolvePreviewTarget(): Promise<ResolvedPreviewTarget> {
+    await this.initialized;
+    return this.preview.resolve();
+  }
+
   // --- stream -----------------------------------------------------------------
 
   async fetch(request: Request): Promise<Response> {
@@ -2148,17 +2193,34 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const attemptId = this.route.attemptId;
     const attempt = readPreparationAttempt(this.eventQueries, attemptId);
     if (attempt?.status !== 'running') return;
+    let steps = readPreparationSteps(this.eventQueries, attemptId);
+    let phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+    const latestPhase = steps.findLast(step => step.kind === 'phase');
+    if (
+      phase === undefined ||
+      (phase.id !== latestPhase?.id &&
+        (event.type === CONTROL_PLANE_SETUP_EVENTS.started ||
+          event.type === CONTROL_PLANE_SETUP_EVENTS.output))
+    ) {
+      this.preparationRecorder(attemptId, attempt.triggerMessageId).onProgress(
+        'setup_commands',
+        'Running setup commands'
+      );
+      steps = readPreparationSteps(this.eventQueries, attemptId);
+      phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+    }
+    if (phase === undefined) return;
     const command = event.properties.command;
-    const stepId = `setup_command:${command - 1}`;
-    const existingStep = readPreparationSteps(this.eventQueries, attemptId).find(
-      step => step.id === stepId
-    );
+    const commandId = `setup_command:${command - 1}`;
+    const stepId = phase.id === 'phase:setup_commands' ? commandId : `${phase.id}:${commandId}`;
+    const existingStep = steps.find(step => step.id === stepId);
     if (existingStep !== undefined && existingStep.status !== 'running') return;
     const base = {
       version: 2 as const,
       attemptId,
       triggerMessageId: attempt.triggerMessageId,
-      revision: attempt.revision + 1,
+      revision:
+        (readPreparationAttempt(this.eventQueries, attemptId)?.revision ?? attempt.revision) + 1,
       timestamp: Date.now(),
       step: 'setup_commands' as const,
     };
@@ -2181,6 +2243,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           kind: 'setup_command',
           label,
           commandIndex: command - 1,
+          parentStepId: phase.id,
           ...(event.type === CONTROL_PLANE_SETUP_EVENTS.started
             ? { commandCount: event.properties.commandCount }
             : {}),

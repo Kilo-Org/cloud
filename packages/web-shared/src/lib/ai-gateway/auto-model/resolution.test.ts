@@ -429,6 +429,95 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
   });
 });
 
+describe('resolveAutoModel — kilo-auto/frontier branch', () => {
+  it.each(['code', 'architect', null] as const)(
+    'preserves the static mapping for mode %s when routing is disabled',
+    async modeHeader => {
+      const efficientDecision = jest.fn(async () => sampleDecision);
+      const result = await resolveAutoModel(
+        {
+          ...baseParams,
+          model: KILO_AUTO_FRONTIER_MODEL.id,
+          modeHeader,
+          apiKind: 'chat_completions',
+          efficientDecision,
+        },
+        nullUserPromise,
+        zeroBalancePromise
+      );
+
+      expect(result).toEqual({
+        kind: 'ok',
+        resolved: modeHeader ? FRONTIER_MODE_TO_MODEL[modeHeader] : FRONTIER_CODE_MODEL,
+      });
+      expect(efficientDecision).not.toHaveBeenCalled();
+    }
+  );
+
+  it('resolves the frontier decision without consulting efficient routing', async () => {
+    const frontierDecision = jest.fn(async () => ({
+      ...sampleDecision,
+      model: 'anthropic/claude-sonnet-5',
+      variant: 'xhigh',
+    }));
+    const efficientDecision = jest.fn(async () => sampleDecision);
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_FRONTIER_MODEL.id,
+        apiKind: 'chat_completions',
+        frontierDecision,
+        efficientDecision,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: {
+        model: 'anthropic/claude-sonnet-5',
+        reasoning: { enabled: true, effort: 'xhigh' },
+        verbosity: 'xhigh',
+      },
+    });
+    expect(frontierDecision).toHaveBeenCalledTimes(1);
+    expect(efficientDecision).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing frontier table', null],
+    ['virtual model', { ...sampleDecision, model: KILO_AUTO_EFFICIENT_MODEL.id }],
+    ['missing catalog variant', { ...sampleDecision, variant: 'missing-variant' }],
+  ] as const)('uses the unchanged mode mapping for %s', async (_, decision) => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_FRONTIER_MODEL.id,
+        modeHeader: 'architect',
+        apiKind: 'chat_completions',
+        frontierDecision: async () => decision,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: FRONTIER_MODE_TO_MODEL.architect });
+  });
+
+  it('keeps efficient routing independent of a supplied frontier decision', async () => {
+    const frontierDecision = jest.fn(async () => sampleDecision);
+    const result = await resolveAutoModel(
+      { ...baseParams, apiKind: 'chat_completions', frontierDecision },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
+    expect(frontierDecision).not.toHaveBeenCalled();
+  });
+});
+
 describe('resolveAutoModel — kilo-auto/free branch', () => {
   beforeEach(() => {
     mockedGetOpenRouterModels.mockResolvedValue(

@@ -7,7 +7,11 @@ import {
   type AutoRoutingModeResponse,
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
-import { getConfiguredAutoRoutingMode, setAutoRoutingMode } from './routing-mode';
+import {
+  clearAutoRoutingSettingsCache,
+  getConfiguredAutoRoutingMode,
+  setAutoRoutingMode,
+} from './routing-mode';
 import type { HonoEnv } from './hono-env';
 
 function responseBody(params: {
@@ -51,5 +55,6 @@ export const putRoutingModeHandler: Handler<HonoEnv> = async c => {
   }
 
   await setAutoRoutingMode(c.env, parsed.data, parsed.data.mode);
+  clearAutoRoutingSettingsCache();
   return c.json(responseBody({ ...parsed.data, configuredMode: parsed.data.mode }));
 };

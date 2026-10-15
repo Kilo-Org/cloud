@@ -17,6 +17,7 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   modeSchema,
+  KILO_AUTO_FRONTIER_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
@@ -53,8 +54,9 @@ type ResolveAutoModelParams = {
   apiKind: GatewayRequest['kind'] | null;
   clientIp: string | null;
   isAutoFreeCandidateAllowed: ((modelId: string) => Promise<boolean>) | null;
-  // Lazily fetches the auto-routing worker's decision (route.ts owns the request-body capture).
+  // Decisions are lazy so only the selected router captures the request body.
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
+  frontierDecision?: () => Promise<AutoRoutingDecision | null>;
   organizationContext?: Promise<{
     organizationId?: string;
     settings?: OrganizationSettings;
@@ -236,19 +238,13 @@ async function resolveOrganizationAutoModel(
 }
 
 /**
- * Map an efficient routing decision onto a concrete model + catalog settings.
- *
- * Prefer canonical `variant` (complete OpenCode variant settings). When the
- * variant key is absent from the model's catalog, return null so the caller
- * falls back to balanced rather than serving implicit defaults. When `variant`
- * is absent, preserve legacy effort-only behavior for rolling deploys.
+ * Resolve exact catalog variants, rejecting missing variants rather than
+ * serving implicit defaults. Effort-only decisions support rolling deploys.
  */
-async function resolveEfficientDecisionModel(
+async function resolveAutoRoutingDecisionModel(
   decision: AutoRoutingDecision
 ): Promise<ResolvedAutoModel | null> {
-  // `variant` is only on the benchmark decision branch of the discriminated
-  // union; coding-plan defaults never carry it.
-  if ('variant' in decision && decision.variant != null) {
+  if (decision.variant != null) {
     const variants = await getModelVariants(decision.model, true);
     const variantSettings: OpenCodeVariant | undefined = variants?.[decision.variant];
     if (!variantSettings) {
@@ -264,7 +260,7 @@ async function resolveEfficientDecisionModel(
   // Legacy effort-only decisions (old workers during rolling deploy).
   return {
     model: decision.model,
-    ...('reasoningEffort' in decision && decision.reasoningEffort
+    ...(decision.reasoningEffort
       ? { reasoning: { enabled: true, effort: decision.reasoningEffort } }
       : {}),
   };
@@ -332,7 +328,7 @@ export async function resolveAutoModel(
     const fallbackModel = { model: PRIMARY_DEFAULT_MODEL };
     const decision = params.efficientDecision ? await params.efficientDecision() : null;
     if (decision && !isVirtualAutoModelId(decision.model)) {
-      const resolvedFromDecision = await resolveEfficientDecisionModel(decision);
+      const resolvedFromDecision = await resolveAutoRoutingDecisionModel(decision);
       if (resolvedFromDecision) {
         return { kind: 'ok', resolved: resolvedFromDecision };
       }
@@ -342,6 +338,15 @@ export async function resolveAutoModel(
     }
     // Static fallback when the worker is slow or unavailable.
     return { kind: 'ok', resolved: fallbackModel };
+  }
+  if (model === KILO_AUTO_FRONTIER_MODEL.id && params.frontierDecision) {
+    const decision = await params.frontierDecision();
+    if (decision && !isVirtualAutoModelId(decision.model)) {
+      const resolvedFromDecision = await resolveAutoRoutingDecisionModel(decision);
+      if (resolvedFromDecision) {
+        return { kind: 'ok', resolved: resolvedFromDecision };
+      }
+    }
   }
   const mode = resolveMode(modeHeader, featureHeader);
   return {

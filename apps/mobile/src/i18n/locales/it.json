@@ -621,7 +621,7 @@
     "redeployTitle": "Ridistribuire l'istanza?",
     "accessRequired": {
       "iosBody": "L'accesso a KiloClaw per questo account è gestito al di fuori dell'app iOS.",
-      "iosContact": "Hai domande? Scrivi a hi@kilo.ai.",
+      "iosContact": "Hai domande? Scrivi a {{supportEmail}}.",
       "iosTitle": "KiloClaw non disponibile su iOS",
       "multipleCurrentConflictBody": "Abbiamo trovato più di un abbonamento attivo sul tuo account, quindi abbiamo sospeso tutto per evitare doppi addebiti.",
       "multipleCurrentConflictCta": "Continua su kilo.ai",
@@ -755,7 +755,7 @@
         "queryErrorBody": "La connessione si è interrotta durante la verifica della configurazione di {{name}}. La configurazione potrebbe essere ancora in corso. Riprova o ricontrolla tra poco.",
         "queryErrorTitle": "Verifica della configurazione non riuscita",
         "settingUp": "Configurazione di {{name}}",
-        "stalledBody": "Non siamo riusciti a completare la configurazione di {{name}}. Riprova oppure scrivi a hi@kilo.ai se il problema persiste.",
+        "stalledBody": "Non siamo riusciti a completare la configurazione di {{name}}. Riprova oppure scrivi a {{supportEmail}} se il problema persiste.",
         "stalledTitle": "Qualcosa si è bloccato",
         "startingSandbox": "Avvio della sandbox",
         "stoppedBody": "L'istanza di {{name}} si è arrestata in modo imprevisto durante la configurazione.",
@@ -1012,7 +1012,7 @@
         "recoveryLabel": "Aggiorna l'app GitHub"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer è stato disattivato perché l'elenco degli indirizzi IP consentiti di questa organizzazione GitHub blocca Kilo. Contatta hi@kilocode.ai per assistenza, poi riattiva Code Reviewer."
+        "description": "Code Reviewer è stato disattivato perché l'elenco degli indirizzi IP consentiti di questa organizzazione GitHub blocca Kilo. Contatta {{supportEmail}} per assistenza, poi riattiva Code Reviewer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer è stato disattivato perché Kilo non può creare un token di accesso per questo progetto GitLab. Concedi il ruolo Maintainer o attiva i token di accesso al progetto, poi riattiva Code Reviewer.",
@@ -1027,7 +1027,7 @@
         "recoveryLabel": "Aggiorna le impostazioni di Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer è stato disattivato perché oggi la clonazione del repository ha superato il tempo limite tre volte. Contatta hi@kilocode.ai per assistenza, poi riattiva Code Reviewer."
+        "description": "Code Reviewer è stato disattivato perché oggi la clonazione del repository ha superato il tempo limite tre volte. Contatta {{supportEmail}} per assistenza, poi riattiva Code Reviewer."
       },
       "title": "Il revisore di codice richiede un intervento.",
       "recoveryLabel": "Contatta l'assistenza"

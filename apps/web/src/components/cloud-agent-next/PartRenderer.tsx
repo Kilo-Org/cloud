@@ -32,6 +32,8 @@ import type { ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { createMarkdownParseCachePlugin, useMarkdownParseCache } from './markdown-parse-cache';
 import { toSafeHttpUrl, toSafeImageSrc } from '@/lib/safe-http-url';
+import { parsePreviewLinkTarget, previewLinkUrl } from '@/lib/cloud-agent/preview-link';
+import { usePreviewLinks } from './use-preview';
 import type { Part, StoredMessage } from './types';
 import {
   isTextPart,
@@ -64,7 +66,40 @@ export type PartRendererProps = {
 // Shared Components
 // ============================================================================
 
+/** True when the link text is the address itself, as in a bare autolinked URL. */
+function isAddressText(children: ReactNode, href: string): boolean {
+  const text = Array.isArray(children) && children.length === 1 ? children[0] : children;
+  return text === href;
+}
+
 function LinkRenderer({ href, children }: { href?: string; children?: ReactNode }) {
+  const previewLinks = usePreviewLinks();
+  const previewTarget = previewLinks ? parsePreviewLinkTarget(href) : null;
+  if (previewLinks && previewTarget && href) {
+    // A localhost address in a cloud chat means the sandbox, so link to its preview.
+    const previewUrl = previewLinkUrl(previewLinks.urlTemplate, previewTarget);
+    return (
+      <a
+        href={previewUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Open a preview of this sandbox server"
+        onClick={event => {
+          event.preventDefault();
+          previewLinks.open(previewTarget.port, previewTarget.path);
+        }}
+        // A middle click must also mint a ticket; the bare preview host needs the cookie.
+        onAuxClick={event => {
+          if (event.button !== 1) return;
+          event.preventDefault();
+          previewLinks.open(previewTarget.port, previewTarget.path);
+        }}
+      >
+        {isAddressText(children, href) ? previewUrl : children}
+      </a>
+    );
+  }
+
   const safeHref = toSafeHttpUrl(href);
   if (!safeHref) {
     return <>{children}</>;

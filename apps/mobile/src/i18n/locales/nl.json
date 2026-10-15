@@ -650,7 +650,7 @@
     "redeployTitle": "Instantie opnieuw uitrollen",
     "accessRequired": {
       "iosBody": "KiloClaw-toegang wordt voor dit account buiten de iOS-app beheerd.",
-      "iosContact": "Vragen? Neem contact op via hi@kilo.ai.",
+      "iosContact": "Vragen? Neem contact op via {{supportEmail}}.",
       "iosTitle": "KiloClaw niet beschikbaar op iOS",
       "multipleCurrentConflictBody": "We hebben meerdere actieve abonnementen voor je account gevonden. Daarom hebben we alles gepauzeerd om te voorkomen dat je dubbel betaalt.",
       "multipleCurrentConflictCta": "Doorgaan op kilo.ai",
@@ -783,7 +783,7 @@
         "queryErrorBody": "De verbinding viel weg terwijl we de installatie van {{name}} controleerden. De installatie loopt mogelijk nog. Probeer het opnieuw of kijk over een moment nog eens.",
         "queryErrorTitle": "Installatiestatus niet beschikbaar",
         "settingUp": "{{name}} instellen",
-        "stalledBody": "We konden {{name}} niet volledig instellen. Probeer het opnieuw of stuur een e-mail naar hi@kilo.ai als dit blijft gebeuren.",
+        "stalledBody": "We konden {{name}} niet volledig instellen. Probeer het opnieuw of stuur een e-mail naar {{supportEmail}} als dit blijft gebeuren.",
         "stalledTitle": "Iets is vastgelopen",
         "startingSandbox": "Sandbox starten",
         "stoppedBody": "De instantie van {{name}} is onverwacht gestopt tijdens de installatie.",
@@ -1040,7 +1040,7 @@
         "recoveryLabel": "GitHub-app bijwerken"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer is uitgeschakeld omdat deze GitHub-organisatie een IP-toegangslijst gebruikt die Kilo blokkeert. Neem contact op met hi@kilocode.ai voor hulp en schakel Code Reviewer vervolgens weer in."
+        "description": "Code Reviewer is uitgeschakeld omdat deze GitHub-organisatie een IP-toegangslijst gebruikt die Kilo blokkeert. Neem contact op met {{supportEmail}} voor hulp en schakel Code Reviewer vervolgens weer in."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer is uitgeschakeld omdat Kilo geen toegangstoken voor dit GitLab-project kan aanmaken. Verleen toegang met de rol Maintainer of schakel toegangstokens voor projecten in. Schakel daarna Code Reviewer weer in.",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "Instellingen van Code Reviewer bijwerken"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer is uitgeschakeld na drie time-outs bij het klonen van de repository vandaag. Neem contact op met hi@kilocode.ai voor hulp en schakel Code Reviewer vervolgens weer in."
+        "description": "Code Reviewer is uitgeschakeld na drie time-outs bij het klonen van de repository vandaag. Neem contact op met {{supportEmail}} voor hulp en schakel Code Reviewer vervolgens weer in."
       },
       "title": "De codebeoordelaar heeft je aandacht nodig.",
       "recoveryLabel": "Contact opnemen met de helpdesk"

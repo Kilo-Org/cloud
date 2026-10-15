@@ -4,7 +4,7 @@ import {
   MAX_WRITER_RESPONSE_BYTES,
   recordUsage,
   USAGE_WRITER_TIMEOUT_MS,
-} from './usage-writer-client';
+} from '@kilocode/worker-utils/usage-writer-client';
 
 const config = {
   url: 'https://writer.example.test/api/internal/usage/record',

@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Uppsetning stöðvuð",
         "stoppedBody": "Tilvikið fyrir {{name}} stöðvaðist óvænt við uppsetningu.",
         "stalledTitle": "Uppsetning stöðnuð",
-        "stalledBody": "Ekki tókst að ljúka uppsetningu fyrir {{name}}. Reyndu aftur eða sendu tölvupóst á hi@kilo.ai ef þetta endurtekur sig.",
+        "stalledBody": "Ekki tókst að ljúka uppsetningu fyrir {{name}}. Reyndu aftur eða sendu tölvupóst á {{supportEmail}} ef þetta endurtekur sig.",
         "timeoutTitle": "Tekur lengri tíma en búist var við",
         "timeoutBody": "Uppsetning fyrir {{name}} tekur lengri tíma en venjulega (yfir {{displayMinutes}} mínútur).",
         "continueInBackground": "Halda áfram í bakgrunni",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Yfirfara þarf áskriftina þína með snemmbúnum aðgangi handvirkt áður en hægt er að nota hana í símanum.",
       "iosTitle": "KiloClaw ekki fáanlegt í iOS",
       "iosBody": "Fyrir þennan reikning er aðgangi að KiloClaw stýrt utan iOS-appsins.",
-      "iosContact": "Spurningar? Sendu tölvupóst á hi@kilo.ai.",
+      "iosContact": "Spurningar? Sendu tölvupóst á {{supportEmail}}.",
       "quarantinedCta": "Sendu tölvupóst á teymið okkar",
       "nonCanonicalEarlybirdCta": "Skoðaðu áskriftina þína á kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Uppfæra GitHub-forrit"
       },
       "githubIpAllowList": {
-        "description": "Kóðarýnirinn var gerður óvirkur því þetta GitHub-fyrirtæki notar IP-leyfislista sem hindrar aðgang Kilo. Fáðu aðstoð á hi@kilocode.ai og virkjaðu svo kóðarýninn aftur."
+        "description": "Kóðarýnirinn var gerður óvirkur því þetta GitHub-fyrirtæki notar IP-leyfislista sem hindrar aðgang Kilo. Fáðu aðstoð á {{supportEmail}} og virkjaðu svo kóðarýninn aftur."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kóðarýnirinn var gerður óvirkur því Kilo getur ekki búið til GitLab-aðgangstóka fyrir þetta verkefni. Veittu viðhaldsaðilaheimildir eða virkjaðu aðgangstóka verkefna og virkjaðu svo kóðarýninn aftur.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Uppfæra stillingar kóðarýnis"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kóðarýnirinn var gerður óvirkur eftir að klónun geymslunnar rann þrisvar út á tíma í dag. Fáðu aðstoð á hi@kilocode.ai og virkjaðu svo kóðarýninn aftur."
+        "description": "Kóðarýnirinn var gerður óvirkur eftir að klónun geymslunnar rann þrisvar út á tíma í dag. Fáðu aðstoð á {{supportEmail}} og virkjaðu svo kóðarýninn aftur."
       },
       "title": "Kóðarýnirinn þarfnast athygli.",
       "recoveryLabel": "Hafa samband við þjónustuver"

@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Nhazi kwụsịrị",
         "stoppedBody": "Igwe {{name}} kwụsịrị na mberede n'oge nhazi.",
         "stalledTitle": "Ọ dị ihe kwụsịrị",
-        "stalledBody": "Anyị enweghị ike imecha nhazi {{name}}. Nwaa ọzọ, ma ọ bụrụ na nke a na-eme ugboro ugboro, ziga ozi-e na hi@kilo.ai.",
+        "stalledBody": "Anyị enweghị ike imecha nhazi {{name}}. Nwaa ọzọ, ma ọ bụrụ na nke a na-eme ugboro ugboro, ziga ozi-e na {{supportEmail}}.",
         "timeoutTitle": "Na-ewe oge karịa ka a tụrụ anya",
         "timeoutBody": "Nhazi {{name}} na-ewe oge karịa ka ọ na-emebu (ihe karịrị nkeji {{displayMinutes}}).",
         "continueInBackground": "Gaa n'ihu n'azụ",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Mmadụ ga-enyocharịrị atụmatụ nnweta mbụ gị tupu i nwee ike iji ya na ekwentị.",
       "iosTitle": "KiloClaw adịghị na iOS",
       "iosBody": "A na-ahụ maka ohere KiloClaw na mpụga ngwa iOS maka akaụntụ a.",
-      "iosContact": "Ajụjụ? Kpọtụrụ hi@kilo.ai.",
+      "iosContact": "Ajụjụ? Kpọtụrụ {{supportEmail}}.",
       "quarantinedCta": "Zipu email nye ìgwè anyị",
       "nonCanonicalEarlybirdCta": "Lelee atụmatụ gị na kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Melite ngwa GitHub"
       },
       "githubIpAllowList": {
-        "description": "A gbanyụrụ onye nyocha koodu n'ihi na nzukọ GitHub a na-eji ndepụta adreesị IP a nabatara nke na-egbochi Kilo. Kpọtụrụ hi@kilocode.ai maka enyemaka, wee gbanye onye nyocha koodu ọzọ."
+        "description": "A gbanyụrụ onye nyocha koodu n'ihi na nzukọ GitHub a na-eji ndepụta adreesị IP a nabatara nke na-egbochi Kilo. Kpọtụrụ {{supportEmail}} maka enyemaka, wee gbanye onye nyocha koodu ọzọ."
       },
       "gitlabProjectAccessRequired": {
         "description": "A gbanyụrụ onye nyocha koodu n'ihi na Kilo enweghị ike imepụta akara ikike ịnweta ọrụ a na GitLab. Nye ikike onye nlekọta ma ọ bụ gbanye akara ikike ịnweta ọrụ, wee gbanye onye nyocha koodu ọzọ.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Melite ntọala onye nyocha koodu"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "A gbanyụrụ onye nyocha koodu mgbe oge e nyere maka ime nnomi ebe nchekwa gwụchara ugboro atọ taa. Kpọtụrụ hi@kilocode.ai maka enyemaka, wee gbanye onye nyocha koodu ọzọ."
+        "description": "A gbanyụrụ onye nyocha koodu mgbe oge e nyere maka ime nnomi ebe nchekwa gwụchara ugboro atọ taa. Kpọtụrụ {{supportEmail}} maka enyemaka, wee gbanye onye nyocha koodu ọzọ."
       },
       "title": "Onye nyocha koodu chọrọ nlebara anya.",
       "recoveryLabel": "Kpọtụrụ ndị nkwado"

@@ -1,8 +1,8 @@
 # auto-routing-benchmark
 
 Cloudflare Worker that benchmarks candidate models and publishes the artifacts
-that drive `kilo-auto/efficient` routing. It is the **sole writer** of the
-routing table and classifier winner; `services/auto-routing` and the `apps/web`
+that drive `kilo-auto/efficient` and `kilo-auto/frontier` routing. It is the **sole writer** of the
+per-router routing tables and shared classifier winner; `services/auto-routing` and the `apps/web`
 gateway only read them. See `docs/adr/0002-auto-routing-efficient.md` for the
 design, invariants, and rollout/rollback.
 
@@ -19,16 +19,46 @@ design, invariants, and rollout/rollback.
   `routeAccuracy`. The classifier winner is the cheapest model whose weighted
   `accuracy` meets `minAccuracy`. A failed call scores 0 and counts as a route
   miss; there is no fallback classification.
-- **Decider benchmark** — runs 180 golden tasks per candidate through the real
-  `kilo` CLI inside a Cloudflare Container and grades mechanically. Every result
-  lands in the **global decider registry** (`benchmark_profiles`), keyed by exact
-  `(model, variant)` under the live engine identity and repetitions. Both the
-  platform routing table and each owner's custom table are assembled from that
-  one registry, so a model wanted by the platform list and by an owner pool is
-  measured once.
+- **Decider benchmark** — runs the selected router's golden tasks per candidate through the real
+  `kilo` CLI inside a Cloudflare Container and grades mechanically. Efficient uses `DECIDER_CASES`;
+  frontier uses only `FRONTIER_CASES`, including its harder long-context tasks, tagged `frontier`.
+  Results land in the decider registry (`benchmark_profiles`), keyed by
+  `(router, model, variant, engine identity, repetitions)`. Engine identity includes the router
+  and a hash of all selected dataset inputs. Efficient platform and owner pools share their
+  measurements; frontier measurements never satisfy efficient profiles.
 - Normalized results live in D1 (`BENCH_DB`); published artifacts are cached in
   the shared `AUTO_ROUTING_CONFIG` KV namespace (publish = delete the keys so the
   next read repopulates from D1).
+
+## Router isolation and activation
+
+`router` is `efficient` or `frontier`; omitted API selectors default to `efficient`.
+Each router owns its saved decider model list, catalog-expanded effort entries, registry,
+runs, routing table, and publication cache key. Accuracy thresholds, `accuracyNoiseBand`,
+`frontierMinAccuracyDelta`, token profile, switch horizon and thresholds, and platform
+`maxConcurrency` are configured independently. The classifier and its winner remain shared:
+classifier runs use the efficient configuration even when requested from the frontier view.
+Classifier inference billing is owned by the routing worker. Usage IDs and durable delivery
+objects include the router, so an otherwise identical call on another router cannot be
+deduplicated as a retry of the first call.
+Capability lookups derive candidate IDs from the selected router's table; the capability
+cache remains a shared model-ID union because modalities and context limits belong to models.
+
+Frontier initially has no saved configuration or published table. No default model pool or
+efficient table is fabricated for it. Before enabling frontier serving, administrators must
+split the existing container budgets, save a frontier configuration with its own decider
+models, benchmark those entries, and publish a complete frontier table.
+
+Efficient platform and owner budgets plus frontier's platform budget must total at most
+`BENCHMARK_CONTAINER_BUDGET` (200). Frontier ignores `userMaxConcurrency`, never registers owner
+custom pools, and has only a platform queue (`both` selects that queue; `user` is rejected).
+Saving configuration and starting decider runs enforce the shared cap. Scheduled drains and
+daily platform sync process both routers with their configured budgets.
+
+Efficient publications invalidate `routing_table_v1`; frontier publications invalidate
+`routing_table_frontier_v1`. Router, engine/dataset identity, ranking settings, and contributing
+measurements are included in routing-table version hashes.
+
 
 ## Platform model selection
 
@@ -44,7 +74,8 @@ design, invariants, and rollout/rollback.
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
 The worker drains expanded entries in batches that fit the configured container budget.
 New routing tables rank exact pairs and emit `variant`, not `reasoningEffort`.
-Legacy nullable storage columns remain; this change requires no migration.
+Legacy nullable effort storage columns remain. Router isolation requires D1 schema migration;
+existing rows stay in the efficient namespace, with noise band 0.05 and frontier delta 0.
 
 The admin panel shows measured coverage and pending, running, or failed efforts per model.
 Each route starts collapsed with its first-ranked pair, accuracy, and cost.
@@ -53,17 +84,321 @@ Expand a route to inspect every ranked model/effort pair.
 ## Ranking
 
 - `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
-- A candidate competes when its accuracy is at most 0.05 below `minAccuracy`, the benchmark noise band.
-- Competing candidates are ordered by `avgCostUsd × p50LatencyMs^1.5 / accuracy^15`, lowest first.
+- A candidate competes within the router's `accuracyNoiseBand` of its effective `minAccuracy` (default noise band 0.05).
+- Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`; the delta defaults to 0.
+- Both routers use the same best-value formula, selecting models and efforts from their own measured pools.
+- Competing candidates are ordered by `estimatedRequestCostUsd × effectiveLatency^1.5 / wilson^15`, lowest first. With known TTFT, `effectiveLatency = p50TtftMs + LATENCY_TOTAL_WEIGHT × p50LatencyMs`, where the exported `LATENCY_TOTAL_WEIGHT` is 0.15 (tuned on a fully streamed offline sweep); without TTFT, total `p50LatencyMs` alone preserves legacy ordering.
+- `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
+- `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.
 - The other candidates follow by accuracy, then cost.
+- When `lowConfidenceThreshold` is set and the classifier's route confidence is below it, the worker picks the most accurate eligible candidate of the route instead of the first-ranked one.
 - `meetsThreshold` stays strict (`accuracy >= minAccuracy`) for sticky routing.
 - The ranking policy version is part of every registry table version, so a policy change republishes.
 
+Production CLI benchmarks currently record total latency only, so published D1
+tables use the total-latency fallback. Offline sweep and candidate-screen
+summaries carry measured TTFT and use the TTFT-aware formula; missing TTFT is
+never fabricated.
 
+The optional `effortByComplexity` table mapping selects a variant after the model
+has been picked, using the production classifier's `low`, `medium`, or `high`
+reasoning-complexity bucket. It never changes models or restores a candidate
+excluded by the decision filters. Same-model effort changes retain the prompt
+cache and do not trigger cost-switch logic; sticky-immediate turns retain the
+incumbent variant until a classification is available.
+
+Platform and custom-table builds read `case_results` for each ready pair's exact
+provenance run and join the committed `src/datasets/case-complexity.json` labels.
+Missing labels are ignored. Each route/model/bucket ranks its measured variants
+with the same value policy, falling back to the route-level variant when fewer
+than six distinct graded cases are available. Mappings are persisted with the
+table and included in its version identity.
+
+Regenerate the labels with the production classifier and gateway normalization:
+
+```bash
+OPENROUTER_API_KEY=... pnpm --filter auto-routing-benchmark exec tsx scripts/label-case-complexity.ts
+```
+
+If a classifier call fails, the script atomically saves completed labels to
+`<output>.checkpoint` and identifies the failed case without changing the
+published dataset. Use `--resume` to read that checkpoint. Only a successful
+complete run atomically replaces the output and removes the checkpoint.
+
+## Grading
+
+- Decider cases use mechanical checks (`exact`, `contains_all`, `regex`, `json_equal`) wherever an answer can be checked.
+- `judged` checks, at most 30% of a route, are graded by a System One model (`typesafe/jev-1.13`). The case score is its probability that the answer meets the rubric.
+- Calibrate the grader with `pnpm judge:calibrate --in labels.jsonl` or `--from-mechanical cases.json`. The command reports accuracy, the Brier score and a reliability table.
+- Grader cost is logged per job. It is not added to the model's `cost_usd`.
+
+
+## Scoreboard
+
+Build a versioned latency, cost, and quality scoreboard without changing routing:
+
+```bash
+pnpm --filter auto-routing-benchmark scoreboard build --label baseline --table table.json --prod prod.json --replay replay.json --out baseline.json
+pnpm --filter auto-routing-benchmark scoreboard build --label candidate --table live --prod prod.json --replay replay.json --out candidate.json
+pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json
+pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json --relative-only
+```
+
+`--table` defaults to `live`, which reads the latest published platform table and
+the current classifier winner from remote D1 through Wrangler. File inputs are
+validated; table candidates may include optional nullable `p50LatencyMs`. Live
+latency comes from each exact model/variant's ready, current-engine/repetition
+registry profile and its measuring-run summary for that route, or is null if absent.
+The live input also retains the published token profile, switch horizon, candidate
+pricing, and request-cost estimates; stored JSON fields are decoded and validated.
+Production and replay inputs are optional. Without production input, benchmark
+weights are uniform over table routes; otherwise they use the observed route mix.
+Missing routes and null benchmark metrics are excluded and the remaining weights normalized.
+Quality includes benchmark accuracy and classifier route accuracy; supplying `--sweep`
+also evaluates the exact first model/variant picks on held-out cases.
+`benchmarkP50Weighted` is the weighted benchmark model latency, not production TTFT.
+Use `--relative-only` for PR bodies so raw production measurements stay local.
+Unavailable comparisons are `n/a`; rows unavailable on both sides are omitted.
+Axis summaries are `mixed` only when metrics both improve and worsen, and `flat`
+when no comparable metric improves or worsens.
+
+Simulate production-input-aware ranking against the published table without spending
+on benchmarks or publishing a routing change:
+
+```bash
+pnpm --filter auto-routing-benchmark scoreboard build --label baseline --table live --pricing live --cost-profile p.json --out baseline.json
+pnpm --filter auto-routing-benchmark scoreboard build --label candidate --table live --pricing live --cost-profile p.json --rerank-profile p.json --out candidate.json
+pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json --relative-only
+```
+
+Both profile flags take JSON with `uncachedInputTokens` and `cachedInputTokens`
+(nonnegative token counts). `--rerank-profile` re-ranks each route using the table's
+accuracy threshold and the contracts ranking policy before computing all metrics.
+Without it, the published order is preserved. `--cost-profile` only affects the
+estimated request cost; it takes precedence over the rerank profile, which otherwise
+also supplies the cost estimate. If neither flag is supplied, the estimate uses the
+table's `productionTokenProfile`, or just the benchmark cost when that is absent.
+
+For held-out measurement without deploying, set `OPENROUTER_API_KEY` and save pairs
+as `[{"model":"provider/model","variant":null}]`. `--suite efficient` (default) selects
+`DECIDER_CASES`; `--suite frontier` selects only `FRONTIER_CASES`, including its own
+harder long-context cases. Long-context prompts are materialized deterministically
+from each case's generator, seed, and target size. Efficient long-context cases target
+32k, 96k, and 160k tokens; frontier cases target 160k. These are deterministic size
+estimates using combined system/user characters divided by four, not model-specific
+tokenizer counts. The long-context set covers all 12 implementation, debugging,
+refactoring, and investigation routes with 36 efficient and 24 frontier `json_equal`
+checks. Agentic cases run through the real Kilo CLI container; all other cases use
+OpenRouter directly with streaming enabled.
+The sweep grades rubric cases with the decider judge and hashes case ids into stable
+train/held-out splits. `--rebuild-from-sweep` ranks train data only with Wilson counts,
+pricing, and the cost profile; both builds evaluate exact first picks on held-out
+accuracy, estimated request cost, wall-clock latency, and TTFT
+(`quality.heldOut.p50TtftMsWeighted`, compared on the latency axis).
+Supply `--complexity-labels src/datasets/case-complexity.json` with
+`--rebuild-from-sweep` to learn complexity-specific effort choices from training
+cases only. Held-out accuracy, cost, latency, and TTFT then aggregate the raw
+per-case results of the mapped variant for each bucket, not the route-level
+variant's overall summary. Without labels, the existing route-level evaluation
+is unchanged.
+Direct TTFT is time to the first nonempty content or reasoning delta; final streaming
+usage supplies cost. Container TTFT uses the first text event timestamp (or text
+`time.start`) relative to request start, and is null when timestamps are unavailable.
+Legacy sweeps without TTFT remain readable and do not substitute total latency.
+Missing picks are excluded; `quality.heldOut.routes` reports coverage.
+`--max-usd` includes model and grader spend (in-flight requests can overshoot).
+Atomic checkpoints every 200 cases retain each pair's raw `results`;
+`--resume sweep.json` requires the same suite and pairs, skips completed
+pair/case/repetitions, and retains accumulated spend.
+Infrastructure/grader failures are excluded from graded `cases` and counted in summary
+`errors`; empty answers score zero. Missing usage still permits grading but makes
+`costUsd` null and excludes that row only from the cost mean. Graded training candidates
+with unknown cost still compete at the route's maximum known request-cost estimate
+(or benchmark cost zero if the entire route lacks costs), without imputing held-out cost.
+Recompute old summaries without
+an API key or network calls using
+`sweep:offline --summarize-only --resume sweep.json --out corrected.json`;
+old missing-usage rows without saved answers remain excluded.
+
+```bash
+pnpm --filter auto-routing-benchmark sweep:offline --suite efficient --pairs pairs.json --catalog live --container-url http://localhost:3000 --cli-api-url "$KILO_CLI_API_URL" --concurrency-agentic 1 --max-usd 20 --out sweep.json
+pnpm --filter auto-routing-benchmark scoreboard build --label baseline --table live --pricing live --cost-profile p.json --sweep sweep.json --out baseline.json
+pnpm --filter auto-routing-benchmark scoreboard build --label candidate --table live --pricing live --cost-profile p.json --sweep sweep.json --rebuild-from-sweep --out candidate.json
+pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json --relative-only
+```
+
+Use `--accuracy-noise-band <0..1>` when rebuilding or reranking a scoreboard with a
+nondefault ranking band. It applies to both route ranking and learned complexity
+variants; omitting it preserves the default `0.05` band.
+
+On the work VM, build and start the existing bench image (from the repository root):
+
+```bash
+docker build -t kilo-bench-local services/auto-routing-benchmark/container
+docker run --rm -d --name kilo-bench-local -p 127.0.0.1:3000:3000 --add-host=host.docker.internal:host-gateway kilo-bench-local
+```
+
+Export `KILO_TOKEN` in the sweep process environment (never pass it as a command-line
+argument), plus `KILO_CLI_API_URL` or `--cli-api-url`. The CLI API URL must be a running,
+container-reachable Kilo gateway base URL with the CLI's model-discovery and chat
+endpoints, and the token must authenticate there and have model access/credit.
+For a gateway on the VM host, use `http://host.docker.internal:<gateway-port>` rather
+than `localhost`, and bind the gateway to an address reachable from Docker.
+The runner posts `/run` with the same model, prompt, variant, token, API URL,
+optional `KILO_ORG_ID`, and timeout fields as the benchmark worker.
+The container maps that API URL to the CLI's `KILO_API_URL`; it cannot use an
+OpenRouter key alone in place of a Kilo gateway/token. No gateway or credentials
+are provisioned by the sweep. Keep the container port loopback-only because `/run`
+accepts credentials. Stop it after the sweep with `docker stop kilo-bench-local`.
+`--concurrency` controls direct requests independently of `--concurrency-agentic`.
+The existing container serializes CLI runs for sqlite safety: the default agentic
+concurrency is 1; higher values queue requests, not parallel CLI executions.
+
+`--pricing live` hydrates candidates by model id from
+`https://app.kilo.ai/api/openrouter/models`. Prompt, completion, and optional
+`input_cache_read` prices are USD **per token**, not per million tokens. A pricing
+file can be a saved catalog response (`{"data":[{"id":"fixture/model","pricing":
+{"prompt":"0.001","completion":"0.002","input_cache_read":"0.0001"}}]}`), or a
+model-id map of `CandidatePricing` objects (`promptUsdPerToken`,
+`completionUsdPerToken`, nullable `cacheReadUsdPerToken`). These example values are
+synthetic. When no pricing flag is supplied, candidate pricing already in the table
+is used. Models absent from a supplied catalog have unavailable pricing.
+
+`cost.estimatedRequestUsdWeighted` weights each first pick's benchmark cost plus
+uncached input at prompt price and cached input at cache-read price (or prompt
+price when cache pricing is absent). It is null if any included first pick lacks
+pricing. Lower estimated cost is better in comparisons. Keep the same profile,
+route mix, table, and pricing snapshot for base and head; use saved table and pricing
+files if the live inputs may change between builds. `benchmarkPerTaskUsdWeighted`
+remains the benchmark-only cost and can move differently from this production-input
+estimate.
+
+### Shadow routing policy
+
+To evaluate an efficient-router candidate without routing traffic to it, put its JSON
+table in the shared `AUTO_ROUTING_CONFIG` namespace under `shadow_routing_table_v1`.
+It must validate against the same `RoutingTableSchema` as `routing_table_v1`.
+Delete the shadow key to disable evaluation; the live routing table is never changed.
+The shadow reader caches both present and absent values in the isolate for 60 seconds,
+in addition to KV's propagation delay. Invalid tables and read/computation failures
+are ignored.
+
+Classified efficient `/decide` requests evaluate the candidate with the same classifier
+result, incumbent, denied models, routing mode, constraints, and capability map as the
+live decision. Only the live decision is returned, stored, or billed. There are no extra
+classifier, capability, or benchmark calls and no shadow cache writes.
+Classifier failures have no classification to shadow-evaluate. Frontier requests do
+not evaluate the efficient shadow table.
+Existing sampled `auto_routing_decision` logs include `shadowModel`, `shadowVariant`,
+and `shadowDiffers`; a valid table with no eligible route records a null shadow model.
+
+Collect with `pnpm --filter auto-routing-benchmark scoreboard:prod --since 24 --out prod.json`,
+then pass that snapshot to `scoreboard build`. Both JSON reports include a `shadow`
+section with observed evaluation count, sampling-weighted divergence, and
+`outcomesByDecidedModel`: actual production request counts, error and abort rates,
+mean input/output/cache-read tokens, and mean cost in USD per request.
+The read-only Postgres join matches distinct observed session/model pairs to
+`microdollar_usage_metadata.session_id` and the actual `microdollar_usage.model`,
+within the collection window, for efficient and balanced auto requests.
+Repeated decision logs do not multiply usage rows. Raw session ids are used only
+in memory for the join and are never written to the reports.
+
+Outcome proxies describe the observed live-model session cohort, not the unserved
+shadow model's counterfactual quality or an exact per-decision request attribution.
+Missing status codes and cancellation flags are excluded from their respective rate
+denominators. Missing sources yield null metrics; no observed/joinable sessions yield
+an empty outcome map. Divergence weighting assumes the supplied/current
+`decision_log_sample_rate` stayed constant over the window; use `--sample-rate` when
+collecting a window with a known rate. This is observation only, not production A/B
+allocation; production ids are not silently bucketed.
+Divergence is unavailable when success sampling is disabled because always-logged
+switches alone cannot estimate population divergence.
+## Candidate screening
+
+Screen inexpensive catalog models before an admin adds them to the platform pool:
+
+```bash
+pnpm --filter auto-routing-benchmark screen:candidates --catalog live --pairs current-pairs.json --suite efficient --max-prompt-usd-per-mtok 3 --cases-per-route 4 --max-usd 5 --table table.json --cost-profile profile.json --out screen.json
+pnpm --filter auto-routing-benchmark screen:candidates --catalog file --catalog-file catalog.json --pairs current-pairs.json --suite frontier --max-prompt-usd-per-mtok 3 --cases-per-route 4 --max-usd 5 --table frontier-table.json --out screen.json
+```
+
+These caps are example screening settings, not production measurements.
+`--catalog` also accepts a saved catalog path directly. `--pairs` is an array
+of `{model, variant}` entries; every model already represented in it is excluded,
+regardless of effort. Eligible models must support text output and tools, have
+fixed nonnegative prompt and completion prices, and have a prompt price strictly
+below the USD-per-million-token cap. Virtual auto-routing entries are excluded.
+`--max-models <n>` optionally keeps only the n cheapest eligible models by prompt
+price, breaking equal-price ties by model ID. Without it, all eligible models run.
+Each model runs once without variant overrides (the provider default), and once
+with its highest catalog-supported reasoning effort, when available. Full catalog
+variant fragments are retained, including controls beyond reasoning.
+
+The screen hashes case IDs with SHA-256 and takes the first N hashes per direct
+route from the selected suite. Every candidate sees the same cases; selection is
+stable when dataset order changes. Agentic routes require CLI execution and are
+explicitly listed in `excludedRoutes`, never simulated by direct completions.
+A shared worker pool pulls requests in round-robin order, alternating each model's
+variants within its case sequence. `--concurrency <n>` defaults to 24. Dispatch
+order spreads partial-run coverage across models; completions may arrive out of order.
+Direct requests, streaming TTFT, retries, long-context materialization, and grading
+reuse the offline sweep path. Set `OPENROUTER_API_KEY`; no container is required.
+
+The report contains model-wide and per-variant accuracy, Wilson lower bounds,
+benchmark and estimated production request cost, p50 TTFT and total latency, raw
+results, and route comparisons against the supplied table's current first pick.
+`--cost-profile` takes the same token-profile JSON as the scoreboard, or defaults
+to the table's profile. Candidate and incumbent prices use the catalog snapshot;
+an incumbent absent from it can use its saved table pricing. A route beats its
+current pick only with complete graded, priced samples and a strictly better
+finite value under the shared ranking policy and accuracy eligibility rule.
+Missing incumbent latency or required pricing prevents a recommendation.
+`recommend` is true when either screened variant beats the current pick on at
+least two distinct routes. It is an admin-review suggestion, not a pool change.
+The command never writes configuration, registry rows, or routing tables.
+
+`--max-usd` includes model and grader spend. Every HTTP attempt reserves its
+estimated prompt-plus-maximum-output cost before sending, then settles that
+reservation against observed or estimated cost. Reservations are shared atomically
+across workers; a worker waits for in-flight settlement when funds are reserved.
+Requests explicitly send the variant's `max_tokens`, defaulting to 8192.
+Input-token estimates are approximate, so unexpectedly higher actual costs can still
+exceed a reservation; no new requests start after the settled budget is exhausted.
+Grading also reserves before sending and settles to the actual reported `usage.cost`.
+When the System One grader is absent from the Kilo catalog, each call reserves
+`GRADER_RESERVE_USD` ($0.002); catalog-priced graders retain token-based reservations.
+Missing model cost marks only that model `costUnknown: true`, excludes it from
+recommendations, and stops sampling all its variants; other models continue.
+Its reported prompt and completion token counts are charged at catalog prices
+without cache discounts. `costUsd` includes these conservative estimates;
+`estimatedCostUsd` identifies their contribution globally and per model.
+If token counts are unavailable, input tokens are estimated as the combined
+system/user prompt characters divided by four, rounded up; output is bounded by
+the request variant's `max_tokens`, or 8192 when unset. Only that request's
+catalog-priced estimate is charged, never the entire remaining budget.
+A failed judge call still stops further spending and sets `spendIncomplete`.
+Atomic checkpoints serialize concurrent writes before replacing the report.
+Reservations are checkpointed before requests leave; completed case results are
+checkpointed after grading.
+
+Resume an interrupted screen with the original inputs and `--resume screen.json`
+(which may also be the `--out` path). Completed exact model/variant/case requests
+are skipped, accumulated spend and `costUnknown` exclusions are retained, and
+concurrency or the total `--max-usd` cap can change. Suite, sample size, sampled
+cases, candidate pairs, table version, and production cost profile must match.
+Reports from the earlier sequential runner remain readable.
+Persisted in-flight reservations become conservative `unsettledCostUsd` charges
+on resume because their actual spend may be unknown; they are not discarded.
+A report with indeterminate grader spend cannot resume safely.
 ## Admin endpoints
 
 All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
 (the gateway's admin panel proxies these with the internal secret):
+
+GET endpoints accept `?router=efficient|frontier`; mutations accept `router` in their body
+or query. Omission selects efficient. Owner profile registration/status and custom-table
+endpoints reject frontier. The classifier-winner endpoint returns the shared winner.
+
 
 | Endpoint | Purpose |
 |---|---|
@@ -101,8 +436,9 @@ row is global, so the pair is benchmarked once and serves both.
 | Container budget | `maxConcurrency` | `userMaxConcurrency` |
 | Slot | Its own; a running user-queue run never blocks it | Its own; a running platform-queue run never blocks it |
 
-The two budgets must sum to at most `BENCHMARK_CONTAINER_BUDGET` (200, the
-wrangler `max_instances`); the config contract rejects a larger pair.
+The efficient platform and owner budgets plus the frontier platform budget must sum to at most
+`BENCHMARK_CONTAINER_BUDGET` (200, the wrangler `max_instances`). Split these budgets before
+saving frontier configuration; its owner budget is unused.
 
 After any decider run completes, the worker assembles the platform table from ready, current registry entries for the current catalog pairs.
 If a desired pair remains pending or running, the previous table stays live.
@@ -163,8 +499,8 @@ first flips it to `running`, so it is still measured exactly once.
 **Scheduled handlers:**
 
 - `*/15 * * * *` — sweep stale runs, then drain both queues.
-- `0 5 * * *` — sweep, refresh auto-decider candidates, reconcile the platform
-  queue with the resulting decider list, drain both queues, republish the
+- `0 5 * * *` — sweep, reconcile the platform queue with each router's
+  admin-configured decider list, drain both queues, republish the
   platform table (so a *removed* model leaves the live table even when nothing
   new needed measuring).
 

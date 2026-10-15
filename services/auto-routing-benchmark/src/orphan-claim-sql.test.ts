@@ -18,6 +18,7 @@ import {
 
 const SCHEMA_SQL = `
   CREATE TABLE benchmark_profiles (
+    router TEXT NOT NULL DEFAULT 'efficient',
     model TEXT NOT NULL,
     variant TEXT NOT NULL DEFAULT '',
     engine_identity TEXT NOT NULL,
@@ -30,7 +31,7 @@ const SCHEMA_SQL = `
     completed_at TEXT,
     platform_requested INTEGER NOT NULL DEFAULT 0,
     user_requested INTEGER NOT NULL DEFAULT 1,
-    PRIMARY KEY (model, variant, engine_identity, repetitions)
+    PRIMARY KEY (router, model, variant, engine_identity, repetitions)
   );
   CREATE TABLE benchmark_runs (
     -- NOT NULL matches production. Without it SQLite allows a NULL id, and a
@@ -115,6 +116,36 @@ beforeEach(() => {
 });
 
 describe('failOrphanedRunningProfilesStatement (real SQLite)', () => {
+  it('keeps identical model and engine profiles separate by router during reconciliation', () => {
+    const orm = drizzle({} as D1Database);
+    const entry = { model: 'shared/model', variant: 'high' };
+    for (const router of ['efficient', 'frontier'] as const) {
+      const query = claimPlatformRequestedStatement(
+        orm,
+        entry,
+        { router, engineIdentity: 'same-engine', repetitions: 1 },
+        NOW
+      ).toSQL();
+      exec(query.sql, query.params);
+    }
+    expect(db.prepare('SELECT router FROM benchmark_profiles ORDER BY router').all()).toEqual([
+      { router: 'efficient' },
+      { router: 'frontier' },
+    ]);
+    const clear = clearPlatformRequestedStatement(orm, {
+      router: 'frontier',
+      engineIdentity: 'same-engine',
+      repetitions: 1,
+    }).toSQL();
+    exec(clear.sql, clear.params);
+    expect(
+      db.prepare('SELECT router, platform_requested FROM benchmark_profiles ORDER BY router').all()
+    ).toEqual([
+      { router: 'efficient', platform_requested: 1 },
+      { router: 'frontier', platform_requested: 0 },
+    ]);
+  });
+
   it('reaps a claim whose run row was never written', () => {
     // startRun claims the registry rows before it writes the run. A failure in
     // between leaves rows pointing at a run id that does not exist, and a

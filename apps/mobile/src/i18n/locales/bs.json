@@ -1277,7 +1277,7 @@
         "stoppedTitle": "Podešavanje zaustavljeno",
         "stoppedBody": "Instanca za {{name}} neočekivano se zaustavila tokom podešavanja.",
         "stalledTitle": "Nešto je zapelo",
-        "stalledBody": "Nismo uspjeli završiti podešavanje za {{name}}. Pokušaj ponovo ili pošalji e-poštu na hi@kilo.ai ako se problem ponavlja.",
+        "stalledBody": "Nismo uspjeli završiti podešavanje za {{name}}. Pokušaj ponovo ili pošalji e-poštu na {{supportEmail}} ako se problem ponavlja.",
         "timeoutTitle": "Traje duže nego što se očekivalo",
         "timeoutBody": "Podešavanje za {{name}} traje duže nego uobičajeno (preko {{displayMinutes}} minuta).",
         "continueInBackground": "Nastavi u pozadini",
@@ -1335,7 +1335,7 @@
       "nonCanonicalEarlybirdBody": "Tvoj plan ranog pristupa zahtijeva ručni pregled prije korištenja na mobitelu.",
       "iosTitle": "KiloClaw nije dostupan na iOS-u",
       "iosBody": "Pristup usluzi KiloClaw za ovaj račun podešava se izvan aplikacije za iOS.",
-      "iosContact": "Imaš pitanja? Piši na hi@kilo.ai.",
+      "iosContact": "Imaš pitanja? Piši na {{supportEmail}}.",
       "quarantinedCta": "Pošalji e-mail našem timu",
       "nonCanonicalEarlybirdCta": "Pregledaj svoj plan na kilo.ai"
     },
@@ -1571,7 +1571,7 @@
         "recoveryLabel": "Ažuriraj GitHub aplikaciju"
       },
       "githubIpAllowList": {
-        "description": "Agent za pregled koda je isključen jer ova GitHub organizacija koristi listu dozvoljenih IP adresa koja blokira Kilo. Zatraži pomoć na hi@kilocode.ai, pa ponovo uključi agenta za pregled koda."
+        "description": "Agent za pregled koda je isključen jer ova GitHub organizacija koristi listu dozvoljenih IP adresa koja blokira Kilo. Zatraži pomoć na {{supportEmail}}, pa ponovo uključi agenta za pregled koda."
       },
       "gitlabProjectAccessRequired": {
         "description": "Agent za pregled koda je isključen jer Kilo ne može kreirati token za pristup ovom projektu na GitLabu. Dodijeli pristup održavatelja ili omogući tokene za pristup projektu, pa ponovo uključi agenta za pregled koda.",
@@ -1586,7 +1586,7 @@
         "recoveryLabel": "Ažuriraj postavke agenta za pregled koda"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Agent za pregled koda je isključen jer je danas tri puta isteklo vrijeme za kloniranje repozitorija. Zatraži pomoć na hi@kilocode.ai, pa ponovo uključi agenta za pregled koda."
+        "description": "Agent za pregled koda je isključen jer je danas tri puta isteklo vrijeme za kloniranje repozitorija. Zatraži pomoć na {{supportEmail}}, pa ponovo uključi agenta za pregled koda."
       },
       "title": "Agent za pregled koda zahtijeva tvoju pažnju.",
       "recoveryLabel": "Kontaktiraj podršku"

@@ -7,11 +7,13 @@ import {
   chunkArray,
   computeDeciderShardCount,
   computeEngineIdentity,
+  deciderCasesForRouter,
   getDeciderContainerInstanceName,
   runCasesWithConcurrency,
   summarize,
 } from './run';
 import { pickClassifierWinner } from './winner';
+import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 
 function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
   return {
@@ -315,7 +317,33 @@ describe('computeEngineIdentity', () => {
   });
 
   it('is versioned (carries the engine version prefix)', () => {
-    expect(computeEngineIdentity('decider')).toMatch(/^v\d+:[0-9a-f]{8}$/);
+    expect(computeEngineIdentity('decider')).toMatch(/^efficient:v\d+:[0-9a-f]{8}$/);
+    expect(computeEngineIdentity('classifier')).toMatch(/^efficient:v1:[0-9a-f]{8}$/);
+  });
+
+  it('defaults to efficient and keeps the classifier shared', () => {
+    expect(computeEngineIdentity('decider')).toBe(computeEngineIdentity('decider', 'efficient'));
+    expect(computeEngineIdentity('classifier', 'frontier')).toBe(
+      computeEngineIdentity('classifier')
+    );
+  });
+
+  it('selects the frontier dataset and hashes every selected input', () => {
+    expect(deciderCasesForRouter()).toBe(DECIDER_CASES);
+    expect(deciderCasesForRouter('frontier')).toBe(FRONTIER_CASES);
+    expect(FRONTIER_CASES.every(c => c.tier === 'frontier')).toBe(true);
+    expect(computeEngineIdentity('decider', 'frontier')).not.toBe(computeEngineIdentity('decider'));
+    for (const router of ['efficient', 'frontier'] as const) {
+      let hash = 0x811c9dc5;
+      const signature = JSON.stringify(deciderCasesForRouter(router));
+      for (let i = 0; i < signature.length; i++) {
+        hash ^= signature.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+      }
+      expect(computeEngineIdentity('decider', router)).toBe(
+        `${router}:v1:${(hash >>> 0).toString(16).padStart(8, '0')}`
+      );
+    }
   });
 });
 

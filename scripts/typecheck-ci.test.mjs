@@ -30,7 +30,7 @@ for (const [file, name, command, condition] of [
     harnessBuild,
     "matrix.workspace.name == 'kilo-app' || matrix.workspace.name == '@kilocode/harness-sdk'",
   ],
-  ...['typecheck', 'lint', 'i18n-leftover', 'check-unused', 'test'].map(name => [
+  ...['typecheck', 'lint', 'i18n-leftover', 'check-unused', 'mobile-test'].map(name => [
     'kilo-app-ci.yml',
     name,
     harnessBuild,

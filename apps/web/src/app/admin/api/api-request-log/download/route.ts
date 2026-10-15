@@ -133,6 +133,7 @@ function jsonError(message: string, status: number) {
 }
 
 function buildFilter(
+  id: bigint | null,
   userId: string | null,
   parsedStart: Date | null,
   parsedEnd: Date | null,
@@ -141,6 +142,9 @@ function buildFilter(
   errorsOnly: boolean
 ) {
   const conditions: SQL[] = [];
+  if (id !== null) {
+    conditions.push(eq(api_request_log.id, id));
+  }
   if (userId) {
     conditions.push(eq(api_request_log.kilo_user_id, userId));
   }
@@ -178,6 +182,7 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
+  const id = searchParams.get('id');
   const userId = searchParams.get('userId');
   const startDate = searchParams.get('startDate');
   const startTime = searchParams.get('startTime');
@@ -186,6 +191,11 @@ export async function GET(request: NextRequest) {
   const model = searchParams.get('model');
   const sessionId = searchParams.get('sessionId') || searchParams.get('session_id');
   const errorsOnly = searchParams.get('errorsOnly') === 'true';
+
+  if (id !== null && (!/^[1-9]\d{0,18}$/.test(id) || BigInt(id) > BigInt('9223372036854775807'))) {
+    return jsonError('Invalid log ID. Use an integer between 1 and 9223372036854775807.', 400);
+  }
+  const parsedId = id === null ? null : BigInt(id);
 
   const parsedStart = parseBoundary(startDate, startTime, 'start');
   const parsedEnd = parseBoundary(endDate, endTime, 'end');
@@ -200,6 +210,7 @@ export async function GET(request: NextRequest) {
   }
 
   const filter = buildFilter(
+    parsedId,
     userId,
     parsedStart.value,
     parsedEnd.value,
@@ -363,10 +374,11 @@ export async function GET(request: NextRequest) {
   const safeUserId = userId ? sanitize(userId) : 'all-users';
   const safeModel = model ? `_${sanitize(model)}` : '';
   const safeSessionId = sessionId ? `_${sanitize(sessionId)}` : '';
+  const safeId = parsedId !== null ? `_id-${parsedId}` : '';
   const safeErrorsOnly = errorsOnly ? '_errors-only' : '';
   const safeStart = formatBoundaryForFilename(startDate, startTime, 'any-start');
   const safeEnd = formatBoundaryForFilename(endDate, endTime, 'any-end');
-  const filename = `api-request-log_${safeUserId}_${safeStart}_${safeEnd}${safeModel}${safeSessionId}${safeErrorsOnly}.zip`;
+  const filename = `api-request-log_${safeUserId}_${safeStart}_${safeEnd}${safeModel}${safeSessionId}${safeErrorsOnly}${safeId}.zip`;
 
   return new Response(webStream, {
     headers: {

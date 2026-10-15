@@ -91,6 +91,11 @@ export function createSharedWorktreeChanges(deps: {
           deps.storage.kv.put(`${prefix}source`, 'migration');
         });
         deps.onSnapshot(context, revision);
+      } else if (previous.success && snapshot.revision > previous.data.revision) {
+        const revision = snapshot.revision + 1;
+        if (!Number.isSafeInteger(revision)) throw new Error('Worktree revision exhausted');
+        storage.kv.put(WORKTREE_CHANGES_KEY, { ...previous.data, revision });
+        deps.onSnapshot(context, revision);
       }
     }
     return createWorktreeChanges({

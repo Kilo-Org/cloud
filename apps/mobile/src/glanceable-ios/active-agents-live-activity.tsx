@@ -12,6 +12,7 @@ import {
   font,
   foregroundStyle,
   frame,
+  layoutPriority,
   lineLimit,
   monospacedDigit,
   padding,
@@ -413,31 +414,92 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       </VStack>
     ),
     // The Apple Watch and CarPlay small family draws this section, not the
-    // phone `banner`. Neither host adds margins, so the card pads itself and
-    // fills the slot: the mark and checked time, the status row with Approve,
-    // and a reserved line row so a failed press cannot move the count. CarPlay
+    // phone `banner`. The CarPlay Dashboard slot is narrow and short and adds
+    // no margins, so the card is two compact rows: the mark and the status
+    // label, then the count (with a failed press's line) and a compact Approve.
+    // The other counts do not fit beside Approve, so they stay on the Lock
+    // Screen. The label keeps layout priority, so it never truncates. CarPlay
     // shows Approve but disables it; Apple Watch lets it act.
     bannerSmall: (
       <VStack
         alignment="leading"
-        spacing={0}
+        spacing={4}
         modifiers={[
-          padding({ all: 16 }),
-          frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'topLeading' }),
+          padding({ horizontal: 12, vertical: 10 }),
+          frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'leading' }),
           environment({ key: 'locale', value: locale }),
         ]}
       >
-        {header(island)}
-        <Spacer minLength={8} />
-        <HStack alignment="center" spacing={0}>
-          {statusBlock({ ...island, countSize: 28 })}
-          <Spacer minLength={10} />
-          {approveControl(island)}
+        <HStack
+          alignment="center"
+          spacing={6}
+          modifiers={[accessibilityElement('combine'), accessibilityLabel(accessibility)]}
+        >
+          {mark(16)}
+          <Text
+            modifiers={[
+              font({ size: 13, weight: 'semibold' }),
+              lineLimit(1),
+              layoutPriority(1),
+              foregroundStyle(island.fg),
+            ]}
+          >
+            {primary === null ? (statusLine ?? COPY.openAgents ?? 'Open agents') : primary.label}
+          </Text>
+          <Spacer minLength={4} />
         </HStack>
-        <Spacer minLength={6} />
-        <VStack alignment="leading" spacing={0} modifiers={[frame({ height: 16 })]}>
-          {islandLine}
-        </VStack>
+        {primary === null ? null : (
+          <HStack alignment="center" spacing={8}>
+            <Text
+              modifiers={[
+                font({ size: 26, weight: 'bold' }),
+                monospacedDigit(),
+                lineLimit(1),
+                fixedSize({ horizontal: true, vertical: false }),
+                foregroundStyle(island.fg),
+              ]}
+            >
+              {count(primary.count)}
+            </Text>
+            {dot(8, island.dots[primary.kind])}
+            {notice === null ? null : text(notice, 11, island.warn, 'semibold')}
+            <Spacer minLength={6} />
+            {approving ? (
+              <Text
+                modifiers={[
+                  font({ size: 12, weight: 'semibold' }),
+                  lineLimit(1),
+                  fixedSize({ horizontal: true, vertical: false }),
+                  foregroundStyle(island.muted),
+                  padding({ horizontal: 10 }),
+                  frame({ height: 26 }),
+                  background(island.secondary, shapes.capsule()),
+                ]}
+              >
+                {COPY.approving ?? 'Approving…'}
+              </Text>
+            ) : canApprove ? (
+              <Button
+                target="approve"
+                modifiers={[buttonStyle('plain'), accessibilityLabel(COPY.approve ?? 'Approve')]}
+              >
+                <Text
+                  modifiers={[
+                    font({ size: 12, weight: 'semibold' }),
+                    lineLimit(1),
+                    fixedSize({ horizontal: true, vertical: false }),
+                    foregroundStyle(island.primaryFg),
+                    padding({ horizontal: 12 }),
+                    frame({ height: 26 }),
+                    background(island.primary, shapes.capsule()),
+                  ]}
+                >
+                  {COPY.approve ?? 'Approve'}
+                </Text>
+              </Button>
+            ) : null}
+          </HStack>
+        )}
       </VStack>
     ),
     // Compact: the mark leading, the dot and count trailing.

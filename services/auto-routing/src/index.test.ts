@@ -6,7 +6,6 @@ import type * as ModelCapabilitiesModule from './model-capabilities';
 import { clearCustomRoutingTableCache } from './decide';
 import { AutoRoutingDecisionCacheDO, clearClassificationHotCache } from './decision-cache';
 import { clearAutoRoutingSettingsCache } from './routing-mode';
-import { clearCodingPlanPreferenceCache } from './coding-plan-preference';
 import { app } from './index';
 import { ClassifierRunError, type ClassifierRunResult } from './model-classifier';
 import type * as DbModule from '@kilocode/db';
@@ -31,11 +30,6 @@ const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const getWorkerDb = vi.hoisted(() => vi.fn());
 const dbSelect = vi.hoisted(() => vi.fn());
 const dbFrom = vi.hoisted(() => vi.fn());
-const dbInnerJoin = vi.hoisted(() => vi.fn());
-const dbWhere = vi.hoisted(() => vi.fn());
-const dbOrderBy = vi.hoisted(() => vi.fn());
-const dbLimit = vi.hoisted(() => vi.fn());
-// Model-capabilities mock chain (select -> from -> where, no innerJoin/limit).
 const dbWhereCaps = vi.hoisted(() => vi.fn());
 const getModelCapabilitiesMock = vi.hoisted(() => vi.fn());
 
@@ -282,7 +276,6 @@ describe('auto routing worker', () => {
     clearModelCapabilitiesCache();
     clearClassificationHotCache();
     clearAutoRoutingSettingsCache();
-    clearCodingPlanPreferenceCache();
     backgroundTasks.length = 0;
     const actualCaps =
       await vi.importActual<typeof ModelCapabilitiesModule>('./model-capabilities');
@@ -295,19 +288,7 @@ describe('auto routing worker', () => {
     dbSelect.mockReset();
     dbSelect.mockReturnValue({ from: dbFrom });
     dbFrom.mockReset();
-    // The coding-plan path goes through `innerJoin -> where -> orderBy -> limit`; the
-    // model-capabilities path goes straight to `where` and awaits a plain
-    // promise. Both are mounted on the same `from()` so a single test can
-    // exercise either chain without a separate mock harness.
-    dbFrom.mockReturnValue({ innerJoin: dbInnerJoin, where: dbWhereCaps });
-    dbInnerJoin.mockReset();
-    dbInnerJoin.mockReturnValue({ where: dbWhere });
-    dbWhere.mockReset();
-    dbWhere.mockReturnValue({ orderBy: dbOrderBy });
-    dbOrderBy.mockReset();
-    dbOrderBy.mockReturnValue({ limit: dbLimit });
-    dbLimit.mockReset();
-    dbLimit.mockResolvedValue([]);
+    dbFrom.mockReturnValue({ where: dbWhereCaps });
     dbWhereCaps.mockReset();
     dbWhereCaps.mockResolvedValue([]);
     writeDataPoint.mockReset();
@@ -394,6 +375,90 @@ describe('auto routing worker', () => {
     globalThis.fetch = originalFetch;
     clearCustomRoutingTableCache();
     vi.restoreAllMocks();
+  });
+
+  it('defaults /decide to the efficient table and cache namespace', async () => {
+    const response = await decideRequest(mirrorPayload());
+    expect(response.status).toBe(200);
+    expect(configGet).toHaveBeenCalledWith('routing_table_v1');
+    expect(cacheIdFromName).toHaveBeenCalledWith('efficient:user:user-1:task:task-123');
+  });
+
+  it('reads the frontier table and state without applying the owner efficient pool', async () => {
+    modeConfigGet.mockImplementation(() => ({
+      getSettings: async () => ({
+        mode: 'cost_per_accuracy',
+        pool: [{ model: 'owner/efficient', variant: null }],
+      }),
+    }));
+    const frontierTable = {
+      ...benchmarkRoutingTable,
+      version: 'frontier-table',
+      routes: {
+        'implementation/feature_development': [
+          {
+            model: 'anthropic/claude-opus-4.6',
+            accuracy: 0.95,
+            avgCostUsd: 0.01,
+            meetsThreshold: true,
+            reasoningEffort: null,
+          },
+        ],
+      },
+    };
+    configGet.mockImplementation(async (key: string) =>
+      key === 'routing_table_frontier_v1' ? JSON.stringify(frontierTable) : null
+    );
+    dbWhereCaps.mockResolvedValue([
+      {
+        openrouterId: 'anthropic/claude-opus-4.6',
+        inputModalities: ['image', 'file'],
+        contextLength: 200_000,
+        isActive: true,
+      },
+    ]);
+    const response = await decideRequest(
+      mirrorPayload({
+        router: 'frontier',
+        constraints: { requiredInputModalities: ['image', 'file'] },
+      })
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      decision: { model: 'anthropic/claude-opus-4.6', tableVersion: 'frontier-table' },
+    });
+    expect(getModelCapabilitiesMock).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ router: 'frontier' })
+    );
+    expect(cacheIdFromName).toHaveBeenCalledWith('frontier:user:user-1:task:task-123');
+    expect(cacheReadConversationState).toHaveBeenCalledWith(expect.stringMatching(/^frontier:/));
+    expect(configGet).not.toHaveBeenCalledWith('routing_table_v1');
+    expect(
+      benchmarkFetch.mock.calls.some(
+        ([url]) => typeof url === 'string' && url.includes('/admin/custom-routing-table')
+      )
+    ).toBe(false);
+  });
+
+  it('returns no frontier decision when only the efficient table exists', async () => {
+    configGet.mockImplementation(async (key: string) =>
+      key === 'routing_table_v1' ? JSON.stringify(benchmarkRoutingTable) : null
+    );
+    benchmarkFetch.mockImplementation(async () =>
+      Response.json({ table: null, publishedAt: null, winner: null })
+    );
+    const response = await decideRequest(mirrorPayload({ router: 'frontier' }));
+    await expect(response.json()).resolves.toMatchObject({ decision: null });
+    expect(benchmarkFetch).toHaveBeenCalledWith(
+      'https://auto-routing-benchmark/admin/routing-table?router=frontier',
+      expect.anything()
+    );
+  });
+
+  it('rejects unknown router identifiers', async () => {
+    const response = await decideRequest(mirrorPayload({ router: 'invalid' }));
+    expect(response.status).toBe(400);
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
   describe.each([false, true])('classifier overlap (cached=%s)', cacheHit => {
@@ -487,66 +552,6 @@ describe('auto routing worker', () => {
       classifierResult: { classification: mockClassification },
     });
   });
-
-  it.each([false, true])(
-    'waits for constrained coding-plan eligibility before classifying (eligible=%s)',
-    async eligible => {
-      configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:v2:')
-          ? JSON.stringify({
-              active: true,
-              planId: 'minimax-token-plan-plus',
-              providerId: 'minimax',
-              modelId: 'minimax/minimax-m3',
-            })
-          : null
-      );
-      const capabilities = Promise.withResolvers<ModelCapabilitiesModule.ModelCapabilitiesMap>();
-      getModelCapabilitiesMock.mockReturnValueOnce(capabilities.promise);
-      const pending = decideRequest(
-        mirrorPayload({ constraints: { promptTokensEstimate: 50_000 } })
-      );
-      try {
-        await vi.waitFor(() => expect(getModelCapabilitiesMock).toHaveBeenCalledTimes(1));
-        await new Promise<void>(resolve => setImmediate(resolve));
-        expect(classifyNormalizedInput).not.toHaveBeenCalled();
-        expect(cacheReadConversationState).not.toHaveBeenCalled();
-      } finally {
-        capabilities.resolve(
-          new Map([
-            [
-              'minimax/minimax-m3',
-              {
-                inputModalities: new Set<string>(),
-                contextLength: eligible ? 1_000_000 : 8_000,
-                isActive: true,
-              },
-            ],
-          ])
-        );
-        await pending;
-      }
-
-      const response = await pending;
-      expect(response.status).toBe(200);
-      if (eligible) {
-        await expect(response.json()).resolves.toMatchObject({
-          cost: 0,
-          decision: { model: 'minimax/minimax-m3', source: 'coding_plan_default' },
-          classifierResult: null,
-        });
-        expect(classifyNormalizedInput).not.toHaveBeenCalled();
-        expect(cacheReadConversationState).not.toHaveBeenCalled();
-      } else {
-        await expect(response.json()).resolves.toMatchObject({
-          cost: 0,
-          decision: { model: 'google/gemini-2.5-flash-lite', source: 'benchmark' },
-          classifierResult: { classification: mockClassification, normalized: normalizedInput },
-        });
-        expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
-      }
-    }
-  );
 
   describe('capability-aware routing', () => {
     // A two-candidate route where the cheaper model is text-only and the
@@ -693,223 +698,6 @@ describe('auto routing worker', () => {
         decision: null,
         classifierResult: { classification: mockClassification },
       });
-    });
-
-    it('falls through the coding-plan short-circuit when the model lacks a required modality', async () => {
-      configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:v2:')
-          ? JSON.stringify({
-              active: true,
-              planId: 'minimax-token-plan-plus',
-              providerId: 'minimax',
-              modelId: 'minimax/minimax-m3',
-            })
-          : null
-      );
-      // The coding-plan default model has no image modality → short-
-      // circuit guard rejects it and the request falls through to a
-      // benchmark candidate. The benchmark table's top candidate is
-      // also text-only, so we need a vision-capable candidate to be
-      // available in the route.
-      setVisionBenchmark();
-      dbWhereCaps.mockResolvedValue([
-        {
-          openrouterId: 'minimax/minimax-m3',
-          inputModalities: ['text'],
-          contextLength: 1_000_000,
-        },
-        { openrouterId: 'text-only/chat', inputModalities: [], contextLength: 1_000_000 },
-        { openrouterId: 'vision/chat', inputModalities: ['image'], contextLength: 1_000_000 },
-      ]);
-      const response = await decideRequest(
-        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
-      );
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({
-        decision: {
-          model: 'vision/chat',
-          source: 'benchmark',
-          sticky: false,
-        },
-      });
-      // The coding-plan short-circuit did not fire: the benchmark path ran.
-      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
-    });
-
-    it('falls through the coding-plan short-circuit when the estimate exceeds the model context', async () => {
-      configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:v2:')
-          ? JSON.stringify({
-              active: true,
-              planId: 'minimax-token-plan-plus',
-              providerId: 'minimax',
-              modelId: 'minimax/minimax-m3',
-            })
-          : null
-      );
-      setVisionBenchmark();
-      dbWhereCaps.mockResolvedValue([
-        {
-          openrouterId: 'minimax/minimax-m3',
-          inputModalities: ['image'],
-          contextLength: 8_000,
-        },
-        { openrouterId: 'text-only/chat', inputModalities: [], contextLength: 4_000 },
-        { openrouterId: 'vision/chat', inputModalities: ['image'], contextLength: 1_000_000 },
-      ]);
-      const response = await decideRequest(
-        mirrorPayload({
-          constraints: { promptTokensEstimate: 50_000 },
-        })
-      );
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({
-        decision: {
-          model: 'vision/chat',
-          source: 'benchmark',
-          sticky: false,
-        },
-      });
-      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
-    });
-
-    it('takes the coding-plan short-circuit when the model context is unknown', async () => {
-      configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:v2:')
-          ? JSON.stringify({
-              active: true,
-              planId: 'minimax-token-plan-plus',
-              providerId: 'minimax',
-              modelId: 'minimax/minimax-m3',
-            })
-          : null
-      );
-      // No image requirement; estimate present but context is null. The
-      // unknown-keeps-rank policy applies: short-circuit is still taken.
-      dbWhereCaps.mockResolvedValue([
-        {
-          openrouterId: 'minimax/minimax-m3',
-          inputModalities: ['text'],
-          contextLength: null,
-        },
-      ]);
-      const response = await decideRequest(
-        mirrorPayload({
-          constraints: { promptTokensEstimate: 50_000 },
-        })
-      );
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({
-        decision: { model: 'minimax/minimax-m3', source: 'coding_plan_default' },
-      });
-      expect(classifyNormalizedInput).not.toHaveBeenCalled();
-    });
-
-    it('takes the BytePlus coding-plan short-circuit for image requests using static capabilities', async () => {
-      configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:v2:')
-          ? JSON.stringify({
-              active: true,
-              planId: 'byteplus-coding-plan-team-lite',
-              providerId: 'byteplus-coding',
-              modelId: 'byteplus-coding/bytedance-seed-code',
-            })
-          : null
-      );
-      const response = await decideRequest(
-        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
-      );
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({
-        decision: {
-          model: 'byteplus-coding/bytedance-seed-code',
-          source: 'coding_plan_default',
-        },
-      });
-      expect(classifyNormalizedInput).not.toHaveBeenCalled();
-    });
-
-    it('falls through the BytePlus coding-plan short-circuit for file input', async () => {
-      configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:v2:')
-          ? JSON.stringify({
-              active: true,
-              planId: 'byteplus-coding-plan-team-lite',
-              providerId: 'byteplus-coding',
-              modelId: 'byteplus-coding/bytedance-seed-code',
-            })
-          : null
-      );
-      setVisionBenchmark();
-      dbWhereCaps.mockResolvedValue([
-        { openrouterId: 'text-only/chat', inputModalities: [], contextLength: 1_000_000 },
-        {
-          openrouterId: 'vision/chat',
-          inputModalities: ['image', 'file'],
-          contextLength: 1_000_000,
-        },
-      ]);
-      const response = await decideRequest(
-        mirrorPayload({ constraints: { requiredInputModalities: ['file'] } })
-      );
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({
-        decision: { model: 'vision/chat', source: 'benchmark' },
-      });
-      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
-    });
-
-    it('falls through the BytePlus coding-plan short-circuit above its context limit', async () => {
-      configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:v2:')
-          ? JSON.stringify({
-              active: true,
-              planId: 'byteplus-coding-plan-team-lite',
-              providerId: 'byteplus-coding',
-              modelId: 'byteplus-coding/bytedance-seed-code',
-            })
-          : null
-      );
-      setVisionBenchmark();
-      dbWhereCaps.mockResolvedValue([
-        { openrouterId: 'text-only/chat', inputModalities: [], contextLength: 1_000_000 },
-        { openrouterId: 'vision/chat', inputModalities: ['image'], contextLength: 1_000_000 },
-      ]);
-      const response = await decideRequest(
-        mirrorPayload({ constraints: { promptTokensEstimate: 262_145 } })
-      );
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({
-        decision: { model: 'text-only/chat', source: 'benchmark' },
-      });
-      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
-    });
-
-    it('returns null when capability lookup fails on the coding-plan path with an image requirement', async () => {
-      configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:v2:')
-          ? JSON.stringify({
-              active: true,
-              planId: 'minimax-token-plan-plus',
-              providerId: 'minimax',
-              modelId: 'minimax/minimax-m3',
-            })
-          : null
-      );
-      // Lookup fails → no capability data for the coding-plan model → the
-      // short-circuit guard cannot confirm the model supports image, so
-      // it must fail closed rather than take the possibly-incapable
-      // short-circuit.
-      dbWhereCaps.mockRejectedValue(new Error('db down'));
-      const response = await decideRequest(
-        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
-      );
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({
-        decision: null,
-        classifierResult: { classification: mockClassification },
-      });
-      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
     });
 
     it('enforces file modality the same way it enforces image', async () => {
@@ -1278,10 +1066,7 @@ describe('auto routing worker', () => {
       });
       expect(benchmarkFetch).toHaveBeenCalledWith(
         expect.stringContaining('/admin/profiles/status'),
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ entries: pool, ownerType: 'user', ownerId: 'user-1' }),
-        })
+        expect.objectContaining({ method: 'POST' })
       );
     });
 
@@ -1458,6 +1243,7 @@ describe('auto routing worker', () => {
       });
       expect(response.status).toBe(200);
       expect(registerBody).toEqual({
+        router: 'efficient',
         ownerType: 'user',
         ownerId: 'user-1',
         entries: pool,
@@ -1466,83 +1252,6 @@ describe('auto routing worker', () => {
       expect(store.setSettings).toHaveBeenCalledTimes(1);
       expect(store.setSettings).toHaveBeenCalledWith({ mode: 'best_accuracy', pool });
       expect(store.pool).toEqual(pool);
-    });
-
-    it('POST estimates all measurement pairs before saving without persisting settings', async () => {
-      const store = ownerSettingsStore();
-      const estimate = {
-        estimatedCostUsd: 2,
-        pairs: [
-          {
-            entry: { model: 'custom/chat', variant: 'thinking' },
-            status: 'pending',
-            estimatedCostUsd: 2,
-            chargedCostUsd: null,
-          },
-          {
-            entry: { model: 'custom/chat', variant: 'max' },
-            status: 'ready',
-            estimatedCostUsd: 0,
-            chargedCostUsd: null,
-          },
-        ],
-      };
-      benchmarkFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => estimate,
-      });
-      const response = await request('/admin/profiles/estimate', {
-        method: 'POST',
-        headers: { authorization: 'Bearer classifier-token', 'content-type': 'application/json' },
-        body: JSON.stringify({ ownerType: 'user', ownerId: 'user-1', entries: pool }),
-      });
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual(estimate);
-      expect(store.setSettings).not.toHaveBeenCalled();
-      expect(benchmarkFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/admin/profiles/estimate'),
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ ownerType: 'user', ownerId: 'user-1', entries: pool }),
-        })
-      );
-    });
-
-    it.each([
-      { status: 400, error: 'Model custom/chat has no pricing available' },
-      { status: 409, error: 'Benchmark profile measurement is already running' },
-    ])('POST preserves estimate rejection $status and its message', async ({ status, error }) => {
-      const store = ownerSettingsStore();
-      benchmarkFetch.mockResolvedValue(Response.json({ error }, { status }));
-      const response = await request('/admin/profiles/estimate', {
-        method: 'POST',
-        headers: { authorization: 'Bearer classifier-token', 'content-type': 'application/json' },
-        body: JSON.stringify({ ownerType: 'user', ownerId: 'user-1', entries: pool }),
-      });
-
-      expect(response.status).toBe(status);
-      await expect(response.json()).resolves.toEqual({ error });
-      expect(store.setSettings).not.toHaveBeenCalled();
-    });
-
-    it('PUT preserves insufficient credits and does not save the pool', async () => {
-      const store = ownerSettingsStore();
-      benchmarkFetch.mockResolvedValue({
-        ok: false,
-        status: 402,
-        json: async () => ({ error: 'Insufficient credits for benchmark profiles' }),
-      });
-      const response = await request('/admin/routing-settings', {
-        method: 'PUT',
-        headers: { authorization: 'Bearer classifier-token', 'content-type': 'application/json' },
-        body: JSON.stringify({ ownerType: 'user', ownerId: 'user-1', mode: null, pool }),
-      });
-      expect(response.status).toBe(402);
-      await expect(response.json()).resolves.toEqual({
-        error: 'Insufficient credits for benchmark profiles',
-      });
-      expect(store.setSettings).not.toHaveBeenCalled();
     });
   });
 
@@ -1785,51 +1494,6 @@ describe('auto routing worker', () => {
         })
       );
     });
-
-    it('takes coding-plan short-circuit from the single pool-aware capability load', async () => {
-      setOwnerPool(pool);
-      configGet.mockImplementation(async (key: string) =>
-        key.startsWith('coding_plan_preference:v2:')
-          ? JSON.stringify({
-              active: true,
-              planId: 'minimax-token-plan-plus',
-              providerId: 'minimax',
-              modelId: 'minimax/minimax-m3',
-            })
-          : null
-      );
-      dbWhereCaps.mockResolvedValue([
-        {
-          openrouterId: 'minimax/minimax-m3',
-          inputModalities: ['image'],
-          contextLength: 1_000_000,
-          isActive: true,
-        },
-        {
-          openrouterId: 'pool/chat',
-          inputModalities: ['image'],
-          contextLength: 1_000_000,
-          isActive: true,
-        },
-      ]);
-
-      const response = await decideRequest(
-        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
-      );
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({
-        decision: { model: 'minimax/minimax-m3', source: 'coding_plan_default' },
-      });
-      expect(classifyNormalizedInput).not.toHaveBeenCalled();
-      expect(getModelCapabilitiesMock).toHaveBeenCalledTimes(1);
-      expect(getModelCapabilitiesMock).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          codingPlanModelId: 'minimax/minimax-m3',
-          additionalModelIds: ['pool/chat'],
-        })
-      );
-    });
   });
 
   it('filters denied routing-policy models from the full decide path', async () => {
@@ -1854,267 +1518,6 @@ describe('auto routing worker', () => {
     });
   });
 
-  it('serves a coding-plan default decision without classifying', async () => {
-    configGet.mockImplementation(async (key: string) =>
-      key.startsWith('coding_plan_preference:v2:')
-        ? JSON.stringify({
-            active: true,
-            planId: 'minimax-token-plan-plus',
-            providerId: 'minimax',
-            modelId: 'minimax/minimax-m3',
-          })
-        : null
-    );
-
-    const response = await decideRequest(mirrorPayload());
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      cost: 0,
-      decision: {
-        model: 'minimax/minimax-m3',
-        taskType: null,
-        subtaskType: null,
-        source: 'coding_plan_default',
-        tableVersion: 'coding-plan:v1',
-        reasoningEffort: null,
-        sticky: false,
-      },
-      classifierResult: null,
-    });
-    expect(classifyNormalizedInput).not.toHaveBeenCalled();
-    expect(benchmarkFetch).not.toHaveBeenCalled();
-    expect(cachePutEntry).not.toHaveBeenCalled();
-    expect(writeDataPoint).toHaveBeenCalledWith({
-      indexes: ['coding_plan_default'],
-      blobs: [
-        'coding_plan_default',
-        'anthropic/claude-sonnet-4',
-        'coding_plan_default',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-      ],
-      doubles: [expect.any(Number), 0, -1, 0],
-    });
-  });
-
-  it('falls back to benchmark routing when the coding-plan default model is denied', async () => {
-    configGet.mockImplementation(async (key: string) =>
-      key.startsWith('coding_plan_preference:v2:')
-        ? JSON.stringify({
-            active: true,
-            planId: 'minimax-token-plan-plus',
-            providerId: 'minimax',
-            modelId: 'minimax/minimax-m3',
-          })
-        : null
-    );
-
-    const response = await decideRequest(
-      mirrorPayload({
-        routingPolicy: { deniedModelIds: ['minimax/minimax-m3'] },
-      })
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      cost: 0,
-      decision: {
-        model: 'google/gemini-2.5-flash-lite',
-        taskType: 'implementation',
-        subtaskType: 'feature_development',
-        source: 'benchmark',
-        tableVersion: 'bench-run-1',
-        sticky: false,
-      },
-    });
-    expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
-  });
-
-  it('falls back to benchmark routing when the BytePlus coding-plan default model is denied', async () => {
-    configGet.mockImplementation(async (key: string) =>
-      key.startsWith('coding_plan_preference:v2:')
-        ? JSON.stringify({
-            active: true,
-            planId: 'byteplus-coding-plan-team-lite',
-            providerId: 'byteplus-coding',
-            modelId: 'byteplus-coding/bytedance-seed-code',
-          })
-        : null
-    );
-
-    const response = await decideRequest(
-      mirrorPayload({
-        routingPolicy: { deniedModelIds: ['byteplus-coding/bytedance-seed-code'] },
-      })
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      decision: { model: 'google/gemini-2.5-flash-lite', source: 'benchmark' },
-    });
-    expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
-  });
-
-  it('loads and caches a coding-plan preference on cache miss', async () => {
-    dbLimit.mockResolvedValueOnce([{ planId: 'minimax-token-plan-plus', providerId: 'minimax' }]);
-
-    const response = await decideRequest(mirrorPayload());
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      cost: 0,
-      decision: {
-        model: 'minimax/minimax-m3',
-        source: 'coding_plan_default',
-      },
-      classifierResult: null,
-    });
-    expect(getWorkerDb).toHaveBeenCalledWith('postgres://worker', {
-      statement_timeout: 2_000,
-    });
-    expect(dbSelect).toHaveBeenCalledWith({
-      planId: expect.any(Object),
-      providerId: expect.any(Object),
-    });
-    expect(dbFrom).toHaveBeenCalledTimes(1);
-    expect(dbInnerJoin).toHaveBeenCalledTimes(1);
-    expect(dbWhere).toHaveBeenCalledTimes(1);
-    expect(dbOrderBy).toHaveBeenCalledTimes(1);
-    expect(dbLimit).toHaveBeenCalledWith(1);
-    expect(configPut).toHaveBeenCalledWith(
-      expect.stringMatching(/^coding_plan_preference:v2:[0-9a-f]{16}$/),
-      JSON.stringify({
-        active: true,
-        planId: 'minimax-token-plan-plus',
-        providerId: 'minimax',
-        modelId: 'minimax/minimax-m3',
-      }),
-      { expirationTtl: 60, metadata: { writtenAt: expect.any(Number) } }
-    );
-    expect(classifyNormalizedInput).not.toHaveBeenCalled();
-  });
-
-  it('loads and caches the BytePlus coding-plan preference on cache miss', async () => {
-    dbLimit.mockResolvedValueOnce([
-      { planId: 'byteplus-coding-plan-team-lite', providerId: 'byteplus-coding' },
-    ]);
-
-    const response = await decideRequest(mirrorPayload());
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      decision: {
-        model: 'byteplus-coding/bytedance-seed-code',
-        source: 'coding_plan_default',
-      },
-    });
-    expect(configPut).toHaveBeenCalledWith(
-      expect.stringMatching(/^coding_plan_preference:v2:[0-9a-f]{16}$/),
-      JSON.stringify({
-        active: true,
-        planId: 'byteplus-coding-plan-team-lite',
-        providerId: 'byteplus-coding',
-        modelId: 'byteplus-coding/bytedance-seed-code',
-      }),
-      { expirationTtl: 60, metadata: { writtenAt: expect.any(Number) } }
-    );
-    expect(classifyNormalizedInput).not.toHaveBeenCalled();
-  });
-
-  it('loads and caches the BytePlus Pro coding-plan preference on cache miss', async () => {
-    dbLimit.mockResolvedValueOnce([
-      { planId: 'byteplus-coding-plan-team-pro', providerId: 'byteplus-coding' },
-    ]);
-
-    const response = await decideRequest(mirrorPayload({ userId: 'pro-user-1' }));
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      decision: {
-        model: 'byteplus-coding/bytedance-seed-code',
-        source: 'coding_plan_default',
-      },
-    });
-    expect(configPut).toHaveBeenCalledWith(
-      expect.stringMatching(/^coding_plan_preference:v2:[0-9a-f]{16}$/),
-      JSON.stringify({
-        active: true,
-        planId: 'byteplus-coding-plan-team-pro',
-        providerId: 'byteplus-coding',
-        modelId: 'byteplus-coding/bytedance-seed-code',
-      }),
-      { expirationTtl: 60, metadata: { writtenAt: expect.any(Number) } }
-    );
-    expect(classifyNormalizedInput).not.toHaveBeenCalled();
-  });
-
-  it('prioritizes BytePlus Pro over MiniMax when both subscriptions are active', async () => {
-    dbLimit.mockResolvedValueOnce([
-      { planId: 'byteplus-coding-plan-team-pro', providerId: 'byteplus-coding' },
-      { planId: 'minimax-token-plan-plus', providerId: 'minimax' },
-    ]);
-
-    const response = await decideRequest(mirrorPayload());
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      decision: {
-        model: 'byteplus-coding/bytedance-seed-code',
-        source: 'coding_plan_default',
-      },
-    });
-    expect(dbOrderBy).toHaveBeenCalledTimes(1);
-  });
-
-  it('uses the database-selected BytePlus row when both recognized plans are active', async () => {
-    dbLimit.mockResolvedValueOnce([
-      { planId: 'byteplus-coding-plan-team-lite', providerId: 'byteplus-coding' },
-    ]);
-
-    const response = await decideRequest(mirrorPayload());
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      decision: {
-        model: 'byteplus-coding/bytedance-seed-code',
-        source: 'coding_plan_default',
-      },
-    });
-    expect(dbOrderBy).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([['missing managed key'], ['disabled managed key'], ['cancelled subscription']])(
-    'falls back to benchmark routing when the query excludes a %s',
-    async () => {
-      dbLimit.mockResolvedValueOnce([]);
-
-      const response = await decideRequest(mirrorPayload());
-
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({
-        decision: { model: 'google/gemini-2.5-flash-lite', source: 'benchmark' },
-      });
-      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
-    }
-  );
-
-  it('falls back to benchmark routing for an unrecognized plan/provider row', async () => {
-    dbLimit.mockResolvedValueOnce([{ planId: 'unknown-plan', providerId: 'unknown-provider' }]);
-
-    const response = await decideRequest(mirrorPayload());
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      decision: { model: 'google/gemini-2.5-flash-lite', source: 'benchmark' },
-    });
-    expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
-  });
-
   it('serves a cached classification for the session without calling the classifier', async () => {
     cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
 
@@ -2134,7 +1537,7 @@ describe('auto routing worker', () => {
       },
       classifierResult: { classification: mockClassification },
     });
-    expect(cacheIdFromName).toHaveBeenCalledWith('user:user-1:task:task-123');
+    expect(cacheIdFromName).toHaveBeenCalledWith('efficient:user:user-1:task:task-123');
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
     // The classification is not re-cached; only the served model is
     // remembered for session stickiness.
@@ -2156,7 +1559,7 @@ describe('auto routing worker', () => {
 
     expect(response.status).toBe(200);
     expect(cachePutEntry).toHaveBeenCalledWith(
-      expect.stringMatching(/^google\/gemini-2\.5-flash-lite:[0-9a-f]{16}$/),
+      expect.stringMatching(/^efficient:google\/gemini-2\.5-flash-lite:[0-9a-f]{16}$/),
       expect.objectContaining({ taskType: 'implementation' })
     );
   });
@@ -2275,7 +1678,7 @@ describe('auto routing worker', () => {
               },
             });
             expect(cachePutEntry).toHaveBeenCalledWith(
-              expect.stringMatching(/^typesafe\/jev-1\.13:/),
+              expect.stringMatching(/^efficient:typesafe\/jev-1\.13:/),
               mockClassification
             );
             expect(cachePutStickyDecision).toHaveBeenCalledTimes(1);
@@ -3062,7 +2465,7 @@ describe('auto routing worker', () => {
     const response = await decideRequest(mirrorPayload({ sessionId: null }));
 
     expect(response.status).toBe(200);
-    expect(cacheIdFromName).toHaveBeenCalledWith('user:user-1:machine:machine-1');
+    expect(cacheIdFromName).toHaveBeenCalledWith('efficient:user:user-1:machine:machine-1');
   });
 
   it('falls back to a content-fingerprint conversation key without session or machine ids', async () => {
@@ -3070,7 +2473,7 @@ describe('auto routing worker', () => {
 
     expect(response.status).toBe(200);
     expect(cacheIdFromName).toHaveBeenCalledWith(
-      expect.stringMatching(/^user:user-1:content:[0-9a-f]{16}$/)
+      expect.stringMatching(/^efficient:user:user-1:content:[0-9a-f]{16}$/)
     );
   });
 

@@ -108,7 +108,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         good: '#5FCB8E',
         info: '#60A5FA',
         idle: '#56544F',
-        primary: '#E8F27A',
+        primary: '#FFDD00',
         primaryFg: '#1A1A10',
         secondary: '#26262B',
       }
@@ -166,7 +166,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     fg: '#FFFFFF',
     muted: '#8A8680',
     warn: '#F2B05F',
-    primary: '#E8F27A',
+    primary: '#FFDD00',
     primaryFg: '#1A1A10',
     secondary: '#26262B',
     dots: { needsInput: '#F2B05F', running: '#5FCB8E', scheduled: '#60A5FA', idle: '#56544F' },

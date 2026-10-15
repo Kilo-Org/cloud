@@ -18,6 +18,7 @@ import type { ControlDiagnosticReporter } from '../../../src/shared/control-diag
 import { parseControlPlaneCredential } from '../../../src/shared/control-plane-credential.js';
 import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import { fetchKiloServer } from '../kilo-server-auth.js';
 import {
   git,
   runProcess,
@@ -232,7 +233,7 @@ async function defaultSessionExists(
 ): Promise<boolean> {
   const url = new URL(`/session/${encodeURIComponent(kiloSessionId)}`, client.serverUrl);
   url.searchParams.set('directory', directory);
-  const response = await fetch(url, { signal });
+  const response = await fetchKiloServer(client.server, url, { signal });
   if (response.status === 404) return false;
   if (!response.ok) throw new Error('Kilo session probe failed');
   const data: unknown = await response.json();

@@ -7,11 +7,8 @@ import {
   CustomRoutingTableRequestSchema,
   CustomRoutingTableResponseSchema,
   RegisterBenchmarkProfilesRequestSchema,
-  EstimateBenchmarkProfilesRequestSchema,
-  EstimateBenchmarkProfilesResponseSchema,
-  type EstimateBenchmarkProfilesRequest,
-  type EstimateBenchmarkProfilesResponse,
-  type AutoRoutingModeOwnerQuery,
+  DEFAULT_AUTO_ROUTER,
+  type AutoRouter,
   type BenchmarkProfileStatusesResponse,
   type ClassifierWinner,
   type CustomRoutingTable,
@@ -19,7 +16,6 @@ import {
   type RegisterBenchmarkProfilesRequest,
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
-import * as z from 'zod';
 
 type BenchmarkEnv = Pick<Env, 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'>;
 
@@ -31,27 +27,6 @@ export class BenchmarkProfileQuotaError extends Error {
     this.name = 'BenchmarkProfileQuotaError';
     this.retryAt = retryAt;
   }
-}
-
-export class BenchmarkInsufficientCreditsError extends Error {}
-
-export class BenchmarkEstimateRequestError extends Error {
-  readonly status: 400 | 409;
-
-  constructor(message: string, status: 400 | 409) {
-    super(message);
-    this.name = 'BenchmarkEstimateRequestError';
-    this.status = status;
-  }
-}
-
-async function rejectInsufficientCredits(res: Response): Promise<void> {
-  if (res.status !== 402) return;
-  const raw: unknown = await res.json().catch(() => null);
-  const parsed = z.object({ error: z.string() }).safeParse(raw);
-  throw new BenchmarkInsufficientCreditsError(
-    parsed.success ? parsed.data.error : 'Insufficient credits for benchmark profiles'
-  );
 }
 
 async function fetchBenchmark(
@@ -78,8 +53,15 @@ async function fetchBenchmarkJson(env: BenchmarkEnv, path: string): Promise<unkn
   return res.json();
 }
 
-export async function fetchRoutingTableFromOrigin(env: BenchmarkEnv): Promise<RoutingTable | null> {
-  const body = await fetchBenchmarkJson(env, '/admin/routing-table');
+export async function fetchRoutingTableFromOrigin(
+  env: BenchmarkEnv,
+  router: AutoRouter = DEFAULT_AUTO_ROUTER
+): Promise<RoutingTable | null> {
+  const path =
+    router === DEFAULT_AUTO_ROUTER
+      ? '/admin/routing-table'
+      : `/admin/routing-table?router=${router}`;
+  const body = await fetchBenchmarkJson(env, path);
   const parsed = BenchmarkRoutingTableResponseSchema.safeParse(body);
   if (!parsed.success) {
     throw new Error(
@@ -112,7 +94,6 @@ export async function registerBenchmarkProfiles(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
-  await rejectInsufficientCredits(res);
 
   if (res.status === 429) {
     const raw: unknown = await res.json().catch(() => null);
@@ -140,10 +121,9 @@ export async function registerBenchmarkProfiles(
 
 export async function fetchBenchmarkProfileStatuses(
   env: BenchmarkEnv,
-  entries: EfficientModelPool,
-  owner?: AutoRoutingModeOwnerQuery
+  entries: EfficientModelPool
 ): Promise<BenchmarkProfileStatusesResponse> {
-  const body = BenchmarkProfileStatusesRequestSchema.parse({ entries, ...owner });
+  const body = BenchmarkProfileStatusesRequestSchema.parse({ entries });
   const res = await fetchBenchmark(env, '/admin/profiles/status', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -187,28 +167,4 @@ export async function fetchCustomRoutingTable(
     );
   }
   return parsed.data.table;
-}
-
-export async function estimateBenchmarkProfiles(
-  env: BenchmarkEnv,
-  request: EstimateBenchmarkProfilesRequest
-): Promise<EstimateBenchmarkProfilesResponse> {
-  const body = EstimateBenchmarkProfilesRequestSchema.parse(request);
-  const res = await fetchBenchmark(env, '/admin/profiles/estimate', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  await rejectInsufficientCredits(res);
-  if (res.status === 400 || res.status === 409) {
-    const raw: unknown = await res.json().catch(() => null);
-    const parsed = z.object({ error: z.string() }).safeParse(raw);
-    if (parsed.success) {
-      throw new BenchmarkEstimateRequestError(parsed.data.error, res.status);
-    }
-  }
-  if (!res.ok) {
-    throw new Error(`benchmark estimate responded ${res.status}`);
-  }
-  return EstimateBenchmarkProfilesResponseSchema.parse(await res.json());
 }

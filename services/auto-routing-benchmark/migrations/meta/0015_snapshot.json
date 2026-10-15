@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "cb27bb92-b361-437f-bafe-f6c51c6f6429",
+  "id": "0b11442b-2c16-40c2-87c5-5f6162490e62",
   "prevId": "cf460e89-aba3-4e96-9df1-e89dc5f4d452",
   "tables": {
     "benchmark_config": {
@@ -841,256 +841,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "profile_benchmark_admissions": {
-      "name": "profile_benchmark_admissions",
-      "columns": {
-        "admission_id": {
-          "name": "admission_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "owner_type": {
-          "name": "owner_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "owner_id": {
-          "name": "owner_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "engine_identity": {
-          "name": "engine_identity",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "repetitions": {
-          "name": "repetitions",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "recovery_attempts": {
-          "name": "recovery_attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "recovery_next_at": {
-          "name": "recovery_next_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "IDX_profile_benchmark_admissions_state": {
-          "name": "IDX_profile_benchmark_admissions_state",
-          "columns": [
-            "state",
-            "created_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "profile_benchmark_claims": {
-      "name": "profile_benchmark_claims",
-      "columns": {
-        "admission_id": {
-          "name": "admission_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "model": {
-          "name": "model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "variant": {
-          "name": "variant",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "engine_identity": {
-          "name": "engine_identity",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "repetitions": {
-          "name": "repetitions",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "estimated_cost_usd": {
-          "name": "estimated_cost_usd",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "charged_cost_usd": {
-          "name": "charged_cost_usd",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "quota_charged": {
-          "name": "quota_charged",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "terminal_status": {
-          "name": "terminal_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "run_id": {
-          "name": "run_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "settled_at": {
-          "name": "settled_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "UQ_profile_benchmark_claims_active_pair": {
-          "name": "UQ_profile_benchmark_claims_active_pair",
-          "columns": [
-            "model",
-            "variant",
-            "engine_identity",
-            "repetitions"
-          ],
-          "isUnique": true,
-          "where": "\"profile_benchmark_claims\".\"state\" IN ('allocating', 'admitted') AND \"profile_benchmark_claims\".\"terminal_status\" IS NULL"
-        },
-        "IDX_profile_benchmark_claims_run": {
-          "name": "IDX_profile_benchmark_claims_run",
-          "columns": [
-            "run_id",
-            "state"
-          ],
-          "isUnique": false
-        },
-        "IDX_profile_benchmark_claims_state": {
-          "name": "IDX_profile_benchmark_claims_state",
-          "columns": [
-            "state",
-            "created_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "profile_benchmark_claims_admission_id_profile_benchmark_admissions_admission_id_fk": {
-          "name": "profile_benchmark_claims_admission_id_profile_benchmark_admissions_admission_id_fk",
-          "tableFrom": "profile_benchmark_claims",
-          "tableTo": "profile_benchmark_admissions",
-          "columnsFrom": [
-            "admission_id"
-          ],
-          "columnsTo": [
-            "admission_id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "profile_benchmark_claims_admission_id_model_variant_pk": {
-          "columns": [
-            "admission_id",
-            "model",
-            "variant"
-          ],
-          "name": "profile_benchmark_claims_admission_id_model_variant_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "profile_request_events": {
       "name": "profile_request_events",
       "columns": {
@@ -1335,6 +1085,13 @@
         "low_confidence_threshold": {
           "name": "low_confidence_threshold",
           "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "effort_by_complexity": {
+          "name": "effort_by_complexity",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

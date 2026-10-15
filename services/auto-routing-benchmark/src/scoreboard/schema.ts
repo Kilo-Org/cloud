@@ -1,6 +1,9 @@
 import * as z from 'zod';
 import {
+  AutoRouterSchema,
   CandidatePricingSchema,
+  DEFAULT_AUTO_ROUTER,
+  EffortByComplexitySchema,
   ProductionTokenProfileSchema,
   RankedCandidateSchema,
   RoutingTableSchema,
@@ -72,11 +75,13 @@ export const OfflineSweepSummarySchema = z.object({
   errors: z.number().int().nonnegative().optional(),
   avgCostUsd: z.number().nonnegative().nullable(),
   p50LatencyMs: z.number().nonnegative().nullable(),
+  p50TtftMs: nullableMetric.optional(),
 });
 export type OfflineSweepSummary = z.infer<typeof OfflineSweepSummarySchema>;
 
 export const OfflineSweepSchema = z.object({
   startedAt: z.iso.datetime({ offset: true }),
+  suite: z.enum(['efficient', 'frontier']).optional(),
   truncated: z.boolean(),
   costUsd: z.number().nonnegative(),
   graderCostUsd: z.number().nonnegative(),
@@ -94,6 +99,7 @@ export const OfflineSweepSchema = z.object({
           costUsd: z.number().nonnegative().nullable().default(null),
           graderCostUsd: z.number().nonnegative(),
           latencyMs: z.number().nonnegative(),
+          ttftMs: nullableMetric.optional(),
           error: z.string().nullable(),
           output: z.string().nullable().optional(),
         })
@@ -134,6 +140,7 @@ export const ScoreboardSchema = z.object({
         accuracyWeighted: nullableRate,
         estimatedRequestUsdWeighted: nullableMetric,
         p50LatencyMsWeighted: nullableMetric,
+        p50TtftMsWeighted: nullableMetric.optional(),
         routes: z.number().int().nonnegative(),
       })
       .nullable(),
@@ -162,6 +169,7 @@ export type ScoreboardRoutingTable = z.infer<typeof ScoreboardRoutingTableSchema
 const storedJsonSchema = z.string().transform((value): unknown => JSON.parse(value));
 
 export const LiveScoreboardTableRowSchema = z.object({
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
   run_id: z.string(),
   published_at: z.string(),
   generated_at: z.string(),
@@ -179,6 +187,10 @@ export const LiveScoreboardTableRowSchema = z.object({
     .nullish()
     .transform(value => value ?? null),
   low_confidence_threshold: nullableRate.optional().transform(value => value ?? null),
+  effort_by_complexity: storedJsonSchema
+    .pipe(EffortByComplexitySchema)
+    .nullish()
+    .transform(value => value ?? null),
   source: z.string(),
 });
 

@@ -1,5 +1,4 @@
 import {
-  estimateAutoRoutingProfiles,
   getAutoRoutingClassifierAnalytics,
   getAutoRoutingClassifierModel,
   getAutoRoutingSettings,
@@ -58,35 +57,6 @@ const settingsResponse = {
 describe('auto routing admin client', () => {
   beforeEach(() => {
     mockFetch.mockReset();
-  });
-
-  it('requests owner estimates through the authorized auto-routing proxy', async () => {
-    const body = {
-      estimatedCostUsd: 0.2,
-      pairs: [
-        {
-          entry: { model: 'google/gemini-2.5-flash', variant: null },
-          status: 'pending',
-          estimatedCostUsd: 0.2,
-          chargedCostUsd: null,
-        },
-      ],
-    };
-    mockFetch.mockResolvedValue({ status: 200, ok: true, json: () => Promise.resolve(body) });
-    const request = {
-      ownerType: 'user' as const,
-      ownerId: 'user-1',
-      entries: [{ model: 'google/gemini-2.5-flash' }],
-    };
-    expect(await estimateAutoRoutingProfiles(request)).toEqual({ status: 200, body });
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://auto-routing.example.com/admin/profiles/estimate',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ authorization: expect.stringMatching(/^Bearer /) }),
-        body: JSON.stringify(request),
-      })
-    );
   });
 
   it('gets the classifier model using worker bearer auth', async () => {

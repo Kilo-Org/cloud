@@ -1,8 +1,10 @@
+import { DatabaseSync } from 'node:sqlite';
 import { describe, it, expect } from 'vitest';
 import { RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { RankedCandidate, RoutingTable } from '@kilocode/auto-routing-contracts';
 import {
   exactPairKey,
+  getRoutingCaseResultsForEntries,
   mapRunRow,
   mapSummaryRow,
   routingTableToRows,
@@ -11,6 +13,82 @@ import {
 import type { BenchmarkModelSummary } from '@kilocode/auto-routing-contracts';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
+describe('routing case results provenance read', () => {
+  it('reads only the ready exact pairs from their own measuring runs', async () => {
+    const sqlite = new DatabaseSync(':memory:');
+    sqlite.exec(`
+      CREATE TABLE case_results (
+        run_id TEXT, model TEXT, variant TEXT, case_id TEXT, route_key TEXT,
+        rep INTEGER, score REAL, cost_usd REAL, latency_ms INTEGER, error TEXT
+      );
+      INSERT INTO case_results VALUES
+        ('run-a', 'shared/model', 'low', 'correct-low', 'implementation/code_generation', 0, 1, 0.01, 100, NULL),
+        ('run-b', 'shared/model', 'high', 'correct-high', 'implementation/code_generation', 0, 1, 0.02, 200, NULL),
+        ('run-b', 'shared/model', 'low', 'wrong-run', 'implementation/code_generation', 0, 0, 5, 500, NULL),
+        ('run-a', 'shared/model', 'high', 'wrong-pair', 'implementation/code_generation', 0, 0, 5, 500, NULL),
+        ('run-a', 'other/model', 'low', 'wrong-model', 'implementation/code_generation', 0, 0, 5, 500, NULL),
+        ('run-null', 'null/model', '', 'null-variant', 'debugging/bug_fixing', 0, 1, 0.03, 300, NULL),
+        ('run-null', 'null/model', '', 'no-route', NULL, 0, 1, 0.03, 300, NULL);
+    `);
+    const binding = {
+      prepare(sqlText: string) {
+        const statement = sqlite.prepare(sqlText);
+        return {
+          bind(...params: unknown[]) {
+            return {
+              async raw() {
+                return statement.all(...(params as never[])).map(row => Object.values(row));
+              },
+            };
+          },
+        };
+      },
+    } as D1Database;
+    try {
+      const results = await getRoutingCaseResultsForEntries(binding, [
+        { entry: { model: 'shared/model', variant: 'low' }, runId: 'run-a' },
+        { entry: { model: 'shared/model', variant: 'high' }, runId: 'run-b' },
+        { entry: { model: 'null/model', variant: null }, runId: 'run-null' },
+      ]);
+      expect(results.flatMap(pair => pair.results.map(result => result.caseId)).sort()).toEqual([
+        'correct-high',
+        'correct-low',
+        'null-variant',
+      ]);
+      expect(results.find(pair => pair.model === 'null/model')?.variant).toBeNull();
+      expect(results.flatMap(pair => pair.results).every(result => result.split === 'train')).toBe(
+        true
+      );
+      expect(await getRoutingCaseResultsForEntries(binding, [])).toEqual([]);
+    } finally {
+      sqlite.close();
+    }
+  });
+});
+
+describe('complexity mapping persistence', () => {
+  it('round-trips learned variants through routing table D1 rows', () => {
+    const table: RoutingTable = {
+      version: 'fixture-efforts',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      source: 'benchmark',
+      routes: {
+        'implementation/code_generation': [
+          { model: 'm', variant: 'high', accuracy: 1, avgCostUsd: 1, meetsThreshold: true },
+        ],
+      },
+      effortByComplexity: { 'implementation/code_generation': { m: { low: null, high: 'high' } } },
+    };
+    const rows = routingTableToRows(table, table.generatedAt);
+    expect(rows.tableRow.effort_by_complexity).toEqual(table.effortByComplexity);
+    expect(rowsToRoutingTable(rows.tableRow, rows.candidateRows).effortByComplexity).toEqual(
+      table.effortByComplexity
+    );
+  });
+});
 describe('variant storage helpers', () => {
   it('round-trips null and empty as the D1 null/default convention', () => {
     expect(variantToStorage(null)).toBe('');
@@ -97,6 +175,9 @@ describe('mapRunRow', () => {
   it('maps a RunRow and attaches its summaries', () => {
     const runRow = {
       id: 'run-abc',
+      router: 'efficient' as const,
+      accuracy_noise_band: 0.05,
+      frontier_min_accuracy_delta: 0,
       kind: 'classifier' as const,
       status: 'completed' as const,
       started_at: '2026-06-10T04:10:00.000Z',
@@ -142,6 +223,9 @@ describe('mapRunRow', () => {
   it('attaches an empty summaries array when none are provided', () => {
     const runRow = {
       id: 'run-xyz',
+      router: 'efficient' as const,
+      accuracy_noise_band: 0.05,
+      frontier_min_accuracy_delta: 0,
       kind: 'decider' as const,
       status: 'running' as const,
       started_at: '2026-06-11T05:10:00.000Z',
@@ -186,6 +270,14 @@ const sampleTable: RoutingTable = {
 };
 
 describe('routingTableToRows', () => {
+  it('stores the selected router without changing artifact reconstruction', () => {
+    const efficient = routingTableToRows(sampleTable, 'now');
+    const frontier = routingTableToRows(sampleTable, 'now', 'frontier');
+    expect(efficient.tableRow.router).toBe('efficient');
+    expect(frontier.tableRow.router).toBe('frontier');
+    expect(rowsToRoutingTable(frontier.tableRow, frontier.candidateRows)).toEqual(sampleTable);
+  });
+
   it('produces a tableRow with the correct scalar fields', () => {
     const { tableRow } = routingTableToRows(sampleTable, '2026-06-01T11:00:00.000Z');
     expect(tableRow.run_id).toBe('run-test-1');
@@ -283,6 +375,7 @@ describe('rowsToRoutingTable', () => {
   it('reads back a reasoning_effort candidate row as effort-only', () => {
     const tableRow = {
       run_id: 'run-effort',
+      router: 'efficient' as const,
       published_at: '2026-06-01T11:00:00.000Z',
       generated_at: '2026-06-01T10:00:00.000Z',
       min_accuracy: 0.7,
@@ -291,6 +384,7 @@ describe('rowsToRoutingTable', () => {
       production_token_profile: null,
       switch_horizon_turns: null,
       low_confidence_threshold: null,
+      effort_by_complexity: null,
       source: 'benchmark',
     };
     const candidateRows = [
@@ -318,6 +412,7 @@ describe('rowsToRoutingTable', () => {
   it('reads back a variant-only candidate row as variant', () => {
     const tableRow = {
       run_id: 'run-variant',
+      router: 'efficient' as const,
       published_at: '2026-06-01T11:00:00.000Z',
       generated_at: '2026-06-01T10:00:00.000Z',
       min_accuracy: 0.7,
@@ -326,6 +421,7 @@ describe('rowsToRoutingTable', () => {
       production_token_profile: null,
       switch_horizon_turns: null,
       low_confidence_threshold: null,
+      effort_by_complexity: null,
       source: 'benchmark',
     };
     const candidateRows = [

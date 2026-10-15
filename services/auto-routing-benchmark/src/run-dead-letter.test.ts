@@ -1,11 +1,12 @@
+/**
+ * Dead-letter handling: a queue message that exhausted retries must record its
+ * lane death and finalize the run — profile runs complete per-entry, platform
+ * runs fail fast. Mocks the db module; SQL guards are covered honestly in
+ * lane-failure-sql.test.ts.
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
-
-vi.mock('./benchmark-settlement', () => ({
-  recordBenchmarkSettlementOutcomes: vi.fn().mockResolvedValue(undefined),
-  recoverPendingBenchmarkSettlements: vi.fn().mockResolvedValue(undefined),
-}));
 
 vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
@@ -47,10 +48,6 @@ import {
   saveRoutingTable,
 } from './db';
 import { processDeadLetter, PROFILE_LANE_DEAD_FAILURE_REASON } from './run';
-import {
-  recordBenchmarkSettlementOutcomes,
-  recoverPendingBenchmarkSettlements,
-} from './benchmark-settlement';
 
 const queueSendBatch = vi.fn();
 const kvDelete = vi.fn();
@@ -115,8 +112,6 @@ function deadLetterMessage(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(recordBenchmarkSettlementOutcomes).mockReset().mockResolvedValue(undefined);
-  vi.mocked(recoverPendingBenchmarkSettlements).mockReset().mockResolvedValue(undefined);
   vi.mocked(countCaseResultsByLane).mockResolvedValue([]);
   vi.mocked(listLaneFailures).mockResolvedValue([]);
   vi.mocked(recordLaneFailure).mockResolvedValue(undefined);
@@ -173,12 +168,6 @@ describe('processDeadLetter', () => {
       PROFILE_LANE_DEAD_FAILURE_REASON
     );
     expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    expect(recordBenchmarkSettlementOutcomes).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.anything(),
-      runId
-    );
     // Nothing is ready in the registry, so no table is published.
     expect(saveRoutingTable).not.toHaveBeenCalled();
     expect(kvDelete).not.toHaveBeenCalled();
@@ -295,7 +284,7 @@ describe('processDeadLetter', () => {
     expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
   });
 
-  it('retries unpaid settlement without re-finalizing a terminal run', async () => {
+  it('ignores messages for a run that is no longer running', async () => {
     mockRunState([{ model: 'b/dead', variant: 'high' }], 'profile', 'failed');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -303,11 +292,6 @@ describe('processDeadLetter', () => {
 
     expect(recordLaneFailure).not.toHaveBeenCalled();
     expect(markRunCompleted).not.toHaveBeenCalled();
-    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.anything(),
-      runId
-    );
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('benchmark_deadletter_run_not_running')
     );

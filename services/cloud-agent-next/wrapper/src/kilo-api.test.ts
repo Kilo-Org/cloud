@@ -147,7 +147,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
   function createClient(serverUrl: string) {
     return createWrapperKiloClient(
       createKiloClient({ baseUrl: serverUrl }),
-      serverUrl,
+      { url: serverUrl },
       '/workspace'
     );
   }
@@ -681,7 +681,11 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     });
     try {
       const url = server.url.toString();
-      const client = createWrapperKiloClient(createKiloClient({ baseUrl: url }), url, directory);
+      const client = createWrapperKiloClient(
+        createKiloClient({ baseUrl: url }),
+        { url },
+        directory
+      );
       await client.ensureSession(sessionId, directory);
       expect(await client.getSession(sessionId)).toEqual({ id: sessionId });
       expect(await client.abortSession({ sessionId, directory })).toBe(true);

@@ -94,6 +94,297 @@ const table: RoutingTable = {
   },
 };
 
+describe('complexity effort selection', () => {
+  const route = 'implementation/code_generation';
+  const effortTable: RoutingTable = {
+    ...table,
+    routes: {
+      [route]: [
+        {
+          model: 'shared/chat',
+          variant: 'low',
+          accuracy: 1,
+          avgCostUsd: 0.001,
+          meetsThreshold: true,
+        },
+        { model: 'shared/chat', variant: 'high', accuracy: 1, avgCostUsd: 1, meetsThreshold: true },
+        {
+          model: 'other/chat',
+          variant: 'other-high',
+          accuracy: 1,
+          avgCostUsd: 2,
+          meetsThreshold: true,
+        },
+      ],
+    },
+    effortByComplexity: { [route]: { 'shared/chat': { low: 'low', high: 'high' } } },
+  };
+
+  it('changes only the picked model variant for a fresh classification', () => {
+    expect(
+      computeDecision({ ...classification, reasoningComplexity: 'high' }, effortTable, null)
+    ).toMatchObject({ model: 'shared/chat', variant: 'high', switchReason: null });
+  });
+
+  it('changes a sticky incumbent effort without triggering a model cost switch', () => {
+    expect(
+      computeDecision(
+        { ...classification, reasoningComplexity: 'high' },
+        effortTable,
+        inc('shared/chat', 'low')
+      )
+    ).toMatchObject({ model: 'shared/chat', variant: 'high', sticky: true, switchReason: null });
+    expect(computeDecision(classification, effortTable, inc('shared/chat', 'high'))).toMatchObject({
+      model: 'shared/chat',
+      variant: 'low',
+      sticky: true,
+      switchReason: null,
+    });
+  });
+
+  it.each([false, true])(
+    'uses the served variant cost when deciding a cross-model switch (horizon=%s)',
+    horizon => {
+      const pricing = {
+        promptUsdPerToken: 0.0001,
+        completionUsdPerToken: 0.0001,
+        cacheReadUsdPerToken: 0.0001,
+      };
+      const mappedTable: RoutingTable = {
+        ...effortTable,
+        ...(horizon ? { switchHorizonTurns: 3 } : {}),
+        routes: {
+          [route]: [
+            {
+              model: 'shared/chat',
+              variant: 'low',
+              accuracy: 1,
+              avgCostUsd: 0.001,
+              estimatedRequestCostUsd: 0.001,
+              pricing,
+              meetsThreshold: true,
+            },
+            {
+              model: 'other/chat',
+              variant: 'other-high',
+              accuracy: 0.95,
+              avgCostUsd: 0.5,
+              estimatedRequestCostUsd: 0.5,
+              pricing,
+              meetsThreshold: true,
+            },
+            {
+              model: 'shared/chat',
+              variant: 'high',
+              accuracy: 1,
+              avgCostUsd: 1,
+              estimatedRequestCostUsd: 1,
+              pricing,
+              meetsThreshold: true,
+            },
+          ],
+        },
+      };
+      expect(
+        computeDecision(
+          { ...classification, reasoningComplexity: 'high' },
+          mappedTable,
+          inc('other/chat', 'other-high'),
+          new Set(),
+          'cost_per_accuracy',
+          { contextTokens: 1000 }
+        )
+      ).toMatchObject({
+        model: 'other/chat',
+        variant: 'other-high',
+        sticky: true,
+        switchReason: null,
+      });
+    }
+  );
+
+  it('compares served-variant accuracy instead of switching to a less accurate effort', () => {
+    const mappedTable: RoutingTable = {
+      ...effortTable,
+      routes: {
+        [route]: [
+          {
+            model: 'shared/chat',
+            variant: 'low',
+            accuracy: 1,
+            avgCostUsd: 0.001,
+            meetsThreshold: true,
+          },
+          {
+            model: 'other/chat',
+            variant: 'other-high',
+            accuracy: 0.95,
+            avgCostUsd: 0.5,
+            meetsThreshold: true,
+          },
+          {
+            model: 'shared/chat',
+            variant: 'high',
+            accuracy: 0.8,
+            avgCostUsd: 1,
+            meetsThreshold: true,
+          },
+        ],
+      },
+    };
+    expect(
+      computeDecision(
+        { ...classification, reasoningComplexity: 'high' },
+        mappedTable,
+        inc('other/chat', 'other-high'),
+        new Set(),
+        'best_accuracy'
+      )
+    ).toMatchObject({
+      model: 'other/chat',
+      variant: 'other-high',
+      sticky: true,
+      switchReason: null,
+    });
+  });
+
+  it('compares against the incumbent variant that would actually be retained', () => {
+    const mappedTable: RoutingTable = {
+      ...effortTable,
+      routes: {
+        [route]: [
+          {
+            model: 'shared/chat',
+            variant: 'low',
+            accuracy: 1,
+            avgCostUsd: 0.1,
+            meetsThreshold: true,
+          },
+          {
+            model: 'other/chat',
+            variant: 'other-high',
+            accuracy: 0.95,
+            avgCostUsd: 1,
+            meetsThreshold: true,
+          },
+          {
+            model: 'other/chat',
+            variant: 'other-low',
+            accuracy: 0.8,
+            avgCostUsd: 0.01,
+            meetsThreshold: true,
+          },
+        ],
+      },
+      effortByComplexity: { [route]: { 'other/chat': { low: 'other-low' } } },
+    };
+    expect(
+      computeDecision(classification, mappedTable, inc('other/chat', 'other-high'))
+    ).toMatchObject({
+      model: 'other/chat',
+      variant: 'other-low',
+      sticky: true,
+      switchReason: null,
+    });
+  });
+
+  it('applies the incumbent model mapping after a different fresh model loses sticky switching', () => {
+    const stickyTable: RoutingTable = {
+      ...effortTable,
+      routes: {
+        [route]: [
+          {
+            model: 'other/chat',
+            variant: 'other-high',
+            accuracy: 1,
+            avgCostUsd: 0.4,
+            meetsThreshold: true,
+          },
+          ...(effortTable.routes[route] ?? []),
+        ],
+      },
+    };
+    expect(computeDecision(classification, stickyTable, inc('shared/chat', 'high'))).toMatchObject({
+      model: 'shared/chat',
+      variant: 'low',
+      sticky: true,
+      switchReason: null,
+    });
+  });
+
+  it.each(['missing', 'other-high'])('skips an unavailable same-model pair (%s)', variant => {
+    const invalid: RoutingTable = {
+      ...effortTable,
+      effortByComplexity: { [route]: { 'shared/chat': { low: variant } } },
+    };
+    expect(computeDecision(classification, invalid, null)).toMatchObject({
+      model: 'shared/chat',
+      variant: 'low',
+    });
+  });
+
+  it('never restores denied or inactive mapped candidates', () => {
+    const decision = computeDecision(
+      { ...classification, reasoningComplexity: 'high' },
+      effortTable,
+      null,
+      new Set(['shared/chat'])
+    );
+    expect(decision).toMatchObject({ model: 'other/chat', variant: 'other-high' });
+    const filtered = computeDecision(
+      { ...classification, reasoningComplexity: 'high' },
+      effortTable,
+      null,
+      new Set(),
+      'cost_per_accuracy',
+      { failClosedOnInactive: true, capabilityMap: makeCaps({ 'other/chat': {} }) }
+    );
+    expect(filtered).toMatchObject({ model: 'other/chat', variant: 'other-high' });
+  });
+
+  it('keeps behavior unchanged without a mapping or bucket', () => {
+    const { effortByComplexity, ...withoutMapping } = effortTable;
+    expect(effortByComplexity).toBeDefined();
+    const { reasoningComplexity, ...withoutBucket } = classification;
+    expect(reasoningComplexity).toBe('low');
+    const decisions = [
+      computeDecision(classification, withoutMapping, null),
+      computeDecision({ ...classification, reasoningComplexity: 'medium' }, effortTable, null),
+      computeDecision(withoutBucket as ClassifierOutput, effortTable, null),
+    ];
+    for (const decision of decisions) {
+      if (decision?.source !== 'benchmark') throw new Error('Expected a benchmark decision');
+      expect(decision.variant).toBe('low');
+    }
+  });
+
+  it('preserves the incumbent variant on sticky-immediate turns', () => {
+    expect(
+      computeDecision(
+        classification,
+        effortTable,
+        inc('shared/chat', 'high'),
+        new Set(),
+        'cost_per_accuracy',
+        { preserveIncumbentVariant: true }
+      )
+    ).toMatchObject({ model: 'shared/chat', variant: 'high', sticky: true, switchReason: null });
+  });
+
+  it('does not mark an unchanged incumbent pair sticky merely to preserve its variant', () => {
+    expect(
+      computeDecision(
+        classification,
+        effortTable,
+        inc('shared/chat', 'low'),
+        new Set(),
+        'cost_per_accuracy',
+        { preserveIncumbentVariant: true }
+      )
+    ).toMatchObject({ model: 'shared/chat', variant: 'low', sticky: false, switchReason: null });
+  });
+});
+
 describe('computeDecision', () => {
   it('picks the first candidate of the classifier taxonomy route', () => {
     const decision = computeDecision(classification, table, null);

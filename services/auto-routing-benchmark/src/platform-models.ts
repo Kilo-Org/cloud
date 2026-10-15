@@ -25,7 +25,6 @@ export const BenchmarkModelCatalogSchema = z.object({
           prompt: CatalogTokenPriceSchema.optional(),
           completion: CatalogTokenPriceSchema.optional(),
           input_cache_read: CatalogTokenPriceSchema.optional(),
-          request: CatalogTokenPriceSchema.optional(),
         })
         .nullable()
         .catch(null)
@@ -94,18 +93,4 @@ export async function fetchPlatformRegistryEntries(
   fetchImpl: typeof fetch = fetch
 ): Promise<RunModelEntry[]> {
   return platformRegistryEntries(config, await fetchBenchmarkModelCatalog(env, fetchImpl));
-}
-
-export function catalogFallbackCaseCosts(
-  catalog: z.infer<typeof BenchmarkModelCatalogSchema>
-): Map<string, number> {
-  const costs = new Map<string, number>();
-  for (const model of catalog.data) {
-    if (model.pricing?.prompt == null || model.pricing.completion == null) continue;
-    const prompt = model.pricing.prompt;
-    const completion = model.pricing.completion;
-    const request = model.pricing.request ?? 0;
-    costs.set(model.id, 100_000 * prompt + 50_000 * completion + 32 * request);
-  }
-  return costs;
 }

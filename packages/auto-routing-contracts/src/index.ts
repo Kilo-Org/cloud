@@ -3,6 +3,7 @@ import { BenchmarkProfileEntryStatusSchema } from './benchmark';
 import { NormalizedClassifierInputSchema } from './input';
 import { ReasoningEffortSchema } from './reasoning';
 import { EfficientModelPoolSchema, PoolEntrySchema, poolEntryKey } from './routing-table';
+import { AutoRouterSchema } from './router';
 import {
   ClassifierSubtaskTypeSchema,
   ClassifierTaskTypeSchema,
@@ -15,6 +16,8 @@ export {
   type JsonValue,
   type NormalizedClassifierInput,
 } from './input';
+
+export { AUTO_ROUTERS, AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 
 export const AutoRoutingModeSchema = z.enum(['cost_per_accuracy', 'best_accuracy']);
 export type AutoRoutingMode = z.infer<typeof AutoRoutingModeSchema>;
@@ -43,6 +46,7 @@ export function isVirtualAutoModelId(model: string): boolean {
 // leaves it, and skips the mirror entirely when normalization fails.
 export const MirrorPayloadSchema = z.object({
   input: NormalizedClassifierInputSchema,
+  router: AutoRouterSchema.optional(),
   routingPolicy: z
     .object({
       deniedModelIds: z.array(z.string().trim().min(1)),
@@ -107,7 +111,7 @@ export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
  * legacy variant key. New writers emit `variant` only; old writers emitted
  * `reasoningEffort` only. Both non-null is malformed.
  */
-const BenchmarkAutoRoutingDecisionSchema = z
+export const AutoRoutingDecisionSchema = z
   .object({
     model: z.string(),
     taskType: ClassifierTaskTypeSchema,
@@ -141,20 +145,6 @@ const BenchmarkAutoRoutingDecisionSchema = z
     }
   });
 
-const CodingPlanDefaultDecisionSchema = z.object({
-  model: z.string(),
-  taskType: z.null(),
-  subtaskType: z.null(),
-  source: z.literal('coding_plan_default'),
-  tableVersion: z.string(),
-  reasoningEffort: ReasoningEffortSchema.nullable().optional(),
-  sticky: z.boolean().default(false),
-});
-
-export const AutoRoutingDecisionSchema = z.discriminatedUnion('source', [
-  BenchmarkAutoRoutingDecisionSchema,
-  CodingPlanDefaultDecisionSchema,
-]);
 export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
 
 export const AutoRoutingDecisionResponseSchema = z.object({

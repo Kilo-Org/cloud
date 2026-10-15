@@ -39,6 +39,7 @@ it('preserves distinct variants from a pairs file and resumes their results inde
       '0',
       '--out',
       outputPath,
+      '--skip-agentic',
     ];
     const options = { env: { ...process.env, OPENROUTER_API_KEY: 'unused-zero-budget-key' } };
     await execFileAsync(process.execPath, args, options);

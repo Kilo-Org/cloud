@@ -77,6 +77,7 @@ import {
 import { billingPayerPresentation } from './billing-payer-presentation';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
+import { PreviewPortDialog } from './PreviewPortDialog';
 import { WorktreeChangesView } from './WorktreeChanges';
 import { WorktreeFilePane } from './WorktreeFilePane';
 import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
@@ -102,6 +103,8 @@ import {
 } from './workspace-tabs';
 import { getWorkspaceTabsStorageKey } from './workspace-tabs-storage';
 import { usePersistedWorkspaceTabs } from './hooks/usePersistedWorkspaceTabs';
+import { PreviewLinksContext } from './use-preview';
+import { usePreviewController } from './use-preview-controller';
 import {
   createRemoteModelOverride,
   useSessionModels,
@@ -1680,6 +1683,19 @@ export default function CloudChatPage({
       ? worktreeChats.some(chat => Boolean(chat.cloudAgentSessionId))
       : Boolean(sessionId) && !isReadOnly;
 
+  const preview = usePreviewController({
+    selectedWorktreeId,
+    routeReady:
+      sessionIdFromParams !== null && fetchedSessionData?.kiloSessionId === sessionIdFromParams
+        ? fetchedSessionData?.routeReady
+        : undefined,
+    sessionIdFromParams,
+    sessionId,
+    worktreeChats,
+    canOpenTerminal,
+    organizationId,
+  });
+
   const composerTextareaDisabled =
     activeSessionType === 'cloud-agent'
       ? isReadOnly || isLoading || transcriptPhase === 'opening'
@@ -1831,8 +1847,10 @@ export default function CloudChatPage({
                         terminals={workspaceTabs.terminals}
                         terminalStatuses={terminalStatuses}
                         canCreateTerminal={canOpenTerminal}
+                        canOpenPreview={preview.links !== null}
                         onSelectTab={handleSelectWorkspaceTab}
                         onCreateTerminal={handleCreateTerminalTab}
+                        onOpenPreview={preview.openDialog}
                         onCloseTerminal={handleCloseTerminalTab}
                         onActivateTab={closeChangesView}
                         selectionSuppressed={changesViewOpen}
@@ -1842,6 +1860,7 @@ export default function CloudChatPage({
                     )}
                   </div>
                   <WorktreeReviewDialog review={review} onOpenComment={handleOpenReviewComment} />
+                  {preview.dialog !== null && <PreviewPortDialog {...preview.dialog} />}
                   {(sessionIdFromParams || workspaceControlSession) && (
                     <div className="ml-auto shrink-0">{sessionActions}</div>
                   )}
@@ -1947,7 +1966,7 @@ export default function CloudChatPage({
                                   <Skeleton className="h-3 w-1/2 motion-reduce:animate-none" />
                                 </div>
                               ) : transcriptPhase === 'failed' ? null : (
-                                <>
+                                <PreviewLinksContext.Provider value={preview.links}>
                                   <ConversationMessages
                                     active={chatTabActive}
                                     isStreaming={isStreaming}
@@ -1973,7 +1992,7 @@ export default function CloudChatPage({
                                     visibleStatusIndicator.type !== 'error' && (
                                       <SessionStatusIndicator indicator={visibleStatusIndicator} />
                                     )}
-                                </>
+                                </PreviewLinksContext.Provider>
                               )}
 
                               <div ref={messagesEndRef} />

@@ -5,11 +5,6 @@ import type * as DbModule from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import type * as ConfigModule from './config';
 
-vi.mock('./benchmark-settlement', () => ({
-  recordBenchmarkSettlementOutcomes: vi.fn().mockResolvedValue(undefined),
-  recoverPendingBenchmarkSettlements: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('./decider-judge', () => ({ createDeciderJudge: vi.fn() }));
 vi.mock('./openrouter', () => ({ createSystemOneClient: vi.fn() }));
 // Publishing reads live config to learn which pairs the platform table wants.
@@ -36,6 +31,7 @@ vi.mock('./db', async importOriginal => {
     getLatestRoutingTable: vi.fn(),
     countCurrentProfilesByStatus: vi.fn(),
     getSummariesForRuns: vi.fn(),
+    getRoutingCaseResultsForEntries: vi.fn().mockResolvedValue([]),
     listReadyCurrentProfilesForEntries: vi.fn(),
     markRunCompleted: vi.fn(),
     replaceModelSummaries: vi.fn(),
@@ -92,7 +88,6 @@ import {
 } from './db';
 import { getBenchmarkConfig } from './config';
 import { processJob } from './run';
-import { recoverPendingBenchmarkSettlements } from './benchmark-settlement';
 import { createDeciderJudge } from './decider-judge';
 import { createSystemOneClient } from './openrouter';
 import type { DeciderJudge } from './grading';
@@ -129,12 +124,10 @@ function mockRunSnapshot(
     variant: string;
     enqueued?: boolean;
     reasoning_effort?: string | null;
-  }> = [{ model, variant: '', enqueued: true, reasoning_effort: null }],
-  status: 'running' | 'completed' | 'failed' = 'running'
+  }> = [{ model, variant: '', enqueued: true, reasoning_effort: null }]
 ): void {
   vi.mocked(getRunWithModels).mockResolvedValue({
     run: {
-      status,
       max_concurrency: 4,
       min_accuracy: 0.7,
       switch_cost_factor: 3,
@@ -169,6 +162,9 @@ function deciderMessage(overrides: { variant?: string | null } = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getBenchmarkConfig).mockResolvedValue({
+    router: 'efficient',
+    accuracyNoiseBand: 0.05,
+    frontierMinAccuracyDelta: 0,
     classifierModels: ['classifier/a'],
     deciderModels: [{ id: model }],
     minAccuracy: 0.7,
@@ -184,8 +180,6 @@ beforeEach(() => {
     classifierRepetitions: 1,
     deciderRepetitions: 1,
     classifierMaxP95LatencyMs: 1000,
-    autoDeciderMinCostUsd: 15,
-    autoDeciderMaxCostUsd: 25,
     updatedAt: null,
     updatedBy: null,
   });
@@ -230,24 +224,6 @@ afterEach(() => {
 });
 
 describe('processJob — decider exact-pair snapshot resolution', () => {
-  it.each(['completed', 'failed'] as const)(
-    'retries billing for a %s run without executing another benchmark case',
-    async status => {
-      mockRunSnapshot(undefined, status);
-
-      await processJob(env, deciderMessage());
-
-      expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
-      expect(upsertCaseResult).not.toHaveBeenCalled();
-      expect(markRunCompleted).not.toHaveBeenCalled();
-      expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
-        env.BENCH_DB,
-        expect.anything(),
-        runId
-      );
-    }
-  );
-
   it('throws when an explicit-variant message has no exact snapshot row', async () => {
     mockRunSnapshot([
       { model, variant: 'high', reasoning_effort: 'high' },
@@ -609,6 +585,8 @@ describe('processJob — canonical registry publication', () => {
       variant: 'max',
       accuracy: 0.9,
       avgCostUsd: 0.001,
+      p50LatencyMs: 90,
+      p50TtftMs: undefined,
       pricing: null,
       estimatedRequestCostUsd: 0.001,
       cases: 5,

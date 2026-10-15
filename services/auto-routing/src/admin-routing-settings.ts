@@ -4,7 +4,6 @@ import {
   BenchmarkProfileQuotaErrorSchema,
   DEFAULT_AUTO_ROUTING_MODE,
   UpdateAutoRoutingSettingsRequestSchema,
-  EstimateBenchmarkProfilesRequestSchema,
   type AutoRoutingMode,
   type AutoRoutingModeOwnerType,
   type AutoRoutingSettingsResponse,
@@ -14,9 +13,6 @@ import {
 import type { Handler } from 'hono';
 import {
   BenchmarkProfileQuotaError,
-  BenchmarkInsufficientCreditsError,
-  BenchmarkEstimateRequestError,
-  estimateBenchmarkProfiles,
   fetchBenchmarkProfileStatuses,
   registerBenchmarkProfiles,
 } from './benchmark-origin';
@@ -67,7 +63,7 @@ export const getRoutingSettingsHandler: Handler<HonoEnv> = async c => {
   }
 
   try {
-    const statuses = await fetchBenchmarkProfileStatuses(c.env, configured.pool, parsed.data);
+    const statuses = await fetchBenchmarkProfileStatuses(c.env, configured.pool);
     return c.json(
       settingsResponse({
         ...parsed.data,
@@ -107,9 +103,6 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
       });
       poolStatuses = registered.statuses;
     } catch (error) {
-      if (error instanceof BenchmarkInsufficientCreditsError) {
-        return c.json({ error: error.message }, 402);
-      }
       if (error instanceof BenchmarkProfileQuotaError) {
         return c.json(
           BenchmarkProfileQuotaErrorSchema.parse({
@@ -136,21 +129,4 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
       poolStatuses,
     })
   );
-};
-
-export const estimateRoutingProfilesHandler: Handler<HonoEnv> = async c => {
-  const raw: unknown = await c.req.json().catch(() => null);
-  const parsed = EstimateBenchmarkProfilesRequestSchema.safeParse(raw);
-  if (!parsed.success) return c.json({ error: 'Invalid benchmark estimate request' }, 400);
-  try {
-    return c.json(await estimateBenchmarkProfiles(c.env, parsed.data));
-  } catch (error) {
-    if (error instanceof BenchmarkInsufficientCreditsError) {
-      return c.json({ error: error.message }, 402);
-    }
-    if (error instanceof BenchmarkEstimateRequestError) {
-      return c.json({ error: error.message }, error.status);
-    }
-    return c.json({ error: 'Failed to estimate benchmark profiles' }, 502);
-  }
 };

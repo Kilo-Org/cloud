@@ -424,7 +424,7 @@ describe('conversation state', () => {
 
   it('makes exactly one RPC on each cold and hot read', async () => {
     const { cacheDO, readRpc, readState } = createCacheEnv();
-    await cacheDO.putEntry('model:hash', classification);
+    await cacheDO.putEntry('efficient:model:hash', classification);
 
     expect((await readState()).classification).toEqual(classification);
     expect(readRpc).toHaveBeenCalledTimes(1);
@@ -443,7 +443,7 @@ describe('conversation state', () => {
       'implementation/code_generation',
       1
     );
-    storage.entries.delete('model:hash');
+    storage.entries.delete('efficient:model:hash');
 
     expect(await readState()).toEqual({
       classification,
@@ -484,12 +484,56 @@ describe('conversation state', () => {
     expect(second.readRpc).toHaveBeenCalledTimes(1);
   });
 
+  it('isolates sticky and classification state by router, defaulting to efficient', async () => {
+    const efficient = createCacheDO();
+    const frontier = createCacheDO();
+    const idFromName = vi.fn((name: string) => name);
+    const env = {
+      AUTO_ROUTING_DECISION_CACHE: {
+        idFromName,
+        get: (name: string) =>
+          name.startsWith('frontier:') ? frontier.cacheDO : efficient.cacheDO,
+      },
+    } as unknown as Pick<Env, 'AUTO_ROUTING_DECISION_CACHE'>;
+    await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
+    await putStickyDecision(env, 'conversation-1', 'efficient/chat', null, 'route', 1);
+    expect(await readConversationState(env, 'conversation-1', 'hash', 'model', 'frontier')).toEqual(
+      { classification: null, sticky: null }
+    );
+    const frontierClassification = { ...classification, confidence: 0.9 };
+    await putCachedClassification(
+      env,
+      'conversation-1',
+      'hash',
+      'model',
+      frontierClassification,
+      'frontier'
+    );
+    await putStickyDecision(env, 'conversation-1', 'frontier/chat', null, 'route', 1, 'frontier');
+    const efficientState = await readConversationState(env, 'conversation-1', 'hash', 'model');
+    const frontierState = await readConversationState(
+      env,
+      'conversation-1',
+      'hash',
+      'model',
+      'frontier'
+    );
+    expect(efficientState.classification).toEqual(classification);
+    expect(efficientState.sticky?.model).toBe('efficient/chat');
+    expect(frontierState.classification).toEqual(frontierClassification);
+    expect(frontierState.sticky?.model).toBe('frontier/chat');
+    expect(idFromName).toHaveBeenCalledWith('efficient:conversation-1');
+    expect(idFromName).toHaveBeenCalledWith('frontier:conversation-1');
+    expect(efficient.storage.entries.has('efficient:model:hash')).toBe(true);
+    expect(frontier.storage.entries.has('frontier:model:hash')).toBe(true);
+  });
+
   it('populates the hot cache on a DO hit without extending the stored TTL', async () => {
     const { cacheDO, storage, readState } = createCacheEnv();
-    await cacheDO.putEntry('model:hash', classification);
+    await cacheDO.putEntry('efficient:model:hash', classification);
     vi.advanceTimersByTime(29 * 60 * 1000);
     expect((await readState()).classification).toEqual(classification);
-    storage.entries.delete('model:hash');
+    storage.entries.delete('efficient:model:hash');
     expect((await readState()).classification).toEqual(classification);
 
     vi.advanceTimersByTime(2 * 60 * 1000);
@@ -499,7 +543,7 @@ describe('conversation state', () => {
   it('expires classifications cached by a write and separates classifier models', async () => {
     const { env, storage, readState } = createCacheEnv();
     await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
-    storage.entries.delete('model:hash');
+    storage.entries.delete('efficient:model:hash');
     expect((await readState()).classification).toEqual(classification);
     expect(
       (await readConversationState(env, 'conversation-1', 'hash', 'other-model')).classification
@@ -519,7 +563,7 @@ describe('conversation state', () => {
       'implementation/code_generation',
       1
     );
-    storage.entries.set('model:hash', { value: { nope: true }, storedAt: Date.now() });
+    storage.entries.set('efficient:model:hash', { value: { nope: true }, storedAt: Date.now() });
 
     expect(await readState()).toEqual({
       classification: null,

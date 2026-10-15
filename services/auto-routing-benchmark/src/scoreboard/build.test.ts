@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { rowsToRoutingTable } from '../db';
 import { buildScoreboard } from './build';
+import { summarizeSweep } from './sweep';
 import { compareScoreboards } from './compare';
 import { estimateClassifiedMetrics } from './production';
 import {
@@ -76,7 +77,13 @@ function build(
   replay: ReplayMetrics | null = null,
   options: Pick<
     Parameters<typeof buildScoreboard>[0],
-    'costProfile' | 'rerankProfile' | 'sweep' | 'rebuildFromSweep' | 'pricing'
+    | 'costProfile'
+    | 'rerankProfile'
+    | 'sweep'
+    | 'rebuildFromSweep'
+    | 'pricing'
+    | 'complexityLabels'
+    | 'accuracyNoiseBand'
   > = {}
 ) {
   return buildScoreboard({
@@ -91,6 +98,114 @@ function build(
 }
 
 describe('buildScoreboard', () => {
+  it.each([
+    { accuracyNoiseBand: undefined, expectedAccuracy: 0 },
+    { accuracyNoiseBand: 0.05, expectedAccuracy: 0 },
+    { accuracyNoiseBand: 0.01, expectedAccuracy: 1 },
+  ])(
+    'rebuilds learned efforts with noise band $accuracyNoiseBand',
+    ({ accuracyNoiseBand, expectedAccuracy }) => {
+      const route = 'implementation/code_generation';
+      const pairs: OfflineSweep['pairs'] = ['low', 'high'].map(variant => ({
+        model: 'fixture/shared',
+        variant,
+        results: Array.from({ length: 7 }, (_, i) => ({
+          caseId: `case-${i}`,
+          rep: 0,
+          routeKey: route,
+          split: i === 6 ? ('heldOut' as const) : ('train' as const),
+          score: variant === 'high' ? 1 : i === 6 ? 0 : 0.97,
+          costUsd: variant === 'low' ? 0.01 : 1,
+          graderCostUsd: 0,
+          latencyMs: 100,
+          error: null,
+        })),
+      }));
+      const sweep: OfflineSweep = {
+        startedAt: now.toISOString(),
+        truncated: false,
+        costUsd: 0,
+        graderCostUsd: 0,
+        pairs,
+        summaries: summarizeSweep(pairs),
+      };
+      const result = build({ ...table, minAccuracy: 0.99 }, prod({ [route]: 1 }), null, {
+        sweep,
+        rebuildFromSweep: true,
+        complexityLabels: Object.fromEntries(
+          Array.from({ length: 7 }, (_, i) => [`case-${i}`, 'high' as const])
+        ),
+        accuracyNoiseBand,
+      });
+      expect(result.quality.heldOut?.accuracyWeighted).toBe(expectedAccuracy);
+    }
+  );
+
+  it('learns efforts from train buckets and evaluates mapped per-case held-out results', () => {
+    const route = 'implementation/code_generation';
+    const labels = Object.fromEntries([
+      ...Array.from({ length: 6 }, (_, i) => [`low-${i}`, 'low'] as const),
+      ...Array.from({ length: 6 }, (_, i) => [`high-${i}`, 'high'] as const),
+      ['held-low', 'low'] as const,
+      ['held-high', 'high'] as const,
+    ]);
+    const pairs: OfflineSweep['pairs'] = ['low', 'high'].map(variant => ({
+      model: 'fixture/shared',
+      variant,
+      results: [
+        ...['low', 'high'].flatMap(bucket =>
+          Array.from({ length: 6 }, (_, i) => ({
+            caseId: `${bucket}-${i}`,
+            rep: 0,
+            routeKey: route,
+            split: 'train' as const,
+            score: 1,
+            costUsd: variant === 'low' ? (bucket === 'low' ? 0.01 : 2) : bucket === 'low' ? 4 : 0.1,
+            graderCostUsd: 0,
+            latencyMs: 100,
+            error: null,
+          }))
+        ),
+        ...['low', 'high'].map(bucket => ({
+          caseId: `held-${bucket}`,
+          rep: 0,
+          routeKey: route,
+          split: 'heldOut' as const,
+          score: variant === bucket ? 1 : 0,
+          costUsd: variant === bucket ? (bucket === 'low' ? 0.02 : 0.03) : 1,
+          graderCostUsd: 0,
+          latencyMs: variant === bucket ? (bucket === 'low' ? 20 : 40) : 1000,
+          ttftMs: variant === bucket ? (bucket === 'low' ? 5 : 7) : 500,
+          error: null,
+        })),
+      ],
+    }));
+    const sweep: OfflineSweep = {
+      startedAt: now.toISOString(),
+      truncated: false,
+      costUsd: 0,
+      graderCostUsd: 0,
+      pairs,
+      summaries: summarizeSweep(pairs),
+    };
+    const result = build(table, prod({ [route]: 1 }), null, {
+      sweep,
+      rebuildFromSweep: true,
+      complexityLabels: labels,
+    });
+    expect(result.quality.heldOut).toEqual({
+      accuracyWeighted: 1,
+      estimatedRequestUsdWeighted: 0.025,
+      p50LatencyMsWeighted: 30,
+      p50TtftMsWeighted: 6,
+      routes: 1,
+    });
+    const withoutMapping = build(table, prod({ [route]: 1 }), null, {
+      sweep,
+      rebuildFromSweep: true,
+    });
+    expect(withoutMapping.quality.heldOut?.accuracyWeighted).toBe(0.5);
+  });
   it('weights first candidates over shared routes and excludes routes missing from the mix', () => {
     const result = build(
       table,
@@ -183,6 +298,25 @@ describe('buildScoreboard', () => {
       meetsThreshold: true,
     });
     expect(build(parsed).cost.estimatedRequestUsdWeighted).toBeCloseTo(0.22);
+  });
+
+  it('validates live-table routers and defaults legacy rows to efficient', () => {
+    const row = {
+      run_id: 'fixture/live',
+      published_at: now.toISOString(),
+      generated_at: now.toISOString(),
+      min_accuracy: 0.5,
+      switch_cost_factor: 2,
+      best_accuracy_switch_threshold: 0.05,
+      source: 'benchmark',
+    };
+    expect(LiveScoreboardTableRowSchema.parse(row).router).toBe('efficient');
+    expect(LiveScoreboardTableRowSchema.parse({ ...row, router: 'frontier' }).router).toBe(
+      'frontier'
+    );
+    expect(LiveScoreboardTableRowSchema.safeParse({ ...row, router: 'unknown' }).success).toBe(
+      false
+    );
   });
 
   it('weights prompt-aware estimates without changing the published first picks', () => {
@@ -329,6 +463,7 @@ describe('buildScoreboard', () => {
         cases: 10,
         avgCostUsd: 0.03,
         p50LatencyMs: 500,
+        p50TtftMs: 200,
       },
       {
         model: 'fixture/second',
@@ -349,6 +484,7 @@ describe('buildScoreboard', () => {
         cases: 10,
         avgCostUsd: 0.01,
         p50LatencyMs: 100,
+        p50TtftMs: 40,
       },
     ];
     const sweep: OfflineSweep = {
@@ -369,9 +505,24 @@ describe('buildScoreboard', () => {
     expect(result.quality.heldOut?.estimatedRequestUsdWeighted).toBeCloseTo(0.025);
     expect(result.quality.heldOut).toMatchObject({
       p50LatencyMsWeighted: 400,
+      p50TtftMsWeighted: 160,
       routes: 2,
     });
     expect(ScoreboardSchema.parse(result)).toEqual(result);
+    const missingTtft = build(
+      table,
+      prod({ 'implementation/code_generation': 0.75, 'debugging/bug_fixing': 0.25 }),
+      null,
+      {
+        sweep: {
+          ...sweep,
+          summaries: summaries.map(summary =>
+            summary.model === 'fixture/third' ? { ...summary, p50TtftMs: null } : summary
+          ),
+        },
+      }
+    );
+    expect(missingTtft.quality.heldOut?.p50TtftMsWeighted).toBe(200);
   });
 
   it('rebuilds from train only with pricing and evaluates new picks on held-out costs and latency', () => {
@@ -384,6 +535,7 @@ describe('buildScoreboard', () => {
       cases: 100,
       avgCostUsd: 0.4,
       p50LatencyMs: 1000,
+      p50TtftMs: 200,
     };
     const sweep: OfflineSweep = {
       startedAt: now.toISOString(),
@@ -402,6 +554,7 @@ describe('buildScoreboard', () => {
           accuracy: 0.9,
           avgCostUsd: 0.015,
           p50LatencyMs: 150,
+          p50TtftMs: 50,
         },
         {
           ...summary,
@@ -450,6 +603,7 @@ describe('buildScoreboard', () => {
     expect(head.quality.heldOut?.accuracyWeighted).toBe(0.9);
     expect(head.quality.heldOut?.estimatedRequestUsdWeighted).toBeCloseTo(0.035);
     expect(head.quality.heldOut?.p50LatencyMsWeighted).toBe(150);
+    expect(head.quality.heldOut?.p50TtftMsWeighted).toBe(50);
     expect(head.quality.heldOut?.routes).toBe(1);
     expect(base.quality.heldOut?.accuracyWeighted).toBe(0.2);
     expect(base.quality.heldOut?.estimatedRequestUsdWeighted).toBeCloseTo(0.05);
@@ -459,6 +613,7 @@ describe('buildScoreboard', () => {
       '| quality.heldOut.estimatedRequestUsdWeighted | -30.00% | better |'
     );
     expect(markdown).toContain('| quality.heldOut.p50LatencyMsWeighted | -70.00% | better |');
+    expect(markdown).toContain('| quality.heldOut.p50TtftMsWeighted | -75.00% | better |');
     expect(pricedTable.routes['implementation/code_generation'][0].model).toBe('fixture/first');
   });
 
@@ -494,6 +649,7 @@ describe('buildScoreboard', () => {
       accuracyWeighted: 0.7,
       estimatedRequestUsdWeighted: 0.03,
       p50LatencyMsWeighted: 500,
+      p50TtftMsWeighted: null,
       routes: 1,
     });
     expect(
@@ -502,6 +658,7 @@ describe('buildScoreboard', () => {
       accuracyWeighted: null,
       estimatedRequestUsdWeighted: null,
       p50LatencyMsWeighted: null,
+      p50TtftMsWeighted: null,
       routes: 0,
     });
     const missingCost = build(table, null, null, {

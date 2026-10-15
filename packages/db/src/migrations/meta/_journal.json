@@ -1954,13 +1954,6 @@
       "when": 1791913993257,
       "tag": "0278_needy_master_mold",
       "breakpoints": true
-    },
-    {
-      "idx": 279,
-      "version": "7",
-      "when": 1791942202694,
-      "tag": "0279_short_big_bertha",
-      "breakpoints": true
     }
   ]
 }

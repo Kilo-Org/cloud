@@ -14,10 +14,15 @@ vi.mock('./db', async importOriginal => {
     ...actual,
     listReadyCurrentProfilesForEntries: vi.fn(),
     getSummariesForRuns: vi.fn(),
+    getRoutingCaseResultsForEntries: vi.fn(),
   };
 });
 
-import { getSummariesForRuns, listReadyCurrentProfilesForEntries } from './db';
+import {
+  getRoutingCaseResultsForEntries,
+  getSummariesForRuns,
+  listReadyCurrentProfilesForEntries,
+} from './db';
 import { assembleCustomRoutingTable } from './custom-routing-table';
 import { computeEngineIdentity } from './run';
 
@@ -155,7 +160,6 @@ describe('buildCustomRoutingTable', () => {
       accuracy: 0.8,
       avgCostUsd: 0.003,
     });
-    // Deterministic version shape unchanged
     expect(table!.version).toMatch(/^registry-[0-9a-f]{8}$/);
     expect(table!.version).toBe(
       computeRegistryRoutingTableVersion(
@@ -163,7 +167,7 @@ describe('buildCustomRoutingTable', () => {
           { runId: 'run-r1', model: 'vendor/a', variant: 'high' },
           { runId: 'run-r2', model: 'vendor/b', variant: 'max' },
         ],
-        base
+        { ...base, summaries: [summaries[0], summaries[2]] }
       )
     );
   });
@@ -229,6 +233,7 @@ describe('assembleCustomRoutingTable', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getRoutingCaseResultsForEntries).mockResolvedValue([]);
   });
 
   it('returns table null when no ready current profiles', async () => {
@@ -271,6 +276,10 @@ describe('assembleCustomRoutingTable', () => {
       expect.any(Array)
     );
     expect(result.table).not.toBeNull();
+    expect(getRoutingCaseResultsForEntries).toHaveBeenCalledWith(expect.anything(), [
+      { entry: { model: 'vendor/m', variant: 'xhigh' }, runId: 'run-x' },
+      { entry: { model: 'vendor/m', variant: 'max' }, runId: 'run-m' },
+    ]);
     expect(result.table?.lowConfidenceThreshold).toBe(0.8);
     expect(result.table!.routes['implementation/code_generation']).toHaveLength(2);
   });

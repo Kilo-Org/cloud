@@ -3,6 +3,7 @@ import {
   benchmarkPairKey,
   rankCandidates,
   type CandidatePricing,
+  type ComplexityLabels,
   type ProductionTokenProfile,
 } from '@kilocode/auto-routing-contracts';
 import type {
@@ -13,6 +14,8 @@ import type {
   Scoreboard,
   ScoreboardRoutingTable,
 } from './schema';
+import { buildEffortByComplexity } from '../routing-table-builder';
+import { summarizeSweep } from './sweep';
 
 type BuildScoreboardInput = {
   label: string;
@@ -25,7 +28,9 @@ type BuildScoreboardInput = {
   costProfile?: ProductionTokenProfile | null;
   sweep?: OfflineSweep | null;
   rebuildFromSweep?: boolean;
+  complexityLabels?: ComplexityLabels | null;
   pricing?: Record<string, CandidatePricing | null> | null;
+  accuracyNoiseBand?: number;
 };
 
 export function buildScoreboard({
@@ -39,7 +44,9 @@ export function buildScoreboard({
   costProfile,
   sweep = null,
   rebuildFromSweep = false,
+  complexityLabels = null,
   pricing = null,
+  accuracyNoiseBand,
 }: BuildScoreboardInput): Scoreboard {
   const profile = costProfile ?? rerankProfile ?? table.productionTokenProfile ?? null;
   if (rebuildFromSweep && !sweep) throw new Error('Rebuilding requires an offline sweep');
@@ -87,7 +94,7 @@ export function buildScoreboard({
             return maximum === null ? cost : Math.max(maximum, cost);
           }, null);
           const candidates = measured.map(
-            ({ model, variant, accuracy, cases, avgCostUsd, p50LatencyMs }) => {
+            ({ model, variant, accuracy, cases, avgCostUsd, p50LatencyMs, p50TtftMs }) => {
               const candidatePricing = pricing
                 ? (pricing[model] ?? null)
                 : (storedPricing.get(model) ?? null);
@@ -106,6 +113,7 @@ export function buildScoreboard({
                     ? 0
                     : Math.max(0, maxKnownEstimatedCostUsd - promptCostUsd)),
                 p50LatencyMs,
+                p50TtftMs,
                 pricing: candidatePricing,
               };
             }
@@ -113,10 +121,12 @@ export function buildScoreboard({
           return [
             [
               route,
-              rankCandidates(candidates, table.minAccuracy, { profile }).map(candidate => ({
-                ...candidate,
-                p50LatencyMs: latencies.get(candidateKey(candidate)) ?? null,
-              })),
+              rankCandidates(candidates, table.minAccuracy, { profile, accuracyNoiseBand }).map(
+                candidate => ({
+                  ...candidate,
+                  p50LatencyMs: latencies.get(candidateKey(candidate)) ?? null,
+                })
+              ),
             ],
           ];
         })
@@ -133,7 +143,7 @@ export function buildScoreboard({
                 p50LatencyMs: candidate.p50LatencyMs ?? null,
               })),
               table.minAccuracy,
-              { profile: rerankProfile }
+              { profile: rerankProfile, accuracyNoiseBand }
             ).map(candidate => ({
               ...candidate,
               p50LatencyMs: latencies[candidateKey(candidate)],
@@ -142,6 +152,17 @@ export function buildScoreboard({
           })
         )
       : table.routes;
+  const effortByComplexity =
+    rebuildFromSweep && sweep && complexityLabels
+      ? buildEffortByComplexity(
+          routes,
+          sweep.pairs,
+          complexityLabels,
+          table.minAccuracy,
+          profile,
+          accuracyNoiseBand
+        )
+      : table.effortByComplexity;
   const routeKeys = Object.keys(table.routes);
   const routeMix =
     prod && Object.keys(prod.routeMix).length > 0
@@ -167,8 +188,43 @@ export function buildScoreboard({
     return weight > 0 ? total / weight : null;
   };
 
+  const selectedResults: Record<string, OfflineSweep['pairs'][number]['results']> = {};
+  if (sweep && complexityLabels && effortByComplexity) {
+    for (const pair of sweep.pairs) {
+      for (const result of pair.results) {
+        if (result.split !== 'heldOut') continue;
+        const pick = routes[result.routeKey]?.[0];
+        if (!pick || pair.model !== pick.model) continue;
+        const bucket = complexityLabels[result.caseId];
+        const mapped = bucket
+          ? effortByComplexity[result.routeKey]?.[pick.model]?.[bucket]
+          : undefined;
+        const variant =
+          mapped !== undefined ? mapped : (pick.variant ?? pick.reasoningEffort ?? null);
+        if (pair.variant !== variant) continue;
+        (selectedResults[result.routeKey] ??= []).push(result);
+      }
+    }
+  }
+  const heldOutSummaries =
+    sweep && complexityLabels && effortByComplexity
+      ? summarizeSweep(
+          Object.entries(selectedResults).flatMap(([route, results]) => {
+            const pick = routes[route]?.[0];
+            return pick
+              ? [
+                  {
+                    model: pick.model,
+                    variant: pick.variant ?? pick.reasoningEffort ?? null,
+                    results,
+                  },
+                ]
+              : [];
+          })
+        )
+      : (sweep?.summaries ?? []);
   const heldOutByRoute = new Map<string, Map<string, OfflineSweepSummary>>();
-  for (const summary of sweep?.summaries ?? []) {
+  for (const summary of heldOutSummaries) {
     if (summary.split !== 'heldOut') continue;
     let summaries = heldOutByRoute.get(summary.routeKey);
     if (!summaries) {
@@ -184,7 +240,9 @@ export function buildScoreboard({
       ? [{ pick, summary, share }]
       : [];
   });
-  const heldOutWeighted = (metric: 'accuracy' | 'avgCostUsd' | 'p50LatencyMs'): number | null => {
+  const heldOutWeighted = (
+    metric: 'accuracy' | 'avgCostUsd' | 'p50LatencyMs' | 'p50TtftMs'
+  ): number | null => {
     let total = 0;
     let weight = 0;
     for (const { pick, summary, share } of heldOutPicks) {
@@ -196,7 +254,7 @@ export function buildScoreboard({
           profile
         );
       } else {
-        value = summary[metric];
+        value = summary[metric] ?? null;
       }
       if (value === null) continue;
       total += value * share;
@@ -238,6 +296,7 @@ export function buildScoreboard({
             accuracyWeighted: heldOutWeighted('accuracy'),
             estimatedRequestUsdWeighted: heldOutWeighted('avgCostUsd'),
             p50LatencyMsWeighted: heldOutWeighted('p50LatencyMs'),
+            p50TtftMsWeighted: heldOutWeighted('p50TtftMs'),
             routes: heldOutPicks.length,
           }
         : null,

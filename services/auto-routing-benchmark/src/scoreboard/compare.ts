@@ -117,6 +117,12 @@ export function compareScoreboards(
     base.quality.heldOut?.p50LatencyMsWeighted ?? null,
     head.quality.heldOut?.p50LatencyMsWeighted ?? null
   );
+  add(
+    'quality.heldOut.p50TtftMsWeighted',
+    'latency',
+    base.quality.heldOut?.p50TtftMsWeighted ?? null,
+    head.quality.heldOut?.p50TtftMsWeighted ?? null
+  );
 
   const directions: Record<Axis, Set<Direction>> = {
     latency: new Set(),

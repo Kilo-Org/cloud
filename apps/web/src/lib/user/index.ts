@@ -910,8 +910,6 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - The kilocode_users row (anonymized)
  * - Stripe link (stripe_customer_id unchanged)
  * - credit_transactions, microdollar_usage (billing records)
- * - auto_routing_benchmark_holds (financial payer references to the anonymized
- *   user; pending holds must still settle and settled usage must reconcile)
  * - kilo_pass_subscriptions/issuances/issuance_items (financial)
  * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
  * - deployments, app_builder_projects (user assets)

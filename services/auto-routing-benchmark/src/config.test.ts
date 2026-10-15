@@ -12,22 +12,43 @@ const configRow = {
   classifier_repetitions: 1,
   decider_repetitions: 1,
   classifier_max_p95_latency_ms: null,
-  auto_decider_min_cost_usd: 12,
-  auto_decider_max_cost_usd: 24,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: 'admin@example.com',
 };
 
-const autoRows = [
-  {
-    model: 'auto/model',
-    reasoning_effort: 'high',
-    avg_attempt_cost_usd: 19.75,
-    synced_at: configRow.updated_at,
-  },
-];
-
 describe('platform model configuration', () => {
+  it('defaults legacy rows to efficient with the configured ranking defaults', () => {
+    const config = mapConfigRows(
+      configRow,
+      ['classifier'],
+      [{ model: 'manual/model', variant: null, reasoning_effort: null }]
+    );
+    expect(config).toMatchObject({
+      router: 'efficient',
+      accuracyNoiseBand: 0.05,
+      frontierMinAccuracyDelta: 0,
+    });
+  });
+
+  it('preserves independent frontier ranking knobs and candidate selection', () => {
+    const config = mapConfigRows(
+      {
+        ...configRow,
+        router: 'frontier',
+        accuracy_noise_band: 0.02,
+        frontier_min_accuracy_delta: 0.1,
+      },
+      ['classifier'],
+      [{ model: 'frontier/model', variant: null, reasoning_effort: null }]
+    );
+    expect(config).toMatchObject({
+      router: 'frontier',
+      accuracyNoiseBand: 0.02,
+      frontierMinAccuracyDelta: 0.1,
+      deciderModels: [{ id: 'frontier/model' }],
+    });
+  });
+
   it('preserves a configured confidence threshold and defaults old rows to disabled', () => {
     const models = [{ model: 'manual/model', variant: null, reasoning_effort: null }];
     expect(
@@ -39,28 +60,17 @@ describe('platform model configuration', () => {
     ).toBe(0.8);
   });
 
-  it('discards stale saved variants and legacy selected efforts in every config list', () => {
-    const result = mapConfigRows(
-      configRow,
-      ['classifier/model'],
-      [{ model: 'manual/model', variant: 'retired', reasoning_effort: 'high' }],
-      autoRows
-    );
-    expect(result?.manualDeciderModels).toEqual([{ id: 'manual/model' }]);
-    expect(result?.autoDeciderModels).toEqual([{ id: 'auto/model', avgAttemptCostUsd: 19.75 }]);
-    expect(result?.deciderModels).toEqual([{ id: 'manual/model' }, { id: 'auto/model' }]);
-  });
-
-  it('manual selections override auto exclusions and deduplicate the effective list', () => {
-    const manual = [{ model: 'auto/model', variant: null, reasoning_effort: null }];
-    expect(mapConfigRows(configRow, ['classifier/model'], manual, autoRows)?.deciderModels).toEqual(
-      [{ id: 'auto/model' }]
-    );
-    expect(
-      mapConfigRows(configRow, ['classifier/model'], manual, autoRows, ['auto/model'])
-        ?.deciderModels
-    ).toEqual([{ id: 'auto/model' }]);
-  });
+  it.each(['efficient', 'frontier'] as const)(
+    'uses only configured models and discards legacy efforts for %s',
+    router => {
+      const result = mapConfigRows(
+        { ...configRow, router },
+        ['classifier/model'],
+        [{ model: 'configured/model', variant: 'retired', reasoning_effort: 'high' }]
+      );
+      expect(result?.deciderModels).toEqual([{ id: 'configured/model' }]);
+    }
+  );
 
   it('clears legacy effort columns on save without dropping rolling-deploy storage', () => {
     expect(toDeciderModelRows([{ id: 'manual/model' }])).toEqual([

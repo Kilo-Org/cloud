@@ -2,7 +2,6 @@
 
 import {
   AutoRoutingModeSchema,
-  EstimateBenchmarkProfilesResponseSchema,
   getReasoningVariantKeys,
   isVirtualAutoModelId,
   MAX_POOL_ENTRIES,
@@ -447,9 +446,6 @@ export function toEligibleModelOptions(
 }
 
 export function formatSaveErrorMessage(body: unknown, status: number): string {
-  if (status === 402) {
-    return 'Insufficient owner credits to benchmark this pool. Add credits and try again.';
-  }
   if (status === 429) {
     const retryAt =
       body && typeof body === 'object' && 'retryAt' in body && typeof body.retryAt === 'string'
@@ -705,26 +701,6 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     poolOverride,
   });
 
-  const estimateQuery = useQuery({
-    queryKey: ['auto-routing-estimate', organizationId ?? 'personal', draftPool],
-    enabled: !readonly && query.data?.poolSupported === true && !!draftPool?.length,
-    staleTime: 30_000,
-    refetchInterval: 30_000,
-    retry: false,
-    queryFn: async () => {
-      const endpoint = settingsEndpoint(organizationId).replace('/settings', '/estimate');
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ entries: draftPool }),
-      });
-      const body: unknown = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(formatSaveErrorMessage(body, response.status));
-      return EstimateBenchmarkProfilesResponseSchema.parse(body);
-    },
-  });
-  const quoteReady = !draftPool?.length || estimateQuery.isSuccess;
-
   useEffect(() => {
     if (!clearOverridesAfterSaveRef.current) return;
     if (!query.data) return;
@@ -883,7 +859,6 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
   const poolSupported = query.data?.poolSupported !== false;
 
   const handleSave = () => {
-    if (poolSupported && !quoteReady) return;
     setSaveError(null);
     if (!poolSupported) {
       // Mode-only legacy endpoint never touches pool keys (any worker version).
@@ -1118,10 +1093,6 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
                           .map(status => (
                             <li key={status.entry.variant ?? 'default'}>
                               {variantLabel(status.entry.variant)}: {status.status}
-                              {' · Charged: '}
-                              {status.chargedCostUsd == null
-                                ? 'Not charged'
-                                : `$${status.chargedCostUsd.toFixed(6)}`}
                             </li>
                           ))}
                       </ul>
@@ -1239,49 +1210,6 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
           ) : null}
         </div>
 
-        {poolSupported && !readonly && draftPool?.length ? (
-          <div className="space-y-2 text-sm" role="status">
-            {estimateQuery.isFetching ? <p>Estimating benchmark cost…</p> : null}
-            {estimateQuery.isError ? (
-              <div className="text-destructive">
-                <p>{estimateQuery.error.message}</p>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => void estimateQuery.refetch()}
-                >
-                  Retry estimate
-                </Button>
-              </div>
-            ) : null}
-            {estimateQuery.isSuccess ? (
-              <>
-                <p className="font-medium tabular-nums">
-                  Estimated owner cost: ${estimateQuery.data.estimatedCostUsd.toFixed(6)}
-                </p>
-                <ul className="text-muted-foreground space-y-1 text-xs">
-                  {estimateQuery.data.pairs.map(pair => (
-                    <li key={`${pair.entry.model}:${pair.entry.variant ?? 'default'}`}>
-                      {pair.entry.model} · {variantLabel(pair.entry.variant)} · {pair.status}
-                      {' · Estimated: $'}
-                      {pair.estimatedCostUsd.toFixed(6)}
-                      {' · Charged: '}
-                      {pair.chargedCostUsd === null
-                        ? 'Not charged'
-                        : `$${pair.chargedCostUsd.toFixed(6)}`}
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-muted-foreground">
-                  Cached measurements are free. This quote is advisory; admission recalculates the
-                  cost and reserves owner credits atomically. Only successful efforts are charged.
-                </p>
-              </>
-            ) : null}
-          </div>
-        ) : null}
-
         {retryError ? (
           <Alert variant="destructive" id={retryErrorId}>
             <AlertTitle>Could not retry benchmark</AlertTitle>
@@ -1312,7 +1240,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
                   type="button"
                   variant="secondary"
                   size="sm"
-                  disabled={controlsDisabled || (poolSupported && !quoteReady)}
+                  disabled={controlsDisabled}
                   onClick={handleSave}
                 >
                   Try again
@@ -1326,7 +1254,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
           <Button
             type="button"
             onClick={handleSave}
-            disabled={controlsDisabled || !hasChanges || (poolSupported && !quoteReady)}
+            disabled={controlsDisabled || !hasChanges}
             aria-describedby={saveError ? saveErrorId : undefined}
           >
             {saveMutation.isPending ? 'Saving…' : 'Save auto routing'}

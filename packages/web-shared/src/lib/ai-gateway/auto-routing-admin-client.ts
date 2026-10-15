@@ -4,8 +4,6 @@ import {
   AutoRoutingModeResponseSchema,
   AutoRoutingSettingsResponseSchema,
   BenchmarkProfileQuotaErrorSchema,
-  EstimateBenchmarkProfilesResponseSchema,
-  type EstimateBenchmarkProfilesRequest,
   type AutoRoutingMode,
   type AutoRoutingModeOwnerType,
   type AutoRoutingAnalyticsPeriod,
@@ -185,16 +183,4 @@ export function updateAutoRoutingSettings(params: {
       ...(retryEntries !== undefined ? { retryEntries } : {}),
     }),
   });
-}
-
-export function estimateAutoRoutingProfiles(request: EstimateBenchmarkProfilesRequest) {
-  return fetchAutoRoutingAdmin(
-    '/admin/profiles/estimate',
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(request),
-    },
-    EstimateBenchmarkProfilesResponseSchema
-  );
 }

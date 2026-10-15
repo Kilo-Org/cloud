@@ -1,18 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from './db';
 import type * as CliRunnerModule from './cli-runner';
-import type * as ProfileBillingModule from './profile-billing';
-import { DECIDER_CASES } from './datasets/decider-cases';
-
-vi.mock('./benchmark-settlement', () => ({
-  recordBenchmarkSettlementOutcomes: vi.fn().mockResolvedValue(undefined),
-  recoverPendingBenchmarkSettlements: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('./profile-billing', async importOriginal => {
-  const actual = await importOriginal<typeof ProfileBillingModule>();
-  return { ...actual, recoverPendingProfileAdmissions: vi.fn().mockResolvedValue(undefined) };
-});
+import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
+import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
+import type { BenchmarkJobMessage } from './run';
 
 vi.mock('./cli-runner', async importOriginal => {
   const actual = await importOriginal<typeof CliRunnerModule>();
@@ -52,6 +43,7 @@ vi.mock('./db', async importOriginal => {
     getRunWithModels: vi.fn(),
     listReadyCurrentProfilesForEntries: vi.fn(),
     getSummariesForRuns: vi.fn(),
+    getRoutingCaseResultsForEntries: vi.fn(),
     countCurrentProfilesByStatus: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     syncPlatformRegistryRows: vi.fn(),
@@ -72,6 +64,7 @@ import {
   getRunWithModels,
   getSummaries,
   getSummariesForRuns,
+  getRoutingCaseResultsForEntries,
   insertRun,
   listLaneFailures,
   listPendingCurrentProfiles,
@@ -99,20 +92,19 @@ import {
   drainQueues,
   failRunAndDrain,
   processJob,
+  publishPlatformRoutingTable,
   startRun,
   sweepStaleRunsAndDrain,
 } from './run';
-import {
-  recordBenchmarkSettlementOutcomes,
-  recoverPendingBenchmarkSettlements,
-} from './benchmark-settlement';
-import { recoverPendingProfileAdmissions } from './profile-billing';
 
-const queueSendBatch = vi.fn();
+const queueSendBatch = vi.fn<(messages: { body: BenchmarkJobMessage }[]) => Promise<void>>();
 const kvDelete = vi.fn();
 
 const configRow = {
   id: 1 as const,
+  router: 'efficient' as 'efficient' | 'frontier',
+  accuracy_noise_band: 0.05,
+  frontier_min_accuracy_delta: 0,
   min_accuracy: 0.7,
   switch_cost_factor: 3,
   best_accuracy_switch_threshold: 0.05,
@@ -125,8 +117,6 @@ const configRow = {
   classifier_repetitions: 1,
   decider_repetitions: 1,
   classifier_max_p95_latency_ms: 1000,
-  auto_decider_min_cost_usd: 15,
-  auto_decider_max_cost_usd: 25,
   user_max_concurrency: 100,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: null,
@@ -142,17 +132,15 @@ const env = {
 } as unknown as Env;
 
 function mockConfig(overrides: Partial<typeof configRow> = {}) {
-  vi.mocked(getConfigRows).mockResolvedValue({
-    config: { ...configRow, ...overrides },
-    // mapConfigRows requires non-empty classifier + decider lists.
+  const row = { ...configRow, ...overrides };
+  vi.mocked(getConfigRows).mockImplementation(async (_db, router = 'efficient') => ({
+    config: router === row.router ? row : null,
     classifierModels: ['classifier/a'],
     deciderModels: [
       { model: 'platform/a', variant: null, reasoning_effort: null },
       { model: 'platform/b', variant: null, reasoning_effort: 'high' },
     ],
-    autoDeciderModels: [],
-    excludedAutoDeciderModels: [],
-  });
+  }));
 }
 
 const catalogFetch = vi.fn<typeof fetch>();
@@ -161,9 +149,6 @@ afterEach(() => vi.unstubAllGlobals());
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(recordBenchmarkSettlementOutcomes).mockReset().mockResolvedValue(undefined);
-  vi.mocked(recoverPendingBenchmarkSettlements).mockReset().mockResolvedValue(undefined);
-  vi.mocked(recoverPendingProfileAdmissions).mockReset().mockResolvedValue(undefined);
   mockConfig();
   vi.stubGlobal('fetch', catalogFetch);
   catalogFetch.mockImplementation(async () =>
@@ -199,6 +184,7 @@ beforeEach(() => {
   vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
+  vi.mocked(getRoutingCaseResultsForEntries).mockResolvedValue([]);
   vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
   vi.mocked(recordLaneFailure).mockResolvedValue(undefined);
   vi.mocked(failOrphanedRunningProfiles).mockResolvedValue(0);
@@ -210,6 +196,9 @@ beforeEach(() => {
 });
 
 const RUN_ROW_BASE = {
+  router: 'efficient' as const,
+  accuracy_noise_band: 0.05,
+  frontier_min_accuracy_delta: 0,
   kind: 'decider' as const,
   status: 'running' as const,
   started_at: '2026-06-01T00:00:00.000Z',
@@ -481,18 +470,6 @@ describe('decider run completion', () => {
     expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
     expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
     expect(markProfilesFailedForEntries).not.toHaveBeenCalled();
-    expect(recordBenchmarkSettlementOutcomes).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.objectContaining({ settle: expect.any(Function) }),
-      runId
-    );
-    expect(vi.mocked(recordBenchmarkSettlementOutcomes).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(markRunCompleted).mock.invocationCallOrder[0]
-    );
-    expect(vi.mocked(markRunCompleted).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(recoverPendingBenchmarkSettlements).mock.invocationCallOrder[0]
-    );
     // Settle the registry rows first. The orphan reaper spares rows whose run
     // is still running, so completing the run first would open a window where a
     // concurrent sweep fails entries that are fully measured.
@@ -504,28 +481,6 @@ describe('decider run completion', () => {
     // Nothing is ready here, so publishing is honestly skipped.
     expect(listReadyCurrentProfilesForEntries).toHaveBeenCalled();
     expect(saveRoutingTable).not.toHaveBeenCalled();
-  });
-
-  it('keeps terminal profiles and publication when the billing bridge is unavailable', async () => {
-    const runId = 'user-billing-retry-1';
-    mockRunState(runId, 'user', [{ model: 'vendor/m', variant: '' }]);
-    vi.mocked(countCaseResultsByLane).mockResolvedValue([
-      { model: 'vendor/m', variant: '', rep: 0, n: DECIDER_CASES.length },
-    ]);
-    vi.mocked(recoverPendingBenchmarkSettlements).mockRejectedValueOnce(
-      new Error('billing unavailable')
-    );
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    await finalizeVia(runId, 'vendor/m', null);
-
-    expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('benchmark_settlement_recovery_error')
-    );
-    warn.mockRestore();
   });
 
   it('fails only the entries whose lane died, and readies the rest', async () => {
@@ -654,6 +609,14 @@ describe('decider run completion', () => {
       expect(saveRoutingTable).toHaveBeenCalledOnce();
       const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
       expect(table.source).toBe('benchmark');
+      expect(getRoutingCaseResultsForEntries).toHaveBeenCalledWith(env.BENCH_DB, [
+        { entry: { model: 'platform/a', variant: null }, runId },
+        { entry: { model: 'platform/b', variant: 'high' }, runId },
+      ]);
+      expect(table.effortByComplexity?.['implementation/code_generation']).toEqual({
+        'platform/a': { low: null, medium: null, high: null },
+        'platform/b': { low: 'high', medium: 'high', high: 'high' },
+      });
       // Version identifies the contributing registry rows, not a single run.
       expect(table.version).toMatch(/^registry-/);
       expect(Object.keys(table.routes)).toHaveLength(TAXONOMY_ROUTE_KEYS.length);
@@ -681,11 +644,6 @@ describe('decider run completion', () => {
       env.BENCH_DB,
       'user-fail-1',
       'enqueue failed'
-    );
-    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.anything(),
-      'user-fail-1'
     );
     // Both queues have pending work in this mock, so both start a run.
     expect(vi.mocked(insertRun).mock.calls.map(call => call[1].purpose)).toEqual([
@@ -808,12 +766,6 @@ describe('sweepStaleRunsAndDrain', () => {
     expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
     // The run completed with partial results rather than being failed wholesale.
     expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    expect(recordBenchmarkSettlementOutcomes).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.anything(),
-      runId
-    );
   });
 
   it('does not throw when a queue slot is still occupied after the sweep', async () => {
@@ -837,36 +789,137 @@ describe('sweepStaleRunsAndDrain', () => {
       vi.mocked(listPendingCurrentProfiles).mock.invocationCallOrder[0]
     );
   });
+});
 
-  it('recovers allocating admissions and unpaid terminal claims before draining', async () => {
-    await sweepStaleRunsAndDrain(env);
-
-    expect(recoverPendingProfileAdmissions).toHaveBeenCalledWith(env.BENCH_DB, expect.anything());
-    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
+describe('frontier router runs', () => {
+  it('snapshots the router, uses its container budget, and queues only frontier cases', async () => {
+    mockConfig({ router: 'frontier', max_concurrency: 3, frontier_min_accuracy_delta: 0.1 });
+    const entries = [{ model: 'platform/a', variant: null }];
+    const result = await startRun(env, 'decider', { router: 'frontier', entries });
+    expect(result.runId).toMatch(/^frontier-decider-/);
+    expect(insertRun).toHaveBeenCalledWith(
       env.BENCH_DB,
-      expect.anything()
+      expect.objectContaining({
+        router: 'frontier',
+        max_concurrency: 3,
+        frontier_min_accuracy_delta: 0.1,
+        engine_identity: expect.stringMatching(/^frontier:v1:/),
+      }),
+      expect.anything(),
+      []
     );
-    expect(vi.mocked(recoverPendingProfileAdmissions).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(recoverPendingBenchmarkSettlements).mock.invocationCallOrder[0]
+    expect(markProfilesRunningForRun).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      result.runId,
+      entries,
+      expect.objectContaining({ router: 'frontier' })
     );
-    expect(vi.mocked(recoverPendingBenchmarkSettlements).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(listPendingCurrentProfiles).mock.invocationCallOrder[0]
+    const messages = queueSendBatch.mock.calls.flatMap(([batch]) => batch);
+    const caseIds = messages.flatMap(message => message.body.caseIds ?? []);
+    expect(caseIds.length).toBeGreaterThan(0);
+    const frontierIds = new Set(FRONTIER_CASES.map(c => c.id));
+    const efficientIds = new Set(DECIDER_CASES.map(c => c.id));
+    expect(caseIds.every(id => frontierIds.has(id) && !efficientIds.has(id))).toBe(true);
+  });
+
+  it('rejects frontier owner queues before any profile claim', async () => {
+    await expect(drainQueues(env, 'user', undefined, 'frontier')).rejects.toThrow(
+      'does not support owner queues'
+    );
+    await expect(
+      startRun(env, 'decider', {
+        router: 'frontier',
+        purpose: 'user',
+        entries: [{ model: 'model', variant: null }],
+      })
+    ).rejects.toThrow('does not support owner queues');
+    expect(markProfilesRunningForRun).not.toHaveBeenCalled();
+  });
+
+  it('limits frontier both-queue drains to its platform registry', async () => {
+    mockConfig({ router: 'frontier' });
+    await drainQueues(env, 'both', undefined, 'frontier');
+    expect(listPendingCurrentProfiles).toHaveBeenCalledOnce();
+    expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      'platform'
     );
   });
 
-  it('still retries settlements and drains when admission reconciliation fails', async () => {
-    vi.mocked(recoverPendingProfileAdmissions).mockRejectedValueOnce(
-      new Error('reserve bridge unavailable')
+  it('rejects decider admission when aggregate saved router budgets exceed the physical cap', async () => {
+    vi.mocked(getConfigRows).mockImplementation(async (_db, router = 'efficient') => ({
+      config: {
+        ...configRow,
+        router,
+        max_concurrency: 80,
+        user_max_concurrency: 80,
+      },
+      classifierModels: ['classifier/a'],
+      deciderModels: [{ model: 'platform/a', variant: null, reasoning_effort: null }],
+    }));
+    await expect(
+      startRun(env, 'decider', {
+        router: 'frontier',
+        entries: [{ model: 'platform/a', variant: null }],
+      })
+    ).rejects.toThrow('must total at most 200');
+    expect(insertRun).not.toHaveBeenCalled();
+  });
+
+  it('publishes the frontier effective threshold and invalidates only its cache', async () => {
+    mockConfig({ router: 'frontier', min_accuracy: 0.8, frontier_min_accuracy_delta: 0.1 });
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'platform/a', variant: '', run_id: 'frontier-measured' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model: 'platform/a',
+        variant: null,
+        runId: 'frontier-measured',
+        routeKey,
+        accuracy: 0.95,
+        avgCostUsd: 0.002,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+      }))
     );
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    await sweepStaleRunsAndDrain(env);
-
-    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
+    await publishPlatformRoutingTable(env, catalogFetch, 'frontier');
+    expect(saveRoutingTable).toHaveBeenCalledWith(
       env.BENCH_DB,
-      expect.anything()
+      expect.objectContaining({ minAccuracy: 0.9 }),
+      expect.any(String),
+      'frontier'
     );
-    expect(listPendingCurrentProfiles).toHaveBeenCalled();
-    warn.mockRestore();
+    expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
+    expect(kvDelete).toHaveBeenCalledWith('routing_table_frontier_v1');
+    expect(kvDelete).not.toHaveBeenCalledWith('routing_table_v1');
+  });
+});
+
+describe('live container admission refusal', () => {
+  it('releases registry claims and surfaces a budget error when the atomic run insert rejects', async () => {
+    mockConfig({ router: 'frontier' });
+    vi.mocked(insertRun).mockRejectedValue(
+      new Error('Failed query', {
+        cause: new Error('D1_ERROR: NOT NULL constraint failed: benchmark_runs.max_concurrency'),
+      })
+    );
+    await expect(
+      startRun(env, 'decider', {
+        router: 'frontier',
+        entries: [{ model: 'platform/a', variant: null }],
+      })
+    ).rejects.toThrow('must total at most 200');
+    expect(releaseProfileClaims).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.stringMatching(/^frontier-/)
+    );
+    expect(queueSendBatch).not.toHaveBeenCalled();
   });
 });

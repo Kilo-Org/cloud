@@ -10,9 +10,11 @@ import {
 } from 'drizzle-orm/sqlite-core';
 import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
 import type {
+  AutoRouter,
   BenchmarkKind,
   CandidatePricing,
   ProductionTokenProfile,
+  EffortByComplexity,
   BenchmarkProfileStatus,
   BenchmarkRunPurpose,
   BenchmarkRunStatus,
@@ -23,7 +25,10 @@ import type {
 
 export const benchmarkConfig = sqliteTable('benchmark_config', {
   id: integer('id').primaryKey(),
+  router: text('router').$type<AutoRouter>().notNull().default('efficient').unique(),
   min_accuracy: real('min_accuracy').notNull(),
+  accuracy_noise_band: real('accuracy_noise_band').notNull().default(0.05),
+  frontier_min_accuracy_delta: real('frontier_min_accuracy_delta').notNull().default(0),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
   production_token_profile: text('production_token_profile', {
@@ -43,38 +48,35 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   classifier_repetitions: integer('classifier_repetitions').notNull().default(1),
   decider_repetitions: integer('decider_repetitions').notNull().default(1),
   classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
-  auto_decider_min_cost_usd: real('auto_decider_min_cost_usd').notNull().default(15),
-  auto_decider_max_cost_usd: real('auto_decider_max_cost_usd').notNull().default(25),
   updated_at: text('updated_at').notNull(),
   updated_by: text('updated_by'),
 });
 
-export const configClassifierModels = sqliteTable('config_classifier_models', {
-  model: text('model').primaryKey(),
-});
+export const configClassifierModels = sqliteTable(
+  'config_classifier_models',
+  {
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
+    model: text('model').notNull(),
+  },
+  table => [primaryKey({ columns: [table.router, table.model] })]
+);
 
-export const configDeciderModels = sqliteTable('config_decider_models', {
-  model: text('model').primaryKey(),
-  // Retained for rolling deploys; model-level config ignores and clears these columns.
-  variant: text('variant'),
-  reasoning_effort: text('reasoning_effort'),
-});
-
-export const configAutoDeciderModels = sqliteTable('config_auto_decider_models', {
-  model: text('model').primaryKey(),
-  reasoning_effort: text('reasoning_effort'),
-  avg_attempt_cost_usd: real('avg_attempt_cost_usd').notNull(),
-  synced_at: text('synced_at').notNull(),
-});
-
-export const configAutoDeciderExclusions = sqliteTable('config_auto_decider_exclusions', {
-  model: text('model').primaryKey(),
-});
+export const configDeciderModels = sqliteTable(
+  'config_decider_models',
+  {
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
+    model: text('model').notNull(),
+    variant: text('variant'),
+    reasoning_effort: text('reasoning_effort'),
+  },
+  table => [primaryKey({ columns: [table.router, table.model] })]
+);
 
 export const benchmarkRuns = sqliteTable(
   'benchmark_runs',
   {
     id: text('id').primaryKey(),
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
     kind: text('kind').$type<BenchmarkKind>().notNull(),
     status: text('status').$type<BenchmarkRunStatus>().notNull(),
     started_at: text('started_at').notNull(),
@@ -82,6 +84,8 @@ export const benchmarkRuns = sqliteTable(
     error: text('error'),
     // Config snapshot taken at startRun time so mid-run edits can't skew results.
     min_accuracy: real('min_accuracy').notNull(),
+    accuracy_noise_band: real('accuracy_noise_band').notNull().default(0.05),
+    frontier_min_accuracy_delta: real('frontier_min_accuracy_delta').notNull().default(0),
     switch_cost_factor: real('switch_cost_factor').notNull(),
     best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
     max_concurrency: integer('max_concurrency').notNull(),
@@ -100,12 +104,8 @@ export const benchmarkRuns = sqliteTable(
     purpose: text('purpose').$type<BenchmarkRunPurpose>().notNull().default('platform'),
   },
   table => [
-    // At most one running run per (kind, purpose) — the atomic backstop for the
-    // server-side admission rule (concurrent POSTs / multiple tabs that slip
-    // past the pre-check still can't both claim). The platform and user queues
-    // hold independent slots, so a user drain never blocks a platform run.
-    uniqueIndex('UQ_benchmark_runs_one_running_per_kind_purpose')
-      .on(table.kind, table.purpose)
+    uniqueIndex('UQ_benchmark_runs_one_running_per_router_kind_purpose')
+      .on(table.router, table.kind, table.purpose)
       .where(sql`${table.status} = 'running'`),
   ]
 );
@@ -206,6 +206,7 @@ export const pendingDeciderOutputs = sqliteTable(
 
 export const routingTables = sqliteTable('routing_tables', {
   run_id: text('run_id').primaryKey(),
+  router: text('router').$type<AutoRouter>().notNull().default('efficient'),
   published_at: text('published_at').notNull(),
   generated_at: text('generated_at').notNull(),
   min_accuracy: real('min_accuracy').notNull(),
@@ -216,6 +217,7 @@ export const routingTables = sqliteTable('routing_tables', {
   }).$type<ProductionTokenProfile>(),
   switch_horizon_turns: integer('switch_horizon_turns'),
   low_confidence_threshold: real('low_confidence_threshold'),
+  effort_by_complexity: text('effort_by_complexity', { mode: 'json' }).$type<EffortByComplexity>(),
   source: text('source').notNull(),
 });
 
@@ -252,6 +254,7 @@ export const benchmarkProfiles = sqliteTable(
   'benchmark_profiles',
   {
     model: text('model').notNull(),
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
     // Canonical variant key at the D1 boundary. '' means null/default variant.
     variant: text('variant').notNull().default(''),
     engine_identity: text('engine_identity').notNull(),
@@ -274,64 +277,16 @@ export const benchmarkProfiles = sqliteTable(
   },
   table => [
     primaryKey({
-      columns: [table.model, table.variant, table.engine_identity, table.repetitions],
+      columns: [table.router, table.model, table.variant, table.engine_identity, table.repetitions],
     }),
   ]
 );
 
-export const profileBenchmarkAdmissions = sqliteTable(
-  'profile_benchmark_admissions',
-  {
-    admission_id: text('admission_id').primaryKey(),
-    owner_type: text('owner_type').$type<'user' | 'org'>().notNull(),
-    owner_id: text('owner_id').notNull(),
-    engine_identity: text('engine_identity').notNull(),
-    repetitions: integer('repetitions').notNull(),
-    state: text('state')
-      .$type<'allocating' | 'admitted' | 'insufficient' | 'quota_exceeded'>()
-      .notNull(),
-    created_at: text('created_at').notNull(),
-    updated_at: text('updated_at').notNull(),
-    recovery_attempts: integer('recovery_attempts').notNull().default(0),
-    recovery_next_at: text('recovery_next_at'),
-  },
-  table => [index('IDX_profile_benchmark_admissions_state').on(table.state, table.created_at)]
-);
-
-export const profileBenchmarkClaims = sqliteTable(
-  'profile_benchmark_claims',
-  {
-    admission_id: text('admission_id')
-      .notNull()
-      .references(() => profileBenchmarkAdmissions.admission_id),
-    model: text('model').notNull(),
-    variant: text('variant').notNull().default(''),
-    engine_identity: text('engine_identity').notNull(),
-    repetitions: integer('repetitions').notNull(),
-    estimated_cost_usd: real('estimated_cost_usd').notNull(),
-    charged_cost_usd: real('charged_cost_usd'),
-    quota_charged: integer('quota_charged', { mode: 'boolean' }).notNull(),
-    state: text('state')
-      .$type<'allocating' | 'admitted' | 'release_pending' | 'settled' | 'released'>()
-      .notNull(),
-    terminal_status: text('terminal_status').$type<'ready' | 'failed'>(),
-    run_id: text('run_id'),
-    created_at: text('created_at').notNull(),
-    updated_at: text('updated_at').notNull(),
-    settled_at: text('settled_at'),
-  },
-  table => [
-    primaryKey({ columns: [table.admission_id, table.model, table.variant] }),
-    uniqueIndex('UQ_profile_benchmark_claims_active_pair')
-      .on(table.model, table.variant, table.engine_identity, table.repetitions)
-      .where(
-        sql`${table.state} IN ('allocating', 'admitted') AND ${table.terminal_status} IS NULL`
-      ),
-    index('IDX_profile_benchmark_claims_run').on(table.run_id, table.state),
-    index('IDX_profile_benchmark_claims_state').on(table.state, table.created_at),
-  ]
-);
-
+/**
+ * Rolling owner admission ledger for the 24h profile request quota. One row
+ * per charged model admission (new under current engine, or explicit failed
+ * retry). Stale engine-drift re-admissions are free and do not insert here.
+ */
 export const profileRequestEvents = sqliteTable(
   'profile_request_events',
   {

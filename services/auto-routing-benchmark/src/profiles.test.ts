@@ -1,704 +1,1141 @@
-import { DatabaseSync } from 'node:sqlite';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
-import { drizzle } from 'drizzle-orm/d1';
-import { benchmarkProfiles, profileRequestEvents } from './db-schema';
-import { DECIDER_CASES } from './datasets/decider-cases';
+import type * as DbSchemaModule from './db-schema';
+import type * as DrizzleOrmModule from 'drizzle-orm';
+import type { ProfileRow } from './profiles';
+import type * as RunModule from './run';
+
+// Honestly models ON CONFLICT WHERE (failed-only), onConflictDoNothing,
+// INSERT...SELECT...WHERE NOT EXISTS charge guards, and post-batch reads.
+
+type EventRow = {
+  id: number;
+  owner_type: string;
+  owner_id: string;
+  model: string;
+  variant: string;
+  engine_identity: string;
+  repetitions: number;
+  admitted_at: string;
+};
+
+type PendingStmt =
+  | { kind: 'event'; values: Omit<EventRow, 'id'>; guarded: boolean }
+  | { kind: 'claim_user_requested'; entries: string[] }
+  | {
+      kind: 'profile';
+      values: ProfileRow;
+      onConflict: 'update_if_failed' | 'do_nothing' | 'replace';
+    };
+
+const store = vi.hoisted(() => {
+  const profiles = new Map<string, ProfileRow>();
+  const events: EventRow[] = [];
+  let nextEventId = 1;
+
+  function profilePk(row: {
+    model: string;
+    variant: string;
+    engine_identity: string;
+    repetitions: number;
+  }): string {
+    return JSON.stringify([row.model, row.variant, row.engine_identity, row.repetitions]);
+  }
+
+  return {
+    profiles,
+    events,
+    nextEventId: () => nextEventId++,
+    profilePk,
+    reset() {
+      profiles.clear();
+      events.length = 0;
+      nextEventId = 1;
+    },
+    seedProfile(row: ProfileRow) {
+      profiles.set(profilePk(row), { ...row });
+    },
+    seedEvent(row: Omit<EventRow, 'id'>) {
+      events.push({ ...row, id: nextEventId++ });
+    },
+  };
+});
+
+vi.mock('drizzle-orm/d1', () => {
+  type WhereClause =
+    | { type: 'models'; models: string[] }
+    | {
+        type: 'events';
+        ownerType: string;
+        ownerId: string;
+        windowStart: string;
+      };
+
+  function createSelectBuilder(table: 'profiles' | 'events') {
+    let where: WhereClause | null = null;
+    let orderAsc = false;
+
+    const builder = {
+      from() {
+        return builder;
+      },
+      where(clause: WhereClause) {
+        where = clause;
+        return builder;
+      },
+      orderBy() {
+        orderAsc = true;
+        return builder;
+      },
+      then(resolve: (value: unknown) => unknown, reject?: (err: unknown) => unknown) {
+        return Promise.resolve(builder.execute()).then(resolve, reject);
+      },
+      async execute() {
+        if (table === 'profiles') {
+          const all = [...store.profiles.values()];
+          if (where?.type === 'models') {
+            const set = new Set(where.models);
+            return all.filter(r => set.has(r.model));
+          }
+          return all;
+        }
+        let rows = [...store.events];
+        if (where && where.type === 'events') {
+          const eventWhere = where;
+          rows = rows.filter(
+            e =>
+              e.owner_type === eventWhere.ownerType &&
+              e.owner_id === eventWhere.ownerId &&
+              e.admitted_at >= eventWhere.windowStart
+          );
+        }
+        if (orderAsc) {
+          rows.sort((a, b) => a.admitted_at.localeCompare(b.admitted_at) || a.id - b.id);
+        }
+        return rows;
+      },
+    };
+    return builder;
+  }
+
+  function profileValuesFromRow(row: Record<string, unknown>): ProfileRow {
+    return {
+      router: row.router === 'frontier' ? 'frontier' : 'efficient',
+      model: String(row.model),
+      variant: typeof row.variant === 'string' ? row.variant : '',
+      engine_identity: String(row.engine_identity),
+      repetitions: Number(row.repetitions),
+      status: row.status as ProfileRow['status'],
+      run_id: (row.run_id as string | null) ?? null,
+      failure_reason: (row.failure_reason as string | null) ?? null,
+      requested_at: String(row.requested_at),
+      updated_at: String(row.updated_at),
+      completed_at: (row.completed_at as string | null) ?? null,
+      platform_requested: row.platform_requested === true,
+      user_requested: row.user_requested !== false,
+    };
+  }
+
+  function eventValuesFromRow(row: Record<string, unknown>): Omit<EventRow, 'id'> {
+    return {
+      owner_type: String(row.owner_type),
+      owner_id: String(row.owner_id),
+      model: String(row.model),
+      variant: typeof row.variant === 'string' ? row.variant : '',
+      engine_identity: String(row.engine_identity),
+      repetitions: Number(row.repetitions),
+      admitted_at: String(row.admitted_at),
+    };
+  }
+
+  function wrapStmt(stmt: PendingStmt) {
+    return Object.assign(Promise.resolve(stmt), { __stmt: stmt });
+  }
+
+  function createOrm() {
+    return {
+      select() {
+        return {
+          from(table: { _: { name: string } } | unknown) {
+            const name =
+              table && typeof table === 'object' && '_' in table
+                ? String((table as { _: { name: string } })._.name)
+                : '';
+            const tagged = table as { __tableName?: string };
+            if (
+              tagged.__tableName === 'profile_request_events' ||
+              name.includes('profile_request')
+            ) {
+              return createSelectBuilder('events');
+            }
+            return createSelectBuilder('profiles');
+          },
+        };
+      },
+      update() {
+        const stmt: PendingStmt = { kind: 'claim_user_requested', entries: [] };
+        const builder = {
+          set() {
+            return builder;
+          },
+          where(clause: unknown) {
+            // The claim's WHERE is an and() tree that this mock does not walk,
+            // so `entries` stays empty and these tests only prove the statement
+            // is issued. What it actually updates is covered for real against
+            // SQLite in profiles-sql.test.ts.
+            const models = (clause as { models?: string[] } | null)?.models;
+            if (models) stmt.entries = models;
+            return builder;
+          },
+          __stmt: stmt,
+        };
+        return builder;
+      },
+      insert(table: { __tableName?: string }) {
+        const isEvents = table.__tableName === 'profile_request_events';
+        return {
+          values(values: unknown) {
+            const row = values as Record<string, unknown>;
+            if (isEvents) {
+              const stmt: PendingStmt = {
+                kind: 'event',
+                values: eventValuesFromRow(row),
+                guarded: false,
+              };
+              return Object.assign(wrapStmt(stmt), {
+                async execute() {
+                  applyStmt(stmt);
+                },
+              });
+            }
+            const profileValues = profileValuesFromRow(row);
+            return {
+              onConflictDoUpdate(config?: { where?: { type?: string; value?: string } }) {
+                // Register path: WHERE status = 'failed'
+                const whereFailed =
+                  !!config?.where &&
+                  (config.where as { type?: string; value?: string }).type === 'eq' &&
+                  (config.where as { value?: string }).value === 'failed';
+                const stmt: PendingStmt = {
+                  kind: 'profile',
+                  values: profileValues,
+                  onConflict: whereFailed ? 'update_if_failed' : 'replace',
+                };
+                return wrapStmt(stmt);
+              },
+              onConflictDoNothing() {
+                const stmt: PendingStmt = {
+                  kind: 'profile',
+                  values: profileValues,
+                  onConflict: 'do_nothing',
+                };
+                return wrapStmt(stmt);
+              },
+            };
+          },
+          /**
+           * INSERT ... SELECT ... WHERE NOT EXISTS — charged event guard.
+           * Production Object.assigns __stmt onto the returned value.
+           */
+          select(_query: unknown) {
+            // Placeholder object; chargedEventInsertStatement Object.assigns __stmt.
+            return {};
+          },
+        };
+      },
+      async batch(stmts: Array<{ __stmt?: PendingStmt } | PendingStmt>) {
+        for (const s of stmts) {
+          const stmt = (s as { __stmt?: PendingStmt }).__stmt ?? (s as PendingStmt);
+          if (!stmt || typeof stmt !== 'object' || !('kind' in stmt)) {
+            throw new Error('batch received untagged statement');
+          }
+          applyStmt(stmt);
+        }
+      },
+    };
+  }
+
+  function hasActiveCurrentProfile(values: {
+    model: string;
+    variant: string;
+    engine_identity: string;
+    repetitions: number;
+  }): boolean {
+    const existing = store.profiles.get(store.profilePk(values));
+    return (
+      !!existing &&
+      (existing.status === 'pending' ||
+        existing.status === 'running' ||
+        existing.status === 'ready')
+    );
+  }
+
+  function applyStmt(stmt: PendingStmt) {
+    if (stmt.kind === 'claim_user_requested') {
+      // Not simulated: this mock does not read the claim's WHERE tree, so it
+      // cannot know which rows to touch. What the claim updates is verified
+      // against real SQLite in profiles-sql.test.ts.
+      return;
+    }
+    if (stmt.kind === 'event') {
+      if (stmt.guarded && hasActiveCurrentProfile(stmt.values)) {
+        // INSERT...SELECT...WHERE NOT EXISTS → zero rows.
+        return;
+      }
+      store.events.push({ ...stmt.values, id: store.nextEventId() });
+      return;
+    }
+
+    const pk = store.profilePk(stmt.values);
+    const existing = store.profiles.get(pk);
+    if (!existing) {
+      store.profiles.set(pk, { ...stmt.values });
+      return;
+    }
+    if (stmt.onConflict === 'do_nothing') {
+      return;
+    }
+    if (stmt.onConflict === 'update_if_failed') {
+      if (existing.status !== 'failed') {
+        // WHERE status = 'failed' not satisfied — leave row intact.
+        return;
+      }
+    }
+    store.profiles.set(pk, { ...stmt.values });
+  }
+
+  return {
+    drizzle: vi.fn(() => createOrm()),
+  };
+});
+
+// Tag schema tables so the mock can distinguish them.
+vi.mock('./db-schema', async importOriginal => {
+  const actual = await importOriginal<typeof DbSchemaModule>();
+  Object.assign(actual.benchmarkProfiles, { __tableName: 'benchmark_profiles' });
+  Object.assign(actual.profileRequestEvents, { __tableName: 'profile_request_events' });
+  return actual;
+});
+
+// Stabilize engine identity for currency tests that swap only repetitions.
+vi.mock('./run', async importOriginal => {
+  const actual = await importOriginal<typeof RunModule>();
+  return {
+    ...actual,
+    computeEngineIdentity: vi.fn(() => 'v-test:engine'),
+  };
+});
+
+// drizzle operators: return plain descriptors the mock can read.
+vi.mock('drizzle-orm', async importOriginal => {
+  const actual = await importOriginal<typeof DrizzleOrmModule>();
+  return {
+    ...actual,
+    inArray: (_col: unknown, values: string[]) => ({ type: 'models' as const, models: values }),
+    and: (...parts: unknown[]) => {
+      const asEq = parts.filter(
+        (p): p is { type: 'eq'; value: string } =>
+          !!p && typeof p === 'object' && (p as { type?: string }).type === 'eq'
+      );
+      const gtePart = parts.find(
+        (p): p is { type: 'gte'; value: string } =>
+          !!p && typeof p === 'object' && (p as { type?: string }).type === 'gte'
+      );
+      if (asEq.length >= 2 && gtePart) {
+        return {
+          type: 'events' as const,
+          ownerType: asEq[0]!.value,
+          ownerId: asEq[1]!.value,
+          windowStart: gtePart.value,
+        };
+      }
+      return { type: 'and', parts };
+    },
+    eq: (_col: unknown, value: unknown) => ({ type: 'eq' as const, value: String(value) }),
+    gte: (_col: unknown, value: unknown) => ({ type: 'gte' as const, value: String(value) }),
+    asc: (col: unknown) => col,
+  };
+});
+
 import {
-  recoverPendingProfileAdmissions,
-  ProfileReservationMismatchError,
-  type ProfileCreditBridge,
-} from './profile-billing';
-import {
-  boundFailureReason,
+  buildPendingUpsertValues,
+  chargedEventInsertStatement,
   classifyProfileAdmission,
   computeQuotaRetryAt,
-  estimateProfiles,
   isCurrentBenchmarkProfile,
   lookupProfileStatuses,
   MISSING_PROFILE_FAILURE_REASON,
+  pendingRegisterUpsertStatement,
+  pendingStatusInsertStatement,
+  PROFILE_ADMISSION_LIMIT,
   PROFILE_ADMISSION_WINDOW_MS,
-  ProfileAdmissionInProgressError,
-  ProfileInsufficientCreditsError,
   ProfileQuotaExceededError,
   ProfileValidationError,
   registerProfiles,
-  STALE_PROFILE_FAILURE_REASON,
-  type ProfileRow,
 } from './profiles';
+import { variantToStorage } from './reasoning-effort';
+import { computeEngineIdentity } from './run';
 
-vi.mock('./run', () => ({ computeEngineIdentity: () => 'current-engine' }));
+const ENGINE = 'v-test:engine';
+const REPS = 1;
+const NOW = new Date('2026-07-28T12:00:00.000Z');
 
-const SCHEMA_SQL = `
-  CREATE TABLE benchmark_profiles (
-    model TEXT NOT NULL, variant TEXT NOT NULL DEFAULT '', engine_identity TEXT NOT NULL,
-    repetitions INTEGER NOT NULL, status TEXT NOT NULL, run_id TEXT, failure_reason TEXT,
-    requested_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT,
-    platform_requested INTEGER NOT NULL DEFAULT 0, user_requested INTEGER NOT NULL DEFAULT 1,
-    PRIMARY KEY (model, variant, engine_identity, repetitions)
-  );
-  CREATE TABLE profile_request_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, owner_type TEXT NOT NULL, owner_id TEXT NOT NULL,
-    model TEXT NOT NULL, variant TEXT NOT NULL DEFAULT '', engine_identity TEXT NOT NULL,
-    repetitions INTEGER NOT NULL, admitted_at TEXT NOT NULL
-  );
-  CREATE TABLE profile_benchmark_admissions (
-    admission_id TEXT PRIMARY KEY, owner_type TEXT NOT NULL, owner_id TEXT NOT NULL,
-    engine_identity TEXT NOT NULL, repetitions INTEGER NOT NULL, state TEXT NOT NULL,
-    created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-    recovery_attempts INTEGER NOT NULL DEFAULT 0, recovery_next_at TEXT
-  );
-  CREATE TABLE profile_benchmark_claims (
-    admission_id TEXT NOT NULL REFERENCES profile_benchmark_admissions(admission_id),
-    model TEXT NOT NULL, variant TEXT NOT NULL DEFAULT '', engine_identity TEXT NOT NULL,
-    repetitions INTEGER NOT NULL, estimated_cost_usd REAL NOT NULL, charged_cost_usd REAL,
-    quota_charged INTEGER NOT NULL, state TEXT NOT NULL, terminal_status TEXT, run_id TEXT,
-    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, settled_at TEXT,
-    PRIMARY KEY (admission_id, model, variant)
-  );
-  CREATE UNIQUE INDEX active_pair ON profile_benchmark_claims
-    (model, variant, engine_identity, repetitions)
-    WHERE state IN ('allocating', 'admitted') AND terminal_status IS NULL;
-  CREATE TABLE case_results (
-    run_id TEXT NOT NULL, model TEXT NOT NULL, variant TEXT NOT NULL, case_id TEXT NOT NULL,
-    rep INTEGER NOT NULL DEFAULT 0, cost_usd REAL,
-    PRIMARY KEY (run_id, model, variant, case_id, rep)
-  );
-`;
-
-type SQLiteStatement = {
-  bind(...values: unknown[]): SQLiteStatement;
-  execute(): { success: boolean; results: Record<string, unknown>[]; meta: { changes: number } };
-  all(): Promise<{
-    success: boolean;
-    results: Record<string, unknown>[];
-    meta: { changes: number };
-  }>;
-  raw(): Promise<unknown[][]>;
-  run(): Promise<{
-    success: boolean;
-    results: Record<string, unknown>[];
-    meta: { changes: number };
-  }>;
-  query: string;
-};
-type D1Fixture = { db: D1Database; failNextPublication(): void };
-
-function createD1Fixture(sqlite: DatabaseSync): D1Fixture {
-  let failPublication = false;
-  const adapter = {
-    prepare(query: string) {
-      let params: unknown[] = [];
-      const statement: SQLiteStatement = {
-        query,
-        bind(...values) {
-          params = values;
-          return statement;
-        },
-        execute() {
-          const rows = sqlite.prepare(query).all(...(params as never[]));
-          const changes = sqlite.prepare('SELECT changes() AS n').get();
-          return { success: true, results: rows, meta: { changes: Number(changes?.n ?? 0) } };
-        },
-        async all() {
-          return statement.execute();
-        },
-        async raw() {
-          return statement.execute().results.map(row => Object.values(row));
-        },
-        async run() {
-          return statement.execute();
-        },
-      };
-      return statement;
-    },
-    async batch(statements: SQLiteStatement[]) {
-      sqlite.exec('BEGIN');
-      try {
-        if (
-          failPublication &&
-          statements.some(statement => statement.query.includes('insert into "benchmark_profiles"'))
-        ) {
-          failPublication = false;
-          throw new Error('D1 unavailable after reserve');
-        }
-        const results = statements.map(statement => statement.execute());
-        sqlite.exec('COMMIT');
-        return results;
-      } catch (error) {
-        sqlite.exec('ROLLBACK');
-        throw error;
-      }
-    },
-  };
-  return {
-    db: adapter as unknown as D1Database,
-    failNextPublication() {
-      failPublication = true;
-    },
-  };
+function entry(model: string, variant: string | null = null): BenchmarkPair {
+  return { model, variant };
 }
 
-const NOW = new Date('2026-10-14T12:00:00.000Z');
-const config = { deciderRepetitions: 2 };
-const current = { engineIdentity: 'current-engine', repetitions: 2 };
-const FALLBACK_ESTIMATE_USD =
-  Math.ceil(0.01 * DECIDER_CASES.length * config.deciderRepetitions * 1_000_000) / 1_000_000;
-
-function profileRow(overrides: Partial<ProfileRow> = {}): ProfileRow {
+function profileRow(
+  partial: Partial<ProfileRow> & Pick<ProfileRow, 'model' | 'status'>
+): ProfileRow {
   return {
-    model: 'vendor/model',
+    router: 'efficient',
     variant: '',
-    engine_identity: 'current-engine',
-    repetitions: 2,
-    status: 'ready',
-    run_id: 'cached-run',
+    engine_identity: ENGINE,
+    repetitions: REPS,
+    run_id: null,
     failure_reason: null,
-    requested_at: NOW.toISOString(),
-    updated_at: NOW.toISOString(),
-    completed_at: NOW.toISOString(),
+    requested_at: '2026-07-27T00:00:00.000Z',
+    updated_at: '2026-07-27T00:00:00.000Z',
+    completed_at: null,
     platform_requested: false,
     user_requested: true,
-    ...overrides,
+    ...partial,
   };
 }
 
-function deferred() {
-  let resolve = () => {};
-  const promise = new Promise<void>(done => {
-    resolve = done;
-  });
-  return { promise, resolve };
+/**
+ * Build production admission statements (real builders) and apply them through
+ * the mock batch path. Exercises chargedEventInsertStatement /
+ * pendingRegisterUpsertStatement / pendingStatusInsertStatement so a missing
+ * __stmt tag or broken builder wiring fails these race tests.
+ */
+async function applyProductionAdmissionBatch(opts: {
+  chargedEvents?: Array<{
+    ownerType: string;
+    ownerId: string;
+    entry: BenchmarkPair;
+  }>;
+  registerUpserts?: BenchmarkPair[];
+  statusInserts?: BenchmarkPair[];
+  nowIso?: string;
+}): Promise<void> {
+  const { drizzle } = await import('drizzle-orm/d1');
+  const orm = drizzle({} as D1Database);
+  const nowIso = opts.nowIso ?? NOW.toISOString();
+  const current = { engineIdentity: ENGINE, repetitions: REPS };
+  const stmts: Array<{ __stmt?: PendingStmt }> = [];
+
+  for (const ev of opts.chargedEvents ?? []) {
+    stmts.push(
+      chargedEventInsertStatement(orm, {
+        owner_type: ev.ownerType,
+        owner_id: ev.ownerId,
+        model: ev.entry.model,
+        variant: variantToStorage(ev.entry.variant),
+        engine_identity: ENGINE,
+        repetitions: REPS,
+        admitted_at: nowIso,
+      }) as { __stmt?: PendingStmt }
+    );
+  }
+  for (const entry of opts.registerUpserts ?? []) {
+    stmts.push(
+      pendingRegisterUpsertStatement(orm, buildPendingUpsertValues(entry, current, nowIso)) as {
+        __stmt?: PendingStmt;
+      }
+    );
+  }
+  for (const entry of opts.statusInserts ?? []) {
+    stmts.push(
+      pendingStatusInsertStatement(orm, buildPendingUpsertValues(entry, current, nowIso)) as {
+        __stmt?: PendingStmt;
+      }
+    );
+  }
+
+  await (orm as unknown as { batch: (s: typeof stmts) => Promise<void> }).batch(stmts);
 }
 
-describe('exact-pair benchmark profiles', () => {
-  let sqlite: DatabaseSync;
-  let fixture: D1Fixture;
-  const reserve = vi.fn<ProfileCreditBridge['reserve']>();
-  const settle = vi.fn<ProfileCreditBridge['settle']>();
-  const billing: ProfileCreditBridge = { reserve, settle };
+const config = { deciderRepetitions: REPS };
 
-  beforeEach(() => {
-    sqlite = new DatabaseSync(':memory:');
-    sqlite.exec(SCHEMA_SQL);
-    fixture = createD1Fixture(sqlite);
-    reserve.mockReset().mockResolvedValue({ kind: 'held' });
-    settle.mockReset().mockResolvedValue(undefined);
-  });
-  afterEach(() => sqlite.close());
+beforeEach(() => {
+  store.reset();
+  vi.mocked(computeEngineIdentity).mockReturnValue(ENGINE);
+});
 
-  function registration(
-    pairs: BenchmarkPair[],
-    ownerId = 'owner-a',
-    retryPairs: BenchmarkPair[] = []
-  ) {
-    return registerProfiles(fixture.db, config, {
-      pairs,
-      retryPairs,
-      ownerType: 'user',
-      ownerId,
-      billing,
-      now: NOW,
-      fallbackCaseCostUsd: new Map(pairs.map(pair => [pair.model, 0.01])),
-    });
-  }
+describe('isCurrentBenchmarkProfile', () => {
+  const current = { engineIdentity: ENGINE, repetitions: REPS };
+  const e = entry('m/a', 'xhigh');
 
-  async function seedProfile(overrides: Partial<ProfileRow> = {}) {
-    await drizzle(fixture.db).insert(benchmarkProfiles).values(profileRow(overrides));
-  }
-
-  it('matches model, effort, engine and repetitions independently', () => {
-    const row = profileRow({ variant: 'high' });
-    expect(isCurrentBenchmarkProfile(row, current, { model: row.model, variant: 'high' })).toBe(
-      true
-    );
-    expect(isCurrentBenchmarkProfile(row, current, { model: row.model, variant: 'low' })).toBe(
-      false
-    );
+  it('is current only when engine identity, repetitions, and exact entry match', () => {
     expect(
-      isCurrentBenchmarkProfile({ ...row, engine_identity: 'old' }, current, {
-        model: row.model,
-        variant: 'high',
-      })
-    ).toBe(false);
-    expect(
-      isCurrentBenchmarkProfile({ ...row, repetitions: 1 }, current, {
-        model: row.model,
-        variant: 'high',
-      })
-    ).toBe(false);
-  });
-
-  it('reports cached ready/pending/running free without credit or admissions', async () => {
-    for (const status of ['ready', 'pending', 'running'] as const) {
-      await seedProfile({
-        model: `vendor/${status}`,
-        status,
-        user_requested: false,
-        platform_requested: true,
-      });
-    }
-    const pairs = ['ready', 'pending', 'running'].map(status => ({
-      model: `vendor/${status}`,
-      variant: null,
-    }));
-    const result = await registration(pairs);
-    expect(result.statuses.map(status => status.status)).toEqual(['ready', 'pending', 'running']);
-    expect(
-      result.statuses.every(status => status.estimatedCostUsd === 0 && status.chargedCostUsd === 0)
+      isCurrentBenchmarkProfile(
+        {
+          model: 'm/a',
+          variant: 'xhigh',
+          engine_identity: ENGINE,
+          repetitions: REPS,
+        },
+        current,
+        e
+      )
     ).toBe(true);
-    expect(reserve).not.toHaveBeenCalled();
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_benchmark_admissions').get()).toEqual({
-      n: 0,
-    });
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({
-      n: 0,
-    });
+  });
+
+  it('treats an engine-identity change as stale', () => {
     expect(
-      sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles WHERE user_requested = 1').get()
-    ).toEqual({ n: 3 });
+      isCurrentBenchmarkProfile(
+        {
+          model: 'm/a',
+          variant: 'xhigh',
+          engine_identity: 'v-old:engine',
+          repetitions: REPS,
+        },
+        current,
+        e
+      )
+    ).toBe(false);
   });
 
-  it('quotes every missing effort from historical model average before fallback', async () => {
-    sqlite
-      .prepare('INSERT INTO case_results VALUES (?, ?, ?, ?, ?, ?)')
-      .run('run-1', 'vendor/model', 'low', 'a', 0, 0.02);
-    sqlite
-      .prepare('INSERT INTO case_results VALUES (?, ?, ?, ?, ?, ?)')
-      .run('run-1', 'vendor/model', 'high', 'b', 0, 0.04);
-    sqlite
-      .prepare('INSERT INTO case_results VALUES (?, ?, ?, ?, ?, ?)')
-      .run('run-1', 'vendor/model', 'high', 'c', 0, null);
-    const quote = await estimateProfiles(fixture.db, config, {
-      pairs: [
-        { model: 'vendor/model', variant: 'low' },
-        { model: 'vendor/model', variant: 'high' },
-      ],
-      fallbackCaseCostUsd: new Map(),
-    });
-    for (const status of quote.statuses) {
-      expect(status.estimatedCostUsd).toBeCloseTo(0.03 * DECIDER_CASES.length * 2, 5);
-    }
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 0 });
-    expect(reserve).not.toHaveBeenCalled();
-  });
-
-  it('quotes fallback per case times case count and repetitions only when needed', async () => {
-    const pair = { model: 'vendor/model', variant: null };
-    const quote = await estimateProfiles(fixture.db, config, {
-      pairs: [pair],
-      fallbackCaseCostUsd: new Map([[pair.model, 0.01]]),
-    });
-    expect(quote.statuses[0]?.estimatedCostUsd).toBe(FALLBACK_ESTIMATE_USD);
-    await expect(
-      estimateProfiles(fixture.db, config, { pairs: [pair], fallbackCaseCostUsd: new Map() })
-    ).rejects.toThrow(ProfileValidationError);
-    await seedProfile();
-    await expect(
-      estimateProfiles(fixture.db, config, { pairs: [pair], fallbackCaseCostUsd: new Map() })
-    ).resolves.toMatchObject({ statuses: [{ estimatedCostUsd: 0 }] });
-  });
-
-  it('never admits missing or stale rows from read-only status lookup', async () => {
-    await seedProfile({ engine_identity: 'old-engine' });
-    const result = await lookupProfileStatuses(fixture.db, config, {
-      pairs: [
-        { model: 'vendor/model', variant: null },
-        { model: 'vendor/missing', variant: null },
-      ],
-    });
-    expect(result.statuses).toMatchObject([
-      { status: 'failed', failureReason: STALE_PROFILE_FAILURE_REASON },
-      { status: 'failed', failureReason: MISSING_PROFILE_FAILURE_REASON },
-    ]);
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 1 });
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_benchmark_claims').get()).toEqual({
-      n: 0,
-    });
-  });
-
-  it('requires paid reserve for engine drift while retaining quota exemption', async () => {
-    await seedProfile({ engine_identity: 'old-engine' });
-    const result = await registration([{ model: 'vendor/model', variant: null }]);
-    expect(reserve).toHaveBeenCalledOnce();
-    expect(result.statuses[0]).toMatchObject({
-      status: 'pending',
-      estimatedCostUsd: FALLBACK_ESTIMATE_USD,
-      chargedCostUsd: null,
-    });
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({
-      n: 0,
-    });
-    expect(sqlite.prepare('SELECT state FROM profile_benchmark_claims').get()).toEqual({
-      state: 'admitted',
-    });
-  });
-
-  it('reserves the whole won request atomically and insufficient credits leave no runnable row', async () => {
-    reserve.mockResolvedValueOnce({
-      kind: 'insufficient',
-      availableCostUsd: 0.5,
-      requiredCostUsd: 2,
-    });
-    const pairs = [
-      { model: 'vendor/model', variant: 'low' },
-      { model: 'vendor/model', variant: 'high' },
-    ];
-    await expect(registration(pairs)).rejects.toThrow(ProfileInsufficientCreditsError);
-    expect(reserve.mock.calls[0]?.[0].items).toHaveLength(2);
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 0 });
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({
-      n: 0,
-    });
-    expect(sqlite.prepare('SELECT state FROM profile_benchmark_admissions').get()).toEqual({
-      state: 'insufficient',
-    });
+  it('treats a repetitions change as stale', () => {
     expect(
-      sqlite
-        .prepare("SELECT COUNT(*) AS n FROM profile_benchmark_claims WHERE state = 'released'")
-        .get()
-    ).toEqual({ n: 2 });
-    await registration(pairs);
-    expect(reserve).toHaveBeenCalledTimes(2);
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 2 });
+      isCurrentBenchmarkProfile(
+        {
+          model: 'm/a',
+          variant: 'xhigh',
+          engine_identity: ENGINE,
+          repetitions: 3,
+        },
+        current,
+        e
+      )
+    ).toBe(false);
   });
 
-  it('serializes concurrent ownership before reserve and reports allocating losers as 409', async () => {
-    const started = deferred();
-    const finish = deferred();
-    reserve.mockImplementationOnce(async () => {
-      started.resolve();
-      await finish.promise;
-      return { kind: 'held' };
-    });
-    const pairs = [{ model: 'vendor/model', variant: 'high' }];
-    const first = registration(pairs);
-    await started.promise;
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 0 });
-    await expect(registration(pairs, 'owner-b')).rejects.toThrow(ProfileAdmissionInProgressError);
-    expect(reserve).toHaveBeenCalledOnce();
-    finish.resolve();
-    await expect(first).resolves.toMatchObject({ statuses: [{ status: 'pending' }] });
-    const cached = await registration(pairs, 'owner-b');
-    expect(cached.statuses[0]).toMatchObject({ estimatedCostUsd: 0, chargedCostUsd: 0 });
-    expect(reserve).toHaveBeenCalledOnce();
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({
-      n: 1,
-    });
-  });
-
-  it('reserves only exact-pair claims won by a partially overlapping request', async () => {
-    const started = deferred();
-    const finish = deferred();
-    reserve.mockImplementationOnce(async () => {
-      started.resolve();
-      await finish.promise;
-      return { kind: 'held' };
-    });
-    const shared = { model: 'vendor/model', variant: 'high' };
-    const unique = { model: 'vendor/other', variant: null };
-    const first = registration([shared]);
-    await started.promise;
-    await expect(registration([shared, unique], 'owner-b')).rejects.toThrow(
-      ProfileAdmissionInProgressError
-    );
-    expect(reserve.mock.calls[1]?.[0].items).toEqual([
-      { ...unique, estimatedCostUsd: FALLBACK_ESTIMATE_USD },
-    ]);
-    finish.resolve();
-    await first;
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 2 });
-  });
-
-  it('reconciles crash-after-reserve using the same persisted idempotency request', async () => {
-    reserve.mockImplementationOnce(async () => {
-      fixture.failNextPublication();
-      return { kind: 'held' };
-    });
-    const pairs = [{ model: 'vendor/model', variant: null }];
-    await expect(registration(pairs)).rejects.toThrow('D1 unavailable after reserve');
-    expect(sqlite.prepare('SELECT state FROM profile_benchmark_claims').get()).toEqual({
-      state: 'allocating',
-    });
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 0 });
-    await recoverPendingProfileAdmissions(fixture.db, billing, NOW);
-    expect(reserve.mock.calls[1]?.[0]).toEqual(reserve.mock.calls[0]?.[0]);
-    expect(sqlite.prepare('SELECT state FROM profile_benchmark_claims').get()).toEqual({
-      state: 'admitted',
-    });
-    expect(sqlite.prepare('SELECT status FROM benchmark_profiles').get()).toEqual({
-      status: 'pending',
-    });
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({
-      n: 1,
-    });
-    await recoverPendingProfileAdmissions(fixture.db, billing, NOW);
-    expect(reserve).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not overwrite a platform winner and retries durable zero-release after a bridge failure', async () => {
-    reserve.mockImplementationOnce(async () => {
-      await seedProfile({
-        status: 'running',
-        run_id: 'platform-run',
-        platform_requested: true,
-        user_requested: false,
-      });
-      return { kind: 'held' };
-    });
-    settle.mockRejectedValueOnce(new Error('settlement bridge unavailable'));
-    await expect(registration([{ model: 'vendor/model', variant: null }])).rejects.toThrow(
-      'settlement bridge unavailable'
-    );
-    expect(sqlite.prepare('SELECT status, run_id FROM benchmark_profiles').get()).toEqual({
-      status: 'running',
-      run_id: 'platform-run',
-    });
-    expect(sqlite.prepare('SELECT state FROM profile_benchmark_claims').get()).toEqual({
-      state: 'release_pending',
-    });
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({
-      n: 0,
-    });
-    await recoverPendingProfileAdmissions(fixture.db, billing, NOW);
-    expect(settle).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        model: 'vendor/model',
-        variant: null,
-        runId: null,
-        actualCostUsd: 0,
-      })
-    );
+  it('treats a same-engine/repetitions row of another variant as not current', () => {
     expect(
-      sqlite.prepare('SELECT state, charged_cost_usd FROM profile_benchmark_claims').get()
-    ).toEqual({ state: 'released', charged_cost_usd: 0 });
+      isCurrentBenchmarkProfile(
+        {
+          model: 'm/a',
+          variant: 'max',
+          engine_identity: ENGINE,
+          repetitions: REPS,
+        },
+        current,
+        e
+      )
+    ).toBe(false);
   });
 
-  it('closes allocating claims after echoed holds were released on a reservation mismatch', async () => {
-    reserve.mockRejectedValueOnce(new ProfileReservationMismatchError());
-    await expect(registration([{ model: 'vendor/model', variant: null }])).rejects.toThrow(
-      'mismatched reservation'
-    );
-    expect(sqlite.prepare('SELECT state FROM profile_benchmark_admissions').get()).toEqual({
-      state: 'admitted',
-    });
-    expect(sqlite.prepare('SELECT state FROM profile_benchmark_claims').get()).toEqual({
-      state: 'released',
-    });
-    await recoverPendingProfileAdmissions(fixture.db, billing, NOW);
-    expect(reserve).toHaveBeenCalledTimes(1);
-    await registration([{ model: 'vendor/model', variant: null }]);
-    expect(reserve).toHaveBeenCalledTimes(2);
-  });
-
-  it('backs off poisoned admissions so newer allocations and hold releases are recovered', async () => {
-    const insertAdmission = sqlite.prepare(`INSERT INTO profile_benchmark_admissions
-      (admission_id, owner_type, owner_id, engine_identity, repetitions, state, created_at, updated_at)
-      VALUES (?, 'user', 'owner-a', 'current-engine', 1, ?, ?, ?)`);
-    const insertClaim = sqlite.prepare(`INSERT INTO profile_benchmark_claims
-      (admission_id, model, variant, engine_identity, repetitions, estimated_cost_usd, quota_charged, state, created_at, updated_at)
-      VALUES (?, ?, '', 'current-engine', 1, 0.01, 0, ?, ?, ?)`);
-    const old = new Date(NOW.getTime() - 60_000).toISOString();
-    for (let index = 0; index < 100; index++) {
-      const id = `poison-${index}`;
-      insertAdmission.run(id, 'allocating', old, old);
-      insertClaim.run(id, `vendor/${id}`, 'allocating', old, old);
-    }
-    insertAdmission.run('new-admission', 'allocating', NOW.toISOString(), NOW.toISOString());
-    insertClaim.run(
-      'new-admission',
-      'vendor/new',
-      'allocating',
-      NOW.toISOString(),
-      NOW.toISOString()
-    );
-    insertAdmission.run('new-release', 'admitted', NOW.toISOString(), NOW.toISOString());
-    insertClaim.run(
-      'new-release',
-      'vendor/release',
-      'release_pending',
-      NOW.toISOString(),
-      NOW.toISOString()
-    );
-    reserve.mockImplementation(async request => {
-      if (request.admissionId.startsWith('poison-')) throw new Error('poisoned admission');
-      return { kind: 'held' };
-    });
-    await expect(recoverPendingProfileAdmissions(fixture.db, billing, NOW)).rejects.toThrow(
-      'poisoned admission'
-    );
-    expect(reserve).toHaveBeenCalledTimes(100);
-    await recoverPendingProfileAdmissions(fixture.db, billing, NOW);
-    expect(reserve).toHaveBeenCalledTimes(101);
-    expect(settle).toHaveBeenCalledWith(
-      expect.objectContaining({ admissionId: 'new-release', actualCostUsd: 0 })
-    );
+  it('maps null entry variant to empty storage variant', () => {
     expect(
-      sqlite
-        .prepare(`SELECT state FROM profile_benchmark_claims WHERE admission_id = 'new-admission'`)
-        .get()
-    ).toEqual({ state: 'admitted' });
-    expect(
-      sqlite
-        .prepare(`SELECT state FROM profile_benchmark_claims WHERE admission_id = 'new-release'`)
-        .get()
-    ).toEqual({ state: 'released' });
-    const retryAt = new Date(NOW.getTime() + 15 * 60_000);
-    await expect(recoverPendingProfileAdmissions(fixture.db, billing, retryAt)).rejects.toThrow(
-      'poisoned admission'
-    );
-    expect(
-      sqlite
-        .prepare(`SELECT recovery_attempts, recovery_next_at FROM profile_benchmark_admissions
-      WHERE admission_id = 'poison-0'`)
-        .get()
-    ).toEqual({
-      recovery_attempts: 2,
-      recovery_next_at: new Date(retryAt.getTime() + 30 * 60_000).toISOString(),
-    });
-  });
-
-  it('retains the previous unpaid terminal claim when admitting a failed retry with a new hold', async () => {
-    const pair = { model: 'vendor/model', variant: 'high' };
-    await registration([pair]);
-    sqlite.exec(
-      "UPDATE benchmark_profiles SET status = 'failed', run_id = 'failed-run', failure_reason = 'boom'; UPDATE profile_benchmark_claims SET run_id = 'failed-run', terminal_status = 'failed', charged_cost_usd = 0;"
-    );
-    const beforeRetry = await registration([pair]);
-    expect(beforeRetry.statuses[0]?.status).toBe('failed');
-    expect(reserve).toHaveBeenCalledOnce();
-    await registration([pair], 'owner-a', [pair]);
-    expect(reserve).toHaveBeenCalledTimes(2);
-    expect(reserve.mock.calls[1]?.[0].admissionId).not.toBe(reserve.mock.calls[0]?.[0].admissionId);
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_benchmark_claims').get()).toEqual({
-      n: 2,
-    });
-    expect(
-      sqlite
-        .prepare(
-          "SELECT state, terminal_status FROM profile_benchmark_claims WHERE run_id = 'failed-run'"
-        )
-        .get()
-    ).toEqual({ state: 'admitted', terminal_status: 'failed' });
-    expect(sqlite.prepare('SELECT status, run_id FROM benchmark_profiles').get()).toEqual({
-      status: 'pending',
-      run_id: null,
-    });
-  });
-
-  it('counts ten admitted models rather than expanded effort pairs for quota', async () => {
-    const pairs = Array.from({ length: 10 }, (_, index) => `vendor/model-${index}`).flatMap(
-      model => [
-        { model, variant: 'low' },
-        { model, variant: 'high' },
-      ]
-    );
-    await registration(pairs);
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({
-      n: 10,
-    });
-    expect(reserve.mock.calls[0]?.[0].items).toHaveLength(20);
-    await expect(registration([{ model: 'vendor/eleventh', variant: null }])).rejects.toThrow(
-      ProfileQuotaExceededError
-    );
-    expect(reserve).toHaveBeenCalledOnce();
-    expect(
-      sqlite
-        .prepare("SELECT COUNT(*) AS n FROM benchmark_profiles WHERE model = 'vendor/eleventh'")
-        .get()
-    ).toEqual({ n: 0 });
-  });
-
-  it('includes allocating model claims in concurrent quota enforcement', async () => {
-    for (let index = 0; index < 9; index++) {
-      await drizzle(fixture.db)
-        .insert(profileRequestEvents)
-        .values({
-          owner_type: 'user',
-          owner_id: 'owner-a',
-          model: `old/model-${index}`,
+      isCurrentBenchmarkProfile(
+        {
+          model: 'm/a',
           variant: '',
-          engine_identity: 'current-engine',
-          repetitions: 2,
-          admitted_at: NOW.toISOString(),
-        });
+          engine_identity: ENGINE,
+          repetitions: REPS,
+        },
+        current,
+        entry('m/a', null)
+      )
+    ).toBe(true);
+  });
+});
+
+describe('classifyProfileAdmission', () => {
+  const current = { engineIdentity: ENGINE, repetitions: REPS };
+  const e = entry('m');
+
+  it('reports ready/pending/running without admission', () => {
+    for (const status of ['ready', 'pending', 'running'] as const) {
+      expect(
+        classifyProfileAdmission([profileRow({ model: 'm', status })], current, e, false)
+      ).toEqual({ kind: 'report', status });
     }
-    const started = deferred();
-    const finish = deferred();
-    reserve.mockImplementationOnce(async () => {
-      started.resolve();
-      await finish.promise;
-      return { kind: 'held' };
-    });
-    const first = registration([
-      { model: 'vendor/tenth', variant: 'low' },
-      { model: 'vendor/tenth', variant: 'high' },
-    ]);
-    await started.promise;
-    await expect(registration([{ model: 'vendor/eleventh', variant: null }])).rejects.toThrow(
-      ProfileQuotaExceededError
-    );
-    finish.resolve();
-    await first;
-    expect(reserve).toHaveBeenCalledOnce();
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({
-      n: 10,
-    });
   });
 
-  it('returns actual cost only to the admitting owner while new cached requests remain free', async () => {
-    const pair = { model: 'vendor/model', variant: null };
-    await registration([pair]);
-    sqlite.exec(
-      "UPDATE benchmark_profiles SET status = 'ready', run_id = 'paid-run'; UPDATE profile_benchmark_claims SET run_id = 'paid-run', terminal_status = 'ready', charged_cost_usd = 0.12, state = 'settled';"
-    );
-    const owner = await lookupProfileStatuses(fixture.db, config, {
-      pairs: [pair],
-      ownerType: 'user',
-      ownerId: 'owner-a',
-    });
-    expect(owner.statuses[0]?.chargedCostUsd).toBe(0.12);
-    const other = await lookupProfileStatuses(fixture.db, config, {
-      pairs: [pair],
-      ownerType: 'user',
-      ownerId: 'owner-b',
-    });
-    expect(other.statuses[0]?.chargedCostUsd).toBe(0);
-    expect((await registration([pair], 'owner-b')).statuses[0]?.chargedCostUsd).toBe(0);
-    expect(
-      (
-        await estimateProfiles(fixture.db, config, {
-          pairs: [pair],
-          fallbackCaseCostUsd: new Map(),
-        })
-      ).statuses[0]?.estimatedCostUsd
-    ).toBe(0);
-  });
-
-  it('validates duplicate exact pairs while allowing every variant of one model', async () => {
-    const pair = { model: 'vendor/model', variant: null };
-    await expect(registration([pair, pair])).rejects.toThrow(ProfileValidationError);
-    await expect(
-      registration([
-        { model: 'vendor/model', variant: 'low' },
-        { model: 'vendor/model', variant: 'high' },
-      ])
-    ).resolves.toMatchObject({ statuses: [{ status: 'pending' }, { status: 'pending' }] });
-  });
-
-  it('bounds failures and computes rolling-window retry times', () => {
-    expect(boundFailureReason(null)).toBeNull();
-    expect(boundFailureReason('x'.repeat(10_000))?.length).toBeLessThan(10_000);
-    expect(computeQuotaRetryAt(NOW.toISOString())).toBe(
-      new Date(NOW.getTime() + PROFILE_ADMISSION_WINDOW_MS).toISOString()
-    );
+  it('reports failed without charge when not retried', () => {
     expect(
       classifyProfileAdmission(
-        [profileRow({ status: 'failed', failure_reason: 'boom' })],
+        [profileRow({ model: 'm', status: 'failed', failure_reason: 'boom' })],
         current,
-        { model: 'vendor/model', variant: null },
+        e,
         false
       )
     ).toEqual({ kind: 'report', status: 'failed', failureReason: 'boom' });
+  });
+
+  it('charges admission for explicit failed retry', () => {
+    expect(
+      classifyProfileAdmission(
+        [profileRow({ model: 'm', status: 'failed', failure_reason: 'boom' })],
+        current,
+        e,
+        true
+      )
+    ).toEqual({ kind: 'admit', charged: true });
+  });
+
+  it('charges for a never-seen pair', () => {
+    expect(classifyProfileAdmission([], current, e, false)).toEqual({
+      kind: 'admit',
+      charged: true,
+    });
+  });
+
+  it('free-admits when only a stale (old engine) row exists', () => {
+    expect(
+      classifyProfileAdmission(
+        [
+          profileRow({
+            model: 'm',
+            status: 'ready',
+            engine_identity: 'v-old:engine',
+          }),
+        ],
+        current,
+        e,
+        false
+      )
+    ).toEqual({ kind: 'admit', charged: false });
+  });
+
+  it('free-admits when only a stale (old repetitions) row exists', () => {
+    expect(
+      classifyProfileAdmission(
+        [profileRow({ model: 'm', status: 'ready', repetitions: 5 })],
+        current,
+        e,
+        false
+      )
+    ).toEqual({ kind: 'admit', charged: false });
+  });
+});
+
+describe('computeQuotaRetryAt', () => {
+  it('is oldest in-window event + 24h', () => {
+    const oldest = '2026-07-28T01:00:00.000Z';
+    expect(computeQuotaRetryAt(oldest)).toBe('2026-07-29T01:00:00.000Z');
+  });
+});
+
+describe('registerProfiles', () => {
+  it('admits a missing pair once; a second owner is not charged', async () => {
+    const pairs = [entry('openai/gpt-4o', 'xhigh')];
+
+    const first = await registerProfiles({} as D1Database, config, {
+      ownerType: 'user',
+      ownerId: 'owner-a',
+      pairs,
+      now: NOW,
+    });
+    expect(first.statuses).toEqual([{ entry: pairs[0], status: 'pending', failureReason: null }]);
+    expect(store.events).toHaveLength(1);
+    expect(store.events[0]?.owner_id).toBe('owner-a');
+    expect(store.profiles.size).toBe(1);
+
+    const second = await registerProfiles({} as D1Database, config, {
+      ownerType: 'org',
+      ownerId: 'owner-b',
+      pairs,
+      now: NOW,
+    });
+    expect(second.statuses).toEqual([{ entry: pairs[0], status: 'pending', failureReason: null }]);
+    // Second owner sees pending and is not charged.
+    expect(store.events).toHaveLength(1);
+    expect(store.profiles.size).toBe(1);
+  });
+
+  it('blocks a second concurrent charge when the batch observes a committed pending row', async () => {
+    const pairs = [entry('race/model', 'xhigh')];
+
+    // First owner commits a charged pending admission.
+    await registerProfiles({} as D1Database, config, {
+      ownerType: 'user',
+      ownerId: 'owner-a',
+      pairs,
+      now: NOW,
+    });
+    expect(store.events).toHaveLength(1);
+    const firstRunId = [...store.profiles.values()][0]?.run_id ?? null;
+
+    // Concurrent second batch after a stale pre-read that classified "charge":
+    // real builders → event guard + failed-only upsert observe committed pending.
+    await applyProductionAdmissionBatch({
+      chargedEvents: [{ ownerType: 'org', ownerId: 'owner-b', entry: pairs[0]! }],
+      registerUpserts: pairs,
+    });
+
+    expect(store.events).toHaveLength(1);
+    const row = [...store.profiles.values()].find(r => r.model === 'race/model');
+    expect(row?.status).toBe('pending');
+    expect(row?.run_id).toBe(firstRunId);
+
+    // Fresh register after concurrent commit reports true pending, no new charge.
+    const second = await registerProfiles({} as D1Database, config, {
+      ownerType: 'org',
+      ownerId: 'owner-b',
+      pairs,
+      now: NOW,
+    });
+    expect(second.statuses[0]?.status).toBe('pending');
+    expect(store.events).toHaveLength(1);
+  });
+
+  it('does not charge ready, pending, or running entries', async () => {
+    store.seedProfile(profileRow({ model: 'a/ready', status: 'ready', variant: '' }));
+    store.seedProfile(profileRow({ model: 'a/pending', status: 'pending', variant: '' }));
+    store.seedProfile(profileRow({ model: 'a/running', status: 'running', variant: '' }));
+
+    const result = await registerProfiles({} as D1Database, config, {
+      ownerType: 'user',
+      ownerId: 'u1',
+      pairs: [entry('a/ready'), entry('a/pending'), entry('a/running')],
+      now: NOW,
+    });
+
+    expect(result.statuses.map(s => s.status)).toEqual(['ready', 'pending', 'running']);
+    expect(store.events).toHaveLength(0);
+  });
+
+  it('does not regress a running current row when a stale pre-read would admit', async () => {
+    store.seedProfile(
+      profileRow({
+        model: 'live/running',
+        status: 'running',
+        run_id: 'active-run',
+        requested_at: '2026-07-28T10:00:00.000Z',
+      })
+    );
+
+    // Stale-read batch via real builders: charged event + failed-only upsert.
+    await applyProductionAdmissionBatch({
+      chargedEvents: [{ ownerType: 'user', ownerId: 'stale-reader', entry: entry('live/running') }],
+      registerUpserts: [entry('live/running')],
+    });
+
+    const row = store.profiles.get(
+      store.profilePk(profileRow({ model: 'live/running', status: 'running' }))
+    );
+    expect(row?.status).toBe('running');
+    expect(row?.run_id).toBe('active-run');
+    expect(store.events).toHaveLength(0);
+
+    const result = await registerProfiles({} as D1Database, config, {
+      ownerType: 'user',
+      ownerId: 'u1',
+      pairs: [entry('live/running')],
+      now: NOW,
+    });
+    expect(result.statuses[0]?.status).toBe('running');
+    expect(store.events).toHaveLength(0);
+  });
+
+  it('does not regress a ready current row when a stale pre-read would admit', async () => {
+    store.seedProfile(
+      profileRow({
+        model: 'live/ready',
+        status: 'ready',
+        run_id: 'done-run',
+        completed_at: '2026-07-28T09:00:00.000Z',
+      })
+    );
+
+    await applyProductionAdmissionBatch({
+      registerUpserts: [entry('live/ready')],
+    });
+
+    const row = store.profiles.get(
+      store.profilePk(profileRow({ model: 'live/ready', status: 'ready' }))
+    );
+    expect(row?.status).toBe('ready');
+    expect(row?.run_id).toBe('done-run');
+    expect(row?.completed_at).toBe('2026-07-28T09:00:00.000Z');
+  });
+
+  it('reports failed without charge when not in retryPairs', async () => {
+    store.seedProfile(
+      profileRow({
+        model: 'a/fail',
+        status: 'failed',
+        failure_reason: 'container crash',
+      })
+    );
+
+    const result = await registerProfiles({} as D1Database, config, {
+      ownerType: 'user',
+      ownerId: 'u1',
+      pairs: [entry('a/fail')],
+      now: NOW,
+    });
+
+    expect(result.statuses).toEqual([
+      {
+        entry: entry('a/fail'),
+        status: 'failed',
+        failureReason: 'container crash',
+      },
+    ]);
+    expect(store.events).toHaveLength(0);
+    expect(
+      store.profiles.get(store.profilePk(profileRow({ model: 'a/fail', status: 'failed' })))?.status
+    ).toBe('failed');
+  });
+
+  it('charges and resets failed entry when listed in retryPairs', async () => {
+    store.seedProfile(
+      profileRow({
+        model: 'a/fail',
+        status: 'failed',
+        failure_reason: 'container crash',
+        run_id: 'old-run',
+      })
+    );
+
+    const result = await registerProfiles({} as D1Database, config, {
+      ownerType: 'user',
+      ownerId: 'u1',
+      pairs: [entry('a/fail')],
+      retryPairs: [entry('a/fail')],
+      now: NOW,
+    });
+
+    expect(result.statuses[0]?.status).toBe('pending');
+    expect(store.events).toHaveLength(1);
+    const row = [...store.profiles.values()].find(r => r.model === 'a/fail');
+    expect(row).toMatchObject({
+      status: 'pending',
+      failure_reason: null,
+      run_id: null,
+      engine_identity: ENGINE,
+      repetitions: REPS,
+    });
+  });
+
+  it('free-admits stale engine rows without a request event and keeps history', async () => {
+    const stale = profileRow({
+      model: 'stale/m',
+      status: 'ready',
+      engine_identity: 'v-old:engine',
+      completed_at: '2026-01-01T00:00:00.000Z',
+    });
+    store.seedProfile(stale);
+
+    const result = await registerProfiles({} as D1Database, config, {
+      ownerType: 'user',
+      ownerId: 'u1',
+      pairs: [entry('stale/m')],
+      now: NOW,
+    });
+
+    expect(result.statuses[0]?.status).toBe('pending');
+    expect(store.events).toHaveLength(0);
+    // Old row preserved.
+    expect(store.profiles.get(store.profilePk(stale))?.status).toBe('ready');
+    // New current pending row inserted.
+    const current = [...store.profiles.values()].find(
+      r => r.model === 'stale/m' && r.engine_identity === ENGINE
+    );
+    expect(current?.status).toBe('pending');
+  });
+
+  it('allows 10 charged admissions in 24h and rejects the 11th with nothing written', async () => {
+    const owner = { ownerType: 'user' as const, ownerId: 'quota-user' };
+    // Seed 10 prior charged events in the window.
+    for (let i = 0; i < PROFILE_ADMISSION_LIMIT; i++) {
+      store.seedEvent({
+        owner_type: owner.ownerType,
+        owner_id: owner.ownerId,
+        model: `prior/${i}`,
+        variant: '',
+        engine_identity: ENGINE,
+        repetitions: REPS,
+        admitted_at: new Date(NOW.getTime() - (PROFILE_ADMISSION_LIMIT - i) * 60_000).toISOString(),
+      });
+    }
+    const oldest = store.events[0]!.admitted_at;
+    const expectedRetryAt = new Date(
+      Date.parse(oldest) + PROFILE_ADMISSION_WINDOW_MS
+    ).toISOString();
+
+    const profilesBefore = store.profiles.size;
+    const eventsBefore = store.events.length;
+
+    await expect(
+      registerProfiles({} as D1Database, config, {
+        ...owner,
+        pairs: [entry('over/quota')],
+        now: NOW,
+      })
+    ).rejects.toBeInstanceOf(ProfileQuotaExceededError);
+
+    try {
+      await registerProfiles({} as D1Database, config, {
+        ...owner,
+        pairs: [entry('over/quota')],
+        now: NOW,
+      });
+    } catch (err) {
+      const quotaErr = err as ProfileQuotaExceededError;
+      expect(quotaErr.quota.retryAt).toBe(expectedRetryAt);
+      expect(quotaErr.quota.error).toContain(expectedRetryAt);
+    }
+
+    // All-or-nothing: no new events, no profile upsert.
+    expect(store.events).toHaveLength(eventsBefore);
+    expect(store.profiles.size).toBe(profilesBefore);
+    expect([...store.profiles.keys()].some(k => k.includes('over/quota'))).toBe(false);
+
+    // After the retryAt instant, admission succeeds.
+    const after = new Date(Date.parse(expectedRetryAt) + 1);
+    const result = await registerProfiles({} as D1Database, config, {
+      ...owner,
+      pairs: [entry('over/quota')],
+      now: after,
+    });
+    expect(result.statuses[0]?.status).toBe('pending');
+    expect(store.events.some(e => e.model === 'over/quota')).toBe(true);
+  });
+
+  it('rejects the whole batch when any charged admission would exceed quota', async () => {
+    const owner = { ownerType: 'user' as const, ownerId: 'batch-quota' };
+    for (let i = 0; i < 9; i++) {
+      store.seedEvent({
+        owner_type: owner.ownerType,
+        owner_id: owner.ownerId,
+        model: `prior/${i}`,
+        variant: '',
+        engine_identity: ENGINE,
+        repetitions: REPS,
+        admitted_at: new Date(NOW.getTime() - 60_000).toISOString(),
+      });
+    }
+    // 9 existing + 2 new charged = 11 → reject both, write nothing.
+    await expect(
+      registerProfiles({} as D1Database, config, {
+        ...owner,
+        pairs: [entry('new/a'), entry('new/b')],
+        now: NOW,
+      })
+    ).rejects.toBeInstanceOf(ProfileQuotaExceededError);
+
+    expect(store.profiles.size).toBe(0);
+    expect(store.events).toHaveLength(9);
+  });
+
+  it('counts ten admitted models rather than expanded effort pairs for quota', async () => {
+    const owner = { ownerType: 'user' as const, ownerId: 'model-quota' };
+    const efforts = ['low', 'medium', 'high'];
+    const pairs = Array.from(
+      { length: PROFILE_ADMISSION_LIMIT },
+      (_, i) => `vendor/m-${i}`
+    ).flatMap(model => efforts.map(variant => entry(model, variant)));
+
+    const result = await registerProfiles({} as D1Database, config, {
+      ...owner,
+      pairs,
+      now: NOW,
+    });
+
+    expect(result.statuses).toHaveLength(pairs.length);
+    expect(result.statuses.every(s => s.status === 'pending')).toBe(true);
+    expect(store.profiles.size).toBe(pairs.length);
+    // One request event per model, recorded with its first charged pair.
+    expect(store.events.map(e => [e.model, e.variant])).toEqual(
+      Array.from({ length: PROFILE_ADMISSION_LIMIT }, (_, i) => [`vendor/m-${i}`, 'low'])
+    );
+
+    await expect(
+      registerProfiles({} as D1Database, config, {
+        ...owner,
+        pairs: [entry('vendor/eleventh', 'low'), entry('vendor/eleventh', 'high')],
+        now: NOW,
+      })
+    ).rejects.toBeInstanceOf(ProfileQuotaExceededError);
+    expect(store.events).toHaveLength(PROFILE_ADMISSION_LIMIT);
+    expect([...store.profiles.values()].some(r => r.model === 'vendor/eleventh')).toBe(false);
+  });
+
+  it('charges one event for a model mixing a stale effort and a missing effort', async () => {
+    store.seedProfile(
+      profileRow({
+        model: 'mix/m',
+        variant: 'low',
+        status: 'ready',
+        engine_identity: 'v-old:engine',
+      })
+    );
+
+    const result = await registerProfiles({} as D1Database, config, {
+      ownerType: 'user',
+      ownerId: 'u1',
+      pairs: [entry('mix/m', 'low'), entry('mix/m', 'high')],
+      now: NOW,
+    });
+
+    expect(result.statuses.map(s => s.status)).toEqual(['pending', 'pending']);
+    expect(store.events.map(e => [e.model, e.variant])).toEqual([['mix/m', 'high']]);
+  });
+
+  it('rejects more than the model limit even when pairs are few per model', async () => {
+    await expect(
+      registerProfiles({} as D1Database, config, {
+        ownerType: 'user',
+        ownerId: 'u1',
+        pairs: Array.from({ length: PROFILE_ADMISSION_LIMIT + 1 }, (_, i) => entry(`many/${i}`)),
+        now: NOW,
+      })
+    ).rejects.toBeInstanceOf(ProfileValidationError);
+    expect(store.profiles.size).toBe(0);
+    expect(store.events).toHaveLength(0);
+  });
+
+  it('rejects duplicate exact pairs while allowing every effort of one model', async () => {
+    await expect(
+      registerProfiles({} as D1Database, config, {
+        ownerType: 'user',
+        ownerId: 'u1',
+        pairs: [entry('dup/m', 'high'), entry('dup/m', 'high')],
+        now: NOW,
+      })
+    ).rejects.toThrow('Duplicate benchmark pair');
+    await expect(
+      lookupProfileStatuses({} as D1Database, config, {
+        pairs: [entry('dup/m'), entry('dup/m')],
+        now: NOW,
+      })
+    ).rejects.toBeInstanceOf(ProfileValidationError);
+    expect(store.profiles.size).toBe(0);
+
+    const result = await registerProfiles({} as D1Database, config, {
+      ownerType: 'user',
+      ownerId: 'u1',
+      pairs: [entry('dup/m', 'low'), entry('dup/m', 'high')],
+      now: NOW,
+    });
+    expect(result.statuses.map(s => s.status)).toEqual(['pending', 'pending']);
+  });
+
+  it('rejects retryPairs outside pairs before writing anything', async () => {
+    store.seedProfile(profileRow({ model: 'retry/m', variant: 'high', status: 'failed' }));
+
+    await expect(
+      registerProfiles({} as D1Database, config, {
+        ownerType: 'user',
+        ownerId: 'u1',
+        pairs: [entry('retry/m', 'high')],
+        retryPairs: [entry('retry/m', 'low')],
+        now: NOW,
+      })
+    ).rejects.toThrow('retryPairs must be a subset of pairs');
+    expect(store.events).toHaveLength(0);
+    expect(
+      store.profiles.get(
+        store.profilePk(profileRow({ model: 'retry/m', variant: 'high', status: 'failed' }))
+      )?.status
+    ).toBe('failed');
+  });
+});
+
+describe('lookupProfileStatuses', () => {
+  it('returns current statuses without charging', async () => {
+    store.seedProfile(profileRow({ model: 'a/ready', status: 'ready' }));
+    store.seedProfile(profileRow({ model: 'a/fail', status: 'failed', failure_reason: 'nope' }));
+
+    const result = await lookupProfileStatuses({} as D1Database, config, {
+      pairs: [entry('a/ready'), entry('a/fail')],
+      now: NOW,
+    });
+
+    expect(result.statuses).toEqual([
+      { entry: entry('a/ready'), status: 'ready', failureReason: null },
+      { entry: entry('a/fail'), status: 'failed', failureReason: 'nope' },
+    ]);
+    expect(store.events).toHaveLength(0);
+  });
+
+  it('inserts a free pending row for stale profiles and reports pending', async () => {
+    const stale = profileRow({
+      model: 'stale/m',
+      status: 'ready',
+      engine_identity: 'v-old:engine',
+    });
+    store.seedProfile(stale);
+
+    const result = await lookupProfileStatuses({} as D1Database, config, {
+      pairs: [entry('stale/m')],
+      now: NOW,
+    });
+
+    expect(result.statuses[0]).toEqual({
+      entry: entry('stale/m'),
+      status: 'pending',
+      failureReason: null,
+    });
+    expect(store.events).toHaveLength(0);
+    expect(store.profiles.get(store.profilePk(stale))?.status).toBe('ready');
+    const current = [...store.profiles.values()].find(
+      r => r.model === 'stale/m' && r.engine_identity === ENGINE
+    );
+    expect(current?.status).toBe('pending');
+  });
+
+  it('preserves a concurrent current row on stale status-lookup insert race', async () => {
+    const stale = profileRow({
+      model: 'race/stale',
+      status: 'ready',
+      engine_identity: 'v-old:engine',
+    });
+    store.seedProfile(stale);
+    // Concurrent writer already created the current ready row.
+    store.seedProfile(
+      profileRow({
+        model: 'race/stale',
+        status: 'ready',
+        run_id: 'winner-run',
+        completed_at: '2026-07-28T08:00:00.000Z',
+      })
+    );
+
+    // Lookup sees current ready → reports it, no charge.
+    const withCurrent = await lookupProfileStatuses({} as D1Database, config, {
+      pairs: [entry('race/stale')],
+      now: NOW,
+    });
+    expect(withCurrent.statuses[0]?.status).toBe('ready');
+    expect(
+      store.profiles.get(
+        store.profilePk(profileRow({ model: 'race/stale', status: 'ready', run_id: 'winner-run' }))
+      )?.run_id
+    ).toBe('winner-run');
+
+    // Explicit do_nothing race via real status builder: must not clobber ready.
+    await applyProductionAdmissionBatch({
+      statusInserts: [entry('race/stale')],
+    });
+    const current = store.profiles.get(
+      store.profilePk(profileRow({ model: 'race/stale', status: 'ready' }))
+    );
+    expect(current?.status).toBe('ready');
+    expect(current?.run_id).toBe('winner-run');
+    expect(store.events).toHaveLength(0);
+  });
+
+  it('reports missing as failed without admitting', async () => {
+    const result = await lookupProfileStatuses({} as D1Database, config, {
+      pairs: [entry('never/seen')],
+      now: NOW,
+    });
+
+    expect(result.statuses).toEqual([
+      {
+        entry: entry('never/seen'),
+        status: 'failed',
+        failureReason: MISSING_PROFILE_FAILURE_REASON,
+      },
+    ]);
+    expect(store.profiles.size).toBe(0);
+    expect(store.events).toHaveLength(0);
   });
 });

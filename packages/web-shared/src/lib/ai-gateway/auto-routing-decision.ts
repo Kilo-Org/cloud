@@ -3,6 +3,7 @@ import {
   detectRequiredInputModalities,
   estimateRoutingTokens,
   type AutoRoutingDecision,
+  type AutoRouter,
   normalizeClassifierInput,
 } from '@kilocode/auto-routing-contracts';
 import type { ClassifierApiKind, MirrorPayload } from '@kilocode/auto-routing-contracts';
@@ -13,8 +14,10 @@ import {
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export const EFFICIENT_DECISION_TIMEOUT_MS = 5_000;
+export const FRONTIER_ROUTING_FLAG = 'kilo-auto-frontier-routing';
 
 export type EfficientDecisionParams = {
+  router?: AutoRouter;
   apiKind: ClassifierApiKind;
   body: unknown;
   requestedModel: string;
@@ -62,6 +65,7 @@ function buildDecidePayload(params: EfficientDecisionParams): MirrorPayload | nu
 
   return {
     input: normalizedInput,
+    ...(params.router ? { router: params.router } : {}),
     ...(params.deniedModelIds?.length
       ? { routingPolicy: { deniedModelIds: [...params.deniedModelIds] } }
       : {}),

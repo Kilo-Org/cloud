@@ -2,7 +2,6 @@ import { createServer } from 'node:http';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BenchmarkModelCatalogSchema,
-  catalogFallbackCaseCosts,
   catalogCandidatePrices,
   fetchPlatformRegistryEntries,
   platformRegistryEntries,
@@ -187,38 +186,4 @@ describe('platform catalog expansion', () => {
       );
     }
   }, 20_000);
-});
-
-describe('catalogFallbackCaseCosts', () => {
-  it('uses conservative token and request allowances for unmeasured models', () => {
-    const priced = BenchmarkModelCatalogSchema.parse({
-      data: [
-        {
-          id: 'priced/model',
-          pricing: {
-            prompt: '0.000001',
-            completion: '0.000002',
-            request: '0.001',
-          },
-        },
-      ],
-    });
-    expect(catalogFallbackCaseCosts(priced).get('priced/model')).toBeCloseTo(0.232);
-  });
-
-  it('does not invent prices for missing or virtual negative-price catalog entries', () => {
-    const unpriced = BenchmarkModelCatalogSchema.parse({
-      data: [
-        { id: 'missing/model' },
-        {
-          id: 'virtual/model',
-          pricing: {
-            prompt: '-1',
-            completion: '-1',
-          },
-        },
-      ],
-    });
-    expect(catalogFallbackCaseCosts(unpriced).size).toBe(0);
-  });
 });

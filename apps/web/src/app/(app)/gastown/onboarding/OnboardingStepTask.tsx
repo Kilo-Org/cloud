@@ -172,7 +172,7 @@ export function OnboardingStepTask() {
           onChange={e => setFirstTask(e.target.value)}
           placeholder="Describe something you'd like done in this repo..."
           disabled={isSubmitting}
-          className="min-h-[160px] resize-none border-white/[0.08] bg-white/[0.03] text-sm leading-relaxed text-white/85 placeholder:text-white/25 focus-visible:ring-[color:oklch(95%_0.15_108_/_0.4)]"
+          className="min-h-[160px] resize-none border-white/[0.08] bg-white/[0.03] text-sm leading-relaxed text-white/85 placeholder:text-white/25 focus-visible:ring-primary/40"
           onKeyDown={e => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canCreate) {
               void handleCreateTown();
@@ -188,7 +188,7 @@ export function OnboardingStepTask() {
 
         {isSubmitting && (
           <div className="mt-6 flex flex-col items-center gap-3">
-            <Loader2 className="size-6 animate-spin text-[color:oklch(95%_0.15_108_/_0.7)]" />
+            <Loader2 className="size-6 animate-spin text-primary/70" />
             <p className="text-sm text-white/50">
               {PHASE_LABELS[phase]}
               {isProvisioning && phase === 'creating-town' ? ' (already in progress)' : ''}

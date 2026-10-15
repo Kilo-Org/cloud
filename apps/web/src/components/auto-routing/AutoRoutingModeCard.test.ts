@@ -953,12 +953,6 @@ describe('error messages', () => {
     expect(message).toBe('Invalid routing settings');
   });
 
-  it('explains insufficient owner credits', () => {
-    expect(formatSaveErrorMessage({ error: 'balance too low' }, 402)).toBe(
-      'Insufficient owner credits to benchmark this pool. Add credits and try again.'
-    );
-  });
-
   it('429 message includes retry timing from retryAt', () => {
     const retryAt = '2026-07-29T12:00:00.000Z';
     const message = formatSaveErrorMessage(
@@ -971,73 +965,6 @@ describe('error messages', () => {
     expect(message).toContain('Benchmark profile request limit exceeded');
     expect(message).toContain('New benchmarks can be requested');
     expect(message.toLowerCase()).toMatch(/after /);
-  });
-});
-
-describe('owner benchmark quote', () => {
-  it('blocks a changed pool until its current quote succeeds and displays individual charges', async () => {
-    const originalFetch = global.fetch;
-    jest.useFakeTimers();
-    const data = settings({
-      configuredPool: [
-        { ...entryReady, unavailable: false },
-        { ...entryFailed, unavailable: false },
-      ],
-      poolStatuses: statuses,
-    });
-    let resolveQuote: ((response: Response) => void) | undefined;
-    const fetchMock = jest.fn((input: RequestInfo | URL) => {
-      if (String(input).includes('/estimate')) {
-        const quote = Promise.withResolvers<Response>();
-        resolveQuote = quote.resolve;
-        return quote.promise;
-      }
-      return Promise.resolve({ ok: true, status: 200, json: async () => data } as Response);
-    });
-    global.fetch = fetchMock as typeof fetch;
-    const mounted = mountCardDom(data);
-    try {
-      await act(async () => {
-        const remove = mounted.container.querySelector<HTMLButtonElement>(
-          `button[aria-label="Remove ${entryReady.model} from pool"]`
-        );
-        if (!remove) throw new Error('Remove control not found');
-        remove.click();
-      });
-      expect(findSaveButton(mounted.container).disabled).toBe(true);
-      await act(async () => {
-        if (!resolveQuote) throw new Error('Estimate was not requested');
-        resolveQuote({
-          ok: true,
-          status: 200,
-          json: async () => ({
-            estimatedCostUsd: 0.25,
-            pairs: [
-              {
-                entry: { ...entryFailed, variant: null },
-                status: 'failed',
-                estimatedCostUsd: 0.25,
-                chargedCostUsd: null,
-              },
-            ],
-          }),
-        } as Response);
-        await jest.advanceTimersByTimeAsync(0);
-      });
-      expect(findSaveButton(mounted.container).disabled).toBe(false);
-      expect(mounted.container.textContent).toContain('Estimated owner cost: $0.250000');
-      expect(mounted.container.textContent).toContain('Charged: Not charged');
-      expect(mounted.container.textContent).toContain('quote is advisory');
-      await act(async () => {
-        await jest.advanceTimersByTimeAsync(30_000);
-      });
-      expect(mounted.container.textContent).toContain('Estimated owner cost: $0.250000');
-      expect(findSaveButton(mounted.container).disabled).toBe(false);
-    } finally {
-      mounted.cleanup();
-      global.fetch = originalFetch;
-      jest.useRealTimers();
-    }
   });
 });
 

@@ -322,7 +322,6 @@ describe('ChatComposer send — one tap sends exactly once', () => {
 
   it('sends the typed message on the first send press, keyboard open', async () => {
     const onSend = vi.fn(async () => undefined);
-    const renderer = await mountComposer(baseProps({ onSend }));
 
     // Keyboard open: the provider's reported height caps the remaining space.
     keyboardState.height = 336;

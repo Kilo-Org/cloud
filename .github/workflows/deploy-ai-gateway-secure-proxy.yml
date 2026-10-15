@@ -37,8 +37,5 @@ jobs:
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-secure-proxy.outputs.deployment_url }}
-      axiom_annotation_dataset: vercel
-      axiom_expected_project: kilocode-ai-gateway-secure-proxy
     secrets:
-      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

@@ -51,3 +51,5 @@ async function loop() {
 void loop();
 
 // ci-probe 1
+
+// ci-probe 2

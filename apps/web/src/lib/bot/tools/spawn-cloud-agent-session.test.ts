@@ -256,4 +256,35 @@ describe('spawnCloudAgentSession delegation', () => {
       );
     }
   );
+
+  it('forwards the thinking-effort variant to prepareSession', async () => {
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'anthropic/claude-sonnet-4.5',
+      userIntegration,
+      'auth-token',
+      'request-variant',
+      undefined,
+      { chatPlatform: 'github', variant: 'high' }
+    );
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'anthropic/claude-sonnet-4.5', variant: 'high' })
+    );
+  });
+
+  it('omits the variant when no thinking effort is set', async () => {
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'anthropic/claude-sonnet-4.5',
+      userIntegration,
+      'auth-token',
+      'request-no-variant',
+      undefined,
+      { chatPlatform: 'github' }
+    );
+
+    const prepareInput = mockPrepareSession.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(prepareInput).not.toHaveProperty('variant');
+  });
 });

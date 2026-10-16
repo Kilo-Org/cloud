@@ -35,8 +35,9 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 
 ## Processing mode
 
-`USAGE_INGEST_MODE` is `receipt` in both committed environments. An absent mode also
-uses receipt behavior. Set it to `processing` to validate and write events
+Production commits `USAGE_INGEST_MODE=receipt`; staging commits `processing` with
+`https://staging-app.kilo.ai/api/internal/usage/record` as its Frankfurt writer URL.
+An absent mode also uses receipt behavior. Processing validates and writes events
 sequentially, preserving the supplied usage ID and validated fields.
 
 Processing uses `@kilocode/worker-utils/usage-writer-client` for the existing

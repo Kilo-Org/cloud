@@ -26,7 +26,6 @@ import {
   organization_invitations,
   organization_recommendation_dismissals,
   security_audit_log,
-  free_model_usage,
   organizations,
   user_feedback,
   cloud_agent_feedback,
@@ -304,7 +303,6 @@ describe('User', () => {
     await db.delete(organization_user_usage);
     await db.delete(organization_user_limits);
     await db.delete(organization_memberships);
-    await db.delete(free_model_usage);
     await db.delete(microdollar_usage_metadata);
     await db.delete(microdollar_usage);
     await db.delete(user_feedback);
@@ -5768,22 +5766,6 @@ describe('User', () => {
       await softDeleteUser(user.id);
       const retained = await db.select().from(github_app_installations);
       expect(retained.map(row => row.id)).toEqual([canonicals[1]?.id]);
-    });
-
-    it('should nullify free_model_usage FK', async () => {
-      const user = await insertTestUser();
-
-      await db.insert(free_model_usage).values([
-        { ip_address: '1.2.3.4', model: 'test-model', kilo_user_id: user.id },
-        { ip_address: '1.2.3.4', model: 'test-model', kilo_user_id: null },
-      ]);
-
-      await softDeleteUser(user.id);
-
-      // User's free model usage should have kilo_user_id nulled, anonymous record untouched
-      const usages = await db.select().from(free_model_usage);
-      expect(usages).toHaveLength(2);
-      expect(usages.every(u => u.kilo_user_id === null)).toBe(true);
     });
 
     it('should anonymize security_advisor_scans and null public_ip', async () => {

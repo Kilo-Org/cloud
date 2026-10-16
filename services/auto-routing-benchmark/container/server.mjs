@@ -35,9 +35,12 @@ let runChain = Promise.resolve();
 let activeCliJobs = 0;
 let activeHttpRequests = 0;
 let stopRequested = false;
+let pendingDeliveries = 0;
 
 function exitWhenIdle() {
-  if (stopRequested && activeCliJobs === 0 && activeHttpRequests === 0) process.exit(0);
+  if (stopRequested && activeCliJobs === 0 && activeHttpRequests === 0 && pendingDeliveries === 0) {
+    process.exit(0);
+  }
 }
 
 function serializeCli(run) {
@@ -50,8 +53,43 @@ function serializeCli(run) {
   return next;
 }
 
+class NotStartedError extends Error {}
+
+// A case accepted before SIGTERM but not yet spawned never reaches a provider.
 function runCaseSerialized(params) {
-  return serializeCli(() => runCase(params));
+  return serializeCli(() => {
+    if (stopRequested) throw new NotStartedError('container is stopping');
+    return runCase(params);
+  });
+}
+
+const RESULT_DELIVERY_ATTEMPTS = 3;
+
+// A rollout tears down the caller's connection while this process drains, so the
+// outcome is also posted to the worker, which persists it as recoverable output.
+async function deliverResult(callback, outcome) {
+  for (let attempt = 1; attempt <= RESULT_DELIVERY_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(callback.url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ execution: callback.execution, outcome }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (response.ok || response.status === 404) return;
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, attempt * 1_000));
+  }
+}
+
+function isResultCallback(value) {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof value.url === 'string' &&
+    typeof value.execution === 'object' &&
+    value.execution !== null
+  );
 }
 
 let warmup = null;
@@ -104,7 +142,13 @@ function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, varia
 }
 
 async function runCli({ args, env, timeoutMs, kiloToken }) {
-  const dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
+  let dir;
+  try {
+    dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
+  } catch (error) {
+    // No child exists yet, so this case never reached a provider.
+    throw new NotStartedError(error instanceof Error ? error.message : 'case workspace failed');
+  }
   const startedAt = Date.now();
   let result;
   try {
@@ -114,12 +158,18 @@ async function runCli({ args, env, timeoutMs, kiloToken }) {
       let stdoutTruncated = false;
       let stderrTail = '';
       // The kilo wrapper spawns a grandchild; timeout must kill its whole group.
-      const child = spawn('kilo', args, {
-        cwd: dir,
-        env,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true,
-      });
+      let child;
+      try {
+        child = spawn('kilo', args, {
+          cwd: dir,
+          env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          detached: true,
+        });
+      } catch (error) {
+        // A synchronous spawn failure creates no process, so no provider call happened.
+        throw new NotStartedError(error instanceof Error ? error.message : 'case process failed');
+      }
       let finished = false;
       let finishTimer;
       const finish = exitCode => {
@@ -227,7 +277,8 @@ const server = createServer(
           sendJson(res, 503, { error: 'container is stopping' });
           return;
         }
-        const { model, prompt, kiloToken, kiloApiUrl, orgId, variant } = parsed ?? {};
+        const { model, prompt, kiloToken, kiloApiUrl, orgId, variant, resultCallback } =
+          parsed ?? {};
         const timeoutMs =
           typeof parsed?.timeoutMs === 'number' && parsed.timeoutMs > 0
             ? parsed.timeoutMs
@@ -249,24 +300,51 @@ const server = createServer(
           return;
         }
 
-        try {
-          if (variant !== undefined && variant !== null && typeof variant !== 'string') {
-            sendJson(res, 400, { error: 'variant must be a string when provided' });
-            return;
-          }
-          const result = await runCaseSerialized({
-            model,
-            prompt,
-            kiloToken,
-            kiloApiUrl,
-            orgId,
-            timeoutMs,
-            variant,
-          });
-          sendJson(res, 200, result);
-        } catch (err) {
-          sendJson(res, 500, { error: err instanceof Error ? err.message : 'run failed' });
+        if (variant !== undefined && variant !== null && typeof variant !== 'string') {
+          sendJson(res, 400, { error: 'variant must be a string when provided' });
+          return;
         }
+        const callback = isResultCallback(resultCallback) ? resultCallback : null;
+        if (callback) pendingDeliveries += 1;
+        let outcome;
+        let failure = null;
+        try {
+          outcome = {
+            kind: 'completed',
+            response: await runCaseSerialized({
+              model,
+              prompt,
+              kiloToken,
+              kiloApiUrl,
+              orgId,
+              timeoutMs,
+              variant,
+            }),
+          };
+        } catch (err) {
+          // A case may only be reported as never started when no child was spawned.
+          if (err instanceof NotStartedError) {
+            outcome = { kind: 'not_started' };
+            if (!stopRequested) failure = err.message;
+          } else {
+            outcome = { kind: 'failed' };
+            failure = err instanceof Error ? err.message : 'run failed';
+          }
+        }
+        const responseDelivered = !res.destroyed && !responseFinished;
+        if (outcome.kind === 'completed') sendJson(res, 200, outcome.response);
+        else if (failure) sendJson(res, 500, { error: failure });
+        else sendJson(res, 503, { error: 'container is stopping' });
+        if (!callback) return;
+        const recoverable = outcome.kind === 'completed' || outcome.kind === 'not_started';
+        if (
+          recoverable &&
+          (outcome.kind === 'not_started' || stopRequested || !responseDelivered)
+        ) {
+          await deliverResult(callback, outcome);
+        }
+        pendingDeliveries -= 1;
+        exitWhenIdle();
         return;
       }
 

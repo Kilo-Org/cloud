@@ -1161,6 +1161,60 @@ export async function listPendingCurrentProfiles(
     );
 }
 
+/**
+ * Move owner requests off pending alias rows whose concrete catalog target is
+ * resolvable, so the owner queue never measures an alias beside its target.
+ * Each alias still pending and owner-requested hands its flag to its concrete
+ * pair (created pending when absent); a null target only drops the flag
+ * because that variant no longer exists on the target. Running, failed and
+ * ready alias rows are left untouched.
+ */
+export async function collapsePendingOwnerAliasRows(
+  db: D1Database,
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
+  aliases: readonly {
+    alias: { model: string; variant: string };
+    target: { model: string; variant: string | null } | null;
+  }[],
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  const router = current.router ?? 'efficient';
+  const aliasKey = [router, current.engineIdentity, current.repetitions] as const;
+  const stmts = aliases.flatMap(({ alias, target }) => {
+    const unflag = db
+      .prepare(
+        `UPDATE benchmark_profiles SET user_requested = 0, updated_at = ?
+         WHERE router = ? AND engine_identity = ? AND repetitions = ? AND model = ? AND variant = ?
+           AND status = 'pending' AND user_requested = 1`
+      )
+      .bind(nowIso, ...aliasKey, alias.model, alias.variant);
+    if (!target) return [unflag];
+    const claimTarget = db
+      .prepare(
+        `INSERT INTO benchmark_profiles
+           (router, model, variant, engine_identity, repetitions, status, run_id, failure_reason,
+            requested_at, updated_at, completed_at, platform_requested, user_requested)
+         SELECT router, ?, ?, engine_identity, repetitions, 'pending', NULL, NULL,
+                requested_at, ?, NULL, 0, 1
+         FROM benchmark_profiles
+         WHERE router = ? AND engine_identity = ? AND repetitions = ? AND model = ? AND variant = ?
+           AND status = 'pending' AND user_requested = 1
+         ON CONFLICT (router, model, variant, engine_identity, repetitions)
+         DO UPDATE SET user_requested = 1`
+      )
+      .bind(
+        target.model,
+        variantToStorage(target.variant),
+        nowIso,
+        ...aliasKey,
+        alias.model,
+        alias.variant
+      );
+    return [claimTarget, unflag];
+  });
+  if (stmts.length > 0) await db.batch(stmts);
+}
+
 /** Registry row counts per status for one queue's current-engine rows. */
 export async function countCurrentProfilesByStatus(
   db: D1Database,

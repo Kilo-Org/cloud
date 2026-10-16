@@ -204,6 +204,7 @@ measurements are included in routing-table version hashes.
 - Catalog requests have a 10-second deadline, including body reads, so a stalled response cannot block both queues indefinitely.
 - Manual and automatic selections use the same expansion. Existing saved effort selections no longer restrict platform measurements.
 - Owner pools use the same alias resolution and all-efforts expansion, sharing concrete measurements with the platform. Status responses preserve the requested model ids; custom routing tables use concrete ids.
+- Before the owner queue claims a batch, each pending owner-requested alias row whose target resolves hands its owner request to the concrete pair (creating it pending when absent) and drops its own. This converts owner rows registered before alias resolution, and stops an alias and its target from being measured twice. A variant the target no longer offers only loses the request; the next status lookup re-admits the target's current pairs. Running, failed, and ready alias rows are untouched.
 - Custom tables are already scoped to the requested resolved pairs by the benchmark worker. The serving worker accepts those concrete candidates and loads capabilities by their ids rather than re-filtering against saved alias ids.
 - Deploy the serving worker before the benchmark worker when introducing alias resolution; older serving workers filter concrete custom-table candidates against the original pool aliases.
 

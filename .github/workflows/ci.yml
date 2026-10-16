@@ -789,11 +789,13 @@ jobs:
       needs.changes.outputs.cloud_agent_next == 'true' ||
       (github.event_name == 'pull_request' &&
       contains(fromJSON(needs.changes.outputs.affected).packages, 'cloud-agent-next'))
-    # The suite runs as three parallel parts; test:all chains the same suites.
+    # The suite runs as four parallel parts; test:all chains the same suites.
     strategy:
       fail-fast: false
       matrix:
-        part: [unit, workers, other]
+        # process.test.ts alone takes about as long as the rest of the wrapper
+        # suite, so it runs as its own part.
+        part: [unit, workers, wrapper-process, other]
     name: cloud-agent-next (${{ matrix.part }})
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 15
@@ -872,9 +874,17 @@ jobs:
         if: matrix.part == 'other'
         run: pnpm --filter cloud-agent-next test:sdk-provenance
 
-      - name: Run cloud-agent-next wrapper tests
+      - name: Run the wrapper process tests
+        if: matrix.part == 'wrapper-process'
+        working-directory: services/cloud-agent-next/wrapper
+        run: bun test ./src/control-plane/process.test.ts
+
+      # Every other wrapper test file, in bun's own discovery order: some
+      # files mock modules for the whole process, so the order matters.
+      - name: Run the other wrapper tests
         if: matrix.part == 'other'
-        run: pnpm --filter cloud-agent-next test:wrapper
+        working-directory: services/cloud-agent-next/wrapper
+        run: bun test src --path-ignore-patterns='**/control-plane/process.test.ts'
 
       - name: Run Cloud Agent Postgres aggregate tests
         if: matrix.part == 'other'

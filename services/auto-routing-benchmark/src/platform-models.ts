@@ -101,6 +101,23 @@ export function platformRegistryEntries(
   return entries;
 }
 
+/**
+ * Concrete target of an alias pair: `undefined` when the alias is unresolvable
+ * (absent, or its target is missing from the catalog), `null` when the target
+ * no longer offers that variant.
+ */
+export function concreteAliasPair(
+  catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
+  pair: { model: string; variant: string | null }
+): { model: string; variant: string | null } | null | undefined {
+  const modelsById = new Map(catalog.data.map(model => [model.id, model]));
+  const target = resolveCatalogModel(pair.model, modelsById);
+  if (!target || target.id === pair.model) return undefined;
+  const variants = getReasoningVariantKeys(target.opencode?.variants);
+  const supported = variants.length > 0 ? variants.includes(pair.variant ?? '') : !pair.variant;
+  return supported ? { model: target.id, variant: pair.variant } : null;
+}
+
 export function catalogCandidatePrices(
   catalog: z.infer<typeof BenchmarkModelCatalogSchema>
 ): ReadonlyMap<string, CandidatePricing | null> {

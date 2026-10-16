@@ -77,17 +77,116 @@ efficient table is fabricated for it. Before enabling frontier serving, administ
 save a frontier configuration with its own decider models, benchmark those entries, and
 publish a complete frontier table.
 
-Container lanes come from one shared budget: `BENCHMARK_CONTAINER_BUDGET` (250), sized per run
-against the lanes other running runs hold. Each queue job holds one container for its consumer
-invocation, so the budget equals Cloudflare's limit of 250 concurrent push-consumer invocations;
-wrangler's container `max_instances` and jobs consumer `max_concurrency` match it. Raising it needs
-a Cloudflare limit increase plus matching wrangler limits. User-queue runs stop at
-`BENCHMARK_USER_CONTAINER_LIMIT` (150), which keeps `BENCHMARK_PLATFORM_RESERVED_CONTAINERS`
-(100) available to platform runs, and a platform run takes half of what is free so the efficient
-and frontier platform queues share the pool. Frontier never registers owner
-custom pools, and has only a platform queue (`both` selects that queue; `user` is rejected).
-A run that does not fit waits: the drain logs `benchmark_queue_drain_skipped_no_capacity` and
-retries on the next tick. Scheduled drains and daily platform sync process both routers.
+Decider execution uses a global pool of reusable container slots, not run reservations.
+An atomic D1 claim selects an eligible unfinished chunk from any running run whenever a
+slot becomes free. Queued and executing claims both count against the limit.
+The pool is bounded by `BENCHMARK_CONTAINER_BUDGET`, the queue consumer concurrency,
+and container `max_instances`; increasing the platform ceiling requires a Cloudflare limit increase.
+Containers are named by slot and run one CLI at a time. There are no fixed shard chains.
+One-case chunks leave room for warmup, the existing empty-output retry, and grading within
+the queue invocation deadline; prompts, variants, CLI timeouts, repetitions, cost accounting,
+and CLI-reported latency remain unchanged.
+
+`BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250`,
+`modelConcurrency: 12`, `providerConcurrency: 16`, and `unknownProviderConcurrency: 2`.
+Optional `modelLimits` and `providerLimits` objects override those defaults by exact identity.
+`shares` defaults to `{"efficient/platform":2,"frontier/platform":2,"efficient/user":1}`.
+The least-occupied weighted share receives the next eligible claim; unused shares are
+borrowed without reservations or preempting active work. Model caps span variants and runs.
+Provider identities come from the catalog's optional `inference_provider_ids`, which uses
+the existing gateway provider index. Every possible provider is conservatively counted;
+missing metadata shares a small unknown-provider bucket. Model-name prefixes are never
+treated as serving providers. Frontier has no owner queue.
+
+Admins can override `slots`, `modelConcurrency`, `providerConcurrency`, and
+`unknownProviderConcurrency` at runtime, without a deploy, from the Scheduler card on the
+admin panel's Benchmarks tab or with `PUT /admin/scheduler-config`. Each limit resolves
+admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then the default. Overrides live in the
+single-row `scheduler_settings` D1 table; each dispatch pass reads it once by primary key, so
+a change applies on the next completion or one-minute tick. The PUT body replaces the whole
+override set: a missing or `null` limit clears that override. Values must be integers from 1
+to `BENCHMARK_CONTAINER_BUDGET`; anything else, including an unknown key, is a 400.
+`modelLimits` and `providerLimits` still come only from the env config and take precedence
+over `modelConcurrency` and `providerConcurrency` for their exact identities.
+`GET /admin/scheduler-config` returns each limit's `effective` value, its `source`
+(`admin`, `env`, or `default`), the `override`, and the `fallback` used without one.
+
+```sh
+curl -s -X PUT "$WORKER_URL/admin/scheduler-config" \
+  -H "Authorization: Bearer $INTERNAL_API_SECRET_PROD" -H 'content-type: application/json' \
+  -H 'x-updated-by: you@kilocode.ai' -d '{"modelConcurrency":12}'
+```
+
+Claims carry fencing tokens. Redelivery cannot start an already executing claim, and
+stale tokens cannot release newer ownership. A queued lease lasts 30 minutes; an executing
+lease lasts 20 minutes, beyond the queue's 15-minute invocation limit. The one-minute tick
+recovers abandoned claims; completion refills slots immediately without waiting for a tick.
+Recovery and infrastructure/grader waits are bounded to six claims, with 15–300 second
+backoff. Capacity and unbilled provider-throttle waits do not create model-failure rows.
+
+A dispatch pass reads current occupancy and the next pending chunk of every lane — one
+`(run, model, variant, repetition)` chunk chain — and claims as many of those lanes as fit.
+Both reads are index seeks: occupancy is bounded by the slot budget, lane heads by the
+number of lanes, so cost does not grow with the pending backlog. Each claim is a
+conditional `UPDATE ... WHERE id = ? AND status = 'pending'` that assigns a free slot.
+Only one pass runs at a time; a pass holds a short lease row and a dispatcher that finds it
+held returns immediately, because the holding pass has already read that wake's
+completions. The per-minute tick is the backstop if a lease expires without a release, and
+the `(status, run_id, model, variant, repetition, chunk)` index bounds lane reads.
+
+A provider or model throttle records a cooldown deadline rather than stamping every
+pending row, so one throttle event costs a bounded write instead of rewriting the backlog.
+
+Materialization writes chunks in bounded batches and checks the run's status once per batch
+rather than per row. A chunk is inserted already completed when all of its cases have
+results; that check is a `case_results` primary-key probe per case, so its cost follows the
+batch, not the run. One initialization pass spends at most 20 seconds per run, and each batch
+commits on its own: the next pass reads how many chunks every lane already holds and resumes
+after that prefix, so a large run initializes over several passes instead of restarting from
+its first lane. The `scheduler_runs` marker commits with the final batch, once every chunk
+exists, and only marked runs are dispatched. Dispatch claims for initialized runs before it
+materializes, and a second lease row keeps concurrent dispatchers from initializing at the
+same time; a pass that completes a run's initialization claims again so its chunks start at
+once.
+
+Run completion accounting reads every case result of the run, so it does not run per
+completed chunk. A completion first asks whether the run still has scheduled work — an
+index probe for a chunk that is pending, queued or active in a lane that has not
+dead-lettered — and only settled runs are accounted. Chunks of a dead-lettered lane never
+count as unsettled, so a run with a dead lane still settles once its live lanes finish, and
+runs with no scheduler chunks (legacy whole-run work) are always accounted. The dispatch
+sweep and the dead-letter path remain responsible for runs that settle without a train of
+completions. Chunk recovery and the 24-hour prune batches are likewise bounded: recovery
+completes only the runs that still hold unsettled chunks, and pruning is driven from the
+per-run scheduler markers instead of scanning the chunk, execution or run tables.
+
+Completed cases are skipped, and all final CLI outputs are persisted before grading.
+A separate paid-execution ledger prevents automatic repetition if a worker disappears
+after inference may have started but before an output was saved. A *planned* rollout no
+longer reaches that outcome: the container finishes the case it already accepted, posts
+the output back to the worker, and refuses the cases it had not started, so an
+interrupted lane resumes from recoverable output or repeats a case that provably made no
+paid call. The chunk keeps its slot lease while the outcome is in doubt, and lease
+recovery re-dispatches it, which then reuses the delivered output. Only a container that
+dies mid-flight without delivering (a hard kill, or a connection lost past the drain
+window) leaves the case genuinely ambiguous; a case that reaches the ledger without
+recoverable output by the time the chunk is recovered fails its measurement lane as
+infrastructure uncertainty instead of inventing a score or issuing another paid call.
+Manual requeue creates a new run and may repeat that unknown
+case; compatible completed cases and pending successful outputs are still reused.
+An ambiguous case retains the slot/provider lease until expiry, because the
+container may still be finishing its request. This quarantine cannot oversubscribe providers.
+Terminal scheduler rows are pruned in bounded batches after 24 hours. Benchmark history,
+completed case results, and pending outputs remain available for compatible reuse.
+
+Rollout first exposes catalog provider metadata, then applies the additive D1 migration while
+the queue is paused. Wait for old consumers to quiesce and stop old run-scoped containers
+before enabling the new worker. Legacy queued chunk bodies are wakeups only: it materializes the run's
+entire remaining workload from its snapshot and schedules it under the same global caps.
+Old chunk/shard metadata cannot grant ownership. Do not run old and new consumers together
+or roll back while scheduler claims are active. Pause and quiesce first; complete or requeue
+affected runs before returning to an older worker. This change does not deploy or resume work.
+
 
 Efficient publications invalidate `routing_table_v1`; frontier publications invalidate
 `routing_table_frontier_v1`. Router, engine/dataset identity, ranking settings, and contributing
@@ -109,7 +208,7 @@ measurements are included in routing-table version hashes.
 - Deploy the serving worker before the benchmark worker when introducing alias resolution; older serving workers filter concrete custom-table candidates against the original pool aliases.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
-The worker drains expanded entries in batches that fit the shared container budget.
+The worker admits bounded oldest-first registry batches independently of available execution slots.
 New routing tables rank exact pairs and emit `variant`, not `reasoningEffort`.
 Legacy nullable effort storage columns remain. Router isolation requires D1 schema migration;
 existing rows stay in the efficient namespace, with noise band 0.05 and frontier delta 0.
@@ -444,6 +543,7 @@ endpoints reject frontier. The classifier-winner endpoint returns the shared win
 | Endpoint | Purpose |
 |---|---|
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`) |
+| `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots`, `modelConcurrency`, `providerConcurrency`, `unknownProviderConcurrency` |
 | `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
@@ -474,17 +574,15 @@ row is global, so the pair is benchmarked once and serves both.
 | | Platform queue | User queue |
 |---|---|---|
 | Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from owner pools (quota-charged) |
-| Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, 15-minute cron, any decider terminal state |
+| Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, one-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
-| Container lanes | Half of the free lanes; the two routers split the platform pool | `BENCHMARK_USER_CONTAINER_LIMIT` (150), or the free lanes when fewer remain |
-| Slot | Its own; a running user-queue run never blocks it | Its own; a running platform-queue run never blocks it |
+| Execution share | Efficient and frontier each have default weight 2 | Efficient has default weight 1 |
+| Run lifecycle | One active run per router/queue | One active efficient owner run |
 
-Every router and queue shares one budget of `BENCHMARK_CONTAINER_BUDGET` (250, matching the
-Cloudflare concurrent-consumer limit and the wrangler limits). A run's lanes are recorded in
-`benchmark_runs.max_concurrency`, and the atomic insert refuses a run whose lanes would push the
-running total past 250, or the owner total past 150. A run that cannot fit waits for a running
-one to finish; the drain logs
-`benchmark_queue_drain_skipped_no_capacity` rather than reporting a failure.
+All three shares use the same bounded chunk scheduler and borrow unused capacity.
+`benchmark_runs.max_concurrency` is retained for storage compatibility but new decider
+runs write zero: it is not an execution reservation. Registry admission is still atomic
+per exact pair, and the per-router/queue run lifecycle gate remains independent of slots.
 
 After any decider run completes, the worker assembles the platform table from ready, current registry entries for the current catalog pairs.
 If a desired pair remains pending or running, the previous table stays live.
@@ -529,22 +627,19 @@ exact variant match the live decider engine. Stale rows are never returned as
 Ready or assembled into custom tables.
 
 **Per-queue drain** (after any decider terminal state, on the admin's manual
-trigger, and on the 15-minute cron):
+trigger, and on the one-minute cron):
 
-1. If that queue's run is already active → log and leave its pending rows alone.
-   The other queue is unaffected.
-2. Else take that queue's pending current-engine rows oldest-`requested_at`-first,
-   capped by the lanes that queue may hold now (`entries × repetitions ≤ free lanes`).
-   With no lanes free, log `benchmark_queue_drain_skipped_no_capacity` and leave the
-   rows pending.
-3. `startRun(purpose: queue, entries: snapshot)`.
+1. If that queue's run is active, leave its pending registry rows alone.
+2. Otherwise take up to 100 current-engine entries oldest-`requested_at`-first.
+3. `startRun(purpose: queue, entries: snapshot)` persists the workload, then the
+   global scheduler claims only the chunks that fit its current caps.
 
 A row wanted by both queues appears in both listings; whichever run claims it
 first flips it to `running`, so it is still measured exactly once.
 
 **Scheduled handlers:**
 
-- `*/15 * * * *` — sweep stale runs, then drain both queues.
+- `* * * * *` — recover expired chunk claims, sweep stale runs, and drain both queues.
 - `0 5 * * *` — sweep, reconcile the platform queue with each router's
   admin-configured decider list, drain both queues, republish the
   platform table (so a *removed* model leaves the live table even when nothing
@@ -627,12 +722,21 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 
 ## Debugging container (decider) failures
 
-- Each decider run seeds bounded shard lanes across the configured models and
-  repetitions. A lane uses one stable container instance
-  (`runId:model:rep:shard`) and processes chunk `N`, then `N+shardCount`, and
-  so on. CLI runs are serialized per instance because its sqlite state is not
-  safe under concurrent first runs. A `/warmup` call absorbs the one-time sqlite
-  migration before the case loop.
+- Reusable `benchmark-slot:<n>` containers handle dynamically assigned chunks from any run.
+  The D1 live-slot uniqueness constraint and claim tokens protect container ownership.
+  CLI runs remain serialized because they share SQLite state.
+- `/warmup` initializes the local CLI database once per container without making an inference request.
+- The server handles SIGTERM and drains the CLI case it already accepted, then exits.
+  A case still queued when SIGTERM arrives is refused with `503` instead of starting a new
+  paid call, so a rollout is never charged for work it interrupts. Idle containers therefore
+  release capacity instead of ignoring the inactivity stop.
+- A drained case whose caller disappeared (a rollout tears the queue invocation's connection
+  down) is posted to the worker's `/container/case-result` route, which stores it as pending
+  output. The route is authenticated by the paid-execution claim token instead of the backend
+  secret, which a container never holds, and it only records outcomes for a claim token that
+  actually opened the execution.
+- Completed or failed runs reject queued work before starting another CLI case.
+- Smaller chunks leave time for an empty-output retry within the queue invocation limit.
 - `case_results` rows carry diagnostics: CLI exit code, output prefix, and an
   event tail — start there for a failing case.
 - `POST /admin/debug-cli {model, prompt}` runs one prompt through the container
@@ -645,15 +749,15 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 
 ## Dead-letter handling (lane failure)
 
-Failed queue messages land in `auto-routing-benchmark-dlq` after `max_retries`
-(6) on `auto-routing-benchmark-jobs`. A decider message is one
-(model, repetition, shard, chunk) job, and later chunks are chained from it —
-so a DLQ'd message kills its lane's remaining cases.
+Failed queue messages land in the dead-letter queue after transport retries.
+A token-bearing decider message is a delivery of one durable chunk claim, not ownership
+of a fixed chain. Its DLQ handler atomically releases only a still-queued matching token;
+it never revokes active ownership. Expired leases recover abandoned executing claims.
+The scheduler records a lane death only when recovery is exhausted or execution is ambiguous.
+Classifier dead-letter handling remains fail-fast.
 
-The worker consumes the DLQ itself: each dead message is recorded in
-`run_lane_failures`, and run finalization is lane-aware. A run completes once
-every (model, variant, rep) lane has either all its case rows or a recorded
-lane death — a single dead model can no longer wedge the whole run.
+`run_lane_failures` preserves lane-aware finalization: a run settles once each
+(model, variant, repetition) lane has all its cases or a recorded infrastructure failure.
 
 - **Decider runs of either queue** complete per-entry: entries whose lanes all
   finished go `ready`; entries with a dead lane go `failed` ("Benchmark lane did
@@ -663,16 +767,23 @@ lane death — a single dead model can no longer wedge the whole run.
   money to produce.
 - **Classifier runs** still fail fast on a dead lane: their models are not
   registry-tracked and the winner must come from one comparable set.
-- **Backstop**: the 6h stale sweep *salvages* a wedged decider run rather than
-  failing it wholesale — lanes with a full set of case rows are settled `ready`,
-  and only the unfinished lanes' entries go `failed`.
+- **Backstop**: the 6h stale sweep salvages legacy decider runs that never completed
+  scheduler initialization. Initialized runs use bounded per-chunk leases instead of
+  an absolute run-age timeout, so legitimate backlogs do not discard ongoing measurements.
+
+Retries reuse successful graded cases from compatible terminal runs.
+The router, benchmark engine, repetitions, concrete model, variant, case, and repetition index must match.
+The newest compatible case wins; existing destination results and source rows remain unchanged.
+Failed or timed-out CLI cases run again; a successful zero score remains a valid measurement.
+Pending successful CLI outputs also survive terminal transitions so rubric grading can resume without another model call.
+Historical alias-keyed results remain stored but cannot be reused because their concrete target was not recorded.
 
 To inspect:
 
 - **Prod**: Cloudflare dashboard (Workers → Queues →
-  `auto-routing-benchmark-dlq`); the message body is the JSON job (`runId`,
-  `model`, `rep`, `shard`, `chunk`, case ids). Recorded lane deaths are
-  queryable: `SELECT * FROM run_lane_failures WHERE run_id = '…'`.
+  `auto-routing-benchmark-dlq`); scheduler messages contain `runId`, `model`,
+  `claimId`, and `claimToken`. Inspect `scheduler_chunks` for queued/active slots,
+  attempts, and lease deadlines; `run_lane_failures` records terminal lane failures.
 - **Replay**: failed entries re-admit via the owner's Retry or the admin's
   requeue endpoint, and the next drain of their queue measures them. Entries that
   are already `ready` are never re-measured.
@@ -684,5 +795,6 @@ pnpm dev          # wrangler dev (port 8814)
 pnpm typecheck    # tsgo --noEmit
 pnpm lint
 pnpm test         # vitest run
+pnpm smoke:scheduler # real SQLite + heterogeneous child-process work; no model endpoint
 pnpm db:generate  # regenerate D1 migration from src/db-schema.ts
 ```

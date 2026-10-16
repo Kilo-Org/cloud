@@ -208,6 +208,116 @@ export const pendingDeciderOutputs = sqliteTable(
   ]
 );
 
+export const schedulerChunks = sqliteTable(
+  'scheduler_chunks',
+  {
+    id: text('id').primaryKey(),
+    run_id: text('run_id')
+      .notNull()
+      .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    providers: text('providers').notNull(),
+    rep: integer('rep').notNull(),
+    chunk: integer('chunk').notNull(),
+    case_ids: text('case_ids').notNull(),
+    status: text('status')
+      .$type<'pending' | 'queued' | 'active' | 'completed' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    token: text('token'),
+    slot: integer('slot'),
+    lease_until: integer('lease_until').notNull().default(0),
+    available_at: integer('available_at').notNull().default(0),
+    attempts: integer('attempts').notNull().default(0),
+  },
+  table => [
+    index('IX_scheduler_chunks_pending').on(table.status, table.available_at),
+    index('IX_scheduler_chunks_run').on(table.run_id),
+    // Lane-head dispatch: a lane is one (run, model, variant, rep) chunk chain, and
+    // `(available_at, chunk)` orders its runnable head. This prefix lets a claim
+    // find each lane's next runnable chunk by index seek instead of scanning the
+    // run's or the backlog's pending rows.
+    index('IX_scheduler_chunks_lane').on(
+      table.status,
+      table.run_id,
+      table.model,
+      table.variant,
+      table.rep,
+      table.available_at,
+      table.chunk
+    ),
+    uniqueIndex('UQ_scheduler_chunks_live_slot')
+      .on(table.slot)
+      .where(sql`${table.status} IN ('queued', 'active')`),
+  ]
+);
+
+export const schedulerRuns = sqliteTable('scheduler_runs', {
+  run_id: text('run_id')
+    .primaryKey()
+    .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
+});
+
+export const schedulerExecutions = sqliteTable(
+  'scheduler_executions',
+  {
+    run_id: text('run_id')
+      .notNull()
+      .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    rep: integer('rep').notNull(),
+    case_id: text('case_id').notNull(),
+    token: text('token').notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.run_id, table.model, table.variant, table.rep, table.case_id] }),
+  ]
+);
+
+/**
+ * Scheduler lease rows. Row 1 serializes dispatch passes: a pass holds the lease while
+ * it reads live occupancy and claims; another dispatcher that finds the lease held
+ * returns immediately and the next completion or cron wake retries. Model,
+ * provider and slot caps are only exact if one pass at a time reads occupancy.
+ * Row 2, created on first use, serializes run initialization passes.
+ */
+export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
+  id: integer('id').primaryKey(),
+  token: text('token'),
+  lease_until: integer('lease_until').notNull().default(0),
+});
+
+/**
+ * Model- and provider-wide throttle deadlines. Cooling is stored here rather than
+ * stamped onto every pending chunk so one throttle event costs a bounded write
+ * instead of rewriting the whole backlog.
+ */
+export const schedulerCooldowns = sqliteTable(
+  'scheduler_cooldowns',
+  {
+    scope: text('scope').$type<'model' | 'provider'>().notNull(),
+    key: text('key').notNull(),
+    until: integer('until').notNull(),
+  },
+  table => [primaryKey({ columns: [table.scope, table.key] })]
+);
+
+/**
+ * Single row (id = 1) of admin scheduler overrides. A null limit falls back to
+ * `BENCHMARK_SCHEDULER_CONFIG`, then the default. Dispatch reads it by primary key.
+ */
+export const schedulerSettings = sqliteTable('scheduler_settings', {
+  id: integer('id').primaryKey(),
+  slots: integer('slots'),
+  model_concurrency: integer('model_concurrency'),
+  provider_concurrency: integer('provider_concurrency'),
+  unknown_provider_concurrency: integer('unknown_provider_concurrency'),
+  updated_at: text('updated_at').notNull(),
+  updated_by: text('updated_by'),
+});
+
 export const routingTables = sqliteTable('routing_tables', {
   run_id: text('run_id').primaryKey(),
   router: text('router').$type<AutoRouter>().notNull().default('efficient'),

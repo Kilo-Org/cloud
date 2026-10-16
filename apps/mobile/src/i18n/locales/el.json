@@ -2429,6 +2429,7 @@
       "title": "Ο πράκτορας χρειάζεται απάντηση",
       "skipQuestionsTitle": "Παράλειψη ερωτήσεων;",
       "skipQuestionsMessage": "Ο πράκτορας θα παραλείψει αυτό το βήμα.",
+      "answerProgress": "{{answered}} από {{total}} απαντήθηκαν",
       "selectAllThatApply": "Επίλεξε όσα ισχύουν.",
       "option": "Επιλογή: {{label}}",
       "optionSelected": "{{label}}, επιλεγμένο",

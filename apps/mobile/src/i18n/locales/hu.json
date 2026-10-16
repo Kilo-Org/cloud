@@ -2429,6 +2429,7 @@
       "title": "Az ügynök válaszra vár",
       "skipQuestionsTitle": "Kérdések kihagyása?",
       "skipQuestionsMessage": "Az ügynök kihagyja ezt a lépést.",
+      "answerProgress": "{{answered}}/{{total}} megválaszolva",
       "selectAllThatApply": "Jelöld be az összes megfelelő lehetőséget.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, kijelölve",

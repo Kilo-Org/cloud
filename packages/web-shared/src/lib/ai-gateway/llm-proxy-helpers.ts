@@ -558,6 +558,30 @@ export function accountForMicrodollarUsage(
   after(countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan));
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Field names, never values, of the request as sent upstream, so rejections
+ * such as "unknown field" can be attributed from logs alone.
+ */
+function describeRequestFields(request: unknown): Record<string, string> {
+  if (!isObjectRecord(request)) {
+    return {};
+  }
+  const fields: Record<string, string> = {
+    requestFields: Object.keys(request).sort().join(','),
+  };
+  if (Array.isArray(request.messages)) {
+    const messageFields = new Set(
+      request.messages.filter(isObjectRecord).flatMap(message => Object.keys(message))
+    );
+    fields.messageFields = [...messageFields].sort().join(',');
+  }
+  return fields;
+}
+
 export async function captureProxyError(params: {
   errorMessage: string;
   user: { id: string };
@@ -565,18 +589,35 @@ export async function captureProxyError(params: {
   response: Response;
   organizationId: string | undefined;
   model: string;
+  gatewayModel?: string;
+  byokProviderIds?: ReadonlyArray<string> | null;
   trackInSentry: boolean;
 }) {
-  const { errorMessage, user, response, organizationId, model, trackInSentry } = params;
+  const {
+    errorMessage,
+    user,
+    request,
+    response,
+    organizationId,
+    model,
+    gatewayModel,
+    byokProviderIds,
+    trackInSentry,
+  } = params;
   after(
     (async () => {
       const extraErrorData: Record<string, string | number> = {
         kiloUserId: user.id,
         model,
+        ...(gatewayModel && gatewayModel !== model ? { gatewayModel } : {}),
+        ...(byokProviderIds && byokProviderIds.length > 0
+          ? { byokProviderIds: byokProviderIds.join(',') }
+          : {}),
         status: response.status,
         statusText: response.statusText,
         responseContentType: response.headers.get('content-type') || '',
         ...(organizationId && { organizationId }),
+        ...describeRequestFields(request),
       };
 
       const clonedReponse = response.clone();

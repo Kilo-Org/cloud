@@ -2448,6 +2448,7 @@
       "title": "Agent needs input",
       "skipQuestionsTitle": "Skip questions?",
       "skipQuestionsMessage": "The agent will skip this step.",
+      "answerProgress": "{{answered}} of {{total}} answered",
       "selectAllThatApply": "Select all that apply",
       "option": "{{label}}",
       "optionSelected": "{{label}}, selected",

@@ -2,7 +2,6 @@
 
 import {
   BENCHMARK_CONTAINER_BUDGET,
-  BENCHMARK_PLATFORM_RESERVED_CONTAINERS,
   DEFAULT_AUTO_ROUTER,
   type AutoRouter,
   BenchmarkConfigResponseSchema,
@@ -67,6 +66,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { parseAdminResponse } from './admin-fetch';
+import { SchedulerConfigCard } from './SchedulerConfigCard';
 import { useSystemOneModelOptions } from './system-one-models';
 
 // ---------------------------------------------------------------------------
@@ -1053,11 +1053,9 @@ function BenchmarkConfigEditor({
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <span className="text-sm font-medium">Shared container budget</span>
             <p className="text-muted-foreground text-xs">
-              {BENCHMARK_CONTAINER_BUDGET} benchmark containers are shared by every queue and both
-              routers. User-queue runs use at most{' '}
-              {BENCHMARK_CONTAINER_BUDGET - BENCHMARK_PLATFORM_RESERVED_CONTAINERS}; the remaining{' '}
-              {BENCHMARK_PLATFORM_RESERVED_CONTAINERS} stay reserved for platform runs, which split
-              the free lanes with the other router.
+              Up to {BENCHMARK_CONTAINER_BUDGET} containers are shared by every queue and both
+              routers. Freed slots take eligible unfinished work using weighted shares with
+              borrowing. Model and provider concurrency limits apply to active chunks.
             </p>
           </div>
           <div className="sm:col-span-2">
@@ -1729,6 +1727,8 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
       </TabsContent>
 
       <TabsContent value="benchmarks" className="mt-4 flex flex-col gap-4">
+        <SchedulerConfigCard />
+
         <Card className="rounded-lg">
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-base">Decider Registry</CardTitle>

@@ -1891,6 +1891,7 @@
       "title": "एजेंट को आपका उत्तर चाहिए",
       "skipQuestionsTitle": "प्रश्न छोड़ें?",
       "skipQuestionsMessage": "एजेंट यह चरण छोड़ देगा।",
+      "answerProgress": "{{total}} में से {{answered}} के उत्तर दिए गए",
       "selectAllThatApply": "लागू होने वाले सभी विकल्प चुनें।",
       "option": "विकल्प: {{label}}",
       "optionSelected": "{{label}}, चयनित",

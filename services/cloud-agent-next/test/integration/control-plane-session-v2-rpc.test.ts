@@ -467,8 +467,8 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     });
     expect(provider.createCalls).toBe(1);
 
-    // The registered route spec carries the issued credential handle/scope, and
-    // M1: modern authorization requests per-session runtime isolation.
+    // The stored route keeps isolation for legacy wrappers. Preparation removes
+    // it on the wire only after this allocation negotiates a shared runtime.
     const row = await readSandboxRouteRow(sandboxStub, sessionId);
     expect(row.state).toBe('preparing');
     expect(row.spec.runtimeIsolation).toBe('per-session');

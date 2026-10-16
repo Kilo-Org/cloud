@@ -1,14 +1,16 @@
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { randomUUID } from 'node:crypto';
 import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 
 export default {
   id: 'opencode-go',
   base_url: 'https://opencode.ai/zen/go/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],
-  default_ai_sdk_provider: 'openai-compatible',
+  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
   transformRequest(context) {
     context.extraHeaders['x-opencode-session'] = generateProviderSpecificSessionHash(
       context.kilo_user_id,
@@ -18,6 +20,7 @@ export default {
     if (context.request.kind === 'messages') {
       context.extraHeaders['x-api-key'] = context.provider.apiKey;
     }
+    replaceReasoningObjectWithReasoningEffort(context.request);
     if (context.request.kind === 'chat_completions') {
       delete context.request.body.prompt_cache_key;
       delete context.request.body.safety_identifier;

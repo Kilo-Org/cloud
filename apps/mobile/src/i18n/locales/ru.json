@@ -1949,6 +1949,7 @@
       "title": "Агенту нужен ответ",
       "skipQuestionsTitle": "Пропустить вопросы?",
       "skipQuestionsMessage": "Агент пропустит этот шаг.",
+      "answerProgress": "Отвечено: {{answered}} из {{total}}",
       "selectAllThatApply": "Выберите все подходящие варианты.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, выбрано",

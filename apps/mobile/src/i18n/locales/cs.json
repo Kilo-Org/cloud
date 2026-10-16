@@ -2493,6 +2493,7 @@
       "title": "Agent potřebuje odpověď",
       "skipQuestionsTitle": "Přeskočit otázky?",
       "skipQuestionsMessage": "Agent přeskočí tento krok.",
+      "answerProgress": "Zodpovězeno {{answered}} z {{total}}",
       "selectAllThatApply": "Vyberte všechny vhodné možnosti.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, vybráno",

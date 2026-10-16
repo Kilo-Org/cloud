@@ -1917,6 +1917,7 @@
       "title": "智慧代理需要你的回覆",
       "skipQuestionsTitle": "略過問題？",
       "skipQuestionsMessage": "智慧代理將略過此步驟。",
+      "answerProgress": "已回覆 {{answered}}/{{total}}",
       "selectAllThatApply": "請選取所有適用的項目。",
       "option": "{{label}}",
       "optionSelected": "{{label}}，已選取",

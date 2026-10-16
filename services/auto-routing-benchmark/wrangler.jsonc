@@ -15,12 +15,12 @@
       "custom_domain": true,
     },
   ],
-  // 05:00 daily: platform auto-decider sync (may start a platform run).
-  // Every 15 min: drain pending Benchmark-profile work into the profile slot.
-  "triggers": { "crons": ["0 5 * * *", "*/15 * * * *"] },
+  // The frequent tick recovers expired leases; completion dispatches immediately.
+  "triggers": { "crons": ["0 5 * * *", "* * * * *"] },
   "dev": { "port": 8814, "local_protocol": "http", "ip": "0.0.0.0" },
   "observability": { "enabled": true },
   "vars": {
+    "BENCHMARK_SCHEDULER_CONFIG": "{}",
     // Base URL for reaching apps/web's /api/internal/* routes. Other workers
     // that call apps/web internal endpoints use app.kilo.ai.
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
@@ -28,6 +28,9 @@
     // CLI's KILO_API_URL. Local dev overrides both vars via .dev.vars (see
     // .dev.vars.example) so the decider benchmark runs fully locally.
     "KILO_CLI_API_URL": "https://api.kilo.ai",
+    // Where a container posts a case outcome after losing its caller (for
+    // example during a version rollout). Local dev overrides it via .dev.vars.
+    "BENCH_RESULT_URL": "https://auto-routing-benchmark.kiloapps.io/container/case-result",
   },
   "containers": [
     {

@@ -2429,6 +2429,7 @@
       "title": "Mila valiny ny mpanampy",
       "skipQuestionsTitle": "Hodinganina ve ny fanontaniana?",
       "skipQuestionsMessage": "Hodinganin'ny mpanampy ity dingana ity.",
+      "answerProgress": "{{answered}} amin'ny {{total}} no voavaly",
       "selectAllThatApply": "Safidio izay rehetra mifanaraka.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, voafidy",

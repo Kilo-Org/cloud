@@ -2429,6 +2429,7 @@
       "title": "ເອເຈນຕ້ອງການຄຳຕອບ",
       "skipQuestionsTitle": "ຂ້າມຄຳຖາມບໍ?",
       "skipQuestionsMessage": "ເອເຈນຈະຂ້າມຂັ້ນຕອນນີ້.",
+      "answerProgress": "ຕອບແລ້ວ {{answered}} ຈາກ {{total}}",
       "selectAllThatApply": "ເລືອກທຸກຂໍ້ທີ່ກົງກັບຄຳຕອບຂອງເຈົ້າ.",
       "option": "ຕົວເລືອກ {{label}}",
       "optionSelected": "{{label}}, ເລືອກແລ້ວ",

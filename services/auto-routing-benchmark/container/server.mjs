@@ -30,68 +30,181 @@ async function readBody(req) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-// The CLI's one-time sqlite migration (and its state dir generally) is not
-// safe under concurrent first runs; serialize every CLI execution in this
-// instance. Callers see requests queue, which is fine for benchmark traffic.
+// The CLI's sqlite state is shared by every invocation in this instance.
 let runChain = Promise.resolve();
-function runCaseSerialized(params) {
-  const next = runChain.then(() => runCase(params));
+let activeCliJobs = 0;
+let activeHttpRequests = 0;
+let stopRequested = false;
+let pendingDeliveries = 0;
+
+function exitWhenIdle() {
+  if (stopRequested && activeCliJobs === 0 && activeHttpRequests === 0 && pendingDeliveries === 0) {
+    process.exit(0);
+  }
+}
+
+function serializeCli(run) {
+  activeCliJobs += 1;
+  const next = runChain.then(run).finally(() => {
+    activeCliJobs -= 1;
+    exitWhenIdle();
+  });
   runChain = next.catch(() => {});
   return next;
 }
 
-function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, variant }) {
-  return new Promise(resolve => {
-    void (async () => {
-      const dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
-      const startedAt = Date.now();
-      let timedOut = false;
+class NotStartedError extends Error {}
 
+// A case accepted before SIGTERM but not yet spawned never reaches a provider.
+function runCaseSerialized(params) {
+  return serializeCli(() => {
+    if (stopRequested) throw new NotStartedError('container is stopping');
+    return runCase(params);
+  });
+}
+
+const RESULT_DELIVERY_ATTEMPTS = 3;
+
+// A rollout tears down the caller's connection while this process drains, so the
+// outcome is also posted to the worker, which persists it as recoverable output.
+async function deliverResult(callback, outcome) {
+  for (let attempt = 1; attempt <= RESULT_DELIVERY_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(callback.url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ execution: callback.execution, outcome }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (response.ok || response.status === 404) return;
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, attempt * 1_000));
+  }
+}
+
+function isResultCallback(value) {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof value.url === 'string' &&
+    typeof value.execution === 'object' &&
+    value.execution !== null
+  );
+}
+
+let warmup = null;
+function warmUpOnce() {
+  if (!warmup) {
+    const env = { ...process.env, KILO_DISABLE_SESSION_INGEST: '1', NO_COLOR: '1' };
+    delete env.KILO_AUTH_CONTENT;
+    delete env.KILO_API_URL;
+    delete env.KILO_ORG_ID;
+    warmup = serializeCli(() =>
+      runCli({ args: ['db', 'path'], env, timeoutMs: DEFAULT_TIMEOUT_MS })
+    ).then(
+      result => {
+        if (result.exitCode !== 0) warmup = null;
+        return result;
+      },
+      error => {
+        warmup = null;
+        throw error;
+      }
+    );
+  }
+  return warmup;
+}
+
+function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, variant }) {
+  const resolvedOrgId = typeof orgId === 'string' && orgId.length > 0 ? orgId : null;
+  const args = ['run', '--format', 'json', '--auto', '-m', `kilo/${model}`];
+  if (typeof variant === 'string' && variant.length > 0) args.push('--variant', variant);
+  args.push(prompt);
+  return runCli({
+    args,
+    env: {
+      ...process.env,
+      KILO_AUTH_CONTENT: JSON.stringify({
+        kilo: {
+          type: 'api',
+          key: kiloToken,
+          ...(resolvedOrgId ? { organizationId: resolvedOrgId } : {}),
+        },
+      }),
+      KILO_API_URL: kiloApiUrl,
+      KILO_DISABLE_SESSION_INGEST: '1',
+      ...(resolvedOrgId ? { KILO_ORG_ID: resolvedOrgId } : {}),
+      NO_COLOR: '1',
+    },
+    timeoutMs,
+    kiloToken,
+  });
+}
+
+async function runCli({ args, env, timeoutMs, kiloToken }) {
+  let dir;
+  try {
+    dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
+  } catch (error) {
+    // No child exists yet, so this case never reached a provider.
+    throw new NotStartedError(error instanceof Error ? error.message : 'case workspace failed');
+  }
+  const startedAt = Date.now();
+  let result;
+  try {
+    result = await new Promise(resolve => {
+      let timedOut = false;
       let stdout = '';
       let stdoutTruncated = false;
       let stderrTail = '';
-      const resolvedOrgId = typeof orgId === 'string' && orgId.length > 0 ? orgId : null;
-
-      const args = ['run', '--format', 'json', '--auto', '-m', `kilo/${model}`];
-      // Reasoning effort: forwarded as the CLI's provider-specific variant.
-      if (typeof variant === 'string' && variant.length > 0) args.push('--variant', variant);
-      args.push(prompt);
-      // detached: the `kilo` bin is a wrapper that spawns the real CLI binary
-      // as a grandchild. Killing only the wrapper orphans the grandchild: it
-      // keeps running (and spending) and holds the stdout/stderr pipes open,
-      // so 'close' never fires and the case hangs forever. A detached child
-      // leads its own process group, letting the timeout kill the whole tree.
-      const child = spawn('kilo', args, {
-        cwd: dir,
-        env: {
-          ...process.env,
-          KILO_AUTH_CONTENT: JSON.stringify({
-            kilo: {
-              type: 'api',
-              key: kiloToken,
-              ...(resolvedOrgId ? { organizationId: resolvedOrgId } : {}),
-            },
-          }),
-          KILO_API_URL: kiloApiUrl,
-          KILO_DISABLE_SESSION_INGEST: '1',
-          ...(resolvedOrgId ? { KILO_ORG_ID: resolvedOrgId } : {}),
-          NO_COLOR: '1',
-        },
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true,
-      });
-
-      const killProcessTree = () => {
-        // Negative pid = the child's whole process group (wrapper + real CLI).
-        try {
-          process.kill(-child.pid, 'SIGKILL');
-        } catch {
-          child.kill('SIGKILL');
-        }
+      // The kilo wrapper spawns a grandchild; timeout must kill its whole group.
+      let child;
+      try {
+        child = spawn('kilo', args, {
+          cwd: dir,
+          env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          detached: true,
+        });
+      } catch (error) {
+        // A synchronous spawn failure creates no process, so no provider call happened.
+        throw new NotStartedError(error instanceof Error ? error.message : 'case process failed');
+      }
+      let finished = false;
+      let finishTimer;
+      const finish = exitCode => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(killTimer);
+        clearTimeout(finishTimer);
+        resolve({
+          exitCode,
+          stdoutLines: stdout.split('\n').filter(line => line.length > 0),
+          stderrTail:
+            typeof kiloToken === 'string' && kiloToken.length > 0
+              ? stderrTail.split(kiloToken).join('[redacted]')
+              : stderrTail,
+          timedOut,
+        });
+      };
+      // A surviving grandchild can keep the pipes open after the CLI exits.
+      const finishAfterExit = exitCode => {
+        if (finished || finishTimer) return;
+        finishTimer = setTimeout(() => finish(exitCode), 5_000);
+        finishTimer.unref();
       };
       const killTimer = setTimeout(() => {
         timedOut = true;
-        killProcessTree();
+        finishAfterExit(-1);
+        try {
+          process.kill(-child.pid, 'SIGKILL');
+        } catch {
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            return;
+          }
+        }
       }, timeoutMs);
 
       child.stdout.on('data', chunk => {
@@ -104,147 +217,152 @@ function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, varia
           stdout += text;
         }
       });
-
       child.stderr.on('data', chunk => {
         stderrTail = (stderrTail + chunk.toString('utf8')).slice(-STDERR_CAP_BYTES);
       });
-
-      // 'error' and 'close' can both fire for the same child (Node emits
-      // 'close' after 'error' on spawn failure); only the first wins.
-      let finished = false;
-      const finish = async exitCode => {
-        if (finished) return;
-        finished = true;
-        clearTimeout(killTimer);
-        await rm(dir, { recursive: true, force: true }).catch(() => {});
-        const stdoutLines = stdout.split('\n').filter(line => line.length > 0);
-        // Defense in case a future CLI version echoes auth material to stderr.
-        const redactedStderrTail = stderrTail.split(kiloToken).join('[redacted]');
-        resolve({
-          exitCode,
-          durationMs: Date.now() - startedAt,
-          stdoutLines,
-          stderrTail: redactedStderrTail,
-          timedOut,
-        });
-      };
-
-      child.on('error', err => {
-        stderrTail = (stderrTail + `\nspawn error: ${err.message}`).slice(-STDERR_CAP_BYTES);
-        void finish(-1);
+      child.on('error', error => {
+        stderrTail = (stderrTail + `\nspawn error: ${error.message}`).slice(-STDERR_CAP_BYTES);
+        finish(-1);
       });
-      child.on('close', code => {
-        void finish(code ?? -1);
-      });
-      // Backstop for 'close' never firing: a stray process that survives the
-      // group kill (e.g. a tool process that moved to its own group) can hold
-      // the stdio pipes open indefinitely. After the child itself has exited,
-      // give the streams a short grace to flush, then finish regardless.
-      child.on('exit', code => {
-        setTimeout(() => void finish(code ?? -1), 5_000).unref();
-      });
-    })();
-  });
+      child.on('close', code => finish(code ?? -1));
+      child.on('exit', code => finishAfterExit(code ?? -1));
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+  result.durationMs = Date.now() - startedAt;
+  return result;
 }
 
-const server = createServer((req, res) => {
-  void (async () => {
-    if (req.method === 'GET' && req.url === '/health') {
-      sendJson(res, 200, { ok: true });
-      return;
-    }
-
-    // One-time CLI warmup (sqlite migration on a fresh instance): a trivial
-    // serialized run so real cases never burn their timeout on it.
-    if (req.method === 'POST' && req.url === '/warmup') {
-      let parsed;
-      try {
-        parsed = JSON.parse(await readBody(req));
-      } catch {
-        sendJson(res, 400, { error: 'invalid JSON body' });
+const server = createServer(
+  { requestTimeout: 30_000, headersTimeout: 10_000, connectionsCheckingInterval: 1_000 },
+  (req, res) => {
+    activeHttpRequests += 1;
+    let responseFinished = false;
+    const finishRequest = () => {
+      if (responseFinished) return;
+      responseFinished = true;
+      activeHttpRequests -= 1;
+      exitWhenIdle();
+    };
+    res.once('finish', finishRequest);
+    res.once('close', finishRequest);
+    void (async () => {
+      if (stopRequested) {
+        sendJson(res, 503, { error: 'container is stopping' });
         return;
       }
-      const { model, kiloToken, kiloApiUrl, orgId } = parsed ?? {};
-      if (
-        typeof model !== 'string' ||
-        typeof kiloToken !== 'string' ||
-        typeof kiloApiUrl !== 'string'
-      ) {
-        sendJson(res, 400, { error: 'model, kiloToken and kiloApiUrl are required strings' });
-        return;
-      }
-      if (orgId !== undefined && orgId !== null && typeof orgId !== 'string') {
-        sendJson(res, 400, { error: 'orgId must be a string when provided' });
-        return;
-      }
-      const result = await runCaseSerialized({
-        model,
-        prompt: 'Reply with exactly: ok',
-        kiloToken,
-        kiloApiUrl,
-        orgId,
-        timeoutMs: DEFAULT_TIMEOUT_MS,
-      });
-      sendJson(res, 200, { exitCode: result.exitCode, durationMs: result.durationMs });
-      return;
-    }
-
-    if (req.method === 'POST' && req.url === '/run') {
-      let parsed;
-      try {
-        parsed = JSON.parse(await readBody(req));
-      } catch {
-        sendJson(res, 400, { error: 'invalid JSON body' });
+      if (req.method === 'GET' && req.url === '/health') {
+        sendJson(res, 200, { ok: true });
         return;
       }
 
-      const { model, prompt, kiloToken, kiloApiUrl, orgId, variant } = parsed ?? {};
-      const timeoutMs =
-        typeof parsed?.timeoutMs === 'number' && parsed.timeoutMs > 0
-          ? parsed.timeoutMs
-          : DEFAULT_TIMEOUT_MS;
-
-      if (
-        typeof model !== 'string' ||
-        typeof prompt !== 'string' ||
-        typeof kiloToken !== 'string' ||
-        typeof kiloApiUrl !== 'string'
-      ) {
-        sendJson(res, 400, {
-          error: 'model, prompt, kiloToken and kiloApiUrl are required strings',
-        });
-        return;
-      }
-      if (orgId !== undefined && orgId !== null && typeof orgId !== 'string') {
-        sendJson(res, 400, { error: 'orgId must be a string when provided' });
+      if (req.method === 'POST' && req.url === '/warmup') {
+        req.resume();
+        const result = await warmUpOnce();
+        sendJson(res, 200, { exitCode: result.exitCode, durationMs: result.durationMs });
         return;
       }
 
-      try {
+      if (req.method === 'POST' && req.url === '/run') {
+        let parsed;
+        try {
+          parsed = JSON.parse(await readBody(req));
+        } catch {
+          sendJson(res, 400, { error: 'invalid JSON body' });
+          return;
+        }
+
+        if (stopRequested) {
+          sendJson(res, 503, { error: 'container is stopping' });
+          return;
+        }
+        const { model, prompt, kiloToken, kiloApiUrl, orgId, variant, resultCallback } =
+          parsed ?? {};
+        const timeoutMs =
+          typeof parsed?.timeoutMs === 'number' && parsed.timeoutMs > 0
+            ? parsed.timeoutMs
+            : DEFAULT_TIMEOUT_MS;
+
+        if (
+          typeof model !== 'string' ||
+          typeof prompt !== 'string' ||
+          typeof kiloToken !== 'string' ||
+          typeof kiloApiUrl !== 'string'
+        ) {
+          sendJson(res, 400, {
+            error: 'model, prompt, kiloToken and kiloApiUrl are required strings',
+          });
+          return;
+        }
+        if (orgId !== undefined && orgId !== null && typeof orgId !== 'string') {
+          sendJson(res, 400, { error: 'orgId must be a string when provided' });
+          return;
+        }
+
         if (variant !== undefined && variant !== null && typeof variant !== 'string') {
           sendJson(res, 400, { error: 'variant must be a string when provided' });
           return;
         }
-        const result = await runCaseSerialized({
-          model,
-          prompt,
-          kiloToken,
-          kiloApiUrl,
-          orgId,
-          timeoutMs,
-          variant,
-        });
-        sendJson(res, 200, result);
-      } catch (err) {
-        sendJson(res, 500, { error: err instanceof Error ? err.message : 'run failed' });
+        const callback = isResultCallback(resultCallback) ? resultCallback : null;
+        if (callback) pendingDeliveries += 1;
+        let outcome;
+        let failure = null;
+        try {
+          outcome = {
+            kind: 'completed',
+            response: await runCaseSerialized({
+              model,
+              prompt,
+              kiloToken,
+              kiloApiUrl,
+              orgId,
+              timeoutMs,
+              variant,
+            }),
+          };
+        } catch (err) {
+          // A case may only be reported as never started when no child was spawned.
+          if (err instanceof NotStartedError) {
+            outcome = { kind: 'not_started' };
+            if (!stopRequested) failure = err.message;
+          } else {
+            outcome = { kind: 'failed' };
+            failure = err instanceof Error ? err.message : 'run failed';
+          }
+        }
+        const responseDelivered = !res.destroyed && !responseFinished;
+        if (outcome.kind === 'completed') sendJson(res, 200, outcome.response);
+        else if (failure) sendJson(res, 500, { error: failure });
+        else sendJson(res, 503, { error: 'container is stopping' });
+        if (!callback) return;
+        const recoverable = outcome.kind === 'completed' || outcome.kind === 'not_started';
+        if (
+          recoverable &&
+          (outcome.kind === 'not_started' || stopRequested || !responseDelivered)
+        ) {
+          await deliverResult(callback, outcome);
+        }
+        pendingDeliveries -= 1;
+        exitWhenIdle();
+        return;
       }
-      return;
-    }
 
-    sendJson(res, 404, { error: 'not found' });
-  })();
-});
+      sendJson(res, 404, { error: 'not found' });
+    })().catch(error => {
+      sendJson(res, 500, { error: error instanceof Error ? error.message : 'run failed' });
+    });
+  }
+);
 
 server.listen(PORT, () => {
   console.log(`decider-benchmark runner listening on :${PORT}`);
+});
+
+// Node is PID 1, so SIGTERM needs an explicit handler.
+process.on('SIGTERM', () => {
+  if (stopRequested) return;
+  stopRequested = true;
+  server.close();
+  exitWhenIdle();
 });

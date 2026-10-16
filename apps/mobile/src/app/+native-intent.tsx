@@ -40,6 +40,9 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/transcript-style-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/transcript-style-fixture';
     }
+    if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(auth)/question-card-fixture';
+    }
     const fixtureRoute = modelPickerFixtureRoute(path);
     if (fixtureRoute) {
       return fixtureRoute;

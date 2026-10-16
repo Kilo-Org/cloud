@@ -1,4 +1,8 @@
-import { isReasoningExplicitlyDisabled } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import {
+  isReasoningExplicitlyDisabled,
+  replaceReasoningObjectWithReasoningEffort,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type {
   DirectByokModel,
   DirectByokProvider,
@@ -119,11 +123,12 @@ export default {
   base_url: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
-  default_ai_sdk_provider: 'openai-compatible',
+  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
   transformRequest(context) {
     context.request.body.thinking = {
       type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
     };
+    replaceReasoningObjectWithReasoningEffort(context.request);
   },
   models: () => Promise.resolve(BYTEPLUS_CODING_MODELS),
 } satisfies DirectByokProvider;

@@ -2,9 +2,9 @@ import type { DirectByokProviderMetaId } from '@kilocode/web-shared/lib/ai-gatew
 import type {
   GatewayChatApiKind,
   ProviderApiUrlOverrides,
+  ProviderResponseTransforms,
   TransformRequestContext,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { CustomLlmProvider } from '@kilocode/db';
 import type { DirectByokModel } from '@kilocode/db/schema-types';
 
 export {
@@ -21,7 +21,7 @@ export type DirectByokProvider = {
   base_url_overrides: ProviderApiUrlOverrides;
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
   supported_chat_apis: ReadonlyArray<GatewayChatApiKind>;
-  default_ai_sdk_provider: CustomLlmProvider;
+  reasoning_details_transform: ProviderResponseTransforms | null;
   transformRequest(context: TransformRequestContext): void;
 };
 

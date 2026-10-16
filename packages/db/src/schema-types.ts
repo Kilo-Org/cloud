@@ -1,3 +1,4 @@
+import { SecureProxyUpstreamUrlSchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
 import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
@@ -1946,6 +1947,8 @@ export const OpenRouterProvider = z.object({
     training: z.boolean(),
     retainsPrompts: z.boolean(),
     canPublish: z.boolean(),
+    termsOfServiceURL: z.string().optional(),
+    privacyPolicyURL: z.string().optional(),
   }),
   headquarters: z.string().optional(),
   datacenters: z.array(z.string()).optional(),
@@ -1974,6 +1977,8 @@ export const NormalizedProvider = z.object({
     training: z.boolean(),
     retainsPrompts: z.boolean(),
     canPublish: z.boolean(),
+    termsOfServiceURL: z.string().optional(),
+    privacyPolicyURL: z.string().optional(),
   }),
   headquarters: z.string().optional(),
   datacenters: z.array(z.string()).optional(),
@@ -2105,7 +2110,6 @@ export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 export const CustomLlmProviderSchema = z.enum([
   'anthropic', // uses Messages API
   'openai', // uses Responses API
-  'openai-compatible', // uses Chat Completions API with reasoning_content
   'openrouter', // uses Chat Completions API with reasoning_details
 ]);
 
@@ -2243,10 +2247,27 @@ export const CustomLlmXApiKeyCredentialsSchema = z.object({
 
 export type CustomLlmXApiKeyCredentials = z.infer<typeof CustomLlmXApiKeyCredentialsSchema>;
 
+/**
+ * Routes requests through apps/ai-gateway-secure-proxy. The definition's
+ * `base_url` is the proxy's `/api/proxy` URL, used as-is; `config.url` takes the
+ * role `base_url` has for direct custom LLMs, including `disable_url_suffix`.
+ */
+export const CustomLlmSecureProxyCredentialsSchema = z.object({
+  type: z.literal('secure_proxy'),
+  proxy_secret: z.string().min(1),
+  config: z.object({
+    url: SecureProxyUpstreamUrlSchema,
+    extra_headers: CustomLlmExtraHeadersSchema.optional(),
+  }),
+});
+
+export type CustomLlmSecureProxyCredentials = z.infer<typeof CustomLlmSecureProxyCredentialsSchema>;
+
 export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
   CustomLlmXApiKeyCredentialsSchema,
   GoogleServiceAccountKeySchema,
+  CustomLlmSecureProxyCredentialsSchema,
 ]);
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;

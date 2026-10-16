@@ -2429,6 +2429,7 @@
       "title": "ወኪሉ መልስ ይፈልጋል",
       "skipQuestionsTitle": "ጥያቄዎቹን መዝለል ይፈልጋሉ?",
       "skipQuestionsMessage": "ወኪሉ ይህን እርምጃ ይዘልለዋል።",
+      "answerProgress": "ከ{{total}} ውስጥ {{answered}} ተመልሰዋል",
       "selectAllThatApply": "የሚመለከቱትን ሁሉ ይምረጡ።",
       "option": "አማራጭ፦ {{label}}",
       "optionSelected": "{{label}}፣ ተመርጧል",

@@ -1,5 +1,6 @@
 import { BottomSheet } from '@expo/ui/community/bottom-sheet';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Platform, View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -130,7 +131,12 @@ export function Sheet({
         onDismiss?.();
       }}
     >
-      {children}
+      {Platform.OS === 'android' && !snapPoints?.length ? (
+        // Material3 caps the sheet at 640dp; Expo UI sizes its content host to the window.
+        <View className="w-full max-w-[640px] self-center">{children}</View>
+      ) : (
+        children
+      )}
     </BottomSheet>
   );
 }

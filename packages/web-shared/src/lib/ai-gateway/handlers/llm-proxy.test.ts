@@ -35,9 +35,7 @@ import {
   fetchCustomRouterDecision,
   fetchEfficientAutoDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
-import {
-  findCustomRouter,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { findCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import {
   signAutoDecision,
   type AutoDecisionPayload,

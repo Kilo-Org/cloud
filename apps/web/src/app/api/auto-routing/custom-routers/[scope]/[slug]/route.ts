@@ -22,7 +22,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
   );
 }
 
-export async function DELETE(request: NextRequest, { params }: RouteContext): Promise<NextResponse> {
+export async function DELETE(
+  request: NextRequest,
+  { params }: RouteContext
+): Promise<NextResponse> {
   const routerParams = await params;
   return handleCustomRouterRequest(request, context =>
     deleteCustomRouterResponse(context, routerParams)

@@ -67,7 +67,8 @@ export class CustomRouterApiError extends Error {
   }
 }
 
-const routerNotFound = () => new CustomRouterApiError('router_not_found', 'Custom router not found');
+const routerNotFound = () =>
+  new CustomRouterApiError('router_not_found', 'Custom router not found');
 
 export function customRouterErrorResponse(error: CustomRouterApiError): NextResponse {
   const body: CustomRouterErrorResponse & Record<string, unknown> = {
@@ -239,15 +240,18 @@ async function toSummary(
   router: CustomRouterDefinition,
   canEdit: boolean
 ): Promise<CustomRouterSummary> {
-  const clientEvalKeys = router.entries
-    .filter(requiresClientEval)
-    .map(customRouterEntryKey);
+  const clientEvalKeys = router.entries.filter(requiresClientEval).map(customRouterEntryKey);
   const clientEval = new Set(clientEvalKeys);
   const statuses = await fetchVariantStatuses(router, clientEvalKeys);
   const entries = router.entries.map((entry): CustomRouterListEntry => {
     const key = customRouterEntryKey(entry);
     const variants = statuses?.get(key) ?? [];
-    return { key, entry, needsClientEval: needsClientEval(clientEval.has(key), variants), variants };
+    return {
+      key,
+      entry,
+      needsClientEval: needsClientEval(clientEval.has(key), variants),
+      variants,
+    };
   });
   return {
     id: router.id,
@@ -306,9 +310,7 @@ async function requestPlatformBenchmarks(params: {
   entries: CustomRouterEntry[];
 }): Promise<void> {
   const models = params.entries.flatMap(entry =>
-    entry.kind === 'gateway' && !requiresClientEval(entry)
-      ? [{ model: entry.model }]
-      : []
+    entry.kind === 'gateway' && !requiresClientEval(entry) ? [{ model: entry.model }] : []
   );
   for (let start = 0; start < models.length; start += BENCHMARK_REGISTER_BATCH_SIZE) {
     const result = await registerOwnerBenchmarkProfiles({

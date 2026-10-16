@@ -228,7 +228,12 @@ describe('addCustomRouterModels', () => {
         provider: 'ollama',
         model: 'qwen3:8b',
         variants: [],
-        capabilities: { contextLength: null, inputModalities: ['text'], toolCall: true, reasoning: false },
+        capabilities: {
+          contextLength: null,
+          inputModalities: ['text'],
+          toolCall: true,
+          reasoning: false,
+        },
         pricing: null,
       },
     ],

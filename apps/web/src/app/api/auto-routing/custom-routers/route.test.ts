@@ -7,7 +7,11 @@ import {
   type CustomRouterResponse,
   type CustomRouterVariantStatus,
 } from '@kilocode/auto-routing-contracts';
-import { auto_routing_custom_routers, organization_memberships, type User } from '@kilocode/db/schema';
+import {
+  auto_routing_custom_routers,
+  organization_memberships,
+  type User,
+} from '@kilocode/db/schema';
 import {
   getCustomRouterStatus,
   registerOwnerBenchmarkProfiles,
@@ -23,7 +27,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, type NextResponse } from 'next/server';
 import { GET as listRouters, POST as createRouter } from './route';
 import {
   DELETE as deleteRouter,
@@ -88,7 +92,12 @@ function clientEntry(modelId: string, variants: string[] = []): ClientCustomRout
     provider: 'ollama',
     model: modelId,
     variants,
-    capabilities: { contextLength: 32_000, inputModalities: ['text'], toolCall: true, reasoning: false },
+    capabilities: {
+      contextLength: 32_000,
+      inputModalities: ['text'],
+      toolCall: true,
+      reasoning: false,
+    },
     pricing: null,
   };
 }
@@ -189,7 +198,10 @@ describe('/api/auto-routing/custom-routers', () => {
       });
       expect(created.status).toBe(404);
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
-      expect(mockedIsReleaseToggleEnabled).toHaveBeenCalledWith('kilo-auto-custom-routers', user.id);
+      expect(mockedIsReleaseToggleEnabled).toHaveBeenCalledWith(
+        'kilo-auto-custom-routers',
+        user.id
+      );
     });
   });
 
@@ -221,7 +233,9 @@ describe('/api/auto-routing/custom-routers', () => {
       await create(routerBody());
       signIn(await insertTestUser());
 
-      const read = await errorOf(await getRouter(request('/user/coding'), params('user', 'coding')));
+      const read = await errorOf(
+        await getRouter(request('/user/coding'), params('user', 'coding'))
+      );
       const deleted = await errorOf(
         await deleteRouter(request('/user/coding', { method: 'DELETE' }), params('user', 'coding'))
       );
@@ -235,7 +249,11 @@ describe('/api/auto-routing/custom-routers', () => {
       const entries = [gateway(SONNET), gateway(BYOK), clientEntry('qwen3:8b')];
 
       const created = await create(
-        routerBody({ baseRouter: 'frontier', entries, defaultEntryKey: customRouterEntryKey(entries[0]) })
+        routerBody({
+          baseRouter: 'frontier',
+          entries,
+          defaultEntryKey: customRouterEntryKey(entries[0]),
+        })
       );
 
       expect(created.status).toBe(201);
@@ -268,12 +286,17 @@ describe('/api/auto-routing/custom-routers', () => {
     test('lists only personal routers outside an organization context', async () => {
       const organization = await createTestOrganization('Acme', user.id, 0);
       await create(routerBody());
-      await create(routerBody({ scope: 'org', slug: 'team' }), `?organizationId=${organization.id}`);
+      await create(
+        routerBody({ scope: 'org', slug: 'team' }),
+        `?organizationId=${organization.id}`
+      );
 
       const listed = await list();
 
       expect(listed.status).toBe(200);
-      expect(listed.body.routers.map(router => router.modelId)).toEqual(['kilo-auto/custom/coding']);
+      expect(listed.body.routers.map(router => router.modelId)).toEqual([
+        'kilo-auto/custom/coding',
+      ]);
     });
   });
 
@@ -352,7 +375,10 @@ describe('/api/auto-routing/custom-routers', () => {
       const moved = await updateRouter(
         request('/user/coding', {
           method: 'PATCH',
-          body: { entries: [gateway(FLASH)], defaultEntryKey: customRouterEntryKey(gateway(FLASH)) },
+          body: {
+            entries: [gateway(FLASH)],
+            defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
+          },
         }),
         params('user', 'coding')
       );
@@ -362,7 +388,9 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(moved.status).toBe(200);
       const { router } = (await moved.json()) as CustomRouterResponse;
       expect(router.defaultEntryKey).toBe(customRouterEntryKey(gateway(FLASH)));
-      expect(router.entries.map(entry => entry.key)).toEqual([customRouterEntryKey(gateway(FLASH))]);
+      expect(router.entries.map(entry => entry.key)).toEqual([
+        customRouterEntryKey(gateway(FLASH)),
+      ]);
     });
   });
 
@@ -375,7 +403,10 @@ describe('/api/auto-routing/custom-routers', () => {
         kilo_user_id: member.id,
         role,
       });
-      await create(routerBody({ scope: 'org', slug: 'team' }), `?organizationId=${organization.id}`);
+      await create(
+        routerBody({ scope: 'org', slug: 'team' }),
+        `?organizationId=${organization.id}`
+      );
       return { organization, member };
     }
 
@@ -416,7 +447,10 @@ describe('/api/auto-routing/custom-routers', () => {
       );
       const registered = await errorOf(
         await registerClientEntry(
-          request('/org/team/client-entries', { method: 'POST', body: { entry: clientEntry('qwen3:8b') } }),
+          request('/org/team/client-entries', {
+            method: 'POST',
+            body: { entry: clientEntry('qwen3:8b') },
+          }),
           params('org', 'team')
         )
       );
@@ -453,7 +487,9 @@ describe('/api/auto-routing/custom-routers', () => {
       const { organization } = await organizationWithMember('member');
       signIn(await insertTestUser());
 
-      const listed = await errorOf(await listRouters(request(`?organizationId=${organization.id}`)));
+      const listed = await errorOf(
+        await listRouters(request(`?organizationId=${organization.id}`))
+      );
 
       expect(listed.status).toBe(403);
       expect(listed.body.error.code).toBe('forbidden');
@@ -525,7 +561,11 @@ describe('/api/auto-routing/custom-routers', () => {
         clientEvalEntryKeys: [gateway(BYOK), ready, stale].map(customRouterEntryKey),
       });
       expect(
-        listed.body.routers[0]?.entries.map(entry => [entry.key, entry.needsClientEval, entry.variants])
+        listed.body.routers[0]?.entries.map(entry => [
+          entry.key,
+          entry.needsClientEval,
+          entry.variants,
+        ])
       ).toEqual([
         [customRouterEntryKey(gateway(SONNET)), false, variants(['pending'])],
         [customRouterEntryKey(gateway(BYOK)), true, variants(['failed'])],
@@ -564,7 +604,9 @@ describe('/api/auto-routing/custom-routers', () => {
       expect((await register(local)).status).toBe(200);
       const replaced = await register({ ...local, variants: ['think'] });
       const removed = await removeClientEntry(
-        request('/user/coding/client-entries?provider=ollama&model=qwen3%3A8b', { method: 'DELETE' }),
+        request('/user/coding/client-entries?provider=ollama&model=qwen3%3A8b', {
+          method: 'DELETE',
+        }),
         params('user', 'coding')
       );
 

@@ -140,6 +140,8 @@ const DISMISS_KEYBOARD_ACTIVE_OFFSET_Y = 24;
 const DISMISS_KEYBOARD_FAIL_OFFSET_X = 16;
 /** Hide the remaining-characters counter until the draft nears the limit. */
 const COMPOSER_COUNTER_VISIBLE_REMAINING = 1000;
+/** A shown toolbar row is never clamped; any real row is far below this. */
+const TOOLBAR_ROW_UNCLAMPED_HEIGHT = 10_000;
 
 type AndroidDismissKeyboardGesture = {
   identifier: string;
@@ -804,17 +806,22 @@ export function ChatComposer({
   // Once the chip is hidden, its row gives its height back in the same frames
   // as the keyboard. `keyboardVisible` reaches false only after the keyboard
   // has landed, so unmounting the row on that flag alone shifted the
-  // transcript a second time, after the keyboard had finished moving.
+  // transcript a second time, after the keyboard had finished moving. The
+  // worklet reads only shared values and always writes `maxHeight`: Reanimated
+  // keeps a style key a worklet stops returning, so a conditional key would
+  // leave the row stuck at its collapsed height.
   const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
   const toolbarRowHeight = useSharedValue(0);
-  const toolbarRowCollapsing = !control.showToolbar;
-  const toolbarRowStyle = useAnimatedStyle(
-    () =>
-      toolbarRowCollapsing
-        ? { height: toolbarRowHeight.value * keyboardProgress.value, overflow: 'hidden' }
-        : {},
-    [toolbarRowCollapsing]
-  );
+  const toolbarRowCollapsing = useSharedValue(false);
+  useEffect(() => {
+    toolbarRowCollapsing.value = !control.showToolbar;
+  }, [control.showToolbar, toolbarRowCollapsing]);
+  const toolbarRowStyle = useAnimatedStyle(() => ({
+    maxHeight: toolbarRowCollapsing.value
+      ? toolbarRowHeight.value * keyboardProgress.value
+      : TOOLBAR_ROW_UNCLAMPED_HEIGHT,
+    overflow: 'hidden',
+  }));
 
   const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
@@ -1356,27 +1363,29 @@ export function ChatComposer({
 
         {!suggestionRow && showToolbarRow ? (
           <Animated.View
-            // The row is never animated out. An exit animation leaves its
-            // snapshot painted while the input row has already moved up into
-            // that space, so the collapsing model chip drew over the message
-            // field (video V1 ~4.5s and ~19s). The chip and the field stay in
-            // separate rows, and when the row does go there is nothing left to
-            // paint through the input.
-            entering={
-              control.showToolbar
-                ? selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))
-                : undefined
-            }
-            pointerEvents={control.showToolbar ? 'auto' : 'none'}
-            accessibilityElementsHidden={!control.showToolbar}
-            importantForAccessibility={control.showToolbar ? 'auto' : 'no-hide-descendants'}
-            className={control.showToolbar ? undefined : 'opacity-0'}
             style={toolbarRowStyle}
-          >
-            <View
-              onLayout={event => {
+            onLayout={event => {
+              if (!toolbarRowCollapsing.value) {
                 toolbarRowHeight.value = event.nativeEvent.layout.height;
-              }}
+              }
+            }}
+          >
+            <Animated.View
+              // The row is never animated out. An exit animation leaves its
+              // snapshot painted while the input row has already moved up into
+              // that space, so the collapsing model chip drew over the message
+              // field (video V1 ~4.5s and ~19s). The chip and the field stay in
+              // separate rows, and when the row does go there is nothing left to
+              // paint through the input.
+              entering={
+                control.showToolbar
+                  ? selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))
+                  : undefined
+              }
+              pointerEvents={control.showToolbar ? 'auto' : 'none'}
+              accessibilityElementsHidden={!control.showToolbar}
+              importantForAccessibility={control.showToolbar ? 'auto' : 'no-hide-descendants'}
+              className={control.showToolbar ? undefined : 'opacity-0'}
             >
               <ChatToolbar
                 modeControl={modeControl}
@@ -1391,7 +1400,7 @@ export function ChatComposer({
                 modelLockLabel={modelLockLabel}
                 className={toolbarClassName}
               />
-            </View>
+            </Animated.View>
           </Animated.View>
         ) : null}
 

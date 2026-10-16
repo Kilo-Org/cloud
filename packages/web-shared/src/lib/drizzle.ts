@@ -229,30 +229,74 @@ export async function closeAllDrizzleConnections(): Promise<void> {
 
 export type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+/**
+ * Leaves the database as `TRUNCATE <every public table> RESTART IDENTITY CASCADE`
+ * would: every table and partition empty, every owned identity/serial sequence
+ * restarted. TRUNCATE recreates the files of all ~250 tables and their indexes on
+ * every call; this only touches tables whose heap has pages. A table without pages
+ * holds no tuples, so the set never misses rows.
+ *
+ * `session_replication_role = replica` skips FK checks and ON DELETE actions,
+ * which is safe because every table holding rows is emptied in the same
+ * transaction. It needs a superuser, as the test and dev Postgres roles are.
+ */
 export async function cleanupDbForTest(): Promise<void> {
   // Use primary for test cleanup to ensure consistency
-  const { rows: tables } = await primaryDb.execute<{ tablename: string }>(
-    drizzleSql`
-      SELECT tablename
-      FROM pg_tables
-      WHERE schemaname = 'public'
-        AND tablename != 'migrations'
-        AND NOT EXISTS (
-          SELECT 1
-          FROM pg_inherits
-          JOIN pg_class child ON pg_inherits.inhrelid = child.oid
-          JOIN pg_namespace child_ns ON child.relnamespace = child_ns.oid
-          WHERE child_ns.nspname = 'public'
-            AND child.relname = pg_tables.tablename
-        )
-      ORDER BY tablename
-    `
-  );
+  const { rows } = await primaryDb.execute<{ kind: 'table' | 'sequence'; sql: string }>(drizzleSql`
+    WITH RECURSIVE roots AS (
+      SELECT c.oid, c.relname
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relkind IN ('r', 'p')
+        AND c.relname <> 'migrations'
+        AND NOT EXISTS (SELECT 1 FROM pg_inherits i WHERE i.inhrelid = c.oid)
+    ),
+    tree AS (
+      SELECT oid AS root, oid AS rel FROM roots
+      UNION ALL
+      SELECT tree.root, i.inhrelid FROM tree JOIN pg_inherits i ON i.inhparent = tree.rel
+    ),
+    -- Materialized so pg_sequence_last_value only ever sees sequence OIDs.
+    owned AS MATERIALIZED (
+      SELECT s.seqrelid, s.seqstart
+      FROM tree
+      JOIN pg_depend d
+        ON d.refclassid = 'pg_class'::regclass
+        AND d.refobjid = tree.rel
+        AND d.classid = 'pg_class'::regclass
+        AND d.deptype IN ('a', 'i')
+      JOIN pg_sequence s ON s.seqrelid = d.objid
+    )
+    SELECT 'table' AS kind, format('%I', roots.relname) AS sql
+    FROM roots
+    JOIN tree ON tree.root = roots.oid
+    GROUP BY roots.oid, roots.relname
+    HAVING bool_or(pg_relation_size(tree.rel) > 0)
+    UNION ALL
+    SELECT 'sequence', format('setval(%s, %s, false)', seqrelid, seqstart)
+    FROM owned
+    WHERE pg_sequence_last_value(seqrelid) IS NOT NULL
+  `);
+  const tables = rows.filter(row => row.kind === 'table').map(row => row.sql);
+  const sequenceResets = rows.filter(row => row.kind === 'sequence').map(row => row.sql);
+  if (tables.length === 0 && sequenceResets.length === 0) return;
 
-  if (tables.length === 0) return;
+  await primaryDb.transaction(async tx => {
+    const statements: string[] = [];
+    if (tables.length > 0) {
+      statements.push(
+        // Waits for in-flight writers, as TRUNCATE's lock does.
+        `LOCK TABLE ${tables.join(', ')} IN SHARE ROW EXCLUSIVE MODE`,
+        'SET LOCAL session_replication_role = replica',
+        ...tables.map(table => `DELETE FROM ${table}`)
+      );
+    }
+    if (sequenceResets.length > 0) statements.push(`SELECT ${sequenceResets.join(', ')}`);
+    await tx.execute(drizzleSql.raw(statements.join(';\n')));
+  });
 
-  const truncateTargets = tables.map(({ tablename }) => `"${tablename}"`).join(', ');
-  await primaryDb.execute(
-    drizzleSql.raw(`TRUNCATE TABLE ${truncateTargets} RESTART IDENTITY CASCADE;`)
-  );
+  // Shrinks the emptied heaps back to zero pages, as TRUNCATE leaves them, so the
+  // next file inserts into a fresh heap and the next cleanup skips these tables.
+  if (tables.length > 0) await primaryDb.execute(drizzleSql.raw(`VACUUM ${tables.join(', ')}`));
 }

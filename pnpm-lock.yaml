@@ -2003,6 +2003,9 @@ importers:
       '@kilocode/event-service':
         specifier: workspace:*
         version: link:../event-service
+      '@kilocode/mcp-gateway':
+        specifier: workspace:*
+        version: link:../mcp-gateway
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../notifications

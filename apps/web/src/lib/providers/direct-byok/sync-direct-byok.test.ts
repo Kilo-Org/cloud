@@ -272,7 +272,7 @@ describe('parseModelsDevProviderModels', () => {
     ]);
   });
 
-  test('excludes models served through an SDK whose protocol the gateway cannot proxy', () => {
+  test('excludes models served only over the native Gemini API', () => {
     const models = parseModelsDevProviderModels(
       {
         models: {
@@ -302,9 +302,17 @@ describe('parseModelsDevProviderModels', () => {
               api: 'https://opencode.ai/inference/go/google/v1beta',
             },
           },
-          'bedrock-model': {
-            id: 'bedrock-model',
-            provider: { npm: '@ai-sdk/amazon-bedrock' },
+          'vertex-gemini': {
+            id: 'vertex-gemini',
+            provider: { npm: '@ai-sdk/google-vertex' },
+          },
+          'mistral-alias': {
+            id: 'mistral-alias',
+            provider: { npm: '@ai-sdk/mistral', api: 'https://opencode.ai/inference/openai/v1' },
+          },
+          'openrouter-alias': {
+            id: 'openrouter-alias',
+            provider: { npm: '@openrouter/ai-sdk-provider' },
           },
         },
       },
@@ -315,7 +323,9 @@ describe('parseModelsDevProviderModels', () => {
         'gpt-6-luna',
         'compatible-model',
         'gemini-4-argon-contributor',
-        'bedrock-model',
+        'vertex-gemini',
+        'mistral-alias',
+        'openrouter-alias',
       ])
     );
 
@@ -324,6 +334,8 @@ describe('parseModelsDevProviderModels', () => {
       'qwen3.7-plus',
       'gpt-6-luna',
       'compatible-model',
+      'mistral-alias',
+      'openrouter-alias',
     ]);
   });
 });

@@ -52,12 +52,12 @@ const ModelsDevModelSchema = z.object({
   provider: z.object({ npm: z.string().optional() }).optional().catch(undefined),
 });
 
-// A models.dev per-model `provider.npm` overrides the provider's SDK when the model is served over
-// another protocol, such as OpenCode Go's Gemini models over the native Google Gemini API.
-const GATEWAY_COMPATIBLE_MODELS_DEV_SDKS: ReadonlySet<string> = new Set([
-  '@ai-sdk/openai-compatible',
-  '@ai-sdk/openai',
-  '@ai-sdk/anthropic',
+// A models.dev per-model `provider.npm` names the SDK for the model's own endpoint. Several SDK
+// names, such as `@ai-sdk/mistral`, still speak Chat Completions, so only SDKs for the native
+// Gemini API, which the gateway cannot proxy, are excluded.
+const GEMINI_API_MODELS_DEV_SDKS: ReadonlySet<string> = new Set([
+  '@ai-sdk/google',
+  '@ai-sdk/google-vertex',
 ]);
 
 const ModelsDevProviderSchema = z.object({
@@ -150,7 +150,7 @@ export function parseModelsDevProviderModels(
         (!availableModelIds || availableModelIds.has(model.id)) &&
         model.tool_call !== false &&
         (!model.modalities?.input || model.modalities.input.includes('text')) &&
-        (!model.provider?.npm || GATEWAY_COMPATIBLE_MODELS_DEV_SDKS.has(model.provider.npm))
+        (!model.provider?.npm || !GEMINI_API_MODELS_DEV_SDKS.has(model.provider.npm))
     )
     .map(model => {
       return {

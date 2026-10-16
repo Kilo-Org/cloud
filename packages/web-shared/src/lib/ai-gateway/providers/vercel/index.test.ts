@@ -3,6 +3,7 @@ import { afterEach, describe, it, expect, jest } from '@jest/globals';
 import {
   applyVercelSettings,
   convertProviderOptions,
+  excludesAllOpenRouterEndpoints,
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
@@ -299,12 +300,17 @@ describe('shouldRouteToVercel', () => {
     };
   }
 
-  async function loadShouldRouteToVercel(options?: { optOut?: boolean }) {
+  async function loadShouldRouteToVercel(options?: {
+    optOut?: boolean;
+    vercelPercentage?: number;
+    openRouterEndpointTags?: string[];
+    vercelInferenceProviders?: string[];
+  }) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
       getRuntimeGatewayRoutingConfig: jest.fn(async () => ({
-        vercelPaid: 100,
-        vercelFree: 100,
+        vercelPaid: options?.vercelPercentage ?? 100,
+        vercelFree: options?.vercelPercentage ?? 100,
         vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
       })),
     }));
@@ -313,7 +319,16 @@ describe('shouldRouteToVercel', () => {
     }));
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
-      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => ['anthropic']),
+      getCachedVercelInferenceProviderIdsForModel: jest.fn(
+        async () => options?.vercelInferenceProviders ?? ['anthropic']
+      ),
+      getOpenRouterModelsMetadataFromDatabase: jest.fn(async () => ({
+        'anthropic/claude-sonnet-4.5': {
+          id: 'anthropic/claude-sonnet-4.5',
+          name: 'Claude Sonnet 4.5',
+          endpoints: (options?.openRouterEndpointTags ?? ['anthropic']).map(tag => ({ tag })),
+        },
+      })),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
       .shouldRouteToVercel;
@@ -372,6 +387,78 @@ describe('shouldRouteToVercel', () => {
       )
     ).resolves.toBe(false);
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+  });
+  it('routes to Vercel outside the routing percentage when OpenRouter has no allowed endpoint', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel({
+      vercelPercentage: 1,
+      vercelInferenceProviders: ['anthropic', 'boundless'],
+    });
+
+    await expect(
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', request(), 'seed', async () => ({
+        only: ['boundless'],
+      }))
+    ).resolves.toBe(true);
+  });
+
+  it('keeps the routing percentage when OpenRouter has an allowed endpoint', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel({
+      vercelPercentage: 1,
+      vercelInferenceProviders: ['anthropic', 'boundless'],
+    });
+
+    await expect(
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', request(), 'seed', async () => ({
+        only: ['boundless', 'anthropic'],
+      }))
+    ).resolves.toBe(false);
+  });
+
+  it('does not route to Vercel when Vercel routing is disabled', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel({
+      vercelPercentage: 0,
+      vercelInferenceProviders: ['anthropic', 'boundless'],
+    });
+
+    await expect(
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', request(), 'seed', async () => ({
+        only: ['boundless'],
+      }))
+    ).resolves.toBe(false);
+  });
+});
+
+describe('excludesAllOpenRouterEndpoints', () => {
+  const model = {
+    id: 'vendor/model',
+    name: 'Model',
+    endpoints: [{ tag: 'deepinfra/fp8' }, { tag: 'together' }],
+  };
+
+  it('is true when no allowed provider has an OpenRouter endpoint', () => {
+    expect(excludesAllOpenRouterEndpoints(model, { only: ['boundless'] })).toBe(true);
+  });
+
+  it('is true when the only matching provider is ignored', () => {
+    expect(
+      excludesAllOpenRouterEndpoints(model, {
+        only: ['deepinfra', 'boundless'],
+        ignore: ['deepinfra'],
+      })
+    ).toBe(true);
+  });
+
+  it('is false when an allowed provider has an OpenRouter endpoint', () => {
+    expect(excludesAllOpenRouterEndpoints(model, { only: ['boundless', 'DeepInfra'] })).toBe(false);
+  });
+
+  it('is false without an allow list or endpoint data', () => {
+    expect(excludesAllOpenRouterEndpoints(model, { ignore: ['deepinfra'] })).toBe(false);
+    expect(excludesAllOpenRouterEndpoints(model, undefined)).toBe(false);
+    expect(excludesAllOpenRouterEndpoints(undefined, { only: ['boundless'] })).toBe(false);
+    expect(
+      excludesAllOpenRouterEndpoints({ ...model, endpoints: [{}] }, { only: ['boundless'] })
+    ).toBe(false);
   });
 });
 

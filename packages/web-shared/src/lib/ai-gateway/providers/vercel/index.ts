@@ -4,6 +4,7 @@ import {
   DirectUserByokInferenceProviderIdSchema,
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
+  normalizeInferenceProviderId,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   VertexCredentialsSchema,
@@ -19,8 +20,10 @@ import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   getCachedVercelInferenceProviderIdsForModel,
+  getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type { StoredModel } from '@kilocode/db/schema-types';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
@@ -69,6 +72,30 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
   return optOutModels.has(requestedModel);
 }
 
+/**
+ * Whether OpenRouter has no endpoint for `openRouterModel` among the providers
+ * that `only` and `ignore` leave allowed. Unknown endpoint data never counts as
+ * excluding OpenRouter.
+ */
+export function excludesAllOpenRouterEndpoints(
+  openRouterModel: StoredModel | undefined,
+  provider: Pick<OpenRouterProviderConfig, 'only' | 'ignore'> | undefined
+) {
+  if (!openRouterModel || !provider?.only) return false;
+  const openRouterProviders = new Set(
+    openRouterModel.endpoints.flatMap(endpoint =>
+      endpoint.tag ? [normalizeInferenceProviderId(endpoint.tag)] : []
+    )
+  );
+  if (openRouterProviders.size === 0) return false;
+  const ignored = new Set(
+    (provider.ignore ?? []).map(providerId => normalizeInferenceProviderId(providerId))
+  );
+  return !provider.only
+    .map(providerId => normalizeInferenceProviderId(providerId))
+    .some(providerId => !ignored.has(providerId) && openRouterProviders.has(providerId));
+}
+
 export async function shouldRouteToVercel(
   requestedModel: string,
   request: GatewayRequest,
@@ -87,9 +114,25 @@ export async function shouldRouteToVercel(
     : routingConfig.vercelPaid;
 
   const passedRandomization = passesVercelRoutingPercentage(randomSeed, routingPercentage);
+  let providerConfig: Promise<OpenRouterProviderConfig | undefined> | undefined;
+  const resolveProviderConfig = () => (providerConfig ??= getRoutingProviderConfig());
 
   if (!passedRandomization) {
-    return false;
+    if (routingPercentage <= 0) {
+      return false;
+    }
+    const openRouterModels = await getOpenRouterModelsMetadataFromDatabase();
+    if (
+      !excludesAllOpenRouterEndpoints(
+        openRouterModels[requestedModel],
+        await resolveProviderConfig()
+      )
+    ) {
+      return false;
+    }
+    console.debug(
+      '[shouldRouteToVercel] provider preferences exclude every OpenRouter endpoint, trying Vercel'
+    );
   }
 
   const vercelModels = await getVercelModelsFromDatabase();
@@ -99,7 +142,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const provider = await getRoutingProviderConfig();
+  const provider = await resolveProviderConfig();
   if (provider && (provider.only || provider.ignore?.length)) {
     const { only, ignore } = provider;
     const vercelInferenceProviders =

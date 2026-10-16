@@ -743,6 +743,9 @@ export async function handleLlmProxyRequest(
     // instead of silently serving the request through another billing path.
     return chatGptReconnectResponse(providerResult.message);
   }
+  if (providerResult.kind === 'custom-llm-temporarily-unavailable') {
+    return temporarilyUnavailableResponse();
+  }
   const effectiveProviderContext = providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {

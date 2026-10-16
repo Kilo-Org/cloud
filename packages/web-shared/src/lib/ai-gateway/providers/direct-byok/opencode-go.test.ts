@@ -189,6 +189,46 @@ describe('OpenCode Go session headers', () => {
     expect(request.body).not.toHaveProperty('reasoning_effort');
   });
 
+  test('keeps Kimi K3 thinking on when a Messages request disables it', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: { model: 'kimi-k3', messages: [], max_tokens: 100, thinking: { type: 'disabled' } },
+    };
+
+    openCodeGo.transformRequest(createContext({ model: 'opencode-go/kimi-k3', request }));
+
+    expect(request.body).not.toHaveProperty('thinking');
+  });
+
+  test('keeps the requested Kimi K3 thinking configuration when enabled', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'kimi-k3',
+        messages: [],
+        max_tokens: 100,
+        thinking: { type: 'adaptive', display: 'summarized' },
+        output_config: { effort: 'max' },
+      },
+    };
+
+    openCodeGo.transformRequest(createContext({ model: 'opencode-go/kimi-k3', request }));
+
+    expect(request.body.thinking).toEqual({ type: 'adaptive', display: 'summarized' });
+    expect(request.body.output_config).toEqual({ effort: 'max' });
+  });
+
+  test('keeps disabled thinking for other Messages models', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: { model: 'minimax-m3', messages: [], max_tokens: 100, thinking: { type: 'disabled' } },
+    };
+
+    openCodeGo.transformRequest(createContext({ model: 'opencode-go/minimax-m3', request }));
+
+    expect(request.body.thinking).toEqual({ type: 'disabled' });
+  });
+
   test('keeps the header stable when the model, API key, or request body changes', () => {
     const first = createContext();
     const next = createContext({
@@ -219,12 +259,26 @@ describe('OpenCode Go session headers', () => {
 });
 
 describe('getAiSdkProvider', () => {
-  test.each(['opencode-go/minimax-m3', 'opencode-go/qwen3.7-plus'])(
+  test.each(['opencode-go/minimax-m3', 'opencode-go/qwen3.7-plus', 'opencode-go/kimi-k3'])(
     'uses the Anthropic Messages API for OpenCode Go model %s',
     model => {
       expect(getAiSdkProvider(model, 'opencode-go')).toBe('anthropic');
     }
   );
+
+  test.each(['opencode-go/kimi-k2.6', 'opencode-go/kimi-k2.7-code', 'opencode-go/kimi-k3-fast'])(
+    'uses Chat Completions for OpenCode Go model %s without Messages API support',
+    model => {
+      expect(getAiSdkProvider(model, 'opencode-go')).toBeUndefined();
+    }
+  );
+
+  test.each([
+    ['moonshotai/kimi-k3', null],
+    ['martian/moonshotai/kimi-k3', 'martian'],
+  ] as const)('uses Chat Completions for Kimi K3 outside OpenCode Go: %s', (model, provider) => {
+    expect(getAiSdkProvider(model, provider)).toBeUndefined();
+  });
 
   test('uses Chat Completions for MiniMax models from other direct providers', () => {
     expect(getAiSdkProvider('minimax/minimax-m2.5', 'chutes-byok')).toBeUndefined();

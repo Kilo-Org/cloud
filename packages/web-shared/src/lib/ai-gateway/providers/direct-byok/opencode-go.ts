@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { isKimiK3Model } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
 import {
   removeChatCompletionsMessageNames,
   replaceReasoningObjectWithReasoningEffort,
@@ -22,6 +23,11 @@ export default {
     );
     if (context.request.kind === 'messages') {
       context.extraHeaders['x-api-key'] = context.provider.apiKey;
+      if (isKimiK3Model(context.model) && context.request.body.thinking?.type === 'disabled') {
+        // Kimi K3 always thinks (https://huggingface.co/moonshotai/Kimi-K3#6-model-usage), but
+        // Kilo CLI sends disabled thinking when no reasoning variant is selected.
+        delete context.request.body.thinking;
+      }
     }
     replaceReasoningObjectWithReasoningEffort(context.request);
     if (context.request.kind === 'chat_completions') {

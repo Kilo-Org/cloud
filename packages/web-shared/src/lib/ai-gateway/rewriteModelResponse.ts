@@ -1,6 +1,17 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
 import { isKiloExclusiveFreeModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import {
+  getCustomPricing,
+  type CustomPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { calculateCustomPricingCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import {
+  chatCompletionsUsageTokenCounts,
+  messagesUsageTokenCounts,
+  responsesUsageTokenCounts,
+  type UsageTokenCounts,
+} from '@kilocode/web-shared/lib/ai-gateway/usage-token-counts';
 import { detectToolCallArgumentErrors } from '@kilocode/web-shared/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -56,9 +67,15 @@ export type LogUnrewrittenResponseParams = {
   logging: RequestLoggingParams;
 };
 
+/** How the upstream `usage.cost` is rewritten before it reaches the client. */
+export type UsageCostRewrite =
+  | { type: 'upstream' }
+  | { type: 'remove' }
+  | { type: 'custom'; modelId: string; customPricing: CustomPricing };
+
 export type RewriteResponseParams = {
   response: Response;
-  removeCost: boolean;
+  usageCost: UsageCostRewrite;
   capture: RequestLogCapture | null;
   vercelRequestId: string | null;
   reasoningEffort: string | null;
@@ -75,6 +92,7 @@ export type RewriteModelResponseParams = {
   kind: GatewayRequest['kind'];
   logging: RequestLoggingParams;
   responseTransforms: ProviderResponseTransforms | null;
+  userByok: boolean;
 };
 
 type CapturedResponseBody =
@@ -423,12 +441,47 @@ async function rewriteSseStream(
   }
 }
 
-function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
-  if (removeCost) {
-    delete usage.cost;
-    delete usage.cost_details;
-    delete usage.is_byok;
+type UpstreamUsageCost = {
+  cost?: number;
+  cost_details?: { upstream_inference_cost: number };
+  is_byok?: boolean | null;
+};
+
+/** Mirrors `computeOpenRouterCostFields`, whose microdollar cost billing compares against zero. */
+function upstreamReportsCost(usage: UpstreamUsageCost): boolean {
+  const upstreamCost = usage.is_byok ? usage.cost_details?.upstream_inference_cost : usage.cost;
+  return toMicrodollars(upstreamCost ?? 0) > 0;
+}
+
+function rewriteUsageCost(
+  usage: UpstreamUsageCost,
+  usageCost: UsageCostRewrite,
+  tokenCounts: UsageTokenCounts
+) {
+  if (usageCost.type === 'upstream') return;
+  if (
+    usageCost.type === 'custom' &&
+    usageCost.customPricing.fallbackOnly &&
+    upstreamReportsCost(usage)
+  ) {
+    return;
   }
+  delete usage.cost;
+  delete usage.cost_details;
+  delete usage.is_byok;
+  if (usageCost.type === 'custom') {
+    usage.cost =
+      calculateCustomPricingCost_mUsd(usageCost.modelId, usageCost.customPricing, tokenCounts) /
+      1_000_000;
+  }
+}
+
+function rewriteUsage(
+  usage: UpstreamUsageCost & { prompt_tokens_details?: { cached_tokens?: number } },
+  usageCost: UsageCostRewrite,
+  tokenCounts: UsageTokenCounts
+) {
+  rewriteUsageCost(usage, usageCost, tokenCounts);
   if (usage.prompt_tokens_details) {
     if (usage.prompt_tokens_details.cached_tokens === undefined) {
       usage.prompt_tokens_details.cached_tokens = 0; // OpenCode crashes if this is absent
@@ -438,7 +491,7 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
 
 export async function rewriteModelResponse_ChatCompletions({
   response,
-  removeCost,
+  usageCost,
   capture,
   reasoningEffort,
   vercelRequestId,
@@ -475,7 +528,7 @@ export async function rewriteModelResponse_ChatCompletions({
     }
     const usage = json.usage as OpenRouterUsage;
     if (usage) {
-      rewriteUsage(usage, removeCost);
+      rewriteUsage(usage, usageCost, chatCompletionsUsageTokenCounts(usage));
     }
     for (const choice of json.choices ?? []) {
       // Some APIs set null here, which @openrouter/ai-sdk-provider rejects in non-streaming responses
@@ -551,7 +604,7 @@ export async function rewriteModelResponse_ChatCompletions({
           }
 
           if (json.usage) {
-            rewriteUsage(json.usage, removeCost);
+            rewriteUsage(json.usage, usageCost, chatCompletionsUsageTokenCounts(json.usage));
           }
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
@@ -608,11 +661,7 @@ export async function rewriteModelResponse_ChatCompletions({
   });
 }
 
-type MessagesApiUsage = Anthropic.Messages.Usage & {
-  cost?: number;
-  is_byok?: boolean | null;
-  cost_details?: { upstream_inference_cost: number };
-};
+type MessagesApiUsage = Anthropic.Messages.Usage & UpstreamUsageCost;
 
 type MessagesApiMessageStart = {
   type: 'message_start';
@@ -630,17 +679,22 @@ type MessagesApiError = {
   error: unknown;
 };
 
-function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
-  if (removeCost) {
-    delete usage.cost;
-    delete usage.cost_details;
-    delete usage.is_byok;
-  }
+/**
+ * Billing uses the final message_delta usage; the start event only has partial counts,
+ * so it must not report a custom-priced cost.
+ */
+function messageStartUsageCost(usageCost: UsageCostRewrite): UsageCostRewrite {
+  if (usageCost.type !== 'custom') return usageCost;
+  return usageCost.customPricing.fallbackOnly ? { type: 'upstream' } : { type: 'remove' };
+}
+
+function rewriteMessagesUsage(usage: MessagesApiUsage, usageCost: UsageCostRewrite) {
+  rewriteUsageCost(usage, usageCost, messagesUsageTokenCounts(usage));
 }
 
 export async function rewriteModelResponse_Messages({
   response,
-  removeCost,
+  usageCost,
   capture,
   reasoningEffort,
   vercelRequestId,
@@ -675,7 +729,7 @@ export async function rewriteModelResponse_Messages({
       });
     }
     if (json.usage) {
-      rewriteMessagesUsage(json.usage, removeCost);
+      rewriteMessagesUsage(json.usage, usageCost);
     }
     return NextResponse.json(json, {
       status: response.status,
@@ -729,14 +783,14 @@ export async function rewriteModelResponse_Messages({
               });
             }
             if (e.message.usage) {
-              rewriteMessagesUsage(e.message.usage, removeCost);
+              rewriteMessagesUsage(e.message.usage, messageStartUsageCost(usageCost));
             }
           }
 
           if (json.type === 'message_delta') {
             const e = json as MessagesApiMessageDelta;
             if (e.usage) {
-              rewriteMessagesUsage(e.usage, removeCost);
+              rewriteMessagesUsage(e.usage, usageCost);
             }
           }
 
@@ -796,15 +850,17 @@ export async function rewriteModelResponse_Messages({
   });
 }
 
+type ResponsesApiUsage = OpenAI.Responses.ResponseUsage & UpstreamUsageCost;
+
 type ResponsesApiEvent = {
   type: string;
   sequence_number?: number;
-  response?: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
+  response?: OpenAI.Responses.Response & { usage?: ResponsesApiUsage | null };
 };
 
 export async function rewriteModelResponse_Responses({
   response,
-  removeCost,
+  usageCost,
   capture,
   reasoningEffort,
   vercelRequestId,
@@ -825,10 +881,10 @@ export async function rewriteModelResponse_Responses({
     }
     capture?.setBody(textResult.text);
     const { text } = textResult;
-    let json: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
+    let json: OpenAI.Responses.Response & { usage?: ResponsesApiUsage | null };
     try {
       json = JSON.parse(text) as OpenAI.Responses.Response & {
-        usage?: OpenRouterUsage | null;
+        usage?: ResponsesApiUsage | null;
       };
     } catch {
       // Upstream returned invalid/empty JSON body — pass through as-is
@@ -839,7 +895,7 @@ export async function rewriteModelResponse_Responses({
       });
     }
     if (json.usage) {
-      rewriteUsage(json.usage, removeCost);
+      rewriteUsage(json.usage, usageCost, responsesUsageTokenCounts(json.usage));
     }
     return NextResponse.json(json, {
       status: response.status,
@@ -891,7 +947,11 @@ export async function rewriteModelResponse_Responses({
               });
             }
             if (json.response.usage) {
-              rewriteUsage(json.response.usage, removeCost);
+              rewriteUsage(
+                json.response.usage,
+                usageCost,
+                responsesUsageTokenCounts(json.response.usage)
+              );
             }
           }
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
@@ -955,6 +1015,33 @@ export async function rewriteModelResponse_Responses({
   });
 }
 
+/**
+ * Clients should see the cost Kilo bills, which `processTokenData` derives from the
+ * requested model: custom pricing replaces the upstream cost (fallback-only pricing only
+ * when the upstream reports none), and BYOK requests are not billed.
+ */
+function getUsageCostRewrite(
+  model: string,
+  providerId: ProviderId,
+  userByok: boolean
+): UsageCostRewrite {
+  const customPricing = getCustomPricing(model);
+  if (customPricing?.fallbackOnly) {
+    // Vercel reports its cost in provider_metadata or the generation lookup rather than
+    // in `usage`, so the response alone cannot tell whether the fallback applies.
+    return userByok || providerId === 'vercel'
+      ? { type: 'upstream' }
+      : { type: 'custom', modelId: model, customPricing };
+  }
+  if (customPricing !== undefined) {
+    return userByok ? { type: 'remove' } : { type: 'custom', modelId: model, customPricing };
+  }
+  if ((providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model)) {
+    return { type: 'remove' };
+  }
+  return { type: 'upstream' };
+}
+
 export async function rewriteModelResponse({
   response,
   model,
@@ -962,13 +1049,10 @@ export async function rewriteModelResponse({
   kind,
   logging,
   responseTransforms,
+  userByok,
 }: RewriteModelResponseParams): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
-  const customPricing = getCustomPricing(model);
-  const requiresCostRemoval =
-    (providerId === 'openrouter' || providerId === 'vercel') &&
-    (isKiloExclusiveFreeModel(model) ||
-      (customPricing !== undefined && !customPricing.fallbackOnly));
+  const usageCost = getUsageCostRewrite(model, providerId, userByok);
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;
@@ -976,7 +1060,7 @@ export async function rewriteModelResponse({
   if (kind === 'chat_completions') {
     return rewriteModelResponse_ChatCompletions({
       response,
-      removeCost: requiresCostRemoval,
+      usageCost,
       capture,
       reasoningEffort,
       vercelRequestId,
@@ -986,7 +1070,7 @@ export async function rewriteModelResponse({
   if (kind === 'responses') {
     return rewriteModelResponse_Responses({
       response,
-      removeCost: requiresCostRemoval,
+      usageCost,
       capture,
       reasoningEffort,
       vercelRequestId,
@@ -995,7 +1079,7 @@ export async function rewriteModelResponse({
   if (kind === 'messages') {
     return rewriteModelResponse_Messages({
       response,
-      removeCost: requiresCostRemoval,
+      usageCost,
       capture,
       reasoningEffort,
       vercelRequestId,

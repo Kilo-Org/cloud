@@ -21,6 +21,7 @@ import {
   extractVercelUpstreamId,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
+import { responsesUsageTokenCounts } from '@kilocode/web-shared/lib/ai-gateway/usage-token-counts';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
@@ -52,11 +53,8 @@ export function processResponsesApiUsage(
   providerMetadata: VercelProviderMetaData | null | undefined,
   coreProps: NotYetCostedUsageStats
 ): JustTheCostsUsageStats {
-  // OpenAI-style input_tokens already includes cached and cache-write tokens.
-  const inputTokens = usage?.input_tokens ?? 0;
-  const outputTokens = usage?.output_tokens ?? 0;
-  const cacheHitTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
-  const cacheWriteTokens = usage?.input_tokens_details?.cache_write_tokens ?? 0;
+  const { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens } =
+    responsesUsageTokenCounts(usage);
 
   // OpenRouter path: cost fields are present directly in usage
   if (usage?.cost != null || usage?.is_byok != null) {

@@ -8,7 +8,9 @@ import {
 import {
   formatPricePerToken,
   getCustomPricing,
+  type CustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import type { UsageTokenCounts } from '@kilocode/web-shared/lib/ai-gateway/usage-token-counts';
 
 function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricing) {
   return {
@@ -58,7 +60,14 @@ export function calculateCustomCost_mUsd(
 ): number | undefined {
   const customPricing = getCustomPricing(modelId);
   if (!customPricing || (customPricing.fallbackOnly && usage.cost_mUsd > 0)) return undefined;
+  return calculateCustomPricingCost_mUsd(modelId, customPricing, usage);
+}
 
+export function calculateCustomPricingCost_mUsd(
+  modelId: string,
+  customPricing: CustomPricing,
+  usage: UsageTokenCounts
+): number {
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
   if (uncachedInputTokens < 0) {
     captureMessage('SUSPICIOUS: negative uncached input tokens for custom pricing', {

@@ -95,6 +95,7 @@ import {
   type KiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { chatCompletionsUsageTokenCounts } from '@kilocode/web-shared/lib/ai-gateway/usage-token-counts';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
@@ -1083,13 +1084,7 @@ export function processOpenRouterUsage(
   );
 
   return {
-    inputTokens: usage?.prompt_tokens ?? 0,
-    cacheHitTokens: usage?.prompt_tokens_details?.cached_tokens ?? 0,
-    cacheWriteTokens:
-      usage?.prompt_tokens_details?.cache_write_tokens ??
-      usage?.prompt_tokens_details?.cache_creation_input_tokens ??
-      0,
-    outputTokens: usage?.completion_tokens ?? 0,
+    ...chatCompletionsUsageTokenCounts(usage),
     cost_mUsd,
     is_byok: is_byok ?? extractVercelIsByok(vercelProviderMetadata?.gateway),
   };

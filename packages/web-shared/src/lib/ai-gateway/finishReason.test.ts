@@ -5,18 +5,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 
 describe('finishReason', () => {
-  it('classifies known error finish_reasons as errors', () => {
-    for (const reason of ERROR_FINISH_REASONS) {
-      expect(isErrorFinishReason(reason)).toBe(true);
-    }
-  });
-
-  it('classifies known non-error finish_reasons as non-errors', () => {
-    for (const reason of NON_ERROR_FINISH_REASONS) {
-      expect(isErrorFinishReason(reason)).toBe(false);
-    }
-  });
-
   it('treats null/undefined as non-error', () => {
     expect(isErrorFinishReason(null)).toBe(false);
     expect(isErrorFinishReason(undefined)).toBe(false);

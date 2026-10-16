@@ -16,7 +16,7 @@ import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   convertFromKiloExclusiveModel,
-  getInferenceProvider,
+  getInferenceProviders,
   type KiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
@@ -191,11 +191,10 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     catalogModels.map(async (model: OpenRouterModel) => {
       const preferredIndex = preferredModels.indexOf(model.id);
       const exclusive = exclusiveById.get(model.id);
-      const exclusiveProvider = exclusive && getInferenceProvider(exclusive);
-      const providerIds = exclusiveProvider
-        ? [exclusiveProvider.slug]
-        : exclusive && exclusive.inference_provider_restriction.length > 0
-          ? exclusive.inference_provider_restriction
+      const exclusiveProviders = exclusive ? getInferenceProviders(exclusive) : [];
+      const providerIds =
+        exclusiveProviders.length > 0
+          ? exclusiveProviders.map(({ slug }) => slug)
           : (indexedProviders.get(providerLookupId(model)) ?? []);
       const inferenceProviderIds = [
         ...new Set([...providerIds].map(id => normalizeInferenceProviderId(id))),

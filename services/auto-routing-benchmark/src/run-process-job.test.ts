@@ -13,6 +13,7 @@ vi.mock('./scheduler', async importOriginal => {
   return {
     ...actual,
     beginPaidCase: vi.fn(),
+    hasPaidCase: vi.fn(),
     claimScheduledChunks: vi.fn(),
     clearUnbilledCase: vi.fn(),
     cooldownProviders: vi.fn(),
@@ -111,12 +112,13 @@ import {
   upsertCaseResult,
 } from './db';
 import { getBenchmarkConfig } from './config';
-import { processJob } from './run';
+import { processJob, acceptContainerCaseResult } from './run';
 import { createDeciderJudge } from './decider-judge';
 import { createSystemOneClient } from './openrouter';
 import type { DeciderJudge } from './grading';
 import {
   beginPaidCase,
+  hasPaidCase,
   claimScheduledChunks,
   clearUnbilledCase,
   cooldownProviders,
@@ -165,6 +167,7 @@ const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
   KILO_CLI_API_URL: 'http://host.docker.internal:3000',
   KILO_WEB_API_BASE_URL: 'http://host.docker.internal:3000',
+  BENCH_RESULT_URL: 'https://bench.test/container/case-result',
   BENCH_DB: { prepare: schedulerPrepare } as unknown as D1Database,
   BENCH_QUEUE: { send: queueSend, sendBatch: queueSendBatch },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
@@ -260,6 +263,7 @@ beforeEach(() => {
   queueSend.mockResolvedValue(undefined);
   vi.mocked(startChunk).mockResolvedValue(true);
   vi.mocked(beginPaidCase).mockResolvedValue(true);
+  vi.mocked(hasPaidCase).mockResolvedValue(true);
   vi.mocked(claimScheduledChunks).mockResolvedValue([]);
   vi.mocked(recoverChunks).mockResolvedValue([]);
   vi.mocked(hasUnsettledChunks).mockResolvedValue(false);
@@ -353,15 +357,29 @@ describe('processJob — scheduler-owned execution', () => {
         orgId: 'benchmark-org',
       })
     );
-    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(env, {
-      instanceName: 'benchmark-slot:7',
-      model,
-      variant: 'low',
-      benchCase,
-      kiloToken: 'kilo-user-token',
-      kiloApiUrl: env.KILO_CLI_API_URL,
-      orgId: 'benchmark-org',
-    });
+    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        instanceName: 'benchmark-slot:7',
+        model,
+        variant: 'low',
+        benchCase,
+        kiloToken: 'kilo-user-token',
+        kiloApiUrl: env.KILO_CLI_API_URL,
+        orgId: 'benchmark-org',
+        resultCallback: {
+          url: env.BENCH_RESULT_URL,
+          execution: {
+            runId,
+            model,
+            variant: 'low',
+            rep: 2,
+            caseId: benchCase.id,
+            token: 'token-1',
+          },
+        },
+      })
+    );
     expect(beginPaidCase).toHaveBeenCalledWith(env.BENCH_DB, {
       runId,
       model,
@@ -676,6 +694,57 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     });
     expect(deferChunk).not.toHaveBeenCalled();
     expect(finishChunk).not.toHaveBeenCalled();
+  });
+
+  it('quarantines a lost paid connection without killing the lane', async () => {
+    vi.mocked(runDeciderCaseViaCli).mockRejectedValue(
+      new Error('container /run failed: HTTP 500 container just exited')
+    );
+    await processJob(env, deciderMessage());
+
+    // The container may still deliver the output, so the chunk keeps its lease
+    // and the lane stays alive for lease recovery to re-dispatch.
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(clearUnbilledCase).not.toHaveBeenCalled();
+  });
+
+  it('records a container-posted outcome as pending output or a released ledger row', async () => {
+    const execution = {
+      runId,
+      model,
+      variant: '',
+      rep: 0,
+      caseId: benchCase.id,
+      token: 'token-1',
+    };
+    const response = {
+      exitCode: 0,
+      durationMs: 12,
+      stdoutLines: ['{"type":"text","part":{"text":"42","time":{"end":1}}}'],
+      stderrTail: '',
+    };
+
+    await expect(
+      acceptContainerCaseResult(env, { execution, outcome: { kind: 'completed', response } })
+    ).resolves.toBe(true);
+    expect(savePendingDeciderOutput).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      { run_id: runId, model, variant: '', rep: 0, case_id: benchCase.id },
+      { result: expect.objectContaining({ text: '42', exitCode: 0 }), retried: false }
+    );
+
+    await expect(
+      acceptContainerCaseResult(env, { execution, outcome: { kind: 'not_started' } })
+    ).resolves.toBe(true);
+    expect(clearUnbilledCase).toHaveBeenCalledWith(env.BENCH_DB, execution);
+
+    vi.mocked(hasPaidCase).mockResolvedValue(false);
+    await expect(
+      acceptContainerCaseResult(env, { execution, outcome: { kind: 'not_started' } })
+    ).resolves.toBe(false);
+    expect(clearUnbilledCase).toHaveBeenCalledTimes(1);
   });
 
   it('persists raw failed output and CLI diagnostics before saving its grade', async () => {

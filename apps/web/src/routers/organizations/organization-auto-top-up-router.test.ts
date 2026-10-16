@@ -489,5 +489,24 @@ describe('organization auto-top-up router', () => {
       });
       await expect(promise).rejects.toThrow(/amountCents/i);
     });
+
+    it('keeps the saved amount and threshold in the new setup checkout', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_change',
+        amount_cents: 100000,
+        threshold_cents: 50000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await caller.organizations.autoTopUp.changePaymentMethod({ organizationId: testOrg.id });
+
+      const [params] = jest.mocked(client.checkout.sessions.create).mock.calls.at(-1) as [
+        Stripe.Checkout.SessionCreateParams,
+      ];
+      expect(params.payment_intent_data?.metadata).toEqual(
+        expect.objectContaining({ amountCents: '100000', thresholdCents: '50000' })
+      );
+    });
   });
 });

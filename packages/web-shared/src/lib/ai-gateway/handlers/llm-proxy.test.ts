@@ -2390,23 +2390,20 @@ describe('custom routers and signed auto decisions', () => {
     it.each([
       ['an organization router without an organization context', 'kilo-auto/custom/org/team'],
       ['a missing router', 'kilo-auto/custom/missing'],
-    ] satisfies Array<[string, string]>)(
-      'answers router_not_found for %s',
-      async (_name, model) => {
-        if (model.endsWith('missing')) mockedFindCustomRouter.mockResolvedValue(null);
+    ])('answers router_not_found for %s', async (_name, model) => {
+      if (model.endsWith('missing')) mockedFindCustomRouter.mockResolvedValue(null);
 
-        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)));
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(model)));
 
-        expect(response.status).toBe(404);
-        expect(await response.json()).toEqual({
-          error: { code: 'router_not_found', message: 'Custom router not found' },
-          error_type: 'custom_router',
-          message: 'Custom router not found',
-        });
-        expect(mockedFetchCustomRouterDecision).not.toHaveBeenCalled();
-        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-      }
-    );
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({
+        error: { code: 'router_not_found', message: 'Custom router not found' },
+        error_type: 'custom_router',
+        message: 'Custom router not found',
+      });
+      expect(mockedFetchCustomRouterDecision).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
 
     it('fails with a retryable error instead of serving an out-of-pool model when the worker is unreachable', async () => {
       mockedFetchCustomRouterDecision.mockResolvedValue({ kind: 'unavailable' });

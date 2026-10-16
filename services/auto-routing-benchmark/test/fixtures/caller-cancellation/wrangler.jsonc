@@ -1,0 +1,6 @@
+{
+  "name": "caller-cancellation-fixture",
+  "main": "worker.ts",
+  "durable_objects": { "bindings": [{ "name": "RELAY", "class_name": "Relay" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Relay"] }],
+}

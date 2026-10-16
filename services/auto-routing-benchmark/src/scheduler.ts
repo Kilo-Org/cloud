@@ -578,6 +578,12 @@ function batches<T>(items: readonly T[], size: number): T[][] {
   return out;
 }
 
+/**
+ * Starts a queued claim, or resumes the executing claim this token still owns when its
+ * delivery is redelivered after the previous invocation was canceled. Resuming keeps
+ * the running lease; the paid-execution ledger, not this transition, keeps a resumed
+ * delivery from repeating inference.
+ */
 export async function startChunk(
   db: D1Database,
   id: string,
@@ -586,8 +592,9 @@ export async function startChunk(
 ): Promise<boolean> {
   const result = await db
     .prepare(`
-    UPDATE scheduler_chunks SET status = 'active', lease_until = ?
-    WHERE id = ? AND token = ? AND status = 'queued' AND lease_until > ?
+    UPDATE scheduler_chunks SET status = 'active',
+      lease_until = CASE status WHEN 'queued' THEN ? ELSE lease_until END
+    WHERE id = ? AND token = ? AND status IN ('queued', 'active') AND lease_until > ?
       AND EXISTS (SELECT 1 FROM benchmark_runs WHERE id = scheduler_chunks.run_id AND status = 'running')
   `)
     .bind(now + SCHEDULER_ACTIVE_LEASE_MS, id, token, now)
@@ -751,8 +758,8 @@ export async function beginPaidCase(
 ): Promise<boolean> {
   const result = await db
     .prepare(`
-    INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token)
-    SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (
+    INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token, started_at)
+    SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (
       SELECT 1 FROM scheduler_chunks WHERE run_id = ? AND model = ? AND variant = ? AND rep = ?
         AND token = ? AND status = 'active' AND lease_until > ?
         AND EXISTS (SELECT 1 FROM json_each(case_ids) WHERE value = ?)
@@ -766,6 +773,7 @@ export async function beginPaidCase(
       key.rep,
       key.caseId,
       key.token,
+      now,
       key.runId,
       key.model,
       key.variant,
@@ -785,6 +793,32 @@ export async function hasPaidCase(db: D1Database, key: PaidExecutionKey): Promis
     .bind(key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
     .first();
   return row !== null;
+}
+
+/** When the ledgered paid call for this case started, whichever claim token opened it. */
+export async function getPaidCaseStartedAt(
+  db: D1Database,
+  key: Omit<PaidExecutionKey, 'token'>
+): Promise<number | null> {
+  const row = await db
+    .prepare(`SELECT started_at FROM scheduler_executions
+    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?`)
+    .bind(key.runId, key.model, key.variant, key.rep, key.caseId)
+    .first<{ started_at: number }>();
+  return row?.started_at ?? null;
+}
+
+/** Moves a ledgered case's start to a further paid call its own token makes. */
+export async function restartPaidCase(
+  db: D1Database,
+  key: PaidExecutionKey,
+  now: number
+): Promise<void> {
+  await db
+    .prepare(`UPDATE scheduler_executions SET started_at = ?
+    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)
+    .bind(now, key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
+    .run();
 }
 
 export function schedulerBackoffSeconds(attempts: number): number {

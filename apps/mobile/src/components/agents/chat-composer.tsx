@@ -35,8 +35,13 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useKeyboardState } from 'react-native-keyboard-controller';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useKeyboardState, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -135,6 +140,8 @@ const DISMISS_KEYBOARD_ACTIVE_OFFSET_Y = 24;
 const DISMISS_KEYBOARD_FAIL_OFFSET_X = 16;
 /** Hide the remaining-characters counter until the draft nears the limit. */
 const COMPOSER_COUNTER_VISIBLE_REMAINING = 1000;
+/** A shown toolbar row is never clamped; any real row is far below this. */
+const TOOLBAR_ROW_UNCLAMPED_HEIGHT = 10_000;
 
 type AndroidDismissKeyboardGesture = {
   identifier: string;
@@ -796,6 +803,26 @@ export function ChatComposer({
   // the message field (video V1 ~4.5s and ~19s).
   const showToolbarRow = control.showToolbar || keyboardVisible;
 
+  // Once the chip is hidden, its row gives its height back in the same frames
+  // as the keyboard. `keyboardVisible` reaches false only after the keyboard
+  // has landed, so unmounting the row on that flag alone shifted the
+  // transcript a second time, after the keyboard had finished moving. The
+  // worklet reads only shared values and always writes `maxHeight`: Reanimated
+  // keeps a style key a worklet stops returning, so a conditional key would
+  // leave the row stuck at its collapsed height.
+  const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
+  const toolbarRowHeight = useSharedValue(0);
+  const toolbarRowCollapsing = useSharedValue(false);
+  useEffect(() => {
+    toolbarRowCollapsing.value = !control.showToolbar;
+  }, [control.showToolbar, toolbarRowCollapsing]);
+  const toolbarRowStyle = useAnimatedStyle(() => ({
+    maxHeight: toolbarRowCollapsing.value
+      ? toolbarRowHeight.value * keyboardProgress.value
+      : TOOLBAR_ROW_UNCLAMPED_HEIGHT,
+    overflow: 'hidden',
+  }));
+
   const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
       await upload.addCandidates([file]);
@@ -1336,35 +1363,44 @@ export function ChatComposer({
 
         {!suggestionRow && showToolbarRow ? (
           <Animated.View
-            // The row is never animated out. An exit animation leaves its
-            // snapshot painted while the input row has already moved up into
-            // that space, so the collapsing model chip drew over the message
-            // field (video V1 ~4.5s and ~19s). The chip and the field stay in
-            // separate rows, and when the row does go there is nothing left to
-            // paint through the input.
-            entering={
-              control.showToolbar
-                ? selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))
-                : undefined
-            }
-            pointerEvents={control.showToolbar ? 'auto' : 'none'}
-            accessibilityElementsHidden={!control.showToolbar}
-            importantForAccessibility={control.showToolbar ? 'auto' : 'no-hide-descendants'}
-            className={control.showToolbar ? undefined : 'opacity-0'}
+            style={toolbarRowStyle}
+            onLayout={event => {
+              if (!toolbarRowCollapsing.value) {
+                toolbarRowHeight.value = event.nativeEvent.layout.height;
+              }
+            }}
           >
-            <ChatToolbar
-              modeControl={modeControl}
-              model={model}
-              variant={variant}
-              modelOptions={modelOptions}
-              onModelSelect={onModelSelect}
-              disabled={control.toolbarDisabled}
-              onPaste={attachmentsEnabled ? pasteClipboard : undefined}
-              pasteDisabled={!control.inputEditable}
-              modelLocked={modelLocked}
-              modelLockLabel={modelLockLabel}
-              className={toolbarClassName}
-            />
+            <Animated.View
+              // The row is never animated out. An exit animation leaves its
+              // snapshot painted while the input row has already moved up into
+              // that space, so the collapsing model chip drew over the message
+              // field (video V1 ~4.5s and ~19s). The chip and the field stay in
+              // separate rows, and when the row does go there is nothing left to
+              // paint through the input.
+              entering={
+                control.showToolbar
+                  ? selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))
+                  : undefined
+              }
+              pointerEvents={control.showToolbar ? 'auto' : 'none'}
+              accessibilityElementsHidden={!control.showToolbar}
+              importantForAccessibility={control.showToolbar ? 'auto' : 'no-hide-descendants'}
+              className={control.showToolbar ? undefined : 'opacity-0'}
+            >
+              <ChatToolbar
+                modeControl={modeControl}
+                model={model}
+                variant={variant}
+                modelOptions={modelOptions}
+                onModelSelect={onModelSelect}
+                disabled={control.toolbarDisabled}
+                onPaste={attachmentsEnabled ? pasteClipboard : undefined}
+                pasteDisabled={!control.inputEditable}
+                modelLocked={modelLocked}
+                modelLockLabel={modelLockLabel}
+                className={toolbarClassName}
+              />
+            </Animated.View>
           </Animated.View>
         ) : null}
 

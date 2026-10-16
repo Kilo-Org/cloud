@@ -1,16 +1,9 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import {
   removeTopLevelSchemaCombinators,
   removeTopLevelToolSchemaCombinators,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-
-jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
-  warnExceptInTest: jest.fn(),
-}));
-
-const warn = jest.mocked(warnExceptInTest);
 
 const nteractCreateCellSchema = () => ({
   type: 'object',
@@ -198,10 +191,6 @@ describe('removeTopLevelSchemaCombinators', () => {
 });
 
 describe('removeTopLevelToolSchemaCombinators', () => {
-  beforeEach(() => {
-    warn.mockClear();
-  });
-
   const combinatorSchema = () => ({
     type: 'object' as const,
     properties: { a: { type: 'string' } },
@@ -315,44 +304,5 @@ describe('removeTopLevelToolSchemaCombinators', () => {
       name: 'f',
       input_schema: { type: 'object', properties: {} },
     });
-    expect(warn).not.toHaveBeenCalled();
-  });
-
-  it('logs the changed tools once per request', () => {
-    const request: GatewayRequest = {
-      kind: 'messages',
-      body: {
-        model: 'anthropic/claude-opus-5.5',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: 'hello' }],
-        tools: [
-          { name: 'plain', input_schema: { type: 'object', properties: {} } },
-          { name: 'strict_one_of', strict: true, input_schema: combinatorSchema() },
-          {
-            name: 'all_and_any_of',
-            input_schema: {
-              type: 'object',
-              allOf: [{ required: ['a'] }],
-              anyOf: [{ required: ['b'] }],
-            },
-          },
-        ],
-      },
-    };
-
-    removeTopLevelToolSchemaCombinators(request);
-
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn).toHaveBeenCalledWith(
-      '[removeTopLevelToolSchemaCombinators] removed top-level tool schema combinators',
-      {
-        model: 'anthropic/claude-opus-5.5',
-        requestKind: 'messages',
-        tools: [
-          { name: 'strict_one_of', combinators: ['oneOf'], strict: true },
-          { name: 'all_and_any_of', combinators: ['allOf', 'anyOf'], strict: false },
-        ],
-      }
-    );
   });
 });

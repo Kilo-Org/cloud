@@ -1,4 +1,5 @@
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const COMBINATORS = [
   ['allOf', 'all of'],
@@ -147,7 +148,7 @@ export function removeTopLevelToolSchemaCombinators(request: GatewayRequest): vo
   }
 
   if (changedTools.length > 0) {
-    console.warn(
+    warnExceptInTest(
       '[removeTopLevelToolSchemaCombinators] removed top-level tool schema combinators',
       {
         model: request.body.model,

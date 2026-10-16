@@ -1,9 +1,16 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import {
   removeTopLevelSchemaCombinators,
   removeTopLevelToolSchemaCombinators,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  warnExceptInTest: jest.fn(),
+}));
+
+const warn = jest.mocked(warnExceptInTest);
 
 const nteractCreateCellSchema = () => ({
   type: 'object',
@@ -191,14 +198,8 @@ describe('removeTopLevelSchemaCombinators', () => {
 });
 
 describe('removeTopLevelToolSchemaCombinators', () => {
-  let warn: jest.SpiedFunction<typeof console.warn>;
-
   beforeEach(() => {
-    warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-  });
-
-  afterEach(() => {
-    warn.mockRestore();
+    warn.mockClear();
   });
 
   const combinatorSchema = () => ({

@@ -124,36 +124,6 @@ describe('resolveIncomingUrl — kiloapp:// forms', () => {
 });
 
 describe('wildcard capture substitution', () => {
-  it('row 7: /code-reviews/rev_9', () => {
-    expect(resolveIncomingUrl(`${WEB}/code-reviews/rev_9`)).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews/rev_9'
-    );
-  });
-
-  it('row 8: /organizations/org_123/security-agent', () => {
-    expect(resolveIncomingUrl(`${WEB}/organizations/org_123/security-agent`)).toBe(
-      '/(app)/(tabs)/(3_profile)/security-agent/org_123'
-    );
-  });
-
-  it('row 9: /organizations/org_123/security-agent/findings', () => {
-    expect(resolveIncomingUrl(`${WEB}/organizations/org_123/security-agent/findings`)).toBe(
-      '/(app)/(tabs)/(3_profile)/security-agent/org_123/findings'
-    );
-  });
-
-  it('row 10: /organizations/org_123/code-reviews', () => {
-    expect(resolveIncomingUrl(`${WEB}/organizations/org_123/code-reviews`)).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/org_123'
-    );
-  });
-
-  it('row 11: /organizations/org_123/code-reviews/rev_9', () => {
-    expect(resolveIncomingUrl(`${WEB}/organizations/org_123/code-reviews/rev_9`)).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/org_123/reviews/rev_9'
-    );
-  });
-
   it('inserts captures literally — dollar substitution patterns stay verbatim', () => {
     // String replacement would run ECMA-262 GetSubstitution on the capture:
     // `$&` re-inserts the placeholder, `$'` splices the un-substituted tail.

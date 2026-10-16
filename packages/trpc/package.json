@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "GOMEMLIMIT=2GiB tsgo -p tsconfig.json --checkers 1 && rollup -c rollup.config.mjs",
+    "build": "GOMEMLIMIT=${GOMEMLIMIT:-2GiB} tsgo -p tsconfig.json --checkers 1 && rollup -c rollup.config.mjs",
     "typecheck": "GOMEMLIMIT=2GiB tsgo --noEmit"
   },
   "exports": {

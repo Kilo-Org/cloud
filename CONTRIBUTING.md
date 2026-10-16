@@ -216,3 +216,5 @@ Please keep concurrent PRs focused and limited. As a rule, open no more than thr
 For issues, do not mass-create tickets through automation or agents. Search existing issues first, open issues only when you have enough context for someone to act, and prioritize the most important reports instead of filing every possible finding. Maintainers may close duplicate, low-signal, automated, or weakly reviewed issues without action.
 
 Repeated disregard of this contribution guide, or high-volume automated or agent-generated tracker spam across issues or PRs, may result in maintainers blocking the responsible account.
+
+<!-- ci-probe 1 -->

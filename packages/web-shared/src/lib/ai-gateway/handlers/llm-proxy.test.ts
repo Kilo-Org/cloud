@@ -1222,7 +1222,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     'google/gemma-4-26b-a4b-it:free',
     'google/gemma-4-31b-it:free',
     'thinkingmachines/inkling:free',
-  ])('rejects the unavailable or disabled model %s before upstream', async modelId => {
+  ])('rejects the unavailable model %s before upstream', async modelId => {
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');

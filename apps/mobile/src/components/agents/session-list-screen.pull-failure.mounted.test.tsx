@@ -341,6 +341,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   detachSync?.();
   detachSync = undefined;
   act(() => mountedRenderer?.unmount());
@@ -368,6 +369,9 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
       const result = await inFlight.promise;
       return result;
     };
+    // From the pull on, the pull's feedback timers run on the fake clock so the
+    // beat elapses without a real wait.
+    vi.useFakeTimers();
     act(() => {
       refreshControl().onRefresh();
     });
@@ -394,9 +398,7 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
       inFlight.reject(failure);
     });
     await act(async () => {
-      await new Promise(resolve => {
-        setTimeout(resolve, PULL_FEEDBACK_MIN_BEAT_MS + 250);
-      });
+      await vi.advanceTimersByTimeAsync(PULL_FEEDBACK_MIN_BEAT_MS + 250);
     });
 
     // The inline retryable failure with a working Retry action, next to the kept rows.
@@ -406,6 +408,7 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
     expect(retry?.props.onPress).toBeTypeOf('function');
     expect(nodes('RemoteSessionRow')).toHaveLength(1);
     expect(refreshControl().refreshing).toBe(false);
+    vi.useRealTimers();
   }
 
   it('keeps rows, shows Updating in flight, and the inline failure with Retry (socket up)', async () => {
@@ -460,13 +463,12 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
 
     onlineManager.setOnline(false);
     try {
+      vi.useFakeTimers();
       act(() => {
         refreshControl().onRefresh();
       });
       await act(async () => {
-        await new Promise(resolve => {
-          setTimeout(resolve, PULL_FEEDBACK_BUDGET_MS + 250);
-        });
+        await vi.advanceTimersByTimeAsync(PULL_FEEDBACK_BUDGET_MS + 250);
       });
 
       expect(text()).toContain("Couldn't refresh");
@@ -476,7 +478,8 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
       expect(nodes('RemoteSessionRow')).toHaveLength(1);
       expect(refreshControl().refreshing).toBe(false);
     } finally {
+      vi.useRealTimers();
       onlineManager.setOnline(true);
     }
-  }, 45_000);
+  }, 15_000);
 });

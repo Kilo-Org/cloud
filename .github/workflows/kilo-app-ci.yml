@@ -65,7 +65,9 @@ jobs:
           # `github.event.before`. If neither object is available, run the
           # suite rather than skip it: a false "no changes" would break the
           # required checks' promise, while a redundant run is harmless.
-          base="${{ github.event.pull_request.base.sha }}"
+          # A merge queue entry diffs against the group's base: the PRs in the
+          # group passed the suite on their own branches.
+          base="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
           if ! git rev-parse --verify "${base}^{commit}" > /dev/null 2>&1; then
             base="${{ github.event.before }}"
           fi

@@ -622,9 +622,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Dependency cycle check
-        run: pnpm run dependency-cycle-check
-
       - name: Run script tests
         run: pnpm run test:scripts
 
@@ -639,16 +636,43 @@ jobs:
       - name: Run Session Ingest Durable Object regressions
         run: pnpm --filter cloudflare-session-ingest run test:integration
 
+  # In its own job, madge runs beside the script tests instead of before them.
+  dependency-cycle-check:
+    needs: changes
+    if: needs.changes.outputs.kilocode_backend == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Dependency cycle check
+        run: pnpm run dependency-cycle-check
+
   # Required check. A skipped job (nothing relevant changed) passes; a failed
   # or cancelled job fails this one. Besides the web tests it covers the
-  # workspace tests, drizzle-check, harness-sdk and the ai-gateway builds,
-  # which have no required check of their own.
+  # workspace tests, the dependency cycle check, drizzle-check, harness-sdk and
+  # the ai-gateway builds, which have no required check of their own.
   test:
     needs:
       - changes
       - ci-wiring
       - web-test
       - test-scripts
+      - dependency-cycle-check
       - workspace-tests
       - drizzle-check
       - harness-sdk

@@ -90,7 +90,7 @@ describe('replacement workspace local recovery', () => {
     }
   );
 
-  it('imports nonempty ingest history but recovers the newer local file before snapshot upload', async () => {
+  it('captures setup state before recovering the newer local file and importing ingest history', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-local-precedence-'));
     const directory = path.join(root, 'workspace');
     const imported = path.join(root, 'imported.json');
@@ -124,7 +124,7 @@ describe('replacement workspace local recovery', () => {
       const harness = createHarness(FAST_TIMERS, {
         capture: true,
         beforeCapture: async () => {
-          expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('newer local\n');
+          expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('base\n');
           expect(harness.ensureCalls()).toBe(0);
         },
       });
@@ -158,6 +158,114 @@ describe('replacement workspace local recovery', () => {
       fetchSpy.mockRestore();
       await fs.rm(root, { recursive: true, force: true });
     }
+  });
+
+  it.each(['clone', 'refresh', 'rebuild', 'keep'] as const)(
+    'recovers only after the shared snapshot decision on the %s path',
+    async kind => {
+      const order: string[] = [];
+      const harness = createHarness(FAST_TIMERS, {
+        hasGit: kind !== 'clone',
+        capture: true,
+        beforeCapture: async () => {
+          order.push('capture');
+        },
+        recoverWorktree: async () => {
+          order.push('recovery');
+          return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+        },
+      });
+      if (kind !== 'clone') {
+        harness.setStamp({
+          ...FOREIGN_STAMP,
+          capturedAt: kind === 'keep' ? FOREIGN_STAMP.capturedAt : DUE_STAMP.capturedAt,
+          generation: kind === 'rebuild' ? SNAPSHOT_MAX_GENERATION : 0,
+        });
+      }
+
+      await harness.manager.prepare(
+        routeSpec({ git: { url: REPO }, capture: true, worktreeRecovery: recovery })
+      );
+
+      expect(order).toEqual(kind === 'keep' ? ['recovery'] : ['capture', 'recovery']);
+      expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
+    }
+  );
+
+  it.each(['not_saved', 'failed', 'timeout', 'not_requested', 'no_channel', 'unsafe_origin'])(
+    'still recovers when snapshot capture is %s',
+    async outcome => {
+      let recovered = false;
+      const capture = createWorkspaceCapture({ send: () => undefined });
+      const harness = createHarness(timers({ captureMs: 20 }), {
+        capture: outcome !== 'no_channel',
+        captureRequest:
+          outcome === 'timeout'
+            ? (sessionId, commit, timeoutMs) => capture.request(sessionId, commit, timeoutMs)
+            : undefined,
+        recoverWorktree: async () => {
+          recovered = true;
+          return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+        },
+      });
+      harness.setCaptureResult(outcome === 'failed' ? 'throw' : false);
+      if (outcome === 'unsafe_origin') {
+        harness.setGit(args => (args[0] === 'reflog' ? result(1) : result(0)));
+      }
+
+      await harness.manager.prepare(
+        routeSpec({
+          git: { url: REPO },
+          capture: outcome === 'not_requested' ? undefined : true,
+          worktreeRecovery: recovery,
+        })
+      );
+
+      expect(recovered).toBe(true);
+      expect(harness.captureRequests).toHaveLength(
+        ['not_saved', 'failed', 'timeout'].includes(outcome) ? 1 : 0
+      );
+      expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
+    }
+  );
+
+  it('keeps sibling preparation blocked through both capture and worktree recovery', async () => {
+    const capturing = Promise.withResolvers<void>();
+    const finishCapture = Promise.withResolvers<void>();
+    const recovering = Promise.withResolvers<void>();
+    const finishRecovery = Promise.withResolvers<void>();
+    let recoveries = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      capture: true,
+      beforeCapture: async () => {
+        capturing.resolve();
+        await finishCapture.promise;
+      },
+      recoverWorktree: async () => {
+        recoveries++;
+        recovering.resolve();
+        await finishRecovery.promise;
+        return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+      },
+    });
+    const spec = routeSpec({ git: { url: REPO }, capture: true, worktreeRecovery: recovery });
+    const first = harness.manager.prepare(spec);
+    await capturing.promise;
+    const sibling = harness.manager.prepare({ ...spec, sessionId: 'ses_sibling' });
+    await Bun.sleep(5);
+    expect(harness.ensureCalls()).toBe(0);
+    expect(recoveries).toBe(0);
+    finishCapture.resolve();
+    await recovering.promise;
+    await Bun.sleep(5);
+    expect(harness.ensureCalls()).toBe(0);
+    finishRecovery.resolve();
+    await Promise.all([first, sibling]);
+
+    expect(harness.ensureCalls()).toBe(2);
+    expect(harness.captureRequests).toHaveLength(1);
+    expect(recoveries).toBe(1);
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
   });
 
   it('does not fail preparation when local recovery fails', async () => {
@@ -1915,16 +2023,20 @@ describe('adopting a repository snapshot', () => {
     expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
     const setUrl = harness.gitCalls.find(args => args[0] === 'remote' && args[1] === 'set-url');
     expect(setUrl?.[3]).toContain('git-1');
-    expect(gitKinds(harness.gitCalls).slice(0, 7)).toEqual([
+    expect(gitKinds(harness.gitCalls).slice(0, 9)).toEqual([
       'remote set-url',
       'fetch',
       'remote set-head',
+      'reset',
+      'clean',
       'checkout',
       'for-each-ref',
       'branch',
       'show-ref',
     ]);
     expect(harness.gitCalls).toContainEqual(['fetch', '--prune', 'origin']);
+    expect(harness.gitCalls).toContainEqual(['reset', '--hard']);
+    expect(harness.gitCalls).toContainEqual(['clean', '-ffd']);
     expect(harness.gitCalls).toContainEqual(['checkout', '--detach', 'origin/HEAD']);
     expect(harness.gitCalls).toContainEqual(['branch', '-D', 'main', 'session/old']);
     expect(harness.gitCalls).toContainEqual(['checkout', '--progress', '-b', 'session/scope-1']);

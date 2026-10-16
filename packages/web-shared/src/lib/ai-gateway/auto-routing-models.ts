@@ -10,7 +10,10 @@ import {
   KILO_AUTO_SMALL_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { getAutoFreeCandidates } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
-import { isVirtualAutoModelId, type CustomRouterDefinition } from '@kilocode/auto-routing-contracts';
+import {
+  isVirtualAutoModelId,
+  type CustomRouterDefinition,
+} from '@kilocode/auto-routing-contracts';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { buildAutoModelCatalogEntry } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 

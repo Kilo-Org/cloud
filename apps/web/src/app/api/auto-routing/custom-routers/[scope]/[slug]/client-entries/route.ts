@@ -14,7 +14,10 @@ export async function POST(request: NextRequest, { params }: RouteContext): Prom
   );
 }
 
-export async function DELETE(request: NextRequest, { params }: RouteContext): Promise<NextResponse> {
+export async function DELETE(
+  request: NextRequest,
+  { params }: RouteContext
+): Promise<NextResponse> {
   const routerParams = await params;
   return handleCustomRouterRequest(request, context =>
     removeClientEntryResponse(context, routerParams, request)

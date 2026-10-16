@@ -70,9 +70,12 @@ export async function deleteCustomRouter(
   router: Pick<CustomRouterSummary, 'scope' | 'slug'>,
   organizationId: string | undefined
 ): Promise<void> {
-  const response = await fetch(customRouterItemEndpoint(router.scope, router.slug, organizationId), {
-    method: 'DELETE',
-  });
+  const response = await fetch(
+    customRouterItemEndpoint(router.scope, router.slug, organizationId),
+    {
+      method: 'DELETE',
+    }
+  );
   if (!response.ok) throw new Error(await errorMessage(response));
 }
 

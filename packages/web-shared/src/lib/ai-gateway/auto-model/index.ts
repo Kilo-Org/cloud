@@ -193,7 +193,8 @@ export function customRouterAutoModel(router: {
   name: string;
   baseRouter: AutoRouter;
 }): AutoModel {
-  const base = router.baseRouter === 'frontier' ? KILO_AUTO_FRONTIER_MODEL : KILO_AUTO_EFFICIENT_MODEL;
+  const base =
+    router.baseRouter === 'frontier' ? KILO_AUTO_FRONTIER_MODEL : KILO_AUTO_EFFICIENT_MODEL;
   return {
     ...base,
     id: customRouterModelId(router.scope, router.slug),

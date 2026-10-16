@@ -130,10 +130,7 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
       {header}
       <CardContent className="space-y-3">
         {routers.length === 0 ? (
-          <div
-            className="bg-muted/30 space-y-3 rounded-md border border-dashed p-4"
-            role="status"
-          >
+          <div className="bg-muted/30 space-y-3 rounded-md border border-dashed p-4" role="status">
             <p className="text-muted-foreground text-sm">
               {canCreate
                 ? 'No custom routers yet. Create one to route between models you pick, including local models added from the CLI.'

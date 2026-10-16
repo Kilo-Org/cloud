@@ -9,6 +9,7 @@ interface __BaseEnv_Env {
 	BENCHMARK_SCHEDULER_CONFIG: string;
 	KILO_WEB_API_BASE_URL: string;
 	KILO_CLI_API_URL: string;
+	BENCH_RESULT_URL: string;
 	BENCH_RUNNER: DurableObjectNamespace<import("./src/index").BenchRunnerContainer>;
 }
 declare namespace Cloudflare {
@@ -23,5 +24,5 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "BENCHMARK_SCHEDULER_CONFIG" | "KILO_WEB_API_BASE_URL" | "KILO_CLI_API_URL">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "BENCHMARK_SCHEDULER_CONFIG" | "KILO_WEB_API_BASE_URL" | "KILO_CLI_API_URL" | "BENCH_RESULT_URL">> {}
 }

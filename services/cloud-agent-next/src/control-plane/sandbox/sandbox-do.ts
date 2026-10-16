@@ -656,8 +656,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
 
-  // --- lifecycle entry points -------------------------------------------------
-
   /**
    * Establishes the provider pin and starts the allocation. `prepare` starts an
    * allocation from the stored pin without going through here, so callers that
@@ -726,8 +724,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       allocationName: this.providerPin?.allocationName ?? this.sandboxId,
     };
   }
-
-  // --- routes (B3) ------------------------------------------------------------
 
   /**
    * Session DO -> Sandbox DO (spec §10). Returns the route view at once and
@@ -838,8 +834,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return state.kind === 'connected' ? state.wrapperId : null;
     });
   }
-
-  // --- worktree deletion (B10) ------------------------------------------------
 
   /**
    * Worker -> Sandbox DO (spec §6 "Billing, credentials and deletion"). Port of
@@ -1031,8 +1025,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return (await this.observeWorktreeRuntime(plan.providerRef)).status === 'terminal';
   }
 
-  // --- worktree changes (B10) -------------------------------------------------
-
   /**
    * Session DO -> Sandbox DO (spec §10). Forwards one worktree-change request
    * to the wrapper and returns its result. The Sandbox DO owns no snapshot
@@ -1062,8 +1054,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.beginWrapperControlRequest(frame);
   }
 
-  // --- terminals (B10) --------------------------------------------------------
-
   /**
    * Session DO -> Sandbox DO (spec §10). Forwards exactly one terminal
    * create/resize/close/connect request to the wrapper and returns its result.
@@ -1082,8 +1072,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
   ): Promise<ControlRequestHandoff> {
     return this.beginWrapperControlRequest(terminalRequestFrame(crypto.randomUUID(), input));
   }
-
-  // --- preview ----------------------------------------------------------------
 
   /**
    * Off-queue read the Session DO uses to resolve one preview's provider
@@ -1206,8 +1194,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       frame.ok ? { ok: true, result: frame.result } : { ok: false, error: frame.error }
     );
   }
-
-  // --- credentials (B3) -------------------------------------------------------
 
   /**
    * Contained outbound credential lookup (spec §6/§10), same request shape as
@@ -1724,8 +1710,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  // --- init and storage cutover ----------------------------------------------
-
   private async initializeStorage(): Promise<void> {
     const generation = await this.ctx.storage.get<unknown>(GENERATION_KEY);
     if (generation === undefined) {
@@ -1948,8 +1932,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  // --- allocation events and effects -----------------------------------------
-
   private async applyEvent(event: AllocationEvent): Promise<void> {
     const previous = await this.readAllocation();
     const timers = { ...this.sandboxTimers() };
@@ -2045,8 +2027,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       publishGrant: route => this.publishRouteGrant(route),
     };
   }
-
-  // --- route execution and notifications (B3) ---------------------------------
 
   private async runPrepare(
     spec: ControlPlaneRouteSpec,
@@ -2886,8 +2866,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const marker = await hasAcceptedScopeHandle(this.ctx.storage, scopeGrantId(grant), fence);
     return isAdoptableWorktreeScope({ grant, acceptedMarker: marker });
   }
-
-  // --- contained credential helpers (B3) --------------------------------------
 
   /** The managed outbound container id for the current provider/allocation. */
   private outboundContainerIdFor(state: AllocationState): string | null {
@@ -4487,8 +4465,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.enqueue(() => this.applyEvent(event));
   }
 
-  // --- wrapper socket ---------------------------------------------------------
-
   private readAttachment(ws: WebSocket): WrapperSocketAttachment | null {
     const parsed = wrapperSocketAttachmentSchema.safeParse(ws.deserializeAttachment());
     return parsed.success ? parsed.data : null;
@@ -4957,8 +4933,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.billingRuntime.defer(generation, callback);
   }
 
-  // --- provider selection -----------------------------------------------------
-
   private ensureVercelBillingRuntime() {
     return this.billingRuntime.ensureRuntime();
   }
@@ -5027,8 +5001,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
     return resolved === undefined ? undefined : { ...resolved, teamId: locator.teamId };
   }
-
-  // --- storage ----------------------------------------------------------------
 
   private async retryAllowed(): Promise<boolean> {
     return routeRetryAllowed(this.routeContext(await this.readAllocation()));

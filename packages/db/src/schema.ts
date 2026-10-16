@@ -6803,6 +6803,21 @@ export type CloudAgentSessionRunFailureCode =
   | 'system_interrupt'
   | 'unclassified';
 
+// Runtime container identity for a run. Keep in sync with
+// CloudAgentRunContainerSchema in @kilocode/worker-utils/cloud-agent-queue-report.
+export type CloudAgentRunContainer = {
+  provider: 'cloudflare' | 'vercel' | 'cloudflare-containers';
+  sandboxId: string;
+  allocationId?: string;
+  instanceId?: string;
+  instanceType?: string;
+  region?: string;
+  imageRef?: string;
+  snapshotId?: string;
+  runtimeBuildId?: string;
+  startSource?: 'image' | 'snapshot';
+};
+
 export const cloud_agent_session_runs = pgTable(
   'cloud_agent_session_runs',
   {
@@ -6811,6 +6826,7 @@ export const cloud_agent_session_runs = pgTable(
       .references(() => cloud_agent_sessions.cloud_agent_session_id, { onDelete: 'cascade' }),
     message_id: text().notNull(),
     wrapper_run_id: text(),
+    container: jsonb().$type<CloudAgentRunContainer>(),
     status: text().notNull().$type<CloudAgentSessionRunStatus>(),
     queued_at: timestamp({ withTimezone: true, mode: 'string' }),
     dispatch_accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -8843,6 +8859,40 @@ export const agent_environment_profile_kilo_commands = pgTable(
 
 export type AgentEnvironmentProfileKiloCommand =
   typeof agent_environment_profile_kilo_commands.$inferSelect;
+
+// ============ AGENT ENVIRONMENT PROFILE INSTRUCTIONS ============
+// Instruction files attached to an environment profile. Materialized into
+// ${SESSION_HOME}/.kilocode/rules/<name>.md at session preparation time as
+// additional rule files alongside the Cloud-Agent-owned cloud-agent.md.
+
+export const agent_environment_profile_instructions = pgTable(
+  'agent_environment_profile_instructions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    // Rules filename slug — materialized as `<name>.md` under .kilocode/rules.
+    name: text().notNull(),
+    content: text().notNull(),
+    enabled: boolean().notNull().default(true),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_instructions_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_instructions_profile_name').on(table.profile_id, table.name),
+  ]
+);
+
+export type AgentEnvironmentProfileInstruction =
+  typeof agent_environment_profile_instructions.$inferSelect;
 
 // ============ APP BUILDER FEEDBACK ============
 

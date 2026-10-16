@@ -236,7 +236,11 @@ describe('useStoreCreditProducts paused store query', () => {
 
       onlineManager.setOnline(false);
       setConnected(true);
-      await waitFor(() => api().catalogEmpty);
+      // Wait for the settled view, not the backend catalog alone: the catalog
+      // answers independently of the store connection, so `catalogEmpty` can be
+      // true on a render where `connected` has not applied yet, and `isLoading`
+      // is still true for that render.
+      await waitFor(() => api().catalogEmpty && !api().isLoading);
 
       expect(api().isLoading).toBe(false);
       expect(api().products).toHaveLength(0);

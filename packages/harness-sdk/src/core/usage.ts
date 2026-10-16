@@ -1,4 +1,6 @@
-import type { ModelUsage } from './model.js';
+import { Effect, Ref } from 'effect';
+import { type ModelUsage, zeroUsage } from './model.js';
+import type { Wiring } from './wiring.js';
 
 /**
  * The cost of two parts together. A part that reported none adds nothing, and
@@ -15,6 +17,18 @@ const add = (held: ModelUsage, part: ModelUsage): ModelUsage => ({
   cacheWriteTokens: held.cacheWriteTokens + part.cacheWriteTokens,
   ...costOf(held.cost, part.cost),
 });
+
+const countUsage = (
+  wiring: Wiring,
+  call: { readonly usage: ModelUsage; readonly model?: string }
+): Effect.Effect<void> =>
+  Effect.zipRight(
+    Ref.update(wiring.totals, held => add(held, call.usage)),
+    Ref.update(wiring.modelTotals, held => {
+      const model = call.model ?? wiring.model;
+      return new Map(held).set(model, add(held.get(model) ?? zeroUsage, call.usage));
+    })
+  );
 
 /**
  * Folds one frame's counts into what this reply has reported so far.
@@ -52,4 +66,4 @@ const hitRatio = (usage: ModelUsage): number => {
   return total === 0 ? 0 : usage.cacheReadTokens / total;
 };
 
-export { add, hitRatio, raise };
+export { add, countUsage, hitRatio, raise };

@@ -15,12 +15,12 @@
       "custom_domain": true,
     },
   ],
-  // 05:00 daily: platform auto-decider sync (may start a platform run).
-  // Every 15 min: drain pending Benchmark-profile work into the profile slot.
-  "triggers": { "crons": ["0 5 * * *", "*/15 * * * *"] },
+  // The frequent tick recovers expired leases; completion dispatches immediately.
+  "triggers": { "crons": ["0 5 * * *", "* * * * *"] },
   "dev": { "port": 8814, "local_protocol": "http", "ip": "0.0.0.0" },
   "observability": { "enabled": true },
   "vars": {
+    "BENCHMARK_SCHEDULER_CONFIG": "{}",
     // Base URL for reaching apps/web's /api/internal/* routes. Other workers
     // that call apps/web internal endpoints use app.kilo.ai.
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
@@ -35,7 +35,7 @@
       "class_name": "BenchRunnerContainer",
       "image": "./container/Dockerfile",
       "instance_type": "standard-2",
-      "max_instances": 200,
+      "max_instances": 250,
     },
   ],
   "durable_objects": {
@@ -58,7 +58,7 @@
         "max_batch_size": 1,
         "max_retries": 6,
         "retry_delay": 180,
-        "max_concurrency": 200,
+        "max_concurrency": 250,
         "dead_letter_queue": "auto-routing-benchmark-dlq",
       },
       {

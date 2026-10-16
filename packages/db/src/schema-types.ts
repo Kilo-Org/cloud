@@ -1,3 +1,4 @@
+import { SecureProxyUpstreamUrlSchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
 import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
@@ -2123,6 +2124,18 @@ export const OpenCodeVariantSchema = z.object({
 
 export type OpenCodeVariant = z.infer<typeof OpenCodeVariantSchema>;
 
+// models.dev `reasoning_options` format, consumed by Kilo CLI v2 to build its own
+// per-protocol reasoning variants.
+export const ReasoningOptionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('toggle') }),
+  z.object({
+    type: z.literal('effort'),
+    values: z.array(z.union([z.null(), ReasoningEffortSchema, z.literal('default')])),
+  }),
+]);
+
+export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
+
 export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
 
 export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
@@ -2133,7 +2146,7 @@ export const DirectByokModelSchema = z.object({
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
-  variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
+  reasoning_options: z.array(ReasoningOptionSchema).optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
@@ -2145,6 +2158,7 @@ export const OpenCodeSettingsSchema = z.object({
   family: OpenCodeFamilySchema.optional(),
   prompt: OpenCodePromptSchema.optional(),
   variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
+  reasoning_options: z.array(ReasoningOptionSchema).optional(),
 });
 
 export type OpenCodeSettings = z.infer<typeof OpenCodeSettingsSchema>;
@@ -2230,10 +2244,27 @@ export const CustomLlmXApiKeyCredentialsSchema = z.object({
 
 export type CustomLlmXApiKeyCredentials = z.infer<typeof CustomLlmXApiKeyCredentialsSchema>;
 
+/**
+ * Routes requests through apps/ai-gateway-secure-proxy. The definition's
+ * `base_url` is the proxy's `/api/proxy` URL, used as-is; `config.url` takes the
+ * role `base_url` has for direct custom LLMs, including `disable_url_suffix`.
+ */
+export const CustomLlmSecureProxyCredentialsSchema = z.object({
+  type: z.literal('secure_proxy'),
+  proxy_secret: z.string().min(1),
+  config: z.object({
+    url: SecureProxyUpstreamUrlSchema,
+    extra_headers: CustomLlmExtraHeadersSchema.optional(),
+  }),
+});
+
+export type CustomLlmSecureProxyCredentials = z.infer<typeof CustomLlmSecureProxyCredentialsSchema>;
+
 export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
   CustomLlmXApiKeyCredentialsSchema,
   GoogleServiceAccountKeySchema,
+  CustomLlmSecureProxyCredentialsSchema,
 ]);
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;

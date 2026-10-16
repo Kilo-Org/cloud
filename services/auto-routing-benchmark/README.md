@@ -35,8 +35,8 @@ design, invariants, and rollout/rollback.
 `router` is `efficient` or `frontier`; omitted API selectors default to `efficient`.
 Each router owns its saved decider model list, catalog-expanded effort entries, registry,
 runs, routing table, and publication cache key. Accuracy thresholds, `accuracyNoiseBand`,
-`frontierMinAccuracyDelta`, token profile, switch horizon and thresholds, and platform
-`maxConcurrency` are configured independently. The classifier and its winner remain shared:
+`frontierMinAccuracyDelta`, token profile, switch horizon and thresholds are configured
+independently. The classifier and its winner remain shared:
 classifier runs use the efficient configuration even when requested from the frontier view.
 Classifier inference billing is owned by the routing worker. Usage IDs and durable delivery
 objects include the router, so an otherwise identical call on another router cannot be
@@ -44,16 +44,113 @@ deduplicated as a retry of the first call.
 Capability lookups derive candidate IDs from the selected router's table; the capability
 cache remains a shared model-ID union because modalities and context limits belong to models.
 
+## System-optimal policy settings
+
+The daily platform sync recomputes each router's policy settings before publishing, and stores
+the result on the router's `benchmark_config` row (`policy_computed`) with its `computedAt`,
+`source`, and a short evidence string. The effective value of a setting is
+`override ?? computed ?? stored default`, so an admin override always wins and clearing it
+falls back to the system value. Publishing reads effective values only.
+
+- `minAccuracy` and `accuracyNoiseBand`: chosen from a grid over the registry's measured
+  summaries, scored on held-out cases (a deterministic sha256 train/held-out split of the case
+  ids). The objective is mean held-out accuracy per estimated request dollar, subject to a
+  quality floor, and the chosen point is the middle of the stable plateau rather than its edge.
+  Insufficient held-out data (`< 20` distinct graded held-out cases summed over routes, or `< 2`
+  evaluated routes) leaves the current value in place, as does a catalog or registry failure;
+  production-derived settings are still saved in that case.
+- `productionTokenProfile` and `switchHorizonTurns`: derived from production auto-request usage.
+  The worker has no Postgres access, so it reads mean uncached/cached input tokens and the
+  median requests per auto session from `GET /api/internal/auto-routing-benchmark/production-profile`
+  on apps/web over a 6-hour window, with a 10-second timeout. An unavailable or slow endpoint
+  leaves the previous computed values.
+- Each setting has its own value schema. `PUT /admin/config` rejects an override that does not
+  fit its setting (400), and stored overrides or computed values that do not fit are ignored.
+- `frontierMinAccuracyDelta`, `switchCostFactor`, `bestAccuracySwitchThreshold`,
+  `lowConfidenceThreshold`, classifier/decider repetitions, and `classifierMaxP95LatencyMs` are
+  fixed constants: the held-out benchmark scores single requests, so session-economics and
+  measurement-effort knobs have no measured basis for a daily recomputation. The Policy tab
+  shows their value and the reason they are read-only.
+
 Frontier initially has no saved configuration or published table. No default model pool or
 efficient table is fabricated for it. Before enabling frontier serving, administrators must
-split the existing container budgets, save a frontier configuration with its own decider
-models, benchmark those entries, and publish a complete frontier table.
+save a frontier configuration with its own decider models, benchmark those entries, and
+publish a complete frontier table.
 
-Efficient platform and owner budgets plus frontier's platform budget must total at most
-`BENCHMARK_CONTAINER_BUDGET` (200). Frontier ignores `userMaxConcurrency`, never registers owner
-custom pools, and has only a platform queue (`both` selects that queue; `user` is rejected).
-Saving configuration and starting decider runs enforce the shared cap. Scheduled drains and
-daily platform sync process both routers with their configured budgets.
+Decider execution uses a global pool of reusable container slots, not run reservations.
+An atomic D1 claim selects an eligible unfinished chunk from any running run whenever a
+slot becomes free. Queued and executing claims both count against the limit.
+The pool is bounded by `BENCHMARK_CONTAINER_BUDGET`, the queue consumer concurrency,
+and container `max_instances`; increasing the platform ceiling requires a Cloudflare limit increase.
+Containers are named by slot and run one CLI at a time. There are no fixed shard chains.
+One-case chunks leave room for warmup, the existing empty-output retry, and grading within
+the queue invocation deadline; prompts, variants, CLI timeouts, repetitions, cost accounting,
+and CLI-reported latency remain unchanged.
+
+`BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250`,
+`modelConcurrency: 4`, `providerConcurrency: 16`, and `unknownProviderConcurrency: 2`.
+Optional `modelLimits` and `providerLimits` objects override those defaults by exact identity.
+`shares` defaults to `{"efficient/platform":2,"frontier/platform":2,"efficient/user":1}`.
+The least-occupied weighted share receives the next eligible claim; unused shares are
+borrowed without reservations or preempting active work. Model caps span variants and runs.
+Provider identities come from the catalog's optional `inference_provider_ids`, which uses
+the existing gateway provider index. Every possible provider is conservatively counted;
+missing metadata shares a small unknown-provider bucket. Model-name prefixes are never
+treated as serving providers. Frontier has no owner queue.
+
+Claims carry fencing tokens. Redelivery cannot start an already executing claim, and
+stale tokens cannot release newer ownership. A queued lease lasts 30 minutes; an executing
+lease lasts 20 minutes, beyond the queue's 15-minute invocation limit. The one-minute tick
+recovers abandoned claims; completion refills slots immediately without waiting for a tick.
+Recovery and infrastructure/grader waits are bounded to six claims, with 15–300 second
+backoff. Capacity and unbilled provider-throttle waits do not create model-failure rows.
+
+A dispatch pass reads current occupancy and the next pending chunk of every lane — one
+`(run, model, variant, repetition)` chunk chain — and claims as many of those lanes as fit.
+Both reads are index seeks: occupancy is bounded by the slot budget, lane heads by the
+number of lanes, so cost does not grow with the pending backlog. Each claim is a
+conditional `UPDATE ... WHERE id = ? AND status = 'pending'` that assigns a free slot.
+Only one pass runs at a time; a pass holds a short lease row and a dispatcher that finds it
+held returns immediately, because the holding pass has already read that wake's
+completions. The per-minute tick is the backstop if a lease expires without a release, and
+the `(status, run_id, model, variant, repetition, chunk)` index bounds lane reads.
+
+A provider or model throttle records a cooldown deadline rather than stamping every
+pending row, so one throttle event costs a bounded write instead of rewriting the backlog.
+
+Materialization writes chunks in bounded batches, marks a batch complete when all of its
+cases already have results, and checks the run's status once per batch rather than per row.
+
+Run completion accounting reads every case result of the run, so it does not run per
+completed chunk. A completion first asks whether the run still has scheduled work — an
+index probe for a chunk that is pending, queued or active in a lane that has not
+dead-lettered — and only settled runs are accounted. Chunks of a dead-lettered lane never
+count as unsettled, so a run with a dead lane still settles once its live lanes finish, and
+runs with no scheduler chunks (legacy whole-run work) are always accounted. The dispatch
+sweep and the dead-letter path remain responsible for runs that settle without a train of
+completions. Chunk recovery and the 24-hour prune batches are likewise bounded: recovery
+completes only the runs that still hold unsettled chunks, and pruning is driven from the
+per-run scheduler markers instead of scanning the chunk, execution or run tables.
+
+Completed cases are skipped, and all final CLI outputs are persisted before grading.
+A separate paid-execution ledger prevents automatic repetition if a worker disappears
+after inference may have started but before an output was saved. Such an ambiguous case
+fails its measurement lane as infrastructure uncertainty instead of inventing a score or
+issuing another paid call. Manual requeue creates a new run and may repeat that unknown
+case; compatible completed cases and pending successful outputs are still reused.
+An ambiguous transport failure retains the slot/provider lease until expiry, because the
+container may still be finishing its request. This quarantine cannot oversubscribe providers.
+Terminal scheduler rows are pruned in bounded batches after 24 hours. Benchmark history,
+completed case results, and pending outputs remain available for compatible reuse.
+
+Rollout first exposes catalog provider metadata, then applies the additive D1 migration while
+the queue is paused. Wait for old consumers to quiesce and stop old run-scoped containers
+before enabling the new worker. Legacy queued chunk bodies are wakeups only: it materializes the run's
+entire remaining workload from its snapshot and schedules it under the same global caps.
+Old chunk/shard metadata cannot grant ownership. Do not run old and new consumers together
+or roll back while scheduler claims are active. Pause and quiesce first; complete or requeue
+affected runs before returning to an older worker. This change does not deploy or resume work.
+
 
 Efficient publications invalidate `routing_table_v1`; frontier publications invalidate
 `routing_table_frontier_v1`. Router, engine/dataset identity, ranking settings, and contributing
@@ -63,16 +160,19 @@ measurements are included in routing-table version hashes.
 ## Platform model selection
 
 - Select a model, not one effort, in the platform configuration.
-- The worker expands each selected model into every reasoning variant from the current `/api/openrouter/models` catalog.
+- The worker resolves `~` model aliases through the catalog's `alias_target` when the concrete target is present, then expands every reasoning variant from that target's current `/api/openrouter/models` entry. An alias whose target is absent stays alias-keyed.
+- Exact resolved `(model, variant)` pairs are deduplicated: an alias and its target, or multiple aliases for one target, share a measurement. Retargeting an alias requests the new concrete pair instead of reusing the old target's result.
 - Variants must contain explicit `reasoning.enabled` or `reasoning.effort` controls. Unrelated presets do not create benchmark entries.
 - A model without reasoning controls creates one `(model, null)` entry.
 - If the catalog fails or omits a selected model, reconciliation fails. It does not infer a default effort.
 - Catalog requests have a 10-second deadline, including body reads, so a stalled response cannot block both queues indefinitely.
 - Manual and automatic selections use the same expansion. Existing saved effort selections no longer restrict platform measurements.
-- Owner pools still select exact pairs. Platform expansion does not change their entries.
+- Owner pools use the same alias resolution and all-efforts expansion, sharing concrete measurements with the platform. Status responses preserve the requested model ids; custom routing tables use concrete ids.
+- Custom tables are already scoped to the requested resolved pairs by the benchmark worker. The serving worker accepts those concrete candidates and loads capabilities by their ids rather than re-filtering against saved alias ids.
+- Deploy the serving worker before the benchmark worker when introducing alias resolution; older serving workers filter concrete custom-table candidates against the original pool aliases.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
-The worker drains expanded entries in batches that fit the configured container budget.
+The worker admits bounded oldest-first registry batches independently of available execution slots.
 New routing tables rank exact pairs and emit `variant`, not `reasoningEffort`.
 Legacy nullable effort storage columns remain. Router isolation requires D1 schema migration;
 existing rows stay in the efficient namespace, with noise band 0.05 and frontier delta 0.
@@ -85,8 +185,12 @@ Expand a route to inspect every ranked model/effort pair.
 
 - `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
 - A candidate competes within the router's `accuracyNoiseBand` of its effective `minAccuracy` (default noise band 0.05).
-- Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`; the delta defaults to 0.
+- Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`. The delta is fixed at 0, so the frontier router uses its own system-computed `minAccuracy`.
 - Both routers use the same best-value formula, selecting models and efforts from their own measured pools.
+- Daily re-evaluation: `minAccuracy`/`accuracyNoiseBand` come from a held-out grid over the
+  registry's measurements, `productionTokenProfile`/`switchHorizonTurns` from production auto
+  usage (mean uncached/cached input tokens per request, median requests per session), and the
+  rest are fixed constants. Admin overrides win over the computed values.
 - Competing candidates are ordered by `estimatedRequestCostUsd × effectiveLatency^1.5 / wilson^15`, lowest first. With known TTFT, `effectiveLatency = p50TtftMs + LATENCY_TOTAL_WEIGHT × p50LatencyMs`, where the exported `LATENCY_TOTAL_WEIGHT` is 0.15 (tuned on a fully streamed offline sweep); without TTFT, total `p50LatencyMs` alone preserves legacy ordering.
 - `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
 - `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.
@@ -273,6 +377,46 @@ files if the live inputs may change between builds. `benchmarkPerTaskUsdWeighted
 remains the benchmark-only cost and can move differently from this production-input
 estimate.
 
+### Shadow routing policy
+
+To evaluate an efficient-router candidate without routing traffic to it, put its JSON
+table in the shared `AUTO_ROUTING_CONFIG` namespace under `shadow_routing_table_v1`.
+It must validate against the same `RoutingTableSchema` as `routing_table_v1`.
+Delete the shadow key to disable evaluation; the live routing table is never changed.
+The shadow reader caches both present and absent values in the isolate for 60 seconds,
+in addition to KV's propagation delay. Invalid tables and read/computation failures
+are ignored.
+
+Classified efficient `/decide` requests evaluate the candidate with the same classifier
+result, incumbent, denied models, routing mode, constraints, and capability map as the
+live decision. Only the live decision is returned, stored, or billed. There are no extra
+classifier, capability, or benchmark calls and no shadow cache writes.
+Classifier failures have no classification to shadow-evaluate. Frontier requests do
+not evaluate the efficient shadow table.
+Existing sampled `auto_routing_decision` logs include `shadowModel`, `shadowVariant`,
+and `shadowDiffers`; a valid table with no eligible route records a null shadow model.
+
+Collect with `pnpm --filter auto-routing-benchmark scoreboard:prod --since 24 --out prod.json`,
+then pass that snapshot to `scoreboard build`. Both JSON reports include a `shadow`
+section with observed evaluation count, sampling-weighted divergence, and
+`outcomesByDecidedModel`: actual production request counts, error and abort rates,
+mean input/output/cache-read tokens, and mean cost in USD per request.
+The read-only Postgres join matches distinct observed session/model pairs to
+`microdollar_usage_metadata.session_id` and the actual `microdollar_usage.model`,
+within the collection window, for efficient and balanced auto requests.
+Repeated decision logs do not multiply usage rows. Raw session ids are used only
+in memory for the join and are never written to the reports.
+
+Outcome proxies describe the observed live-model session cohort, not the unserved
+shadow model's counterfactual quality or an exact per-decision request attribution.
+Missing status codes and cancellation flags are excluded from their respective rate
+denominators. Missing sources yield null metrics; no observed/joinable sessions yield
+an empty outcome map. Divergence weighting assumes the supplied/current
+`decision_log_sample_rate` stayed constant over the window; use `--sample-rate` when
+collecting a window with a known rate. This is observation only, not production A/B
+allocation; production ids are not silently bucketed.
+Divergence is unavailable when success sampling is disabled because always-logged
+switches alone cannot estimate population divergence.
 ## Candidate screening
 
 Screen inexpensive catalog models before an admin adds them to the platform pool:
@@ -350,7 +494,6 @@ Reports from the earlier sequential runner remain readable.
 Persisted in-flight reservations become conservative `unsettledCostUsd` charges
 on resume because their actual spend may be unknown; they are not discarded.
 A report with indeterminate grader spend cannot resume safely.
-
 ## Admin endpoints
 
 All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
@@ -371,17 +514,19 @@ endpoints reject frontier. The classifier-winner endpoint returns the shared win
 | `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
-| `POST /admin/profiles/register` | Atomically admit missing/stale/retried global Benchmark profiles for an owner (quota 10/24h) |
-| `POST /admin/profiles/status` | Current statuses for up to 10 exact Pool entries (may free-admit engine-drifted rows) |
-| `POST /admin/custom-routing-table` | Assemble a **sparse** custom table for ready/current entries only (`table: null` → balanced fallback) |
+| `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of the pool models (quota 10 models/24h) |
+| `POST /admin/profiles/status` | Read current per-effort coverage; free re-admission for engine-stale pairs |
+| `POST /admin/custom-routing-table` | Rank ready/current exact pairs for the selected models (`table: null` → balanced fallback) |
 
 ## Owner pools and Benchmark profiles
 
 Owners (personal users or organizations) can constrain `kilo-auto/efficient` to
-1–10 exact `(model, canonical variant)` **Pool entries**. The pool itself lives
-in the auto-routing Durable Object; this worker owns **global Benchmark
-profiles** — per-route measurements for each exact pair under the current
-benchmark engine identity and decider repetitions.
+1–10 **pool models**. The pool lives in the auto-routing Durable Object, whose
+read path collapses and deduplicates legacy exact-pair pools. Each selected model
+expands through the live catalog into every supported reasoning effort, or one
+default pair when there are no reasoning controls. This worker measures exact
+model-effort pairs globally under the current engine identity and repetitions.
+Custom tables rank every measured pair; the router, not the owner, chooses effort.
 
 ### The two registry queues
 
@@ -392,14 +537,15 @@ row is global, so the pair is benchmarked once and serves both.
 | | Platform queue | User queue |
 |---|---|---|
 | Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from owner pools (quota-charged) |
-| Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, 15-minute cron, any decider terminal state |
+| Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, one-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
-| Container budget | `maxConcurrency` | `userMaxConcurrency` |
-| Slot | Its own; a running user-queue run never blocks it | Its own; a running platform-queue run never blocks it |
+| Execution share | Efficient and frontier each have default weight 2 | Efficient has default weight 1 |
+| Run lifecycle | One active run per router/queue | One active efficient owner run |
 
-The efficient platform and owner budgets plus the frontier platform budget must sum to at most
-`BENCHMARK_CONTAINER_BUDGET` (200, the wrangler `max_instances`). Split these budgets before
-saving frontier configuration; its owner budget is unused.
+All three shares use the same bounded chunk scheduler and borrow unused capacity.
+`benchmark_runs.max_concurrency` is retained for storage compatibility but new decider
+runs write zero: it is not an execution reservation. Registry admission is still atomic
+per exact pair, and the per-router/queue run lifecycle gate remains independent of slots.
 
 After any decider run completes, the worker assembles the platform table from ready, current registry entries for the current catalog pairs.
 If a desired pair remains pending or running, the previous table stays live.
@@ -411,20 +557,18 @@ untouched — it only ever draws on rows the platform list asks for.
 
 ### Request ledger and admission
 
-`POST /admin/profiles/register` evaluates every submitted entry in one D1 batch:
+The platform pays for every owner-requested measurement. Owners are never charged.
+Already ready/current or pending/running pairs are reused by every owner.
 
-- Ready/current or already pending/running global profiles are reported without
-  charging quota.
-- Globally new, engine-stale, or explicitly retried-failed profiles are admitted
-  as `pending` while the owner has fewer than **10** charged admissions in the
-  rolling 24h window (`profile_request_events`). Over-limit → 429, nothing written.
-- Concurrent owners requesting the same exact pair + engine identity dedupe to
-  one global row.
+`POST /admin/profiles/register` admits missing, stale, or retried pairs and records
+one quota request event per newly requested model in the same D1 batch. The rolling
+quota counts models, not efforts. Engine-stale remeasurement is quota-free.
+Concurrent requests share one global pair; the first admission wins and the
+others report its status.
 
-Admission is all-or-nothing and returns before the caller's Durable Object
-settings write. If that later write fails, the owner's previous pool is kept,
-admitted profiles stay pending globally, the single-slot drain still runs them,
-and a later retry reports them without re-charging quota.
+Admission returns before the caller's Durable Object settings write. If that
+write fails, the previous pool remains, but admitted measurements still run.
+Retrying reuses the same global profiles without charging quota twice.
 
 ### Status transitions and drain
 
@@ -446,20 +590,19 @@ exact variant match the live decider engine. Stale rows are never returned as
 Ready or assembled into custom tables.
 
 **Per-queue drain** (after any decider terminal state, on the admin's manual
-trigger, and on the 15-minute cron):
+trigger, and on the one-minute cron):
 
-1. If that queue's run is already active → log and leave its pending rows alone.
-   The other queue is unaffected.
-2. Else take that queue's pending current-engine rows oldest-`requested_at`-first,
-   capped by its own container budget (`entries × repetitions ≤ budget`).
-3. `startRun(purpose: queue, entries: snapshot)`.
+1. If that queue's run is active, leave its pending registry rows alone.
+2. Otherwise take up to 100 current-engine entries oldest-`requested_at`-first.
+3. `startRun(purpose: queue, entries: snapshot)` persists the workload, then the
+   global scheduler claims only the chunks that fit its current caps.
 
 A row wanted by both queues appears in both listings; whichever run claims it
 first flips it to `running`, so it is still measured exactly once.
 
 **Scheduled handlers:**
 
-- `*/15 * * * *` — sweep stale runs, then drain both queues.
+- `* * * * *` — recover expired chunk claims, sweep stale runs, and drain both queues.
 - `0 5 * * *` — sweep, reconcile the platform queue with each router's
   admin-configured decider list, drain both queues, republish the
   platform table (so a *removed* model leaves the live table even when nothing
@@ -542,12 +685,14 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 
 ## Debugging container (decider) failures
 
-- Each decider run seeds bounded shard lanes across the configured models and
-  repetitions. A lane uses one stable container instance
-  (`runId:model:rep:shard`) and processes chunk `N`, then `N+shardCount`, and
-  so on. CLI runs are serialized per instance because its sqlite state is not
-  safe under concurrent first runs. A `/warmup` call absorbs the one-time sqlite
-  migration before the case loop.
+- Reusable `benchmark-slot:<n>` containers handle dynamically assigned chunks from any run.
+  The D1 live-slot uniqueness constraint and claim tokens protect container ownership.
+  CLI runs remain serialized because they share SQLite state.
+- `/warmup` initializes the local CLI database once per container without making an inference request.
+- The server handles SIGTERM and drains accepted CLI jobs before exiting.
+  Idle containers therefore release capacity instead of ignoring the inactivity stop.
+- Completed or failed runs reject queued work before starting another CLI case.
+- Smaller chunks leave time for an empty-output retry within the queue invocation limit.
 - `case_results` rows carry diagnostics: CLI exit code, output prefix, and an
   event tail — start there for a failing case.
 - `POST /admin/debug-cli {model, prompt}` runs one prompt through the container
@@ -560,15 +705,15 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 
 ## Dead-letter handling (lane failure)
 
-Failed queue messages land in `auto-routing-benchmark-dlq` after `max_retries`
-(6) on `auto-routing-benchmark-jobs`. A decider message is one
-(model, repetition, shard, chunk) job, and later chunks are chained from it —
-so a DLQ'd message kills its lane's remaining cases.
+Failed queue messages land in the dead-letter queue after transport retries.
+A token-bearing decider message is a delivery of one durable chunk claim, not ownership
+of a fixed chain. Its DLQ handler atomically releases only a still-queued matching token;
+it never revokes active ownership. Expired leases recover abandoned executing claims.
+The scheduler records a lane death only when recovery is exhausted or execution is ambiguous.
+Classifier dead-letter handling remains fail-fast.
 
-The worker consumes the DLQ itself: each dead message is recorded in
-`run_lane_failures`, and run finalization is lane-aware. A run completes once
-every (model, variant, rep) lane has either all its case rows or a recorded
-lane death — a single dead model can no longer wedge the whole run.
+`run_lane_failures` preserves lane-aware finalization: a run settles once each
+(model, variant, repetition) lane has all its cases or a recorded infrastructure failure.
 
 - **Decider runs of either queue** complete per-entry: entries whose lanes all
   finished go `ready`; entries with a dead lane go `failed` ("Benchmark lane did
@@ -578,16 +723,23 @@ lane death — a single dead model can no longer wedge the whole run.
   money to produce.
 - **Classifier runs** still fail fast on a dead lane: their models are not
   registry-tracked and the winner must come from one comparable set.
-- **Backstop**: the 6h stale sweep *salvages* a wedged decider run rather than
-  failing it wholesale — lanes with a full set of case rows are settled `ready`,
-  and only the unfinished lanes' entries go `failed`.
+- **Backstop**: the 6h stale sweep salvages legacy decider runs that never completed
+  scheduler initialization. Initialized runs use bounded per-chunk leases instead of
+  an absolute run-age timeout, so legitimate backlogs do not discard ongoing measurements.
+
+Retries reuse successful graded cases from compatible terminal runs.
+The router, benchmark engine, repetitions, concrete model, variant, case, and repetition index must match.
+The newest compatible case wins; existing destination results and source rows remain unchanged.
+Failed or timed-out CLI cases run again; a successful zero score remains a valid measurement.
+Pending successful CLI outputs also survive terminal transitions so rubric grading can resume without another model call.
+Historical alias-keyed results remain stored but cannot be reused because their concrete target was not recorded.
 
 To inspect:
 
 - **Prod**: Cloudflare dashboard (Workers → Queues →
-  `auto-routing-benchmark-dlq`); the message body is the JSON job (`runId`,
-  `model`, `rep`, `shard`, `chunk`, case ids). Recorded lane deaths are
-  queryable: `SELECT * FROM run_lane_failures WHERE run_id = '…'`.
+  `auto-routing-benchmark-dlq`); scheduler messages contain `runId`, `model`,
+  `claimId`, and `claimToken`. Inspect `scheduler_chunks` for queued/active slots,
+  attempts, and lease deadlines; `run_lane_failures` records terminal lane failures.
 - **Replay**: failed entries re-admit via the owner's Retry or the admin's
   requeue endpoint, and the next drain of their queue measures them. Entries that
   are already `ready` are never re-measured.
@@ -599,5 +751,6 @@ pnpm dev          # wrangler dev (port 8814)
 pnpm typecheck    # tsgo --noEmit
 pnpm lint
 pnpm test         # vitest run
+pnpm smoke:scheduler # real SQLite + heterogeneous child-process work; no model endpoint
 pnpm db:generate  # regenerate D1 migration from src/db-schema.ts
 ```

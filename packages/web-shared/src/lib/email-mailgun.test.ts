@@ -84,6 +84,21 @@ const message = {
 };
 
 describe('Mailgun email boundary', () => {
+  it('defaults production Reply-To to support without changing the sender', async () => {
+    restoreEnvironmentVariable('NODE_ENV', 'production');
+    process.env.VERCEL_TARGET_ENV = 'production';
+
+    await expect(sendViaMailgun({ ...message, replyTo: undefined })).resolves.toBe(true);
+
+    expect(latestMessagesCreateMock()).toHaveBeenCalledWith(
+      'mail.example.test',
+      expect.objectContaining({
+        from: 'Kilo Code <hi@app.kilocode.ai>',
+        'h:Reply-To': 'hi@kilo.ai',
+      })
+    );
+  });
+
   it('delivers the original message in the production target', async () => {
     restoreEnvironmentVariable('NODE_ENV', 'production');
     process.env.VERCEL_TARGET_ENV = 'production';

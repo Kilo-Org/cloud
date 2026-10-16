@@ -133,6 +133,7 @@
     "status": "Hali",
     "truncated": "An yanke",
     "updated": "An sabunta",
+    "generating": "Ana ƙirƙira…",
     "working": "Ana aiki",
     "yourOwnRepositories": "Ma'ajiyoyinka",
     "dismissed": "An yi watsi da shi",
@@ -1259,7 +1260,7 @@
         "stoppedTitle": "Saitin ya tsaya",
         "stoppedBody": "Muhallin aikin {{name}} ya tsaya ba zato ba tsammani yayin saiti.",
         "stalledTitle": "Wani abu ya tsaya",
-        "stalledBody": "Ba mu iya gama saitin {{name}} ba. Sake gwadawa, ko aika imel zuwa hi@kilo.ai idan wannan ya ci gaba da faruwa.",
+        "stalledBody": "Ba mu iya gama saitin {{name}} ba. Sake gwadawa, ko aika imel zuwa {{supportEmail}} idan wannan ya ci gaba da faruwa.",
         "timeoutTitle": "Yana ɗaukar lokaci fiye da yadda ake tsammani",
         "timeoutBody": "Saitin {{name}} yana ɗaukar lokaci fiye da yadda aka saba (sama da mintuna {{displayMinutes}}).",
         "continueInBackground": "Ci gaba a baya",
@@ -1317,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Dole mutum ya yi bitar tsarin samun damar amfani da wuri da kake da shi kafin a yi amfani da shi a waya.",
       "iosTitle": "KiloClaw ba ya samuwa a cikin iOS",
       "iosBody": "Ana sarrafa damar amfani da KiloClaw ga wannan asusun a wajen manhajar iOS.",
-      "iosContact": "Tambayoyi? Tuntuɓi hi@kilo.ai.",
+      "iosContact": "Tambayoyi? Tuntuɓi {{supportEmail}}.",
       "quarantinedCta": "Aika imel ga tawagar mu",
       "nonCanonicalEarlybirdCta": "Bitar da tsarinka a kilo.ai"
     },
@@ -1552,7 +1553,7 @@
         "recoveryLabel": "Sabunta manhajar GitHub"
       },
       "githubIpAllowList": {
-        "description": "An kashe Mai bitar lamba saboda jerin adiresoshin IP da wannan ƙungiyar GitHub ta amince da su yana hana Kilo shiga. Tuntuɓi hi@kilo.ai don taimako, sannan ka sake kunna Mai bitar lamba."
+        "description": "An kashe Mai bitar lamba saboda jerin adiresoshin IP da wannan ƙungiyar GitHub ta amince da su yana hana Kilo shiga. Tuntuɓi {{supportEmail}} don taimako, sannan ka sake kunna Mai bitar lamba."
       },
       "gitlabProjectAccessRequired": {
         "description": "An kashe Mai bitar lamba saboda Kilo ba zai iya ƙirƙirar lambar izinin shiga wannan aikin GitLab ba. Ba da izinin mai kula da aikin ko kunna lambobin izinin shiga aikin, sannan ka sake kunna Mai bitar lamba.",
@@ -1567,7 +1568,7 @@
         "recoveryLabel": "Sabunta saitunan Mai bitar lamba"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "An kashe Mai bitar lamba bayan kwafin ma'ajiyar ya kasa ƙarewa cikin lokacin da aka ba shi sau uku yau. Tuntuɓi hi@kilo.ai don taimako, sannan ka sake kunna Mai bitar lamba."
+        "description": "An kashe Mai bitar lamba bayan kwafin ma'ajiyar ya kasa ƙarewa cikin lokacin da aka ba shi sau uku yau. Tuntuɓi {{supportEmail}} don taimako, sannan ka sake kunna Mai bitar lamba."
       },
       "title": "Mai bitar lambar shiri yana buƙatar kulawa.",
       "recoveryLabel": "Tuntuɓi masu tallafi"
@@ -2428,6 +2429,7 @@
       "title": "Wakili yana buƙatar bayani",
       "skipQuestionsTitle": "Tsallake tambayoyi?",
       "skipQuestionsMessage": "Wakilin zai tsallake wannan mataki.",
+      "answerProgress": "An amsa {{answered}} daga cikin {{total}}",
       "selectAllThatApply": "Zaɓi duk amsoshin da suka dace.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, an zaɓa",
@@ -3322,6 +3324,10 @@
     },
     "backends": {
       "title": "Uwar garken tattaunawa",
+      "providersTitle": "Masu ba da hira",
+      "cloud": "A cikin girgije",
+      "cloudModel": "Samfuri: {{model}}",
+      "cloudUnavailable": "Samfuran Kilo ba su nan a yanzu. Duba haɗin ka.",
       "manage": "Sarrafa uwar garken tattaunawa",
       "defaultKilo": "$t(consent.kilo) (na asali)",
       "kiloHelp": "Uwar garken da aka gina a ciki tana amfani da asusunka na Kilo kuma ba za a iya gyara ko share ta ba.",
@@ -3381,7 +3387,6 @@
     "gguf": {
       "title": "Samfuran da ake iya saukewa",
       "help": "Sauke buɗaɗɗen samfuri ka gudanar da shi a wannan wayar da llama.cpp. Saƙonninka da amsoshi suna zama a kan na'urar. Samfuran manya ne, don haka yi amfani da Wi-Fi.",
-      "details": "{{size}} · Lasisi: {{license}}",
       "download": "Sauke samfuri",
       "pause": "Dakatar da saukewa",
       "resume": "Ci gaba da saukewa",
@@ -3393,6 +3398,8 @@
       "url": "Hanyar haɗin sauke kai tsaye",
       "urlHelp": "Manna hanyar haɗi ta HTTPS zuwa fayil ɗin .gguf, kamar hanyar haɗin resolve ta Hugging Face. Ka sauke samfura daga tushen da ka amince da su kawai.",
       "downloadUrl": "Sauke daga hanyar haɗi",
+      "advanced": "Na ci gaba",
+      "localPurpose": "Yana aiki a wannan na'ura da llama.cpp. Umarni da amsoshi suna zama a na'urar.",
       "deleteTitle": "Share wannan samfurin?",
       "deleteMessage": "Share {{name}} daga wannan na'urar? Tattaunawar da ke amfani da shi tana buƙatar wani samfuri kafin ta iya ci gaba.",
       "errors": {
@@ -3421,8 +3428,17 @@
         "fits": "Ya dace",
         "tight": "Da kyar ya dace",
         "tooLarge": "Ya yi girma sosai",
-        "noStorage": "Babu isasshen ma'ajiya"
+        "noStorage": "Babu isasshen ma'ajiya",
+        "unknown": "Ba a san dacewa ba"
       },
+      "recommendationsHelp": "Wata gajeriyar jeri da wannan manhajar ta kayyade: fayil ɗaya ga kowace samfuri, daga mawallafi da ke bayyana lasisi. Ba a rarraba wani abu.",
+      "compatibilityHelp": "Dacewa tana kwatanta fayil ɗin samfurin da ƙwaƙwalwa da sarari na wannan na'urar. Adadin ƙwaƙwalwar ƙiyasi ne, ba ma'auni ba.",
+      "text": "Rubutu",
+      "listTextPurpose": "Umarnin rubutu kawai.",
+      "listImagePurpose": "Yana karanta hotuna da rubutu.",
+      "smallestDownload": "Ƙaramin saukewa: {{size}} · kusan {{memory}} na ƙwaƙwalwa",
+      "fullFileName": "Fayil: {{name}}",
+      "memoryEstimateNote": "Adadin ƙwaƙwalwa ƙiyasi ne, ba ma'auni ba.",
       "parameters": "Sigogi: {{value}}",
       "downloads": "Saukewa: {{value}}",
       "likes": "Masu so: {{value}}",
@@ -3447,7 +3463,8 @@
     },
     "localModels": {
       "title": "Samfuran da ke kan na'ura",
-      "help": "Samfuran da ke kan na'ura suna aiki a wannan wayar. Saƙonninka da amsoshi suna zama a kan na'urar, kuma waɗannan samfuran ba sa iya amfani da kayan aiki.",
+      "help": "Samfuran da ke kan na'ura suna aiki a wannan wayar. Saƙonninka da amsoshi suna zama a kan na'urar.",
+      "systemPurpose": "Samfurin da aka gina cikin tsarin wannan na'urar. Yana aiki a kan na'urar.",
       "apple": "Apple Intelligence (a kan na'ura)",
       "checking": "Ana duba samuwa…",
       "ready": "A shirye don amfani",
@@ -3748,12 +3765,26 @@
       "startNow": "Fara ba tare da bita ba",
       "startNowHint": "Danna tsawon lokaci domin farawa ba tare da bita ba",
       "titleLabel": "Taken aiki",
+      "renameTitle": "Sake sunan aiki",
       "notes": "Bayanan kula",
-      "notesPlaceholder": "Ƙara bayanan kula a cikin Markdown",
+      "addNotes": "Ƙara bayanin kula",
+      "notesPrompt": "Ƙara mahalli, buƙatu, ko ma'aunin karɓa.",
+      "markdownSupported": "Ana goyan bayan Markdown",
       "sessions": "Zamannin da aka haɗa",
       "noSessions": "Babu zamanni tukuna",
+      "untitledLinkedSession": "Zama mai alaƙa",
+      "sessionNeedsInput": "Zama yana buƙatar shigarwa",
+      "sessionRunning": "Zama yana gudana",
+      "sessionFinished": "Zama ya ƙare",
+      "sessionPullRequest": "PR na zama",
+      "sessionPullRequestNumber": "PR na zama #{{number}}",
+      "openSessionHint": "Yana buɗe zama.",
+      "unlinkSessionAction": "Cire alaƙar zama",
+      "unlinkConfirmTitle": "Cire alaƙar {{title}}?",
+      "unlinkConfirmMessage": "Ba a share zama kanta ba. Ana cire alaƙarta da wannan aikin ne kawai.",
+      "startNewSession": "Fara sabon zama",
+      "startNewSessionHint": "Riƙe dogon lokaci don fara sabon zama.",
       "linkSession": "Haɗa zama",
-      "unlinkSession": "Cire haɗin {{title}}",
       "linkFailed": "An kasa haɗa zaman da aikin"
     },
     "linkSession": {

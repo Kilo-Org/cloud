@@ -28,11 +28,12 @@ import {
   createKiloRuntimes,
   defaultKiloPidfileDirectory,
   type KiloRuntimesOptions,
+  liveRuntimeClient,
 } from './kilo-runtime.js';
-import { createPreparationManager, runtimeKey } from './prepare.js';
+import { createPreparationManager, runtimeKey, type PreparationManager } from './prepare.js';
 import { createWorkspaceCapture, type WorkspaceCapture } from './workspace-capture.js';
 import { createTurnManager, type TurnManager, type TurnManagerDeps } from './turn.js';
-import { createControlPlaneTerminals } from './terminals.js';
+import { createControlPlaneTerminals, type ControlPlaneTerminalRuntime } from './terminals.js';
 import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
@@ -208,6 +209,95 @@ export function createControlPlaneSessionHost(options: {
 }
 
 /**
+ * The `session.*`/`terminal.*`/`worktree.*` frame dispatcher, split out of
+ * {@link runControlPlaneWrapper} so the production routing can be constructed
+ * with real managers in a test. The holder objects are read at frame time, so
+ * construction order does not change behavior.
+ */
+export type ControlPlaneFrameDispatcherDeps = {
+  preparation: { current?: PreparationManager };
+  turns: { current?: TurnManager };
+  terminals: { current?: ControlPlaneTerminalRuntime };
+  capture: { current?: WorkspaceCapture };
+  worktreeChanges: { current?: ReturnType<typeof createControlPlaneWorktreeChanges> };
+  worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
+  send: (frame: ControlPlaneWrapperFrame) => void;
+  log: (message: string) => void;
+};
+
+export function createControlPlaneFrameDispatcher(
+  deps: ControlPlaneFrameDispatcherDeps
+): (frame: ControlPlaneWrapperFrame) => void {
+  return function onFrame(frame: ControlPlaneWrapperFrame): void {
+    switch (frame.type) {
+      case 'session.prepare':
+        deps.turns.current?.registerRoute(frame.spec);
+        void deps.preparation.current
+          ?.prepare(frame.spec, frame.credentials)
+          .then(() => {
+            if (deps.preparation.current?.isPrepared(frame.spec.sessionId)) {
+              try {
+                deps.terminals.current?.rememberAttachedSession(
+                  {
+                    sessionId: frame.spec.sessionId,
+                    kiloSessionId: frame.spec.kiloSessionId,
+                    directory: frame.spec.directory,
+                  },
+                  runtimeKey(frame.spec)
+                );
+              } catch {
+                // Terminal attachment is best-effort; a missing runtime is
+                // reported as `not_ready` when a terminal is requested.
+              }
+            }
+            return deps.turns.current?.publishCommands(frame.spec.sessionId);
+          })
+          .catch(() => undefined);
+        return;
+      case 'workspace.captured':
+        deps.capture.current?.onCaptured(frame.sessionId, frame.ok);
+        return;
+      case 'session.credentials':
+        void deps.preparation.current?.installCredentials(frame);
+        return;
+      case 'session.prompt':
+        deps.turns.current?.submit(frame.sessionId, frame.payload);
+        return;
+      case 'session.abort':
+        deps.turns.current?.abort(frame.sessionId);
+        return;
+      case 'session.answer':
+        void deps.turns.current?.answer(frame.sessionId, frame.reply);
+        return;
+      case 'session.release':
+        deps.turns.current?.release(frame.sessionId);
+        deps.preparation.current?.release(frame.sessionId);
+        void deps.terminals.current?.forgetSession(frame.sessionId);
+        return;
+      case 'worktree.snapshot':
+      case 'worktree.summary':
+        void deps.worktreeChanges.current?.handle(frame);
+        return;
+      case 'worktree.prepareDeletion':
+      case 'worktree.delete':
+        void deps.worktreeDeletion.current?.handle(frame);
+        return;
+      case 'terminal.create':
+      case 'terminal.resize':
+      case 'terminal.close':
+      case 'terminal.connect':
+        void deps.terminals.current
+          ?.handle(frame)
+          .then(result => deps.send(result))
+          .catch(() => undefined);
+        return;
+      default:
+        deps.log(`control-plane frame ${frame.type}`);
+    }
+  };
+}
+
+/**
  * Process entry for the control-plane wrapper. Runs forever until `shutdown`
  * frame, SIGTERM or an uncaught exception; a disconnect never exits.
  */
@@ -309,73 +399,16 @@ export async function runControlPlaneWrapper(
     log: logToFile,
     onNativeDiagnostic: projector,
     getHeartbeat: host.getHeartbeat,
-    onFrame: (frame: ControlPlaneWrapperFrame) => {
-      switch (frame.type) {
-        case 'session.prepare':
-          turnsRef.current?.registerRoute(frame.spec);
-          void preparationRef.current
-            ?.prepare(frame.spec, frame.credentials)
-            .then(() => {
-              if (preparationRef.current?.isPrepared(frame.spec.sessionId)) {
-                try {
-                  terminalsRef.current?.rememberAttachedSession(
-                    {
-                      sessionId: frame.spec.sessionId,
-                      kiloSessionId: frame.spec.kiloSessionId,
-                      directory: frame.spec.directory,
-                    },
-                    runtimeKey(frame.spec)
-                  );
-                } catch {
-                  // Terminal attachment is best-effort; a missing runtime is
-                  // reported as `not_ready` when a terminal is requested.
-                }
-              }
-              return turnsRef.current?.publishCommands(frame.spec.sessionId);
-            })
-            .catch(() => undefined);
-          return;
-        case 'workspace.captured':
-          captureRef.current?.onCaptured(frame.sessionId, frame.ok);
-          return;
-        case 'session.credentials':
-          void preparationRef.current?.installCredentials(frame);
-          return;
-        case 'session.prompt':
-          turnsRef.current?.submit(frame.sessionId, frame.payload);
-          return;
-        case 'session.abort':
-          turnsRef.current?.abort(frame.sessionId);
-          return;
-        case 'session.answer':
-          void turnsRef.current?.answer(frame.sessionId, frame.reply);
-          return;
-        case 'session.release':
-          turnsRef.current?.release(frame.sessionId);
-          preparationRef.current?.release(frame.sessionId);
-          void terminalsRef.current?.forgetSession(frame.sessionId);
-          return;
-        case 'worktree.snapshot':
-        case 'worktree.summary':
-          void worktreeChangesRef.current?.handle(frame);
-          return;
-        case 'worktree.prepareDeletion':
-        case 'worktree.delete':
-          void worktreeDeletionRef.current?.handle(frame);
-          return;
-        case 'terminal.create':
-        case 'terminal.resize':
-        case 'terminal.close':
-        case 'terminal.connect':
-          void terminalsRef.current
-            ?.handle(frame)
-            .then(result => connection.send(result))
-            .catch(() => undefined);
-          return;
-        default:
-          logToFile(`control-plane frame ${frame.type}`);
-      }
-    },
+    onFrame: createControlPlaneFrameDispatcher({
+      preparation: preparationRef,
+      turns: turnsRef,
+      terminals: terminalsRef,
+      capture: captureRef,
+      worktreeChanges: worktreeChangesRef,
+      worktreeDeletion: worktreeDeletionRef,
+      send: frame => connection.send(frame),
+      log: logToFile,
+    }),
     onShutdown: reason => shutdownRef.current?.(reason),
     onConnected: () => diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true }),
     onDisconnected: reason => logToFile(`control-plane disconnected: ${reason}`),
@@ -401,6 +434,7 @@ export async function runControlPlaneWrapper(
         const runtime = runtimes.get(key);
         return !runtime || runtime.isUnavailable();
       },
+      getLiveClient: key => liveRuntimeClient(runtimes.get(key)),
       remove: key => runtimes.remove(key),
       release: key => runtimes.remove(key),
     },

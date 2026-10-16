@@ -133,6 +133,7 @@
     "status": "ሁኔታ",
     "truncated": "ተቆርጧል",
     "updated": "ተዘምኗል",
+    "generating": "በማመንጨት ላይ…",
     "working": "በመሥራት ላይ",
     "yourOwnRepositories": "የራስህ ማከማቻዎች",
     "dismissed": "ተወግዷል",
@@ -1259,7 +1260,7 @@
         "stoppedTitle": "ማዋቀር ቆሟል",
         "stoppedBody": "የ{{name}} ኢንስታንስ በማዋቀር ወቅት ባልተጠበቀ ሁኔታ ቆሟል።",
         "stalledTitle": "ማዋቀሩ ተቋርጧል",
-        "stalledBody": "{{name}}ን ማዋቀር ማጠናቀቅ አልቻልንም። እንደገና ሞክር፤ ችግሩ ከቀጠለ ወደ hi@kilo.ai ኢሜይል ላክ።",
+        "stalledBody": "{{name}}ን ማዋቀር ማጠናቀቅ አልቻልንም። እንደገና ሞክር፤ ችግሩ ከቀጠለ ወደ {{supportEmail}} ኢሜይል ላክ።",
         "timeoutTitle": "ከተጠበቀው በላይ ጊዜ እየወሰደ ነው",
         "timeoutBody": "የ{{name}} ማዋቀር ከወትሮው በላይ ጊዜ እየወሰደ ነው (ከ{{displayMinutes}} ደቂቃዎች በላይ)።",
         "continueInBackground": "ከበስተጀርባ ቀጥል",
@@ -1317,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "የቅድሚያ መዳረሻ ዕቅድህን በሞባይል ላይ ከመጠቀምህ በፊት በሰው መገምገም ያስፈልጋል።",
       "iosTitle": "KiloClaw በiOS አይገኝም",
       "iosBody": "ለዚህ መለያ የKiloClaw መዳረሻ ከiOS መተግበሪያ ውጭ ነው የሚተዳደረው።",
-      "iosContact": "ጥያቄ አለህ? ወደ hi@kilo.ai ጻፍ።",
+      "iosContact": "ጥያቄ አለህ? ወደ {{supportEmail}} ጻፍ።",
       "quarantinedCta": "ለቡድናችን ኢሜይል ላክ",
       "nonCanonicalEarlybirdCta": "ዕቅድህን በkilo.ai ላይ ገምግም"
     },
@@ -1552,7 +1553,7 @@
         "recoveryLabel": "የGitHub መተግበሪያውን ያዘምኑ"
       },
       "githubIpAllowList": {
-        "description": "ይህ የGitHub ድርጅት Kiloን የሚያግድ የተፈቀዱ የIP አድራሻዎች ዝርዝር ስለሚጠቀም የኮድ ገምጋሚው ተሰናክሏል። ለእርዳታ በhi@kilo.ai ያግኙን፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።"
+        "description": "ይህ የGitHub ድርጅት Kiloን የሚያግድ የተፈቀዱ የIP አድራሻዎች ዝርዝር ስለሚጠቀም የኮድ ገምጋሚው ተሰናክሏል። ለእርዳታ በ{{supportEmail}} ያግኙን፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።"
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo ለዚህ ፕሮጀክት የGitLab ፕሮጀክት መዳረሻ ቶከን መፍጠር ስላልቻለ የኮድ ገምጋሚው ተሰናክሏል። የፕሮጀክት ተንከባካቢ ፈቃድ ይስጡ ወይም የፕሮጀክት መዳረሻ ቶከኖችን ያንቁ፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።",
@@ -1567,7 +1568,7 @@
         "recoveryLabel": "የኮድ ገምጋሚ ቅንብሮችን ያዘምኑ"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "ዛሬ ማከማቻውን ለመቅዳት የተደረጉ ሦስት ሙከራዎች ከጊዜ ገደባቸው ስላለፉ የኮድ ገምጋሚው ተሰናክሏል። ለእርዳታ በhi@kilo.ai ያግኙን፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።"
+        "description": "ዛሬ ማከማቻውን ለመቅዳት የተደረጉ ሦስት ሙከራዎች ከጊዜ ገደባቸው ስላለፉ የኮድ ገምጋሚው ተሰናክሏል። ለእርዳታ በ{{supportEmail}} ያግኙን፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።"
       },
       "title": "የኮድ ገምጋሚው ትኩረትህን ይፈልጋል።",
       "recoveryLabel": "የድጋፍ ቡድኑን አግኝ"
@@ -2428,6 +2429,7 @@
       "title": "ወኪሉ መልስ ይፈልጋል",
       "skipQuestionsTitle": "ጥያቄዎቹን መዝለል ይፈልጋሉ?",
       "skipQuestionsMessage": "ወኪሉ ይህን እርምጃ ይዘልለዋል።",
+      "answerProgress": "ከ{{total}} ውስጥ {{answered}} ተመልሰዋል",
       "selectAllThatApply": "የሚመለከቱትን ሁሉ ይምረጡ።",
       "option": "አማራጭ፦ {{label}}",
       "optionSelected": "{{label}}፣ ተመርጧል",
@@ -3322,6 +3324,10 @@
     },
     "backends": {
       "title": "የውይይት የጀርባ አገልግሎቶች",
+      "providersTitle": "የውይይት አቅራቢዎች",
+      "cloud": "በደመና ውስጥ",
+      "cloudModel": "ሞዴል፦ {{model}}",
+      "cloudUnavailable": "የKilo ሞዴሎች አሁን አይገኙም። ግንኙነትህን አረጋግጥ።",
       "manage": "የጀርባ አገልግሎቶችን አስተዳድር",
       "defaultKilo": "$t(consent.kilo) (ነባሪ)",
       "kiloHelp": "አብሮ የተሰራው የጀርባ አገልግሎት የKilo መለያዎን ይጠቀማል፤ ማርትዕ ወይም መሰረዝ አይቻልም።",
@@ -3381,7 +3387,6 @@
     "gguf": {
       "title": "ሊወርዱ የሚችሉ ሞዴሎች",
       "help": "ክፍት ሞዴል አውርደው በዚህ ስልክ ላይ በllama.cpp ያሂዱት። ጥያቄዎችዎና ምላሾችዎ በመሣሪያው ላይ ይቆያሉ። ሞዴሎች ትልቅ ናቸው፤ ስለዚህ Wi-Fi ይጠቀሙ።",
-      "details": "{{size}} · ፈቃድ፦ {{license}}",
       "download": "ሞዴል አውርድ",
       "pause": "ማውረዱን አቁም",
       "resume": "ማውረዱን ቀጥል",
@@ -3393,6 +3398,8 @@
       "url": "ቀጥታ የማውረድ አገናኝ",
       "urlHelp": "ወደ .gguf ፋይል የሚወስድ HTTPS አገናኝ ይለጥፉ፤ ለምሳሌ የHugging Face resolve አገናኝ። ሞዴሎችን የሚያምኗቸው ምንጮች ላይ ብቻ ያውርዱ።",
       "downloadUrl": "ከአገናኝ አውርድ",
+      "advanced": "የላቀ",
+      "localPurpose": "በllama.cpp በዚህ መሣሪያ ላይ ይሠራል። ጥያቄዎችና መልሶች በመሣሪያው ላይ ይቆያሉ።",
       "deleteTitle": "ይህን ሞዴል ይሰረዝ?",
       "deleteMessage": "{{name}}ን ከዚህ መሣሪያ ይሰረዝ? እሱን የሚጠቀሙ ውይይቶች ከመቀጠላቸው በፊት ሌላ ሞዴል ያስፈልጋቸዋል።",
       "errors": {
@@ -3421,8 +3428,17 @@
         "fits": "ይስማማል",
         "tight": "በጭንቅ ይስማማል",
         "tooLarge": "በጣም ትልቅ",
-        "noStorage": "በቂ ማከማቻ የለም"
+        "noStorage": "በቂ ማከማቻ የለም",
+        "unknown": "ተስማሚነት አይታወቅም"
       },
+      "recommendationsHelp": "ይህ መተግበሪያ የሚያስቀምጠው አጭር ዝርዝር፦ ለእያንዳንዱ ሞዴል አንድ ፋይል፣ ፈቃድ ከሚገልጽ አሳታሚ። ሌላ ምንም አይመደብም።",
+      "compatibilityHelp": "ተስማሚነት የሞዴሉን ፋይል ከዚህ መሣሪያ ማህደረ-ትውስታና ከነጻ ማከማቻ ጋር ያወዳድራል። የማህደረ-ትውስታ ቁጥር ግምት ነው፣ መለኪያ አይደለም።",
+      "text": "ጽሑፍ",
+      "listTextPurpose": "ጽሑፍ ጥያቄዎች ብቻ።",
+      "listImagePurpose": "ምስሎችንም እንዲሁም ጽሑፍን ያነባል።",
+      "smallestDownload": "ትንሹ የሚወርድ፦ {{size}} · በግምት {{memory}} ማህደረ-ትውስታ",
+      "fullFileName": "ፋይል፦ {{name}}",
+      "memoryEstimateNote": "የማህደረ-ትውስታ ቁጥሮች ግምቶች ናቸው፣ መለኪያዎች አይደሉም።",
       "parameters": "ፓራሜትሮች፦ {{value}}",
       "downloads": "ውርዶች፦ {{value}}",
       "likes": "መውደዶች፦ {{value}}",
@@ -3447,7 +3463,8 @@
     },
     "localModels": {
       "title": "በመሣሪያ ላይ ያሉ ሞዴሎች",
-      "help": "በመሣሪያ ላይ ያሉ ሞዴሎች በዚህ ስልክ ላይ ይሠራሉ። ጥያቄዎችዎና ምላሾችዎ በመሣሪያው ላይ ይቆያሉ፤ እነዚህ ሞዴሎች መሳሪያዎችን መጠቀም አይችሉም።",
+      "help": "በመሣሪያ ላይ ያሉ ሞዴሎች በዚህ ስልክ ላይ ይሠራሉ። ጥያቄዎችዎና ምላሾችዎ በመሣሪያው ላይ ይቆያሉ።",
+      "systemPurpose": "በዚህ መሣሪያ ሥርዓት ውስጥ የተገነባው ሞዴል። በመሣሪያው ላይ ይሠራል።",
       "apple": "Apple Intelligence (በመሣሪያ ላይ)",
       "checking": "መገኘቱን በማረጋገጥ ላይ…",
       "ready": "ለአገልግሎት ዝግጁ",
@@ -3748,12 +3765,26 @@
       "startNow": "ያለ ግምገማ ጀምር",
       "startNowHint": "ያለ ግምገማ ለመጀመር ተጭነው ይያዙ",
       "titleLabel": "የተግባር ርዕስ",
+      "renameTitle": "ተግባርን እንደገና ሰይም",
       "notes": "ማስታወሻዎች",
-      "notesPlaceholder": "ማስታወሻዎችን በMarkdown ጨምር",
+      "addNotes": "ማስታወሻዎች ጨምር",
+      "notesPrompt": "አውድ፣ መስፈርቶች ወይም የመቀበያ መስፈርቶች ጨምር።",
+      "markdownSupported": "Markdown ይደገፋል",
       "sessions": "የተገናኙ ክፍለ ጊዜዎች",
       "noSessions": "እስካሁን ክፍለ ጊዜ የለም",
+      "untitledLinkedSession": "የተገናኘ ክፍለ-ጊዜ",
+      "sessionNeedsInput": "ክፍለ-ጊዜ ግብዓት ይፈልጋል",
+      "sessionRunning": "ክፍለ-ጊዜ በሂደት ላይ",
+      "sessionFinished": "ክፍለ-ጊዜ ተጠናቅቋል",
+      "sessionPullRequest": "የክፍለ-ጊዜ የማዋሃጃ ጥያቄ",
+      "sessionPullRequestNumber": "የክፍለ-ጊዜ PR #{{number}}",
+      "openSessionHint": "ክፍለ-ጊዜውን ይከፍታል።",
+      "unlinkSessionAction": "የክፍለ-ጊዜ አገናኝ አስወግድ",
+      "unlinkConfirmTitle": "የ{{title}} አገናኝ ይወገድ?",
+      "unlinkConfirmMessage": "ክፍለ-ጊዜው ራሱ አይሰረዝም። ከዚህ ተግባር ጋር ያለው አገናኝ ብቻ ይወገዳል።",
+      "startNewSession": "አዲስ ክፍለ-ጊዜ ጀምር",
+      "startNewSessionHint": "አዲስ ክፍለ-ጊዜ ለመጀመር ረዘም ብለህ ተጫን።",
       "linkSession": "ክፍለ ጊዜ አገናኝ",
-      "unlinkSession": "የ{{title}} አገናኝ አስወግድ",
       "linkFailed": "ክፍለ ጊዜውን ከተግባሩ ጋር ማገናኘት አልተቻለም"
     },
     "linkSession": {

@@ -16,12 +16,11 @@ import type { AllocationView } from './allocation.js';
 export type AllocationStatusSnapshotInput = {
   /** The V2 allocation view, or null when the sandbox has no owner. */
   allocation: AllocationView | null;
-  containersInstance?: string;
   /** Snapshot creation time; the value of `observedAt`. */
   observedAt: number;
   /**
-   * The applicable sandbox inactivity bound, from
-   * `resolveControlPlaneTimers(env).sandbox.idleMs`.
+   * The connected sandbox's heartbeat-confirmed idle stop, independent of the
+   * allocation recovery and provider lease backstops.
    */
   inactivityTimeoutMs: number;
 };
@@ -30,7 +29,10 @@ export function projectAllocationStatusSnapshot(
   input: AllocationStatusSnapshotInput
 ): SandboxStatusSnapshot {
   const { allocation, observedAt, inactivityTimeoutMs } = input;
-  const containersInstance = input.containersInstance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
+  const containersInstance =
+    allocation?.configuration?.provider === 'cloudflare-containers'
+      ? (allocation.configuration.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE)
+      : CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
   const base = {
     provider: getSandboxProviderLabel(allocation?.provider),
     observedAt,

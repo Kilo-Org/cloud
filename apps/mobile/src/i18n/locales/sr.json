@@ -133,6 +133,7 @@
     "status": "Stanje",
     "truncated": "Skraćeno",
     "updated": "Ažurirano",
+    "generating": "Generisanje…",
     "working": "U radu",
     "yourOwnRepositories": "Tvoji repozitorijumi",
     "dismissed": "Odbačeno",
@@ -1277,7 +1278,7 @@
         "stoppedTitle": "Podešavanje zaustavljeno",
         "stoppedBody": "Instanca za {{name}} se neočekivano zaustavila tokom podešavanja.",
         "stalledTitle": "Podešavanje je zastalo",
-        "stalledBody": "Nismo uspeli da završimo podešavanje za {{name}}. Pokušaj ponovo ili piši na hi@kilo.ai ako se problem ponavlja.",
+        "stalledBody": "Nismo uspeli da završimo podešavanje za {{name}}. Pokušaj ponovo ili piši na {{supportEmail}} ako se problem ponavlja.",
         "timeoutTitle": "Traje duže nego što se očekivalo",
         "timeoutBody": "Podešavanje za {{name}} traje duže nego obično (preko {{displayMinutes}} minuta).",
         "continueInBackground": "Nastavi u pozadini",
@@ -1335,7 +1336,7 @@
       "nonCanonicalEarlybirdBody": "Tvoj plan ranog pristupa mora da prođe ručnu proveru pre korišćenja u mobilnoj aplikaciji.",
       "iosTitle": "KiloClaw nije dostupan u iOS-u",
       "iosBody": "Pristupom usluzi KiloClaw za ovaj nalog upravlja se van iOS aplikacije.",
-      "iosContact": "Imaš pitanja? Piši na hi@kilo.ai.",
+      "iosContact": "Imaš pitanja? Piši na {{supportEmail}}.",
       "quarantinedCta": "Pošalji e-mejl našem timu",
       "nonCanonicalEarlybirdCta": "Pregledaj svoj plan na kilo.ai"
     },
@@ -1571,7 +1572,7 @@
         "recoveryLabel": "Ažuriraj GitHub aplikaciju"
       },
       "githubIpAllowList": {
-        "description": "Agent za pregled koda je isključen jer ova GitHub organizacija blokira Kilo listom dozvoljenih IP adresa. Zatraži pomoć na hi@kilo.ai, pa ponovo uključi agenta za pregled koda."
+        "description": "Agent za pregled koda je isključen jer ova GitHub organizacija blokira Kilo listom dozvoljenih IP adresa. Zatraži pomoć na {{supportEmail}}, pa ponovo uključi agenta za pregled koda."
       },
       "gitlabProjectAccessRequired": {
         "description": "Agent za pregled koda je isključen jer Kilo ne može da kreira token za pristup ovom projektu na GitLab-u. Dodeli pristup za održavanje projekta ili omogući tokene za pristup projektu, pa ponovo uključi agenta za pregled koda.",
@@ -1586,7 +1587,7 @@
         "recoveryLabel": "Ažuriraj podešavanja agenta za pregled koda"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Agent za pregled koda je isključen jer je danas tri puta istekao rok za kloniranje repozitorijuma. Zatraži pomoć na hi@kilo.ai, pa ponovo uključi agenta za pregled koda."
+        "description": "Agent za pregled koda je isključen jer je danas tri puta istekao rok za kloniranje repozitorijuma. Zatraži pomoć na {{supportEmail}}, pa ponovo uključi agenta za pregled koda."
       },
       "title": "Agent za pregled koda zahteva tvoju pažnju.",
       "recoveryLabel": "Kontaktiraj podršku"
@@ -2460,6 +2461,7 @@
       "title": "Agent čeka odgovor",
       "skipQuestionsTitle": "Preskočiti pitanja?",
       "skipQuestionsMessage": "Agent će preskočiti ovaj korak.",
+      "answerProgress": "Odgovoreno {{answered}} od {{total}}",
       "selectAllThatApply": "Izaberi sve što odgovara.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, izabrano",
@@ -3363,6 +3365,10 @@
     },
     "backends": {
       "title": "Pozadinski servisi za ćaskanje",
+      "providersTitle": "Provajderi ćaskanja",
+      "cloud": "U oblaku",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo modeli trenutno nisu dostupni. Proveri vezu.",
       "manage": "Upravljaj pozadinskim servisima",
       "defaultKilo": "$t(consent.kilo) (podrazumevani)",
       "kiloHelp": "Ugrađeni pozadinski servis koristi tvoj Kilo nalog i ne može se urediti ni obrisati.",
@@ -3422,7 +3428,6 @@
     "gguf": {
       "title": "Modeli za preuzimanje",
       "help": "Preuzmite otvoreni model i pokrenite ga na ovom telefonu pomoću llama.cpp. Vaši upiti i odgovori ostaju na uređaju. Modeli su veliki, pa koristite Wi-Fi.",
-      "details": "{{size}} · Licenca: {{license}}",
       "download": "Preuzmite model",
       "pause": "Pauzirajte preuzimanje",
       "resume": "Nastavite preuzimanje",
@@ -3434,6 +3439,8 @@
       "url": "Direktan link za preuzimanje",
       "urlHelp": "Nalepite HTTPS link do .gguf fajla, na primer Hugging Face resolve link. Preuzimajte modele samo sa izvora kojima verujete.",
       "downloadUrl": "Preuzmite sa linka",
+      "advanced": "Napredno",
+      "localPurpose": "Radi na ovom uređaju pomoću llama.cpp. Upiti i odgovori ostaju na uređaju.",
       "deleteTitle": "Obrisati ovaj model?",
       "deleteMessage": "Obrisati {{name}} sa ovog uređaja? Razgovori koji ga koriste zahtevaju drugi model pre nego što mogu da nastave.",
       "errors": {
@@ -3462,8 +3469,17 @@
         "fits": "Odgovara",
         "tight": "Jedva odgovara",
         "tooLarge": "Prevelik",
-        "noStorage": "Nema dovoljno prostora"
+        "noStorage": "Nema dovoljno prostora",
+        "unknown": "Odgovaranje nepoznato"
       },
+      "recommendationsHelp": "Kratak spisak koji ova aplikacija zakači: jedna datoteka po modelu, od izdavača koji navodi licencu. Ništa drugo se ne rangira.",
+      "compatibilityHelp": "Odgovaranje poredi datoteku modela sa memorijom i slobodnim prostorom ovog uređaja. Podatak o memoriji je procena, a ne merenje.",
+      "text": "Tekst",
+      "listTextPurpose": "Samo tekstualni upiti.",
+      "listImagePurpose": "Čita i slike i tekst.",
+      "smallestDownload": "Najmanje preuzimanje: {{size}} · oko {{memory}} memorije",
+      "fullFileName": "Datoteka: {{name}}",
+      "memoryEstimateNote": "Podaci o memoriji su procene, a ne merenja.",
       "parameters": "Parametri: {{value}}",
       "downloads": "Preuzimanja: {{value}}",
       "likes": "Sviđanja: {{value}}",
@@ -3488,7 +3504,8 @@
     },
     "localModels": {
       "title": "Modeli na uređaju",
-      "help": "Modeli na uređaju rade na ovom telefonu. Vaši upiti i odgovori ostaju na uređaju, a ovi modeli ne mogu da koriste alate.",
+      "help": "Modeli na uređaju rade na ovom telefonu. Vaši upiti i odgovori ostaju na uređaju.",
+      "systemPurpose": "Model ugrađen u sistem ovog uređaja. Radi na uređaju.",
       "apple": "Apple Intelligence (na uređaju)",
       "checking": "Provera dostupnosti…",
       "ready": "Spremno za upotrebu",
@@ -3793,12 +3810,26 @@
       "startNow": "Pokreni bez pregleda",
       "startNowHint": "Pritisni i drži da pokreneš bez pregleda",
       "titleLabel": "Naslov zadatka",
+      "renameTitle": "Preimenuj zadatak",
       "notes": "Beleške",
-      "notesPlaceholder": "Dodaj beleške u Markdown formatu",
+      "addNotes": "Dodaj beleške",
+      "notesPrompt": "Dodaj kontekst, zahteve ili kriterijume prihvatanja.",
+      "markdownSupported": "Markdown je podržan",
       "sessions": "Povezane sesije",
       "noSessions": "Još nema sesija",
+      "untitledLinkedSession": "Povezana sesija",
+      "sessionNeedsInput": "Sesija čeka unos",
+      "sessionRunning": "Sesija je aktivna",
+      "sessionFinished": "Sesija je završena",
+      "sessionPullRequest": "PR sesije",
+      "sessionPullRequestNumber": "PR sesije #{{number}}",
+      "openSessionHint": "Otvara sesiju.",
+      "unlinkSessionAction": "Otpoji sesiju",
+      "unlinkConfirmTitle": "Otpojiti {{title}}?",
+      "unlinkConfirmMessage": "Sama sesija se ne briše. Uklanja se samo njena veza sa ovim zadatkom.",
+      "startNewSession": "Pokreni novu sesiju",
+      "startNewSessionHint": "Pritisni i drži da pokreneš novu sesiju.",
       "linkSession": "Poveži sesiju",
-      "unlinkSession": "Otpoji {{title}}",
       "linkFailed": "Sesija nije mogla da se poveže sa zadatkom"
     },
     "linkSession": {

@@ -3,9 +3,66 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   BenchmarkModelCatalogSchema,
   catalogCandidatePrices,
+  catalogModelProviders,
   fetchPlatformRegistryEntries,
   platformRegistryEntries,
 } from './platform-models';
+
+describe('catalog inference providers', () => {
+  it('preserves every canonical upstream identity rather than using the model author', () => {
+    const catalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        {
+          id: 'meta-llama/llama-3.3-70b-instruct',
+          inference_provider_ids: ['deepinfra', 'fireworks', 'together'],
+        },
+      ],
+    });
+    expect(catalogModelProviders(catalog, 'meta-llama/llama-3.3-70b-instruct')).toEqual([
+      'deepinfra',
+      'fireworks',
+      'together',
+    ]);
+  });
+
+  it('uses the canonical target providers instead of stale alias metadata', () => {
+    const catalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        {
+          id: '~vendor/latest',
+          alias_target: 'vendor/current',
+          inference_provider_ids: ['deepinfra'],
+        },
+        { id: 'vendor/current', inference_provider_ids: ['google-vertex', 'google-ai-studio'] },
+      ],
+    });
+    expect(catalogModelProviders(catalog, '~vendor/latest')).toEqual([
+      'google-vertex',
+      'google-ai-studio',
+    ]);
+  });
+
+  it('returns unknown when a model or its provider metadata is absent', () => {
+    const catalog = BenchmarkModelCatalogSchema.parse({
+      data: [{ id: 'anthropic/claude-sonnet' }],
+    });
+    expect(catalogModelProviders(catalog, 'anthropic/claude-sonnet')).toEqual([]);
+    expect(catalogModelProviders(catalog, 'missing/model')).toEqual([]);
+  });
+
+  it('retains published alias providers when the target is not listed', () => {
+    const catalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        {
+          id: '~vendor/latest',
+          alias_target: 'vendor/missing',
+          inference_provider_ids: ['deepinfra', 'deepinfra'],
+        },
+      ],
+    });
+    expect(catalogModelProviders(catalog, '~vendor/latest')).toEqual(['deepinfra']);
+  });
+});
 
 describe('catalog candidate pricing', () => {
   it('keeps normal models usable alongside variable-price virtual models', () => {
@@ -83,6 +140,57 @@ const catalog = BenchmarkModelCatalogSchema.parse({
 });
 
 describe('platform catalog expansion', () => {
+  it.each([
+    ['an alias and its concrete target', ['~vendor/latest', 'vendor/current']],
+    ['two aliases sharing a target', ['~vendor/latest', '~vendor/fast-latest']],
+  ])('deduplicates %s using the concrete target reasoning variants', (_label, ids) => {
+    const resolvedCatalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        {
+          id: '~vendor/latest',
+          alias_target: 'vendor/current',
+          opencode: { variants: { stale: { reasoning: { effort: 'low' } } } },
+        },
+        { id: '~vendor/fast-latest', alias_target: 'vendor/current' },
+        {
+          id: 'vendor/current',
+          opencode: { variants: { thinking: { reasoning: { effort: 'high' } } } },
+        },
+      ],
+    });
+    expect(
+      platformRegistryEntries({ deciderModels: ids.map(id => ({ id })) }, resolvedCatalog)
+    ).toEqual([{ model: 'vendor/current', variant: 'thinking' }]);
+  });
+
+  it('keeps an alias when its target is absent from the catalog', () => {
+    expect(
+      platformRegistryEntries(
+        { deciderModels: [{ id: '~vendor/latest' }] },
+        BenchmarkModelCatalogSchema.parse({
+          data: [{ id: '~vendor/latest', alias_target: 'vendor/missing' }],
+        })
+      )
+    ).toEqual([{ model: '~vendor/latest', variant: null }]);
+  });
+
+  it('requests a new concrete pair when an alias is retargeted', () => {
+    const config = { deciderModels: [{ id: '~vendor/latest' }] };
+    const entriesForTarget = (target: string) =>
+      platformRegistryEntries(
+        config,
+        BenchmarkModelCatalogSchema.parse({
+          data: [
+            { id: '~vendor/latest', alias_target: target },
+            { id: 'vendor/old' },
+            { id: 'vendor/new' },
+          ],
+        })
+      );
+    expect(entriesForTarget('vendor/old')).toEqual([{ model: 'vendor/old', variant: null }]);
+    expect(entriesForTarget('vendor/new')).toEqual([{ model: 'vendor/new', variant: null }]);
+  });
+
   it('expands manual and auto models into all and only explicit reasoning configurations', () => {
     expect(
       platformRegistryEntries(

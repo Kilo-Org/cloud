@@ -19,6 +19,10 @@ import {
   getKiloCommandsForSession,
   type KiloCommandForSession,
 } from './profile-kilo-commands-service';
+import {
+  getInstructionsForSession,
+  type InstructionForSession,
+} from './profile-instructions-service';
 import { resolveProfileLayers } from './profile-resolution';
 import { buildOwnershipCondition } from './profile-utils';
 import type { ProfileOwner } from './types';
@@ -47,6 +51,8 @@ export type MergedSkillForSession = {
 export type MergedAgentForSession = AgentForSession;
 
 export type MergedKiloCommandForSession = KiloCommandForSession;
+
+export type MergedInstructionForSession = InstructionForSession;
 
 /**
  * Permissive shape for an inline runtime skill supplied by the caller. The
@@ -109,6 +115,7 @@ export type MergeProfileConfigurationResult = {
    * the user saw selected.
    */
   resolvedProfileId?: string;
+  instructions?: MergedInstructionForSession[];
 };
 
 /** Ensure a profileId belongs to the given owner (or, for org context, to the user personally). */
@@ -156,6 +163,7 @@ type Layer = {
   skills: SkillForSession[];
   agents: AgentForSession[];
   kiloCommands: KiloCommandForSession[];
+  instructions: InstructionForSession[];
 };
 
 type ProfileLayerData = {
@@ -165,6 +173,7 @@ type ProfileLayerData = {
   skills: SkillForSession[];
   agents: AgentForSession[];
   kiloCommands: KiloCommandForSession[];
+  instructions: InstructionForSession[];
 };
 
 function profileToLayer(data: ProfileLayerData): Layer {
@@ -185,6 +194,7 @@ function profileToLayer(data: ProfileLayerData): Layer {
     skills: [...data.skills],
     agents: [...data.agents],
     kiloCommands: [...data.kiloCommands],
+    instructions: [...data.instructions],
   };
 }
 
@@ -241,6 +251,9 @@ function inlineToLayer(args: MergeProfileConfigurationArgs): Layer | null {
     // above (profileToLayer). Unresolved pass-through handles commands supplied
     // directly by the caller without merging.
     kiloCommands: [],
+    // Inline instructions are not supported either; like kilo commands they
+    // arrive only through the resolved-profile DB query path.
+    instructions: [],
   };
 }
 
@@ -260,6 +273,7 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
   const skillByName = new Map<string, MergedSkillForSession>();
   const agentBySlug = new Map<string, MergedAgentForSession>();
   const commandByName = new Map<string, KiloCommandForSession>();
+  const instructionByName = new Map<string, MergedInstructionForSession>();
 
   for (const layer of layers) {
     Object.assign(envVars, layer.envVars);
@@ -282,6 +296,9 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
     for (const cmd of layer.kiloCommands) {
       commandByName.set(cmd.name, cmd);
     }
+    for (const instruction of layer.instructions) {
+      instructionByName.set(instruction.name, instruction);
+    }
   }
 
   return {
@@ -292,6 +309,7 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
     skills: skillByName.size > 0 ? Array.from(skillByName.values()) : undefined,
     agents: agentBySlug.size > 0 ? Array.from(agentBySlug.values()) : undefined,
     kiloCommands: commandByName.size > 0 ? Array.from(commandByName.values()) : undefined,
+    instructions: instructionByName.size > 0 ? Array.from(instructionByName.values()) : undefined,
   };
 }
 
@@ -325,24 +343,43 @@ export async function mergeProfileConfiguration(
     explicitOverrideProfileId,
   });
 
-  // Load profile data for the resolved layers in parallel.
   const profilesToLoad: string[] = [];
   if (base) profilesToLoad.push(base.profileId);
   if (top) profilesToLoad.push(top.profileId);
 
-  const profileData = await Promise.all(
-    profilesToLoad.map(async id => {
-      const [vars, commands, mcpServers, skills, agents, kiloCommands] = await Promise.all([
-        getVarsForSession(db, id),
-        getCommandsForSession(db, id),
-        getMcpServersForSession(db, id),
-        getSkillsForSession(db, id),
-        getAgentsForSession(db, id),
-        getKiloCommandsForSession(db, id),
-      ]);
-      return { profileId: id, vars, commands, mcpServers, skills, agents, kiloCommands };
-    })
-  );
+  // Load profile data for the resolved layers in one read-only
+  // repeatable-read transaction. Each category is a separate SELECT, so without
+  // a shared snapshot a session prepared during a profile import could observe
+  // the new commands with the old agents. The snapshot makes resolution see
+  // either the complete old or the complete new bundle.
+  const profileData =
+    profilesToLoad.length === 0
+      ? []
+      : await db.transaction(
+          async tx => {
+            // The transaction handle has the same read builders as the
+            // pool-backed db these getters are typed for; only the nominal
+            // `$client` property differs between the two drizzle types.
+            const readDb = tx as unknown as WorkerDb;
+            const rows = [];
+            for (const id of profilesToLoad) {
+              // Sequential awaits keep every query on the transaction's single
+              // connection; the reads are cheap and the snapshot is what matters.
+              rows.push({
+                profileId: id,
+                vars: await getVarsForSession(readDb, id),
+                commands: await getCommandsForSession(readDb, id),
+                mcpServers: await getMcpServersForSession(readDb, id),
+                skills: await getSkillsForSession(readDb, id),
+                agents: await getAgentsForSession(readDb, id),
+                kiloCommands: await getKiloCommandsForSession(readDb, id),
+                instructions: await getInstructionsForSession(readDb, id),
+              });
+            }
+            return rows;
+          },
+          { isolationLevel: 'repeatable read', accessMode: 'read only' }
+        );
 
   // Stack layers in precedence order: repo-binding base < explicit/default
   // top < inline. The inline layer is built from the args and treated as

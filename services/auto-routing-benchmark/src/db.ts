@@ -7,15 +7,14 @@ import type {
   BenchmarkRunPurpose,
   ClassifierWinner,
   RankedCandidate,
+  PolicySettingComputedMap,
+  PolicySettingOverrides,
   ProductionTokenProfile,
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
-import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
-import type { PoolEntry } from '@kilocode/auto-routing-contracts';
-import {
-  BENCHMARK_CONTAINER_BUDGET,
-  BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH,
-} from '@kilocode/auto-routing-contracts';
+import { benchmarkPairKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
+import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
+import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
@@ -149,6 +148,16 @@ export async function getConfigRows(
   };
 }
 
+// Retired per-config lane budgets. Nothing in this worker reads them, but the
+// columns are NOT NULL and the previously deployed worker sizes runs from them
+// and rejects configs unless efficient max + efficient user + frontier max <=
+// 200. Writing today's production values on every save (80 + 40 + 80 = 200)
+// keeps that worker valid during rollout.
+const ROLLBACK_SAFE_LEGACY_LANE_BUDGETS = {
+  max_concurrency: 80,
+  user_max_concurrency: 40,
+};
+
 export async function replaceConfig(
   db: D1Database,
   config: {
@@ -160,13 +169,12 @@ export async function replaceConfig(
     production_token_profile?: ProductionTokenProfile | null;
     switch_horizon_turns?: number | null;
     low_confidence_threshold?: number | null;
-    max_concurrency: number;
-    user_max_concurrency: number;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
+    policy_overrides?: PolicySettingOverrides | null;
     updated_at: string;
     updated_by: string | null;
   },
@@ -178,10 +186,15 @@ export async function replaceConfig(
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm
       .insert(benchmarkConfig)
-      .values({ id: router === 'efficient' ? 1 : 2, ...config, router })
+      .values({
+        id: router === 'efficient' ? 1 : 2,
+        ...config,
+        ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
+        router,
+      })
       .onConflictDoUpdate({
         target: benchmarkConfig.router,
-        set: config,
+        set: { ...config, ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS },
       }),
     orm.delete(configClassifierModels).where(eq(configClassifierModels.router, router)),
     orm.delete(configDeciderModels).where(eq(configDeciderModels.router, router)),
@@ -197,6 +210,28 @@ export async function replaceConfig(
 
 /** Which registry queue a run drains: the platform decider list, or owner pools. */
 export type { BenchmarkRunPurpose };
+
+/**
+ * Record the daily system-optimal computation for one router. Only the computed
+ * map is written, so admin provenance (updated_at/updated_by) is untouched.
+ */
+export async function savePolicyComputed(
+  db: D1Database,
+  router: AutoRouter,
+  computed: PolicySettingComputedMap
+): Promise<void> {
+  await drizzle(db)
+    .update(benchmarkConfig)
+    .set({ policy_computed: computed })
+    .where(eq(benchmarkConfig.router, router));
+}
+
+export async function getLiveContainerLanes(db: D1Database): Promise<number> {
+  const row = await db
+    .prepare("SELECT COUNT(*) AS lanes FROM scheduler_chunks WHERE status IN ('queued', 'active')")
+    .first<{ lanes: number }>();
+  return row?.lanes ?? 0;
+}
 
 export async function insertRun(
   db: D1Database,
@@ -233,16 +268,7 @@ export async function insertRun(
     min_accuracy: run.min_accuracy,
     switch_cost_factor: run.switch_cost_factor,
     best_accuracy_switch_threshold: run.best_accuracy_switch_threshold,
-    // A NOT NULL rejection rolls back the whole D1 batch, including model snapshots.
-    max_concurrency:
-      run.kind === 'decider'
-        ? sql`CASE WHEN (
-          SELECT COALESCE(SUM(${benchmarkRuns.max_concurrency}), 0)
-          FROM ${benchmarkRuns}
-          WHERE ${benchmarkRuns.kind} = 'decider' AND ${benchmarkRuns.status} = 'running'
-        ) + ${run.max_concurrency} <= ${BENCHMARK_CONTAINER_BUDGET}
-        THEN ${run.max_concurrency} ELSE NULL END`
-        : run.max_concurrency,
+    max_concurrency: run.max_concurrency,
     benchmark_user_id: run.benchmark_user_id,
     benchmark_org_id: run.benchmark_org_id,
     repetitions: run.repetitions,
@@ -305,7 +331,8 @@ export async function getRunWithModels(
 }
 
 export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Promise<void> {
-  await drizzle(db)
+  const orm = drizzle(db);
+  const upsert = orm
     .insert(caseResults)
     .values(row)
     .onConflictDoUpdate({
@@ -333,6 +360,121 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
         timed_out: row.timed_out,
       },
     });
+  await orm.batch([
+    upsert,
+    orm.delete(pendingDeciderOutputs).where(pendingDeciderOutputPredicate(row)),
+  ]);
+}
+
+export async function reuseDeciderCaseResults(
+  db: D1Database,
+  params: {
+    runId: string;
+    router: AutoRouter;
+    engineIdentity: string;
+    repetitions: number;
+    entries: readonly BenchmarkPair[];
+  }
+): Promise<number> {
+  let copied = 0;
+  for (let offset = 0; offset < params.entries.length; offset += 10) {
+    const statements: D1PreparedStatement[] = [];
+    for (const entry of params.entries.slice(offset, offset + 10)) {
+      if (entry.model.startsWith('~')) continue;
+      const bindings = [
+        params.router,
+        params.engineIdentity,
+        params.repetitions,
+        entry.model,
+        variantToStorage(entry.variant),
+        params.runId,
+      ];
+      statements.push(
+        db
+          .prepare(`
+          WITH ranked AS (
+            SELECT source.*,
+              ROW_NUMBER() OVER (
+                PARTITION BY source.case_id, source.rep
+                ORDER BY run.started_at DESC, run.id DESC
+              ) AS reuse_rank
+            FROM case_results AS source
+            JOIN benchmark_runs AS run ON run.id = source.run_id
+            WHERE run.kind = 'decider' AND run.status IN ('completed', 'failed')
+              AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
+              AND source.model = ? AND source.variant = ?
+              AND source.error IS NULL AND source.timed_out = 0 AND source.exit_code = 0
+          )
+          INSERT INTO case_results (
+            run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+            error, fallback_reason, route_hit, retried, exit_code, output_prefix,
+            event_count, last_event_types, rep, timed_out
+          )
+          SELECT ?, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+            error, fallback_reason, route_hit, retried, exit_code, output_prefix,
+            event_count, last_event_types, rep, timed_out
+          FROM ranked WHERE reuse_rank = 1
+          ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
+        `)
+          .bind(...bindings),
+        db
+          .prepare(`
+          WITH ranked AS (
+            SELECT source.*,
+              ROW_NUMBER() OVER (
+                PARTITION BY source.case_id, source.rep
+                ORDER BY run.started_at DESC, run.id DESC
+              ) AS reuse_rank
+            FROM pending_decider_outputs AS source
+            JOIN benchmark_runs AS run ON run.id = source.run_id
+            WHERE run.kind = 'decider' AND run.status IN ('completed', 'failed')
+              AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
+              AND source.model = ? AND source.variant = ?
+              AND CASE WHEN json_valid(source.payload) THEN
+                json_type(source.payload, '$.result.exitCode') = 'integer'
+                AND json_extract(source.payload, '$.result.exitCode') = 0
+                AND json_type(source.payload, '$.result.timedOut') = 'false'
+              ELSE 0 END
+              AND NOT EXISTS (
+                SELECT 1 FROM case_results AS graded
+                WHERE graded.run_id = source.run_id AND graded.model = source.model
+                  AND graded.variant = source.variant AND graded.case_id = source.case_id
+                  AND graded.rep = source.rep
+              )
+          )
+          INSERT INTO pending_decider_outputs (run_id, model, variant, case_id, rep, payload)
+          SELECT ?, model, variant, case_id, rep, payload FROM ranked
+          WHERE reuse_rank = 1 AND NOT EXISTS (
+            SELECT 1 FROM case_results AS destination
+            WHERE destination.run_id = ? AND destination.model = ranked.model
+              AND destination.variant = ranked.variant AND destination.case_id = ranked.case_id
+              AND destination.rep = ranked.rep
+          )
+          ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
+        `)
+          .bind(...bindings, params.runId),
+        db
+          .prepare(`
+            DELETE FROM pending_decider_outputs
+            WHERE model = ? AND variant = ? AND EXISTS (
+              SELECT 1 FROM case_results AS graded
+              WHERE graded.run_id = pending_decider_outputs.run_id
+                AND graded.model = pending_decider_outputs.model
+                AND graded.variant = pending_decider_outputs.variant
+                AND graded.case_id = pending_decider_outputs.case_id
+                AND graded.rep = pending_decider_outputs.rep
+            )
+          `)
+          .bind(entry.model, variantToStorage(entry.variant))
+      );
+    }
+    if (statements.length === 0) continue;
+    const results = await db.batch(statements);
+    for (let index = 0; index < results.length; index += 3) {
+      copied += results[index].meta.changes ?? 0;
+    }
+  }
+  return copied;
 }
 
 export type LaneCaseCount = { model: string; variant: string; rep: number; n: number };
@@ -360,7 +502,7 @@ export async function getCaseResults(db: D1Database, runId: string): Promise<Cas
 
 export async function getRoutingCaseResultsForEntries(
   db: D1Database,
-  entries: readonly { entry: PoolEntry; runId: string }[]
+  entries: readonly { entry: BenchmarkPair; runId: string }[]
 ): Promise<OfflineSweep['pairs']> {
   const pairs = new Map<string, OfflineSweep['pairs'][number]>();
   const orm = drizzle(db);
@@ -393,7 +535,7 @@ export async function getRoutingCaseResultsForEntries(
     for (const row of rows) {
       if (row.routeKey === null) continue;
       const variant = variantFromStorage(row.variant);
-      const key = poolEntryKey({ model: row.model, variant });
+      const key = benchmarkPairKey({ model: row.model, variant });
       let pair = pairs.get(key);
       if (!pair) {
         pair = { model: row.model, variant, results: [] };
@@ -502,13 +644,6 @@ export async function savePendingDeciderOutput(
     .onConflictDoNothing();
 }
 
-export async function deletePendingDeciderOutputsForRun(
-  db: D1Database,
-  runId: string
-): Promise<void> {
-  await drizzle(db).delete(pendingDeciderOutputs).where(eq(pendingDeciderOutputs.run_id, runId));
-}
-
 export async function replaceModelSummaries(
   db: D1Database,
   runId: string,
@@ -612,28 +747,77 @@ export async function listRuns(
   return runRows.map(row => mapRunRow(row, summariesByRunId.get(row.id) ?? []));
 }
 
+export type RunProgressCountRow = {
+  runId: string;
+  kind: BenchmarkKind;
+  router: AutoRouter;
+  repetitions: number;
+  engineIdentity: string;
+  enqueuedModels: number;
+  completedCases: number;
+  failedCases: number;
+};
+
+/**
+ * Case tallies for every RUNNING run among `runIds` in one statement, so a page
+ * of runs costs one query instead of one per run. Terminal runs are filtered out
+ * in SQL: their counts are already final in their summaries.
+ */
+export async function listRunProgressCounts(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<RunProgressCountRow[]> {
+  if (runIds.length === 0) return [];
+  const rows = await drizzle(db)
+    .select({
+      runId: benchmarkRuns.id,
+      kind: benchmarkRuns.kind,
+      router: benchmarkRuns.router,
+      repetitions: benchmarkRuns.repetitions,
+      engineIdentity: benchmarkRuns.engine_identity,
+      enqueuedModels: sql<number>`(
+        SELECT COUNT(*) FROM ${runModels}
+        WHERE ${runModels.run_id} = ${benchmarkRuns.id} AND ${runModels.enqueued} = 1
+      )`,
+      completedCases: sql<number>`(
+        SELECT COUNT(*) FROM ${caseResults} WHERE ${caseResults.run_id} = ${benchmarkRuns.id}
+      )`,
+      failedCases: sql<number>`(
+        SELECT COUNT(*) FROM ${caseResults}
+        WHERE ${caseResults.run_id} = ${benchmarkRuns.id}
+          AND (${caseResults.error} IS NOT NULL OR ${caseResults.timed_out} = 1)
+      )`,
+    })
+    .from(benchmarkRuns)
+    .where(and(inArray(benchmarkRuns.id, [...runIds]), eq(benchmarkRuns.status, 'running')));
+  return rows.map(row => ({
+    runId: row.runId,
+    kind: row.kind,
+    router: row.router,
+    repetitions: row.repetitions,
+    engineIdentity: row.engineIdentity,
+    enqueuedModels: Number(row.enqueuedModels),
+    completedCases: Number(row.completedCases),
+    failedCases: Number(row.failedCases),
+  }));
+}
+
 export async function markRunCompleted(db: D1Database, runId: string): Promise<void> {
   await drizzle(db)
     .update(benchmarkRuns)
     .set({ status: 'completed', completed_at: new Date().toISOString() })
     .where(and(eq(benchmarkRuns.id, runId), eq(benchmarkRuns.status, 'running')));
-  await deletePendingDeciderOutputsForRun(db, runId);
 }
 
 export async function markStaleRunsFailed(db: D1Database, olderThanIso: string): Promise<void> {
   await drizzle(db)
     .update(benchmarkRuns)
     .set({ status: 'failed', error: 'timed out' })
-    .where(and(eq(benchmarkRuns.status, 'running'), lt(benchmarkRuns.started_at, olderThanIso)));
-  await drizzle(db)
-    .delete(pendingDeciderOutputs)
     .where(
-      inArray(
-        pendingDeciderOutputs.run_id,
-        drizzle(db)
-          .select({ id: benchmarkRuns.id })
-          .from(benchmarkRuns)
-          .where(ne(benchmarkRuns.status, 'running'))
+      and(
+        eq(benchmarkRuns.status, 'running'),
+        lt(benchmarkRuns.started_at, olderThanIso),
+        sql`NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = ${benchmarkRuns.id})`
       )
     );
 }
@@ -697,7 +881,6 @@ export async function markRunFailed(db: D1Database, runId: string, error: string
     .update(benchmarkRuns)
     .set({ status: 'failed', error: error.slice(0, 500), completed_at: new Date().toISOString() })
     .where(and(eq(benchmarkRuns.id, runId), eq(benchmarkRuns.status, 'running')));
-  await deletePendingDeciderOutputsForRun(db, runId);
 }
 
 function boundProfileFailureReason(reason: string): string {
@@ -713,16 +896,16 @@ function boundProfileFailureReason(reason: string): string {
 export async function markProfilesRunningForRun(
   db: D1Database,
   runId: string,
-  entries: readonly PoolEntry[],
+  entries: readonly BenchmarkPair[],
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
   nowIso: string = new Date().toISOString()
-): Promise<PoolEntry[]> {
+): Promise<BenchmarkPair[]> {
   if (entries.length === 0) return [];
   const orm = drizzle(db);
   // Returns the entries this run actually claimed. An entry already claimed by
   // the other queue's run updates 0 rows and is dropped, so the pair is
   // measured once instead of being benchmarked (and billed) twice.
-  const claimed: PoolEntry[] = [];
+  const claimed: BenchmarkPair[] = [];
   for (const entry of entries) {
     const result = await orm
       .update(benchmarkProfiles)
@@ -1176,7 +1359,7 @@ export function clearPlatformRequestedStatement(
 export async function listReadyCurrentProfilesForEntries(
   db: D1Database,
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
-  entries: readonly PoolEntry[]
+  entries: readonly BenchmarkPair[]
 ): Promise<Array<{ model: string; variant: string; run_id: string | null }>> {
   if (entries.length === 0) return [];
   const models = [...new Set(entries.map(e => e.model))];
@@ -1322,13 +1505,14 @@ export async function listStaleRunningDeciderRuns(
       and(
         eq(benchmarkRuns.kind, 'decider'),
         eq(benchmarkRuns.status, 'running'),
-        lt(benchmarkRuns.started_at, olderThanIso)
+        lt(benchmarkRuns.started_at, olderThanIso),
+        sql`NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = ${benchmarkRuns.id})`
       )
     );
   return rows.map(r => ({ id: r.id, purpose: r.purpose === 'user' ? 'user' : 'platform' }));
 }
 
-// What the most recent completed run measured for an exact Pool entry, plus
+// What the most recent completed run measured for an exact benchmark pair, plus
 // the benchmark identity it was measured under. startRun carries these
 // summaries into a new run only when the identity (engine + repetitions +
 // exact variant) still matches; otherwise the entry is re-benchmarked.
@@ -1347,13 +1531,13 @@ export type PriorModelResult = {
 
 /**
  * Canonical map key for an exact (model, variant) pair. Uses the shared
- * poolEntryKey contract helper so keys stay collision-safe.
+ * benchmarkPairKey contract helper so keys stay collision-safe.
  */
 export function exactPairKey(model: string, variant: string | null | undefined): string {
-  return poolEntryKey({ model, variant: variant ?? null });
+  return benchmarkPairKey({ model, variant: variant ?? null });
 }
 
-// Latest summaries per exact Pool entry for a benchmark kind: for each
+// Latest summaries per exact benchmark pair for a benchmark kind: for each
 // (model, variant), all routes from the most recent COMPLETED run that
 // included that pair (mixing routes across runs would pair incomparable numbers).
 export async function getLatestSummariesByModel(

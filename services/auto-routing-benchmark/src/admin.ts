@@ -2,7 +2,6 @@ import * as z from 'zod';
 import {
   AutoRouterSchema,
   DEFAULT_AUTO_ROUTER,
-  type BenchmarkConfig,
   BenchmarkConfigSchema,
   BenchmarkKindSchema,
   BenchmarkProfileStatusesRequestSchema,
@@ -12,12 +11,14 @@ import {
   RequeueBenchmarkRegistryRequestSchema,
   type BenchmarkRegistryQueue,
   resolveBenchmarkIdentity,
+  resolvePolicySettings,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
+  type BenchmarkRunProgress,
 } from '@kilocode/auto-routing-contracts';
-import { zodJsonValidator } from '@kilocode/worker-utils';
+import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
 import type { Context, Hono } from 'hono';
-import { BenchmarkConcurrencyBudgetError, getBenchmarkConfig, saveBenchmarkConfig } from './config';
+import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
 import { assembleCustomRoutingTable } from './custom-routing-table';
 import {
@@ -46,7 +47,13 @@ import {
   listRuns,
   requeueFailedCurrentProfiles,
 } from './db';
+import { loadRunProgress } from './run-progress';
 import type { HonoEnv } from './hono-env';
+import {
+  fetchBenchmarkModelCatalog,
+  mapProfileStatusesToRequestedModels,
+  platformRegistryEntries,
+} from './platform-models';
 
 const DebugCliRequestSchema = z.object({
   model: z.string().trim().min(1),
@@ -69,9 +76,13 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
     await next();
   });
-  app.get('/admin/config', async c =>
-    c.json({ config: await getBenchmarkConfig(c.env.BENCH_DB, requestRouter(c)) })
-  );
+  app.get('/admin/config', async c => {
+    const config = await getBenchmarkConfig(c.env.BENCH_DB, requestRouter(c));
+    return c.json({
+      config,
+      policySettings: config ? resolvePolicySettings(config) : null,
+    });
+  });
 
   app.put(
     '/admin/config',
@@ -79,19 +90,11 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     async c => {
       const updatedBy = c.req.header('x-updated-by') ?? null;
       const router = AutoRouterSchema.parse(c.req.query('router') ?? c.req.valid('json').router);
-      let saved: BenchmarkConfig;
-      try {
-        saved = await saveBenchmarkConfig(
-          c.env.BENCH_DB,
-          { ...c.req.valid('json'), router },
-          updatedBy
-        );
-      } catch (error) {
-        if (error instanceof BenchmarkConcurrencyBudgetError) {
-          return c.json({ error: error.message }, 400);
-        }
-        throw error;
-      }
+      const saved = await saveBenchmarkConfig(
+        c.env.BENCH_DB,
+        { ...c.req.valid('json'), router },
+        updatedBy
+      );
       await syncPlatformRegistry(c.env, fetch, router);
       await publishPlatformRoutingTable(c.env, fetch, router).catch(error => {
         console.warn(
@@ -102,7 +105,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           })
         );
       });
-      return c.json({ config: saved });
+      return c.json({ config: saved, policySettings: resolvePolicySettings(saved) });
     }
   );
 
@@ -118,7 +121,22 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       purpose: purpose.success ? purpose.data : undefined,
       router: kind.success && kind.data === 'classifier' ? DEFAULT_AUTO_ROUTER : requestRouter(c),
     });
-    return c.json({ runs });
+    // Progress is display-only: a failed count query must not hide the run list.
+    const progressByRunId = await loadRunProgress(
+      c.env.BENCH_DB,
+      runs.filter(run => run.status === 'running').map(run => run.id)
+    ).catch((error: unknown) => {
+      console.warn(
+        JSON.stringify({ event: 'benchmark_run_progress_failed', ...formatError(error) })
+      );
+      return new Map<string, BenchmarkRunProgress>();
+    });
+    return c.json({
+      runs: runs.map(run => {
+        const progress = progressByRunId.get(run.id);
+        return progress ? { ...run, progress } : run;
+      }),
+    });
   });
 
   app.post(
@@ -154,10 +172,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         // another started is reported alongside the run that did start.
         if (started.length === 0 && drainErrors.length > 0) {
           const [first] = drainErrors;
-          if (
-            first instanceof BenchmarkRunConfigError ||
-            first instanceof BenchmarkConcurrencyBudgetError
-          )
+          if (first instanceof BenchmarkRunConfigError)
             return c.json({ error: first.message }, 400);
           throw first;
         }
@@ -179,10 +194,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         if (error instanceof RunAlreadyActiveError) {
           return c.json({ error: error.message }, 409);
         }
-        if (
-          error instanceof BenchmarkRunConfigError ||
-          error instanceof BenchmarkConcurrencyBudgetError
-        ) {
+        if (error instanceof BenchmarkRunConfigError) {
           return c.json({ error: error.message }, 400);
         }
         throw error;
@@ -293,7 +305,6 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
   );
 
-  // Atomically admit missing/stale/retried Benchmark profiles for an owner.
   app.post(
     '/admin/profiles/register',
     zodJsonValidator(RegisterBenchmarkProfilesRequestSchema, {
@@ -315,13 +326,36 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       }
       try {
+        const catalog = await fetchBenchmarkModelCatalog(c.env);
+        const available = new Set(catalog.data.map(model => model.id));
+        for (const entry of body.entries) {
+          if (!available.has(entry.model)) {
+            throw new ProfileValidationError(
+              `Model is unavailable in the current catalog: ${entry.model}`
+            );
+          }
+        }
+        const pairs = platformRegistryEntries(
+          { deciderModels: body.entries.map(entry => ({ id: entry.model })) },
+          catalog
+        );
+        const retryModels = new Set((body.retryEntries ?? []).map(entry => entry.model));
         const result = await registerProfiles(c.env.BENCH_DB, config, {
           ownerType: body.ownerType,
           ownerId: body.ownerId,
-          entries: body.entries,
-          retryEntries: body.retryEntries,
+          pairs,
+          retryPairs: platformRegistryEntries(
+            {
+              deciderModels: body.entries
+                .filter(entry => retryModels.has(entry.model))
+                .map(entry => ({ id: entry.model })),
+            },
+            catalog
+          ),
         });
-        return c.json(result);
+        return c.json({
+          statuses: mapProfileStatusesToRequestedModels(body.entries, catalog, result.statuses),
+        });
       } catch (error) {
         if (error instanceof ProfileQuotaExceededError) {
           return c.json(error.quota, 429);
@@ -334,7 +368,6 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
   );
 
-  // Current per-entry Benchmark-profile statuses (may free-admit stale rows).
   app.post(
     '/admin/profiles/status',
     zodJsonValidator(BenchmarkProfileStatusesRequestSchema, {
@@ -356,9 +389,29 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       }
       try {
-        return c.json(
-          await lookupProfileStatuses(c.env.BENCH_DB, config, { entries: body.entries })
+        const catalog = await fetchBenchmarkModelCatalog(c.env);
+        const available = new Set(catalog.data.map(model => model.id));
+        const supported = body.entries.filter(entry => available.has(entry.model));
+        const pairs = platformRegistryEntries(
+          { deciderModels: supported.map(entry => ({ id: entry.model })) },
+          catalog
         );
+        const result =
+          pairs.length > 0
+            ? await lookupProfileStatuses(c.env.BENCH_DB, config, { pairs })
+            : { statuses: [] };
+        return c.json({
+          statuses: [
+            ...mapProfileStatusesToRequestedModels(supported, catalog, result.statuses),
+            ...body.entries
+              .filter(entry => !available.has(entry.model))
+              .map(entry => ({
+                entry: { model: entry.model, variant: null },
+                status: 'failed',
+                failureReason: 'Model is unavailable in the current catalog.',
+              })),
+          ],
+        });
       } catch (error) {
         if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
           return c.json({ error: error.message }, 400);
@@ -390,10 +443,22 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       }
       try {
+        const catalog = await fetchBenchmarkModelCatalog(c.env);
+        const available = new Set(catalog.data.map(model => model.id));
+        const pairs = platformRegistryEntries(
+          {
+            deciderModels: body.entries
+              .filter(entry => available.has(entry.model))
+              .map(entry => ({ id: entry.model })),
+          },
+          catalog
+        );
         return c.json(
-          await assembleCustomRoutingTable(c.env.BENCH_DB, config, body.entries, {
-            catalogEnv: c.env,
-          })
+          pairs.length > 0
+            ? await assembleCustomRoutingTable(c.env.BENCH_DB, config, pairs, {
+                catalogEnv: c.env,
+              })
+            : { table: null }
         );
       } catch (error) {
         if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {

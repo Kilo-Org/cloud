@@ -133,6 +133,7 @@
     "status": "Zustand",
     "truncated": "Gekürzt",
     "updated": "Aktualisiert",
+    "generating": "Wird generiert…",
     "working": "In Bearbeitung",
     "yourOwnRepositories": "Deine eigenen Code-Repositories",
     "dismissed": "Verworfen",
@@ -650,7 +651,7 @@
     "redeployTitle": "Instanz erneut bereitstellen",
     "accessRequired": {
       "iosBody": "Der KiloClaw-Zugriff wird für dieses Konto außerhalb der iOS-App verwaltet.",
-      "iosContact": "Fragen? Schreibe an hi@kilo.ai.",
+      "iosContact": "Fragen? Schreibe an {{supportEmail}}.",
       "iosTitle": "KiloClaw unter iOS nicht verfügbar",
       "multipleCurrentConflictBody": "Wir haben mehrere aktive Abos für dein Konto gefunden. Deshalb haben wir die Nutzung vorübergehend pausiert, um doppelte Abbuchungen zu vermeiden.",
       "multipleCurrentConflictCta": "Auf kilo.ai fortfahren",
@@ -783,7 +784,7 @@
         "queryErrorBody": "Beim Prüfen der Einrichtung von {{name}} wurde die Verbindung unterbrochen. Die Einrichtung läuft möglicherweise weiter. Versuche es erneut oder schau gleich noch einmal nach.",
         "queryErrorTitle": "Einrichtungsstatus nicht verfügbar",
         "settingUp": "{{name}} wird eingerichtet",
-        "stalledBody": "Wir konnten die Einrichtung von {{name}} nicht abschließen. Versuche es erneut. Falls das Problem weiter auftritt, schreibe an hi@kilo.ai.",
+        "stalledBody": "Wir konnten die Einrichtung von {{name}} nicht abschließen. Versuche es erneut. Falls das Problem weiter auftritt, schreibe an {{supportEmail}}.",
         "stalledTitle": "Einrichtung kommt nicht voran",
         "startingSandbox": "Sandbox wird gestartet",
         "stoppedBody": "Die Instanz von {{name}} wurde während der Einrichtung unerwartet gestoppt.",
@@ -1040,7 +1041,7 @@
         "recoveryLabel": "GitHub-App aktualisieren"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an hi@kilo.ai, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Code Reviewer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer wurde deaktiviert, weil Kilo für dieses GitLab-Projekt kein Projektzugriffstoken erstellen kann. Gewähre Zugriff mit der Rolle Maintainer oder aktiviere Projektzugriffstoken. Aktiviere Code Reviewer anschließend wieder.",
@@ -1055,7 +1056,7 @@
         "recoveryLabel": "Code-Reviewer-Einstellungen aktualisieren"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an hi@kilo.ai, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Code Reviewer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
       },
       "title": "Beim Code-Prüfer musst du eingreifen.",
       "recoveryLabel": "Support kontaktieren"
@@ -1916,6 +1917,7 @@
       "title": "Der Agent braucht deine Antwort",
       "skipQuestionsTitle": "Fragen überspringen?",
       "skipQuestionsMessage": "Der Agent überspringt diesen Schritt.",
+      "answerProgress": "{{answered}} von {{total}} beantwortet",
       "selectAllThatApply": "Wähle alle zutreffenden Antworten aus.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, ausgewählt",
@@ -3322,6 +3324,10 @@
     },
     "backends": {
       "title": "Chat-Backends",
+      "providersTitle": "Chat-Anbieter",
+      "cloud": "In der Cloud",
+      "cloudModel": "Modell: {{model}}",
+      "cloudUnavailable": "Kilo-Modelle sind derzeit nicht verfügbar. Prüfe deine Verbindung.",
       "manage": "Backends verwalten",
       "defaultKilo": "$t(consent.kilo) (Standard)",
       "kiloHelp": "Das integrierte Backend verwendet dein Kilo-Konto und kann weder bearbeitet noch gelöscht werden.",
@@ -3381,7 +3387,6 @@
     "gguf": {
       "title": "Herunterladbare Modelle",
       "help": "Lade ein offenes Modell herunter und führe es mit llama.cpp auf diesem Telefon aus. Deine Eingaben und Antworten bleiben auf dem Gerät. Modelle sind groß, verwende daher WLAN.",
-      "details": "{{size}} · Lizenz: {{license}}",
       "download": "Modell herunterladen",
       "pause": "Download pausieren",
       "resume": "Download fortsetzen",
@@ -3393,6 +3398,8 @@
       "url": "Direkter Download-Link",
       "urlHelp": "Füge einen HTTPS-Link zu einer .gguf-Datei ein, z. B. einen Resolve-Link von Hugging Face. Lade Modelle nur aus Quellen herunter, denen du vertraust.",
       "downloadUrl": "Über Link herunterladen",
+      "advanced": "Erweitert",
+      "localPurpose": "Läuft mit llama.cpp auf diesem Gerät. Eingabeaufforderungen und Antworten bleiben auf dem Gerät.",
       "deleteTitle": "Dieses Modell löschen?",
       "deleteMessage": "{{name}} von diesem Gerät löschen? Chats, die es verwenden, benötigen ein anderes Modell, bevor sie fortgesetzt werden können.",
       "errors": {
@@ -3421,8 +3428,17 @@
         "fits": "Passt",
         "tight": "Knapp",
         "tooLarge": "Zu groß",
-        "noStorage": "Nicht genug Speicherplatz"
+        "noStorage": "Nicht genug Speicherplatz",
+        "unknown": "Kompatibilität unbekannt"
       },
+      "recommendationsHelp": "Eine von dieser App festgelegte Auswahl: eine Datei pro Modell, von einem Herausgeber, der eine Lizenz angibt. Nichts anderes wird eingestuft.",
+      "compatibilityHelp": "Die Kompatibilität vergleicht die Modelldatei mit dem Speicher und dem freien Speicherplatz dieses Geräts. Die Speicherangabe ist eine Schätzung, keine Messung.",
+      "text": "Text",
+      "listTextPurpose": "Nur Text-Eingabeaufforderungen.",
+      "listImagePurpose": "Liest Bilder ebenso wie Text.",
+      "smallestDownload": "Kleinster Download: {{size}} · etwa {{memory}} Speicher",
+      "fullFileName": "Datei: {{name}}",
+      "memoryEstimateNote": "Speicherangaben sind Schätzungen, keine Messungen.",
       "parameters": "Parameter: {{value}}",
       "downloads": "Downloads: {{value}}",
       "likes": "Likes: {{value}}",
@@ -3447,7 +3463,8 @@
     },
     "localModels": {
       "title": "Modelle auf dem Gerät",
-      "help": "Modelle auf dem Gerät laufen auf diesem Telefon. Deine Eingaben und Antworten bleiben auf dem Gerät, und diese Modelle können keine Tools verwenden.",
+      "help": "Modelle auf dem Gerät laufen auf diesem Telefon. Deine Eingaben und Antworten bleiben auf dem Gerät.",
+      "systemPurpose": "Das in das System dieses Geräts integrierte Modell. Es läuft auf dem Gerät.",
       "apple": "Apple Intelligence (auf dem Gerät)",
       "checking": "Verfügbarkeit wird geprüft …",
       "ready": "Einsatzbereit",
@@ -3748,12 +3765,26 @@
       "startNow": "Ohne Prüfung starten",
       "startNowHint": "Zum Starten ohne Prüfung lange drücken",
       "titleLabel": "Titel der Aufgabe",
+      "renameTitle": "Aufgabe umbenennen",
       "notes": "Notizen",
-      "notesPlaceholder": "Notizen in Markdown hinzufügen",
+      "addNotes": "Notizen hinzufügen",
+      "notesPrompt": "Füge Kontext, Anforderungen oder Akzeptanzkriterien hinzu.",
+      "markdownSupported": "Markdown wird unterstützt",
       "sessions": "Verknüpfte Sitzungen",
       "noSessions": "Noch keine Sitzungen",
+      "untitledLinkedSession": "Verknüpfte Sitzung",
+      "sessionNeedsInput": "Sitzung benötigt Eingabe",
+      "sessionRunning": "Sitzung läuft",
+      "sessionFinished": "Sitzung beendet",
+      "sessionPullRequest": "PR der Sitzung",
+      "sessionPullRequestNumber": "PR der Sitzung #{{number}}",
+      "openSessionHint": "Öffnet die Sitzung.",
+      "unlinkSessionAction": "Sitzung trennen",
+      "unlinkConfirmTitle": "{{title}} trennen?",
+      "unlinkConfirmMessage": "Die Sitzung selbst wird nicht gelöscht. Nur ihre Verknüpfung mit dieser Aufgabe wird entfernt.",
+      "startNewSession": "Neue Sitzung starten",
+      "startNewSessionHint": "Lange drücken, um eine neue Sitzung zu starten.",
       "linkSession": "Sitzung verknüpfen",
-      "unlinkSession": "{{title}} trennen",
       "linkFailed": "Die Sitzung konnte nicht mit der Aufgabe verknüpft werden."
     },
     "linkSession": {

@@ -133,6 +133,7 @@
     "status": "Tila",
     "truncated": "Katkaistu",
     "updated": "Päivitetty",
+    "generating": "Luodaan…",
     "working": "Työn alla",
     "yourOwnRepositories": "Omat koodivarastosi",
     "dismissed": "Sivuutettu",
@@ -1259,7 +1260,7 @@
         "stoppedTitle": "Käyttöönotto keskeytyi",
         "stoppedBody": "Instanssi {{name}} pysähtyi odottamatta käyttöönoton aikana.",
         "stalledTitle": "Käyttöönotto ei etene",
-        "stalledBody": "Käyttöönottoa ei voitu viimeistellä: {{name}}. Yritä uudelleen. Jos ongelma jatkuu, lähetä sähköpostia osoitteeseen hi@kilo.ai.",
+        "stalledBody": "Käyttöönottoa ei voitu viimeistellä: {{name}}. Yritä uudelleen. Jos ongelma jatkuu, lähetä sähköpostia osoitteeseen {{supportEmail}}.",
         "timeoutTitle": "Kestää odotettua kauemmin",
         "timeoutBody": "Käyttöönotto kestää tavallista kauemmin (yli {{displayMinutes}} minuuttia): {{name}}.",
         "continueInBackground": "Jatka taustalla",
@@ -1317,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Ennakkokäyttötilauksesi on tarkistettava manuaalisesti, ennen kuin voit käyttää sitä mobiililaitteella.",
       "iosTitle": "KiloClaw ei ole käytettävissä iOS:ssä",
       "iosBody": "Tämän tilin KiloClaw-käyttöoikeutta hallinnoidaan iOS-sovelluksen ulkopuolella.",
-      "iosContact": "Kysyttävää? Lähetä sähköpostia osoitteeseen hi@kilo.ai.",
+      "iosContact": "Kysyttävää? Lähetä sähköpostia osoitteeseen {{supportEmail}}.",
       "quarantinedCta": "Lähetä sähköpostia tiimillemme",
       "nonCanonicalEarlybirdCta": "Tarkista tilauksesi osoitteessa kilo.ai"
     },
@@ -1552,7 +1553,7 @@
         "recoveryLabel": "Päivitä GitHub-sovellus"
       },
       "githubIpAllowList": {
-        "description": "Koodikatselmoija poistettiin käytöstä, koska GitHub-organisaation sallittujen IP-osoitteiden luettelo estää Kilon pääsyn. Pyydä apua osoitteesta hi@kilo.ai ja ota sitten koodikatselmoija uudelleen käyttöön."
+        "description": "Koodikatselmoija poistettiin käytöstä, koska GitHub-organisaation sallittujen IP-osoitteiden luettelo estää Kilon pääsyn. Pyydä apua osoitteesta {{supportEmail}} ja ota sitten koodikatselmoija uudelleen käyttöön."
       },
       "gitlabProjectAccessRequired": {
         "description": "Koodikatselmoija poistettiin käytöstä, koska Kilo ei voi luoda tälle GitLab-projektille käyttöoikeustunnusta. Myönnä ylläpitäjän käyttöoikeus tai salli projektin käyttöoikeustunnukset ja ota sitten koodikatselmoija uudelleen käyttöön.",
@@ -1567,7 +1568,7 @@
         "recoveryLabel": "Päivitä koodikatselmoijan asetukset"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koodikatselmoija poistettiin käytöstä, koska tietovaraston kloonaus aikakatkaistiin tänään kolmesti. Pyydä apua osoitteesta hi@kilo.ai ja ota sitten koodikatselmoija uudelleen käyttöön."
+        "description": "Koodikatselmoija poistettiin käytöstä, koska tietovaraston kloonaus aikakatkaistiin tänään kolmesti. Pyydä apua osoitteesta {{supportEmail}} ja ota sitten koodikatselmoija uudelleen käyttöön."
       },
       "title": "Koodintarkistaja vaatii toimenpiteitä.",
       "recoveryLabel": "Ota yhteyttä tukeen"
@@ -2428,6 +2429,7 @@
       "title": "Agentti tarvitsee vastauksesi",
       "skipQuestionsTitle": "Ohitetaanko kysymykset?",
       "skipQuestionsMessage": "Agentti ohittaa tämän vaiheen.",
+      "answerProgress": "{{answered}}/{{total}} vastattu",
       "selectAllThatApply": "Valitse kaikki sopivat vaihtoehdot.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, valittu",
@@ -3322,6 +3324,10 @@
     },
     "backends": {
       "title": "Keskustelujen taustapalvelut",
+      "providersTitle": "Chat-palveluntarjoajat",
+      "cloud": "Pilvessä",
+      "cloudModel": "Malli: {{model}}",
+      "cloudUnavailable": "Kilo-mallit eivät ole juuri nyt saatavilla. Tarkista yhteytesi.",
       "manage": "Hallitse taustapalveluja",
       "defaultKilo": "$t(consent.kilo) (oletus)",
       "kiloHelp": "Sisäänrakennettu taustapalvelu käyttää Kilo-tiliäsi, eikä sitä voi muokata tai poistaa.",
@@ -3381,7 +3387,6 @@
     "gguf": {
       "title": "Ladattavat mallit",
       "help": "Lataa avoin malli ja aja se tässä puhelimessa llama.cpp:n avulla. Kehotteesi ja vastaukset pysyvät laitteessa. Mallit ovat suuria, joten käytä Wi-Fi-yhteyttä.",
-      "details": "{{size}} · Lisenssi: {{license}}",
       "download": "Lataa malli",
       "pause": "Keskeytä lataus",
       "resume": "Jatka latausta",
@@ -3393,6 +3398,8 @@
       "url": "Suora latauslinkki",
       "urlHelp": "Liitä HTTPS-linkki .gguf-tiedostoon, esimerkiksi Hugging Face -resolve-linkki. Lataa malleja vain lähteistä, joihin luotat.",
       "downloadUrl": "Lataa linkistä",
+      "advanced": "Lisäasetukset",
+      "localPurpose": "Toimii tällä laitteella llama.cpp:n avulla. Kehotteet ja vastaukset pysyvät laitteella.",
       "deleteTitle": "Poistetaanko tämä malli?",
       "deleteMessage": "Poistetaanko {{name}} tältä laitteelta? Keskustelut, jotka käyttävät sitä, tarvitsevat toisen mallin ennen kuin ne voivat jatkaa.",
       "errors": {
@@ -3421,8 +3428,17 @@
         "fits": "Sopii",
         "tight": "Mahtuu niukasti",
         "tooLarge": "Liian suuri",
-        "noStorage": "Tallennustila ei riitä"
+        "noStorage": "Tallennustila ei riitä",
+        "unknown": "Sopivuus tuntematon"
       },
+      "recommendationsHelp": "Luettelo, jonka tämä sovellus kiinnittää: yksi tiedosto mallia kohden, julkaisijalta, joka ilmoittaa lisenssin. Muuta ei järjestetä.",
+      "compatibilityHelp": "Sopivuus vertaa mallitiedostoa tämän laitteen muistiin ja vapaaseen tallennustilaan. Muistiluku on arvio, ei mittaus.",
+      "text": "Teksti",
+      "listTextPurpose": "Vain tekstikehotteet.",
+      "listImagePurpose": "Lukee kuvia ja tekstiä.",
+      "smallestDownload": "Pienin lataus: {{size}} · noin {{memory}} muistia",
+      "fullFileName": "Tiedosto: {{name}}",
+      "memoryEstimateNote": "Muistiluvut ovat arvioita, eivät mittauksia.",
       "parameters": "Parametrit: {{value}}",
       "downloads": "Lataukset: {{value}}",
       "likes": "Tykkäykset: {{value}}",
@@ -3447,7 +3463,8 @@
     },
     "localModels": {
       "title": "Laitteessa toimivat mallit",
-      "help": "Laitteessa toimivat mallit toimivat tässä puhelimessa. Kehotteesi ja vastaukset pysyvät laitteessa, eivätkä nämä mallit voi käyttää työkaluja.",
+      "help": "Laitteessa toimivat mallit toimivat tässä puhelimessa. Kehotteesi ja vastaukset pysyvät laitteessa.",
+      "systemPurpose": "Tämän laitteen järjestelmään sisäänrakennettu malli. Se toimii laitteessa.",
       "apple": "Apple Intelligence (laitteessa)",
       "checking": "Tarkistetaan saatavuutta…",
       "ready": "Käyttövalmis",
@@ -3748,12 +3765,26 @@
       "startNow": "Aloita ilman katselmointia",
       "startNowHint": "Aloita ilman katselmointia pitkällä painalluksella",
       "titleLabel": "Tehtävän otsikko",
+      "renameTitle": "Nimeä tehtävä uudelleen",
       "notes": "Muistiinpanot",
-      "notesPlaceholder": "Lisää muistiinpanoja Markdownina",
+      "addNotes": "Lisää muistiinpanoja",
+      "notesPrompt": "Lisää taustatietoja, vaatimuksia tai hyväksymiskriteerejä.",
+      "markdownSupported": "Markdown-tuki",
       "sessions": "Linkitetyt istunnot",
       "noSessions": "Ei vielä istuntoja",
+      "untitledLinkedSession": "Linkitetty istunto",
+      "sessionNeedsInput": "Istunto tarvitsee syötteen",
+      "sessionRunning": "Istunto käynnissä",
+      "sessionFinished": "Istunto päättynyt",
+      "sessionPullRequest": "Istunnon PR",
+      "sessionPullRequestNumber": "Istunnon PR #{{number}}",
+      "openSessionHint": "Avaa istunnon.",
+      "unlinkSessionAction": "Poista istunnon linkitys",
+      "unlinkConfirmTitle": "Poistetaanko linkitys: {{title}}?",
+      "unlinkConfirmMessage": "Itse istuntoa ei poisteta. Vain sen linkitys tähän tehtävään poistetaan.",
+      "startNewSession": "Aloita uusi istunto",
+      "startNewSessionHint": "Aloita uusi istunto pitämällä painettuna.",
       "linkSession": "Linkitä istunto",
-      "unlinkSession": "Poista linkitys: {{title}}",
       "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut"
     },
     "linkSession": {

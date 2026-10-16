@@ -45,6 +45,11 @@ export type WrapperBootstrapRuntimeSkill = {
   files?: Record<string, string>;
 };
 
+export type WrapperBootstrapRuntimeInstruction = {
+  name: string;
+  content: string;
+};
+
 export type WrapperBootstrapAttachment = {
   filename: string;
   mime: string;
@@ -58,6 +63,7 @@ export type WrapperBootstrapMaterializedConfig = {
   runtimeSkills?: WrapperBootstrapRuntimeSkill[];
   /** Env key names whose values the wrapper redacts in setup output and diagnostics. */
   secretEnvKeys?: string[];
+  runtimeInstructions?: WrapperBootstrapRuntimeInstruction[];
 };
 
 export type WrapperRuntimeCredentialProxyConfig = {

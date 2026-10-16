@@ -21,10 +21,19 @@ export function useNewSessionPrefill(): NewSessionPrefill {
     prefillModel?: string | string[];
     prefillVariant?: string | string[];
     prefillPrompt?: string | string[];
+    prefillTodoTitle?: string | string[];
     todoId?: string | string[];
   }>();
 
-  const { prefillRepo, prefillMode, prefillModel, prefillVariant, prefillPrompt, todoId } = raw;
+  const {
+    prefillRepo,
+    prefillMode,
+    prefillModel,
+    prefillVariant,
+    prefillPrompt,
+    prefillTodoTitle,
+    todoId,
+  } = raw;
 
   const prefill = useMemo(
     () =>
@@ -34,9 +43,18 @@ export function useNewSessionPrefill(): NewSessionPrefill {
         prefillModel,
         prefillVariant,
         prefillPrompt,
+        prefillTodoTitle,
         todoId,
       }),
-    [prefillRepo, prefillMode, prefillModel, prefillVariant, prefillPrompt, todoId]
+    [
+      prefillRepo,
+      prefillMode,
+      prefillModel,
+      prefillVariant,
+      prefillPrompt,
+      prefillTodoTitle,
+      todoId,
+    ]
   );
 
   return prefill;

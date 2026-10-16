@@ -8,7 +8,6 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
-import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
 import type {
   AutoRouter,
   BenchmarkKind,
@@ -18,6 +17,8 @@ import type {
   BenchmarkProfileStatus,
   BenchmarkRunPurpose,
   BenchmarkRunStatus,
+  PolicySettingComputedMap,
+  PolicySettingOverrides,
 } from '@kilocode/auto-routing-contracts';
 
 // Migrations are generated via `pnpm db:generate` (drizzle-kit) and applied
@@ -36,18 +37,21 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   }).$type<ProductionTokenProfile>(),
   switch_horizon_turns: integer('switch_horizon_turns'),
   low_confidence_threshold: real('low_confidence_threshold'),
+  // Legacy lane-budget columns: never read by this worker, but still read by
+  // the previously deployed one, so they stay until a cleanup migration drops
+  // both. replaceConfig writes values the old worker accepts; the user default is
+  // migration 0010's stored default, kept so the column definition is unchanged.
   max_concurrency: integer('max_concurrency').notNull(),
-  // Live container budget for user-queue runs, independent of max_concurrency
-  // (the platform-queue budget). The two must sum to at most the platform
-  // container cap; the config contract enforces that at the write boundary.
-  user_max_concurrency: integer('user_max_concurrency')
-    .notNull()
-    .default(BENCHMARK_CONTAINER_BUDGET / 2),
+  user_max_concurrency: integer('user_max_concurrency').notNull().default(100),
   benchmark_user_id: text('benchmark_user_id'),
   benchmark_org_id: text('benchmark_org_id'),
   classifier_repetitions: integer('classifier_repetitions').notNull().default(1),
   decider_repetitions: integer('decider_repetitions').notNull().default(1),
   classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
+  // Admin overrides for system-optimal policy settings; null when none are set.
+  policy_overrides: text('policy_overrides', { mode: 'json' }).$type<PolicySettingOverrides>(),
+  // Daily system-optimal computation, keyed by policy setting. Server-owned.
+  policy_computed: text('policy_computed', { mode: 'json' }).$type<PolicySettingComputedMap>(),
   updated_at: text('updated_at').notNull(),
   updated_by: text('updated_by'),
 });
@@ -204,6 +208,101 @@ export const pendingDeciderOutputs = sqliteTable(
   ]
 );
 
+export const schedulerChunks = sqliteTable(
+  'scheduler_chunks',
+  {
+    id: text('id').primaryKey(),
+    run_id: text('run_id')
+      .notNull()
+      .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    providers: text('providers').notNull(),
+    rep: integer('rep').notNull(),
+    chunk: integer('chunk').notNull(),
+    case_ids: text('case_ids').notNull(),
+    status: text('status')
+      .$type<'pending' | 'queued' | 'active' | 'completed' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    token: text('token'),
+    slot: integer('slot'),
+    lease_until: integer('lease_until').notNull().default(0),
+    available_at: integer('available_at').notNull().default(0),
+    attempts: integer('attempts').notNull().default(0),
+  },
+  table => [
+    index('IX_scheduler_chunks_pending').on(table.status, table.available_at),
+    index('IX_scheduler_chunks_run').on(table.run_id),
+    // Lane-head dispatch: a lane is one (run, model, variant, rep) chunk chain, and
+    // `(available_at, chunk)` orders its runnable head. This prefix lets a claim
+    // find each lane's next runnable chunk by index seek instead of scanning the
+    // run's or the backlog's pending rows.
+    index('IX_scheduler_chunks_lane').on(
+      table.status,
+      table.run_id,
+      table.model,
+      table.variant,
+      table.rep,
+      table.available_at,
+      table.chunk
+    ),
+    uniqueIndex('UQ_scheduler_chunks_live_slot')
+      .on(table.slot)
+      .where(sql`${table.status} IN ('queued', 'active')`),
+  ]
+);
+
+export const schedulerRuns = sqliteTable('scheduler_runs', {
+  run_id: text('run_id')
+    .primaryKey()
+    .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
+});
+
+export const schedulerExecutions = sqliteTable(
+  'scheduler_executions',
+  {
+    run_id: text('run_id')
+      .notNull()
+      .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    rep: integer('rep').notNull(),
+    case_id: text('case_id').notNull(),
+    token: text('token').notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.run_id, table.model, table.variant, table.rep, table.case_id] }),
+  ]
+);
+
+/**
+ * Single row (id = 1) serializing dispatch passes. A pass holds the lease while it
+ * reads live occupancy and claims; another dispatcher that finds the lease held
+ * returns immediately and the next completion or cron wake retries. Model,
+ * provider and slot caps are only exact if one pass at a time reads occupancy.
+ */
+export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
+  id: integer('id').primaryKey(),
+  token: text('token'),
+  lease_until: integer('lease_until').notNull().default(0),
+});
+
+/**
+ * Model- and provider-wide throttle deadlines. Cooling is stored here rather than
+ * stamped onto every pending chunk so one throttle event costs a bounded write
+ * instead of rewriting the whole backlog.
+ */
+export const schedulerCooldowns = sqliteTable(
+  'scheduler_cooldowns',
+  {
+    scope: text('scope').$type<'model' | 'provider'>().notNull(),
+    key: text('key').notNull(),
+    until: integer('until').notNull(),
+  },
+  table => [primaryKey({ columns: [table.scope, table.key] })]
+);
+
 export const routingTables = sqliteTable('routing_tables', {
   run_id: text('run_id').primaryKey(),
   router: text('router').$type<AutoRouter>().notNull().default('efficient'),
@@ -246,7 +345,7 @@ export const routingTableCandidates = sqliteTable(
 );
 
 /**
- * Global Benchmark-profile registry: one current row per exact Pool entry per
+ * Global Benchmark-profile registry: one current row per exact benchmark pair per
  * engine identity + repetitions. Old-engine rows remain as history; currency
  * is decided by matching the live decider engine identity and repetitions.
  */
@@ -284,8 +383,8 @@ export const benchmarkProfiles = sqliteTable(
 
 /**
  * Rolling owner admission ledger for the 24h profile request quota. One row
- * per charged admission (new under current engine, or explicit failed retry).
- * Stale engine-drift re-admissions are free and do not insert here.
+ * per charged model admission (new under current engine, or explicit failed
+ * retry). Stale engine-drift re-admissions are free and do not insert here.
  */
 export const profileRequestEvents = sqliteTable(
   'profile_request_events',

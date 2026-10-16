@@ -90,7 +90,7 @@ import { peekSharePayload } from '@/lib/share-payload';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
-import { linkStartedTodoSession } from '@/lib/hooks/use-todos';
+import { linkStartedTodoSession } from '@/lib/hooks/todo-session-link';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
@@ -203,7 +203,7 @@ export function NewSessionScreenBody() {
   // prompt's own `useSharePrefill` still delivers the shared files and
   // re-applies the same text idempotently. A to-do's Start carries its prompt
   // the same way, so it also beats a stored draft.
-  const { prompt: routePrefillPrompt, todoId } = useNewSessionPrefill();
+  const { prompt: routePrefillPrompt, todoId, todoTitle } = useNewSessionPrefill();
   const [sharePrefillText] = useState<string | null>(() =>
     shareId ? (peekSharePayload(shareId)?.text ?? null) : (routePrefillPrompt ?? null)
   );
@@ -459,10 +459,16 @@ export function NewSessionScreenBody() {
   const handleSpawnSucceeded = useCallback(
     (sessionId: string) => {
       if (todoId) {
-        void linkStartedTodoSession({ queryClient, trpc, todoId, sessionId });
+        void linkStartedTodoSession({
+          queryClient,
+          trpc,
+          todoId,
+          sessionId,
+          ...(todoTitle ? { title: todoTitle } : {}),
+        });
       }
     },
-    [queryClient, todoId, trpc]
+    [queryClient, todoId, todoTitle, trpc]
   );
 
   // The manual draft as the create body carries it: one plaintext value per key
@@ -492,6 +498,7 @@ export function NewSessionScreenBody() {
     manualEnvVars,
     setupCommands,
     todoId,
+    todoTitle,
   });
 
   // Seed the route-owned prompt state from the restored draft once the load

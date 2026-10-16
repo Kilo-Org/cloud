@@ -16,7 +16,11 @@ import { formatError, ttlCached } from '@kilocode/worker-utils';
 import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import type { ClassifierAnalyticsStatus } from './classifier-analytics';
-import { getClassifierModel, getDecisionLogSampleRate } from './classifier-config';
+import {
+  getClassifierModel,
+  getDecisionLogSampleRate,
+  getShadowRoutingTable,
+} from './classifier-config';
 import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifier';
 import {
   computeContentHashes,
@@ -31,7 +35,13 @@ import {
   putStickyDecision,
 } from './decision-cache';
 import type { StickyDecision } from './decision-cache';
-import { computeDecision, isLowConfidence, type DecisionIncumbent } from './decision-engine';
+import {
+  computeDecision,
+  computeShadowDecision,
+  isLowConfidence,
+  type DecisionIncumbent,
+  type ShadowDecision,
+} from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
 import { fetchCustomRoutingTable } from './benchmark-origin';
@@ -73,9 +83,9 @@ async function loadCustomRoutingTable(
   let cache = customTableLoaders.get(key);
   if (!cache) {
     const poolSnapshot = pool;
-    cache = ttlCached(CUSTOM_ROUTING_TABLE_CACHE_TTL_MS, async (e: Env) => {
-      return fetchCustomRoutingTable(e, poolSnapshot);
-    });
+    cache = ttlCached(CUSTOM_ROUTING_TABLE_CACHE_TTL_MS, (e: Env) =>
+      fetchCustomRoutingTable(e, poolSnapshot)
+    );
     customTableLoaders.set(key, cache);
   }
   return cache.get(env).catch((error: unknown) => {
@@ -279,7 +289,8 @@ function recordDecision(
     ? 'cache'
     : 'sync',
   lowConfidence = false,
-  speculativeCost?: number
+  speculativeCost?: number,
+  shadow: ShadowDecision | null = null
 ): void {
   const summary = summarizeOutcome(outcome);
   if (speculativeCost !== undefined) summary.cost = speculativeCost;
@@ -361,6 +372,7 @@ function recordDecision(
       // retry, failure); downstream rate math must only scale sampled rows.
       sampled: !alwaysLog,
       ...summary.details,
+      ...shadow,
     })
   );
 }
@@ -400,8 +412,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   const constraints: RoutingConstraints | undefined = payload.constraints;
 
   const routingPrerequisites = (async () => {
-    // Resolve settings before the single capability load so custom-pool
-    // model ids are included. Classification does not depend on either.
     const settingsStartedAt = performance.now();
     const effectiveSettings = await getEffectiveAutoRoutingSettings(c.env, {
       userId: payload.userId,
@@ -409,6 +419,15 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     });
     timings.settingsMs = performance.now() - settingsStartedAt;
     const configuredPool = router === 'efficient' ? effectiveSettings.pool : null;
+
+    const tableStartedAt = performance.now();
+    const [routingTable, shadowRoutingTable] = await Promise.all([
+      configuredPool === null
+        ? getRoutingTable(c.env, router)
+        : loadCustomRoutingTable(c.env, configuredPool),
+      router === 'efficient' ? getShadowRoutingTable(c.env) : null,
+    ]);
+    timings.tableMs = performance.now() - tableStartedAt;
     let capabilities: ModelCapabilitiesMap = new Map();
     if (hasConstraints || configuredPool !== null) {
       const capabilitiesStartedAt = performance.now();
@@ -416,22 +435,25 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         router,
         waitUntil: promise => c.executionCtx.waitUntil(promise),
         ...(configuredPool !== null
-          ? { additionalModelIds: configuredPool.map(entry => entry.model) }
+          ? {
+              additionalModelIds: [
+                ...new Set(
+                  Object.values(routingTable?.routes ?? {}).flatMap(candidates =>
+                    candidates.map(candidate => candidate.model)
+                  )
+                ),
+              ],
+            }
           : {}),
       });
       timings.capabilitiesMs = performance.now() - capabilitiesStartedAt;
     }
-
-    const tableStartedAt = performance.now();
-    const routingTable = await (configuredPool === null
-      ? getRoutingTable(c.env, router)
-      : loadCustomRoutingTable(c.env, configuredPool));
-    timings.tableMs = performance.now() - tableStartedAt;
     return {
       configuredPool,
       routingMode: effectiveSettings.mode,
       capabilities,
       routingTable,
+      shadowRoutingTable,
     };
   })();
   const classifyAndBill = async (
@@ -577,7 +599,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   );
 
   const [routing, prepared] = await Promise.all([routingPrerequisites, preparedClassification]);
-  const { configuredPool, routingMode, capabilities, routingTable } = routing;
+  const { configuredPool, routingMode, capabilities, routingTable, shadowRoutingTable } = routing;
   const { ctx, sticky, speculative, outcome } = prepared;
   const incumbent = stickyToIncumbent(sticky);
   const decisionOptions = {
@@ -641,7 +663,18 @@ export const decideHandler: Handler<HonoEnv> = async c => {
             sticky,
             'background',
             isLowConfidence(routingTable, classifier.classification.confidence),
-            speculative ? (classifier.cost ?? 0) : undefined
+            speculative ? (classifier.cost ?? 0) : undefined,
+            shadowRoutingTable === null
+              ? null
+              : computeShadowDecision(
+                  decision,
+                  classifier.classification,
+                  shadowRoutingTable,
+                  incumbent,
+                  deniedModelIds,
+                  routingMode,
+                  { ...decisionOptions, confidence: classifier.classification.confidence }
+                )
           );
         } catch (error) {
           if (speculative) {
@@ -691,6 +724,18 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         )
       );
     }
+    const shadow =
+      shadowRoutingTable === null
+        ? null
+        : computeShadowDecision(
+            decision,
+            cached,
+            shadowRoutingTable,
+            incumbent,
+            deniedModelIds,
+            routingMode,
+            { ...decisionOptions, confidence: cached.confidence }
+          );
     const responseDurationMs = performance.now() - startedAt;
     if (speculative && !speculative.outcome) {
       c.executionCtx.waitUntil(
@@ -705,7 +750,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
             sticky,
             'cache',
             isLowConfidence(routingTable, cached.confidence),
-            classifierOutcomeCost(result)
+            classifierOutcomeCost(result),
+            shadow
           );
         })
       );
@@ -720,7 +766,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         sticky,
         'cache',
         isLowConfidence(routingTable, cached.confidence),
-        speculative?.outcome ? classifierOutcomeCost(speculative.outcome) : undefined
+        speculative?.outcome ? classifierOutcomeCost(speculative.outcome) : undefined,
+        shadow
       );
     }
     return c.json(decisionResponse(cached, payload.input, decision));
@@ -769,7 +816,19 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       decision,
       sticky,
       speculative ? 'speculative' : 'sync',
-      isLowConfidence(routingTable, classifier.classification.confidence)
+      isLowConfidence(routingTable, classifier.classification.confidence),
+      undefined,
+      shadowRoutingTable === null
+        ? null
+        : computeShadowDecision(
+            decision,
+            classifier.classification,
+            shadowRoutingTable,
+            incumbent,
+            deniedModelIds,
+            routingMode,
+            { ...decisionOptions, confidence: classifier.classification.confidence }
+          )
     );
     return c.json(decisionResponse(classifier.classification, payload.input, decision));
   } catch (error) {

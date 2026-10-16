@@ -1,6 +1,6 @@
 import {
   CustomRoutingTableSchema,
-  poolEntryKey,
+  benchmarkPairKey,
   RANKING_POLICY_VERSION,
   rankCandidates,
   RoutingTableSchema,
@@ -14,7 +14,7 @@ import {
   type ProductionTokenProfile,
   type BenchmarkModelSummary,
   type CustomRoutingTable,
-  type PoolEntry,
+  type BenchmarkPair,
   type RoutingTable,
   type TaxonomyRouteKey,
 } from '@kilocode/auto-routing-contracts';
@@ -296,14 +296,14 @@ export function computeRegistryRoutingTableVersion(
  * both read the same registry.
  */
 export function filterSummariesByProvenance(
-  readyEntries: readonly { entry: PoolEntry; runId: string }[],
+  readyEntries: readonly { entry: BenchmarkPair; runId: string }[],
   summaries: readonly BenchmarkModelSummaryWithRun[]
 ): BenchmarkModelSummaryWithRun[] {
   const provenanceByPair = new Map(
-    readyEntries.map(r => [poolEntryKey(r.entry), r.runId] as const)
+    readyEntries.map(r => [benchmarkPairKey(r.entry), r.runId] as const)
   );
   return summaries.filter(summary => {
-    const pairKey = poolEntryKey({ model: summary.model, variant: summary.variant ?? null });
+    const pairKey = benchmarkPairKey({ model: summary.model, variant: summary.variant ?? null });
     return provenanceByPair.get(pairKey) === summary.runId;
   });
 }
@@ -329,7 +329,7 @@ export function buildCustomRoutingTable(params: {
   complexityLabels?: ComplexityLabels;
   /** Ready current profiles with provenance run ids. */
   readyEntries: readonly {
-    entry: PoolEntry;
+    entry: BenchmarkPair;
     runId: string;
   }[];
   /**

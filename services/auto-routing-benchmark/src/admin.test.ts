@@ -4,12 +4,17 @@ import {
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   type BenchmarkConfig,
+  type BenchmarkRun,
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { app } from './index';
 import type * as DbModule from './db';
 import type * as ProfilesModule from './profiles';
+import type * as SchedulerModule from './scheduler';
+import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
+import { DECIDER_CASES } from './datasets/decider-cases';
+import { computeEngineIdentity } from './run';
 
 const TEST_CONFIG: BenchmarkConfig = {
   router: 'efficient',
@@ -23,8 +28,6 @@ const TEST_CONFIG: BenchmarkConfig = {
   productionTokenProfile: null,
   switchHorizonTurns: null,
   lowConfidenceThreshold: null,
-  maxConcurrency: 40,
-  userMaxConcurrency: 40,
   benchmarkUserId: null,
   benchmarkOrgId: null,
   classifierRepetitions: 1,
@@ -47,13 +50,15 @@ const TEST_CONFIG_ROWS = {
     production_token_profile: null,
     switch_horizon_turns: null,
     low_confidence_threshold: null,
-    max_concurrency: TEST_CONFIG.maxConcurrency,
-    user_max_concurrency: TEST_CONFIG.userMaxConcurrency,
+    max_concurrency: 80,
+    user_max_concurrency: 40,
     benchmark_user_id: TEST_CONFIG.benchmarkUserId,
     benchmark_org_id: TEST_CONFIG.benchmarkOrgId,
     classifier_repetitions: TEST_CONFIG.classifierRepetitions,
     decider_repetitions: TEST_CONFIG.deciderRepetitions,
     classifier_max_p95_latency_ms: TEST_CONFIG.classifierMaxP95LatencyMs,
+    policy_overrides: null,
+    policy_computed: null,
     updated_at: '2026-06-01T00:00:00.000Z',
     updated_by: null,
   },
@@ -68,6 +73,13 @@ const TEST_CONFIG_ROWS = {
 // Stubs: the db module is mocked at its function boundary (drizzle generates
 // the SQL, so statement-level stubbing would couple tests to its internals).
 
+vi.mock('./scheduler', async importOriginal => ({
+  ...(await importOriginal<typeof SchedulerModule>()),
+  claimScheduledChunks: vi.fn(),
+  recoverChunks: vi.fn(),
+  scheduleRunChunks: vi.fn(),
+}));
+
 vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
   return {
@@ -75,10 +87,15 @@ vi.mock('./db', async importOriginal => {
     getConfigRows: vi.fn(),
     replaceConfig: vi.fn(),
     listRuns: vi.fn(),
+    listRunProgressCounts: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     getClassifierWinner: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
     insertRun: vi.fn(),
+    getRunWithModels: vi.fn(),
+    countCaseResultsByLane: vi.fn().mockResolvedValue([]),
+    listLaneFailures: vi.fn().mockResolvedValue([]),
+    reuseDeciderCaseResults: vi.fn().mockResolvedValue(0),
     markStaleRunsFailed: vi.fn(),
     listStaleRunningDeciderRuns: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
@@ -93,6 +110,7 @@ vi.mock('./db', async importOriginal => {
     markProfilesRunningForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
     getRunningRun: vi.fn(),
+    getLiveContainerLanes: vi.fn(),
     existsNewerCompletedRun: vi.fn(),
   };
 });
@@ -112,8 +130,10 @@ import {
   getLatestRoutingTable,
   getLatestSummariesByModel,
   getRunningRun,
+  getLiveContainerLanes,
   existsNewerCompletedRun,
   insertRun,
+  getRunWithModels,
   listPendingCurrentProfiles,
   markProfilesRunningForRun,
   listReadyCurrentProfilesForEntries,
@@ -122,6 +142,7 @@ import {
   listCurrentPlatformProfileStatuses,
   countCurrentProfilesByStatus,
   listRuns,
+  listRunProgressCounts,
   listStaleRunningDeciderRuns,
   markStaleRunsFailed,
   replaceConfig,
@@ -130,11 +151,23 @@ import { lookupProfileStatuses, ProfileQuotaExceededError, registerProfiles } fr
 
 const tokenGet = vi.fn<() => Promise<string>>();
 const queueSendBatch = vi.fn();
+const queueSend = vi.fn();
+
+function schedulerDatabase(): D1Database {
+  const statement = {
+    bind: vi.fn().mockReturnThis(),
+    first: vi.fn().mockResolvedValue(null),
+    all: vi.fn().mockResolvedValue({ results: [] }),
+    run: vi.fn().mockResolvedValue({ meta: { changes: 0 } }),
+  };
+  return { prepare: vi.fn(() => statement) } as unknown as D1Database;
+}
 
 const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
-  BENCH_DB: {} as D1Database,
-  BENCH_QUEUE: { sendBatch: queueSendBatch },
+  BENCH_DB: schedulerDatabase(),
+  BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
+  BENCHMARK_SCHEDULER_CONFIG: '{}',
   AUTO_ROUTING_CONFIG: { put: vi.fn(), get: vi.fn(), delete: vi.fn() },
   KILO_WEB_API_BASE_URL: 'https://app.test',
 } as unknown as Env;
@@ -179,11 +212,11 @@ beforeEach(() => {
   tokenGet.mockResolvedValue('bench-token');
   vi.stubGlobal(
     'fetch',
-    vi
-      .fn<typeof fetch>()
-      .mockImplementation(async () =>
-        Response.json({ data: TEST_CONFIG.deciderModels.map(model => ({ id: model.id })) })
-      )
+    vi.fn<typeof fetch>().mockImplementation(async () =>
+      Response.json({
+        data: [...TEST_CONFIG.deciderModels.map(model => ({ id: model.id })), { id: 'a/b' }],
+      })
+    )
   );
   vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([]);
   vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
@@ -194,10 +227,36 @@ beforeEach(() => {
   });
   vi.mocked(replaceConfig).mockResolvedValue(undefined);
   vi.mocked(listRuns).mockResolvedValue([]);
+  vi.mocked(listRunProgressCounts).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getClassifierWinner).mockResolvedValue(null);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
   vi.mocked(insertRun).mockResolvedValue(undefined);
+  vi.mocked(getRunWithModels)
+    .mockReset()
+    .mockImplementation(async (_db, id) => {
+      const inserted = vi.mocked(insertRun).mock.calls.find(([, run]) => run.id === id);
+      if (!inserted) return null;
+      const [, run, models] = inserted;
+      return {
+        run: {
+          ...run,
+          started_at: run.startedAt,
+          router: run.router ?? 'efficient',
+          purpose: run.purpose ?? 'platform',
+          accuracy_noise_band: run.accuracy_noise_band ?? 0.05,
+          frontier_min_accuracy_delta: run.frontier_min_accuracy_delta ?? 0,
+          status: 'running',
+          completed_at: null,
+          error: null,
+        },
+        models,
+      };
+    });
+  vi.mocked(scheduleRunChunks).mockReset().mockResolvedValue(undefined);
+  vi.mocked(claimScheduledChunks).mockReset().mockResolvedValue([]);
+  vi.mocked(recoverChunks).mockReset().mockResolvedValue([]);
+  queueSend.mockReset().mockResolvedValue(undefined);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
@@ -208,6 +267,7 @@ beforeEach(() => {
   vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
   vi.mocked(registerProfiles).mockReset();
   vi.mocked(lookupProfileStatuses).mockReset();
@@ -234,7 +294,7 @@ describe('GET /admin/config', () => {
     // getConfigRows already returns null config by default
     const res = await authedGet('/admin/config');
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ config: null });
+    await expect(res.json()).resolves.toEqual({ config: null, policySettings: null });
   });
 
   it('returns the stored config when DB rows exist', async () => {
@@ -263,6 +323,8 @@ describe('GET /admin/config', () => {
         decider_repetitions: 1,
         classifier_max_p95_latency_ms: null,
         user_max_concurrency: 100,
+        policy_overrides: null,
+        policy_computed: null,
         updated_at: '2026-06-01T00:00:00.000Z',
         updated_by: 'admin@example.com',
       },
@@ -274,9 +336,52 @@ describe('GET /admin/config', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       config: { minAccuracy: number; updatedBy: string | null };
+      policySettings: Record<
+        string,
+        { kind: string; effective: unknown; override: unknown; computed: unknown; reason: unknown }
+      >;
     };
     expect(body.config.minAccuracy).toBe(0.9);
     expect(body.config.updatedBy).toBe('admin@example.com');
+    expect(body.policySettings.minAccuracy).toMatchObject({
+      kind: 'auto',
+      effective: 0.9,
+      override: null,
+      computed: null,
+    });
+    expect(body.policySettings.switchCostFactor).toMatchObject({
+      kind: 'fixed',
+      effective: 3,
+      reason: expect.any(String),
+    });
+  });
+
+  it('returns overrides and computed values per policy setting', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        policy_overrides: { minAccuracy: 0.95 },
+        policy_computed: {
+          accuracyNoiseBand: {
+            value: 0.08,
+            computedAt: '2026-06-02T00:00:00.000Z',
+            source: 'held-out-grid',
+            evidence: 'fixture',
+          },
+        },
+      },
+    });
+
+    const res = await authedGet('/admin/config');
+    const body = (await res.json()) as {
+      policySettings: Record<string, { effective: number; override: number | null }>;
+    };
+    expect(body.policySettings.minAccuracy).toMatchObject({ effective: 0.95, override: 0.95 });
+    expect(body.policySettings.accuracyNoiseBand).toMatchObject({
+      effective: 0.08,
+      override: null,
+    });
   });
 });
 
@@ -295,6 +400,19 @@ describe('PUT /admin/config', () => {
 
   it('returns 400 for a schema-invalid config', async () => {
     const res = await authedPut('/admin/config', { classifierModels: 'oops' });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      error: 'Invalid benchmark config',
+    });
+    expect(replaceConfig).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when an override value does not fit its setting', async () => {
+    const res = await authedPut('/admin/config', {
+      ...TEST_CONFIG,
+      policyOverrides: { minAccuracy: { uncachedInputTokens: 1000, cachedInputTokens: 200 } },
+    });
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({
       success: false,
@@ -371,6 +489,76 @@ describe('GET /admin/runs', () => {
     await authedGet('/admin/runs');
     // sweepStaleRuns → markStaleRunsFailed runs on list, independent of starting.
     expect(markStaleRunsFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it('attaches live progress to running runs only', async () => {
+    const running: BenchmarkRun = {
+      id: 'decider-2026-06-15T00-00-00-000Z',
+      router: 'efficient',
+      kind: 'decider',
+      purpose: 'platform',
+      status: 'running',
+      startedAt: '2026-06-15T00:00:00.000Z',
+      completedAt: null,
+      error: null,
+      summaries: [],
+    };
+    const completed: BenchmarkRun = {
+      ...running,
+      id: 'decider-2026-06-14T00-00-00-000Z',
+      status: 'completed',
+      completedAt: '2026-06-14T01:00:00.000Z',
+    };
+    vi.mocked(listRuns).mockResolvedValue([running, completed]);
+    vi.mocked(listRunProgressCounts).mockResolvedValue([
+      {
+        runId: running.id,
+        kind: 'decider',
+        router: 'efficient',
+        repetitions: 2,
+        engineIdentity: computeEngineIdentity('decider', 'efficient'),
+        enqueuedModels: 3,
+        completedCases: 40,
+        failedCases: 3,
+      },
+    ]);
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: BenchmarkRun[] };
+    expect(body.runs[0].progress).toEqual({
+      completedCases: 40,
+      failedCases: 3,
+      totalCases: 3 * DECIDER_CASES.length * 2,
+    });
+    expect(body.runs[1].progress).toBeUndefined();
+    // Only runs that can still change are tallied.
+    expect(listRunProgressCounts).toHaveBeenCalledWith(env.BENCH_DB, [running.id]);
+  });
+
+  it('still lists runs when the progress query fails', async () => {
+    const running: BenchmarkRun = {
+      id: 'decider-2026-06-15T00-00-00-000Z',
+      router: 'efficient',
+      kind: 'decider',
+      purpose: 'platform',
+      status: 'running',
+      startedAt: '2026-06-15T00:00:00.000Z',
+      completedAt: null,
+      error: null,
+      summaries: [],
+    };
+    vi.mocked(listRuns).mockResolvedValue([running]);
+    vi.mocked(listRunProgressCounts).mockRejectedValue(new Error('D1 overloaded'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: BenchmarkRun[] };
+    expect(body.runs.map(run => run.id)).toEqual([running.id]);
+    expect(body.runs[0].progress).toBeUndefined();
   });
 });
 
@@ -505,6 +693,14 @@ describe('POST /admin/runs', () => {
     // Owner-requested work must not silently re-admit platform models.
     expect(syncPlatformRegistryRows).not.toHaveBeenCalled();
     expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('user');
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: expect.any(String),
+      entries: [{ model: 'owner/a', variant: 'high', providers: [] }],
+      repetitions: TEST_CONFIG.deciderRepetitions,
+      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
+    expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
   it('starts one run per queue for queue=both', async () => {
@@ -541,32 +737,7 @@ describe('POST /admin/runs', () => {
     expect(insertRun).not.toHaveBeenCalled();
   });
 
-  it('caps a queue batch by that queue container budget', async () => {
-    // user budget 4, repetitions 2 → floor(4/2) = 2 entries per run.
-    vi.mocked(getConfigRows).mockResolvedValue({
-      ...TEST_CONFIG_ROWS,
-      config: {
-        ...TEST_CONFIG_ROWS.config,
-        user_max_concurrency: 4,
-        decider_repetitions: 2,
-      },
-    });
-    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
-      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
-      { model: 'm/2', variant: '', requested_at: '2026-06-01T00:00:01.000Z' },
-      { model: 'm/3', variant: '', requested_at: '2026-06-01T00:00:02.000Z' },
-    ]);
-
-    await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
-
-    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
-    expect(modelRows.map(m => m.model)).toEqual(['m/1', 'm/2']);
-  });
-
-  it('reports a queue that cannot start instead of claiming there is nothing to run', async () => {
-    // One repetition per live container is the floor. Below it no batch fits,
-    // and drains swallow their own errors — so without this the panel would
-    // answer 200 "nothing pending" for a queue full of pending work.
+  it('admits the whole registry batch independently of retired concurrency limits', async () => {
     vi.mocked(getConfigRows).mockResolvedValue({
       ...TEST_CONFIG_ROWS,
       config: {
@@ -575,38 +746,61 @@ describe('POST /admin/runs', () => {
         decider_repetitions: 5,
       },
     });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue(
+      Array.from({ length: 100 }, (_, i) => ({
+        model: `m/${i}`,
+        variant: '',
+        requested_at: `2026-06-01T00:00:${String(i % 60).padStart(2, '0')}.000Z`,
+      }))
+    );
+
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
+    expect(res.status).toBe(200);
+    const [, run, modelRows] = vi.mocked(insertRun).mock.calls[0];
+    expect(modelRows).toHaveLength(100);
+    expect(run).toMatchObject({ repetitions: 5, max_concurrency: 0, router: 'efficient' });
+    expect(modelRows[0].model).toBe('m/0');
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: run.id,
+      entries: modelRows.map(row => ({ model: row.model, variant: null, providers: [] })),
+      repetitions: 5,
+      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('starts a durable run when all live scheduler slots are occupied', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(250);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
-    expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toMatchObject({
-      error: expect.stringContaining('requires at least one live container lane'),
-    });
-    expect(insertRun).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      startedRuns: { purpose: string; entryCount: number }[];
+      drainErrors: string[];
+    };
+    expect(body.startedRuns).toEqual([expect.objectContaining({ purpose: 'user', entryCount: 1 })]);
+    expect(body.drainErrors).toEqual([]);
+    expect(insertRun).toHaveBeenCalledOnce();
+    expect(scheduleRunChunks).toHaveBeenCalledOnce();
+    expect(claimScheduledChunks).toHaveBeenCalled();
+    expect(queueSend).not.toHaveBeenCalled();
   });
 
   it('reports a wedged queue alongside the queue that did start', async () => {
-    // The platform budget fits one entry per repetition; the user budget does
-    // not. Hiding the user queue's failure behind the platform run would leave
-    // its pending work looking like an empty queue.
-    const configRows = {
-      ...TEST_CONFIG_ROWS,
-      config: {
-        ...TEST_CONFIG_ROWS.config,
-        max_concurrency: 100,
-        user_max_concurrency: 4,
-        decider_repetitions: 5,
-      },
-    };
-    vi.mocked(getConfigRows).mockImplementation(async (_db, router) =>
-      router === 'frontier' ? { ...TEST_CONFIG_ROWS, config: null } : configRows
-    );
-    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
-      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
-    ]);
+    // The platform queue starts; the user queue's registry read fails. Hiding
+    // that behind the started run would leave its pending work looking absent.
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockImplementation(async (_db, _filter, purpose) => {
+      if (purpose === 'user') throw new Error('registry unavailable');
+      return [{ model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' }];
+    });
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'both' });
 
@@ -616,8 +810,7 @@ describe('POST /admin/runs', () => {
       drainErrors: string[];
     };
     expect(body.startedRuns.map(r => r.purpose)).toEqual(['platform']);
-    expect(body.drainErrors).toHaveLength(1);
-    expect(body.drainErrors[0]).toContain('requires at least one live container lane');
+    expect(body.drainErrors).toEqual(['registry unavailable']);
   });
 });
 
@@ -727,12 +920,103 @@ describe('GET /admin/classifier-winner', () => {
   });
 });
 
+function stubCatalog(): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>().mockImplementation(async () =>
+      Response.json({
+        data: [
+          {
+            id: 'a/b',
+            opencode: {
+              variants: {
+                low: { reasoning: { effort: 'low' } },
+                high: { reasoning: { effort: 'high' } },
+                fast: {},
+              },
+            },
+          },
+          { id: 'c/d' },
+          { id: '~a/latest', alias_target: 'a/b' },
+          { id: '~a/fast-latest', alias_target: 'a/b' },
+        ],
+      })
+    )
+  );
+}
+
+describe('owner model aliases', () => {
+  it.each(['register', 'status'])(
+    'shares concrete pairs and maps %s statuses back to each requested model',
+    async action => {
+      vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+      stubCatalog();
+      const statuses = [
+        { entry: { model: 'a/b', variant: 'low' }, status: 'ready' as const, failureReason: null },
+        {
+          entry: { model: 'a/b', variant: 'high' },
+          status: 'failed' as const,
+          failureReason: 'Benchmark failed',
+        },
+      ];
+      vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses });
+      vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({ statuses });
+      const entries = [{ model: '~a/latest' }, { model: '~a/fast-latest' }, { model: 'a/b' }];
+      const response = await authedPost(`/admin/profiles/${action}`, {
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries,
+        retryEntries: [{ model: '~a/latest' }],
+      });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        statuses: statuses.flatMap(status =>
+          entries.map(entry => ({ ...status, entry: { ...status.entry, model: entry.model } }))
+        ),
+      });
+      const pairs = [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+      ];
+      if (action === 'register') {
+        expect(registerProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+          ownerType: 'user',
+          ownerId: 'u1',
+          pairs,
+          retryPairs: pairs,
+        });
+      } else {
+        expect(lookupProfileStatuses).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+          pairs,
+        });
+      }
+    }
+  );
+
+  it('assembles custom tables from the resolved pairs of alias pool entries', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+    const response = await authedPost('/admin/custom-routing-table', {
+      entries: [{ model: '~a/latest' }, { model: 'a/b' }],
+    });
+    expect(response.status).toBe(200);
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+      ]
+    );
+  });
+});
+
 describe('POST /admin/profiles/register', () => {
   it('returns 400 when benchmark config is not set', async () => {
     const res = await authedPost('/admin/profiles/register', {
       ownerType: 'user',
       ownerId: 'u1',
-      entries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({
@@ -764,8 +1048,8 @@ describe('POST /admin/profiles/register', () => {
     const res = await authedPost('/admin/profiles/register', {
       ownerType: 'user',
       ownerId: 'u1',
-      entries: [{ model: 'a/b', variant: null }],
-      retryEntries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
+      retryEntries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -779,10 +1063,57 @@ describe('POST /admin/profiles/register', () => {
       expect.objectContaining({
         ownerType: 'user',
         ownerId: 'u1',
-        entries: [{ model: 'a/b', variant: null }],
-        retryEntries: [{ model: 'a/b', variant: null }],
+        pairs: [{ model: 'a/b', variant: null }],
+        retryPairs: [{ model: 'a/b', variant: null }],
       })
     );
+  });
+
+  it('expands each model to every catalog effort and retries only listed models', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+    vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses: [] });
+
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'org',
+      ownerId: 'o1',
+      entries: [{ model: 'a/b' }, { model: 'c/d' }],
+      retryEntries: [{ model: 'a/b' }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(registerProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      expect.objectContaining({
+        pairs: [
+          { model: 'a/b', variant: 'low' },
+          { model: 'a/b', variant: 'high' },
+          { model: 'c/d', variant: null },
+        ],
+        retryPairs: [
+          { model: 'a/b', variant: 'low' },
+          { model: 'a/b', variant: 'high' },
+        ],
+      })
+    );
+  });
+
+  it('rejects a model missing from the catalog with 400 before admission', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [{ model: 'a/b' }, { model: 'gone/model' }],
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Model is unavailable in the current catalog: gone/model',
+    });
+    expect(registerProfiles).not.toHaveBeenCalled();
   });
 
   it('returns 429 with retryAt when quota is exceeded', async () => {
@@ -798,7 +1129,7 @@ describe('POST /admin/profiles/register', () => {
     const res = await authedPost('/admin/profiles/register', {
       ownerType: 'org',
       ownerId: 'o1',
-      entries: [{ model: 'a/b', variant: 'xhigh' }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(429);
     await expect(res.json()).resolves.toEqual({
@@ -812,7 +1143,7 @@ describe('POST /admin/profiles/register', () => {
 describe('POST /admin/profiles/status', () => {
   it('returns 400 when benchmark config is not set', async () => {
     const res = await authedPost('/admin/profiles/status', {
-      entries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(400);
     expect(lookupProfileStatuses).not.toHaveBeenCalled();
@@ -825,12 +1156,102 @@ describe('POST /admin/profiles/status', () => {
     });
 
     const res = await authedPost('/admin/profiles/status', {
-      entries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       statuses: [{ entry: { model: 'a/b', variant: null }, status: 'ready', failureReason: null }],
     });
+  });
+
+  it('looks up every catalog effort and reports missing models as failed', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+    const statuses = [
+      { entry: { model: 'a/b', variant: 'low' }, status: 'ready' as const, failureReason: null },
+      { entry: { model: 'a/b', variant: 'high' }, status: 'pending' as const, failureReason: null },
+    ];
+    vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({ statuses });
+
+    const res = await authedPost('/admin/profiles/status', {
+      entries: [{ model: 'gone/model' }, { model: 'a/b' }],
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      statuses: [
+        ...statuses,
+        {
+          entry: { model: 'gone/model', variant: null },
+          status: 'failed',
+          failureReason: 'Model is unavailable in the current catalog.',
+        },
+      ],
+    });
+    expect(lookupProfileStatuses).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+      pairs: [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+      ],
+    });
+  });
+
+  it('skips lookup when every model is missing from the catalog', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+
+    const res = await authedPost('/admin/profiles/status', {
+      entries: [{ model: 'gone/model' }],
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      statuses: [
+        {
+          entry: { model: 'gone/model', variant: null },
+          status: 'failed',
+          failureReason: 'Model is unavailable in the current catalog.',
+        },
+      ],
+    });
+    expect(lookupProfileStatuses).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /admin/custom-routing-table', () => {
+  it('assembles from every catalog effort of the supported pool models', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValueOnce([]);
+
+    const res = await authedPost('/admin/custom-routing-table', {
+      entries: [{ model: 'a/b' }, { model: 'gone/model' }, { model: 'c/d' }],
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ table: null });
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ repetitions: TEST_CONFIG.deciderRepetitions }),
+      [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+        { model: 'c/d', variant: null },
+      ]
+    );
+  });
+
+  it('returns a null table without a registry read when no model is in the catalog', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog();
+
+    const res = await authedPost('/admin/custom-routing-table', {
+      entries: [{ model: 'gone/model' }],
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ table: null });
+    expect(listReadyCurrentProfilesForEntries).not.toHaveBeenCalled();
   });
 });
 
@@ -925,15 +1346,18 @@ describe('router selection', () => {
   });
 });
 
-describe('shared concurrency cap', () => {
-  it('returns HTTP 400 rather than HTTP 500 when saving overcommits the combined budget', async () => {
+describe('retired concurrency knobs', () => {
+  it('saves a config from a previous admin UI without the retired knobs', async () => {
     const response = await authedPut('/admin/config', {
       ...TEST_CONFIG,
       maxConcurrency: 150,
       userMaxConcurrency: 100,
     });
-    expect(response.status).toBe(400);
-    expect(replaceConfig).not.toHaveBeenCalled();
+
+    expect(response.status).toBe(200);
+    const [, saved] = vi.mocked(replaceConfig).mock.calls[0];
+    expect(saved).not.toHaveProperty('maxConcurrency');
+    expect(saved).not.toHaveProperty('userMaxConcurrency');
   });
 });
 
@@ -956,7 +1380,7 @@ describe('body router selection', () => {
       router: 'frontier',
       ownerType: 'user',
       ownerId: 'owner',
-      entries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
     });
     expect(response.status).toBe(400);
     expect(registerProfiles).not.toHaveBeenCalled();

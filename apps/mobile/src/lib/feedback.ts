@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import * as Application from 'expo-application';
 import * as SecureStore from '@/lib/auth/secure-store';
 import * as StoreReview from 'expo-store-review';
@@ -8,8 +9,6 @@ import { i18n } from '@/i18n';
 import { captureEvent, FEEDBACK_SUBMITTED_EVENT } from '@/lib/analytics/posthog';
 import { writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { FEEDBACK_LAST_ASKED_AT_KEY, REVIEW_REQUESTED_AT_KEY } from '@/lib/storage-keys';
-
-const SUPPORT_EMAIL = 'hi@kilo.ai';
 
 const STORE_REVIEW_URL = Platform.select({
   ios: 'https://apps.apple.com/app/id6761193135?action=write-review',

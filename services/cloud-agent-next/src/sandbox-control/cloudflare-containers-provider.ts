@@ -117,6 +117,16 @@ export function createCloudflareContainersProviderAdapter(deps: {
 
   return {
     ensureBillingAdmission,
+    describeRuntime(ref) {
+      const parsed = decodeOwnedProviderRef(ref);
+      if (parsed === null) return undefined;
+      return {
+        provider: 'cloudflare-containers',
+        sandboxId: deps.logicalSandboxId,
+        instanceId: parsed.instanceId,
+        instanceType: instance,
+      };
+    },
     async create(intent: ProviderCreateIntent) {
       const providerRef = encodeIntentProviderRef(intent);
       await ensureBillingAdmission(providerRef, intent.billing);

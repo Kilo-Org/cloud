@@ -1775,6 +1775,7 @@ function profileCreateIntent(
     runtimeSkills: resolved.runtimeSkills,
     runtimeAgents: resolved.runtimeAgents,
     kiloCommands: resolved.kiloCommands,
+    runtimeInstructions: resolved.runtimeInstructions,
   };
 }
 

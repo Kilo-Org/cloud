@@ -1,0 +1,1 @@
+ALTER TABLE `control_plane_messages` ADD `container` text;

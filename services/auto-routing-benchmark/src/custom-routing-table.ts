@@ -2,12 +2,12 @@ import type {
   BenchmarkConfig,
   CustomRoutingTable,
   CustomRoutingTableResponse,
-  PoolEntry,
+  BenchmarkPair,
 } from '@kilocode/auto-routing-contracts';
 import {
   ComplexityLabelsSchema,
   MAX_POOL_ENTRIES,
-  poolEntryKey,
+  benchmarkPairKey,
 } from '@kilocode/auto-routing-contracts';
 import {
   getRoutingCaseResultsForEntries,
@@ -20,15 +20,15 @@ import { currentProfileContextFromConfig, ProfileValidationError } from './profi
 import { catalogCandidatePrices, fetchBenchmarkModelCatalog } from './platform-models';
 import caseComplexity from './datasets/case-complexity.json';
 
-function assertUniqueEntries(entries: readonly PoolEntry[]): void {
-  if (entries.length < 1 || entries.length > MAX_POOL_ENTRIES) {
+function assertUniqueEntries(entries: readonly BenchmarkPair[]): void {
+  if (entries.length < 1 || new Set(entries.map(entry => entry.model)).size > MAX_POOL_ENTRIES) {
     throw new ProfileValidationError(
-      `entries must contain between 1 and ${MAX_POOL_ENTRIES} unique pool entries`
+      `entries must contain between 1 and ${MAX_POOL_ENTRIES} unique pool models`
     );
   }
   const seen = new Set<string>();
   for (const entry of entries) {
-    const key = poolEntryKey(entry);
+    const key = benchmarkPairKey(entry);
     if (seen.has(key)) {
       throw new ProfileValidationError(`Duplicate pool entry: ${key}`);
     }
@@ -37,7 +37,7 @@ function assertUniqueEntries(entries: readonly PoolEntry[]): void {
 }
 
 /**
- * Assemble a sparse custom routing table for the requested exact Pool entries
+ * Assemble a sparse custom routing table for expanded model-effort pairs
  * from ready+current Benchmark profiles and their provenance-run summaries.
  * Returns `{ table: null }` when no requested entry is ready/current.
  */
@@ -57,7 +57,7 @@ export async function assembleCustomRoutingTable(
         | 'lowConfidenceThreshold'
       >
     >,
-  entries: readonly PoolEntry[],
+  entries: readonly BenchmarkPair[],
   options: {
     now?: Date;
     catalogEnv?: { KILO_WEB_API_BASE_URL: string };
@@ -81,7 +81,7 @@ export async function assembleCustomRoutingTable(
       entry: {
         model: row.model,
         variant: variantFromStorage(row.variant),
-      } satisfies PoolEntry,
+      } satisfies BenchmarkPair,
       runId: row.run_id,
     }));
 

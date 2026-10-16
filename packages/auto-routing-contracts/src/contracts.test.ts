@@ -159,8 +159,6 @@ describe('BenchmarkConfigSchema defaults', () => {
       classifierModels: ['model/a'],
       deciderModels: [{ id: 'model/b' }],
       minAccuracy: 0.8,
-      maxConcurrency: 4,
-      userMaxConcurrency: 100,
       benchmarkUserId: null,
       benchmarkOrgId: null,
       switchCostFactor: 2,
@@ -181,8 +179,6 @@ describe('BenchmarkConfigSchema defaults', () => {
       classifierModels: ['model/a'],
       deciderModels: [{ id: 'model/b' }],
       minAccuracy: 0.8,
-      maxConcurrency: 4,
-      userMaxConcurrency: 100,
       benchmarkUserId: null,
       switchCostFactor: 2,
       updatedAt: null,
@@ -200,22 +196,6 @@ describe('BenchmarkConfigSchema defaults', () => {
     }
   });
 
-  it('accepts the benchmark maximum concurrency cap of 100', () => {
-    const result = BenchmarkConfigSchema.safeParse({
-      classifierModels: ['model/a'],
-      deciderModels: [{ id: 'model/b' }],
-      minAccuracy: 0.8,
-      maxConcurrency: 100,
-      userMaxConcurrency: 100,
-      benchmarkUserId: null,
-      benchmarkOrgId: null,
-      switchCostFactor: 2,
-      updatedAt: null,
-      updatedBy: null,
-    });
-    expect(result.success).toBe(true);
-  });
-
   it.each(['efficient', 'frontier'])(
     'strips retired auto decider fields for %s clients',
     router => {
@@ -230,8 +210,6 @@ describe('BenchmarkConfigSchema defaults', () => {
         autoDeciderMaxCostUsd: 20,
         minAccuracy: 0.7,
         switchCostFactor: 3,
-        maxConcurrency: 10,
-        userMaxConcurrency: 100,
         benchmarkUserId: null,
         benchmarkOrgId: null,
         updatedAt: null,
@@ -248,6 +226,28 @@ describe('BenchmarkConfigSchema defaults', () => {
       ]) {
         expect(result).not.toHaveProperty(field);
       }
+    }
+  );
+
+  it.each(['efficient', 'frontier'])(
+    'strips the retired concurrency knobs from %s payloads',
+    router => {
+      const result = BenchmarkConfigSchema.parse({
+        router,
+        classifierModels: ['model/a'],
+        deciderModels: [{ id: 'model/b' }],
+        minAccuracy: 0.7,
+        switchCostFactor: 3,
+        maxConcurrency: 100,
+        userMaxConcurrency: 100,
+        benchmarkUserId: null,
+        benchmarkOrgId: null,
+        updatedAt: null,
+        updatedBy: null,
+      });
+
+      expect(result).not.toHaveProperty('maxConcurrency');
+      expect(result).not.toHaveProperty('userMaxConcurrency');
     }
   );
 });
@@ -276,8 +276,6 @@ describe('resolveBenchmarkIdentity', () => {
 describe('BenchmarkConfigSchema duplicate model ids', () => {
   const base = {
     minAccuracy: 0.8,
-    maxConcurrency: 4,
-    userMaxConcurrency: 100,
     benchmarkUserId: null,
     benchmarkOrgId: null,
     switchCostFactor: 2,
@@ -579,25 +577,22 @@ describe('owner pool settings wire contracts', () => {
       mode: 'cost_per_accuracy',
       configuredMode: null,
       defaultMode: 'cost_per_accuracy',
-      configuredPool: [{ model: 'a/b', variant: null }],
+      configuredPool: [{ model: 'a/b' }],
       poolStatuses: [{ entry: { model: 'a/b', variant: null }, status: 'pending' }],
     });
     expect(parsed.poolStatuses).toHaveLength(1);
   });
 
   it('accepts optional retryEntries that are a subset of pool by poolEntryKey', () => {
-    const pool = [
-      { model: 'a/b', variant: null as string | null },
-      { model: 'c/d', variant: 'xhigh' as string | null },
-    ];
+    const pool = [{ model: 'a/b' }, { model: 'c/d' }];
     const parsed = UpdateAutoRoutingSettingsRequestSchema.parse({
       ownerType: 'user',
       ownerId: 'user-1',
       mode: 'cost_per_accuracy',
       pool,
-      retryEntries: [{ model: 'c/d', variant: 'xhigh' }],
+      retryEntries: [{ model: 'c/d' }],
     });
-    expect(parsed.retryEntries).toEqual([{ model: 'c/d', variant: 'xhigh' }]);
+    expect(parsed.retryEntries).toEqual([{ model: 'c/d' }]);
   });
 
   it('rejects retryEntries that are not in pool', () => {
@@ -605,8 +600,8 @@ describe('owner pool settings wire contracts', () => {
       ownerType: 'user',
       ownerId: 'user-1',
       mode: null,
-      pool: [{ model: 'a/b', variant: null }],
-      retryEntries: [{ model: 'other/model', variant: 'max' }],
+      pool: [{ model: 'a/b' }],
+      retryEntries: [{ model: 'other/model' }],
     });
     expect(result.success).toBe(false);
   });
@@ -617,7 +612,7 @@ describe('owner pool settings wire contracts', () => {
       ownerId: 'user-1',
       mode: null,
       pool: null,
-      retryEntries: [{ model: 'a/b', variant: null }],
+      retryEntries: [{ model: 'a/b' }],
     });
     expect(result.success).toBe(false);
   });
@@ -626,7 +621,6 @@ describe('owner pool settings wire contracts', () => {
 describe('benchmark profile request entry bounds', () => {
   const eleven = Array.from({ length: 11 }, (_, i) => ({
     model: `model/${i}`,
-    variant: null as string | null,
   }));
 
   it('bounds RegisterBenchmarkProfilesRequestSchema entries at 10', () => {
@@ -656,10 +650,7 @@ describe('benchmark profile request entry bounds', () => {
   });
 
   it('accepts optional retryEntries that are a subset of entries', () => {
-    const entries = [
-      { model: 'a/b', variant: null as string | null },
-      { model: 'c/d', variant: 'xhigh' as string | null },
-    ];
+    const entries = [{ model: 'a/b' }, { model: 'c/d' }];
     expect(
       RegisterBenchmarkProfilesRequestSchema.safeParse({
         ownerType: 'user',
@@ -672,7 +663,7 @@ describe('benchmark profile request entry bounds', () => {
         ownerType: 'user',
         ownerId: 'u1',
         entries,
-        retryEntries: [{ model: 'a/b', variant: null }],
+        retryEntries: [{ model: 'a/b' }],
       }).success
     ).toBe(true);
   });
@@ -681,8 +672,8 @@ describe('benchmark profile request entry bounds', () => {
     const result = RegisterBenchmarkProfilesRequestSchema.safeParse({
       ownerType: 'org',
       ownerId: 'o1',
-      entries: [{ model: 'a/b', variant: null }],
-      retryEntries: [{ model: 'other/model', variant: 'max' }],
+      entries: [{ model: 'a/b' }],
+      retryEntries: [{ model: 'other/model' }],
     });
     expect(result.success).toBe(false);
   });

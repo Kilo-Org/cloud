@@ -55,6 +55,7 @@ describe('mapModelIdToVercel', () => {
       ['minimax-m3', 'minimax/minimax-m3'],
       ['minimax/minimax-m2.5-20260211', 'minimax/minimax-m2.5'],
       ['kimi-k3', 'moonshotai/kimi-k3'],
+      ['meta/muse-wonder', 'meta/muse-wonder-1.0'],
       ['gpt-4.1-mini', 'openai/gpt-4.1-mini'],
       ['gpt-4o', 'openai/gpt-4o'],
       ['gpt-4o-mini', 'openai/gpt-4o-mini'],

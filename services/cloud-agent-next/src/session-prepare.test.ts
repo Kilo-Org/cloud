@@ -911,6 +911,7 @@ describe('prepareSession endpoint', () => {
           runtimeSkills: undefined,
           runtimeAgents: undefined,
           kiloCommands: undefined,
+          runtimeInstructions: undefined,
         },
         finalization: {
           autoCommit: true,
@@ -956,6 +957,30 @@ describe('prepareSession endpoint', () => {
       expect.stringMatching(/^New session - /),
       'https://github.com/acme/repo',
       undefined
+    );
+  });
+
+  it('projects resolved instruction files into registered profile metadata', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+    mergeProfileConfigurationMock.mockResolvedValue({
+      instructions: [{ name: 'repo-rules', content: 'Follow the repository policy' }],
+    });
+
+    await caller.prepareSession({
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      createdOnPlatform: 'cloud-agent-web',
+    });
+
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profile: expect.objectContaining({
+          runtimeInstructions: [{ name: 'repo-rules', content: 'Follow the repository policy' }],
+        }),
+      })
     );
   });
 

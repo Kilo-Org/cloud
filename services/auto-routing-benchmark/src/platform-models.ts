@@ -3,6 +3,7 @@ import {
   getReasoningVariantKeys,
   type BenchmarkConfig,
   type CandidatePricing,
+  type BenchmarkProfileEntryStatus,
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
 import { exactPairKey } from './db';
@@ -19,6 +20,8 @@ export const BenchmarkModelCatalogSchema = z.object({
   data: z.array(
     z.object({
       id: z.string().trim().min(1),
+      alias_target: z.string().trim().min(1).optional(),
+      inference_provider_ids: z.array(z.string()).optional(),
       opencode: z.object({ variants: BenchmarkCatalogVariantsSchema.optional() }).optional(),
       pricing: z
         .object({
@@ -33,6 +36,48 @@ export const BenchmarkModelCatalogSchema = z.object({
   ),
 });
 
+type CatalogModel = z.infer<typeof BenchmarkModelCatalogSchema>['data'][number];
+
+function resolveCatalogModel(
+  modelId: string,
+  modelsById: ReadonlyMap<string, CatalogModel>
+): CatalogModel | undefined {
+  const model = modelsById.get(modelId);
+  return model?.id.startsWith('~') && model.alias_target
+    ? (modelsById.get(model.alias_target) ?? model)
+    : model;
+}
+
+export function catalogModelProviders(
+  catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
+  modelId: string
+): string[] {
+  const modelsById = new Map(catalog.data.map(model => [model.id, model]));
+  return [...new Set(resolveCatalogModel(modelId, modelsById)?.inference_provider_ids ?? [])];
+}
+
+export function mapProfileStatusesToRequestedModels(
+  requested: readonly { model: string }[],
+  catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
+  statuses: readonly BenchmarkProfileEntryStatus[]
+): BenchmarkProfileEntryStatus[] {
+  const modelsById = new Map(catalog.data.map(model => [model.id, model]));
+  const requestedByResolvedId = new Map<string, string[]>();
+  for (const entry of requested) {
+    const resolvedId = resolveCatalogModel(entry.model, modelsById)?.id;
+    if (!resolvedId) continue;
+    const models = requestedByResolvedId.get(resolvedId);
+    if (models) models.push(entry.model);
+    else requestedByResolvedId.set(resolvedId, [entry.model]);
+  }
+  return statuses.flatMap(status =>
+    (requestedByResolvedId.get(status.entry.model) ?? []).map(model => ({
+      ...status,
+      entry: { ...status.entry, model },
+    }))
+  );
+}
+
 /** Expand only current catalog-supported reasoning controls, never saved effort aliases. */
 export function platformRegistryEntries(
   config: Pick<BenchmarkConfig, 'deciderModels'>,
@@ -42,7 +87,7 @@ export function platformRegistryEntries(
   const entries: RunModelEntry[] = [];
   const seen = new Set<string>();
   for (const selected of config.deciderModels) {
-    const model = modelsById.get(selected.id);
+    const model = resolveCatalogModel(selected.id, modelsById);
     if (!model)
       throw new Error(`selected benchmark model is missing from Kilo catalog: ${selected.id}`);
     const variants = getReasoningVariantKeys(model.opencode?.variants);

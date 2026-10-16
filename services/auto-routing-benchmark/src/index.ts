@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
-import { AUTO_ROUTERS } from '@kilocode/auto-routing-contracts';
+import { AUTO_ROUTERS, POLICY_SETTING_KEYS } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
 import type { HonoEnv } from './hono-env';
+import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './system-optimal';
+import { isRetryableContainerAvailabilityError } from './cli-runner';
 import {
   processDeadLetter,
   processJob,
@@ -36,6 +38,8 @@ export default {
   fetch: app.fetch,
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     const errors: unknown[] = [];
+    const production =
+      controller.cron === PLATFORM_SYNC_CRON ? await fetchProductionAutoMetrics(env) : null;
     for (const router of AUTO_ROUTERS) {
       try {
         if (controller.cron !== PLATFORM_SYNC_CRON) {
@@ -52,6 +56,33 @@ export default {
         } else {
           const staleRunIds = await sweepStaleRuns(env);
           const { desiredEntries } = await syncPlatformRegistry(env, fetch, router);
+          const computed = await reevaluateSystemOptimalSettings(env, router, production).catch(
+            error => {
+              console.warn(
+                JSON.stringify({
+                  event: 'system_optimal_settings_skipped',
+                  router,
+                  error: error instanceof Error ? error.message : String(error),
+                })
+              );
+              return null;
+            }
+          );
+          if (computed) {
+            const computedValues: Record<string, unknown> = {};
+            for (const key of POLICY_SETTING_KEYS) {
+              const record = computed[key];
+              if (record) computedValues[key] = { value: record.value, source: record.source };
+            }
+            console.log(
+              JSON.stringify({
+                event: 'system_optimal_settings_computed',
+                cron: controller.cron,
+                router,
+                computed: computedValues,
+              })
+            );
+          }
           const startedRuns = await drainQueues(
             env,
             router === 'frontier' ? 'platform' : 'both',
@@ -95,27 +126,33 @@ export default {
     if (errors.length > 0) throw new AggregateError(errors, 'Benchmark scheduled routers failed');
   },
   async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
-    // Dead-lettered messages: record the lane death and try to finalize the
-    // run. Same retry contract as the jobs branch: a throw (transient D1
-    // failure after the death was recorded) skips the ack so the message
-    // retries and finalization is re-attempted. A message still failing after
-    // max_retries is dropped (the DLQ has no DLQ); the stale sweep remains
-    // the backstop for runs that never finalize.
-    if (batch.queue === DLQ_NAME) {
-      for (const message of batch.messages) {
-        await processDeadLetter(env, message.body);
-        message.ack();
-      }
-      return;
-    }
     for (const message of batch.messages) {
-      // Deliberately no try/catch: a throw from processJob (transient token,
-      // D1 or container failures) must skip the ack so the queue retries the
-      // whole (run, model, rep, chunk) unit, dead-lettering after max_retries.
-      // Case-level failures are recorded as failed rows inside processJob and
-      // do not throw. Swallowing the throw here would silently drop chunks.
-      await processJob(env, message.body);
-      message.ack();
+      try {
+        if (batch.queue === DLQ_NAME) {
+          await processDeadLetter(env, message.body);
+        } else {
+          await processJob(env, message.body);
+        }
+        message.ack();
+      } catch (error) {
+        if (batch.queue !== DLQ_NAME && isRetryableContainerAvailabilityError(error)) {
+          try {
+            await env.BENCH_QUEUE.send(message.body, { delaySeconds: 30 });
+            message.ack();
+            continue;
+          } catch (dispatchError) {
+            console.error(
+              JSON.stringify({
+                event: 'benchmark_capacity_requeue_failed',
+                error: String(dispatchError),
+              })
+            );
+          }
+        }
+        console.error(JSON.stringify({ event: 'benchmark_job_retry', error: String(error) }));
+        // Explicit retry preserves redelivery without reducing Queue consumer concurrency.
+        message.retry();
+      }
     }
   },
 };

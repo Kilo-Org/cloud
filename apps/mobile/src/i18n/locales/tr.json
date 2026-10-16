@@ -133,6 +133,7 @@
     "status": "Durum",
     "truncated": "Kısaltıldı",
     "updated": "Güncellendi",
+    "generating": "Oluşturuluyor…",
     "working": "Çalışıyor",
     "yourOwnRepositories": "Kendi depoların",
     "dismissed": "Yok sayıldı",
@@ -650,7 +651,7 @@
     "redeployTitle": "Örneği yeniden dağıt",
     "accessRequired": {
       "iosBody": "Bu hesap için KiloClaw erişimi iOS uygulamasının dışında yönetilir.",
-      "iosContact": "Sorun mu var? hi@kilo.ai adresine yaz.",
+      "iosContact": "Sorun mu var? {{supportEmail}} adresine yaz.",
       "iosTitle": "KiloClaw iOS'ta kullanılamıyor",
       "multipleCurrentConflictBody": "Hesabında birden fazla etkin abonelik bulduk. Senden iki kez ücret almamak için işlemleri duraklattık.",
       "multipleCurrentConflictCta": "Kilo.ai sitesinde devam et",
@@ -783,7 +784,7 @@
         "queryErrorBody": "{{name}} için kurulum durumunu kontrol ederken bağlantımız kesildi. Kurulum hâlâ devam ediyor olabilir. Tekrar dene veya biraz sonra kontrol et.",
         "queryErrorTitle": "Kurulum durumu kontrol edilemedi",
         "settingUp": "{{name}} kuruluyor",
-        "stalledBody": "{{name}} için kurulumu tamamlayamadık. Tekrar dene. Sorun devam ederse hi@kilo.ai adresine e-posta gönder.",
+        "stalledBody": "{{name}} için kurulumu tamamlayamadık. Tekrar dene. Sorun devam ederse {{supportEmail}} adresine e-posta gönder.",
         "stalledTitle": "Kurulum ilerlemiyor",
         "startingSandbox": "Korumalı alan başlatılıyor",
         "stoppedBody": "{{name}} adlı örnek kurulum sırasında beklenmedik şekilde durdu.",
@@ -1040,7 +1041,7 @@
         "recoveryLabel": "GitHub uygulamasını güncelle"
       },
       "githubIpAllowList": {
-        "description": "Bu GitHub kuruluşunun IP izin listesi Kilo'yu engellediği için Kod inceleyici devre dışı bırakıldı. Yardım için hi@kilo.ai adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
+        "description": "Bu GitHub kuruluşunun IP izin listesi Kilo'yu engellediği için Kod inceleyici devre dışı bırakıldı. Yardım için {{supportEmail}} adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo bu proje için GitLab proje erişim belirteci oluşturamadığından Kod inceleyici devre dışı bırakıldı. Proje sorumlusu yetkisi ver veya proje erişim belirteçlerini etkinleştir, ardından Kod inceleyiciyi tekrar etkinleştir.",
@@ -1055,7 +1056,7 @@
         "recoveryLabel": "Kod inceleyici ayarlarını güncelle"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Depo klonlama işlemi bugün üç kez zaman aşımına uğradığı için Kod inceleyici devre dışı bırakıldı. Yardım için hi@kilo.ai adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
+        "description": "Depo klonlama işlemi bugün üç kez zaman aşımına uğradığı için Kod inceleyici devre dışı bırakıldı. Yardım için {{supportEmail}} adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
       },
       "title": "Kod inceleyici için işlem yapman gerekiyor.",
       "recoveryLabel": "Destekle iletişime geç"
@@ -1916,6 +1917,7 @@
       "title": "Ajan yanıt bekliyor",
       "skipQuestionsTitle": "Sorular atlansın mı?",
       "skipQuestionsMessage": "Ajan bu adımı atlayacak.",
+      "answerProgress": "{{answered}}/{{total}} yanıtlandı",
       "selectAllThatApply": "Uygun seçeneklerin tümünü seç.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, seçili",
@@ -3322,6 +3324,10 @@
     },
     "backends": {
       "title": "Sohbet arka uçları",
+      "providersTitle": "Sohbet sağlayıcıları",
+      "cloud": "Bulutta",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Kilo modelleri şu anda kullanılamıyor. Bağlantını kontrol et.",
       "manage": "Arka uçları yönet",
       "defaultKilo": "$t(consent.kilo) (varsayılan)",
       "kiloHelp": "Yerleşik arka uç Kilo hesabını kullanır ve düzenlenemez veya silinemez.",
@@ -3381,7 +3387,6 @@
     "gguf": {
       "title": "İndirilebilir modeller",
       "help": "Açık bir model indirin ve llama.cpp ile bu telefonda çalıştırın. İstemleriniz ve yanıtlarınız cihazda kalır. Modeller büyüktür, bu yüzden Wi-Fi kullanın.",
-      "details": "{{size}} · Lisans: {{license}}",
       "download": "Modeli indir",
       "pause": "İndirmeyi duraklat",
       "resume": "İndirmeyi sürdür",
@@ -3393,6 +3398,8 @@
       "url": "Doğrudan indirme bağlantısı",
       "urlHelp": "Bir .gguf dosyasına ait HTTPS bağlantısını (örneğin bir Hugging Face resolve bağlantısı) yapıştırın. Modelleri yalnızca güvendiğiniz kaynaklardan indirin.",
       "downloadUrl": "Bağlantıdan indir",
+      "advanced": "Gelişmiş",
+      "localPurpose": "Bu cihazda llama.cpp ile çalışır. İstemler ve yanıtlar cihazda kalır.",
       "deleteTitle": "Bu model silinsin mi?",
       "deleteMessage": "{{name}} bu cihazdan silinsin mi? Bu modeli kullanan sohbetlerin devam edebilmesi için başka bir modele ihtiyacı olur.",
       "errors": {
@@ -3421,8 +3428,17 @@
         "fits": "Uygun",
         "tight": "Sınırda",
         "tooLarge": "Çok büyük",
-        "noStorage": "Yetersiz depolama alanı"
+        "noStorage": "Yetersiz depolama alanı",
+        "unknown": "Sığma durumu bilinmiyor"
       },
+      "recommendationsHelp": "Bu uygulamanın sabitlediği kısa liste: model başına bir dosya, lisans belirten bir yayıncıdan. Başka hiçbir şey sıralanmaz.",
+      "compatibilityHelp": "Sığma, model dosyasını bu cihazın belleği ve boş depolamasıyla karşılaştırır. Bellek rakamı bir tahmindir, ölçüm değil.",
+      "text": "Metin",
+      "listTextPurpose": "Yalnızca metin istemleri.",
+      "listImagePurpose": "Metnin yanı sıra görselleri de okur.",
+      "smallestDownload": "En küçük indirme: {{size}} · yaklaşık {{memory}} bellek",
+      "fullFileName": "Dosya: {{name}}",
+      "memoryEstimateNote": "Bellek rakamları tahminidir, ölçüm değil.",
       "parameters": "Parametre: {{value}}",
       "downloads": "İndirme: {{value}}",
       "likes": "Beğeni: {{value}}",
@@ -3447,7 +3463,8 @@
     },
     "localModels": {
       "title": "Cihazdaki modeller",
-      "help": "Cihazdaki modeller bu telefonda çalışır. İstemleriniz ve yanıtlarınız cihazda kalır ve bu modeller araç kullanamaz.",
+      "help": "Cihazdaki modeller bu telefonda çalışır. İstemleriniz ve yanıtlarınız cihazda kalır.",
+      "systemPurpose": "Bu cihazın sistemine yerleşik model. Cihazda çalışır.",
       "apple": "Apple Intelligence (cihazda)",
       "checking": "Kullanılabilirlik denetleniyor…",
       "ready": "Kullanıma hazır",
@@ -3748,12 +3765,26 @@
       "startNow": "İncelemeden başlat",
       "startNowHint": "İncelemeden başlatmak için basılı tut",
       "titleLabel": "Görev başlığı",
+      "renameTitle": "Görevi yeniden adlandır",
       "notes": "Notlar",
-      "notesPlaceholder": "Markdown ile not ekle",
+      "addNotes": "Not ekle",
+      "notesPrompt": "Bağlam, gereksinimler veya kabul ölçütleri ekle.",
+      "markdownSupported": "Markdown desteklenir",
       "sessions": "Bağlı oturumlar",
       "noSessions": "Henüz oturum yok",
+      "untitledLinkedSession": "Bağlı oturum",
+      "sessionNeedsInput": "Oturum girdi bekliyor",
+      "sessionRunning": "Oturum çalışıyor",
+      "sessionFinished": "Oturum tamamlandı",
+      "sessionPullRequest": "Oturum PR'ı",
+      "sessionPullRequestNumber": "Oturum PR #{{number}}",
+      "openSessionHint": "Oturumu açar.",
+      "unlinkSessionAction": "Oturumun bağlantısını kaldır",
+      "unlinkConfirmTitle": "{{title}} bağlantısı kaldırılsın mı?",
+      "unlinkConfirmMessage": "Oturumun kendisi silinmez. Yalnızca bu yapılacaklar öğesine olan bağlantısı kaldırılır.",
+      "startNewSession": "Yeni oturum başlat",
+      "startNewSessionHint": "Yeni bir oturum başlatmak için uzun bas.",
       "linkSession": "Oturum bağla",
-      "unlinkSession": "{{title}} bağlantısını kaldır",
       "linkFailed": "Oturum göreve bağlanamadı"
     },
     "linkSession": {

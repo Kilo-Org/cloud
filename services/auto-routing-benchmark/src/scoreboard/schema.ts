@@ -22,6 +22,26 @@ export const DistSchema = z.object({
 });
 export type Dist = z.infer<typeof DistSchema>;
 
+export const ShadowOutcomesSchema = z.record(
+  z.string(),
+  z.object({
+    requests: z.number().int().nonnegative(),
+    errorRate: nullableRate,
+    abortRate: nullableRate,
+    inputTokensPerRequest: nullableMetric,
+    outputTokensPerRequest: nullableMetric,
+    cacheReadTokensPerRequest: nullableMetric,
+    costUsdPerRequest: nullableMetric,
+  })
+);
+
+export const ShadowMetricsSchema = z.object({
+  observedDecisions: z.number().int().nonnegative(),
+  differsRate: nullableRate,
+  outcomesByDecidedModel: ShadowOutcomesSchema.nullable(),
+});
+export type ShadowMetrics = z.infer<typeof ShadowMetricsSchema>;
+
 export const ProdMetricsSchema = z.object({
   kind: z.literal('prod'),
   window: z.object({
@@ -38,6 +58,7 @@ export const ProdMetricsSchema = z.object({
   modelTtftMs: DistSchema.nullable(),
   prodPerRequestUsd: perRequestUsdSchema,
   prodCacheReadShare: nullableRate,
+  shadow: ShadowMetricsSchema.nullable().default(null),
 });
 export type ProdMetrics = z.infer<typeof ProdMetricsSchema>;
 
@@ -146,6 +167,7 @@ export const ScoreboardSchema = z.object({
       .nullable(),
   }),
   routeMix: routeMixSchema,
+  shadow: ShadowMetricsSchema.nullable().default(null),
 });
 export type Scoreboard = z.infer<typeof ScoreboardSchema>;
 

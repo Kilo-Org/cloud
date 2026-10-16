@@ -3,6 +3,7 @@ import { selectAutoFreeCandidate } from './models';
 import {
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
+  isDisabledKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   shouldRedactErrorResponse,
@@ -32,20 +33,24 @@ describe('rate-limited Kilo-exclusive models', () => {
 });
 
 describe('Step 5 Preview', () => {
-  test('registers the free model with its upstream id, limits, and OpenRouter routing', () => {
-    expect(findKiloExclusiveModel('stepfun/step-5-preview-free')).toMatchObject({
+  test('keeps the disabled free model registered but not usable', () => {
+    expect(
+      kiloExclusiveModels.find(m => m.public_id === 'stepfun/step-5-preview-free')
+    ).toMatchObject({
       public_id: 'stepfun/step-5-preview-free',
       internal_id: 'stepfun/step-5-preview',
       display_name: 'StepFun: Step 5 Preview (free)',
       context_length: 1_000_000,
       max_completion_tokens: 64_000,
-      status: 'public',
+      status: 'disabled',
       provider: { id: 'openrouter' },
       flags: ['reasoning', 'vision'],
       pricing: null,
       inference_provider_restriction: ['stepfun'],
     });
-    expect(isFreeModel('stepfun/step-5-preview-free')).toBe(true);
+    expect(isDisabledKiloExclusiveModel('stepfun/step-5-preview-free')).toBe(true);
+    expect(findKiloExclusiveModel('stepfun/step-5-preview-free')).toBeNull();
+    expect(isFreeModel('stepfun/step-5-preview-free')).toBe(false);
     expect(findKiloExclusiveModel('stepfun/step-3.7-flash:free')).toBeNull();
   });
 });
@@ -326,10 +331,10 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 });
 
 describe('getKiloExclusiveInferenceProviderRestriction', () => {
-  test('returns the routing allow-list for restricted exclusive models', () => {
-    expect(getKiloExclusiveInferenceProviderRestriction('stepfun/step-5-preview-free')).toEqual(
-      new Set(['stepfun'])
-    );
+  test('returns no routing allow-list for disabled exclusive models', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction('stepfun/step-5-preview-free')
+    ).toBeUndefined();
   });
 
   test('does not treat removed or unrestricted exclusives or unknown ids as restricted', () => {

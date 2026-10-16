@@ -21,10 +21,10 @@ wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The legacy `agen
 5. **One state value per entity.** Each message, route and allocation has exactly one state from a
    small closed set. No side flags, proofs or counters that together encode a state.
 6. **No old-plane backward compatibility.** Sessions created before the rewrite are not supported. There is
-    no old-plane data migration and no support for older wrapper versions. A Durable Object instance that
+   no old-plane data migration and no support for older wrapper versions. A Durable Object instance that
    still holds old-plane storage is wiped on first access; the Sandbox DO first stops the old
-    allocation so no old container keeps running.
-    Current-generation SQLite contract upgrades are not old-plane storage.
+   allocation so no old container keeps running.
+   Current-generation SQLite contract upgrades are not old-plane storage.
 7. **Public surfaces stay stable.** The tRPC API, the `/stream` event schema
    (`src/shared/protocol.ts`), reports and callbacks keep their current shapes.
 
@@ -55,10 +55,12 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
 - One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`. A shared sandbox
   (`usr-`, `org-`, `bot-`, `ubt-`) hosts many sessions and worktrees; an isolated sandbox hosts one.
 - A **route** is one session on one sandbox: `sessionId`, worktree directory, `kiloSessionId`.
-  Sessions in one worktree share the checkout. A Kilo runtime serves one directory, or one session
-  when runtime isolation is per session.
+  New allocations with a compatible wrapper share one Kilo runtime per directory.
+  Existing allocations retain their original `runtimeIsolation` and HOME keys until normal replacement.
+  MCP servers are workspace configuration in shared runtimes.
 - Compatible routes reference one Sandbox-owned credential scope. Scope membership includes every
-  eligible root Kilo session; it does not merge modern per-session runtime authorization.
+  eligible root Kilo session. Shared runtimes use **one handle per worktree scope**.
+  Existing allocations retain per-session handles. A modern grant never merges with a legacy grant.
 - `messageId` is the permanent message identity. The wrapper passes it to Kilo as the user message
   ID.
 - `allocationId` identifies one physical allocation. `wrapperId` is random per wrapper process. A new
@@ -197,7 +199,7 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 | `creating` | `stopping` or `stopped` | Classified permanent create/launch error: fail preparing routes immediately; an owned physical ref uses the existing stop ladder | Existing ladder when a ref exists |
 | `starting` | `connected` | Wrapper `hello` accepted | 5 min without `hello` → `stopping` |
 | `connected` | `disconnected` | Socket closed, or no heartbeat for 45 s | — |
-| `connected` | `stopping` | No activity for 10 min, or explicit stop or delete | Idle 10 min |
+| `connected` | `stopping` | Inactive heartbeat after 1 min for unattended routes, no activity for 10 min otherwise, or explicit stop or delete | Unattended idle 1 min; existing idle backstop 10 min |
 | `disconnected` | `connected` | Wrapper `hello`, same or new `wrapperId` | — |
 | `disconnected` | `stopping` | No activity for 10 min, or 90 s after the last frame received, or explicit stop or delete | Idle 10 min, or reconnect 90 s, whichever is earlier |
 | `stopping` | `stopped` | Provider confirms stop, or the existing stop ladder ends | Existing ladder |
@@ -315,10 +317,19 @@ its own; the command's live native execution decides it. An accepted UI turn alo
 A session blocked only on questions or permissions does not need compute. Pending requests
 are tracked separately; answering one does not clear another, and an independent runnable
 tool still counts. A parent waiting on a blocked child can sleep, while another working
-session or descendant retains compute. After 10 minutes without activity the Sandbox DO
-stops the sandbox. Active heartbeats renew the provider lease (`ensureLeaseAtLeast`);
-inactive heartbeats still prove wrapper liveness. Native supervision does not schedule
-future wakeups after compute has stopped.
+session or descendant retains compute. Once a connected sandbox has had no activity for
+1 minute, the next inactive heartbeat stops it if all routes are unattended. A sandbox
+with at least one interactive origin (`cloud-agent-web`), a route still preparing,
+no routes, or an unreadable stored origin keeps the 10-minute idle window. Unrecognized
+or missing origins are unattended. The Sandbox DO derives this policy from its routes
+without a cache.
+
+The 1-minute rule is checked only on an inactive heartbeat, never on a disconnect or
+reconnect. The existing allocation idle backstop (10 min), heartbeat deadline (45 s),
+reconnect window (90 s), and provider lease (11 min) are unchanged. Active heartbeats
+renew that provider lease (`ensureLeaseAtLeast`); inactive heartbeats still prove wrapper
+liveness. A reconnect does not manufacture activity or extend the existing idle clock.
+Native supervision does not schedule future wakeups after compute has stopped.
 
 ### Billing, credentials and deletion
 
@@ -330,16 +341,25 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   compatible credential scope in DO SQLite. Route rows reference that owner rather than storing
   writable grant copies. Compatibility requires the same user, organization, worktree/directory,
   repository authority, targets, provider/physical binding, containment and backing authorization
-  class. A scope cannot replace a legacy backing token with a modern delegated token. Repository-only
-  mixed scopes use separate canonical identities per authorization class; mixed managed-SCM scopes
-  and other incompatible scope or directory reuse fail closed without changing the surviving grant. Modern handles stay
-  per session. It serves contained outbound credential lookups
-  (`resolveCredential`), runtime proxy authorization and Vercel network policy as today. Grants
-  last 4 hours. When less than 1 hour remains, `deliver` re-issues the grant with freshly selected
-  Git and legacy Kilo material and sends them in a `session.credentials` frame before the prompts;
-  the wrapper installs them into the running route and Kilo runtime. Modern runtime-authorized
-  sessions use a per-session runtime proxy handle on Cloudflare Sandbox, Cloudflare Containers and
-  Vercel instead of a Kilo capability wrapping the registration token. The Session DO owns the
+  class. A scope cannot replace a legacy backing token with a modern delegated token. A checkout
+  directory in a negotiated shared allocation uses exactly one credential class: if another grant serves the joining
+  route's directory with a different runtime-proxy presence (modern vs legacy, either direction), the
+  join fails closed before any prepare frame, recorded as the distinct `mixed_credential_class`
+  diagnostic stage. Existing allocations retain the repository-only mixed-class allowance for isolated
+  runtimes. Other incompatible scope or directory reuse fails without changing the surviving grant. A modern worktree scope
+  adopts one canonical runtime-proxy handle shared by its members: the first prepare mints through its
+  requesting member and each joiner copies that string. A pre-adoption per-session scope, which has
+  stored member rows but no accepted entry at this fence, cannot enter a shared allocation and fails
+  with `scope_handle_conflict`. Existing allocations bypass adoption and this guard, so siblings can
+  join and refresh credentials during deployment. Only a new allocation can enable sharing.
+  A shared allocation admits at most 32 member roots per worktree; an extra joiner fails `workspace_setup_failed`
+  without touching incumbents. It serves contained outbound credential lookups (`resolveCredential`),
+  runtime proxy authorization and Vercel network policy as today. Grants last 4 hours. When less than
+  1 hour remains, `deliver` re-issues the grant with freshly selected Git and legacy Kilo material and
+  sends them in a `session.credentials` frame before the prompts; the wrapper installs them into the
+  running route and Kilo runtime. Modern runtime-authorized sessions use one runtime proxy handle per
+  worktree scope, shared by every member of the scope, on Cloudflare Sandbox, Cloudflare Containers
+  and Vercel instead of a Kilo capability wrapping the registration token. The Session DO owns the
   current delegated token and its renewal; registration credentials are route configuration, not
   authority to reuse a create-time delegated token. Grant renewal does not renew delegation.
 - Repeated preparation, new preparation attempts and warm renewal reuse the canonical grant's
@@ -357,12 +377,12 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   generation or compatibility flag. Ready sessions receive `lost(agent_restarted)`: accepted work
   fails, queued work can reprepare. Preparing sessions receive `failed(agent_restarted)` and their
   pending work fails explicitly. Credential sources remain available for a fresh user send/prepare,
-   which starts a new attempt on the replacement allocation. Old aliases/modern handles are denied
-   immediately by DO resolution and the modern facade. A legacy backing credential already injected
-   by Vercel's existing network policy can remain usable until the physical stop removes that
-   allocation; constructor retirement is not proof of policy revocation or physical stop and makes
-   no synchronous provider calls. The existing stop ladder owns that physical cleanup,
-  and new scopes retain normal shared legacy membership and per-session modern authorization.
+  which starts a new attempt on the replacement allocation. Old aliases/modern handles are denied
+  immediately by DO resolution and the modern facade. A legacy backing credential already injected
+  by Vercel's existing network policy can remain usable until the physical stop removes that
+  allocation; constructor retirement is not proof of policy revocation or physical stop and makes
+  no synchronous provider calls. The existing stop ladder owns that physical cleanup,
+  and new scopes retain normal shared legacy membership and worktree-scoped modern authorization.
   Already canonical storage reconstructs without this retirement.
 - Release removes only that route's membership, native ingestion/export permissions and modern
   handle. The shared aliases and runtime survive while another member remains; the last member
@@ -446,10 +466,9 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
   `session.prepare` carries the names as frame-only `secretEnvKeys`, never written to the route row; a
   frame with no secrets omits the field and stays valid for a version-3 wrapper. A secret-bearing
   prepare is never sent to a wrapper that did not advertise the capability: the attempt fails
-  `workspace_setup_failed`. A secret-bearing spec forces `runtimeIsolation: 'per-session'` so a
-  sibling sharing its worktree directory cannot reuse a runtime whose env already holds another
-  session's secrets; read-only Bitbucket reviews carry no profile secrets, like the withheld MCP
-  snapshot.
+   `workspace_setup_failed`. Worktree chats inherit their source chat's profile, environment, and
+   secrets and share its directory runtime and HOME. Separate worktree directories retain separate
+   runtimes; read-only Bitbucket reviews carry no profile secrets, like the withheld MCP snapshot.
 
 - Connect, send `hello` (`wrapperId`, `allocationId`, protocol version), wait for `welcome` or
   `shutdown`. On `shutdown`, permanently close the connection and exit with code 0, even when the
@@ -532,10 +551,10 @@ no Kilo home, so nothing stale shadows the restore from session-ingest. `session
 `workspace: 'cloned' | 'same' | 'adopted'`.
 
 Before starting Kilo, materialize the session's profile skills (including companion files) into
-`HOME/.kilocode/skills`. Custom agents and Kilo commands use a session-owned config file selected
-by `KILO_CONFIG`, so large prompts and templates do not enlarge the process environment.
-Registration requires per-session runtime isolation for these collections and for plain
-profile environment variables, so a sibling cannot inherit another session's configuration.
+`HOME/.kilocode/skills`. Custom agents and Kilo commands use a profile config file under HOME,
+selected by `KILO_CONFIG`, so large prompts and templates do not enlarge the process environment.
+Chats in one worktree share this HOME and runtime. Worktree chats inherit their source chat's
+profile, so every member materializes the same collections; registration does not isolate them.
 Preparation replaces stale profile artifacts from restored homes, and credential refresh retains
 the same profile config path. Read-only Bitbucket reviews withhold these collections, matching
 the legacy profile restrictions.
@@ -663,6 +682,13 @@ protections.
   check, 15 s after the reconnect. Kilo sends heartbeats every 10–15 s, so silence means a real
   fault. Local runs on Kilo 7.6.2 and 7.8.1 show an intermittent hang after a prompt is accepted:
   Kilo stops emitting, never calls the model and does not answer HTTP.
+- Tool memory isolation: the workload reserves 1 GiB for the wrapper and keeps the tool cap
+  1.5 GiB below the shared workload cap. Kilo has OOM protection. Its tool descendants inherit
+  that protection, so the process sweep removes it before attempting tool cgroup migration.
+  This adjustment does not depend on migration success and retries for existing group members.
+  A failed move must not leave an oversized tool immune to OOM kills at the shared cap.
+  Memory allocated before migration stays charged to the original group; server-group memory
+  and OOM counters therefore do not identify the Kilo process itself.
 - Memory hold: the wrapper samples the shared workload cgroup at every 5 s check. Usage within
   256 MiB of `memory.max` with the `memory.events` `max` count risen since the previous sample
   means Kilo is stalled in reclaim, not hung. Before a hang restart (no health answer, the
@@ -670,9 +696,10 @@ protections.
   decides again at each check; an answer reconnects the stream as above, and failed observation
   keeps reading snapshots. The hold ends as recovered once Kilo delivers events and its activity
   is observable. It ends with the restart as above after two quiet samples in a row while Kilo is
-  still unhealthy, or after 10 minutes; one episode holds at most 10 minutes. A cap that is full
+  still unhealthy, or after two minutes; one episode holds at most two minutes. A cap that is full
   of idle page cache does not raise the count, so it does not hold a restart. The cost: a genuine
-  hang during real memory pressure waits up to 10 minutes. While held, the runtime's executions
+  hang during real memory pressure waits up to two extra minutes. This permits transient recovery
+  but bounds the wait when pressure cannot clear. While held, the runtime's executions
   pause their no-progress clocks, and the 120 s prompt delivery deadline does not run; it starts
   again when the hold ends. Each turn on the held runtime, including one that starts during the
   hold, gets a non-fatal `error` event saying Kilo is not responding while the sandbox is low on
@@ -698,7 +725,7 @@ protections.
 - Only actual resubmission spends the once-only allowance. A turn received during restart whose
   prompts were never dispatched gets its first dispatch without spending it. Recovery preserves
   the turn's existing clocks, progress, user-wait pause and allowance; credential maintenance does
-  not reset them. MCP-isolated runtime keys remain independent.
+  not reset them, and the runtime stays keyed by its directory rather than by session.
 - Budget: 3 restarts in 10 minutes per runtime. After that, routes on it report `failed`
   (`agent_unavailable`).
 - Degraded state (event stream reconnecting, Kilo restarting) goes in the heartbeat. The Sandbox DO
@@ -791,7 +818,7 @@ them through one development-only override.
 | Socket drops, wrapper returns | Sandbox DO | Wrapper reconnects | None |
 | Socket down 90 s | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |
 | Wrapper crash | Supervisor | Restart wrapper; routes re-prepared | Accepted fail (`agent_restarted`) |
-| Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s; up to 10 min while the workload reclaims at its memory cap | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
+| Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s; up to two extra minutes while the workload reclaims at its memory cap | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
 | Kilo crash | Wrapper | Restart Kilo, at most 3 in 10 min | Same as Kilo hang, but the reason is `agent_restarted` |
 | Dead event stream (Kilo still answers health) | Wrapper, after 6 reconnects in 2 min | Restart Kilo, at most 3 in 10 min | Same as Kilo hang (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
 | Kilo restart budget used up | Wrapper | None until the next message | Queued and accepted fail (`agent_unavailable`) |
@@ -829,19 +856,94 @@ Session-owned token through its renewing authorization path. No modern backing t
 wrapper, and no capability or direct-token fallback can redeem the registration snapshot. Legacy
 non-policy-bearing tokens retain their existing credential paths and access limits.
 
-Handles remain per session, including in a shared checkout. They are bound to user, organization,
-authorization, Cloud Agent session, Kilo root session, current allocation/provider instance and
-wrapper identity. A socket reconnect on the same wrapper keeps the handle valid; allocation or
-wrapper replacement and authorization revocation invalidate it. Renewal checks current principal
-and organization membership bindings and never extends the delegation lifetime.
+Handles are per worktree scope, including in a shared checkout: one handle serves every member of
+the scope. A handle is bound to the user, organization, authorization, worktree scope, current
+allocation/provider instance and wrapper identity; the attestation `resourceId` is the member that
+served it. A socket reconnect on the same wrapper keeps the handle valid; allocation or wrapper
+replacement and authorization revocation invalidate it. Renewal checks current principal and
+organization membership bindings and never extends the delegation lifetime.
+
+Because the handle is scope-wide, revoking one member's handle no longer stops another member's
+in-flight model calls while a surviving member can still serve; that member's **new** sends are still
+denied. The usage `session_id` attribute on a forwarded request is the wrapper's forwarded
+`X-KILOCODE-TASKID`; it is not verified in this repository that Kilo sets it per chat.
+
+A modern worktree scope adopts one canonical handle shared by all of its member roots. When less than
+the 1-hour proactive threshold remains on that canonical, `deliver` re-mints through an active member
+whose live delegation outlives it (a joining prepare instead mints through itself and reads no
+delegation), adopts the new handle for every member row, and fans the new `session.credentials` out to
+every ready or preparing member; a superseded handle stays accepted and keeps its provider rules until
+its own `exp`. While the current canonical
+is still valid the route continues on it. Once it has verifiably expired the route fails
+(`workspace_setup_failed`), whether no member's delegation is still live or a live member's handoff
+mint failed: the verified-expiry check immediately before send is the gate. A ready member that missed a fanout is
+reconciled with the current canonical immediately before its next prompt, and a preparing member on
+`session.ready`, before it is published ready. An already-ended canonical is recovered through any
+member that is still live. A fresh Git/Kilo grant re-issue still sends its frame even when the handle
+string is unchanged, because Git material is independent of the proxy handle.
+
+A turn or PTY that crosses handle expiry still receives a 401 from the facade; that is existing
+behavior. Kilo's reaction to a 401 and its descendant-abort semantics are not verified in this
+repository.
+
+### Runtime compatibility and rolling deployment
+
+No admission pause or fleet shutdown is required. Existing allocations keep their runtime keys,
+HOME paths, per-session handles, and repository-only mixed credential compatibility.
+They can finish active work, accept new work, admit sibling sessions, and renew credentials.
+
+The Sandbox DO stores one runtime contract per allocation in `allocation_runtime_contract`:
+
+- A missing record means an existing allocation and preserves legacy behavior.
+- A new allocation starts `pending`. Its first authenticated wrapper selects `legacy` or `worktree`.
+- The wrapper advertises `x-kilo-worktree-runtime: 1` on the WebSocket upgrade.
+  Old Workers ignore this header; their strict `hello` schema remains unchanged.
+- The contract stays fixed across reconnects, wrapper replacement, and DO restarts.
+  A shared allocation rejects a wrapper without the capability before replacing its working socket.
+- Normal allocation replacement clears the contract and permits fresh negotiation.
+
+Registration retains `runtimeIsolation` for compatibility. The Sandbox removes it only from frames
+for a negotiated shared allocation. Updated wrappers still honor it for legacy allocations.
+This preserves old runtime and HOME identities. Shared HOME uses
+`sha256(scopeId + "\0" + directory)` under the wrapper home root.
+
+Deploy in this order:
+
+1. Deploy `services/session-ingest` from the first stack PR. Wait for deployment success.
+2. Deploy `services/cloud-agent-next` and its wrapper image from the complete stack, including these
+   compatibility fixes. Keep API, web, and automated callers running.
+3. Check an existing allocation: send a follow-up and add a sibling session.
+   Check a fresh allocation: prepare a profile/permission session and two chats in one worktree.
+   The fresh compatible allocation must share a runtime and handle; the existing allocation must keep its layout.
+
+Use the `Deploy Cloudflare Workers` workflow (`deploy-workers.yml`) with the selected release ref.
+Set `worker` to the service path above and `target_environment` to the target environment.
+Its automatic changed-worker matrix runs services concurrently, so deploy the ingest prerequisite
+separately before releasing the remaining stack.
+
+The corrected intermediate wrapper PR preserves per-session behavior and can run with the old Worker.
+Only the complete stack advertises worktree sharing. An old image starting during deployment remains
+compatible and uses legacy behavior for that allocation's lifetime.
+
+For `SandboxContainers` (`scheduling_policy: "durable_object"`), the new named image map affects future
+starts. It does not replace running containers. Existing allocations migrate through their normal
+lifecycle. See [Cloudflare scheduling policies](https://developers.cloudflare.com/containers/configuration/scheduling-policy/#configure-named-images).
+Other providers retain their existing deployment and allocation lifecycle behavior.
+
+After sharing activates, retain this contract negotiation in any Worker rollback build.
+A pre-compatibility Worker cannot safely serve allocations already using shared handles.
+Do not downgrade such allocations to an old wrapper image. Roll forward with a corrected compatible
+build instead; no fleet shutdown is part of this rollout.
 
 The stored admission containment selection determines the proxy grant's `direct` or `contained`
 mode. The environment default is captured at registration when admission omitted a selection;
 callers cannot choose proxy mode independently. Runtime authorization does not require SCM
 containment: Cloudflare Sandbox and Cloudflare Containers support both modes, while Vercel still
 requires containment. Unsupported modes and invalid modern facade configuration are rejected
-before queuing work. Contained SCM resolution and Vercel policy remain enforced, and MCP still
-requires independent per-session runtimes.
+before queuing work. Contained SCM resolution and Vercel policy remain enforced. MCP servers are
+workspace configuration: sessions in one worktree share one runtime, and a session whose MCP set
+differs from the warm runtime's fails with `Kilo worktree MCP configuration mismatch` rather than
+running with another session's servers.
 
 Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `heartbeat`, `heartbeat_ack`,
 `session.prepare`, `session.progress`, `session.ready`, `session.failed`, `workspace.capture`,
@@ -1050,23 +1152,27 @@ counts.
 4. **Kilo final error with A and B accepted.** Both fail with Kilo's reason; the next message
    works.
 5. **Two chats in one worktree, two worktrees in one sandbox.** Turns stream at the same time; Stop
-    in one chat does not affect the others; deleting the runtime creator leaves surviving model,
-    Git and native history access usable. Deleted-root ingestion/export and deleted modern handles
-    are denied; last-member release retires the scope.
+   in one chat does not affect the others. Deleting the chat that issued the scope handle leaves
+   surviving chats usable: their in-flight model calls keep working through a surviving member, whose
+   attestation `resourceId` is that member, while the deleted root's ingestion/export and title writes
+   are denied. Revoking the deleted member's handle does not stop a surviving chat's in-flight model
+   calls while another member can serve, but a revoked member's new sends are denied. The usage
+   `session_id` stays the forwarded `X-KILOCODE-TASKID`; this repository does not verify that Kilo
+   sets it per chat. Last-member release retires the scope.
 6. **Slash commands and attachment.** `/compact` summarizes the session; another known command runs
-    as a command; an attachment reaches the model.
-    A follow-up may wait for the command/summary response, then reaches Kilo in arrival order;
-    immediate intake during those operations is not a completion gate. Credential refresh with
-    native idle inspection and attachments held in either release order must not retire a pending
-    or sibling submission client.
+   as a command; an attachment reaches the model.
+   A follow-up may wait for the command/summary response, then reaches Kilo in arrival order;
+   immediate intake during those operations is not a completion gate. Credential refresh with
+   native idle inspection and attachments held in either release order must not retire a pending
+   or sibling submission client.
 7. **Contained credentials.** Clone and Kilo calls work through contained outbound credential
-    lookup, not only with direct credentials. Compatible legacy siblings can both publish/export
-    native history through the installed shared alias. Busy renewal and a new preparation attempt
-    leave that alias usable with fresh backing material. Policy failure never publishes rejected
-    credentials; physical replacement rejects old aliases and preserves attempt deadlines. Eligible
-    managed GitHub HTTPS clone and fetch carry the control alias on the first request and reject
-    every redirect, while the credential flow stays contained resolution, repository-authorized
-    redemption, and the bounded Retry-After handler.
+   lookup, not only with direct credentials. Compatible legacy siblings can both publish/export
+   native history through the installed shared alias. Busy renewal and a new preparation attempt
+   leave that alias usable with fresh backing material. Policy failure never publishes rejected
+   credentials; physical replacement rejects old aliases and preserves attempt deadlines. Eligible
+   managed GitHub HTTPS clone and fetch carry the control alias on the first request and reject
+   every redirect, while the credential flow stays contained resolution, repository-authorized
+   redemption, and the bounded Retry-After handler.
 8. **Stop during a turn.** Messages `cancelled` at once; Kilo aborted; the sandbox and the other
    routes keep running; the next message works on the warm route.
 9. **Setup command fails.** Queued message fails with a visible reason; after fixing the setup the
@@ -1117,7 +1223,7 @@ counts.
     network failure still reconnects. Silent, malformed-frame and non-hello candidates close at their
     original deadline after reconstruction, even while stopped, without changing allocation/route
     state or initializing provider work. Two concurrent candidates and overflow leave a healthy
-     bound socket unchanged until an authorized reconnect completes; late closes retain their fence.
+    bound socket unchanged until an authorized reconnect completes; late closes retain their fence.
 21. **Notification backpressure.** Flood events while a Session peer stalls: retained entries and
     UTF-8 bytes stay within 1,000 / 8 MiB, queued age uses the original two-second deadline and at most
     four lanes run. Healthy siblings can receive ready/outcome independently; retained per-session
@@ -1126,7 +1232,7 @@ counts.
     overflow drops newest, loss diagnostics stay bounded/internal and expired queue heads make no RPC.
     Heartbeats, alarms, stop and reconnect continue while notifications are held. Release retires
     references; reconstruction replays no notification backlog. Public events, reports, callbacks
-     and the 16.5/125-minute lost-notification backstops are unchanged.
+    and the 16.5/125-minute lost-notification backstops are unchanged.
 22. **Permanent versus transient creation failure.** Balance lost after send preflight fails queued
     work promptly with `billing_blocked`, not preparation timeout. Proven local invalid configuration
     fails promptly with `invalid_configuration`. The safe stream reason, durable route/message,
@@ -1169,5 +1275,9 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
   live wrapper reconnects within seconds (backoff 1 s to 30 s; supervisor restart 1 s to 16 s), but
   one cut off from the Sandbox DO for longer than 90 s, for example during a platform outage, loses
   its accepted turn (`connection_lost`).
+- Sibling chats in one directory are not compared for profile environment differences: `ensure`
+  guards only the credential class and the MCP set, and the last `installCredentials` frame decides
+  the desired environment after the next restart. This predates the directory-key flip for legacy
+  shared directories.
 - Out of scope: Kilo and model-provider retry policy, workspace file recovery after sandbox loss,
   the legacy plane.

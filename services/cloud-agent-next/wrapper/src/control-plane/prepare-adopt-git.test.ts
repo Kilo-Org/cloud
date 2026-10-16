@@ -119,6 +119,7 @@ function manager(allocationId: string, now = T0) {
       ensure: async () => ({ serverUrl: 'http://127.0.0.1:1' }) as unknown as WrapperKiloClient,
       installCredentials: async () => undefined,
       isUnavailable: () => false,
+      getLiveClient: () => undefined,
       remove: () => undefined,
       release: () => undefined,
     },

@@ -133,6 +133,7 @@
     "status": "Xaaladda",
     "truncated": "La gaabiyay",
     "updated": "La cusboonaysiiyay",
+    "generating": "Waa la abuurayaa…",
     "working": "Shaqaynaya",
     "yourOwnRepositories": "Kaydadkaaga shakhsiga ah",
     "dismissed": "La iska dhaafay",
@@ -1259,7 +1260,7 @@
         "stoppedTitle": "Diyaarintu way joogsatay",
         "stoppedBody": "Nuqulka {{name}} ayaa si lama filaan ah u joogsaday intii la diyaarinayay.",
         "stalledTitle": "Wax baa istaagay",
-        "stalledBody": "Ma aanan dhammaystiri karin diyaarinta {{name}}. Mar kale isku day ama farriin u dir hi@kilo.ai haddii tani soo noqnoqoto.",
+        "stalledBody": "Ma aanan dhammaystiri karin diyaarinta {{name}}. Mar kale isku day ama farriin u dir {{supportEmail}} haddii tani soo noqnoqoto.",
         "timeoutTitle": "Waxay qaadanaysaa waqti ka badan intii la filayay",
         "timeoutBody": "Diyaarinta {{name}} waxay qaadanaysaa waqti ka badan sidii caadiga ahayd (in ka badan {{displayMinutes}} daqiiqo).",
         "continueInBackground": "Gadaal ka sii wad",
@@ -1317,7 +1318,7 @@
       "nonCanonicalEarlybirdBody": "Qorshahaaga helitaanka hore wuxuu u baahan yahay dib-u-eegis qof sameeyo ka hor inta aan taleefanka lagu isticmaali karin.",
       "iosTitle": "KiloClaw lagama heli karo iOS",
       "iosBody": "Helitaanka KiloClaw ee akoonkan waxaa laga maamulaa meel ka baxsan abka iOS.",
-      "iosContact": "Su'aalo? La xiriir hi@kilo.ai.",
+      "iosContact": "Su'aalo? La xiriir {{supportEmail}}.",
       "quarantinedCta": "U dir iimayl kooxdayada",
       "nonCanonicalEarlybirdCta": "Dib u eeg qorshahaaga kilo.ai"
     },
@@ -1552,7 +1553,7 @@
         "recoveryLabel": "Cusboonaysii abka GitHub"
       },
       "githubIpAllowList": {
-        "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah ururkan GitHub wuxuu isticmaalaa liiska cinwaannada IP ee la oggol yahay oo xannibaya Kilo. La xiriir hi@kilo.ai si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka."
+        "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah ururkan GitHub wuxuu isticmaalaa liiska cinwaannada IP ee la oggol yahay oo xannibaya Kilo. La xiriir {{supportEmail}} si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka."
       },
       "gitlabProjectAccessRequired": {
         "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah Kilo ma abuuri karo summadda gelitaanka mashruucan ee GitLab. Sii oggolaanshaha daryeelaha mashruuca ama shid summadaha gelitaanka mashruuca, ka dibna mar kale shid Dib-u-eegaha koodhka.",
@@ -1567,7 +1568,7 @@
         "recoveryLabel": "Cusboonaysii dejinta Dib-u-eegaha koodhka"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Dib-u-eegaha koodhka waa la damiyay ka dib markii nuqul ka samaynta kaydku saddex jeer maanta dhaaftay waqtigii loo qoondeeyay. La xiriir hi@kilo.ai si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka."
+        "description": "Dib-u-eegaha koodhka waa la damiyay ka dib markii nuqul ka samaynta kaydku saddex jeer maanta dhaaftay waqtigii loo qoondeeyay. La xiriir {{supportEmail}} si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka."
       },
       "title": "Dib-u-eegaha koodhka wuxuu u baahan yahay in wax laga qabto.",
       "recoveryLabel": "La xiriir taageerada"
@@ -2428,6 +2429,7 @@
       "title": "Wakiilku wuxuu u baahan yahay jawaab",
       "skipQuestionsTitle": "Ma ka boodaysaa su'aalaha?",
       "skipQuestionsMessage": "Wakiilku wuxuu ka boodi doonaa tallaabadan.",
+      "answerProgress": "{{answered}} ka mid ah {{total}} ayaa la jawaabay",
       "selectAllThatApply": "Dooro dhammaan kuwa khuseeya.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, la doortay",
@@ -3322,6 +3324,10 @@
     },
     "backends": {
       "title": "Adeegyada gadaale ee wada sheekaysiga",
+      "providersTitle": "Bixiyeyaasha wada hadalka",
+      "cloud": "Daruurta",
+      "cloudModel": "Moodel: {{model}}",
+      "cloudUnavailable": "Moodelada Kilo hadda lama heli karo. Hubi xiriirkaaga.",
       "manage": "Maamul adeegyada gadaale",
       "defaultKilo": "$t(consent.kilo) (kan caadiga ah)",
       "kiloHelp": "Adeegga gadaale ee ku dhex jira wuxuu isticmaalaa akoonkaaga Kilo, lamana beddeli karo ama tirtiri karo.",
@@ -3381,7 +3387,6 @@
     "gguf": {
       "title": "Moodeelada la soo dejin karo",
       "help": "Soo deji moodeel furan oo ku shaqeeya taleefankan adigoo isticmaalaya llama.cpp. Codsiyadaada iyo jawaabaha waxay ku jiraan aaladda. Moodeeladu way waaweyn yihiin, markaa isticmaal Wi-Fi.",
-      "details": "{{size}} · Ruqsad: {{license}}",
       "download": "Soo deji moodeelka",
       "pause": "Jooji soo dejinta",
       "resume": "Sii wad soo dejinta",
@@ -3393,6 +3398,8 @@
       "url": "Xiriirka soo dejinta ee tooska ah",
       "urlHelp": "Ku dheji xiriir HTTPS ah oo fayl .gguf ah, sida xiriirka resolve ee Hugging Face. Kaliya soo deji moodeelada ilo aad isku halleysid.",
       "downloadUrl": "Ka soo deji xiriirka",
+      "advanced": "Horumarsan",
+      "localPurpose": "Waxa uu ku shaqeeyaa qalabkan isagoo la socda llama.cpp. Codsiyada iyo jawaabaha waxay ku hadhaan qalabka.",
       "deleteTitle": "Ma tirtirtaa moodeelkan?",
       "deleteMessage": "Ma tirtirtaa {{name}} aaladdan? Wadahadallada isticmaala waxay u baahan yihiin moodeel kale ka hor inta aysan sii socon karin.",
       "errors": {
@@ -3421,8 +3428,17 @@
         "fits": "Ku habboon",
         "tight": "Si cidhiidhi ah u habboon",
         "tooLarge": "Aad u weyn",
-        "noStorage": "Kayd kuma filna"
+        "noStorage": "Kayd kuma filna",
+        "unknown": "Habboonaansho aan la garanayn"
       },
+      "recommendationsHelp": "Liis gaaban oo abkani dhejiyo: hal fayl moodel kasta, oo ka imanaya daabacaha sheegaya laysanka. Wax kale lama kala sarreeyo.",
+      "compatibilityHelp": "Habboonaanshu waxay isbarbardhigtaa faylka moodelka iyo xusuusta qalabkan iyo kaydka bannaan. Tirada xusuustu waa qiyaas, ma aha cabbir.",
+      "text": "Qoraal",
+      "listTextPurpose": "Kaliya codsiyo qoraal ah.",
+      "listImagePurpose": "Wuxuu akhriyaa sawirro iyo sidoo kale qoraal.",
+      "smallestDownload": "Soo dejinta ugu yar: {{size}} · qiyaastii {{memory}} xusuus ah",
+      "fullFileName": "Fayl: {{name}}",
+      "memoryEstimateNote": "Tirooyinka xusuustu waa qiyaaso, ma aha cabbirro.",
       "parameters": "Halbeegyada: {{value}}",
       "downloads": "Soo dejinta: {{value}}",
       "likes": "Jeclaysiga: {{value}}",
@@ -3447,7 +3463,8 @@
     },
     "localModels": {
       "title": "Moodeelada aaladda gudaheeda",
-      "help": "Moodeelada aaladda gudaheeda waxay ku shaqeeyaan taleefankan. Codsiyadaada iyo jawaabaha waxay ku jiraan aaladda, moodeeladanina ma isticmaali karaan qalab.",
+      "help": "Moodeelada aaladda gudaheeda waxay ku shaqeeyaan taleefankan. Codsiyadaada iyo jawaabaha waxay ku jiraan aaladda.",
+      "systemPurpose": "Moodeelka ku dhisan nidaamka aaladdan. Wuxuu ku shaqeeyaa aaladda gudaheeda.",
       "apple": "Apple Intelligence (aaladda gudaheeda)",
       "checking": "Waxaa la hubinayaa helitaanka…",
       "ready": "Diyaar u ah isticmaal",
@@ -3748,12 +3765,26 @@
       "startNow": "Bilow dib-u-eegis la'aan",
       "startNowHint": "Riix dheer si aad u bilowdo dib-u-eegis la'aan",
       "titleLabel": "Cinwaanka hawsha",
+      "renameTitle": "Beddel magaca hawsha",
       "notes": "Qoraallo",
-      "notesPlaceholder": "Ku dar qoraallo Markdown ah",
+      "addNotes": "Ku dar qoraallo",
+      "notesPrompt": "Ku dar xaalad, shuruudo, ama shuruudaha aqbalaadda.",
+      "markdownSupported": "Markdown waa la taageeraa",
       "sessions": "Kalfadhiyada xidhiidhsan",
       "noSessions": "Weli ma jiraan kalfadhiyo",
+      "untitledLinkedSession": "Fadhi xiriir leh",
+      "sessionNeedsInput": "Fadhiga wuxuu u baahan yahay gelin",
+      "sessionRunning": "Fadhigu wuu socdaa",
+      "sessionFinished": "Fadhigu wuu dhammaaday",
+      "sessionPullRequest": "PR-ka fadhiga",
+      "sessionPullRequestNumber": "PR-ka fadhiga #{{number}}",
+      "openSessionHint": "Wuxuu furaa fadhiga.",
+      "unlinkSessionAction": "Jooji xiriirka fadhiga",
+      "unlinkConfirmTitle": "Ma joojinayaa xiriirka {{title}}?",
+      "unlinkConfirmMessage": "Fadhiga laftiisu lama tirtiro. Kaliya xiriirka uu la leeyahay hawshan ayaa la saaraa.",
+      "startNewSession": "Bilow fadhi cusub",
+      "startNewSessionHint": "Riix muddo dheer si aad u bilowdo fadhi cusub.",
       "linkSession": "Ku xidh kalfadhi",
-      "unlinkSession": "Ka saar xiriirka {{title}}",
       "linkFailed": "Lama xidhi karin kalfadhiga hawsha"
     },
     "linkSession": {

@@ -113,7 +113,20 @@ export function hasNonWhitespaceText(text: string): boolean {
 }
 
 function hasReasoningText(text: string | undefined): boolean {
-  return text != null && hasNonWhitespaceText(text);
+  return text != null && hasDisplayableReasoningText(text);
+}
+
+/**
+ * Whether a reasoning body has anything a reader can see.
+ *
+ * Whitespace draws nothing, and neither does a body made only of the zero-width
+ * and format characters a provider can leave in a block it never put into words.
+ * Either would leave a disclosure that opens onto an empty body, so neither is
+ * content. The row and the transcript's content check share this one answer, so
+ * a part that draws nothing can never be counted as content.
+ */
+export function hasDisplayableReasoningText(text: string): boolean {
+  return /[^\s\u00AD\u200B-\u200F\u2060\uFEFF]/.test(text);
 }
 
 export function shouldRenderReasoningPart(part: Part, _isStreaming: boolean): boolean {

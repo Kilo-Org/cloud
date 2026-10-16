@@ -2,7 +2,9 @@ import { formatError, ttlCached } from '@kilocode/worker-utils';
 import {
   CLASSIFIER_WINNER_KV_KEY,
   ClassifierWinnerSchema,
+  RoutingTableSchema,
   type ClassifierWinner,
+  type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { DEFAULT_CLASSIFIER_MODEL } from '@kilocode/auto-routing-contracts/classifier';
 import { kvReadThrough } from './kv-read-through';
@@ -10,6 +12,7 @@ import { fetchClassifierWinnerFromOrigin } from './benchmark-origin';
 
 export const CLASSIFIER_MODEL_CONFIG_KEY = 'classifier_model';
 export const DECISION_LOG_SAMPLE_RATE_CONFIG_KEY = 'decision_log_sample_rate';
+export const SHADOW_ROUTING_TABLE_CONFIG_KEY = 'shadow_routing_table_v1';
 
 // Successful decisions are high volume (~30/s) and only needed for latency
 // and cache hit-rate percentiles, so they are sampled by default. The rate
@@ -88,9 +91,30 @@ const decisionLogSampleRateCache = ttlCached(
   }
 );
 
+const shadowRoutingTableCache = ttlCached(
+  CONFIG_CACHE_TTL_MS,
+  async (env: Pick<Env, 'AUTO_ROUTING_CONFIG'>): Promise<RoutingTable | null> => {
+    const raw = await env.AUTO_ROUTING_CONFIG.get(SHADOW_ROUTING_TABLE_CONFIG_KEY);
+    if (raw === null) return null;
+    try {
+      const parsed = RoutingTableSchema.safeParse(JSON.parse(raw));
+      return parsed.success ? parsed.data : null;
+    } catch {
+      return null;
+    }
+  }
+);
+
+export function getShadowRoutingTable(
+  env: Pick<Env, 'AUTO_ROUTING_CONFIG'>
+): Promise<RoutingTable | null> {
+  return shadowRoutingTableCache.get(env).catch(() => null);
+}
+
 export function clearClassifierConfigCache(): void {
   classifierModelCache.clear();
   decisionLogSampleRateCache.clear();
+  shadowRoutingTableCache.clear();
 }
 
 // Config reads run before the guarded decision path. A transient KV failure

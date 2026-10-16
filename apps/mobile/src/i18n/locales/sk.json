@@ -133,6 +133,7 @@
     "status": "Stav",
     "truncated": "Skrátené",
     "updated": "Aktualizované",
+    "generating": "Generuje sa…",
     "working": "Pracuje sa",
     "yourOwnRepositories": "Tvoje vlastné repozitáre",
     "dismissed": "Ignorované",
@@ -1295,7 +1296,7 @@
         "stoppedTitle": "Nastavovanie sa zastavilo",
         "stoppedBody": "Inštancia {{name}} sa neočakávane zastavila počas nastavovania.",
         "stalledTitle": "Nastavovanie sa zaseklo",
-        "stalledBody": "Nepodarilo sa dokončiť nastavenie pre {{name}}. Skús to znova. Ak sa problém opakuje, napíš na hi@kilo.ai.",
+        "stalledBody": "Nepodarilo sa dokončiť nastavenie pre {{name}}. Skús to znova. Ak sa problém opakuje, napíš na {{supportEmail}}.",
         "timeoutTitle": "Trvá to dlhšie, než sa očakávalo",
         "timeoutBody": "Nastavovanie pre {{name}} trvá dlhšie než zvyčajne (viac než {{displayMinutes}} minút).",
         "continueInBackground": "Pokračovať na pozadí",
@@ -1353,7 +1354,7 @@
       "nonCanonicalEarlybirdBody": "Pred používaním v mobile musí tvoj program prednostného prístupu prejsť ručnou kontrolou.",
       "iosTitle": "KiloClaw nie je dostupný v systéme iOS",
       "iosBody": "Prístup k službe KiloClaw sa pre tento účet spravuje mimo aplikácie pre iOS.",
-      "iosContact": "Máš otázky? Napíš na hi@kilo.ai.",
+      "iosContact": "Máš otázky? Napíš na {{supportEmail}}.",
       "quarantinedCta": "Napísať nášmu tímu",
       "nonCanonicalEarlybirdCta": "Skontrolovať svoj program na kilo.ai"
     },
@@ -1590,7 +1591,7 @@
         "recoveryLabel": "Aktualizovať aplikáciu GitHub"
       },
       "githubIpAllowList": {
-        "description": "Kontrolór kódu bol vypnutý, pretože organizácia na platforme GitHub používa zoznam povolených IP adries, ktorý blokuje Kilo. Požiadajte o pomoc na hi@kilo.ai a potom kontrolóra kódu znova zapnite."
+        "description": "Kontrolór kódu bol vypnutý, pretože organizácia na platforme GitHub používa zoznam povolených IP adries, ktorý blokuje Kilo. Požiadajte o pomoc na {{supportEmail}} a potom kontrolóra kódu znova zapnite."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kontrolór kódu bol vypnutý, pretože Kilo nemôže vytvoriť prístupový token pre tento projekt na platforme GitLab. Udeľte rolu správcu alebo povoľte prístupové tokeny projektov a potom kontrolóra kódu znova zapnite.",
@@ -1605,7 +1606,7 @@
         "recoveryLabel": "Aktualizovať nastavenia kontrolóra kódu"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kontrolór kódu bol vypnutý, pretože klonovanie repozitára dnes trikrát prekročilo časový limit. Požiadajte o pomoc na hi@kilo.ai a potom kontrolóra kódu znova zapnite."
+        "description": "Kontrolór kódu bol vypnutý, pretože klonovanie repozitára dnes trikrát prekročilo časový limit. Požiadajte o pomoc na {{supportEmail}} a potom kontrolóra kódu znova zapnite."
       },
       "title": "Agent na kontrolu kódu vyžaduje tvoju pozornosť.",
       "recoveryLabel": "Kontaktovať podporu"
@@ -2492,6 +2493,7 @@
       "title": "Agent potrebuje odpoveď",
       "skipQuestionsTitle": "Preskočiť otázky?",
       "skipQuestionsMessage": "Agent tento krok preskočí.",
+      "answerProgress": "Zodpovedané {{answered}} z {{total}}",
       "selectAllThatApply": "Vyber všetky možnosti, ktoré platia.",
       "option": "{{label}}",
       "optionSelected": "{{label}}, vybraté",
@@ -3404,6 +3406,10 @@
     },
     "backends": {
       "title": "Servery chatu",
+      "providersTitle": "Poskytovatelia chatu",
+      "cloud": "V cloude",
+      "cloudModel": "Model: {{model}}",
+      "cloudUnavailable": "Modely Kilo teraz nie sú dostupné. Skontrolujte pripojenie.",
       "manage": "Spravovať servery",
       "defaultKilo": "$t(consent.kilo) (predvolené)",
       "kiloHelp": "Vstavaný server používa váš účet Kilo a nedá sa upraviť ani odstrániť.",
@@ -3463,7 +3469,6 @@
     "gguf": {
       "title": "Modely na stiahnutie",
       "help": "Stiahnite si otvorený model a spustite ho v tomto telefóne pomocou llama.cpp. Vaše výzvy a odpovede zostávajú v zariadení. Modely sú veľké, preto použite Wi-Fi.",
-      "details": "{{size}} · Licencia: {{license}}",
       "download": "Stiahnuť model",
       "pause": "Pozastaviť sťahovanie",
       "resume": "Pokračovať v sťahovaní",
@@ -3475,6 +3480,8 @@
       "url": "Priamy odkaz na stiahnutie",
       "urlHelp": "Vložte odkaz HTTPS na súbor .gguf, napríklad odkaz na Hugging Face typu resolve. Modely sťahujte iba zo zdrojov, ktorým dôverujete.",
       "downloadUrl": "Stiahnuť z odkazu",
+      "advanced": "Pokročilé",
+      "localPurpose": "Beží na tomto zariadení s llama.cpp. Výzvy a odpovede zostávajú v zariadení.",
       "deleteTitle": "Odstrániť tento model?",
       "deleteMessage": "Odstrániť {{name}} z tohto zariadenia? Konverzácie, ktoré ho používajú, potrebujú pred pokračovaním iný model.",
       "errors": {
@@ -3503,8 +3510,17 @@
         "fits": "Vhodný",
         "tight": "Tesne vhodný",
         "tooLarge": "Príliš veľký",
-        "noStorage": "Nedostatok úložiska"
+        "noStorage": "Nedostatok úložiska",
+        "unknown": "Zhoda neznáma"
       },
+      "recommendationsHelp": "Krátky zoznam, ktorý táto aplikácia pripína: jeden súbor na model od vydavateľa, ktorý uvádza licenciu. Nič iné sa nehodnotí.",
+      "compatibilityHelp": "Zhoda porovnáva súbor modelu s pamäťou a voľným úložiskom tohto zariadenia. Údaj o pamäti je odhad, nie meranie.",
+      "text": "Text",
+      "listTextPurpose": "Iba textové výzvy.",
+      "listImagePurpose": "Číta obrázky aj text.",
+      "smallestDownload": "Najmenšie stiahnutie: {{size}} · približne {{memory}} pamäte",
+      "fullFileName": "Súbor: {{name}}",
+      "memoryEstimateNote": "Údaje o pamäti sú odhady, nie merania.",
       "parameters": "Parametre: {{value}}",
       "downloads": "Stiahnutia: {{value}}",
       "likes": "Páči sa: {{value}}",
@@ -3529,7 +3545,8 @@
     },
     "localModels": {
       "title": "Modely v zariadení",
-      "help": "Modely v zariadení bežia priamo v tomto telefóne. Vaše výzvy a odpovede zostávajú v zariadení a tieto modely nemôžu používať nástroje.",
+      "help": "Modely v zariadení bežia priamo v tomto telefóne. Vaše výzvy a odpovede zostávajú v zariadení.",
+      "systemPurpose": "Model zabudovaný do systému tohto zariadenia. Beží priamo v zariadení.",
       "apple": "Apple Intelligence (v zariadení)",
       "checking": "Kontroluje sa dostupnosť…",
       "ready": "Pripravený na použitie",
@@ -3838,12 +3855,26 @@
       "startNow": "Spustiť bez kontroly",
       "startNowHint": "Dlhým stlačením spustíte bez kontroly",
       "titleLabel": "Názov úlohy",
+      "renameTitle": "Premenovať úlohu",
       "notes": "Poznámky",
-      "notesPlaceholder": "Pridať poznámky v Markdowne",
+      "addNotes": "Pridať poznámky",
+      "notesPrompt": "Pridajte kontext, požiadavky alebo kritériá prijatia.",
+      "markdownSupported": "Podporovaný Markdown",
       "sessions": "Prepojené relácie",
       "noSessions": "Zatiaľ žiadne relácie",
+      "untitledLinkedSession": "Prepojená relácia",
+      "sessionNeedsInput": "Relácia potrebuje vstup",
+      "sessionRunning": "Relácia beží",
+      "sessionFinished": "Relácia dokončená",
+      "sessionPullRequest": "PR relácie",
+      "sessionPullRequestNumber": "PR relácie #{{number}}",
+      "openSessionHint": "Otvorí reláciu.",
+      "unlinkSessionAction": "Odpojiť reláciu",
+      "unlinkConfirmTitle": "Odpojiť {{title}}?",
+      "unlinkConfirmMessage": "Samotná relácia sa neodstráni. Odstráni sa iba jej prepojenie s touto úlohou.",
+      "startNewSession": "Začať novú reláciu",
+      "startNewSessionHint": "Dlhým stlačením začnete novú reláciu.",
       "linkSession": "Prepojiť reláciu",
-      "unlinkSession": "Zrušiť prepojenie: {{title}}",
       "linkFailed": "Reláciu sa nepodarilo prepojiť s úlohou"
     },
     "linkSession": {

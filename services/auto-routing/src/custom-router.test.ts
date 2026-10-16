@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  AUTO_ROUTING_DENIED_MODELS_PATH,
   CUSTOM_ROUTER_DECIDE_PATH,
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
@@ -22,6 +23,7 @@ import type * as ModelCapabilitiesModule from './model-capabilities';
 import type * as ModelClassifierModule from './model-classifier';
 import { clearCustomRouterTableCache } from './custom-router-decision';
 import { clearClassificationHotCache } from './decision-cache';
+import { clearOrganizationPolicyCache } from './organization-policy';
 import { app } from './index';
 
 const findCustomRouter = vi.hoisted(() => vi.fn());
@@ -182,6 +184,9 @@ const env = {
   NEXTAUTH_SECRET: { get: async () => NEXTAUTH_SECRET },
   AUTO_ROUTING_DECISION_SECRET: { get: async () => DECISION_SECRET },
   KILO_WEB_API_BASE_URL: 'https://web.example.test',
+  KILO_AI_GATEWAY_BASE_URL: 'https://gateway.example.test',
+  UPSTASH_REDIS_REST_URL: { get: async () => 'https://redis.example.test' },
+  UPSTASH_REDIS_REST_TOKEN: { get: async () => 'redis-read-token' },
   HYPERDRIVE: { connectionString: 'postgres://worker' },
   AUTO_ROUTING_CONFIG: { get: async () => null, put: async () => {}, delete: async () => {} },
   BENCHMARK_SERVICE: { fetch: benchmarkFetch },
@@ -273,16 +278,47 @@ async function errorCode(res: Response) {
   return body.error.code;
 }
 
+const fetchMock = vi.fn<typeof fetch>();
+let gatewayDeniedModelIds: string[] | 'unavailable' = [];
+let blacklistedDomainsConfig: string | null = null;
+
+function gatewayCalls() {
+  return fetchMock.mock.calls.filter(([input]) =>
+    requestUrl(input).startsWith(`https://gateway.example.test${AUTO_ROUTING_DENIED_MODELS_PATH}`)
+  );
+}
+
+function requestUrl(input: RequestInfo | URL): string {
+  return input instanceof Request ? input.url : input.toString();
+}
+
 beforeEach(() => {
   clearSecretCacheForTest();
   clearCustomRouterTableCache();
   clearClassificationHotCache();
+  clearOrganizationPolicyCache();
   backgroundTasks.length = 0;
   customTable = rankedTable;
+  gatewayDeniedModelIds = [];
+  blacklistedDomainsConfig = null;
+  fetchMock.mockReset().mockImplementation(async input => {
+    const url = requestUrl(input);
+    if (url.startsWith('https://gateway.example.test')) {
+      return gatewayDeniedModelIds === 'unavailable'
+        ? new Response('down', { status: 503 })
+        : Response.json({ deniedModelIds: gatewayDeniedModelIds });
+    }
+    if (url.startsWith('https://redis.example.test/get/')) {
+      return Response.json({ result: blacklistedDomainsConfig });
+    }
+    return new Response('unexpected', { status: 500 });
+  });
+  vi.stubGlobal('fetch', fetchMock);
   dbRows.user = [
     {
       api_token_pepper: 'pepper-1',
       blocked_reason: null,
+      google_user_email: 'dev@example.com',
       total_microdollars_acquired: 5_000_000,
       microdollars_used: 1_000_000,
     },
@@ -311,6 +347,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await drainBackgroundTasks();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -382,10 +419,39 @@ describe('public custom router decide', () => {
     });
   });
 
-  it('falls back to the first servable entry when the default is denied', async () => {
-    findOrganizationMemberBalanceRow.mockResolvedValue(
-      memberBalanceRow({ plan: 'enterprise', settings: { model_deny_list: [`${SONNET}:free`] } })
+  it('drops gateway entries the organization policy denies the member', async () => {
+    gatewayDeniedModelIds = [SONNET];
+    const { decision } = await decisionOf(
+      await post(
+        CUSTOM_ROUTER_DECIDE_PATH,
+        decideBody({ clientEntries: [{ provider: 'lmstudio', model: 'gemma' }] }),
+        { 'X-KiloCode-OrganizationId': ORG_ID }
+      )
     );
+    expect(decision).toMatchObject({ model: 'client:lmstudio/gemma', fallback: true });
+  });
+
+  it('asks the gateway for the policy on the router gateway entries with the internal secret', async () => {
+    await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), { 'X-KiloCode-OrganizationId': ORG_ID })
+    );
+    const [call, ...rest] = gatewayCalls();
+    expect(rest).toHaveLength(0);
+    expect(new Headers(call?.[1]?.headers).get('authorization')).toBe('Bearer internal-secret');
+    expect(JSON.parse(call?.[1]?.body as string)).toEqual({
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      modelIds: [SONNET],
+    });
+  });
+
+  it('skips the organization policy for a personal context', async () => {
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(gatewayCalls()).toHaveLength(0);
+  });
+
+  it('denies every gateway entry when the organization policy cannot be read', async () => {
+    gatewayDeniedModelIds = 'unavailable';
     classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
     const { decision } = await decisionOf(
       await post(
@@ -399,6 +465,22 @@ describe('public custom router decide', () => {
       variant: 'fast',
       fallback: true,
     });
+  });
+
+  it('refuses a user in a blocked email domain', async () => {
+    blacklistedDomainsConfig = JSON.stringify({
+      domains: ['example.com'],
+      updated_at: null,
+      updated_by: null,
+      updated_by_email: null,
+    });
+    const decide = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(decide.status).toBe(403);
+    expect(await errorCode(decide)).toBe('forbidden');
+    const plan = await post(CUSTOM_ROUTER_EVAL_PLAN_PATH, { routerId: ROUTER_ID });
+    expect(plan.status).toBe(403);
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    expect(benchmarkFetch).not.toHaveBeenCalled();
   });
 
   it('fails with custom_router_unavailable when no entry is servable', async () => {
@@ -472,6 +554,7 @@ describe('public custom router decide', () => {
       {
         api_token_pepper: 'pepper-1',
         blocked_reason: null,
+        google_user_email: 'dev@example.com',
         total_microdollars_acquired: 1_000_000,
         microdollars_used: 1_000_000,
       },

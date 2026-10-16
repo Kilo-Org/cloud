@@ -9,6 +9,7 @@ import {
 } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
 import { and, eq, not, sql } from 'drizzle-orm';
+import * as z from 'zod';
 
 // Account access rules shared by the Next.js gateway and Workers that authenticate Kilo users.
 
@@ -167,13 +168,39 @@ export function canSpendPaidUsage(balance: number): boolean {
   return balance > 0;
 }
 
-// Enterprise organizations deny models by ID; a `:` variant suffix never escapes the deny list.
-export function enterpriseModelDenyList(
-  organization: Pick<Organization, 'plan' | 'settings'>
+// Admins maintain the blocked email domains in Redis; an empty list falls back to the
+// deployment's BLACKLIST_DOMAINS setting.
+export const BLACKLISTED_DOMAINS_REDIS_KEY = 'admin:blacklisted-domains';
+
+export const BlacklistDomainsConfigSchema = z.object({
+  domains: z.array(z.string()),
+  updated_at: z.string().nullable(),
+  updated_by: z.string().nullable(),
+  updated_by_email: z.string().nullable(),
+});
+
+export function blacklistedDomainsFromConfig(
+  raw: string | null,
+  fallbackDomains: string[]
 ): string[] {
-  if (organization.plan !== 'enterprise') return [];
-  return (organization.settings.model_deny_list ?? []).map(modelId => {
-    const colonIndex = modelId.indexOf(':');
-    return colonIndex >= 0 ? modelId.substring(0, colonIndex) : modelId;
-  });
+  if (!raw) return fallbackDomains;
+  const { domains } = BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+  return domains.length > 0 ? domains : fallbackDomains;
+}
+
+// A blocked domain also blocks its subdomains.
+export function isEmailBlacklistedByDomain(
+  email: string,
+  blacklistedDomains: readonly string[] | undefined
+): boolean {
+  const normalizedEmail = email.toLowerCase();
+  return (
+    blacklistedDomains?.some(domain => {
+      const normalizedDomain = domain.toLowerCase();
+      return (
+        normalizedEmail.endsWith(`@${normalizedDomain}`) ||
+        normalizedEmail.endsWith(`.${normalizedDomain}`)
+      );
+    }) ?? false
+  );
 }

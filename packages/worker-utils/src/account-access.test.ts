@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  blacklistedDomainsFromConfig,
   canSpendPaidUsage,
-  enterpriseModelDenyList,
   isApiTokenPepperCurrent,
+  isEmailBlacklistedByDomain,
   organizationMemberBalance,
   requestOrganizationId,
 } from './account-access';
@@ -71,12 +72,20 @@ describe('account access rules', () => {
     expect(canSpendPaidUsage(-1)).toBe(false);
   });
 
-  it('applies the model deny list to enterprise organizations only, without variant suffixes', () => {
-    const settings = { model_deny_list: ['openai/gpt-5:free', 'anthropic/claude-opus-4'] };
-    expect(enterpriseModelDenyList({ plan: 'enterprise', settings })).toEqual([
-      'openai/gpt-5',
-      'anthropic/claude-opus-4',
-    ]);
-    expect(enterpriseModelDenyList({ plan: 'teams', settings })).toEqual([]);
+  it('blocks a listed email domain and its subdomains, case-insensitively', () => {
+    const domains = ['Spam.com'];
+    expect(isEmailBlacklistedByDomain('user@SPAM.com', domains)).toBe(true);
+    expect(isEmailBlacklistedByDomain('user@mail.spam.com', domains)).toBe(true);
+    expect(isEmailBlacklistedByDomain('user@notspam.com', domains)).toBe(false);
+    expect(isEmailBlacklistedByDomain('spam.com@legitimate.org', domains)).toBe(false);
+    expect(isEmailBlacklistedByDomain('user@spam.com', undefined)).toBe(false);
+  });
+
+  it('reads blocked domains from the admin config and falls back when it is empty', () => {
+    const config = (domains: string[]) =>
+      JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null });
+    expect(blacklistedDomainsFromConfig(config(['spam.com']), ['env.com'])).toEqual(['spam.com']);
+    expect(blacklistedDomainsFromConfig(config([]), ['env.com'])).toEqual(['env.com']);
+    expect(blacklistedDomainsFromConfig(null, ['env.com'])).toEqual(['env.com']);
   });
 });

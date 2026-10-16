@@ -20,15 +20,16 @@ import {
 } from '@kilocode/worker-utils';
 import {
   accountBalanceMicrodollars,
-  enterpriseModelDenyList,
   findOrganizationMemberBalanceRow,
   findOrganizationMemberRole,
   isApiTokenPepperCurrent,
+  isEmailBlacklistedByDomain,
   organizationMemberBalance,
   requestOrganizationId,
 } from '@kilocode/worker-utils/account-access';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import * as z from 'zod';
+import { getBlacklistedDomains } from './organization-policy';
 
 export class CustomRouterError extends Error {
   readonly code: CustomRouterErrorCode;
@@ -56,7 +57,10 @@ export type Caller = {
   db: WorkerDb;
 };
 
-type CallerEnv = Pick<Env, 'HYPERDRIVE' | 'NEXTAUTH_SECRET'>;
+type CallerEnv = Pick<
+  Env,
+  'HYPERDRIVE' | 'NEXTAUTH_SECRET' | 'UPSTASH_REDIS_REST_URL' | 'UPSTASH_REDIS_REST_TOKEN'
+>;
 
 const OrganizationIdSchema = z.uuid();
 
@@ -79,28 +83,38 @@ async function verifyCallerToken(env: CallerEnv, token: string): Promise<KiloTok
   return payload;
 }
 
-// Mirrors the gateway's user authentication: token, current pepper, unblocked account, and
-// organization membership for the organization context.
+// Mirrors the gateway's user authentication: token, current pepper, an account outside the
+// blocked email domains and not blocked, and organization membership for the organization
+// context.
 export async function authenticateCaller(env: CallerEnv, headers: Headers): Promise<Caller> {
   const token = extractBearerToken(headers.get('authorization'));
   if (!token) throw new CustomRouterError('unauthorized', 'Authentication required');
   const payload = await verifyCallerToken(env, token);
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 2_000 });
-  const [user] = await db
-    .select({
-      api_token_pepper: kilocode_users.api_token_pepper,
-      blocked_reason: kilocode_users.blocked_reason,
-      total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
-      microdollars_used: kilocode_users.microdollars_used,
-    })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, payload.kiloUserId))
-    .limit(1);
+  const [[user], blacklistedDomains] = await Promise.all([
+    db
+      .select({
+        api_token_pepper: kilocode_users.api_token_pepper,
+        blocked_reason: kilocode_users.blocked_reason,
+        google_user_email: kilocode_users.google_user_email,
+        total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
+        microdollars_used: kilocode_users.microdollars_used,
+      })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, payload.kiloUserId))
+      .limit(1),
+    getBlacklistedDomains(env),
+  ]);
   if (!user || !isApiTokenPepperCurrent(user.api_token_pepper, payload.apiTokenPepper)) {
     throw new CustomRouterError('unauthorized', 'Invalid token');
   }
-  if (user.blocked_reason) throw new CustomRouterError('forbidden', 'Access denied');
+  if (
+    user.blocked_reason ||
+    isEmailBlacklistedByDomain(user.google_user_email, blacklistedDomains)
+  ) {
+    throw new CustomRouterError('forbidden', 'Access denied');
+  }
 
   const organizationId =
     requestOrganizationId(payload.organizationId, headers.get(AUTO_ROUTING_ORGANIZATION_HEADER)) ??
@@ -125,27 +139,16 @@ export async function authenticateCaller(env: CallerEnv, headers: Headers): Prom
   };
 }
 
-export type CallerSpending = {
-  balanceUsd: number;
-  deniedModelIds: string[];
-};
-
-// The organization pays in an organization context, within the member's allowance, and its
-// model deny list applies; otherwise the user pays.
-export async function loadCallerSpending(caller: Caller): Promise<CallerSpending> {
-  if (caller.organizationId === null) {
-    return { balanceUsd: caller.userBalanceMicrodollars / 1_000_000, deniedModelIds: [] };
-  }
+// The organization pays in an organization context, within the member's allowance; otherwise
+// the user pays.
+export async function loadPayerBalanceUsd(caller: Caller): Promise<number> {
+  if (caller.organizationId === null) return caller.userBalanceMicrodollars / 1_000_000;
   const row = await findOrganizationMemberBalanceRow(
     caller.db,
     caller.organizationId,
     caller.userId
   );
-  if (!row) return { balanceUsd: 0, deniedModelIds: [] };
-  return {
-    balanceUsd: organizationMemberBalance(row).balanceMicrodollars / 1_000_000,
-    deniedModelIds: enterpriseModelDenyList(row),
-  };
+  return row ? organizationMemberBalance(row).balanceMicrodollars / 1_000_000 : 0;
 }
 
 export async function loadOrganizationBalanceUsd(

@@ -29,7 +29,7 @@ import {
   authenticateCaller,
   CustomRouterError,
   customRouterErrorResponse,
-  loadCallerSpending,
+  loadPayerBalanceUsd,
   loadOrganizationBalanceUsd,
   type Caller,
 } from './caller-auth';
@@ -43,6 +43,7 @@ import {
 import { findCustomRouter, findCustomRouterById } from './custom-router-store';
 import { runDecision } from './decide';
 import type { HonoEnv } from './hono-env';
+import { deniedOrganizationModelIds } from './organization-policy';
 
 function publicHandler(handle: (c: Context<HonoEnv>) => Promise<Response>): Handler<HonoEnv> {
   return async c => {
@@ -95,12 +96,24 @@ export const publicDecideHandler = publicHandler(async c => {
   const reference = parseCustomRouterModelId(request.model);
   if (!reference) throw new CustomRouterError('invalid_request', 'Not a custom router model ID');
   const owner = customRouterOwner(reference, caller);
-  const [router, spending] = await Promise.all([
+  const [router, balanceUsd] = await Promise.all([
     owner ? findCustomRouter(c.env, owner, reference.slug) : null,
-    loadCallerSpending(caller),
+    loadPayerBalanceUsd(caller),
   ]);
   if (!router) throw new CustomRouterError('router_not_found', 'Custom router not found');
-  requirePaidUsageBalance(spending.balanceUsd);
+  requirePaidUsageBalance(balanceUsd);
+  // The organization model policy filters gateway entries for any router used in that
+  // organization's context, including a member's personal router.
+  const deniedModelIds =
+    caller.organizationId === null
+      ? []
+      : await deniedOrganizationModelIds(c.env, {
+          userId: caller.userId,
+          organizationId: caller.organizationId,
+          modelIds: router.entries.flatMap(entry =>
+            entry.kind === 'gateway' ? [entry.model] : []
+          ),
+        });
 
   const body = { model: request.model, messages: request.messages, tools: request.tools };
   const input = normalizeClassifierInput('chat_completions', body);
@@ -110,9 +123,7 @@ export const publicDecideHandler = publicHandler(async c => {
   const payload: MirrorPayload = {
     input,
     router: router.baseRouter,
-    ...(spending.deniedModelIds.length > 0
-      ? { routingPolicy: { deniedModelIds: spending.deniedModelIds } }
-      : {}),
+    ...(deniedModelIds.length > 0 ? { routingPolicy: { deniedModelIds } } : {}),
     ...(requiredInputModalities.length > 0 || promptTokensEstimate > 0
       ? {
           constraints: {
@@ -132,7 +143,7 @@ export const publicDecideHandler = publicHandler(async c => {
     customRouter: reference,
     clientEntries: request.clientEntries,
   };
-  const routing = customRouting(router, request.clientEntries, new Set(spending.deniedModelIds));
+  const routing = customRouting(router, request.clientEntries, new Set(deniedModelIds));
   const run = await runDecision(
     c,
     payload,

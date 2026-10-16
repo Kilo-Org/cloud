@@ -21,6 +21,7 @@ import { redirect } from 'next/navigation';
 import type { Organization, User } from '@kilocode/db/schema';
 import {
   isApiTokenPepperCurrent,
+  isEmailBlacklistedByDomain,
   isOrganizationMember,
   requestOrganizationId,
 } from '@kilocode/worker-utils/account-access';
@@ -47,11 +48,6 @@ import {
 } from '@kilocode/worker-utils/kilo-token-policy';
 
 import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
-
-const blacklistDomainsEnv = getEnvVariable('BLACKLIST_DOMAINS');
-const BLACKLIST_DOMAINS_FROM_ENV = blacklistDomainsEnv
-  ? blacklistDomainsEnv.split('|').map((domain: string) => domain.trim())
-  : [];
 
 // NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
 // and its debug payloads contain sensitive data (tokens, secrets, provider config).
@@ -454,19 +450,9 @@ export async function isUserBlacklistedByDomain(
   return isEmailBlacklistedByDomain(existingUser.google_user_email, domains);
 }
 
-export const isEmailBlacklistedByDomain = (
-  email: string,
-  blacklisted_domains: string[] | undefined = BLACKLIST_DOMAINS_FROM_ENV
-) =>
-  blacklisted_domains?.some(
-    domain =>
-      email.toLowerCase().endsWith('@' + domain.toLowerCase()) ||
-      email.toLowerCase().endsWith('.' + domain.toLowerCase())
-  );
-
 export async function isEmailBlacklistedByDomainAsync(email: string): Promise<boolean> {
   const domains = await getBlacklistedDomains();
-  return !!isEmailBlacklistedByDomain(email, domains);
+  return isEmailBlacklistedByDomain(email, domains);
 }
 
 export const isBlockedTLD = (email: string) => {

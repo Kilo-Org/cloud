@@ -35,6 +35,15 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type * as UnavailableModelsModule from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
+  const actual = jest.requireActual<typeof UnavailableModelsModule>(
+    '@kilocode/web-shared/lib/ai-gateway/unavailable-models'
+  );
+  return { ...actual, getUnavailableModelIds: jest.fn(actual.getUnavailableModelIds) };
+});
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -382,6 +391,21 @@ describe('auto models', () => {
       expect(
         response.data.find(entry => entry.id === model.public_id)?.inference_provider_ids
       ).toEqual([provider.slug]);
+    }
+  });
+
+  it('excludes unavailable public exclusive models from the public model list', async () => {
+    const [unavailable, ...available] = kiloExclusiveModels.filter(
+      model => model.status === 'public'
+    );
+    if (!unavailable) throw new Error('Expected a public Kilo-exclusive model fixture');
+    jest.mocked(getUnavailableModelIds).mockResolvedValueOnce(new Set([unavailable.public_id]));
+
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(models.data.some(model => model.id === unavailable.public_id)).toBe(false);
+    for (const model of available) {
+      expect(models.data.some(entry => entry.id === model.public_id)).toBe(true);
     }
   });
 

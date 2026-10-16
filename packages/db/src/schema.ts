@@ -2549,6 +2549,7 @@ export const auto_top_up_configs = pgTable(
     created_by_user_id: text(), // Audit trail: null for user-owned, set for org-owned
     stripe_payment_method_id: text().notNull(),
     amount_cents: integer().notNull().default(5000), // Default $50, options: 2000, 5000, 10000
+    threshold_cents: integer(), // Org-only; null means the default org threshold
     last_auto_top_up_at: timestamp({ withTimezone: true, mode: 'string' }),
     attempt_started_at: timestamp({ withTimezone: true, mode: 'string' }),
     disabled_reason: text(),
@@ -3438,48 +3439,6 @@ export const kilo_pass_org_agreements = pgTable(
       KiloPassOrgPurchaseChannel
     ),
     enumCheck('kilo_pass_org_agreements_cadence_check', table.cadence, KiloPassCadence),
-  ]
-);
-
-export const kilo_pass_org_term_transitions = pgTable(
-  'kilo_pass_org_term_transitions',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    agreement_id: uuid()
-      .notNull()
-      .references(() => kilo_pass_org_agreements.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    from_term_version_id: uuid()
-      .notNull()
-      .references(() => kilo_pass_org_term_versions.id, {
-        onDelete: 'restrict',
-        onUpdate: 'cascade',
-      }),
-    to_term_version_id: uuid()
-      .notNull()
-      .references(() => kilo_pass_org_term_versions.id, {
-        onDelete: 'restrict',
-        onUpdate: 'cascade',
-      }),
-    effective_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    created_by_kilo_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
-    reason: text().notNull(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    unique('UQ_kilo_pass_org_term_transitions_agreement_effective').on(
-      table.agreement_id,
-      table.effective_at
-    ),
-    check(
-      'kilo_pass_org_term_transitions_changes_version_check',
-      sql`${table.from_term_version_id} <> ${table.to_term_version_id}`
-    ),
   ]
 );
 
@@ -8414,79 +8373,6 @@ export const auto_fix_tickets = pgTable(
 );
 
 export type AutoFixTicket = typeof auto_fix_tickets.$inferSelect;
-
-// Period types for user_period_cache
-export const PeriodType = ['year', 'quarter', 'month', 'week', 'custom'] as const;
-export type PeriodType = (typeof PeriodType)[number];
-
-export const user_period_cache = pgTable(
-  'user_period_cache',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    kilo_user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    cache_type: text().notNull(), // 'wrapped', 'usage_summary', etc.
-    period_type: text().notNull().$type<PeriodType>(), // 'year', 'month', etc.
-    period_key: text().notNull(), // '2024', '2024-Q1', '2024-03'
-    data: jsonb().notNull(),
-    computed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    version: integer().default(1).notNull(), // Data schema version for invalidation
-
-    // Shareability
-    shared_url_token: text(), // Random token like 'a8f3k2x9'
-    shared_at: timestamp({ withTimezone: true, mode: 'string' }), // When sharing was enabled
-  },
-  table => [
-    index('IDX_user_period_cache_kilo_user_id').on(table.kilo_user_id),
-    uniqueIndex('UQ_user_period_cache').on(
-      table.kilo_user_id,
-      table.cache_type,
-      table.period_type,
-      table.period_key
-    ),
-    index('IDX_user_period_cache_lookup').on(table.cache_type, table.period_type, table.period_key),
-    uniqueIndex('UQ_user_period_cache_share_token')
-      .on(table.shared_url_token)
-      .where(sql`${table.shared_url_token} IS NOT NULL`), // Partial unique index
-    check(
-      'user_period_cache_period_type_check',
-      sql`${table.period_type} IN ('year', 'quarter', 'month', 'week', 'custom')`
-    ),
-  ]
-);
-
-export type UserPeriodCache = typeof user_period_cache.$inferSelect;
-
-// ============ FREE MODEL USAGE (rate limiting) ============
-// Lightweight table for rate limiting on free models
-// IP-based for client-side products, per-user for server-side products
-
-export const free_model_usage = pgTable(
-  'free_model_usage',
-  {
-    id: uuid()
-      .notNull()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey(),
-    ip_address: text().notNull(),
-    model: text().notNull(),
-    // Optional: link to authenticated user if present (for analytics and per-user rate limiting)
-    kilo_user_id: text(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    // Primary index for rate limiting queries
-    index('idx_free_model_usage_ip_created_at').on(table.ip_address, table.created_at),
-    // Secondary index for analytics
-    index('idx_free_model_usage_created_at').on(table.created_at),
-  ]
-);
-
-export type FreeModelUsage = typeof free_model_usage.$inferSelect;
 
 // ============ AGENT ENVIRONMENT PROFILES ============
 // Profiles for storing reusable environment configurations for cloud-agent sessions

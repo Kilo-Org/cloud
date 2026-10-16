@@ -174,7 +174,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     })
     .concat(
       kiloExclusiveModels
-        .filter(m => m.status === 'public')
+        .filter(m => m.status === 'public' && !unavailableModelIds.has(m.public_id))
         .map(model => convertFromKiloExclusiveModel(model))
     )
     .concat(autoModels)

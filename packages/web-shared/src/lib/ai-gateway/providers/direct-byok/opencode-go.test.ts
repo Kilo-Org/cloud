@@ -1,6 +1,7 @@
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import type { GatewayRequest } from '../openrouter/types';
+import type OpenAI from 'openai';
+import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
 import openCodeGo from './opencode-go';
@@ -109,6 +110,85 @@ describe('OpenCode Go session headers', () => {
     expect(context.extraHeaders['x-opencode-session']).toEqual(expect.any(String));
   });
 
+  test('removes message names from Chat Completions requests', () => {
+    const toolMessageFromClient = {
+      role: 'tool',
+      name: 'read',
+      tool_call_id: 'call-1',
+      content: 'ok',
+    };
+    const body: OpenRouterChatCompletionRequest = {
+      model: 'glm-5.3-flash',
+      messages: [
+        { role: 'user', name: 'alice', content: 'Read a' },
+        {
+          role: 'assistant',
+          name: 'agent',
+          content: '',
+          tool_calls: [
+            { id: 'call-1', type: 'function', function: { name: 'read', arguments: '{}' } },
+          ],
+        },
+        toolMessageFromClient as OpenAI.Chat.ChatCompletionToolMessageParam,
+      ],
+    };
+
+    openCodeGo.transformRequest(createContext({ request: { kind: 'chat_completions', body } }));
+
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'Read a' },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [
+          { id: 'call-1', type: 'function', function: { name: 'read', arguments: '{}' } },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'call-1', content: 'ok' },
+    ]);
+  });
+
+  test('replaces the OpenRouter reasoning object with reasoning_effort', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'omen-alpha', messages: [], reasoning: { effort: 'high', enabled: true } },
+    };
+
+    openCodeGo.transformRequest(createContext({ request }));
+
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body.reasoning_effort).toBe('high');
+  });
+
+  test('keeps an explicit reasoning_effort over the reasoning object', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'omen-alpha',
+        messages: [],
+        reasoning_effort: 'low',
+        reasoning: { effort: 'high' },
+      },
+    };
+
+    openCodeGo.transformRequest(createContext({ request }));
+
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body.reasoning_effort).toBe('low');
+  });
+
+  test('does not add reasoning_effort when the reasoning object has no effort', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'omen-alpha', messages: [], reasoning: { enabled: true } },
+    };
+
+    openCodeGo.transformRequest(createContext({ request }));
+
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body).not.toHaveProperty('reasoning_effort');
+  });
+
   test('keeps the header stable when the model, API key, or request body changes', () => {
     const first = createContext();
     const next = createContext({
@@ -150,8 +230,8 @@ describe('getAiSdkProvider', () => {
     expect(getAiSdkProvider('minimax/minimax-m2.5', 'chutes-byok')).toBeUndefined();
   });
 
-  test('uses OpenAI-compatible Chat Completions for Morph direct BYOK models', () => {
-    expect(getAiSdkProvider('morph/morph-gpt-compatible', 'morph-byok')).toBe('openai-compatible');
+  test('uses Chat Completions for Morph direct BYOK models', () => {
+    expect(getAiSdkProvider('morph/morph-gpt-compatible', 'morph-byok')).toBeUndefined();
   });
 
   test('uses Chat Completions for MiniMax models through the gateway', () => {

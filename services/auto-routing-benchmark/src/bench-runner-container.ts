@@ -1,4 +1,5 @@
 import { Container } from '@cloudflare/containers';
+import { withCallerCancellation } from './caller-cancellation';
 
 export class BenchRunnerContainer extends Container<Env> {
   defaultPort = 3000;
@@ -14,6 +15,8 @@ export class BenchRunnerContainer extends Container<Env> {
       await this.destroy();
       return new Response('destroyed');
     }
-    return super.fetch(request);
+    // Without this the container answers a connection nobody reads after the queue
+    // invocation is canceled, and never posts the outcome to /container/case-result.
+    return super.fetch(withCallerCancellation(request));
   }
 }

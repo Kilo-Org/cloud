@@ -81,17 +81,17 @@ try {
     const caseIds: string[] = JSON.parse(claim.case_ids);
     const caseId = caseIds[0];
     assert(caseId);
-    assert(
-      await beginPaidCase(db, {
-        runId: claim.run_id,
-        model: claim.model,
-        variant: claim.variant,
-        rep: claim.rep,
-        caseId,
-        token: claim.token,
-      })
-    );
-    assert.equal(await startChunk(db, claim.id, claim.token, Date.now()), false);
+    const paid = {
+      runId: claim.run_id,
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId,
+      token: claim.token,
+    };
+    assert(await beginPaidCase(db, paid));
+    assert(await startChunk(db, claim.id, claim.token, Date.now()));
+    assert.equal(await beginPaidCase(db, paid), false);
     events.push({
       event: 'start',
       run: claim.run_id,

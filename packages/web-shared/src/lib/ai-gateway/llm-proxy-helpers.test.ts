@@ -26,7 +26,14 @@ jest.mock('./processUsage', () => ({
   ) => mockedLogMicrodollarUsage(stats, ctx),
 }));
 
+const mockedErrorExceptInTest = jest.fn();
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
+  errorExceptInTest: (...args: unknown[]) => mockedErrorExceptInTest(...args),
+}));
+
 import {
+  captureProxyError,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
   extractEditPromptInfo,
@@ -737,6 +744,80 @@ describe('parseTranscriptionUsageFromResponse', () => {
     );
 
     expect(result.hasError).toBe(true);
+  });
+});
+
+describe('captureProxyError', () => {
+  beforeEach(() => {
+    mockedErrorExceptInTest.mockClear();
+  });
+
+  async function capturedErrorData() {
+    for (
+      let attempt = 0;
+      attempt < 20 && mockedErrorExceptInTest.mock.calls.length === 0;
+      attempt++
+    ) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    expect(mockedErrorExceptInTest).toHaveBeenCalledTimes(1);
+    return mockedErrorExceptInTest.mock.calls[0][1] as Record<string, unknown>;
+  }
+
+  it('logs the gateway model, BYOK providers, and request field names', async () => {
+    await captureProxyError({
+      errorMessage: 'direct-byok returned error 400',
+      user: { id: 'user-1' },
+      request: {
+        model: 'glm-5.3-flash',
+        reasoning: { effort: 'high' },
+        messages: [
+          { role: 'user', content: 'secret prompt' },
+          { role: 'assistant', content: 'hi', reasoning: 'secret thoughts' },
+        ],
+      },
+      response: new Response('{"error":"unknown field"}', {
+        status: 400,
+        statusText: 'Bad Request',
+        headers: { 'content-type': 'application/json' },
+      }),
+      organizationId: undefined,
+      model: 'glm-5.3-flash',
+      gatewayModel: 'opencode-go/glm-5.3-flash',
+      byokProviderIds: ['opencode-go'],
+      trackInSentry: false,
+    });
+
+    const data = await capturedErrorData();
+    expect(data).toMatchObject({
+      model: 'glm-5.3-flash',
+      gatewayModel: 'opencode-go/glm-5.3-flash',
+      byokProviderIds: 'opencode-go',
+      requestFields: 'messages,model,reasoning',
+      messageFields: 'content,reasoning,role',
+      first4kOfResponse: '{"error":"unknown field"}',
+    });
+    expect(JSON.stringify(data)).not.toContain('secret');
+  });
+
+  it('omits optional fields that add no information', async () => {
+    await captureProxyError({
+      errorMessage: 'openrouter returned error 400',
+      user: { id: 'user-1' },
+      request: null,
+      response: new Response('', { status: 400 }),
+      organizationId: undefined,
+      model: 'vendor/model',
+      gatewayModel: 'vendor/model',
+      byokProviderIds: null,
+      trackInSentry: false,
+    });
+
+    const data = await capturedErrorData();
+    expect(data).not.toHaveProperty('gatewayModel');
+    expect(data).not.toHaveProperty('byokProviderIds');
+    expect(data).not.toHaveProperty('requestFields');
+    expect(data).not.toHaveProperty('messageFields');
   });
 });
 

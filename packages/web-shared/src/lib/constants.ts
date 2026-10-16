@@ -63,15 +63,7 @@ export const CLOUD_AGENT_NEXT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_
 // Used by the CLI live transport for real-time event streaming
 export const SESSION_INGEST_WS_URL = process.env.NEXT_PUBLIC_SESSION_INGEST_WS_URL ?? '';
 
-// Free model rate limits: per-IP for client-side products, per-user for server-side products
-export const FREE_MODEL_RATE_LIMIT_WINDOW_HOURS = 1;
-export const FREE_MODEL_MAX_REQUESTS_PER_WINDOW = 200;
-export const ADMIN_RATE_LIMIT_TEST_MODEL = 'admin-rate-limit-test';
-
 // Stripe publishable key (client-side, inlined at build time)
 export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
-
-export const PROMOTION_MAX_REQUESTS = 10000;
-export const PROMOTION_WINDOW_HOURS = 24;
 
 export const EXA_MONTHLY_ALLOWANCE_MICRODOLLARS = 10_000_000;

@@ -1,10 +1,26 @@
-import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
+import {
+  BENCHMARK_CONTAINER_BUDGET,
+  BenchmarkSchedulerLimitSchema,
+  type BenchmarkSchedulerConfigResponse,
+  type BenchmarkSchedulerOverrides,
+  type BenchmarkSchedulerSetting,
+  type BenchmarkSchedulerSettingKey,
+} from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
 
-const positiveLimit = z.number().int().min(1).max(BENCHMARK_CONTAINER_BUDGET);
+export type PaidExecutionKey = {
+  runId: string;
+  model: string;
+  variant: string;
+  rep: number;
+  caseId: string;
+  token: string;
+};
+
+const positiveLimit = BenchmarkSchedulerLimitSchema;
 const SchedulerConfigSchema = z.object({
   slots: positiveLimit.default(BENCHMARK_CONTAINER_BUDGET),
-  modelConcurrency: positiveLimit.default(4),
+  modelConcurrency: positiveLimit.default(12),
   providerConcurrency: positiveLimit.default(16),
   unknownProviderConcurrency: positiveLimit.default(2),
   modelLimits: z.record(z.string(), positiveLimit).default({}),
@@ -23,14 +39,125 @@ export function schedulerConfig(raw?: string): SchedulerConfig {
   return SchedulerConfigSchema.parse(raw ? JSON.parse(raw) : {});
 }
 
+type ResolvedSchedulerConfig = {
+  config: SchedulerConfig;
+  settings: BenchmarkSchedulerConfigResponse['settings'];
+};
+
+/** Each overridable limit resolves admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then default. */
+export function resolveSchedulerConfig(
+  envConfig: string | undefined,
+  overrides: BenchmarkSchedulerOverrides
+): ResolvedSchedulerConfig {
+  const env = z.record(z.string(), z.unknown()).parse(envConfig ? JSON.parse(envConfig) : {});
+  const fallback = SchedulerConfigSchema.parse(env);
+  const setting = (key: BenchmarkSchedulerSettingKey): BenchmarkSchedulerSetting => {
+    const override = overrides[key];
+    return {
+      effective: override ?? fallback[key],
+      source: override !== null ? 'admin' : key in env ? 'env' : 'default',
+      override,
+      fallback: fallback[key],
+    };
+  };
+  const settings = {
+    slots: setting('slots'),
+    modelConcurrency: setting('modelConcurrency'),
+    providerConcurrency: setting('providerConcurrency'),
+    unknownProviderConcurrency: setting('unknownProviderConcurrency'),
+  };
+  return {
+    config: {
+      ...fallback,
+      slots: settings.slots.effective,
+      modelConcurrency: settings.modelConcurrency.effective,
+      providerConcurrency: settings.providerConcurrency.effective,
+      unknownProviderConcurrency: settings.unknownProviderConcurrency.effective,
+    },
+    settings,
+  };
+}
+
+type StoredSchedulerOverrides = {
+  overrides: BenchmarkSchedulerOverrides;
+  updatedAt: string | null;
+  updatedBy: string | null;
+};
+
+type SchedulerSettingsRow = {
+  slots: unknown;
+  model_concurrency: unknown;
+  provider_concurrency: unknown;
+  unknown_provider_concurrency: unknown;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+// A stored limit above a since-lowered container budget is ignored, not enforced.
+function storedLimit(value: unknown): number | null {
+  const parsed = BenchmarkSchedulerLimitSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+export async function getSchedulerOverrides(db: D1Database): Promise<StoredSchedulerOverrides> {
+  const row = await db
+    .prepare(`
+    SELECT slots, model_concurrency, provider_concurrency, unknown_provider_concurrency,
+      updated_at, updated_by
+    FROM scheduler_settings WHERE id = 1
+  `)
+    .first<SchedulerSettingsRow>();
+  return {
+    overrides: {
+      slots: storedLimit(row?.slots),
+      modelConcurrency: storedLimit(row?.model_concurrency),
+      providerConcurrency: storedLimit(row?.provider_concurrency),
+      unknownProviderConcurrency: storedLimit(row?.unknown_provider_concurrency),
+    },
+    updatedAt: row?.updated_at ?? null,
+    updatedBy: row?.updated_by ?? null,
+  };
+}
+
+export async function saveSchedulerOverrides(
+  db: D1Database,
+  overrides: BenchmarkSchedulerOverrides,
+  updatedBy: string | null
+): Promise<StoredSchedulerOverrides> {
+  const updatedAt = new Date().toISOString();
+  await db
+    .prepare(`
+    INSERT INTO scheduler_settings (
+      id, slots, model_concurrency, provider_concurrency, unknown_provider_concurrency,
+      updated_at, updated_by
+    ) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6)
+    ON CONFLICT (id) DO UPDATE SET slots = ?1, model_concurrency = ?2, provider_concurrency = ?3,
+      unknown_provider_concurrency = ?4, updated_at = ?5, updated_by = ?6
+  `)
+    .bind(
+      overrides.slots,
+      overrides.modelConcurrency,
+      overrides.providerConcurrency,
+      overrides.unknownProviderConcurrency,
+      updatedAt,
+      updatedBy
+    )
+    .run();
+  return { overrides, updatedAt, updatedBy };
+}
+
 export const SCHEDULER_ACTIVE_LEASE_MS = 20 * 60_000;
 export const SCHEDULER_QUEUE_LEASE_MS = 30 * 60_000;
 export const SCHEDULER_MAX_ATTEMPTS = 6;
 export const SCHEDULER_DISPATCH_LEASE_MS = 20_000;
+export const SCHEDULER_INIT_BUDGET_MS = 20_000;
+export const SCHEDULER_INIT_LEASE_MS = 2 * 60_000;
 const SCHEDULER_DISPATCH_ROUNDS = 8;
 const SCHEDULER_DISPATCH_ROUND_LIMIT = 64;
 const SCHEDULER_CLAIM_BATCH = 50;
 const SCHEDULER_MATERIALIZE_BATCH = 50;
+const DISPATCH_LEASE_ID = 1;
+const INIT_LEASE_ID = 2;
 
 export type SchedulerClaim = {
   id: string;
@@ -66,6 +193,34 @@ type SchedulerLiveChunk = {
   share: string;
 };
 
+/** Rows each lane of a run already holds; exported for the query-plan regression test. */
+export const SCHEDULER_MATERIALIZED_LANES_SQL = `
+  SELECT model, variant, rep, COUNT(*) AS written, MAX(chunk) AS last
+  FROM scheduler_chunks WHERE run_id = ? GROUP BY model, variant, rep
+`;
+
+/**
+ * Inserts one chunk, already completed when every one of its cases has a result, so
+ * a run never re-measures carried-over cases. Each case is a `case_results` primary
+ * key probe, so the cost is bounded by the chunk rather than the run or its results.
+ */
+export const SCHEDULER_INSERT_CHUNK_SQL = `
+  INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk, case_ids, status)
+  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, CASE WHEN EXISTS (
+    SELECT 1 FROM json_each(?8) AS expected WHERE NOT EXISTS (
+      SELECT 1 FROM case_results WHERE run_id = ?2 AND model = ?3 AND variant = ?4
+        AND rep = ?6 AND case_id = expected.value
+    )
+  ) THEN 'pending' ELSE 'completed' END)
+  ON CONFLICT (id) DO NOTHING
+`;
+
+/**
+ * Materializes a run's chunks for at most {@link SCHEDULER_INIT_BUDGET_MS} and reports
+ * whether the run is initialized. Every batch commits on its own, so a later pass
+ * resumes after each lane's written prefix instead of rewriting the run. The
+ * `scheduler_runs` marker commits with the last batch, once every chunk exists.
+ */
 export async function scheduleRunChunks(
   db: D1Database,
   run: {
@@ -75,14 +230,26 @@ export async function scheduleRunChunks(
     caseIds: readonly string[];
     chunkSize: number;
   }
-): Promise<void> {
+): Promise<boolean> {
+  const deadline = Date.now() + SCHEDULER_INIT_BUDGET_MS;
   const initialized = await db
     .prepare('SELECT run_id FROM scheduler_runs WHERE run_id = ?')
     .bind(run.runId)
     .first();
-  if (initialized) return;
+  if (initialized) return true;
+  const lanes = await db
+    .prepare(SCHEDULER_MATERIALIZED_LANES_SQL)
+    .bind(run.runId)
+    .all<{ model: string; variant: string; rep: number; written: number; last: number }>();
+  // Batches commit in chunk order, so a lane's rows are the prefix 0..written-1;
+  // a lane of any other shape is rewritten from its first chunk.
+  const resumeAt = new Map(
+    lanes.results.map(lane => [
+      JSON.stringify([lane.model, lane.variant, lane.rep]),
+      lane.written === lane.last + 1 ? lane.written : 0,
+    ])
+  );
   const statements: D1PreparedStatement[] = [];
-  const ids: string[] = [];
   const writeBatch = async (final: boolean): Promise<boolean> => {
     const status = await db
       .prepare('SELECT status FROM benchmark_runs WHERE id = ?')
@@ -91,7 +258,6 @@ export async function scheduleRunChunks(
     if (status?.status !== 'running') return false;
     await db.batch([
       ...statements,
-      reuseCompletedChunksStatement(db, run.runId, ids),
       ...(final
         ? [
             db
@@ -101,66 +267,36 @@ export async function scheduleRunChunks(
         : []),
     ]);
     statements.length = 0;
-    ids.length = 0;
     return true;
   };
+  const chunks = Math.ceil(run.caseIds.length / run.chunkSize);
   for (const entry of run.entries) {
+    const variant = entry.variant ?? '';
+    const providers = JSON.stringify([...new Set(entry.providers)].sort());
     for (let rep = 0; rep < run.repetitions; rep++) {
-      for (let offset = 0; offset < run.caseIds.length; offset += run.chunkSize) {
-        const chunk = offset / run.chunkSize;
-        const variant = entry.variant ?? '';
-        const id = JSON.stringify([run.runId, entry.model, variant, rep, chunk]);
+      const start = resumeAt.get(JSON.stringify([entry.model, variant, rep])) ?? 0;
+      for (let chunk = start; chunk < chunks; chunk++) {
+        const offset = chunk * run.chunkSize;
         statements.push(
           db
-            .prepare(`
-          INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk, case_ids)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT (id) DO NOTHING
-        `)
+            .prepare(SCHEDULER_INSERT_CHUNK_SQL)
             .bind(
-              id,
+              JSON.stringify([run.runId, entry.model, variant, rep, chunk]),
               run.runId,
               entry.model,
               variant,
-              JSON.stringify([...new Set(entry.providers)].sort()),
+              providers,
               rep,
               chunk,
               JSON.stringify(run.caseIds.slice(offset, offset + run.chunkSize))
             )
         );
-        ids.push(id);
-        if (statements.length === SCHEDULER_MATERIALIZE_BATCH && !(await writeBatch(false))) return;
+        if (statements.length < SCHEDULER_MATERIALIZE_BATCH) continue;
+        if (!(await writeBatch(false)) || Date.now() >= deadline) return false;
       }
     }
   }
-  await writeBatch(true);
-}
-
-/**
- * Marks a materialized batch's chunks completed when every case in them already
- * has a result, so a run never re-measures carried-over cases. The lookup is
- * bounded by the batch: each chunk's own cases are probed through the
- * `case_results` primary key.
- */
-function reuseCompletedChunksStatement(
-  db: D1Database,
-  runId: string,
-  ids: readonly string[]
-): D1PreparedStatement {
-  const placeholders = ids.map(() => '?').join(', ');
-  return db
-    .prepare(`
-    UPDATE scheduler_chunks SET status = 'completed'
-    WHERE run_id = ? AND status = 'pending' AND id IN (${placeholders})
-      AND NOT EXISTS (
-        SELECT 1 FROM json_each(case_ids) AS expected WHERE NOT EXISTS (
-          SELECT 1 FROM case_results WHERE run_id = scheduler_chunks.run_id
-            AND model = scheduler_chunks.model AND variant = scheduler_chunks.variant
-            AND rep = scheduler_chunks.rep AND case_id = expected.value
-        )
-      )
-  `)
-    .bind(runId, ...ids);
+  return writeBatch(true);
 }
 
 /** Live reservations read by one dispatch pass; bounded by the slot budget. */
@@ -307,27 +443,49 @@ function selectScheduledChunks(input: {
   return selected;
 }
 
-/** Takes the single-row dispatch lease, or reports that another pass holds it. */
-async function acquireDispatchLock(db: D1Database, token: string, now: number): Promise<boolean> {
+/** Takes a scheduler lease row, or reports that another pass holds it. */
+async function acquireLease(
+  db: D1Database,
+  id: number,
+  token: string,
+  until: number,
+  now: number
+): Promise<boolean> {
   const acquired = await db
     .prepare(`
-    INSERT INTO scheduler_dispatch_lock (id, token, lease_until) VALUES (1, ?1, ?2)
-    ON CONFLICT (id) DO UPDATE SET token = ?1, lease_until = ?2
-    WHERE scheduler_dispatch_lock.lease_until <= ?3
+    INSERT INTO scheduler_dispatch_lock (id, token, lease_until) VALUES (?1, ?2, ?3)
+    ON CONFLICT (id) DO UPDATE SET token = ?2, lease_until = ?3
+    WHERE scheduler_dispatch_lock.lease_until <= ?4
     RETURNING token
   `)
-    .bind(token, now + SCHEDULER_DISPATCH_LEASE_MS, now)
+    .bind(id, token, until, now)
     .first<{ token: string }>();
   return acquired !== null;
 }
 
-async function releaseDispatchLock(db: D1Database, token: string): Promise<void> {
+async function releaseLease(db: D1Database, id: number, token: string): Promise<void> {
   await db
     .prepare(
-      'UPDATE scheduler_dispatch_lock SET token = NULL, lease_until = 0 WHERE id = 1 AND token = ?'
+      'UPDATE scheduler_dispatch_lock SET token = NULL, lease_until = 0 WHERE id = ? AND token = ?'
     )
-    .bind(token)
+    .bind(id, token)
     .run();
+}
+
+/**
+ * One initialization pass at a time: every dispatcher would otherwise materialize the
+ * same uninitialized run concurrently and contend with claims for the database.
+ */
+export function acquireInitializationLease(
+  db: D1Database,
+  token: string,
+  now: number
+): Promise<boolean> {
+  return acquireLease(db, INIT_LEASE_ID, token, now + SCHEDULER_INIT_LEASE_MS, now);
+}
+
+export function releaseInitializationLease(db: D1Database, token: string): Promise<void> {
+  return releaseLease(db, INIT_LEASE_ID, token);
 }
 
 /**
@@ -343,7 +501,9 @@ export async function claimScheduledChunks(
   now: number,
   token: string
 ): Promise<SchedulerClaim[]> {
-  if (!(await acquireDispatchLock(db, token, now))) return [];
+  if (!(await acquireLease(db, DISPATCH_LEASE_ID, token, now + SCHEDULER_DISPATCH_LEASE_MS, now))) {
+    return [];
+  }
   // One round claims at most one chunk per lane. A model's own concurrency cap
   // bounds how many chunks of a lane can run at once, so that cap also bounds the
   // rounds needed to fill the budget when few lanes have pending work.
@@ -405,7 +565,7 @@ export async function claimScheduledChunks(
       if (claimed === 0) break;
     }
   } finally {
-    await releaseDispatchLock(db, token);
+    await releaseLease(db, DISPATCH_LEASE_ID, token);
   }
   return claims;
 }
@@ -418,6 +578,12 @@ function batches<T>(items: readonly T[], size: number): T[][] {
   return out;
 }
 
+/**
+ * Starts a queued claim, or resumes the executing claim this token still owns when its
+ * delivery is redelivered after the previous invocation was canceled. Resuming keeps
+ * the running lease; the paid-execution ledger, not this transition, keeps a resumed
+ * delivery from repeating inference.
+ */
 export async function startChunk(
   db: D1Database,
   id: string,
@@ -426,8 +592,9 @@ export async function startChunk(
 ): Promise<boolean> {
   const result = await db
     .prepare(`
-    UPDATE scheduler_chunks SET status = 'active', lease_until = ?
-    WHERE id = ? AND token = ? AND status = 'queued' AND lease_until > ?
+    UPDATE scheduler_chunks SET status = 'active',
+      lease_until = CASE status WHEN 'queued' THEN ? ELSE lease_until END
+    WHERE id = ? AND token = ? AND status IN ('queued', 'active') AND lease_until > ?
       AND EXISTS (SELECT 1 FROM benchmark_runs WHERE id = scheduler_chunks.run_id AND status = 'running')
   `)
     .bind(now + SCHEDULER_ACTIVE_LEASE_MS, id, token, now)
@@ -479,25 +646,26 @@ export async function failChunk(db: D1Database, id: string, token: string): Prom
 
 export async function recoverChunks(db: D1Database, now: number): Promise<SchedulerClaim[]> {
   const results = await db.batch<SchedulerClaim>([
-    db.prepare(`UPDATE scheduler_chunks SET status = 'completed', slot = NULL, token = NULL, lease_until = 0
+    db.prepare(`WITH RECURSIVE busy_run(run_id) AS (
+        SELECT * FROM (
+          SELECT c.run_id FROM scheduler_chunks AS c WHERE c.status = 'pending'
+          ORDER BY c.run_id LIMIT 1
+        )
+        UNION ALL
+        SELECT (SELECT c.run_id FROM scheduler_chunks AS c
+          WHERE c.status = 'pending' AND c.run_id > busy_run.run_id ORDER BY c.run_id LIMIT 1)
+        FROM busy_run WHERE busy_run.run_id IS NOT NULL
+      )
+      UPDATE scheduler_chunks SET status = 'completed', slot = NULL, token = NULL, lease_until = 0
       WHERE status IN ('pending', 'queued')
         AND run_id IN (
-          WITH RECURSIVE busy_run(run_id) AS (
-            SELECT * FROM (
-              SELECT c.run_id FROM scheduler_chunks AS c WHERE c.status = 'pending'
-              ORDER BY c.run_id LIMIT 1
-            )
-            UNION ALL
-            SELECT (SELECT c.run_id FROM scheduler_chunks AS c
-              WHERE c.status = 'pending' AND c.run_id > busy_run.run_id ORDER BY c.run_id LIMIT 1)
-            FROM busy_run WHERE busy_run.run_id IS NOT NULL
-          )
-          SELECT run_id FROM busy_run WHERE run_id IS NOT NULL
-          UNION SELECT DISTINCT run_id FROM scheduler_chunks WHERE status = 'queued'
-        )
-        AND EXISTS (
-          SELECT 1 FROM benchmark_runs
-          WHERE benchmark_runs.id = scheduler_chunks.run_id AND benchmark_runs.status != 'running')`),
+          SELECT candidate.run_id FROM (
+            SELECT run_id FROM busy_run WHERE run_id IS NOT NULL
+            UNION SELECT DISTINCT run_id FROM scheduler_chunks WHERE status = 'queued'
+          ) AS candidate
+          WHERE NOT EXISTS (
+            SELECT 1 FROM benchmark_runs WHERE id = candidate.run_id AND status = 'running')
+        )`),
     db
       .prepare(`UPDATE scheduler_chunks SET status = CASE WHEN EXISTS (
         SELECT 1 FROM run_lane_failures WHERE run_id = scheduler_chunks.run_id
@@ -514,26 +682,45 @@ export async function recoverChunks(db: D1Database, now: number): Promise<Schedu
         AND model = scheduler_chunks.model AND variant = scheduler_chunks.variant AND rep = scheduler_chunks.rep)
       LIMIT 250`),
     db
-      .prepare(`DELETE FROM scheduler_executions WHERE rowid IN (
-      SELECT execution.rowid FROM scheduler_executions AS execution
-      JOIN benchmark_runs AS run ON run.id = execution.run_id
+      .prepare(`WITH stale_run(run_id) AS MATERIALIZED (
+      SELECT marker.run_id FROM scheduler_runs AS marker
+      JOIN benchmark_runs AS run ON run.id = marker.run_id
       WHERE run.status != 'running' AND run.completed_at < ?
-        AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = run.id AND status = 'active')
+      LIMIT 100
+    )
+    DELETE FROM scheduler_executions WHERE rowid IN (
+      SELECT execution.rowid FROM scheduler_executions AS execution
+      WHERE execution.run_id IN (SELECT run_id FROM stale_run)
+        AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = execution.run_id AND status = 'active')
       LIMIT 1000
     )`)
       .bind(new Date(now - 24 * 3600_000).toISOString()),
     db
-      .prepare(`DELETE FROM scheduler_chunks WHERE id IN (
-      SELECT chunk.id FROM scheduler_chunks AS chunk JOIN benchmark_runs AS run ON run.id = chunk.run_id
-      WHERE run.status != 'running' AND run.completed_at < ? AND chunk.status IN ('completed', 'failed')
+      .prepare(`WITH stale_run(run_id) AS MATERIALIZED (
+      SELECT marker.run_id FROM scheduler_runs AS marker
+      JOIN benchmark_runs AS run ON run.id = marker.run_id
+      WHERE run.status != 'running' AND run.completed_at < ?
+      LIMIT 100
+    )
+    DELETE FROM scheduler_chunks WHERE id IN (
+      SELECT chunk.id FROM scheduler_chunks AS chunk
+      WHERE chunk.run_id IN (SELECT run_id FROM stale_run)
+        AND chunk.status IN ('completed', 'failed')
       LIMIT 1000
     )`)
       .bind(new Date(now - 24 * 3600_000).toISOString()),
     db
-      .prepare(`DELETE FROM scheduler_runs WHERE run_id IN (
-      SELECT run.id FROM benchmark_runs AS run WHERE run.status != 'running' AND run.completed_at < ?
-        AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = run.id)
-        AND NOT EXISTS (SELECT 1 FROM scheduler_executions WHERE run_id = run.id)
+      .prepare(`WITH stale_run(run_id) AS MATERIALIZED (
+      SELECT marker.run_id FROM scheduler_runs AS marker
+      JOIN benchmark_runs AS run ON run.id = marker.run_id
+      WHERE run.status != 'running' AND run.completed_at < ?
+      LIMIT 100
+    )
+    DELETE FROM scheduler_runs WHERE run_id IN (
+      SELECT marker.run_id FROM scheduler_runs AS marker
+      WHERE marker.run_id IN (SELECT run_id FROM stale_run)
+        AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = marker.run_id)
+        AND NOT EXISTS (SELECT 1 FROM scheduler_executions WHERE run_id = marker.run_id)
       LIMIT 1000
     )`)
       .bind(new Date(now - 24 * 3600_000).toISOString()),
@@ -542,22 +729,37 @@ export async function recoverChunks(db: D1Database, now: number): Promise<Schedu
   return results[2]?.results ?? [];
 }
 
+/** SQL for {@link hasUnsettledChunks}; exported for the query-plan regression test. */
+export const SCHEDULER_UNSETTLED_SQL = `
+  SELECT 1 FROM scheduler_chunks AS chunk
+  WHERE chunk.run_id = ? AND chunk.status IN ('pending', 'queued', 'active')
+    AND NOT EXISTS (
+      SELECT 1 FROM run_lane_failures AS failure
+      WHERE failure.run_id = chunk.run_id AND failure.model = chunk.model
+        AND failure.variant = chunk.variant AND failure.rep = chunk.rep)
+  LIMIT 1
+`;
+
+/**
+ * Whether a run still has scheduled work that could settle it: a chunk that is
+ * pending, queued or active in a lane that has not dead-lettered. Runs without
+ * scheduler chunks (legacy whole-run work) are always settled. Callers use this
+ * to keep run accounting off the per-completion path.
+ */
+export async function hasUnsettledChunks(db: D1Database, runId: string): Promise<boolean> {
+  const row = await db.prepare(SCHEDULER_UNSETTLED_SQL).bind(runId).first();
+  return row !== null;
+}
+
 export async function beginPaidCase(
   db: D1Database,
-  key: {
-    runId: string;
-    model: string;
-    variant: string;
-    rep: number;
-    caseId: string;
-    token: string;
-  },
+  key: PaidExecutionKey,
   now: number = Date.now()
 ): Promise<boolean> {
   const result = await db
     .prepare(`
-    INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token)
-    SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (
+    INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token, started_at)
+    SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (
       SELECT 1 FROM scheduler_chunks WHERE run_id = ? AND model = ? AND variant = ? AND rep = ?
         AND token = ? AND status = 'active' AND lease_until > ?
         AND EXISTS (SELECT 1 FROM json_each(case_ids) WHERE value = ?)
@@ -571,6 +773,7 @@ export async function beginPaidCase(
       key.rep,
       key.caseId,
       key.token,
+      now,
       key.runId,
       key.model,
       key.variant,
@@ -583,14 +786,46 @@ export async function beginPaidCase(
   return result.meta.changes > 0;
 }
 
+export async function hasPaidCase(db: D1Database, key: PaidExecutionKey): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT 1 FROM scheduler_executions
+    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)
+    .bind(key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
+    .first();
+  return row !== null;
+}
+
+/** When the ledgered paid call for this case started, whichever claim token opened it. */
+export async function getPaidCaseStartedAt(
+  db: D1Database,
+  key: Omit<PaidExecutionKey, 'token'>
+): Promise<number | null> {
+  const row = await db
+    .prepare(`SELECT started_at FROM scheduler_executions
+    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?`)
+    .bind(key.runId, key.model, key.variant, key.rep, key.caseId)
+    .first<{ started_at: number }>();
+  return row?.started_at ?? null;
+}
+
+/** Moves a ledgered case's start to a further paid call its own token makes. */
+export async function restartPaidCase(
+  db: D1Database,
+  key: PaidExecutionKey,
+  now: number
+): Promise<void> {
+  await db
+    .prepare(`UPDATE scheduler_executions SET started_at = ?
+    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)
+    .bind(now, key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
+    .run();
+}
+
 export function schedulerBackoffSeconds(attempts: number): number {
   return Math.min(300, 15 * 2 ** Math.min(attempts - 1, 5));
 }
 
-export async function clearUnbilledCase(
-  db: D1Database,
-  key: { runId: string; model: string; variant: string; rep: number; caseId: string; token: string }
-): Promise<void> {
+export async function clearUnbilledCase(db: D1Database, key: PaidExecutionKey): Promise<void> {
   await db
     .prepare(`DELETE FROM scheduler_executions
     WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)

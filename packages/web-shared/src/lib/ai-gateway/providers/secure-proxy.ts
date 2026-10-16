@@ -2,24 +2,25 @@ import {
   SECURE_PROXY_BODY_KEY,
   type SecureProxyForward,
 } from '@kilocode/ai-gateway-secure-proxy-contracts';
-import type { SecureProxyRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 export function buildSecureProxyRequest({
-  secureProxy,
+  proxyUrl,
+  secret,
   upstreamUrl,
   upstreamHeaders,
   body,
 }: {
-  secureProxy: SecureProxyRoute;
+  proxyUrl: string;
+  secret: string;
   upstreamUrl: string;
   upstreamHeaders: Headers;
   body: object;
 }) {
   return {
-    url: secureProxy.url,
+    url: proxyUrl,
     headers: new Headers({
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${secureProxy.secret}`,
+      Authorization: `Bearer ${secret}`,
     }),
     body: JSON.stringify({
       ...body,

@@ -88,7 +88,7 @@ the queue invocation deadline; prompts, variants, CLI timeouts, repetitions, cos
 and CLI-reported latency remain unchanged.
 
 `BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250`,
-`modelConcurrency: 4`, `providerConcurrency: 16`, and `unknownProviderConcurrency: 2`.
+`modelConcurrency: 12`, `providerConcurrency: 16`, and `unknownProviderConcurrency: 2`.
 Optional `modelLimits` and `providerLimits` objects override those defaults by exact identity.
 `shares` defaults to `{"efficient/platform":2,"frontier/platform":2,"efficient/user":1}`.
 The least-occupied weighted share receives the next eligible claim; unused shares are
@@ -98,12 +98,35 @@ the existing gateway provider index. Every possible provider is conservatively c
 missing metadata shares a small unknown-provider bucket. Model-name prefixes are never
 treated as serving providers. Frontier has no owner queue.
 
-Claims carry fencing tokens. Redelivery cannot start an already executing claim, and
-stale tokens cannot release newer ownership. A queued lease lasts 30 minutes; an executing
-lease lasts 20 minutes, beyond the queue's 15-minute invocation limit. The one-minute tick
-recovers abandoned claims; completion refills slots immediately without waiting for a tick.
-Recovery and infrastructure/grader waits are bounded to six claims, with 15–300 second
-backoff. Capacity and unbilled provider-throttle waits do not create model-failure rows.
+Admins can override `slots`, `modelConcurrency`, `providerConcurrency`, and
+`unknownProviderConcurrency` at runtime, without a deploy, from the Scheduler card on the
+admin panel's Benchmarks tab or with `PUT /admin/scheduler-config`. Each limit resolves
+admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then the default. Overrides live in the
+single-row `scheduler_settings` D1 table; each dispatch pass reads it once by primary key, so
+a change applies on the next completion or one-minute tick. The PUT body replaces the whole
+override set: a missing or `null` limit clears that override. Values must be integers from 1
+to `BENCHMARK_CONTAINER_BUDGET`; anything else, including an unknown key, is a 400.
+`modelLimits` and `providerLimits` still come only from the env config and take precedence
+over `modelConcurrency` and `providerConcurrency` for their exact identities.
+`GET /admin/scheduler-config` returns each limit's `effective` value, its `source`
+(`admin`, `env`, or `default`), the `override`, and the `fallback` used without one.
+
+```sh
+curl -s -X PUT "$WORKER_URL/admin/scheduler-config" \
+  -H "Authorization: Bearer $INTERNAL_API_SECRET_PROD" -H 'content-type: application/json' \
+  -H 'x-updated-by: you@kilocode.ai' -d '{"modelConcurrency":12}'
+```
+
+Claims carry fencing tokens, and stale tokens cannot release newer ownership. A same-token
+redelivery resumes its executing claim instead of being dropped: the Workers runtime can
+cancel an in-flight queue invocation mid-case, so none of its error handling runs, and Queues
+redelivers the message within about a minute. A resumed delivery skips completed cases,
+reuses recoverable output, and never begins a ledgered paid case again. A queued lease lasts
+30 minutes; an executing lease lasts 20 minutes, beyond the queue's 15-minute invocation
+limit, and a resume keeps the running lease. The one-minute tick recovers abandoned claims;
+completion refills slots immediately without waiting for a tick. Recovery and
+infrastructure/grader waits are bounded to six claims, with 15–300 second backoff. Capacity
+and unbilled provider-throttle waits do not create model-failure rows.
 
 A dispatch pass reads current occupancy and the next pending chunk of every lane — one
 `(run, model, variant, repetition)` chunk chain — and claims as many of those lanes as fit.
@@ -118,17 +141,47 @@ the `(status, run_id, model, variant, repetition, chunk)` index bounds lane read
 A provider or model throttle records a cooldown deadline rather than stamping every
 pending row, so one throttle event costs a bounded write instead of rewriting the backlog.
 
-Materialization writes chunks in bounded batches, marks a batch complete when all of its
-cases already have results, and checks the run's status once per batch rather than per row.
+Materialization writes chunks in bounded batches and checks the run's status once per batch
+rather than per row. A chunk is inserted already completed when all of its cases have
+results; that check is a `case_results` primary-key probe per case, so its cost follows the
+batch, not the run. One initialization pass spends at most 20 seconds per run, and each batch
+commits on its own: the next pass reads how many chunks every lane already holds and resumes
+after that prefix, so a large run initializes over several passes instead of restarting from
+its first lane. The `scheduler_runs` marker commits with the final batch, once every chunk
+exists, and only marked runs are dispatched. Dispatch claims for initialized runs before it
+materializes, and a second lease row keeps concurrent dispatchers from initializing at the
+same time; a pass that completes a run's initialization claims again so its chunks start at
+once.
+
+Run completion accounting reads every case result of the run, so it does not run per
+completed chunk. A completion first asks whether the run still has scheduled work — an
+index probe for a chunk that is pending, queued or active in a lane that has not
+dead-lettered — and only settled runs are accounted. Chunks of a dead-lettered lane never
+count as unsettled, so a run with a dead lane still settles once its live lanes finish, and
+runs with no scheduler chunks (legacy whole-run work) are always accounted. The dispatch
+sweep and the dead-letter path remain responsible for runs that settle without a train of
+completions. Chunk recovery and the 24-hour prune batches are likewise bounded: recovery
+completes only the runs that still hold unsettled chunks, and pruning is driven from the
+per-run scheduler markers instead of scanning the chunk, execution or run tables.
 
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
-A separate paid-execution ledger prevents automatic repetition if a worker disappears
-after inference may have started but before an output was saved. Such an ambiguous case
-fails its measurement lane as infrastructure uncertainty instead of inventing a score or
-issuing another paid call. Manual requeue creates a new run and may repeat that unknown
-case; compatible completed cases and pending successful outputs are still reused.
-An ambiguous transport failure retains the slot/provider lease until expiry, because the
-container may still be finishing its request. This quarantine cannot oversubscribe providers.
+A separate paid-execution ledger records when each paid case started and prevents automatic
+repetition if a worker disappears after inference may have started but before an output was
+saved. The container finishes a case whose caller is gone, posts the output back to the
+worker, and refuses the cases it had not started, so an interrupted lane resumes from
+recoverable output or repeats a case that provably made no paid call.
+
+A chunk that finds a ledgered case without output waits for it instead of failing its lane.
+It keeps its slot and provider lease, so the wait cannot oversubscribe providers, and its
+claim is redelivered every 30 seconds to recheck. The wait ends when the output arrives,
+which the chunk then grades, or once the decider case timeout (180 seconds) plus the
+container's delivery window (90 seconds) has passed since the case's latest paid call started
+(an empty-output retry restarts it in the ledger). Only then does the case count as genuinely
+ambiguous (a container hard-killed mid-flight, or a lost delivery): it fails its measurement
+lane as infrastructure uncertainty instead of inventing a score or issuing another paid call.
+A recheck mints no user token and warms no container.
+Manual requeue creates a new run and may repeat that unknown case; compatible completed cases
+and pending successful outputs are still reused.
 Terminal scheduler rows are pruned in bounded batches after 24 hours. Benchmark history,
 completed case results, and pending outputs remain available for compatible reuse.
 
@@ -157,6 +210,7 @@ measurements are included in routing-table version hashes.
 - Catalog requests have a 10-second deadline, including body reads, so a stalled response cannot block both queues indefinitely.
 - Manual and automatic selections use the same expansion. Existing saved effort selections no longer restrict platform measurements.
 - Owner pools use the same alias resolution and all-efforts expansion, sharing concrete measurements with the platform. Status responses preserve the requested model ids; custom routing tables use concrete ids.
+- Before the owner queue claims a batch, each pending owner-requested alias row whose target resolves hands its owner request to the concrete pair (creating it pending when absent) and drops its own. This converts owner rows registered before alias resolution, and stops an alias and its target from being measured twice. A variant the target no longer offers only loses the request; the next status lookup re-admits the target's current pairs. Running, failed, and ready alias rows are untouched.
 - Custom tables are already scoped to the requested resolved pairs by the benchmark worker. The serving worker accepts those concrete candidates and loads capabilities by their ids rather than re-filtering against saved alias ids.
 - Deploy the serving worker before the benchmark worker when introducing alias resolution; older serving workers filter concrete custom-table candidates against the original pool aliases.
 
@@ -496,6 +550,7 @@ endpoints reject frontier. The classifier-winner endpoint returns the shared win
 | Endpoint | Purpose |
 |---|---|
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`) |
+| `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots`, `modelConcurrency`, `providerConcurrency`, `unknownProviderConcurrency` |
 | `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
@@ -678,8 +733,17 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
   The D1 live-slot uniqueness constraint and claim tokens protect container ownership.
   CLI runs remain serialized because they share SQLite state.
 - `/warmup` initializes the local CLI database once per container without making an inference request.
-- The server handles SIGTERM and drains accepted CLI jobs before exiting.
-  Idle containers therefore release capacity instead of ignoring the inactivity stop.
+- The server handles SIGTERM and drains the CLI case it already accepted, then exits.
+  A case still queued when SIGTERM arrives is refused with `503` instead of starting a new
+  paid call, so a rollout is never charged for work it interrupts. Idle containers therefore
+  release capacity instead of ignoring the inactivity stop.
+- A drained case whose caller disappeared is posted to the worker's `/container/case-result`
+  route, which stores it as pending output. A Durable Object request keeps running after its
+  caller is canceled, so `BenchRunnerContainer` relays the caller's `request.signal` (enabled
+  by the `enable_request_signal` compatibility flag) to the container request; without that,
+  the container would answer the Durable Object and never post. The route is authenticated
+  by the paid-execution claim token instead of the backend secret, which a container never
+  holds, and it only records outcomes for a claim token that actually opened the execution.
 - Completed or failed runs reject queued work before starting another CLI case.
 - Smaller chunks leave time for an empty-output retry within the queue invocation limit.
 - `case_results` rows carry diagnostics: CLI exit code, output prefix, and an
@@ -698,7 +762,8 @@ Failed queue messages land in the dead-letter queue after transport retries.
 A token-bearing decider message is a delivery of one durable chunk claim, not ownership
 of a fixed chain. Its DLQ handler atomically releases only a still-queued matching token;
 it never revokes active ownership. Expired leases recover abandoned executing claims.
-The scheduler records a lane death only when recovery is exhausted or execution is ambiguous.
+The scheduler records a lane death only when recovery is exhausted or a paid case's output
+can no longer arrive.
 Classifier dead-letter handling remains fail-fast.
 
 `run_lane_failures` preserves lane-aware finalization: a run settles once each

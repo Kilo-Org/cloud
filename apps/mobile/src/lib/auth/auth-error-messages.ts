@@ -50,7 +50,11 @@ export function signupStepUpMessage(
   methods: readonly string[] | undefined,
   shown: { apple: boolean; google: boolean }
 ): string {
-  if (shown.apple && methods?.includes('apple')) return i18n.t('authErrors.signupStepUpApple');
-  if (shown.google && methods?.includes('google')) return i18n.t('authErrors.signupStepUpGoogle');
+  if (shown.apple && methods?.includes('apple')) {
+    return i18n.t('authErrors.signupStepUpApple');
+  }
+  if (shown.google && methods?.includes('google')) {
+    return i18n.t('authErrors.signupStepUpGoogle');
+  }
   return i18n.t('authErrors.signupStepUp');
 }

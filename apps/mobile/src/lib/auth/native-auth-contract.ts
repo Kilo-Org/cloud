@@ -14,9 +14,10 @@ const emailCodeResponseSchema = z.object({
 const errorResponseSchema = z.object({
   error: z.string(),
   ssoOrganizationId: z.string().min(1).optional(),
-  // A malformed method list must not hide the error code it accompanies.
-  methods: z.array(z.string()).optional().catch(undefined),
+  // Parsed on its own below: a malformed method list must not hide the error code.
+  methods: z.unknown().optional(),
 });
+const signupMethodsSchema = z.array(z.string());
 
 export type TokenPair =
   | { token: string; refreshToken: string; expiresIn: number; created?: boolean }
@@ -125,10 +126,11 @@ export function parseAuthError(
   if (!result.success) {
     return undefined;
   }
+  const methods = signupMethodsSchema.safeParse(result.data.methods);
   return {
     code: result.data.error,
     ssoOrganizationId: result.data.ssoOrganizationId,
-    signupMethods: result.data.methods,
+    signupMethods: methods.success ? methods.data : undefined,
   };
 }
 

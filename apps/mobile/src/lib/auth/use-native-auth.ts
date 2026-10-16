@@ -12,12 +12,8 @@ import { i18n } from '@/i18n';
 import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
-import {
-  defaultErrorMessage,
-  mapError,
-  signupStepUpMessage,
-} from '@/lib/auth/auth-error-messages';
-import { hasStringCode, type PostAuthFailure, postAuth } from '@/lib/auth/auth-fetch';
+import { defaultErrorMessage, mapError, signupStepUpMessage } from '@/lib/auth/auth-error-messages';
+import { hasStringCode, postAuth, type PostAuthFailure } from '@/lib/auth/auth-fetch';
 import {
   buildChallengeEntry,
   parseEmailCodeResponse,
@@ -61,7 +57,9 @@ async function tokenRefusalMessage(
   result: PostAuthFailure,
   googleConfigured: boolean
 ): Promise<string> {
-  if (result.errorCode !== 'SIGNUP-STEP-UP') return mapError(result.errorCode);
+  if (result.errorCode !== 'SIGNUP-STEP-UP') {
+    return mapError(result.errorCode);
+  }
   const apple =
     Platform.OS === 'ios' && (await AppleAuthentication.isAvailableAsync().catch(() => false));
   return signupStepUpMessage(result.signupMethods, { apple, google: googleConfigured });

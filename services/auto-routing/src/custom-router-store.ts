@@ -66,7 +66,9 @@ function cached(
   const value = load();
   cache.delete(key);
   cache.set(key, { expiresAt: now + CUSTOM_ROUTER_CACHE_TTL_MS, value });
-  value.catch(() => cache.delete(key));
+  value.catch(() => {
+    if (cache.get(key)?.value === value) cache.delete(key);
+  });
   if (cache.size > CUSTOM_ROUTER_CACHE_LIMIT) {
     const oldest = cache.keys().next().value;
     if (oldest !== undefined) cache.delete(oldest);

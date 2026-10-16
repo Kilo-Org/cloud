@@ -28,6 +28,9 @@
     // CLI's KILO_API_URL. Local dev overrides both vars via .dev.vars (see
     // .dev.vars.example) so the decider benchmark runs fully locally.
     "KILO_CLI_API_URL": "https://api.kilo.ai",
+    // Where a container posts a case outcome after losing its caller (for
+    // example during a version rollout). Local dev overrides it via .dev.vars.
+    "BENCH_RESULT_URL": "https://auto-routing-benchmark.kiloapps.io/container/case-result",
   },
   "containers": [
     {

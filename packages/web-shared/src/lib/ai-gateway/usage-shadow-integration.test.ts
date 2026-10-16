@@ -111,6 +111,9 @@ const bouncer = jest.requireMock<{ deliverBouncerUsageEventNow: jest.Mock }>(
 const outbox = jest.requireMock<{ enqueueBouncerUsageEvent: jest.Mock }>(
   '@kilocode/db/bouncer-usage-event-outbox'
 );
+const { fetchGeneration } = jest.requireMock<{ fetchGeneration: jest.Mock }>(
+  './providers/upstream-request'
+);
 
 const stats: MicrodollarUsageStats = {
   messageId: 'synthetic-message',
@@ -605,6 +608,40 @@ describe('gateway shadow background integration', () => {
       expect(sent[0].core.cache_discount).toBe(0);
       expect(sent[0].metadata.market_cost).toBe(1234);
       expect(writer).toHaveBeenCalledWith(sent[0]);
+    }
+  );
+
+  test.each([
+    { generationFinishReason: null, expected: 'refusal' },
+    { generationFinishReason: 'content_filter', expected: 'content_filter' },
+  ])(
+    'processTokenData keeps the response finish_reason only when the generation lookup has none ($generationFinishReason)',
+    async ({ generationFinishReason, expected }) => {
+      process.env.VERCEL_REGION = 'sfo1';
+      fetchGeneration.mockResolvedValue({
+        data: {
+          id: 'synthetic-message',
+          total_cost: 0.001,
+          created_at: '2026-10-16T00:00:00.000Z',
+          model: 'synthetic-model',
+          origin: '',
+          usage: 0.001,
+          is_byok: false,
+          provider_name: 'synthetic',
+          finish_reason: generationFinishReason,
+          native_tokens_prompt: 10,
+          native_tokens_completion: 0,
+        },
+      });
+      const lifecycle = requestLifetime();
+      await lifecycle.run(() =>
+        processTokenData({ ...stats, outputTokens: 0, finish_reason: 'refusal' }, context)
+      );
+      lifecycle.close();
+      await lifecycle.drain();
+      expect(fetchGeneration).toHaveBeenCalledTimes(1);
+      expect(sent).toHaveLength(1);
+      expect(sent[0].metadata.finish_reason).toBe(expected);
     }
   );
 });

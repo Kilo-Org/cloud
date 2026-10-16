@@ -287,6 +287,12 @@ describe('public decide API', () => {
       ).toBe(true);
     }
     expect(CUSTOM_ROUTER_ERROR_HTTP_STATUS.custom_router_unavailable).toBe(422);
+    expect(CUSTOM_ROUTER_ERROR_HTTP_STATUS.quota_exceeded).toBe(429);
+    expect(
+      CustomRouterErrorResponseSchema.parse({
+        error: { code: 'quota_exceeded', message: 'm', retryAt: '2026-10-17T00:00:00.000Z' },
+      }).error.retryAt
+    ).toBe('2026-10-17T00:00:00.000Z');
   });
 });
 

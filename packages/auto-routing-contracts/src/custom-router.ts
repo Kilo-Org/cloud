@@ -217,6 +217,7 @@ export const CustomRouterErrorCodeSchema = z.enum([
   'router_not_found',
   'invalid_request',
   'insufficient_balance',
+  'quota_exceeded',
   'custom_router_unavailable',
   'stale_engine_identity',
   'internal_error',
@@ -229,6 +230,7 @@ export const CUSTOM_ROUTER_ERROR_HTTP_STATUS = {
   router_not_found: 404,
   invalid_request: 400,
   insufficient_balance: 402,
+  quota_exceeded: 429,
   custom_router_unavailable: 422,
   stale_engine_identity: 409,
   internal_error: 500,
@@ -238,6 +240,8 @@ export const CustomRouterErrorResponseSchema = z.object({
   error: z.object({
     code: CustomRouterErrorCodeSchema,
     message: z.string(),
+    // quota_exceeded only: ISO time when the owner may request new benchmarks.
+    retryAt: z.string().optional(),
   }),
 });
 export type CustomRouterErrorResponse = z.infer<typeof CustomRouterErrorResponseSchema>;

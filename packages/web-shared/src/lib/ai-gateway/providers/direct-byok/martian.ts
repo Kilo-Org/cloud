@@ -6,7 +6,7 @@ export default {
   base_url: 'https://api.withmartian.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],
-  default_ai_sdk_provider: 'openrouter',
+  reasoning_details_transform: null,
   transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'martian',

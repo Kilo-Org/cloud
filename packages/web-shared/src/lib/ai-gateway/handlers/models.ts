@@ -12,7 +12,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
+import {
+  addAutoRoutingModels,
+  addCustomRouterModels,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
+import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import {
   getEnkryptBenchmarks,
@@ -55,10 +59,14 @@ export async function handleModelsRequest(): Promise<
             kiloUserId: auth.user.id,
           })
         : null;
-    if (result) {
+    if (result && auth.user && auth.organizationId) {
+      const [models, customRouters] = await Promise.all([
+        addAutoRoutingModels(result.data),
+        listUsableCustomRouters({ userId: auth.user.id, organizationId: auth.organizationId }),
+      ]);
       return await modelResponse({
         ...result,
-        data: await addAutoRoutingModels(result.data),
+        data: addCustomRouterModels(models, customRouters),
       });
     }
 
@@ -73,9 +81,10 @@ export async function handleModelsRequest(): Promise<
       });
     }
 
-    const [byokModels, enabledByokProviderIds] = await Promise.all([
+    const [byokModels, enabledByokProviderIds, customRouters] = await Promise.all([
       getDirectByokModelsForUser(auth.user.id),
       getUserByokProviderIds(readDb, auth.user.id),
+      listUsableCustomRouters({ userId: auth.user.id, organizationId: null }),
     ]);
     const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
       { kiloUserId: auth.user.id, organizationId: null },
@@ -83,7 +92,7 @@ export async function handleModelsRequest(): Promise<
     );
     return await modelResponse({
       data: appendLocalFakeDeterministicCatalogModels(
-        modelsWithByokAvailability.concat(byokModels)
+        addCustomRouterModels(modelsWithByokAvailability.concat(byokModels), customRouters)
       ),
     });
   } catch (error) {

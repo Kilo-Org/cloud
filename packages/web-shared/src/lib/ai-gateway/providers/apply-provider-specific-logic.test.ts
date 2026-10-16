@@ -238,11 +238,12 @@ describe('applyProviderSpecificLogic recursive tool schemas', () => {
 });
 
 describe('applyProviderSpecificLogic top-level tool schema combinators', () => {
-  async function applyToInputSchema(model: string) {
+  async function applyToTool(model: string) {
     const request = makeMessagesRequest(model);
     request.body.tools = [
       {
         name: 'nteract_create_cell',
+        description: 'Create a cell.',
         input_schema: {
           type: 'object',
           properties: { notebook_id: { type: ['string', 'null'] } },
@@ -265,23 +266,36 @@ describe('applyProviderSpecificLogic top-level tool schema combinators', () => {
       false
     );
 
-    const tool = request.body.tools[0];
-    return tool && 'input_schema' in tool ? tool.input_schema : undefined;
+    return request.body.tools[0];
   }
 
   it('removes top-level combinators for Claude models', async () => {
-    const inputSchema = await applyToInputSchema('anthropic/claude-opus-5.5');
+    const tool = await applyToTool('anthropic/claude-opus-5.5');
 
-    expect(inputSchema).toEqual({
-      type: 'object',
-      properties: { notebook_id: { type: ['string', 'null'] } },
+    expect(tool).toEqual({
+      name: 'nteract_create_cell',
+      description:
+        'Create a cell.\n\nThe input must also match exactly one of these JSON schemas: [{"required":["notebook_id"]}]',
+      input_schema: {
+        type: 'object',
+        properties: { notebook_id: { type: ['string', 'null'] } },
+        required: ['notebook_id'],
+      },
     });
   });
 
   it('preserves top-level combinators for other models', async () => {
-    const inputSchema = await applyToInputSchema('vendor/model');
+    const tool = await applyToTool('vendor/model');
 
-    expect(inputSchema?.oneOf).toEqual([{ required: ['notebook_id'] }]);
+    expect(tool).toEqual({
+      name: 'nteract_create_cell',
+      description: 'Create a cell.',
+      input_schema: {
+        type: 'object',
+        properties: { notebook_id: { type: ['string', 'null'] } },
+        oneOf: [{ required: ['notebook_id'] }],
+      },
+    });
   });
 });
 

@@ -58,23 +58,26 @@ const nteractCreateCellSchema = () => ({
 });
 
 describe('removeTopLevelSchemaCombinators', () => {
-  it('removes a top-level oneOf and keeps the root properties', () => {
+  it('removes a top-level oneOf, keeps the root properties and describes the constraint', () => {
     const schema: Record<string, unknown> = nteractCreateCellSchema();
-    const { oneOf: _oneOf, ...expected } = nteractCreateCellSchema();
+    const { oneOf, ...expected } = nteractCreateCellSchema();
 
-    removeTopLevelSchemaCombinators(schema);
+    const constraints = removeTopLevelSchemaCombinators(schema);
 
     expect(schema).toEqual(expected);
+    expect(constraints).toBe(
+      `The input must also match exactly one of these JSON schemas: ${JSON.stringify(oneOf)}`
+    );
   });
 
-  it('adds properties only declared by anyOf branches as optional properties', () => {
+  it('adds properties only declared by anyOf branches and requires what every branch requires', () => {
     const schema = {
       type: 'object',
       properties: { a: { type: 'string' } },
       additionalProperties: false,
       anyOf: [
-        { required: ['b'], properties: { a: { type: 'null' }, b: { type: 'number' } } },
-        { required: ['c'], properties: { c: { type: 'boolean' } } },
+        { required: ['b', 'd'], properties: { a: { type: 'null' }, b: { type: 'number' } } },
+        { required: ['c', 'd'], properties: { c: { type: 'boolean' }, d: { type: 'string' } } },
       ],
     };
 
@@ -82,12 +85,33 @@ describe('removeTopLevelSchemaCombinators', () => {
 
     expect(schema).toEqual({
       type: 'object',
-      properties: { a: { type: 'string' }, b: { type: 'number' }, c: { type: 'boolean' } },
+      properties: {
+        a: { type: 'string' },
+        b: { type: 'number' },
+        c: { type: 'boolean' },
+        d: { type: 'string' },
+      },
+      required: ['d'],
       additionalProperties: false,
     });
   });
 
-  it('keeps required entries from allOf branches', () => {
+  it('requires nothing extra when a oneOf branch has no required properties', () => {
+    const schema = {
+      type: 'object',
+      properties: { a: { type: 'string' } },
+      oneOf: [{ required: ['a'] }, { properties: { b: { type: 'string' } } }],
+    };
+
+    removeTopLevelSchemaCombinators(schema);
+
+    expect(schema).toEqual({
+      type: 'object',
+      properties: { a: { type: 'string' }, b: { type: 'string' } },
+    });
+  });
+
+  it('keeps required entries from every allOf branch', () => {
     const schema = {
       type: 'object',
       required: ['a'],
@@ -106,6 +130,23 @@ describe('removeTopLevelSchemaCombinators', () => {
     });
   });
 
+  it('describes each removed combinator on its own line', () => {
+    const schema = {
+      type: 'object',
+      allOf: [{ required: ['a'] }],
+      anyOf: [{ required: ['b'] }, { required: ['c'] }],
+    };
+
+    const constraints = removeTopLevelSchemaCombinators(schema);
+
+    expect(constraints).toBe(
+      [
+        'The input must also match all of these JSON schemas: [{"required":["a"]}]',
+        'The input must also match at least one of these JSON schemas: [{"required":["b"]},{"required":["c"]}]',
+      ].join('\n')
+    );
+  });
+
   it('sets the object type when the root only had combinators', () => {
     const schema = {
       oneOf: [
@@ -122,6 +163,15 @@ describe('removeTopLevelSchemaCombinators', () => {
     });
   });
 
+  it('removes a malformed combinator without describing it', () => {
+    const schema = { type: 'object', oneOf: { required: ['a'] } };
+
+    const constraints = removeTopLevelSchemaCombinators(schema);
+
+    expect(schema).toEqual({ type: 'object' });
+    expect(constraints).toBeUndefined();
+  });
+
   it('keeps nested combinators', () => {
     const schema = {
       type: 'object',
@@ -129,13 +179,14 @@ describe('removeTopLevelSchemaCombinators', () => {
     };
     const expected = structuredClone(schema);
 
-    removeTopLevelSchemaCombinators(schema);
+    const constraints = removeTopLevelSchemaCombinators(schema);
 
     expect(schema).toEqual(expected);
+    expect(constraints).toBeUndefined();
   });
 
   it.each([null, 'string', 42, []])('ignores non-object schema %p', schema => {
-    expect(() => removeTopLevelSchemaCombinators(schema)).not.toThrow();
+    expect(removeTopLevelSchemaCombinators(schema)).toBeUndefined();
   });
 });
 
@@ -145,54 +196,113 @@ describe('removeTopLevelToolSchemaCombinators', () => {
     properties: { a: { type: 'string' } },
     oneOf: [{ required: ['a'] }],
   });
-  const expectedSchema = { type: 'object', properties: { a: { type: 'string' } } };
+  const expectedSchema = {
+    type: 'object',
+    properties: { a: { type: 'string' } },
+    required: ['a'],
+  };
+  const constraints =
+    'The input must also match exactly one of these JSON schemas: [{"required":["a"]}]';
 
-  it('updates chat completions function tools', () => {
+  it('updates chat completions function tools and keeps strict', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'anthropic/claude-opus-5.5',
         messages: [{ role: 'user', content: 'hello' }],
-        tools: [{ type: 'function', function: { name: 'f', parameters: combinatorSchema() } }],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'f',
+              description: 'Does f.',
+              strict: true,
+              parameters: combinatorSchema(),
+            },
+          },
+        ],
       },
     };
 
     removeTopLevelToolSchemaCombinators(request);
 
     const tool = request.body.tools?.[0];
-    expect(tool?.type === 'function' && tool.function.parameters).toEqual(expectedSchema);
+    expect(tool?.type === 'function' && tool.function).toEqual({
+      name: 'f',
+      description: `Does f.\n\n${constraints}`,
+      strict: true,
+      parameters: expectedSchema,
+    });
   });
 
-  it('updates Responses function tools', () => {
+  it('updates Responses function tools without a description', () => {
     const request: GatewayRequest = {
       kind: 'responses',
       body: {
         model: 'anthropic/claude-opus-5.5',
         input: 'hello',
-        tools: [{ type: 'function', name: 'f', strict: false, parameters: combinatorSchema() }],
+        tools: [
+          {
+            type: 'function',
+            name: 'f',
+            description: null,
+            strict: true,
+            parameters: combinatorSchema(),
+          },
+        ],
       },
     };
 
     removeTopLevelToolSchemaCombinators(request);
 
-    const tool = request.body.tools?.[0];
-    expect(tool?.type === 'function' && tool.parameters).toEqual(expectedSchema);
+    expect(request.body.tools?.[0]).toEqual({
+      type: 'function',
+      name: 'f',
+      description: constraints,
+      strict: true,
+      parameters: expectedSchema,
+    });
   });
 
-  it('updates Messages tools', () => {
+  it('updates Messages tools and keeps strict', () => {
     const request: GatewayRequest = {
       kind: 'messages',
       body: {
         model: 'anthropic/claude-opus-5.5',
         max_tokens: 1024,
         messages: [{ role: 'user', content: 'hello' }],
-        tools: [{ name: 'f', input_schema: combinatorSchema() }],
+        tools: [
+          { name: 'f', description: 'Does f.', strict: true, input_schema: combinatorSchema() },
+        ],
       },
     };
 
     removeTopLevelToolSchemaCombinators(request);
 
-    const tool = request.body.tools?.[0];
-    expect(tool && 'input_schema' in tool && tool.input_schema).toEqual(expectedSchema);
+    expect(request.body.tools?.[0]).toEqual({
+      name: 'f',
+      description: `Does f.\n\n${constraints}`,
+      strict: true,
+      input_schema: expectedSchema,
+    });
+  });
+
+  it('leaves tools without top-level combinators untouched', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-opus-5.5',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: 'hello' }],
+        tools: [{ name: 'f', input_schema: { type: 'object', properties: {} } }],
+      },
+    };
+
+    removeTopLevelToolSchemaCombinators(request);
+
+    expect(request.body.tools?.[0]).toStrictEqual({
+      name: 'f',
+      input_schema: { type: 'object', properties: {} },
+    });
   });
 });

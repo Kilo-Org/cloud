@@ -3,6 +3,7 @@ import {
   AutoRouterSchema,
   DEFAULT_AUTO_ROUTER,
   BenchmarkConfigSchema,
+  BenchmarkSchedulerOverridesSchema,
   BenchmarkKindSchema,
   BenchmarkProfileStatusesRequestSchema,
   BenchmarkRunPurposeSchema,
@@ -14,6 +15,7 @@ import {
   resolvePolicySettings,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
+  type BenchmarkSchedulerConfigResponse,
   type BenchmarkRunProgress,
 } from '@kilocode/auto-routing-contracts';
 import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
@@ -48,6 +50,7 @@ import {
   requeueFailedCurrentProfiles,
 } from './db';
 import { loadRunProgress } from './run-progress';
+import { getSchedulerOverrides, resolveSchedulerConfig, saveSchedulerOverrides } from './scheduler';
 import type { HonoEnv } from './hono-env';
 import {
   fetchBenchmarkModelCatalog,
@@ -106,6 +109,32 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       });
       return c.json({ config: saved, policySettings: resolvePolicySettings(saved) });
+    }
+  );
+
+  app.get('/admin/scheduler-config', async c => {
+    const { overrides, ...updated } = await getSchedulerOverrides(c.env.BENCH_DB);
+    return c.json({
+      settings: resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides).settings,
+      ...updated,
+    } satisfies BenchmarkSchedulerConfigResponse);
+  });
+
+  app.put(
+    '/admin/scheduler-config',
+    zodJsonValidator(BenchmarkSchedulerOverridesSchema, {
+      errorMessage: 'Invalid scheduler config',
+    }),
+    async c => {
+      const { overrides, ...updated } = await saveSchedulerOverrides(
+        c.env.BENCH_DB,
+        c.req.valid('json'),
+        c.req.header('x-updated-by') ?? null
+      );
+      return c.json({
+        settings: resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides).settings,
+        ...updated,
+      } satisfies BenchmarkSchedulerConfigResponse);
     }
   );
 

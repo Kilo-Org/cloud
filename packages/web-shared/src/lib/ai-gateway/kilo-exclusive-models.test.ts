@@ -11,6 +11,7 @@ import {
   qwen36_plus_stealth_model,
   gemma_4_26b_a4b_it_free_model,
   glyph_cluster_stealth_free_model,
+  cat_jam_stealth_free_model,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
 describe('Kilo-exclusive model providers', () => {
@@ -41,5 +42,20 @@ describe('Kilo-exclusive model providers', () => {
       inference_provider_restriction: [],
     });
     expect(findKiloExclusiveModel('stealth/glyph-cluster')?.provider).toBe(VERCEL_AI_GATEWAY);
+  });
+
+  test('serves stealth/cat-jam through Vercel AI Gateway as a free stealth model', () => {
+    expect(findKiloExclusiveModel(cat_jam_stealth_free_model.public_id)).toMatchObject({
+      public_id: 'stealth/cat-jam',
+      internal_id: 'stealth/cat-jam',
+      display_name: 'Stealth: Cat Jam (free)',
+      context_length: 1_048_576,
+      max_completion_tokens: 131_072,
+      status: 'public',
+      flags: ['reasoning', 'stealth', 'requires-data-collection'],
+      pricing: null,
+      inference_provider_restriction: [],
+    });
+    expect(findKiloExclusiveModel('stealth/cat-jam')?.provider).toBe(VERCEL_AI_GATEWAY);
   });
 });

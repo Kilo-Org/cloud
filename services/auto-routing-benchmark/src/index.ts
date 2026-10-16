@@ -8,6 +8,7 @@ import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './s
 import { isRetryableContainerAvailabilityError } from './cli-runner';
 import {
   processDeadLetter,
+  acceptContainerCaseResult,
   processJob,
   drainQueues,
   publishPlatformRoutingTable,
@@ -26,6 +27,12 @@ const PLATFORM_SYNC_CRON = '0 5 * * *';
 export { BenchRunnerContainer } from './bench-runner-container';
 
 export const app = new Hono<HonoEnv>();
+// Containers cannot hold the backend secret; the paid-execution claim token
+// authenticates their result instead, so this route precedes the auth middleware.
+app.post('/container/case-result', async c => {
+  const accepted = await acceptContainerCaseResult(c.env, await c.req.json().catch(() => null));
+  return c.body(null, accepted ? 204 : 404);
+});
 app.use('*', authMiddleware);
 app.get('/health', c => c.json({ status: 'ok', service: 'auto-routing-benchmark' }));
 

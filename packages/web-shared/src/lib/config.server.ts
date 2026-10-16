@@ -179,11 +179,6 @@ export const USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY =
 export const USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY =
   getEnvVariable('USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY') || '';
 
-// openssl rand -base64 32
-export const USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY = getEnvVariable(
-  'USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY'
-);
-
 /**
  * AES-256 encryption key for BYOK API keys.
  * Must be a base64-encoded 32-byte (256-bit) key.

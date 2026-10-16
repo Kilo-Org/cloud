@@ -2498,6 +2498,7 @@
       "title": "სესიების გაფილტვრა",
       "platformCloud": "ღრუბელი",
       "platformExtension": "გაფართოება",
+      "platformDesktop": "დესკტოპი",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

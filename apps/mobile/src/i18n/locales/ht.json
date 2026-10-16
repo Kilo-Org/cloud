@@ -2498,6 +2498,7 @@
       "title": "Filtre sesyon yo",
       "platformCloud": "Sèvè adistans",
       "platformExtension": "Ekstansyon",
+      "platformDesktop": "Òdinatè",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

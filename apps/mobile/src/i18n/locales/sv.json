@@ -2498,6 +2498,7 @@
       "title": "Filtrera sessioner",
       "platformCloud": "Molnet",
       "platformExtension": "Tillägg",
+      "platformDesktop": "Skrivbord",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

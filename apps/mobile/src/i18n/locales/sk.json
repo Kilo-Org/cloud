@@ -2564,6 +2564,7 @@
       "title": "Filtrovať relácie",
       "platformCloud": "Cloudové prostredie",
       "platformExtension": "Rozšírenie",
+      "platformDesktop": "Desktopová aplikácia",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

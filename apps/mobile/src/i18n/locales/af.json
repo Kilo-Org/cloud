@@ -2498,6 +2498,7 @@
       "title": "Filtreer sessies",
       "platformCloud": "Wolk",
       "platformExtension": "Uitbreiding",
+      "platformDesktop": "Rekenaar",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

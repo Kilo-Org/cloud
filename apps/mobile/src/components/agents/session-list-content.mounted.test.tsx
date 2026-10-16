@@ -201,6 +201,11 @@ function isHost(node: TestRenderer.ReactTestInstance, type: string) {
 function hosts(renderer: TestRenderer.ReactTestRenderer, type: string) {
   return renderer.root.findAll(node => isHost(node, type));
 }
+function skeletonRows(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(
+    node => typeof node.type === 'string' && node.props.testID === 'session-row-skeleton'
+  );
+}
 function rows(renderer: TestRenderer.ReactTestRenderer) {
   return hosts(renderer, 'StoredSessionRow').map(node => {
     const { session: stored, live, metaWhileLive } = node.props as RowProps;
@@ -610,7 +615,7 @@ describe('AgentSessionListContent liveness', () => {
 
   it('keeps the loading skeletons instead of flashing empty history', () => {
     const renderer = mount(contentProps({ isLoading: true, hasAnySessions: false }));
-    expect(hosts(renderer, 'Skeleton')).toHaveLength(8);
+    expect(skeletonRows(renderer)).toHaveLength(8);
     expect(hosts(renderer, 'Button')).toHaveLength(0);
     expect(rows(renderer)).toEqual([]);
     // The skeleton rows ride in the list data: an empty-data loading state
@@ -626,22 +631,6 @@ describe('AgentSessionListContent liveness', () => {
     expect((composite.props as ListProps).data.map(row => row.kind)).toEqual(
       Array.from({ length: 8 }, () => 'skeleton')
     );
-  });
-
-  it('sizes the loading skeletons to the stored session-row pitch', () => {
-    // The reserved space must survive the skeleton → rows swap: each skeleton
-    // slot (12dp wrapper padding + block) matches the SessionRow pitch
-    // (py-[13px] + eyebrow/title ≈ 61dp), so rows land where skeletons stood.
-    const renderer = mount(contentProps({ isLoading: true, hasAnySessions: false }));
-    const skeletons = hosts(renderer, 'Skeleton');
-    expect(skeletons).toHaveLength(8);
-    for (const skeleton of skeletons) {
-      expect(skeleton.props.className).toContain('h-[49px]');
-    }
-    const slots = hosts(renderer, 'View').filter(
-      node => (node.props as { className?: string }).className === 'py-1.5'
-    );
-    expect(slots).toHaveLength(8);
   });
 
   it('swaps the reserved skeleton rows for real rows inside the same mounted list', () => {

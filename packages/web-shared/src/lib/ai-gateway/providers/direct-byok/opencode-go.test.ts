@@ -1,6 +1,7 @@
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import type { GatewayRequest } from '../openrouter/types';
+import type OpenAI from 'openai';
+import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
 import openCodeGo from './opencode-go';
@@ -107,6 +108,44 @@ describe('OpenCode Go session headers', () => {
     expect(request.body).not.toHaveProperty('safety_identifier');
     expect(request.body).not.toHaveProperty('user');
     expect(context.extraHeaders['x-opencode-session']).toEqual(expect.any(String));
+  });
+
+  test('removes message names from Chat Completions requests', () => {
+    const toolMessageFromClient = {
+      role: 'tool',
+      name: 'read',
+      tool_call_id: 'call-1',
+      content: 'ok',
+    };
+    const body: OpenRouterChatCompletionRequest = {
+      model: 'glm-5.3-flash',
+      messages: [
+        { role: 'user', name: 'alice', content: 'Read a' },
+        {
+          role: 'assistant',
+          name: 'agent',
+          content: '',
+          tool_calls: [
+            { id: 'call-1', type: 'function', function: { name: 'read', arguments: '{}' } },
+          ],
+        },
+        toolMessageFromClient as OpenAI.Chat.ChatCompletionToolMessageParam,
+      ],
+    };
+
+    openCodeGo.transformRequest(createContext({ request: { kind: 'chat_completions', body } }));
+
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'Read a' },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [
+          { id: 'call-1', type: 'function', function: { name: 'read', arguments: '{}' } },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'call-1', content: 'ok' },
+    ]);
   });
 
   test('replaces the OpenRouter reasoning object with reasoning_effort', () => {

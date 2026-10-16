@@ -296,6 +296,14 @@ export function removeChatCompletionsToolNames(request: OpenRouterChatCompletion
   }
 }
 
+export function removeChatCompletionsMessageNames(request: OpenRouterChatCompletionRequest) {
+  for (const message of request.messages) {
+    if ('name' in message) {
+      delete message.name;
+    }
+  }
+}
+
 /**
  * Inverse of the reasoning-content response transform: folds
  * OpenRouter-style `reasoning_details` back into the DeepSeek-style

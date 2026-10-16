@@ -300,13 +300,20 @@ export function removeChatCompletionsToolNames(request: OpenRouterChatCompletion
  * Inverse of the reasoning-content response transform: folds
  * OpenRouter-style `reasoning_details` back into the DeepSeek-style
  * `reasoning_content` string that upstreams like Friendli and Perplexity
- * expect on chat completions messages.
+ * expect on chat completions messages. The legacy OpenRouter `reasoning`
+ * string is dropped because strict upstreams reject it as an unknown field.
  */
 export function mapReasoningDetailsToReasoningContent(request: OpenRouterChatCompletionRequest) {
   for (const message of request.messages) {
     const messageWithReasoning = message as typeof message & MessageWithReasoning;
+    const legacyReasoning = messageWithReasoning.reasoning;
+    delete messageWithReasoning.reasoning;
+
     const reasoningDetails = messageWithReasoning.reasoning_details;
     if (!Array.isArray(reasoningDetails)) {
+      if (legacyReasoning && !messageWithReasoning.reasoning_content) {
+        messageWithReasoning.reasoning_content = legacyReasoning;
+      }
       continue;
     }
     delete messageWithReasoning.reasoning_details;

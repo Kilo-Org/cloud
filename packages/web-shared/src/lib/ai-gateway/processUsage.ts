@@ -152,6 +152,11 @@ const extractMessageTextContent = (m: Message) =>
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
 
+/** Custom LLMs are always free; every other model follows `isFreeModel`. */
+function isFreeUsage(usageContext: { provider: ProviderId; requested_model: string }) {
+  return usageContext.provider === 'custom' || isFreeModel(usageContext.requested_model);
+}
+
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
     kilo_user_id: usageContext.kiloUserId,
@@ -254,7 +259,7 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
-    is_free: isFreeModel(usageContextInfo.requested_model),
+    is_free: isFreeUsage(usageContextInfo),
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
@@ -1391,7 +1396,7 @@ export async function processTokenData(
   usageStats.market_cost ??= usageStats.cost_mUsd;
   usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
-  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
+  if (isFreeUsage(usageContext) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }

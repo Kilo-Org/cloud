@@ -1495,6 +1495,19 @@ describe('rewriteModelResponse', () => {
     });
   });
 
+  test('strips upstream cost for custom LLMs, which are always free', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({ model: 'upstream', usage: { cost: 0.5, is_byok: false } }),
+      model: 'kilo-internal/custom-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await result.json()).toEqual({ model: 'upstream', usage: {} });
+  });
+
   test('processes paid-model responses when request logging is enabled', async () => {
     mockedOptIn.mockResolvedValueOnce(true);
     const result = await rewriteModelResponse({

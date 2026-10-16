@@ -965,10 +965,12 @@ export async function rewriteModelResponse({
 }: RewriteModelResponseParams): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
   const customPricing = getCustomPricing(model);
+  // Custom LLMs are always free, so an upstream-reported cost must not reach the user.
   const requiresCostRemoval =
-    (providerId === 'openrouter' || providerId === 'vercel') &&
-    (isKiloExclusiveFreeModel(model) ||
-      (customPricing !== undefined && !customPricing.fallbackOnly));
+    providerId === 'custom' ||
+    ((providerId === 'openrouter' || providerId === 'vercel') &&
+      (isKiloExclusiveFreeModel(model) ||
+        (customPricing !== undefined && !customPricing.fallbackOnly)));
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;

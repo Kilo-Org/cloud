@@ -1,0 +1,19 @@
+name: pnpm store
+description: >-
+  Mount the pnpm content-addressable store on a Blacksmith sticky disk and point
+  pnpm at it. The disk replaces the setup-node pnpm cache, which downloads and
+  unpacks the whole store on every job. pnpm checks each package against the
+  lockfile integrity hash when it links it, so a stale entry is fetched again.
+
+runs:
+  using: composite
+  steps:
+    - name: Mount pnpm store
+      uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
+      with:
+        key: ${{ github.repository }}-pnpm-store-${{ runner.os }}-${{ runner.arch }}
+        path: ~/.pnpm-store
+
+    - name: Use the mounted store
+      shell: bash
+      run: echo "pnpm_config_store_dir=$HOME/.pnpm-store" >> "$GITHUB_ENV"

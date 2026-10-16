@@ -1474,6 +1474,19 @@ describe('rewriteModelResponse', () => {
     });
   });
 
+  test('strips upstream cost for custom LLMs, which are always free', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({ model: 'upstream', usage: { cost: 0.5, is_byok: false } }),
+      model: 'kilo-internal/custom-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await result.json()).toEqual({ model: 'upstream', usage: {} });
+  });
+
   test('strips cost for models with custom pricing', async () => {
     const result = await rewriteModelResponse({
       response: jsonResponse({

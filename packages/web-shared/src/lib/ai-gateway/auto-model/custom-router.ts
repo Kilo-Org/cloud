@@ -24,8 +24,8 @@ export const CUSTOM_ROUTER_NOT_FOUND = {
 } as const satisfies CustomRouterResolution;
 
 // The gateway path considers gateway entries only, and a custom router never routes outside its
-// pool: the worker owns null decisions, and the gateway serves exactly the entry it picked
-// (ADR 0005).
+// pool: the worker owns null decisions, and the gateway serves exactly the entry it picked. Only
+// flagged owners can create routers, so a router's existence is the rollout gate (ADR 0005).
 export async function decideCustomRouter(params: {
   reference: CustomRouterReference;
   userId: string;

@@ -3,7 +3,13 @@ import { BenchmarkProfileEntryStatusSchema } from './benchmark';
 import { NormalizedClassifierInputSchema } from './input';
 import { ReasoningEffortSchema } from './reasoning';
 import { EfficientModelPoolSchema, PoolEntrySchema, poolEntryKey } from './routing-table';
-import { AutoRouterSchema } from './router';
+import {
+  CustomRouterClientEntryIdSchema,
+  CustomRouterEntryRefSchema,
+  CustomRouterReferenceSchema,
+  customRouterCandidateModel,
+} from './custom-router';
+import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
 import {
   ClassifierSubtaskTypeSchema,
   ClassifierTaskTypeSchema,
@@ -17,11 +23,15 @@ export {
   type NormalizedClassifierInput,
 } from './input';
 
-export { AUTO_ROUTERS, AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
-
-export const AutoRoutingModeSchema = z.enum(['cost_per_accuracy', 'best_accuracy']);
-export type AutoRoutingMode = z.infer<typeof AutoRoutingModeSchema>;
-export const DEFAULT_AUTO_ROUTING_MODE: AutoRoutingMode = 'cost_per_accuracy';
+export {
+  AUTO_ROUTERS,
+  AutoRouterSchema,
+  AutoRoutingModeSchema,
+  DEFAULT_AUTO_ROUTER,
+  DEFAULT_AUTO_ROUTING_MODE,
+  type AutoRouter,
+  type AutoRoutingMode,
+} from './router';
 
 // Capability-aware routing hints attached to the mirrored request payload.
 // Absent `constraints` (or absent fields within it) means "no extra
@@ -72,6 +82,10 @@ export const MirrorPayloadSchema = z.object({
   // supply them. The schema is non-strict (plain z.object above) so an old
   // worker can safely ignore unknown keys added by a newer gateway.
   constraints: RoutingConstraintsSchema.optional(),
+  // Custom router reference (ADR 0005). Optional so an old worker or gateway still parses.
+  customRouter: CustomRouterReferenceSchema.optional(),
+  // Client entries the caller can serve; present only on the public CLI decide path.
+  clientEntries: z.array(CustomRouterClientEntryIdSchema).optional(),
 });
 export type MirrorPayload = z.infer<typeof MirrorPayloadSchema>;
 
@@ -134,6 +148,11 @@ export const AutoRoutingDecisionSchema = z
     // capability filters. Null when there was no incumbent or it was kept.
     // Optional so responses from a not-yet-redeployed worker still parse.
     switchReason: z.enum(['threshold', 'cost', 'capability']).nullable().optional(),
+    // Custom router fields (ADR 0005). Optional so decisions from or to a not-yet-redeployed
+    // worker or gateway still parse.
+    entry: CustomRouterEntryRefSchema.optional(),
+    stale: z.boolean().optional(),
+    fallback: z.boolean().optional(),
   })
   .superRefine((decision, ctx) => {
     if (decision.variant != null && decision.reasoningEffort != null) {
@@ -142,6 +161,9 @@ export const AutoRoutingDecisionSchema = z
         path: ['variant'],
         message: 'Decision must not set both variant and reasoningEffort; emit variant only',
       });
+    }
+    if (decision.entry && decision.model !== customRouterCandidateModel(decision.entry)) {
+      ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
     }
   });
 
@@ -292,3 +314,4 @@ export * from './taxonomy';
 export * from './routing-table';
 export * from './policy-settings';
 export * from './benchmark';
+export * from './custom-router';

@@ -103,10 +103,10 @@ export default function ApiRequestLogPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="userId">User ID (optional)</Label>
+              <Label htmlFor="userId">User ID or email (optional)</Label>
               <Input
                 id="userId"
-                placeholder="Enter user ID"
+                placeholder="Enter user ID or email"
                 value={userId}
                 onChange={e => setUserId(e.target.value)}
               />

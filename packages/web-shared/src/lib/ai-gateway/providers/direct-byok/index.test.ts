@@ -47,7 +47,7 @@ jest.mock('./direct-byok-definitions', () => ({
         },
       ]),
       supported_chat_apis: ['chat_completions'],
-      default_ai_sdk_provider: 'openai-compatible',
+      reasoning_details_transform: 'reasoning-content',
       transformRequest: jest.fn(),
     },
     {
@@ -63,7 +63,7 @@ jest.mock('./direct-byok-definitions', () => ({
         },
       ]),
       supported_chat_apis: ['chat_completions'],
-      default_ai_sdk_provider: 'openai-compatible',
+      reasoning_details_transform: 'reasoning-content',
       transformRequest: jest.fn(),
     },
   ],
@@ -191,6 +191,21 @@ describe('getDirectByokModel', () => {
     });
     expect(models[0].opencode.reasoning_options).toEqual([{ type: 'effort', values: ['high'] }]);
     expect(models[1].opencode.reasoning_options).toBeUndefined();
+  });
+
+  test('uses the default AI SDK provider unless a model-specific provider applies', async () => {
+    const { getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getAiSdkProvider } =
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
+    jest.mocked(getAiSdkProvider).mockReturnValueOnce('anthropic').mockReturnValueOnce(undefined);
+
+    const models = await getDirectByokModelsForUser('user-id');
+
+    expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual(['anthropic', undefined]);
   });
 
   test('does not fall back to model-name variants when reasoning is unsupported', async () => {

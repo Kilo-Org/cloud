@@ -532,6 +532,30 @@ export const listDirectoriesV1Schema = z
   .strict();
 export type ListDirectoriesV1 = z.infer<typeof listDirectoriesV1Schema>;
 
+const REMOTE_AGENT_MAX_ENTRIES = 128;
+const REMOTE_AGENT_MAX_NAME_LENGTH = 256;
+const REMOTE_AGENT_MAX_DESCRIPTION_LENGTH = 1_000;
+
+/**
+ * `list_agents` success body (protocol v1): the agents a CLI can start or
+ * continue a session with, resolved in the requested directory. Unknown keys
+ * are stripped, not rejected, so a CLI can add optional agent fields without
+ * hiding every agent from an older app. Out-of-range values still fail.
+ */
+export const listAgentsV1Schema = z.object({
+  protocolVersion: z.literal(1),
+  agents: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(REMOTE_AGENT_MAX_NAME_LENGTH),
+        displayName: z.string().min(1).max(REMOTE_AGENT_MAX_NAME_LENGTH).optional(),
+        description: z.string().max(REMOTE_AGENT_MAX_DESCRIPTION_LENGTH).optional(),
+      })
+    )
+    .max(REMOTE_AGENT_MAX_ENTRIES),
+});
+export type ListAgentsV1 = z.infer<typeof listAgentsV1Schema>;
+
 /**
  * Permissive status value for v2 session rows and status-updated payloads.
  *

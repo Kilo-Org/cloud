@@ -1,0 +1,124 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { selectAffected } from './affected-workspaces.mjs';
+
+const workspace = (name, dir, dependencies = {}) => ({ name, dir, manifest: { dependencies } });
+const items = [
+  workspace('@kilocode/db', 'packages/db'),
+  workspace('@kilocode/trpc', 'packages/trpc', { '@kilocode/db': 'workspace:*' }),
+  workspace('web', 'apps/web', { '@kilocode/db': 'workspace:*' }),
+  workspace('kilo-app', 'apps/mobile', { '@kilocode/trpc': 'workspace:*' }),
+  workspace('agent', 'services/agent'),
+  workspace('agent-wrapper', 'services/agent/wrapper'),
+  workspace('leaf', 'services/leaf'),
+];
+const references = [
+  ['packages/trpc/src/index.ts', 'apps/web/src/routers/root-router'],
+  ['apps/web/src/lib/preview.ts', 'services/agent/src/shared/preview'],
+  ['services/leaf/vitest.config.ts', 'tools/shared'],
+];
+const select = (changedFiles, lockfileDirs = []) =>
+  selectAffected({ items, changedFiles, lockfileDirs, references });
+
+test('a leaf change selects only the leaf', () => {
+  assert.deepEqual(select(['services/leaf/src/index.ts']), {
+    full: false,
+    reasons: [],
+    full_checks: [],
+    dirs: ['services/leaf'],
+    packages: ['leaf'],
+  });
+});
+
+test('a web .env change selects ai-gateway, which builds with those files', () => {
+  const result = selectAffected({
+    items: [...items, workspace('ai-gateway', 'apps/ai-gateway')],
+    changedFiles: ['apps/web/.env.test'],
+    lockfileDirs: [],
+    references: [],
+  });
+  assert.ok(result.packages.includes('ai-gateway'));
+});
+
+test('a change reaches workspace dependents and relative-import readers', () => {
+  assert.deepEqual(select(['packages/db/src/schema.ts']).packages, [
+    '@kilocode/db',
+    '@kilocode/trpc',
+    'kilo-app',
+    'web',
+  ]);
+  assert.deepEqual(select(['services/agent/src/shared/preview.ts']).packages, [
+    '@kilocode/trpc',
+    'agent',
+    'kilo-app',
+    'web',
+  ]);
+});
+
+test('a nested workspace change selects the workspace around it', () => {
+  assert.deepEqual(select(['services/agent/wrapper/src/main.ts']).packages.slice(0, 2), [
+    '@kilocode/trpc',
+    'agent',
+  ]);
+});
+
+test('documentation and unchecked root paths select nothing', () => {
+  for (const file of [
+    'README.md',
+    'services/leaf/README.md',
+    'docs/a.ts',
+    '.github/workflows/deploy.yml',
+    'dev/a.ts',
+  ]) {
+    assert.deepEqual(select([file]).dirs, [], file);
+  }
+});
+
+test('a root path read by a workspace selects its reader', () => {
+  assert.deepEqual(select(['tools/shared/setup.ts']).packages, ['leaf']);
+  assert.deepEqual(select(['scripts/web-env/plan.ts']).packages, [
+    '@kilocode/trpc',
+    'kilo-app',
+    'web',
+  ]);
+});
+
+test('an unattributable or global change selects everything', () => {
+  for (const file of [
+    'package.json',
+    'tsconfig.base.json',
+    'unknown/file.ts',
+    '.github/workflows/ci.yml',
+    'scripts/affected-workspaces.mjs',
+    '.github/actions/trpc-declarations/action.yml',
+    'scripts/trpc-declaration-key.mjs',
+    'patches/a.patch',
+  ]) {
+    const result = select([file]);
+    assert.equal(result.full, true, file);
+    assert.equal(result.dirs.length, items.length, file);
+    assert.deepEqual(result.full_checks, ['lint', 'typecheck'], file);
+  }
+  assert.equal(select(['<no base revision>']).full, true);
+});
+
+test('a check script change runs only that check everywhere', () => {
+  assert.deepEqual(select(['scripts/lint-all.sh']), {
+    full: false,
+    reasons: [],
+    full_checks: ['lint'],
+    dirs: [],
+    packages: [],
+  });
+  const both = select(['scripts/typecheck-all.sh', 'services/leaf/src/a.ts']);
+  assert.deepEqual(both.full_checks, ['typecheck']);
+  assert.deepEqual(both.packages, ['leaf']);
+});
+
+test('lockfile changes select the workspaces whose dependencies changed', () => {
+  assert.deepEqual(select(['pnpm-lock.yaml'], ['services/leaf']).packages, ['leaf']);
+  assert.deepEqual(select(['pnpm-lock.yaml'], []).dirs, []);
+  assert.equal(select(['pnpm-lock.yaml'], ['*']).full, true);
+  assert.equal(select(['pnpm-lock.yaml'], ['.']).full, true);
+});

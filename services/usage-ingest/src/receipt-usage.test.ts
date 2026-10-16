@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from './index';
 import { usage } from './usage.test-fixture';
+import type { Env } from './publish-usage';
+
+const env = {} as Env;
 
 function message(body: unknown, id = 'queue-message-1') {
   return {
@@ -37,7 +40,7 @@ describe('shadow usage receipts', () => {
       ),
     ];
     const receipts = batch(messages);
-    worker.queue(receipts);
+    expect(worker.queue(receipts, env)).toBeUndefined();
     messages.forEach((msg, index) => {
       expect(JSON.parse(log.mock.calls[index][0])).toEqual({
         event: 'usage_ingest_receipt',
@@ -60,14 +63,14 @@ describe('shadow usage receipts', () => {
   it('clamps clock skew to zero event age', () => {
     vi.spyOn(Date, 'now').mockReturnValue(0);
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    worker.queue(batch([message(usage)]));
+    expect(worker.queue(batch([message(usage)]), env)).toBeUndefined();
     expect(JSON.parse(log.mock.calls[0][0]).event_age_ms).toBe(0);
   });
 
   it('continues through an invalid body in a mixed successful batch', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const messages = [message(usage, 'first'), message(null, 'invalid'), message(usage, 'last')];
-    worker.queue(batch(messages));
+    expect(worker.queue(batch(messages), env)).toBeUndefined();
     expect(log.mock.calls.map(([value]) => JSON.parse(value).outcome)).toEqual([
       'received',
       'invalid',
@@ -87,7 +90,7 @@ describe('shadow usage receipts', () => {
   ])('logs a categorical invalid receipt and discards malformed messages without leakage', body => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const msg = message(body);
-    worker.queue(batch([msg]));
+    expect(worker.queue(batch([msg]), env)).toBeUndefined();
     expect(log).toHaveBeenCalledExactlyOnceWith(
       JSON.stringify({
         event: 'usage_ingest_receipt',
@@ -110,7 +113,7 @@ describe('shadow usage receipts', () => {
           throw new Error('synthetic logging failure');
         });
       const messages = [message(usage), message(body, 'failed'), message(usage, 'later')];
-      expect(() => worker.queue(batch(messages))).toThrow('synthetic logging failure');
+      expect(() => worker.queue(batch(messages), env)).toThrow('synthetic logging failure');
       expect(log).toHaveBeenCalledTimes(2);
       expect(messages[0].ack).toHaveBeenCalledExactlyOnceWith();
       expect(messages[1].ack).not.toHaveBeenCalled();

@@ -52,18 +52,12 @@ const BENCHMARK_REGISTER_BATCH_SIZE = 10;
 
 export class CustomRouterApiError extends Error {
   readonly code: CustomRouterErrorCode;
-  readonly status: number;
-  readonly extra: Record<string, unknown>;
+  readonly retryAt: string | undefined;
 
-  constructor(
-    code: CustomRouterErrorCode,
-    message: string,
-    options: { status?: number; extra?: Record<string, unknown> } = {}
-  ) {
+  constructor(code: CustomRouterErrorCode, message: string, retryAt?: string) {
     super(message);
     this.code = code;
-    this.status = options.status ?? CUSTOM_ROUTER_ERROR_HTTP_STATUS[code];
-    this.extra = options.extra ?? {};
+    this.retryAt = retryAt;
   }
 }
 
@@ -71,11 +65,14 @@ const routerNotFound = () =>
   new CustomRouterApiError('router_not_found', 'Custom router not found');
 
 export function customRouterErrorResponse(error: CustomRouterApiError): NextResponse {
-  const body: CustomRouterErrorResponse & Record<string, unknown> = {
-    ...error.extra,
-    error: { code: error.code, message: error.message },
+  const body: CustomRouterErrorResponse = {
+    error: {
+      code: error.code,
+      message: error.message,
+      ...(error.retryAt ? { retryAt: error.retryAt } : {}),
+    },
   };
-  return NextResponse.json(body, { status: error.status });
+  return NextResponse.json(body, { status: CUSTOM_ROUTER_ERROR_HTTP_STATUS[error.code] });
 }
 
 function invalidRequest(error: z.ZodError): CustomRouterApiError {
@@ -96,8 +93,7 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
     const status = auth.authFailedResponse.status;
     throw new CustomRouterApiError(
       status === 403 ? 'forbidden' : status === 400 ? 'invalid_request' : 'unauthorized',
-      'Authentication required',
-      { status }
+      'Authentication required'
     );
   }
   if (!(await isCustomRoutersEnabled(auth.user.id))) throw routerNotFound();
@@ -320,13 +316,11 @@ async function requestPlatformBenchmarks(params: {
       entries: models.slice(start, start + BENCHMARK_REGISTER_BATCH_SIZE),
     });
     if (result.ok) continue;
-    // The contract error codes have no quota code; 429 with `retryAt` keeps the benchmark
-    // admission limit distinguishable from validation failures.
     if ('quota' in result) {
       throw new CustomRouterApiError(
-        'invalid_request',
+        'quota_exceeded',
         `${result.quota.error} New benchmarks can be requested after ${result.quota.retryAt}.`,
-        { status: 429, extra: { retryAt: result.quota.retryAt } }
+        result.quota.retryAt
       );
     }
     if (result.status === 400) {

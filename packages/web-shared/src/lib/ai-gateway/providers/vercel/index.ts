@@ -16,7 +16,7 @@ import type {
   VercelProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getVercelModelsFromDatabase,
@@ -82,7 +82,7 @@ export async function shouldRouteToVercel(
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  const routingPercentage = isFreeModel(requestedModel)
+  const routingPercentage = isFreeModelExcludingCustomLlms(requestedModel)
     ? routingConfig.vercelFree
     : routingConfig.vercelPaid;
 

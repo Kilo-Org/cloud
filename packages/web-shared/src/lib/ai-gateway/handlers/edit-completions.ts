@@ -6,7 +6,7 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -221,7 +221,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     readDb
   );
 
-  if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
+  if (balance <= 0 && !isFreeModelExcludingCustomLlms(requestBody.model) && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },

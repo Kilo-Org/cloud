@@ -1474,6 +1474,19 @@ describe('rewriteModelResponse', () => {
     });
   });
 
+  test('strips upstream cost for custom LLMs, which are always free', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({ model: 'upstream', usage: { cost: 0.5, is_byok: false } }),
+      model: 'kilo-internal/custom-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await result.json()).toEqual({ model: 'upstream', usage: {} });
+  });
+
   test('strips cost for models with custom pricing', async () => {
     const result = await rewriteModelResponse({
       response: jsonResponse({
@@ -1493,6 +1506,68 @@ describe('rewriteModelResponse', () => {
       model: GEMINI_FLASH_CURRENT_MODEL_ID,
       usage: {},
     });
+  });
+
+  test.each([
+    {
+      kind: 'chat_completions' as const,
+      event: { id: 'gen-1', choices: [], error: { message: 'secret at https://internal' } },
+      expected: {
+        error: {
+          message: 'The upstream provider was unable to process the request',
+          type: 'upstream_error',
+        },
+      },
+    },
+    {
+      kind: 'messages' as const,
+      event: { type: 'error', error: { type: 'overloaded_error', message: 'secret' } },
+      expected: {
+        type: 'error',
+        error: {
+          type: 'api_error',
+          message: 'The upstream provider was unable to process the request',
+        },
+      },
+    },
+    {
+      kind: 'responses' as const,
+      event: { type: 'error', sequence_number: 3, code: 'internal', message: 'secret', param: 'x' },
+      expected: {
+        type: 'error',
+        code: 'upstream_error',
+        message: 'The upstream provider was unable to process the request',
+        param: null,
+      },
+    },
+    {
+      kind: 'responses' as const,
+      event: {
+        type: 'response.failed',
+        response: { id: 'resp-1', status: 'failed', error: { code: 'x', message: 'secret' } },
+      },
+      expected: {
+        response: {
+          error: {
+            code: 'server_error',
+            message: 'The upstream provider was unable to process the request',
+          },
+        },
+      },
+    },
+  ])('redacts $kind stream error events from custom LLMs', async ({ kind, event, expected }) => {
+    const result = await rewriteModelResponse({
+      response: sseResponse(`data: ${JSON.stringify(event)}\n\n`),
+      model: 'kilo-internal/custom-model',
+      providerId: 'custom',
+      kind,
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    const sse = await readOutputStream(result);
+    expect(sse).not.toContain('secret');
+    expect(dataObjects(sse)[0]).toMatchObject(expected);
   });
 
   test('processes paid-model responses when request logging is enabled', async () => {

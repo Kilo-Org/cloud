@@ -48,7 +48,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { getInferenceProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { getInferenceProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
@@ -221,17 +221,29 @@ export function checkExclusiveModelProviderAllowed(
   model: string,
   provider: OpenRouterProviderConfig | undefined
 ) {
-  if (!provider) return null;
   const exclusiveModel = findKiloExclusiveModel(model);
   if (!exclusiveModel) return null;
-  const inferenceProvider = getInferenceProvider(exclusiveModel)?.slug;
-  if (!inferenceProvider) return null;
-  if (
-    (!provider.only || provider.only.includes(inferenceProvider)) &&
-    (!provider.ignore || !provider.ignore.includes(inferenceProvider))
-  )
-    return null;
-  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProvider}`;
+  const inferenceProviders = getInferenceProviders(exclusiveModel).map(({ slug }) => slug);
+  if (inferenceProviders.length === 0) return null;
+  return checkInferenceProvidersAllowed(inferenceProviders, provider);
+}
+
+/**
+ * Rejects a request whose provider config excludes every provider that can
+ * serve the model. Used for models routed to a fixed set of providers.
+ */
+export function checkInferenceProvidersAllowed(
+  inferenceProviders: readonly string[],
+  provider: OpenRouterProviderConfig | undefined
+) {
+  if (!provider) return null;
+  const allowed = inferenceProviders.some(
+    inferenceProvider =>
+      (!provider.only || provider.only.includes(inferenceProvider)) &&
+      (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+  );
+  if (allowed) return null;
+  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`;
   return NextResponse.json(
     {
       error: error,
@@ -254,8 +266,11 @@ export function apiKindNotSupportedResponse(
   );
 }
 
+export const REDACTED_UPSTREAM_ERROR_MESSAGE =
+  'The upstream provider was unable to process the request';
+
 async function redactedErrorResponse(response: Response) {
-  const error = 'The upstream provider was unable to process the request';
+  const error = REDACTED_UPSTREAM_ERROR_MESSAGE;
   warnExceptInTest(`Responding with ${response.status} ${error}`);
   return NextResponse.json(
     { error, error_type: ProxyErrorType.upstream_error, message: error },
@@ -371,6 +386,26 @@ async function providerNotAllowedResponse(providerId: ProviderId, response: Resp
   );
 }
 
+/**
+ * Custom LLM upstream bodies may expose private endpoints, keys, or model
+ * names, so only a context overflow is reported, in Kilo's own words.
+ */
+async function customLlmErrorResponse(params: {
+  requestedModel: string;
+  request: GatewayRequest;
+  response: Response;
+}) {
+  if (await detectContextOverflow(params)) {
+    const error = 'The request exceeds the context length of the selected model.';
+    warnExceptInTest(`Responding with ${params.response.status} ${error}`);
+    return NextResponse.json(
+      { error, error_type: ProxyErrorType.context_length_exceeded, message: error },
+      { status: params.response.status }
+    );
+  }
+  return await redactedErrorResponse(params.response);
+}
+
 export async function makeErrorReadable({
   providerId,
   requestedModel,
@@ -386,6 +421,10 @@ export async function makeErrorReadable({
 }) {
   if (response.status < 400) {
     return undefined;
+  }
+
+  if (providerId === 'custom') {
+    return await customLlmErrorResponse({ requestedModel, request, response });
   }
 
   const vertexByokResponse = vertexByokModelNotFoundResponse(response, userByokProviderIds);

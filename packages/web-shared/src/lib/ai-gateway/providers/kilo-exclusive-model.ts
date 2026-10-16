@@ -187,32 +187,38 @@ export function applyKiloExclusiveModelSettings(
   }
 }
 
-type InferenceProvider = {
+export type InferenceProvider = {
   slug: OpenRouterInferenceProviderId;
   name: string;
   training: boolean;
   retainsPrompts: boolean;
 };
 
-export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvider | null {
+/**
+ * Every inference provider that may serve the model: the stealth provider, the
+ * restriction list, or the model's direct upstream. Empty when the model is
+ * routed through OpenRouter or Vercel without a restriction, because the
+ * snapshot then decides.
+ */
+export function getInferenceProviders(model: KiloExclusiveModel): InferenceProvider[] {
   if (model.flags.includes('stealth')) {
-    return { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true };
+    return [{ slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true }];
   }
 
-  const slug: OpenRouterInferenceProviderId | null =
-    model.inference_provider_restriction.length === 1
-      ? model.inference_provider_restriction[0]
+  const slugs: ReadonlySet<OpenRouterInferenceProviderId> = new Set(
+    model.inference_provider_restriction.length > 0
+      ? model.inference_provider_restriction
       : model.provider.id === 'openrouter' || model.provider.id === 'vercel'
-        ? null
-        : OpenRouterInferenceProviderIdSchema.parse(model.provider.id);
-  if (!slug) return null;
+        ? []
+        : [OpenRouterInferenceProviderIdSchema.parse(model.provider.id)]
+  );
 
-  return {
+  return [...slugs].map(slug => ({
     slug,
     name: slug.toUpperCase(),
     training: model.flags.includes('requires-data-collection'),
     retainsPrompts: true,
-  };
+  }));
 }
 
 function formatPricePerMillionAsPerToken(price: number): string;

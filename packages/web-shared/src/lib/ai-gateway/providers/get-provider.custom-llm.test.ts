@@ -1,61 +1,209 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
-import { custom_llm2, type User } from '@kilocode/db/schema';
-import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
-import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { User } from '@kilocode/db/schema';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  privateCustomLlmDefinition,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
+  getDirectByokModel: jest.fn().mockResolvedValue({ provider: null, model: null }),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  getModelUserByokProviders: jest.fn().mockResolvedValue([]),
+  getBYOKforUser: jest.fn(),
+  getBYOKforOrganization: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
+  shouldRouteToVercel: jest.fn().mockResolvedValue(false),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
+  checkOpenAiChatGptByok: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account', () => ({
+  getGoogleServiceAccountAccessToken: jest.fn().mockRejectedValue(new Error('network error')),
+}));
+
+const serviceAccountKey = encryptApiKey(
+  JSON.stringify({
+    type: 'service_account',
+    project_id: 'project',
+    private_key_id: 'key-id',
+    private_key: 'private-key',
+    client_email: 'service@project.iam.gserviceaccount.com',
+    client_id: 'client-id',
+    auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+    token_uri: 'https://oauth2.googleapis.com/token',
+    auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+    client_x509_cert_url: 'https://www.googleapis.com/robot/v1/metadata/x509/service',
+  }),
+  BYOK_ENCRYPTION_KEY
+);
 
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
-const PUBLIC_ID = 'kilo-internal/secure-proxy-model';
+const OTHER_ORG_ID = '00000000-0000-4000-8000-000000000002';
+const user = { id: 'user-id' } as User;
+const encryptedApiKey = encryptApiKey(
+  JSON.stringify({ type: 'api_key', api_key: 'sk-upstream' }),
+  BYOK_ENCRYPTION_KEY
+);
+const secureProxyKey = encryptApiKey(
+  JSON.stringify({
+    type: 'secure_proxy',
+    proxy_secret: 'proxy-secret',
+    config: {
+      url: 'https://llm.example.com/v1/chat/completions',
+      extra_headers: { Authorization: 'Bearer upstream-key' },
+    },
+  }),
+  BYOK_ENCRYPTION_KEY
+);
+const xApiKey = encryptApiKey(
+  JSON.stringify({ type: 'x-api-key', api_key: 'upstream-key' }),
+  BYOK_ENCRYPTION_KEY
+);
+const shadowedExclusiveId =
+  kiloExclusiveModels.find(model => !model.public_id.includes(':'))?.public_id ?? '';
 
-const definition: CustomLlmDefinition = {
-  internal_id: 'upstream-model',
-  display_name: 'Secure proxy model',
-  context_length: 128_000,
-  max_completion_tokens: 4096,
-  base_url: 'https://secure-proxy.example.com/api/proxy',
-  disable_url_suffix: true,
-  organization_ids: [ORG_ID],
-};
-
-async function insertCustomLlm(credentials: CustomLlmCredentials) {
-  await db.insert(custom_llm2).values({
-    public_id: PUBLIC_ID,
-    definition,
-    encrypted_api_key: encryptApiKey(JSON.stringify(credentials), BYOK_ENCRYPTION_KEY),
-  });
-}
-
-function resolveProvider() {
-  return getProvider({
-    requestedModel: PUBLIC_ID,
+function providerInput(
+  requestedModel: string,
+  caller: User | ReturnType<typeof createAnonymousContext>,
+  organizationId: string | undefined
+) {
+  return {
+    requestedModel,
     request: {
       kind: 'chat_completions',
-      body: { model: PUBLIC_ID, messages: [{ role: 'user', content: 'hi' }] },
-    },
-    user: { id: 'user-id' } as User,
-    organizationId: ORG_ID,
+      body: { model: requestedModel, messages: [] },
+    } satisfies GatewayRequest,
+    user: caller,
+    organizationId,
     taskId: undefined,
-  });
+  };
 }
 
-describe('getProvider custom LLM credentials', () => {
-  beforeEach(async () => {
-    await cleanupDbForTest();
+describe('getProvider with custom LLMs', () => {
+  beforeAll(async () => {
+    await insertCustomLlmForTest(
+      'acme/public-model',
+      publicCustomLlmDefinition(['acme']),
+      encryptedApiKey
+    );
+    await insertCustomLlmForTest(
+      'acme/private-model',
+      privateCustomLlmDefinition({ organization_ids: [ORG_ID] }),
+      encryptedApiKey
+    );
+    await insertCustomLlmForTest('acme/no-credentials', publicCustomLlmDefinition(['acme']), null);
+    await insertCustomLlmForTest('acme/undecryptable', publicCustomLlmDefinition(['acme']), {
+      ...encryptedApiKey,
+      authTag: Buffer.alloc(16).toString('base64'),
+    });
+    await insertCustomLlmForTest(
+      'acme/service-account',
+      publicCustomLlmDefinition(['acme']),
+      serviceAccountKey
+    );
+    await insertCustomLlmForTest(
+      shadowedExclusiveId,
+      privateCustomLlmDefinition({ organization_ids: [ORG_ID] }),
+      encryptedApiKey
+    );
+    const proxyDefinition = privateCustomLlmDefinition({
+      organization_ids: [ORG_ID],
+      base_url: 'https://secure-proxy.example.com/api/proxy',
+      disable_url_suffix: true,
+    });
+    await insertCustomLlmForTest('acme/secure-proxy', proxyDefinition, secureProxyKey);
+    await insertCustomLlmForTest('acme/x-api-key', proxyDefinition, xApiKey);
   });
 
-  it('routes secure_proxy credentials through the proxy in base_url', async () => {
-    await insertCustomLlm({
-      type: 'secure_proxy',
-      proxy_secret: 'proxy-secret',
-      config: {
-        url: 'https://llm.example.com/v1/chat/completions',
-        extra_headers: { Authorization: 'Bearer upstream-key' },
-      },
-    });
+  afterAll(async () => {
+    for (const publicId of [
+      'acme/public-model',
+      'acme/private-model',
+      'acme/no-credentials',
+      'acme/undecryptable',
+      'acme/service-account',
+      'acme/secure-proxy',
+      'acme/x-api-key',
+      shadowedExclusiveId,
+    ]) {
+      await deleteCustomLlmForTest(publicId);
+    }
+  });
 
-    const result = await resolveProvider();
+  test('routes a public custom LLM for an anonymous caller through policy checks', async () => {
+    const result = await getProvider(
+      providerInput('acme/public-model', createAnonymousContext('127.0.0.1'), undefined)
+    );
+
+    expect(result).toMatchObject({
+      kind: 'provider',
+      provider: { id: 'custom', apiUrl: 'https://upstream.example.com/v1', apiKey: 'sk-upstream' },
+      bypassAccessCheck: false,
+    });
+  });
+
+  test('routes a private custom LLM for an eligible organization member', async () => {
+    const result = await getProvider(providerInput('acme/private-model', user, ORG_ID));
+
+    expect(result).toMatchObject({
+      kind: 'provider',
+      provider: { id: 'custom' },
+      bypassAccessCheck: true,
+    });
+  });
+
+  test.each([
+    ['another organization', user, OTHER_ORG_ID],
+    ['a personal account', user, undefined],
+    ['an anonymous caller', createAnonymousContext('127.0.0.1'), undefined],
+  ])('does not fall back to another upstream for %s', async (_caller, caller, organizationId) => {
+    const result = await getProvider(providerInput('acme/private-model', caller, organizationId));
+
+    expect(result).toEqual({ kind: 'custom-llm-unavailable' });
+  });
+
+  test('takes precedence over a Kilo-exclusive model with the same id', async () => {
+    await expect(
+      getProvider(providerInput(shadowedExclusiveId, user, ORG_ID))
+    ).resolves.toMatchObject({ kind: 'provider', provider: { id: 'custom' } });
+    await expect(
+      getProvider(providerInput(shadowedExclusiveId, user, OTHER_ORG_ID))
+    ).resolves.toEqual({ kind: 'custom-llm-unavailable' });
+  });
+
+  test('fails a custom LLM without credentials instead of falling back', async () => {
+    const result = await getProvider(providerInput('acme/no-credentials', user, undefined));
+
+    expect(result).toEqual({ kind: 'custom-llm-unavailable' });
+  });
+
+  test('fails a custom LLM whose credentials cannot be decrypted instead of throwing', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const result = await getProvider(providerInput('acme/undecryptable', user, undefined));
+
+    expect(result).toEqual({ kind: 'custom-llm-unavailable' });
+  });
+
+  test('reports a failed service account token exchange as temporary', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const result = await getProvider(providerInput('acme/service-account', user, undefined));
+
+    expect(result).toEqual({ kind: 'custom-llm-temporarily-unavailable' });
+  });
+
+  test('routes secure_proxy credentials through the proxy in base_url', async () => {
+    const result = await getProvider(providerInput('acme/secure-proxy', user, ORG_ID));
 
     expect(result).toMatchObject({
       kind: 'provider',
@@ -73,10 +221,8 @@ describe('getProvider custom LLM credentials', () => {
     });
   });
 
-  it('sends API key credentials straight to base_url', async () => {
-    await insertCustomLlm({ type: 'x-api-key', api_key: 'upstream-key' });
-
-    const result = await resolveProvider();
+  test('sends API key credentials straight to base_url', async () => {
+    const result = await getProvider(providerInput('acme/x-api-key', user, ORG_ID));
 
     expect(result).toMatchObject({
       kind: 'provider',
@@ -88,5 +234,11 @@ describe('getProvider custom LLM credentials', () => {
     });
     if (result.kind !== 'provider') throw new Error('expected a provider');
     expect(result.provider.secureProxy).toBeUndefined();
+  });
+
+  test('routes ids without a custom LLM to the regular gateway', async () => {
+    const result = await getProvider(providerInput('acme/unknown-model', user, ORG_ID));
+
+    expect(result).toMatchObject({ kind: 'provider', provider: OPENROUTER });
   });
 });

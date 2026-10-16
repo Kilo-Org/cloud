@@ -39,8 +39,12 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
-  isFreeModel,
+  isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import {
+  lookupCustomLlm,
+  isPublicCustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
@@ -65,6 +69,7 @@ import {
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
+  checkInferenceProvidersAllowed,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
   lastUserPromptText,
@@ -476,6 +481,17 @@ export async function handleLlmProxyRequest(
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
 
+  // A custom LLM takes precedence over any built-in model with the same id,
+  // including Kilo-exclusive models, so exclusive-model rules do not apply to it.
+  const customLlmLookup = await lookupCustomLlm(effectiveModelIdLowerCased);
+  if (customLlmLookup.kind === 'unknown') {
+    return temporarilyUnavailableResponse();
+  }
+  const customLlm = customLlmLookup.kind === 'custom-llm' ? customLlmLookup.customLlm : null;
+  // Custom LLMs are always free; eligibility is enforced when the provider resolves.
+  const isFreeRequestedModel =
+    customLlm !== null || isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
+
   if (!ipAddress) {
     return NextResponse.json(
       {
@@ -494,7 +510,7 @@ export async function handleLlmProxyRequest(
   // code-review, app-builder, gastown) rate-limit per user when the request comes
   // from Cloudflare IPs (Kilo infrastructure). All other products rate-limit per
   // IP (fast pre-auth path).
-  if (isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased)) {
+  if (!customLlm && isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased)) {
     const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
     if (rateLimitKey instanceof NextResponse) return rateLimitKey;
 
@@ -541,7 +557,7 @@ export async function handleLlmProxyRequest(
     }
 
     // No valid auth
-    if (!isFreeModel(effectiveModelIdLowerCased)) {
+    if (!isFreeRequestedModel) {
       // Paid model requires authentication
       return NextResponse.json(
         {
@@ -743,6 +759,12 @@ export async function handleLlmProxyRequest(
     // instead of silently serving the request through another billing path.
     return chatGptReconnectResponse(providerResult.message);
   }
+  if (providerResult.kind === 'custom-llm-unavailable') {
+    return modelDoesNotExistResponse();
+  }
+  if (providerResult.kind === 'custom-llm-temporarily-unavailable') {
+    return temporarilyUnavailableResponse();
+  }
   const effectiveProviderContext = providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
@@ -778,8 +800,9 @@ export async function handleLlmProxyRequest(
   }
 
   if (
-    isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
-    (!autoModel && (await isUnavailableModel(effectiveModelIdLowerCased)))
+    !customLlm &&
+    (isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
+      (!autoModel && (await isUnavailableModel(effectiveModelIdLowerCased))))
   ) {
     console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
     return unavailableModelResponse();
@@ -797,7 +820,7 @@ export async function handleLlmProxyRequest(
 
     if (
       balance <= 0 &&
-      !isFreeModel(effectiveModelIdLowerCased) &&
+      !isFreeRequestedModel &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {
@@ -872,17 +895,27 @@ export async function handleLlmProxyRequest(
 
   setTag('ui.ai_model', requestBodyParsed.body.model);
 
+  const requiresDataCollection = customLlm
+    ? isPublicCustomLlm(customLlm.definition)
+    : hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased);
   if (
-    hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased) &&
+    requiresDataCollection &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();
   }
 
-  const providerNotAllowedError = checkExclusiveModelProviderAllowed(
-    effectiveModelIdLowerCased,
-    requestBodyParsed.body.provider
-  );
+  const providerNotAllowedError = customLlm
+    ? customLlm.definition.public
+      ? checkInferenceProvidersAllowed(
+          customLlm.definition.public.inference_providers,
+          requestBodyParsed.body.provider
+        )
+      : null
+    : checkExclusiveModelProviderAllowed(
+        effectiveModelIdLowerCased,
+        requestBodyParsed.body.provider
+      );
   if (providerNotAllowedError) return providerNotAllowedError;
 
   sentryRootSpan()?.setAttribute(

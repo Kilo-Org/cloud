@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
 
@@ -32,8 +32,11 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   errorExceptInTest: (...args: unknown[]) => mockedErrorExceptInTest(...args),
 }));
 
+import { kiloExclusiveModels } from './kilo-exclusive-models';
+import type { KiloExclusiveModel } from './providers/kilo-exclusive-model';
 import {
   captureProxyError,
+  checkExclusiveModelProviderAllowed,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
   extractEditPromptInfo,
@@ -166,6 +169,47 @@ describe('extractReasoningSetting', () => {
     },
   ])('$name', ({ body, expected }) => {
     expect(extractReasoningSetting(body)).toBe(expected);
+  });
+});
+
+describe('checkExclusiveModelProviderAllowed', () => {
+  const restrictedModel: KiloExclusiveModel = {
+    ...kiloExclusiveModels[0],
+    public_id: 'test/multi-provider-exclusive',
+    status: 'public',
+    flags: [],
+    inference_provider_restriction: ['openai', 'azure'],
+  };
+
+  beforeEach(() => {
+    kiloExclusiveModels.push(restrictedModel);
+  });
+
+  afterEach(() => {
+    const index = kiloExclusiveModels.indexOf(restrictedModel);
+    if (index >= 0) kiloExclusiveModels.splice(index, 1);
+  });
+
+  it.each([
+    ['no provider config', undefined],
+    ['an only list with one of the providers', { only: ['azure'] }],
+    ['an ignore list that leaves one provider', { ignore: ['openai'] }],
+  ])('allows %s', (_name, provider) => {
+    expect(checkExclusiveModelProviderAllowed(restrictedModel.public_id, provider)).toBeNull();
+  });
+
+  it.each([
+    ['an only list without the providers', { only: ['anthropic'] }],
+    ['an ignore list with every provider', { ignore: ['openai', 'azure'] }],
+  ])('rejects %s and names every provider', async (_name, provider) => {
+    const response = checkExclusiveModelProviderAllowed(restrictedModel.public_id, provider);
+
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toMatchObject({
+      error_type: 'provider_not_allowed',
+      error:
+        'No eligible provider can serve the selected model. Please enable provider: openai, azure',
+    });
   });
 });
 
@@ -1245,7 +1289,7 @@ describe('makeErrorReadable', () => {
     }
   });
 
-  it('does not redact errors for custom model provider', async () => {
+  it('redacts errors for custom model provider', async () => {
     const response = Response.json(
       { error: { message: 'Custom endpoint failure details' } },
       { status: 500 }
@@ -1259,7 +1303,40 @@ describe('makeErrorReadable', () => {
       userByokProviderIds: null,
     });
 
-    expect(result).toBeUndefined();
+    expect(result?.status).toBe(500);
+    await expect(result?.json()).resolves.toEqual({
+      error: 'The upstream provider was unable to process the request',
+      error_type: 'upstream_error',
+      message: 'The upstream provider was unable to process the request',
+    });
+  });
+
+  it('reports a custom model context overflow without the upstream body', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message:
+            'This model maximum context length is 1000 tokens at https://internal.example.com',
+          code: 'context_length_exceeded',
+        },
+      },
+      { status: 400 }
+    );
+
+    const result = await makeErrorReadable({
+      providerId: 'custom',
+      requestedModel: 'kilo-internal/custom-endpoint',
+      request,
+      response,
+      userByokProviderIds: null,
+    });
+
+    expect(result?.status).toBe(400);
+    await expect(result?.json()).resolves.toEqual({
+      error: 'The request exceeds the context length of the selected model.',
+      error_type: 'context_length_exceeded',
+      message: 'The request exceeds the context length of the selected model.',
+    });
   });
 
   it('redacts errors for stealth models', async () => {

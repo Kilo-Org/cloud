@@ -1410,6 +1410,29 @@ describe('logMicrodollarUsage', () => {
     expect(mockedReportUsageEvent).not.toHaveBeenCalled();
   });
 
+  test('records custom LLM usage as free regardless of upstream cost', async () => {
+    const user = await insertTestUser({
+      id: 'test-custom-llm-free-user',
+      microdollars_used: 1000,
+      google_user_email: 'custom-llm-free@example.com',
+    });
+
+    await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: 'test-custom-llm-free', cost_mUsd: 700 },
+      {
+        ...createBaseUsageContext(user),
+        provider: 'custom',
+        requested_model: 'kilo-internal/custom-model',
+      }
+    );
+
+    expect((await findUserById('test-custom-llm-free-user'))?.microdollars_used).toBe(1000);
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-custom-llm-free'),
+    });
+    expect(metadataRecord?.is_free).toBe(true);
+  });
+
   test('does not report a bouncer usage event without the bouncer context', async () => {
     mockedReportUsageEvent.mockClear();
     const user = await insertTestUser({

@@ -24,7 +24,7 @@ import {
   formatGitLabRepositoriesForPrompt,
   getGitLabRepositoryContext,
 } from '@/lib/slack-bot/gitlab-repository-context';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -141,7 +141,7 @@ ${conversationContext}`;
 }
 
 async function pickSummaryModel(modelSlug: string): Promise<string> {
-  return isFreeModel(modelSlug) ? modelSlug : SUMMARY_MODEL;
+  return isFreeModelExcludingCustomLlms(modelSlug) ? modelSlug : SUMMARY_MODEL;
 }
 
 async function summarizePrompt(

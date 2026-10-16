@@ -219,6 +219,24 @@ describe('auto-routing-pool-validation', () => {
       });
     });
 
+    test('rejects private custom LLMs from the organization catalog', async () => {
+      mockedGetEnhanced.mockResolvedValue({ data: [model('anthropic/claude-sonnet-4')] });
+      mockedGetOrgModels.mockResolvedValue({
+        data: [
+          model('anthropic/claude-sonnet-4'),
+          { ...model('acme/private-model'), isPrivateCustomLlm: true },
+        ],
+      });
+
+      const result = await validatePoolEntries({
+        user: { id: 'user-1' },
+        organizationId: 'org-1',
+        entries: [{ model: 'acme/private-model' }],
+      });
+
+      expect(result).toMatchObject({ ok: false });
+    });
+
     test('rejects unknown models', async () => {
       mockedGetEnhanced.mockResolvedValue({ data: [model('openrouter/base')] });
 

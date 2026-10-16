@@ -152,6 +152,11 @@ const extractMessageTextContent = (m: Message) =>
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
 
+/** Usage on the custom provider is free even if the custom LLM catalog cannot be read. */
+async function isFreeUsage(usageContext: { provider: ProviderId; requested_model: string }) {
+  return usageContext.provider === 'custom' || (await isFreeModel(usageContext.requested_model));
+}
+
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
     kilo_user_id: usageContext.kiloUserId,
@@ -254,7 +259,7 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
-    is_free: isFreeModel(usageContextInfo.requested_model),
+    is_free: await isFreeUsage(usageContextInfo),
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
@@ -1376,7 +1381,10 @@ export async function processTokenData(
     usageStats.model = usageContext.requested_model;
   }
 
-  const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
+  const kiloExclusiveModel =
+    usageContext.provider === 'custom'
+      ? null
+      : findKiloExclusiveModel(usageContext.requested_model);
   if (kiloExclusiveModel?.pricing) {
     const exclusiveCost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
     if (exclusiveCost_mUsd !== undefined) {
@@ -1391,7 +1399,7 @@ export async function processTokenData(
   usageStats.market_cost ??= usageStats.cost_mUsd;
   usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
-  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
+  if ((await isFreeUsage(usageContext)) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
@@ -1483,7 +1491,7 @@ async function getGenerationLookupProvider(
   }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
-    isFreeModel(usageContext.requested_model) ||
+    (await isFreeModel(usageContext.requested_model)) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);

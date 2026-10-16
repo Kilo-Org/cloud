@@ -320,6 +320,8 @@ async function requestPlatformBenchmarks(params: {
       entries: models.slice(start, start + BENCHMARK_REGISTER_BATCH_SIZE),
     });
     if (result.ok) continue;
+    // The contract error codes have no quota code; 429 with `retryAt` keeps the benchmark
+    // admission limit distinguishable from validation failures.
     if ('quota' in result) {
       throw new CustomRouterApiError(
         'invalid_request',

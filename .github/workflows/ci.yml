@@ -341,10 +341,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The extension sources lint against the built tRPC types.
+      # The extension sources lint against the built tRPC types. A full lint
+      # also covers apps/mobile, which needs the harness SDK build too.
       - name: Build trpc types
         if: matrix.group == 'trpc'
         run: pnpm --filter @kilocode/trpc run build
+
+      - name: Cache compiler plugins
+        if: matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+
+      - name: Build harness SDK
+        if: matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')
+        run: pnpm --filter @kilocode/harness-sdk run build
 
       - name: Lint
         env:

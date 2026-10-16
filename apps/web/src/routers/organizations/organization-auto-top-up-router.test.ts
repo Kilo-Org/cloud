@@ -18,6 +18,8 @@ import {
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
   DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
+import type Stripe from 'stripe';
 
 // Mock Stripe client to avoid API calls in tests
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
@@ -246,6 +248,66 @@ describe('organization auto-top-up router', () => {
           accountCreatedAt: new Date(testOrg.created_at).toISOString(),
           accountUsedMicrodollars: testOrg.microdollars_used,
         })
+      );
+    });
+
+    it('saves the threshold when enabling with an existing payment method', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_enable_threshold',
+        amount_cents: 100000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await caller.organizations.autoTopUp.toggle({
+        organizationId: testOrg.id,
+        currentEnabled: false,
+        thresholdCents: 50000,
+      });
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
+      });
+      expect(config?.threshold_cents).toBe(50000);
+      expect(config?.amount_cents).toBe(100000);
+    });
+
+    it('rejects enabling when the saved amount is below the requested threshold', async () => {
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_enable_invalid',
+        amount_cents: 10000,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      await expect(
+        caller.organizations.autoTopUp.toggle({
+          organizationId: testOrg.id,
+          currentEnabled: false,
+          thresholdCents: 50000,
+        })
+      ).rejects.toThrow(/at least the balance threshold/);
+
+      const org = await db.query.organizations.findFirst({
+        where: eq(organizations.id, testOrg.id),
+      });
+      expect(org?.auto_top_up_enabled).toBe(false);
+    });
+
+    it('sends the threshold to the setup checkout when no payment method exists', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await caller.organizations.autoTopUp.toggle({
+        organizationId: testOrg.id,
+        currentEnabled: false,
+        amountCents: 100000,
+        thresholdCents: 50000,
+      });
+
+      const [params] = jest.mocked(client.checkout.sessions.create).mock.calls.at(-1) as [
+        Stripe.Checkout.SessionCreateParams,
+      ];
+      expect(params.payment_intent_data?.metadata).toEqual(
+        expect.objectContaining({ amountCents: '100000', thresholdCents: '50000' })
       );
     });
 

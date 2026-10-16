@@ -781,6 +781,12 @@ jobs:
       needs.changes.outputs.cloud_agent_next == 'true' ||
       (github.event_name == 'pull_request' &&
       contains(fromJSON(needs.changes.outputs.affected).packages, 'cloud-agent-next'))
+    # The suite runs as three parallel parts; test:all chains the same suites.
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [unit, workers, other]
+    name: cloud-agent-next (${{ matrix.part }})
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 15
 
@@ -822,7 +828,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Run cloud-agent-next unit tests
+        if: matrix.part == 'unit'
+        run: pnpm --filter cloud-agent-next test
+
+      - name: Run cloud-agent-next Workers tests
+        if: matrix.part == 'workers'
+        run: pnpm --filter cloud-agent-next test:integration
+
       - name: Build wrapper bundles with isolated production dependencies
+        if: matrix.part == 'other'
         run: |
           build_dir=$(mktemp -d "$RUNNER_TEMP/wrapper-build.XXXXXX")
           trap 'rm -rf "$build_dir"' EXIT
@@ -836,15 +851,23 @@ jobs:
           bun run build.ts --install-dir "$build_dir/bin"
 
       - name: Test cloud-agent-next checkers
+        if: matrix.part == 'other'
         run: pnpm --filter cloud-agent-next test:checkers
 
       - name: Check cloud-agent-next duplication
+        if: matrix.part == 'other'
         run: pnpm --filter cloud-agent-next check:duplication
 
-      - name: Run cloud-agent-next tests
-        run: pnpm --filter cloud-agent-next test:all
+      - name: Run cloud-agent-next SDK provenance tests
+        if: matrix.part == 'other'
+        run: pnpm --filter cloud-agent-next test:sdk-provenance
+
+      - name: Run cloud-agent-next wrapper tests
+        if: matrix.part == 'other'
+        run: pnpm --filter cloud-agent-next test:wrapper
 
       - name: Run Cloud Agent Postgres aggregate tests
+        if: matrix.part == 'other'
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloud-agent-next test:postgres
 
   harness-sdk:

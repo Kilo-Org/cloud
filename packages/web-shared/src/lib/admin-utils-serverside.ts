@@ -40,3 +40,5 @@ export async function hasPaymentMethod(userId: string): Promise<boolean> {
 
   return result !== undefined;
 }
+
+// ci-probe 1

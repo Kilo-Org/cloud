@@ -185,8 +185,6 @@ export function routeView(
   return { state: 'preparing', attemptId: route.attemptId, ...sandboxProgress };
 }
 
-// --- storage -----------------------------------------------------------------
-
 export async function readRoute(db: RouteDatabase, sessionId: string): Promise<RouteRecord | null> {
   const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
   const row = rows[0];
@@ -243,8 +241,6 @@ export async function earliestRouteDeadlineAt(db: RouteDatabase): Promise<number
     .filter((value): value is number => typeof value === 'number');
   return values.length === 0 ? null : Math.min(...values);
 }
-
-// --- route transitions -------------------------------------------------------
 
 /**
  * A route spec with no issuer material, used only when issuance fails. It is

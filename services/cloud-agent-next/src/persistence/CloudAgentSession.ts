@@ -505,8 +505,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   constructor(ctx: DurableObjectState, env: WorkerEnv) {
     super(ctx, env);
 
-    // Extract sessionId from DO name pattern: "userId:sessionId"
-    // The DO name is set by the worker when creating the stub.
     // Split on the *last* colon because userId may contain colons
     // (e.g. "oauth/google:12345:agent_abc" → sessionId = "agent_abc").
     const doName = ctx.id.name;
@@ -1278,7 +1276,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return response;
     }
 
-    // Route ingest WebSocket (internal only - from queue consumer)
     if (url.pathname === '/ingest') {
       if (await this.hasDeletionIntent()) {
         return new Response('Session not found', { status: 404 });
@@ -1303,9 +1300,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       await ingestHandler.handleIngestMessage(ws, message);
       return;
     }
-
-    // Stream connections are server-push only, ignore client messages
-    // Future: could handle client commands like subscribe/unsubscribe
   }
 
   /**

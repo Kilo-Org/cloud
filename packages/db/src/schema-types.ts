@@ -1947,6 +1947,8 @@ export const OpenRouterProvider = z.object({
     training: z.boolean(),
     retainsPrompts: z.boolean(),
     canPublish: z.boolean(),
+    termsOfServiceURL: z.string().optional(),
+    privacyPolicyURL: z.string().optional(),
   }),
   headquarters: z.string().optional(),
   datacenters: z.array(z.string()).optional(),
@@ -1975,6 +1977,8 @@ export const NormalizedProvider = z.object({
     training: z.boolean(),
     retainsPrompts: z.boolean(),
     canPublish: z.boolean(),
+    termsOfServiceURL: z.string().optional(),
+    privacyPolicyURL: z.string().optional(),
   }),
   headquarters: z.string().optional(),
   datacenters: z.array(z.string()).optional(),
@@ -2106,7 +2110,6 @@ export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 export const CustomLlmProviderSchema = z.enum([
   'anthropic', // uses Messages API
   'openai', // uses Responses API
-  'openai-compatible', // uses Chat Completions API with reasoning_content
   'openrouter', // uses Chat Completions API with reasoning_details
 ]);
 

@@ -3,11 +3,11 @@ import { NextRequest } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { strFromU8, unzipSync } from 'fflate';
-import { api_request_log } from '@kilocode/db/schema';
+import { api_request_log, kilocode_users } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
-import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { GET } from './route';
 
 jest.mock('next/server', () => {
@@ -241,6 +241,68 @@ describe('GET /admin/api/api-request-log/download', () => {
     expect(response.headers.get('Content-Disposition')).toBe(
       'attachment; filename="api-request-log_api-request-log-download-test-user_2026-08-01_2026-08-01_poolside-laguna-s-2.1-free.zip"'
     );
+  });
+
+  describe('when filtering by user email', () => {
+    const TEST_EMAIL = 'api-request-log-download-test-user@example.com';
+
+    afterEach(async () => {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, TEST_USER_ID));
+    });
+
+    it('downloads the logs of the user with that email', async () => {
+      await insertTestUser({ id: TEST_USER_ID, google_user_email: TEST_EMAIL });
+      const request_r2_key = '2026-08-01/email/request.json';
+      fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ email: true }));
+      const [row] = await db
+        .insert(api_request_log)
+        .values({ ...baseRow, request_r2_key })
+        .returning({ id: api_request_log.id });
+
+      const response = await GET(createRequest({ userId: TEST_EMAIL }));
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Disposition')).toBe(
+        'attachment; filename="api-request-log_api-request-log-download-test-user-example.com_2026-08-01_2026-08-01_poolside-laguna-s-2.1-free.zip"'
+      );
+      const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+      expect(JSON.parse(readEntry(entries, `_${row.id}_request.json`))).toEqual({ email: true });
+    });
+
+    it('matches the email case-insensitively', async () => {
+      await insertTestUser({ id: TEST_USER_ID, google_user_email: TEST_EMAIL });
+      await db.insert(api_request_log).values(baseRow);
+
+      const response = await GET(createRequest({ userId: TEST_EMAIL.toUpperCase() }));
+
+      expect(response.status).toBe(200);
+    });
+
+    it('rejects an email that matches several users case-insensitively', async () => {
+      const otherUserId = `${TEST_USER_ID}-other`;
+      await insertTestUser({ id: TEST_USER_ID, google_user_email: TEST_EMAIL });
+      await insertTestUser({ id: otherUserId, google_user_email: TEST_EMAIL.toUpperCase() });
+      await db.insert(api_request_log).values(baseRow);
+
+      try {
+        const response = await GET(
+          createRequest({ userId: 'Api-Request-Log-Download-Test-User@Example.com' })
+        );
+
+        expect(response.status).toBe(400);
+      } finally {
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
+      }
+    });
+
+    it('reports an unknown email', async () => {
+      await db.insert(api_request_log).values(baseRow);
+
+      const response = await GET(createRequest({ userId: TEST_EMAIL }));
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: `No user found with email ${TEST_EMAIL}` });
+    });
   });
 
   it('rejects a start after the end', async () => {

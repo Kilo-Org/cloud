@@ -150,8 +150,8 @@ describe('getAiSdkProvider', () => {
     expect(getAiSdkProvider('minimax/minimax-m2.5', 'chutes-byok')).toBeUndefined();
   });
 
-  test('uses OpenAI-compatible Chat Completions for Morph direct BYOK models', () => {
-    expect(getAiSdkProvider('morph/morph-gpt-compatible', 'morph-byok')).toBe('openai-compatible');
+  test('uses Chat Completions for Morph direct BYOK models', () => {
+    expect(getAiSdkProvider('morph/morph-gpt-compatible', 'morph-byok')).toBeUndefined();
   });
 
   test('uses Chat Completions for MiniMax models through the gateway', () => {

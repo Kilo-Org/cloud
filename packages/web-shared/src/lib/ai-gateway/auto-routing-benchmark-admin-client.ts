@@ -4,10 +4,12 @@ import {
   BenchmarkRegistryResponseSchema,
   BenchmarkRoutingTableResponseSchema,
   BenchmarkConfigResponseSchema,
+  BenchmarkSchedulerConfigResponseSchema,
   BenchmarkRunsResponseSchema,
   RequeueBenchmarkRegistryResponseSchema,
   StartBenchmarkRunResponseSchema,
   type BenchmarkConfig,
+  type BenchmarkSchedulerOverrides,
   type BenchmarkKind,
   type BenchmarkQueueSelector,
   type BenchmarkRunPurpose,
@@ -40,6 +42,32 @@ export function updateBenchmarkConfig(config: BenchmarkConfig, updatedByEmail: s
       body: JSON.stringify(config),
     },
     BenchmarkConfigResponseSchema
+  );
+}
+
+export function getBenchmarkSchedulerConfig() {
+  return fetchBenchmarkAdmin(
+    '/admin/scheduler-config',
+    { method: 'GET' },
+    BenchmarkSchedulerConfigResponseSchema
+  );
+}
+
+export function updateBenchmarkSchedulerConfig(
+  overrides: BenchmarkSchedulerOverrides,
+  updatedByEmail: string
+) {
+  return fetchBenchmarkAdmin(
+    '/admin/scheduler-config',
+    {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json',
+        'x-updated-by': updatedByEmail,
+      },
+      body: JSON.stringify(overrides),
+    },
+    BenchmarkSchedulerConfigResponseSchema
   );
 }
 

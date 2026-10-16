@@ -944,6 +944,57 @@ describe('delivery callback plumbing', () => {
   });
 });
 
+describe('Cloud delivery queue authority', () => {
+  it.each([{ queued: ['delivered'] }, { queued: [] }])(
+    'ignores Kilo queue snapshots after handoff (queued: $queued)',
+    async ({ queued }) => {
+      const session = createCloudAgentResolvedSession(createMockApi());
+      await connectSession(session);
+      const deliver = (streamEventType: string, data: unknown) => {
+        mockWs.onmessage?.({
+          data: JSON.stringify({
+            eventId: 0,
+            sessionId: cloudAgentSessionId,
+            streamEventType,
+            timestamp: new Date().toISOString(),
+            data,
+          }),
+        } as MessageEvent);
+      };
+
+      try {
+        deliver('connected', {});
+        deliver('cloud.message.queued', { messageId: 'delivered', content: 'First prompt' });
+        deliver('cloud.message.sent', { messageId: 'delivered' });
+        expect(session.state.getPendingMessages().has('delivered')).toBe(false);
+
+        deliver('kilocode', {
+          type: 'message.updated',
+          properties: { info: assistantMsg('reply', 'delivered', kiloSessionId) },
+        });
+        deliver('kilocode', {
+          type: 'session.status',
+          properties: { sessionID: kiloSessionId, status: { type: 'busy' } },
+        });
+        deliver('cloud.message.queued', { messageId: 'waiting', content: 'Next prompt' });
+        deliver('kilocode', {
+          type: 'session.queue.changed',
+          properties: { sessionID: kiloSessionId, queued },
+        });
+
+        expect([...session.state.getPendingMessages()]).toEqual([
+          ['waiting', { status: 'queued' }],
+        ]);
+        expect(session.state.getActiveMessageId()).toBe('delivered');
+        expect(session.state.getActivity()).toEqual({ type: 'busy' });
+        expect(session.storage.getMessageInfo('reply')).toMatchObject({ parentID: 'delivered' });
+      } finally {
+        session.destroy();
+      }
+    }
+  );
+});
+
 describe('queued message cancellation replay', () => {
   it('materializes only final delivery rows and publishes service state at bootstrap completion', async () => {
     const session = createCloudAgentResolvedSession(createMockApi());

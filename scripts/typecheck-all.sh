@@ -38,7 +38,8 @@ if [ -n "$group" ]; then
   case "$group" in
     web)
       if affects web; then
-        tsgo --noEmit -p apps/web/tsconfig.json
+        # apps/web/tsconfig.json sets incremental; CI caches this file.
+        tsgo --noEmit -p apps/web/tsconfig.json --tsBuildInfoFile apps/web/.tsbuildinfo/ci-web.tsbuildinfo
         tsgo --noEmit -p scripts/web-env/tsconfig.json
       fi
       if affects @kilocode/storybook; then

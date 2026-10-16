@@ -316,6 +316,17 @@ jobs:
         if: matrix.group == 'trpc'
         uses: ./.github/actions/trpc-declarations
 
+      # tsgo checks each file against the hashes in the build info, so a stale
+      # entry is rechecked; the cache only saves work on unchanged files.
+      - name: Cache web typecheck build info
+        if: matrix.group == 'web'
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: apps/web/.tsbuildinfo/ci-web.tsbuildinfo
+          key: ${{ runner.os }}-web-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-web-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-
+
       - name: Typecheck
         env:
           KILO_AFFECTED: ${{ needs.changes.outputs.affected }}

@@ -1,4 +1,5 @@
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const COMBINATORS = [
   ['allOf', 'all of'],
@@ -104,11 +105,23 @@ function appendConstraints(description: string | null | undefined, constraints: 
  * the removed constraints move to the tool description.
  */
 export function removeTopLevelToolSchemaCombinators(request: GatewayRequest): void {
+  const changedTools: { name: string; combinators: Combinator[]; strict: boolean }[] = [];
+  const rewrite = (name: string, schema: unknown, strict: boolean | null | undefined) => {
+    const combinators = isRecord(schema)
+      ? COMBINATORS.flatMap(([keyword]) => (schema[keyword] === undefined ? [] : [keyword]))
+      : [];
+    if (combinators.length > 0) {
+      changedTools.push({ name, combinators, strict: strict === true });
+    }
+    return removeTopLevelSchemaCombinators(schema);
+  };
+
   switch (request.kind) {
     case 'chat_completions':
       for (const tool of request.body.tools ?? []) {
         if (tool.type !== 'function') continue;
-        const constraints = removeTopLevelSchemaCombinators(tool.function.parameters);
+        const { name, parameters, strict } = tool.function;
+        const constraints = rewrite(name, parameters, strict);
         if (constraints) {
           tool.function.description = appendConstraints(tool.function.description, constraints);
         }
@@ -117,7 +130,7 @@ export function removeTopLevelToolSchemaCombinators(request: GatewayRequest): vo
     case 'responses':
       for (const tool of request.body.tools ?? []) {
         if (tool.type !== 'function') continue;
-        const constraints = removeTopLevelSchemaCombinators(tool.parameters);
+        const constraints = rewrite(tool.name, tool.parameters, tool.strict);
         if (constraints) {
           tool.description = appendConstraints(tool.description, constraints);
         }
@@ -126,11 +139,22 @@ export function removeTopLevelToolSchemaCombinators(request: GatewayRequest): vo
     case 'messages':
       for (const tool of request.body.tools ?? []) {
         if (!('input_schema' in tool)) continue;
-        const constraints = removeTopLevelSchemaCombinators(tool.input_schema);
+        const constraints = rewrite(tool.name, tool.input_schema, tool.strict);
         if (constraints) {
           tool.description = appendConstraints(tool.description, constraints);
         }
       }
       break;
+  }
+
+  if (changedTools.length > 0) {
+    warnExceptInTest(
+      '[removeTopLevelToolSchemaCombinators] removed top-level tool schema combinators',
+      {
+        model: request.body.model,
+        requestKind: request.kind,
+        tools: changedTools,
+      }
+    );
   }
 }

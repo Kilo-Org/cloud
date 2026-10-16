@@ -13,9 +13,14 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "4.0.15",
+    "@ai-sdk/openai": "4.0.15",
+    "@ai-sdk/openai-compatible": "3.0.11",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
+    "@openrouter/ai-sdk-provider": "3.1.0",
+    "ai": "7.0.29",
     "drizzle-orm": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"

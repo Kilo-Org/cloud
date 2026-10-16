@@ -13,7 +13,6 @@ import {
   renderNonAutolinkedText,
   renderTemplate,
   sendAccountDeletionCompletedEmail,
-  sendAutoRoutingPoolConvertedEmail,
   sendAccountDeletionSupportNotification,
   sendKiloPassDuplicateCardCanceledEmail,
   sendSpendAlertEmail,
@@ -280,45 +279,5 @@ describe('spend alert email', () => {
       retryable: ['billing@example.com'],
       undeliverable: [],
     });
-  });
-});
-
-describe('auto routing pool converted email', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('names the organization router and links only to its providers and models page', async () => {
-    await sendAutoRoutingPoolConvertedEmail('admin@example.com', {
-      routerName: 'Efficient',
-      modelId: 'kilo-auto/custom/org/efficient',
-      organization: { id: 'org-1', name: 'Acme' },
-    });
-
-    expect(sendViaMailgun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: 'admin@example.com',
-        subject: subjects.autoRoutingPoolConverted,
-        category: 'autoRoutingPoolConverted',
-      })
-    );
-    const { html } = jest.mocked(sendViaMailgun).mock.calls[0][0];
-    expect(html).toContain('no longer reads per-owner model pools');
-    expect(html).toContain('Acme');
-    expect(html).toContain('kilo-auto/custom/org/efficient');
-    expect(html).toContain(`href="${NEXTAUTH_URL}/organizations/org-1/providers-and-models"`);
-    expect((html.match(/href=/g) ?? []).length).toBe(1);
-  });
-
-  it('links a personal router to the profile page', async () => {
-    await sendAutoRoutingPoolConvertedEmail('user@example.com', {
-      routerName: 'Efficient',
-      modelId: 'kilo-auto/custom/efficient',
-      organization: null,
-    });
-
-    const { html } = jest.mocked(sendViaMailgun).mock.calls[0][0];
-    expect(html).toContain('your account');
-    expect(html).toContain(`href="${NEXTAUTH_URL}/profile"`);
   });
 });

@@ -15,13 +15,12 @@ interface __BaseEnv_Env {
 	KILO_WEB_API_BASE_URL: string;
 	KILO_AI_GATEWAY_BASE_URL: string;
 	AUTO_ROUTING_DECISION_CACHE: DurableObjectNamespace<import("./src/index").AutoRoutingDecisionCacheDO>;
-	AUTO_ROUTING_MODE_CONFIG: DurableObjectNamespace<import("./src/index").AutoRoutingModeConfigDO>;
 	BENCHMARK_SERVICE: Fetcher /* auto-routing-benchmark */;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/index");
-		durableNamespaces: "AutoRoutingDecisionCacheDO" | "AutoRoutingModeConfigDO";
+		durableNamespaces: "AutoRoutingDecisionCacheDO";
 	}
 	interface Env extends __BaseEnv_Env {}
 }

@@ -10,7 +10,6 @@ import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-util
 import { authMiddleware } from './auth';
 import { classifierAnalyticsHandler } from './admin-classifier-analytics';
 import { getClassifierModelHandler, putClassifierModelHandler } from './admin-classifier-model';
-import { ownerPoolConversionScanHandler } from './owner-pool-conversion';
 import { decideHandler } from './decide';
 import type { HonoEnv } from './hono-env';
 import {
@@ -21,7 +20,6 @@ import {
 } from './public-routes';
 
 export { AutoRoutingDecisionCacheDO } from './decision-cache';
-export { AutoRoutingModeConfigDO } from './routing-mode';
 
 export const app = new Hono<HonoEnv>();
 
@@ -43,7 +41,6 @@ app.get('/health', c => c.json({ status: 'ok', service: 'auto-routing' }));
 
 app.get('/admin/classifier-model', getClassifierModelHandler);
 app.put('/admin/classifier-model', putClassifierModelHandler);
-app.post('/admin/owner-pool-conversion/scan', ownerPoolConversionScanHandler);
 app.get('/admin/classifier-analytics', classifierAnalyticsHandler);
 
 app.post('/decide', decideHandler);

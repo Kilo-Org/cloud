@@ -65,8 +65,6 @@ const cacheRecordClassifierUsage = vi.fn();
 const cachePutEntry = vi.fn();
 const cachePutStickyDecision = vi.fn();
 const cacheIdFromName = vi.fn(() => 'cache-do-id');
-const modeConfigIdFromName = vi.fn((name: string) => name);
-const modeConfigGet = vi.fn();
 const benchmarkFetch = vi.fn();
 const originalFetch = globalThis.fetch;
 const mockedFetch = vi.fn<typeof globalThis.fetch>();
@@ -95,10 +93,6 @@ const env = {
       putEntry: cachePutEntry,
       putStickyDecision: cachePutStickyDecision,
     }),
-  },
-  AUTO_ROUTING_MODE_CONFIG: {
-    idFromName: modeConfigIdFromName,
-    get: modeConfigGet,
   },
   O11Y_CF_ACCOUNT_ID: 'test-account-id',
   O11Y_CF_AE_API_TOKEN: {
@@ -301,12 +295,6 @@ describe('auto routing worker', () => {
     configDelete.mockResolvedValue(undefined);
     configPut.mockReset();
     configPut.mockResolvedValue(undefined);
-    modeConfigIdFromName.mockReset();
-    modeConfigIdFromName.mockImplementation((name: string) => name);
-    modeConfigGet.mockReset();
-    modeConfigGet.mockImplementation(() => ({
-      readStoredSettings: vi.fn(async () => ({ mode: null, pool: null })),
-    }));
     benchmarkFetch.mockReset();
     benchmarkFetch.mockImplementation(async (url: string) => {
       if (String(url).includes('/admin/classifier-winner')) {
@@ -567,7 +555,6 @@ describe('auto routing worker', () => {
     expect(cacheReadConversationState).toHaveBeenCalledWith(expect.stringMatching(/^frontier:/));
     expect(configGet).not.toHaveBeenCalledWith('routing_table_v1');
     expect(configGet).not.toHaveBeenCalledWith(SHADOW_ROUTING_TABLE_CONFIG_KEY);
-    expect(modeConfigGet).not.toHaveBeenCalled();
   });
 
   it('returns no frontier decision when only the efficient table exists', async () => {
@@ -902,71 +889,6 @@ describe('auto routing worker', () => {
     // The raw user id (which embeds the client IP for anonymous users) must
     // never reach persisted logs.
     expect(String(logMessage)).not.toContain('user-1');
-  });
-
-  it('ignores stored owner mode and pool for the efficient router', async () => {
-    const readStoredSettings = vi.fn(async () => ({
-      mode: 'best_accuracy' as const,
-      pool: [{ model: 'owner/pool-model' }],
-    }));
-    modeConfigGet.mockImplementation(() => ({ readStoredSettings }));
-    benchmarkFetch.mockImplementation(async (url: string) => {
-      if (String(url).includes('/admin/classifier-winner')) {
-        return { ok: true, status: 200, json: async () => ({ winner: null }) };
-      }
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          table: {
-            ...benchmarkRoutingTable,
-            version: 'platform-efficient',
-            routes: {
-              ...benchmarkRoutingTable.routes,
-              'implementation/feature_development': [
-                {
-                  model: 'cheap/model',
-                  accuracy: 0.8,
-                  avgCostUsd: 0.001,
-                  meetsThreshold: true,
-                  reasoningEffort: null,
-                },
-                {
-                  model: 'accurate/model',
-                  accuracy: 0.95,
-                  avgCostUsd: 0.1,
-                  meetsThreshold: true,
-                  reasoningEffort: null,
-                },
-              ],
-            },
-          },
-          publishedAt: benchmarkRoutingTable.generatedAt,
-        }),
-      };
-    });
-
-    const response = await decideRequest(
-      mirrorPayload({
-        router: 'efficient',
-        organizationId: '00000000-0000-4000-8000-000000000001',
-      })
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      decision: { model: 'cheap/model', tableVersion: 'platform-efficient' },
-    });
-    expect(modeConfigIdFromName).not.toHaveBeenCalled();
-    expect(modeConfigGet).not.toHaveBeenCalled();
-    expect(readStoredSettings).not.toHaveBeenCalled();
-    const benchmarkPaths = benchmarkFetch.mock.calls.map(([url]) => new URL(String(url)).pathname);
-    expect(benchmarkPaths).toContain('/admin/routing-table');
-    expect(
-      benchmarkPaths.filter(
-        path => path !== '/admin/routing-table' && path !== '/admin/classifier-winner'
-      )
-    ).toEqual([]);
   });
 
   it('filters denied routing-policy models from the full decide path', async () => {

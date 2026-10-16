@@ -5,7 +5,6 @@ import {
   MAX_POOL_ENTRIES,
   poolEntryKey,
   benchmarkPairKey,
-  PersistedEfficientModelPoolSchema,
   rankCandidates,
   RankedCandidateSchema,
   RoutingTableSchema,
@@ -472,16 +471,6 @@ describe('EfficientModelPoolSchema', () => {
         { model: 'a/b', variant: 'max' },
       ]).success
     ).toBe(false);
-  });
-
-  it('dedupes legacy stored variants into model-only entries', () => {
-    expect(
-      PersistedEfficientModelPoolSchema.parse([
-        { model: 'a/b', variant: 'xhigh' },
-        { model: 'a/b', variant: 'max' },
-        { model: 'c/d', variant: null },
-      ])
-    ).toEqual([{ model: 'a/b' }, { model: 'c/d' }]);
   });
 
   it('rejects zero entries', () => {

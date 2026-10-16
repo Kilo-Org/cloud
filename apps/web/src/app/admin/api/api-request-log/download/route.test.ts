@@ -269,6 +269,32 @@ describe('GET /admin/api/api-request-log/download', () => {
       expect(JSON.parse(readEntry(entries, `_${row.id}_request.json`))).toEqual({ email: true });
     });
 
+    it('matches the email case-insensitively', async () => {
+      await insertTestUser({ id: TEST_USER_ID, google_user_email: TEST_EMAIL });
+      await db.insert(api_request_log).values(baseRow);
+
+      const response = await GET(createRequest({ userId: TEST_EMAIL.toUpperCase() }));
+
+      expect(response.status).toBe(200);
+    });
+
+    it('rejects an email that matches several users case-insensitively', async () => {
+      const otherUserId = `${TEST_USER_ID}-other`;
+      await insertTestUser({ id: TEST_USER_ID, google_user_email: TEST_EMAIL });
+      await insertTestUser({ id: otherUserId, google_user_email: TEST_EMAIL.toUpperCase() });
+      await db.insert(api_request_log).values(baseRow);
+
+      try {
+        const response = await GET(
+          createRequest({ userId: 'Api-Request-Log-Download-Test-User@Example.com' })
+        );
+
+        expect(response.status).toBe(400);
+      } finally {
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
+      }
+    });
+
     it('reports an unknown email', async () => {
       await db.insert(api_request_log).values(baseRow);
 

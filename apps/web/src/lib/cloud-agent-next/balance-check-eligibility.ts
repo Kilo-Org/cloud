@@ -1,6 +1,6 @@
 import 'server-only';
 import { type db } from '@kilocode/web-shared/lib/drizzle';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelIncludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   getModelUserByokProviders,
@@ -42,7 +42,7 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   modelId: string;
   organizationId?: string;
 }): Promise<BalanceCheckModelEligibility> {
-  const isFree = isFreeModel(params.modelId);
+  const isFree = await isFreeModelIncludingCustomLlms(params.modelId);
   if (isFree) {
     return { isFree: true, hasUserByokAvailable: false };
   }

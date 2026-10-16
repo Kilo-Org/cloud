@@ -1,26 +1,26 @@
-import { custom_llm2 } from '@kilocode/db/schema';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
+import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { orderOpenCodeSettings } from './order-opencode-variants';
 import { hasCustomLlmAccess } from './access';
+import { fetchCustomLlmsFromDatabase, isPublicCustomLlm } from './custom-llm-catalog';
 
-const CUSTOM_LLM_DESCRIPTION =
+const PRIVATE_CUSTOM_LLM_DESCRIPTION =
   'Access to this model was granted by a Kilo admin. This model has no availability or data retention guarantees. Do not use for mission critical workloads. Existence of the model may be confidential.';
 
-function convert(publicId: string, model: CustomLlmDefinition) {
+export function convertCustomLlmToCatalogModel(publicId: string, model: CustomLlmDefinition) {
+  const isPublic = isPublicCustomLlm(model);
   const opencode = orderOpenCodeSettings(model.opencode_settings);
   return {
     id: publicId,
     canonical_slug: publicId,
     hugging_face_id: '',
     name: model.display_name,
-    isPrivateCustomLlm: true,
+    ...(!isPublic && { isPrivateCustomLlm: true }),
     created: 1756238927,
-    description: CUSTOM_LLM_DESCRIPTION,
+    description: model.description ?? PRIVATE_CUSTOM_LLM_DESCRIPTION,
     context_length: model.context_length,
     architecture: {
-      modality: model.supports_image_input ? 'text+image-\u003Etext' : 'text-\u003Etext',
+      modality: model.supports_image_input ? 'text+image->text' : 'text->text',
       input_modalities: model.supports_image_input ? ['text', 'image'] : ['text'],
       output_modalities: ['text'],
       tokenizer: 'Other',
@@ -50,17 +50,14 @@ function convert(publicId: string, model: CustomLlmDefinition) {
   };
 }
 
+/** Non-public custom LLMs granted to the organization or one of the groups.
+ * Public custom LLMs are part of the regular gateway catalog. */
 export async function listAvailableCustomLlms(organizationId: string, groupIds: readonly string[]) {
-  const rows = await readDb.select().from(custom_llm2);
-  return rows
-    .map(row => {
-      const parsed = CustomLlmDefinitionSchema.safeParse(row.definition);
-      if (!parsed.success) {
-        console.log('Failed to parse custom llm definition', parsed.error);
-      }
-      return parsed.success ? { public_id: row.public_id, definition: parsed.data } : null;
-    })
-    .filter(row => row !== null)
-    .filter(row => hasCustomLlmAccess(row.definition, organizationId, groupIds))
-    .map(row => convert(row.public_id, row.definition));
+  return (await fetchCustomLlmsFromDatabase())
+    .filter(
+      row =>
+        !isPublicCustomLlm(row.definition) &&
+        hasCustomLlmAccess(row.definition, organizationId, groupIds)
+    )
+    .map(row => convertCustomLlmToCatalogModel(row.public_id, row.definition));
 }

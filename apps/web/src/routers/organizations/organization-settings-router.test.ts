@@ -56,6 +56,11 @@ import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  privateCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 
 function makeTestOpenRouterModel(id: string): OpenRouterModel {
@@ -698,9 +703,21 @@ describe('organizations settings trpc router', () => {
       );
     });
 
-    it.each(['kilo-auto/balanced', 'kilo-internal/private-model'])(
-      'keeps %s defaults exempt from Enterprise model restrictions',
-      async modelId => {
+    it('keeps kilo-auto/balanced defaults exempt from Enterprise model restrictions', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateDefaultModel({
+        organizationId: orgWithModelDenyList.id,
+        default_model: 'kilo-auto/balanced',
+      });
+
+      expect(result.settings.default_model).toBe('kilo-auto/balanced');
+    });
+
+    it('keeps private custom LLM defaults exempt from Enterprise model restrictions', async () => {
+      const modelId = `acme/private-${randomUUID()}`;
+      await insertCustomLlmForTest(modelId, privateCustomLlmDefinition());
+      try {
         const caller = await createCallerForUser(owner.id);
 
         const result = await caller.organizations.settings.updateDefaultModel({
@@ -709,8 +726,10 @@ describe('organizations settings trpc router', () => {
         });
 
         expect(result.settings.default_model).toBe(modelId);
+      } finally {
+        await deleteCustomLlmForTest(modelId);
       }
-    );
+    });
 
     it('should throw UNAUTHORIZED error for non-owner users', async () => {
       const caller = await createCallerForUser(member.id);

@@ -7,15 +7,13 @@ import {
   findKiloExclusiveModel,
   isKiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { custom_llm2, type CustomLlm2, type User } from '@kilocode/db/schema';
+import type { User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
@@ -25,9 +23,13 @@ import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import {
   CustomLlmCredentialsSchema,
-  CustomLlmDefinitionSchema,
   type CustomLlmCredentials,
 } from '@kilocode/db/schema-types';
+import {
+  lookupCustomLlm,
+  isPublicCustomLlm,
+  type CustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   buildDirectProvider,
   type DirectUpstreamAuth,
@@ -48,8 +50,8 @@ export type GetProviderProviderResult = {
   provider: Provider;
   userByok: BYOKResult[] | null;
   /** Skip balance, paid-auth, and organization policy checks entirely. Used
-   *  by direct-byok and custom_llm2 because both already require explicit
-   *  admin opt-in. */
+   *  by direct-byok and non-public custom_llm2 because both already require
+   *  explicit admin opt-in. */
   bypassAccessCheck: boolean;
   /** Skip only the zero-balance paid-model block. Set when a user credential
    *  outside Kilo credits pays for the request, such as the ChatGPT
@@ -60,6 +62,7 @@ export type GetProviderProviderResult = {
 export type GetProviderResult =
   | GetProviderProviderResult
   | { kind: 'chatgpt-reconnect'; message: string }
+  | { kind: 'custom-llm-unavailable' }
   | { kind: 'custom-llm-temporarily-unavailable' };
 
 async function checkDirectBYOK(
@@ -99,6 +102,27 @@ async function checkDirectBYOK(
   };
 }
 
+async function isEligibleForCustomLlm(
+  customLlm: CustomLlm,
+  user: User | AnonymousUserContext,
+  organizationId: string | undefined
+) {
+  if (isPublicCustomLlm(customLlm.definition)) return true;
+  if (!organizationId || isAnonymousContext(user)) return false;
+  return await userHasCustomLlmAccess(customLlm.definition, organizationId, user.id);
+}
+
+function readCustomLlmCredentials(customLlm: CustomLlm): CustomLlmCredentials | null {
+  if (!customLlm.encrypted_api_key) return null;
+  try {
+    const decrypted = decryptApiKey(customLlm.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+    return CustomLlmCredentialsSchema.safeParse(JSON.parse(decrypted)).data ?? null;
+  } catch {
+    // A rotated encryption key, corrupted ciphertext, or malformed JSON.
+    return null;
+  }
+}
+
 /** Null when the service account token exchange fails, which is usually transient. */
 async function resolveCustomLlmAuth(
   publicId: string,
@@ -124,66 +148,45 @@ async function resolveCustomLlmAuth(
   }
 }
 
-function readCustomLlmCredentials(
-  encryptedApiKey: NonNullable<CustomLlm2['encrypted_api_key']>
-): CustomLlmCredentials | null {
-  try {
-    const decrypted = decryptApiKey(encryptedApiKey, BYOK_ENCRYPTION_KEY);
-    return CustomLlmCredentialsSchema.safeParse(JSON.parse(decrypted)).data ?? null;
-  } catch {
-    // A rotated encryption key, corrupted ciphertext, or malformed JSON.
-    return null;
+/**
+ * A custom LLM owns its id: an ineligible user or a broken definition must not
+ * fall back to OpenRouter or a Kilo-exclusive model with the same id.
+ */
+async function resolveCustomLlmProvider(
+  customLlm: CustomLlm,
+  user: User | AnonymousUserContext,
+  organizationId: string | undefined
+): Promise<GetProviderResult> {
+  if (!(await isEligibleForCustomLlm(customLlm, user, organizationId))) {
+    return { kind: 'custom-llm-unavailable' };
   }
-}
-
-async function checkCustomLlm(
-  requestedModel: string,
-  organizationId: string,
-  kiloUserId: string
-): Promise<GetProviderResult | null> {
-  const [row] = await readDb
-    .select()
-    .from(custom_llm2)
-    .where(eq(custom_llm2.public_id, requestedModel));
-  const parsedCustomLlm = CustomLlmDefinitionSchema.safeParse(row?.definition);
-  if (row && !parsedCustomLlm.success) {
-    console.log('Failed to parse custom llm definition', parsedCustomLlm.error);
-  }
-  const customLlm = parsedCustomLlm.data;
-  if (!customLlm || !(await userHasCustomLlmAccess(customLlm, organizationId, kiloUserId))) {
-    return null;
-  }
-
-  if (!row?.encrypted_api_key) {
-    return null;
-  }
-
-  const credentials = readCustomLlmCredentials(row.encrypted_api_key);
+  const credentials = readCustomLlmCredentials(customLlm);
   if (!credentials) {
-    console.error('Custom LLM credentials are invalid', requestedModel);
-    return null;
+    console.error('Custom LLM credentials are missing or invalid', customLlm.public_id);
+    return { kind: 'custom-llm-unavailable' };
   }
-  const auth = await resolveCustomLlmAuth(requestedModel, credentials);
+  const auth = await resolveCustomLlmAuth(customLlm.public_id, credentials);
   if (!auth) {
     return { kind: 'custom-llm-temporarily-unavailable' };
   }
 
+  const { definition } = customLlm;
   return {
     kind: 'provider',
     provider: buildDirectProvider(
       'custom',
       [
-        customLlm.opencode_settings?.ai_sdk_provider === 'anthropic'
+        definition.opencode_settings?.ai_sdk_provider === 'anthropic'
           ? 'messages'
-          : customLlm.opencode_settings?.ai_sdk_provider === 'openai'
+          : definition.opencode_settings?.ai_sdk_provider === 'openai'
             ? 'responses'
             : 'chat_completions',
       ],
-      customLlm,
+      definition,
       auth
     ),
     userByok: null,
-    bypassAccessCheck: true,
+    bypassAccessCheck: !isPublicCustomLlm(definition),
   };
 }
 
@@ -216,7 +219,7 @@ export type GetProviderInput = {
   botId?: string | undefined;
   taskId: string | undefined;
   /** Resolves organization/group provider policy only when selecting a managed
-   * gateway. Direct BYOK and custom LLM routes remain exempt. */
+   * gateway. Direct BYOK and custom LLM routes do not use it. */
   getRoutingProviderConfig?: () => Promise<OpenRouterProviderConfig | undefined>;
 };
 
@@ -234,6 +237,14 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
         bypassAccessCheck: true,
       };
     }
+  }
+
+  const customLlmLookup = await lookupCustomLlm(requestedModel);
+  if (customLlmLookup.kind === 'unknown') {
+    return { kind: 'custom-llm-temporarily-unavailable' };
+  }
+  if (customLlmLookup.kind === 'custom-llm') {
+    return await resolveCustomLlmProvider(customLlmLookup.customLlm, user, organizationId);
   }
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
@@ -271,13 +282,6 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   }
 
   const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
-
-  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId && !isAnonymousContext(user)) {
-    const customLlmResult = await checkCustomLlm(requestedModel, organizationId, user.id);
-    if (customLlmResult) {
-      return customLlmResult;
-    }
-  }
 
   const eligibleForVercelRouting =
     !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');

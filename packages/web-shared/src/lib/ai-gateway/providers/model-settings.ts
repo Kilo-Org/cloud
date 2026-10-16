@@ -12,6 +12,7 @@ import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import { isKimiK3Model } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   effortOptions,
@@ -71,7 +72,10 @@ export function getAiSdkProvider(
   if (directProviderId === 'morph-byok') {
     return undefined;
   }
-  if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
+  if (
+    directProviderId === 'opencode-go' &&
+    (isMinimaxModel(model) || isQwenModel(model) || isKimiK3Model(model))
+  ) {
     return 'anthropic';
   }
   if (isClaudeModel(model)) {

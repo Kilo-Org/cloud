@@ -4,6 +4,10 @@ export function isKimiModel(model: string) {
   return model.includes('kimi');
 }
 
+export function isKimiK3Model(model: string) {
+  return model === 'kimi-k3' || model.endsWith('/kimi-k3');
+}
+
 export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {
   // Moonshot models don't support the temperature parameter
   delete requestToMutate.body.temperature;

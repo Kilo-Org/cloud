@@ -467,7 +467,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo
 
       - name: Drizzle check
         run: pnpm drizzle check
@@ -765,7 +765,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'ai-gateway-secure-proxy...' --filter kilocode-monorepo
 
       - name: Build ai-gateway-secure-proxy
         env:
@@ -931,8 +931,10 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      # Install only this workspace, its workspace dependencies, and the root
+      # tools. Relative imports into another workspace fail loudly here.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter '${{ matrix.workspace.name }}...' --filter kilocode-monorepo
 
       # The harness SDK's own vitest run compiles the typia plugin through
       # @ttsc/unplugin. kilo-app is not in this matrix: its sharded suite runs

@@ -196,6 +196,8 @@ type ChatComposerProps = {
   modeControl?: ChatToolbarModeControl;
   /** Extra classes for the toolbar row; Quick Chat tightens the gap above the input. */
   toolbarClassName?: string;
+  /** Extra classes for the composer's bar background; Quick Chat drops its top border. */
+  barClassName?: string;
   model: string;
   variant: string;
   modelOptions: (ModelOption | SessionModelOption)[];
@@ -267,6 +269,7 @@ export function ChatComposer({
   placeholder = i18n.t('common.sendMessage'),
   modeControl,
   toolbarClassName,
+  barClassName,
   model,
   variant,
   modelOptions,
@@ -1315,7 +1318,7 @@ export function ChatComposer({
   // unchanged, and the rotation applies as a style-only re-render — no
   // remount, so the uncontrolled input keeps its text.
   return (
-    <BlurBar>
+    <BlurBar className={barClassName}>
       <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
         <ChatComposerMeasure
           handleRef={measureHandleRef}

@@ -163,6 +163,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
@@ -266,18 +267,20 @@ describe('the chat transcript while it opens', () => {
   });
 
   it.each([
-    { progress: 0, paddingBottom: 24 },
-    { progress: 1, paddingBottom: 0 },
+    { progress: 0, height: 24 },
+    { progress: 1, height: 0 },
   ])(
     'keeps the composer inset in step with the keyboard at progress $progress',
-    async ({ progress, paddingBottom }) => {
+    async ({ progress, height }) => {
       keyboard.progress = progress;
       const tree = await mount();
-      const composer = tree.root.find(node => (node.type as string) === 'ChatComposer');
+      const inset = tree.root.find(node => node.props.testID === 'chat-composer-inset');
 
-      // The composer holds its bottom spacing in step with the keyboard's own
-      // progress, rather than flipping it after the keyboard has landed.
-      expect(composer.parent?.props.style).toEqual({ paddingBottom });
+      // The inset below the composer tracks the keyboard's own progress, rather
+      // than flipping after the keyboard has landed, and draws on the composer's
+      // bar surface instead of the screen background.
+      expect(inset.props.style).toEqual({ height });
+      expect(inset.parent?.type).toBe('BlurBar');
     }
   );
 

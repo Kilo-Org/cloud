@@ -51,6 +51,55 @@ export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema
  */
 export const BENCHMARK_CONTAINER_BUDGET = 250;
 
+/** Scheduler limits an admin can override at runtime, without a deploy. */
+export const BENCHMARK_SCHEDULER_SETTING_KEYS = [
+  'slots',
+  'modelConcurrency',
+  'providerConcurrency',
+  'unknownProviderConcurrency',
+] as const;
+export const BenchmarkSchedulerSettingKeySchema = z.enum(BENCHMARK_SCHEDULER_SETTING_KEYS);
+export type BenchmarkSchedulerSettingKey = z.infer<typeof BenchmarkSchedulerSettingKeySchema>;
+
+export const BenchmarkSchedulerLimitSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(BENCHMARK_CONTAINER_BUDGET);
+
+/**
+ * Admin scheduler overrides. PUT replaces the whole set: a null or missing limit
+ * falls back to the worker's `BENCHMARK_SCHEDULER_CONFIG`, then its default.
+ */
+export const BenchmarkSchedulerOverridesSchema = z.strictObject({
+  slots: BenchmarkSchedulerLimitSchema.nullable().default(null),
+  modelConcurrency: BenchmarkSchedulerLimitSchema.nullable().default(null),
+  providerConcurrency: BenchmarkSchedulerLimitSchema.nullable().default(null),
+  unknownProviderConcurrency: BenchmarkSchedulerLimitSchema.nullable().default(null),
+});
+export type BenchmarkSchedulerOverrides = z.infer<typeof BenchmarkSchedulerOverridesSchema>;
+
+export const BenchmarkSchedulerSettingSourceSchema = z.enum(['admin', 'env', 'default']);
+export type BenchmarkSchedulerSettingSource = z.infer<typeof BenchmarkSchedulerSettingSourceSchema>;
+
+/** `fallback` is the env or default value the setting returns to without an override. */
+export const BenchmarkSchedulerSettingSchema = z.object({
+  effective: BenchmarkSchedulerLimitSchema,
+  source: BenchmarkSchedulerSettingSourceSchema,
+  override: BenchmarkSchedulerLimitSchema.nullable(),
+  fallback: BenchmarkSchedulerLimitSchema,
+});
+export type BenchmarkSchedulerSetting = z.infer<typeof BenchmarkSchedulerSettingSchema>;
+
+export const BenchmarkSchedulerConfigResponseSchema = z.object({
+  settings: z.record(BenchmarkSchedulerSettingKeySchema, BenchmarkSchedulerSettingSchema),
+  updatedAt: z.string().nullable(),
+  updatedBy: z.string().nullable(),
+});
+export type BenchmarkSchedulerConfigResponse = z.infer<
+  typeof BenchmarkSchedulerConfigResponseSchema
+>;
+
 /** Exact model/effort identity in persisted benchmark run snapshots. */
 export const BenchmarkDeciderModelSchema = z
   .object({

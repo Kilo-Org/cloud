@@ -1064,6 +1064,73 @@ describe('rewriteModelResponse_Messages', () => {
     expect(dataPayloads(sse)).toContain('[DONE]');
   });
 
+  test('streams the start signature of a thinking block that has no signature_delta', async () => {
+    const upstream = sseResponse(
+      'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}\n\n' +
+        'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Reading the file."}}\n\n' +
+        'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n' +
+        'event: content_block_start\ndata: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"call-1","name":"read","input":{}}}\n\n' +
+        'event: content_block_stop\ndata: {"type":"content_block_stop","index":1}\n\n'
+    );
+
+    const result = await rewriteModelResponse_Messages({
+      response: upstream,
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const sse = await readOutputStream(result);
+
+    expect(dataObjects(sse)).toEqual([
+      {
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'thinking', thinking: '', signature: '' },
+      },
+      {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'thinking_delta', thinking: 'Reading the file.' },
+      },
+      { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: '' } },
+      { type: 'content_block_stop', index: 0 },
+      {
+        type: 'content_block_start',
+        index: 1,
+        content_block: { type: 'tool_use', id: 'call-1', name: 'read', input: {} },
+      },
+      { type: 'content_block_stop', index: 1 },
+    ]);
+    expect(sse).toContain(
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":""}}\n\n'
+    );
+  });
+
+  test.each([
+    [
+      'a streamed thinking signature',
+      'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}\n\n' +
+        'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"sig-1"}}\n\n' +
+        'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n',
+    ],
+    [
+      'a thinking block without any signature',
+      'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}\n\n' +
+        'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n',
+    ],
+  ])('keeps %s unchanged', async (_description, body) => {
+    const result = await rewriteModelResponse_Messages({
+      response: sseResponse(body),
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(await readOutputStream(result)).toBe(body);
+  });
+
   test('does not synthesize a [DONE] sentinel when upstream omits it', async () => {
     const upstream = sseResponse(
       'data: {"type":"message_delta","usage":{"output_tokens":9},"delta":{}}\n\n'

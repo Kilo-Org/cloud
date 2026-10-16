@@ -630,12 +630,50 @@ type MessagesApiError = {
   error: unknown;
 };
 
+type MessagesApiStreamEvent =
+  | MessagesApiMessageStart
+  | MessagesApiMessageDelta
+  | MessagesApiError
+  | Anthropic.Messages.MessageStreamEvent;
+
 function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
   if (removeCost) {
     delete usage.cost;
     delete usage.cost_details;
     delete usage.is_byok;
   }
+}
+
+/**
+ * Some upstreams, such as Moonshot, put a thinking block's signature only in
+ * `content_block_start` and never stream a `signature_delta`. The AI SDK reads
+ * streamed signatures only from `signature_delta` and drops unsigned thinking
+ * from later turns, so the start signature is replayed as a `signature_delta`.
+ */
+function createThinkingSignatureForwarder() {
+  const unstreamedSignatures = new Map<number, string>();
+  return (event: MessagesApiStreamEvent): Anthropic.Messages.RawContentBlockDeltaEvent | null => {
+    if (
+      event.type === 'content_block_start' &&
+      event.content_block.type === 'thinking' &&
+      typeof event.content_block.signature === 'string'
+    ) {
+      unstreamedSignatures.set(event.index, event.content_block.signature);
+    } else if (event.type === 'content_block_delta' && event.delta.type === 'signature_delta') {
+      unstreamedSignatures.delete(event.index);
+    } else if (event.type === 'content_block_stop') {
+      const signature = unstreamedSignatures.get(event.index);
+      unstreamedSignatures.delete(event.index);
+      if (signature !== undefined) {
+        return {
+          type: 'content_block_delta',
+          index: event.index,
+          delta: { type: 'signature_delta', signature },
+        };
+      }
+    }
+    return null;
+  };
 }
 
 export async function rewriteModelResponse_Messages({
@@ -702,6 +740,7 @@ export async function rewriteModelResponse_Messages({
       let terminalEventReceived = false;
       let generationId: string | undefined;
       const progress = createStreamProgressLogger();
+      const forwardThinkingSignature = createThinkingSignatureForwarder();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
           if (doneReceived || terminalEventReceived) {
@@ -713,11 +752,7 @@ export async function rewriteModelResponse_Messages({
             doneReceived = true;
             return;
           }
-          const json = JSON.parse(event.data) as
-            | MessagesApiMessageStart
-            | MessagesApiMessageDelta
-            | MessagesApiError
-            | Anthropic.Messages.MessageStreamEvent;
+          const json = JSON.parse(event.data) as MessagesApiStreamEvent;
 
           if (json.type === 'message_start') {
             const e = json as MessagesApiMessageStart;
@@ -738,6 +773,13 @@ export async function rewriteModelResponse_Messages({
             if (e.usage) {
               rewriteMessagesUsage(e.usage, removeCost);
             }
+          }
+
+          const signatureDelta = forwardThinkingSignature(json);
+          if (signatureDelta) {
+            controller.enqueue(
+              'event: content_block_delta\ndata: ' + JSON.stringify(signatureDelta) + '\n\n'
+            );
           }
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';

@@ -60,6 +60,10 @@ import {
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
+  customRouterErrorResponse,
+  autoRoutingUnavailableResponse,
+  invalidAutoDecisionResponse,
+  paidModelAuthRequiredResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
@@ -100,17 +104,32 @@ import {
   KILO_AUTO_FRONTIER_MODEL,
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import {
+  applyResolvedAutoModel,
+  applyResolvedModel,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
+import { decideCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/auto-model/custom-router';
+import { checkAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
+import {
+  fetchCustomRouterDecision,
   fetchEfficientAutoDecision,
   FRONTIER_ROUTING_FLAG,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
-import type { AutoRouter } from '@kilocode/auto-routing-contracts';
+import {
+  AUTO_DECISION_HEADER,
+  customRouterModelId,
+  isCustomRouterModelId,
+  type AutoRouter,
+  type CustomRouterReference,
+} from '@kilocode/auto-routing-contracts';
 import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
+  dataCollectionRequiredAutoRoutingCandidates,
+  deniedAutoRoutingCandidates,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
+import { AUTO_ROUTING_DECISION_SECRET } from '@kilocode/web-shared/lib/config.server';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -127,6 +146,7 @@ import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/orga
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
+  type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
@@ -141,8 +161,6 @@ import {
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
-
-const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
 /**
  * Checks if a string starts with a required prefix and removes it.
@@ -384,16 +402,77 @@ export async function handleLlmProxyRequest(
   // validation after resolution.
   let routingTarget: string | null = null;
   let legacyClassifierCostUsd = 0;
-  // Efficient/balanced requests resolve through the auto-routing pool. Kept for
+  // Efficient/balanced and custom router requests resolve through an auto-routing pool. Kept for
   // the org policy check below so a failed routing decision gets a specific
   // auto-routing error instead of the generic model-not-allowed error.
-  let isAutoEfficientRequest = false;
-  if (isKiloAutoModel(requestedModelLowerCased)) {
+  let isAutoRoutedRequest = false;
+  // Custom routers and signed CLI decisions bill an account, so they never fall through to
+  // anonymous handling.
+  const authenticatedRoutingCaller = async () => {
+    const { user, authFailedResponse, credentialsRejected, organizationId } = await authPromise;
+    if (authFailedResponse && credentialsRejected) return invalidTokenResponse();
+    if (!user || authFailedResponse) return paidModelAuthRequiredResponse();
+    return { userId: user.id, organizationId: organizationId ?? null };
+  };
+  const autoRoutingDenials = async (
+    fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
+    fromPrivacy: () => Promise<string[]>
+  ) => {
+    const { settings, plan } = await balanceAndSettingsPromise;
+    const groupPolicy = await organizationGroupPolicyPromise;
+    const deniedFromSettings =
+      !groupPolicy && plan === 'enterprise'
+        ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
+        : [];
+    const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
+      groupPolicy ? fromPolicy(groupPolicy) : [],
+      isDataCollectionExplicitlyDisallowed(effectivePrivacy) ? fromPrivacy() : [],
+    ]);
+    return [...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy])];
+  };
+  const decisionRequest = (caller: { userId: string; organizationId: string | null }) => ({
+    apiKind: requestBodyParsed.kind,
+    body: requestBodyParsed.body,
+    providerHints: autoRoutingProviderHints,
+    bodyBytes: Buffer.byteLength(requestBodyText),
+    userId: caller.userId,
+    organizationId: caller.organizationId,
+    sessionId: taskId ?? sessionHeader,
+    machineId: machineIdHeader,
+    clientRequestId,
+    mode: modeHeader,
+    userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+  });
+
+  const autoDecisionToken = request.headers.get(AUTO_DECISION_HEADER);
+  if (autoDecisionToken !== null) {
+    const caller = await authenticatedRoutingCaller();
+    if (caller instanceof NextResponse) return caller;
+    if (!AUTO_ROUTING_DECISION_SECRET) {
+      console.error(`${AUTO_DECISION_HEADER} received but AUTO_ROUTING_DECISION_SECRET is unset`);
+      return temporarilyUnavailableResponse();
+    }
+    const check = await checkAutoDecision({
+      token: autoDecisionToken,
+      secret: AUTO_ROUTING_DECISION_SECRET,
+      nowMs: Date.now(),
+      userId: caller.userId,
+      organizationId: caller.organizationId,
+      model: requestedModel,
+    });
+    if (check.kind === 'rejected') return invalidAutoDecisionResponse(check.reason);
+    applyResolvedModel(requestBodyParsed, check.resolved);
+    autoModel = check.routerModelId;
+  } else if (isKiloAutoModel(requestedModelLowerCased)) {
+    if (isCustomRouterModelId(requestedModelLowerCased)) {
+      const caller = await authenticatedRoutingCaller();
+      if (caller instanceof NextResponse) return caller;
+    }
     autoModel = requestedModelLowerCased;
     const isAutoEfficientId =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
-    isAutoEfficientRequest = isAutoEfficientId;
+    isAutoRoutedRequest = isAutoEfficientId || isCustomRouterModelId(requestedModelLowerCased);
     const decisionForRouter = async (router: AutoRouter) => {
       const { user, authFailedResponse, organizationId } = await authPromise;
       // The classifier uses Kilo's paid credential. Unauthenticated callers
@@ -405,39 +484,60 @@ export async function handleLlmProxyRequest(
       ) {
         return null;
       }
-      const { settings, plan } = await balanceAndSettingsPromise;
-      const groupPolicy = await organizationGroupPolicyPromise;
-      const deniedFromSettings =
-        !groupPolicy && plan === 'enterprise'
-          ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
-          : [];
-      const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
-        groupPolicy ? collectDeniedAutoRoutingModelIds(groupPolicy) : [],
-        isDataCollectionExplicitlyDisallowed(effectivePrivacy)
-          ? collectDataCollectionRequiredAutoRoutingModelIds()
-          : [],
-      ]);
-      const deniedModelIds = [
-        ...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy]),
-      ];
+2:   findCustomRouter,
+3: export async function dataCollectionRequiredAutoRoutingCandidates(
+  candidateIds: ReadonlyArray<string>
+): Promise<string[]> {
+  return dataCollectionRequiredCandidates(candidateIds, await getDataCollectionRequiredModelIds());
+}
+
+export async function collectDataCollectionRequiredAutoRoutingModelIds(): Promise<string[]> {
+  const [table, dataCollectionRequiredModelIds] = await Promise.all([
+    getCachedRoutingTable(),
+4: import { and, asc, eq, or } from 'drizzle-orm';
+import { readDb, type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+5:       const deniedModelIds = await autoRoutingDenials(
+        policy => collectDeniedAutoRoutingModelIds(policy),
+        () => collectDataCollectionRequiredAutoRoutingModelIds()
+      );
       const result = await fetchEfficientAutoDecision({
+        ...decisionRequest(owner),
         ...(router === 'frontier' ? { router } : {}),
-        apiKind: requestBodyParsed.kind,
-        body: requestBodyParsed.body,
         requestedModel,
-        providerHints: autoRoutingProviderHints,
-        bodyBytes: Buffer.byteLength(requestBodyText),
-        userId: user.id,
-        organizationId: organizationId ?? null,
-        sessionId: taskId ?? sessionHeader,
-        machineId: machineIdHeader,
-        clientRequestId,
-        mode: modeHeader,
-        userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
         deniedModelIds,
       });
       legacyClassifierCostUsd = result?.costUsd ?? 0;
       return result?.decision ?? null;
+    };
+    const customRouterDecision = async (reference: CustomRouterReference) => {
+      const caller = await authenticatedRoutingCaller();
+      if (caller instanceof NextResponse) {
+        return {
+          kind: 'rejected',
+          code: 'unauthorized',
+          message: 'Custom routers require an authenticated user',
+        } as const;
+      }
+      return await decideCustomRouter({
+        reference,
+        ...caller,
+        deniedModelIds: candidateIds =>
+          autoRoutingDenials(
+            policy => deniedAutoRoutingCandidates(policy, candidateIds),
+            () => dataCollectionRequiredAutoRoutingCandidates(candidateIds)
+          ),
+        decide: async (router, deniedModelIds) => {
+          const outcome = await fetchCustomRouterDecision({
+            ...decisionRequest(caller),
+            router: router.baseRouter,
+            customRouter: reference,
+            requestedModel: customRouterModelId(router.ownerType, router.slug),
+            deniedModelIds,
+          });
+          if (outcome.kind === 'ok') legacyClassifierCostUsd = outcome.costUsd;
+          return outcome;
+        },
+      });
     };
     const efficientDecision = isAutoEfficientId ? () => decisionForRouter('efficient') : undefined;
     const frontierDecision =
@@ -455,6 +555,7 @@ export async function handleLlmProxyRequest(
         clientIp: ipAddress ?? null,
         efficientDecision,
         frontierDecision,
+        customRouterDecision,
         organizationContext: organizationContextPromise,
         isAutoFreeCandidateAllowed: async modelId => {
           const policy = await organizationGroupPolicyPromise;
@@ -470,6 +571,12 @@ export async function handleLlmProxyRequest(
     }
     if (autoResult.kind === 'organization_auto_configuration_error') {
       return organizationAutoConfigurationResponse(autoResult.message);
+    }
+    if (autoResult.kind === 'custom_router_error') {
+      return customRouterErrorResponse(autoResult.code, autoResult.message);
+    }
+    if (autoResult.kind === 'auto_routing_unavailable') {
+      return autoRoutingUnavailableResponse(requestedModelLowerCased);
     }
     routingTarget = autoResult.routingTarget ?? null;
   }
@@ -542,17 +649,7 @@ export async function handleLlmProxyRequest(
 
     // No valid auth
     if (!isFreeModel(effectiveModelIdLowerCased)) {
-      // Paid model requires authentication
-      return NextResponse.json(
-        {
-          error: {
-            code: PAID_MODEL_AUTH_REQUIRED,
-            message: 'You need to sign in to use this model.',
-          },
-          error_type: ProxyErrorType.paid_model_auth_required,
-        },
-        { status: 401 }
-      );
+      return paidModelAuthRequiredResponse();
     }
 
     // Anonymous access for free model (rate-limited above when configured)
@@ -810,7 +907,7 @@ export async function handleLlmProxyRequest(
     }
 
     if (!groupModelAllowed) {
-      return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
+      return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
     }
     if (!groupProvidersAllowed) return modelNotAllowedResponse();
 

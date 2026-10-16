@@ -16,6 +16,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () 
   getConfiguredAutoFreeModels: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
+  findCustomRouter: jest.fn(),
+}));
+
 import type * as AutoModelResolution from './resolution';
 import {
   FRONTIER_CODE_MODEL,
@@ -27,7 +31,13 @@ import {
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
+import type {
+  AutoRoutingDecision,
+  CustomRouterDefinition,
+  CustomRouterReference,
+} from '@kilocode/auto-routing-contracts';
+import type { CustomRouterResolution } from './custom-router';
+import type * as CustomRouters from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 
 const { resolveAutoModel, applyResolvedAutoModel } =
@@ -51,6 +61,9 @@ const { getOpenRouterModelsFromDatabase: mockedGetOpenRouterModels } = jest.requ
 const { getConfiguredAutoFreeModels: mockedGetConfiguredAutoFreeModels } = jest.requireMock<
   jest.Mocked<typeof AutoFreeConfigModule>
 >('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config');
+const { findCustomRouter: mockedFindCustomRouter } = jest.requireMock<
+  jest.Mocked<typeof CustomRouters>
+>('@kilocode/web-shared/lib/ai-gateway/custom-routers');
 
 const sampleDecision: AutoRoutingDecision = {
   model: 'anthropic/claude-haiku-4',
@@ -917,6 +930,202 @@ describe('resolveAutoModel — Organization Auto branch', () => {
       kind: 'organization_auto_configuration_error',
       message: 'Organization Auto cannot target itself.',
     });
+  });
+});
+
+describe('resolveAutoModel — custom routers', () => {
+  const haiku = 'anthropic/claude-haiku-4.5';
+  const customDecision: AutoRoutingDecision = {
+    ...sampleDecision,
+    model: haiku,
+    entry: { kind: 'gateway', model: haiku },
+    variant: 'max',
+    stale: false,
+    fallback: false,
+  };
+  const orgRouter: CustomRouterDefinition = {
+    id: '00000000-0000-4000-8000-000000000002',
+    ownerType: 'org',
+    ownerId: 'org-1',
+    slug: 'team',
+    name: 'Team',
+    baseRouter: 'efficient',
+    mode: 'cost_per_accuracy',
+    entries: [{ kind: 'gateway', model: haiku }],
+    defaultEntryKey: `gateway:${haiku}`,
+  };
+  const okDecide = () =>
+    jest.fn(
+      async (_reference: CustomRouterReference): Promise<CustomRouterResolution> => ({
+        kind: 'ok',
+        decision: customDecision,
+      })
+    );
+
+  function resolveCustom(
+    model: string,
+    customRouterDecision: (reference: CustomRouterReference) => Promise<CustomRouterResolution>
+  ) {
+    return resolveAutoModel(
+      {
+        ...baseParams,
+        model,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => sampleDecision,
+        customRouterDecision,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+  }
+
+  beforeEach(() => {
+    mockedFindCustomRouter.mockReset();
+  });
+
+  it('serves the worker decision with its exact catalog variant', async () => {
+    const decide = okDecide();
+
+    const result = await resolveCustom('kilo-auto/custom/org/team', decide);
+
+    expect(decide).toHaveBeenCalledWith({ scope: 'org', slug: 'team' });
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: haiku, reasoning: { enabled: true, effort: 'max' }, verbosity: 'max' },
+    });
+  });
+
+  it('parses personal router ids', async () => {
+    const decide = okDecide();
+
+    await resolveCustom('kilo-auto/custom/mine', decide);
+
+    expect(decide).toHaveBeenCalledWith({ scope: 'user', slug: 'mine' });
+  });
+
+  it.each(['kilo-auto/custom/org', 'kilo-auto/custom/Not_A_Slug', 'kilo-auto/custom/'])(
+    'answers router_not_found for the invalid id %s without deciding',
+    async model => {
+      const decide = okDecide();
+
+      expect(await resolveCustom(model, decide)).toEqual({
+        kind: 'custom_router_error',
+        code: 'router_not_found',
+        message: 'Custom router not found',
+      });
+      expect(decide).not.toHaveBeenCalled();
+    }
+  );
+
+  it('surfaces worker rejections instead of a fallback model', async () => {
+    const result = await resolveCustom('kilo-auto/custom/mine', async () => ({
+      kind: 'rejected',
+      code: 'custom_router_unavailable',
+      message: 'No entry of this custom router is available to this client',
+    }));
+
+    expect(result).toEqual({
+      kind: 'custom_router_error',
+      code: 'custom_router_unavailable',
+      message: 'No entry of this custom router is available to this client',
+    });
+  });
+
+  it('reports an unreachable worker as unavailable instead of the balanced fallback', async () => {
+    const result = await resolveCustom('kilo-auto/custom/mine', async () => ({
+      kind: 'unavailable',
+    }));
+
+    expect(result).toEqual({ kind: 'auto_routing_unavailable' });
+  });
+
+  it('refuses a decision variant missing from the catalog instead of serving defaults', async () => {
+    const result = await resolveCustom('kilo-auto/custom/mine', async () => ({
+      kind: 'ok',
+      decision: {
+        ...customDecision,
+        model: 'anthropic/claude-sonnet-5',
+        entry: { kind: 'gateway', model: 'anthropic/claude-sonnet-5' },
+        variant: 'thinking',
+      },
+    }));
+
+    expect(result).toMatchObject({
+      kind: 'custom_router_error',
+      code: 'custom_router_unavailable',
+    });
+  });
+
+  it('resolves an Organization Auto route to an organization custom router', async () => {
+    mockedFindCustomRouter.mockResolvedValue(orgRouter);
+    const decide = okDecide();
+
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        modeHeader: 'code',
+        apiKind: 'chat_completions',
+        customRouterDecision: decide,
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            model_deny_list: ['openai/gpt-4o'],
+            org_auto_model: {
+              routes: { code: 'kilo-auto/custom/org/team' },
+              fallback_model: 'kilo-auto/balanced',
+            },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(mockedFindCustomRouter).toHaveBeenCalledWith(
+      { type: 'org', id: 'org-1' },
+      'team',
+      expect.anything()
+    );
+    expect(decide).toHaveBeenCalledWith({ scope: 'org', slug: 'team' });
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: haiku, reasoning: { enabled: true, effort: 'max' }, verbosity: 'max' },
+      routingTarget: 'kilo-auto/custom/org/team',
+    });
+  });
+
+  it.each([
+    ['a personal router', 'kilo-auto/custom/mine'],
+    ['a router of another organization', 'kilo-auto/custom/org/team'],
+  ])('rejects an Organization Auto route to %s', async (_name, target) => {
+    mockedFindCustomRouter.mockResolvedValue(null);
+    const decide = okDecide();
+
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        modeHeader: 'code',
+        apiKind: 'chat_completions',
+        customRouterDecision: decide,
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: { routes: { code: target }, fallback_model: 'kilo-auto/balanced' },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toMatchObject({ kind: 'organization_auto_configuration_error' });
+    expect(decide).not.toHaveBeenCalled();
   });
 });
 

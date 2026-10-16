@@ -31,6 +31,22 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import {
   customRouterOwnerCondition,
+2:   findCustomRouter,
+3: export async function dataCollectionRequiredAutoRoutingCandidates(
+  candidateIds: ReadonlyArray<string>
+): Promise<string[]> {
+  return dataCollectionRequiredCandidates(candidateIds, await getDataCollectionRequiredModelIds());
+}
+
+export async function collectDataCollectionRequiredAutoRoutingModelIds(): Promise<string[]> {
+  const [table, dataCollectionRequiredModelIds] = await Promise.all([
+    getCachedRoutingTable(),
+4: import { and, asc, eq, or } from 'drizzle-orm';
+import { readDb, type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+5:       const deniedModelIds = await autoRoutingDenials(
+        policy => collectDeniedAutoRoutingModelIds(policy),
+        () => collectDataCollectionRequiredAutoRoutingModelIds()
+      );
   listCustomRouters,
   toCustomRouterDefinition,
   type CustomRouterOwner,
@@ -341,13 +357,9 @@ async function findRouter(
   owner: CustomRouterOwner,
   slug: string
 ): Promise<CustomRouterDefinition> {
-  const [row] = await tx
-    .select()
-    .from(auto_routing_custom_routers)
-    .where(and(customRouterOwnerCondition(owner), eq(auto_routing_custom_routers.slug, slug)))
-    .limit(1);
-  if (!row) throw routerNotFound();
-  return toCustomRouterDefinition(row);
+  const router = await findCustomRouter(owner, slug, tx);
+  if (!router) throw routerNotFound();
+  return router;
 }
 
 async function saveRouter(

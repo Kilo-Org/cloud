@@ -31,7 +31,19 @@ import {
   ReasoningDetailsTransform,
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { fetchEfficientAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
+import {
+  fetchCustomRouterDecision,
+  fetchEfficientAutoDecision,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
+import {
+  findCustomRouter,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import {
+  signAutoDecision,
+  type AutoDecisionPayload,
+  type AutoRoutingDecision,
+  type CustomRouterDefinition,
+} from '@kilocode/auto-routing-contracts';
 import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
   FRONTIER_CODE_MODEL,
@@ -40,6 +52,7 @@ import {
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
+  deniedAutoRoutingCandidates,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
 import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
@@ -154,6 +167,18 @@ jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models', () => ({
   collectDeniedAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
   collectDataCollectionRequiredAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
+  deniedAutoRoutingCandidates: jest.fn().mockResolvedValue([]),
+  dataCollectionRequiredAutoRoutingCandidates: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
+  findCustomRouter: jest.fn(),
+}));
+let mockDecisionSecret = 'test-decision-secret';
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/config.server'),
+  get AUTO_ROUTING_DECISION_SECRET() {
+    return mockDecisionSecret;
+  },
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/processUsage');
@@ -188,6 +213,9 @@ const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
+const mockedFetchCustomRouterDecision = jest.mocked(fetchCustomRouterDecision);
+const mockedFindCustomRouter = jest.mocked(findCustomRouter);
+const mockedDeniedAutoRoutingCandidates = jest.mocked(deniedAutoRoutingCandidates);
 const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
 const mockedCollectDataCollectionRequiredAutoRoutingModelIds = jest.mocked(
@@ -2228,5 +2256,327 @@ describe('auto-routing shadow classifier', () => {
     );
     // The decide registers its lifetime and lease-release callback with after().
     expect(mockedAfter).toHaveBeenCalledWith(expect.any(Function));
+  });
+});
+
+describe('custom routers and signed auto decisions', () => {
+  const haiku = 'anthropic/claude-haiku-4.5';
+  const personalRouter: CustomRouterDefinition = {
+    id: '00000000-0000-4000-8000-000000000001',
+    ownerType: 'user',
+    ownerId: 'user-123',
+    slug: 'mine',
+    name: 'Mine',
+    baseRouter: 'frontier',
+    mode: 'best_accuracy',
+    entries: [
+      { kind: 'gateway', model: haiku },
+      { kind: 'gateway', model: 'openai/gpt-5-mini' },
+    ],
+    defaultEntryKey: 'gateway:openai/gpt-5-mini',
+  };
+  const haikuDecision: AutoRoutingDecision = {
+    model: haiku,
+    entry: { kind: 'gateway', model: haiku },
+    taskType: 'implementation',
+    subtaskType: 'feature_development',
+    source: 'benchmark',
+    tableVersion: 'v1',
+    sticky: false,
+    stale: false,
+    fallback: false,
+  };
+
+  function setOrganizationAuth(organizationId: string | undefined) {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId,
+    });
+  }
+
+  function usageContext() {
+    return mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockDecisionSecret = 'test-decision-secret';
+    setUserAuth();
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    mockedGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: haiku, choices: [] }),
+    });
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+    mockedDeniedAutoRoutingCandidates.mockResolvedValue([]);
+    mockedFindCustomRouter.mockResolvedValue(personalRouter);
+    mockedFetchCustomRouterDecision.mockResolvedValue({
+      kind: 'ok',
+      decision: haikuDecision,
+      costUsd: 0,
+    });
+    const actualResolution = jest.requireActual<typeof AutoModelResolution>(
+      '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution'
+    );
+    mockedApplyResolvedAutoModel.mockImplementation(actualResolution.applyResolvedAutoModel);
+  });
+
+  describe('gateway path', () => {
+    it('routes a personal router inside its pool and attributes usage to it', async () => {
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/mine')));
+
+      expect(response.status).toBe(200);
+      expect(mockedFindCustomRouter).toHaveBeenCalledWith({ type: 'user', id: 'user-123' }, 'mine');
+      const decideParams = mockedFetchCustomRouterDecision.mock.calls[0]?.[0];
+      expect(decideParams).toMatchObject({
+        customRouter: { scope: 'user', slug: 'mine' },
+        router: 'frontier',
+        requestedModel: 'kilo-auto/custom/mine',
+        userId: 'user-123',
+        organizationId: null,
+      });
+      expect(decideParams).not.toHaveProperty('clientEntries');
+      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(haiku);
+      expect(usageContext()).toMatchObject({
+        auto_model: 'kilo-auto/custom/mine',
+        requested_model: haiku,
+      });
+    });
+
+    it('resolves an organization router in the active organization and applies its policy', async () => {
+      setOrganizationAuth('org-1');
+      mockedFindCustomRouter.mockResolvedValue({
+        ...personalRouter,
+        ownerType: 'org',
+        ownerId: 'org-1',
+        slug: 'team',
+      });
+      mockedDeniedAutoRoutingCandidates.mockResolvedValue(['openai/gpt-5-mini']);
+
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('kilo-auto/custom/org/team'))
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedFindCustomRouter).toHaveBeenCalledWith({ type: 'org', id: 'org-1' }, 'team');
+      expect(mockedDeniedAutoRoutingCandidates).toHaveBeenCalledWith(expect.anything(), [
+        haiku,
+        'openai/gpt-5-mini',
+      ]);
+      expect(mockedFetchCustomRouterDecision).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customRouter: { scope: 'org', slug: 'team' },
+          requestedModel: 'kilo-auto/custom/org/team',
+          organizationId: 'org-1',
+          deniedModelIds: ['openai/gpt-5-mini'],
+        })
+      );
+      expect(usageContext()).toMatchObject({
+        auto_model: 'kilo-auto/custom/org/team',
+        organizationId: 'org-1',
+      });
+    });
+
+    it.each([
+      ['an organization router without an organization context', 'kilo-auto/custom/org/team'],
+      ['a missing router', 'kilo-auto/custom/missing'],
+    ] satisfies Array<[string, string]>)(
+      'answers router_not_found for %s',
+      async (_name, model) => {
+        if (model.endsWith('missing')) mockedFindCustomRouter.mockResolvedValue(null);
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)));
+
+        expect(response.status).toBe(404);
+        expect(await response.json()).toEqual({
+          error: { code: 'router_not_found', message: 'Custom router not found' },
+          error_type: 'custom_router',
+          message: 'Custom router not found',
+        });
+        expect(mockedFetchCustomRouterDecision).not.toHaveBeenCalled();
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it('fails with a retryable error instead of serving an out-of-pool model when the worker is unreachable', async () => {
+      mockedFetchCustomRouterDecision.mockResolvedValue({ kind: 'unavailable' });
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/mine')));
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('retry-after')).toBe('1');
+      expect(await response.json()).toMatchObject({ error_type: 'auto_routing_unavailable' });
+      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a null decision', null],
+      ['an out-of-pool model', { ...haikuDecision, model: 'qwen/qwen3-coder', entry: undefined }],
+    ] satisfies Array<[string, AutoRoutingDecision | null]>)(
+      'never serves %s from the worker',
+      async (_name, decision) => {
+        mockedFetchCustomRouterDecision.mockResolvedValue({ kind: 'ok', decision, costUsd: 0 });
+
+        const response = await handleLlmProxyRequest(
+          makeRequest(makeBody('kilo-auto/custom/mine'))
+        );
+
+        expect(response.status).toBe(503);
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it('passes the worker custom_router_unavailable rejection through', async () => {
+      mockedFetchCustomRouterDecision.mockResolvedValue({
+        kind: 'rejected',
+        code: 'custom_router_unavailable',
+        message: 'No entry of this custom router is available to this client',
+      });
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/mine')));
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({
+        error: { code: 'custom_router_unavailable' },
+      });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('requires authentication before resolving a custom router', async () => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: null,
+        authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+        credentialsRejected: false,
+      });
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/mine')));
+
+      expect(response.status).toBe(401);
+      expect(mockedFindCustomRouter).not.toHaveBeenCalled();
+      expect(mockedFetchCustomRouterDecision).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('x-kilo-auto-decision header', () => {
+    const signedPayload: AutoDecisionPayload = {
+      userId: 'user-123',
+      organizationId: null,
+      routerModelId: 'kilo-auto/custom/mine',
+      model: 'openai/gpt-4o',
+      variant: null,
+      expiresAt: Date.now() + 60_000,
+    };
+
+    async function requestWithDecision(
+      overrides: Partial<AutoDecisionPayload> = {},
+      model = 'openai/gpt-4o'
+    ) {
+      const token = await signAutoDecision(
+        { ...signedPayload, ...overrides },
+        'test-decision-secret'
+      );
+      return handleLlmProxyRequest(makeRequest(makeBody(model), { 'x-kilo-auto-decision': token }));
+    }
+
+    it('serves the signed model and attributes usage to the custom router', async () => {
+      const response = await requestWithDecision();
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('openai/gpt-4o');
+      expect(usageContext()).toMatchObject({
+        auto_model: 'kilo-auto/custom/mine',
+        requested_model: 'openai/gpt-4o',
+      });
+      expect(mockedFetchCustomRouterDecision).not.toHaveBeenCalled();
+      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+    });
+
+    it('accepts an organization decision in the same organization context', async () => {
+      setOrganizationAuth('org-1');
+
+      const response = await requestWithDecision({ organizationId: 'org-1' });
+
+      expect(response.status).toBe(200);
+      expect(usageContext()).toMatchObject({ auto_model: 'kilo-auto/custom/mine' });
+    });
+
+    it.each([
+      ['a decision for another model', { model: 'openai/gpt-5-mini' }, 'model_mismatch'],
+      ['an expired decision', { expiresAt: Date.now() - 1_000 }, 'expired'],
+      [
+        'a decision from another organization',
+        { organizationId: 'org-1' },
+        'organization_mismatch',
+      ],
+      ['a decision for another user', { userId: 'user-456' }, 'user_mismatch'],
+    ] satisfies Array<[string, Partial<AutoDecisionPayload>, string]>)(
+      'rejects %s',
+      async (_name, overrides, reason) => {
+        const response = await requestWithDecision(overrides);
+
+        expect(response.status).toBe(403);
+        expect(await response.json()).toMatchObject({
+          error: { code: 'invalid_auto_decision', reason },
+          error_type: 'invalid_auto_decision',
+        });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it('rejects a tampered decision', async () => {
+      const token = await signAutoDecision(signedPayload, 'test-decision-secret');
+      const [version, , signature] = token.split('.');
+      const forged = Buffer.from(
+        JSON.stringify({ ...signedPayload, routerModelId: 'kilo-auto/custom/other' })
+      ).toString('base64url');
+
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('openai/gpt-4o'), {
+          'x-kilo-auto-decision': `${version}.${forged}.${signature}`,
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ error: { reason: 'bad_signature' } });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('rejects a malformed decision with a 400', async () => {
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('openai/gpt-4o'), { 'x-kilo-auto-decision': 'garbage' })
+      );
+
+      expect(response.status).toBe(400);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('rejects a decision header on an auto model id', async () => {
+      const response = await requestWithDecision({}, 'kilo-auto/custom/mine');
+
+      expect(response.status).toBe(403);
+      expect(mockedFetchCustomRouterDecision).not.toHaveBeenCalled();
+    });
+
+    it('answers 503 when the gateway has no decision secret', async () => {
+      mockDecisionSecret = '';
+
+      const response = await requestWithDecision();
+
+      expect(response.status).toBe(503);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
   });
 });

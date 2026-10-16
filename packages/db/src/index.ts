@@ -50,6 +50,7 @@ export {
   markSecurityAgentCommandRetriesExhausted,
   reconcileStaleSecurityAgentCommands,
   requireSecurityAgentCommandTransitionOrTerminal,
+  SECURITY_AGENT_COMMAND_RETRIES_EXHAUSTED_FALLBACK,
   transitionSecurityAgentCommand,
   transitionSecurityAgentCommandWithCurrentState,
   type CreateSecurityAgentCommandInput,

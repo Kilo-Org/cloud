@@ -785,7 +785,11 @@ describe('consumeManualAnalysisBatch', () => {
       } as CloudflareEnv
     );
 
-    expect(markSecurityAgentCommandRetriesExhausted).toHaveBeenCalledWith({}, command.commandId);
+    expect(markSecurityAgentCommandRetriesExhausted).toHaveBeenCalledWith(
+      {},
+      command.commandId,
+      new Error('Security Agent command running transition rejected')
+    );
     expect(
       vi.mocked(markSecurityAgentCommandRetriesExhausted).mock.invocationCallOrder[0]
     ).toBeLessThan(message.retry.mock.invocationCallOrder[0] ?? Infinity);

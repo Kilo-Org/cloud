@@ -202,16 +202,45 @@ export async function markSecurityAgentCommandQueueAdmissionFailed(
   });
 }
 
+/**
+ * Placeholder written to `last_error_redacted` before the underlying attempt
+ * error was preserved; clients use it to tell legacy rows apart from real
+ * preserved messages.
+ */
+export const SECURITY_AGENT_COMMAND_RETRIES_EXHAUSTED_FALLBACK =
+  'Queue command failed after maximum delivery attempts';
+
+const LAST_ERROR_REDACTED_LIMIT = 300;
+
+/**
+ * Turns the last failed attempt's error into user-facing text for
+ * `last_error_redacted`: whitespace collapsed, token-shaped values redacted,
+ * length bounded. Falls back to the generic placeholder when the error carries
+ * no usable message.
+ */
+function redactCommandErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  const redacted = message
+    .replace(/\s+/g, ' ')
+    .replace(/bearer\s+\S+/gi, 'bearer [redacted]')
+    .replace(/gh[pousr]_[A-Za-z0-9]+/g, '[redacted]')
+    .replace(/github_pat_[A-Za-z0-9_]+/g, '[redacted]')
+    .trim()
+    .slice(0, LAST_ERROR_REDACTED_LIMIT);
+  return redacted || SECURITY_AGENT_COMMAND_RETRIES_EXHAUSTED_FALLBACK;
+}
+
 export async function markSecurityAgentCommandRetriesExhausted(
   db: SecurityAgentCommandDb,
-  commandId: string
+  commandId: string,
+  lastAttemptError?: unknown
 ): Promise<SecurityAgentCommandTransitionOutcome> {
   return transitionSecurityAgentCommandWithCurrentState(db, {
     commandId,
     fromStatuses: ['accepted', 'running'],
     status: 'failed',
     resultCode: 'QUEUE_RETRIES_EXHAUSTED',
-    lastErrorRedacted: 'Queue command failed after maximum delivery attempts',
+    lastErrorRedacted: redactCommandErrorMessage(lastAttemptError),
   });
 }
 

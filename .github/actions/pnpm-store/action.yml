@@ -5,6 +5,11 @@ description: >-
   unpacks the whole store on every job. pnpm checks each package against the
   lockfile integrity hash when it links it, so a stale entry is fetched again.
 
+  Each job mounts its own clone of the disk, so parallel jobs do not wait on
+  each other. Keep Branch Protection for sticky disks on in the Blacksmith
+  dashboard (Settings): then only default-branch runs commit the disk, and a
+  pull request job cannot change what main reads.
+
 runs:
   using: composite
   steps:

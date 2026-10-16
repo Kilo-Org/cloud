@@ -24,7 +24,6 @@ const nonFlexExclusiveModel: KiloExclusiveModel = {
   internal_id: 'test/non-flex',
   display_name: 'Non-Flex test model',
   description: 'Test model',
-  status: 'public',
   context_length: 8_192,
   max_completion_tokens: 4_096,
   provider: OPENROUTER,

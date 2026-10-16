@@ -33,10 +33,7 @@ import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import {
-  isDisabledKiloExclusiveModel,
-  isKiloExclusiveRateLimitedModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isKiloExclusiveRateLimitedModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
@@ -777,10 +774,7 @@ export async function handleLlmProxyRequest(
     return temporarilyUnavailableResponse();
   }
 
-  if (
-    isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
-    (!autoModel && (await isUnavailableModel(effectiveModelIdLowerCased)))
-  ) {
+  if (!autoModel && (await isUnavailableModel(effectiveModelIdLowerCased))) {
     console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
     return unavailableModelResponse();
   }

@@ -209,17 +209,14 @@ describe('getProvider exclusive model routing', () => {
     jest.mocked(getModelUserByokProviders).mockReset().mockResolvedValue([]);
   });
 
-  test.each(kiloExclusiveModels)(
-    'routes $public_id to its provider unless disabled',
-    async model => {
-      const result = await getProvider(providerInput(model.public_id));
-      expect(result.kind).toBe('provider');
-      if (result.kind !== 'provider') throw new Error('Expected a provider');
-      expect(result.provider).toBe(model.status === 'disabled' ? OPENROUTER : model.provider);
-      expect(result.userByok).toBeNull();
-      expect(result.bypassAccessCheck).toBe(false);
-    }
-  );
+  test.each(kiloExclusiveModels)('routes $public_id to its provider', async model => {
+    const result = await getProvider(providerInput(model.public_id));
+    expect(result.kind).toBe('provider');
+    if (result.kind !== 'provider') throw new Error('Expected a provider');
+    expect(result.provider).toBe(model.provider);
+    expect(result.userByok).toBeNull();
+    expect(result.bypassAccessCheck).toBe(false);
+  });
 
   test.each(kiloExclusiveModels.filter(({ provider }) => provider === MARTIAN))(
     'does not divert $public_id to Vercel or BYOK',

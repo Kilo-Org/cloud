@@ -538,13 +538,15 @@ describe('/api/auto-routing/custom-routers', () => {
     test('derives needsClientEval from client-eval entries without a current ready result', async () => {
       const ready = clientEntry('ready-model', ['high', 'low']);
       const stale = clientEntry('stale-model');
-      const entries = [gateway(SONNET), gateway(BYOK), ready, stale];
+      const partial = clientEntry('partial-model', ['high', 'low']);
+      const entries = [gateway(SONNET), gateway(BYOK), ready, stale, partial];
       await create(routerBody({ entries }));
       const statusByKey = new Map<string, CustomRouterVariantStatus[]>([
         [customRouterEntryKey(gateway(SONNET)), variants(['pending'])],
         [customRouterEntryKey(gateway(BYOK)), variants(['failed'])],
         [customRouterEntryKey(ready), variants(['ready', 'ready'])],
         [customRouterEntryKey(stale), variants(['stale'])],
+        [customRouterEntryKey(partial), variants(['ready', 'missing'])],
       ]);
       mockedGetStatus.mockImplementation(async request => ({
         status: 200,
@@ -563,7 +565,7 @@ describe('/api/auto-routing/custom-routers', () => {
         ownerId: user.id,
         baseRouter: 'efficient',
         entries,
-        clientEvalEntryKeys: [gateway(BYOK), ready, stale].map(customRouterEntryKey),
+        clientEvalEntryKeys: [gateway(BYOK), ready, stale, partial].map(customRouterEntryKey),
       });
       expect(
         listed.body.routers[0]?.entries.map(entry => [
@@ -576,6 +578,7 @@ describe('/api/auto-routing/custom-routers', () => {
         [customRouterEntryKey(gateway(BYOK)), true, variants(['failed'])],
         [customRouterEntryKey(ready), false, variants(['ready', 'ready'])],
         [customRouterEntryKey(stale), true, variants(['stale'])],
+        [customRouterEntryKey(partial), true, variants(['ready', 'missing'])],
       ]);
     });
 

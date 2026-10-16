@@ -26,9 +26,10 @@ done
 #   resolves to HEAD, which would produce an empty matrix and skip the
 #   workspace-tests job.
 # - `pull_request` and `merge_group` events: use the PR base SHA or the merge
-#   group base SHA from $GITHUB_EVENT_PATH, the same base the affected
-#   workspace detector uses. For a stacked PR this is the parent branch, so the
-#   matrix covers this PR's changes, not the whole stack's.
+#   group base SHA from $GITHUB_EVENT_PATH. On pull requests this is the base
+#   the affected workspace detector uses; in the merge queue that detector
+#   checks every workspace instead. For a stacked PR the base is the parent
+#   branch, so the matrix covers this PR's changes, not the whole stack's.
 # - Otherwise (or when that SHA is unavailable, and locally with no GitHub
 #   env): use the merge-base against origin/main.
 # - All-zeros before-sha (force-push / first push / branch creation) or any

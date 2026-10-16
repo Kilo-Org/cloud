@@ -21,6 +21,7 @@ import {
 } from '@/components/agents/use-new-session-creator';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import {
+  type AgentMode,
   dedupeCustomModeOptions,
   isBuiltinAgentMode,
   lockedModelOption,
@@ -273,12 +274,39 @@ export function NewSessionScreenBody() {
   const { customOptions, profileAgents } = useEffectiveProfileCustomModes(organizationId);
   // A computer also offers the agents its CLI loads for the selected launch
   // folder, including project agents from `.kilo/agents`.
-  const cliAgents = useCliAgents(
+  const { agents: cliAgents, settled: cliAgentsSettled } = useCliAgents(
     runOnInstance ? { connectionId: runOnInstance.connectionId, directory: folderPath } : null
   );
   const remoteCustomOptions = dedupeCustomModeOptions(
     mergeProfileAndRuntimeModeOptions(profileAgents, cliAgents)
   );
+  // The slug the user picked from a CLI's own list. When the target or the
+  // launch folder changes and the settled answer no longer offers it, the mode
+  // falls back to the default rather than sending an agent the target lacks.
+  const cliPickedModeRef = useRef<AgentMode | null>(null);
+  const handleModeChange = useCallback(
+    (next: AgentMode) => {
+      cliPickedModeRef.current =
+        !isBuiltinAgentMode(next) &&
+        !profileAgents.some(agent => agent.slug === next) &&
+        cliAgents.some(agent => agent.slug === next)
+          ? next
+          : null;
+      setMode(next);
+    },
+    [profileAgents, cliAgents, setMode]
+  );
+  useEffect(() => {
+    const picked = cliPickedModeRef.current;
+    if (picked === null || picked !== mode || !cliAgentsSettled) {
+      return;
+    }
+    const available = runOnInstance === null ? customOptions : remoteCustomOptions;
+    if (!available.some(option => option.value === picked)) {
+      cliPickedModeRef.current = null;
+      setMode('code');
+    }
+  }, [mode, cliAgentsSettled, runOnInstance, customOptions, remoteCustomOptions, setMode]);
   // Clone entry keeps the source prefill model and an unlocked toolbar: no
   // pinned-agent lock, no gateway pin override.
   const pinned = isCloneEntry ? {} : resolvePinnedAgentModel({ slug: mode, profileAgents });
@@ -619,18 +647,9 @@ export function NewSessionScreenBody() {
       // would render stale above Start after switching to a computer. A fresh
       // cloud attempt clears it again at press time.
       setCloudCreateError(null);
-      // An agent only the previous computer's CLI offered may not exist on the
-      // next target, so fall back to the default mode.
-      if (
-        !isBuiltinAgentMode(mode) &&
-        !profileAgents.some(agent => agent.slug === mode) &&
-        cliAgents.some(agent => agent.slug === mode)
-      ) {
-        setMode('code');
-      }
       handleRunOnInstanceChange(next);
     },
-    [handleRunOnInstanceChange, saveRunOn, mode, profileAgents, cliAgents, setMode]
+    [handleRunOnInstanceChange, saveRunOn]
   );
 
   function handlePromptChange(text: string) {
@@ -988,7 +1007,7 @@ export function NewSessionScreenBody() {
         modelLockLabel={isRemoteTargetSelected ? undefined : pinned.agentName}
         initialPrompt={initialPrompt}
         onChangeText={handlePromptChange}
-        onModeChange={setMode}
+        onModeChange={handleModeChange}
         onModelSelect={handleModelSelect}
         onAddAttachment={() => void handleAddAttachment()}
         onRemoveAttachment={handleRemoveAttachment}

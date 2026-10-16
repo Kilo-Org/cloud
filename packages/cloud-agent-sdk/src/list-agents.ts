@@ -50,6 +50,8 @@ export type ListAgentsResult =
  *
  * - Resolved and schema-valid → `{ ok: true, agents }`.
  * - Resolved but outside the schema → `{ ok: false, reason: 'invalid' }`.
+ * - Resolved but the parse throws unexpectedly → `{ ok: false, reason:
+ *   'transport', cause }`; the parse never escapes the helper.
  * - Rejected with an old-CLI unknown-command or invalid-request string, a
  *   non-retryable relay code, or `CLI_UPGRADE_REQUIRED` → `{ ok: false,
  *   reason: 'unsupported' }`.
@@ -93,8 +95,12 @@ export async function listAgents(
     return { ok: false, reason: 'transport', cause: error };
   }
 
-  const parsed = listAgentsV1Schema.safeParse(raw);
-  return parsed.success
-    ? { ok: true, agents: parsed.data.agents }
-    : { ok: false, reason: 'invalid' };
+  try {
+    const parsed = listAgentsV1Schema.safeParse(raw);
+    return parsed.success
+      ? { ok: true, agents: parsed.data.agents }
+      : { ok: false, reason: 'invalid' };
+  } catch (error) {
+    return { ok: false, reason: 'transport', cause: error };
+  }
 }

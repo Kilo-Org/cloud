@@ -9,7 +9,9 @@ import {
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import { cliCommandUnavailableError } from '@/lib/hooks/cli-command-unavailable-error';
 
-export type CliAgent = { slug: string; name: string; description?: string };
+type CliAgent = { slug: string; name: string; description?: string };
+
+export type CliAgents = { agents: CliAgent[]; settled: boolean };
 
 const NO_AGENTS: CliAgent[] = [];
 
@@ -22,8 +24,12 @@ const NO_AGENTS: CliAgent[] = [];
  * retry and the app reports it once. An old CLI (`unsupported`) or a bad body
  * (`invalid`) resolves to no agents: the picker then shows what it showed
  * before this command existed.
+ *
+ * `settled` is true once the target's answer is known (or there is no
+ * target). It stays false while loading and after a transport failure, so a
+ * caller never treats "not answered yet" as "this agent is gone".
  */
-export function useCliAgents(target: ListAgentsTarget | null): CliAgent[] {
+export function useCliAgents(target: ListAgentsTarget | null): CliAgents {
   const connection = useUserWebConnection();
   const { data } = useQuery<ListAgentsResult>({
     queryKey: ['cli-agents', target],
@@ -54,5 +60,7 @@ export function useCliAgents(target: ListAgentsTarget | null): CliAgent[] {
         : NO_AGENTS,
     [data]
   );
-  return target === null ? NO_AGENTS : agents;
+  return target === null
+    ? { agents: NO_AGENTS, settled: true }
+    : { agents, settled: data !== undefined };
 }

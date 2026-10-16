@@ -668,7 +668,7 @@ export function SessionDetailContent({
   // built-in nor already listed, so an inherited custom slug stays visible in
   // the picker.
   const runtimeAgents = sessionConfig?.runtimeAgents;
-  const cliAgents = useCliAgents(
+  const { agents: cliAgents } = useCliAgents(
     activeSessionType === 'remote' && remoteModelState.ownerConnectionId !== null
       ? { sessionId, ownerConnectionId: remoteModelState.ownerConnectionId }
       : null

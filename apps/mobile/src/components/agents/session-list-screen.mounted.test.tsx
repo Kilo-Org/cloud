@@ -22,52 +22,58 @@ import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-a
 import { type BannerState } from '@/lib/offline-banner-state';
 
 type Org = { organizationId: string; organizationName: string };
-const state = vi.hoisted(() => ({
-  focused: true,
-  fontScale: 1,
-  // The window width `ScreenHeader` reads to decide whether the header's
-  // controls share the title's row. Undefined by default keeps every other case
-  // on the single-row layout; a case that sets it exercises the reflow.
-  windowWidth: undefined as number | undefined,
-  // Mutable so a case can put the tree on Android: the platform decides
-  // whether the floating pull-to-refresh indicator is safe (device defect
-  // uxs1) or the reserved band carries the in-flight state instead.
-  platform: { OS: 'ios' as string },
-  // Mutable so a case can turn reduced motion on: the platform control is then
-  // inert and a centered body draws the pull's static progress itself.
-  reducedMotion: false,
-  topInset: 0,
-  leftInset: 0,
-  rightInset: 0,
-  tabBarHeight: 60,
-  focusCallbacks: new Set<() => void>(),
-  listeners: new Set<(state: string) => void>(),
-  // Keyboard listeners, keyed by the event the platform reports (the screen's
-  // empty state reserves the IME's height, so a case must be able to raise it).
-  keyboard: new Map<string, Set<(event: { endCoordinates: { height: number } }) => void>>(),
-  auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
-  organization: { organizationId: null as string | null, isLoaded: true },
-  boundary: { orgs: [] as Org[] | undefined, isResolving: false, isError: false },
-  live: {
-    activeSessions: [] as ActiveSession[],
-    isLoading: false,
-    isError: false,
-    hasAcceptedSuccess: true,
-    isFetching: false,
-    isPaused: false,
-    terminalError: null as ReturnType<typeof useLiveAgentSessions>['terminalError'],
-  },
-  internet: 'online' as BannerState,
-  connection: { isConnected: true, reconnectExhausted: false },
-  refetch: vi.fn<() => Promise<boolean>>(),
-  boundaryRefetch: vi.fn(),
-  socketRetry: vi.fn(),
-  invalidate: vi.fn(),
-  announcements: [] as string[],
-  destination: '',
-  sessionId: '',
-  liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
-}));
+const state = vi.hoisted(() => {
+  // Route parameters the screen reads; a case sets `status` to mount the
+  // transient status filter the Home card opens.
+  const routeParams: Record<string, string | undefined> = {};
+  return {
+    focused: true,
+    fontScale: 1,
+    // The window width `ScreenHeader` reads to decide whether the header's
+    // controls share the title's row. Undefined by default keeps every other case
+    // on the single-row layout; a case that sets it exercises the reflow.
+    windowWidth: undefined as number | undefined,
+    // Mutable so a case can put the tree on Android: the platform decides
+    // whether the floating pull-to-refresh indicator is safe (device defect
+    // uxs1) or the reserved band carries the in-flight state instead.
+    platform: { OS: 'ios' as string },
+    // Mutable so a case can turn reduced motion on: the platform control is then
+    // inert and a centered body draws the pull's static progress itself.
+    reducedMotion: false,
+    topInset: 0,
+    leftInset: 0,
+    rightInset: 0,
+    tabBarHeight: 60,
+    focusCallbacks: new Set<() => void>(),
+    listeners: new Set<(state: string) => void>(),
+    // Keyboard listeners, keyed by the event the platform reports (the screen's
+    // empty state reserves the IME's height, so a case must be able to raise it).
+    keyboard: new Map<string, Set<(event: { endCoordinates: { height: number } }) => void>>(),
+    auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
+    organization: { organizationId: null as string | null, isLoaded: true },
+    boundary: { orgs: [] as Org[] | undefined, isResolving: false, isError: false },
+    live: {
+      activeSessions: [] as ActiveSession[],
+      isLoading: false,
+      isError: false,
+      hasAcceptedSuccess: true,
+      isFetching: false,
+      isPaused: false,
+      terminalError: null as ReturnType<typeof useLiveAgentSessions>['terminalError'],
+    },
+    internet: 'online' as BannerState,
+    connection: { isConnected: true, reconnectExhausted: false },
+    refetch: vi.fn<() => Promise<boolean>>(),
+    boundaryRefetch: vi.fn(),
+    socketRetry: vi.fn(),
+    invalidate: vi.fn(),
+    announcements: [] as string[],
+    destination: '',
+    sessionId: '',
+    routeParams,
+    liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
+  };
+});
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 // Mutable so a case can put the tree in an RTL interface: the header action's
 // letterspaced capitals are LTR-only and must drop under RTL, keeping the
@@ -216,6 +222,14 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => state.focused }),
+  // Real `setParams` shallow-merges and cannot delete a key; the real
+  // `useLocalSearchParams` then hides an undefined value. The mock keeps the
+  // merged key and masks it on read, so a cleared status is absent to the
+  // screen exactly as it is on the device.
+  useLocalSearchParams: () =>
+    Object.fromEntries(
+      Object.entries(state.routeParams).filter(([, value]) => value !== undefined)
+    ),
   useFocusEffect: (effect: () => void) => {
     state.focusCallbacks.add(effect);
   },
@@ -226,6 +240,9 @@ vi.mock('expo-router', () => ({
     },
     replace: (path: string) => {
       state.destination = path;
+    },
+    setParams: (params: Record<string, string | undefined>) => {
+      Object.assign(state.routeParams, params);
     },
   }),
   useScrollToTop: () => undefined,
@@ -267,6 +284,9 @@ vi.mock('@/components/agents/session-list-content', () => ({
 }));
 vi.mock('@/components/agents/session-list-search-header', () => ({
   SessionListSearchHeader: 'SessionListSearchHeader',
+}));
+vi.mock('@/components/agents/session-status-filter-bar', () => ({
+  SessionStatusFilterBar: 'SessionStatusFilterBar',
 }));
 vi.mock('@/components/agents/platform-filter-modal', async importOriginal => ({
   ...(await importOriginal<typeof PlatformFilterModule>()),
@@ -540,6 +560,7 @@ beforeEach(() => {
   keyboardStore.setHeight(0);
   state.destination = '';
   state.sessionId = '';
+  state.routeParams = {};
   state.announcements = [];
   Object.assign(state.auth, { token: 'account', isLoading: false, isSigningOut: false });
   Object.assign(state.organization, { organizationId: null, isLoaded: true });
@@ -2046,6 +2067,43 @@ describe('AgentSessionListScreen live filtering', () => {
 
     const list = requireNode('FlashList');
     expect((list.props.data as ActiveSession[]).map(session => session.id)).toEqual(['a1']);
+  });
+
+  it('narrows the live list to the status the Home card sets and clears the filter', async () => {
+    state.live.activeSessions = [
+      { ...row, id: 'idle-1', status: 'idle' },
+      { ...row, id: 'work-1', status: 'running' },
+    ];
+    state.routeParams = { status: 'idle' };
+    await renderScreen();
+
+    const list = requireNode('FlashList');
+    expect((list.props.data as ActiveSession[]).map(session => session.id)).toEqual(['idle-1']);
+    const bar = requireNode('SessionStatusFilterBar');
+    expect(bar.props.kind).toBe('idle');
+    expect(bar.props.count).toBe(1);
+
+    act(() => {
+      (bar.props.onClear as () => void)();
+    });
+    expect(state.routeParams.status).toBeUndefined();
+  });
+
+  it('shows a clearable no-match state when the Home status filter has no rows', async () => {
+    state.live.activeSessions = [{ ...row, id: 'work-1', status: 'running' }];
+    state.routeParams = { status: 'idle' };
+    const renderer = await renderScreen();
+
+    expect(nodes('FlashList')).toHaveLength(0);
+    // The bar still names the active filter, with a zero count.
+    expect(requireNode('SessionStatusFilterBar').props.count).toBe(0);
+    const emptyState = renderer.root.findByType(EmptyState);
+    expect(emptyState.props.title).toBe('No sessions match');
+    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
+    act(() => {
+      clearAction.props.onPress();
+    });
+    expect(state.routeParams.status).toBeUndefined();
   });
 
   it('shows a clearable no-match state when every live row is filtered out', async () => {

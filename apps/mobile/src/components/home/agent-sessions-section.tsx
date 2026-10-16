@@ -1,9 +1,11 @@
 /* eslint-disable max-lines -- the shared live feedback (Home and the Agents tab) and the Home section that places its notices share one state model */
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+
+import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { CenteredState } from '@/components/centered-state';
 
@@ -313,6 +315,18 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const content = liveSessionContent(context, sessions);
   const failureLabel = t('home.couldNotLoadActiveSessions');
   const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
+  // Open the Agents tab, with the status filter a count row names. Same tab
+  // switch and stack reset as `See all`, so a pushed history screen cannot hide
+  // the filtered list. `See all` passes no status, which clears any filter a
+  // previous tap left on the route.
+  const openAgentsIndex = useCallback(
+    (status?: GlanceableStatusKind) => {
+      const href: Href = { pathname: AGENTS_INDEX_HREF, params: status ? { status } : {} };
+      router.navigate(href);
+      router.dismissTo(href);
+    },
+    [router]
+  );
 
   return (
     <View>
@@ -324,9 +338,7 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
         actionLabel={t('home.seeAll')}
         actionHidden={content === 'empty'}
         onActionPress={() => {
-          // Switch tabs, then pop a previously pushed history screen to the live index.
-          router.navigate(AGENTS_INDEX_HREF as Href);
-          router.dismissTo(AGENTS_INDEX_HREF as Href);
+          openAgentsIndex();
         }}
         notice={notice && <LiveSessionHeaderNotice notice={notice} />}
       />
@@ -348,6 +360,7 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
               <GlanceableActiveCard
                 sessions={sessions.activeSessions}
                 onPressSession={handleRowPress}
+                onPressStatus={openAgentsIndex}
               />
             </Animated.View>
           )}

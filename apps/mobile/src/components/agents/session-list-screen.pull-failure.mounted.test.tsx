@@ -140,9 +140,11 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => true }),
   useFocusEffect: () => undefined,
+  useLocalSearchParams: () => ({}),
   useRouter: () => ({
     push: () => undefined,
     replace: () => undefined,
+    setParams: () => undefined,
   }),
   useScrollToTop: () => undefined,
 }));

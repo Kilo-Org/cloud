@@ -86,3 +86,5 @@ fi
 if [ ${#mobile_lint_dirs[@]} -gt 0 ]; then
   oxlint --config apps/mobile/.oxlintrc.json "${mobile_lint_dirs[@]}"
 fi
+
+# ci-probe 1

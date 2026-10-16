@@ -7,10 +7,10 @@ jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
-  buildAutoModelCatalogEntry: jest.fn((model: { id: string; name: string }) => ({
+  buildAutoModelCatalogEntry: (model: { id: string; name: string }) => ({
     id: model.id,
     name: model.name,
-  })),
+  }),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
   listUsableCustomRouters: jest.fn(),

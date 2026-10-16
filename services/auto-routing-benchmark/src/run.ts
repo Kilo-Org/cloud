@@ -361,15 +361,8 @@ export async function drainQueues(
   errors?: unknown[],
   router: AutoRouter = 'efficient'
 ): Promise<StartedQueueRun[]> {
-  if (router === 'frontier' && selector === 'user') {
-    throw new BenchmarkRunConfigError('The frontier router does not support owner queues');
-  }
   const queues: BenchmarkRunPurpose[] =
-    selector === 'both'
-      ? router === 'frontier'
-        ? ['platform']
-        : ['platform', 'user']
-      : [selector satisfies BenchmarkRunPurpose];
+    selector === 'both' ? ['platform', 'user'] : [selector satisfies BenchmarkRunPurpose];
   const started: StartedQueueRun[] = [];
   for (const queue of queues) {
     try {
@@ -663,9 +656,6 @@ export async function startRun(
 ): Promise<{ runId: string; enqueuedModels: number; skippedModels: string[] }> {
   const router = kind === 'classifier' ? 'efficient' : (options.router ?? 'efficient');
   const purpose: BenchmarkRunPurpose = options.purpose ?? 'platform';
-  if (router === 'frontier' && purpose === 'user') {
-    throw new BenchmarkRunConfigError('The frontier router does not support owner queues');
-  }
   if (kind === 'decider' && (!options.entries || options.entries.length === 0)) {
     throw new BenchmarkRunConfigError('decider runs require a non-empty registry entry snapshot');
   }
@@ -912,9 +902,6 @@ export async function drainQueue(
   queue: BenchmarkRunPurpose,
   router: AutoRouter = 'efficient'
 ): Promise<{ runId: string; entryCount: number } | null> {
-  if (router === 'frontier' && queue === 'user') {
-    throw new BenchmarkRunConfigError('The frontier router does not support owner queues');
-  }
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return null;
 

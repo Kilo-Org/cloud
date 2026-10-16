@@ -166,7 +166,12 @@ describe('scheduler (production migrations and real SQLite)', () => {
       unknownProviderConcurrency: 2,
       modelLimits: {},
       providerLimits: {},
-      shares: { 'efficient/platform': 2, 'frontier/platform': 2, 'efficient/user': 1 },
+      shares: {
+        'efficient/platform': 2,
+        'frontier/platform': 2,
+        'efficient/user': 1,
+        'frontier/user': 1,
+      },
     });
     expect(() => schedulerConfig('{"slots":251}')).toThrow();
     expect(() => schedulerConfig('{"slots":0}')).toThrow();

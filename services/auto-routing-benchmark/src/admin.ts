@@ -1,6 +1,9 @@
 import * as z from 'zod';
 import {
   AutoRouterSchema,
+  CUSTOM_ROUTER_STATUS_PATH,
+  CUSTOM_ROUTER_TABLE_PATH,
+  CustomRouterBenchmarkContextSchema,
   DEFAULT_AUTO_ROUTER,
   BenchmarkConfigSchema,
   BenchmarkSchedulerOverridesSchema,
@@ -17,12 +20,14 @@ import {
   type BenchmarkRun,
   type BenchmarkSchedulerConfigResponse,
   type BenchmarkRunProgress,
+  type CustomRoutingTableResponse,
 } from '@kilocode/auto-routing-contracts';
 import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
 import type { Context, Hono } from 'hono';
 import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
 import { assembleCustomRoutingTable } from './custom-routing-table';
+import { assembleCustomRouterTable, lookupCustomRouterStatuses } from './custom-routers';
 import {
   lookupProfileStatuses,
   ProfileConfigMissingError,
@@ -71,12 +76,6 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
   app.use('/admin/*', async (c, next) => {
     const router = AutoRouterSchema.safeParse(c.req.query('router') ?? DEFAULT_AUTO_ROUTER);
     if (!router.success) return c.json({ error: 'Invalid router' }, 400);
-    if (
-      router.data !== DEFAULT_AUTO_ROUTER &&
-      (c.req.path.startsWith('/admin/profiles/') || c.req.path === '/admin/custom-routing-table')
-    ) {
-      return c.json({ error: 'Custom profiles are only supported by the efficient router' }, 400);
-    }
     await next();
   });
   app.get('/admin/config', async c => {
@@ -188,12 +187,6 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       // platform queue; an unavailable catalog must not block owner work.
       if (kind === 'decider') {
         const drainErrors: unknown[] = [];
-        if (router === 'frontier' && queue === 'user') {
-          return c.json(
-            { error: 'Custom profiles are only supported by the efficient router' },
-            400
-          );
-        }
         const started = await drainQueues(c.env, queue, drainErrors, router);
         // Drains never throw, so a wedged queue would otherwise return 200 and
         // the panel would report "nothing pending" for work that is stuck.
@@ -246,9 +239,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     };
     const [platform, user, platformEntries] = await Promise.all([
       countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'platform'),
-      router === 'frontier'
-        ? Promise.resolve([])
-        : countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'user'),
+      countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'user'),
       listCurrentPlatformProfileStatuses(c.env.BENCH_DB, current),
     ]);
     const toQueue = (rows: Awaited<ReturnType<typeof countCurrentProfilesByStatus>>) => {
@@ -275,9 +266,6 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }),
     async c => {
       const router = AutoRouterSchema.parse(c.req.query('router') ?? c.req.valid('json').router);
-      if (router === 'frontier' && c.req.valid('json').scope === 'user') {
-        return c.json({ error: 'Custom profiles are only supported by the efficient router' }, 400);
-      }
       const config = await getBenchmarkConfig(c.env.BENCH_DB, router);
       if (!config) {
         return c.json({ error: 'benchmark config not set: save it in the admin panel first' }, 400);
@@ -289,7 +277,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           engineIdentity: computeEngineIdentity('decider', router),
           repetitions: config.deciderRepetitions,
         },
-        router === 'frontier' ? 'platform' : c.req.valid('json').scope
+        c.req.valid('json').scope
       );
       return c.json({ requeued });
     }
@@ -341,10 +329,8 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }),
     async c => {
       const body = c.req.valid('json');
-      if (AutoRouterSchema.parse(c.req.query('router') ?? body.router) !== DEFAULT_AUTO_ROUTER) {
-        return c.json({ error: 'Custom profiles are only supported by the efficient router' }, 400);
-      }
-      const config = await getBenchmarkConfig(c.env.BENCH_DB);
+      const router = AutoRouterSchema.parse(c.req.query('router') ?? body.router);
+      const config = await getBenchmarkConfig(c.env.BENCH_DB, router);
       if (!config) {
         return c.json(
           {
@@ -404,10 +390,8 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }),
     async c => {
       const body = c.req.valid('json');
-      if (AutoRouterSchema.parse(c.req.query('router') ?? body.router) !== DEFAULT_AUTO_ROUTER) {
-        return c.json({ error: 'Custom profiles are only supported by the efficient router' }, 400);
-      }
-      const config = await getBenchmarkConfig(c.env.BENCH_DB);
+      const router = AutoRouterSchema.parse(c.req.query('router') ?? body.router);
+      const config = await getBenchmarkConfig(c.env.BENCH_DB, router);
       if (!config) {
         return c.json(
           {
@@ -458,10 +442,8 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }),
     async c => {
       const body = c.req.valid('json');
-      if (AutoRouterSchema.parse(c.req.query('router') ?? body.router) !== DEFAULT_AUTO_ROUTER) {
-        return c.json({ error: 'Custom profiles are only supported by the efficient router' }, 400);
-      }
-      const config = await getBenchmarkConfig(c.env.BENCH_DB);
+      const router = AutoRouterSchema.parse(c.req.query('router') ?? body.router);
+      const config = await getBenchmarkConfig(c.env.BENCH_DB, router);
       if (!config) {
         return c.json(
           {
@@ -495,6 +477,41 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         }
         throw error;
       }
+    }
+  );
+
+  app.post(
+    CUSTOM_ROUTER_TABLE_PATH,
+    zodJsonValidator(CustomRouterBenchmarkContextSchema, {
+      errorMessage: 'Invalid custom router table request',
+    }),
+    async c => {
+      const context = c.req.valid('json');
+      const config = await getBenchmarkConfig(c.env.BENCH_DB, context.baseRouter);
+      if (!config) return c.json({ table: null } satisfies CustomRoutingTableResponse);
+      return c.json(
+        await assembleCustomRouterTable(c.env.BENCH_DB, config, context, { catalogEnv: c.env })
+      );
+    }
+  );
+
+  app.post(
+    CUSTOM_ROUTER_STATUS_PATH,
+    zodJsonValidator(CustomRouterBenchmarkContextSchema, {
+      errorMessage: 'Invalid custom router status request',
+    }),
+    async c => {
+      const context = c.req.valid('json');
+      const config = await getBenchmarkConfig(c.env.BENCH_DB, context.baseRouter);
+      if (!config) {
+        return c.json(
+          { error: `benchmark config not set for the ${context.baseRouter} router` },
+          400
+        );
+      }
+      return c.json(
+        await lookupCustomRouterStatuses(c.env.BENCH_DB, config, context, { catalogEnv: c.env })
+      );
     }
   );
 }

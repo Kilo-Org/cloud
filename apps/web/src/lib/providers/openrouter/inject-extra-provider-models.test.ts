@@ -192,20 +192,49 @@ describe('injectVercelOnlyProviders', () => {
     ]);
     const runinfra = providerModelData[2];
     expect(runinfra?.provider).toEqual({
-      name: 'Runinfra',
-      displayName: 'Runinfra',
+      name: 'RunInfra',
+      displayName: 'RunInfra',
       slug: 'runinfra',
-      dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+      dataPolicy: {
+        training: false,
+        retainsPrompts: false,
+        canPublish: false,
+        termsOfServiceURL: 'https://runinfra.ai/terms-of-service',
+        privacyPolicyURL: 'https://runinfra.ai/privacy-policy',
+      },
       icon: { url: 'https://placehold.co/100?text=RU&font=roboto', className: 'rounded-sm' },
     });
     expect(runinfra?.models).toHaveLength(1);
     expect(runinfra?.models[0]?.slug).toBe(MODEL_SLUG);
     expect(runinfra?.models[0]?.context_length).toBe(128_000);
     expect(runinfra?.models[0]?.endpoint).toEqual({
-      provider_display_name: 'Runinfra',
+      provider_display_name: 'RunInfra',
       is_free: false,
       pricing: { prompt: '0.0000001', completion: '0.0000004' },
       data_policy: { training: false, retainsPrompts: false },
+    });
+  });
+
+  test('derives a display name without policy links for unknown providers', () => {
+    const providerModelData = nvidiaProviderModelData();
+    const vercelModels: Record<string, StoredModel> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [{ provider_name: 'nvidia' }, { provider_name: 'future-provider' }],
+      },
+    };
+
+    injectVercelOnlyProviders(vercelModels, providerModelData);
+
+    const futureProvider = providerModelData.find(
+      ({ provider }) => provider.slug === 'future-provider'
+    )?.provider;
+    expect(futureProvider?.displayName).toBe('Future Provider');
+    expect(futureProvider?.dataPolicy).toEqual({
+      training: true,
+      retainsPrompts: true,
+      canPublish: false,
     });
   });
 
@@ -229,6 +258,8 @@ describe('injectVercelOnlyProviders', () => {
       training: true,
       retainsPrompts: false,
       canPublish: false,
+      termsOfServiceURL: 'https://boundless.network/terms-of-service',
+      privacyPolicyURL: 'https://boundless.network/privacy-policy',
     });
     expect(boundless?.models[0]?.endpoint?.data_policy).toEqual({
       training: true,

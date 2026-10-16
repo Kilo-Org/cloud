@@ -80,13 +80,54 @@ function toDisplayName(providerId: string) {
     .join(' ');
 }
 
+type VercelOnlyProviderMetadata = {
+  displayName: string;
+  termsOfServiceURL: string;
+  privacyPolicyURL: string;
+};
+
+/** Vercel's API has no provider metadata, so known providers are listed here. */
+const vercelOnlyProviderMetadata = new Map<string, VercelOnlyProviderMetadata>(
+  Object.entries({
+    boundless: {
+      displayName: 'Boundless',
+      termsOfServiceURL: 'https://boundless.network/terms-of-service',
+      privacyPolicyURL: 'https://boundless.network/privacy-policy',
+    },
+    particle: {
+      displayName: 'Particle',
+      termsOfServiceURL: 'https://particle.ai/legal/terms',
+      privacyPolicyURL: 'https://particle.ai/legal/privacy',
+    },
+    runinfra: {
+      displayName: 'RunInfra',
+      termsOfServiceURL: 'https://runinfra.ai/terms-of-service',
+      privacyPolicyURL: 'https://runinfra.ai/privacy-policy',
+    },
+    runware: {
+      displayName: 'Runware',
+      termsOfServiceURL: 'https://runware.ai/terms',
+      privacyPolicyURL: 'https://runware.ai/privacy',
+    },
+  })
+);
+
 function createVercelOnlyProvider(providerId: string): OpenRouterProvider {
-  const displayName = toDisplayName(providerId);
+  const metadata = vercelOnlyProviderMetadata.get(providerId);
+  const displayName = metadata?.displayName ?? toDisplayName(providerId);
   return {
     name: displayName,
     displayName,
     slug: providerId,
-    dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+    dataPolicy: {
+      training: false,
+      retainsPrompts: false,
+      canPublish: false,
+      ...(metadata && {
+        termsOfServiceURL: metadata.termsOfServiceURL,
+        privacyPolicyURL: metadata.privacyPolicyURL,
+      }),
+    },
     icon: {
       url: `https://placehold.co/100?text=${providerId.slice(0, 2).toUpperCase()}&font=roboto`,
       className: 'rounded-sm',

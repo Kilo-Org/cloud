@@ -111,6 +111,7 @@ import {
   hasUnsettledChunks,
   recoverChunks,
   releaseInitializationLease,
+  restartPaidCase,
   resolveSchedulerConfig,
   scheduleRunChunks,
   schedulerBackoffSeconds,
@@ -1652,7 +1653,7 @@ async function processDeciderJob(
         const priorStartedAt = await getPaidCaseStartedAt(env.BENCH_DB, execution);
         if (priorStartedAt !== null) throw new AmbiguousBenchmarkExecutionError(priorStartedAt);
         const kiloToken = await cliToken();
-        const startedAt = Date.now();
+        let startedAt = Date.now();
         if (!(await beginPaidCase(env.BENCH_DB, execution, startedAt))) {
           throw new AmbiguousBenchmarkExecutionError(
             await getPaidCaseStartedAt(env.BENCH_DB, execution)
@@ -1683,6 +1684,8 @@ async function processDeciderJob(
         ) {
           return { result: first, retried: false };
         }
+        startedAt = Date.now();
+        await restartPaidCase(env.BENCH_DB, execution, startedAt);
         const retry = await invokeCli();
         retry.costUsd =
           retry.costUsd === null && first.costUsd === null

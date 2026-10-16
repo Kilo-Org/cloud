@@ -7,8 +7,12 @@
  */
 export function withCallerCancellation(request: Request): Request {
   const callerGone = new AbortController();
-  request.signal.addEventListener('abort', () => callerGone.abort(request.signal.reason), {
-    once: true,
-  });
+  if (request.signal.aborted) {
+    callerGone.abort(request.signal.reason);
+  } else {
+    request.signal.addEventListener('abort', () => callerGone.abort(request.signal.reason), {
+      once: true,
+    });
+  }
   return new Request(request, { signal: callerGone.signal });
 }

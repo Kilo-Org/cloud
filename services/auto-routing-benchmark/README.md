@@ -175,10 +175,11 @@ A chunk that finds a ledgered case without output waits for it instead of failin
 It keeps its slot and provider lease, so the wait cannot oversubscribe providers, and its
 claim is redelivered every 30 seconds to recheck. The wait ends when the output arrives,
 which the chunk then grades, or once the decider case timeout (180 seconds) plus the
-container's delivery window (90 seconds) has passed since the paid case started. Only then
-does the case count as genuinely ambiguous (a container hard-killed mid-flight, or a lost
-delivery): it fails its measurement lane as infrastructure uncertainty instead of inventing
-a score or issuing another paid call. A recheck mints no user token and warms no container.
+container's delivery window (90 seconds) has passed since the case's latest paid call started
+(an empty-output retry restarts it in the ledger). Only then does the case count as genuinely
+ambiguous (a container hard-killed mid-flight, or a lost delivery): it fails its measurement
+lane as infrastructure uncertainty instead of inventing a score or issuing another paid call.
+A recheck mints no user token and warms no container.
 Manual requeue creates a new run and may repeat that unknown case; compatible completed cases
 and pending successful outputs are still reused.
 Terminal scheduler rows are pruned in bounded batches after 24 hours. Benchmark history,

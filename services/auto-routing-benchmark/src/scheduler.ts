@@ -808,6 +808,19 @@ export async function getPaidCaseStartedAt(
   return row?.started_at ?? null;
 }
 
+/** Moves a ledgered case's start to a further paid call its own token makes. */
+export async function restartPaidCase(
+  db: D1Database,
+  key: PaidExecutionKey,
+  now: number
+): Promise<void> {
+  await db
+    .prepare(`UPDATE scheduler_executions SET started_at = ?
+    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)
+    .bind(now, key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
+    .run();
+}
+
 export function schedulerBackoffSeconds(attempts: number): number {
   return Math.min(300, 15 * 2 ** Math.min(attempts - 1, 5));
 }

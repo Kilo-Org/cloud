@@ -24,6 +24,7 @@ vi.mock('./scheduler', async importOriginal => {
     getPaidCaseStartedAt: vi.fn(),
     hasUnsettledChunks: vi.fn(),
     recoverChunks: vi.fn(),
+    restartPaidCase: vi.fn(),
     scheduleRunChunks: vi.fn(),
     startChunk: vi.fn(),
   };
@@ -130,6 +131,7 @@ import {
   getPaidCaseStartedAt,
   hasUnsettledChunks,
   recoverChunks,
+  restartPaidCase,
   scheduleRunChunks,
   startChunk,
   type SchedulerClaim,
@@ -736,6 +738,28 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(deferChunk).not.toHaveBeenCalled();
     expect(clearUnbilledCase).not.toHaveBeenCalled();
     expect(queueSend).toHaveBeenCalledWith(deciderMessage(), { delaySeconds: 30 });
+  });
+
+  it('restarts the paid start in the ledger before an empty-output retry', async () => {
+    vi.mocked(runDeciderCaseViaCli)
+      .mockResolvedValueOnce({ ...successfulCliResult, text: '' })
+      .mockResolvedValueOnce(successfulCliResult);
+    await processJob(env, deciderMessage());
+    const execution = {
+      runId,
+      model,
+      variant: '',
+      rep: 0,
+      caseId: benchCase.id,
+      token: 'token-1',
+    };
+    expect(beginPaidCase).toHaveBeenCalledWith(env.BENCH_DB, execution, expect.any(Number));
+    expect(restartPaidCase).toHaveBeenCalledWith(env.BENCH_DB, execution, expect.any(Number));
+    const [firstCall, retryCall] = vi.mocked(runDeciderCaseViaCli).mock.invocationCallOrder;
+    const restartCall = vi.mocked(restartPaidCase).mock.invocationCallOrder[0];
+    expect(restartCall).toBeGreaterThan(firstCall);
+    expect(restartCall).toBeLessThan(retryCall);
+    expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
   });
 
   it('records a container-posted outcome as pending output or a released ledger row', async () => {

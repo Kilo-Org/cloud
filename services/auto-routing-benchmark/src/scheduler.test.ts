@@ -14,6 +14,7 @@ import {
   getPaidCaseStartedAt,
   hasUnsettledChunks,
   recoverChunks,
+  restartPaidCase,
   scheduleRunChunks,
   schedulerConfig,
   startChunk,
@@ -817,6 +818,26 @@ describe('scheduler (production migrations and real SQLite)', () => {
       { case_id: 'paid-case', token: claim.token, started_at: NOW },
       { case_id: 'unpaid-case', token: replacement.token, started_at: recoveredAt },
     ]);
+  });
+
+  it("restarts a ledgered case's paid start only for the token that opened it", async () => {
+    insertRun(sqlite, 'restart');
+    await scheduleRunChunks(db, {
+      runId: 'restart',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const [claim] = await claimMany(db, schedulerConfig(), 1, 'restart');
+    if (!claim) throw new Error('Expected a claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const key = paidCase(claim, 'case');
+    expect(await beginPaidCase(db, key, NOW)).toBe(true);
+    await restartPaidCase(db, { ...key, token: 'another-token' }, NOW + 1_000);
+    expect(await getPaidCaseStartedAt(db, key)).toBe(NOW);
+    await restartPaidCase(db, key, NOW + 2_000);
+    expect(await getPaidCaseStartedAt(db, key)).toBe(NOW + 2_000);
   });
 
   it('keys paid-case admission separately by exact variant and repetition', async () => {

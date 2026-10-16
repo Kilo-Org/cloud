@@ -41,6 +41,7 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   font: mockModifier('font'),
   foregroundStyle: mockModifier('foregroundStyle'),
   frame: mockModifier('frame'),
+  layoutPriority: mockModifier('layoutPriority'),
   lineLimit: mockModifier('lineLimit'),
   monospacedDigit: mockModifier('monospacedDigit'),
   padding: mockModifier('padding'),

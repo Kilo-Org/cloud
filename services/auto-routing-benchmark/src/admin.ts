@@ -8,9 +8,7 @@ import {
   BenchmarkConfigSchema,
   BenchmarkSchedulerOverridesSchema,
   BenchmarkKindSchema,
-  BenchmarkProfileStatusesRequestSchema,
   BenchmarkRunPurposeSchema,
-  CustomRoutingTableRequestSchema,
   RegisterBenchmarkProfilesRequestSchema,
   RequeueBenchmarkRegistryRequestSchema,
   type BenchmarkRegistryQueue,
@@ -26,10 +24,8 @@ import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
 import type { Context, Hono } from 'hono';
 import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
-import { assembleCustomRoutingTable } from './custom-routing-table';
 import { assembleCustomRouterTable, lookupCustomRouterStatuses } from './custom-routers';
 import {
-  lookupProfileStatuses,
   ProfileConfigMissingError,
   ProfileQuotaExceededError,
   ProfileValidationError,
@@ -375,103 +371,6 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         if (error instanceof ProfileQuotaExceededError) {
           return c.json(error.quota, 429);
         }
-        if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
-          return c.json({ error: error.message }, 400);
-        }
-        throw error;
-      }
-    }
-  );
-
-  app.post(
-    '/admin/profiles/status',
-    zodJsonValidator(BenchmarkProfileStatusesRequestSchema, {
-      errorMessage: 'Invalid profile status request',
-    }),
-    async c => {
-      const body = c.req.valid('json');
-      const router = AutoRouterSchema.parse(c.req.query('router') ?? body.router);
-      const config = await getBenchmarkConfig(c.env.BENCH_DB, router);
-      if (!config) {
-        return c.json(
-          {
-            error:
-              'benchmark config not set: save it in the admin panel before looking up profiles',
-          },
-          400
-        );
-      }
-      try {
-        const catalog = await fetchBenchmarkModelCatalog(c.env);
-        const available = new Set(catalog.data.map(model => model.id));
-        const supported = body.entries.filter(entry => available.has(entry.model));
-        const pairs = platformRegistryEntries(
-          { deciderModels: supported.map(entry => ({ id: entry.model })) },
-          catalog
-        );
-        const result =
-          pairs.length > 0
-            ? await lookupProfileStatuses(c.env.BENCH_DB, config, { pairs })
-            : { statuses: [] };
-        return c.json({
-          statuses: [
-            ...mapProfileStatusesToRequestedModels(supported, catalog, result.statuses),
-            ...body.entries
-              .filter(entry => !available.has(entry.model))
-              .map(entry => ({
-                entry: { model: entry.model, variant: null },
-                status: 'failed',
-                failureReason: 'Model is unavailable in the current catalog.',
-              })),
-          ],
-        });
-      } catch (error) {
-        if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
-          return c.json({ error: error.message }, 400);
-        }
-        throw error;
-      }
-    }
-  );
-
-  // Sparse custom routing table for ready/current pool entries only.
-  app.post(
-    '/admin/custom-routing-table',
-    zodJsonValidator(CustomRoutingTableRequestSchema, {
-      errorMessage: 'Invalid custom routing table request',
-    }),
-    async c => {
-      const body = c.req.valid('json');
-      const router = AutoRouterSchema.parse(c.req.query('router') ?? body.router);
-      const config = await getBenchmarkConfig(c.env.BENCH_DB, router);
-      if (!config) {
-        return c.json(
-          {
-            error:
-              'benchmark config not set: save it in the admin panel before assembling a custom routing table',
-          },
-          400
-        );
-      }
-      try {
-        const catalog = await fetchBenchmarkModelCatalog(c.env);
-        const available = new Set(catalog.data.map(model => model.id));
-        const pairs = platformRegistryEntries(
-          {
-            deciderModels: body.entries
-              .filter(entry => available.has(entry.model))
-              .map(entry => ({ id: entry.model })),
-          },
-          catalog
-        );
-        return c.json(
-          pairs.length > 0
-            ? await assembleCustomRoutingTable(c.env.BENCH_DB, config, pairs, {
-                catalogEnv: c.env,
-              })
-            : { table: null }
-        );
-      } catch (error) {
         if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
           return c.json({ error: error.message }, 400);
         }

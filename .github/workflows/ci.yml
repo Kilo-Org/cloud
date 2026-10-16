@@ -879,15 +879,12 @@ jobs:
         working-directory: services/cloud-agent-next/wrapper
         run: bun test ./src/control-plane/process.test.ts
 
-      # Every other wrapper test file, listed at run time so a new file runs
-      # here without a workflow change.
+      # Every other wrapper test file, in bun's own discovery order: some
+      # files mock modules for the whole process, so the order matters.
       - name: Run the other wrapper tests
         if: matrix.part == 'other'
         working-directory: services/cloud-agent-next/wrapper
-        run: |
-          mapfile -t files < <(find src -name '*.test.ts' ! -path 'src/control-plane/process.test.ts' | sort | sed 's|^|./|')
-          echo "${#files[@]} test files"
-          bun test "${files[@]}"
+        run: bun test src --path-ignore-patterns='**/control-plane/process.test.ts'
 
       - name: Run Cloud Agent Postgres aggregate tests
         if: matrix.part == 'other'

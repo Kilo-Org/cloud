@@ -35,6 +35,56 @@ const agentConfig = {
   additionalProperties: {},
 } as const;
 
+const hookGroups = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      matcher: {
+        description:
+          'Tool names to match: "*" or omitted matches all tools, "edit|write" matches exact names, anything else is a regular expression. Kilo tool ids and their Claude Code names (e.g. Edit, Bash) both match.',
+        type: 'string',
+      },
+      hooks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['command'] },
+            command: {
+              description:
+                'Command to run. Without args it runs through the shell; with args it is the program to spawn directly. It receives the hook input as JSON on stdin.',
+              type: 'string',
+            },
+            args: {
+              description:
+                'Arguments for exec form: the command is spawned directly with these arguments, without a shell.',
+              type: 'array',
+              items: { type: 'string' },
+            },
+            timeout: {
+              description:
+                'Timeout in seconds (default: 60). A hook that times out does not block the tool call.',
+              type: 'integer',
+              exclusiveMinimum: 0,
+            },
+            onFailure: {
+              description:
+                'Set to "block" so a PreToolUse hook that fails (timeout, crash, unexpected exit code) blocks the tool call instead of letting it run.',
+              type: 'string',
+              enum: ['block'],
+            },
+          },
+          required: ['type', 'command'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['hooks'],
+    additionalProperties: false,
+  },
+} as const;
+
 export const kiloExtras = {
   top: {
     auto_expand_history: {
@@ -126,6 +176,24 @@ export const kiloExtras = {
             'Days a session is kept before retention deletes it. Defaults to 30, minimum 1.',
           type: 'number',
           minimum: 1,
+        },
+      },
+      additionalProperties: false,
+    },
+    hooks: {
+      description:
+        'Shell command hooks run around agent tool calls, compatible with Claude Code hooks. Only read from global, managed, or organization config; project config hooks are ignored.',
+      type: 'object',
+      properties: {
+        PreToolUse: {
+          description:
+            'Run before a tool call. Exit code 2 (or a JSON deny decision) blocks the call.',
+          ...hookGroups,
+        },
+        PostToolUse: {
+          description:
+            'Run after a tool call succeeds. Exit code 2 stderr (or a JSON block reason / additionalContext) is shown to the model.',
+          ...hookGroups,
         },
       },
       additionalProperties: false,

@@ -94,6 +94,25 @@ describe('kilo config.json schema merge', () => {
     expect(props.privacy_mode).toBeDefined();
     expect(props.retention).toBeDefined();
     expect(props.memory_model).toBeDefined();
+    expect(props.hooks).toBeDefined();
+  });
+
+  test('hooks accepts PreToolUse and PostToolUse command hooks', () => {
+    type Groups = {
+      type: string;
+      items: { properties: { hooks: { items: { properties: Record<string, unknown> } } } };
+    };
+    const hooks = props.hooks as {
+      additionalProperties: boolean;
+      properties: { PreToolUse: Groups; PostToolUse: Groups };
+    };
+    expect(hooks.additionalProperties).toBe(false);
+    expect(hooks.properties.PreToolUse.type).toBe('array');
+    expect(hooks.properties.PostToolUse.type).toBe('array');
+    const handler = hooks.properties.PreToolUse.items.properties.hooks.items.properties;
+    expect(handler.type).toEqual({ type: 'string', enum: ['command'] });
+    expect(handler.command).toEqual(expect.objectContaining({ type: 'string' }));
+    expect(handler.onFailure).toEqual(expect.objectContaining({ enum: ['block'] }));
   });
 
   test('retention exposes enabled boolean and maxAgeDays number', () => {

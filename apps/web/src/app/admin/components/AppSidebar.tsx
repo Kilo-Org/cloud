@@ -21,7 +21,6 @@ import {
   MailCheck,
   FileSearch,
   GitPullRequest,
-  UserX,
   Upload,
   Bell,
   Network,
@@ -271,11 +270,6 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Feature Interest',
     url: '/admin/feature-interest',
     icon: () => <Sparkles />,
-  },
-  {
-    title: () => 'Free Model Usage',
-    url: '/admin/free-model-usage',
-    icon: () => <UserX />,
   },
   {
     title: () => 'Alerting',

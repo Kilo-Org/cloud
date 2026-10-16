@@ -19,7 +19,6 @@ export const proxyErrorTypeSchema = z.enum([
   'rate_limit_exceeded',
   'account_restricted',
   'paid_model_auth_required',
-  'promotion_limit_reached',
   'unsupported_fim_model',
   'unsupported_edit_model',
   'insufficient_credits',

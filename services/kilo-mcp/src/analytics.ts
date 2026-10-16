@@ -328,3 +328,5 @@ export function createMcpAnalytics(deps: McpAnalyticsDeps): McpAnalytics {
     oauthSignIn: input => emit(oauthSignInEvent(input)),
   };
 }
+
+// ci-probe 1

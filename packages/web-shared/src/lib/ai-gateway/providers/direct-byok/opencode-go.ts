@@ -1,3 +1,4 @@
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { randomUUID } from 'node:crypto';
 import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
@@ -8,7 +9,7 @@ export default {
   base_url: 'https://opencode.ai/zen/go/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],
-  default_ai_sdk_provider: 'openai-compatible',
+  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
   transformRequest(context) {
     context.extraHeaders['x-opencode-session'] = generateProviderSpecificSessionHash(
       context.kilo_user_id,

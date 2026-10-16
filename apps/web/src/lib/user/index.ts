@@ -74,11 +74,9 @@ import {
   kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
-  user_period_cache,
   user_feedback,
   app_builder_feedback,
   cloud_agent_feedback,
-  free_model_usage,
   security_advisor_scans,
   kilo_pass_scheduled_changes,
   security_analysis_owner_state,
@@ -943,7 +941,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - credit_campaigns (created_by_kilo_user_id anonymized)
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
  * - App Store account token and retained Kilo Pass store purchase/event token fields
- * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
+ * - user_feedback / app_builder_feedback (FK nulled)
  * - user_data_exports and their multipart/outbox state (external object keys
  *   are copied to durable deletion tombstones for Worker cleanup)
  * - Stripe early-fraud-warning/dispute retained user links (FK nulled)
@@ -970,7 +968,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   cloud_agent_code_reviews, review memory feedback/proposals,
  *   device_auth_requests, auto_top_up_configs,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
- *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
+ *   kilo_pass_scheduled_changes, coding_plan_availability_intents,
  *   user_notification_preferences)
  * - the organization's shared-services openai_chatgpt_connections row is kept
  *   (it belongs to the organization): the deleted connector's reference is
@@ -1575,7 +1573,6 @@ export async function anonymizeCloudUserData(
         OR recipients->'emails' ? ${originalEmail}::text
       )
   `);
-  await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
   await tx
     .delete(kilo_pass_scheduled_changes)
     .where(eq(kilo_pass_scheduled_changes.kilo_user_id, userId));
@@ -1782,10 +1779,6 @@ export async function anonymizeCloudUserData(
     .update(cloud_agent_feedback)
     .set({ kilo_user_id: null })
     .where(eq(cloud_agent_feedback.kilo_user_id, userId));
-  await tx
-    .update(free_model_usage)
-    .set({ kilo_user_id: null })
-    .where(eq(free_model_usage.kilo_user_id, userId));
   await tx
     .update(stripe_early_fraud_warning_cases)
     .set({ kilo_user_id: null })

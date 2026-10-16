@@ -27,3 +27,5 @@ export function backendAuthMiddleware<E extends { Bindings: Record<never, never>
     return next();
   };
 }
+
+// ci-probe 1

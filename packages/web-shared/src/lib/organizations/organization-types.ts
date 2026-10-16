@@ -336,6 +336,8 @@ const OpenRouterModelSchema = z.object({
   isFree: z.boolean().optional(),
   mayTrainOnYourPrompts: z.boolean().optional(),
   hasUserByokAvailable: z.boolean().optional(),
+  /** Custom LLM granted to specific organizations or groups by a Kilo admin. */
+  isPrivateCustomLlm: z.boolean().optional(),
   autoRouting: z
     .object({
       models: z.array(z.string()),

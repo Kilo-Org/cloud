@@ -43,6 +43,7 @@ function convert(publicId: string, model: CustomLlmDefinition) {
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
+    isPrivateCustomLlm: true,
     mayTrainOnYourPrompts: true,
     opencode: opencode && withLegacyVariants(opencode),
   };

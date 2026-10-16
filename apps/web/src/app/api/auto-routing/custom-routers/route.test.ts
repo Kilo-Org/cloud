@@ -271,7 +271,7 @@ describe('/api/auto-routing/custom-routers', () => {
       });
     });
 
-    test('rolls back the router when benchmark admission hits the owner quota', async () => {
+    test('does not create the router when benchmark admission hits the owner quota', async () => {
       mockedRegister.mockResolvedValue({
         ok: false,
         status: 429,

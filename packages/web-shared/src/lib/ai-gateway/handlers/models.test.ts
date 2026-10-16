@@ -309,4 +309,20 @@ describe('GET /api/openrouter/models', () => {
       ],
     });
   });
+
+  test('serves the catalog without custom routers when loading them fails', async () => {
+    const publicModel = makeModel('public/model');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id' },
+      organizationId: null,
+      authFailedResponse: null,
+    } as never);
+    mockedAddUserByokAvailability.mockResolvedValue([publicModel]);
+    mockedListUsableCustomRouters.mockRejectedValue(new Error('database unavailable'));
+
+    const response = await handleModelsRequest();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ data: [publicModel] });
+  });
 });

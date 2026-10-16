@@ -641,8 +641,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return peer.worktreeCapture(input);
   }
 
-  // --- init and storage cutover ----------------------------------------------
-
   private async initializeStorage(): Promise<void> {
     const generation = await this.ctx.storage.get<unknown>(GENERATION_KEY);
     if (generation !== GENERATION) {
@@ -701,8 +699,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       this.wipeLocator = parsedLocator.locator;
     }
   }
-
-  // --- registration -----------------------------------------------------------
 
   async registerSession(input: ControlPlaneSessionRegistration): Promise<{ ok: true }> {
     await this.initialized;
@@ -1218,8 +1214,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return { type: 'ok', authorization };
   }
 
-  // --- message flow -----------------------------------------------------------
-
   async send(intent: ControlPlanePromptPayload): Promise<ControlPlaneSendResult> {
     await this.initialized;
     if (this.registration === null) return { type: 'session-not-found' };
@@ -1373,8 +1367,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
   }
 
-  // --- notifications (spec §10) ----------------------------------------------
-
   async onRoute(update: ControlPlaneRouteUpdate): Promise<void> {
     await this.initialized;
     if (this.registration === null) return;
@@ -1510,8 +1502,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  // --- worktree changes (B10) -------------------------------------------------
-
   async getWorktreeChanges(): Promise<GetWorktreeChangesOutput> {
     await this.initialized;
     return this.worktreeChanges.get();
@@ -1525,8 +1515,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     return this.worktreeChanges.refresh();
   }
-
-  // --- backstop alarm ---------------------------------------------------------
 
   async alarm(): Promise<void> {
     await this.initialized;
@@ -1581,8 +1569,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     await this.ctx.storage.setAlarm(Math.min(...candidates));
   }
-
-  // --- reads ------------------------------------------------------------------
 
   async getSession(): Promise<ControlPlaneSessionSnapshot> {
     await this.initialized;
@@ -1766,8 +1752,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     return closed;
   }
-
-  // --- delete and worktree deletion ------------------------------------------
 
   /**
    * C1c: updates a prepared session's callback target (legacy `tryUpdate`,
@@ -2015,8 +1999,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.preparationRecorders.clear();
   }
 
-  // --- terminals (B10) --------------------------------------------------------
-
   /** Worker-facing terminal RPC (spec §10); routing/handler wiring is C1. */
   async terminalCreate(input: {
     operationId: string;
@@ -2041,8 +2023,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.terminals.close(input);
   }
 
-  // --- preview ----------------------------------------------------------------
-
   /**
    * Worker-facing preview resolver (spec §10). Runs on the RPC path, not the
    * operation queue, so a preview never waits behind queued messages. It owns
@@ -2053,8 +2033,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     return this.preview.resolve();
   }
-
-  // --- stream -----------------------------------------------------------------
 
   async fetch(request: Request): Promise<Response> {
     await this.initialized;
@@ -2128,8 +2106,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       getPreparationSnapshots: async () => getPreparationSnapshots(this.eventQueries),
     });
   }
-
-  // --- route view -------------------------------------------------------------
 
   private async applyView(view: ControlPlaneRouteView, pass = this.transportPass()): Promise<void> {
     // The route view is the source of the preparation row: the previous
@@ -2509,8 +2485,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return namespace === undefined ? null : namespace.getByName(sandboxId);
   }
 
-  // --- preparation progress ---------------------------------------------------
-
   /**
    * The preparation attempt id is the route attempt id (spec §10); the trigger
    * is the oldest queued message. The recorder owns step continuity and the
@@ -2645,8 +2619,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private currentAttemptId(): string | null {
     return this.route.state === 'unknown' ? null : this.route.attemptId;
   }
-
-  // --- settlement and message events -----------------------------------------
 
   private async settleMessages(
     messageIds: readonly string[],
@@ -2867,8 +2839,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.streamHandler().broadcastEvent(event);
   }
 
-  // --- connected-event projections -------------------------------------------
-
   private deriveCloudStatus(): {
     type: 'preparing' | 'ready' | 'finalizing' | 'error';
     step?: string;
@@ -2955,8 +2925,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           permissions: this.pendingInteractions.permissions,
         };
   }
-
-  // --- storage ----------------------------------------------------------------
 
   private async loadMessages(): Promise<SessionMessage[]> {
     const rows = await this.db

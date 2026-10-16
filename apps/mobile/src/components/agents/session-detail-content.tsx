@@ -190,6 +190,7 @@ import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
+import { useCliAgents } from '@/lib/hooks/use-cli-agents';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
@@ -660,12 +661,18 @@ export function SessionDetailContent({
 
   // Custom modes: a remote session merges the session profile's visible custom
   // agents (loaded for the session's own recorded/bound profile, not the
-  // context's effective default) with the session's runtime-reported agents, so
-  // the user's roles show even when the CLI has not reported them. Cloud-agent
-  // and read-only sessions use only `runtimeAgents`. The selected slug is
-  // appended once when it is neither a built-in nor already listed, so an
-  // inherited custom slug stays visible in the picker.
+  // context's effective default) with the agents its CLI reports for the
+  // session's directory, so both the user's profile roles and the project's
+  // `.kilo/agents` show. Cloud-agent and read-only sessions use only
+  // `runtimeAgents`. The selected slug is appended once when it is neither a
+  // built-in nor already listed, so an inherited custom slug stays visible in
+  // the picker.
   const runtimeAgents = sessionConfig?.runtimeAgents;
+  const cliAgents = useCliAgents(
+    activeSessionType === 'remote' && remoteModelState.ownerConnectionId !== null
+      ? { sessionId, ownerConnectionId: remoteModelState.ownerConnectionId }
+      : null
+  );
   const { profileAgents: effectiveProfileAgents } = useEffectiveProfileCustomModes(
     organizationId,
     activeSessionProfileId
@@ -674,11 +681,12 @@ export function SessionDetailContent({
     () =>
       resolveSessionRoleView({
         sessionType: activeSessionType,
-        runtimeAgents,
+        runtimeAgents:
+          activeSessionType === 'remote' && cliAgents.length > 0 ? cliAgents : runtimeAgents,
         profileAgents: effectiveProfileAgents,
         selectedMode: currentMode,
       }),
-    [activeSessionType, runtimeAgents, effectiveProfileAgents, currentMode]
+    [activeSessionType, cliAgents, runtimeAgents, effectiveProfileAgents, currentMode]
   );
   const customOptions = roleView.customOptions;
   // A custom agent can pin a model (+ optional variant). The pin always comes

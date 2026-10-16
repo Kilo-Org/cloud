@@ -2840,6 +2840,7 @@ describe('UserConnectionDO', () => {
       'list_models',
       'list_commands',
       'list_directories',
+      'list_agents',
       'send_command',
       'create_session',
       'exit_cli',
@@ -3220,6 +3221,34 @@ describe('UserConnectionDO', () => {
           code: 'CLI_UPGRADE_REQUIRED',
           message: 'Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect.',
         },
+      });
+    });
+
+    it('maps "unknown command: list_agents" to CLI_UPGRADE_REQUIRED', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'list_agents',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1, directory: 'src' },
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      await sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: 'unknown command: list_agents',
+      });
+
+      expect(parseSent(webWs)).toMatchObject({
+        type: 'response',
+        id: 'cmd-1',
+        error: { source: 'relay', code: 'CLI_UPGRADE_REQUIRED' },
       });
     });
 

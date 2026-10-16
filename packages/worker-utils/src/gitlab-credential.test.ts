@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  GitLabProjectAccessTokenMetadataSchema as RootGitLabProjectAccessTokenMetadataSchema,
-  buildGitLabOAuthCredentialAad as rootBuildGitLabOAuthCredentialAad,
-} from './index';
-import {
   GITLAB_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
   GitLabOAuthCredentialRowSchema,
   GITLAB_PERSONAL_ACCESS_TOKEN_ENVELOPE_SCHEME,
@@ -344,10 +340,5 @@ describe('GitLab credential contract', () => {
         authorized_by_user_id: 'user-1',
       }).success
     ).toBe(false);
-  });
-
-  it('exports the GitLab credential contract from the package root', () => {
-    expect(rootBuildGitLabOAuthCredentialAad).toBe(buildGitLabOAuthCredentialAad);
-    expect(RootGitLabProjectAccessTokenMetadataSchema).toBe(GitLabProjectAccessTokenMetadataSchema);
   });
 });

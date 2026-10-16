@@ -13,7 +13,7 @@ import {
   getBYOKforUser,
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { custom_llm2, type User } from '@kilocode/db/schema';
+import { custom_llm2, type CustomLlm2, type User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
@@ -59,7 +59,8 @@ export type GetProviderProviderResult = {
 
 export type GetProviderResult =
   | GetProviderProviderResult
-  | { kind: 'chatgpt-reconnect'; message: string };
+  | { kind: 'chatgpt-reconnect'; message: string }
+  | { kind: 'custom-llm-temporarily-unavailable' };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
@@ -98,22 +99,40 @@ async function checkDirectBYOK(
   };
 }
 
+/** Null when the service account token exchange fails, which is usually transient. */
 async function resolveCustomLlmAuth(
+  publicId: string,
   credentials: CustomLlmCredentials
-): Promise<DirectUpstreamAuth> {
+): Promise<DirectUpstreamAuth | null> {
   switch (credentials.type) {
     case 'api_key':
       return { type: 'api_key', apiKey: credentials.api_key, apiKeyHeader: null };
     case 'x-api-key':
       return { type: 'api_key', apiKey: credentials.api_key, apiKeyHeader: 'x-api-key' };
     case 'service_account':
-      return {
-        type: 'api_key',
-        apiKey: await getGoogleServiceAccountAccessToken(credentials),
-        apiKeyHeader: null,
-      };
+      try {
+        const apiKey = await getGoogleServiceAccountAccessToken(credentials);
+        return { type: 'api_key', apiKey, apiKeyHeader: null };
+      } catch (error) {
+        console.error('Custom LLM service account token exchange failed', publicId, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
+      }
     case 'secure_proxy':
       return { type: 'secure_proxy', credentials };
+  }
+}
+
+function readCustomLlmCredentials(
+  encryptedApiKey: NonNullable<CustomLlm2['encrypted_api_key']>
+): CustomLlmCredentials | null {
+  try {
+    const decrypted = decryptApiKey(encryptedApiKey, BYOK_ENCRYPTION_KEY);
+    return CustomLlmCredentialsSchema.safeParse(JSON.parse(decrypted)).data ?? null;
+  } catch {
+    // A rotated encryption key, corrupted ciphertext, or malformed JSON.
+    return null;
   }
 }
 
@@ -121,7 +140,7 @@ async function checkCustomLlm(
   requestedModel: string,
   organizationId: string,
   kiloUserId: string
-): Promise<GetProviderProviderResult | null> {
+): Promise<GetProviderResult | null> {
   const [row] = await readDb
     .select()
     .from(custom_llm2)
@@ -139,16 +158,14 @@ async function checkCustomLlm(
     return null;
   }
 
-  const decrypted = decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(decrypted);
-  } catch {
+  const credentials = readCustomLlmCredentials(row.encrypted_api_key);
+  if (!credentials) {
+    console.error('Custom LLM credentials are invalid', requestedModel);
     return null;
   }
-  const parsedCredentials = CustomLlmCredentialsSchema.safeParse(parsedJson);
-  if (!parsedCredentials.success) {
-    return null;
+  const auth = await resolveCustomLlmAuth(requestedModel, credentials);
+  if (!auth) {
+    return { kind: 'custom-llm-temporarily-unavailable' };
   }
 
   return {
@@ -163,7 +180,7 @@ async function checkCustomLlm(
             : 'chat_completions',
       ],
       customLlm,
-      await resolveCustomLlmAuth(parsedCredentials.data)
+      auth
     ),
     userByok: null,
     bypassAccessCheck: true,

@@ -332,8 +332,7 @@ async function requestPlatformBenchmarks(params: {
     }
     throw new CustomRouterApiError(
       'internal_error',
-      `Could not request benchmarks: ${result.error.error}`,
-      { status: 502 }
+      `Could not request benchmarks: ${result.error.error}`
     );
   }
 }
@@ -407,6 +406,35 @@ export async function getCustomRouterResponse(
   return singleRouterResponse(await findRouter(db, owner, slug), canEdit);
 }
 
+function assertCanCreate(existing: { slug: string }[], slug: string): void {
+  if (existing.some(row => row.slug === slug)) {
+    throw new CustomRouterApiError(
+      'invalid_request',
+      `A custom router with slug ${slug} already exists`
+    );
+  }
+  if (existing.length >= MAX_CUSTOM_ROUTERS_PER_OWNER) {
+    throw new CustomRouterApiError(
+      'invalid_request',
+      `An owner can have at most ${MAX_CUSTOM_ROUTERS_PER_OWNER} custom routers`
+    );
+  }
+}
+
+async function ownerRouterSlugs(
+  executor: DrizzleTransaction | typeof db,
+  owner: CustomRouterOwner
+): Promise<{ slug: string }[]> {
+  return executor
+    .select({ slug: auto_routing_custom_routers.slug })
+    .from(auto_routing_custom_routers)
+    .where(customRouterOwnerCondition(owner));
+}
+
+/**
+ * Catalog validation and benchmark admission make network calls, so they run before the write
+ * transaction; the transaction holds the owner lock only for the database checks and the write.
+ */
 export async function createCustomRouterResponse(
   context: CustomRouterRequestContext,
   request: NextRequest
@@ -415,31 +443,18 @@ export async function createCustomRouterResponse(
   if (!parsed.success) throw invalidRequest(parsed.error);
   const input = parsed.data;
   const owner = await resolveEditableOwner(context, input.scope);
+  assertCanCreate(await ownerRouterSlugs(db, owner), input.slug);
   await validateNewGatewayEntries({
     userId: context.user.id,
     owner,
     entries: input.entries,
     existingKeys: new Set(),
   });
+  await requestPlatformBenchmarks({ owner, baseRouter: input.baseRouter, entries: input.entries });
 
   const router = await db.transaction(async tx => {
     await lockOwner(tx, owner);
-    const existing = await tx
-      .select({ slug: auto_routing_custom_routers.slug })
-      .from(auto_routing_custom_routers)
-      .where(customRouterOwnerCondition(owner));
-    if (existing.some(row => row.slug === input.slug)) {
-      throw new CustomRouterApiError(
-        'invalid_request',
-        `A custom router with slug ${input.slug} already exists`
-      );
-    }
-    if (existing.length >= MAX_CUSTOM_ROUTERS_PER_OWNER) {
-      throw new CustomRouterApiError(
-        'invalid_request',
-        `An owner can have at most ${MAX_CUSTOM_ROUTERS_PER_OWNER} custom routers`
-      );
-    }
+    assertCanCreate(await ownerRouterSlugs(tx, owner), input.slug);
     const [row] = await tx
       .insert(auto_routing_custom_routers)
       .values({
@@ -455,15 +470,31 @@ export async function createCustomRouterResponse(
       })
       .returning();
     if (!row) throw new Error('Custom router insert returned no row');
-    await requestPlatformBenchmarks({
-      owner,
-      baseRouter: input.baseRouter,
-      entries: input.entries,
-    });
     return toCustomRouterDefinition(row);
   });
 
   return singleRouterResponse(router, true, 201);
+}
+
+function applyUpdate(
+  current: CustomRouterDefinition,
+  input: z.infer<typeof UpdateCustomRouterRequestSchema>
+): CustomRouterDefinition {
+  const next: CustomRouterDefinition = {
+    ...current,
+    name: input.name ?? current.name,
+    baseRouter: input.baseRouter ?? current.baseRouter,
+    mode: input.mode ?? current.mode,
+    entries: input.entries ?? current.entries,
+    defaultEntryKey: input.defaultEntryKey ?? current.defaultEntryKey,
+  };
+  if (!next.entries.some(entry => customRouterEntryKey(entry) === next.defaultEntryKey)) {
+    throw new CustomRouterApiError(
+      'invalid_request',
+      'defaultEntryKey: defaultEntryKey must name a pool entry'
+    );
+  }
+  return next;
 }
 
 export async function updateCustomRouterResponse(
@@ -477,38 +508,25 @@ export async function updateCustomRouterResponse(
   const input = parsed.data;
   const owner = await resolveEditableOwner(context, scope);
 
+  const before = await findRouter(db, owner, slug);
+  const planned = applyUpdate(before, input);
+  await validateNewGatewayEntries({
+    userId: context.user.id,
+    owner,
+    entries: planned.entries,
+    existingKeys: new Set(before.entries.map(customRouterEntryKey)),
+  });
+  if (input.entries !== undefined || input.baseRouter !== undefined) {
+    await requestPlatformBenchmarks({
+      owner,
+      baseRouter: planned.baseRouter,
+      entries: planned.entries,
+    });
+  }
+
   const router = await db.transaction(async tx => {
     await lockOwner(tx, owner);
-    const current = await findRouter(tx, owner, slug);
-    const next: CustomRouterDefinition = {
-      ...current,
-      name: input.name ?? current.name,
-      baseRouter: input.baseRouter ?? current.baseRouter,
-      mode: input.mode ?? current.mode,
-      entries: input.entries ?? current.entries,
-      defaultEntryKey: input.defaultEntryKey ?? current.defaultEntryKey,
-    };
-    if (!next.entries.some(entry => customRouterEntryKey(entry) === next.defaultEntryKey)) {
-      throw new CustomRouterApiError(
-        'invalid_request',
-        'defaultEntryKey: defaultEntryKey must name a pool entry'
-      );
-    }
-    await validateNewGatewayEntries({
-      userId: context.user.id,
-      owner,
-      entries: next.entries,
-      existingKeys: new Set(current.entries.map(customRouterEntryKey)),
-    });
-    const saved = await saveRouter(tx, next);
-    if (input.entries !== undefined || input.baseRouter !== undefined) {
-      await requestPlatformBenchmarks({
-        owner,
-        baseRouter: saved.baseRouter,
-        entries: saved.entries,
-      });
-    }
-    return saved;
+    return saveRouter(tx, applyUpdate(await findRouter(tx, owner, slug), input));
   });
 
   return singleRouterResponse(router, true);

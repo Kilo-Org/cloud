@@ -49,7 +49,8 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
     queryKey,
     queryFn: () => fetchCustomRouters(organizationId),
     refetchInterval: current =>
-      current.state.data && hasPendingEntries(current.state.data.routers)
+      current.state.data &&
+      hasPendingEntries(current.state.data.routers.filter(router => router.scope === scope))
         ? CUSTOM_ROUTERS_POLL_INTERVAL_MS
         : false,
   });
@@ -108,7 +109,7 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
     );
   }
 
-  if (query.isError) {
+  if (query.isError && query.data === undefined) {
     return (
       <Card className="w-full">
         {header}
@@ -129,6 +130,12 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
     <Card className="w-full">
       {header}
       <CardContent className="space-y-3">
+        {query.isRefetchError ? (
+          <Alert variant="destructive">
+            <AlertTitle>Could not refresh custom routers</AlertTitle>
+            <AlertDescription>{query.error.message}</AlertDescription>
+          </Alert>
+        ) : null}
         {routers.length === 0 ? (
           <div className="bg-muted/30 space-y-3 rounded-md border border-dashed p-4" role="status">
             <p className="text-muted-foreground text-sm">

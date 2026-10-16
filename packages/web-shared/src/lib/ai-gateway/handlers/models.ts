@@ -31,6 +31,18 @@ async function modelResponse(response: OpenRouterModelsResponse) {
   });
 }
 
+async function usableCustomRouters(params: { userId: string; organizationId: string | null }) {
+  try {
+    return await listUsableCustomRouters(params);
+  } catch (error) {
+    captureException(error, {
+      tags: { endpoint: 'openrouter/models' },
+      extra: { action: 'listing_custom_routers', ...params },
+    });
+    return [];
+  }
+}
+
 async function tryGetUserFromAuth() {
   try {
     return await getUserFromAuth({
@@ -62,7 +74,7 @@ export async function handleModelsRequest(): Promise<
     if (result && auth.user && auth.organizationId) {
       const [models, customRouters] = await Promise.all([
         addAutoRoutingModels(result.data),
-        listUsableCustomRouters({ userId: auth.user.id, organizationId: auth.organizationId }),
+        usableCustomRouters({ userId: auth.user.id, organizationId: auth.organizationId }),
       ]);
       return await modelResponse({
         ...result,
@@ -84,7 +96,7 @@ export async function handleModelsRequest(): Promise<
     const [byokModels, enabledByokProviderIds, customRouters] = await Promise.all([
       getDirectByokModelsForUser(auth.user.id),
       getUserByokProviderIds(readDb, auth.user.id),
-      listUsableCustomRouters({ userId: auth.user.id, organizationId: null }),
+      usableCustomRouters({ userId: auth.user.id, organizationId: null }),
     ]);
     const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
       { kiloUserId: auth.user.id, organizationId: null },

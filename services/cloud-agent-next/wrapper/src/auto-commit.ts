@@ -374,3 +374,5 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     released.resolve();
   }
 }
+
+// ci-probe 1

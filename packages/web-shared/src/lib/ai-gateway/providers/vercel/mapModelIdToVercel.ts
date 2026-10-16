@@ -62,7 +62,6 @@ export function mapResolvedModelIdToVercel(modelId: string) {
     kiloExclusiveModels.find(
       m =>
         m.public_id === modelId &&
-        m.status !== 'disabled' &&
         (m.provider.id === 'vercel' || m.flags.includes('vercel-routing'))
     )?.internal_id ?? modelId;
 

@@ -40,7 +40,7 @@ function dataCollectingKiloExclusiveModels(
   const models = new Map<string, ReadonlySet<string> | null>();
   for (const model of kiloExclusiveModels) {
     const collectsData = model.pricing === null || model.flags.includes('requires-data-collection');
-    if (model.status !== 'public' || !collectsData || unavailableModelIds.has(model.public_id)) {
+    if (!collectsData || unavailableModelIds.has(model.public_id)) {
       continue;
     }
     const modelId = normalizeModelId(model.public_id);

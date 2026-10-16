@@ -3,7 +3,6 @@ import { selectAutoFreeCandidate } from './models';
 import {
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
-  isDisabledKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   shouldRedactErrorResponse,
@@ -30,29 +29,6 @@ describe('rate-limited Kilo-exclusive models', () => {
     ]);
     expect(isKiloExclusiveRateLimitedModel(gemma_4_26b_a4b_it_free_model.public_id)).toBe(true);
     expect(isKiloExclusiveRateLimitedModel('tencent/hy3:free')).toBe(false);
-  });
-});
-
-describe('Step 5 Preview', () => {
-  test('keeps the disabled free model registered but not usable', () => {
-    expect(
-      kiloExclusiveModels.find(m => m.public_id === 'stepfun/step-5-preview-free')
-    ).toMatchObject({
-      public_id: 'stepfun/step-5-preview-free',
-      internal_id: 'stepfun/step-5-preview',
-      display_name: 'StepFun: Step 5 Preview (free)',
-      context_length: 1_000_000,
-      max_completion_tokens: 64_000,
-      status: 'disabled',
-      provider: { id: 'openrouter' },
-      flags: ['reasoning', 'vision'],
-      pricing: null,
-      inference_provider_restriction: ['stepfun'],
-    });
-    expect(isDisabledKiloExclusiveModel('stepfun/step-5-preview-free')).toBe(true);
-    expect(findKiloExclusiveModel('stepfun/step-5-preview-free')).toBeNull();
-    expect(isFreeModel('stepfun/step-5-preview-free')).toBe(false);
-    expect(findKiloExclusiveModel('stepfun/step-3.7-flash:free')).toBeNull();
   });
 });
 
@@ -101,23 +77,14 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('stealth/model-beta')).toBe(false);
     });
 
-    test('should return true for enabled Kilo exclusive models with no pricing', async () => {
-      // Test with known Kilo exclusive models that are enabled and have no pricing (free)
-      const enabledFreeModels = kiloExclusiveModels.filter(
-        m => m.status === 'public' && !m.pricing
-      );
-
-      // All enabled free models should be detected as free
-      for (const model of enabledFreeModels) {
+    test('should return true for Kilo exclusive models with no pricing', async () => {
+      for (const model of kiloExclusiveModels.filter(m => !m.pricing)) {
         expect(await isFreeModel(model.public_id)).toBe(true);
       }
     });
 
-    test('should return false for enabled Kilo exclusive models with pricing', async () => {
-      // Models with pricing should NOT be free
-      const pricedModels = kiloExclusiveModels.filter(m => m.status !== 'disabled' && !!m.pricing);
-
-      for (const model of pricedModels) {
+    test('should return false for Kilo exclusive models with pricing', async () => {
+      for (const model of kiloExclusiveModels.filter(m => !!m.pricing)) {
         expect(await isFreeModel(model.public_id)).toBe(false);
       }
     });
@@ -138,20 +105,6 @@ describe('isFreeModel', () => {
       }
     );
 
-    test('ignores pricing on disabled Kilo exclusive models', () => {
-      const disabledModel = {
-        ...claude_opus_4_7_stealth_model,
-        public_id: 'vendor/disabled-priced-exclusive:free',
-        status: 'disabled' as const,
-      };
-      kiloExclusiveModels.push(disabledModel);
-      try {
-        expect(isFreeModel(disabledModel.public_id)).toBe(true);
-      } finally {
-        kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(disabledModel), 1);
-      }
-    });
-
     test('getInferenceProvider does not crash for any Kilo exclusive model', () => {
       expect(kiloExclusiveModels.length).toBeGreaterThan(0);
       for (const model of kiloExclusiveModels) {
@@ -164,13 +117,15 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
     });
 
-    test.each(['tencent/hy3:free', 'meituan/longcat-2.0-free', 'nex-agi/nex-n2.5-pro:free'])(
-      'removes %s from exclusive models',
-      modelId => {
-        expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
-        expect(findKiloExclusiveModel(modelId)).toBeNull();
-      }
-    );
+    test.each([
+      'tencent/hy3:free',
+      'meituan/longcat-2.0-free',
+      'nex-agi/nex-n2.5-pro:free',
+      'stepfun/step-5-preview-free',
+    ])('removes %s from exclusive models', modelId => {
+      expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
+      expect(findKiloExclusiveModel(modelId)).toBeNull();
+    });
 
     test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
       'inherits %s without an exclusive definition or provider restriction',
@@ -335,12 +290,6 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 });
 
 describe('getKiloExclusiveInferenceProviderRestriction', () => {
-  test('returns no routing allow-list for disabled exclusive models', () => {
-    expect(
-      getKiloExclusiveInferenceProviderRestriction('stepfun/step-5-preview-free')
-    ).toBeUndefined();
-  });
-
   test('does not treat removed or unrestricted exclusives or unknown ids as restricted', () => {
     expect(
       getKiloExclusiveInferenceProviderRestriction('openai/gpt-5.6-sol-discounted')

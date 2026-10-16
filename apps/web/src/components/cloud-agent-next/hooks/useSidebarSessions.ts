@@ -25,6 +25,7 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { useUserWebConnection } from '../CloudAgentProvider';
 import type {
+  AgentStatus,
   CloudStatus,
   MessageDeliveryState,
   ResolvedSession,
@@ -71,6 +72,8 @@ export function dbSessionToStoredSession(session: DbSession | DbSessionV2): Stor
     createdOnPlatform: dbSession.created_on_platform ?? null,
     sessionStatus: session.status,
     sessionStatusUpdatedAt: session.status_updated_at?.toISOString() ?? null,
+    latestRunFailureKind: session.latest_run_failure_kind ?? null,
+    latestRunTerminalAt: session.latest_run_terminal_at ?? null,
     associatedPr: 'associatedPr' in dbSession ? (dbSession.associatedPr ?? null) : undefined,
   };
 }
@@ -86,9 +89,10 @@ type ForegroundSessionStatusInput = {
   activePermission: { requestId: string } | null;
   cloudStatus: CloudStatus | null;
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
+  agentStatus?: Pick<AgentStatus, 'type'>;
 };
 
-type ForegroundSessionStatus = 'permission' | 'question' | 'retry' | 'busy' | 'idle';
+type ForegroundSessionStatus = 'permission' | 'question' | 'retry' | 'busy' | 'idle' | 'failed';
 
 export function deriveForegroundSessionStatus({
   currentSessionId,
@@ -101,6 +105,7 @@ export function deriveForegroundSessionStatus({
   activePermission,
   cloudStatus,
   pendingMessages,
+  agentStatus,
 }: ForegroundSessionStatusInput): ForegroundSessionStatus | null {
   if (
     !currentSessionId ||
@@ -129,7 +134,26 @@ export function deriveForegroundSessionStatus({
     if (message.status === 'queued') return 'busy';
   }
 
+  if (agentStatus?.type === 'error' || cloudStatus?.type === 'error') return 'failed';
+
   return 'idle';
+}
+
+export function getSidebarSessionStatus(
+  session: Pick<
+    StoredSession,
+    'sessionStatus' | 'sessionStatusUpdatedAt' | 'latestRunFailureKind' | 'latestRunTerminalAt'
+  >
+): string | null {
+  const status = session.sessionStatus;
+  if (
+    session.latestRunFailureKind &&
+    session.latestRunTerminalAt &&
+    new Date(session.latestRunTerminalAt).getTime() >=
+      new Date(session.sessionStatusUpdatedAt ?? 0).getTime()
+  )
+    return session.latestRunFailureKind;
+  return !status || status === 'idle' ? (session.latestRunFailureKind ?? status ?? null) : status;
 }
 
 export function mergeWorktreeChatSessions(
@@ -196,7 +220,12 @@ type WorktreeDetailsQueryData = inferRouterOutputs<RootRouter>['cliSessionsV2'][
 
 type SidebarSessionActivity = Pick<
   StoredSession,
-  'sessionId' | 'sessionStatus' | 'sessionStatusUpdatedAt' | 'updatedAt'
+  | 'sessionId'
+  | 'sessionStatus'
+  | 'sessionStatusUpdatedAt'
+  | 'updatedAt'
+  | 'latestRunFailureKind'
+  | 'latestRunTerminalAt'
 >;
 
 export type SidebarForegroundSessionStatus = {
@@ -409,7 +438,16 @@ export function getSidebarWorktreeActivity(
       (session.sessionStatusUpdatedAt === existing.sessionStatusUpdatedAt &&
         new Date(session.updatedAt).getTime() >= new Date(existing.updatedAt).getTime())
     ) {
-      sessionsById.set(session.sessionId, session);
+      sessionsById.set(
+        session.sessionId,
+        existing
+          ? {
+              ...session,
+              latestRunFailureKind: existing.latestRunFailureKind,
+              latestRunTerminalAt: existing.latestRunTerminalAt,
+            }
+          : session
+      );
     }
   }
 
@@ -430,17 +468,30 @@ export function getSidebarWorktreeActivity(
         : (session.sessionStatus ?? null);
     const statuses =
       foregroundStatus !== undefined
-        ? [foregroundStatus]
+        ? [
+            foregroundStatus === 'idle'
+              ? getSidebarSessionStatus({ ...session, sessionStatus: foregroundStatus })
+              : foregroundStatus,
+          ]
         : activeStatus === 'idle'
-          ? [activeStatus]
-          : [storedStatus, activeStatus ?? null];
+          ? [getSidebarSessionStatus({ ...session, sessionStatus: activeStatus })]
+          : [
+              getSidebarSessionStatus({ ...session, sessionStatus: storedStatus }),
+              session.latestRunFailureKind &&
+              session.latestRunTerminalAt &&
+              getSidebarSessionStatus(session) === session.latestRunFailureKind
+                ? null
+                : (activeStatus ?? null),
+            ];
     for (const status of statuses) {
       const priority =
         status === 'question' || status === 'permission'
-          ? 2
+          ? 3
           : status === 'busy' || status === 'retry'
-            ? 1
-            : 0;
+            ? 2
+            : status === 'failed' || status === 'system_interrupted'
+              ? 1
+              : 0;
       if (priority <= selectedPriority) continue;
       selectedPriority = priority;
       selectedStatus = status;
@@ -479,6 +530,11 @@ export function patchSidebarWorktreeSessionStatus(
         session.sessionId === update.sessionId
           ? {
               ...session,
+              ...getSidebarRunOutcomeAfterStatus(
+                session,
+                update.sessionStatus,
+                update.sessionStatusUpdatedAt
+              ),
               sessionStatus: update.sessionStatus ?? null,
               sessionStatusUpdatedAt: update.sessionStatusUpdatedAt ?? null,
               updatedAt: update.updatedAt ?? session.updatedAt,
@@ -503,6 +559,9 @@ export function sessionCacheKey(s: {
   status: string | null;
   status_updated_at: string | null;
   cloud_agent_worktree_id?: string | null;
+  latest_run_status?: string | null;
+  latest_run_failure_kind?: string | null;
+  latest_run_terminal_at?: string | null;
   associatedPr?: {
     state: string;
     lastSyncedAt: string;
@@ -510,7 +569,7 @@ export function sessionCacheKey(s: {
     reviewDecisionPending: boolean;
   } | null;
 }): string {
-  return `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}`;
+  return `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.latest_run_status ?? ''}-${s.latest_run_failure_kind ?? ''}-${s.latest_run_terminal_at ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}`;
 }
 
 /**
@@ -520,6 +579,20 @@ export function sessionCacheKey(s: {
  * the flag clears, then stop.
  */
 const REVIEW_DECISION_POLL_INTERVAL_MS = 5_000;
+
+export function getSidebarWorktreeRefetchInterval(
+  data: WorktreeDetailsQueryData | undefined,
+  hasVisibleCloudSession = false
+): number | false {
+  if (!data) return false;
+  const details = Object.values(data.worktrees);
+  if (details.some(worktree => worktree.prSession?.associatedPr?.reviewDecisionPending === true))
+    return REVIEW_DECISION_POLL_INTERVAL_MS;
+  return hasVisibleCloudSession ||
+    details.some(worktree => worktree.sessions.some(session => session.latest_run_status != null))
+    ? SIDEBAR_RECONCILE_DELAY_MS
+    : false;
+}
 
 type SidebarSessionFilters = {
   organizationId?: string | null;
@@ -563,14 +636,59 @@ export function sortSidebarDbSessions(
   return [...sessions].sort(compareDbSessionsByUpdatedAtDesc);
 }
 
+export function getSidebarRunOutcomeAfterStatus(
+  session: Pick<
+    DbSessionV2,
+    'latest_run_status' | 'latest_run_failure_kind' | 'latest_run_terminal_at'
+  >,
+  status: string | null | undefined,
+  statusUpdatedAt: Date | string | null | undefined
+) {
+  if (
+    status === 'busy' &&
+    session.latest_run_failure_kind &&
+    session.latest_run_terminal_at &&
+    statusUpdatedAt &&
+    new Date(statusUpdatedAt).getTime() > new Date(session.latest_run_terminal_at).getTime()
+  ) {
+    return {
+      latest_run_status: null,
+      latest_run_failure_kind: null,
+      latest_run_terminal_at: null,
+    };
+  }
+  return {
+    latest_run_status: session.latest_run_status ?? null,
+    latest_run_failure_kind: session.latest_run_failure_kind ?? null,
+    latest_run_terminal_at: session.latest_run_terminal_at ?? null,
+  };
+}
+
 function mergeSidebarDbSession(
   existing: DbSession | DbSessionV2 | undefined,
   next: DbSessionV2
 ): DbSessionV2 {
   if (!existing) return next;
 
+  const previousOutcome = getSidebarRunOutcomeAfterStatus(
+    existing,
+    next.status,
+    next.status_updated_at
+  );
   const merged = {
     ...next,
+    latest_run_status:
+      next.latest_run_status === undefined
+        ? previousOutcome.latest_run_status
+        : next.latest_run_status,
+    latest_run_failure_kind:
+      next.latest_run_failure_kind === undefined
+        ? previousOutcome.latest_run_failure_kind
+        : next.latest_run_failure_kind,
+    latest_run_terminal_at:
+      next.latest_run_terminal_at === undefined
+        ? previousOutcome.latest_run_terminal_at
+        : next.latest_run_terminal_at,
     cloud_agent_session_id: existing.cloud_agent_session_id ?? next.cloud_agent_session_id,
     cloud_agent_worktree_id:
       next.cloud_agent_worktree_id ?? existing.cloud_agent_worktree_id ?? null,
@@ -776,14 +894,16 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     ...trpc.cliSessionsV2.list.queryOptions(listInput),
     staleTime: 5000,
     enabled: !isSearchActive,
-    // While the server has flagged any PR for an async review-decision fetch,
-    // poll the list so the badge updates without a manual refresh. The poll
-    // self-terminates once every row reports `reviewDecisionPending: false`.
+    // Run telemetry can settle after the final session status event.
     refetchInterval: query => {
       const hasPending = query.state.data?.cliSessions?.some(
         s => s.associatedPr?.reviewDecisionPending === true
       );
-      return hasPending ? REVIEW_DECISION_POLL_INTERVAL_MS : false;
+      return hasPending
+        ? REVIEW_DECISION_POLL_INTERVAL_MS
+        : query.state.data?.cliSessions.some(session => session.cloud_agent_session_id)
+          ? SIDEBAR_RECONCILE_DELAY_MS
+          : false;
     },
   });
 
@@ -801,6 +921,10 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     ...trpc.cliSessionsV2.search.queryOptions(searchInput),
     staleTime: 5000,
     enabled: isSearchActive,
+    refetchInterval: query =>
+      query.state.data?.results.some(session => session.cloud_agent_session_id)
+        ? SIDEBAR_RECONCILE_DELAY_MS
+        : false,
   });
 
   const attemptedPrLinks = useRef(new Map<string, string>());
@@ -847,7 +971,9 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
               session => session.associatedPr?.reviewDecisionPending === true
             )
               ? REVIEW_DECISION_POLL_INTERVAL_MS
-              : false,
+              : query.state.data?.cliSessions.some(session => session.cloud_agent_session_id)
+                ? SIDEBAR_RECONCILE_DELAY_MS
+                : false,
         }
       );
       const queryFn = queryOptions.queryFn;
@@ -915,6 +1041,8 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       createdOnPlatform: row.created_on_platform,
       sessionStatus: row.status,
       sessionStatusUpdatedAt: row.status_updated_at,
+      latestRunFailureKind: row.latest_run_failure_kind,
+      latestRunTerminalAt: row.latest_run_terminal_at,
       associatedPr: row.associatedPr ?? null,
     }));
   }, [searchData?.results]);
@@ -940,6 +1068,9 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       status_updated_at: session.status_updated_at?.toISOString() ?? null,
       associatedPr: session.associatedPr ?? null,
       total_cost_microdollars: session.total_cost_microdollars ?? null,
+      latest_run_status: session.latest_run_status ?? null,
+      latest_run_failure_kind: session.latest_run_failure_kind ?? null,
+      latest_run_terminal_at: session.latest_run_terminal_at ?? null,
     };
   }
 
@@ -993,6 +1124,11 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
               cloud_agent_worktree_id:
                 session.cloud_agent_worktree_id ?? existing.cloud_agent_worktree_id ?? null,
               associatedPr: existing.associatedPr ?? session.associatedPr,
+              ...getSidebarRunOutcomeAfterStatus(
+                existing,
+                session.status,
+                session.status_updated_at
+              ),
             }
           : session;
         const shouldKeep =
@@ -1025,6 +1161,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         const withoutSession = current.results.filter(row => row.session_id !== payload.sessionId);
         const updated = {
           ...existing,
+          ...getSidebarRunOutcomeAfterStatus(existing, payload.status, payload.statusUpdatedAt),
           status: payload.status,
           status_updated_at: payload.statusUpdatedAt,
           updated_at: payload.updatedAt ?? existing.updated_at,
@@ -1091,6 +1228,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
               s.session_id === payload.sessionId
                 ? {
                     ...s,
+                    ...getSidebarRunOutcomeAfterStatus(s, payload.status, payload.statusUpdatedAt),
                     status: payload.status,
                     status_updated_at: payload.statusUpdatedAt
                       ? new Date(payload.statusUpdatedAt)
@@ -1165,11 +1303,14 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         {
           staleTime: 5000,
           refetchInterval: query =>
-            Object.values(query.state.data?.worktrees ?? {}).some(
-              details => details.prSession?.associatedPr?.reviewDecisionPending === true
-            )
-              ? REVIEW_DECISION_POLL_INTERVAL_MS
-              : false,
+            getSidebarWorktreeRefetchInterval(
+              query.state.data,
+              sessions.some(
+                session =>
+                  session.cloudAgentSessionId &&
+                  worktreeIds.some(worktreeId => worktreeId === session.worktreeId)
+              )
+            ),
         }
       )
     ),
@@ -1180,7 +1321,11 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
           details[worktreeId] = {
             name: worktree.name,
             defaultTitle: worktree.defaultTitle,
-            sessions: worktree.sessions,
+            sessions: worktree.sessions.map(session => ({
+              ...session,
+              latestRunFailureKind: session.latest_run_failure_kind,
+              latestRunTerminalAt: session.latest_run_terminal_at,
+            })),
             prSession: worktree.prSession
               ? dbSessionToStoredSession(apiSessionToDbSession(worktree.prSession))
               : null,

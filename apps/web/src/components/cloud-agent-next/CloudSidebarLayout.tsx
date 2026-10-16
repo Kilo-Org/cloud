@@ -222,6 +222,7 @@ export function CloudSidebarLayout({
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
+  const agentStatus = useAtomValue(manager.atoms.agentStatus);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
 
@@ -299,6 +300,7 @@ export function CloudSidebarLayout({
         activePermission,
         cloudStatus,
         pendingMessages,
+        agentStatus,
       }),
     [
       activePermission,
@@ -311,6 +313,7 @@ export function CloudSidebarLayout({
       isStreaming,
       organizationId,
       pendingMessages,
+      agentStatus,
     ]
   );
   const foregroundSession = useMemo(
@@ -323,8 +326,13 @@ export function CloudSidebarLayout({
   const sidebarSessions = useMemo(() => {
     if (foregroundSessionStatus === null) return sessions;
     return sessions.map(session =>
-      session.sessionId === currentSessionId && session.sessionStatus !== foregroundSessionStatus
-        ? { ...session, sessionStatus: foregroundSessionStatus }
+      session.sessionId === currentSessionId
+        ? {
+            ...session,
+            sessionStatus: foregroundSessionStatus,
+            latestRunTerminalAt:
+              foregroundSessionStatus === 'idle' ? session.latestRunTerminalAt : null,
+          }
         : session
     );
   }, [currentSessionId, foregroundSessionStatus, sessions]);
@@ -375,8 +383,13 @@ export function CloudSidebarLayout({
     );
     if (foregroundSessionStatus === null) return mergedSessions;
     return mergedSessions.map(session =>
-      session.sessionId === currentSessionId && session.sessionStatus !== foregroundSessionStatus
-        ? { ...session, sessionStatus: foregroundSessionStatus }
+      session.sessionId === currentSessionId
+        ? {
+            ...session,
+            sessionStatus: foregroundSessionStatus,
+            latestRunTerminalAt:
+              foregroundSessionStatus === 'idle' ? session.latestRunTerminalAt : null,
+          }
         : session
     );
   }, [

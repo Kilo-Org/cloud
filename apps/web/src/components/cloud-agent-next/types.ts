@@ -424,6 +424,8 @@ export type StoredSession = {
   worktreeId?: string | null;
   sessionStatus?: string | null;
   sessionStatusUpdatedAt?: string | null;
+  latestRunFailureKind?: 'failed' | 'system_interrupted' | null;
+  latestRunTerminalAt?: string | null;
   /**
    * Associated GitHub pull request for this session's own verified link, if
    * any.

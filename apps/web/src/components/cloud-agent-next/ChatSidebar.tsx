@@ -33,6 +33,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { StoredSession } from './types';
 import {
   getRunningSessionSortTime,
+  getSidebarSessionStatus,
   getSidebarWorktreeActivity,
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
@@ -173,8 +174,9 @@ const SessionRow = memo(function SessionRow({
   };
 
   const isV2 = session.sessionId.startsWith('ses_');
+  const sidebarStatus = getSidebarSessionStatus(session);
   const sessionActivityIndicatorKind = getSessionActivityIndicatorKind(
-    session.sessionStatus ?? null,
+    sidebarStatus,
     session.sessionStatusUpdatedAt ?? null
   );
   const shouldReplaceTime = isLive || sessionActivityIndicatorKind !== null;
@@ -221,7 +223,7 @@ const SessionRow = memo(function SessionRow({
                 >
                   {sessionActivityIndicatorKind ? (
                     <SessionStatusIndicator
-                      status={session.sessionStatus ?? null}
+                      status={sidebarStatus}
                       statusUpdatedAt={session.sessionStatusUpdatedAt ?? null}
                     />
                   ) : null}
@@ -786,12 +788,10 @@ export function ChatSidebar({
     const pins = new Map<string, number>();
     for (const session of sessions) {
       const liveStatus = activeSessionStatuses.get(session.sessionId) ?? null;
-      const isRunning =
-        getSessionActivityIndicatorKind(liveStatus, null) !== null ||
-        getSessionActivityIndicatorKind(
-          session.sessionStatus ?? null,
-          session.sessionStatusUpdatedAt ?? null
-        ) !== null;
+      const isRunning = [liveStatus, getSidebarSessionStatus(session)].some(status => {
+        const kind = getSessionActivityIndicatorKind(status, null);
+        return kind === 'working' || kind === 'attention';
+      });
       if (isRunning) pins.set(session.sessionId, getRunningSessionSortTime(session, true));
     }
     return pins;

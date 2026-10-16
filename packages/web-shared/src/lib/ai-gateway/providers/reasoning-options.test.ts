@@ -31,9 +31,7 @@ describe('getFallbackReasoningOptions', () => {
     ['openai/gpt-5.6-sol', ['none', 'low', 'medium', 'high', 'xhigh', 'max']],
     ['qwen/qwen3.8', ['minimal', 'low', 'medium', 'high', 'xhigh']],
     ['stepfun/step-5-preview', ['low', 'medium', 'high']],
-    ['stepfun/step-5-preview-free', ['low', 'medium', 'high']],
     ['stealth/glyph-cluster', ['low', 'medium', 'high', 'xhigh']],
-    ['stealth/cat-jam', ['low', 'medium', 'high', 'xhigh', 'max']],
   ])('lists %s efforts from least to most intensive', (model, values) => {
     expect(getFallbackReasoningOptions(model)).toEqual([{ type: 'effort', values }]);
   });

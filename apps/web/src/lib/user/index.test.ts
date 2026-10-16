@@ -978,7 +978,7 @@ describe('User', () => {
     });
     it.each([
       'unknown response',
-      'invalid six-flag rejection',
+      'invalid nine-flag rejection',
       'transport failure',
       'HTTP failure',
       'invalid JSON',
@@ -992,13 +992,13 @@ describe('User', () => {
         case 'unknown response':
           fetchMock.mockResolvedValue(Response.json(null));
           break;
-        case 'invalid six-flag rejection':
+        case 'invalid nine-flag rejection':
           fetchMock.mockResolvedValue(
             Response.json({
               enforced: true,
               code: 'signup_rate_limited',
               retryAfterMs: 1_000,
-              flags: Array.from({ length: 6 }, () => ({
+              flags: Array.from({ length: 9 }, () => ({
                 name: 'signup:ja4',
                 source: 'ja4',
                 decision: 'throttle',
@@ -1106,6 +1106,68 @@ describe('User', () => {
         expect(
           await db.query.kilocode_users.findFirst({
             where: eq(kilocode_users.google_user_email, email),
+          })
+        ).toBeUndefined();
+      }
+    );
+
+    it.each(['email', 'github', 'google'] as const)(
+      'returns SIGNUP-STEP-UP for a %s signup without Stripe or user rows',
+      async provider => {
+        const email = `bouncer-step-up-${provider}@example.test`;
+        const providerAccountId = `${provider}-bouncer-step-up`;
+        mockSignupDecide.mockImplementation(actualSignupDecide);
+        const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+          Response.json({
+            enforced: true,
+            code: 'signup_step_up',
+            methods: ['apple', 'passkey', 'google'],
+            flags: [
+              {
+                name: 'signup:domain',
+                source: 'domain',
+                decision: 'throttle',
+                enforced: true,
+                until: null,
+              },
+            ],
+          })
+        );
+        const result = await createOrUpdateUser(
+          {
+            google_user_email: email,
+            google_user_name: 'Step Up',
+            google_user_image_url: '',
+            hosted_domain: null,
+            provider,
+            provider_account_id: providerAccountId,
+          },
+          undefined,
+          false,
+          new Headers({ 'x-forwarded-for': '203.0.113.64' })
+        );
+
+        expect(result).toEqual({
+          success: false,
+          error: 'SIGNUP-STEP-UP',
+          methods: ['google', 'apple'],
+        });
+        expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+          operationId: expect.stringMatching(/^signup:[a-f0-9]{64}$/),
+          ip: '203.0.113.64',
+          method: provider,
+          emailDomain: 'example.test',
+        });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(deleteStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, email),
+          })
+        ).toBeUndefined();
+        expect(
+          await db.query.user_auth_provider.findFirst({
+            where: eq(user_auth_provider.provider_account_id, providerAccountId),
           })
         ).toBeUndefined();
       }

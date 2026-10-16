@@ -134,7 +134,12 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
-import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
+import {
+  hosted_domain_specials,
+  knownSignupStepUpMethods,
+  type AuthErrorType,
+  type SignupStepUpMethod,
+} from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
@@ -143,7 +148,6 @@ import type { TRPCError } from '@trpc/server';
 import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import * as z from 'zod';
 import {
   generateOpenRouterDownstreamSafetyIdentifier,
@@ -213,7 +217,7 @@ function getSignupIp(requestHeaders?: Headers): string | null {
 async function checkNormalizedEmailUnique(
   normalizedEmail: string,
   tx: DrizzleTransaction
-): Promise<Result<null, AuthErrorType>> {
+): Promise<Result<null, 'EMAIL-ALREADY-USED'>> {
   const [existing] = await tx
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
@@ -239,6 +243,24 @@ export type CreateOrUpdateUserArgs = {
   provider_account_id: string;
   display_name?: string | null;
 };
+
+/** A user settlement error other than a signup step-up, which carries its methods. */
+type UserSettlementError = Exclude<AuthErrorType, 'SIGNUP-STEP-UP'>;
+
+/** Bouncer admits this signup only with a stronger sign-in method; nothing was created. */
+export type SignupStepUpFailure = {
+  success: false;
+  error: 'SIGNUP-STEP-UP';
+  /** The known methods Bouncer admits now, in display order. Empty when it named none we know. */
+  methods: SignupStepUpMethod[];
+};
+
+export type CreateOrUpdateUserResult =
+  | Result<
+      { user: User; isNew: boolean; deferredSignInEvent?: DeferredSignInEvent },
+      UserSettlementError
+    >
+  | SignupStepUpFailure;
 
 export type CreateOrUpdateUserTrackingContext = {
   affiliateTouch?: ParsedImpactAffiliateTouch | null;
@@ -434,9 +456,7 @@ export async function createOrUpdateUser(
   affiliateTrackingId?: string | null,
   trackingContext?: CreateOrUpdateUserTrackingContext,
   deferSignInAnalytics?: boolean
-): Promise<
-  Result<{ user: User; isNew: boolean; deferredSignInEvent?: DeferredSignInEvent }, AuthErrorType>
-> {
+): Promise<CreateOrUpdateUserResult> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
     if (deferSignInAnalytics) {
@@ -596,6 +616,8 @@ export async function createOrUpdateUser(
           operationId,
           ip: bouncerIp,
           ja4: normalizeJa4(requestHeaders?.get('x-vercel-ja4-digest')),
+          method: args.provider,
+          emailDomain: normalizedEmail.slice(normalizedEmail.lastIndexOf('@') + 1),
         })
       : null;
     console.info('[auth] Bouncer signup admission', {
@@ -617,8 +639,14 @@ export async function createOrUpdateUser(
         operationId,
         outcome: 'rejected',
         reason: 'bouncer',
+        code: verdict.code,
       });
-      return failureResult('SIGNUP-RATE-LIMITED');
+      if (verdict.code === 'signup_rate_limited') return failureResult('SIGNUP-RATE-LIMITED');
+      return {
+        success: false,
+        error: 'SIGNUP-STEP-UP',
+        methods: knownSignupStepUpMethods(verdict.methods),
+      } satisfies SignupStepUpFailure;
     }
   }
   const newUserId = turnstile_guid ?? randomUUID();
@@ -661,7 +689,7 @@ export async function createOrUpdateUser(
     email_domain: extractEmailDomain(args.google_user_email),
   } satisfies typeof kilocode_users.$inferInsert;
 
-  type TxResult = Result<{ user: User }, AuthErrorType>;
+  type TxResult = Result<{ user: User }, UserSettlementError>;
   let txResult: TxResult;
   let caughtError: unknown;
   try {
@@ -765,7 +793,7 @@ export async function createOrUpdateUser(
 export async function linkAccountToExistingUser(
   existingKiloUserId: string,
   authProviderData: CreateOrUpdateUserArgs
-): Promise<Result<{ user: User }, AuthErrorType>> {
+): Promise<Result<{ user: User }, UserSettlementError>> {
   // Verify the existing user exists
   const existingUser = await findUserById(existingKiloUserId);
   if (!existingUser) return failureResult('USER-NOT-FOUND');

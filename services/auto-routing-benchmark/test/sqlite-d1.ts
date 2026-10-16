@@ -17,7 +17,8 @@ export function applyBenchmarkMigrations(sqlite: DatabaseSync) {
   }
 }
 
-export function sqliteD1(sqlite: DatabaseSync): D1Database {
+/** `onRoundTrip` runs before every statement or batch reaches SQLite, as one D1 call. */
+export function sqliteD1(sqlite: DatabaseSync, onRoundTrip: () => void = () => {}): D1Database {
   const executions = new WeakMap<D1PreparedStatement, () => SqliteD1Result>();
 
   function query(sqlText: string, params: SQLInputValue[]) {
@@ -58,16 +59,20 @@ export function sqliteD1(sqlite: DatabaseSync): D1Database {
         return prepare(sqlText, values);
       },
       async run() {
+        onRoundTrip();
         return execute(sqlText, params);
       },
       async all() {
+        onRoundTrip();
         return execute(sqlText, params);
       },
       async first(column?: string) {
+        onRoundTrip();
         const row = execute(sqlText, params).results[0];
         return row ? (column === undefined ? row : row[column]) : null;
       },
       async raw(options?: { columnNames?: boolean }) {
+        onRoundTrip();
         const { statement: prepared, results } = query(sqlText, params);
         const rows = results.map(row => Object.values(row));
         return options?.columnNames
@@ -82,6 +87,7 @@ export function sqliteD1(sqlite: DatabaseSync): D1Database {
   return {
     prepare,
     async batch(statements: D1PreparedStatement[]) {
+      onRoundTrip();
       sqlite.exec('BEGIN');
       try {
         const results = statements.map(statement => {

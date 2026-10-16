@@ -18,8 +18,10 @@ import {
   startChunk,
   SCHEDULER_ACTIVE_LEASE_MS,
   SCHEDULER_DISPATCH_LEASE_MS,
+  SCHEDULER_INSERT_CHUNK_SQL,
   SCHEDULER_LANE_HEADS_SQL,
   SCHEDULER_LIVE_SQL,
+  SCHEDULER_MATERIALIZED_LANES_SQL,
   SCHEDULER_MAX_ATTEMPTS,
   SCHEDULER_QUEUE_LEASE_MS,
   SCHEDULER_UNSETTLED_SQL,
@@ -157,7 +159,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
   it('uses safe defaults and rejects a configured budget above the container ceiling', () => {
     expect(schedulerConfig()).toEqual({
       slots: 250,
-      modelConcurrency: 4,
+      modelConcurrency: 12,
       providerConcurrency: 16,
       unknownProviderConcurrency: 2,
       modelLimits: {},
@@ -1035,6 +1037,20 @@ describe('scheduler (production migrations and real SQLite)', () => {
       claims.find(claim => claim.variant === 'low' && claim.rep === 0 && claim.chunk === 2)
         ?.case_ids
     ).toBe('["missing-a","missing-b"]');
+  });
+
+  it('bounds materialization reads by the chunk and the run instead of the backlog', () => {
+    const insertPlan = explainPlan(sqlite, SCHEDULER_INSERT_CHUNK_SQL);
+    expect(insertPlan).toContain(
+      'SEARCH case_results USING COVERING INDEX sqlite_autoindex_case_results_1 (run_id=? AND model=? AND variant=? AND case_id=? AND rep=?)'
+    );
+    expect(insertPlan).not.toContain('SCAN case_results');
+    expect(insertPlan).not.toContain('scheduler_chunks');
+    const lanesPlan = explainPlan(sqlite, SCHEDULER_MATERIALIZED_LANES_SQL);
+    expect(lanesPlan).toContain(
+      'SEARCH scheduler_chunks USING INDEX IX_scheduler_chunks_run (run_id=?)'
+    );
+    expect(lanesPlan).not.toContain('SCAN scheduler_chunks');
   });
 
   it('does not repeatedly report failed chunks from lanes already recorded in run_lane_failures', async () => {

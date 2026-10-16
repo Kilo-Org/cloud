@@ -253,7 +253,7 @@ beforeEach(() => {
         models,
       };
     });
-  vi.mocked(scheduleRunChunks).mockReset().mockResolvedValue(undefined);
+  vi.mocked(scheduleRunChunks).mockReset().mockResolvedValue(true);
   vi.mocked(claimScheduledChunks).mockReset().mockResolvedValue([]);
   vi.mocked(recoverChunks).mockReset().mockResolvedValue([]);
   queueSend.mockReset().mockResolvedValue(undefined);

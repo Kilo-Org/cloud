@@ -48,6 +48,12 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
+      # scripts/changed-dependencies.mjs parses pnpm-lock.yaml with js-yaml
+      # when a change touches the lockfile, so detection needs the root
+      # dependencies. The warm store keeps that install short.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
@@ -55,9 +61,6 @@ jobs:
 
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
-
-      - name: Check stacked CI admission
-        run: node --test scripts/stacked-ci.test.mjs
 
       # dorny/paths-filter has no built-in retry: one dropped connection to
       # api.github.com ("other side closed" while listing the PR's changed
@@ -246,6 +249,12 @@ jobs:
 
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
+
+      # The stacked-CI admission wiring is checked on every PR. It runs here,
+      # off the critical path; the required `test` job needs this job, so a
+      # broken admission still blocks the merge.
+      - name: Check stacked CI admission
+        run: node --test scripts/stacked-ci.test.mjs
 
       - name: Test dependency change detection
         run: node --test scripts/changed-dependencies.test.mjs

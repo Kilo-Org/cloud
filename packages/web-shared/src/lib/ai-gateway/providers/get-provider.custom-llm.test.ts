@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { custom_llm2, type User } from '@kilocode/db/schema';
 import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
@@ -43,6 +43,10 @@ function resolveProvider() {
 describe('getProvider custom LLM credentials', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('routes secure_proxy credentials through the proxy in base_url', async () => {
@@ -107,6 +111,5 @@ describe('getProvider custom LLM credentials', () => {
     expect(result.provider.id).not.toBe('custom');
     expect(result.provider.apiKey).not.toBe('proxy-secret');
     expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('base_url must use https'));
-    consoleError.mockRestore();
   });
 });

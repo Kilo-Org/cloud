@@ -40,6 +40,17 @@ const DeleteCustomLlmSchema = z.object({
   public_id: publicIdSchema,
 });
 
+// A definition-only update keeps the stored blob as-is, so a blob that no longer
+// decrypts (e.g. after a key rotation) must not block it. The gateway still
+// refuses an insecure secure-proxy URL at routing time.
+function tryDecryptStoredCredentials(encrypted: EncryptedData) {
+  try {
+    return decryptCustomLlmCredentials(encrypted);
+  } catch {
+    return null;
+  }
+}
+
 export const adminCustomLlmRouter = createTRPCRouter({
   list: adminProcedure.query(async () => {
     const rows = await db
@@ -60,7 +71,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
     const effectiveCredentials =
       input.credentials ??
       (existing?.encrypted_api_key
-        ? decryptCustomLlmCredentials(existing.encrypted_api_key)
+        ? tryDecryptStoredCredentials(existing.encrypted_api_key)
         : null);
     if (
       effectiveCredentials &&

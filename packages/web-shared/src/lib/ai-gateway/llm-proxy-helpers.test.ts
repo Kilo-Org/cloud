@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
 
@@ -32,8 +32,11 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   errorExceptInTest: (...args: unknown[]) => mockedErrorExceptInTest(...args),
 }));
 
+import { kiloExclusiveModels } from './kilo-exclusive-models';
+import type { KiloExclusiveModel } from './providers/kilo-exclusive-model';
 import {
   captureProxyError,
+  checkExclusiveModelProviderAllowed,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
   extractEditPromptInfo,
@@ -166,6 +169,46 @@ describe('extractReasoningSetting', () => {
     },
   ])('$name', ({ body, expected }) => {
     expect(extractReasoningSetting(body)).toBe(expected);
+  });
+});
+
+describe('checkExclusiveModelProviderAllowed', () => {
+  const restrictedModel: KiloExclusiveModel = {
+    ...kiloExclusiveModels[0],
+    public_id: 'test/multi-provider-exclusive',
+    status: 'public',
+    flags: [],
+    inference_provider_restriction: ['openai', 'azure'],
+  };
+
+  beforeEach(() => {
+    kiloExclusiveModels.push(restrictedModel);
+  });
+
+  afterEach(() => {
+    kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(restrictedModel), 1);
+  });
+
+  it.each([
+    ['no provider config', undefined],
+    ['an only list with one of the providers', { only: ['azure'] }],
+    ['an ignore list that leaves one provider', { ignore: ['openai'] }],
+  ])('allows %s', (_name, provider) => {
+    expect(checkExclusiveModelProviderAllowed(restrictedModel.public_id, provider)).toBeNull();
+  });
+
+  it.each([
+    ['an only list without the providers', { only: ['anthropic'] }],
+    ['an ignore list with every provider', { ignore: ['openai', 'azure'] }],
+  ])('rejects %s and names every provider', async (_name, provider) => {
+    const response = checkExclusiveModelProviderAllowed(restrictedModel.public_id, provider);
+
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toMatchObject({
+      error_type: 'provider_not_allowed',
+      error:
+        'No eligible provider can serve the selected model. Please enable provider: openai, azure',
+    });
   });
 });
 

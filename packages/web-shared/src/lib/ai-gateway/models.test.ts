@@ -10,7 +10,7 @@ import {
   shouldRedactModelNameInMicrodollarUsage,
 } from './kilo-exclusive-models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
-import { getInferenceProvider } from './providers/kilo-exclusive-model';
+import { getInferenceProviders } from './providers/kilo-exclusive-model';
 import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
@@ -64,12 +64,9 @@ describe.each([glyph_cluster_stealth_free_model, cat_jam_stealth_free_model])(
       expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
       expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(true);
       expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(true);
-      expect(getInferenceProvider(model)).toEqual({
-        slug: 'stealth',
-        name: 'Stealth',
-        training: true,
-        retainsPrompts: true,
-      });
+      expect(getInferenceProviders(model)).toEqual([
+        { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true },
+      ]);
     });
   }
 );
@@ -152,10 +149,10 @@ describe('isFreeModel', () => {
       }
     });
 
-    test('getInferenceProvider does not crash for any Kilo exclusive model', () => {
+    test('getInferenceProviders does not crash for any Kilo exclusive model', () => {
       expect(kiloExclusiveModels.length).toBeGreaterThan(0);
       for (const model of kiloExclusiveModels) {
-        expect(() => getInferenceProvider(model)).not.toThrow();
+        expect(() => getInferenceProviders(model)).not.toThrow();
       }
     });
 
@@ -183,11 +180,17 @@ describe('isFreeModel', () => {
     );
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
-      expect(getInferenceProvider(claude_opus_4_7_stealth_model)?.slug).toBe('stealth');
+      expect(getInferenceProviders(claude_opus_4_7_stealth_model).map(({ slug }) => slug)).toEqual([
+        'stealth',
+      ]);
       expect(claude_opus_4_7_stealth_model.public_id).toBe('stealth/claude-opus-4.7');
-      expect(getInferenceProvider(claude_sonnet_4_6_stealth_model)?.slug).toBe('stealth');
+      expect(
+        getInferenceProviders(claude_sonnet_4_6_stealth_model).map(({ slug }) => slug)
+      ).toEqual(['stealth']);
       expect(claude_sonnet_4_6_stealth_model.public_id).toBe('stealth/claude-sonnet-4.6');
-      expect(getInferenceProvider(claude_opus_4_6_stealth_model)?.slug).toBe('stealth');
+      expect(getInferenceProviders(claude_opus_4_6_stealth_model).map(({ slug }) => slug)).toEqual([
+        'stealth',
+      ]);
       expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
     });
 

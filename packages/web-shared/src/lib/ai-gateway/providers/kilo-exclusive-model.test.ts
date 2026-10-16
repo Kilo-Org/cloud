@@ -5,7 +5,7 @@ import {
   applyKiloExclusiveModelSettings,
   calculateCost_mUsd,
   convertFromKiloExclusiveModel,
-  getInferenceProvider,
+  getInferenceProviders,
   type KiloExclusiveModel,
   type PricingTiers,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
@@ -140,20 +140,24 @@ describe('convertFromKiloExclusiveModel', () => {
   });
 });
 
-describe('getInferenceProvider', () => {
-  it('uses a single inference provider restriction before the gateway', () => {
+describe('getInferenceProviders', () => {
+  it('returns every provider in the restriction before the gateway', () => {
     const model = makeModel({
       internal_id: 'vendor/x',
       provider: VERCEL_AI_GATEWAY,
-      inference_provider_restriction: ['openai'],
+      inference_provider_restriction: ['openai', 'azure'],
     });
 
-    expect(getInferenceProvider(model)).toEqual({
-      slug: 'openai',
-      name: 'OPENAI',
-      training: false,
-      retainsPrompts: true,
-    });
+    expect(getInferenceProviders(model)).toEqual([
+      { slug: 'openai', name: 'OPENAI', training: false, retainsPrompts: true },
+      { slug: 'azure', name: 'AZURE', training: false, retainsPrompts: true },
+    ]);
+  });
+
+  it('defers to the snapshot for an unrestricted gateway model', () => {
+    const model = makeModel({ internal_id: 'vendor/x', provider: OPENROUTER });
+
+    expect(getInferenceProviders(model)).toEqual([]);
   });
 
   it('reports data collection for a concrete gateway provider', () => {
@@ -163,12 +167,9 @@ describe('getInferenceProvider', () => {
       flags: ['requires-data-collection'],
     });
 
-    expect(getInferenceProvider(model)).toEqual({
-      slug: 'mistral',
-      name: 'MISTRAL',
-      training: true,
-      retainsPrompts: true,
-    });
+    expect(getInferenceProviders(model)).toEqual([
+      { slug: 'mistral', name: 'MISTRAL', training: true, retainsPrompts: true },
+    ]);
   });
 });
 

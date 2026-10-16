@@ -4,22 +4,18 @@ Authenticated `POST /usage` validates the existing usage request contract and
 publishes it to `USAGE_INGEST_QUEUE`, preserving the supplied usage ID. A 202 means
 queue acceptance after `send` resolves, not consumer completion. The same Worker
 consumes shadow events, logs a safe receipt, then acknowledges each message.
-Acknowledged events are removed from the queue: this is not durable recovery
-storage or a billing consumer. Current direct usage writes remain authoritative;
-this Worker does not record usage, deduct credits, or call Vercel. The consumer has
-no mode flag: it always logs and acknowledges messages. The gateway's shadow
-setting controls sending only. Before authoritative queue processing, replace
-receipt-only handling with successful usage persistence before acknowledgement.
+Acknowledged events are removed from the queue. Current direct usage writes remain
+authoritative. The gateway's shadow setting controls sending only; the consumer
+always logs and acknowledges messages.
 
 Receipts contain only the validated usage ID, queue message ID, delivery attempt
 count, and non-negative event age in milliseconds. Malformed messages log an
 `invalid` receipt without body/schema details and are acknowledged and discarded.
-Acknowledgement follows a successful console call; it does not prove durable log
-storage. If validation or logging throws,
-the handler fails; already acknowledged messages stay acknowledged, while failed
-and later messages use the queue's default bounded retries (three retries, then
-discard without a DLQ). Logs can repeat on redelivery. This stage provides neither
-deduplication nor reconciliation.
+Acknowledgement follows a successful console call. If validation or logging throws,
+unacknowledged messages use three retries with a 60-second retry delay, then move
+to the environment's dead-letter queue (DLQ). Logs can repeat on redelivery. The DLQ only
+receives exhausted failures: malformed events that were acknowledged do not reach
+it.
 
 The wire schema comes from `@kilocode/usage-contracts` through its package export.
 That package depends only on Zod at runtime; the Worker does not depend on
@@ -31,10 +27,23 @@ auth returns 401. Invalid JSON/schema returns 400, requests or serialized events
 over 120,000 bytes return 413, and enqueue failure returns a generic 503.
 Unrelated paths return 404; other methods on `/usage` return 405.
 
-| Environment | Worker | Producer and receipt consumer queue |
+| Environment | Worker | Producer and receipt consumer queue | DLQ (no consumer) |
+|---|---|---|---|
+| Production (top-level config) | `usage-ingest` | `usage-ingest-processing` | `usage-ingest-processing-dlq` |
+| Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging` | `usage-ingest-processing-dlq-staging` |
+
+## Queue policy
+
+Both environments use the same consumer settings:
+
+| Consumer setting | Value | Purpose |
 |---|---|---|
-| Production (top-level config) | `usage-ingest` | `usage-ingest-processing` |
-| Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging` |
+| `max_batch_size` | `1` | One message per invocation. |
+| `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
+| `max_concurrency` | `1` | One active consumer invocation per environment's source queue. |
+| `max_retries` | `3` | Initial delivery plus up to three retries. |
+| `retry_delay` | `60` seconds | Space failed deliveries by one minute rather than retrying immediately. |
+| `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
 
 ## Usage writer client
 
@@ -56,16 +65,11 @@ production and staging deployments. To deploy it individually, dispatch that
 workflow with `worker: services/usage-ingest` and `target_environment: production`
 or `staging`.
 
-Wrangler 4.135.0 automatically provisions the configured producer queue if it
-does not already exist, then deploys the Worker with its `USAGE_INGEST_QUEUE` binding.
-No dashboard setup or separate queue-create command is required. Subsequent
-deployments reuse the existing queue. The same Worker is registered as its consumer
-in each environment, using default batch and retry settings.
-
-Deploy and verify receipt consumption before enabling the gateway's default-off
-shadow publisher. Deploying this consumer can drain an existing backlog, including
-discarding malformed messages. Keep current direct usage writes enabled. Local
-synthetic proof does not confirm hosted delivery; no rollout is performed here.
+Wrangler automatically provisions missing configured producer queues and reuses
+existing queues. `USAGE_INGEST_QUEUE` binds the source queue; `USAGE_INGEST_DLQ` is
+an unused producer binding so Wrangler also provisions the DLQ. The consumer's
+`dead_letter_queue` routes exhausted failures to it. No consumer is attached to
+either DLQ.
 
 To deploy directly from the repository root with Wrangler authenticated to the
 account in `wrangler.jsonc`:
@@ -82,10 +86,21 @@ Staging enables its public `workers.dev` URL. After deployment, append `/usage`
 to the hostname shown for `usage-ingest-staging` and use that as the gateway's
 `USAGE_INGEST_URL`. Requests require the dedicated publisher secret above.
 Production keeps `workers_dev: false`; no custom routes or preview URLs are
-configured. These settings do not prevent deployment. This configuration attaches
-the receipt consumer to each environment's producer queue. Publishing and receipt
-handling require no database access. See
+configured. The receipt consumer is attached to each environment's producer queue.
+Publishing and receipt handling require no database access. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
+
+## Retention
+
+The retention target is **four days (345600 seconds)** for each source queue and
+DLQ. Retention is managed separately from `wrangler.jsonc`; the pinned Wrangler
+schema does not expose it. Update a queue using its name from the table above:
+
+```bash
+pnpm --filter cloudflare-usage-ingest exec wrangler queues update <queue-name> --message-retention-period-secs 345600
+```
+
+See [queue settings](https://developers.cloudflare.com/queues/configuration/configure-queues/).
 
 ## Verify locally
 
@@ -101,15 +116,10 @@ pnpm --filter cloudflare-usage-ingest exec wrangler deploy --dry-run
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy --dry-run --env staging
 ```
 
-The dry runs build and show bindings without creating queues or deploying a
-Worker. The compatibility date matches the repository's pinned workerd runtime.
+The dry runs build and show bindings without creating queues or deploying a Worker.
 
 For local HTTP testing, put a synthetic `USAGE_INGEST_PUBLISH_SECRET` in this
 service's ignored `.dev.vars`, then run `pnpm --filter cloudflare-usage-ingest dev`.
 The queue is simulated locally and delivered to the shipped `queue()` handler in
-the same Worker. Runtime tests load the actual configured entry for production
-and staging, send synthetic HTTP events, and observe receipts and queue drainage.
-Keep tokens and payloads out of logs. Before a future remote rollout,
-configure a reachable URL and separate dedicated publisher secrets for production
-and staging. The staging `workers.dev` URL is enabled on deployment; production
-public URLs and all preview URLs remain disabled.
+the same Worker. Runtime tests cover HTTP publishing and receipt consumption in
+both environments.

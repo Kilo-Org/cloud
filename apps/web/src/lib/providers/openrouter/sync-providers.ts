@@ -281,6 +281,8 @@ async function syncProviders(params: {
         training: data.provider.dataPolicy.training,
         retainsPrompts: data.provider.dataPolicy.retainsPrompts,
         canPublish: data.provider.dataPolicy.canPublish,
+        termsOfServiceURL: data.provider.dataPolicy.termsOfServiceURL,
+        privacyPolicyURL: data.provider.dataPolicy.privacyPolicyURL,
       },
       headquarters: data.provider.headquarters,
       datacenters: data.provider.datacenters,

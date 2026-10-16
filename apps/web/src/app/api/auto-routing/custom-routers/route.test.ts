@@ -282,8 +282,7 @@ describe('/api/auto-routing/custom-routers', () => {
 
       expect(created.status).toBe(429);
       expect(created.body).toMatchObject({
-        error: { code: 'invalid_request' },
-        retryAt: '2026-10-17T00:00:00.000Z',
+        error: { code: 'quota_exceeded', retryAt: '2026-10-17T00:00:00.000Z' },
       });
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
     });

@@ -70,9 +70,7 @@ function eligibilityResponse(
  * A refused user settlement. An unavailable signup is retryable (503); a step-up names the
  * sign-in methods that can finish the signup.
  */
-function settlementFailureResponse(
-  failure: Extract<CreateOrUpdateUserResult, { success: false }>
-) {
+function settlementFailureResponse(failure: Extract<CreateOrUpdateUserResult, { success: false }>) {
   if (failure.error === 'SIGNUP-STEP-UP') {
     return NextResponse.json({ error: failure.error, methods: failure.methods }, { status: 403 });
   }

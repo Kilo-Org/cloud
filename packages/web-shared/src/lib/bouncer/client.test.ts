@@ -380,7 +380,11 @@ describe('signupDecide', () => {
     it('sends the method and normalized email domain', async () => {
       mockFetch.mockResolvedValue(Response.json({ enforced: false, flags: [] }));
       await signupDecide({ ...request, method: 'email', emailDomain: ' Example.TEST ' });
-      expect(lastRequestBody()).toEqual({ ...request, method: 'email', emailDomain: 'example.test' });
+      expect(lastRequestBody()).toEqual({
+        ...request,
+        method: 'email',
+        emailDomain: 'example.test',
+      });
     });
 
     it.each([

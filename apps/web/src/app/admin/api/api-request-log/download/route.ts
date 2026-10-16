@@ -1,11 +1,12 @@
 import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { api_request_log } from '@kilocode/db/schema';
+import { api_request_log, kilocode_users } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
 import { getApiRequestLogBlob } from '@kilocode/web-shared/lib/r2/api-request-log';
+import { findUserByEmailCaseInsensitive } from '@/lib/user';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
@@ -132,6 +133,35 @@ function jsonError(message: string, status: number) {
   });
 }
 
+type ResolvedUser = { ok: true; userId: string } | { ok: false; error: string; status: number };
+
+async function resolveUserId(userIdOrEmail: string): Promise<ResolvedUser> {
+  const users = await db
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(
+      or(eq(kilocode_users.id, userIdOrEmail), eq(kilocode_users.google_user_email, userIdOrEmail))
+    )
+    .limit(2);
+  const user = users.find(({ id }) => id === userIdOrEmail) ?? users[0];
+  if (user) return { ok: true, userId: user.id };
+  // Logs can outlive their user row, so an unknown non-email value is still a valid user ID filter.
+  if (!userIdOrEmail.includes('@')) return { ok: true, userId: userIdOrEmail };
+
+  const caseInsensitiveMatches = await findUserByEmailCaseInsensitive(userIdOrEmail);
+  if (caseInsensitiveMatches.length === 1) {
+    return { ok: true, userId: caseInsensitiveMatches[0].id };
+  }
+  if (caseInsensitiveMatches.length > 1) {
+    return {
+      ok: false,
+      error: `Multiple users match email ${userIdOrEmail} case-insensitively. Use the exact email or user ID.`,
+      status: 400,
+    };
+  }
+  return { ok: false, error: `No user found with email ${userIdOrEmail}`, status: 404 };
+}
+
 function buildFilter(
   id: bigint | null,
   userId: string | null,
@@ -209,9 +239,15 @@ export async function GET(request: NextRequest) {
     return jsonError('Start must be before end.', 400);
   }
 
+  const resolvedUser = userId ? await resolveUserId(userId) : null;
+  if (resolvedUser && !resolvedUser.ok) {
+    return jsonError(resolvedUser.error, resolvedUser.status);
+  }
+  const resolvedUserId = resolvedUser?.userId ?? null;
+
   const filter = buildFilter(
     parsedId,
-    userId,
+    resolvedUserId,
     parsedStart.value,
     parsedEnd.value,
     model,

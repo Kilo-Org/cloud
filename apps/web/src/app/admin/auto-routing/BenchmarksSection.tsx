@@ -66,6 +66,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { parseAdminResponse } from './admin-fetch';
+import { SchedulerConfigCard } from './SchedulerConfigCard';
 import { useSystemOneModelOptions } from './system-one-models';
 
 // ---------------------------------------------------------------------------
@@ -1726,6 +1727,8 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
       </TabsContent>
 
       <TabsContent value="benchmarks" className="mt-4 flex flex-col gap-4">
+        <SchedulerConfigCard />
+
         <Card className="rounded-lg">
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-base">Decider Registry</CardTitle>

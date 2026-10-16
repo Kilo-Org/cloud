@@ -200,10 +200,10 @@ overrides:
   pbkdf2: 3.1.7
   shell-quote: 1.11.0
   # Keep one @slack/web-api in the tree. @chat-adapter/slack needs ^7.18.0 while
-  # @slack/oauth and @slack/socket-mode still ask for ^7.15.0, so without this we
-  # end up with two copies of the WebClient. apps/web also depends on it directly
-  # and constructs its own WebClient, so the versions must agree. 7.x is the
-  # ceiling until @chat-adapter/slack moves to @slack/web-api 8.
+  # @slack/socket-mode still asks for ^7.15.0, so without this we end up with two
+  # copies of the WebClient. apps/web also depends on it directly and constructs
+  # its own WebClient, so the versions must agree. 7.x is the ceiling until
+  # @chat-adapter/slack moves to @slack/web-api 8.
   '@slack/web-api': 7.19.0
   # Direct `@expo/ui@57.0.21` (expo-widgets peer) and expo-router's `^57.0.21`
   # otherwise resolve to two native-module copies. Force one version.

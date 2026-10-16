@@ -50,6 +50,7 @@ vi.mock('./db', async importOriginal => {
     markStaleRunsFailed: vi.fn(),
     listStaleRunningDeciderRuns: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
+    collapsePendingOwnerAliasRows: vi.fn(),
     markProfilesFailedForEntries: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
@@ -79,6 +80,7 @@ vi.mock('./db', async importOriginal => {
 });
 
 import {
+  collapsePendingOwnerAliasRows,
   countCaseResultsByLane,
   existsNewerCompletedRun,
   getCaseResults,
@@ -780,6 +782,43 @@ describe('drainQueue', () => {
     const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
     expect(modelRows[0].model).toBe('m/old');
     expect(modelRows[1].model).toBe('m/new');
+  });
+
+  it('hands pending owner aliases to their concrete pair before claiming', async () => {
+    catalogFetch.mockImplementation(async () =>
+      Response.json({
+        data: [
+          { id: 'platform/a' },
+          { id: '~platform/a-latest', alias_target: 'platform/a' },
+          { id: '~platform/gone-latest', alias_target: 'platform/gone' },
+        ],
+      })
+    );
+    const requestedAt = '2026-06-01T00:00:00.000Z';
+    vi.mocked(listPendingCurrentProfiles)
+      .mockResolvedValueOnce([
+        { model: '~platform/a-latest', variant: '', requested_at: requestedAt },
+        { model: 'platform/a', variant: '', requested_at: requestedAt },
+        { model: '~platform/gone-latest', variant: '', requested_at: requestedAt },
+      ])
+      .mockResolvedValueOnce([
+        { model: 'platform/a', variant: '', requested_at: requestedAt },
+        { model: '~platform/gone-latest', variant: '', requested_at: requestedAt },
+      ]);
+
+    const result = await drainQueue(env, 'user');
+
+    expect(collapsePendingOwnerAliasRows).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), [
+      {
+        alias: { model: '~platform/a-latest', variant: '' },
+        target: { model: 'platform/a', variant: null },
+      },
+    ]);
+    expect(result!.entryCount).toBe(2);
+    expect(vi.mocked(insertRun).mock.calls[0][2].map(row => row.model)).toEqual([
+      'platform/a',
+      '~platform/gone-latest',
+    ]);
   });
 
   it('skips only the queue whose own slot is occupied', async () => {

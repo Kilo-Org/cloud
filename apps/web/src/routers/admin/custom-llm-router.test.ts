@@ -151,6 +151,62 @@ describe('adminCustomLlmRouter', () => {
       });
     });
 
+    describe('secure proxy base_url', () => {
+      const secureProxyCredentials = {
+        type: 'secure_proxy' as const,
+        proxy_secret: 'proxy-secret',
+        config: { url: 'https://llm.example.com/v1' },
+      };
+
+      it('rejects a non-HTTPS base_url with secure proxy credentials', async () => {
+        const caller = await createCallerForUser(admin.id);
+
+        await expect(
+          caller.admin.customLlm.upsert({
+            public_id: 'kilo-internal/secure-proxy-http',
+            definition: { ...validDefinition, base_url: 'http://proxy.example.com/api/proxy' },
+            credentials: secureProxyCredentials,
+          })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('base_url must use https'),
+        });
+      });
+
+      it('rejects switching base_url to HTTP when stored credentials use the secure proxy', async () => {
+        const caller = await createCallerForUser(admin.id);
+        const publicId = 'kilo-internal/secure-proxy-update';
+        await caller.admin.customLlm.upsert({
+          public_id: publicId,
+          definition: { ...validDefinition, base_url: 'https://proxy.example.com/api/proxy' },
+          credentials: secureProxyCredentials,
+        });
+
+        await expect(
+          caller.admin.customLlm.upsert({
+            public_id: publicId,
+            definition: { ...validDefinition, base_url: 'http://proxy.example.com/api/proxy' },
+          })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('base_url must use https'),
+        });
+      });
+
+      it('still accepts a non-HTTPS base_url for API key credentials', async () => {
+        const caller = await createCallerForUser(admin.id);
+        const definition = { ...validDefinition, base_url: 'http://llm.internal.example/v1' };
+
+        const result = await caller.admin.customLlm.upsert({
+          public_id: 'kilo-internal/api-key-http',
+          definition,
+          credentials: { type: 'api_key', api_key: 'sk-test' },
+        });
+
+        expect(result.definition.base_url).toBe(definition.base_url);
+      });
+    });
+
     it('updates existing custom LLM preserving existing encrypted key when credentials are omitted', async () => {
       const caller = await createCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-update-preserve';

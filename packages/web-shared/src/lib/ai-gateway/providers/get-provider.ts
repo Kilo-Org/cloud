@@ -23,19 +23,18 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
-import {
-  CustomLlmCredentialsSchema,
-  CustomLlmDefinitionSchema,
-  type CustomLlmCredentials,
-} from '@kilocode/db/schema-types';
+import { CustomLlmDefinitionSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
 import {
   buildDirectProvider,
   type DirectUpstreamAuth,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
-import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import {
+  decryptCustomLlmCredentials,
+  hasInsecureSecureProxyUrl,
+  INSECURE_SECURE_PROXY_URL_MESSAGE,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/credentials';
 import {
   getLocalFakeLlmProvider,
   getLocalFakeTranscriptionProvider,
@@ -139,15 +138,12 @@ async function checkCustomLlm(
     return null;
   }
 
-  const decrypted = decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(decrypted);
-  } catch {
+  const credentials = decryptCustomLlmCredentials(row.encrypted_api_key);
+  if (!credentials) {
     return null;
   }
-  const parsedCredentials = CustomLlmCredentialsSchema.safeParse(parsedJson);
-  if (!parsedCredentials.success) {
+  if (hasInsecureSecureProxyUrl(customLlm.base_url, credentials)) {
+    console.error(`Refusing custom LLM ${requestedModel}: ${INSECURE_SECURE_PROXY_URL_MESSAGE}`);
     return null;
   }
 
@@ -163,7 +159,7 @@ async function checkCustomLlm(
             : 'chat_completions',
       ],
       customLlm,
-      await resolveCustomLlmAuth(parsedCredentials.data)
+      await resolveCustomLlmAuth(credentials)
     ),
     userByok: null,
     bypassAccessCheck: true,

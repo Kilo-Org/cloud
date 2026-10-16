@@ -2249,7 +2249,7 @@ export type CustomLlmXApiKeyCredentials = z.infer<typeof CustomLlmXApiKeyCredent
 
 /**
  * Routes requests through apps/ai-gateway-secure-proxy. The definition's
- * `base_url` is the proxy's `/api/proxy` URL, used as-is; `config.url` takes the
+ * `base_url` is the proxy's HTTPS `/api/proxy` URL, used as-is; `config.url` takes the
  * role `base_url` has for direct custom LLMs, including `disable_url_suffix`.
  */
 export const CustomLlmSecureProxyCredentialsSchema = z.object({

@@ -12,6 +12,11 @@ import * as z from 'zod';
 import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import {
+  decryptCustomLlmCredentials,
+  hasInsecureSecureProxyUrl,
+  INSECURE_SECURE_PROXY_URL_MESSAGE,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/credentials';
 
 const publicIdSchema = z
   .string()
@@ -51,6 +56,18 @@ export const adminCustomLlmRouter = createTRPCRouter({
     const existing = await db.query.custom_llm2.findFirst({
       where: eq(custom_llm2.public_id, input.public_id),
     });
+
+    const effectiveCredentials =
+      input.credentials ??
+      (existing?.encrypted_api_key
+        ? decryptCustomLlmCredentials(existing.encrypted_api_key)
+        : null);
+    if (
+      effectiveCredentials &&
+      hasInsecureSecureProxyUrl(input.definition.base_url, effectiveCredentials)
+    ) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: INSECURE_SECURE_PROXY_URL_MESSAGE });
+    }
 
     let encrypted_api_key: EncryptedData | undefined = undefined;
 

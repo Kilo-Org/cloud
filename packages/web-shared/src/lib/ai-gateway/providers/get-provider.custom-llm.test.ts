@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { custom_llm2, type User } from '@kilocode/db/schema';
 import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
@@ -19,10 +19,10 @@ const definition: CustomLlmDefinition = {
   organization_ids: [ORG_ID],
 };
 
-async function insertCustomLlm(credentials: CustomLlmCredentials) {
+async function insertCustomLlm(credentials: CustomLlmCredentials, baseUrl = definition.base_url) {
   await db.insert(custom_llm2).values({
     public_id: PUBLIC_ID,
-    definition,
+    definition: { ...definition, base_url: baseUrl },
     encrypted_api_key: encryptApiKey(JSON.stringify(credentials), BYOK_ENCRYPTION_KEY),
   });
 }
@@ -88,5 +88,25 @@ describe('getProvider custom LLM credentials', () => {
     });
     if (result.kind !== 'provider') throw new Error('expected a provider');
     expect(result.provider.secureProxy).toBeUndefined();
+  });
+
+  it('refuses secure_proxy credentials when base_url is not HTTPS', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await insertCustomLlm(
+      {
+        type: 'secure_proxy',
+        proxy_secret: 'proxy-secret',
+        config: { url: 'https://llm.example.com/v1/chat/completions' },
+      },
+      'http://secure-proxy.example.com/api/proxy'
+    );
+
+    const result = await resolveProvider();
+
+    if (result.kind !== 'provider') throw new Error('expected a provider');
+    expect(result.provider.id).not.toBe('custom');
+    expect(result.provider.apiKey).not.toBe('proxy-secret');
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('base_url must use https'));
+    consoleError.mockRestore();
   });
 });

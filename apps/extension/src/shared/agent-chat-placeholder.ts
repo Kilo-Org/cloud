@@ -36,3 +36,5 @@ export const getFooterControlDisplay = (
   modelLabel: getModelLabel(footer.model) ?? footer.model,
   thinkingLabel: thinkingEffortLabel(footer.thinkingEffort),
 });
+
+// ci-probe 1

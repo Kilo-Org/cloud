@@ -1,21 +1,7 @@
 import type { CustomRouterDefinition, CustomRouterScope } from '@kilocode/auto-routing-contracts';
 import { auto_routing_custom_routers, type AutoRoutingCustomRouter } from '@kilocode/db/schema';
-2:   findCustomRouter,
-3: export async function dataCollectionRequiredAutoRoutingCandidates(
-  candidateIds: ReadonlyArray<string>
-): Promise<string[]> {
-  return dataCollectionRequiredCandidates(candidateIds, await getDataCollectionRequiredModelIds());
-}
-
-export async function collectDataCollectionRequiredAutoRoutingModelIds(): Promise<string[]> {
-  const [table, dataCollectionRequiredModelIds] = await Promise.all([
-    getCachedRoutingTable(),
-4: import { and, asc, eq, or } from 'drizzle-orm';
+import { and, asc, eq, or } from 'drizzle-orm';
 import { readDb, type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-5:       const deniedModelIds = await autoRoutingDenials(
-        policy => collectDeniedAutoRoutingModelIds(policy),
-        () => collectDataCollectionRequiredAutoRoutingModelIds()
-      );
 
 export type CustomRouterOwner = { type: CustomRouterScope; id: string };
 

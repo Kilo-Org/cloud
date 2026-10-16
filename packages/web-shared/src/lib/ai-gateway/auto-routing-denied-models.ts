@@ -91,8 +91,7 @@ function dataCollectionRequiredCandidates(
   );
 }
 
-2:   findCustomRouter,
-3: export async function dataCollectionRequiredAutoRoutingCandidates(
+export async function dataCollectionRequiredAutoRoutingCandidates(
   candidateIds: ReadonlyArray<string>
 ): Promise<string[]> {
   return dataCollectionRequiredCandidates(candidateIds, await getDataCollectionRequiredModelIds());
@@ -101,12 +100,6 @@ function dataCollectionRequiredCandidates(
 export async function collectDataCollectionRequiredAutoRoutingModelIds(): Promise<string[]> {
   const [table, dataCollectionRequiredModelIds] = await Promise.all([
     getCachedRoutingTable(),
-4: import { and, asc, eq, or } from 'drizzle-orm';
-import { readDb, type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-5:       const deniedModelIds = await autoRoutingDenials(
-        policy => collectDeniedAutoRoutingModelIds(policy),
-        () => collectDataCollectionRequiredAutoRoutingModelIds()
-      );
     getDataCollectionRequiredModelIds(),
   ]);
   return dataCollectionRequiredCandidates(

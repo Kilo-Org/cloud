@@ -35,10 +35,7 @@ import {
   fetchCustomRouterDecision,
   fetchEfficientAutoDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
-import {
-  findCustomRouter,
-  isCustomRoutersEnabled,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { findCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import {
   signAutoDecision,
   type AutoDecisionPayload,
@@ -173,7 +170,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models', () =
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
   findCustomRouter: jest.fn(),
-  isCustomRoutersEnabled: jest.fn(),
 }));
 let mockDecisionSecret = 'test-decision-secret';
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -217,7 +213,6 @@ const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage)
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedFetchCustomRouterDecision = jest.mocked(fetchCustomRouterDecision);
 const mockedFindCustomRouter = jest.mocked(findCustomRouter);
-const mockedIsCustomRoutersEnabled = jest.mocked(isCustomRoutersEnabled);
 const mockedDeniedAutoRoutingCandidates = jest.mocked(deniedAutoRoutingCandidates);
 const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
@@ -2327,7 +2322,6 @@ describe('custom routers and signed auto decisions', () => {
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedDeniedAutoRoutingCandidates.mockResolvedValue([]);
     mockedFindCustomRouter.mockResolvedValue(personalRouter);
-    mockedIsCustomRoutersEnabled.mockResolvedValue(true);
     mockedFetchCustomRouterDecision.mockResolvedValue({
       kind: 'ok',
       decision: haikuDecision,
@@ -2345,7 +2339,6 @@ describe('custom routers and signed auto decisions', () => {
 
       expect(response.status).toBe(200);
       expect(mockedFindCustomRouter).toHaveBeenCalledWith({ type: 'user', id: 'user-123' }, 'mine');
-      expect(mockedIsCustomRoutersEnabled).toHaveBeenCalledWith('user-123');
       const decideParams = mockedFetchCustomRouterDecision.mock.calls[0]?.[0];
       expect(decideParams).toMatchObject({
         customRouter: { scope: 'user', slug: 'mine' },
@@ -2398,27 +2391,22 @@ describe('custom routers and signed auto decisions', () => {
     });
 
     it.each([
-      ['an organization router without an organization context', 'kilo-auto/custom/org/team', true],
-      ['a missing router', 'kilo-auto/custom/missing', true],
-      ['a user without the custom routers flag', 'kilo-auto/custom/mine', false],
-    ] satisfies Array<[string, string, boolean]>)(
-      'answers router_not_found for %s',
-      async (_name, model, flagged) => {
-        if (model.endsWith('missing')) mockedFindCustomRouter.mockResolvedValue(null);
-        mockedIsCustomRoutersEnabled.mockResolvedValue(flagged);
+      ['an organization router without an organization context', 'kilo-auto/custom/org/team'],
+      ['a missing router', 'kilo-auto/custom/missing'],
+    ])('answers router_not_found for %s', async (_name, model) => {
+      if (model.endsWith('missing')) mockedFindCustomRouter.mockResolvedValue(null);
 
-        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)));
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(model)));
 
-        expect(response.status).toBe(404);
-        expect(await response.json()).toEqual({
-          error: { code: 'router_not_found', message: 'Custom router not found' },
-          error_type: 'custom_router',
-          message: 'Custom router not found',
-        });
-        expect(mockedFetchCustomRouterDecision).not.toHaveBeenCalled();
-        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-      }
-    );
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({
+        error: { code: 'router_not_found', message: 'Custom router not found' },
+        error_type: 'custom_router',
+        message: 'Custom router not found',
+      });
+      expect(mockedFetchCustomRouterDecision).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
 
     it('fails with a retryable error instead of serving an out-of-pool model when the worker is unreachable', async () => {
       mockedFetchCustomRouterDecision.mockResolvedValue({ kind: 'unavailable' });

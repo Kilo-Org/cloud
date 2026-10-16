@@ -1,19 +1,14 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { AutoRoutingDecision, CustomRouterDefinition } from '@kilocode/auto-routing-contracts';
 import type { CustomRouterDecisionOutcome } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
-import {
-  findCustomRouter,
-  isCustomRoutersEnabled,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { findCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { decideCustomRouter } from './custom-router';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
   findCustomRouter: jest.fn(),
-  isCustomRoutersEnabled: jest.fn(),
 }));
 
 const mockedFindCustomRouter = jest.mocked(findCustomRouter);
-const mockedIsCustomRoutersEnabled = jest.mocked(isCustomRoutersEnabled);
 
 const router: CustomRouterDefinition = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -85,7 +80,6 @@ function decideFor(
 beforeEach(() => {
   jest.clearAllMocks();
   mockedFindCustomRouter.mockResolvedValue(router);
-  mockedIsCustomRoutersEnabled.mockResolvedValue(true);
 });
 
 describe('decideCustomRouter', () => {
@@ -93,7 +87,6 @@ describe('decideCustomRouter', () => {
     const result = await decideFor({ scope: 'user', slug: 'mine' }, 'org-1');
 
     expect(mockedFindCustomRouter).toHaveBeenCalledWith({ type: 'user', id: 'user-1' }, 'mine');
-    expect(mockedIsCustomRoutersEnabled).toHaveBeenCalledWith('user-1');
     expect(result).toEqual({ kind: 'ok', decision: gatewayDecision('anthropic/claude-haiku-4.5') });
   });
 
@@ -119,15 +112,6 @@ describe('decideCustomRouter', () => {
     mockedFindCustomRouter.mockResolvedValue(null);
 
     const result = await decideFor({ scope: 'user', slug: 'missing' });
-
-    expect(result).toMatchObject({ kind: 'rejected', code: 'router_not_found' });
-    expect(decide).not.toHaveBeenCalled();
-  });
-
-  it('answers router_not_found when the custom routers flag is off for the user', async () => {
-    mockedIsCustomRoutersEnabled.mockResolvedValue(false);
-
-    const result = await decideFor({ scope: 'user', slug: 'mine' });
 
     expect(result).toMatchObject({ kind: 'rejected', code: 'router_not_found' });
     expect(decide).not.toHaveBeenCalled();

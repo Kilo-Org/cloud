@@ -18,7 +18,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () 
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
   findCustomRouter: jest.fn(),
-  isCustomRoutersEnabled: jest.fn(),
 }));
 
 import type * as AutoModelResolution from './resolution';

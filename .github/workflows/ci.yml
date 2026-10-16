@@ -503,18 +503,18 @@ jobs:
           POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 25
         ports:
           - 5432:5432
       redis:
         image: redis:7
         options: >-
           --health-cmd "redis-cli ping"
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 25
       redis-http:
         image: hiett/serverless-redis-http:0.0.10
         env:
@@ -523,9 +523,9 @@ jobs:
           SRH_CONNECTION_STRING: redis://redis:6379
         options: >-
           --health-cmd "wget -qO- http://127.0.0.1:80/ >/dev/null || exit 1"
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 25
         ports:
           - 8079:80
 
@@ -576,18 +576,18 @@ jobs:
           POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 25
         ports:
           - 5432:5432
       redis:
         image: redis:7
         options: >-
           --health-cmd "redis-cli ping"
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 25
       redis-http:
         image: hiett/serverless-redis-http:0.0.10
         env:
@@ -596,9 +596,9 @@ jobs:
           SRH_CONNECTION_STRING: redis://redis:6379
         options: >-
           --health-cmd "wget -qO- http://127.0.0.1:80/ >/dev/null || exit 1"
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 25
         ports:
           - 8079:80
 
@@ -820,9 +820,9 @@ jobs:
           POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 25
         ports:
           - 5432:5432
 

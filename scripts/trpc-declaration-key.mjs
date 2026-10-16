@@ -28,6 +28,10 @@ const files = new Set([
   'packages/trpc/package.json',
   'packages/trpc/tsconfig.json',
   'packages/trpc/rollup.config.mjs',
+  // The action holds the build command, and this script decides the inputs:
+  // a change to either must not reuse declarations built the old way.
+  '.github/actions/trpc-declarations/action.yml',
+  'scripts/trpc-declaration-key.mjs',
 ]);
 for (const file of listed) {
   const path = relative(root, resolve(trpc, file));

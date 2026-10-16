@@ -193,6 +193,9 @@ describe('kilo config.json schema merge', () => {
       expect.objectContaining({ type: 'array', items: { type: 'string' } })
     );
     expect(exp.properties.openTelemetry).toBeDefined();
+    expect(exp.properties.chatMaxRetries).toEqual(
+      expect.objectContaining({ type: 'integer', exclusiveMinimum: 0 })
+    );
     expect(exp.properties.batch_tool).toBeDefined(); // upstream key preserved
   });
 

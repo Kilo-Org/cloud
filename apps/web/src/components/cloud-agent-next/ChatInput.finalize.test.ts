@@ -122,8 +122,7 @@ function buildMockUpload(
 /**
  * linkedom + React's controlled-textarea tracking don't round-trip a raw
  * 'input' event reliably, so drive the same onChange the textarea wires up by
- * walking the fiber tree (the technique AutoRoutingModeCard.test.ts uses for
- * Radix Select).
+ * walking the fiber tree.
  */
 function setTextareaValue(rootContainer: HTMLElement, value: string) {
   type Fiber = {

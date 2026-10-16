@@ -31,7 +31,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import {
   customRouterOwnerCondition,
-  isCustomRoutersEnabled,
   listCustomRouters,
   toCustomRouterDefinition,
   type CustomRouterOwner,
@@ -96,7 +95,6 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
       'Authentication required'
     );
   }
-  if (!(await isCustomRoutersEnabled(auth.user.id))) throw routerNotFound();
 
   const queryOrganizationId = request.nextUrl.searchParams.get('organizationId');
   const authOrganizationId = auth.organizationId ?? null;
@@ -333,7 +331,7 @@ async function requestPlatformBenchmarks(params: {
   }
 }
 
-async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
+export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
   const key = `auto-routing-custom-routers:${owner.type}:${owner.id}`;
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
 }
@@ -417,7 +415,7 @@ function assertCanCreate(existing: { slug: string }[], slug: string): void {
   }
 }
 
-async function ownerRouterSlugs(
+export async function ownerRouterSlugs(
   executor: DrizzleTransaction | typeof db,
   owner: CustomRouterOwner
 ): Promise<{ slug: string }[]> {

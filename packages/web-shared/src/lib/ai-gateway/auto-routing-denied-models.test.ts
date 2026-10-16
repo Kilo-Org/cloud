@@ -1,5 +1,4 @@
 import { describe, expect, it } from '@jest/globals';
-import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
@@ -7,7 +6,7 @@ import {
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
-  candidateModelIdsFromSources,
+  candidateModelIdsFromTable,
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
   deniedAutoRoutingModelIdsForMember,
@@ -15,9 +14,6 @@ import {
   policyNeedsCandidateEvaluation,
 } from './auto-routing-denied-models';
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client', () => ({
-  getAutoRoutingSettings: jest.fn(),
-}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
 }));
@@ -45,8 +41,6 @@ function policy(
     ...overrides,
   };
 }
-
-const owner = { userId: 'user-1', organizationId: 'org-1' };
 
 describe('policyNeedsCandidateEvaluation', () => {
   it('is false for an unrestricted policy with an inactive baseline deny list', () => {
@@ -91,13 +85,38 @@ describe('policyNeedsCandidateEvaluation', () => {
 
 describe('collectDeniedAutoRoutingModelIds', () => {
   it('returns no denials without loading when the policy cannot deny anything', async () => {
-    await expect(collectDeniedAutoRoutingModelIds(policy(), owner)).resolves.toEqual([]);
+    await expect(collectDeniedAutoRoutingModelIds(policy())).resolves.toEqual([]);
+    expect(getCachedRoutingTable).not.toHaveBeenCalled();
+  });
+
+  it('denies platform routing-table candidates outside the member grant', async () => {
+    jest.mocked(getCachedRoutingTable).mockResolvedValue({
+      routes: {
+        'implementation/code_generation': [
+          { model: 'anthropic/claude-sonnet-4.6' },
+          { model: 'openai/gpt-5' },
+          { model: 'kilo-auto/balanced' },
+        ],
+      },
+    } as never);
+
+    await expect(
+      collectDeniedAutoRoutingModelIds(
+        policy({
+          memberGrant: {
+            mode: 'selected',
+            includeOrganizationBaseline: false,
+            modelAllowList: ['anthropic/claude-sonnet-4.6'],
+            providerAllowList: [],
+          },
+        })
+      )
+    ).resolves.toEqual(['openai/gpt-5']);
   });
 });
 
 describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
   it('returns routing candidates that cannot be served without data collection', async () => {
-    jest.mocked(getAutoRoutingSettings).mockResolvedValue({ status: 404, body: {} } as never);
     jest.mocked(getCachedRoutingTable).mockResolvedValue({
       routes: {
         'implementation/code_generation': [
@@ -112,7 +131,7 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
       .mocked(getDataCollectionRequiredModelIds)
       .mockResolvedValue(new Set(['meta/muse-spark-1.3-contributor', 'unrelated/model']));
 
-    await expect(collectDataCollectionRequiredAutoRoutingModelIds(owner)).resolves.toEqual([
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds()).resolves.toEqual([
       'meta/muse-spark-1.3-contributor',
       'provider/free-model:free',
     ]);
@@ -227,7 +246,7 @@ describe('deniedModelIdsForCandidates', () => {
     ).toEqual(['example/model', 'example/model:suffix']);
   });
 
-  it('denies a custom-pool-only model excluded by a selected member grant', () => {
+  it('denies a candidate excluded by a selected member grant', () => {
     expect(
       deniedModelIdsForCandidates(
         policy({
@@ -238,50 +257,29 @@ describe('deniedModelIdsForCandidates', () => {
             providerAllowList: [],
           },
         }),
-        ['pool/only-model', 'anthropic/claude'],
+        ['other/model', 'anthropic/claude'],
         modelId => modelId === 'anthropic/claude'
       )
-    ).toEqual(['pool/only-model']);
+    ).toEqual(['other/model']);
   });
 });
 
-describe('candidateModelIdsFromSources', () => {
-  it('uses the custom pool instead of the platform table when a pool is configured', () => {
-    const ids = candidateModelIdsFromSources(
-      {
+describe('candidateModelIdsFromTable', () => {
+  it('includes each concrete routing-table model once', () => {
+    expect(
+      candidateModelIdsFromTable({
         routes: {
-          'implementation/code_generation': [{ model: 'google/gemini-2.5-flash' }],
+          'implementation/code_generation': [
+            { model: 'google/gemini-2.5-flash' },
+            { model: 'kilo-auto/balanced' },
+          ],
+          'implementation/debugging': [{ model: 'google/gemini-2.5-flash' }],
         },
-      },
-      ['pool/only-model']
-    );
-    expect(ids).toEqual(['pool/only-model']);
-    expect(ids).not.toContain('google/gemini-2.5-flash');
+      })
+    ).toEqual(['google/gemini-2.5-flash']);
   });
 
-  it('includes only concrete routing-table models when no pool is configured', () => {
-    expect(
-      candidateModelIdsFromSources(
-        {
-          routes: {
-            'implementation/code_generation': [
-              { model: 'google/gemini-2.5-flash' },
-              { model: 'kilo-auto/balanced' },
-            ],
-          },
-        },
-        null
-      )
-    ).toEqual(['google/gemini-2.5-flash']);
-    const ids = candidateModelIdsFromSources(
-      {
-        routes: {
-          'implementation/code_generation': [{ model: 'kilo-auto/balanced' }],
-        },
-      },
-      null
-    );
-    expect(ids).not.toContain('kilo-auto/balanced');
-    expect(ids).not.toContain('moonshotai/kimi-k3');
+  it('returns no candidates without a routing table', () => {
+    expect(candidateModelIdsFromTable(null)).toEqual([]);
   });
 });

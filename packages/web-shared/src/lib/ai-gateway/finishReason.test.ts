@@ -1,7 +1,9 @@
 import {
   ERROR_FINISH_REASONS,
   NON_ERROR_FINISH_REASONS,
+  REFUSAL_FINISH_REASONS,
   isErrorFinishReason,
+  isRefusalFinishReason,
 } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 
 describe('finishReason', () => {
@@ -34,5 +36,21 @@ describe('finishReason', () => {
       (ERROR_FINISH_REASONS as readonly string[]).includes(r)
     );
     expect(intersection).toEqual([]);
+  });
+
+  it('classifies refusal finish_reasons as refusals and errors', () => {
+    for (const reason of REFUSAL_FINISH_REASONS) {
+      expect(isRefusalFinishReason(reason)).toBe(true);
+      expect(isErrorFinishReason(reason)).toBe(true);
+    }
+  });
+
+  it('does not classify other finish_reasons as refusals', () => {
+    expect(isRefusalFinishReason(null)).toBe(false);
+    expect(isRefusalFinishReason(undefined)).toBe(false);
+    expect(isRefusalFinishReason('length')).toBe(false);
+    for (const reason of NON_ERROR_FINISH_REASONS) {
+      expect(isRefusalFinishReason(reason)).toBe(false);
+    }
   });
 });

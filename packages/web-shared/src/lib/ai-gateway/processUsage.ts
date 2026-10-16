@@ -81,7 +81,11 @@ import {
   parseMessagesMicrodollarUsageFromString,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.messages';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
-import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
+import {
+  isErrorFinishReason,
+  isRefusalFinishReason,
+} from '@kilocode/web-shared/lib/ai-gateway/finishReason';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import {
   computeOpenRouterCostFields,
   drainSseStream,
@@ -1346,6 +1350,7 @@ export async function processTokenData(
     genStats.model = usageStats.model; // openrouter bug?
     genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
     genStats.generation_time ??= usageStats.generation_time;
+    genStats.finish_reason ??= usageStats.finish_reason;
     genStats.hasError = usageStats.hasError; // retain by choice
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
@@ -1386,16 +1391,31 @@ export async function processTokenData(
 
   const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, usageStats);
 
-  // Preserve the real cost before zeroing for free/BYOK
+  // Preserve the real cost before zeroing for free/BYOK/Claude refusals
   usageStats.market_cost ??= usageStats.cost_mUsd;
   usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
-  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
+  if (
+    isFreeModel(usageContext.requested_model) ||
+    usageContext.user_byok ||
+    isClaudeRefusal(usageStats, usageContext)
+  ) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
 
   return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+}
+
+function isClaudeRefusal(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext
+): boolean {
+  if (!isRefusalFinishReason(usageStats.finish_reason)) return false;
+  return (
+    isClaudeModel(usageContext.requested_model) ||
+    (usageStats.model !== null && isClaudeModel(usageStats.model))
+  );
 }
 
 /**
@@ -1454,7 +1474,7 @@ function bouncerUsageEvent(
     requestedLogprobs: bouncer.requestedLogprobs,
     samples: bouncer.samples,
     promptSimHash: bouncer.promptSimHash,
-    // The charged cost, after free-model and BYOK zeroing.
+    // The charged cost, after free-model, BYOK, and Claude refusal zeroing.
     costMicrodollars: usageStats.cost_mUsd,
   };
   if (bouncer.accountId === null) {

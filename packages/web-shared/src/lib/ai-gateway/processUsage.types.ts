@@ -107,7 +107,7 @@ export type NotYetCostedUsageStats = {
 export type JustTheCostsUsageStats = {
   cost_mUsd: number;
   cacheDiscount_mUsd?: number;
-  /** The real cost before any free/BYOK/promo zeroing. Set by processTokenData. */
+  /** The real cost before any free/BYOK/promo/refusal zeroing. Set by processTokenData. */
   market_cost?: number;
   inputTokens: number;
   outputTokens: number;

@@ -858,6 +858,82 @@ describe('logMicrodollarUsage', () => {
     expect(metadataRecord?.has_middle_out_transform).toBe(false);
   });
 
+  describe('processTokenData Claude refusals', () => {
+    async function processAndLoad(
+      name: string,
+      stats: Partial<MicrodollarUsageStats>,
+      context: Partial<MicrodollarUsageContext> = {}
+    ) {
+      const user = await insertTestUser({
+        id: `test-refusal-user-${name}`,
+        microdollars_used: 1000,
+        google_user_email: `refusal-${name}@example.com`,
+      });
+      const messageId = `test-refusal-msg-${name}`;
+      await processTokenData(
+        { ...BASE_USAGE_STATS, is_byok: false, messageId, ...stats },
+        { ...createBaseUsageContext(user), ...context }
+      );
+      const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+        where: eq(microdollar_usage_metadata.message_id, messageId),
+      });
+      const usageRecord = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.id, metadataRecord!.id),
+      });
+      const updatedUser = await findUserById(user.id);
+      return { metadataRecord, usageRecord, microdollarsUsed: updatedUser?.microdollars_used };
+    }
+
+    test.each(['refusal', 'content_filter', 'content-filter'])(
+      'does not charge a Claude %s but records market_cost',
+      async finish_reason => {
+        const { metadataRecord, usageRecord, microdollarsUsed } = await processAndLoad(
+          `claude-${finish_reason}`,
+          { finish_reason, hasError: true, cacheDiscount_mUsd: 50 }
+        );
+
+        expect(microdollarsUsed).toBe(1000);
+        expect(usageRecord?.cost).toBe(0);
+        expect(usageRecord?.cache_discount).toBe(0);
+        expect(usageRecord?.has_error).toBe(true);
+        expect(metadataRecord?.market_cost).toBe(500);
+      }
+    );
+
+    test('does not charge a refusal from a Claude model served behind another requested model', async () => {
+      const { usageRecord, metadataRecord, microdollarsUsed } = await processAndLoad(
+        'auto-claude',
+        { finish_reason: 'refusal', hasError: true, model: 'anthropic/claude-sonnet-4.6' },
+        { requested_model: 'kilo-auto/frontier' }
+      );
+
+      expect(microdollarsUsed).toBe(1000);
+      expect(usageRecord?.cost).toBe(0);
+      expect(metadataRecord?.market_cost).toBe(500);
+    });
+
+    test('charges a content_filter finish from a non-Claude model', async () => {
+      const { usageRecord, metadataRecord, microdollarsUsed } = await processAndLoad(
+        'gpt-content-filter',
+        { finish_reason: 'content_filter', hasError: true, model: 'openai/gpt-4.1' },
+        { requested_model: 'openai/gpt-4.1' }
+      );
+
+      expect(microdollarsUsed).toBe(1500);
+      expect(usageRecord?.cost).toBe(500);
+      expect(metadataRecord?.market_cost).toBe(500);
+    });
+
+    test('charges a Claude response that was not refused', async () => {
+      const { usageRecord, microdollarsUsed } = await processAndLoad('claude-end-turn', {
+        finish_reason: 'end_turn',
+      });
+
+      expect(microdollarsUsed).toBe(1500);
+      expect(usageRecord?.cost).toBe(500);
+    });
+  });
+
   test('keeps AI source rows when legacy usage owner does not exist', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const { core, metadata } = await defineMicrodollarUsage();

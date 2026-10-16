@@ -30,11 +30,21 @@ export const ERROR_FINISH_REASONS = [
   'in_progress',
 ] as const;
 
+// Anthropic reports a refusal as `stop_reason: "refusal"` on the Messages API;
+// OpenAI-compatible chat completions (OpenRouter, Vercel) normalize it to `content_filter`.
+export const REFUSAL_FINISH_REASONS = ['refusal', 'content_filter', 'content-filter'] as const;
+
 const errorFinishReasonSet: ReadonlySet<string> = new Set(ERROR_FINISH_REASONS);
+const refusalFinishReasonSet: ReadonlySet<string> = new Set(REFUSAL_FINISH_REASONS);
 
 // `null` / `undefined` return false: an absent finish_reason is handled by
 // the `wasAborted` / `reportedError` signals in the parsers, not here.
 export function isErrorFinishReason(finish_reason: string | null | undefined): boolean {
   if (finish_reason == null) return false;
   return errorFinishReasonSet.has(finish_reason);
+}
+
+export function isRefusalFinishReason(finish_reason: string | null | undefined): boolean {
+  if (finish_reason == null) return false;
+  return refusalFinishReasonSet.has(finish_reason);
 }

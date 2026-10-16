@@ -93,6 +93,17 @@ describe('collectDeniedAutoRoutingModelIds', () => {
   it('returns no denials without loading when the policy cannot deny anything', async () => {
     await expect(collectDeniedAutoRoutingModelIds(policy(), owner)).resolves.toEqual([]);
   });
+
+  it('ignores the organization deny list for an unrestricted grant without loading candidates', async () => {
+    jest.mocked(getCachedRoutingTable).mockClear();
+    await expect(
+      collectDeniedAutoRoutingModelIds(
+        policy({ organizationModelDenyList: ['openai/gpt-4o'] }),
+        owner
+      )
+    ).resolves.toEqual([]);
+    expect(getCachedRoutingTable).not.toHaveBeenCalled();
+  });
 });
 
 describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
@@ -121,6 +132,21 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
 
 describe('deniedAutoRoutingModelIdsForMember', () => {
   const member = { userId: 'user-1', organizationId: '22222222-2222-4222-8222-222222222222' };
+
+  it('applies the organization deny list to a baseline grant', async () => {
+    jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(
+      policy({
+        memberGrant: { mode: 'organization_baseline' },
+        organizationModelDenyList: ['openai/gpt-4o'],
+      })
+    );
+    await expect(
+      deniedAutoRoutingModelIdsForMember({
+        ...member,
+        modelIds: ['openai/gpt-4o:free', 'anthropic/claude'],
+      })
+    ).resolves.toEqual(['openai/gpt-4o', 'openai/gpt-4o:free']);
+  });
 
   it('denies candidates outside the member group policy grant', async () => {
     jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(

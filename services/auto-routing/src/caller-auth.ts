@@ -109,10 +109,13 @@ export async function authenticateCaller(env: CallerEnv, headers: Headers): Prom
   if (!user || !isApiTokenPepperCurrent(user.api_token_pepper, payload.apiTokenPepper)) {
     throw new CustomRouterError('unauthorized', 'Invalid token');
   }
-  if (
-    user.blocked_reason ||
-    isEmailBlacklistedByDomain(user.google_user_email, blacklistedDomains)
-  ) {
+  if (user.blocked_reason) throw new CustomRouterError('forbidden', 'Access denied');
+  // Fail closed: without a blocked-domain list this request cannot be admitted. A 5xx tells
+  // the client to retry.
+  if (blacklistedDomains === null) {
+    throw new CustomRouterError('internal_error', 'Account checks are temporarily unavailable');
+  }
+  if (isEmailBlacklistedByDomain(user.google_user_email, blacklistedDomains)) {
     throw new CustomRouterError('forbidden', 'Access denied');
   }
 

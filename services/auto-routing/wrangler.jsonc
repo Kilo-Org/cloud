@@ -86,5 +86,16 @@
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "O11Y_CF_AE_API_TOKEN",
     },
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "NEXTAUTH_SECRET_PROD",
+    },
+    {
+      // Shared with the gateway, which verifies decision IDs (ADR 0005).
+      "binding": "AUTO_ROUTING_DECISION_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "AUTO_ROUTING_DECISION_SECRET_PROD",
+    },
   ],
 }

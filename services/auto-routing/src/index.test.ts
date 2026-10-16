@@ -1778,11 +1778,13 @@ describe('auto routing worker', () => {
       const expected = await buildClassifierUsage(
         mirrorPayload({ input }),
         {
+          scope: 'efficient',
           conversationKey: 'user:user-1:task:task-123',
           classifierModel,
           contentHash: hashes.exact,
           kind,
           requestStart: `${generation}:10`,
+          requestedModel: input.requestedModel,
         },
         cost,
         new Date(generation).toISOString()

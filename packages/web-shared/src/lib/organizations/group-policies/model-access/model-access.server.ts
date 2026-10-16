@@ -19,6 +19,7 @@ import {
   getOrganizationGroupPolicyContext,
   type OrganizationGroupPolicyContext,
 } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
+import { enterpriseModelDenyList } from '@kilocode/worker-utils/account-access';
 
 export type EffectiveOrganizationModelPolicy = {
   requireModelInCurrentSnapshot: boolean;
@@ -59,9 +60,7 @@ export function evaluateEffectiveModelAccessPolicy(
   context: OrganizationGroupPolicyContext
 ): EffectiveOrganizationModelPolicy {
   const organizationRestrictionsEnabled = context.organization.plan === 'enterprise';
-  const organizationModelDenyList = organizationRestrictionsEnabled
-    ? (context.organization.settings.model_deny_list ?? []).map(normalizeModelId)
-    : [];
+  const organizationModelDenyList = enterpriseModelDenyList(context.organization);
   const organizationProviderCeiling = organizationRestrictionsEnabled
     ? context.organization.settings.provider_allow_list
     : undefined;

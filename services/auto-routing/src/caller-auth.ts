@@ -1,0 +1,164 @@
+import {
+  AUTO_ROUTING_ORGANIZATION_HEADER,
+  CUSTOM_ROUTER_ERROR_HTTP_STATUS,
+  type CustomRouterErrorCode,
+  type CustomRouterErrorResponse,
+} from '@kilocode/auto-routing-contracts';
+import {
+  getWorkerDb,
+  kilocode_users,
+  organizations,
+  type OrganizationRole,
+  type WorkerDb,
+} from '@kilocode/db';
+import { eq } from 'drizzle-orm';
+import {
+  extractBearerToken,
+  getCachedSecret,
+  verifyKiloTokenForResource,
+  type KiloTokenPayload,
+} from '@kilocode/worker-utils';
+import {
+  accountBalanceMicrodollars,
+  enterpriseModelDenyList,
+  findOrganizationMemberBalanceRow,
+  findOrganizationMemberRole,
+  isApiTokenPepperCurrent,
+  organizationMemberBalance,
+  requestOrganizationId,
+} from '@kilocode/worker-utils/account-access';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import * as z from 'zod';
+
+export class CustomRouterError extends Error {
+  readonly code: CustomRouterErrorCode;
+
+  constructor(code: CustomRouterErrorCode, message: string) {
+    super(message);
+    this.name = 'CustomRouterError';
+    this.code = code;
+  }
+}
+
+export function customRouterErrorResponse(error: CustomRouterError): Response {
+  return Response.json(
+    { error: { code: error.code, message: error.message } } satisfies CustomRouterErrorResponse,
+    { status: CUSTOM_ROUTER_ERROR_HTTP_STATUS[error.code] }
+  );
+}
+
+export type Caller = {
+  userId: string;
+  // The request's organization context; null for a personal request.
+  organizationId: string | null;
+  organizationRole: OrganizationRole | null;
+  userBalanceMicrodollars: number;
+  db: WorkerDb;
+};
+
+type CallerEnv = Pick<Env, 'HYPERDRIVE' | 'NEXTAUTH_SECRET'>;
+
+const OrganizationIdSchema = z.uuid();
+
+async function verifyCallerToken(env: CallerEnv, token: string): Promise<KiloTokenPayload> {
+  const secret = await getCachedSecret(env.NEXTAUTH_SECRET, 'NEXTAUTH_SECRET');
+  let payload: KiloTokenPayload;
+  try {
+    // The CLI presents its gateway token, so accept exactly the audiences the gateway accepts.
+    payload = await verifyKiloTokenForResource(token, secret, {
+      audience: KILO_GATEWAY_AUDIENCE,
+      mode: 'allow-legacy',
+    });
+  } catch {
+    throw new CustomRouterError('unauthorized', 'Invalid token');
+  }
+  // Runtime-scoped tokens need a proxy attestation that only the gateway verifies.
+  if (payload.runtimeAuthorization !== undefined) {
+    throw new CustomRouterError('unauthorized', 'Invalid token');
+  }
+  return payload;
+}
+
+// Mirrors the gateway's user authentication: token, current pepper, unblocked account, and
+// organization membership for the organization context.
+export async function authenticateCaller(env: CallerEnv, headers: Headers): Promise<Caller> {
+  const token = extractBearerToken(headers.get('authorization'));
+  if (!token) throw new CustomRouterError('unauthorized', 'Authentication required');
+  const payload = await verifyCallerToken(env, token);
+
+  const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 2_000 });
+  const [user] = await db
+    .select({
+      api_token_pepper: kilocode_users.api_token_pepper,
+      blocked_reason: kilocode_users.blocked_reason,
+      total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
+      microdollars_used: kilocode_users.microdollars_used,
+    })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, payload.kiloUserId))
+    .limit(1);
+  if (!user || !isApiTokenPepperCurrent(user.api_token_pepper, payload.apiTokenPepper)) {
+    throw new CustomRouterError('unauthorized', 'Invalid token');
+  }
+  if (user.blocked_reason) throw new CustomRouterError('forbidden', 'Access denied');
+
+  const organizationId =
+    requestOrganizationId(payload.organizationId, headers.get(AUTO_ROUTING_ORGANIZATION_HEADER)) ??
+    null;
+  let organizationRole: OrganizationRole | null = null;
+  if (organizationId !== null) {
+    if (!OrganizationIdSchema.safeParse(organizationId).success) {
+      throw new CustomRouterError('invalid_request', 'Invalid organization ID');
+    }
+    organizationRole = await findOrganizationMemberRole(db, organizationId, payload.kiloUserId);
+    if (organizationRole === null) {
+      throw new CustomRouterError('forbidden', 'Not a member of the organization');
+    }
+  }
+
+  return {
+    userId: payload.kiloUserId,
+    organizationId,
+    organizationRole,
+    userBalanceMicrodollars: accountBalanceMicrodollars(user),
+    db,
+  };
+}
+
+export type CallerSpending = {
+  balanceUsd: number;
+  deniedModelIds: string[];
+};
+
+// The organization pays in an organization context, within the member's allowance, and its
+// model deny list applies; otherwise the user pays.
+export async function loadCallerSpending(caller: Caller): Promise<CallerSpending> {
+  if (caller.organizationId === null) {
+    return { balanceUsd: caller.userBalanceMicrodollars / 1_000_000, deniedModelIds: [] };
+  }
+  const row = await findOrganizationMemberBalanceRow(
+    caller.db,
+    caller.organizationId,
+    caller.userId
+  );
+  if (!row) return { balanceUsd: 0, deniedModelIds: [] };
+  return {
+    balanceUsd: organizationMemberBalance(row).balanceMicrodollars / 1_000_000,
+    deniedModelIds: enterpriseModelDenyList(row),
+  };
+}
+
+export async function loadOrganizationBalanceUsd(
+  db: WorkerDb,
+  organizationId: string
+): Promise<number> {
+  const [organization] = await db
+    .select({
+      total_microdollars_acquired: organizations.total_microdollars_acquired,
+      microdollars_used: organizations.microdollars_used,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  return organization ? accountBalanceMicrodollars(organization) / 1_000_000 : 0;
+}

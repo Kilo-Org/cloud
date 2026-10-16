@@ -94,11 +94,11 @@ describe('upstreamRequest upstream URL policy', () => {
     });
 
     it.each([
-      'http://104.18.2.115/v1',
-      'https://localhost:8080/v1',
-      'https://169.254.169.254/latest',
-      'https://[::1]/v1',
-    ])('rejects %s before sending anything', async baseUrl => {
+      ['http://104.18.2.115/v1', 'does not use HTTPS'],
+      ['https://localhost:8080/v1', 'its host is not public'],
+      ['https://169.254.169.254/latest', 'its host is not public'],
+      ['https://[::1]/v1', 'its host is not public'],
+    ])('rejects %s before sending anything', async (baseUrl, reason) => {
       const fetchMock = mockFetch();
 
       const result = await send(directProvider(baseUrl));
@@ -111,8 +111,20 @@ describe('upstreamRequest upstream URL policy', () => {
         error_type: 'upstream_error',
         vercel_request_id: 'fra1::abc',
       });
-      expect(body.error).toContain('must use HTTPS and resolve to a public address');
+      expect(body.error).toContain(reason);
       expect(body.error).not.toContain(baseUrl);
+    });
+
+    it('reports an unresolvable host as temporarily unavailable', async () => {
+      const fetchMock = mockFetch();
+
+      const result = await send(directProvider('https://upstream-url-policy-test.invalid/v1'));
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.response.status).toBe(503);
+      const body = await result.response.json();
+      expect(body.error_type).toBe('temporarily_unavailable');
+      expect(body.error).toContain('could not resolve the upstream provider host');
     });
 
     it('rejects a secure proxy request whose upstream URL is not public', async () => {

@@ -12,6 +12,8 @@ export type ResolveHostAddresses = (hostname: string) => Promise<string[]>;
 
 const PUBLIC_HOSTNAME_CACHE_TTL_MS = 60 * 1000;
 const PUBLIC_HOSTNAME_CACHE_MAX_ENTRIES = 1000;
+const DNS_LOOKUP_ATTEMPTS = 2;
+const DNS_RETRY_DELAY_MS = 100;
 const publicHostnameExpiresAt = new Map<string, number>();
 
 /**
@@ -47,6 +49,23 @@ function cachePublicHostname(hostname: string, now: number): void {
   publicHostnameExpiresAt.set(hostname, now + PUBLIC_HOSTNAME_CACHE_TTL_MS);
 }
 
+/** One retry absorbs a transient resolver failure such as `EAI_AGAIN`. */
+async function resolveWithRetry(
+  hostname: string,
+  resolveHostAddresses: ResolveHostAddresses
+): Promise<string[] | null> {
+  for (let attempt = 0; attempt < DNS_LOOKUP_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) await new Promise(resolve => setTimeout(resolve, DNS_RETRY_DELAY_MS));
+    try {
+      const addresses = await resolveHostAddresses(hostname);
+      if (addresses.length > 0) return addresses;
+    } catch {
+      // Retried below; the caller reports dns_lookup_failed once attempts run out.
+    }
+  }
+  return null;
+}
+
 export function clearUpstreamUrlPolicyCache(): void {
   publicHostnameExpiresAt.clear();
 }
@@ -80,13 +99,8 @@ export async function findUpstreamUrlViolation(
   const now = Date.now();
   if (isCachedPublicHostname(hostname, now)) return null;
 
-  let addresses: string[];
-  try {
-    addresses = await resolveHostAddresses(hostname);
-  } catch {
-    return 'dns_lookup_failed';
-  }
-  if (addresses.length === 0) return 'dns_lookup_failed';
+  const addresses = await resolveWithRetry(hostname, resolveHostAddresses);
+  if (!addresses) return 'dns_lookup_failed';
   if (addresses.some(address => !isPublicIp(address))) return 'non_public_address';
 
   cachePublicHostname(hostname, now);

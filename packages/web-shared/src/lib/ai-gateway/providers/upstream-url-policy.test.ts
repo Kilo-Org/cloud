@@ -59,18 +59,31 @@ describe('findUpstreamUrlViolation', () => {
     ).resolves.toBe('non_public_address');
   });
 
-  it('rejects a host that does not resolve', async () => {
+  it('rejects a host that still does not resolve after one retry', async () => {
+    const empty = resolvesTo();
+    await expect(findUpstreamUrlViolation('https://missing.example.com/v1', empty)).resolves.toBe(
+      'dns_lookup_failed'
+    );
+    expect(empty).toHaveBeenCalledTimes(2);
+
+    const failing = jest.fn(async (_hostname: string): Promise<string[]> => {
+      throw new Error('getaddrinfo ENOTFOUND');
+    });
+    await expect(findUpstreamUrlViolation('https://broken.example.com/v1', failing)).resolves.toBe(
+      'dns_lookup_failed'
+    );
+    expect(failing).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts a host whose first lookup fails transiently', async () => {
+    const resolve = jest
+      .fn(async (_hostname: string) => ['104.18.2.115'])
+      .mockRejectedValueOnce(new Error('getaddrinfo EAI_AGAIN'));
+
     await expect(
-      findUpstreamUrlViolation('https://missing.example.com/v1', resolvesTo())
-    ).resolves.toBe('dns_lookup_failed');
-    await expect(
-      findUpstreamUrlViolation(
-        'https://broken.example.com/v1',
-        jest.fn(async () => {
-          throw new Error('getaddrinfo ENOTFOUND');
-        })
-      )
-    ).resolves.toBe('dns_lookup_failed');
+      findUpstreamUrlViolation('https://llm.example.com/v1', resolve)
+    ).resolves.toBeNull();
+    expect(resolve).toHaveBeenCalledTimes(2);
   });
 
   it('reuses a public verdict but re-resolves a rejected host', async () => {

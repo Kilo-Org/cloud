@@ -275,11 +275,23 @@ function isRedirect(response: Response): boolean {
   return response.status >= 300 && response.status < 400;
 }
 
+const UPSTREAM_URL_REJECTION_MESSAGES = {
+  invalid_url: 'The upstream provider URL is not a valid URL.',
+  non_https: 'The upstream provider URL is not allowed because it does not use HTTPS.',
+  non_public_host: 'The upstream provider URL is not allowed because its host is not public.',
+  non_public_address:
+    'The upstream provider URL is not allowed because its host resolves to a non-public address.',
+  dns_lookup_failed:
+    'The gateway could not resolve the upstream provider host. This may be temporary; try again shortly.',
+  redirect: 'The upstream provider responded with a redirect, which the gateway does not follow.',
+} as const satisfies Record<RejectedUpstreamUrl['violation'], string>;
+
 function upstreamUrlRejectedResponse(
   rejected: RejectedUpstreamUrl,
   provider: Provider,
   vercelRequestId: string | null | undefined
 ) {
+  const transient = rejected.violation === 'dns_lookup_failed';
   const metadata = {
     providerId: provider.id,
     targetHost: rejected.host,
@@ -288,7 +300,7 @@ function upstreamUrlRejectedResponse(
   };
   errorExceptInTest('AI gateway upstream URL rejected', metadata);
   captureMessage('AI gateway upstream URL rejected', {
-    level: 'error',
+    level: transient ? 'warning' : 'error',
     tags: {
       source: 'ai-gateway-upstream-url-policy',
       provider: provider.id,
@@ -297,20 +309,17 @@ function upstreamUrlRejectedResponse(
     extra: metadata,
   });
 
-  const error = withRequestId(
-    rejected.violation === 'redirect'
-      ? 'The upstream provider responded with a redirect, which the gateway does not follow.'
-      : 'The upstream provider URL is not allowed. It must use HTTPS and resolve to a public address.',
-    vercelRequestId
-  );
+  const error = withRequestId(UPSTREAM_URL_REJECTION_MESSAGES[rejected.violation], vercelRequestId);
   return NextResponse.json(
     {
       error,
-      error_type: ProxyErrorType.upstream_error,
+      error_type: transient
+        ? ProxyErrorType.temporarily_unavailable
+        : ProxyErrorType.upstream_error,
       message: error,
       ...(vercelRequestId && { vercel_request_id: vercelRequestId }),
     },
-    { status: 502 }
+    { status: transient ? 503 : 502 }
   );
 }
 

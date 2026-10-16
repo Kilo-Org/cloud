@@ -15,6 +15,7 @@ function convert(publicId: string, model: CustomLlmDefinition) {
     canonical_slug: publicId,
     hugging_face_id: '',
     name: model.display_name,
+    isPrivateCustomLlm: true,
     created: 1756238927,
     description: CUSTOM_LLM_DESCRIPTION,
     context_length: model.context_length,
@@ -43,7 +44,6 @@ function convert(publicId: string, model: CustomLlmDefinition) {
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
-    isPrivateCustomLlm: true,
     mayTrainOnYourPrompts: true,
     opencode: opencode && withLegacyVariants(opencode),
   };

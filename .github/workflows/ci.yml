@@ -292,9 +292,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
+      - name: Restore or build tRPC declarations
+        if: matrix.group == 'trpc'
+        uses: ./.github/actions/trpc-declarations
+
       - name: Typecheck
         env:
           KILO_AFFECTED: ${{ needs.changes.outputs.affected }}
+          KILO_TYPECHECK_TRPC_BUILT: ${{ matrix.group == 'trpc' && '1' || '' }}
         run: scripts/typecheck-all.sh --group ${{ matrix.group }}
 
   # Required check. Skipped groups (nothing affected) pass; a failed or
@@ -343,9 +348,9 @@ jobs:
 
       # The extension sources lint against the built tRPC types. A full lint
       # also covers apps/mobile, which needs the harness SDK build too.
-      - name: Build trpc types
+      - name: Restore or build tRPC declarations
         if: matrix.group == 'trpc'
-        run: pnpm --filter @kilocode/trpc run build
+        uses: ./.github/actions/trpc-declarations
 
       - name: Cache compiler plugins
         if: matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')

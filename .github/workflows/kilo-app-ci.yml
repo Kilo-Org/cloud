@@ -116,8 +116,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
-      - name: Build trpc types
-        run: pnpm --filter @kilocode/trpc run build
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
 
       - name: Build harness SDK
         run: pnpm --filter @kilocode/harness-sdk run build
@@ -160,8 +160,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
-      - name: Build trpc types
-        run: pnpm --filter @kilocode/trpc run build
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
 
       - name: Build harness SDK
         run: pnpm --filter @kilocode/harness-sdk run build

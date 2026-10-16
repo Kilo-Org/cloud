@@ -91,6 +91,8 @@ test('an unattributable or global change selects everything', () => {
     'unknown/file.ts',
     '.github/workflows/ci.yml',
     'scripts/affected-workspaces.mjs',
+    '.github/actions/trpc-declarations/action.yml',
+    'scripts/trpc-declaration-key.mjs',
     'patches/a.patch',
   ]) {
     const result = select([file]);

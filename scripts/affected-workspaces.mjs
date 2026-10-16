@@ -19,7 +19,8 @@ const GLOBAL = [
   /^(package\.json|pnpm-workspace\.yaml|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|\.oxlintrc\.json|\.oxfmtrc\.json|oxlint-plugin-drizzle\.js|tsconfig[^/]*\.json)$/,
   /^(patches|tools\/oxlint)\//,
   /^\.github\/workflows\/(ci|kilo-app-ci)\.yml$/,
-  /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs)$/,
+  /^\.github\/actions\//,
+  /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs|trpc-declaration-key\.mjs)$/,
 ];
 
 // Root scripts that change one check for every workspace, and nothing else.

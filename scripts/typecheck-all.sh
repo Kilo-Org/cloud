@@ -49,8 +49,12 @@ if [ -n "$group" ]; then
       # kilo-app typechecks in kilo-app CI, which runs whenever kilo-app is
       # affected. The extension has no other job that typechecks it outside its
       # own workflow, which skips unrelated PRs.
-      pnpm --filter @kilocode/trpc run build
-      export KILO_TYPECHECK_TRPC_BUILT=1
+      # CI restores or builds the declarations first and sets
+      # KILO_TYPECHECK_TRPC_BUILT=1.
+      if [ "${KILO_TYPECHECK_TRPC_BUILT:-}" != 1 ]; then
+        pnpm --filter @kilocode/trpc run build
+        export KILO_TYPECHECK_TRPC_BUILT=1
+      fi
       if affects kilo-extension; then
         pnpm --filter kilo-extension run typecheck
       fi

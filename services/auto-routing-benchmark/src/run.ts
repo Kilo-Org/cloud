@@ -41,6 +41,7 @@ import {
   getSummariesForRuns,
   getRoutingCaseResultsForEntries,
   insertRun,
+  collapsePendingOwnerAliasRows,
   listLaneFailures,
   listPendingCurrentProfiles,
   listReadyCurrentProfilesForEntries,
@@ -86,6 +87,7 @@ import {
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import {
   catalogCandidatePrices,
+  concreteAliasPair,
   fetchBenchmarkModelCatalog,
   fetchPlatformRegistryEntries,
   platformRegistryEntries,
@@ -932,11 +934,24 @@ export async function drainQueue(
   const repetitions = config.deciderRepetitions;
   const maxEntries = 100;
 
-  const pending = await listPendingCurrentProfiles(
-    env.BENCH_DB,
-    { router, engineIdentity, repetitions },
-    queue
-  );
+  const current = { router, engineIdentity, repetitions };
+  let pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
+  if (queue === 'user' && pending.some(row => row.model.startsWith('~'))) {
+    const catalog = await fetchBenchmarkModelCatalog(env);
+    const aliases = pending.flatMap(row => {
+      if (!row.model.startsWith('~')) return [];
+      const alias = { model: row.model, variant: row.variant };
+      const target = concreteAliasPair(catalog, {
+        model: row.model,
+        variant: variantFromStorage(row.variant),
+      });
+      return target === undefined ? [] : [{ alias, target }];
+    });
+    if (aliases.length > 0) {
+      await collapsePendingOwnerAliasRows(env.BENCH_DB, current, aliases);
+      pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
+    }
+  }
   if (pending.length === 0) return null;
 
   const batch = pending.slice(0, maxEntries);

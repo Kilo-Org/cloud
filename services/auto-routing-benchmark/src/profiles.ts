@@ -23,8 +23,6 @@ import { computeEngineIdentity } from './run';
 export const PROFILE_ADMISSION_LIMIT = 20;
 export const PROFILE_ADMISSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export const MISSING_PROFILE_FAILURE_REASON = 'Benchmark profile missing; retry to request it.';
-
 export type ProfileOwnerType = 'user' | 'org';
 
 export type ProfileRow = typeof benchmarkProfiles.$inferSelect;
@@ -207,14 +205,6 @@ function statusFromRow(entry: BenchmarkPair, row: ProfileRow): BenchmarkProfileE
 
 function pendingStatus(entry: BenchmarkPair): BenchmarkProfileEntryStatus {
   return { entry, status: 'pending', failureReason: null };
-}
-
-function missingStatus(entry: BenchmarkPair): BenchmarkProfileEntryStatus {
-  return {
-    entry,
-    status: 'failed',
-    failureReason: MISSING_PROFILE_FAILURE_REASON,
-  };
 }
 
 export function buildPendingUpsertValues(
@@ -556,76 +546,6 @@ export async function registerProfiles(
           ? boundFailureReason(classification.failureReason)
           : null,
     };
-  });
-
-  return { statuses };
-}
-
-export type LookupProfileStatusesInput = {
-  pairs: readonly BenchmarkPair[];
-  /** Injectable clock for tests. */
-  now?: Date;
-};
-
-/**
- * Status lookup for up to MAX_POOL_ENTRIES exact pairs.
- * - current row → its status
- * - stale only → free pending insert (no request event; on-conflict do nothing)
- *   + report the actual post-batch current status
- * - missing → failed with missing message; never admits from a read path
- */
-export async function lookupProfileStatuses(
-  db: D1Database,
-  config: Pick<BenchmarkConfig, 'deciderRepetitions'> & Partial<Pick<BenchmarkConfig, 'router'>>,
-  input: LookupProfileStatusesInput
-): Promise<BenchmarkProfileStatusesResponse> {
-  assertUniquePairs(input.pairs);
-  const current = currentProfileContextFromConfig(config);
-  const router = current.router ?? 'efficient';
-  const nowIso = (input.now ?? new Date()).toISOString();
-
-  const existingRows = await loadProfileRowsForPairs(db, router, input.pairs);
-  const byEntry = groupRowsByEntry(existingRows);
-
-  const staleToAdmit: BenchmarkPair[] = [];
-  /** Parallel to input.entries: pre-resolved status, or null when stale-admit pending. */
-  const preStatuses: Array<BenchmarkProfileEntryStatus | null> = [];
-
-  for (const entry of input.pairs) {
-    const rows = byEntry.get(benchmarkPairKey(entry)) ?? [];
-    const currentRow = rows.find(row => isCurrentBenchmarkProfile(row, current, entry));
-    if (currentRow) {
-      preStatuses.push(statusFromRow(entry, currentRow));
-      continue;
-    }
-    if (rows.length > 0) {
-      staleToAdmit.push(entry);
-      preStatuses.push(null);
-      continue;
-    }
-    preStatuses.push(missingStatus(entry));
-  }
-
-  if (staleToAdmit.length > 0) {
-    const orm = drizzle(db);
-    const stmts = staleToAdmit.map(entry =>
-      pendingStatusInsertStatement(orm, buildPendingUpsertValues(entry, current, nowIso))
-    );
-    await orm.batch(stmts as unknown as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
-  }
-
-  const postRows =
-    staleToAdmit.length > 0 ? await loadProfileRowsForPairs(db, router, staleToAdmit) : [];
-  const postByEntry = groupRowsByEntry(postRows);
-
-  const statuses: BenchmarkProfileEntryStatus[] = input.pairs.map((entry, i) => {
-    const pre = preStatuses[i];
-    if (pre) return pre;
-    const currentRow = (postByEntry.get(benchmarkPairKey(entry)) ?? []).find(row =>
-      isCurrentBenchmarkProfile(row, current, entry)
-    );
-    if (currentRow) return statusFromRow(entry, currentRow);
-    return pendingStatus(entry);
   });
 
   return { statuses };

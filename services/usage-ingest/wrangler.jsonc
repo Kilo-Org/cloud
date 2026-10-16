@@ -9,6 +9,7 @@
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },
+  "vars": { "USAGE_INGEST_MODE": "receipt" },
   "queues": {
     "producers": [
       { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing" },
@@ -31,6 +32,7 @@
     "staging": {
       "name": "usage-ingest-staging",
       "workers_dev": true,
+      "vars": { "USAGE_INGEST_MODE": "receipt" },
       "queues": {
         "producers": [
           { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging" },

@@ -26,3 +26,5 @@ export function sessionHasTerminal(
 ): boolean {
   return isControlSession(sessionId) || PROVIDER_CAPABILITIES[provider].terminal;
 }
+
+// ci-probe 1

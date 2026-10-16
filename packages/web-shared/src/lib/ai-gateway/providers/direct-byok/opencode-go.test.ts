@@ -14,11 +14,26 @@ test('allows the Responses API for OpenCode Go', () => {
   expect(openCodeGo.supported_chat_apis).toContain('responses');
 });
 
+test('serves the Gemini API from the OpenCode Go Google endpoint', () => {
+  expect(openCodeGo.supported_chat_apis).toContain('generate_content');
+  expect(openCodeGo.base_url_overrides).toEqual({
+    generate_content: 'https://opencode.ai/inference/go/google/v1beta',
+  });
+});
+
 describe('OpenCode Go session headers', () => {
   const requests: GatewayRequest[] = [
     { kind: 'chat_completions', body: { model: 'qwen3.7-plus', messages: [] } },
     { kind: 'messages', body: { model: 'qwen3.7-plus', messages: [], max_tokens: 100 } },
     { kind: 'responses', body: { model: 'qwen3.7-plus', input: 'Hello' } },
+    {
+      kind: 'generate_content',
+      body: {
+        model: 'gemini-4-argon-contributor',
+        stream: true,
+        contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+      },
+    },
   ];
 
   function createContext(
@@ -65,6 +80,9 @@ describe('OpenCode Go session headers', () => {
     expect(otherApi.extraHeaders['x-opencode-session']).toBe(session);
     expect(first.extraHeaders['x-api-key']).toBe(
       request.kind === 'messages' ? 'test-api-key' : undefined
+    );
+    expect(first.extraHeaders['x-goog-api-key']).toBe(
+      request.kind === 'generate_content' ? 'test-api-key' : undefined
     );
   });
 

@@ -21,7 +21,10 @@ import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokModel,
+  getDirectByokSupportedChatApis,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import {
   CustomLlmCredentialsSchema,
@@ -85,7 +88,10 @@ async function checkDirectBYOK(
       disableUrlSuffix: false,
       apiKey: userByok[0].decryptedAPIKey,
       apiKeyHeader: null,
-      supportedChatApis: directByok.supported_chat_apis,
+      supportedChatApis: getDirectByokSupportedChatApis(
+        directByok,
+        organizationId ? 'organization' : 'user'
+      ),
       responseTransforms: directByok.reasoning_details_transform,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;

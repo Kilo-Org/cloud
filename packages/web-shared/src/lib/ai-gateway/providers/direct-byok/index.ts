@@ -14,6 +14,19 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+
+type DirectByokKeyOwner = 'user' | 'organization';
+
+/** The Gemini API is enabled for personal BYOK keys only, for now. */
+export function getDirectByokSupportedChatApis(
+  provider: DirectByokProvider,
+  keyOwner: DirectByokKeyOwner
+): ReadonlyArray<GatewayChatApiKind> {
+  return keyOwner === 'user'
+    ? provider.supported_chat_apis
+    : provider.supported_chat_apis.filter(kind => kind !== 'generate_content');
+}
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();

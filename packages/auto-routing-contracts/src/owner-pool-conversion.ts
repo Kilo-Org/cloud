@@ -13,7 +13,9 @@ export const OWNER_POOL_CONVERSION_PATH = '/api/internal/auto-routing/owner-pool
 export const CONVERTED_ROUTER_SLUG = 'efficient';
 export const CONVERTED_ROUTER_NAME = 'Efficient';
 export const CONVERTED_ROUTER_BASE: AutoRouter = 'efficient';
-export const MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST = 100;
+// Conversions run one by one and send their notices inline, so a batch stays well inside the
+// web route's duration limit.
+export const MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST = 25;
 
 export const OwnerPoolConversionOwnerSchema = z.object({
   type: CustomRouterScopeSchema,

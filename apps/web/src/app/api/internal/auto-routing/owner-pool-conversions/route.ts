@@ -15,6 +15,8 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { convertOwnerPools } from '@/lib/auto-routing-owner-pool-conversion';
 
+export const maxDuration = 300;
+
 export async function POST(req: NextRequest) {
   const token = extractBearerToken(req.headers.get('authorization'));
   if (!INTERNAL_API_SECRET || !token || !timingSafeEqual(token, INTERNAL_API_SECRET)) {

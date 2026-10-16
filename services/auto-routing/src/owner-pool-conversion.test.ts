@@ -202,8 +202,8 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     expect(webFetch).not.toHaveBeenCalled();
   });
 
-  it('chunks conversions at 100 per web request', async () => {
-    ownerRows = Array.from({ length: 250 }, (_, index) => `u${String(index).padStart(3, '0')}`);
+  it('chunks conversions at 25 per web request', async () => {
+    ownerRows = Array.from({ length: 60 }, (_, index) => `u${String(index).padStart(3, '0')}`);
     const objectIds = ownerRows.map(id =>
       setOwner('user', id, { mode: null, pool: [{ model: 'a/b' }] })
     );
@@ -212,11 +212,11 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      conversions: 250,
-      outcomes: { created: 250 },
-      noticesSent: 250,
+      conversions: 60,
+      outcomes: { created: 60 },
+      noticesSent: 60,
     });
-    expect(webRequests().map(request => request.conversions.length)).toEqual([100, 100, 50]);
+    expect(webRequests().map(request => request.conversions.length)).toEqual([25, 25, 10]);
     expect(webRequests().flatMap(request => request.conversions.map(c => c.owner.id))).toEqual(
       ownerRows
     );

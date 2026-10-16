@@ -309,7 +309,7 @@ describe('shouldRouteToVercel', () => {
       })),
     }));
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-      isFreeModel: jest.fn(() => false),
+      isFreeModelExcludingCustomLlms: jest.fn(() => false),
     }));
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),

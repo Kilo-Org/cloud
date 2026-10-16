@@ -574,15 +574,15 @@ export function CustomLlmsContent() {
                 prefix. It may reuse a Kilo-exclusive model ID, which the custom LLM then replaces.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
-                To make the model available to every user for free, replace{' '}
-                <code>organization_ids</code> and <code>group_ids</code> with{' '}
+                Custom LLMs are always free for users. To make the model available to every user,
+                replace <code>organization_ids</code> and <code>group_ids</code> with{' '}
                 <code>
                   &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;]{' '}
                   {'}'}
-                </code>
-                , add a <code>description</code>, and remove <code>pricing</code>. Organization
-                provider allow lists apply to these providers. Unknown providers appear in the
-                provider list after the next provider sync.
+                </code>{' '}
+                and add a <code>description</code>. Organization provider allow lists apply to these
+                providers. Unknown providers appear in the provider list after the next provider
+                sync. Saved changes reach every server within a minute.
               </p>
             </div>
 

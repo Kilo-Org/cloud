@@ -40,7 +40,7 @@ import {
   findKiloExclusiveModel,
   shouldRedactModelNameInMicrodollarUsage,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { isFreeModelIncludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
@@ -152,9 +152,9 @@ const extractMessageTextContent = (m: Message) =>
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
 
-/** Custom LLMs are always free; every other model follows `isFreeModel`. */
-function isFreeUsage(usageContext: { provider: ProviderId; requested_model: string }) {
-  return usageContext.provider === 'custom' || isFreeModel(usageContext.requested_model);
+/** Usage on the custom provider is free even if the custom LLM catalog cannot be read. */
+async function isFreeUsage(usageContext: { provider: ProviderId; requested_model: string }) {
+  return usageContext.provider === 'custom' || (await isFreeModel(usageContext.requested_model));
 }
 
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
@@ -1491,7 +1491,7 @@ async function getGenerationLookupProvider(
   }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
-    (await isFreeModelIncludingCustomLlms(usageContext.requested_model)) ||
+    (await isFreeModel(usageContext.requested_model)) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);

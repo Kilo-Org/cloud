@@ -12,7 +12,6 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
-import { invalidateCustomLlmCache } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -122,7 +121,6 @@ export const adminCustomLlmRouter = createTRPCRouter({
           public_id: custom_llm2.public_id,
           definition: custom_llm2.definition,
         });
-      invalidateCustomLlmCache();
 
       return updated;
     }
@@ -138,7 +136,6 @@ export const adminCustomLlmRouter = createTRPCRouter({
         public_id: custom_llm2.public_id,
         definition: custom_llm2.definition,
       });
-    invalidateCustomLlmCache();
 
     return inserted;
   }),
@@ -179,7 +176,6 @@ export const adminCustomLlmRouter = createTRPCRouter({
         message: `Custom LLM with public_id "${input.public_id}" already exists`,
       });
     }
-    invalidateCustomLlmCache();
 
     return inserted;
   }),
@@ -193,7 +189,6 @@ export const adminCustomLlmRouter = createTRPCRouter({
         message: `Custom LLM with public_id "${input.public_id}" not found`,
       });
     }
-    invalidateCustomLlmCache();
 
     return { success: true };
   }),

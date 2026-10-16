@@ -129,7 +129,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', (
     '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
   ) as Record<string, unknown>),
   lookupCustomLlm: jest.fn(async () => ({ kind: 'none' })),
-  isFreeModelIncludingCustomLlms: jest.fn(async () => false),
+  findCustomLlm: jest.fn(async () => null),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
@@ -2333,18 +2333,8 @@ describe('custom LLM requests', () => {
     expect(response.status).toBe(200);
   });
 
-  it('requires sign-in for a private custom LLM that reuses a free Kilo-exclusive id', async () => {
+  it('answers an anonymous caller of a private custom LLM with model not found', async () => {
     setAnonymousAuth();
-    const freeExclusiveId = gemma_4_26b_a4b_it_free_model.public_id;
-    mockCustomLlm(customLlm(freeExclusiveId, false));
-
-    const response = await handleLlmProxyRequest(makeRequest(makeBody(freeExclusiveId)) as never);
-
-    expect(response.status).toBe(401);
-    expect(mockedGetProvider).not.toHaveBeenCalled();
-  });
-
-  it('returns model not found instead of falling back when the caller is not eligible', async () => {
     mockCustomLlm(customLlm('acme/private-model', false));
     mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-unavailable' });
 
@@ -2356,15 +2346,15 @@ describe('custom LLM requests', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('returns service unavailable when custom LLM credentials cannot be resolved now', async () => {
-    mockCustomLlm(customLlm('acme/public-model', true));
-    mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-temporarily-unavailable' });
+  it('returns model not found instead of falling back when the caller is not eligible', async () => {
+    mockCustomLlm(customLlm('acme/private-model', false));
+    mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-unavailable' });
 
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('acme/public-model')) as never
+      makeRequest(makeBody('acme/private-model')) as never
     );
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(404);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 

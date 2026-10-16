@@ -1,7 +1,7 @@
 import { isPdfSupportingModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   getLocalFakeTranscriptionModelsUrl,
   LOCAL_FAKE_LLM_API_KEY,
@@ -141,14 +141,13 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     preferredModels,
     unavailableModelIds,
     customLlmsById,
-  ] =
-    await Promise.all([
-      getOpenRouterModelsMetadataFromDatabase(),
-      getDataCollectionRequiredModelIds(),
-      getPreferredModels(),
-      getUnavailableModelIds(),
-      getCustomLlmsById(),
-    ]);
+  ] = await Promise.all([
+    getOpenRouterModelsMetadataFromDatabase(),
+    getDataCollectionRequiredModelIds(),
+    getPreferredModels(),
+    getUnavailableModelIds(),
+    getCustomLlmsById(),
+  ]);
   // A custom LLM takes precedence over any built-in model with the same id.
   const isShadowedByCustomLlm = (modelId: string) => customLlmsById.has(modelId.toLowerCase());
   const publicCustomLlms = [...customLlmsById.values()].flatMap(customLlm =>
@@ -240,7 +239,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       const description = isFreeNemotronModel(model.id)
         ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
         : model.description;
-      const isFree = isFreeModel(model.id);
+      const isFree = isFreeModelExcludingCustomLlms(model.id);
       return {
         ...model,
         inference_provider_ids: inferenceProviderIds,

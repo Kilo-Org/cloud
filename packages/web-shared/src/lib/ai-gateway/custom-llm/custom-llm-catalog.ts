@@ -2,7 +2,6 @@ import 'server-only';
 import { custom_llm2, type CustomLlm2 } from '@kilocode/db/schema';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { captureException } from '@sentry/nextjs';
 
@@ -43,8 +42,9 @@ export async function fetchCustomLlmsFromDatabase(): Promise<CustomLlm[]> {
   return parseCustomLlmRows(await readDb.select().from(custom_llm2));
 }
 
-/** Short enough that admin edits reach every instance quickly; routing reads
- * this on every gateway request, so it must not hit the database each time. */
+/** Admin edits take effect when this expires: every serverless instance keeps
+ * its own copy, so there is no cross-instance invalidation. Routing reads this
+ * on every gateway request, so it must not hit the database each time. */
 const CACHE_TTL_MS = 60_000;
 /** After a failed read, wait this long before querying again so an outage does
  * not turn every lookup into a database query and a Sentry event. */
@@ -61,23 +61,18 @@ const UNAVAILABLE_CATALOG: CustomLlmCatalog = { byId: new Map(), available: fals
 let cache: { byId: ReadonlyMap<string, CustomLlm>; at: number } | null = null;
 let inFlight: Promise<ReadonlyMap<string, CustomLlm>> | null = null;
 let lastFailureAt: number | null = null;
-/** Bumped on invalidation so a load that started earlier cannot update the cache. */
-let generation = 0;
 
 async function loadCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
-  const loadGeneration = generation;
   try {
     const byId = new Map<string, CustomLlm>();
     for (const customLlm of await fetchCustomLlmsFromDatabase()) {
       byId.set(customLlm.public_id.toLowerCase(), customLlm);
     }
-    if (loadGeneration === generation) {
-      cache = { byId, at: Date.now() };
-      lastFailureAt = null;
-    }
+    cache = { byId, at: Date.now() };
+    lastFailureAt = null;
     return byId;
   } catch (error) {
-    if (loadGeneration === generation) lastFailureAt = Date.now();
+    lastFailureAt = Date.now();
     console.error('Failed to load custom LLMs', error);
     captureException(error, { tags: { source: 'custom_llm_catalog' } });
     throw error;
@@ -113,9 +108,8 @@ export async function getCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm
   return (await getCustomLlmCatalog()).byId;
 }
 
-/** Drops this instance's cache so admin edits apply here immediately. */
-export function invalidateCustomLlmCache() {
-  generation++;
+/** Tests insert rows directly; production relies on `CACHE_TTL_MS` expiry. */
+export function resetCustomLlmCacheForTest() {
   cache = null;
   inFlight = null;
   lastFailureAt = null;
@@ -149,15 +143,6 @@ export async function lookupCustomLlm(modelId: string): Promise<CustomLlmLookup>
 /** A custom LLM for the id, or null when there is none or the catalog is unavailable. */
 export async function findCustomLlm(modelId: string): Promise<CustomLlm | null> {
   return (await getCustomLlmsById()).get(modelId.trim().toLowerCase()) ?? null;
-}
-
-/**
- * `isFreeModel` that also knows custom LLMs. A custom LLM shadows any built-in
- * model with the same id, so its own public flag decides.
- */
-export async function isFreeModelIncludingCustomLlms(modelId: string): Promise<boolean> {
-  const customLlm = await findCustomLlm(modelId);
-  return customLlm ? isPublicCustomLlm(customLlm.definition) : isFreeModel(modelId);
 }
 
 /**

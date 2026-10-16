@@ -1,7 +1,7 @@
 import { custom_llm2 } from '@kilocode/db/schema';
 import type { CustomLlmDefinition, EncryptedData } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { invalidateCustomLlmCache } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { resetCustomLlmCacheForTest } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { eq } from 'drizzle-orm';
 
 const baseDefinition = {
@@ -43,10 +43,10 @@ export async function insertCustomLlmForTest(
   await db
     .insert(custom_llm2)
     .values({ public_id: publicId, definition, encrypted_api_key: encryptedApiKey });
-  invalidateCustomLlmCache();
+  resetCustomLlmCacheForTest();
 }
 
 export async function deleteCustomLlmForTest(publicId: string) {
   await db.delete(custom_llm2).where(eq(custom_llm2.public_id, publicId));
-  invalidateCustomLlmCache();
+  resetCustomLlmCacheForTest();
 }

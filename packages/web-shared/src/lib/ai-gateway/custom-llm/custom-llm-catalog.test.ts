@@ -2,11 +2,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/gl
 import {
   findCustomLlm,
   getPublicCustomLlmInferenceProviders,
-  invalidateCustomLlmCache,
-  isFreeModelIncludingCustomLlms,
   lookupCustomLlm,
+  resetCustomLlmCacheForTest,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { custom_llm2 } from '@kilocode/db/schema';
 import {
   isKiloExclusiveFreeModel,
   kiloExclusiveModels,
@@ -25,20 +26,22 @@ describe('custom LLM catalog', () => {
   beforeAll(async () => {
     await insertCustomLlmForTest('Acme/Public-Model', publicCustomLlmDefinition(['acme']));
     await insertCustomLlmForTest(freeExclusiveId, privateCustomLlmDefinition());
+    await insertCustomLlmForTest('acme/private-model', privateCustomLlmDefinition());
   });
 
   afterAll(async () => {
     await deleteCustomLlmForTest('Acme/Public-Model');
     await deleteCustomLlmForTest(freeExclusiveId);
+    await deleteCustomLlmForTest('acme/private-model');
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
-    invalidateCustomLlmCache();
+    resetCustomLlmCacheForTest();
   });
 
   test('fails closed only for Kilo-exclusive ids while the catalog cannot be read', async () => {
-    invalidateCustomLlmCache();
+    resetCustomLlmCacheForTest();
     jest.spyOn(console, 'error').mockImplementation(() => {});
     const now = Date.now();
     const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
@@ -59,21 +62,23 @@ describe('custom LLM catalog', () => {
     expect(select).toHaveBeenCalledTimes(2);
   });
 
-  test('does not cache rows from a load that started before an invalidation', async () => {
-    invalidateCustomLlmCache();
-    let releaseStaleLoad: (rows: never[]) => void = () => {};
-    const staleRows = new Promise<never[]>(resolve => {
-      releaseStaleLoad = resolve;
-    });
-    jest.spyOn(readDb, 'select').mockImplementationOnce(() => ({ from: () => staleRows }) as never);
+  test('picks up new rows only after the cache expires', async () => {
+    resetCustomLlmCacheForTest();
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+    await expect(findCustomLlm('acme/late-model')).resolves.toBeNull();
+    await db
+      .insert(custom_llm2)
+      .values({ public_id: 'acme/late-model', definition: privateCustomLlmDefinition() });
+    try {
+      clock.mockReturnValue(now + 59_999);
+      await expect(findCustomLlm('acme/late-model')).resolves.toBeNull();
 
-    const staleLookup = findCustomLlm('acme/public-model');
-    invalidateCustomLlmCache();
-    await expect(findCustomLlm('acme/public-model')).resolves.not.toBeNull();
-    releaseStaleLoad([]);
-    await expect(staleLookup).resolves.toBeNull();
-
-    await expect(findCustomLlm('acme/public-model')).resolves.not.toBeNull();
+      clock.mockReturnValue(now + 60_000);
+      await expect(findCustomLlm('acme/late-model')).resolves.not.toBeNull();
+    } finally {
+      await deleteCustomLlmForTest('acme/late-model');
+    }
   });
 
   test('finds custom LLMs case-insensitively', async () => {
@@ -83,11 +88,12 @@ describe('custom LLM catalog', () => {
     await expect(findCustomLlm('acme/unknown')).resolves.toBeNull();
   });
 
-  test('treats public custom LLMs as free and lets custom LLMs override built-in free models', async () => {
-    await expect(isFreeModelIncludingCustomLlms('acme/public-model')).resolves.toBe(true);
-    await expect(isFreeModelIncludingCustomLlms(freeExclusiveId)).resolves.toBe(false);
-    await expect(isFreeModelIncludingCustomLlms('openrouter/free')).resolves.toBe(true);
-    await expect(isFreeModelIncludingCustomLlms('openai/gpt-4o')).resolves.toBe(false);
+  test('treats every custom LLM as free', async () => {
+    await expect(isFreeModel('acme/public-model')).resolves.toBe(true);
+    await expect(isFreeModel('acme/private-model')).resolves.toBe(true);
+    await expect(isFreeModel(freeExclusiveId)).resolves.toBe(true);
+    await expect(isFreeModel('openrouter/free')).resolves.toBe(true);
+    await expect(isFreeModel('openai/gpt-4o')).resolves.toBe(false);
   });
 
   test('returns inference providers only for public custom LLMs', async () => {

@@ -8,8 +8,18 @@ import {
   isLocalFakeLlmEnabled,
   isLocalFakeTranscriptionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
+import { findCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
-export function isFreeModel(model: string): boolean {
+/**
+ * Whether Kilo charges nothing for the model. Custom LLMs are always free and
+ * take precedence over any built-in model with the same id.
+ */
+export async function isFreeModel(modelId: string): Promise<boolean> {
+  return (await findCustomLlm(modelId)) !== null || isFreeModelExcludingCustomLlms(modelId);
+}
+
+/** `isFreeModel` for callers that already handled custom LLMs or never see them. */
+export function isFreeModelExcludingCustomLlms(model: string): boolean {
   const modelId = model ?? '';
   const exclusiveModel = findKiloExclusiveModel(modelId);
   if (exclusiveModel) {
@@ -27,7 +37,7 @@ export function isFreeModel(model: string): boolean {
 
 export function hasBestEffortGuessDataCollectionRequirement(model: string): boolean {
   return (
-    isFreeModel(model) ||
+    isFreeModelExcludingCustomLlms(model) ||
     kiloExclusiveModels.some(
       candidate =>
         candidate.public_id === model &&

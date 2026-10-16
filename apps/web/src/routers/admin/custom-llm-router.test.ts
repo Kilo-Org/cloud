@@ -573,7 +573,6 @@ describe('adminCustomLlmRouter', () => {
     it.each([
       ['organization_ids', { organization_ids: [] }],
       ['group_ids', { group_ids: ['00000000-0000-4000-8000-000000000123'] }],
-      ['pricing', { pricing: { prompt: '0.000001', completion: '0.000002' } }],
       ['description', { description: undefined }],
     ])('rejects a public definition with an invalid %s', async (_field, overrides) => {
       const caller = await createCallerForUser(admin.id);

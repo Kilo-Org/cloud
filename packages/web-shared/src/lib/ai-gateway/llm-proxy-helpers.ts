@@ -48,7 +48,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { getInferenceProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { getInferenceProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
@@ -224,14 +224,15 @@ export function checkExclusiveModelProviderAllowed(
   if (!provider) return null;
   const exclusiveModel = findKiloExclusiveModel(model);
   if (!exclusiveModel) return null;
-  const inferenceProvider = getInferenceProvider(exclusiveModel)?.slug;
-  if (!inferenceProvider) return null;
-  if (
-    (!provider.only || provider.only.includes(inferenceProvider)) &&
-    (!provider.ignore || !provider.ignore.includes(inferenceProvider))
-  )
-    return null;
-  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProvider}`;
+  const inferenceProviders = getInferenceProviders(exclusiveModel).map(({ slug }) => slug);
+  if (inferenceProviders.length === 0) return null;
+  const allowed = inferenceProviders.some(
+    inferenceProvider =>
+      (!provider.only || provider.only.includes(inferenceProvider)) &&
+      (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+  );
+  if (allowed) return null;
+  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`;
   return NextResponse.json(
     {
       error: error,

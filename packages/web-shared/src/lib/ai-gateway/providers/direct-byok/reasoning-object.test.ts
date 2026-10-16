@@ -5,10 +5,13 @@ import type { DirectByokProvider } from './types';
 import alibabaTokenPlan from './alibaba-token-plan';
 import byteplusCoding from './byteplus-coding';
 import chutes from './chutes-byok';
+import edenai from './edenai';
 import inceptron from './inceptron-byok';
 import kimiCoding from './kimi-coding';
 import morph from './morph';
 import neuralwatt from './neurowatt';
+import nvidia from './nvidia-byok';
+import openCodeGo from './opencode-go';
 import ollamaCloud from './ollama-cloud';
 import synthetic from './synthetic';
 import xiaomiTokenPlanAms from './xiaomi-token-plan-ams';
@@ -22,7 +25,13 @@ function chatRequest(
 }
 
 function transform(provider: DirectByokProvider, request: GatewayRequest) {
-  provider.transformRequest({ request, extraHeaders: {} } as unknown as TransformRequestContext);
+  provider.transformRequest({
+    request,
+    extraHeaders: {},
+    kilo_user_id: 'user-1',
+    session_id: 'session-1',
+    provider: { id: 'direct-byok', apiKey: 'test-api-key' },
+  } as unknown as TransformRequestContext);
 }
 
 describe('replaceReasoningObjectWithReasoningEffort', () => {
@@ -53,6 +62,19 @@ describe('replaceReasoningObjectWithReasoningEffort', () => {
     expect(request.body).not.toHaveProperty('reasoning_effort');
   });
 
+  test('maps disabled reasoning to none only when opted in', () => {
+    const optedIn = chatRequest({ reasoning: { enabled: false } });
+    const defaultRequest = chatRequest({ reasoning: { enabled: false } });
+
+    replaceReasoningObjectWithReasoningEffort(optedIn, { disableWithNoneEffort: true });
+    replaceReasoningObjectWithReasoningEffort(defaultRequest);
+
+    expect(optedIn.body.reasoning_effort).toBe('none');
+    expect(defaultRequest.body).not.toHaveProperty('reasoning_effort');
+    expect(optedIn.body).not.toHaveProperty('reasoning');
+    expect(defaultRequest.body).not.toHaveProperty('reasoning');
+  });
+
   test('leaves the Responses API reasoning object alone', () => {
     const request: GatewayRequest = {
       kind: 'responses',
@@ -70,10 +92,13 @@ describe('direct BYOK providers that receive OpenRouter reasoning settings', () 
     alibabaTokenPlan,
     byteplusCoding,
     chutes,
+    edenai,
     inceptron,
     kimiCoding,
     morph,
     neuralwatt,
+    nvidia,
+    openCodeGo,
     ollamaCloud,
     synthetic,
     xiaomiTokenPlanAms,
@@ -106,6 +131,27 @@ describe('direct BYOK providers that receive OpenRouter reasoning settings', () 
     expect(enabled.body.thinking).toEqual({ type: 'enabled' });
     expect(disabled.body).not.toHaveProperty('reasoning');
     expect(enabled.body).not.toHaveProperty('reasoning');
+  });
+
+  test.each([nvidia, edenai].map(provider => [provider.id, provider] as const))(
+    '%s maps disabled reasoning to none',
+    (_id, provider) => {
+      const request = chatRequest({ reasoning: { enabled: false } });
+
+      transform(provider, request);
+
+      expect(request.body).not.toHaveProperty('reasoning');
+      expect(request.body.reasoning_effort).toBe('none');
+    }
+  );
+
+  test('chutes-byok does not send none, which Chutes rejects', () => {
+    const request = chatRequest({ reasoning: { enabled: false } });
+
+    transform(chutes, request);
+
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body).not.toHaveProperty('reasoning_effort');
   });
 
   test('kimi-coding drops a carried-over none effort', () => {

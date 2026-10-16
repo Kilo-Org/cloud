@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 
 export default {
   id: 'opencode-go',
@@ -19,13 +20,8 @@ export default {
     if (context.request.kind === 'messages') {
       context.extraHeaders['x-api-key'] = context.provider.apiKey;
     }
+    replaceReasoningObjectWithReasoningEffort(context.request);
     if (context.request.kind === 'chat_completions') {
-      // Some OpenCode Go models reject the OpenRouter `reasoning` object as an unknown field.
-      const reasoningEffort = context.request.body.reasoning?.effort;
-      if (reasoningEffort) {
-        context.request.body.reasoning_effort ??= reasoningEffort;
-      }
-      delete context.request.body.reasoning;
       delete context.request.body.prompt_cache_key;
       delete context.request.body.safety_identifier;
       delete context.request.body.user;

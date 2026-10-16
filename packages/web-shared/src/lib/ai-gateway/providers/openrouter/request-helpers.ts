@@ -365,13 +365,21 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
 /**
  * Strict OpenAI-compatible upstreams reject OpenRouter's top-level `reasoning`
  * object as an unknown parameter, so its effort is carried over as the
- * standard `reasoning_effort` instead.
+ * standard `reasoning_effort` instead. `reasoning: { enabled: false }` maps to
+ * `reasoning_effort: 'none'` only for upstreams that accept that value; others,
+ * such as Chutes, reject it.
  */
-export function replaceReasoningObjectWithReasoningEffort(request: GatewayRequest) {
+export function replaceReasoningObjectWithReasoningEffort(
+  request: GatewayRequest,
+  { disableWithNoneEffort = false }: { disableWithNoneEffort?: boolean } = {}
+) {
   if (request.kind !== 'chat_completions') {
     return;
   }
-  const reasoningEffort = request.body.reasoning?.effort;
+  const reasoning = request.body.reasoning;
+  const reasoningEffort =
+    reasoning?.effort ??
+    (disableWithNoneEffort && reasoning?.enabled === false ? 'none' : undefined);
   if (reasoningEffort) {
     request.body.reasoning_effort ??= reasoningEffort;
   }

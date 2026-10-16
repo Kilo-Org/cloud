@@ -18,7 +18,11 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
-import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type {
+  BYOKResult,
+  GatewayChatApiKind,
+  Provider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
@@ -30,6 +34,7 @@ import {
   CustomLlmCredentialsSchema,
   CustomLlmDefinitionSchema,
   type CustomLlmCredentials,
+  type CustomLlmProvider,
 } from '@kilocode/db/schema-types';
 import {
   buildDirectProvider,
@@ -104,6 +109,13 @@ async function checkDirectBYOK(
   };
 }
 
+const CUSTOM_LLM_CHAT_API = {
+  anthropic: 'messages',
+  openai: 'responses',
+  openrouter: 'chat_completions',
+  google: 'generate_content',
+} as const satisfies Record<CustomLlmProvider, GatewayChatApiKind>;
+
 async function resolveCustomLlmAuth(
   credentials: CustomLlmCredentials
 ): Promise<DirectUpstreamAuth> {
@@ -161,13 +173,7 @@ async function checkCustomLlm(
     kind: 'provider',
     provider: buildDirectProvider(
       'custom',
-      [
-        customLlm.opencode_settings?.ai_sdk_provider === 'anthropic'
-          ? 'messages'
-          : customLlm.opencode_settings?.ai_sdk_provider === 'openai'
-            ? 'responses'
-            : 'chat_completions',
-      ],
+      [CUSTOM_LLM_CHAT_API[customLlm.opencode_settings?.ai_sdk_provider ?? 'openrouter']],
       customLlm,
       await resolveCustomLlmAuth(parsedCredentials.data)
     ),

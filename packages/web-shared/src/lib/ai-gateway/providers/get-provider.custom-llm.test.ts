@@ -19,10 +19,13 @@ const definition: CustomLlmDefinition = {
   organization_ids: [ORG_ID],
 };
 
-async function insertCustomLlm(credentials: CustomLlmCredentials) {
+async function insertCustomLlm(
+  credentials: CustomLlmCredentials,
+  customDefinition: CustomLlmDefinition = definition
+) {
   await db.insert(custom_llm2).values({
     public_id: PUBLIC_ID,
-    definition,
+    definition: customDefinition,
     encrypted_api_key: encryptApiKey(JSON.stringify(credentials), BYOK_ENCRYPTION_KEY),
   });
 }
@@ -88,5 +91,22 @@ describe('getProvider custom LLM credentials', () => {
     });
     if (result.kind !== 'provider') throw new Error('expected a provider');
     expect(result.provider.secureProxy).toBeUndefined();
+  });
+
+  it.each([
+    [undefined, 'chat_completions'],
+    ['openrouter', 'chat_completions'],
+    ['anthropic', 'messages'],
+    ['openai', 'responses'],
+    ['google', 'generate_content'],
+  ] as const)('serves the API of AI SDK provider %s', async (aiSdkProvider, chatApi) => {
+    await insertCustomLlm(
+      { type: 'api_key', api_key: 'upstream-key' },
+      { ...definition, opencode_settings: { ai_sdk_provider: aiSdkProvider } }
+    );
+
+    const result = await resolveProvider();
+
+    expect(result).toMatchObject({ kind: 'provider', provider: { supportedChatApis: [chatApi] } });
   });
 });

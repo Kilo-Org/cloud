@@ -3,7 +3,7 @@ import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/ope
 import { isQwenModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
 import type {
-  OpenCodeAiSdkProvider,
+  CustomLlmProvider,
   OpenCodePrompt,
   OpenCodeSettings,
   ReasoningOption,
@@ -68,7 +68,7 @@ export async function getModelVariants(
 export function getAiSdkProvider(
   model: string,
   directProviderId: DirectUserByokInferenceProviderId | null
-): Exclude<OpenCodeAiSdkProvider, 'openrouter' /*the default*/> | undefined {
+): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
   if (directProviderId === 'morph-byok') {
     return undefined;
   }

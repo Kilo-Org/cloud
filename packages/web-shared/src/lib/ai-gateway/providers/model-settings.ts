@@ -71,8 +71,13 @@ export function getAiSdkProvider(
   if (directProviderId === 'morph-byok') {
     return undefined;
   }
-  if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
-    return 'anthropic';
+  if (directProviderId === 'opencode-go') {
+    if (isMinimaxModel(model) || isQwenModel(model)) {
+      return 'anthropic';
+    }
+    if (model.startsWith('opencode-go/muse-')) {
+      return 'openai';
+    }
   }
   if (isClaudeModel(model)) {
     return 'anthropic';

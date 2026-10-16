@@ -1,7 +1,7 @@
 import type { CustomRouterDefinition, CustomRouterScope } from '@kilocode/auto-routing-contracts';
 import { auto_routing_custom_routers, type AutoRoutingCustomRouter } from '@kilocode/db/schema';
-import { asc, eq, or } from 'drizzle-orm';
-import { readDb, type db } from '@kilocode/web-shared/lib/drizzle';
+import { and, asc, eq, or } from 'drizzle-orm';
+import { readDb, type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export type CustomRouterOwner = { type: CustomRouterScope; id: string };
 
@@ -43,6 +43,19 @@ export async function listCustomRouters(
     .where(or(...owners.map(customRouterOwnerCondition)))
     .orderBy(asc(auto_routing_custom_routers.created_at), asc(auto_routing_custom_routers.id));
   return rows.map(toCustomRouterDefinition);
+}
+
+export async function findCustomRouter(
+  owner: CustomRouterOwner,
+  slug: string,
+  fromDb: typeof db | DrizzleTransaction = readDb
+): Promise<CustomRouterDefinition | null> {
+  const [row] = await fromDb
+    .select()
+    .from(auto_routing_custom_routers)
+    .where(and(customRouterOwnerCondition(owner), eq(auto_routing_custom_routers.slug, slug)))
+    .limit(1);
+  return row ? toCustomRouterDefinition(row) : null;
 }
 
 /**

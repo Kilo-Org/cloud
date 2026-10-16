@@ -15,6 +15,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   customRouterModelId,
+  isCustomRouterModelId,
   type AutoRouter,
   type CustomRouterScope,
 } from '@kilocode/auto-routing-contracts';
@@ -204,5 +205,9 @@ export function customRouterAutoModel(router: {
 }
 
 export function isKiloAutoModel(model: string) {
-  return AUTO_MODELS.some(m => m.id === model) || model === ORG_AUTO_MODEL.id;
+  return (
+    AUTO_MODELS.some(m => m.id === model) ||
+    model === ORG_AUTO_MODEL.id ||
+    isCustomRouterModelId(model)
+  );
 }

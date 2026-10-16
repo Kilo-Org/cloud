@@ -1324,24 +1324,21 @@ describe('router selection', () => {
     expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
   });
 
-  it('rejects invalid routers and frontier owner profiles', async () => {
+  it('rejects invalid routers', async () => {
     expect((await authedGet('/admin/config?router=unknown')).status).toBe(400);
-    expect((await authedPost('/admin/profiles/register?router=frontier', {})).status).toBe(400);
-    expect(registerProfiles).not.toHaveBeenCalled();
   });
 
-  it('does not inspect owner queue coverage for frontier', async () => {
+  it('inspects owner queue coverage for frontier', async () => {
     vi.mocked(getConfigRows).mockResolvedValue({
       ...TEST_CONFIG_ROWS,
       config: { ...TEST_CONFIG_ROWS.config, router: 'frontier' },
     });
     const response = await authedGet('/admin/registry?router=frontier');
     expect(response.status).toBe(200);
-    expect(countCurrentProfilesByStatus).toHaveBeenCalledOnce();
     expect(countCurrentProfilesByStatus).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({ router: 'frontier' }),
-      'platform'
+      'user'
     );
   });
 });
@@ -1375,14 +1372,24 @@ describe('body router selection', () => {
     );
   });
 
-  it('rejects frontier owner profiles selected through the body', async () => {
+  it('admits frontier owner profiles under the frontier config', async () => {
+    vi.mocked(getConfigRows).mockImplementation(async (_db, router = 'efficient') => ({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, router },
+    }));
+    vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses: [] });
     const response = await authedPost('/admin/profiles/register', {
       router: 'frontier',
       ownerType: 'user',
       ownerId: 'owner',
       entries: [{ model: 'a/b' }],
     });
-    expect(response.status).toBe(400);
-    expect(registerProfiles).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(getConfigRows).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
+    expect(registerProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      expect.objectContaining({ ownerId: 'owner' })
+    );
   });
 });

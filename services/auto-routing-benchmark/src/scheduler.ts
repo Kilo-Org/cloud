@@ -30,8 +30,14 @@ const SchedulerConfigSchema = z.object({
       'efficient/platform': positiveLimit.default(2),
       'frontier/platform': positiveLimit.default(2),
       'efficient/user': positiveLimit.default(1),
+      'frontier/user': positiveLimit.default(1),
     })
-    .default({ 'efficient/platform': 2, 'frontier/platform': 2, 'efficient/user': 1 }),
+    .default({
+      'efficient/platform': 2,
+      'frontier/platform': 2,
+      'efficient/user': 1,
+      'frontier/user': 1,
+    }),
 });
 
 export type SchedulerConfig = z.infer<typeof SchedulerConfigSchema>;

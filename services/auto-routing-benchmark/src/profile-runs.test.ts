@@ -1071,28 +1071,41 @@ describe('frontier router runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
-  it('rejects frontier owner queues before any profile claim', async () => {
-    await expect(drainQueues(env, 'user', undefined, 'frontier')).rejects.toThrow(
-      'does not support owner queues'
+  it('starts a frontier owner run under the frontier/user share', async () => {
+    mockConfig({ router: 'frontier' });
+    const entries = [{ model: 'owner/a', variant: null }];
+    const result = await startRun(env, 'decider', {
+      router: 'frontier',
+      purpose: 'user',
+      entries,
+    });
+    expect(result.runId).toMatch(/^frontier-user-/);
+    expect(insertRun).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier', purpose: 'user' }),
+      expect.anything(),
+      []
     );
-    await expect(
-      startRun(env, 'decider', {
-        router: 'frontier',
-        purpose: 'user',
-        entries: [{ model: 'model', variant: null }],
-      })
-    ).rejects.toThrow('does not support owner queues');
-    expect(markProfilesRunningForRun).not.toHaveBeenCalled();
+    expect(markProfilesRunningForRun).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      result.runId,
+      entries,
+      expect.objectContaining({ router: 'frontier' })
+    );
   });
 
-  it('limits frontier both-queue drains to its platform registry', async () => {
+  it('drains both frontier registry queues', async () => {
     mockConfig({ router: 'frontier' });
     await drainQueues(env, 'both', undefined, 'frontier');
-    expect(listPendingCurrentProfiles).toHaveBeenCalledOnce();
     expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({ router: 'frontier' }),
       'platform'
+    );
+    expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      'user'
     );
   });
 

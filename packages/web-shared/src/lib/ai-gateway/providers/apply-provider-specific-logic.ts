@@ -83,6 +83,7 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
     }
 
     delete message.thoughtSignature;
+    delete message.reasoning;
 
     const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
     for (const toolCall of toolCalls) {

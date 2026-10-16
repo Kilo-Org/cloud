@@ -272,6 +272,62 @@ describe('applyReasoningDetailsTransform', () => {
     expect(assistant.reasoning_content).toBe('thinking hard');
   });
 
+  it('drops the legacy reasoning string next to reasoning_details', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning = 'thinking hard';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('thinking hard');
+  });
+
+  it('folds a legacy reasoning string into reasoning_content without reasoning_details', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    delete assistant.reasoning_details;
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps existing reasoning_content over a legacy reasoning string', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    delete assistant.reasoning_details;
+    assistant.reasoning = 'legacy thinking';
+    assistant.reasoning_content = 'upstream thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('upstream thinking');
+  });
+
+  it('drops the legacy reasoning string for Gemini', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning = 'thinking hard';
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
+  });
+
   it('leaves reasoning_details untouched without a transform', () => {
     const request = makeReasoningRequest();
 

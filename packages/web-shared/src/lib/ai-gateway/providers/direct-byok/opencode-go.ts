@@ -20,6 +20,12 @@ export default {
       context.extraHeaders['x-api-key'] = context.provider.apiKey;
     }
     if (context.request.kind === 'chat_completions') {
+      // Some OpenCode Go models reject the OpenRouter `reasoning` object as an unknown field.
+      const reasoningEffort = context.request.body.reasoning?.effort;
+      if (reasoningEffort) {
+        context.request.body.reasoning_effort ??= reasoningEffort;
+      }
+      delete context.request.body.reasoning;
       delete context.request.body.prompt_cache_key;
       delete context.request.body.safety_identifier;
       delete context.request.body.user;

@@ -285,7 +285,9 @@ jobs:
       matrix:
         group: ${{ fromJSON(needs.changes.outputs.typecheck_groups) }}
     name: typecheck (${{ matrix.group }})
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    # tsgo loads the whole web program, which outgrows the 8 GB of the default
+    # 2 vCPU runner. The 4 vCPU runner has 16 GB.
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -315,17 +317,6 @@ jobs:
       - name: Restore or build tRPC declarations
         if: matrix.group == 'trpc'
         uses: ./.github/actions/trpc-declarations
-
-      # tsgo checks each file against the hashes in the build info, so a stale
-      # entry is rechecked; the cache only saves work on unchanged files.
-      - name: Cache web typecheck build info
-        if: matrix.group == 'web'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: apps/web/.tsbuildinfo/ci-web.tsbuildinfo
-          key: ${{ runner.os }}-web-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-web-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Typecheck
         env:
@@ -358,7 +349,8 @@ jobs:
       matrix:
         group: ${{ fromJSON(needs.changes.outputs.lint_groups) }}
     name: lint (${{ matrix.group }})
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    # Type-aware lint loads the same program as the typecheck groups.
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1

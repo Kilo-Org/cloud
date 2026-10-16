@@ -39,7 +39,9 @@ for (const [file, name, command, condition] of [
   test(`${file} ${name} restores the compiler plugin cache after install and before use`, () => {
     const steps = workflows[file].jobs[name].steps;
     const cacheIndex = steps.findIndex(step => step.name === 'Cache compiler plugins');
-    const installIndex = steps.findIndex(step => /^pnpm install --frozen-lockfile\b/.test(step.run ?? ''));
+    const installIndex = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
     const buildIndex = steps.findIndex(step => step.run === command);
     assert.ok(installIndex >= 0 && cacheIndex > installIndex && buildIndex > cacheIndex);
     const cache = steps[cacheIndex];

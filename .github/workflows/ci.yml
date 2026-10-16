@@ -811,9 +811,11 @@ jobs:
     env:
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
 
+    # Only the `other` part runs the Postgres tests. An empty image skips the
+    # service container.
     services:
       postgres:
-        image: pgvector/pgvector:pg16
+        image: ${{ matrix.part == 'other' && 'pgvector/pgvector:pg16' || '' }}
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
@@ -955,10 +957,11 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      # Install only this workspace, its workspace dependencies, and the root
+      # Install only this workspace, the workspaces nested in it (their tests
+      # run in the same suite), their workspace dependencies, and the root
       # tools. Relative imports into another workspace fail loudly here.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter '${{ matrix.workspace.name }}...' --filter kilocode-monorepo
+        run: pnpm install --frozen-lockfile --filter './${{ matrix.workspace.dir }}/**...' --filter kilocode-monorepo
 
       # The harness SDK's own vitest run compiles the typia plugin through
       # @ttsc/unplugin. kilo-app is not in this matrix: its sharded suite runs

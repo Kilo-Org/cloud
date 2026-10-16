@@ -15,6 +15,7 @@ import {
   type ControlLogIdentity,
 } from '../shared/control-diagnostics.js';
 import { validateControlLogUploadGrant } from './log-upload-grant.js';
+import { declaredLength, readBoundedBytes } from './bounded-body.js';
 
 function reportUnreapedOwnedProcessCleanup(
   identity: ControlLogIdentity,
@@ -40,41 +41,6 @@ function archivePrefix(identity: ControlLogIdentity): string {
 
 function mediaType(header: string | undefined): string | undefined {
   return header?.split(';')[0].trim();
-}
-
-async function readBoundedBytes(
-  request: Request,
-  maxBytes: number
-): Promise<Uint8Array | undefined> {
-  const stream: ReadableStream<Uint8Array> | null = request.body;
-  if (!stream) return new Uint8Array();
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let length = 0;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      length += value.byteLength;
-      if (length > maxBytes) return undefined;
-      chunks.push(value);
-    }
-  } finally {
-    void reader.cancel().catch(() => undefined);
-  }
-  const bytes = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return bytes;
-}
-
-function declaredLength(header: string | undefined): number | undefined | 'invalid' {
-  if (header === undefined) return undefined;
-  if (!/^\d+$/.test(header)) return 'invalid';
-  return Number(header);
 }
 
 function routeIdentity(c: Context<HonoContext>) {

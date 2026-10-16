@@ -45,6 +45,12 @@ import { gateResultFromProperties } from '../../../src/shared/kilo-event-propert
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import type { materializeMessageAttachments } from '../session-bootstrap.js';
 import type { runAutoCommit } from '../auto-commit.js';
+import type { captureWorktreeState } from '../worktree-state.js';
+import { discardWorktreeState } from '../worktree-state.js';
+import {
+  forgetWorktreeStateEndpoint,
+  worktreeStateEndpointFor,
+} from './worktree-state-endpoints.js';
 import { rejectBeforeAdmission, type ControlHandlerResult } from './control-handler-result.js';
 import {
   createOperationRegistry,
@@ -266,6 +272,8 @@ export type HandlerDeps = {
   applyAttach?: typeof applySessionAttach;
   materializeAttachments?: typeof materializeMessageAttachments;
   runAutoCommit?: typeof runAutoCommit;
+  captureWorktreeState?: typeof captureWorktreeState;
+  discardWorktreeState?: typeof discardWorktreeState;
   collectWorktreeChanges?: typeof collectWorktreeChanges;
   collectWorktreeSnapshot?: typeof collectWorktreeSnapshot;
 };
@@ -600,7 +608,13 @@ export async function handleControlRequest(
           await deps.terminalRuntime?.detachDirectory(directory);
         },
         retireDirectory: async (directory: string) => {
+          // Delete first: dropping the grant and bundle beforehand would leave
+          // a surviving worktree with no way to recover its captured work when
+          // the deletion itself fails.
           await kiloRuntimes.deleteDirectory(directory);
+          const endpoint = worktreeStateEndpointFor(directory);
+          forgetWorktreeStateEndpoint(directory);
+          if (endpoint) await (deps.discardWorktreeState ?? discardWorktreeState)(endpoint);
         },
       };
       failureStage = undefined;
@@ -1119,6 +1133,7 @@ function handlePrompt(
       runtime,
       materializeAttachments: deps.materializeAttachments,
       runAutoCommit: deps.runAutoCommit,
+      captureWorktreeState: deps.captureWorktreeState,
     },
     operationEffects(session, deps)
   );

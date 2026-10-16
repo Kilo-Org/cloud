@@ -18,7 +18,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
-import { OpenRouterInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  isGatewayUserByokProviderId,
+  OpenRouterInferenceProviderIdSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   applyMoonshotModelSettings,
   isKimiModel,
@@ -300,6 +303,11 @@ export async function applyProviderSpecificLogic(
   taskId: string | null,
   isNonTrialEnterprise: boolean
 ) {
+  // A user's own gateway key bills their account, so Kilo's routing preferences
+  // do not override what the request and their account ask for.
+  const usesUserGatewayKey =
+    userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
+
   removeModelsFallback(requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
@@ -351,7 +359,7 @@ export async function applyProviderSpecificLogic(
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
   }
 
-  if (provider.id === 'openrouter' || provider.id === 'vercel') {
+  if (!usesUserGatewayKey && (provider.id === 'openrouter' || provider.id === 'vercel')) {
     // A user's own BYOK credential is never ignored.
     applyPreferredProvider(
       requestedModel,
@@ -373,7 +381,13 @@ export async function applyProviderSpecificLogic(
   }
 
   if (provider.id === 'vercel') {
-    await applyVercelSettings(requestedModel, requestToMutate, userByok);
+    // A user's own Vercel AI Gateway key is shaped like a managed request: the
+    // user's account pays and the provider routing settings still apply.
+    await applyVercelSettings(
+      requestedModel,
+      requestToMutate,
+      usesUserGatewayKey ? null : userByok
+    );
   }
 
   await provider.transformRequest({

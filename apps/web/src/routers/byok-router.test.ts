@@ -724,6 +724,68 @@ describe('BYOK Router', () => {
     });
   });
 
+  describe('gateway keys', () => {
+    function chatCompletionResponse() {
+      return new Response(
+        JSON.stringify({
+          id: 'gen-1',
+          object: 'chat.completion',
+          created: 0,
+          model: 'openai/gpt-5-nano',
+          choices: [
+            { index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' },
+          ],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      );
+    }
+
+    test.each([
+      { owner: 'user', providerId: 'openrouter' },
+      { owner: 'organization', providerId: 'vercel-ai-gateway' },
+    ] as const)('stores a $owner $providerId key', async ({ owner, providerId }) => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const scope = owner === 'organization' ? { organizationId: organizationA.id } : {};
+
+      const created = await caller.byok.create({
+        ...scope,
+        provider_id: providerId,
+        api_key: 'gateway-secret',
+      });
+
+      expect(created).toMatchObject({ provider_id: providerId, is_enabled: true });
+      const [stored] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, created.id));
+      expect(decryptApiKey(stored.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('gateway-secret');
+    });
+
+    test('tests an OpenRouter key against OpenRouter with the stored key', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const key = await caller.byok.create({
+        provider_id: 'openrouter',
+        api_key: 'user-openrouter-key',
+      });
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(chatCompletionResponse());
+
+      try {
+        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toMatchObject({
+          success: true,
+        });
+
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        const [url, init] = fetchSpy.mock.calls[0];
+        expect(String(url)).toBe('https://openrouter.ai/api/v1/chat/completions');
+        expect(new Headers(init?.headers).get('authorization')).toBe('Bearer user-openrouter-key');
+        expect(JSON.parse(String(init?.body))).toMatchObject({ model: 'openai/gpt-5-nano' });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
+
   describe('deprecated codestral provider', () => {
     test('declines to test a legacy codestral key with a deprecation message', async () => {
       const caller = await createCallerForUser(ownerUser.id);

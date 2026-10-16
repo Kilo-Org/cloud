@@ -31,6 +31,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import {
   customRouterOwnerCondition,
+  findCustomRouter,
   isCustomRoutersEnabled,
   listCustomRouters,
   toCustomRouterDefinition,
@@ -343,13 +344,9 @@ async function findRouter(
   owner: CustomRouterOwner,
   slug: string
 ): Promise<CustomRouterDefinition> {
-  const [row] = await tx
-    .select()
-    .from(auto_routing_custom_routers)
-    .where(and(customRouterOwnerCondition(owner), eq(auto_routing_custom_routers.slug, slug)))
-    .limit(1);
-  if (!row) throw routerNotFound();
-  return toCustomRouterDefinition(row);
+  const router = await findCustomRouter(owner, slug, tx);
+  if (!router) throw routerNotFound();
+  return router;
 }
 
 async function saveRouter(

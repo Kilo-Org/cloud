@@ -58,6 +58,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'perplexity',
   'phala',
   'poolside',
+  'reflection',
   'reka',
   'relace',
   'sail-research',

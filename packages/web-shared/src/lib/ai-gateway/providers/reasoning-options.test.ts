@@ -32,6 +32,7 @@ describe('getFallbackReasoningOptions', () => {
     ['qwen/qwen3.8', ['minimal', 'low', 'medium', 'high', 'xhigh']],
     ['stepfun/step-5-preview', ['low', 'medium', 'high']],
     ['stealth/glyph-cluster', ['low', 'medium', 'high', 'xhigh']],
+    ['reflection/beam-free', ['low', 'medium', 'high', 'xhigh', 'max']],
   ])('lists %s efforts from least to most intensive', (model, values) => {
     expect(getFallbackReasoningOptions(model)).toEqual([{ type: 'effort', values }]);
   });

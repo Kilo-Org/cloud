@@ -18,6 +18,7 @@ import {
 import {
   gemma_4_26b_a4b_it_free_model,
   glyph_cluster_stealth_free_model,
+  reflection_beam_free_model,
 } from './kilo-exclusive-models';
 import { getRandomNumber } from './getRandomNumber';
 
@@ -44,6 +45,25 @@ describe('Glyph Cluster', () => {
       training: true,
       retainsPrompts: true,
     });
+  });
+});
+
+describe('Reflection Beam (free)', () => {
+  test('is free, not stealth, requires data collection, and routes only to Reflection', () => {
+    const model = reflection_beam_free_model;
+    expect(isFreeModel(model.public_id)).toBe(true);
+    expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
+    expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(false);
+    expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(false);
+    expect(getInferenceProvider(model)).toEqual({
+      slug: 'reflection',
+      name: 'REFLECTION',
+      training: true,
+      retainsPrompts: true,
+    });
+    expect([...(getKiloExclusiveInferenceProviderRestriction(model.public_id) ?? [])]).toEqual([
+      'reflection',
+    ]);
   });
 });
 

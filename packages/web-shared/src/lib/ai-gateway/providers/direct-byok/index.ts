@@ -63,7 +63,7 @@ function convertModel(
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
     opencode: withLegacyVariants({
-      ai_sdk_provider: getAiSdkProvider(id, provider.id) ?? provider.default_ai_sdk_provider,
+      ai_sdk_provider: getAiSdkProvider(id, provider.id),
       reasoning_options:
         model.reasoning_options ??
         (model.flags?.includes('reasoning') ? getFallbackReasoningOptions(id) : undefined),

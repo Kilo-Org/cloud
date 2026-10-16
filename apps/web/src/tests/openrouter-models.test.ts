@@ -962,7 +962,7 @@ describe('final Enkrypt serialization boundaries', () => {
         default_parameters: {},
         preferredIndex: undefined,
         hasUserByokAvailable: true,
-        opencode: { ai_sdk_provider: 'openai-compatible' as const, variants: undefined },
+        opencode: { ai_sdk_provider: undefined, variants: undefined },
         enkrypt: publishedEnkryptBenchmark,
       };
       jest.mocked(getDirectByokModelsForUser).mockResolvedValue([byok]);

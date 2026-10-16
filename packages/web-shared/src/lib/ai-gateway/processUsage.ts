@@ -1346,6 +1346,7 @@ export async function processTokenData(
     genStats.model = usageStats.model; // openrouter bug?
     genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
     genStats.generation_time ??= usageStats.generation_time;
+    genStats.finish_reason ??= usageStats.finish_reason;
     genStats.hasError = usageStats.hasError; // retain by choice
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;

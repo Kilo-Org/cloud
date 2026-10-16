@@ -11,6 +11,7 @@ import {
   type ChatComposerSendOptions,
 } from '@/components/agents/chat-composer';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { BlurBar } from '@/components/ui/blur-bar';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
@@ -77,10 +78,12 @@ export function ChatComposerArea({
   // keyboard progress puts the lift and the inset in one transition; flipping it
   // on the keyboard's visible flag moved the composer a second time, after the
   // keyboard had finished moving (video V0 ~4.0s, V1 ~5.3s and ~19s).
+  // The inset strip is drawn by its own `BlurBar`, so the home-indicator area
+  // carries the composer's surface instead of the screen background.
   const { progress } = useReanimatedKeyboardAnimation();
   const composerInset = useAnimatedStyle(
     () => ({
-      paddingBottom: interpolate(progress.value, [0, 1], [bottom, 0], Extrapolation.CLAMP),
+      height: interpolate(progress.value, [0, 1], [bottom, 0], Extrapolation.CLAMP),
     }),
     [bottom]
   );
@@ -104,29 +107,31 @@ export function ChatComposerArea({
         <ChatFailureRow failureKey={failureKey} onRetry={retryable ? onRetry : undefined} />
       ) : null}
 
-      <Animated.View style={composerInset}>
-        <ChatComposer
-          toolbarClassName="pb-1"
-          controlRef={composerControlRef}
-          onSend={onSend}
-          onSendCommand={noSessionCommand}
-          onCreateSession={noSessionChange}
-          onRestartSession={noSessionChange}
-          onExitSession={noSessionExit}
-          onStop={onStop}
-          isStreaming={status === 'working'}
-          placeholder={t('common.message')}
-          model={model}
-          variant={variant}
-          modelOptions={modelOptions}
-          onModelSelect={onModelSelect}
-          attachmentsEnabled={attachmentsEnabled}
-          attachmentDelivery="local"
-          activeSessionType={null}
-          organizationId={organizationId}
-          disabled={disabled}
-        />
-      </Animated.View>
+      <ChatComposer
+        barClassName="border-t-0"
+        toolbarClassName="pb-1"
+        controlRef={composerControlRef}
+        onSend={onSend}
+        onSendCommand={noSessionCommand}
+        onCreateSession={noSessionChange}
+        onRestartSession={noSessionChange}
+        onExitSession={noSessionExit}
+        onStop={onStop}
+        isStreaming={status === 'working'}
+        placeholder={t('common.message')}
+        model={model}
+        variant={variant}
+        modelOptions={modelOptions}
+        onModelSelect={onModelSelect}
+        attachmentsEnabled={attachmentsEnabled}
+        attachmentDelivery="local"
+        activeSessionType={null}
+        organizationId={organizationId}
+        disabled={disabled}
+      />
+      <BlurBar className="border-t-0">
+        <Animated.View testID="chat-composer-inset" style={composerInset} />
+      </BlurBar>
     </>
   );
 }

@@ -1,3 +1,4 @@
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 
@@ -6,7 +7,7 @@ export default {
   base_url: 'https://token-plan-sgp.xiaomimimo.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
-  default_ai_sdk_provider: 'openai-compatible',
+  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
   transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'xiaomi-token-plan-sgp',

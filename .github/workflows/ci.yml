@@ -793,7 +793,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [unit, workers, other]
+        # process.test.ts alone takes about as long as the rest of the wrapper
+        # suite, so it runs as its own part.
+        part: [unit, workers, wrapper-process, other]
     name: cloud-agent-next (${{ matrix.part }})
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 15
@@ -872,9 +874,20 @@ jobs:
         if: matrix.part == 'other'
         run: pnpm --filter cloud-agent-next test:sdk-provenance
 
-      - name: Run cloud-agent-next wrapper tests
+      - name: Run the wrapper process tests
+        if: matrix.part == 'wrapper-process'
+        working-directory: services/cloud-agent-next/wrapper
+        run: bun test ./src/control-plane/process.test.ts
+
+      # Every other wrapper test file, listed at run time so a new file runs
+      # here without a workflow change.
+      - name: Run the other wrapper tests
         if: matrix.part == 'other'
-        run: pnpm --filter cloud-agent-next test:wrapper
+        working-directory: services/cloud-agent-next/wrapper
+        run: |
+          mapfile -t files < <(find src -name '*.test.ts' ! -path 'src/control-plane/process.test.ts' | sort | sed 's|^|./|')
+          echo "${#files[@]} test files"
+          bun test "${files[@]}"
 
       - name: Run Cloud Agent Postgres aggregate tests
         if: matrix.part == 'other'

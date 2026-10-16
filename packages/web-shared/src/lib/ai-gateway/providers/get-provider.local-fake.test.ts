@@ -20,12 +20,16 @@ import {
   type TransformRequestContext,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type * as DirectByok from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 import type { User } from '@kilocode/db/schema';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn().mockResolvedValue({ provider: null, model: null }),
+  getDirectByokSupportedChatApis: jest.requireActual<typeof DirectByok>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
+  ).getDirectByokSupportedChatApis,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   getModelUserByokProviders: jest.fn().mockResolvedValue([]),

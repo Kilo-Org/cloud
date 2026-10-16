@@ -1,6 +1,6 @@
 import type {
   GatewayMessagesRequest,
-  GatewayRequest,
+  NonGeminiGatewayRequest,
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -27,7 +27,7 @@ export function dropToolStrictProperties(requestToMutate: OpenRouterChatCompleti
 }
 
 export function normalizeToolCallIds(
-  requestToMutate: GatewayRequest,
+  requestToMutate: NonGeminiGatewayRequest,
   filter: (toolCallId: string) => boolean,
   maxIdLength: number | undefined
 ) {
@@ -194,7 +194,7 @@ const SANITIZED_TOOL_NAME = 'read';
  * Limited to the "read" tool to avoid false positives on tools that
  * legitimately return binary-ish content.
  */
-export function sanitizeBinaryToolResults(request: GatewayRequest): void {
+export function sanitizeBinaryToolResults(request: NonGeminiGatewayRequest): void {
   if (request.kind === 'chat_completions') {
     sanitizeChatCompletionsToolResults(request.body);
   } else if (request.kind === 'responses') {

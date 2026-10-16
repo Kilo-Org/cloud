@@ -2,7 +2,7 @@ import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
-const GATEWAY_CHAT_API_KINDS: readonly GatewayChatApiKind[] = [
+const AUTO_ROUTED_CHAT_API_KINDS: readonly GatewayChatApiKind[] = [
   'chat_completions',
   'responses',
   'messages',
@@ -23,10 +23,10 @@ export function gatewayChatApisForModel(modelId: string): ReadonlyArray<GatewayC
 /**
  * Guards admin saves of the auto-routing benchmark config: routing-table
  * candidates carry no per-protocol metadata, so every decider model must be
- * servable on ALL gateway chat API kinds — otherwise the gateway would hard-
+ * servable on ALL chat API kinds Auto accepts — otherwise the gateway would hard-
  * reject requests whose protocol the model's provider can't speak.
  */
 export function modelServesAllGatewayChatApis(modelId: string): boolean {
   const supported = gatewayChatApisForModel(modelId);
-  return GATEWAY_CHAT_API_KINDS.every(kind => supported.includes(kind));
+  return AUTO_ROUTED_CHAT_API_KINDS.every(kind => supported.includes(kind));
 }

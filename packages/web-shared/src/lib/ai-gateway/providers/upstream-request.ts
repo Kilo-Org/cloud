@@ -3,6 +3,7 @@ import { fetchWithBackoff } from '../../fetchWithBackoff';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type {
+  GatewayGenerateContentRequest,
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
@@ -18,6 +19,7 @@ import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
+import { generateContentUpstreamTarget } from '@kilocode/web-shared/lib/ai-gateway/generate-content';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -81,7 +83,21 @@ const CHAT_API_PATHS = {
   chat_completions: '/chat/completions',
   responses: '/responses',
   messages: '/messages',
-} as const satisfies Record<GatewayChatApiKind, string>;
+} as const satisfies Record<Exclude<GatewayChatApiKind, 'generate_content'>, string>;
+
+export type UpstreamChatApiRequest =
+  | { chatApi: 'generate_content'; body: GatewayGenerateContentRequest }
+  | {
+      chatApi: Exclude<GatewayChatApiKind, 'generate_content'>;
+      body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
+    };
+
+function upstreamTarget(request: UpstreamChatApiRequest, search: string) {
+  if (request.chatApi === 'generate_content') {
+    return generateContentUpstreamTarget(request.body);
+  }
+  return { path: CHAT_API_PATHS[request.chatApi], search, body: request.body };
+}
 
 function appendQueryString(apiUrl: string, search: string): string {
   if (!search) return apiUrl;
@@ -254,20 +270,17 @@ function upstreamFetchFailureResponse(
 }
 
 export async function upstreamRequest({
-  chatApi,
-  search,
+  search: incomingSearch,
   method,
-  body,
   extraHeaders,
   provider,
   signal,
   vercelRequestId,
   reasoningEffort,
-}: {
-  chatApi: GatewayChatApiKind;
+  ...request
+}: UpstreamChatApiRequest & {
   search: string;
   method: string;
-  body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
   extraHeaders: Record<string, string>;
   provider: Provider;
   signal?: AbortSignal;
@@ -294,8 +307,10 @@ export async function upstreamRequest({
     headers.set(key, value);
   });
 
-  const apiUrl = provider.apiUrlOverrides[chatApi] ?? provider.apiUrl;
-  const path = provider.disableUrlSuffix ? '' : CHAT_API_PATHS[chatApi];
+  const apiUrl = provider.apiUrlOverrides[request.chatApi] ?? provider.apiUrl;
+  const target = upstreamTarget(request, incomingSearch);
+  const { search, body } = target;
+  const path = provider.disableUrlSuffix ? '' : target.path;
 
   const fetchStartedAt = performance.now();
   let headersReceivedAfterMs: number | null = null;

@@ -2,7 +2,11 @@ import * as z from 'zod';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
 import { createParser } from 'eventsource-parser';
-import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayRequest,
+  GeminiTool,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { GenerateContentResponse } from '@kilocode/web-shared/lib/ai-gateway/processUsage.generateContent';
 
 export const toolCallArgumentErrorSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -231,6 +235,31 @@ function detectMessagesSseErrors(
   return errors;
 }
 
+function detectGenerateContentSseErrors(
+  lines: string[],
+  tools: GeminiTool[] | undefined
+): ToolCallError[] {
+  const toolSchemaByName = new Map<string, unknown>();
+  const knownToolNames = new Set<string>();
+  for (const declaration of tools?.flatMap(tool => tool.functionDeclarations ?? []) ?? []) {
+    knownToolNames.add(declaration.name);
+    toolSchemaByName.set(declaration.name, declaration.parametersJsonSchema);
+  }
+
+  // Gemini sends each function call complete, with already-parsed arguments.
+  const errors: ToolCallError[] = [];
+  for (const line of lines) {
+    const chunk = JSON.parse(line) as GenerateContentResponse;
+    for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+      if (!part.functionCall) continue;
+      const { id = '', name, args = {} } = part.functionCall;
+      if (!checkKnownTool(knownToolNames, id, name, errors)) continue;
+      validateAgainstSchema(args, toolSchemaByName.get(name), id, name, errors);
+    }
+  }
+  return errors;
+}
+
 /**
  * Checks SSE-streamed response tool call arguments for JSON parse errors or schema mismatches.
  * Returns null if the response is not an SSE stream or if no errors are found.
@@ -248,6 +277,8 @@ export function detectToolCallArgumentErrors(
       errors = detectChatCompletionSseErrors(lines, request.body.tools);
     } else if (request.kind === 'responses') {
       errors = detectResponsesSseErrors(lines, request.body.tools);
+    } else if (request.kind === 'generate_content') {
+      errors = detectGenerateContentSseErrors(lines, request.body.tools);
     } else {
       errors = detectMessagesSseErrors(lines, request.body.tools);
     }

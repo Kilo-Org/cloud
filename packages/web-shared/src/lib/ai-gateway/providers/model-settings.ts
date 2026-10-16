@@ -12,6 +12,7 @@ import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   effortOptions,
@@ -70,6 +71,11 @@ export function getAiSdkProvider(
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
   if (directProviderId === 'morph-byok') {
     return undefined;
+  }
+  // OpenCode Go serves Gemini models only over the Gemini API. Synced models carry this from
+  // models.dev; the model ID covers lists synced without it.
+  if (directProviderId === 'opencode-go' && isGeminiModel(model)) {
+    return 'google';
   }
   if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
     return 'anthropic';

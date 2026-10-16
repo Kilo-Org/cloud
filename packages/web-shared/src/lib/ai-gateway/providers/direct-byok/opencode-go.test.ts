@@ -1,7 +1,11 @@
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import type OpenAI from 'openai';
-import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
+import type {
+  GatewayRequest,
+  NonGeminiGatewayRequest,
+  OpenRouterChatCompletionRequest,
+} from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
 import openCodeGo from './opencode-go';
@@ -10,11 +14,26 @@ test('allows the Responses API for OpenCode Go', () => {
   expect(openCodeGo.supported_chat_apis).toContain('responses');
 });
 
+test('serves the Gemini API from the OpenCode Go Google endpoint', () => {
+  expect(openCodeGo.supported_chat_apis).toContain('generate_content');
+  expect(openCodeGo.base_url_overrides).toEqual({
+    generate_content: 'https://opencode.ai/inference/go/google/v1beta',
+  });
+});
+
 describe('OpenCode Go session headers', () => {
   const requests: GatewayRequest[] = [
     { kind: 'chat_completions', body: { model: 'qwen3.7-plus', messages: [] } },
     { kind: 'messages', body: { model: 'qwen3.7-plus', messages: [], max_tokens: 100 } },
     { kind: 'responses', body: { model: 'qwen3.7-plus', input: 'Hello' } },
+    {
+      kind: 'generate_content',
+      body: {
+        model: 'gemini-4-argon-contributor',
+        stream: true,
+        contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+      },
+    },
   ];
 
   function createContext(
@@ -62,6 +81,9 @@ describe('OpenCode Go session headers', () => {
     expect(first.extraHeaders['x-api-key']).toBe(
       request.kind === 'messages' ? 'test-api-key' : undefined
     );
+    expect(first.extraHeaders['x-goog-api-key']).toBe(
+      request.kind === 'generate_content' ? 'test-api-key' : undefined
+    );
   });
 
   test.each([{ session_id: 'conversation-2' }, { kilo_user_id: 'oauth/another-user' }])(
@@ -79,20 +101,22 @@ describe('OpenCode Go session headers', () => {
     }
   );
 
-  test.each(requests.filter(request => request.kind !== 'messages'))(
-    'matches the existing prompt cache key for $kind',
-    request => {
-      const trackedRequest = structuredClone(request);
-      const context = createContext({ request: trackedRequest });
-      applyTrackingIds(trackedRequest, context.provider, context.kilo_user_id, context.session_id);
-      const promptCacheKey = trackedRequest.body.prompt_cache_key;
+  test.each(
+    requests.filter(
+      (request): request is Exclude<NonGeminiGatewayRequest, { kind: 'messages' }> =>
+        request.kind !== 'messages' && request.kind !== 'generate_content'
+    )
+  )('matches the existing prompt cache key for $kind', request => {
+    const trackedRequest = structuredClone(request);
+    const context = createContext({ request: trackedRequest });
+    applyTrackingIds(trackedRequest, context.provider, context.kilo_user_id, context.session_id);
+    const promptCacheKey = trackedRequest.body.prompt_cache_key;
 
-      openCodeGo.transformRequest(context);
+    openCodeGo.transformRequest(context);
 
-      expect(promptCacheKey).toEqual(expect.any(String));
-      expect(context.extraHeaders['x-opencode-session']).toBe(promptCacheKey);
-    }
-  );
+    expect(promptCacheKey).toEqual(expect.any(String));
+    expect(context.extraHeaders['x-opencode-session']).toBe(promptCacheKey);
+  });
 
   test('removes user tracking fields from Chat Completions requests', () => {
     const request: GatewayRequest = {
@@ -251,6 +275,19 @@ describe('getAiSdkProvider', () => {
 
   test('uses the Responses API for Muse models through the gateway', () => {
     expect(getAiSdkProvider('meta/muse-spark-1.2', null)).toBe('openai');
+  });
+
+  test('uses the Gemini API for OpenCode Go Gemini models', () => {
+    expect(getAiSdkProvider('opencode-go/gemini-4-argon-contributor', 'opencode-go')).toBe(
+      'google'
+    );
+  });
+
+  test.each([
+    ['google/gemini-4-argon', null],
+    ['nvidia-byok/google/gemini-4-argon', 'nvidia-byok'],
+  ] as const)('does not use the Gemini API for %s from %s', (model, directProviderId) => {
+    expect(getAiSdkProvider(model, directProviderId)).toBeUndefined();
   });
 
   test('uses Chat Completions for MiniMax models from other direct providers', () => {

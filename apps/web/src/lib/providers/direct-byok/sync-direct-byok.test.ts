@@ -272,7 +272,7 @@ describe('parseModelsDevProviderModels', () => {
     ]);
   });
 
-  test('excludes models served only over the native Gemini API', () => {
+  test('keeps native Gemini API models for OpenCode Go and excludes Vertex AI models', () => {
     const models = parseModelsDevProviderModels(
       {
         models: {
@@ -329,14 +329,29 @@ describe('parseModelsDevProviderModels', () => {
       ])
     );
 
-    expect(models.map(model => model.id)).toEqual([
-      'glm-5.3',
-      'qwen3.7-plus',
-      'gpt-6-luna',
-      'compatible-model',
-      'mistral-alias',
-      'openrouter-alias',
+    expect(models.map(model => [model.id, model.ai_sdk_provider])).toEqual([
+      ['glm-5.3', undefined],
+      ['qwen3.7-plus', undefined],
+      ['gpt-6-luna', undefined],
+      ['compatible-model', undefined],
+      ['gemini-4-argon-contributor', 'google'],
+      ['mistral-alias', undefined],
+      ['openrouter-alias', undefined],
     ]);
+  });
+
+  test('excludes native Gemini API models for providers that do not serve the Gemini API', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          'glm-5.3': { id: 'glm-5.3' },
+          'gemini-4-argon': { id: 'gemini-4-argon', provider: { npm: '@ai-sdk/google' } },
+        },
+      },
+      'ollama-cloud'
+    );
+
+    expect(models.map(model => model.id)).toEqual(['glm-5.3']);
   });
 });
 
@@ -495,7 +510,7 @@ describe('syncDirectByokModels database snapshots', () => {
     expect(counts[providerId]).toBe(0);
   });
 
-  test('re-sync removes previously synced OpenCode Go models served only over the Gemini API', async () => {
+  test('re-sync stores OpenCode Go models served over the Gemini API with the google AI SDK provider', async () => {
     await db.insert(direct_byok_model_lists).values({
       provider_id: 'opencode-go',
       models: [
@@ -525,8 +540,15 @@ describe('syncDirectByokModels database snapshots', () => {
 
     expect(snapshot.models).toStrictEqual([
       { id: 'glm-5.3', name: 'GLM-5.3', context_length: 200_000, max_completion_tokens: 32_000 },
+      {
+        id: 'gemini-4-argon-contributor',
+        name: 'Gemini 4 Argon Contributor',
+        context_length: 200_000,
+        max_completion_tokens: 32_000,
+        ai_sdk_provider: 'google',
+      },
     ]);
-    expect(counts['opencode-go']).toBe(1);
+    expect(counts['opencode-go']).toBe(2);
   });
 
   test('rejects an upstream failure without replacing the last successful snapshot', async () => {

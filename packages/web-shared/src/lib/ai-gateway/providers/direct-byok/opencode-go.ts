@@ -11,8 +11,10 @@ import {
 export default {
   id: 'opencode-go',
   base_url: 'https://opencode.ai/zen/go/v1',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions', 'messages', 'responses'],
+  base_url_overrides: {
+    generate_content: 'https://opencode.ai/inference/go/google/v1beta',
+  },
+  supported_chat_apis: ['chat_completions', 'messages', 'responses', 'generate_content'],
   reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
   transformRequest(context) {
     context.extraHeaders['x-opencode-session'] = generateProviderSpecificSessionHash(
@@ -22,6 +24,9 @@ export default {
     );
     if (context.request.kind === 'messages') {
       context.extraHeaders['x-api-key'] = context.provider.apiKey;
+    }
+    if (context.request.kind === 'generate_content') {
+      context.extraHeaders['x-goog-api-key'] = context.provider.apiKey;
     }
     replaceReasoningObjectWithReasoningEffort(context.request);
     if (context.request.kind === 'chat_completions') {

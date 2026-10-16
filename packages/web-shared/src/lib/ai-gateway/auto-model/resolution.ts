@@ -1,6 +1,7 @@
 import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
 import type {
   GatewayRequest,
+  NonGeminiGatewayRequest,
   OpenRouterChatCompletionRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
@@ -51,7 +52,7 @@ type ResolveAutoModelParams = {
   modeHeader: string | null;
   featureHeader: FeatureValue | null;
   sessionId: string | null;
-  apiKind: GatewayRequest['kind'] | null;
+  apiKind: NonGeminiGatewayRequest['kind'] | null;
   clientIp: string | null;
   isAutoFreeCandidateAllowed: ((modelId: string) => Promise<boolean>) | null;
   // Decisions are lazy so only the selected router captures the request body.
@@ -357,7 +358,7 @@ export async function resolveAutoModel(
 
 export async function applyResolvedAutoModel(
   params: ResolveAutoModelParams,
-  request: GatewayRequest,
+  request: NonGeminiGatewayRequest,
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ): Promise<ResolveAutoModelResult> {

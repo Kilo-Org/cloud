@@ -92,6 +92,16 @@ export function getToolsAvailable(request: GatewayRequest): string[] {
     );
   }
 
+  if (request.kind === 'generate_content') {
+    return request.body.tools.flatMap((tool): string[] => {
+      if (!isObjectEntry(tool)) return [];
+      if (!Array.isArray(tool.functionDeclarations)) return Object.keys(tool);
+      return tool.functionDeclarations.map(declaration =>
+        labeledTool('function', isObjectEntry(declaration) ? declaration.name : undefined)
+      );
+    });
+  }
+
   return request.body.tools.flatMap((tool): string[] => {
     if (!isObjectEntry(tool)) return [];
     if (tool.type === 'function') return [labeledTool('function', tool.function?.name)];
@@ -117,6 +127,19 @@ export function getToolsUsed(request: GatewayRequest): string[] {
     }
 
     return used;
+  }
+
+  if (request.kind === 'generate_content') {
+    if (!Array.isArray(request.body.contents)) return [];
+    return request.body.contents.flatMap((content): string[] =>
+      isObjectEntry(content) && content.role === 'model' && Array.isArray(content.parts)
+        ? content.parts.flatMap(part =>
+            isObjectEntry(part) && isObjectEntry(part.functionCall)
+              ? [labeledTool('function', part.functionCall.name)]
+              : []
+          )
+        : []
+    );
   }
 
   if (request.kind === 'messages') {

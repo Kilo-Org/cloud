@@ -17,6 +17,7 @@ import type {
   ChatCompletionChunk,
   OpenRouterUsage,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import type { GenerateContentResponse } from '@kilocode/web-shared/lib/ai-gateway/processUsage.generateContent';
 import { isDynamicallyOptedIntoRequestLogging } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -955,6 +956,127 @@ export async function rewriteModelResponse_Responses({
   });
 }
 
+/**
+ * Gemini responses carry no cost fields, and the Gemini API is only served
+ * through direct BYOK, so events pass through unchanged. The stream has no
+ * terminal event other than an error; it ends when the upstream closes it.
+ */
+export async function rewriteModelResponse_GenerateContent({
+  response,
+  capture,
+  reasoningEffort,
+  vercelRequestId,
+}: Omit<RewriteResponseParams, 'removeCost'>) {
+  const headers = getOutputHeaders(response);
+
+  if (!headers.get('content-type')?.includes('text/event-stream')) {
+    const textResult = await readResponseText(
+      response,
+      headers,
+      vercelRequestId,
+      capture,
+      reasoningEffort
+    );
+    if ('errorResponse' in textResult) {
+      capture?.setReadError(textResult.error);
+      return textResult.errorResponse;
+    }
+    capture?.setBody(textResult.text);
+    return new NextResponse(textResult.text, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
+  // Accumulate the raw upstream text for request logging while the stream is
+  // being processed anyway, so it doesn't have to be processed a second time.
+  // Shared with the stream's cancel() callback so a client disconnect still
+  // logs the partially received response body.
+  const capturedChunks: string[] | null = capture ? [] : null;
+  const stream = new ReadableStream({
+    async start(controller) {
+      const reader = response.body?.getReader();
+      if (!reader) {
+        controller.close();
+        capture?.setBody('');
+        return;
+      }
+
+      let terminalEventReceived = false;
+      let generationId: string | undefined;
+      const progress = createStreamProgressLogger();
+      const parser = createParser({
+        onEvent(event: EventSourceMessage) {
+          if (terminalEventReceived) {
+            return;
+          }
+          progress.eventProcessed();
+          if (event.data === '[DONE]') {
+            return;
+          }
+          const json = JSON.parse(event.data) as GenerateContentResponse;
+          if (generationId === undefined && json.responseId) {
+            generationId = json.responseId;
+            logExceptInTest('[rewriteModelResponse] received generation ID', {
+              kind: 'generate_content',
+              generationId,
+            });
+          }
+          const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
+          controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
+          terminalEventReceived = json.error != null;
+          if (terminalEventReceived) {
+            logTerminalStreamEvent('generate_content', 'error', generationId, vercelRequestId);
+          }
+        },
+        onComment() {
+          if (terminalEventReceived) {
+            return;
+          }
+          controller.enqueue(': KILO PROCESSING\n\n');
+        },
+      });
+
+      await rewriteSseStream(
+        reader,
+        parser,
+        controller,
+        () => false,
+        () => terminalEventReceived,
+        responseReadError =>
+          'data: ' +
+          JSON.stringify({
+            error: {
+              code: responseReadError.errorType === 'timeout' ? 504 : 503,
+              message: responseReadError.message,
+              status:
+                responseReadError.errorType === 'timeout' ? 'DEADLINE_EXCEEDED' : 'UNAVAILABLE',
+            },
+          }) +
+          '\n\n',
+        progress.stop,
+        vercelRequestId,
+        capture,
+        capturedChunks,
+        reasoningEffort
+      );
+    },
+    cancel() {
+      capture?.setReadError(
+        new Error('response stream was cancelled'),
+        partialCapturedBody(capturedChunks)
+      );
+    },
+  });
+
+  return new NextResponse(stream, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export async function rewriteModelResponse({
   response,
   model,
@@ -996,6 +1118,14 @@ export async function rewriteModelResponse({
     return rewriteModelResponse_Messages({
       response,
       removeCost: requiresCostRemoval,
+      capture,
+      reasoningEffort,
+      vercelRequestId,
+    });
+  }
+  if (kind === 'generate_content') {
+    return rewriteModelResponse_GenerateContent({
+      response,
       capture,
       reasoningEffort,
       vercelRequestId,

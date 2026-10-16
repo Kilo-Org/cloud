@@ -14,6 +14,19 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+
+type DirectByokKeyOwner = 'user' | 'organization';
+
+/** The Gemini API is enabled for personal BYOK keys only, for now. */
+export function getDirectByokSupportedChatApis(
+  provider: DirectByokProvider,
+  keyOwner: DirectByokKeyOwner
+): ReadonlyArray<GatewayChatApiKind> {
+  return keyOwner === 'user'
+    ? provider.supported_chat_apis
+    : provider.supported_chat_apis.filter(kind => kind !== 'generate_content');
+}
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();
@@ -22,7 +35,8 @@ export function formatDirectByokModelId(provider: DirectByokProvider, model: Dir
 function convertModel(
   provider: DirectByokProvider,
   model: DirectByokModel,
-  preferredIndex: number
+  preferredIndex: number,
+  ai_sdk_provider: DirectByokModel['ai_sdk_provider']
 ) {
   const id = formatDirectByokModelId(provider, model);
   const name = DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name;
@@ -63,7 +77,7 @@ function convertModel(
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
     opencode: withLegacyVariants({
-      ai_sdk_provider: getAiSdkProvider(id, provider.id),
+      ai_sdk_provider,
       reasoning_options:
         model.reasoning_options ??
         (model.flags?.includes('reasoning') ? getFallbackReasoningOptions(id) : undefined),
@@ -71,13 +85,28 @@ function convertModel(
   };
 }
 
-async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
+async function getDirectByokModels(
+  byokProviders: UserByokProviderId[],
+  keyOwner: DirectByokKeyOwner
+) {
   let nextPreferredId = (await getPreferredModels()).length;
   return (
     await Promise.all(
       DIRECT_BYOK_PROVIDERS.filter(provider => byokProviders.includes(provider.id)).map(
-        async provider =>
-          (await provider.models()).map(model => convertModel(provider, model, nextPreferredId++))
+        async provider => {
+          const supportsGeminiApi = getDirectByokSupportedChatApis(provider, keyOwner).includes(
+            'generate_content'
+          );
+          const models: ReadonlyArray<DirectByokModel> = await provider.models();
+          return models.flatMap(model => {
+            const ai_sdk_provider =
+              model.ai_sdk_provider ??
+              getAiSdkProvider(formatDirectByokModelId(provider, model), provider.id);
+            return ai_sdk_provider === 'google' && !supportsGeminiApi
+              ? []
+              : [convertModel(provider, model, nextPreferredId++, ai_sdk_provider)];
+          });
+        }
       )
     )
   ).flat();
@@ -110,7 +139,12 @@ export async function getDirectByokModelsForOrganization(organizationId: string)
     organizationId,
     DIRECT_BYOK_PROVIDERS.map(provider => provider.id)
   );
-  return userByok ? await getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
+  return userByok
+    ? await getDirectByokModels(
+        userByok.map(ub => ub.providerId),
+        'organization'
+      )
+    : [];
 }
 
 export async function getDirectByokModelsForUser(userId: string) {
@@ -119,7 +153,12 @@ export async function getDirectByokModelsForUser(userId: string) {
     userId,
     DIRECT_BYOK_PROVIDERS.map(provider => provider.id)
   );
-  return userByok ? await getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
+  return userByok
+    ? await getDirectByokModels(
+        userByok.map(ub => ub.providerId),
+        'user'
+      )
+    : [];
 }
 
 export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiKey: string) {

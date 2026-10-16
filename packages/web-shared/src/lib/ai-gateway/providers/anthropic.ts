@@ -1,5 +1,5 @@
 import { addCacheBreakpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { NonGeminiGatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { normalizeToolCallIds } from '@kilocode/web-shared/lib/ai-gateway/tool-calling';
 
 const ANTHROPIC_TOOL_CALL_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
@@ -11,7 +11,7 @@ function appendAnthropicBetaHeader(extraHeaders: Record<string, string>, betaFla
 }
 
 export function applyAnthropicModelSettings(
-  requestToMutate: GatewayRequest,
+  requestToMutate: NonGeminiGatewayRequest,
   extraHeaders: Record<string, string>
 ) {
   appendAnthropicBetaHeader(extraHeaders, 'fine-grained-tool-streaming-2025-05-14');

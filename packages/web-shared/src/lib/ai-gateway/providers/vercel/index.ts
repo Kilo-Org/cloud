@@ -11,6 +11,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
   GatewayRequest,
+  NonGeminiGatewayRequest,
   OpenRouterProviderConfig,
   VercelInferenceProviderConfig,
   VercelProviderConfig,
@@ -151,7 +152,7 @@ function convertProviderSort(
 }
 
 export function convertProviderOptions(
-  requestToMutate: GatewayRequest,
+  requestToMutate: NonGeminiGatewayRequest,
   vercelInferenceProviders: string[] | null
 ): VercelProviderConfig {
   const provider = requestToMutate.body.provider;
@@ -203,7 +204,7 @@ function parseCredentials<T>(
 }
 
 export function getAnthropicProviderOptionsForVercel(
-  request: GatewayRequest
+  request: NonGeminiGatewayRequest
 ): AnthropicProviderOptions | undefined {
   const anthropicOptions: AnthropicProviderOptions = {};
 
@@ -255,7 +256,7 @@ export function getVercelInferenceProviderConfigForUserByok(
 
 export async function applyVercelSettings(
   requestedModel: string,
-  requestToMutate: GatewayRequest,
+  requestToMutate: NonGeminiGatewayRequest,
   userByok: BYOKResult[] | null
 ) {
   const vercelModelId = await mapModelIdToVercel(requestedModel);

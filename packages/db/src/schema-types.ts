@@ -2111,6 +2111,7 @@ export const CustomLlmProviderSchema = z.enum([
   'anthropic', // uses Messages API
   'openai', // uses Responses API
   'openrouter', // uses Chat Completions API with reasoning_details
+  'google', // uses Gemini API
 ]);
 
 export type CustomLlmProvider = z.infer<typeof CustomLlmProviderSchema>;
@@ -2150,6 +2151,8 @@ export const DirectByokModelSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
   reasoning_options: z.array(ReasoningOptionSchema).optional(),
+  /** The AI SDK provider models.dev names for the model's own endpoint, when it needs one. */
+  ai_sdk_provider: CustomLlmProviderSchema.optional().catch(undefined),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);

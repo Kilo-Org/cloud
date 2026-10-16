@@ -80,6 +80,10 @@ import {
   parseMessagesMicrodollarUsageFromStream,
   parseMessagesMicrodollarUsageFromString,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.messages';
+import {
+  parseGenerateContentMicrodollarUsageFromStream,
+  parseGenerateContentMicrodollarUsageFromString,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.generateContent';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
@@ -1065,6 +1069,19 @@ export function countAndStoreUsage(
             parseMessagesMicrodollarUsageFromString(content, clonedReponse.status)
           );
     }
+    if (usageContext.api_kind === 'generate_content') {
+      usageStatsPromise = usageContext.isStreaming
+        ? parseGenerateContentMicrodollarUsageFromStream(
+            clonedReponse.body,
+            usageContext.kiloUserId,
+            openrouterRequestSpan,
+            usageContext.provider,
+            clonedReponse.status
+          )
+        : parseResponseText(content =>
+            parseGenerateContentMicrodollarUsageFromString(content, clonedReponse.status)
+          );
+    }
   }
 
   return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
@@ -1443,7 +1460,8 @@ function bouncerUsageEvent(
   const fields = {
     requestId: bouncer.requestId,
     occurredAt: bouncer.occurredAt,
-    apiKind: usageContext.api_kind,
+    // Bouncer does not accept the Gemini API kind yet; it reads an omitted kind as chat completions.
+    apiKind: usageContext.api_kind === 'generate_content' ? undefined : usageContext.api_kind,
     // The client fingerprint comes from the raw fraud headers already carried on
     // this context; it is bounded here so an invalid header cannot fail the event.
     ja4: normalizeJa4(usageContext.fraudHeaders.http_x_vercel_ja4_digest),

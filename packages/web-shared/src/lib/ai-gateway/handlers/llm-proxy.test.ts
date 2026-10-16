@@ -2075,10 +2075,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).toHaveBeenCalledWith({
-        userId: 'user-123',
-        organizationId: 'org-123',
-      });
+      expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).toHaveBeenCalledWith();
       expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
         expect.objectContaining({ deniedModelIds: ['meta/muse-spark-1.3-contributor'] })
       );

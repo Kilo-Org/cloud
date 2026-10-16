@@ -1,11 +1,11 @@
 import {
-  AutoRoutingModeOwnerTypeSchema,
+  CustomRouterScopeSchema,
   DEFAULT_AUTO_ROUTING_MODE,
   MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST,
   OWNER_POOL_CONVERSION_PATH,
   OwnerPoolConversionOutcomeSchema,
   OwnerPoolConversionResponseSchema,
-  type AutoRoutingModeOwnerType,
+  type CustomRouterScope,
   type OwnerPoolConversion,
   type OwnerPoolConversionOutcome,
   type OwnerPoolConversionResult,
@@ -20,7 +20,7 @@ import type { StoredOwnerSettings } from './routing-mode';
 const READ_CONCURRENCY = 10;
 
 const ScanRequestSchema = z.object({
-  ownerType: AutoRoutingModeOwnerTypeSchema,
+  ownerType: CustomRouterScopeSchema,
   objectIds: z.array(z.string().regex(/^[0-9a-f]{64}$/)),
   after: z.string().min(1).nullable(),
   limit: z.number().int().min(1).max(10_000).default(2_000),
@@ -30,7 +30,7 @@ const ScanRequestSchema = z.object({
 export type OwnerObjectMatch = { ownerId: string; objectId: string };
 
 export function matchOwnerObjects(
-  ownerType: AutoRoutingModeOwnerType,
+  ownerType: CustomRouterScope,
   ownerIds: readonly string[],
   objectIds: ReadonlySet<string>,
   idFor: (name: string) => string
@@ -43,7 +43,7 @@ export function matchOwnerObjects(
 
 async function listOwnerIds(
   env: Env,
-  ownerType: AutoRoutingModeOwnerType,
+  ownerType: CustomRouterScope,
   after: string | null,
   limit: number
 ): Promise<string[]> {

@@ -411,11 +411,10 @@ export async function handleLlmProxyRequest(
         !groupPolicy && plan === 'enterprise'
           ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
           : [];
-      const owner = { userId: user.id, organizationId: organizationId ?? null };
       const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
-        groupPolicy ? collectDeniedAutoRoutingModelIds(groupPolicy, owner) : [],
+        groupPolicy ? collectDeniedAutoRoutingModelIds(groupPolicy) : [],
         isDataCollectionExplicitlyDisallowed(effectivePrivacy)
-          ? collectDataCollectionRequiredAutoRoutingModelIds(owner)
+          ? collectDataCollectionRequiredAutoRoutingModelIds()
           : [],
       ]);
       const deniedModelIds = [

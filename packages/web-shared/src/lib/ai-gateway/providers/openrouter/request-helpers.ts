@@ -355,6 +355,22 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
   );
 }
 
+/**
+ * Strict OpenAI-compatible upstreams reject OpenRouter's top-level `reasoning`
+ * object as an unknown parameter, so its effort is carried over as the
+ * standard `reasoning_effort` instead.
+ */
+export function replaceReasoningObjectWithReasoningEffort(request: GatewayRequest) {
+  if (request.kind !== 'chat_completions') {
+    return;
+  }
+  const reasoningEffort = request.body.reasoning?.effort;
+  if (reasoningEffort) {
+    request.body.reasoning_effort ??= reasoningEffort;
+  }
+  delete request.body.reasoning;
+}
+
 export function enableReasoningSummaries(request: GatewayRequest) {
   if (
     request.kind === 'messages' &&

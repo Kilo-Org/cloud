@@ -167,14 +167,14 @@ async function main(): Promise<void> {
     } while (after !== null);
   }
 
-  const unmatched = objectIds.filter(id => !matched.has(id));
+  const unmatched = resume ? null : objectIds.filter(id => !matched.has(id));
   console.log(
     JSON.stringify(
       {
         dryRun,
         listed: objectIds.length,
         matched: matched.size,
-        unmatched: unmatched.length,
+        unmatched: unmatched?.length ?? 'not audited on a resumed run',
         conversions,
         outcomes,
         droppedModeOnly,
@@ -186,7 +186,11 @@ async function main(): Promise<void> {
       2
     )
   );
-  if (unmatched.length > 0) {
+  if (unmatched === null) {
+    console.log(
+      'A resumed run skips owners before its cursor; audit unmatched objects with a full --dry-run.'
+    );
+  } else if (unmatched.length > 0) {
     console.log(`Unmatched object ids:\n${unmatched.join('\n')}`);
   }
 }

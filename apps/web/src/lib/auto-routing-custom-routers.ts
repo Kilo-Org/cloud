@@ -36,11 +36,11 @@ import {
   toCustomRouterDefinition,
   type CustomRouterOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
-import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import { and, eq, sql } from 'drizzle-orm';
@@ -198,17 +198,9 @@ export function parseRouterParams(params: { scope: string; slug: string }): {
   return { scope: scope.data, slug: slug.data };
 }
 
-async function managedModelIds(): Promise<ReadonlySet<string>> {
-  const catalog = await getEnhancedOpenRouterModels();
-  return new Set(Array.isArray(catalog.data) ? catalog.data.map(model => model.id) : []);
-}
-
 /** ADR 0005: the owner's CLI evaluates every entry the platform key cannot serve. */
-export function requiresClientEval(
-  entry: CustomRouterEntry,
-  platformModelIds: ReadonlySet<string>
-): boolean {
-  return entry.kind === 'client' || !platformModelIds.has(entry.model);
+export function requiresClientEval(entry: CustomRouterEntry): boolean {
+  return entry.kind === 'client' || isDirectByokModelId(entry.model);
 }
 
 export function needsClientEval(
@@ -245,11 +237,10 @@ async function fetchVariantStatuses(
 
 async function toSummary(
   router: CustomRouterDefinition,
-  canEdit: boolean,
-  platformModelIds: ReadonlySet<string>
+  canEdit: boolean
 ): Promise<CustomRouterSummary> {
   const clientEvalKeys = router.entries
-    .filter(entry => requiresClientEval(entry, platformModelIds))
+    .filter(requiresClientEval)
     .map(customRouterEntryKey);
   const clientEval = new Set(clientEvalKeys);
   const statuses = await fetchVariantStatuses(router, clientEvalKeys);
@@ -314,9 +305,8 @@ async function requestPlatformBenchmarks(params: {
   baseRouter: AutoRouter;
   entries: CustomRouterEntry[];
 }): Promise<void> {
-  const platformModelIds = await managedModelIds();
   const models = params.entries.flatMap(entry =>
-    entry.kind === 'gateway' && !requiresClientEval(entry, platformModelIds)
+    entry.kind === 'gateway' && !requiresClientEval(entry)
       ? [{ model: entry.model }]
       : []
   );
@@ -389,7 +379,7 @@ async function singleRouterResponse(
   canEdit: boolean,
   status = 200
 ): Promise<NextResponse> {
-  const summary = await toSummary(router, canEdit, await managedModelIds());
+  const summary = await toSummary(router, canEdit);
   return NextResponse.json({ router: summary }, { status });
 }
 
@@ -400,11 +390,8 @@ export async function listCustomRoutersResponse(
   if (context.organization) owners.push({ type: 'org', id: context.organization.id });
   const routers = await listCustomRouters(owners, db);
   const orgCanEdit = context.organization?.canEdit ?? false;
-  const platformModelIds = routers.length > 0 ? await managedModelIds() : new Set<string>();
   const summaries = await Promise.all(
-    routers.map(router =>
-      toSummary(router, router.ownerType === 'user' || orgCanEdit, platformModelIds)
-    )
+    routers.map(router => toSummary(router, router.ownerType === 'user' || orgCanEdit))
   );
   return NextResponse.json({ routers: summaries });
 }

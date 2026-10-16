@@ -64,6 +64,11 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  agent_briefing_reports,
+  agent_briefing_events,
+  agent_briefing_context_preferences,
+  agent_briefing_preferences,
+  cli_sessions_v2,
   spend_alert_settings,
   spend_alert_rules,
   spend_alert_rule_state,
@@ -346,6 +351,7 @@ describe('User', () => {
     await db.delete(platform_integrations);
     await db.delete(github_app_installations);
     await db.delete(organizations);
+    await db.delete(cli_sessions_v2);
     await db.delete(kilocode_users);
   });
 
@@ -5567,6 +5573,66 @@ describe('User', () => {
         .from(user_notification_preferences)
         .where(eq(user_notification_preferences.user_id, user.id));
       expect(rows).toHaveLength(0);
+    });
+
+    it('removes owned briefing reports, excerpts, consent and schedule without touching another user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const now = new Date().toISOString();
+      for (const account of [user, otherUser]) {
+        const sessionId = `ses_briefing_delete_${crypto.randomUUID()}`;
+        await db
+          .insert(cli_sessions_v2)
+          .values({ session_id: sessionId, kilo_user_id: account.id, created_on_platform: 'cli' });
+        await db
+          .insert(agent_briefing_preferences)
+          .values({ kilo_user_id: account.id, timezone: 'UTC', next_run_at: now });
+        await db.insert(agent_briefing_context_preferences).values({
+          kilo_user_id: account.id,
+          context_key: 'personal',
+          model: 'test/model',
+          ai_enabled: true,
+        });
+        await db.insert(agent_briefing_events).values({
+          id: crypto.randomUUID(),
+          kilo_user_id: account.id,
+          session_id: sessionId,
+          kind: 'activity',
+          occurred_at: now,
+          payload: { excerpt: 'Private selected outcome' },
+        });
+        await db.insert(agent_briefing_reports).values({
+          kilo_user_id: account.id,
+          context_key: 'personal',
+          local_date: now.slice(0, 10),
+          night_start_at: now,
+          cutoff_at: now,
+          morning_end_at: now,
+          evidence_hash: 'private',
+          facts: { sessionTitle: 'Private work' },
+          summary: { text: 'Private briefing' },
+        });
+      }
+      await softDeleteUser(user.id);
+      for (const table of [
+        agent_briefing_reports,
+        agent_briefing_events,
+        agent_briefing_context_preferences,
+        agent_briefing_preferences,
+      ]) {
+        expect(
+          await db
+            .select({ userId: table.kilo_user_id })
+            .from(table)
+            .where(eq(table.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select({ userId: table.kilo_user_id })
+            .from(table)
+            .where(eq(table.kilo_user_id, otherUser.id))
+        ).toHaveLength(1);
+      }
     });
 
     it('should delete personal spend alert settings, rules, counters, and deliveries', async () => {

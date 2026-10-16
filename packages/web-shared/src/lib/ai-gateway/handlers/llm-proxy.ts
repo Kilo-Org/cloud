@@ -915,11 +915,20 @@ export async function handleLlmProxyRequest(
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
+  const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
+  const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
   const attempt = await sendUpstreamAttempt({
     ...upstreamAttemptOptions,
     providerContext: effectiveProviderContext,
     request: requestBodyParsed,
+    costLimit:
+      requestCostLimit !== null && requestCostBalance
+        ? {
+            maximumMicrodollars: requestCostLimit,
+            availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
+          }
+        : undefined,
   });
   if (attempt.type === 'invalid-openrouter-model') {
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);

@@ -372,3 +372,5 @@ export type TerminalOutcomeEventName = (typeof TERMINAL_PHASE_EVENTS)[number];
 
 /** Event names that deliver best-effort as accepted-phase metadata. */
 export type AcceptedPhaseEventName = Exclude<keyof AnalyticsEventMap, TerminalOutcomeEventName>;
+
+// ci-probe 1

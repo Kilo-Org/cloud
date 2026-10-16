@@ -117,10 +117,7 @@ describe('collectDeniedAutoRoutingModelIds', () => {
   it('ignores the organization deny list for an unrestricted grant without loading candidates', async () => {
     jest.mocked(getCachedRoutingTable).mockClear();
     await expect(
-      collectDeniedAutoRoutingModelIds(
-        policy({ organizationModelDenyList: ['openai/gpt-4o'] }),
-        owner
-      )
+      collectDeniedAutoRoutingModelIds(policy({ organizationModelDenyList: ['openai/gpt-4o'] }))
     ).resolves.toEqual([]);
     expect(getCachedRoutingTable).not.toHaveBeenCalled();
   });

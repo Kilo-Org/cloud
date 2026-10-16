@@ -63,13 +63,18 @@ function scan(body: unknown, authorization: string | null = 'Bearer internal-sec
   );
 }
 
+function requestBody(init: RequestInit | undefined): OwnerPoolConversionRequest {
+  if (typeof init?.body !== 'string') throw new Error('Expected a JSON string body');
+  return JSON.parse(init.body) as OwnerPoolConversionRequest;
+}
+
 function webRequests(): OwnerPoolConversionRequest[] {
-  return webFetch.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+  return webFetch.mock.calls.map(([, init]) => requestBody(init));
 }
 
 function respondCreated() {
   webFetch.mockImplementation(async (_url, init) => {
-    const body = JSON.parse(String(init?.body)) as OwnerPoolConversionRequest;
+    const body = requestBody(init);
     return Response.json({
       results: body.conversions.map(conversion => ({
         owner: conversion.owner,
@@ -152,7 +157,7 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     expect(dbLimit).toHaveBeenCalledWith(5);
     expect(webFetch).toHaveBeenCalledTimes(1);
     const [url, init] = webFetch.mock.calls[0] ?? [];
-    expect(String(url)).toBe(
+    expect(url instanceof URL ? url.href : url).toBe(
       'https://web.example.test/api/internal/auto-routing/owner-pool-conversions'
     );
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer internal-secret');

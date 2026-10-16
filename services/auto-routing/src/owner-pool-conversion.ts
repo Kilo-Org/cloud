@@ -70,13 +70,13 @@ async function mapBounded<T, R>(
   concurrency: number,
   fn: (item: T) => Promise<R>
 ): Promise<R[]> {
-  const results: R[] = new Array(items.length);
+  const results: R[] = [];
   let next = 0;
   await Promise.all(
     Array.from({ length: Math.min(concurrency, items.length) }, async () => {
       while (next < items.length) {
         const index = next++;
-        results[index] = await fn(items[index] as T);
+        results[index] = await fn(items[index]);
       }
     })
   );

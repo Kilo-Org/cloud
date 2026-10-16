@@ -671,6 +671,18 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('returns service unavailable when custom LLM credentials cannot be resolved now', async () => {
+    mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-temporarily-unavailable' });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('kilo-internal/custom-model')) as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('passes the Vercel request ID to request logging', async () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 

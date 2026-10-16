@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { custom_llm2, type User } from '@kilocode/db/schema';
-import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
+import type {
+  CustomLlmCredentials,
+  CustomLlmDefinition,
+  EncryptedData,
+} from '@kilocode/db/schema-types';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account', () => ({
+  getGoogleServiceAccountAccessToken: jest.fn().mockRejectedValue(new Error('network error')),
+}));
 
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
 const PUBLIC_ID = 'kilo-internal/secure-proxy-model';
@@ -20,10 +28,14 @@ const definition: CustomLlmDefinition = {
 };
 
 async function insertCustomLlm(credentials: CustomLlmCredentials) {
+  await insertEncryptedCustomLlm(encryptApiKey(JSON.stringify(credentials), BYOK_ENCRYPTION_KEY));
+}
+
+async function insertEncryptedCustomLlm(encryptedApiKey: EncryptedData) {
   await db.insert(custom_llm2).values({
     public_id: PUBLIC_ID,
     definition,
-    encrypted_api_key: encryptApiKey(JSON.stringify(credentials), BYOK_ENCRYPTION_KEY),
+    encrypted_api_key: encryptedApiKey,
   });
 }
 
@@ -88,5 +100,40 @@ describe('getProvider custom LLM credentials', () => {
     });
     if (result.kind !== 'provider') throw new Error('expected a provider');
     expect(result.provider.secureProxy).toBeUndefined();
+  });
+
+  it('does not throw when the stored credentials cannot be decrypted', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const encrypted = encryptApiKey(
+      JSON.stringify({ type: 'api_key', api_key: 'upstream-key' }),
+      BYOK_ENCRYPTION_KEY
+    );
+    await insertEncryptedCustomLlm({ ...encrypted, authTag: Buffer.alloc(16).toString('base64') });
+
+    const result = await resolveProvider();
+
+    expect(result).toMatchObject({ kind: 'provider' });
+    if (result.kind !== 'provider') throw new Error('expected a provider');
+    expect(result.provider.id).not.toBe('custom');
+  });
+
+  it('reports a failed service account token exchange as temporarily unavailable', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    await insertCustomLlm({
+      type: 'service_account',
+      project_id: 'project',
+      private_key_id: 'key-id',
+      private_key: 'private-key',
+      client_email: 'service@project.iam.gserviceaccount.com',
+      client_id: 'client-id',
+      auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+      token_uri: 'https://oauth2.googleapis.com/token',
+      auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+      client_x509_cert_url: 'https://www.googleapis.com/robot/v1/metadata/x509/service',
+    });
+
+    await expect(resolveProvider()).resolves.toEqual({
+      kind: 'custom-llm-temporarily-unavailable',
+    });
   });
 });

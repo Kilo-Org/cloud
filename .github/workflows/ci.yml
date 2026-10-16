@@ -893,3 +893,5 @@ jobs:
       - name: Test native heartbeat attachment compatibility
         if: matrix.workspace.name == 'cloudflare-session-ingest'
         run: pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts
+
+# ci-probe 1

@@ -16,9 +16,11 @@ const TEST_SECRET = 'api-token-shape-test-secret';
 // The auth policy (getResourceDelegationAuthority in apps/web) verifies a
 // legacy bearer token with `claims.env === process.env.NODE_ENV` and
 // `isKiloCredentialExchangeEligible(..., { legacy: 'five-year-api' })` before
-// it mints any resource control token. A seed token that misses either check
-// made `session.sh cloud-enter` fail with 401/403 and left the device gate
-// without its scripted setup scene (2026-09-12, section
+// it mints any resource control token. The legacy class name is historical: it
+// covers the current one-year issuer default plus both historical five-year
+// durations. A seed token that misses either check made `session.sh
+// cloud-enter` fail with 401/403 and left the device gate without its scripted
+// setup scene (2026-09-12, section
 // ios-app-terminates-while-remote-session-streams-reasoning).
 test('the default seed token carries the shape the policy accepts', async () => {
   const params = apiTokenSigningParams(DEFAULT_EXPIRES_DAYS);
@@ -26,7 +28,7 @@ test('the default seed token carries the shape the policy accepts', async () => 
   assert.equal(params.env, 'development');
   assert.ok(
     LEGACY_API_TOKEN_LIFETIMES_SECONDS.some(lifetime => lifetime === params.expiresInSeconds),
-    `default lifetime ${params.expiresInSeconds}s must be a legacy five-year API lifetime`
+    `default lifetime ${params.expiresInSeconds}s must be an accepted legacy API token lifetime`
   );
 
   const { token } = await signKiloToken({

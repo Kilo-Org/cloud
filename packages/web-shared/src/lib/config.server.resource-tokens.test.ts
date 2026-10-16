@@ -103,5 +103,5 @@ it.each([
   expect(cloud.exp! - cloud.iat!).toBe(cloudModern ? 3600 : 7200);
   expect(gateway.aud).toBe(gatewayModern ? 'kilo-gateway' : undefined);
   expect(gateway.tokenPurpose).toBe(gatewayModern ? 'delegated-workload' : undefined);
-  expect(gateway.exp! - gateway.iat!).toBe(gatewayModern ? 3600 : 5 * 365 * 24 * 3600);
+  expect(gateway.exp! - gateway.iat!).toBe(gatewayModern ? 3600 : 365 * 24 * 3600);
 });

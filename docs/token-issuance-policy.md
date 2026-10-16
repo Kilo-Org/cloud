@@ -21,14 +21,15 @@ The current shared verifier rejects a token with an audience when no audience is
 
 ## Historical compatibility
 
-`generateApiToken` originally used `expiresIn: '5y'` in commit `bc8179c70` (2026-02-04). Commit `c6bf3468f` (2026-02-10) changed the default to `5 * 365 * 24 * 60 * 60` seconds.
+`generateApiToken` originally used `expiresIn: '5y'` in commit `bc8179c70` (2026-02-04). Commit `c6bf3468f` (2026-02-10) changed the default to `5 * 365 * 24 * 60 * 60` seconds. The current default is `365 * 24 * 60 * 60` seconds (one year).
 
 | Legacy issuer expression | Exact `exp - iat` | Evidence |
 |---|---:|---|
-| Current numeric five-year default | `157680000` | `packages/web-shared/src/lib/tokens.ts` |
+| Current numeric one-year default | `31536000` | `packages/web-shared/src/lib/tokens.ts` |
+| Historical numeric five-year default | `157680000` | `c6bf3468f:packages/web-shared/src/lib/tokens.ts` |
 | Historical `'5y'` default | `157788000` | `bc8179c70:src/lib/tokens.ts`; installed `ms` parser defines a year as 365.25 days |
 
-Both values are required for the narrow legacy five-year class. Confidence is limited to repository history plus the presently installed parser: historical production cutovers, issued-token population, and dependency-lockfile history have not been independently confirmed. The class is compatibility evidence, not proof of a human credential: unmarked automation also calls the generic five-year issuer, including `apps/web/src/routers/app-builder-router.ts` and `apps/web/src/routers/cli-sessions-v2-router.ts`.
+All three values are required for the narrow legacy long-lived API token class (`'five-year-api'`, a historical policy name). Confidence is limited to repository history plus the presently installed parser: historical production cutovers, issued-token population, and dependency-lockfile history have not been independently confirmed. The class is compatibility evidence, not proof of a human credential: unmarked automation also calls the generic long-lived issuer, including `apps/web/src/routers/app-builder-router.ts` and `apps/web/src/routers/cli-sessions-v2-router.ts`.
 
 ## Opt-in contract
 
@@ -69,7 +70,7 @@ No main signer or verifier changes in Phase 1. In particular, this module does n
 
 ## Legacy exchange class
 
-`five-year-api` is deliberately narrow. It permits both exact historical durations (`157680000`, `157788000`) and requires all of the following:
+`five-year-api` (a historical name retained for the policy option) is deliberately narrow. It permits the exact accepted durations — the current one-year issuer default (`31536000`) and both historical five-year durations (`157680000`, `157788000`) — and requires all of the following:
 
 - no `aud`;
 - no modern policy fields;

@@ -192,7 +192,11 @@ export async function verifyKiloSessionForPolicy(
   return auth;
 }
 
-export const LEGACY_API_TOKEN_LIFETIMES_SECONDS = [157_680_000, 157_788_000] as const;
+// Exact original lifetimes (`exp - iat`) a legacy audience-less API token may
+// carry into credential exchange: the current one-year `generateApiToken`
+// default, the numeric five-year default it replaced, and the historical `'5y'`
+// string default (the `ms` parser's 365.25-day year).
+export const LEGACY_API_TOKEN_LIFETIMES_SECONDS = [31_536_000, 157_680_000, 157_788_000] as const;
 
 export type KiloCredentialExchangeEligibilityPolicy = {
   legacy: 'deny' | 'five-year-api';

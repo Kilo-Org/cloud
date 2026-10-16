@@ -9,9 +9,9 @@ import {
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 describe('TOKEN_EXPIRY', () => {
-  test('default is five years in seconds', () => {
-    const FIVE_YEARS_IN_SECONDS = 5 * 365 * 24 * 60 * 60;
-    expect(TOKEN_EXPIRY.default).toBe(FIVE_YEARS_IN_SECONDS);
+  test('default is one year in seconds', () => {
+    const ONE_YEAR_IN_SECONDS = 365 * 24 * 60 * 60;
+    expect(TOKEN_EXPIRY.default).toBe(ONE_YEAR_IN_SECONDS);
   });
 });
 

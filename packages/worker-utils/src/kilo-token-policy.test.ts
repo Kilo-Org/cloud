@@ -28,7 +28,7 @@ import {
 const SECRET = 'synthetic-policy-test-secret-at-least-32-chars';
 const NOW = new Date('2030-01-02T03:04:05.000Z');
 const NOW_SECONDS = Math.floor(NOW.getTime() / 1000);
-const HISTORICAL_FIVE_YEAR_LIFETIMES = [157_680_000, 157_788_000] as const;
+const LEGACY_ACCEPTED_LIFETIMES = [31_536_000, 157_680_000, 157_788_000] as const;
 const API_POLICY = { audience: 'kilo-api', mode: 'required' } as const;
 const LEGACY_POLICY = { audience: 'kilo-api', mode: 'allow-legacy' } as const;
 
@@ -539,8 +539,8 @@ describe('isKiloCredentialExchangeEligible', () => {
     ).rejects.toThrow('synthetic dependency unavailable');
   });
 
-  it.each(HISTORICAL_FIVE_YEAR_LIFETIMES)(
-    'permits historical %i-second legacy API tokens, including near expiry',
+  it.each(LEGACY_ACCEPTED_LIFETIMES)(
+    'permits accepted %i-second legacy API token lifetimes, including near expiry',
     async lifetime => {
       vi.useFakeTimers();
       vi.setSystemTime(NOW);
@@ -570,8 +570,8 @@ describe('isKiloCredentialExchangeEligible', () => {
     6 * 60 * 60,
     24 * 60 * 60,
     30 * 24 * 60 * 60,
-    ...HISTORICAL_FIVE_YEAR_LIFETIMES.map(lifetime => lifetime - 1),
-    ...HISTORICAL_FIVE_YEAR_LIFETIMES.map(lifetime => lifetime + 1),
+    ...LEGACY_ACCEPTED_LIFETIMES.map(lifetime => lifetime - 1),
+    ...LEGACY_ACCEPTED_LIFETIMES.map(lifetime => lifetime + 1),
   ])('rejects legacy original lifetime %i seconds', async lifetime => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);

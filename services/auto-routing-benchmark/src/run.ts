@@ -92,6 +92,7 @@ import {
 } from './platform-models';
 import { pickClassifierWinner } from './winner';
 import {
+  acquireInitializationLease,
   beginPaidCase,
   claimScheduledChunks,
   clearUnbilledCase,
@@ -104,12 +105,14 @@ import {
   getSchedulerOverrides,
   hasUnsettledChunks,
   recoverChunks,
+  releaseInitializationLease,
   resolveSchedulerConfig,
   scheduleRunChunks,
   schedulerBackoffSeconds,
   startChunk,
   SCHEDULER_MAX_ATTEMPTS,
   type SchedulerClaim,
+  type SchedulerConfig,
 } from './scheduler';
 import { catalogModelProviders } from './platform-models';
 
@@ -977,17 +980,17 @@ export async function drainQueue(
   }
 }
 
-async function initializeScheduledRun(env: Env, runId: string): Promise<void> {
+async function initializeScheduledRun(env: Env, runId: string): Promise<boolean> {
   const initialized = await env.BENCH_DB.prepare(
     'SELECT run_id FROM scheduler_runs WHERE run_id = ?'
   )
     .bind(runId)
     .first();
-  if (initialized) return;
+  if (initialized) return true;
   const { run, models } = (await getRunWithModels(env.BENCH_DB, runId)) ?? {};
-  if (!run || !models || run.status !== 'running') return;
+  if (!run || !models || run.status !== 'running') return false;
   const catalog = await fetchBenchmarkModelCatalog(env);
-  await scheduleRunChunks(env.BENCH_DB, {
+  return scheduleRunChunks(env.BENCH_DB, {
     runId,
     entries: models
       .filter(model => model.enqueued)
@@ -1002,37 +1005,30 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<void> {
   });
 }
 
-export async function dispatchScheduler(env: Env): Promise<void> {
-  const { config } = resolveSchedulerConfig(
-    env.BENCHMARK_SCHEDULER_CONFIG,
-    (await getSchedulerOverrides(env.BENCH_DB)).overrides
-  );
-  const failed = await recoverChunks(env.BENCH_DB, Date.now());
-  for (const claim of failed) {
-    await recordLaneFailure(env.BENCH_DB, {
-      runId: claim.run_id,
-      model: claim.model,
-      variant: claim.variant,
-      rep: claim.rep,
-      chunk: claim.chunk,
-      shard: 0,
-    });
-    await finalizeRunIfComplete(env, claim.run_id, 'decider', await getRunState(env, claim.run_id));
-  }
+/**
+ * Advances every uninitialized running decider run by one bounded materialization
+ * pass and reports whether any of them finished initializing.
+ */
+async function initializeScheduledRuns(env: Env): Promise<boolean> {
   const uninitialized = await env.BENCH_DB.prepare(`
     SELECT id FROM benchmark_runs WHERE kind = 'decider' AND status = 'running'
       AND NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id) LIMIT 3
   `).all<{ id: string }>();
-  for (const run of uninitialized.results) await initializeScheduledRun(env, run.id);
-  const settled = await env.BENCH_DB.prepare(`
-    SELECT id FROM benchmark_runs WHERE kind = 'decider' AND status = 'running'
-      AND EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id)
-      AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = benchmark_runs.id
-        AND status IN ('pending', 'queued', 'active')) LIMIT 3
-  `).all<{ id: string }>();
-  for (const run of settled.results) {
-    await finalizeRunIfComplete(env, run.id, 'decider', await getRunState(env, run.id));
+  if (uninitialized.results.length === 0) return false;
+  const token = crypto.randomUUID();
+  if (!(await acquireInitializationLease(env.BENCH_DB, token, Date.now()))) return false;
+  try {
+    let initialized = false;
+    for (const run of uninitialized.results) {
+      if (await initializeScheduledRun(env, run.id)) initialized = true;
+    }
+    return initialized;
+  } finally {
+    await releaseInitializationLease(env.BENCH_DB, token);
   }
+}
+
+async function dispatchClaims(env: Env, config: SchedulerConfig): Promise<number> {
   const claims = await claimScheduledChunks(env.BENCH_DB, config, Date.now(), crypto.randomUUID());
   for (const [index, claim] of claims.entries()) {
     try {
@@ -1050,12 +1046,48 @@ export async function dispatchScheduler(env: Env): Promise<void> {
       throw error;
     }
   }
+  return claims.length;
+}
+
+/**
+ * Claims for initialized runs before materializing uninitialized ones, so a large run
+ * that takes several passes to initialize never holds back other runs' dispatch. A
+ * pass that completes a run's initialization claims again to start its chunks.
+ */
+export async function dispatchScheduler(env: Env): Promise<void> {
+  const { config } = resolveSchedulerConfig(
+    env.BENCHMARK_SCHEDULER_CONFIG,
+    (await getSchedulerOverrides(env.BENCH_DB)).overrides
+  );
+  const failed = await recoverChunks(env.BENCH_DB, Date.now());
+  for (const claim of failed) {
+    await recordLaneFailure(env.BENCH_DB, {
+      runId: claim.run_id,
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      chunk: claim.chunk,
+      shard: 0,
+    });
+    await finalizeRunIfComplete(env, claim.run_id, 'decider', await getRunState(env, claim.run_id));
+  }
+  const settled = await env.BENCH_DB.prepare(`
+    SELECT id FROM benchmark_runs WHERE kind = 'decider' AND status = 'running'
+      AND EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id)
+      AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = benchmark_runs.id
+        AND status IN ('pending', 'queued', 'active')) LIMIT 3
+  `).all<{ id: string }>();
+  for (const run of settled.results) {
+    await finalizeRunIfComplete(env, run.id, 'decider', await getRunState(env, run.id));
+  }
+  let claimed = await dispatchClaims(env, config);
+  if (await initializeScheduledRuns(env)) claimed += await dispatchClaims(env, config);
   console.log(
     JSON.stringify({
       event: 'benchmark_scheduler_dispatched',
       activeSlots: await getLiveContainerLanes(env.BENCH_DB),
       slots: config.slots,
-      claimed: claims.length,
+      claimed,
     })
   );
 }

@@ -137,8 +137,17 @@ the `(status, run_id, model, variant, repetition, chunk)` index bounds lane read
 A provider or model throttle records a cooldown deadline rather than stamping every
 pending row, so one throttle event costs a bounded write instead of rewriting the backlog.
 
-Materialization writes chunks in bounded batches, marks a batch complete when all of its
-cases already have results, and checks the run's status once per batch rather than per row.
+Materialization writes chunks in bounded batches and checks the run's status once per batch
+rather than per row. A chunk is inserted already completed when all of its cases have
+results; that check is a `case_results` primary-key probe per case, so its cost follows the
+batch, not the run. One initialization pass spends at most 20 seconds per run, and each batch
+commits on its own: the next pass reads how many chunks every lane already holds and resumes
+after that prefix, so a large run initializes over several passes instead of restarting from
+its first lane. The `scheduler_runs` marker commits with the final batch, once every chunk
+exists, and only marked runs are dispatched. Dispatch claims for initialized runs before it
+materializes, and a second lease row keeps concurrent dispatchers from initializing at the
+same time; a pass that completes a run's initialization claims again so its chunks start at
+once.
 
 Run completion accounting reads every case result of the run, so it does not run per
 completed chunk. A completion first asks whether the run still has scheduled work — an

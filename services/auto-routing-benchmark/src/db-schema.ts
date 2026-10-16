@@ -277,10 +277,11 @@ export const schedulerExecutions = sqliteTable(
 );
 
 /**
- * Single row (id = 1) serializing dispatch passes. A pass holds the lease while it
- * reads live occupancy and claims; another dispatcher that finds the lease held
+ * Scheduler lease rows. Row 1 serializes dispatch passes: a pass holds the lease while
+ * it reads live occupancy and claims; another dispatcher that finds the lease held
  * returns immediately and the next completion or cron wake retries. Model,
  * provider and slot caps are only exact if one pass at a time reads occupancy.
+ * Row 2, created on first use, serializes run initialization passes.
  */
 export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
   id: integer('id').primaryKey(),

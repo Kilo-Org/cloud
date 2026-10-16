@@ -16,7 +16,10 @@ import {
   getCustomRouterStatus,
   registerOwnerBenchmarkProfiles,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
-import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokModelsForOrganization,
+  getDirectByokModelsForUser,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
@@ -51,7 +54,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
-  getDirectByokModelsForOrganization: jest.fn(async () => []),
+  getDirectByokModelsForOrganization: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
@@ -64,6 +67,7 @@ const mockedGetStatus = jest.mocked(getCustomRouterStatus);
 const mockedRegister = jest.mocked(registerOwnerBenchmarkProfiles);
 const mockedGetEnhanced = jest.mocked(getEnhancedOpenRouterModels);
 const mockedGetByokUser = jest.mocked(getDirectByokModelsForUser);
+const mockedGetByokOrg = jest.mocked(getDirectByokModelsForOrganization);
 const mockedGetOrgModels = jest.mocked(getAvailableModelsForOrganization);
 
 const SONNET = 'anthropic/claude-sonnet-4';
@@ -169,6 +173,7 @@ describe('/api/auto-routing/custom-routers', () => {
     mockedRegister.mockResolvedValue({ ok: true });
     mockedGetEnhanced.mockResolvedValue({ data: [model(SONNET), model(FLASH), model(DENIED)] });
     mockedGetByokUser.mockResolvedValue([model(BYOK)] as never);
+    mockedGetByokOrg.mockResolvedValue([]);
     mockedGetOrgModels.mockResolvedValue({ data: [model(SONNET), model(FLASH)] } as never);
     mockedGetStatus.mockImplementation(async request => ({
       status: 200,

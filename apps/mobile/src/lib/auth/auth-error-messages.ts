@@ -12,6 +12,8 @@ const AUTH_ERROR_KEYS = {
   // Only surfaced by Apple/Google paths; the email-OTP request returns opaque 200 for blocked domains
   BLOCKED: 'authErrors.blocked',
   'SIGNUP-RATE-LIMITED': 'authErrors.signupRateLimited',
+  // Without the methods or a matching button, the browser sign-in offers Google and Apple.
+  'SIGNUP-STEP-UP': 'authErrors.signupStepUp',
   INVALID_CODE: 'authErrors.invalidCode',
   CODE_IN_PROGRESS: 'authErrors.codeInProgress',
   TOO_MANY_ATTEMPTS: 'authErrors.tooManyAttempts',
@@ -38,4 +40,17 @@ export function retryableAdmissionError(): string {
 export function mapError(errorCode: string | undefined): string {
   const key = errorCode && AUTH_ERROR_KEYS[errorCode as keyof typeof AUTH_ERROR_KEYS];
   return key ? i18n.t(key) : defaultErrorMessage();
+}
+
+/**
+ * The `SIGNUP-STEP-UP` message. It names an allowed Apple or Google button only when that button
+ * is on this sign-in screen; otherwise it points to the browser sign-in options.
+ */
+export function signupStepUpMessage(
+  methods: readonly string[] | undefined,
+  shown: { apple: boolean; google: boolean }
+): string {
+  if (shown.apple && methods?.includes('apple')) return i18n.t('authErrors.signupStepUpApple');
+  if (shown.google && methods?.includes('google')) return i18n.t('authErrors.signupStepUpGoogle');
+  return i18n.t('authErrors.signupStepUp');
 }

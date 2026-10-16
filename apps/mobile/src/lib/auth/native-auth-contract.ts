@@ -14,6 +14,8 @@ const emailCodeResponseSchema = z.object({
 const errorResponseSchema = z.object({
   error: z.string(),
   ssoOrganizationId: z.string().min(1).optional(),
+  // A malformed method list must not hide the error code it accompanies.
+  methods: z.array(z.string()).optional().catch(undefined),
 });
 
 export type TokenPair =
@@ -118,12 +120,16 @@ export function parseEmailCodeResponse(value: unknown) {
 
 export function parseAuthError(
   value: unknown
-): { code: string; ssoOrganizationId?: string } | undefined {
+): { code: string; ssoOrganizationId?: string; signupMethods?: string[] } | undefined {
   const result = errorResponseSchema.safeParse(value);
   if (!result.success) {
     return undefined;
   }
-  return { code: result.data.error, ssoOrganizationId: result.data.ssoOrganizationId };
+  return {
+    code: result.data.error,
+    ssoOrganizationId: result.data.ssoOrganizationId,
+    signupMethods: result.data.methods,
+  };
 }
 
 export type ChallengeEntry = { email: string; challengeId: string };

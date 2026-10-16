@@ -1173,6 +1173,30 @@ describe('User', () => {
       }
     );
 
+    it.each([
+      ['mail.team.example.test', 'example.test'],
+      ['x.my.id', 'x.my.id'],
+    ])('sends the registrable domain of %s as %s', async (host, emailDomain) => {
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: `bouncer-domain@${host}`,
+          google_user_name: 'Bouncer Domain',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: `bouncer-domain@${host}`,
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.65' })
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockSignupDecide).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'email', emailDomain })
+      );
+    });
+
     it('propagates a Stripe failure without creating a user', async () => {
       const email = 'bouncer-stripe-failure@example.com';
       const stripeError = new Error('Stripe unavailable');

@@ -45,17 +45,11 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Install root dependencies
-        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
-
-      # The stacked-CI admission wiring must be checked on every PR, before the
-      # suite is gated.
-      - name: Check stacked CI admission
-        run: node --test scripts/stacked-ci.test.mjs
-
       # The suite jobs always report (required checks); only the suite's own
       # paths justify the heavy work. The patterns are pinned by
-      # scripts/stacked-ci.test.mjs.
+      # scripts/stacked-ci.test.mjs, which ci.yml's `ci-wiring` job runs.
+      # A lockfile change matches the patterns first, so the detector below
+      # never parses the lockfile and needs no installed dependencies.
       - name: Detect mobile-relevant changes
         id: detect
         run: |

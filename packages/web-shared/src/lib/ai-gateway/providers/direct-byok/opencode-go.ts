@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 
 export default {
   id: 'opencode-go',
@@ -19,6 +20,7 @@ export default {
     if (context.request.kind === 'messages') {
       context.extraHeaders['x-api-key'] = context.provider.apiKey;
     }
+    replaceReasoningObjectWithReasoningEffort(context.request);
     if (context.request.kind === 'chat_completions') {
       delete context.request.body.prompt_cache_key;
       delete context.request.body.safety_identifier;

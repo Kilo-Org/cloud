@@ -1010,6 +1010,10 @@ export async function handleLlmProxyRequest(
     requestStartedAt
   );
   usageContext.status_code = response.status;
+  const userByokProviderIds =
+    effectiveProviderContext.userByok === null
+      ? null
+      : effectiveProviderContext.userByok.map(byok => byok.providerId);
 
   // Handle OpenRouter 402 errors - don't pass them through to the client. We need to pay, not them.
   // Skip this conversion when user BYOK is used - the 402 is about their account, not ours.
@@ -1020,6 +1024,7 @@ export async function handleLlmProxyRequest(
       response,
       organizationId,
       model: finalUpstreamModel,
+      gatewayModel: effectiveModelIdLowerCased,
       errorMessage: `${effectiveProviderContext.provider.id} returned 402 Payment Required`,
       trackInSentry: true,
     });
@@ -1035,6 +1040,8 @@ export async function handleLlmProxyRequest(
       response,
       organizationId,
       model: finalUpstreamModel,
+      gatewayModel: effectiveModelIdLowerCased,
+      byokProviderIds: userByokProviderIds,
       errorMessage: `${effectiveProviderContext.provider.id} returned error ${response.status}`,
       trackInSentry: response.status >= 500,
     });
@@ -1058,10 +1065,7 @@ export async function handleLlmProxyRequest(
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
       response,
-      userByokProviderIds:
-        effectiveProviderContext.userByok === null
-          ? null
-          : effectiveProviderContext.userByok.map(byok => byok.providerId),
+      userByokProviderIds,
     });
     if (errorResponse) {
       await logUnrewrittenResponse({

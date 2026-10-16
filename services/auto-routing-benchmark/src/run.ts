@@ -62,6 +62,7 @@ import {
   upsertCaseResult,
   type BenchmarkRunPurpose,
   type CaseResultRow,
+  type PendingDeciderOutput,
   type PriorModelResult,
 } from './db';
 import {
@@ -78,6 +79,7 @@ import {
   filterSummariesByProvenance,
 } from './routing-table-builder';
 import {
+  DECIDER_CLI_TIMEOUT_MS,
   destroyDeciderCliContainer,
   isRetryableContainerAvailabilityError,
   parseContainerRunResponse,
@@ -104,6 +106,7 @@ import {
   failChunk,
   finishChunk,
   getChunk,
+  getPaidCaseStartedAt,
   getSchedulerOverrides,
   hasUnsettledChunks,
   recoverChunks,
@@ -1107,20 +1110,27 @@ export async function dispatchScheduler(env: Env): Promise<void> {
   );
 }
 
+// A container that loses its caller still finishes the paid case, then posts the outcome
+// to /container/case-result. Delivery covers the container's own start (at most ~30s)
+// and three timed post attempts (at most ~36s), with headroom.
+const CONTAINER_DELIVERY_WINDOW_MS = 90_000;
+export const PAID_OUTPUT_WAIT_MS = DECIDER_CLI_TIMEOUT_MS + CONTAINER_DELIVERY_WINDOW_MS;
+const PAID_OUTPUT_RECHECK_MS = 30_000;
+
 class AmbiguousBenchmarkExecutionError extends Error {
   /**
-   * True when the container may still finish the case and deliver its output:
-   * the chunk keeps its slot lease and records no lane failure, so lease
-   * recovery re-dispatches it once the outcome is known.
+   * Until this time the container may still deliver the paid call's output, so the
+   * chunk keeps its slot and provider lease and rechecks instead of failing its lane.
+   * Null when no ledger row remains to wait on.
    */
-  constructor(
-    readonly awaitingOutput = false,
-    options?: ErrorOptions
-  ) {
+  readonly outputDeadline: number | null;
+
+  constructor(paidStartedAt: number | null, options?: ErrorOptions) {
     super(
       'Previous paid execution has no recoverable output; refusing automatic duplicate inference',
       options
     );
+    this.outputDeadline = paidStartedAt === null ? null : paidStartedAt + PAID_OUTPUT_WAIT_MS;
   }
 }
 
@@ -1209,21 +1219,37 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
     );
     await finishChunk(env.BENCH_DB, id, token);
   } catch (error) {
-    if (
+    const outputDeadline =
+      error instanceof AmbiguousBenchmarkExecutionError ? error.outputDeadline : null;
+    const awaitingOutput = outputDeadline !== null && Date.now() < outputDeadline;
+    if (awaitingOutput) {
+      await env.BENCH_QUEUE.send(
+        {
+          runId: claim.run_id,
+          kind: 'decider',
+          model: claim.model,
+          claimId: id,
+          claimToken: token,
+        },
+        {
+          delaySeconds: Math.ceil(
+            Math.min(PAID_OUTPUT_RECHECK_MS, outputDeadline - Date.now()) / 1000
+          ),
+        }
+      );
+    } else if (
       error instanceof AmbiguousBenchmarkExecutionError ||
       claim.attempts >= SCHEDULER_MAX_ATTEMPTS
     ) {
-      if (!(error instanceof AmbiguousBenchmarkExecutionError && error.awaitingOutput)) {
-        await failChunk(env.BENCH_DB, id, token);
-        await recordLaneFailure(env.BENCH_DB, {
-          runId: claim.run_id,
-          model: claim.model,
-          variant: claim.variant,
-          rep: claim.rep,
-          chunk: claim.chunk,
-          shard: 0,
-        });
-      }
+      await failChunk(env.BENCH_DB, id, token);
+      await recordLaneFailure(env.BENCH_DB, {
+        runId: claim.run_id,
+        model: claim.model,
+        variant: claim.variant,
+        rep: claim.rep,
+        chunk: claim.chunk,
+        shard: 0,
+      });
     } else {
       const delaySeconds = schedulerBackoffSeconds(claim.attempts);
       await deferChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
@@ -1246,11 +1272,10 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         runId: claim.run_id,
         model: claim.model,
         attempt: claim.attempts,
-        reason:
-          error instanceof AmbiguousBenchmarkExecutionError
-            ? error.awaitingOutput
-              ? 'awaiting_output'
-              : 'ambiguous_execution'
+        reason: awaitingOutput
+          ? 'awaiting_output'
+          : error instanceof AmbiguousBenchmarkExecutionError
+            ? 'ambiguous_execution'
             : error instanceof DeciderGraderRetryError
               ? 'grading'
               : isRetryableContainerAvailabilityError(error)
@@ -1515,7 +1540,8 @@ async function processDeciderJob(
   const cases = deciderCasesForRouter(state.router).filter(c => caseIds.has(c.id));
   if (cases.length !== message.caseIds.length) throw new Error('Scheduler chunk has unknown cases');
 
-  if (!state.benchmarkUserId) {
+  const { benchmarkUserId } = state;
+  if (!benchmarkUserId) {
     // startRun snapshots the effective default/override identity, so this only
     // happens if the run row was tampered with; throwing lets the queue retry.
     throw new Error(`run ${message.runId} has no benchmarkUserId`);
@@ -1580,28 +1606,28 @@ async function processDeciderJob(
         throw new DeciderGraderRetryError('Decider judge client initialization failed');
       }
     }
-    // Fetch a short-lived user token ONCE per queue message. Non-OK throws so the
-    // queue retries the message. The token is never logged.
-    const kiloToken = await fetchBenchmarkUserToken(
-      env,
-      state.benchmarkUserId,
-      state.benchmarkOrgId
-    );
-
-    // Fresh container instances run the CLI's one-time sqlite migration; the
-    // container owns that via its /warmup endpoint so the first real case
-    // doesn't burn its timeout on it. Ordinary warmup failures are non-fatal:
-    // the first case absorbs whatever warmup work remains. Container capacity
-    // failures are infrastructure pressure, so the queue retries the message.
-    await warmUpCliContainer(env, {
-      instanceName,
-      model: message.model,
-      kiloToken,
-      kiloApiUrl: env.KILO_CLI_API_URL,
-      orgId: state.benchmarkOrgId,
-    }).catch(error => {
-      if (isRetryableContainerAvailabilityError(error)) throw error;
-    });
+    // A short-lived user token is minted at most once per queue message and never
+    // logged. Fresh container instances run the CLI's one-time sqlite migration; the
+    // container owns that via its /warmup endpoint so the first real case doesn't
+    // burn its timeout on it. Ordinary warmup failures are non-fatal: the first case
+    // absorbs whatever warmup work remains. Container capacity failures are
+    // infrastructure pressure, so the queue retries the message. Both wait for the
+    // first case that needs a paid call, so rechecking awaited output stays in D1.
+    let cli: Promise<string> | undefined;
+    const cliToken = () =>
+      (cli ??= (async () => {
+        const kiloToken = await fetchBenchmarkUserToken(env, benchmarkUserId, state.benchmarkOrgId);
+        await warmUpCliContainer(env, {
+          instanceName,
+          model: message.model,
+          kiloToken,
+          kiloApiUrl: env.KILO_CLI_API_URL,
+          orgId: state.benchmarkOrgId,
+        }).catch(error => {
+          if (isRetryableContainerAvailabilityError(error)) throw error;
+        });
+        return kiloToken;
+      })());
 
     // Concurrency 1: the CLI's sqlite state in the container is not safe under
     // concurrent sessions (partial-migration crashes); the container serializes
@@ -1622,46 +1648,53 @@ async function processDeciderJob(
         caseId: benchCase.id,
         token: claim.token,
       };
-      const invokeCli = () =>
-        runDeciderCaseViaCli(env, {
-          instanceName,
-          model: message.model,
-          benchCase,
-          kiloToken,
-          kiloApiUrl: env.KILO_CLI_API_URL,
-          orgId: state.benchmarkOrgId,
-          variant: cliVariant,
-          resultCallback: { url: env.BENCH_RESULT_URL, execution },
-        }).catch(error => {
-          if (isRetryableContainerAvailabilityError(error)) throw error;
-          throw new AmbiguousBenchmarkExecutionError(true, { cause: error });
-        });
+      const runPaidCase = async (): Promise<PendingDeciderOutput> => {
+        const priorStartedAt = await getPaidCaseStartedAt(env.BENCH_DB, execution);
+        if (priorStartedAt !== null) throw new AmbiguousBenchmarkExecutionError(priorStartedAt);
+        const kiloToken = await cliToken();
+        const startedAt = Date.now();
+        if (!(await beginPaidCase(env.BENCH_DB, execution, startedAt))) {
+          throw new AmbiguousBenchmarkExecutionError(
+            await getPaidCaseStartedAt(env.BENCH_DB, execution)
+          );
+        }
+        const invokeCli = () =>
+          runDeciderCaseViaCli(env, {
+            instanceName,
+            model: message.model,
+            benchCase,
+            kiloToken,
+            kiloApiUrl: env.KILO_CLI_API_URL,
+            orgId: state.benchmarkOrgId,
+            variant: cliVariant,
+            resultCallback: { url: env.BENCH_RESULT_URL, execution },
+          }).catch(error => {
+            if (isRetryableContainerAvailabilityError(error)) throw error;
+            throw new AmbiguousBenchmarkExecutionError(startedAt, { cause: error });
+          });
+        const first = await invokeCli();
+        // The CLI occasionally ends a session with no assistant text at all
+        // (transient empty completion: a lone step_finish with cost 0). Mirror
+        // the production classifier's policy and retry once.
+        if (
+          first.exitCode !== 0 ||
+          first.text.length > 0 ||
+          /(?:\b429\b|rate.?limit|throttl)/i.test(first.stderrTail)
+        ) {
+          return { result: first, retried: false };
+        }
+        const retry = await invokeCli();
+        retry.costUsd =
+          retry.costUsd === null && first.costUsd === null
+            ? null
+            : (retry.costUsd ?? 0) + (first.costUsd ?? 0);
+        return { result: retry, retried: true };
+      };
       try {
         const pending = await getPendingDeciderOutput(env.BENCH_DB, pendingKey).catch(() => {
           throw new DeciderGraderRetryError('Pending decider output could not be read');
         });
-        if (!pending && !(await beginPaidCase(env.BENCH_DB, execution))) {
-          throw new AmbiguousBenchmarkExecutionError();
-        }
-        let result = pending?.result ?? (await invokeCli());
-        // The CLI occasionally ends a session with no assistant text at all
-        // (transient empty completion: a lone step_finish with cost 0). Mirror
-        // the production classifier's policy and retry once.
-        let retried = pending?.retried ?? false;
-        if (
-          !pending &&
-          result.exitCode === 0 &&
-          result.text.length === 0 &&
-          !/(?:\b429\b|rate.?limit|throttl)/i.test(result.stderrTail)
-        ) {
-          retried = true;
-          const retry = await invokeCli();
-          retry.costUsd =
-            retry.costUsd === null && result.costUsd === null
-              ? null
-              : (retry.costUsd ?? 0) + (result.costUsd ?? 0);
-          result = retry;
-        }
+        const { result, retried } = pending ?? (await runPaidCase());
         if (
           result.text.length === 0 &&
           (result.costUsd ?? 0) === 0 &&

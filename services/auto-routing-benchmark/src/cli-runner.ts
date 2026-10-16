@@ -13,7 +13,7 @@ export type CliRunResult = {
   timedOut: boolean;
 };
 
-const DECIDER_CLI_TIMEOUT_MS = 180_000;
+export const DECIDER_CLI_TIMEOUT_MS = 180_000;
 
 // Appended to every decider prompt: the agent harness tends to wrap answers
 // in prose ("The output is: ..."), which strict mechanical checks reject.

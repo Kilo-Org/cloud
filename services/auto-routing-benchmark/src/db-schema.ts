@@ -270,6 +270,7 @@ export const schedulerExecutions = sqliteTable(
     rep: integer('rep').notNull(),
     case_id: text('case_id').notNull(),
     token: text('token').notNull(),
+    started_at: integer('started_at').notNull().default(0),
   },
   table => [
     primaryKey({ columns: [table.run_id, table.model, table.variant, table.rep, table.case_id] }),

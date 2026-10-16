@@ -11,6 +11,7 @@ import {
   cooldownProviders,
   deferChunk,
   finishChunk,
+  getPaidCaseStartedAt,
   hasUnsettledChunks,
   recoverChunks,
   scheduleRunChunks,
@@ -407,7 +408,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(drainElapsed).toBeLessThan(3_000);
   }, 120_000);
 
-  it('allows only one same-token redelivery to start the paid chunk', async () => {
+  it('lets same-token redeliveries resume the executing claim but begin its paid case once', async () => {
     insertRun(sqlite, 'redelivery');
     await scheduleRunChunks(db, {
       runId: 'redelivery',
@@ -420,10 +421,11 @@ describe('scheduler (production migrations and real SQLite)', () => {
     if (!claim) throw new Error('Expected a queued claim');
     expect(await startChunk(db, claim.id, 'wrong-token', NOW)).toBe(false);
     expect(storedChunk(sqlite, claim.id).status).toBe('queued');
-    const starts = await Promise.all(
-      Array.from({ length: 16 }, () => startChunk(db, claim.id, claim.token, NOW))
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const resumes = await Promise.all(
+      Array.from({ length: 16 }, () => startChunk(db, claim.id, claim.token, NOW + 60_000))
     );
-    expect(starts.filter(Boolean)).toHaveLength(1);
+    expect(resumes.every(Boolean)).toBe(true);
     expect(storedChunk(sqlite, claim.id)).toMatchObject({
       status: 'active',
       token: claim.token,
@@ -431,7 +433,14 @@ describe('scheduler (production migrations and real SQLite)', () => {
       attempts: 1,
       lease_until: NOW + SCHEDULER_ACTIVE_LEASE_MS,
     });
+    const admissions = await Promise.all(
+      Array.from({ length: 16 }, () => beginPaidCase(db, paidCase(claim, 'case'), NOW + 60_000))
+    );
+    expect(admissions.filter(Boolean)).toHaveLength(1);
     expect(await claimMany(db, schedulerConfig(), 3, 'duplicate')).toEqual([]);
+    expect(await startChunk(db, claim.id, claim.token, NOW + SCHEDULER_ACTIVE_LEASE_MS)).toBe(
+      false
+    );
   });
 
   it('allocates weighted 2:2:1 shares across backlogged production lanes', async () => {
@@ -781,6 +790,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
         rep: 0,
         case_id: 'paid-case',
         token: claim.token,
+        started_at: NOW,
       },
     ]);
     sqlite.close();
@@ -795,13 +805,17 @@ describe('scheduler (production migrations and real SQLite)', () => {
     if (!replacement) throw new Error('Expected the recovered paid chunk');
     expect(await startChunk(db, replacement.id, replacement.token, recoveredAt)).toBe(true);
     expect(await beginPaidCase(db, paidCase(replacement, 'paid-case'))).toBe(false);
+    expect(await getPaidCaseStartedAt(db, paidCase(replacement, 'paid-case'))).toBe(NOW);
+    expect(await getPaidCaseStartedAt(db, paidCase(replacement, 'unpaid-case'))).toBeNull();
     expect(await beginPaidCase(db, paidCase(replacement, 'unpaid-case'))).toBe(true);
     expect(await beginPaidCase(db, paidCase(claim, 'unpaid-case'))).toBe(false);
     expect(
-      sqlite.prepare('SELECT case_id, token FROM scheduler_executions ORDER BY case_id').all()
+      sqlite
+        .prepare('SELECT case_id, token, started_at FROM scheduler_executions ORDER BY case_id')
+        .all()
     ).toEqual([
-      { case_id: 'paid-case', token: claim.token },
-      { case_id: 'unpaid-case', token: replacement.token },
+      { case_id: 'paid-case', token: claim.token, started_at: NOW },
+      { case_id: 'unpaid-case', token: replacement.token, started_at: recoveredAt },
     ]);
   });
 

@@ -36,8 +36,9 @@ jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   getOrganizationById: jest.fn(),
 }));
 
+const mockGetDefaultAllowedModel = jest.fn();
 jest.mock('@/lib/slack-bot/model-allow-list', () => ({
-  getDefaultAllowedModel: jest.fn(async () => 'gpt-test'),
+  getDefaultAllowedModel: (...args: unknown[]) => mockGetDefaultAllowedModel(...args),
 }));
 
 jest.mock('@kilocode/web-shared/lib/model-allow.server', () => ({
@@ -187,5 +188,48 @@ describe('discord-service persisted guild ID validation', () => {
     expect(fetchSpy).toHaveBeenCalledWith('https://discord.com/api/v10/guilds/123456789012345678', {
       headers: { Authorization: 'Bot bot-token' },
     });
+  });
+});
+
+describe('discord-service organization install model', () => {
+  const orgOwner = { type: 'org', id: 'org-1' } satisfies Owner;
+
+  const oauthResponse = {
+    access_token: 'access-token',
+    token_type: 'Bearer',
+    expires_in: 3600,
+    refresh_token: 'refresh-token',
+    scope: 'bot guilds',
+    guild: { id: '123456789012345678', name: 'Test Guild', icon: null },
+  };
+
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    mockLimit.mockReset();
+    mockInsertValues.mockReset();
+    mockInsertReturning.mockReset();
+    mockGetDefaultAllowedModel.mockReset();
+    mockLimit.mockResolvedValue([]);
+    mockInsertValues.mockReturnValue({ returning: mockInsertReturning });
+    mockInsertReturning.mockResolvedValue([buildDiscordIntegration()]);
+  });
+
+  it('stores no model when the organization policy allows none', async () => {
+    mockGetDefaultAllowedModel.mockResolvedValue(null);
+
+    await upsertDiscordInstallation(orgOwner, oauthResponse);
+
+    const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect('model_slug' in inserted.metadata).toBe(false);
+    expect(inserted.metadata).toMatchObject({ guild_icon: null });
+  });
+
+  it('stores the allowed model for the organization', async () => {
+    mockGetDefaultAllowedModel.mockResolvedValue('test/allowed-model');
+
+    await upsertDiscordInstallation(orgOwner, oauthResponse);
+
+    const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect(inserted.metadata.model_slug).toBe('test/allowed-model');
   });
 });

@@ -134,7 +134,6 @@ export async function handleEmbeddingsRequest(
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  // Extract IP for all requests (needed for free model rate limiting)
   const ipAddress = rawClientIp(request);
   if (!ipAddress) {
     return NextResponse.json(

@@ -87,9 +87,10 @@ async function readBlacklistedDomainsConfig(env: BlacklistEnv): Promise<string |
   return UpstashGetResponseSchema.parse(await res.json()).result;
 }
 
-// Mirrors the gateway: refresh once a minute, keep the last good list when Redis fails. The
-// gateway's BLACKLIST_DOMAINS fallback is a Vercel env var that this worker does not have.
-export async function getBlacklistedDomains(env: BlacklistEnv): Promise<string[]> {
+// Refreshes once a minute and keeps the last good list when Redis fails. Null means no list
+// has loaded in this isolate yet, so the caller cannot tell a blocked domain from an allowed
+// one. The gateway's BLACKLIST_DOMAINS fallback is a Vercel env var this worker does not have.
+export async function getBlacklistedDomains(env: BlacklistEnv): Promise<string[] | null> {
   const now = Date.now();
   if (blacklistedDomains && blacklistedDomains.expiresAt > now) return blacklistedDomains.value;
   try {
@@ -103,6 +104,6 @@ export async function getBlacklistedDomains(env: BlacklistEnv): Promise<string[]
         ...formatError(error),
       })
     );
-    return blacklistedDomains?.value ?? [];
+    return blacklistedDomains?.value ?? null;
   }
 }

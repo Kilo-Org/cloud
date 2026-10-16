@@ -87,9 +87,7 @@ export async function collectDeniedAutoRoutingModelIds(
   policy: EffectiveOrganizationModelPolicy,
   owner: AutoRoutingOwner
 ): Promise<string[]> {
-  if (!policyNeedsCandidateEvaluation(policy) && policy.organizationModelDenyList.length === 0) {
-    return [];
-  }
+  if (!policyNeedsCandidateEvaluation(policy)) return [];
   return deniedAutoRoutingCandidates(policy, await loadAutoRoutingCandidateModelIds(owner));
 }
 
@@ -97,11 +95,9 @@ export async function deniedAutoRoutingCandidates(
   policy: EffectiveOrganizationModelPolicy,
   candidateIds: ReadonlyArray<string>
 ): Promise<string[]> {
-  if (!policyNeedsCandidateEvaluation(policy)) {
-    return policy.organizationModelDenyList.length === 0
-      ? []
-      : deniedModelIdsForCandidates(policy, candidateIds, () => true);
-  }
+  // A policy that needs no evaluation has an unrestricted member grant, and the organization
+  // deny list applies to baseline grants only, so it denies nothing.
+  if (!policyNeedsCandidateEvaluation(policy)) return [];
 
   const uniqueCandidates = [...new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)))];
   const allowed = new Set<string>();

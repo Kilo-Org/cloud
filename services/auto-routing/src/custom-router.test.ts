@@ -281,6 +281,11 @@ async function errorCode(res: Response) {
 const fetchMock = vi.fn<typeof fetch>();
 let gatewayDeniedModelIds: string[] | 'unavailable' = [];
 let blacklistedDomainsConfig: string | null = null;
+let redisAvailable = true;
+
+function blacklistConfig(domains: string[]) {
+  return JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null });
+}
 
 function gatewayCalls() {
   return fetchMock.mock.calls.filter(([input]) =>
@@ -301,6 +306,7 @@ beforeEach(() => {
   customTable = rankedTable;
   gatewayDeniedModelIds = [];
   blacklistedDomainsConfig = null;
+  redisAvailable = true;
   fetchMock.mockReset().mockImplementation(async input => {
     const url = requestUrl(input);
     if (url.startsWith('https://gateway.example.test')) {
@@ -309,7 +315,9 @@ beforeEach(() => {
         : Response.json({ deniedModelIds: gatewayDeniedModelIds });
     }
     if (url.startsWith('https://redis.example.test/get/')) {
-      return Response.json({ result: blacklistedDomainsConfig });
+      return redisAvailable
+        ? Response.json({ result: blacklistedDomainsConfig })
+        : new Response('unavailable', { status: 503 });
     }
     return new Response('unexpected', { status: 500 });
   });
@@ -468,12 +476,7 @@ describe('public custom router decide', () => {
   });
 
   it('refuses a user in a blocked email domain', async () => {
-    blacklistedDomainsConfig = JSON.stringify({
-      domains: ['example.com'],
-      updated_at: null,
-      updated_by: null,
-      updated_by_email: null,
-    });
+    blacklistedDomainsConfig = blacklistConfig(['example.com']);
     const decide = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
     expect(decide.status).toBe(403);
     expect(await errorCode(decide)).toBe('forbidden');
@@ -481,6 +484,26 @@ describe('public custom router decide', () => {
     expect(plan.status).toBe(403);
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
     expect(benchmarkFetch).not.toHaveBeenCalled();
+  });
+
+  it('fails closed with a retryable error before the blocked-domain list has ever loaded', async () => {
+    redisAvailable = false;
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(500);
+    expect(await errorCode(res)).toBe('internal_error');
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
+  it('keeps enforcing the last loaded blocked-domain list when Redis later fails', async () => {
+    blacklistedDomainsConfig = blacklistConfig(['example.com']);
+    expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(403);
+    redisAvailable = false;
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000);
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(403);
+    expect(
+      fetchMock.mock.calls.filter(([input]) => requestUrl(input).includes('redis'))
+    ).toHaveLength(2);
   });
 
   it('fails with custom_router_unavailable when no entry is servable', async () => {

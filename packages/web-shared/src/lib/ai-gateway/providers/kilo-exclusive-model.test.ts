@@ -154,6 +154,16 @@ describe('getInferenceProviders', () => {
     ]);
   });
 
+  it('lists a repeated restriction entry once', () => {
+    const model = makeModel({
+      internal_id: 'vendor/x',
+      provider: VERCEL_AI_GATEWAY,
+      inference_provider_restriction: ['openai', 'openai'],
+    });
+
+    expect(getInferenceProviders(model).map(({ slug }) => slug)).toEqual(['openai']);
+  });
+
   it('defers to the snapshot for an unrestricted gateway model', () => {
     const model = makeModel({ internal_id: 'vendor/x', provider: OPENROUTER });
 

@@ -186,7 +186,8 @@ describe('checkExclusiveModelProviderAllowed', () => {
   });
 
   afterEach(() => {
-    kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(restrictedModel), 1);
+    const index = kiloExclusiveModels.indexOf(restrictedModel);
+    if (index >= 0) kiloExclusiveModels.splice(index, 1);
   });
 
   it.each([

@@ -205,14 +205,15 @@ export function getInferenceProviders(model: KiloExclusiveModel): InferenceProvi
     return [{ slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true }];
   }
 
-  const slugs: ReadonlyArray<OpenRouterInferenceProviderId> =
+  const slugs: ReadonlySet<OpenRouterInferenceProviderId> = new Set(
     model.inference_provider_restriction.length > 0
       ? model.inference_provider_restriction
       : model.provider.id === 'openrouter' || model.provider.id === 'vercel'
         ? []
-        : [OpenRouterInferenceProviderIdSchema.parse(model.provider.id)];
+        : [OpenRouterInferenceProviderIdSchema.parse(model.provider.id)]
+  );
 
-  return slugs.map(slug => ({
+  return [...slugs].map(slug => ({
     slug,
     name: slug.toUpperCase(),
     training: model.flags.includes('requires-data-collection'),

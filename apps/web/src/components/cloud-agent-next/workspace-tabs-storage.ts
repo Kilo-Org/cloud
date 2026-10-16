@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  worktreeChangesScopeSchema,
+  worktreeFileIdentity,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 import {
   CHAT_TAB_ID,
@@ -21,6 +25,7 @@ const terminalTabSchema = z.object({
 });
 const fileTabSchema = z.object({
   path: z.string(),
+  scope: worktreeChangesScopeSchema.optional(),
   mode: fileModeSchema.optional(),
 });
 const workspaceTabsStateSchema = z.object({
@@ -61,17 +66,18 @@ export function normalizeStoredWorkspaceTabs(tabs: StoredWorkspaceTabsState): Wo
     return true;
   });
 
-  const seenPaths = new Set<string>();
+  const seenFiles = new Set<string>();
   const files = tabs.files.filter(file => {
-    if (seenPaths.has(file.path)) return false;
-    seenPaths.add(file.path);
+    const identity = worktreeFileIdentity(file);
+    if (seenFiles.has(identity)) return false;
+    seenFiles.add(identity);
     return true;
   });
 
   const activeTabExists =
     tabs.activeTabId === CHAT_TAB_ID ||
     terminals.some(tab => terminalTabId(tab.id) === tabs.activeTabId) ||
-    files.some(file => fileTabId(file.path) === tabs.activeTabId);
+    files.some(file => fileTabId(file.path, file.scope) === tabs.activeTabId);
 
   const titleNumbers = terminals
     .map(tab => /^Terminal (\d+)$/.exec(tab.title)?.[1])

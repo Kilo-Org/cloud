@@ -833,7 +833,12 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
       function call(user: User, input: { organizationId: string; cloudAgentSessionId: string }) {
         const caller = createCaller({ user });
         return procedure === 'getWorktreeFile'
-          ? caller.getWorktreeFile({ ...input, path: 'src/exact\nfile.ts', expectedRevision: 7 })
+          ? caller.getWorktreeFile({
+              ...input,
+              path: 'src/exact\nfile.ts',
+              scope: 'against-base-branch',
+              expectedRevision: 7,
+            })
           : caller[procedure](input);
       }
 
@@ -856,6 +861,7 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
           expect(mockGetWorktreeFile).toHaveBeenCalledWith({
             cloudAgentSessionId: orgSessionId,
             path: 'src/exact\nfile.ts',
+            scope: 'against-base-branch',
             expectedRevision: 7,
           });
         }

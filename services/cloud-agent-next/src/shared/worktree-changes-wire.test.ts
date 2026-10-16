@@ -15,6 +15,7 @@ import {
   worktreeFileOmissionReasonSchema as publicOmissionReasonSchema,
   worktreeFileRecordSchema as publicFileRecordSchema,
   worktreeSnapshotCaptureSchema as publicSnapshotCaptureSchema,
+  worktreeRecoverySchema as publicRecoverySchema,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   MAX_WORKTREE_CHANGES_BYTES,
@@ -33,6 +34,7 @@ import {
   worktreeFileOmissionReasonSchema,
   worktreeFileRecordSchema,
   worktreeSnapshotCaptureSchema,
+  worktreeRecoverySchema,
   type SessionGitSummaryResult,
   type WorktreeChangesFile,
   type WorktreeFileRecord,
@@ -80,6 +82,72 @@ const fileRecordSchemas = [worktreeFileRecordSchema, publicFileRecordSchema];
 const snapshotCaptureSchemas = [sessionGitSnapshotResultSchema, publicSnapshotCaptureSchema];
 
 describe('standalone worktree wire/public schema parity', () => {
+  it('accepts independent net recovery and rejects duplicate or oversized recovery in both contracts', () => {
+    const recovery = { files: [{ path: file.path, status: 'modified', patch: 'net patch' }] };
+    for (const schema of [worktreeRecoverySchema, publicRecoverySchema]) {
+      expect(schema.parse(recovery)).toEqual(recovery);
+    }
+    for (const schema of snapshotCaptureSchemas) {
+      const snapshot = { summary: capture, files: [savedFile], recovery };
+      expect(schema.parse(snapshot)).toEqual(snapshot);
+      expect(
+        schema.safeParse({
+          ...snapshot,
+          recovery: { files: [recovery.files[0], recovery.files[0]] },
+        }).success
+      ).toBe(false);
+      expect(
+        schema.safeParse({
+          ...snapshot,
+          recovery: {
+            files: [{ ...recovery.files[0], patch: 'x'.repeat(MAX_WORKTREE_CHANGES_BYTES) }],
+          },
+        }).success
+      ).toBe(false);
+      expect(schema.parse({ ...snapshot, recovery: { files: [] } }).recovery).toEqual({
+        files: [],
+      });
+    }
+    expectTypeOf<z.input<typeof worktreeRecoverySchema>>().toEqualTypeOf<
+      z.input<typeof publicRecoverySchema>
+    >();
+    expectTypeOf<z.output<typeof worktreeRecoverySchema>>().toEqualTypeOf<
+      z.output<typeof publicRecoverySchema>
+    >();
+  });
+
+  it('preserves scoped identities and rejects duplicate or mismatched scopes in both contracts', () => {
+    const scopes = ['uncommitted', 'against-base-branch'] as const;
+    const summary = { ...capture, files: scopes.map(scope => ({ ...file, scope })) };
+    const records = scopes.map(scope => ({ ...savedFile, scope }));
+    for (const schema of snapshotCaptureSchemas) {
+      expect(schema.parse({ summary, files: records })).toEqual({ summary, files: records });
+      expect(schema.safeParse({ summary, files: [records[0], records[0]] }).success).toBe(false);
+      expect(
+        schema.safeParse({ summary: { ...summary, files: [summary.files[0]] }, files: [savedFile] })
+          .success
+      ).toBe(false);
+    }
+    for (const schema of captureSchemas) {
+      expect(schema.parse(summary)).toEqual(summary);
+      expect(
+        schema.safeParse({ ...summary, files: [summary.files[0], summary.files[0]] }).success
+      ).toBe(false);
+    }
+    for (const scope of scopes) {
+      for (const schema of fileSchemas)
+        expect(schema.parse({ ...file, scope })).toEqual({ ...file, scope });
+      for (const schema of fileRecordSchemas)
+        expect(schema.parse({ ...savedFile, scope })).toEqual({ ...savedFile, scope });
+    }
+    for (const scope of ['combined', null]) {
+      for (const schema of fileSchemas)
+        expect(schema.safeParse({ ...file, scope }).success).toBe(false);
+      for (const schema of fileRecordSchemas)
+        expect(schema.safeParse({ ...savedFile, scope }).success).toBe(false);
+    }
+  });
+
   it('keeps input and output types identical to the public contracts', () => {
     expectTypeOf<z.input<typeof sessionGitSummaryPayloadSchema>>().toEqualTypeOf<
       z.input<typeof worktreeChangesCaptureRequestSchema>

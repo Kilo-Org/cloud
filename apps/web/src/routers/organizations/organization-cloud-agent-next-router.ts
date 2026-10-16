@@ -607,6 +607,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       return await client.getWorktreeFile({
         cloudAgentSessionId: input.cloudAgentSessionId,
         path: input.path,
+        scope: input.scope,
         expectedRevision: input.expectedRevision,
       });
     }),

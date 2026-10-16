@@ -8,6 +8,7 @@ import { useWorktreeFile } from './useWorktreeFile';
 import type { WorktreeFileViewMode } from './workspace-tabs';
 import type { WorktreeReviewCapture } from './worktree-review';
 import type { WorktreeFileReviewBindings } from './worktree-review-bindings';
+import type { WorktreeFileQuery } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 const WorktreeFileRenderer = lazy(() => import('./WorktreeFileRenderer'));
 
@@ -92,6 +93,7 @@ export function WorktreeFilePane({
   organizationId,
   path,
   mode,
+  scope,
   onModeChange,
   review,
   reviewScope,
@@ -99,6 +101,7 @@ export function WorktreeFilePane({
   cloudAgentSessionId: string;
   organizationId?: string;
   path: string;
+  scope?: WorktreeFileQuery['scope'];
   mode?: WorktreeFileViewMode;
   onModeChange: (mode: WorktreeFileViewMode) => void;
   review?: WorktreeFileReviewBindings;
@@ -108,6 +111,7 @@ export function WorktreeFilePane({
     cloudAgentSessionId,
     organizationId,
     path,
+    scope,
   });
   const [reloadGeneration, setReloadGeneration] = useState(0);
   const onReload = () => {
@@ -129,6 +133,7 @@ export function WorktreeFilePane({
           workspaceScope: reviewScope.workspaceScope,
           sourceCloudAgentSessionId: cloudAgentSessionId,
           revision: state.file.revision,
+          scope: state.file.scope,
           capturedAt: state.capturedAt,
           comparison: state.comparison,
         }
@@ -145,6 +150,8 @@ export function WorktreeFilePane({
             organizationId,
             cloudAgentSessionId,
             path,
+            scope,
+            state.file.scope,
             state.file.revision,
             reloadGeneration,
           ])}

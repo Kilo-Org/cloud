@@ -63,6 +63,51 @@ const savedFile = {
 } satisfies WorktreeFileRecord;
 
 describe('cloud agent worktree changes contracts', () => {
+  it('accepts the same path in separate scopes and rejects duplicate or mismatched identities', () => {
+    const scopes = ['uncommitted', 'against-base-branch'] as const;
+    const summaries = scopes.map(scope => ({ ...file, scope }));
+    const records = scopes.map(scope => ({ ...savedFile, scope }));
+    const scopedCapture = { summary: capture(summaries), files: records };
+    expect(worktreeSnapshotCaptureSchema.parse(scopedCapture)).toEqual(scopedCapture);
+    expect(
+      worktreeChangesSnapshotSchema.parse({
+        ...snapshot,
+        files: summaries.map(file => ({ ...file, revision: snapshot.revision })),
+      }).files
+    ).toHaveLength(2);
+    expect(
+      worktreeSnapshotCaptureSchema.safeParse({
+        ...scopedCapture,
+        files: [records[0], records[0]],
+      }).success
+    ).toBe(false);
+    expect(
+      worktreeSnapshotCaptureSchema.safeParse({
+        summary: capture([summaries[0]]),
+        files: [savedFile],
+      }).success
+    ).toBe(false);
+    expect(
+      worktreeChangesCaptureSchema.safeParse(capture([summaries[0], summaries[0]])).success
+    ).toBe(false);
+    for (const scope of scopes) {
+      expect(
+        worktreeFileQuerySchema.parse({ path: file.path, scope, expectedRevision: 3 })
+      ).toEqual({
+        path: file.path,
+        scope,
+        expectedRevision: 3,
+      });
+    }
+    for (const scope of ['combined', null]) {
+      expect(worktreeChangesFileSchema.safeParse({ ...file, scope }).success).toBe(false);
+      expect(worktreeFileRecordSchema.safeParse({ ...savedFile, scope }).success).toBe(false);
+      expect(
+        worktreeFileQuerySchema.safeParse({ path: file.path, scope, expectedRevision: 3 }).success
+      ).toBe(false);
+    }
+  });
+
   it('distinguishes no saved snapshot from a successful empty capture', () => {
     expect(getWorktreeChangesOutputSchema.parse({ snapshot: null })).toEqual({ snapshot: null });
     const empty = { ...snapshot, files: [] };

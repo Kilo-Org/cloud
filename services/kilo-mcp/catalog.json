@@ -6911,6 +6911,13 @@
           "minLength": 1,
           "maxLength": 4096
         },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "uncommitted",
+            "against-base-branch"
+          ]
+        },
         "expectedRevision": {
           "type": "integer",
           "exclusiveMinimum": 0,
@@ -6932,10 +6939,11 @@
       "cloudagentnext",
       "getworktreefile",
       "path",
+      "scope",
       "expectedrevision",
       "cloudagentsessionid"
     ],
-    "searchBlob": "cloudAgentNext.getWorktreeFile Read a single file from a cloud agent session's worktree snapshot, returning its diff, content, and revision metadata for the expected revision. cloudagentnext getworktreefile path expectedrevision cloudagentsessionid path expectedRevision cloudAgentSessionId"
+    "searchBlob": "cloudAgentNext.getWorktreeFile Read a single file from a cloud agent session's worktree snapshot, returning its diff, content, and revision metadata for the expected revision. cloudagentnext getworktreefile path scope expectedrevision cloudagentsessionid path scope expectedRevision cloudAgentSessionId"
   },
   "cloudAgentNext.initiateFromPreparedSession": {
     "path": "cloudAgentNext.initiateFromPreparedSession",
@@ -19655,6 +19663,13 @@
               "minLength": 1,
               "maxLength": 4096
             },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "uncommitted",
+                "against-base-branch"
+              ]
+            },
             "expectedRevision": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -19686,10 +19701,11 @@
       "getworktreefile",
       "organizationid",
       "path",
+      "scope",
       "expectedrevision",
       "cloudagentsessionid"
     ],
-    "searchBlob": "organizations.cloudAgentNext.getWorktreeFile Read a single file from an organization's cloud agent session worktree snapshot, returning its diff, content, and revision metadata for the expected revision. organizations cloudagentnext getworktreefile organizationid path expectedrevision cloudagentsessionid organizationId path expectedRevision cloudAgentSessionId"
+    "searchBlob": "organizations.cloudAgentNext.getWorktreeFile Read a single file from an organization's cloud agent session worktree snapshot, returning its diff, content, and revision metadata for the expected revision. organizations cloudagentnext getworktreefile organizationid path scope expectedrevision cloudagentsessionid organizationId path scope expectedRevision cloudAgentSessionId"
   },
   "organizations.cloudAgentNext.initiateFromPreparedSession": {
     "path": "organizations.cloudAgentNext.initiateFromPreparedSession",

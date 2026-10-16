@@ -135,4 +135,11 @@ describe('checkAutoDecision', () => {
       )
     ).toEqual({ kind: 'rejected', reason: 'variant_unavailable' });
   });
+
+  it('rejects a decision for a client entry the CLI serves itself', async () => {
+    const clientModel = 'client:ollama/qwen3:32b';
+    expect(
+      await check({ model: clientModel }, { ...payload, model: clientModel, variant: null })
+    ).toEqual({ kind: 'rejected', reason: 'client_entry' });
+  });
 });

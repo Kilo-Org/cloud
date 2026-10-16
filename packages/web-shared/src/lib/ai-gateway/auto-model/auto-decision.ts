@@ -1,4 +1,7 @@
-import { verifyAutoDecision } from '@kilocode/auto-routing-contracts';
+import {
+  parseCustomRouterCandidateModel,
+  verifyAutoDecision,
+} from '@kilocode/auto-routing-contracts';
 import type { ResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { resolveCatalogVariant } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 
@@ -9,6 +12,7 @@ export type AutoDecisionRejection =
   | 'user_mismatch'
   | 'organization_mismatch'
   | 'model_mismatch'
+  | 'client_entry'
   | 'variant_unavailable';
 
 export type AutoDecisionCheck =
@@ -32,6 +36,10 @@ export async function checkAutoDecision(params: {
   if (payload.userId !== params.userId) return { kind: 'rejected', reason: 'user_mismatch' };
   if (payload.organizationId !== params.organizationId) {
     return { kind: 'rejected', reason: 'organization_mismatch' };
+  }
+  // The CLI dispatches client picks itself; the gateway cannot serve them.
+  if (parseCustomRouterCandidateModel(payload.model)?.kind === 'client') {
+    return { kind: 'rejected', reason: 'client_entry' };
   }
   if (payload.model.toLowerCase() !== params.model.toLowerCase()) {
     return { kind: 'rejected', reason: 'model_mismatch' };

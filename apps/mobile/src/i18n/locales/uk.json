@@ -133,6 +133,7 @@
     "status": "Стан",
     "truncated": "Обрізано",
     "updated": "Оновлено",
+    "generating": "Генерування…",
     "working": "У роботі",
     "yourOwnRepositories": "Власні репозиторії",
     "dismissed": "Відхилено",

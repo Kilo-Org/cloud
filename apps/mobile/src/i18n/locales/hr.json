@@ -133,6 +133,7 @@
     "status": "Stanje",
     "truncated": "Skraćeno",
     "updated": "Ažurirano",
+    "generating": "Generiranje…",
     "working": "U radu",
     "yourOwnRepositories": "Tvoji repozitoriji",
     "dismissed": "Odbačeno",

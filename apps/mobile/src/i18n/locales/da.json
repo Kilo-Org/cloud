@@ -133,6 +133,7 @@
     "status": "Tilstand",
     "truncated": "Afkortet",
     "updated": "Opdateret",
+    "generating": "Genererer…",
     "working": "I gang",
     "yourOwnRepositories": "Dine egne kodelagre",
     "dismissed": "Afvist",

@@ -1,4 +1,4 @@
-import { type Ref } from 'react';
+import { type Ref, useEffect } from 'react';
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
 import { View } from 'react-native';
@@ -13,6 +13,7 @@ import {
 } from '@/components/agents/chat-composer';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { BlurBar } from '@/components/ui/blur-bar';
+import { announceForA11y } from '@/lib/a11y/announce';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
@@ -91,6 +92,15 @@ export function ChatComposerArea({
     }),
     [bottom]
   );
+
+  // The working row is drawn text, not a live region, so a screen reader hears
+  // the reply start once here instead of on every tick of its elapsed time.
+  const generatingLabel = t('common.generating');
+  useEffect(() => {
+    if (status === 'working') {
+      announceForA11y(generatingLabel);
+    }
+  }, [status, generatingLabel]);
 
   return (
     <>

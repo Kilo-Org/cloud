@@ -133,6 +133,7 @@
     "status": "สถานะ",
     "truncated": "ถูกตัดทอน",
     "updated": "อัปเดตแล้ว",
+    "generating": "กำลังสร้าง…",
     "working": "กำลังทำงาน",
     "yourOwnRepositories": "คลังโค้ดของคุณเอง",
     "dismissed": "ละเว้นแล้ว",

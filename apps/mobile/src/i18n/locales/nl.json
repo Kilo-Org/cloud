@@ -133,6 +133,7 @@
     "status": "Toestand",
     "truncated": "Ingekort",
     "updated": "Bijgewerkt",
+    "generating": "Genereren…",
     "working": "Bezig",
     "yourOwnRepositories": "Je eigen coderepository's",
     "dismissed": "Genegeerd",

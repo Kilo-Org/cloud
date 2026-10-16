@@ -133,6 +133,7 @@
     "status": "Stav",
     "truncated": "Skrátené",
     "updated": "Aktualizované",
+    "generating": "Generuje sa…",
     "working": "Pracuje sa",
     "yourOwnRepositories": "Tvoje vlastné repozitáre",
     "dismissed": "Ignorované",

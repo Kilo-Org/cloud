@@ -181,6 +181,8 @@ vi.mock('@/components/agents/session-context-metrics', () => ({
 vi.mock('@/components/agents/working-indicator', () => ({
   WorkingIndicator: 'WorkingIndicator',
 }));
+const announce = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: announce }));
 vi.mock('@/components/chat/web-search-row', () => ({
   useWebSearchSetting: () => ({ enabled: true, setEnabled: () => undefined }),
 }));
@@ -283,11 +285,12 @@ describe('the chat transcript while it opens', () => {
   );
 
   it.each([
-    { status: 'idle' as const, rows: 0 },
-    { status: 'working' as const, rows: 1 },
+    { status: 'idle' as const, rows: 0, announced: [] },
+    { status: 'working' as const, rows: 1, announced: [['Generating…']] },
   ])(
     'draws the working row above the composer only while working ($status)',
-    async ({ status, rows }) => {
+    async ({ status, rows, announced }) => {
+      announce.mockClear();
       state.status = status;
       state.messages = [{ info: { id: 'm1', role: 'assistant' } }];
       const tree = await mount();
@@ -298,6 +301,8 @@ describe('the chat transcript while it opens', () => {
       if (rows === 1) {
         expect(working[0]?.props).toMatchObject({ isStreaming: true, messages: state.messages });
       }
+      // The row is not a live region, so the reply start is announced once.
+      expect(announce.mock.calls).toEqual(announced);
     }
   );
 

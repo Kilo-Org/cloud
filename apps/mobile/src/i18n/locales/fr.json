@@ -133,6 +133,7 @@
     "status": "Statut",
     "truncated": "Tronqué",
     "updated": "Mis à jour",
+    "generating": "Génération…",
     "working": "En cours",
     "yourOwnRepositories": "Vos propres dépôts",
     "dismissed": "Ignoré",

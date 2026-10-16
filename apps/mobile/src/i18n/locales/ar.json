@@ -133,6 +133,7 @@
     "status": "الحالة",
     "truncated": "مقتطع",
     "updated": "تم التحديث",
+    "generating": "جارٍ الإنشاء…",
     "working": "جارٍ العمل",
     "yourOwnRepositories": "مستودعاتك الخاصة",
     "dismissed": "مستبعدة",

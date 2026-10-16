@@ -1,4 +1,5 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
@@ -9,11 +10,7 @@ export default {
   supported_chat_apis: ['chat_completions'],
   reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
   transformRequest(context) {
-    const { request } = context;
-    if (request.kind !== 'chat_completions') {
-      return;
-    }
-    request.body.reasoning_effort ??= request.body.reasoning?.effort ?? undefined;
+    replaceReasoningObjectWithReasoningEffort(context.request);
   },
   models: cachedEnhancedDirectByokModelList({
     providerId: 'ollama-cloud',

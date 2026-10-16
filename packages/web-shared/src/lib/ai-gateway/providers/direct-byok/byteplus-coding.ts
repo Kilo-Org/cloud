@@ -1,5 +1,8 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { isReasoningExplicitlyDisabled } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import {
+  isReasoningExplicitlyDisabled,
+  replaceReasoningObjectWithReasoningEffort,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type {
   DirectByokModel,
   DirectByokProvider,
@@ -125,6 +128,7 @@ export default {
     context.request.body.thinking = {
       type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
     };
+    replaceReasoningObjectWithReasoningEffort(context.request);
   },
   models: () => Promise.resolve(BYTEPLUS_CODING_MODELS),
 } satisfies DirectByokProvider;

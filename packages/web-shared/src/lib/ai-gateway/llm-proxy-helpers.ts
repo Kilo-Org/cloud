@@ -255,8 +255,11 @@ export function apiKindNotSupportedResponse(
   );
 }
 
+export const REDACTED_UPSTREAM_ERROR_MESSAGE =
+  'The upstream provider was unable to process the request';
+
 async function redactedErrorResponse(response: Response) {
-  const error = 'The upstream provider was unable to process the request';
+  const error = REDACTED_UPSTREAM_ERROR_MESSAGE;
   warnExceptInTest(`Responding with ${response.status} ${error}`);
   return NextResponse.json(
     { error, error_type: ProxyErrorType.upstream_error, message: error },
@@ -372,6 +375,26 @@ async function providerNotAllowedResponse(providerId: ProviderId, response: Resp
   );
 }
 
+/**
+ * Custom LLM upstream bodies may expose private endpoints, keys, or model
+ * names, so only a context overflow is reported, in Kilo's own words.
+ */
+async function customLlmErrorResponse(params: {
+  requestedModel: string;
+  request: GatewayRequest;
+  response: Response;
+}) {
+  if (await detectContextOverflow(params)) {
+    const error = 'The request exceeds the context length of the selected model.';
+    warnExceptInTest(`Responding with ${params.response.status} ${error}`);
+    return NextResponse.json(
+      { error, error_type: ProxyErrorType.context_length_exceeded, message: error },
+      { status: params.response.status }
+    );
+  }
+  return await redactedErrorResponse(params.response);
+}
+
 export async function makeErrorReadable({
   providerId,
   requestedModel,
@@ -387,6 +410,10 @@ export async function makeErrorReadable({
 }) {
   if (response.status < 400) {
     return undefined;
+  }
+
+  if (providerId === 'custom') {
+    return await customLlmErrorResponse({ requestedModel, request, response });
   }
 
   const vertexByokResponse = vertexByokModelNotFoundResponse(response, userByokProviderIds);

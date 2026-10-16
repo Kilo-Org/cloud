@@ -284,8 +284,9 @@ export function shouldRedactModelNameInMicrodollarUsage(
   return provider === 'custom' || isKiloStealthModel(model);
 }
 
+/** Custom LLM upstreams are private infrastructure, so their errors never reach users. */
 export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
-  return isKiloStealthModel(model);
+  return provider === 'custom' || isKiloStealthModel(model);
 }
 
 export function isDisabledKiloExclusiveModel(model: string): boolean {

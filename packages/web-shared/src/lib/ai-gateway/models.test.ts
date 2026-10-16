@@ -307,8 +307,8 @@ describe('hasBestEffortGuessDataCollectionRequirement', () => {
 });
 
 describe('shouldRedactErrorResponse', () => {
-  test('does not redact errors for custom models', () => {
-    expect(shouldRedactErrorResponse('custom', 'kilo-internal/my-custom-model')).toBe(false);
+  test('redacts errors for custom models', () => {
+    expect(shouldRedactErrorResponse('custom', 'kilo-internal/my-custom-model')).toBe(true);
   });
 
   test('redacts errors for stealth models regardless of provider', () => {

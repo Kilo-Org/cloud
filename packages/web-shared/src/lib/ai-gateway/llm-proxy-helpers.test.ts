@@ -1289,7 +1289,7 @@ describe('makeErrorReadable', () => {
     }
   });
 
-  it('does not redact errors for custom model provider', async () => {
+  it('redacts errors for custom model provider', async () => {
     const response = Response.json(
       { error: { message: 'Custom endpoint failure details' } },
       { status: 500 }
@@ -1303,7 +1303,40 @@ describe('makeErrorReadable', () => {
       userByokProviderIds: null,
     });
 
-    expect(result).toBeUndefined();
+    expect(result?.status).toBe(500);
+    await expect(result?.json()).resolves.toEqual({
+      error: 'The upstream provider was unable to process the request',
+      error_type: 'upstream_error',
+      message: 'The upstream provider was unable to process the request',
+    });
+  });
+
+  it('reports a custom model context overflow without the upstream body', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message:
+            'This model maximum context length is 1000 tokens at https://internal.example.com',
+          code: 'context_length_exceeded',
+        },
+      },
+      { status: 400 }
+    );
+
+    const result = await makeErrorReadable({
+      providerId: 'custom',
+      requestedModel: 'kilo-internal/custom-endpoint',
+      request,
+      response,
+      userByokProviderIds: null,
+    });
+
+    expect(result?.status).toBe(400);
+    await expect(result?.json()).resolves.toEqual({
+      error: 'The request exceeds the context length of the selected model.',
+      error_type: 'context_length_exceeded',
+      message: 'The request exceeds the context length of the selected model.',
+    });
   });
 
   it('redacts errors for stealth models', async () => {

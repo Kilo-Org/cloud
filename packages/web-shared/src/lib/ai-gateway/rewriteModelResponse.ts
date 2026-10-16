@@ -1,5 +1,8 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
-import { isKiloExclusiveFreeModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  isKiloExclusiveFreeModel,
+  shouldRedactErrorResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { detectToolCallArgumentErrors } from '@kilocode/web-shared/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -12,7 +15,10 @@ import type {
   ProviderResponseTransforms,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
-import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  getOutputHeaders,
+  REDACTED_UPSTREAM_ERROR_MESSAGE,
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import type {
   ChatCompletionChunk,
   OpenRouterUsage,
@@ -59,6 +65,8 @@ export type LogUnrewrittenResponseParams = {
 export type RewriteResponseParams = {
   response: Response;
   removeCost: boolean;
+  /** Replace upstream error details in stream events with a generic message. */
+  redactUpstreamErrors?: boolean;
   capture: RequestLogCapture | null;
   vercelRequestId: string | null;
   reasoningEffort: string | null;
@@ -439,6 +447,7 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
 export async function rewriteModelResponse_ChatCompletions({
   response,
   removeCost,
+  redactUpstreamErrors = false,
   capture,
   reasoningEffort,
   vercelRequestId,
@@ -554,6 +563,12 @@ export async function rewriteModelResponse_ChatCompletions({
             rewriteUsage(json.usage, removeCost);
           }
 
+          if (redactUpstreamErrors && 'error' in json && json.error != null) {
+            Object.assign(json, {
+              error: { message: REDACTED_UPSTREAM_ERROR_MESSAGE, type: 'upstream_error' },
+            });
+          }
+
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
           terminalEventReceived = 'error' in json && json.error != null;
@@ -641,6 +656,7 @@ function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
 export async function rewriteModelResponse_Messages({
   response,
   removeCost,
+  redactUpstreamErrors = false,
   capture,
   reasoningEffort,
   vercelRequestId,
@@ -740,6 +756,12 @@ export async function rewriteModelResponse_Messages({
             }
           }
 
+          if (redactUpstreamErrors && json.type === 'error') {
+            Object.assign(json, {
+              error: { type: 'api_error', message: REDACTED_UPSTREAM_ERROR_MESSAGE },
+            });
+          }
+
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
           terminalEventReceived = json.type === 'message_stop' || json.type === 'error';
@@ -802,9 +824,23 @@ type ResponsesApiEvent = {
   response?: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
 };
 
+function redactResponsesApiError(event: ResponsesApiEvent) {
+  if (event.type === 'error') {
+    Object.assign(event, {
+      code: 'upstream_error',
+      message: REDACTED_UPSTREAM_ERROR_MESSAGE,
+      param: null,
+    });
+  }
+  if (event.response?.error) {
+    event.response.error = { code: 'server_error', message: REDACTED_UPSTREAM_ERROR_MESSAGE };
+  }
+}
+
 export async function rewriteModelResponse_Responses({
   response,
   removeCost,
+  redactUpstreamErrors = false,
   capture,
   reasoningEffort,
   vercelRequestId,
@@ -894,6 +930,9 @@ export async function rewriteModelResponse_Responses({
               rewriteUsage(json.response.usage, removeCost);
             }
           }
+          if (redactUpstreamErrors) {
+            redactResponsesApiError(json);
+          }
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
           terminalEventReceived =
@@ -970,6 +1009,8 @@ export async function rewriteModelResponse({
     (isKiloExclusiveFreeModel(model) ||
       (customPricing !== undefined && !customPricing.fallbackOnly));
 
+  const redactUpstreamErrors = shouldRedactErrorResponse(providerId, model);
+
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;
   const reasoningEffort = getReasoningEffort(logging.request);
@@ -977,6 +1018,7 @@ export async function rewriteModelResponse({
     return rewriteModelResponse_ChatCompletions({
       response,
       removeCost: requiresCostRemoval,
+      redactUpstreamErrors,
       capture,
       reasoningEffort,
       vercelRequestId,
@@ -987,6 +1029,7 @@ export async function rewriteModelResponse({
     return rewriteModelResponse_Responses({
       response,
       removeCost: requiresCostRemoval,
+      redactUpstreamErrors,
       capture,
       reasoningEffort,
       vercelRequestId,
@@ -996,6 +1039,7 @@ export async function rewriteModelResponse({
     return rewriteModelResponse_Messages({
       response,
       removeCost: requiresCostRemoval,
+      redactUpstreamErrors,
       capture,
       reasoningEffort,
       vercelRequestId,

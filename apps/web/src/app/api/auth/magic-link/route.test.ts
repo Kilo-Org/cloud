@@ -10,6 +10,18 @@ import { checkRateLimit } from '@vercel/firewall';
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
+
+const cookieStore = new Map<string, { name: string; value: string }>();
+jest.mock('next/headers', () => ({
+  headers: async () => new Headers({ 'x-forwarded-for': '203.0.113.7' }),
+  cookies: async () => ({
+    get: (name: string) => cookieStore.get(name),
+    delete: (name: string) => cookieStore.delete(name),
+  }),
+}));
 
 jest.mock('@vercel/firewall');
 jest.mock('@/lib/auth/verify-turnstile-jwt');
@@ -48,6 +60,7 @@ describe('POST /api/auth/magic-link', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    cookieStore.clear();
 
     // Default: Turnstile verification succeeds
     mockVerifyTurnstileJWT.mockResolvedValue({
@@ -95,6 +108,27 @@ describe('POST /api/auth/magic-link', () => {
     });
     expect(mockCreateMagicLinkToken).toHaveBeenCalledWith('user@example.com');
     expect(mockSendMagicLinkEmail).toHaveBeenCalledWith(mockMagicLinkToken, undefined);
+  });
+
+  it('accepts only one magic-link request per Turnstile verification', async () => {
+    const actual = jest.requireActual<{ verifyTurnstileJWT: typeof verifyTurnstileJWT }>(
+      '@/lib/auth/verify-turnstile-jwt'
+    );
+    mockVerifyTurnstileJWT.mockImplementation(actual.verifyTurnstileJWT);
+    cookieStore.set('turnstile_jwt', {
+      name: 'turnstile_jwt',
+      value: jwt.sign({ guid: randomUUID(), ip: '203.0.113.7' }, NEXTAUTH_SECRET, {
+        algorithm: 'HS256',
+        expiresIn: '5m',
+      }),
+    });
+
+    const first = await POST(createRequest({ email: 'user@example.com' }));
+    const second = await POST(createRequest({ email: 'other@example.com' }));
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(401);
+    expect(mockSendMagicLinkEmail).toHaveBeenCalledTimes(1);
   });
 
   it('rejects magic links for an SSO-protected domain before creating a token', async () => {

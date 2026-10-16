@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createMagicLinkToken } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { sendMagicLinkEmail } from '@kilocode/web-shared/lib/email';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
@@ -34,6 +35,9 @@ export async function POST(request: NextRequest) {
   if (!turnstileResult.success) {
     return turnstileResult.response;
   }
+  // One Turnstile solve covers one magic-link request; the sign-in form solves again for each one.
+  const userCookies = await cookies();
+  userCookies.delete('turnstile_jwt');
 
   const eligibility = await checkEmailSignInEligibility(email, request);
   if (!eligibility.ok) {

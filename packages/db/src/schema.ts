@@ -182,6 +182,13 @@ import type {
 import type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
+import {
+  AUTO_ROUTERS,
+  AutoRoutingModeSchema,
+  type AutoRouter,
+  type AutoRoutingMode,
+  type CustomRouterEntry,
+} from '@kilocode/auto-routing-contracts';
 
 /**
  * Generates a complete check constraint for an enum column.
@@ -234,6 +241,15 @@ export const StripeServiceFeeOutcome = {
 
 export type StripeServiceFeeOutcome =
   (typeof StripeServiceFeeOutcome)[keyof typeof StripeServiceFeeOutcome];
+
+// ADR 0005 check-constraint values, derived from the contracts so a contract
+// change cannot silently diverge from the database constraint.
+export const CustomRouterBaseRouter = Object.fromEntries(
+  AUTO_ROUTERS.map(router => [router, router])
+);
+export const CustomRouterMode = Object.fromEntries(
+  AutoRoutingModeSchema.options.map(mode => [mode, mode])
+);
 
 export const SCHEMA_CHECK_ENUMS = {
   StripeServiceFeeFlow,
@@ -328,6 +344,8 @@ export const SCHEMA_CHECK_ENUMS = {
   MCPGatewayAuthorizationRequestStatus,
   MCPGatewayPendingProviderAuthorizationStatus,
   MCPGatewayAuditOutcome,
+  CustomRouterBaseRouter,
+  CustomRouterMode,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -12225,3 +12243,55 @@ export const stripe_service_fee_assessments = pgTable(
 
 export type StripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferSelect;
 export type NewStripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferInsert;
+
+// ADR 0005: custom auto routers owned by a user or an organization.
+export const auto_routing_custom_routers = pgTable(
+  'auto_routing_custom_routers',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    // Audit trail; nulled by nothing, so a deleted creator stays unattributed.
+    created_by_user_id: text(),
+    slug: text().notNull(),
+    name: text().notNull(),
+    base_router: text().$type<AutoRouter>().notNull(),
+    mode: text().$type<AutoRoutingMode>().notNull(),
+    entries: jsonb().$type<CustomRouterEntry[]>().notNull(),
+    default_entry_key: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_auto_routing_custom_routers_org_slug')
+      .on(table.owned_by_organization_id, table.slug)
+      .where(isNotNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_auto_routing_custom_routers_user_slug')
+      .on(table.owned_by_user_id, table.slug)
+      .where(isNotNull(table.owned_by_user_id)),
+    index('IDX_auto_routing_custom_routers_org_id').on(table.owned_by_organization_id),
+    index('IDX_auto_routing_custom_routers_user_id').on(table.owned_by_user_id),
+    check(
+      'auto_routing_custom_routers_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    enumCheck(
+      'auto_routing_custom_routers_base_router_check',
+      table.base_router,
+      CustomRouterBaseRouter
+    ),
+    enumCheck('auto_routing_custom_routers_mode_check', table.mode, CustomRouterMode),
+  ]
+);
+
+export type AutoRoutingCustomRouter = typeof auto_routing_custom_routers.$inferSelect;
+export type NewAutoRoutingCustomRouter = typeof auto_routing_custom_routers.$inferInsert;

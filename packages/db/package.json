@@ -29,6 +29,7 @@
   "dependencies": {
     "@kilocode/ai-gateway-secure-proxy-contracts": "workspace:*",
     "@kilocode/app-shared": "workspace:*",
+    "@kilocode/auto-routing-contracts": "workspace:*",
     "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",

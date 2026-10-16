@@ -1622,6 +1622,9 @@ importers:
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../app-shared
+      '@kilocode/auto-routing-contracts':
+        specifier: workspace:*
+        version: link:../auto-routing-contracts
       '@kilocode/kiloclaw-instance-tiers':
         specifier: workspace:*
         version: link:../kiloclaw-instance-tiers

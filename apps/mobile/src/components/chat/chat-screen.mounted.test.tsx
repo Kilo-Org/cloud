@@ -178,6 +178,9 @@ vi.mock('@/components/chat/chat-details-sheet', () => ({ ChatDetailsSheet: 'Chat
 vi.mock('@/components/agents/session-context-metrics', () => ({
   SessionContextMetrics: 'SessionContextMetrics',
 }));
+vi.mock('@/components/agents/working-indicator', () => ({
+  WorkingIndicator: 'WorkingIndicator',
+}));
 vi.mock('@/components/chat/web-search-row', () => ({
   useWebSearchSetting: () => ({ enabled: true, setEnabled: () => undefined }),
 }));
@@ -240,11 +243,6 @@ async function mount(): Promise<ReactTestRenderer> {
 const count = (tree: ReactTestRenderer, type: string): number =>
   tree.root.findAll(node => (node.type as string) === type).length;
 
-/** The one status row above the composer; it reserves its height in every state. */
-function statusSlot(tree: ReactTestRenderer) {
-  return tree.root.findAll(node => node.props.testID === 'chat-status-slot')[0];
-}
-
 function isHandler(value: unknown): value is (...args: unknown[]) => unknown {
   return typeof value === 'function';
 }
@@ -285,16 +283,21 @@ describe('the chat transcript while it opens', () => {
   );
 
   it.each([
-    { status: 'idle' as const, liveStatuses: 0 },
-    { status: 'working' as const, liveStatuses: 1 },
+    { status: 'idle' as const, rows: 0 },
+    { status: 'working' as const, rows: 1 },
   ])(
-    'reserves the status slot above the composer in the $status state',
-    async ({ status, liveStatuses }) => {
+    'draws the working row above the composer only while working ($status)',
+    async ({ status, rows }) => {
       state.status = status;
+      state.messages = [{ info: { id: 'm1', role: 'assistant' } }];
       const tree = await mount();
+      const working = tree.root.findAll(node => (node.type as string) === 'WorkingIndicator');
 
-      expect(statusSlot(tree)).toBeDefined();
-      expect(count(tree, 'AccessibleStatus')).toBe(liveStatuses);
+      // An idle chat reserves no status space: the transcript ends at the composer.
+      expect(working).toHaveLength(rows);
+      if (rows === 1) {
+        expect(working[0]?.props).toMatchObject({ isStreaming: true, messages: state.messages });
+      }
     }
   );
 

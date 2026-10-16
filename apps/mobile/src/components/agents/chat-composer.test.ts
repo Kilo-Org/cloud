@@ -54,6 +54,9 @@ const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor
 // mount-time initial value.
 const stateSlots = vi.hoisted(() => ({ slots: [] as { value: unknown }[], cursor: 0 }));
 const keyboardState = vi.hoisted(() => ({ height: 0 }));
+const keyboardProgress = vi.hoisted(() => ({ value: 0 }));
+const sharedSlots = vi.hoisted(() => ({ slots: [] as { value: unknown }[], cursor: 0 }));
+const toolbarShown = vi.hoisted(() => ({ value: true }));
 const returnSendsPref = vi.hoisted(() => ({ returnSendsMessage: false }));
 const reducedMotionOn = vi.hoisted(() => ({ value: false }));
 
@@ -116,6 +119,7 @@ vi.mock('react-native-safe-area-context', () => ({
 // The composer reads the keyboard from the provider, not from a listener of its own.
 vi.mock('react-native-keyboard-controller', () => ({
   useKeyboardState: <T>(selector: (state: { height: number }) => T) => selector(keyboardState),
+  useReanimatedKeyboardAnimation: () => ({ progress: keyboardProgress, height: { value: 0 } }),
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -159,6 +163,12 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useSharedValue: <T>(initial: T) => {
+    const index = sharedSlots.cursor;
+    sharedSlots.cursor += 1;
+    return (sharedSlots.slots[index] ??= { value: initial as unknown }) as { value: T };
+  },
+  useAnimatedStyle: (style: () => unknown) => style(),
 }));
 vi.mock('@/lib/a11y/motion', () => ({
   selectReducedMotionEntrance: <T>(reduced: boolean, entrance: T) =>
@@ -259,7 +269,7 @@ vi.mock('@/components/agents/chat-composer-input-state', () => ({
       inputAccessibilityDisabled: false,
       inputEditable: true,
       paperclipDisabled: false,
-      showToolbar: true,
+      showToolbar: toolbarShown.value,
       toolbarDisabled: false,
       voiceDisabled: false,
     };
@@ -496,12 +506,14 @@ function findNode(
 async function mount(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.slots.length = 0;
   stateSlots.slots.length = 0;
+  sharedSlots.slots.length = 0;
   return rerender(props);
 }
 
 async function rerender(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.cursor = 0;
   stateSlots.cursor = 0;
+  sharedSlots.cursor = 0;
   const { ChatComposer } = await import('./chat-composer');
   return ChatComposer(props);
 }
@@ -522,6 +534,8 @@ beforeEach(() => {
   reducedMotionOn.value = false;
   layoutDirection.isRTL = false;
   keyboardState.height = 0;
+  keyboardProgress.value = 0;
+  toolbarShown.value = true;
   voiceStatus.value = 'idle';
   safeAreaInsets.bottom = 0;
   safeAreaInsets.left = 0;
@@ -854,6 +868,58 @@ describe('ChatComposer reduced motion', () => {
     const toolbarView = findNode(render, type => type === 'Animated.View');
     expect(toolbarView).not.toBeNull();
     expect(toolbarView?.props.entering).toBeUndefined();
+  });
+});
+
+describe('ChatComposer toolbar row on keyboard dismiss', () => {
+  function toolbarRow(render: React.ReactElement) {
+    const row = findNode(
+      render,
+      (type, props) => type === 'Animated.View' && 'importantForAccessibility' in props
+    );
+    if (row === null) {
+      throw new Error('toolbar row not found');
+    }
+    return row;
+  }
+
+  it('gives the hidden row height back in step with the keyboard, not after it lands', async () => {
+    const props = makeProps({});
+    keyboardState.height = 300;
+    keyboardProgress.value = 1;
+    const open = await mount(props);
+    const measured = findNode(
+      toolbarRow(open),
+      (type, nodeProps) => type === 'View' && typeof nodeProps.onLayout === 'function'
+    );
+    const onLayout = measured?.props.onLayout as ((event: unknown) => void) | undefined;
+    if (onLayout === undefined) {
+      throw new Error('toolbar row measure view not found');
+    }
+    onLayout({ nativeEvent: { layout: { height: 38 } } });
+
+    // Blur: the chip hides while the JS keyboard height still reports open.
+    toolbarShown.value = false;
+    expect(toolbarRow(await rerender(props)).props.style).toEqual({
+      height: 38,
+      overflow: 'hidden',
+    });
+
+    keyboardProgress.value = 0.5;
+    expect(toolbarRow(await rerender(props)).props.style).toMatchObject({ height: 19 });
+
+    // The keyboard has landed but its JS height has not reached zero yet: the
+    // row already takes no space, so its later unmount moves nothing.
+    keyboardProgress.value = 0;
+    expect(toolbarRow(await rerender(props)).props.style).toMatchObject({ height: 0 });
+  });
+
+  it('keeps the natural height while the chip is shown', async () => {
+    keyboardState.height = 300;
+    keyboardProgress.value = 0.5;
+    const render = await mount(makeProps({}));
+
+    expect(toolbarRow(render).props.style).toEqual({});
   });
 });
 

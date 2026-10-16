@@ -35,8 +35,13 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useKeyboardState } from 'react-native-keyboard-controller';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useKeyboardState, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -796,6 +801,21 @@ export function ChatComposer({
   // the message field (video V1 ~4.5s and ~19s).
   const showToolbarRow = control.showToolbar || keyboardVisible;
 
+  // Once the chip is hidden, its row gives its height back in the same frames
+  // as the keyboard. `keyboardVisible` reaches false only after the keyboard
+  // has landed, so unmounting the row on that flag alone shifted the
+  // transcript a second time, after the keyboard had finished moving.
+  const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
+  const toolbarRowHeight = useSharedValue(0);
+  const toolbarRowCollapsing = !control.showToolbar;
+  const toolbarRowStyle = useAnimatedStyle(
+    () =>
+      toolbarRowCollapsing
+        ? { height: toolbarRowHeight.value * keyboardProgress.value, overflow: 'hidden' }
+        : {},
+    [toolbarRowCollapsing]
+  );
+
   const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
       await upload.addCandidates([file]);
@@ -1351,20 +1371,27 @@ export function ChatComposer({
             accessibilityElementsHidden={!control.showToolbar}
             importantForAccessibility={control.showToolbar ? 'auto' : 'no-hide-descendants'}
             className={control.showToolbar ? undefined : 'opacity-0'}
+            style={toolbarRowStyle}
           >
-            <ChatToolbar
-              modeControl={modeControl}
-              model={model}
-              variant={variant}
-              modelOptions={modelOptions}
-              onModelSelect={onModelSelect}
-              disabled={control.toolbarDisabled}
-              onPaste={attachmentsEnabled ? pasteClipboard : undefined}
-              pasteDisabled={!control.inputEditable}
-              modelLocked={modelLocked}
-              modelLockLabel={modelLockLabel}
-              className={toolbarClassName}
-            />
+            <View
+              onLayout={event => {
+                toolbarRowHeight.value = event.nativeEvent.layout.height;
+              }}
+            >
+              <ChatToolbar
+                modeControl={modeControl}
+                model={model}
+                variant={variant}
+                modelOptions={modelOptions}
+                onModelSelect={onModelSelect}
+                disabled={control.toolbarDisabled}
+                onPaste={attachmentsEnabled ? pasteClipboard : undefined}
+                pasteDisabled={!control.inputEditable}
+                modelLocked={modelLocked}
+                modelLockLabel={modelLockLabel}
+                className={toolbarClassName}
+              />
+            </View>
           </Animated.View>
         ) : null}
 

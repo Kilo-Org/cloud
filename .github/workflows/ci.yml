@@ -635,10 +635,21 @@ jobs:
       - name: Run Session Ingest Durable Object regressions
         run: pnpm --filter cloudflare-session-ingest run test:integration
 
-  # Required check. A skipped shard (no backend change) passes; a failed or
-  # cancelled shard fails this job.
+  # Required check. A skipped job (nothing relevant changed) passes; a failed
+  # or cancelled job fails this one. Besides the web tests it covers the
+  # workspace tests, drizzle-check, harness-sdk and the ai-gateway builds,
+  # which have no required check of their own.
   test:
-    needs: [changes, ci-wiring, web-test, test-scripts]
+    needs:
+      - changes
+      - ci-wiring
+      - web-test
+      - test-scripts
+      - workspace-tests
+      - drizzle-check
+      - harness-sdk
+      - build-ai-gateway
+      - build-ai-gateway-secure-proxy
     if: ${{ !cancelled() }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5

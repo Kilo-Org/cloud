@@ -789,7 +789,7 @@ jobs:
       needs.changes.outputs.cloud_agent_next == 'true' ||
       (github.event_name == 'pull_request' &&
       contains(fromJSON(needs.changes.outputs.affected).packages, 'cloud-agent-next'))
-    # The suite runs as three parallel parts; test:all chains the same suites.
+    # The suite runs as four parallel parts; test:all chains the same suites.
     strategy:
       fail-fast: false
       matrix:

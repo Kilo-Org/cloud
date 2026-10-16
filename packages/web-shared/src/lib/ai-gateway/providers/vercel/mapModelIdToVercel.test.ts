@@ -163,6 +163,10 @@ describe('mapModelIdToVercel', () => {
       );
     });
 
+    it('maps the Vercel-served Cat Jam stealth model to its gateway id', async () => {
+      await expect(mapModelIdToVercel('stealth/cat-jam')).resolves.toBe('stealth/cat-jam');
+    });
+
     it('does not use internal_id for disabled exclusives even when vercel-routed', async () => {
       // minimax_m25_free_model has the 'vercel-routing' flag but status
       // 'disabled', so it must not be substituted by internal_id and instead

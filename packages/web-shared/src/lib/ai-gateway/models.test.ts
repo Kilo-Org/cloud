@@ -19,6 +19,7 @@ import {
 import {
   gemma_4_26b_a4b_it_free_model,
   glyph_cluster_stealth_free_model,
+  cat_jam_stealth_free_model,
 } from './kilo-exclusive-models';
 import { getRandomNumber } from './getRandomNumber';
 
@@ -55,20 +56,23 @@ describe('Step 5 Preview', () => {
   });
 });
 
-describe('Glyph Cluster stealth model', () => {
-  test('is free, stealth, and requires data collection', () => {
-    expect(isFreeModel('stealth/glyph-cluster')).toBe(true);
-    expect(hasBestEffortGuessDataCollectionRequirement('stealth/glyph-cluster')).toBe(true);
-    expect(shouldRedactModelNameInMicrodollarUsage('vercel', 'stealth/glyph-cluster')).toBe(true);
-    expect(shouldRedactErrorResponse('vercel', 'stealth/glyph-cluster')).toBe(true);
-    expect(getInferenceProvider(glyph_cluster_stealth_free_model)).toEqual({
-      slug: 'stealth',
-      name: 'Stealth',
-      training: true,
-      retainsPrompts: true,
+describe.each([glyph_cluster_stealth_free_model, cat_jam_stealth_free_model])(
+  '$display_name',
+  model => {
+    test('is free, stealth, and requires data collection', () => {
+      expect(isFreeModel(model.public_id)).toBe(true);
+      expect(hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
+      expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(true);
+      expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(true);
+      expect(getInferenceProvider(model)).toEqual({
+        slug: 'stealth',
+        name: 'Stealth',
+        training: true,
+        retainsPrompts: true,
+      });
     });
-  });
-});
+  }
+);
 
 describe('isFreeModel', () => {
   test('returns a boolean synchronously', () => {

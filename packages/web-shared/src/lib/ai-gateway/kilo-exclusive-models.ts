@@ -230,6 +230,21 @@ export const glyph_cluster_stealth_free_model: KiloExclusiveModel = {
   inference_provider_restriction: [],
 };
 
+export const cat_jam_stealth_free_model: KiloExclusiveModel = {
+  public_id: 'stealth/cat-jam',
+  display_name: 'Stealth: Cat Jam (free)',
+  description:
+    "Your prompts and completions may be retained and used to train or improve the provider's services. Cat Jam is a reasoning model for coding and agentic workflows, combining strong coding capabilities with fast, low-latency inference, served through Vercel AI Gateway during its stealth period at no cost. It supports function calling, structured outputs, and streaming, and takes text input only. Zero Data Retention is not available for this model.",
+  context_length: 1_048_576,
+  max_completion_tokens: 131_072,
+  status: 'public',
+  flags: ['reasoning', 'stealth', 'requires-data-collection'],
+  provider: VERCEL_AI_GATEWAY,
+  internal_id: 'stealth/cat-jam',
+  pricing: null,
+  inference_provider_restriction: [],
+};
+
 export function isKiloExclusiveFreeModel(model: string): boolean {
   return kiloExclusiveModels.some(
     m => m.public_id === model && m.status !== 'disabled' && !m.pricing
@@ -255,6 +270,7 @@ export const kiloExclusiveModels = [
   claude_opus_4_6_stealth_model,
   stepfun_5_preview_free_model,
   glyph_cluster_stealth_free_model,
+  cat_jam_stealth_free_model,
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {

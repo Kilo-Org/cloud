@@ -78,9 +78,10 @@ export function applySetupLimits(reference: string): void {
 }
 
 /**
- * Moves the gated child into the leaf before it execs; any failure falls back to a plain spawn.
- * The gate is the command's stdin and closes after `start`, so the command reads EOF as with
- * `ignore`.
+ * Moves the gated child into the leaf before it execs; a placement failure falls back to a plain
+ * spawn. The gate is the command's stdin and closes after `start`, so the command reads EOF as with
+ * `ignore`. A setup command takes no other stdin: any other `stdio[0]` throws, because running it
+ * unmanaged would drop containment without a signal.
  */
 export function spawnInCgroup(
   leaf: SetupCgroup,

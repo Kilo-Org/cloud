@@ -39,10 +39,13 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * (`agentChat.slashCommands.skillBadge` and
  * `agentChat.slashCommands.useSkillCommand`, added by
  * `slash-command-suggestions.tsx`), and the `credits.*` keys of the Buy
- * credits screen have all landed in every catalog, so the missing-key
- * assertion is strict again.
+ * credits screen have all landed in every catalog.
+ *
+ * Pending: the session filter's Desktop row
+ * (`agentChat.sessionFilter.platformDesktop`), added by
+ * `platform-filter-modal.tsx`.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>();
+const PENDING_TRANSLATION_KEYS = new Set<string>(['agentChat.sessionFilter.platformDesktop']);
 
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {

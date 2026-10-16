@@ -36,7 +36,10 @@ export const OwnerPoolConversionSchema = z.object({
 export type OwnerPoolConversion = z.infer<typeof OwnerPoolConversionSchema>;
 
 export const OwnerPoolConversionRequestSchema = z.object({
-  conversions: z.array(OwnerPoolConversionSchema).min(1).max(MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST),
+  conversions: z
+    .array(OwnerPoolConversionSchema)
+    .min(1)
+    .max(MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST),
 });
 export type OwnerPoolConversionRequest = z.infer<typeof OwnerPoolConversionRequestSchema>;
 
@@ -73,7 +76,9 @@ export type ConvertedOwnerPoolRouter = {
   modelId: string;
 };
 
-export function convertedOwnerPoolRouter(conversion: OwnerPoolConversion): ConvertedOwnerPoolRouter {
+export function convertedOwnerPoolRouter(
+  conversion: OwnerPoolConversion
+): ConvertedOwnerPoolRouter {
   const entries = conversion.models.map(
     (model): GatewayCustomRouterEntry => ({ kind: 'gateway', model })
   );

@@ -2,18 +2,8 @@ import type { CustomRouterDefinition, CustomRouterScope } from '@kilocode/auto-r
 import { auto_routing_custom_routers, type AutoRoutingCustomRouter } from '@kilocode/db/schema';
 import { asc, eq, or } from 'drizzle-orm';
 import { readDb, type db } from '@kilocode/web-shared/lib/drizzle';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
-
-export const CUSTOM_ROUTERS_FLAG = 'kilo-auto-custom-routers';
 
 export type CustomRouterOwner = { type: CustomRouterScope; id: string };
-
-export async function isCustomRoutersEnabled(userId: string): Promise<boolean> {
-  return (
-    process.env.NODE_ENV === 'development' ||
-    (await isReleaseToggleEnabled(CUSTOM_ROUTERS_FLAG, userId))
-  );
-}
 
 export function customRouterOwnerCondition(owner: CustomRouterOwner) {
   return owner.type === 'user'
@@ -57,8 +47,7 @@ export async function listCustomRouters(
 
 /**
  * Custom routers usable in a request context (ADR 0005): the user's personal routers, plus the
- * organization's routers in an organization context. Only flagged users create routers, so the
- * flag lookup is skipped when there is nothing to show.
+ * organization's routers in an organization context.
  */
 export async function listUsableCustomRouters(params: {
   userId: string;
@@ -66,7 +55,5 @@ export async function listUsableCustomRouters(params: {
 }): Promise<CustomRouterDefinition[]> {
   const owners: CustomRouterOwner[] = [{ type: 'user', id: params.userId }];
   if (params.organizationId) owners.push({ type: 'org', id: params.organizationId });
-  const routers = await listCustomRouters(owners);
-  if (routers.length === 0 || !(await isCustomRoutersEnabled(params.userId))) return [];
-  return routers;
+  return listCustomRouters(owners);
 }

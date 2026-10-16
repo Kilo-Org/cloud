@@ -24,7 +24,6 @@ import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -43,7 +42,6 @@ import {
 } from './[scope]/[slug]/client-entries/route';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags');
 jest.mock('@kilocode/web-shared/lib/organizations/trial-middleware');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getCustomRouterStatus: jest.fn(),
@@ -61,7 +59,6 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockedRequireActiveSubscription = jest.mocked(requireActiveSubscriptionOrTrial);
 const mockedGetStatus = jest.mocked(getCustomRouterStatus);
 const mockedRegister = jest.mocked(registerOwnerBenchmarkProfiles);
@@ -168,7 +165,6 @@ describe('/api/auto-routing/custom-routers', () => {
     jest.resetAllMocks();
     user = await insertTestUser();
     signIn(user);
-    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
     mockedRequireActiveSubscription.mockResolvedValue({ isReadOnly: false, daysRemaining: 30 });
     mockedRegister.mockResolvedValue({ ok: true });
     mockedGetEnhanced.mockResolvedValue({ data: [model(SONNET), model(FLASH), model(DENIED)] });
@@ -188,26 +184,6 @@ describe('/api/auto-routing/custom-routers', () => {
 
   afterEach(async () => {
     await cleanupDbForTest();
-  });
-
-  describe('feature flag', () => {
-    test('a user without the flag gets router_not_found and cannot create routers', async () => {
-      mockedIsReleaseToggleEnabled.mockResolvedValue(false);
-
-      const listed = await errorOf(await listRouters(request('')));
-      const created = await create(routerBody());
-
-      expect(listed).toEqual({
-        status: 404,
-        body: { error: { code: 'router_not_found', message: expect.any(String) } },
-      });
-      expect(created.status).toBe(404);
-      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
-      expect(mockedIsReleaseToggleEnabled).toHaveBeenCalledWith(
-        'kilo-auto-custom-routers',
-        user.id
-      );
-    });
   });
 
   describe('personal routers', () => {

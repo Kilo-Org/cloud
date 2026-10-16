@@ -58,15 +58,13 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
   const deleteMutation = useMutation({
     mutationFn: (router: CustomRouterSummary) => deleteCustomRouter(router, organizationId),
     onSuccess: (_result, router) => {
-      queryClient.setQueryData<CustomRouterListResponse | null>(queryKey, current =>
+      queryClient.setQueryData<CustomRouterListResponse>(queryKey, current =>
         current ? { routers: current.routers.filter(item => item.id !== router.id) } : current
       );
       toast.success(`Deleted ${router.name}`);
     },
     onError: error => toast.error(error.message),
   });
-
-  if (query.data === null) return null;
 
   const routers = (query.data?.routers ?? []).filter(router => router.scope === scope);
   const canCreate = !readonly;

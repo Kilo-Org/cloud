@@ -77,7 +77,7 @@ describe('organization access kilo_admin_elevation telemetry', () => {
 
   test('ensureOrganizationAccess does not label a REST caller as a tRPC request', async () => {
     // Route handlers such as `/api/cloud-agent/sessions/stream-ticket` and
-    // `/api/auto-routing/settings` call this helper with a hand-rolled
+    // `/api/auto-routing/custom-routers` call this helper with a hand-rolled
     // `{ user }`. Labelling those `surface:"trpc"`/`authVia:"session"` would
     // hide a token-authenticated admin read behind a web-console-looking event.
     const admin = await insertTestUser({ is_admin: true });

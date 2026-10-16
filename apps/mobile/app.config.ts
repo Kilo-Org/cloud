@@ -325,12 +325,12 @@ const config: ExpoConfig = {
         },
       },
     ],
-    // llama.cpp for on-device GGUF inference. All three options are defaults
-    // turned off: the podspec already compiles itself as C++20, and the app
-    // offloads nothing to Android GPUs, so neither global Podfile flags nor
-    // Qualcomm native libraries belong in the manifest. The plugin adds the iOS
-    // memory entitlements only under the production profile, so ios.entitlements
-    // declares them for every profile instead.
+    // llama.cpp for on-device GGUF inference. Each option below turns off a
+    // plugin behavior that is on by default. The podspec already compiles
+    // itself as C++20, and the app offloads nothing to Android GPUs, so neither
+    // global Podfile flags nor Qualcomm native libraries belong in the
+    // manifest. The plugin adds the iOS memory entitlements only under the
+    // production profile, so ios.entitlements declares them for every profile.
     [
       'llama.rn',
       {

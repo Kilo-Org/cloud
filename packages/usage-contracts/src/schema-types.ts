@@ -19,6 +19,7 @@ export const GatewayApiKindSchema = z.enum([
   'edit_completions',
   'messages',
   'responses',
+  'generate_content',
   'audio_transcriptions',
   'systemone',
 ]);

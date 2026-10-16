@@ -3,7 +3,7 @@ import { type Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { NonGeminiGatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 /**
  * Generates a service-specific SHA256 hash.
@@ -57,7 +57,7 @@ export function generateOpenRouterUpstreamSafetyIdentifier(userId: string): stri
 }
 
 export function applyTrackingIds(
-  request: GatewayRequest,
+  request: NonGeminiGatewayRequest,
   provider: Provider,
   userId: string,
   taskId: string | null

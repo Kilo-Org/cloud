@@ -11,7 +11,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@kilocode/web-shared/lib/ai-gateway/getRandomNumber';
 import type {
-  GatewayRequest,
+  NonGeminiGatewayRequest,
   OpenRouterProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
@@ -33,7 +33,7 @@ afterEach(() => {
 
 describe('getAnthropicProviderOptionsForVercel', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {
-    const request: GatewayRequest = {
+    const request: NonGeminiGatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'anthropic/claude-sonnet-4.5',
@@ -48,7 +48,7 @@ describe('getAnthropicProviderOptionsForVercel', () => {
   });
 
   it('maps responses text verbosity to Anthropic effort', () => {
-    const request: GatewayRequest = {
+    const request: NonGeminiGatewayRequest = {
       kind: 'responses',
       body: {
         model: 'anthropic/claude-sonnet-4.5',
@@ -63,7 +63,7 @@ describe('getAnthropicProviderOptionsForVercel', () => {
   });
 
   it('returns undefined when no Anthropic options are needed', () => {
-    const request: GatewayRequest = {
+    const request: NonGeminiGatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'anthropic/claude-sonnet-4.5',
@@ -165,7 +165,7 @@ describe('convertProviderOptions', () => {
   ] as const)(
     'converts sort $sort to $expected alongside existing preferences',
     ({ sort, expected }) => {
-      const request: GatewayRequest = {
+      const request: NonGeminiGatewayRequest = {
         kind: 'chat_completions',
         body: {
           model: 'anthropic/claude-sonnet-4.5',
@@ -204,7 +204,7 @@ describe('convertProviderOptions', () => {
     { by: 'price' },
     { by: 'latency', partition: 'none' },
   ])('omits unsupported sort %j without rejecting the conversion', sort => {
-    const request: GatewayRequest = {
+    const request: NonGeminiGatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'anthropic/claude-sonnet-4.5',
@@ -217,7 +217,7 @@ describe('convertProviderOptions', () => {
   });
 
   it('emits only available non-ignored providers without changing provider.only', () => {
-    const request: GatewayRequest = {
+    const request: NonGeminiGatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'anthropic/claude-sonnet-4.5',
@@ -237,7 +237,7 @@ describe('convertProviderOptions', () => {
   });
 
   it('passes providers outside the known provider registry through unchanged', () => {
-    const request: GatewayRequest = {
+    const request: NonGeminiGatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'future/model',
@@ -256,7 +256,7 @@ describe('convertProviderOptions', () => {
   });
 
   it('filters ignored providers from an explicit only list when metadata is unavailable', () => {
-    const request: GatewayRequest = {
+    const request: NonGeminiGatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'vendor/model',
@@ -272,7 +272,7 @@ describe('convertProviderOptions', () => {
   });
 
   it('still rejects ignore-only routing when metadata is unavailable', () => {
-    const request: GatewayRequest = {
+    const request: NonGeminiGatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'vendor/model',
@@ -288,7 +288,9 @@ describe('convertProviderOptions', () => {
 });
 
 describe('shouldRouteToVercel', () => {
-  function request(provider?: GatewayRequest['body']['provider']): GatewayRequest {
+  function request(
+    provider?: NonGeminiGatewayRequest['body']['provider']
+  ): NonGeminiGatewayRequest {
     return {
       kind: 'chat_completions',
       body: {
@@ -376,7 +378,7 @@ describe('shouldRouteToVercel', () => {
 });
 
 describe('applyVercelSettings BYOK pinning', () => {
-  function byokRequest(ignore: string[]): GatewayRequest {
+  function byokRequest(ignore: string[]): NonGeminiGatewayRequest {
     return {
       kind: 'chat_completions',
       body: {
@@ -480,7 +482,7 @@ describe('applyVercelSettings BYOK pinning', () => {
     });
   });
 
-  it.each<GatewayRequest>([
+  it.each<NonGeminiGatewayRequest>([
     {
       kind: 'chat_completions',
       body: {
@@ -603,7 +605,7 @@ describe('applyVercelSettings BYOK pinning', () => {
 describe('applyVercelSettings managed requests', () => {
   async function applyManagedVercelSettings(
     requestedModel: string,
-    request: GatewayRequest,
+    request: NonGeminiGatewayRequest,
     vercelInferenceProviders: string[] | null = ['openai']
   ) {
     jest.resetModules();
@@ -621,7 +623,9 @@ describe('applyVercelSettings managed requests', () => {
     return getVercelInferenceProvidersMock;
   }
 
-  function managedRequest(provider?: GatewayRequest['body']['provider']): GatewayRequest {
+  function managedRequest(
+    provider?: NonGeminiGatewayRequest['body']['provider']
+  ): NonGeminiGatewayRequest {
     return {
       kind: 'chat_completions',
       body: {
@@ -632,7 +636,10 @@ describe('applyVercelSettings managed requests', () => {
     };
   }
 
-  function managedRequestForApi(kind: GatewayRequest['kind'], model: string): GatewayRequest {
+  function managedRequestForApi(
+    kind: NonGeminiGatewayRequest['kind'],
+    model: string
+  ): NonGeminiGatewayRequest {
     const provider = { ignore: ['openai'] };
     if (kind === 'responses') {
       return { kind, body: { model, input: 'hello', provider } };

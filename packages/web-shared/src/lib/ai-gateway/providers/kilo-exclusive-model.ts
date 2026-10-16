@@ -5,7 +5,7 @@ import {
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   isOpenRouterProviderConfig,
-  type GatewayRequest,
+  type NonGeminiGatewayRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 export type KiloExclusiveModelFlag =
@@ -93,7 +93,7 @@ export type KiloExclusiveModel = {
 type TokenLimitMutation = 'removed' | 'clamped';
 
 function logMaxTokenMutation(
-  requestToMutate: GatewayRequest,
+  requestToMutate: NonGeminiGatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel,
   field: 'max_completion_tokens' | 'max_tokens' | 'max_output_tokens',
   requestedValue: number,
@@ -110,7 +110,7 @@ function logMaxTokenMutation(
 }
 
 function removeNonSensicalMaxTokens(
-  requestToMutate: GatewayRequest,
+  requestToMutate: NonGeminiGatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel
 ) {
   // OpenClaw sometimes puts numbers in that are too large and some providers will reject the request.
@@ -165,7 +165,7 @@ function removeNonSensicalMaxTokens(
 
 /** Rewrites a gateway request to target a Kilo-exclusive model. */
 export function applyKiloExclusiveModelSettings(
-  requestToMutate: GatewayRequest,
+  requestToMutate: NonGeminiGatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel
 ) {
   requestToMutate.body.model = kiloExclusiveModel.internal_id;

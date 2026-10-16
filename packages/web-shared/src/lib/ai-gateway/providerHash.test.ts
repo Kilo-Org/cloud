@@ -1,6 +1,6 @@
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
-import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { NonGeminiGatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   applyTrackingIds,
   generateOpenRouterDownstreamSafetyIdentifier,
@@ -51,7 +51,7 @@ describe('session tracking identifiers', () => {
     );
   });
 
-  const requests: GatewayRequest[] = [
+  const requests: NonGeminiGatewayRequest[] = [
     { kind: 'chat_completions', body: { model: 'test-model', messages: [] } },
     { kind: 'messages', body: { model: 'test-model', messages: [], max_tokens: 100 } },
     { kind: 'responses', body: { model: 'test-model', input: 'Hello' } },

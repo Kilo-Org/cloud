@@ -130,6 +130,26 @@ describe('extractReasoningSetting', () => {
       body: { reasoning: { enabled: false } },
       expected: 'reasoning:disabled',
     },
+    {
+      name: 'Gemini thinking level',
+      body: { generationConfig: { thinkingConfig: { thinkingLevel: 'HIGH' } } },
+      expected: 'effort:high',
+    },
+    {
+      name: 'Gemini thinking budget',
+      body: { generationConfig: { thinkingConfig: { thinkingBudget: 8_192 } } },
+      expected: 'thinking:enabled:le16k',
+    },
+    {
+      name: 'Gemini dynamic thinking budget',
+      body: { generationConfig: { thinkingConfig: { thinkingBudget: -1 } } },
+      expected: 'thinking:enabled',
+    },
+    {
+      name: 'Gemini thinking disabled',
+      body: { generationConfig: { thinkingConfig: { thinkingBudget: 0 } } },
+      expected: 'thinking:disabled',
+    },
     { name: 'reasoning exclude ignored', body: { reasoning: { exclude: true } }, expected: null },
     { name: 'reasoning enabled ignored', body: { reasoning: { enabled: true } }, expected: null },
     {
@@ -1367,6 +1387,21 @@ describe('lastUserPromptText', () => {
     ).toBe('newest');
   });
 
+  it('reads the last user text of a Gemini request, skipping function responses', () => {
+    expect(
+      lastUserPromptText({
+        kind: 'generate_content',
+        body: {
+          contents: [
+            { role: 'user', parts: [{ text: 'read a' }, { text: 'and b' }] },
+            { role: 'model', parts: [{ functionCall: { name: 'read', args: {} } }] },
+            { role: 'user', parts: [{ functionResponse: { name: 'read', response: {} } }] },
+          ],
+        },
+      })
+    ).toBe('read aand b');
+  });
+
   it('reads a FIM prompt', () => {
     expect(lastUserPromptText({ kind: 'fim_completions', body: { prompt: 'fn main() {' } })).toBe(
       'fn main() {'
@@ -1387,6 +1422,12 @@ describe('requestedLogprobs', () => {
     expect(requestedLogprobs({ logit_bias: { '50256': -100 } })).toBe(true);
   });
 
+  it("reads Gemini's generationConfig", () => {
+    expect(requestedLogprobs({ generationConfig: { responseLogprobs: true } })).toBe(true);
+    expect(requestedLogprobs({ generationConfig: { logprobs: 3 } })).toBe(true);
+    expect(requestedLogprobs({ generationConfig: { temperature: 1 } })).toBe(false);
+  });
+
   it('is false when the request asked for none of them', () => {
     expect(requestedLogprobs({})).toBe(false);
     expect(requestedLogprobs({ logprobs: false, top_logprobs: null, logit_bias: {} })).toBe(false);
@@ -1398,5 +1439,10 @@ describe('requestedSamples', () => {
     expect(requestedSamples({ n: 3 })).toBe(3);
     expect(requestedSamples({})).toBeNull();
     expect(requestedSamples({ n: null })).toBeNull();
+  });
+
+  it("reads Gemini's generationConfig.candidateCount", () => {
+    expect(requestedSamples({ generationConfig: { candidateCount: 2 } })).toBe(2);
+    expect(requestedSamples({ generationConfig: {} })).toBeNull();
   });
 });

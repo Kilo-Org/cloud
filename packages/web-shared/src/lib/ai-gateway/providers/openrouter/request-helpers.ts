@@ -16,6 +16,9 @@ export function getMaxTokens(request: GatewayRequest) {
   if (request.kind === 'messages') {
     return request.body.max_tokens ?? null;
   }
+  if (request.kind === 'generate_content') {
+    return request.body.generationConfig?.maxOutputTokens ?? null;
+  }
   return request.body.max_completion_tokens ?? request.body.max_tokens ?? null;
 }
 
@@ -25,6 +28,9 @@ export function getReasoningEffort(request: GatewayRequest) {
   }
   if (request.kind === 'responses') {
     return request.body.reasoning?.effort ?? null;
+  }
+  if (request.kind === 'generate_content') {
+    return request.body.generationConfig?.thinkingConfig?.thinkingLevel ?? null;
   }
   return request.body.reasoning?.effort ?? request.body.reasoning_effort ?? null;
 }
@@ -359,6 +365,9 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
   }
   if (request.kind === 'responses') {
     return request.body.reasoning?.effort === 'none';
+  }
+  if (request.kind === 'generate_content') {
+    return request.body.generationConfig?.thinkingConfig?.thinkingBudget === 0;
   }
   if (request.body.reasoning?.enabled === true) {
     return false;

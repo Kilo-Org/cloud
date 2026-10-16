@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach } from '@jest/globals';
 import { after } from 'next/server';
 import {
   rewriteModelResponse_ChatCompletions,
+  rewriteModelResponse_GenerateContent,
   rewriteModelResponse_Messages,
   rewriteModelResponse_Responses,
   rewriteModelResponse,
@@ -148,6 +149,7 @@ const rewriters = [
   ['Chat Completions', rewriteChatCompletionsWithoutTransforms],
   ['Messages', rewriteModelResponse_Messages],
   ['Responses', rewriteModelResponse_Responses],
+  ['Gemini API', rewriteModelResponse_GenerateContent],
 ] as const;
 
 describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
@@ -1272,6 +1274,73 @@ describe('rewriteModelResponse_Responses', () => {
       );
     }
   );
+});
+
+describe('rewriteModelResponse_GenerateContent', () => {
+  test('passes JSON bodies through unchanged', async () => {
+    const body = '{"responseId":"response-1","usageMetadata":{"promptTokenCount":3}}';
+
+    const result = await rewriteModelResponse_GenerateContent({
+      response: new Response(body, { headers: { 'content-type': 'application/json' } }),
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(result.status).toBe(200);
+    expect(await result.text()).toBe(body);
+  });
+
+  test('passes upstream errors through with their status', async () => {
+    const body = { error: { code: 400, message: 'bad request', status: 'INVALID_ARGUMENT' } };
+
+    const result = await rewriteModelResponse_GenerateContent({
+      response: jsonResponse(body, 400),
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(result.status).toBe(400);
+    expect(await result.json()).toEqual(body);
+  });
+
+  test('passes events through until upstream closes the stream', async () => {
+    const chunks = [
+      { responseId: 'response-1', candidates: [{ content: { parts: [{ text: 'Hel' }] } }] },
+      {
+        responseId: 'response-1',
+        candidates: [{ content: { parts: [{ text: 'lo' }] }, finishReason: 'STOP' }],
+        usageMetadata: { promptTokenCount: 3, candidatesTokenCount: 2 },
+      },
+    ];
+
+    const result = await rewriteModelResponse_GenerateContent({
+      response: sseResponse(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\r\n\r\n`).join('')),
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const output = await readOutputStream(result);
+
+    expect(dataObjects(output)).toEqual(chunks);
+    expect(output).not.toContain('[DONE]');
+  });
+
+  test('cancels upstream and closes after an error event', async () => {
+    const error = { error: { code: 503, message: 'overloaded', status: 'UNAVAILABLE' } };
+    const { response, cancel } = hangingSseResponse(`data: ${JSON.stringify(error)}\n\n`);
+
+    const result = await rewriteModelResponse_GenerateContent({
+      response,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(dataObjects(await readOutputStream(result))).toEqual([error]);
+    expect(cancel).toHaveBeenCalled();
+  });
 });
 
 describe.each([

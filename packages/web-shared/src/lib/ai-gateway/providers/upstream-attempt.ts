@@ -90,10 +90,12 @@ export async function sendUpstreamAttempt({
   }
 
   const result = await upstreamRequest({
-    chatApi: request.kind,
+    // Each branch pairs the kind with its body type, which a single object would not.
+    ...(request.kind === 'generate_content'
+      ? { chatApi: request.kind, body: request.body }
+      : { chatApi: request.kind, body: request.body }),
     search,
     method,
-    body: request.body,
     extraHeaders,
     provider: providerContext.provider,
     signal,

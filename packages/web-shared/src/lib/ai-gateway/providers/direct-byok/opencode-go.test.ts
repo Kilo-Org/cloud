@@ -1,7 +1,11 @@
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import type OpenAI from 'openai';
-import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
+import type {
+  GatewayRequest,
+  NonGeminiGatewayRequest,
+  OpenRouterChatCompletionRequest,
+} from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
 import openCodeGo from './opencode-go';
@@ -79,20 +83,22 @@ describe('OpenCode Go session headers', () => {
     }
   );
 
-  test.each(requests.filter(request => request.kind !== 'messages'))(
-    'matches the existing prompt cache key for $kind',
-    request => {
-      const trackedRequest = structuredClone(request);
-      const context = createContext({ request: trackedRequest });
-      applyTrackingIds(trackedRequest, context.provider, context.kilo_user_id, context.session_id);
-      const promptCacheKey = trackedRequest.body.prompt_cache_key;
+  test.each(
+    requests.filter(
+      (request): request is Exclude<NonGeminiGatewayRequest, { kind: 'messages' }> =>
+        request.kind !== 'messages' && request.kind !== 'generate_content'
+    )
+  )('matches the existing prompt cache key for $kind', request => {
+    const trackedRequest = structuredClone(request);
+    const context = createContext({ request: trackedRequest });
+    applyTrackingIds(trackedRequest, context.provider, context.kilo_user_id, context.session_id);
+    const promptCacheKey = trackedRequest.body.prompt_cache_key;
 
-      openCodeGo.transformRequest(context);
+    openCodeGo.transformRequest(context);
 
-      expect(promptCacheKey).toEqual(expect.any(String));
-      expect(context.extraHeaders['x-opencode-session']).toBe(promptCacheKey);
-    }
-  );
+    expect(promptCacheKey).toEqual(expect.any(String));
+    expect(context.extraHeaders['x-opencode-session']).toBe(promptCacheKey);
+  });
 
   test('removes user tracking fields from Chat Completions requests', () => {
     const request: GatewayRequest = {

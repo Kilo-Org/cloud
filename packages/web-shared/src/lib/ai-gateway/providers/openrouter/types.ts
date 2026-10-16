@@ -82,6 +82,74 @@ export type GatewayMessagesRequest = SharedGatewayRequestProperties &
     session_id?: string;
   };
 
+// https://ai.google.dev/api/caching#Part
+export type GeminiPart = {
+  text?: string;
+  thought?: boolean;
+  thoughtSignature?: string;
+  inlineData?: { mimeType: string; data: string };
+  fileData?: { mimeType?: string; fileUri: string };
+  functionCall?: { id?: string; name: string; args?: Record<string, unknown> };
+  functionResponse?: { id?: string; name: string; response?: Record<string, unknown> };
+};
+
+export type GeminiContent = {
+  role?: string;
+  parts: GeminiPart[];
+};
+
+export type GeminiFunctionDeclaration = {
+  name: string;
+  description?: string;
+  parameters?: unknown;
+  parametersJsonSchema?: unknown;
+};
+
+export type GeminiTool = {
+  functionDeclarations?: GeminiFunctionDeclaration[];
+  [tool: string]: unknown;
+};
+
+// https://ai.google.dev/api/generate-content#v1beta.GenerationConfig
+export type GeminiGenerationConfig = {
+  maxOutputTokens?: number;
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  candidateCount?: number;
+  stopSequences?: string[];
+  responseLogprobs?: boolean;
+  logprobs?: number;
+  thinkingConfig?: {
+    includeThoughts?: boolean;
+    thinkingBudget?: number;
+    thinkingLevel?: string;
+  };
+  [field: string]: unknown;
+};
+
+// https://ai.google.dev/api/generate-content#request-body
+export type GeminiGenerateContentRequest = {
+  contents: GeminiContent[];
+  systemInstruction?: GeminiContent;
+  tools?: GeminiTool[];
+  toolConfig?: unknown;
+  safetySettings?: unknown[];
+  generationConfig?: GeminiGenerationConfig;
+  cachedContent?: string;
+};
+
+/**
+ * The Gemini API carries the model and streaming mode in the URL path, so the
+ * gateway records them on the body like the other API kinds and strips them
+ * again before the request goes upstream.
+ */
+export type GatewayGenerateContentRequest = SharedGatewayRequestProperties &
+  GeminiGenerateContentRequest & {
+    model: string;
+    stream: boolean;
+  };
+
 /**
  * Approximately OpenRouter API request type. Actually based on OpenAI's, but the differences aren't huge.
  */
@@ -105,7 +173,14 @@ export type MessageWithReasoning = {
 export type GatewayRequest =
   | { kind: 'chat_completions'; body: OpenRouterChatCompletionRequest }
   | { kind: 'responses'; body: GatewayResponsesRequest }
-  | { kind: 'messages'; body: GatewayMessagesRequest };
+  | { kind: 'messages'; body: GatewayMessagesRequest }
+  | { kind: 'generate_content'; body: GatewayGenerateContentRequest };
+
+/**
+ * Gemini API requests skip the gateway's model-specific request transforms and
+ * reach the provider as sent, apart from the provider's own transform.
+ */
+export type NonGeminiGatewayRequest = Exclude<GatewayRequest, { kind: 'generate_content' }>;
 
 export type OpenRouterGeneration = {
   data: {

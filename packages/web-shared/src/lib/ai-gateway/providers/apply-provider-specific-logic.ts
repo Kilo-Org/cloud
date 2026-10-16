@@ -4,6 +4,7 @@ import {
   type OpenRouterChatCompletionRequest,
   type GatewayRequest,
   type GatewayMessagesRequest,
+  type NonGeminiGatewayRequest,
   type OpenRouterProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -238,7 +239,7 @@ export function removeModelsFallback(requestToMutate: GatewayRequest) {
 
 export function removeUnsupportedRequestServiceTier(
   requestedModel: string,
-  requestToMutate: GatewayRequest,
+  requestToMutate: NonGeminiGatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel | null
 ) {
   const customPricing = getCustomPricing(requestedModel);
@@ -301,6 +302,23 @@ export async function applyProviderSpecificLogic(
   isNonTrialEnterprise: boolean
 ) {
   removeModelsFallback(requestToMutate);
+  const transformContext = {
+    provider,
+    model: requestedModel,
+    request: requestToMutate,
+    originalHeaders,
+    extraHeaders,
+    userByok,
+    kilo_user_id: userId,
+    organization_id: organizationId,
+    session_id: sessionId,
+  };
+
+  if (requestToMutate.kind === 'generate_content') {
+    await provider.transformRequest(transformContext);
+    return;
+  }
+
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
@@ -376,17 +394,7 @@ export async function applyProviderSpecificLogic(
     await applyVercelSettings(requestedModel, requestToMutate, userByok);
   }
 
-  await provider.transformRequest({
-    provider,
-    model: requestedModel,
-    request: requestToMutate,
-    originalHeaders,
-    extraHeaders,
-    userByok,
-    kilo_user_id: userId,
-    organization_id: organizationId,
-    session_id: sessionId,
-  });
+  await provider.transformRequest(transformContext);
 
   applyReasoningDetailsTransform(provider, requestToMutate);
 }

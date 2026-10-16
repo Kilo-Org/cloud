@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
 import { after } from 'next/server';
 import type {
+  GatewayGenerateContentRequest,
   GatewayMessagesRequest,
   GatewayRequest,
   GatewayResponsesRequest,
@@ -36,6 +37,15 @@ function responsesRequest(overrides: Partial<GatewayResponsesRequest> = {}): Gat
       input: [],
       ...overrides,
     },
+  };
+}
+
+function generateContentRequest(
+  overrides: Partial<GatewayGenerateContentRequest> = {}
+): GatewayRequest {
+  return {
+    kind: 'generate_content',
+    body: { model: 'test-model', stream: false, contents: [], ...overrides },
   };
 }
 
@@ -116,6 +126,19 @@ describe('getToolsAvailable', () => {
       )
     ).toEqual(['function:read_file']);
   });
+
+  test('labels Gemini function declarations and built-in tools', () => {
+    expect(
+      getToolsAvailable(
+        generateContentRequest({
+          tools: [
+            { functionDeclarations: [{ name: 'read_file' }, { name: ' ' }] },
+            { googleSearch: {} },
+          ],
+        })
+      )
+    ).toEqual(['function:read_file', 'function:unknown', 'googleSearch']);
+  });
 });
 
 describe('getToolsUsed', () => {
@@ -182,6 +205,20 @@ describe('getToolsUsed', () => {
               role: 'assistant',
               content: [{ type: 'tool_use', id: '1', name: 'read_file', input: {} }],
             },
+          ],
+        })
+      )
+    ).toEqual(['function:read_file']);
+  });
+
+  test('labels Gemini function calls from the model', () => {
+    expect(
+      getToolsUsed(
+        generateContentRequest({
+          contents: [
+            { role: 'user', parts: [{ text: 'read it' }] },
+            { role: 'model', parts: [{ functionCall: { name: 'read_file', args: {} } }] },
+            { role: 'user', parts: [{ functionResponse: { name: 'read_file', response: {} } }] },
           ],
         })
       )

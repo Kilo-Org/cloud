@@ -23,8 +23,10 @@ function Harness({ probe, target }: { probe: Probe; target: ListAgentsTarget | n
 
 const listFn = vi.mocked(listAgents);
 
+let client = createTestQueryClient();
+
 async function mount(target: ListAgentsTarget | null) {
-  const client = createTestQueryClient();
+  client = createTestQueryClient();
   client.setQueryDefaults(['cli-agents'], { retryDelay: 0 });
   const probe: Probe = { current: null };
   await renderWithProviders(createElement(Harness, { probe, target }), { queryClient: client });
@@ -55,14 +57,14 @@ describe('useCliAgents', () => {
     expect(listFn).toHaveBeenCalledWith({}, { connectionId: 'conn-1', directory: 'app' });
   });
 
-  it('settles with no agents for a CLI that cannot list them', async () => {
+  it('stays unsettled with no agents for a CLI that cannot list them', async () => {
     listFn.mockResolvedValue({ ok: false, reason: 'unsupported' });
+    const target = { connectionId: 'conn-1' };
 
-    const hook = await mount({ connectionId: 'conn-1' });
+    const hook = await mount(target);
 
-    expect(hook()?.settled).toBe(false);
-    await waitFor(() => hook()?.settled === true);
-    expect(hook()?.agents).toEqual([]);
+    await waitFor(() => client.getQueryState(['cli-agents', target])?.status === 'success');
+    expect(hook()).toEqual({ agents: [], settled: false });
   });
 
   it('stays unsettled when the CLI cannot be reached after the retry', async () => {

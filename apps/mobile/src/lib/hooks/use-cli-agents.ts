@@ -25,9 +25,10 @@ const NO_AGENTS: CliAgent[] = [];
  * (`invalid`) resolves to no agents: the picker then shows what it showed
  * before this command existed.
  *
- * `settled` is true once the target's answer is known (or there is no
- * target). It stays false while loading and after a transport failure, so a
- * caller never treats "not answered yet" as "this agent is gone".
+ * `settled` is true when there is no target, or when the CLI answered with
+ * its agent list. It stays false while loading, after a transport failure,
+ * and for a CLI that cannot list agents, so a caller never treats "unknown"
+ * as "this agent is gone".
  */
 export function useCliAgents(target: ListAgentsTarget | null): CliAgents {
   const connection = useUserWebConnection();
@@ -62,5 +63,5 @@ export function useCliAgents(target: ListAgentsTarget | null): CliAgents {
   );
   return target === null
     ? { agents: NO_AGENTS, settled: true }
-    : { agents, settled: data !== undefined };
+    : { agents, settled: data?.ok === true };
 }

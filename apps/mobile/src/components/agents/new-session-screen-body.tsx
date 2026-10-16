@@ -271,7 +271,11 @@ export function NewSessionScreenBody() {
   // Custom modes and the pinned model come from the effective default profile.
   // The lock applies only to the Cloud Agent target; a remote target keeps the
   // unlocked model view and never sends a gateway pin.
-  const { customOptions, profileAgents } = useEffectiveProfileCustomModes(organizationId);
+  const {
+    customOptions,
+    profileAgents,
+    settled: profileSettled,
+  } = useEffectiveProfileCustomModes(organizationId);
   // A computer also offers the agents its CLI loads for the selected launch
   // folder, including project agents from `.kilo/agents`.
   const { agents: cliAgents, settled: cliAgentsSettled } = useCliAgents(
@@ -280,9 +284,7 @@ export function NewSessionScreenBody() {
   const remoteCustomOptions = dedupeCustomModeOptions(
     mergeProfileAndRuntimeModeOptions(profileAgents, cliAgents)
   );
-  // The slug the user picked from a CLI's own list. When the target or the
-  // launch folder changes and the settled answer no longer offers it, the mode
-  // falls back to the default rather than sending an agent the target lacks.
+  // The slug the user picked from a CLI's own list on this screen.
   const cliPickedModeRef = useRef<AgentMode | null>(null);
   const handleModeChange = useCallback(
     (next: AgentMode) => {
@@ -296,17 +298,33 @@ export function NewSessionScreenBody() {
     },
     [profileAgents, cliAgents, setMode]
   );
+  // Once the target's agent lists are known, a custom mode the target does not
+  // offer falls back to the default instead of being sent as the session
+  // agent. On a computer this covers any custom mode, including one inherited
+  // from a prefill. On Cloud only a mode picked from a CLI list is checked, so
+  // an inherited custom slug keeps its earlier Cloud behavior.
   useEffect(() => {
-    const picked = cliPickedModeRef.current;
-    if (picked === null || picked !== mode || !cliAgentsSettled) {
+    if (isBuiltinAgentMode(mode) || !profileSettled || !cliAgentsSettled) {
       return;
     }
     const available = runOnInstance === null ? customOptions : remoteCustomOptions;
-    if (!available.some(option => option.value === picked)) {
-      cliPickedModeRef.current = null;
-      setMode('code');
+    if (available.some(option => option.value === mode)) {
+      return;
     }
-  }, [mode, cliAgentsSettled, runOnInstance, customOptions, remoteCustomOptions, setMode]);
+    if (runOnInstance === null && cliPickedModeRef.current !== mode) {
+      return;
+    }
+    cliPickedModeRef.current = null;
+    setMode('code');
+  }, [
+    mode,
+    profileSettled,
+    cliAgentsSettled,
+    runOnInstance,
+    customOptions,
+    remoteCustomOptions,
+    setMode,
+  ]);
   // Clone entry keeps the source prefill model and an unlocked toolbar: no
   // pinned-agent lock, no gateway pin override.
   const pinned = isCloneEntry ? {} : resolvePinnedAgentModel({ slug: mode, profileAgents });

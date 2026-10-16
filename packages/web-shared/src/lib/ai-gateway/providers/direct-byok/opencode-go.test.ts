@@ -277,6 +277,19 @@ describe('getAiSdkProvider', () => {
     expect(getAiSdkProvider('meta/muse-spark-1.2', null)).toBe('openai');
   });
 
+  test('uses the Gemini API for OpenCode Go Gemini models', () => {
+    expect(getAiSdkProvider('opencode-go/gemini-4-argon-contributor', 'opencode-go')).toBe(
+      'google'
+    );
+  });
+
+  test.each([
+    ['google/gemini-4-argon', null],
+    ['nvidia-byok/google/gemini-4-argon', 'nvidia-byok'],
+  ] as const)('does not use the Gemini API for %s from %s', (model, directProviderId) => {
+    expect(getAiSdkProvider(model, directProviderId)).toBeUndefined();
+  });
+
   test('uses Chat Completions for MiniMax models from other direct providers', () => {
     expect(getAiSdkProvider('minimax/minimax-m2.5', 'chutes-byok')).toBeUndefined();
   });

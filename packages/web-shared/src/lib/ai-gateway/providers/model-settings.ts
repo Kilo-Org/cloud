@@ -3,7 +3,7 @@ import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/ope
 import { isQwenModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
 import type {
-  CustomLlmProvider,
+  OpenCodeAiSdkProvider,
   OpenCodePrompt,
   OpenCodeSettings,
   ReasoningOption,
@@ -12,6 +12,7 @@ import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   effortOptions,
@@ -67,9 +68,14 @@ export async function getModelVariants(
 export function getAiSdkProvider(
   model: string,
   directProviderId: DirectUserByokInferenceProviderId | null
-): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
+): Exclude<OpenCodeAiSdkProvider, 'openrouter' /*the default*/> | undefined {
   if (directProviderId === 'morph-byok') {
     return undefined;
+  }
+  // OpenCode Go serves Gemini models only over the Gemini API. Synced models carry this from
+  // models.dev; the model ID covers lists synced without it.
+  if (directProviderId === 'opencode-go' && isGeminiModel(model)) {
+    return 'google';
   }
   if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
     return 'anthropic';

@@ -8,6 +8,8 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import { ReasoningOptionSchema, type ReasoningOption } from '@kilocode/db/schema-types';
 import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
+import { getDirectByokSupportedChatApis } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
@@ -53,12 +55,27 @@ const ModelsDevModelSchema = z.object({
 });
 
 // A models.dev per-model `provider.npm` names the SDK for the model's own endpoint. Several SDK
-// names, such as `@ai-sdk/mistral`, still speak Chat Completions, so only SDKs for the native
-// Gemini API, which the gateway cannot proxy, are excluded.
-const GEMINI_API_MODELS_DEV_SDKS: ReadonlySet<string> = new Set([
-  '@ai-sdk/google',
-  '@ai-sdk/google-vertex',
-]);
+// names, such as `@ai-sdk/mistral`, still speak Chat Completions. `@ai-sdk/google` speaks the
+// native Gemini API, which the gateway serves only for providers that declare it, and
+// `@ai-sdk/google-vertex` uses Vertex AI paths, which the gateway cannot proxy.
+const GEMINI_API_MODELS_DEV_SDK = '@ai-sdk/google';
+const VERTEX_AI_MODELS_DEV_SDK = '@ai-sdk/google-vertex';
+
+function servesGeminiApi(providerId: DirectUserByokInferenceProviderId) {
+  return DIRECT_BYOK_PROVIDERS.some(
+    provider =>
+      provider.id === providerId &&
+      getDirectByokSupportedChatApis(provider, 'user').includes('generate_content')
+  );
+}
+
+function isServableModelsDevSdk(
+  npm: string | undefined,
+  providerId: DirectUserByokInferenceProviderId
+) {
+  if (npm === VERTEX_AI_MODELS_DEV_SDK) return false;
+  return npm !== GEMINI_API_MODELS_DEV_SDK || servesGeminiApi(providerId);
+}
 
 const ModelsDevProviderSchema = z.object({
   models: z.record(z.string(), ModelsDevModelSchema),
@@ -76,6 +93,7 @@ type RawModel = {
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
   flags?: ReadonlyArray<DirectByokModelFlag>;
   reasoning_options?: ReasoningOption[];
+  ai_sdk_provider?: DirectByokModel['ai_sdk_provider'];
 };
 
 type SyncContext = {
@@ -150,7 +168,7 @@ export function parseModelsDevProviderModels(
         (!availableModelIds || availableModelIds.has(model.id)) &&
         model.tool_call !== false &&
         (!model.modalities?.input || model.modalities.input.includes('text')) &&
-        (!model.provider?.npm || !GEMINI_API_MODELS_DEV_SDKS.has(model.provider.npm))
+        isServableModelsDevSdk(model.provider?.npm, providerId)
     )
     .map(model => {
       return {
@@ -161,6 +179,7 @@ export function parseModelsDevProviderModels(
         input_modalities: model.modalities?.input,
         flags: model.reasoning ? ['reasoning'] : undefined,
         reasoning_options: supportedReasoningOptions(model.reasoning_options),
+        ai_sdk_provider: model.provider?.npm === GEMINI_API_MODELS_DEV_SDK ? 'google' : undefined,
       };
     });
 }
@@ -273,6 +292,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       context_length,
       max_completion_tokens,
       reasoning_options: raw.reasoning_options,
+      ai_sdk_provider: raw.ai_sdk_provider,
     });
   }
 

@@ -66,6 +66,35 @@ jest.mock('./direct-byok-definitions', () => ({
       reasoning_details_transform: 'reasoning-content',
       transformRequest: jest.fn(),
     },
+    {
+      id: 'opencode-go',
+      base_url: 'https://opencode.example.com/v1',
+      base_url_overrides: { generate_content: 'https://opencode.example.com/google/v1beta' },
+      models: jest.fn(async () => [
+        {
+          id: 'glm-model',
+          name: 'GLM Model',
+          context_length: 4096,
+          max_completion_tokens: 1024,
+        },
+        {
+          id: 'synced-model',
+          name: 'Synced Model',
+          context_length: 4096,
+          max_completion_tokens: 1024,
+          ai_sdk_provider: 'google',
+        },
+        {
+          id: 'gemini-model',
+          name: 'Gemini Model',
+          context_length: 4096,
+          max_completion_tokens: 1024,
+        },
+      ]),
+      supported_chat_apis: ['chat_completions', 'generate_content'],
+      reasoning_details_transform: 'reasoning-content',
+      transformRequest: jest.fn(),
+    },
   ],
 }));
 
@@ -136,10 +165,73 @@ describe('createAiSdkProvider session headers', () => {
 
 async function loadDirectByokModule() {
   const directByokProviders = (await import('./direct-byok-definitions')).default;
-  const { getDirectByokModel, getDirectByokModelsForUser } = await import('.');
+  const {
+    getDirectByokModel,
+    getDirectByokModelsForOrganization,
+    getDirectByokModelsForUser,
+    getDirectByokSupportedChatApis,
+  } = await import('.');
 
-  return { directByokProviders, getDirectByokModel, getDirectByokModelsForUser };
+  return {
+    directByokProviders,
+    getDirectByokModel,
+    getDirectByokModelsForOrganization,
+    getDirectByokModelsForUser,
+    getDirectByokSupportedChatApis,
+  };
 }
+
+describe('Gemini API for direct BYOK', () => {
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    const { getAiSdkProvider } =
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
+    jest
+      .mocked(getAiSdkProvider)
+      .mockImplementation(model => (model.includes('gemini') ? 'google' : undefined));
+  });
+
+  test('is limited to personal keys', async () => {
+    const { directByokProviders, getDirectByokSupportedChatApis } = await loadDirectByokModule();
+    const openCodeGo = directByokProviders[2];
+
+    expect(getDirectByokSupportedChatApis(openCodeGo, 'user')).toEqual([
+      'chat_completions',
+      'generate_content',
+    ]);
+    expect(getDirectByokSupportedChatApis(openCodeGo, 'organization')).toEqual([
+      'chat_completions',
+    ]);
+  });
+
+  test('lists Gemini API models from models.dev or by model ID for personal keys', async () => {
+    const { getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValueOnce([{ providerId: 'opencode-go', decryptedAPIKey: 'test-key' }]);
+
+    const models = await getDirectByokModelsForUser('user-id');
+
+    expect(models.map(model => [model.id, model.opencode.ai_sdk_provider])).toEqual([
+      ['opencode-go/glm-model', undefined],
+      ['opencode-go/synced-model', 'google'],
+      ['opencode-go/gemini-model', 'google'],
+    ]);
+  });
+
+  test('hides Gemini API models from organizations', async () => {
+    const { getDirectByokModelsForOrganization } = await loadDirectByokModule();
+    const { getBYOKforOrganization } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    jest
+      .mocked(getBYOKforOrganization)
+      .mockResolvedValueOnce([{ providerId: 'opencode-go', decryptedAPIKey: 'test-key' }]);
+
+    const models = await getDirectByokModelsForOrganization('organization-id');
+
+    expect(models.map(model => model.id)).toEqual(['opencode-go/glm-model']);
+  });
+});
 
 describe('getDirectByokModel', () => {
   beforeEach(() => {

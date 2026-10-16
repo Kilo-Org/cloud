@@ -2115,6 +2115,17 @@ export const CustomLlmProviderSchema = z.enum([
 
 export type CustomLlmProvider = z.infer<typeof CustomLlmProviderSchema>;
 
+/**
+ * The AI SDK provider the gateway catalog tells clients to use. Custom LLMs
+ * cannot be served over the Gemini API, so `google` is limited to the catalog.
+ */
+export const OpenCodeAiSdkProviderSchema = z.enum([
+  ...CustomLlmProviderSchema.options,
+  'google', // uses Gemini API
+]);
+
+export type OpenCodeAiSdkProvider = z.infer<typeof OpenCodeAiSdkProviderSchema>;
+
 export const OpenCodeVariantSchema = z.object({
   verbosity: VerbositySchema.optional(),
   reasoning: z
@@ -2150,6 +2161,8 @@ export const DirectByokModelSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
   reasoning_options: z.array(ReasoningOptionSchema).optional(),
+  /** The AI SDK provider models.dev names for the model's own endpoint, when it needs one. */
+  ai_sdk_provider: OpenCodeAiSdkProviderSchema.optional().catch(undefined),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
@@ -2157,7 +2170,7 @@ export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
 export type DirectByokModel = z.infer<typeof DirectByokModelSchema>;
 
 export const OpenCodeSettingsSchema = z.object({
-  ai_sdk_provider: CustomLlmProviderSchema.optional(),
+  ai_sdk_provider: OpenCodeAiSdkProviderSchema.optional(),
   family: OpenCodeFamilySchema.optional(),
   prompt: OpenCodePromptSchema.optional(),
   variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
@@ -2189,7 +2202,9 @@ export const CustomLlmMetadataSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
   supports_image_input: z.boolean().optional(),
-  opencode_settings: OpenCodeSettingsSchema.optional(),
+  opencode_settings: OpenCodeSettingsSchema.extend({
+    ai_sdk_provider: CustomLlmProviderSchema.optional(),
+  }).optional(),
 });
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;

@@ -12,6 +12,7 @@ import {
   CustomRouterEntriesSchema,
   CustomRouterErrorCodeSchema,
   CustomRouterErrorResponseSchema,
+  GatewayCustomRouterEntrySchema,
   UpdateCustomRouterRequestSchema,
   customRouterCandidateModel,
   customRouterClientEntriesPath,
@@ -108,6 +109,19 @@ describe('custom router entry keys', () => {
     expect(parseCustomRouterCandidateModel('')).toBeNull();
   });
 
+  it('keeps the candidate namespace injective by reserving the client prefix', () => {
+    expect(
+      GatewayCustomRouterEntrySchema.safeParse({ kind: 'gateway', model: 'client:ollama/qwen3' })
+        .success
+    ).toBe(false);
+    expect(parseCustomRouterCandidateModel('client:ollama/qwen3')).toEqual({
+      kind: 'client',
+      provider: 'ollama',
+      model: 'qwen3',
+    });
+    expect(customRouterCandidateModel(gatewayEntry)).toBe('anthropic/claude-sonnet-4');
+  });
+
   it('strips client fields when building an entry ref', () => {
     expect(customRouterEntryRef(clientEntry)).toEqual({
       kind: 'client',
@@ -189,9 +203,12 @@ describe('web API request schemas', () => {
     ).toBe(false);
   });
 
-  it('requires an update to change a field and validates a both-present default key', () => {
+  it('requires an update to change a field and keeps the default key inside the pool', () => {
     expect(UpdateCustomRouterRequestSchema.safeParse({}).success).toBe(false);
     expect(UpdateCustomRouterRequestSchema.safeParse({ name: 'Renamed' }).success).toBe(true);
+    expect(UpdateCustomRouterRequestSchema.safeParse({ entries: [gatewayEntry] }).success).toBe(
+      false
+    );
     expect(
       UpdateCustomRouterRequestSchema.safeParse({
         entries: [gatewayEntry],
@@ -201,6 +218,11 @@ describe('web API request schemas', () => {
     expect(
       UpdateCustomRouterRequestSchema.safeParse({
         entries: [gatewayEntry],
+        defaultEntryKey: 'gateway:anthropic/claude-sonnet-4',
+      }).success
+    ).toBe(true);
+    expect(
+      UpdateCustomRouterRequestSchema.safeParse({
         defaultEntryKey: 'gateway:anthropic/claude-sonnet-4',
       }).success
     ).toBe(true);

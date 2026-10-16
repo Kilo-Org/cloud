@@ -54,6 +54,7 @@ function addReservedSlugIssue(scope: CustomRouterScope, slug: string, ctx: z.Ref
 }
 
 const ModelIdSchema = z.string().trim().min(1);
+export const CLIENT_CANDIDATE_PREFIX = 'client:';
 // Provider IDs must not contain '/': the entry key splits at the first '/'.
 const ClientProviderIdSchema = z
   .string()
@@ -63,7 +64,11 @@ const ClientProviderIdSchema = z
 
 export const GatewayCustomRouterEntrySchema = z.object({
   kind: z.literal('gateway'),
-  model: ModelIdSchema,
+  // The client prefix is reserved so candidate model strings stay injective.
+  model: ModelIdSchema.refine(
+    model => !model.startsWith(CLIENT_CANDIDATE_PREFIX),
+    'Gateway model ID must not start with client:'
+  ),
 });
 export type GatewayCustomRouterEntry = z.infer<typeof GatewayCustomRouterEntrySchema>;
 
@@ -125,8 +130,6 @@ export function customRouterEntryKey(entry: CustomRouterEntryRef): string {
     ? `gateway:${entry.model}`
     : `client:${entry.provider}/${entry.model}`;
 }
-
-const CLIENT_CANDIDATE_PREFIX = 'client:';
 
 // Custom routing tables and decisions name a client entry `client:<provider>/<model>`, so policy
 // deny lists keyed by gateway model IDs never match a client entry.
@@ -541,6 +544,15 @@ export const UpdateCustomRouterRequestSchema = z
   .superRefine((request, ctx) => {
     if (Object.values(request).every(value => value === undefined)) {
       ctx.addIssue({ code: 'custom', message: 'Update must change at least one field' });
+    }
+    // Without the default key an entries-only update could leave the stored default outside the
+    // new pool, so the two fields move together.
+    if (request.entries !== undefined && request.defaultEntryKey === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['defaultEntryKey'],
+        message: 'An entries update must also send defaultEntryKey',
+      });
     }
     if (request.entries !== undefined && request.defaultEntryKey !== undefined) {
       addDefaultEntryIssue(request.entries, request.defaultEntryKey, ctx);

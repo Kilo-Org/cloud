@@ -494,6 +494,7 @@ jobs:
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
+          --tmpfs /var/lib/postgresql/data
           --health-cmd pg_isready
           --health-interval 2s
           --health-timeout 5s
@@ -503,6 +504,7 @@ jobs:
       redis:
         image: redis:7
         options: >-
+          --tmpfs /data
           --health-cmd "redis-cli ping"
           --health-interval 2s
           --health-timeout 5s
@@ -565,6 +567,7 @@ jobs:
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
+          --tmpfs /var/lib/postgresql/data
           --health-cmd pg_isready
           --health-interval 2s
           --health-timeout 5s
@@ -574,6 +577,7 @@ jobs:
       redis:
         image: redis:7
         options: >-
+          --tmpfs /data
           --health-cmd "redis-cli ping"
           --health-interval 2s
           --health-timeout 5s

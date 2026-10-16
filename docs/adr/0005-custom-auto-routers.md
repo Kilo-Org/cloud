@@ -178,9 +178,11 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
    - Each saved owner pool becomes a custom router with slug `efficient`, base `efficient`, the
      owner's configured mode, and the first pool entry as the default member.
    - Owner settings that have a mode and no pool are dropped.
-   - Efficient stops reading owner settings. The owner settings Durable Object, routes, and UI
-     are removed. ADR 0003 becomes Superseded.
+   - Efficient stops reading owner settings. The owner settings routes and UI are removed. ADR
+     0003 becomes Superseded.
    - Owners whose pool was converted get a notice with the new model ID.
+   - The flag is removed; custom routers are available to every owner.
+3. A follow-up deploy, after the conversion has run, deletes the owner settings Durable Object.
 
 ## Invariants
 

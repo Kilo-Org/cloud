@@ -409,11 +409,20 @@ export const ClientEvalPlanItemSchema = z.object({
 });
 export type ClientEvalPlanItem = z.infer<typeof ClientEvalPlanItemSchema>;
 
+export const ClientEvalPairSchema = z.object({
+  entry: CustomRouterEntryRefSchema,
+  variant: VariantSchema,
+});
+export type ClientEvalPair = z.infer<typeof ClientEvalPairSchema>;
+
 export const ClientEvalPlanResponseSchema = z.object({
   baseRouter: AutoRouterSchema,
   engineIdentity: z.string().min(1),
   repetitions: z.number().int().positive(),
   items: z.array(ClientEvalPlanItemSchema),
+  // Pairs whose newest measurement is from an older engine identity. They keep serving, flagged
+  // stale, until the plan's items for them are uploaded.
+  staleEntries: z.array(ClientEvalPairSchema).default([]),
 });
 export type ClientEvalPlanResponse = z.infer<typeof ClientEvalPlanResponseSchema>;
 
@@ -564,3 +573,105 @@ export const RegisterClientEntryRequestSchema = z.object({
   entry: ClientCustomRouterEntrySchema,
 });
 export type RegisterClientEntryRequest = z.infer<typeof RegisterClientEntryRequestSchema>;
+
+// Internal benchmark worker API, behind the internal API secret. The auto-routing worker and the
+// web app resolve the router from PostgreSQL and forward its context: the benchmark worker has no
+// PostgreSQL access. The client eval routes reuse the public CUSTOM_ROUTER_EVAL_*_PATH paths.
+
+export const CUSTOM_ROUTER_TABLE_PATH = '/admin/custom-router-table';
+export const CUSTOM_ROUTER_STATUS_PATH = '/admin/custom-router-status';
+
+const customRouterBenchmarkContextShape = {
+  ownerType: CustomRouterScopeSchema,
+  ownerId: z.string().trim().min(1),
+  baseRouter: AutoRouterSchema,
+  entries: CustomRouterEntriesSchema,
+  // Keys of the entries the owner's CLI measures: every client entry, and each gateway entry the
+  // platform key cannot serve. Their measurements are owner-scoped client profiles.
+  clientEvalEntryKeys: z.array(EntryKeySchema),
+};
+
+function addClientEvalEntryKeyIssues(
+  context: { entries: readonly CustomRouterEntryRef[]; clientEvalEntryKeys: readonly string[] },
+  ctx: z.RefinementCtx
+): void {
+  const entryKeys = new Set(context.entries.map(customRouterEntryKey));
+  const listed = new Set<string>();
+  context.clientEvalEntryKeys.forEach((key, index) => {
+    if (!entryKeys.has(key)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['clientEvalEntryKeys', index],
+        message: 'clientEvalEntryKeys must name a pool entry',
+      });
+    } else if (listed.has(key)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['clientEvalEntryKeys', index],
+        message: `Duplicate client eval entry ${key}`,
+      });
+    }
+    listed.add(key);
+  });
+  context.entries.forEach((entry, index) => {
+    if (entry.kind === 'client' && !listed.has(customRouterEntryKey(entry))) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['entries', index],
+        message: 'Client entries are always measured by the owner CLI',
+      });
+    }
+  });
+}
+
+export const CustomRouterBenchmarkContextSchema = z
+  .object(customRouterBenchmarkContextShape)
+  .superRefine(addClientEvalEntryKeyIssues);
+export type CustomRouterBenchmarkContext = z.infer<typeof CustomRouterBenchmarkContextSchema>;
+
+// CUSTOM_ROUTER_TABLE_PATH takes CustomRouterBenchmarkContextSchema and answers with
+// CustomRoutingTableResponseSchema: client candidates use customRouterCandidateModel, and rows
+// measured under an older engine identity carry `stale: true`.
+
+export const CustomRouterStatusResponseSchema = z.object({
+  entries: z.array(
+    z.object({
+      key: EntryKeySchema,
+      variants: z.array(CustomRouterVariantStatusSchema),
+    })
+  ),
+});
+export type CustomRouterStatusResponse = z.infer<typeof CustomRouterStatusResponseSchema>;
+
+export const InternalClientEvalPlanRequestSchema = ClientEvalPlanRequestSchema.extend(
+  customRouterBenchmarkContextShape
+).superRefine(addClientEvalEntryKeyIssues);
+export type InternalClientEvalPlanRequest = z.infer<typeof InternalClientEvalPlanRequestSchema>;
+
+export const InternalClientEvalCaseRequestSchema = ClientEvalCaseRequestSchema.extend({
+  baseRouter: AutoRouterSchema,
+});
+export type InternalClientEvalCaseRequest = z.infer<typeof InternalClientEvalCaseRequestSchema>;
+
+// Who pays for judged grading of an upload (ADR 0005 invariant 6), recorded as the usage row's
+// user and organization.
+export const ClientEvalBillingSchema = z.object({
+  userId: z.string().trim().min(1),
+  organizationId: z.string().trim().min(1).nullable(),
+});
+export type ClientEvalBilling = z.infer<typeof ClientEvalBillingSchema>;
+
+export const InternalClientEvalResultRequestSchema = ClientEvalResultUploadSchema.extend({
+  ...customRouterBenchmarkContextShape,
+  billing: ClientEvalBillingSchema,
+}).superRefine((request, ctx) => {
+  addClientEvalEntryKeyIssues(request, ctx);
+  if (!request.clientEvalEntryKeys.includes(customRouterEntryKey(request.entry))) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['entry'],
+      message: 'entry must be measured by the owner CLI',
+    });
+  }
+});
+export type InternalClientEvalResultRequest = z.infer<typeof InternalClientEvalResultRequestSchema>;

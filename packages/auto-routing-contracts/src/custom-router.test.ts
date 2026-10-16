@@ -5,6 +5,8 @@ import {
   ClientCustomRouterEntrySchema,
   ClientEvalPlanResponseSchema,
   ClientEvalResultResponseSchema,
+  CustomRouterBenchmarkContextSchema,
+  InternalClientEvalResultRequestSchema,
   CreateCustomRouterRequestSchema,
   CustomRouterDecideRequestSchema,
   CustomRouterDecideResponseSchema,
@@ -379,5 +381,64 @@ describe('client eval schemas', () => {
     ).toBe(true);
     expect(ClientEvalResultResponseSchema.safeParse({ score: 0.5 }).success).toBe(true);
     expect(ClientEvalResultResponseSchema.safeParse({ score: 1.5 }).success).toBe(false);
+  });
+});
+
+describe('internal custom router context', () => {
+  const clientKey = customRouterEntryKey(clientEntry);
+  const context = {
+    ownerType: 'org',
+    ownerId: 'org-1',
+    baseRouter: 'frontier',
+    entries: [gatewayEntry, clientEntry],
+    clientEvalEntryKeys: [clientKey],
+  };
+
+  it('requires every client entry to be measured by the owner CLI', () => {
+    expect(CustomRouterBenchmarkContextSchema.safeParse(context).success).toBe(true);
+    const unlisted = CustomRouterBenchmarkContextSchema.safeParse({
+      ...context,
+      clientEvalEntryKeys: [],
+    });
+    expect(unlisted.error?.issues.map(issue => issue.path)).toEqual([['entries', 1]]);
+  });
+
+  it('rejects client eval keys outside the pool and duplicates', () => {
+    const result = CustomRouterBenchmarkContextSchema.safeParse({
+      ...context,
+      clientEvalEntryKeys: [clientKey, clientKey, 'gateway:other/model'],
+    });
+    expect(result.error?.issues.map(issue => issue.path)).toEqual([
+      ['clientEvalEntryKeys', 1],
+      ['clientEvalEntryKeys', 2],
+    ]);
+  });
+
+  it('accepts uploads only for entries the owner CLI measures', () => {
+    const upload = {
+      ...context,
+      routerId: '00000000-0000-4000-8000-000000000000',
+      engineIdentity: 'frontier:v4:datasetHash',
+      variant: null,
+      caseId: 'case-1',
+      rep: 0,
+      output: 'answer',
+      costUsd: 0,
+      durationMs: 10,
+      exitCode: 0,
+      timedOut: false,
+      billing: { userId: 'user-1', organizationId: 'org-1' },
+    };
+    expect(
+      InternalClientEvalResultRequestSchema.safeParse({
+        ...upload,
+        entry: customRouterEntryRef(clientEntry),
+      }).success
+    ).toBe(true);
+    const platformMeasured = InternalClientEvalResultRequestSchema.safeParse({
+      ...upload,
+      entry: gatewayEntry,
+    });
+    expect(platformMeasured.error?.issues.map(issue => issue.path)).toEqual([['entry']]);
   });
 });

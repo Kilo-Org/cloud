@@ -128,10 +128,11 @@ export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 export const AutoRoutingDecisionSchema = z
   .object({
     model: z.string(),
-    taskType: ClassifierTaskTypeSchema,
-    subtaskType: ClassifierSubtaskTypeSchema,
+    // Null only on a custom router fallback decision made without a classification (ADR 0005).
+    taskType: ClassifierTaskTypeSchema.nullable(),
+    subtaskType: ClassifierSubtaskTypeSchema.nullable(),
     source: z.literal('benchmark'),
-    tableVersion: z.string(),
+    tableVersion: z.string().nullable(),
     // Canonical catalog variant key the chosen model was benchmarked with.
     variant: z.string().trim().min(1).nullable().optional(),
     // Legacy effort the chosen model was benchmarked with; retained for
@@ -164,6 +165,18 @@ export const AutoRoutingDecisionSchema = z
     }
     if (decision.entry && decision.model !== customRouterCandidateModel(decision.entry)) {
       ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
+    }
+    if (
+      decision.fallback !== true &&
+      (decision.taskType === null ||
+        decision.subtaskType === null ||
+        decision.tableVersion === null)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['taskType'],
+        message: 'Only a fallback decision may omit taskType, subtaskType, and tableVersion',
+      });
     }
   });
 

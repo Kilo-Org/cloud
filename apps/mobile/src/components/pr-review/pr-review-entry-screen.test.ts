@@ -82,8 +82,7 @@ describe('provider-neutral URL field', () => {
     const change = propsOf(input).onChangeText as (value: string) => void;
     const openButton = () =>
       find(tree, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request');
-    const errors = () =>
-      findAll(tree, 'Text').filter(p => p.props?.accessibilityLiveRegion === 'polite');
+    const errors = () => findAll(tree, 'AccessibleStatus').filter(p => p.props?.message != null);
 
     expect(propsOf(openButton()).disabled).toBe(true);
     for (const value of ['   ', '\t\n']) {
@@ -97,7 +96,7 @@ describe('provider-neutral URL field', () => {
       tree = render();
       expect(propsOf(openButton()).disabled).toBe(true);
       expect(errors()).toHaveLength(1);
-      expect(errors()[0]?.props?.children).toBe('Not a pull request or merge request link');
+      expect(errors()[0]?.props?.message).toBe('Not a pull request or merge request link');
     }
     change('  https://github.com/octocat/hello-world/pull/42  ');
     tree = render();
@@ -122,7 +121,7 @@ describe('provider-neutral URL field', () => {
     const input = find(tree, 'Input', () => true);
     (propsOf(input).onChangeText as (value: string) => void)('https://example.com/blog/post');
     (propsOf(input).onSubmitEditing as () => void)();
-    expect(mocks.toastError).toHaveBeenCalledWith('Not a pull request or merge request link');
+    expect(mocks.toastError).not.toHaveBeenCalled();
     expect(mocks.push).not.toHaveBeenCalled();
   });
 
@@ -142,7 +141,7 @@ describe('provider-neutral URL field', () => {
     expect(mocks.toastError).not.toHaveBeenCalled();
   });
 
-  it('paste of plain text keeps the invalid toast without navigating', async () => {
+  it('paste of plain text shows inline feedback without navigating', async () => {
     mocks.clipboard.current = 'just some notes';
     const tree = await renderLoaded();
     const paste = find(
@@ -152,7 +151,11 @@ describe('provider-neutral URL field', () => {
     );
     await (propsOf(paste).onPress as () => Promise<void>)();
     await flush();
-    expect(mocks.toastError).toHaveBeenCalledWith('Not a pull request or merge request link');
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    const after = render();
+    expect(find(after, 'AccessibleStatus', p => p.message != null).props?.message).toBe(
+      'Not a pull request or merge request link'
+    );
     expect(mocks.push).not.toHaveBeenCalled();
   });
 

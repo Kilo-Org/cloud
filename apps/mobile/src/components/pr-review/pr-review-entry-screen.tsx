@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
@@ -24,7 +25,6 @@ import {
   decidePrLinkOpen,
   decidePrLinkPaste,
   prLinkToastClipboardEmptyCopy,
-  prLinkToastInvalidCopy,
   selectPrLinkClearButtonVisible,
 } from '@/lib/pr-review/pr-link-paste';
 import {
@@ -92,7 +92,6 @@ export function PrReviewEntryScreen() {
   const handleSubmit = () => {
     const decision = decidePrLinkOpen(inputValueRef.current);
     if (decision.kind === 'invalid') {
-      announcingToast.error(prLinkToastInvalidCopy());
       return;
     }
     // Navigate straight to the ref's own provider route. Recents are written
@@ -114,7 +113,6 @@ export function PrReviewEntryScreen() {
     // Replace the native field, ref and derived UI together, never append at the cursor.
     applyFieldText(decision.text);
     if (decision.kind === 'non-url-text') {
-      announcingToast.error(prLinkToastInvalidCopy());
       return;
     }
     handleSubmit();
@@ -318,14 +316,21 @@ export function PrReviewEntryScreen() {
           <ClipboardIcon size={18} color={colors.mutedForeground} />
         </Pressable>
       </View>
-      <Text
-        className={linkState === 'invalid' ? 'text-sm text-destructive' : 'text-sm opacity-0'}
-        accessibilityLiveRegion={linkState === 'invalid' ? 'polite' : 'none'}
-        accessibilityElementsHidden={linkState !== 'invalid'}
-        importantForAccessibility={linkState === 'invalid' ? 'auto' : 'no-hide-descendants'}
-      >
-        {t('prReview.linkPasteNotAPullRequest')}
-      </Text>
+      <View>
+        <Text
+          className="text-sm opacity-0"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {t('prReview.linkPasteNotAPullRequest')}
+        </Text>
+        <View className="absolute inset-0">
+          <AccessibleStatus
+            className="text-sm"
+            message={linkState === 'invalid' ? t('prReview.linkPasteNotAPullRequest') : null}
+          />
+        </View>
+      </View>
       <Button
         disabled={linkState !== 'valid'}
         onPress={handleSubmit}

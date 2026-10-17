@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { OwnerPoolConversionScanResponse } from '@kilocode/auto-routing-contracts';
-import { runOwnerPoolConversion, type ScanPage, type ScanPageRequest } from './owner-pool-conversion-run';
+import {
+  runOwnerPoolConversion,
+  type ScanPage,
+  type ScanPageRequest,
+} from './owner-pool-conversion-run';
 
 const NO_OUTCOMES = {
   created: 0,
@@ -64,7 +68,10 @@ describe('runOwnerPoolConversion', () => {
       if (request.ownerType === 'user' && request.after === null) {
         return page({ nextCursor: 'u9', consecutiveFailed: 3, matchedObjectIds: ['a'] });
       }
-      return page({ consecutiveFailed: 2, matchedObjectIds: request.ownerType === 'org' ? ['b'] : [] });
+      return page({
+        consecutiveFailed: 2,
+        matchedObjectIds: request.ownerType === 'org' ? ['b'] : [],
+      });
     });
 
     const { result, lines } = run(scan);
@@ -81,7 +88,11 @@ describe('runOwnerPoolConversion', () => {
   it('prints the summary of the pages so far when a page fails, and is never clean', async () => {
     const scan = vi.fn<ScanPage>(async request => {
       if (request.after === null) {
-        return page({ nextCursor: 'u5', needsAttention: ['exists user:u1'], matchedObjectIds: ['a'] });
+        return page({
+          nextCursor: 'u5',
+          needsAttention: ['exists user:u1'],
+          matchedObjectIds: ['a'],
+        });
       }
       throw new Error('The operation was aborted due to timeout');
     });
@@ -163,9 +174,8 @@ describe('runOwnerPoolConversion', () => {
     const withAttention = await run(
       vi.fn<ScanPage>(async () => page({ matchedObjectIds: ['a', 'b'], noticesFailed: 1 }))
     ).result;
-    const withUnmatched = await run(
-      vi.fn<ScanPage>(async () => page({ matchedObjectIds: ['a'] }))
-    ).result;
+    const withUnmatched = await run(vi.fn<ScanPage>(async () => page({ matchedObjectIds: ['a'] })))
+      .result;
 
     expect(withAttention).toMatchObject({ completed: true, clean: false });
     expect(withUnmatched).toMatchObject({ completed: true, clean: false });

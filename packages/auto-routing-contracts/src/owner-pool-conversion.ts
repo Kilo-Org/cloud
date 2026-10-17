@@ -96,19 +96,21 @@ export const OwnerPoolConversionScanResponseSchema = z.object({
   // Converted with the default mode because the stored mode was invalid.
   invalidMode: z.array(z.string()),
   // `<reason> <ownerType>:<ownerId>`: every OWNER_POOL_CONVERSION_ATTENTION_OUTCOMES result,
-  // `notice_failed` when an owner got no notice, and `mark_failed` when the conversion marker
-  // could not be stored.
+  // `notice_failed` when an owner got no notice, and `mark_failed` when the marker could not be
+  // stored.
   needsAttention: z.array(z.string()),
   outcomes: z.record(OwnerPoolConversionOutcomeSchema, z.number().int().nonnegative()),
   noticesSent: z.number().int().nonnegative(),
   noticesFailed: z.number().int().nonnegative(),
-  // `<ownerType>:<ownerId>` keys the endpoint never received: not failures, and retried as is.
-  notPosted: z.array(z.string()),
-  // The web endpoint failed a whole batch, or too many conversions failed in a row; the rest of
-  // the page was not posted.
+  // The page stopped posting because the web endpoint looks unavailable.
   aborted: z.boolean(),
-  // `failed` results in a row at the end of this page; the next scan request carries it on.
-  // Defaulted so a newer script also reads a worker deployed before this field existed.
+  // Fields below are defaulted so a newer script still reads a worker deployed before them.
+  // `<ownerType>:<ownerId>` keys the endpoint never received: not failures, and retried as is.
+  notPosted: z.array(z.string()).default([]),
+  // `batch_failed`: a batch request failed or timed out. `consecutive_failures`: too many owners
+  // that had not failed before failed in a row.
+  abortReason: z.enum(['batch_failed', 'consecutive_failures']).nullable().default(null),
+  // New `failed` results in a row at the end of this page; the next page request carries it on.
   consecutiveFailed: z.number().int().nonnegative().default(0),
 });
 export type OwnerPoolConversionScanResponse = z.infer<typeof OwnerPoolConversionScanResponseSchema>;

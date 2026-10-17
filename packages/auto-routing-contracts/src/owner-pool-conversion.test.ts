@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CustomRouterDefinitionSchema } from './custom-router';
 import {
   OwnerPoolConversionRequestSchema,
+  OwnerPoolConversionScanResponseSchema,
   OwnerPoolConversionSchema,
   convertedOwnerPoolRouter,
 } from './owner-pool-conversion';
@@ -67,5 +68,35 @@ describe('OwnerPoolConversionSchema', () => {
 
   it('rejects an empty conversion batch', () => {
     expect(OwnerPoolConversionRequestSchema.safeParse({ conversions: [] }).success).toBe(false);
+  });
+});
+
+describe('OwnerPoolConversionScanResponseSchema', () => {
+  it('reads a summary from a worker deployed before the newer fields', () => {
+    const parsed = OwnerPoolConversionScanResponseSchema.parse({
+      scanned: 1,
+      nextCursor: null,
+      matchedObjectIds: [],
+      alreadyConverted: 0,
+      conversions: 0,
+      droppedModeOnly: 0,
+      readFailed: [],
+      invalidPool: [],
+      invalidMode: [],
+      needsAttention: [],
+      outcomes: {
+        created: 0,
+        exists: 0,
+        slug_taken: 0,
+        router_cap_reached: 0,
+        owner_not_found: 0,
+        failed: 0,
+      },
+      noticesSent: 0,
+      noticesFailed: 0,
+      aborted: false,
+    });
+
+    expect(parsed).toMatchObject({ notPosted: [], abortReason: null, consecutiveFailed: 0 });
   });
 });

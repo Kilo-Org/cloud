@@ -24,6 +24,7 @@ const NOTHING_STORED = {
   invalidMode: false,
   invalidPool: false,
   convertedAt: null,
+  failedAt: null,
 };
 
 describe('AutoRoutingModeConfigDO', () => {
@@ -76,6 +77,19 @@ describe('AutoRoutingModeConfigDO', () => {
       ...NOTHING_STORED,
       pool,
       convertedAt: '2026-10-17T00:00:00.000Z',
+    });
+  });
+
+  it('records a failed conversion attempt separately from the conversion', async () => {
+    const pool = [{ model: 'a/chat' }];
+    const { modeDO } = createModeDO({ pool });
+
+    await modeDO.markFailed('2026-10-17T00:00:00.000Z');
+
+    await expect(modeDO.readStoredSettings()).resolves.toEqual({
+      ...NOTHING_STORED,
+      pool,
+      failedAt: '2026-10-17T00:00:00.000Z',
     });
   });
 });

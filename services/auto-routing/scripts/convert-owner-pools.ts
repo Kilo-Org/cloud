@@ -1,16 +1,10 @@
 import { parseArgs } from 'node:util';
-import {
-  OWNER_POOL_CONVERSION_SCAN_PATH,
-  OwnerPoolConversionOutcomeSchema,
-  OwnerPoolConversionScanResponseSchema,
-  type OwnerPoolConversionOutcome,
-  type OwnerPoolConversionScanResponse,
-} from '@kilocode/auto-routing-contracts';
+import { OWNER_POOL_CONVERSION_SCAN_PATH } from '@kilocode/auto-routing-contracts';
+import { OWNER_TYPES, runOwnerPoolConversion } from '../src/owner-pool-conversion-run';
 
 const DEFAULT_ACCOUNT_ID = 'e115e769bcdd4c3d66af59d3332cb394';
 const SCRIPT_NAME = 'auto-routing';
 const CLASS_NAME = 'AutoRoutingModeConfigDO';
-const OWNER_TYPES = ['user', 'org'] as const;
 type OwnerType = (typeof OWNER_TYPES)[number];
 
 type CloudflarePage<T> = {
@@ -124,146 +118,30 @@ async function main(): Promise<void> {
   const objectIds = await listStoredObjectIds(token, accountId, namespaceId);
   console.log(`Listed ${objectIds.length} ${CLASS_NAME} objects with stored data`);
 
-  const matched = new Set<string>();
-  const outcomes = Object.fromEntries(
-    OwnerPoolConversionOutcomeSchema.options.map(outcome => [outcome, 0])
-  ) as Record<OwnerPoolConversionOutcome, number>;
-  const readFailed: string[] = [];
-  const invalidPool: string[] = [];
-  const invalidMode: string[] = [];
-  const needsAttention: string[] = [];
-  const notPosted: string[] = [];
-  let alreadyConverted = 0;
-  let conversions = 0;
-  let droppedModeOnly = 0;
-  let noticesSent = 0;
-  let noticesFailed = 0;
-  // Owner keys are printed as each page arrives so a crash later in the run cannot lose them.
-  // Marked owners (`exists`, `notice_failed`, `invalidMode`) are skipped by a rerun and would not
-  // be reported again.
-  const add = (result: OwnerPoolConversionScanResponse) => {
-    for (const id of result.matchedObjectIds) matched.add(id);
-    for (const outcome of OwnerPoolConversionOutcomeSchema.options) {
-      outcomes[outcome] += result.outcomes[outcome] ?? 0;
-    }
-    for (const [label, keys] of [
-      ['readFailed', result.readFailed],
-      ['invalidPool', result.invalidPool],
-      ['invalidMode', result.invalidMode],
-      ['needsAttention', result.needsAttention],
-      ['notPosted', result.notPosted],
-    ] as const) {
-      for (const key of keys) console.log(`${label}: ${key}`);
-    }
-    readFailed.push(...result.readFailed);
-    invalidPool.push(...result.invalidPool);
-    invalidMode.push(...result.invalidMode);
-    needsAttention.push(...result.needsAttention);
-    notPosted.push(...result.notPosted);
-    alreadyConverted += result.alreadyConverted;
-    conversions += result.conversions;
-    droppedModeOnly += result.droppedModeOnly;
-    noticesSent += result.noticesSent;
-    noticesFailed += result.noticesFailed;
-  };
-  let completed = false;
-  const printSummary = () => {
-    const unmatched = resume || !completed ? null : objectIds.filter(id => !matched.has(id));
-    console.log(
-      JSON.stringify(
-        {
-          dryRun,
-          completed,
-          listed: objectIds.length,
-          matched: matched.size,
-          unmatched: unmatched?.length ?? 'not audited on a resumed or interrupted run',
-          alreadyConverted,
-          conversions,
-          outcomes,
-          droppedModeOnly,
-          readFailed,
-          invalidPool,
-          invalidMode,
-          needsAttention,
-          notPosted,
-          noticesSent,
-          noticesFailed,
-        },
-        null,
-        2
-      )
+  const { clean, completed, error } = await runOwnerPoolConversion({
+    objectIds,
+    resume,
+    dryRun,
+    log: line => console.log(line),
+    scan: async ({ ownerType, after, consecutiveFailed }) => {
+      const response = await fetch(target, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ ownerType, objectIds, after, limit, dryRun, consecutiveFailed }),
+        signal: AbortSignal.timeout(300_000),
+        redirect: 'error',
+      });
+      return { status: response.status, body: await response.json() };
+    },
+  });
+  if (error) console.error(error.message);
+  if (!clean) {
+    console.error(
+      completed
+        ? 'Some owners need attention; see readFailed, invalidPool, invalidMode, needsAttention, notPosted, and unmatched.'
+        : 'The run did not complete (completed: false); handle the owners listed so far, including notPosted, then resume as printed above.'
     );
-    if (unmatched === null) {
-      console.log('Audit unmatched objects with a full --dry-run from the start.');
-    } else if (unmatched.length > 0) {
-      console.log(`Unmatched object ids:\n${unmatched.join('\n')}`);
-    }
-    return (
-      completed &&
-      readFailed.length === 0 &&
-      invalidPool.length === 0 &&
-      invalidMode.length === 0 &&
-      needsAttention.length === 0 &&
-      noticesFailed === 0 &&
-      (unmatched?.length ?? 0) === 0
-    );
-  };
-
-  let consecutiveFailed = 0;
-  try {
-    const startIndex = resume ? OWNER_TYPES.indexOf(resume.ownerType) : 0;
-    for (const ownerType of OWNER_TYPES.slice(startIndex)) {
-      let after: string | null = resume?.ownerType === ownerType ? resume.cursor : null;
-      do {
-        // Converted owners are marked in their Durable Object, so retrying a page skips them.
-        const retryHint = `retry with --resume ${ownerType}:${after ?? ''}`;
-        let response: Response;
-        let body: unknown;
-        try {
-          response = await fetch(target, {
-            method: 'POST',
-            headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-            body: JSON.stringify({ ownerType, objectIds, after, limit, dryRun, consecutiveFailed }),
-            signal: AbortSignal.timeout(300_000),
-            redirect: 'error',
-          });
-          body = await response.json();
-        } catch (error) {
-          const reason = error instanceof Error ? error.message : 'scan failed';
-          throw new Error(
-            `${reason}; ${retryHint}. Owners on the interrupted page whose router already exists come back as \`exists\`; check Mailgun or Sentry for their notice before sending it by hand.`
-          );
-        }
-        const result = OwnerPoolConversionScanResponseSchema.safeParse(body);
-        if (!result.success) {
-          throw new Error(`scan responded ${response.status} without a summary; ${retryHint}`);
-        }
-        add(result.data);
-        consecutiveFailed = result.data.consecutiveFailed;
-        if (result.data.aborted) {
-          const failed = result.data.needsAttention.filter(entry => entry.startsWith('failed '));
-          const escape =
-            failed.length > 0
-              ? ` If this keeps aborting because those owners keep failing, resume past the last one with --resume ${ownerType}:<ownerId>: that skips them and posts the page's notPosted owners next.`
-              : '';
-          throw new Error(
-            `the web endpoint looks unavailable (a failed batch or repeated failed conversions); fix it, then ${retryHint}.${escape}`
-          );
-        }
-        after = result.data.nextCursor;
-        console.log(
-          `${ownerType}: scanned ${result.data.scanned}, matched ${result.data.matchedObjectIds.length}, conversions ${result.data.conversions}; cursor ${after === null ? 'done' : `${ownerType}:${after}`}`
-        );
-      } while (after !== null);
-    }
-    completed = true;
-  } finally {
-    if (!printSummary()) {
-      console.error(
-        'Some owners need attention; see readFailed, invalidPool, invalidMode, needsAttention, and unmatched.'
-      );
-      process.exitCode = 1;
-    }
+    process.exitCode = 1;
   }
 }
 

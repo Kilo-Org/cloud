@@ -249,7 +249,9 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
 
   it('lists every owner whose conversion needs operator attention', async () => {
     ownerRows = ['u1', 'u2', 'u3', 'u4'];
-    const objectIds = ownerRows.map(id => setOwner('user', id, { mode: null, pool: [{ model: 'a/b' }] }));
+    const objectIds = ownerRows.map(id =>
+      setOwner('user', id, { mode: null, pool: [{ model: 'a/b' }] })
+    );
     const outcomes = ['created', 'slug_taken', 'router_cap_reached', 'failed'] as const;
     webFetch.mockImplementation(async (_url, init) =>
       Response.json({

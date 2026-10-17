@@ -134,7 +134,8 @@ async function main(): Promise<void> {
   for (const ownerType of OWNER_TYPES.slice(startIndex)) {
     let after: string | null = resume?.ownerType === ownerType ? resume.cursor : null;
     do {
-      const resumeHint = after === null ? 'a rerun without --resume' : `--resume ${ownerType}:${after}`;
+      const resumeHint =
+        after === null ? 'a rerun without --resume' : `--resume ${ownerType}:${after}`;
       let result: OwnerPoolConversionScanResponse;
       try {
         const response = await fetch(target, {
@@ -203,7 +204,9 @@ async function main(): Promise<void> {
     noticesFailed === 0 &&
     (unmatched?.length ?? 0) === 0;
   if (!clean) {
-    console.error('Some owners need attention; see readFailed, invalidPool, needsAttention, and unmatched.');
+    console.error(
+      'Some owners need attention; see readFailed, invalidPool, needsAttention, and unmatched.'
+    );
     process.exitCode = 1;
   }
 }

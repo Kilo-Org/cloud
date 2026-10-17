@@ -60,10 +60,7 @@ async function insertConvertedRouter(
       .select({ entries: auto_routing_custom_routers.entries })
       .from(auto_routing_custom_routers)
       .where(
-        and(
-          customRouterOwnerCondition(owner),
-          eq(auto_routing_custom_routers.slug, router.slug)
-        )
+        and(customRouterOwnerCondition(owner), eq(auto_routing_custom_routers.slug, router.slug))
       )
       .limit(1);
     if (sameSlug) {

@@ -92,9 +92,7 @@ export const OwnerPoolConversionScanResponseSchema = z.object({
   noticesSent: z.number().int().nonnegative(),
   noticesFailed: z.number().int().nonnegative(),
 });
-export type OwnerPoolConversionScanResponse = z.infer<
-  typeof OwnerPoolConversionScanResponseSchema
->;
+export type OwnerPoolConversionScanResponse = z.infer<typeof OwnerPoolConversionScanResponseSchema>;
 
 export type ConvertedOwnerPoolRouter = {
   slug: string;

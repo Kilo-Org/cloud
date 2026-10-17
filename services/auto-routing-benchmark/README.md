@@ -749,7 +749,7 @@ curl -s http://localhost:8814/admin/config -H "Authorization: Bearer $SECRET"
 ```
 
 A fresh local database has no benchmark configuration, and none is fabricated
-(ADR 0002): profile admission, owner-pool tables, custom routers, and client evals
+(ADR 0002): profile admission, custom routers, and client evals
 answer 400 `benchmark config not set` until one is saved. Save one per base router
 you use, with models from your local catalog, through the admin panel's Benchmarks
 tab or this call (repeat with `?router=frontier` for frontier):

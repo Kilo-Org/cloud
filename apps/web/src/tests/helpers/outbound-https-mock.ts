@@ -31,6 +31,7 @@ export type HttpsReply = {
   status?: number;
   headers?: Record<string, string | string[]>;
   body?: string | Buffer;
+  defer?: boolean;
 };
 
 /**
@@ -53,6 +54,7 @@ export function recordHttpsRequests(
       recordedRequest.body = chunk ?? null;
       queueMicrotask(() => {
         const result = reply(recordedRequest);
+        if (result.defer) return;
         const response = Readable.from([Buffer.from(result.body ?? '')]) as Readable & {
           statusCode: number;
           statusText: string;
@@ -64,7 +66,9 @@ export function recordHttpsRequests(
         (onResponse as (response: unknown) => void)(response);
       });
     };
-    request.destroy = jest.fn();
+    request.destroy = jest.fn((error?: Error) => {
+      if (error) queueMicrotask(() => request.emit('error', error));
+    });
     request.setTimeout = jest.fn();
     return request;
   }) as never);

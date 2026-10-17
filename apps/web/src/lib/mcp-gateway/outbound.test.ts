@@ -124,4 +124,22 @@ describe('requestPublicHttps', () => {
     expect(request.request.setTimeout).toHaveBeenCalledWith(30_000, expect.any(Function));
     expect(request.request.destroy).toHaveBeenCalled();
   });
+
+  it('aborts a request that is waiting for the response', async () => {
+    jest.mocked(resolve4).mockResolvedValue(['93.184.216.34']);
+    const recorded = recordHttpsRequests(() => ({ body: '{}', defer: true }));
+    const controller = new AbortController();
+    const pending = requestPublicHttps('https://service.example/metadata', {
+      signal: controller.signal,
+    });
+
+    const { promise: started, resolve: markStarted } = Promise.withResolvers<void>();
+    setImmediate(markStarted);
+    await started;
+    expect(recorded).toHaveLength(1);
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ code: 'temporarily_unavailable' });
+    expect((recorded[0] as RecordedRequest).request.destroy).toHaveBeenCalled();
+  });
 });

@@ -22,6 +22,7 @@ import { NextResponse } from 'next/server';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { AutoFixConfigRequestSchema } from '@/lib/auto-fix/core/schemas';
 import { getFixConfig } from '@/lib/auto-fix/github/get-fix-config';
 
 export async function POST(req: NextRequest) {
@@ -32,12 +33,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body: { ticketId?: string } = await req.json();
-    const { ticketId } = body;
-
-    if (!ticketId) {
-      return NextResponse.json({ error: 'Missing required field: ticketId' }, { status: 400 });
+    const raw: unknown = await req.json();
+    const parsed = AutoFixConfigRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid payload', issues: parsed.error.issues },
+        { status: 400 }
+      );
     }
+    const { ticketId } = parsed.data;
 
     const result = await getFixConfig(ticketId);
 

@@ -22,20 +22,9 @@ import { getFixTicketById, updateFixTicketStatus } from '@/lib/auto-fix/db/fix-t
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { AutoFixCreatePRRequestSchema } from '@/lib/auto-fix/core/schemas';
 import { createPullRequest } from '@/lib/auto-fix/github/create-pull-request';
 import { postIssueComment } from '@/lib/auto-fix/github/post-comment';
-
-interface CreatePRPayload {
-  ticketId: string;
-  sessionId: string;
-  branchName?: string; // Optional: actual branch name created by agent (defaults to session/{sessionId})
-  githubToken: string;
-  config: {
-    pr_base_branch: string;
-    pr_title_template: string;
-    pr_body_template?: string | null;
-  };
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,16 +34,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const payload: CreatePRPayload = await req.json();
-    const { ticketId, sessionId, branchName: providedBranchName, githubToken, config } = payload;
-
-    // Validate payload
-    if (!ticketId || !sessionId || !githubToken || !config) {
+    const raw: unknown = await req.json();
+    const parsed = AutoFixCreatePRRequestSchema.safeParse(raw);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Missing required fields: ticketId, sessionId, githubToken, config' },
+        { error: 'Invalid payload', issues: parsed.error.issues },
         { status: 400 }
       );
     }
+    const {
+      ticketId,
+      sessionId,
+      branchName: providedBranchName,
+      githubToken,
+      config,
+    } = parsed.data;
 
     logExceptInTest('[auto-fix-create-pr] Creating GitHub PR', {
       ticketId,

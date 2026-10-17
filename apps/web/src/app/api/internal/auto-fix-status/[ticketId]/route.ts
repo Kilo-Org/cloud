@@ -20,18 +20,8 @@ import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import type { FixStatus } from '@/lib/auto-fix/core/schemas';
+import { AutoFixStatusUpdateRequestSchema } from '@/lib/auto-fix/core/schemas';
 import { formatAutoFixErrorMessage } from '@/lib/auto-fix/core/format-error-message';
-
-interface StatusUpdatePayload {
-  sessionId?: string;
-  cliSessionId?: string;
-  status: FixStatus;
-  prNumber?: number;
-  prUrl?: string;
-  prBranch?: string;
-  errorMessage?: string;
-}
 
 export async function POST(
   req: NextRequest,
@@ -45,13 +35,18 @@ export async function POST(
     }
 
     const { ticketId } = await params;
-    const payload: StatusUpdatePayload = await req.json();
-    const { sessionId, cliSessionId, status, errorMessage, ...updates } = payload;
 
-    // Validate payload
-    if (!status) {
-      return NextResponse.json({ error: 'Missing required field: status' }, { status: 400 });
+    const raw: unknown = await req.json();
+    const body = typeof raw === 'object' && raw !== null ? raw : {};
+    const parsed = AutoFixStatusUpdateRequestSchema.safeParse({ ...body, ticketId });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid payload', issues: parsed.error.issues },
+        { status: 400 }
+      );
     }
+    const { status, sessionId, cliSessionId, prNumber, prUrl, prBranch, errorMessage } =
+      parsed.data;
 
     logExceptInTest('[auto-fix-status] Received status update', {
       ticketId,
@@ -94,18 +89,17 @@ export async function POST(
     // - running -> completed/failed (callback)
     // - pending -> completed/failed (edge case: immediate failure)
 
-    // Update ticket status in database
+    // Update ticket status in database. Only the parsed request fields are
+    // forwarded; startedAt/completedAt are always computed by
+    // updateFixTicketStatus from the status transition.
     await updateFixTicketStatus(ticketId, status, {
       sessionId,
       cliSessionId,
+      prNumber,
+      prUrl,
+      prBranch,
       errorMessage:
         errorMessage !== undefined ? formatAutoFixErrorMessage(errorMessage) : undefined,
-      startedAt: status === 'running' ? new Date() : undefined,
-      completedAt:
-        status === 'completed' || status === 'failed' || status === 'cancelled'
-          ? new Date()
-          : undefined,
-      ...updates,
     });
 
     logExceptInTest('[auto-fix-status] Updated ticket status', {

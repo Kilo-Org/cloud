@@ -336,6 +336,41 @@ export const FixStatusUpdateSchema = z.object({
 });
 
 /**
+ * Body of POST /api/internal/auto-fix-status/{ticketId}, merged with the
+ * ticketId from the URL path. Same contract as FixStatusUpdateSchema; unknown
+ * keys are rejected.
+ */
+export const AutoFixStatusUpdateRequestSchema = FixStatusUpdateSchema.strict();
+
+/**
+ * Body of POST /api/internal/auto-fix/config.
+ */
+export const AutoFixConfigRequestSchema = z
+  .object({
+    ticketId: z.string().uuid(),
+  })
+  .strict();
+
+/**
+ * Body of POST /api/internal/auto-fix/create-pr.
+ */
+export const AutoFixCreatePRRequestSchema = z
+  .object({
+    ticketId: z.string().uuid(),
+    sessionId: z.string().min(1),
+    branchName: z.string().min(1).optional(),
+    githubToken: z.string().min(1),
+    config: z
+      .object({
+        pr_base_branch: z.string().min(1),
+        pr_title_template: z.string().min(1),
+        pr_body_template: z.string().nullable().optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
+/**
  * Dispatch fix request to worker
  */
 export const DispatchFixRequestSchema = z.object({
@@ -391,6 +426,9 @@ export type CreateFixTicketParams = z.infer<typeof CreateFixTicketParamsSchema>;
 export type UpdateFixTicketStatusParams = z.infer<typeof UpdateFixTicketStatusParamsSchema>;
 export type ListFixTicketsParams = z.infer<typeof ListFixTicketsParamsSchema>;
 export type FixStatusUpdate = z.infer<typeof FixStatusUpdateSchema>;
+export type AutoFixStatusUpdateRequest = z.infer<typeof AutoFixStatusUpdateRequestSchema>;
+export type AutoFixConfigRequest = z.infer<typeof AutoFixConfigRequestSchema>;
+export type AutoFixCreatePRRequest = z.infer<typeof AutoFixCreatePRRequestSchema>;
 export type DispatchFixRequest = z.infer<typeof DispatchFixRequestSchema>;
 export type IssueLabeledPayload = z.infer<typeof IssueLabeledPayloadSchema>;
 export type TriggerSource = z.infer<typeof TriggerSourceSchema>;

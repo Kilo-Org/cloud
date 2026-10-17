@@ -24,6 +24,31 @@ describe('classifier input normalization', () => {
     });
   });
 
+  it('keeps prefixes stable and cheap on very long prompt text', () => {
+    // Extraction walks message content with forward-only cursors, so the cost
+    // tracks the length of the text. The budget leaves room for a loaded CI
+    // runner while still failing far below the cost of an unbounded scan.
+    const budgetMs = 1000;
+    const cases: Array<{ content: string; prefix: string }> = [
+      { content: `<task>${' '.repeat(500_000)}`, prefix: '<task>' },
+      { content: `<task>open${' '.repeat(500_000)}`, prefix: '<task>open' },
+      { content: '<thinking>'.repeat(50_000), prefix: '<thinking>'.repeat(100) },
+    ];
+
+    const started = performance.now();
+    for (const { content, prefix } of cases) {
+      expect(
+        normalizeClassifierInput('chat_completions', {
+          model: 'anthropic/claude-sonnet-4',
+          messages: [{ role: 'user', content }],
+        })
+      ).toMatchObject({ userPromptPrefix: prefix });
+    }
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(budgetMs);
+  });
+
   it('strips redundant tool result content from prompt prefixes', () => {
     expect(
       normalizeClassifierInput('chat_completions', {

@@ -82,7 +82,11 @@ const mockedCanKiloUserAccessPlatformIntegration = jest.mocked(
 const mockedBotPlatforms = jest.mocked(botPlatforms);
 const mockedProcessLinkedMessage = jest.mocked(processLinkedMessage);
 
-const slackIdentity: PlatformIdentity = { platform: PLATFORM.SLACK, teamId: 'T123', userId: 'U123' };
+const slackIdentity: PlatformIdentity = {
+  platform: PLATFORM.SLACK,
+  teamId: 'T123',
+  userId: 'U123',
+};
 
 function verifiedToken(identity: PlatformIdentity = slackIdentity) {
   return {
@@ -252,10 +256,7 @@ describe('POST /api/chat/link-account', () => {
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toContain('Account linked');
 
-    expect(mockedConsumeLinkAccountContext).toHaveBeenCalledWith(
-      expect.anything(),
-      'context-key'
-    );
+    expect(mockedConsumeLinkAccountContext).toHaveBeenCalledWith(expect.anything(), 'context-key');
     expect(mockedLinkKiloUser).toHaveBeenCalledWith(
       expect.anything(),
       slackIdentity,

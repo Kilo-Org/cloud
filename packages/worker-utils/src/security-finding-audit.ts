@@ -453,7 +453,10 @@ for (const phrase of DISALLOWED_AUDIT_JSON_KEY_PHRASES) {
 
 function auditJsonKeyTokens(key: string): string[] {
   return key
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(
+      /([A-Z]+)(?=[A-Z][a-z])|([a-z0-9])(?=[A-Z])|([A-Za-z])(?=[0-9])|([0-9])(?=[A-Za-z])/g,
+      '$1$2$3$4 '
+    )
     .split(/[^A-Za-z0-9]+/)
     .filter(Boolean)
     .map(token => token.toLowerCase());

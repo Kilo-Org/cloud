@@ -234,6 +234,11 @@ describe('security finding audit contract', () => {
       'transcriptText',
       'cookieJar',
       'credentialId',
+      'APIToken',
+      'IDToken',
+      'ssoToken',
+      'accessToken2',
+      'Cookie2Jar',
     ];
 
     for (const key of disallowedKeys) {
@@ -274,6 +279,10 @@ describe('security finding audit contract', () => {
 
     expect(() =>
       buildSecurityFindingAuditLogValues({ ...baseInput, metadata: { tokenCount: 3 } })
+    ).toThrow(/Audit JSON field is not allowed/);
+
+    expect(() =>
+      buildSecurityFindingAuditLogValues({ ...baseInput, metadata: { access2Token: 'abc' } })
     ).toThrow(/Audit JSON field is not allowed/);
   });
 

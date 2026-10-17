@@ -168,7 +168,7 @@ export async function getTriageTicketByRepoAndIssue(
 export async function updateTriageTicketStatus(
   ticketId: string,
   status: TriageStatus,
-  updates: UpdateTicketParams & { expectedStatus?: TriageStatus } = {}
+  updates: UpdateTicketParams & { expectedStatus?: TriageStatus; startedAt?: Date | null } = {}
 ): Promise<void> {
   try {
     const updateData: Partial<typeof auto_triage_tickets.$inferInsert> = {

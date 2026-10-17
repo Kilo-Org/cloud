@@ -65,7 +65,7 @@ export class GitCloneService {
 
       // HEAD ref with capabilities (symref first per convention)
       const capabilities = [
-        ...(symrefTarget ? [`symref=HEAD:${symrefTarget}`] : []),
+        ...(symrefTarget && isValidRefName(symrefTarget) ? [`symref=HEAD:${symrefTarget}`] : []),
         'side-band-64k',
         'thin-pack',
         'ofs-delta',

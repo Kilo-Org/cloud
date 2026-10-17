@@ -485,6 +485,26 @@ describe('GitReceivePackService', () => {
       }
     });
 
+    it('omits symref capability when the resolved target is not a valid ref name', async () => {
+      const fs = new MemFS();
+      await fs.writeFile('.git/HEAD', 'ref: refs/heads/bad\rname');
+      await fs.writeFile('.git/refs/heads/bad\rname', fakeNewOid);
+
+      const response = await GitReceivePackService.handleInfoRefs(fs);
+      expect(response).not.toContain('symref=');
+      expect(response.includes('bad\rname')).toBe(false);
+    });
+
+    it('sanitizes ref names in report-status lines', () => {
+      const craftedRef = 'refs/heads/x\nok refs/heads/main';
+      const commands = [{ oldOid: zeroOid, newOid: fakeNewOid, refName: craftedRef }];
+      const response = GitReceivePackService.generateReportStatus(commands, []);
+      const text = new TextDecoder().decode(response);
+
+      expect(text).not.toContain('ok refs/heads/main');
+      expect(text).not.toContain('\n\n');
+    });
+
     it('reports ng for all refs when packfile exceeds size limit', async () => {
       const fs = new MemFS();
       const oversizedPack = new Uint8Array(MAX_OBJECT_SIZE + 1);

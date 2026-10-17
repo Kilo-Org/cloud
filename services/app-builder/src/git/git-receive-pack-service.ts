@@ -69,7 +69,7 @@ export class GitReceivePackService {
 
       // Capabilities for receive-pack (symref first per convention)
       const capabilities = [
-        ...(symrefTarget ? [`symref=HEAD:${symrefTarget}`] : []),
+        ...(symrefTarget && isValidRefName(symrefTarget) ? [`symref=HEAD:${symrefTarget}`] : []),
         'report-status',
         'report-status-v2',
         'delete-refs',
@@ -424,14 +424,15 @@ export class GitReceivePackService {
     chunks.push(this.createSidebandPacket(1, encoder.encode(formatPacketLine(unpackStatus))));
 
     for (const cmd of commands) {
+      const safeRefName = isValidRefName(cmd.refName) ? cmd.refName : '';
       let status: string;
       if (globalError) {
-        status = `ng ${cmd.refName} ${sanitizeStatusMessage(globalError.message)}\n`;
+        status = `ng ${safeRefName} ${sanitizeStatusMessage(globalError.message)}\n`;
       } else {
         const refError = errors.find(e => e.kind === 'ref' && e.refName === cmd.refName);
         status = refError
-          ? `ng ${cmd.refName} ${sanitizeStatusMessage(refError.message)}\n`
-          : `ok ${cmd.refName}\n`;
+          ? `ng ${safeRefName} ${sanitizeStatusMessage(refError.message)}\n`
+          : `ok ${safeRefName}\n`;
       }
       chunks.push(this.createSidebandPacket(1, encoder.encode(formatPacketLine(status))));
     }

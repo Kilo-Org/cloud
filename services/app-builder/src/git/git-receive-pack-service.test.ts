@@ -384,10 +384,7 @@ describe('GitReceivePackService', () => {
         new Uint8Array(0)
       );
 
-      const { result, response } = await GitReceivePackService.handleReceivePack(
-        fs,
-        requestData
-      );
+      const { result, response } = await GitReceivePackService.handleReceivePack(fs, requestData);
 
       expect(result.success).toBe(false);
       expect(result.errors.some(e => e.includes('not found in the repository'))).toBe(true);

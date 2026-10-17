@@ -122,11 +122,22 @@ function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
   );
 }
 
-/** Strip the query string from a URL. Returns empty string on a non-string. */
+/** A URL authority's userinfo prefix, the part before the host. */
+const URL_USERINFO_PATTERN = /^([a-z][\da-z+.-]*:\/\/)[^/?#]*@/iu;
+
+/**
+ * Reduce a URL to its origin and path: drop the query string, the fragment,
+ * and the authority's userinfo prefix. Fields built from this — the
+ * `network.url` context, the synthesized message, the fingerprint path — carry
+ * origin and path. Returns empty string on a non-string.
+ * Total: a plain string walk, not `new URL`, whose React Native polyfill does
+ * not implement every component.
+ */
 export function stripQueryString(url: string): string {
   try {
-    const queryIndex = url.indexOf('?');
-    return queryIndex === -1 ? url : url.slice(0, queryIndex);
+    const cut = url.search(/[?#]/u);
+    const originAndPath = cut === -1 ? url : url.slice(0, cut);
+    return originAndPath.replace(URL_USERINFO_PATTERN, '$1');
   } catch {
     return '';
   }

@@ -17,6 +17,7 @@ import {
   TELEMETRY_DESCRIPTION_KEY,
   type TelemetryDescription,
 } from '@/lib/telemetry/error-sink';
+import { fingerprintMessage } from '@/lib/telemetry/sentry-scrub';
 
 type AppErrorSource = 'query' | 'mutation';
 
@@ -205,7 +206,7 @@ export function reportAppError(error: unknown, context: AppErrorContext): void {
         'app-error',
         context.source,
         errorName(error),
-        errorMessage(error),
+        fingerprintMessage(errorMessage(error)),
       ],
     });
   } catch {

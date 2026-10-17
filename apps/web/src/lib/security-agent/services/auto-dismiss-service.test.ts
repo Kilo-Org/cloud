@@ -19,9 +19,6 @@ import type { SecurityFindingAnalysis } from '../core/types';
 const mockGetSecurityFindingById = jest.fn() as jest.MockedFunction<
   typeof securityFindingsModule.getSecurityFindingById
 >;
-const mockUpdateSecurityFindingStatus = jest.fn() as jest.MockedFunction<
-  typeof securityFindingsModule.updateSecurityFindingStatus
->;
 const mockGetSecurityAgentConfig = jest.fn() as jest.MockedFunction<
   typeof securityConfigModule.getSecurityAgentConfig
 >;
@@ -41,7 +38,6 @@ const mockBulkFindings: Array<{ id: string; analysis: SecurityFindingAnalysis | 
 
 jest.mock('@/lib/security-agent/db/security-findings', () => ({
   getSecurityFindingById: mockGetSecurityFindingById,
-  updateSecurityFindingStatus: mockUpdateSecurityFindingStatus,
 }));
 
 jest.mock('@/lib/security-agent/db/security-config', () => ({
@@ -310,8 +306,6 @@ describe('maybeAutoDismissAnalysis', () => {
     mockGetSecurityFindingById.mockResolvedValue(makeFinding());
     mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
-    mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
-
     const result = await maybeAutoDismissAnalysis({
       findingId: 'finding-1',
       analysis: sandboxAnalysis,
@@ -338,8 +332,6 @@ describe('maybeAutoDismissAnalysis', () => {
     mockGetSecurityFindingById.mockResolvedValue(makeFinding());
     mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
-    mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
-
     const result = await maybeAutoDismissAnalysis({
       findingId: 'finding-1',
       analysis: triageAnalysis,
@@ -441,8 +433,6 @@ describe('maybeAutoDismissAnalysis', () => {
     mockGetSecurityFindingById.mockResolvedValue(makeFinding());
     mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockRejectedValue(new Error('GitHub API error'));
-    mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
-
     const result = await maybeAutoDismissAnalysis({
       findingId: 'finding-1',
       analysis: sandboxAnalysis,

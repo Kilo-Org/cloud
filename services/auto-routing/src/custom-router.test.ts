@@ -279,7 +279,8 @@ async function errorCode(res: Response) {
 }
 
 const fetchMock = vi.fn<typeof fetch>();
-let gatewayDeniedModelIds: string[] | 'unavailable' = [];
+let gatewayDeniedModelIds: string[] = [];
+let gatewayFailuresLeft = 0;
 let blacklistedDomainsConfig: string | null = null;
 let redisAvailable = true;
 
@@ -305,21 +306,27 @@ beforeEach(() => {
   backgroundTasks.length = 0;
   customTable = rankedTable;
   gatewayDeniedModelIds = [];
+  gatewayFailuresLeft = 0;
   blacklistedDomainsConfig = null;
   redisAvailable = true;
-  fetchMock.mockReset().mockImplementation(async input => {
+  fetchMock.mockReset().mockImplementation(async (input, init) => {
     const url = requestUrl(input);
     if (url.startsWith('https://gateway.example.test')) {
-      return gatewayDeniedModelIds === 'unavailable'
-        ? new Response('down', { status: 503 })
-        : Response.json({ deniedModelIds: gatewayDeniedModelIds });
+      if (gatewayFailuresLeft > 0) {
+        gatewayFailuresLeft--;
+        return new Response('down', { status: 503 });
+      }
+      return Response.json({ deniedModelIds: gatewayDeniedModelIds });
     }
-    if (url.startsWith('https://redis.example.test/get/')) {
-      return redisAvailable
+    // Like serverless-redis-http: only the command form is served.
+    if (url === 'https://redis.example.test' && init?.method === 'POST') {
+      if (!redisAvailable) return new Response('unavailable', { status: 503 });
+      const [command, key] = JSON.parse(init.body as string) as string[];
+      return command === 'GET' && key === 'admin:blacklisted-domains'
         ? Response.json({ result: blacklistedDomainsConfig })
-        : new Response('unavailable', { status: 503 });
+        : Response.json({ error: 'unexpected command' }, { status: 400 });
     }
-    return new Response('unexpected', { status: 500 });
+    return new Response('not found', { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
   dbRows.user = [
@@ -458,8 +465,36 @@ describe('public custom router decide', () => {
     expect(gatewayCalls()).toHaveLength(0);
   });
 
-  it('denies every gateway entry when the organization policy cannot be read', async () => {
-    gatewayDeniedModelIds = 'unavailable';
+  it('retries a transient organization policy failure once', async () => {
+    gatewayFailuresLeft = 1;
+    gatewayDeniedModelIds = [];
+    const { decision } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody({ clientEntries: [] }), {
+        'X-KiloCode-OrganizationId': ORG_ID,
+      })
+    );
+    expect(decision).toMatchObject({ model: SONNET, fallback: false });
+    expect(gatewayCalls()).toHaveLength(2);
+  });
+
+  it('returns a retryable error when a gateway-only request cannot read the policy', async () => {
+    gatewayFailuresLeft = 2;
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody({ clientEntries: [] }), {
+      'X-KiloCode-OrganizationId': ORG_ID,
+    });
+    expect(res.status).toBe(500);
+    expect(res.headers.get('retry-after')).toBe('5');
+    expect(await errorCode(res)).toBe('internal_error');
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+
+    const retried = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody({ clientEntries: [] }), {
+      'X-KiloCode-OrganizationId': ORG_ID,
+    });
+    expect(retried.status).toBe(200);
+  });
+
+  it('serves a listed client entry when the organization policy cannot be read', async () => {
+    gatewayFailuresLeft = 2;
     classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
     const { decision } = await decisionOf(
       await post(
@@ -490,6 +525,7 @@ describe('public custom router decide', () => {
     redisAvailable = false;
     const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
     expect(res.status).toBe(500);
+    expect(res.headers.get('retry-after')).toBe('5');
     expect(await errorCode(res)).toBe('internal_error');
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });

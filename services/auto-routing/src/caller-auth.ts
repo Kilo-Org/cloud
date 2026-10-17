@@ -33,18 +33,32 @@ import { getBlacklistedDomains } from './organization-policy';
 
 export class CustomRouterError extends Error {
   readonly code: CustomRouterErrorCode;
+  // Set when a dependency was briefly unavailable and the same request can be retried.
+  readonly retryAfterSeconds: number | null;
 
-  constructor(code: CustomRouterErrorCode, message: string) {
+  constructor(
+    code: CustomRouterErrorCode,
+    message: string,
+    retryAfterSeconds: number | null = null
+  ) {
     super(message);
     this.name = 'CustomRouterError';
     this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
+
+export const DEPENDENCY_RETRY_AFTER_SECONDS = 5;
 
 export function customRouterErrorResponse(error: CustomRouterError): Response {
   return Response.json(
     { error: { code: error.code, message: error.message } } satisfies CustomRouterErrorResponse,
-    { status: CUSTOM_ROUTER_ERROR_HTTP_STATUS[error.code] }
+    {
+      status: CUSTOM_ROUTER_ERROR_HTTP_STATUS[error.code],
+      ...(error.retryAfterSeconds === null
+        ? {}
+        : { headers: { 'retry-after': String(error.retryAfterSeconds) } }),
+    }
   );
 }
 
@@ -110,10 +124,13 @@ export async function authenticateCaller(env: CallerEnv, headers: Headers): Prom
     throw new CustomRouterError('unauthorized', 'Invalid token');
   }
   if (user.blocked_reason) throw new CustomRouterError('forbidden', 'Access denied');
-  // Fail closed: without a blocked-domain list this request cannot be admitted. A 5xx tells
-  // the client to retry.
+  // Fail closed: without a blocked-domain list this request cannot be admitted.
   if (blacklistedDomains === null) {
-    throw new CustomRouterError('internal_error', 'Account checks are temporarily unavailable');
+    throw new CustomRouterError(
+      'internal_error',
+      'Account checks are temporarily unavailable',
+      DEPENDENCY_RETRY_AFTER_SECONDS
+    );
   }
   if (isEmailBlacklistedByDomain(user.google_user_email, blacklistedDomains)) {
     throw new CustomRouterError('forbidden', 'Access denied');

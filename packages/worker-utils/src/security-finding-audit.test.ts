@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
@@ -12,7 +12,9 @@ import {
   buildSecurityFindingAuditSnapshot,
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
+  insertSecurityFindingAuditEvents,
   type NewSecurityFindingAuditLogValues,
+  type SecurityFindingAuditBatchWriterDb,
   type SecurityFindingAuditEventFinding,
   type SecurityFindingAuditWriterDb,
 } from './security-finding-audit';
@@ -232,5 +234,66 @@ describe('security finding audit contract', () => {
 
     expect(result).toEqual({ inserted: true, id: 'audit_1' });
     expect(insertedValues[0]?.event_key).toBe(baseInput.eventKey);
+  });
+
+  it('writes every batched event in one statement with the single-event payloads', async () => {
+    const batches: NewSecurityFindingAuditLogValues[][] = [];
+    const db: SecurityFindingAuditBatchWriterDb = {
+      insert: () => ({
+        values: values => ({
+          onConflictDoNothing: () => ({
+            returning: async () => {
+              batches.push(values);
+              return values.map((_, index) => ({ id: `audit_${index}` }));
+            },
+          }),
+        }),
+      }),
+    };
+
+    const secondFinding = {
+      ...finding,
+      id: '22222222-2222-4222-8222-222222222222',
+      source_id: '43',
+    } satisfies SecurityFindingAuditEventFinding;
+    const secondInput = {
+      ...baseInput,
+      finding: secondFinding,
+      beforeState: { status: 'ignored' },
+      afterState: { deleted: true },
+      eventKey: deriveSecurityFindingAuditEventKey(['user', 'user_123', secondFinding.id]),
+    };
+
+    const result = await insertSecurityFindingAuditEvents(db, [baseInput, secondInput]);
+
+    expect(result).toEqual({ insertedCount: 2 });
+    expect(batches).toHaveLength(1);
+    expect(batches[0]?.map(values => values.event_key)).toEqual([
+      baseInput.eventKey,
+      secondInput.eventKey,
+    ]);
+    expect(batches[0]?.[0]?.finding_snapshot).toEqual(
+      buildSecurityFindingAuditLogValues(baseInput).finding_snapshot
+    );
+  });
+
+  it('skips the write entirely for an empty batch', async () => {
+    const insert = vi.fn();
+    const db: SecurityFindingAuditBatchWriterDb = { insert };
+
+    await expect(insertSecurityFindingAuditEvents(db, [])).resolves.toEqual({ insertedCount: 0 });
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a batch whose event owner does not match its finding', async () => {
+    const insert = vi.fn();
+    const db: SecurityFindingAuditBatchWriterDb = { insert };
+
+    await expect(
+      insertSecurityFindingAuditEvents(db, [
+        { ...baseInput, owner: { type: 'user', userId: 'other_user' } },
+      ])
+    ).rejects.toThrow('owner does not match');
+    expect(insert).not.toHaveBeenCalled();
   });
 });

@@ -15,7 +15,7 @@ import { security_findings } from '@kilocode/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { trackSecurityAgentAutoDismiss } from '../posthog-tracking';
-import { updateSecurityFindingStatus, getSecurityFindingById } from '../db/security-findings';
+import { getSecurityFindingById } from '../db/security-findings';
 import { getSecurityAgentConfig } from '../db/security-config';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { dismissDependabotAlert } from '../github/dependabot-api';
@@ -85,23 +85,6 @@ function ownerFindingCondition(owner: SecurityReviewOwner) {
     return eq(security_findings.owned_by_user_id, owner.userId);
   }
   throw new Error('Invalid owner: must have either organizationId or userId');
-}
-
-/**
- * Dismiss a security finding with the given reason
- */
-export async function dismissFinding(
-  findingId: string,
-  params: {
-    reason: string;
-    comment: string;
-    dismissedBy?: string;
-  }
-): Promise<void> {
-  await updateSecurityFindingStatus(findingId, 'ignored', {
-    ignoredReason: params.reason,
-    ignoredBy: params.dismissedBy || `auto-dismiss: ${params.comment}`,
-  });
 }
 
 async function dismissFindingWithAuditEvent(

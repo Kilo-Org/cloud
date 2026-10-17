@@ -253,8 +253,16 @@ type SecurityFindingAuditInsertValues = {
   values(values: NewSecurityFindingAuditLogValues): SecurityFindingAuditInsertConflict;
 };
 
+type SecurityFindingAuditBatchInsertValues = {
+  values(values: NewSecurityFindingAuditLogValues[]): SecurityFindingAuditInsertConflict;
+};
+
 export type SecurityFindingAuditWriterDb = {
   insert(table: typeof security_audit_log): SecurityFindingAuditInsertValues;
+};
+
+export type SecurityFindingAuditBatchWriterDb = {
+  insert(table: typeof security_audit_log): SecurityFindingAuditBatchInsertValues;
 };
 
 export function buildSecurityFindingAuditSnapshot(
@@ -362,6 +370,28 @@ export async function insertSecurityFindingAuditEvent(
     .returning({ id: security_audit_log.id });
 
   return { inserted: inserted.length > 0, id: inserted[0]?.id ?? null };
+}
+
+/**
+ * Write several audit events in one statement. Callers batch a bounded slice of
+ * findings so a bulk operation does not pay one round trip per row; every row is
+ * still built by buildSecurityFindingAuditLogValues, so payloads are identical to
+ * the single-event path. Duplicate event keys are skipped.
+ */
+export async function insertSecurityFindingAuditEvents(
+  db: SecurityFindingAuditBatchWriterDb,
+  inputs: readonly SecurityFindingAuditEventInput[]
+): Promise<{ insertedCount: number }> {
+  if (inputs.length === 0) return { insertedCount: 0 };
+
+  const values = inputs.map(input => buildSecurityFindingAuditLogValues(input));
+  const inserted = await db
+    .insert(security_audit_log)
+    .values(values)
+    .onConflictDoNothing()
+    .returning({ id: security_audit_log.id });
+
+  return { insertedCount: inserted.length };
 }
 
 export function deriveSecurityFindingAuditEventKey(parts: readonly string[]): string {

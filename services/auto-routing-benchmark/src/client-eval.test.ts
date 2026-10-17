@@ -18,7 +18,11 @@ import {
   planClientEval,
   type ClientEvalDeps,
 } from './client-eval';
-import { listOwnerClientProfiles, rollUpClientCases } from './client-profiles';
+import {
+  listOwnerClientProfiles,
+  refreshClientProfileRollup,
+  rollUpClientCases,
+} from './client-profiles';
 import { saveBenchmarkConfig } from './config';
 import { DECIDER_CASES, type DeciderCase } from './datasets/decider-cases';
 import type { DeciderJudge } from './grading';
@@ -347,6 +351,44 @@ describe('client eval (real SQLite)', () => {
       accuracy: null,
       status: 'pending',
     });
+  });
+
+  it('drops a stale rollup when a concurrent upload replaces a case in place', async () => {
+    await gradeClientEvalResult(db, CONFIG, upload({ exitCode: 1, output: 'down' }), deps);
+    const [profile] = await listOwnerClientProfiles(db, context, 'efficient');
+    if (!profile) throw new Error('profile missing');
+    let raced = false;
+    const racing = new Proxy(db, {
+      get(target, property) {
+        if (property === 'prepare') {
+          return (query: string) => {
+            if (!raced && /^update "client_profiles"/i.test(query)) {
+              raced = true;
+              sqlite.exec(`
+                UPDATE client_case_results SET exit_code = 0, score = 1,
+                  uploaded_at = '2099-01-01T00:00:00.000Z';
+                UPDATE client_profiles SET status = 'ready', updated_at = 'fresh';
+              `);
+            }
+            return target.prepare(query);
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const planned = 2 * 2 * DECIDER_CASES.length;
+
+    await refreshClientProfileRollup(racing, profile, planned, '2099-01-02T00:00:00.000Z');
+    expect(raced).toBe(true);
+    expect(sqlite.prepare('SELECT status, results, updated_at FROM client_profiles').get()).toEqual(
+      { status: 'ready', results: 1, updated_at: 'fresh' }
+    );
+
+    await refreshClientProfileRollup(db, profile, planned, '2099-01-03T00:00:00.000Z');
+    expect(
+      sqlite.prepare('SELECT status, accuracy, updated_at FROM client_profiles').get()
+    ).toEqual({ status: 'ready', accuracy: 1, updated_at: '2099-01-03T00:00:00.000Z' });
   });
 
   it('bills each payer under its own usage id', async () => {

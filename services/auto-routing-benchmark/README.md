@@ -555,6 +555,7 @@ endpoints reject frontier. The classifier-winner endpoint returns the shared win
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
 | `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
+| `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action}`) |
 | `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
@@ -654,6 +655,44 @@ first flips it to `running`, so it is still measured exactly once.
 
 Long waits stay `Benchmarking` in the UI; there is no second timeout state in v1.
 
+### Prompt transport re-measure
+
+Every result row carries `prompt_revision` (`PROMPT_TRANSPORT_REVISION` in
+`src/prompt-transport.ts`). Revision 1 passed the prompt as a `kilo run` argument, which
+quoted prompts containing a space and escaped their inner `"`, and omitted long-context
+snapshots. Revision 2 materializes the snapshot and writes the prompt verbatim to stdin.
+`argvAffectedCases(router)` lists the cases revision 1 measured unreliably: every
+long-context case, and efficient cases whose prompt has an inner `"` and whose check is
+`exact`, `contains_all` or `regex` (frontier inner-quote cases join when
+`REMEASURE_FRONTIER_INNER_QUOTE_CASES` is set). The engine identity does not change.
+
+A re-measure claims the pair in `profile_remeasures`, not on the profile: the profile stays
+`ready` on its previous run, so the platform table, owner tables and status keep serving.
+The re-measure run copies the previous run's results except the affected revision-1 rows,
+so only those cases are scheduled, under the normal scheduler caps. When the run completes,
+the profile's `run_id` moves to it, the claim is removed, and the platform table republishes
+as after any decider run. A failed run, a dead lane or an orphaned claim drops the claim and
+keeps the previous measurement; an unwritten run returns the claim to the queue. Prior-case
+reuse never copies an affected revision-1 row into a new run. A container result recovered
+after its caller died is stamped with the revision the paid call was opened under
+(`scheduler_executions.prompt_revision`, defaulting to 1 for calls opened before this
+change), so output a previous deploy produced stays re-measurable instead of being trusted.
+
+Runbook, after the whole stack is merged and deployed (the migration applies on deploy):
+
+1. Dry run (writes nothing): `POST /admin/registry/remeasure-prompt-transport` with
+   `{"action":"dry-run"}`, or `{"router":"efficient","action":"dry-run"}` for one router.
+   Each router reports its affected pairs, affected results, and projected spend: the
+   measured cost of each affected result plus, for long-context cases, the snapshot's
+   prompt tokens at the catalog prompt price. `unknownCostResults` counts results this
+   estimate cannot price.
+2. Queue: the same call with `"action":"request"`. The next drain (at most one minute)
+   starts the runs.
+3. Verify: the dry run reports `pairs: 0` per router, `profile_remeasures` is empty, and
+   `GET /admin/routing-table` shows a new version.
+4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
+   its run.
+
 ### Sparse custom routing tables
 
 `POST /admin/custom-routing-table` with 1–10 entries returns
@@ -733,6 +772,11 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
   The D1 live-slot uniqueness constraint and claim tokens protect container ownership.
   CLI runs remain serialized because they share SQLite state.
 - `/warmup` initializes the local CLI database once per container without making an inference request.
+- The case prompt reaches `kilo run` on stdin, never as an argument. Long-context cases are
+  materialized with their workspace snapshot (up to about 640 KB for 160k-token targets),
+  which exceeds Linux's 128 KiB limit on one argument, and `kilo run` re-quotes argument
+  messages that contain spaces. With no positional message the CLI reads stdin to EOF and
+  sends it verbatim as the user message.
 - The server handles SIGTERM and drains the CLI case it already accepted, then exits.
   A case still queued when SIGTERM arrives is refused with `503` instead of starting a new
   paid call, so a rollout is never charged for work it interrupts. Idle containers therefore

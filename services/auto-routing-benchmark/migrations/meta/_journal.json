@@ -162,6 +162,13 @@
       "when": 1792168659121,
       "tag": "0022_burly_ben_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1792208507144,
+      "tag": "0023_furry_mandroid",
+      "breakpoints": true
     }
   ]
 }

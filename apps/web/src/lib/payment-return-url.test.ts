@@ -4,7 +4,7 @@ function isValid(url: string): boolean {
   return getSafeReturnUrlPath(url) !== null;
 }
 
-describe('isValidReturnUrl', () => {
+describe('return URL validation', () => {
   it('should accept valid relative paths', () => {
     expect(isValid('/credits')).toBe(true);
     expect(isValid('/profile')).toBe(true);

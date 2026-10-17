@@ -14,9 +14,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import {
-  useProviderPrScopeOrNull,
   providerPrRefLabel,
   providerPrTriple,
+  useProviderPrScopeOrNull,
 } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { parseParam } from '@/lib/route-params';

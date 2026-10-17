@@ -214,11 +214,12 @@ describe('PR Overview full-body states', () => {
       </ProviderPrScopeProvider>
     );
     const body = renderer.root.find(node => String(node.type) === 'EmptyState');
+    const actions = body.props.action as { type: unknown; props: { onRetry: () => void } };
     // The provider actions row replaces GitHub's install CTA. The mocked
     // EmptyState never renders its action slot, so the row is asserted
     // structurally; its buttons are covered by the component's own suite.
-    expect(body.props.action.type).toBe(PrReviewUnavailableActions);
-    body.props.action.props.onRetry();
+    expect(actions.type).toBe(PrReviewUnavailableActions);
+    actions.props.onRetry();
     expect(query.refetch).toHaveBeenCalledOnce();
     unmount();
   });
@@ -229,8 +230,12 @@ describe('PR Overview full-body states', () => {
       createElement(PrReviewOverview, overviewProps)
     );
     const body = renderer.root.find(node => String(node.type) === 'EmptyState');
-    expect(String(body.props.action.type)).toBe('Button');
-    expect(body.props.action.props.children.props.children).toBe('Install the Kilo GitHub App');
+    const install = body.props.action as {
+      type: unknown;
+      props: { children: { props: { children: string } } };
+    };
+    expect(String(install.type)).toBe('Button');
+    expect(install.props.children.props.children).toBe('Install the Kilo GitHub App');
     unmount();
   });
 

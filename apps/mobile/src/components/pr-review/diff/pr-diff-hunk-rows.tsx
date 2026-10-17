@@ -7,7 +7,6 @@
 
 import { Check, ChevronDown, File, GitCommit, X } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
-import { type ReactNode } from 'react';
 import { Pressable, type ScrollViewProps, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
@@ -271,29 +270,6 @@ export function PaginationRow({
         {loadedLabel}
       </Text>
     </View>
-  );
-}
-
-export function TabStateMessage({
-  title,
-  message,
-  action,
-}: {
-  title: string;
-  message: string;
-  /** Optional recovery row under the message (provider retry/check actions). */
-  action?: ReactNode;
-}) {
-  return (
-    <CenteredState>
-      <View className="items-center gap-2 px-6">
-        <Text className="text-center text-lg font-semibold text-foreground">{title}</Text>
-        <Text variant="muted" className="text-center">
-          {message}
-        </Text>
-        {action}
-      </View>
-    </CenteredState>
   );
 }
 

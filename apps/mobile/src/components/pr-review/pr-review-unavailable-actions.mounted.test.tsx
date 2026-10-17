@@ -33,12 +33,31 @@ vi.mock('@/lib/trpc', () => ({
 
 const onRetry = vi.fn();
 
-function mount(scope: ProviderPrScope) {
-  return renderWithProviders(
+async function mount(scope: ProviderPrScope) {
+  const mounted = await renderWithProviders(
     <ProviderPrScopeProvider value={scope}>
-      {createElement(PrReviewUnavailableActions, { onRetry, isRetrying: false })}
+      {createElement(PrReviewUnavailableActions, {
+        onRetry: () => {
+          onRetry();
+        },
+        isRetrying: false,
+      })}
     </ProviderPrScopeProvider>
   );
+  return mounted;
+}
+
+type ButtonInstance = {
+  props: {
+    onPress: () => void;
+    children: { props: { children: string } };
+  };
+};
+
+function findButtons(renderer: { root: { findAll: (f: (n: unknown) => boolean) => unknown[] } }) {
+  return renderer.root.findAll(
+    node => String((node as { type: unknown }).type) === 'Button'
+  ) as ButtonInstance[];
 }
 
 describe('PrReviewUnavailableActions', () => {
@@ -48,16 +67,20 @@ describe('PrReviewUnavailableActions', () => {
       organizationId: null,
     };
     const { renderer, unmount } = await mount(scope);
-    const buttons = renderer.root.findAll(node => String(node.type) === 'Button');
+    const buttons = findButtons(renderer);
     expect(buttons).toHaveLength(2);
-    expect(buttons[0].props.children.props.children).toBe('Retry');
-    expect(buttons[1].props.children.props.children).toBe('Check connection');
+    const [retryButton, checkButton] = buttons;
+    if (!retryButton || !checkButton) {
+      throw new Error('the two recovery buttons did not render');
+    }
+    expect(retryButton.props.children.props.children).toBe('Retry');
+    expect(checkButton.props.children.props.children).toBe('Check connection');
     act(() => {
-      buttons[0].props.onPress();
+      retryButton.props.onPress();
     });
     expect(onRetry).toHaveBeenCalledOnce();
     act(() => {
-      buttons[1].props.onPress();
+      checkButton.props.onPress();
     });
     expect(providerConnection.mutate).toHaveBeenCalledWith({
       platform: 'gitlab',
@@ -72,7 +95,11 @@ describe('PrReviewUnavailableActions', () => {
       organizationId: 'org_1',
     };
     const { renderer, unmount } = await mount(scope);
-    const check = renderer.root.findAll(node => String(node.type) === 'Button')[1];
+    const buttons = findButtons(renderer);
+    const check = buttons[1];
+    if (!check) {
+      throw new Error('the connection check button did not render');
+    }
     act(() => {
       check.props.onPress();
     });
@@ -89,7 +116,7 @@ describe('PrReviewUnavailableActions', () => {
       organizationId: null,
     };
     const { renderer, unmount } = await mount(scope);
-    expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
+    expect(findButtons(renderer)).toHaveLength(0);
     unmount();
   });
 });

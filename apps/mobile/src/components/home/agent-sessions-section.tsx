@@ -36,8 +36,7 @@ import { createSubmitLock } from '@/lib/submit-lock';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
-// The trailing slash pins the index route.
-const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 
 type LiveSessionProps = Readonly<{ context: LiveSessionContext; sessions: LiveSessions }>;
 
@@ -325,8 +324,8 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
         actionHidden={content === 'empty'}
         onActionPress={() => {
           // Switch tabs, then pop a previously pushed history screen to the live index.
-          router.navigate(AGENTS_INDEX_HREF as Href);
-          router.dismissTo(AGENTS_INDEX_HREF as Href);
+          router.navigate(AGENTS_SESSIONS_HREF);
+          router.dismissTo(AGENTS_SESSIONS_HREF);
         }}
         notice={notice && <LiveSessionHeaderNotice notice={notice} />}
       />

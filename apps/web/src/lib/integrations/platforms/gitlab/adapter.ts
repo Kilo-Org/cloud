@@ -459,9 +459,7 @@ export async function fetchGitLabProjects(
       continue;
     }
 
-    if (data.length < perPage) break;
-    checkGitLabPaginationBounds(page + 1, projects.length, 'project listing');
-    page++;
+    break;
   }
 
   logExceptInTest('GitLab projects fetched', { count: projects.length });
@@ -520,12 +518,10 @@ export async function fetchGitLabBranches(
     const data = (await response.json()) as GitLabBranch[];
     branches.push(...data);
 
-    const totalPages = Math.min(
-      parseInt(response.headers.get('x-total-pages') || '1', 10),
-      MAX_GITLAB_PAGINATION_PAGES
-    );
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, branches.length, 'branch listing');
     if (page >= totalPages) break;
-    checkGitLabPaginationBounds(page + 1, branches.length, 'branch listing');
     page++;
   }
 
@@ -1121,12 +1117,10 @@ export async function findKiloReviewNote(
     const data = (await response.json()) as GitLabNote[];
     notes.push(...data);
 
-    const totalPages = Math.min(
-      parseInt(response.headers.get('x-total-pages') || '1', 10),
-      MAX_GITLAB_PAGINATION_PAGES
-    );
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, notes.length, 'MR note listing');
     if (page >= totalPages) break;
-    checkGitLabPaginationBounds(page + 1, notes.length, 'MR note listing');
     page++;
   }
 
@@ -1274,12 +1268,10 @@ export async function hasMRNoteWithMarker(
       return true;
     }
 
-    const totalPages = Math.min(
-      parseInt(response.headers.get('x-total-pages') || '1', 10),
-      MAX_GITLAB_PAGINATION_PAGES
-    );
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, page * perPage, 'MR note marker search');
     if (page >= totalPages) break;
-    checkGitLabPaginationBounds(page + 1, page * perPage, 'MR note marker search');
     page++;
   }
 
@@ -1335,12 +1327,10 @@ export async function fetchMRInlineComments(
     const data = (await response.json()) as GitLabDiscussion[];
     discussions.push(...data);
 
-    const totalPages = Math.min(
-      parseInt(response.headers.get('x-total-pages') || '1', 10),
-      MAX_GITLAB_PAGINATION_PAGES
-    );
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, discussions.length, 'MR discussion listing');
     if (page >= totalPages) break;
-    checkGitLabPaginationBounds(page + 1, discussions.length, 'MR discussion listing');
     page++;
   }
 

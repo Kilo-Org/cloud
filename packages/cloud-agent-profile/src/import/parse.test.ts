@@ -2,7 +2,12 @@ import { describe, expect, test } from 'vitest';
 import { kiloCommandCreateInputSchema } from '../contracts/kilo-commands';
 import { collectImportItems, parseLocalConfigArchive, type ImportPreview } from './index';
 import { buildRepresentativeImportArchive, buildStoredZip, buildZip } from './test-fixtures';
-import { MAX_IMPORT_ENTRY_EXPANDED_BYTES } from './limits';
+import {
+  MAX_IMPORT_ENTRY_EXPANDED_BYTES,
+  MAX_IMPORT_INSTRUCTION_GLOB_LENGTH,
+  MAX_IMPORT_INSTRUCTION_GLOB_WILDCARDS,
+  MAX_IMPORT_INSTRUCTION_GLOBS,
+} from './limits';
 
 function parseFiles(files: Record<string, string | Uint8Array>): ImportPreview {
   return parseLocalConfigArchive(buildZip(files));
@@ -559,5 +564,103 @@ describe('parseLocalConfigArchive', () => {
       'instructions',
       'skills',
     ]);
+  });
+});
+
+describe('instruction glob import limits', () => {
+  test('drops an over-long glob and keeps the other globs', () => {
+    const longGlob = `${'a'.repeat(MAX_IMPORT_INSTRUCTION_GLOB_LENGTH)}.md`;
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({ instructions: [longGlob, 'rules/*.md'] }),
+      'rules/style.md': 'Body',
+    });
+
+    expect(preview.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'instruction-glob-limit',
+        category: 'config',
+        path: 'kilo.json',
+        field: 'instructions.0',
+      })
+    );
+    expect(preview.hasErrors).toBe(true);
+    expect(preview.config.instructions).toEqual([{ name: 'rules-style', content: 'Body' }]);
+  });
+
+  test('drops a glob with too many star tokens and keeps the other globs', () => {
+    const starryGlob = `${'**/'.repeat(MAX_IMPORT_INSTRUCTION_GLOB_WILDCARDS + 1)}AGENTS.md`;
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({ instructions: [starryGlob, 'docs/*.md'] }),
+      'docs/style.md': 'Body',
+    });
+
+    expect(preview.issues).toContainEqual(
+      expect.objectContaining({ code: 'instruction-glob-limit', field: 'instructions.0' })
+    );
+    expect(preview.config.instructions).toEqual([{ name: 'docs-style', content: 'Body' }]);
+  });
+
+  test('does not echo an over-long glob in full into the issue message', () => {
+    const longGlob = `rules/${'a'.repeat(4096)}.md`;
+    const preview = parseFiles({ 'kilo.json': JSON.stringify({ instructions: [longGlob] }) });
+
+    const issue = preview.issues.find(candidate => candidate.code === 'instruction-glob-limit');
+    expect(issue?.message).toContain('rules/aaaa');
+    expect(issue?.message).not.toContain('a'.repeat(200));
+    expect(issue?.message.length).toBeLessThan(300);
+  });
+
+  test('reads at most the allowed number of instruction globs', () => {
+    const globs = Array.from({ length: MAX_IMPORT_INSTRUCTION_GLOBS + 3 }, () => 'AGENTS.md');
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({ instructions: globs }),
+      'AGENTS.md': 'Body',
+    });
+
+    expect(issueCodes(preview)).toContain('instruction-globs-exceeded');
+    expect(preview.config.instructions).toEqual([{ name: 'agents', content: 'Body' }]);
+  });
+
+  test('applies instruction globs within the import limit', () => {
+    const glob = `${'*a'.repeat(15)}*.md`;
+    const files: Record<string, string> = {
+      'kilo.json': JSON.stringify({ instructions: Array.from({ length: 8 }, () => glob) }),
+    };
+    for (let index = 0; index < 3; index += 1) {
+      files[`${'a'.repeat(80)}p${index}.md`] = 'Body';
+    }
+
+    const preview = parseFiles(files);
+    expect(preview.issues).toEqual([]);
+    expect(preview.config.instructions).toHaveLength(3);
+  });
+
+  test('skips instruction globs when the archive is over the import limit', () => {
+    const glob = `${'*a'.repeat(15)}*.md`;
+    const files: Record<string, string> = {
+      'kilo.json': JSON.stringify({ instructions: Array.from({ length: 32 }, () => glob) }),
+      'instructions/style.md': 'Directory body',
+    };
+    for (let index = 0; index < 12; index += 1) {
+      files[`${'a'.repeat(5000)}p${index}.md`] = 'Body';
+    }
+
+    const preview = parseFiles(files);
+    expect(preview.issues).toContainEqual(
+      expect.objectContaining({ code: 'instruction-globs-exceeded', field: 'instructions' })
+    );
+    expect(preview.config.instructions).toEqual([{ name: 'style', content: 'Directory body' }]);
+  });
+
+  test('imports an archive whose instruction glob spans many directories', () => {
+    const deepPath = Array.from({ length: 40 }, (_, index) => `d${index}`).join('/');
+    const glob = `${'**/'.repeat(12)}NEVER-EXIST.md`;
+    const started = performance.now();
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({ instructions: [glob] }),
+      [`${deepPath}/other.md`]: 'Body',
+    });
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(preview.config.instructions).toEqual([]);
   });
 });

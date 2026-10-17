@@ -2103,7 +2103,7 @@
       "invalidLink": "Ce lien ne peut pas être ouvert.",
       "hostConfirmTitle": "Ouvrir le lien externe ?",
       "hostConfirmMessage": "Ce lien ouvre {{host}} dans votre navigateur.",
-      "open": "Ouverture",
+      "open": "Ouvrir",
       "trustThisHost": "Faire confiance à ce site"
     },
     "folderPicker": {
@@ -2649,7 +2649,7 @@
       "openAccessibility": "Ouvrir une PR ou un merge request",
       "clearLink": "Effacer le lien",
       "pasteLink": "Coller le lien de PR ou de merge request",
-      "open": "Ouverture"
+      "open": "Ouvrir"
     },
     "eventChips": {
       "comment": "Commenter",

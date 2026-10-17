@@ -11,9 +11,23 @@ export type AuthErrorType =
   | 'INVALID_VERIFICATION'
   | 'IP_MISMATCH'
   | 'SIGNUP-RATE-LIMITED'
+  | 'SIGNUP-STEP-UP'
   | 'SIGNUP-UNAVAILABLE'
   | 'EMAIL-ALREADY-USED'
   | 'SSO_ERROR';
+
+/**
+ * The sign-in methods a signup step-up can ask for, in display order. Bouncer may list other
+ * methods; Cloud shows only these.
+ */
+export const SIGNUP_STEP_UP_METHODS = ['google', 'apple'] as const;
+export type SignupStepUpMethod = (typeof SIGNUP_STEP_UP_METHODS)[number];
+
+/** The known step-up methods among `values`, in display order and without duplicates. */
+export function knownSignupStepUpMethods(values: Iterable<string>): SignupStepUpMethod[] {
+  const present = new Set(values);
+  return SIGNUP_STEP_UP_METHODS.filter(method => present.has(method));
+}
 
 export const hosted_domain_specials = {
   non_workspace_google_account: '@@personal@@',

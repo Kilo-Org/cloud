@@ -102,7 +102,7 @@ beforeEach(() => {
   vi.mocked(deferChunk).mockResolvedValue(undefined);
   vi.mocked(claimScheduledChunks).mockResolvedValue([]);
   vi.mocked(recoverChunks).mockResolvedValue([]);
-  vi.mocked(scheduleRunChunks).mockResolvedValue(undefined);
+  vi.mocked(scheduleRunChunks).mockResolvedValue(true);
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
 });
 

@@ -13,6 +13,7 @@ vi.mock('./scheduler', async importOriginal => {
   return {
     ...actual,
     beginPaidCase: vi.fn(),
+    hasPaidCase: vi.fn(),
     claimScheduledChunks: vi.fn(),
     clearUnbilledCase: vi.fn(),
     cooldownProviders: vi.fn(),
@@ -20,8 +21,10 @@ vi.mock('./scheduler', async importOriginal => {
     failChunk: vi.fn(),
     finishChunk: vi.fn(),
     getChunk: vi.fn(),
+    getPaidCaseStartedAt: vi.fn(),
     hasUnsettledChunks: vi.fn(),
     recoverChunks: vi.fn(),
+    restartPaidCase: vi.fn(),
     scheduleRunChunks: vi.fn(),
     startChunk: vi.fn(),
   };
@@ -111,12 +114,13 @@ import {
   upsertCaseResult,
 } from './db';
 import { getBenchmarkConfig } from './config';
-import { processJob } from './run';
+import { processJob, acceptContainerCaseResult, PAID_OUTPUT_WAIT_MS } from './run';
 import { createDeciderJudge } from './decider-judge';
 import { createSystemOneClient } from './openrouter';
 import type { DeciderJudge } from './grading';
 import {
   beginPaidCase,
+  hasPaidCase,
   claimScheduledChunks,
   clearUnbilledCase,
   cooldownProviders,
@@ -124,8 +128,10 @@ import {
   failChunk,
   finishChunk,
   getChunk,
+  getPaidCaseStartedAt,
   hasUnsettledChunks,
   recoverChunks,
+  restartPaidCase,
   scheduleRunChunks,
   startChunk,
   type SchedulerClaim,
@@ -165,6 +171,7 @@ const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
   KILO_CLI_API_URL: 'http://host.docker.internal:3000',
   KILO_WEB_API_BASE_URL: 'http://host.docker.internal:3000',
+  BENCH_RESULT_URL: 'https://bench.test/container/case-result',
   BENCH_DB: { prepare: schedulerPrepare } as unknown as D1Database,
   BENCH_QUEUE: { send: queueSend, sendBatch: queueSendBatch },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
@@ -260,6 +267,8 @@ beforeEach(() => {
   queueSend.mockResolvedValue(undefined);
   vi.mocked(startChunk).mockResolvedValue(true);
   vi.mocked(beginPaidCase).mockResolvedValue(true);
+  vi.mocked(getPaidCaseStartedAt).mockResolvedValue(null);
+  vi.mocked(hasPaidCase).mockResolvedValue(true);
   vi.mocked(claimScheduledChunks).mockResolvedValue([]);
   vi.mocked(recoverChunks).mockResolvedValue([]);
   vi.mocked(hasUnsettledChunks).mockResolvedValue(false);
@@ -353,23 +362,41 @@ describe('processJob — scheduler-owned execution', () => {
         orgId: 'benchmark-org',
       })
     );
-    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(env, {
-      instanceName: 'benchmark-slot:7',
-      model,
-      variant: 'low',
-      benchCase,
-      kiloToken: 'kilo-user-token',
-      kiloApiUrl: env.KILO_CLI_API_URL,
-      orgId: 'benchmark-org',
-    });
-    expect(beginPaidCase).toHaveBeenCalledWith(env.BENCH_DB, {
-      runId,
-      model,
-      variant: 'low',
-      rep: 2,
-      caseId: benchCase.id,
-      token: 'token-1',
-    });
+    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        instanceName: 'benchmark-slot:7',
+        model,
+        variant: 'low',
+        benchCase,
+        kiloToken: 'kilo-user-token',
+        kiloApiUrl: env.KILO_CLI_API_URL,
+        orgId: 'benchmark-org',
+        resultCallback: {
+          url: env.BENCH_RESULT_URL,
+          execution: {
+            runId,
+            model,
+            variant: 'low',
+            rep: 2,
+            caseId: benchCase.id,
+            token: 'token-1',
+          },
+        },
+      })
+    );
+    expect(beginPaidCase).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      {
+        runId,
+        model,
+        variant: 'low',
+        rep: 2,
+        caseId: benchCase.id,
+        token: 'token-1',
+      },
+      expect.any(Number)
+    );
     expect(upsertCaseResult).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({
@@ -399,7 +426,7 @@ describe('processJob — scheduler-owned execution', () => {
     expect(finishChunk).not.toHaveBeenCalled();
   });
 
-  it('makes redelivery with an already-started or stale token a no-op', async () => {
+  it('makes a delivery whose token no longer owns its chunk a no-op', async () => {
     vi.mocked(startChunk).mockResolvedValue(false);
     await processJob(env, deciderMessage());
     expect(getChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
@@ -660,9 +687,11 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(recordLaneFailure).not.toHaveBeenCalled();
   });
 
-  it('refuses duplicate inference when a prior paid execution has no recoverable output', async () => {
-    vi.mocked(beginPaidCase).mockResolvedValue(false);
+  it('fails the lane without paying again once a prior paid execution can no longer deliver', async () => {
+    vi.mocked(getPaidCaseStartedAt).mockResolvedValue(Date.now() - PAID_OUTPUT_WAIT_MS);
     await processJob(env, deciderMessage());
+    expect(warmUpCliContainer).not.toHaveBeenCalled();
+    expect(beginPaidCase).not.toHaveBeenCalled();
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
     expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
@@ -676,6 +705,98 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     });
     expect(deferChunk).not.toHaveBeenCalled();
     expect(finishChunk).not.toHaveBeenCalled();
+  });
+
+  it('keeps the slot and rechecks while a prior paid execution may still deliver', async () => {
+    vi.mocked(getPaidCaseStartedAt).mockResolvedValue(Date.now() - 1_000);
+    await processJob(env, deciderMessage());
+    expect(getPaidCaseStartedAt).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId,
+      model,
+      variant: '',
+      rep: 0,
+      caseId: benchCase.id,
+      token: 'token-1',
+    });
+    expect(warmUpCliContainer).not.toHaveBeenCalled();
+    expect(beginPaidCase).not.toHaveBeenCalled();
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(queueSend).toHaveBeenCalledWith(deciderMessage(), { delaySeconds: 30 });
+  });
+
+  it('rechecks a lost paid connection without killing the lane', async () => {
+    vi.mocked(runDeciderCaseViaCli).mockRejectedValue(
+      new Error('container /run failed: HTTP 500 container just exited')
+    );
+    await processJob(env, deciderMessage());
+
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(clearUnbilledCase).not.toHaveBeenCalled();
+    expect(queueSend).toHaveBeenCalledWith(deciderMessage(), { delaySeconds: 30 });
+  });
+
+  it('restarts the paid start in the ledger before an empty-output retry', async () => {
+    vi.mocked(runDeciderCaseViaCli)
+      .mockResolvedValueOnce({ ...successfulCliResult, text: '' })
+      .mockResolvedValueOnce(successfulCliResult);
+    await processJob(env, deciderMessage());
+    const execution = {
+      runId,
+      model,
+      variant: '',
+      rep: 0,
+      caseId: benchCase.id,
+      token: 'token-1',
+    };
+    expect(beginPaidCase).toHaveBeenCalledWith(env.BENCH_DB, execution, expect.any(Number));
+    expect(restartPaidCase).toHaveBeenCalledWith(env.BENCH_DB, execution, expect.any(Number));
+    const [firstCall, retryCall] = vi.mocked(runDeciderCaseViaCli).mock.invocationCallOrder;
+    const restartCall = vi.mocked(restartPaidCase).mock.invocationCallOrder[0];
+    expect(restartCall).toBeGreaterThan(firstCall);
+    expect(restartCall).toBeLessThan(retryCall);
+    expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+  });
+
+  it('records a container-posted outcome as pending output or a released ledger row', async () => {
+    const execution = {
+      runId,
+      model,
+      variant: '',
+      rep: 0,
+      caseId: benchCase.id,
+      token: 'token-1',
+    };
+    const response = {
+      exitCode: 0,
+      durationMs: 12,
+      stdoutLines: ['{"type":"text","part":{"text":"42","time":{"end":1}}}'],
+      stderrTail: '',
+    };
+
+    await expect(
+      acceptContainerCaseResult(env, { execution, outcome: { kind: 'completed', response } })
+    ).resolves.toBe(true);
+    expect(savePendingDeciderOutput).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      { run_id: runId, model, variant: '', rep: 0, case_id: benchCase.id },
+      { result: expect.objectContaining({ text: '42', exitCode: 0 }), retried: false }
+    );
+
+    await expect(
+      acceptContainerCaseResult(env, { execution, outcome: { kind: 'not_started' } })
+    ).resolves.toBe(true);
+    expect(clearUnbilledCase).toHaveBeenCalledWith(env.BENCH_DB, execution);
+
+    vi.mocked(hasPaidCase).mockResolvedValue(false);
+    await expect(
+      acceptContainerCaseResult(env, { execution, outcome: { kind: 'not_started' } })
+    ).resolves.toBe(false);
+    expect(clearUnbilledCase).toHaveBeenCalledTimes(1);
   });
 
   it('persists raw failed output and CLI diagnostics before saving its grade', async () => {

@@ -240,6 +240,16 @@ describe('parseAuthError', () => {
     expect(parseAuthError({ error: 'BLOCKED' })).toEqual({ code: 'BLOCKED' });
   });
 
+  it('returns the step-up methods and keeps the code when they are malformed', () => {
+    expect(parseAuthError({ error: 'SIGNUP-STEP-UP', methods: ['google', 'apple'] })).toEqual({
+      code: 'SIGNUP-STEP-UP',
+      signupMethods: ['google', 'apple'],
+    });
+    expect(parseAuthError({ error: 'SIGNUP-STEP-UP', methods: 'apple' })).toEqual({
+      code: 'SIGNUP-STEP-UP',
+    });
+  });
+
   it('returns undefined for null, undefined, and non-error objects', () => {
     expect(parseAuthError(null)).toBeUndefined();
     expect(parseAuthError(undefined)).toBeUndefined();

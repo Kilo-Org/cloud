@@ -144,6 +144,9 @@ export const ALLOWED_VIEWER_COMMANDS: ReadonlySet<string> = new Set([
   // Old CLIs lack this command; remove the CLI_UPGRADE_REQUIRED mapping when
   // every supported CLI has list_directories.
   'list_directories',
+  // Old CLIs lack this command; remove the CLI_UPGRADE_REQUIRED mapping when
+  // every supported CLI has list_agents.
+  'list_agents',
   'send_command',
   'create_session',
   'exit_cli',
@@ -164,6 +167,7 @@ const CLI_UPGRADE_REQUIRED_COMMANDS: ReadonlySet<string> = new Set([
   'exit_cli',
   'drop_queued_message',
   'list_directories',
+  'list_agents',
 ]);
 
 const SESSION_OWNER_CHANGED_ERROR = {

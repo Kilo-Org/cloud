@@ -16,9 +16,12 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ORG_AUTO_TOP_UP_AMOUNTS_CENTS,
-  ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
+  ORG_AUTO_TOP_UP_THRESHOLDS_CENTS,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+  DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
+  isValidOrgAutoTopUpSettings,
   type OrgAutoTopUpAmountCents,
+  type OrgAutoTopUpThresholdCents,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { formatCents, formatPaymentMethodDescription } from '@/lib/utils';
 import { OrganizationAutoTopUpConfigureDialog } from './OrganizationAutoTopUpConfigureDialog';
@@ -40,6 +43,7 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
 
   const enabled = configData?.enabled ?? false;
   const currentAmount = configData?.amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
+  const currentThreshold = configData?.thresholdCents ?? DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS;
   const paymentMethodInfo = configData?.paymentMethod ?? null;
 
   const [selectedAmount, setSelectedAmount] = useState<OrgAutoTopUpAmountCents>(currentAmount);
@@ -90,6 +94,20 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
     })
   );
 
+  const updateThresholdMutation = useMutation(
+    trpc.organizations.autoTopUp.updateThreshold.mutationOptions({
+      onSuccess: () => {
+        toast.success('Automatic top up threshold updated');
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.autoTopUp.getConfig.queryKey({ organizationId }),
+        });
+      },
+      onError: () => {
+        toast.error('Failed to update threshold');
+      },
+    })
+  );
+
   const handleToggle = (checked: boolean) => {
     if (checked) {
       return;
@@ -102,7 +120,11 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
   };
 
   const handleChangePaymentMethod = () => {
-    changePaymentMethodMutation.mutate({ organizationId, amountCents: currentAmount });
+    changePaymentMethodMutation.mutate({
+      organizationId,
+      amountCents: currentAmount,
+      thresholdCents: currentThreshold,
+    });
   };
 
   const handleAmountChange = (value: string) => {
@@ -113,10 +135,16 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
     }
   };
 
+  const handleThresholdChange = (value: string) => {
+    const thresholdCents = parseInt(value, 10) as OrgAutoTopUpThresholdCents;
+    updateThresholdMutation.mutate({ organizationId, thresholdCents });
+  };
+
   const isPending =
     toggleMutation.isPending ||
     changePaymentMethodMutation.isPending ||
-    updateAmountMutation.isPending;
+    updateAmountMutation.isPending ||
+    updateThresholdMutation.isPending;
 
   const displayAmount = enabled ? currentAmount : selectedAmount;
 
@@ -133,8 +161,8 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
       <div className="mt-1 space-y-4">
         <p className="text-muted-foreground text-sm">
           Automatically top up when usage or a requested service brings your organization balance
-          below ${ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS}. Viewing the balance or credit expiration does
-          not trigger a payment.
+          below a threshold you choose. Viewing the balance or credit expiration does not trigger a
+          payment.
         </p>
         <CreditExpiryNotice />
         <Button
@@ -155,7 +183,7 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
 
   return (
     <div className="mt-1 space-y-4">
-      <div className="text-muted-foreground flex items-center gap-4 text-sm">
+      <div className="text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
         <Label className="flex cursor-pointer items-center space-x-2">
           <Switch
             checked={enabled}
@@ -170,18 +198,42 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
           onValueChange={handleAmountChange}
           disabled={isPending}
         >
-          <SelectTrigger className="w-24">
+          <SelectTrigger className="w-32" aria-label="Top up amount">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {ORG_AUTO_TOP_UP_AMOUNTS_CENTS.map(option => (
-              <SelectItem key={option} value={String(option)}>
+              <SelectItem
+                key={option}
+                value={String(option)}
+                disabled={!isValidOrgAutoTopUpSettings(option, currentThreshold)}
+              >
                 {formatCents(option)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <span>when balance drops below ${ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS}.</span>
+        <span>when balance drops below</span>
+        <Select
+          value={String(currentThreshold)}
+          onValueChange={handleThresholdChange}
+          disabled={isPending}
+        >
+          <SelectTrigger className="w-32" aria-label="Balance threshold">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ORG_AUTO_TOP_UP_THRESHOLDS_CENTS.map(option => (
+              <SelectItem
+                key={option}
+                value={String(option)}
+                disabled={!isValidOrgAutoTopUpSettings(currentAmount, option)}
+              >
+                {formatCents(option)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <p className="text-muted-foreground text-sm">
         You can disable automatic top ups at any time. If a payment fails, automatic top up will be

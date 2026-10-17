@@ -1,3 +1,4 @@
+import type { PaidExecutionKey } from './scheduler';
 import { parseKiloRunEvents } from './kilo-events';
 import type { DeciderCase } from './datasets/decider-cases';
 
@@ -12,7 +13,7 @@ export type CliRunResult = {
   timedOut: boolean;
 };
 
-const DECIDER_CLI_TIMEOUT_MS = 180_000;
+export const DECIDER_CLI_TIMEOUT_MS = 180_000;
 
 // Appended to every decider prompt: the agent harness tends to wrap answers
 // in prose ("The output is: ..."), which strict mechanical checks reject.
@@ -33,7 +34,7 @@ export function isRetryableContainerAvailabilityError(error: unknown): boolean {
   );
 }
 
-type ContainerRunResponse = {
+export type ContainerRunResponse = {
   exitCode: number;
   durationMs: number;
   stdoutLines: string[];
@@ -66,6 +67,8 @@ export async function runDeciderCaseViaCli(
     variant?: string | null;
     /** @deprecated Prefer `variant`. Same value; kept for call-site compatibility. */
     reasoningEffort?: string | null;
+    /** Where the container posts the outcome if this request's connection is lost. */
+    resultCallback?: { url: string; execution: PaidExecutionKey };
   }
 ): Promise<CliRunResult> {
   const { instanceName, model, benchCase, kiloToken, kiloApiUrl, orgId } = params;
@@ -86,6 +89,7 @@ export async function runDeciderCaseViaCli(
         orgId: orgId ?? null,
         timeoutMs: DECIDER_CLI_TIMEOUT_MS,
         variant: variant ?? null,
+        resultCallback: params.resultCallback ?? null,
       }),
     })
   );
@@ -95,7 +99,13 @@ export async function runDeciderCaseViaCli(
     throw new Error(`container /run failed: HTTP ${response.status} ${detail}`);
   }
 
-  const body = (await response.json()) as ContainerRunResponse;
+  return parseContainerRunResponse(await response.json(), startedAt);
+}
+
+export function parseContainerRunResponse(
+  body: ContainerRunResponse,
+  startedAt: number
+): CliRunResult {
   const { text, costUsd, eventCount, lastEventTypes } = parseKiloRunEvents(body.stdoutLines ?? []);
   const providerThrottled = (body.stdoutLines ?? []).some(line => {
     try {

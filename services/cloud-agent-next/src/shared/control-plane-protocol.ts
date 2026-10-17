@@ -1000,8 +1000,6 @@ const controlPlaneWorktreeDeleteFrameSchema = z
   })
   .strict();
 
-// --- terminals (B10) --------------------------------------------------------
-
 /**
  * Session DO -> Sandbox DO terminal request (spec §10). The Sandbox DO forwards
  * exactly one request frame and returns the wrapper's `terminal.result`. The

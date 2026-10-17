@@ -19,11 +19,10 @@ function resolveRouting(
   }
   return {
     apiUrl: auth.credentials.config.url,
-    apiKey: '',
+    apiKey: auth.credentials.proxy_secret,
     apiKeyHeader: null,
     secureProxy: {
       url: upstream.base_url,
-      secret: auth.credentials.proxy_secret,
       upstreamAuthHeaders: auth.credentials.config.extra_headers ?? {},
     },
   };

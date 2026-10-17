@@ -5,7 +5,7 @@ import type { OpenAiChatGptOwner } from '@kilocode/web-shared/lib/ai-gateway/ope
 import {
   ReasoningDetailsTransform,
   type ReasoningDetailsTransform as ReasoningDetailsTransformType,
-} from '@kilocode/db';
+} from '@kilocode/db/schema-types';
 
 export { ReasoningDetailsTransform };
 
@@ -46,7 +46,6 @@ export type ProviderResponseTransforms = ReasoningDetailsTransformType;
 export type SecureProxyRoute = {
   /** Proxy endpoint URL, used as-is. */
   url: string;
-  secret: string;
   /** Upstream authentication headers, applied by the proxy instead of the API key. */
   upstreamAuthHeaders: Record<string, string>;
 };
@@ -68,7 +67,7 @@ export type Provider = {
   /**
    * Sends the request through apps/ai-gateway-secure-proxy. `apiUrl` and
    * `disableUrlSuffix` then describe the upstream behind the proxy, and
-   * `apiKey` is unused.
+   * `apiKey` is the proxy's shared secret.
    */
   secureProxy?: SecureProxyRoute;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;

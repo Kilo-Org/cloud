@@ -29,7 +29,8 @@ import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enu
 import {
   AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS,
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
-  ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
+  MAX_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
+  parseOrgAutoTopUpThresholdCents,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
   SYSTEM_AUTO_TOP_UP_USER_ID,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
@@ -73,6 +74,18 @@ export type AutoTopUpOrganization = Pick<
 export type AutoTopUpEntity =
   | { type: 'user'; user: UserForBalance }
   | { type: 'organization'; organization: AutoTopUpOrganization };
+
+function orgThresholdDollars(thresholdCents: number | null | undefined): number {
+  return parseOrgAutoTopUpThresholdCents(thresholdCents) / 100;
+}
+
+async function getOrganizationAutoTopUpThresholdDollars(organizationId: string): Promise<number> {
+  const config = await db.query.auto_top_up_configs.findFirst({
+    columns: { threshold_cents: true },
+    where: eq(auto_top_up_configs.owned_by_organization_id, organizationId),
+  });
+  return orgThresholdDollars(config?.threshold_cents);
+}
 
 async function shouldWaitForKiloPassBonusCredits(kiloUserId: string): Promise<boolean> {
   const subscription = await getKiloPassStateForUser(db, kiloUserId);
@@ -150,8 +163,17 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
   }
 
   // Only trigger if balance is below threshold
+  const maxThreshold =
+    entity.type === 'user'
+      ? AUTO_TOP_UP_THRESHOLD_DOLLARS
+      : MAX_ORG_AUTO_TOP_UP_THRESHOLD_CENTS / 100;
+  if (initialBalance_USD >= maxThreshold) {
+    return;
+  }
   const threshold =
-    entity.type === 'user' ? AUTO_TOP_UP_THRESHOLD_DOLLARS : ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS;
+    entity.type === 'user'
+      ? AUTO_TOP_UP_THRESHOLD_DOLLARS
+      : await getOrganizationAutoTopUpThresholdDollars(entity.organization.id);
   if (initialBalance_USD >= threshold) {
     return;
   }
@@ -238,6 +260,7 @@ async function performAutoTopUpForEntity(
       id: auto_top_up_configs.id,
       stripe_payment_method_id: auto_top_up_configs.stripe_payment_method_id,
       amount_cents: auto_top_up_configs.amount_cents,
+      threshold_cents: auto_top_up_configs.threshold_cents,
       attempt_started_at: auto_top_up_configs.attempt_started_at,
       created_by_user_id: auto_top_up_configs.created_by_user_id,
     });
@@ -265,7 +288,9 @@ async function performAutoTopUpForEntity(
     autoTopUpEnabled,
   } = await getEntityBalanceAndStripeCustomer(entity);
   const threshold =
-    entity.type === 'user' ? AUTO_TOP_UP_THRESHOLD_DOLLARS : ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS;
+    entity.type === 'user'
+      ? AUTO_TOP_UP_THRESHOLD_DOLLARS
+      : orgThresholdDollars(config.threshold_cents);
   if (!autoTopUpEnabled || currentBalance_USD >= threshold) {
     await db
       .update(auto_top_up_configs)

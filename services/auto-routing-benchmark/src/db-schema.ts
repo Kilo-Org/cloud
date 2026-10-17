@@ -270,6 +270,7 @@ export const schedulerExecutions = sqliteTable(
     rep: integer('rep').notNull(),
     case_id: text('case_id').notNull(),
     token: text('token').notNull(),
+    started_at: integer('started_at').notNull().default(0),
   },
   table => [
     primaryKey({ columns: [table.run_id, table.model, table.variant, table.rep, table.case_id] }),
@@ -277,10 +278,11 @@ export const schedulerExecutions = sqliteTable(
 );
 
 /**
- * Single row (id = 1) serializing dispatch passes. A pass holds the lease while it
- * reads live occupancy and claims; another dispatcher that finds the lease held
+ * Scheduler lease rows. Row 1 serializes dispatch passes: a pass holds the lease while
+ * it reads live occupancy and claims; another dispatcher that finds the lease held
  * returns immediately and the next completion or cron wake retries. Model,
  * provider and slot caps are only exact if one pass at a time reads occupancy.
+ * Row 2, created on first use, serializes run initialization passes.
  */
 export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
   id: integer('id').primaryKey(),
@@ -302,6 +304,20 @@ export const schedulerCooldowns = sqliteTable(
   },
   table => [primaryKey({ columns: [table.scope, table.key] })]
 );
+
+/**
+ * Single row (id = 1) of admin scheduler overrides. A null limit falls back to
+ * `BENCHMARK_SCHEDULER_CONFIG`, then the default. Dispatch reads it by primary key.
+ */
+export const schedulerSettings = sqliteTable('scheduler_settings', {
+  id: integer('id').primaryKey(),
+  slots: integer('slots'),
+  model_concurrency: integer('model_concurrency'),
+  provider_concurrency: integer('provider_concurrency'),
+  unknown_provider_concurrency: integer('unknown_provider_concurrency'),
+  updated_at: text('updated_at').notNull(),
+  updated_by: text('updated_by'),
+});
 
 export const routingTables = sqliteTable('routing_tables', {
   run_id: text('run_id').primaryKey(),

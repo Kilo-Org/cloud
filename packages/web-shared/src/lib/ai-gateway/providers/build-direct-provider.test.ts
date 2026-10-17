@@ -255,11 +255,10 @@ describe('buildDirectProvider authentication', () => {
     expect(provider).toMatchObject({
       apiUrl: 'https://llm.example.com/invoke',
       disableUrlSuffix: true,
-      apiKey: '',
+      apiKey: 'proxy-secret',
       apiKeyHeader: null,
       secureProxy: {
         url: 'https://secure-proxy.example.com/api/proxy',
-        secret: 'proxy-secret',
         upstreamAuthHeaders: { authorization: 'Bearer upstream-key' },
       },
     });

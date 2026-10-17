@@ -326,7 +326,8 @@ export async function upstreamRequest({
 
     const outgoing = provider.secureProxy
       ? buildSecureProxyRequest({
-          secureProxy: provider.secureProxy,
+          proxyUrl: provider.secureProxy.url,
+          secret: provider.apiKey,
           upstreamUrl: targetUrl,
           upstreamHeaders: headers,
           body,

@@ -1,0 +1,27 @@
+name: tRPC declarations
+description: >-
+  Restore packages/trpc/dist from the cache, or build it. The cache key hashes
+  every repository file in the tRPC declaration program (from
+  `tsgo --listFilesOnly`), the build configuration, and pnpm-lock.yaml, which
+  pins every file under node_modules. A hit therefore restores exactly what the
+  build would write. Run it after `pnpm install`.
+
+runs:
+  using: composite
+  steps:
+    - name: Hash tRPC declaration inputs
+      id: key
+      shell: bash
+      run: node scripts/trpc-declaration-key.mjs >> "$GITHUB_OUTPUT"
+
+    - name: Restore tRPC declarations
+      id: cache
+      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      with:
+        path: packages/trpc/dist
+        key: ${{ runner.os }}-trpc-declarations-${{ steps.key.outputs.key }}
+
+    - name: Build trpc types
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: pnpm --filter @kilocode/trpc run build

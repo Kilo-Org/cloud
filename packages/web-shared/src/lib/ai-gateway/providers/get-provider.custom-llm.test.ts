@@ -64,9 +64,9 @@ describe('getProvider custom LLM credentials', () => {
         id: 'custom',
         apiUrl: 'https://llm.example.com/v1/chat/completions',
         disableUrlSuffix: true,
+        apiKey: 'proxy-secret',
         secureProxy: {
           url: 'https://secure-proxy.example.com/api/proxy',
-          secret: 'proxy-secret',
           upstreamAuthHeaders: { Authorization: 'Bearer upstream-key' },
         },
       },

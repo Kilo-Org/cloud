@@ -22,7 +22,7 @@ import type { HonoEnv } from './hono-env';
 import type { StoredOwnerSettings } from './routing-mode';
 
 const READ_CONCURRENCY = 10;
-const OUTAGE_BATCH_SIZE = 5;
+const OUTAGE_CONSECUTIVE_FAILURES = 5;
 
 const ScanRequestSchema = z.object({
   ownerType: CustomRouterScopeSchema,
@@ -30,6 +30,8 @@ const ScanRequestSchema = z.object({
   after: z.string().min(1).nullable(),
   limit: z.number().int().min(1).max(10_000).default(2_000),
   dryRun: z.boolean(),
+  // Carried from the previous page so sparse pages still detect an outage.
+  consecutiveFailed: z.number().int().min(0).default(0),
 });
 
 export type OwnerObjectMatch = { ownerId: string; objectId: string };
@@ -120,33 +122,33 @@ async function postChunk(
 }
 
 /**
- * Keeps every result a batch already produced. A transport failure, a bad response, or a batch of
- * at least OUTAGE_BATCH_SIZE conversions that all failed is treated as an outage: the rest of the
- * page is reported `failed` without being posted. A smaller all-failed batch (for example a retry
- * that holds only one persistently failing owner) is reported and the run continues.
+ * Keeps every result a batch already produced. A transport failure, a bad response, or
+ * OUTAGE_CONSECUTIVE_FAILURES `failed` results in a row (counted across batches and, through the
+ * request, across pages) is treated as an outage: the rest of the page is reported `failed`
+ * without being posted. One owner that keeps failing never reaches the threshold on its own.
  */
 async function postConversions(
   env: Env,
-  conversions: readonly OwnerPoolConversion[]
-): Promise<{ results: OwnerPoolConversionResult[]; aborted: boolean }> {
+  conversions: readonly OwnerPoolConversion[],
+  previousConsecutiveFailed: number
+): Promise<{ results: OwnerPoolConversionResult[]; aborted: boolean; consecutiveFailed: number }> {
   const secret = await env.INTERNAL_API_SECRET_PROD.get();
   const url = new URL(OWNER_POOL_CONVERSION_PATH, env.KILO_WEB_API_BASE_URL);
   const results: OwnerPoolConversionResult[] = [];
+  let consecutiveFailed = previousConsecutiveFailed;
   for (let start = 0; start < conversions.length; start += MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST) {
     const chunk = conversions.slice(start, start + MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST);
     const chunkResults = await postChunk(url, secret, chunk);
-    if (
-      chunkResults === null ||
-      (chunk.length >= OUTAGE_BATCH_SIZE &&
-        chunkResults.every(result => result.outcome === 'failed'))
-    ) {
-      results.push(...(chunkResults ?? chunk.map(unpostedResult)));
-      results.push(...conversions.slice(start + chunk.length).map(unpostedResult));
-      return { results, aborted: true };
+    for (const result of chunkResults ?? []) {
+      consecutiveFailed = result.outcome === 'failed' ? consecutiveFailed + 1 : 0;
     }
-    results.push(...chunkResults);
+    results.push(...(chunkResults ?? chunk.map(unpostedResult)));
+    if (chunkResults === null || consecutiveFailed >= OUTAGE_CONSECUTIVE_FAILURES) {
+      results.push(...conversions.slice(start + chunk.length).map(unpostedResult));
+      return { results, aborted: true, consecutiveFailed };
+    }
   }
-  return { results, aborted: false };
+  return { results, aborted: false, consecutiveFailed };
 }
 
 export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
@@ -219,10 +221,10 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
     conversions.push(conversion);
   }
 
-  const { results, aborted } =
+  const { results, aborted, consecutiveFailed } =
     dryRun || conversions.length === 0
-      ? { results: [], aborted: false }
-      : await postConversions(c.env, conversions);
+      ? { results: [], aborted: false, consecutiveFailed: parsed.data.consecutiveFailed }
+      : await postConversions(c.env, conversions, parsed.data.consecutiveFailed);
 
   const outcomes = Object.fromEntries(
     OwnerPoolConversionOutcomeSchema.options.map(outcome => [outcome, 0])
@@ -275,6 +277,7 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
     noticesSent,
     noticesFailed,
     aborted,
+    consecutiveFailed,
   };
   console.log(
     JSON.stringify({

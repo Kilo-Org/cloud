@@ -71,7 +71,10 @@ export type OwnerPoolConversionResponse = z.infer<typeof OwnerPoolConversionResp
 
 // The auto-routing worker's one-off scan route; the operator script drives it.
 export const OWNER_POOL_CONVERSION_SCAN_PATH = '/admin/owner-pool-conversion/scan';
+// `exists` is listed because an unmarked owner whose router already matches was most likely
+// converted by an interrupted run that never sent the notice.
 export const OWNER_POOL_CONVERSION_ATTENTION_OUTCOMES = [
+  'exists',
   'slug_taken',
   'router_cap_reached',
   'failed',
@@ -97,8 +100,11 @@ export const OwnerPoolConversionScanResponseSchema = z.object({
   outcomes: z.record(OwnerPoolConversionOutcomeSchema, z.number().int().nonnegative()),
   noticesSent: z.number().int().nonnegative(),
   noticesFailed: z.number().int().nonnegative(),
-  // The web endpoint failed a whole batch; the rest of the page was not posted.
+  // The web endpoint failed a whole batch, or too many conversions failed in a row; the rest of
+  // the page was not posted.
   aborted: z.boolean(),
+  // `failed` results in a row at the end of this page; the next scan request carries it on.
+  consecutiveFailed: z.number().int().nonnegative(),
 });
 export type OwnerPoolConversionScanResponse = z.infer<typeof OwnerPoolConversionScanResponseSchema>;
 

@@ -192,6 +192,7 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
       noticesSent: 2,
       noticesFailed: 0,
       aborted: false,
+      consecutiveFailed: 0,
     });
     expect([...marked.keys()]).toEqual([withMode, withoutMode]);
     expect(dbFrom).toHaveBeenCalledWith(kilocode_users);
@@ -389,6 +390,92 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
       needsAttention: ['failed user:u1'],
     });
     expect(marked.size).toBe(0);
+  });
+
+  it.each([
+    ['four failures in a row', 0, 4, 200],
+    ['the fifth failure in a row, carried over from earlier pages', 4, 1, 503],
+  ])('counts %s toward an outage', async (_label, carried, failing, status) => {
+    ownerRows = Array.from({ length: failing }, (_, index) => `u${index}`);
+    const objectIds = ownerRows.map(id =>
+      setOwner('user', id, { mode: null, pool: [{ model: 'a/b' }] })
+    );
+    webFetch.mockImplementation(async (_url, init) =>
+      Response.json({
+        results: requestBody(init).conversions.map(conversion => ({
+          owner: conversion.owner,
+          outcome: 'failed',
+          modelId: 'kilo-auto/custom/efficient',
+          noticesSent: 0,
+          noticesFailed: 0,
+        })),
+      })
+    );
+
+    const response = await scan({
+      ownerType: 'user',
+      objectIds,
+      after: null,
+      dryRun: false,
+      consecutiveFailed: carried,
+    });
+
+    expect(response.status).toBe(status);
+    await expect(response.json()).resolves.toMatchObject({
+      aborted: status === 503,
+      consecutiveFailed: carried + failing,
+    });
+  });
+
+  it('resets the failure run on any other outcome', async () => {
+    ownerRows = ['u1', 'u2'];
+    const objectIds = ownerRows.map(id =>
+      setOwner('user', id, { mode: null, pool: [{ model: 'a/b' }] })
+    );
+    const outcomes = ['failed', 'created'] as const;
+    webFetch.mockImplementation(async (_url, init) =>
+      Response.json({
+        results: requestBody(init).conversions.map((conversion, index) => ({
+          owner: conversion.owner,
+          outcome: outcomes[index],
+          modelId: 'kilo-auto/custom/efficient',
+          noticesSent: 1,
+          noticesFailed: 0,
+        })),
+      })
+    );
+
+    const response = await scan({
+      ownerType: 'user',
+      objectIds,
+      after: null,
+      dryRun: false,
+      consecutiveFailed: 3,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ consecutiveFailed: 0 });
+  });
+
+  it('lists an unmarked owner whose router already matches as exists', async () => {
+    const id = setOwner('user', 'u1', { mode: null, pool: [{ model: 'a/b' }] });
+    ownerRows = ['u1'];
+    webFetch.mockImplementation(async (_url, init) =>
+      Response.json({
+        results: requestBody(init).conversions.map(conversion => ({
+          owner: conversion.owner,
+          outcome: 'exists',
+          modelId: 'kilo-auto/custom/efficient',
+          noticesSent: 0,
+          noticesFailed: 0,
+        })),
+      })
+    );
+
+    const response = await scan({ ownerType: 'user', objectIds: [id], after: null, dryRun: false });
+
+    await expect(response.json()).resolves.toMatchObject({ needsAttention: ['exists user:u1'] });
+    expect([...marked.keys()]).toEqual([id]);
   });
 
   it('skips owners an earlier run converted', async () => {

@@ -137,8 +137,9 @@ async function main(): Promise<void> {
   let droppedModeOnly = 0;
   let noticesSent = 0;
   let noticesFailed = 0;
-  // Owner keys are printed as each page arrives: those owners are marked converted, so a rerun
-  // after a crash skips them and could not report them again.
+  // Owner keys are printed as each page arrives so a crash later in the run cannot lose them.
+  // Marked owners (`exists`, `notice_failed`, `invalidMode`) are skipped by a rerun and would not
+  // be reported again.
   const add = (result: OwnerPoolConversionScanResponse) => {
     for (const id of result.matchedObjectIds) matched.add(id);
     for (const outcome of OwnerPoolConversionOutcomeSchema.options) {
@@ -204,6 +205,7 @@ async function main(): Promise<void> {
     );
   };
 
+  let consecutiveFailed = 0;
   try {
     const startIndex = resume ? OWNER_TYPES.indexOf(resume.ownerType) : 0;
     for (const ownerType of OWNER_TYPES.slice(startIndex)) {
@@ -217,7 +219,7 @@ async function main(): Promise<void> {
           response = await fetch(target, {
             method: 'POST',
             headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-            body: JSON.stringify({ ownerType, objectIds, after, limit, dryRun }),
+            body: JSON.stringify({ ownerType, objectIds, after, limit, dryRun, consecutiveFailed }),
             signal: AbortSignal.timeout(300_000),
             redirect: 'error',
           });
@@ -225,7 +227,7 @@ async function main(): Promise<void> {
         } catch (error) {
           const reason = error instanceof Error ? error.message : 'scan failed';
           throw new Error(
-            `${reason}; ${retryHint}. Owners reported failed on an interrupted page may have a router without a notice; check them by hand.`
+            `${reason}; ${retryHint}. Owners on the interrupted page whose router was already created come back as \`exists\` on the retry; send them their notice by hand.`
           );
         }
         const result = OwnerPoolConversionScanResponseSchema.safeParse(body);
@@ -233,9 +235,10 @@ async function main(): Promise<void> {
           throw new Error(`scan responded ${response.status} without a summary; ${retryHint}`);
         }
         add(result.data);
+        consecutiveFailed = result.data.consecutiveFailed;
         if (result.data.aborted) {
           throw new Error(
-            `the web endpoint failed a whole batch; ${retryHint}. To skip a single owner that keeps failing, resume after its id: --resume ${ownerType}:<ownerId>.`
+            `the web endpoint looks unavailable (a failed batch or repeated failed conversions); fix it, then ${retryHint}`
           );
         }
         after = result.data.nextCursor;

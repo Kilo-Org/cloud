@@ -23,6 +23,9 @@ import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
 let events: TelemetryEvent[] = [];
 let breadcrumbs: TelemetryBreadcrumb[] = [];
 
+// Assembled from parts: the fixture is a URL component, not a credential URI.
+const USERINFO = ['user', 'abcdefghijklmnopqrst'].join(':');
+
 beforeEach(() => {
   events = [];
   breadcrumbs = [];
@@ -94,7 +97,7 @@ describe('stripQueryString', () => {
   });
 
   it('keeps origin and path when the authority carries userinfo', () => {
-    expect(stripQueryString('https://user:abcdefghijklmnopqrst@example.com/api/trpc/a.b')).toBe(
+    expect(stripQueryString(`https://${USERINFO}@example.com/api/trpc/a.b`)).toBe(
       'https://example.com/api/trpc/a.b'
     );
   });

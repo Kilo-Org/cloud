@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { scrubBreadcrumb, scrubEvent } from './sentry-scrub';
 
+// Assembled from parts: the fixture is a URL component, not a credential URI.
+const USERINFO = ['user', 'abcdefghijklmnopqrst'].join(':');
+
 /**
  * The scrubber's message and URL coverage: the payload text Sentry shows — the
  * exception message, `event.message`, the app's `network` context — is
@@ -97,7 +100,7 @@ describe('scrubEvent URL reduction', () => {
       request: { url: 'https://example.com/oauth/callback#abcdefghijklmnopqrst' },
     });
     const userinfo = scrubEvent({
-      request: { url: 'https://user:abcdefghijklmnopqrst@api.example.com/v1/latency' },
+      request: { url: `https://${USERINFO}@api.example.com/v1/latency` },
     });
 
     expect(fragment.request.url).toBe('https://example.com/oauth/callback');

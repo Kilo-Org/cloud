@@ -876,6 +876,7 @@ describe('processJob — canonical registry publication', () => {
         last_event_types: 'x',
         rep: 0,
         timed_out: 0,
+        prompt_revision: 2,
       }))
     );
     vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set([benchCase.id]));

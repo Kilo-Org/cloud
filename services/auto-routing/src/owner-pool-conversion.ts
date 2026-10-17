@@ -2,6 +2,7 @@ import {
   CustomRouterScopeSchema,
   DEFAULT_AUTO_ROUTING_MODE,
   MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST,
+  OWNER_POOL_CONVERSION_ATTENTION_OUTCOMES,
   OWNER_POOL_CONVERSION_PATH,
   OwnerPoolConversionOutcomeSchema,
   OwnerPoolConversionResponseSchema,
@@ -9,6 +10,7 @@ import {
   type OwnerPoolConversion,
   type OwnerPoolConversionOutcome,
   type OwnerPoolConversionResult,
+  type OwnerPoolConversionScanResponse,
 } from '@kilocode/auto-routing-contracts';
 import { getWorkerDb, kilocode_users, organizations } from '@kilocode/db';
 import { asc, gt } from 'drizzle-orm';
@@ -145,10 +147,14 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
 
   const conversions: OwnerPoolConversion[] = [];
   const readFailed: string[] = [];
+  const invalidPool: string[] = [];
   let droppedModeOnly = 0;
   for (const { match, settings } of reads) {
+    const ownerKey = `${ownerType}:${match.ownerId}`;
     if (settings === null) {
-      readFailed.push(`${ownerType}:${match.ownerId}`);
+      readFailed.push(ownerKey);
+    } else if (settings.invalidPool) {
+      invalidPool.push(ownerKey);
     } else if (settings.pool === null) {
       droppedModeOnly += 1;
     } else {
@@ -181,21 +187,30 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
   const outcomes = Object.fromEntries(
     OwnerPoolConversionOutcomeSchema.options.map(outcome => [outcome, 0])
   ) as Record<OwnerPoolConversionOutcome, number>;
+  const attentionOutcomes: ReadonlySet<OwnerPoolConversionOutcome> = new Set(
+    OWNER_POOL_CONVERSION_ATTENTION_OUTCOMES
+  );
+  const needsAttention: string[] = [];
   let noticesSent = 0;
   let noticesFailed = 0;
   for (const result of results) {
     outcomes[result.outcome] += 1;
     noticesSent += result.noticesSent;
     noticesFailed += result.noticesFailed;
+    if (attentionOutcomes.has(result.outcome)) {
+      needsAttention.push(`${result.outcome} ${result.owner.type}:${result.owner.id}`);
+    }
   }
 
-  const summary = {
+  const summary: OwnerPoolConversionScanResponse = {
     scanned: ownerIds.length,
     nextCursor: ownerIds.length === limit ? (ownerIds.at(-1) ?? null) : null,
     matchedObjectIds: matches.map(match => match.objectId),
     conversions: conversions.length,
     droppedModeOnly,
     readFailed,
+    invalidPool,
+    needsAttention,
     outcomes,
     noticesSent,
     noticesFailed,
@@ -212,6 +227,8 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
       conversions: summary.conversions,
       droppedModeOnly,
       readFailed: readFailed.length,
+      invalidPool: invalidPool.length,
+      needsAttention: needsAttention.length,
       outcomes,
       noticesSent,
       noticesFailed,

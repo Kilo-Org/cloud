@@ -5,6 +5,7 @@ import {
   CUSTOM_ROUTER_EVAL_CASE_PATH,
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
+  OWNER_POOL_CONVERSION_SCAN_PATH,
 } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { authMiddleware } from './auth';
@@ -43,7 +44,7 @@ app.get('/health', c => c.json({ status: 'ok', service: 'auto-routing' }));
 
 app.get('/admin/classifier-model', getClassifierModelHandler);
 app.put('/admin/classifier-model', putClassifierModelHandler);
-app.post('/admin/owner-pool-conversion/scan', ownerPoolConversionScanHandler);
+app.post(OWNER_POOL_CONVERSION_SCAN_PATH, ownerPoolConversionScanHandler);
 app.get('/admin/classifier-analytics', classifierAnalyticsHandler);
 
 app.post('/decide', decideHandler);

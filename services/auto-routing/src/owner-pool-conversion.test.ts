@@ -35,7 +35,7 @@ const env = {
     get: (id: { toString(): string }) => ({
       readStoredSettings: async () => {
         const value = stored.get(id.toString());
-        if (value === undefined) return { mode: null, pool: null };
+        if (value === undefined) return { mode: null, pool: null, invalidPool: false };
         if (value instanceof Error) throw value;
         return value;
       },
@@ -43,10 +43,27 @@ const env = {
   },
 };
 
-function setOwner(ownerType: 'user' | 'org', id: string, settings: StoredOwnerSettings | Error) {
-  stored.set(objectIdFor(`${ownerType}:${id}`), settings);
+function setOwner(
+  ownerType: 'user' | 'org',
+  id: string,
+  settings: Omit<StoredOwnerSettings, 'invalidPool'> | Error,
+  invalidPool = false
+) {
+  stored.set(
+    objectIdFor(`${ownerType}:${id}`),
+    settings instanceof Error ? settings : { ...settings, invalidPool }
+  );
   return objectIdFor(`${ownerType}:${id}`);
 }
+
+const NO_OUTCOMES = {
+  created: 0,
+  exists: 0,
+  slug_taken: 0,
+  router_cap_reached: 0,
+  owner_not_found: 0,
+  failed: 0,
+};
 
 function scan(body: unknown, authorization: string | null = 'Bearer internal-secret') {
   return app.request(
@@ -131,11 +148,12 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     const modeOnly = setOwner('user', 'u3', { mode: 'best_accuracy', pool: null });
     const failed = setOwner('user', 'u4', new Error('storage unavailable'));
     const orgId = setOwner('org', 'u1', { mode: null, pool: [{ model: 'org/model' }] });
+    const invalid = setOwner('user', 'u5', { mode: 'best_accuracy', pool: null }, true);
     ownerRows = ['u1', 'u2', 'u3', 'u4', 'u5'];
 
     const response = await scan({
       ownerType: 'user',
-      objectIds: [withMode, withoutMode, modeOnly, failed, orgId],
+      objectIds: [withMode, withoutMode, modeOnly, failed, orgId, invalid],
       after: null,
       limit: 5,
       dryRun: false,
@@ -145,11 +163,13 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     await expect(response.json()).resolves.toEqual({
       scanned: 5,
       nextCursor: 'u5',
-      matchedObjectIds: [withMode, withoutMode, modeOnly, failed],
+      matchedObjectIds: [withMode, withoutMode, modeOnly, failed, invalid],
       conversions: 2,
       droppedModeOnly: 1,
       readFailed: ['user:u4'],
-      outcomes: { created: 2, exists: 0, router_cap_reached: 0, owner_not_found: 0 },
+      invalidPool: ['user:u5'],
+      needsAttention: [],
+      outcomes: { ...NO_OUTCOMES, created: 2 },
       noticesSent: 2,
       noticesFailed: 0,
     });
@@ -202,7 +222,7 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       conversions: 1,
-      outcomes: { created: 0, exists: 0, router_cap_reached: 0, owner_not_found: 0 },
+      outcomes: NO_OUTCOMES,
     });
     expect(webFetch).not.toHaveBeenCalled();
   });
@@ -225,6 +245,31 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     expect(webRequests().flatMap(request => request.conversions.map(c => c.owner.id))).toEqual(
       ownerRows
     );
+  });
+
+  it('lists every owner whose conversion needs operator attention', async () => {
+    ownerRows = ['u1', 'u2', 'u3', 'u4'];
+    const objectIds = ownerRows.map(id => setOwner('user', id, { mode: null, pool: [{ model: 'a/b' }] }));
+    const outcomes = ['created', 'slug_taken', 'router_cap_reached', 'failed'] as const;
+    webFetch.mockImplementation(async (_url, init) =>
+      Response.json({
+        results: requestBody(init).conversions.map((conversion, index) => ({
+          owner: conversion.owner,
+          outcome: outcomes[index],
+          modelId: 'kilo-auto/custom/efficient',
+          noticesSent: 0,
+          noticesFailed: 0,
+        })),
+      })
+    );
+
+    const response = await scan({ ownerType: 'user', objectIds, after: null, dryRun: false });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      needsAttention: ['slug_taken user:u2', 'router_cap_reached user:u3', 'failed user:u4'],
+      outcomes: { ...NO_OUTCOMES, created: 1, slug_taken: 1, router_cap_reached: 1, failed: 1 },
+    });
   });
 
   it.each([

@@ -3,6 +3,7 @@ import 'server-only';
 import {
   MAX_CUSTOM_ROUTERS_PER_OWNER,
   convertedOwnerPoolRouter,
+  customRouterEntryKey,
   type ConvertedOwnerPoolRouter,
   type OwnerPoolConversion,
   type OwnerPoolConversionOutcome,
@@ -24,6 +25,7 @@ import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import * as z from 'zod';
+import { customRouterOwnerCondition } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { lockOwner, ownerRouterSlugs } from '@/lib/auto-routing-custom-routers';
 
 type ConvertedOwner =
@@ -54,8 +56,24 @@ async function insertConvertedRouter(
 ): Promise<OwnerPoolConversionOutcome> {
   return db.transaction(async tx => {
     await lockOwner(tx, owner);
+    const [sameSlug] = await tx
+      .select({ entries: auto_routing_custom_routers.entries })
+      .from(auto_routing_custom_routers)
+      .where(
+        and(
+          customRouterOwnerCondition(owner),
+          eq(auto_routing_custom_routers.slug, router.slug)
+        )
+      )
+      .limit(1);
+    if (sameSlug) {
+      const existingKeys = new Set(sameSlug.entries.map(customRouterEntryKey));
+      const holdsPool =
+        existingKeys.size === router.entries.length &&
+        router.entries.every(entry => existingKeys.has(customRouterEntryKey(entry)));
+      return holdsPool ? 'exists' : 'slug_taken';
+    }
     const existing = await ownerRouterSlugs(tx, owner);
-    if (existing.some(row => row.slug === router.slug)) return 'exists';
     if (existing.length >= MAX_CUSTOM_ROUTERS_PER_OWNER) return 'router_cap_reached';
     await tx.insert(auto_routing_custom_routers).values({
       owned_by_user_id: owner.type === 'user' ? owner.id : null,
@@ -142,19 +160,28 @@ async function convertOwnerPool(
     notices = { noticesSent: 0, noticesFailed: 0 }
   ): OwnerPoolConversionResult => ({ owner, outcome, modelId: router.modelId, ...notices });
 
-  const converted = await findOwner(owner);
-  if (!converted) return result('owner_not_found');
+  try {
+    const converted = await findOwner(owner);
+    if (!converted) return result('owner_not_found');
 
-  const outcome = await insertConvertedRouter(owner, router);
-  if (outcome === 'router_cap_reached') {
-    warnExceptInTest('Owner pool conversion skipped: custom router cap reached', {
-      ownerType: owner.type,
-      ownerId: owner.id,
-      cap: MAX_CUSTOM_ROUTERS_PER_OWNER,
+    const outcome = await insertConvertedRouter(owner, router);
+    if (outcome === 'router_cap_reached' || outcome === 'slug_taken') {
+      warnExceptInTest('Owner pool conversion skipped', {
+        outcome,
+        ownerType: owner.type,
+        ownerId: owner.id,
+        cap: MAX_CUSTOM_ROUTERS_PER_OWNER,
+      });
+    }
+    if (outcome !== 'created') return result(outcome);
+    return result(outcome, await sendNotices(owner, converted, router));
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'auto_routing_owner_pool_conversion' },
+      extra: { ownerType: owner.type, ownerId: owner.id },
     });
+    return result('failed');
   }
-  if (outcome !== 'created') return result(outcome);
-  return result(outcome, await sendNotices(owner, converted, router));
 }
 
 /** ADR 0005 cutover: each saved owner pool for efficient becomes the owner's `efficient` router. */

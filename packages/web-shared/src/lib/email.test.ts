@@ -292,7 +292,7 @@ describe('auto routing pool converted email', () => {
     await sendAutoRoutingPoolConvertedEmail('admin@example.com', {
       routerName: 'Efficient',
       modelId: 'kilo-auto/custom/org/efficient',
-      organization: { id: 'org-1', name: 'Acme' },
+      organization: { id: 'org-1', name: 'acme.com' },
     });
 
     expect(sendViaMailgun).toHaveBeenCalledWith(
@@ -304,7 +304,7 @@ describe('auto routing pool converted email', () => {
     );
     const { html } = jest.mocked(sendViaMailgun).mock.calls[0][0];
     expect(html).toContain('no longer reads per-owner model pools');
-    expect(html).toContain('Acme');
+    expect(html).toContain('acme.&#8203;com');
     expect(html).toContain('kilo-auto/custom/org/efficient');
     expect(html).toContain(`href="${NEXTAUTH_URL}/organizations/org-1/providers-and-models"`);
     expect((html.match(/href=/g) ?? []).length).toBe(1);

@@ -19,18 +19,30 @@ function createModeDO(initial: Record<string, unknown>) {
 describe('AutoRoutingModeConfigDO.readStoredSettings', () => {
   it('returns nulls when nothing is stored', async () => {
     const { modeDO } = createModeDO({});
-    await expect(modeDO.readStoredSettings()).resolves.toEqual({ mode: null, pool: null });
+    await expect(modeDO.readStoredSettings()).resolves.toEqual({
+      mode: null,
+      pool: null,
+      invalidPool: false,
+    });
   });
 
   it('returns the stored mode and pool in pool order', async () => {
     const pool = [{ model: 'b/chat' }, { model: 'a/chat' }];
     const { modeDO } = createModeDO({ mode: 'best_accuracy', pool });
-    await expect(modeDO.readStoredSettings()).resolves.toEqual({ mode: 'best_accuracy', pool });
+    await expect(modeDO.readStoredSettings()).resolves.toEqual({
+      mode: 'best_accuracy',
+      pool,
+      invalidPool: false,
+    });
   });
 
-  it('treats invalid stored values as absent', async () => {
+  it('drops an invalid mode and flags an invalid pool instead of treating it as absent', async () => {
     const { modeDO } = createModeDO({ mode: 'fastest', pool: [{ model: '' }] });
-    await expect(modeDO.readStoredSettings()).resolves.toEqual({ mode: null, pool: null });
+    await expect(modeDO.readStoredSettings()).resolves.toEqual({
+      mode: null,
+      pool: null,
+      invalidPool: true,
+    });
   });
 
   it('normalizes duplicate pool entries without writing back', async () => {
@@ -41,6 +53,7 @@ describe('AutoRoutingModeConfigDO.readStoredSettings', () => {
     await expect(modeDO.readStoredSettings()).resolves.toEqual({
       mode: null,
       pool: [{ model: 'a/chat' }, { model: 'b/chat' }],
+      invalidPool: false,
     });
     expect(entries.get('pool')).toHaveLength(3);
     expect(storage.put).not.toHaveBeenCalled();

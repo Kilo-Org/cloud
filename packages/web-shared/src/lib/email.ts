@@ -233,7 +233,9 @@ export async function sendAutoRoutingPoolConvertedEmail(
     to,
     templateName: 'autoRoutingPoolConverted',
     templateVars: {
-      pool_owner: props.organization?.name ?? 'your account',
+      pool_owner: props.organization
+        ? renderNonAutolinkedText(props.organization.name)
+        : 'your account',
       router_name: props.routerName,
       model_id: props.modelId,
       manage_url: props.organization

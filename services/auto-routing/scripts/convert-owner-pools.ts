@@ -1,22 +1,15 @@
 import { parseArgs } from 'node:util';
+import {
+  OWNER_POOL_CONVERSION_SCAN_PATH,
+  OwnerPoolConversionScanResponseSchema,
+  type OwnerPoolConversionScanResponse,
+} from '@kilocode/auto-routing-contracts';
 
 const DEFAULT_ACCOUNT_ID = 'e115e769bcdd4c3d66af59d3332cb394';
 const SCRIPT_NAME = 'auto-routing';
 const CLASS_NAME = 'AutoRoutingModeConfigDO';
 const OWNER_TYPES = ['user', 'org'] as const;
 type OwnerType = (typeof OWNER_TYPES)[number];
-
-type ScanResponse = {
-  scanned: number;
-  nextCursor: string | null;
-  matchedObjectIds: string[];
-  conversions: number;
-  droppedModeOnly: number;
-  readFailed: string[];
-  outcomes: Record<string, number>;
-  noticesSent: number;
-  noticesFailed: number;
-};
 
 type CloudflarePage<T> = {
   success: boolean;
@@ -98,13 +91,13 @@ async function main(): Promise<void> {
     options: {
       'dry-run': { type: 'boolean', default: false },
       resume: { type: 'string' },
-      limit: { type: 'string', default: '2000' },
+      limit: { type: 'string', default: '500' },
       help: { type: 'boolean', short: 'h' },
     },
   });
   if (values.help) {
     console.log(
-      'Usage: pnpm exec tsx scripts/convert-owner-pools.ts [--dry-run] [--resume <user|org>:<cursor>] [--limit 2000]\n' +
+      'Usage: pnpm exec tsx scripts/convert-owner-pools.ts [--dry-run] [--resume <user|org>:<cursor>] [--limit 500]\n' +
         'Env: CLOUDFLARE_API_TOKEN, INTERNAL_API_SECRET, optional CLOUDFLARE_ACCOUNT_ID and AUTO_ROUTING_URL (default https://auto-routing.kiloapps.io).'
     );
     return;
@@ -119,7 +112,7 @@ async function main(): Promise<void> {
   const secret = requireEnv('INTERNAL_API_SECRET');
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim() || DEFAULT_ACCOUNT_ID;
   const target = new URL(
-    '/admin/owner-pool-conversion/scan',
+    OWNER_POOL_CONVERSION_SCAN_PATH,
     process.env.AUTO_ROUTING_URL?.trim() || 'https://auto-routing.kiloapps.io'
   );
 
@@ -130,6 +123,8 @@ async function main(): Promise<void> {
   const matched = new Set<string>();
   const outcomes: Record<string, number> = {};
   const readFailed: string[] = [];
+  const invalidPool: string[] = [];
+  const needsAttention: string[] = [];
   let conversions = 0;
   let droppedModeOnly = 0;
   let noticesSent = 0;
@@ -139,23 +134,29 @@ async function main(): Promise<void> {
   for (const ownerType of OWNER_TYPES.slice(startIndex)) {
     let after: string | null = resume?.ownerType === ownerType ? resume.cursor : null;
     do {
-      const response = await fetch(target, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ ownerType, objectIds, after, limit, dryRun }),
-        signal: AbortSignal.timeout(300_000),
-        redirect: 'error',
-      });
-      if (!response.ok) {
-        const resumeHint = after === null ? '(start)' : `--resume ${ownerType}:${after}`;
-        throw new Error(`Scan responded ${response.status}; retry with ${resumeHint}`);
+      const resumeHint = after === null ? 'a rerun without --resume' : `--resume ${ownerType}:${after}`;
+      let result: OwnerPoolConversionScanResponse;
+      try {
+        const response = await fetch(target, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ ownerType, objectIds, after, limit, dryRun }),
+          signal: AbortSignal.timeout(300_000),
+          redirect: 'error',
+        });
+        if (!response.ok) throw new Error(`scan responded ${response.status}`);
+        result = OwnerPoolConversionScanResponseSchema.parse(await response.json());
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'scan failed';
+        throw new Error(`${reason}; retry with ${resumeHint} (conversions are idempotent)`);
       }
-      const result = (await response.json()) as ScanResponse;
       for (const id of result.matchedObjectIds) matched.add(id);
       for (const [outcome, count] of Object.entries(result.outcomes)) {
         outcomes[outcome] = (outcomes[outcome] ?? 0) + count;
       }
       readFailed.push(...result.readFailed);
+      invalidPool.push(...result.invalidPool);
+      needsAttention.push(...result.needsAttention);
       conversions += result.conversions;
       droppedModeOnly += result.droppedModeOnly;
       noticesSent += result.noticesSent;
@@ -179,6 +180,8 @@ async function main(): Promise<void> {
         outcomes,
         droppedModeOnly,
         readFailed,
+        invalidPool,
+        needsAttention,
         noticesSent,
         noticesFailed,
       },
@@ -192,6 +195,16 @@ async function main(): Promise<void> {
     );
   } else if (unmatched.length > 0) {
     console.log(`Unmatched object ids:\n${unmatched.join('\n')}`);
+  }
+  const clean =
+    readFailed.length === 0 &&
+    invalidPool.length === 0 &&
+    needsAttention.length === 0 &&
+    noticesFailed === 0 &&
+    (unmatched?.length ?? 0) === 0;
+  if (!clean) {
+    console.error('Some owners need attention; see readFailed, invalidPool, needsAttention, and unmatched.');
+    process.exitCode = 1;
   }
 }
 

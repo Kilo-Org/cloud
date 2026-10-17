@@ -45,10 +45,13 @@ export type OwnerPoolConversionRequest = z.infer<typeof OwnerPoolConversionReque
 
 export const OwnerPoolConversionOutcomeSchema = z.enum([
   'created',
-  // The owner already has a router with the converted slug; re-runs land here.
+  // The owner's `efficient` router already holds this pool; re-runs land here.
   'exists',
+  // The owner has its own `efficient` router with other entries; the pool was not converted.
+  'slug_taken',
   'router_cap_reached',
   'owner_not_found',
+  'failed',
 ]);
 export type OwnerPoolConversionOutcome = z.infer<typeof OwnerPoolConversionOutcomeSchema>;
 
@@ -65,6 +68,33 @@ export const OwnerPoolConversionResponseSchema = z.object({
   results: z.array(OwnerPoolConversionResultSchema),
 });
 export type OwnerPoolConversionResponse = z.infer<typeof OwnerPoolConversionResponseSchema>;
+
+// The auto-routing worker's one-off scan route; the operator script drives it.
+export const OWNER_POOL_CONVERSION_SCAN_PATH = '/admin/owner-pool-conversion/scan';
+export const OWNER_POOL_CONVERSION_ATTENTION_OUTCOMES = [
+  'slug_taken',
+  'router_cap_reached',
+  'failed',
+] as const satisfies readonly OwnerPoolConversionOutcome[];
+
+export const OwnerPoolConversionScanResponseSchema = z.object({
+  scanned: z.number().int().nonnegative(),
+  nextCursor: z.string().nullable(),
+  matchedObjectIds: z.array(z.string()),
+  conversions: z.number().int().nonnegative(),
+  droppedModeOnly: z.number().int().nonnegative(),
+  // `<ownerType>:<ownerId>` keys.
+  readFailed: z.array(z.string()),
+  invalidPool: z.array(z.string()),
+  // `<outcome> <ownerType>:<ownerId>` for every OWNER_POOL_CONVERSION_ATTENTION_OUTCOMES result.
+  needsAttention: z.array(z.string()),
+  outcomes: z.record(OwnerPoolConversionOutcomeSchema, z.number().int().nonnegative()),
+  noticesSent: z.number().int().nonnegative(),
+  noticesFailed: z.number().int().nonnegative(),
+});
+export type OwnerPoolConversionScanResponse = z.infer<
+  typeof OwnerPoolConversionScanResponseSchema
+>;
 
 export type ConvertedOwnerPoolRouter = {
   slug: string;

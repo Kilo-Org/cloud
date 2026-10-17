@@ -155,13 +155,52 @@ describe(`POST ${OWNER_POOL_CONVERSION_PATH}`, () => {
       await convert(userConversion(user));
       const [created] = await routers();
 
-      const results = await convert(userConversion(user, [FLASH]));
+      const results = await convert(userConversion(user, [FLASH, SONNET]));
 
       expect(results).toEqual([
         expect.objectContaining({ outcome: 'exists', noticesSent: 0, noticesFailed: 0 }),
       ]);
       expect(await routers()).toEqual([created]);
       expect(mockedSendViaMailgun).toHaveBeenCalledTimes(1);
+    });
+
+    test('reports slug_taken when the owner already has a different efficient router', async () => {
+      await db.insert(auto_routing_custom_routers).values({
+        owned_by_user_id: user.id,
+        created_by_user_id: user.id,
+        slug: 'efficient',
+        name: 'My own',
+        base_router: 'frontier',
+        mode: 'cost_per_accuracy',
+        entries: [{ kind: 'gateway', model: FLASH }],
+        default_entry_key: customRouterEntryKey({ kind: 'gateway', model: FLASH }),
+      });
+      const [ownRouter] = await routers();
+
+      const results = await convert(userConversion(user));
+
+      expect(results).toEqual([
+        expect.objectContaining({ outcome: 'slug_taken', noticesSent: 0, noticesFailed: 0 }),
+      ]);
+      expect(await routers()).toEqual([ownRouter]);
+      expect(mockedSendViaMailgun).not.toHaveBeenCalled();
+    });
+
+    test('reports failed for one conversion without failing the rest of the batch', async () => {
+      const other = await insertTestUser();
+      const transaction = jest
+        .spyOn(db, 'transaction')
+        .mockRejectedValueOnce(new Error('connection reset'));
+
+      const results = await convert(userConversion(user), userConversion(other)).finally(() =>
+        transaction.mockRestore()
+      );
+
+      expect(results.map(result => result.outcome)).toEqual(['failed', 'created']);
+      expect(mockedCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'connection reset' }),
+        expect.objectContaining({ extra: { ownerType: 'user', ownerId: user.id } })
+      );
     });
 
     test('skips an owner already at the custom router cap', async () => {

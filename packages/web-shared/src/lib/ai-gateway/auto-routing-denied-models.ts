@@ -1,11 +1,17 @@
-import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
+import {
+  isVirtualAutoModelId,
+  type AutoRoutingDeniedModelsRequest,
+} from '@kilocode/auto-routing-contracts';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   getEffectiveModelDecision,
+  resolveOrganizationMemberModelPolicy,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
@@ -81,14 +87,17 @@ export async function collectDeniedAutoRoutingModelIds(
   policy: EffectiveOrganizationModelPolicy,
   owner: AutoRoutingOwner
 ): Promise<string[]> {
-  if (!policyNeedsCandidateEvaluation(policy) && policy.organizationModelDenyList.length === 0) {
-    return [];
-  }
+  if (!policyNeedsCandidateEvaluation(policy)) return [];
+  return deniedAutoRoutingCandidates(policy, await loadAutoRoutingCandidateModelIds(owner));
+}
 
-  const candidateIds = await loadAutoRoutingCandidateModelIds(owner);
-  if (!policyNeedsCandidateEvaluation(policy)) {
-    return deniedModelIdsForCandidates(policy, candidateIds, () => true);
-  }
+export async function deniedAutoRoutingCandidates(
+  policy: EffectiveOrganizationModelPolicy,
+  candidateIds: ReadonlyArray<string>
+): Promise<string[]> {
+  // A policy that needs no evaluation has an unrestricted member grant, and the organization
+  // deny list applies to baseline grants only, so it denies nothing.
+  if (!policyNeedsCandidateEvaluation(policy)) return [];
 
   const uniqueCandidates = [...new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)))];
   const allowed = new Set<string>();
@@ -102,6 +111,17 @@ export async function collectDeniedAutoRoutingModelIds(
   return deniedModelIdsForCandidates(policy, uniqueCandidates, modelId => allowed.has(modelId));
 }
 
+function dataCollectionRequiredCandidates(
+  candidateIds: ReadonlyArray<string>,
+  dataCollectionRequiredModelIds: ReadonlySet<string>
+): string[] {
+  return candidateIds.filter(
+    modelId =>
+      hasBestEffortGuessDataCollectionRequirement(modelId) ||
+      dataCollectionRequiredModelIds.has(modelId)
+  );
+}
+
 export async function collectDataCollectionRequiredAutoRoutingModelIds(
   owner: AutoRoutingOwner
 ): Promise<string[]> {
@@ -109,9 +129,29 @@ export async function collectDataCollectionRequiredAutoRoutingModelIds(
     loadAutoRoutingCandidateModelIds(owner),
     getDataCollectionRequiredModelIds(),
   ]);
-  return candidateIds.filter(
-    modelId =>
-      hasBestEffortGuessDataCollectionRequirement(modelId) ||
-      dataCollectionRequiredModelIds.has(modelId)
-  );
+  return dataCollectionRequiredCandidates(candidateIds, dataCollectionRequiredModelIds);
+}
+
+// The gateway evaluation for named candidates, served to the auto-routing worker's CLI path.
+// A CLI request carries no provider privacy of its own, so only the organization's
+// data-collection setting can deny data-collection-required models.
+export async function deniedAutoRoutingModelIdsForMember(
+  request: AutoRoutingDeniedModelsRequest
+): Promise<string[]> {
+  const policy = await resolveOrganizationMemberModelPolicy({
+    organizationId: request.organizationId,
+    kiloUserId: request.userId,
+  });
+  const candidateIds = [...new Set(request.modelIds.filter(id => !isVirtualAutoModelId(id)))];
+  const [deniedByPolicy, deniedByPrivacy] = await Promise.all([
+    deniedAutoRoutingCandidates(policy, candidateIds),
+    isDataCollectionExplicitlyDisallowed(
+      getEffectiveProviderPrivacy(undefined, policy.dataCollection)
+    )
+      ? getDataCollectionRequiredModelIds().then(requiredIds =>
+          dataCollectionRequiredCandidates(candidateIds, requiredIds)
+        )
+      : [],
+  ]);
+  return [...new Set([...deniedByPolicy, ...deniedByPrivacy])];
 }

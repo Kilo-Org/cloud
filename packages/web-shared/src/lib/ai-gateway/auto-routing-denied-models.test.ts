@@ -2,11 +2,15 @@ import { describe, expect, it } from '@jest/globals';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import {
+  resolveOrganizationMemberModelPolicy,
+  type EffectiveOrganizationModelPolicy,
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   candidateModelIdsFromSources,
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
+  deniedAutoRoutingModelIdsForMember,
   deniedModelIdsForCandidates,
   policyNeedsCandidateEvaluation,
 } from './auto-routing-denied-models';
@@ -23,6 +27,12 @@ jest.mock(
     getDataCollectionRequiredModelIds: jest.fn(),
   })
 );
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+  ...jest.requireActual<object>(
+    '@kilocode/web-shared/lib/organizations/effective-model-access.server'
+  ),
+  resolveOrganizationMemberModelPolicy: jest.fn(),
+}));
 
 function policy(
   overrides: Partial<EffectiveOrganizationModelPolicy> = {}
@@ -83,6 +93,17 @@ describe('collectDeniedAutoRoutingModelIds', () => {
   it('returns no denials without loading when the policy cannot deny anything', async () => {
     await expect(collectDeniedAutoRoutingModelIds(policy(), owner)).resolves.toEqual([]);
   });
+
+  it('ignores the organization deny list for an unrestricted grant without loading candidates', async () => {
+    jest.mocked(getCachedRoutingTable).mockClear();
+    await expect(
+      collectDeniedAutoRoutingModelIds(
+        policy({ organizationModelDenyList: ['openai/gpt-4o'] }),
+        owner
+      )
+    ).resolves.toEqual([]);
+    expect(getCachedRoutingTable).not.toHaveBeenCalled();
+  });
 });
 
 describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
@@ -106,6 +127,81 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
       'meta/muse-spark-1.3-contributor',
       'provider/free-model:free',
     ]);
+  });
+});
+
+describe('deniedAutoRoutingModelIdsForMember', () => {
+  const member = { userId: 'user-1', organizationId: '22222222-2222-4222-8222-222222222222' };
+
+  it('applies the organization deny list to a baseline grant', async () => {
+    jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(
+      policy({
+        memberGrant: { mode: 'organization_baseline' },
+        organizationModelDenyList: ['openai/gpt-4o'],
+      })
+    );
+    await expect(
+      deniedAutoRoutingModelIdsForMember({
+        ...member,
+        modelIds: ['openai/gpt-4o:free', 'anthropic/claude'],
+      })
+    ).resolves.toEqual(['openai/gpt-4o', 'openai/gpt-4o:free']);
+  });
+
+  it('denies candidates outside the member group policy grant', async () => {
+    jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(
+      policy({
+        memberGrant: {
+          mode: 'selected',
+          includeOrganizationBaseline: false,
+          modelAllowList: ['anthropic/claude-sonnet-4.6'],
+          providerAllowList: [],
+        },
+      })
+    );
+    await expect(
+      deniedAutoRoutingModelIdsForMember({
+        ...member,
+        modelIds: ['anthropic/claude-sonnet-4.6', 'openai/gpt-5', 'kilo-auto/frontier'],
+      })
+    ).resolves.toEqual(['openai/gpt-5']);
+    expect(resolveOrganizationMemberModelPolicy).toHaveBeenCalledWith({
+      organizationId: member.organizationId,
+      kiloUserId: member.userId,
+    });
+  });
+
+  it('denies data-collection-required candidates when the organization denies data collection', async () => {
+    jest
+      .mocked(resolveOrganizationMemberModelPolicy)
+      .mockResolvedValue(policy({ dataCollection: 'deny' }));
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValue(new Set(['meta/muse-spark-1.3-contributor']));
+    await expect(
+      deniedAutoRoutingModelIdsForMember({
+        ...member,
+        modelIds: [
+          'meta/muse-spark-1.3-contributor',
+          'provider/free-model:free',
+          'anthropic/claude',
+        ],
+      })
+    ).resolves.toEqual(['meta/muse-spark-1.3-contributor', 'provider/free-model:free']);
+  });
+
+  it('keeps data-collection-required candidates when the organization allows data collection', async () => {
+    jest
+      .mocked(resolveOrganizationMemberModelPolicy)
+      .mockResolvedValue(policy({ dataCollection: 'allow' }));
+    jest.mocked(getDataCollectionRequiredModelIds).mockClear();
+    await expect(
+      deniedAutoRoutingModelIdsForMember({
+        ...member,
+        modelIds: ['meta/muse-spark-1.3-contributor', 'provider/free-model:free'],
+      })
+    ).resolves.toEqual([]);
+    expect(getDataCollectionRequiredModelIds).not.toHaveBeenCalled();
   });
 });
 

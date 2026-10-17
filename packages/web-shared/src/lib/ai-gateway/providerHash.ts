@@ -6,14 +6,41 @@ import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 /**
- * Generates a service-specific SHA256 hash.
+ * Deployment secret that keys every pseudonymous identifier sent upstream.
+ * Draw it from server config (`pnpm web:env set AI_GATEWAY_PSEUDONYM_KEY`) so a
+ * user's identifiers are stable within a deployment, differ between
+ * deployments, and cannot be recomputed from the repository.
+ */
+const PSEUDONYM_KEY_ENV_VAR = 'AI_GATEWAY_PSEUDONYM_KEY';
+
+/**
+ * The literal that keyed these identifiers before the variable above existed.
+ * Development, preview and test keep it so local databases, fixtures and tests
+ * stay stable. Production throws instead of falling back: an unkeyed hash is
+ * reproducible by anyone who can read this file.
+ */
+const NON_PRODUCTION_PSEUDONYM_KEY = 'd20250815';
+
+function getPseudonymKey(): string {
+  const configured = getEnvVariable(PSEUDONYM_KEY_ENV_VAR).trim();
+  if (configured) return configured;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      `Missing required environment variable ${PSEUDONYM_KEY_ENV_VAR}; run \`pnpm web:env set ${PSEUDONYM_KEY_ENV_VAR}\` so upstream pseudonyms are keyed with a deployment secret`
+    );
+  }
+  return NON_PRODUCTION_PSEUDONYM_KEY;
+}
+
+/**
+ * Generates a service-specific pseudonym, HMAC-SHA256 keyed with the deployment
+ * secret in `AI_GATEWAY_PSEUDONYM_KEY`.
  *
- * @param payload - The string to hash
- * @param provider - The provider to generate the hash for
- * @returns Base64-encoded SHA256 hash
+ * @param payload - The string to pseudonymize
+ * @param provider - The provider to generate the pseudonym for
+ * @returns Base64-encoded HMAC-SHA256 digest
  */
 export function generateProviderSpecificHash(payload: string, provider: Provider): string {
-  const salt = 'd20250815';
   const pepper =
     provider.id === 'vercel'
       ? 'vercel'
@@ -21,8 +48,8 @@ export function generateProviderSpecificHash(payload: string, provider: Provider
         ? 'henk is a boss'
         : provider.apiUrl;
   return crypto
-    .createHash('sha256')
-    .update(salt + pepper + payload)
+    .createHmac('sha256', getPseudonymKey())
+    .update(pepper + payload)
     .digest('base64');
 }
 

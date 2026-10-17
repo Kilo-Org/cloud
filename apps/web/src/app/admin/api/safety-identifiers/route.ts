@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
@@ -7,7 +7,8 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import { isNull, count, or, desc, sql } from 'drizzle-orm';
+import { and, isNull, count, or, desc, lt, sql, type AnyColumn, type SQL } from 'drizzle-orm';
+import { z } from 'zod';
 
 const missingAny = or(
   isNull(kilocode_users.openrouter_upstream_safety_identifier),
@@ -22,7 +23,25 @@ export type SafetyIdentifierCountsResponse = {
 export type BackfillBatchResponse = {
   processed: number;
   remaining: boolean;
+  /** Recompute mode only: pass back as `cursor` to continue the walk. */
+  cursor?: string;
 };
+
+type BackfillMode = 'missing' | 'recompute';
+
+/**
+ * `missing` (the default) fills only the identifiers that are still NULL.
+ * `recompute` rewrites every row, which is what a key rotation needs: the
+ * stored identifiers are derived from the deployment secret, so a changed
+ * secret stops matching the identifiers the gateway sends upstream. The walk is
+ * keyset-paginated on `kilocode_users.id` because a recomputed row no longer
+ * changes and would otherwise be selected again.
+ */
+const BackfillRequestSchema = z.object({
+  mode: z.enum(['missing', 'recompute']).default('missing'),
+  /** The `cursor` from a previous recompute response, or the last user id processed. */
+  cursor: z.string().min(1).optional(),
+});
 
 type SafetyIdentifierUpdate = {
   id: string;
@@ -45,19 +64,86 @@ export async function GET(): Promise<
 const BATCH_SIZE = 1000;
 const BATCHES_PER_REQUEST = 50;
 
-export async function POST(): Promise<NextResponse<BackfillBatchResponse | { error: string }>> {
+/**
+ * `missing` keeps an identifier that is already stored; `recompute` overwrites
+ * it, which is the only way to resync rows after the deployment secret changes.
+ */
+function safetyIdentifierAssignment(
+  existing: AnyColumn,
+  incomingColumn: string,
+  mode: BackfillMode
+): SQL {
+  const incoming = sql.raw(`safety_identifier_updates.${incomingColumn}`);
+  return mode === 'missing' ? sql`COALESCE(${existing}, ${incoming})` : incoming;
+}
+
+async function writeSafetyIdentifiers(
+  updates: readonly SafetyIdentifierUpdate[],
+  mode: BackfillMode
+): Promise<void> {
+  if (updates.length === 0) return;
+
+  await db.execute(sql`
+    UPDATE ${kilocode_users}
+    SET
+      openrouter_upstream_safety_identifier = ${safetyIdentifierAssignment(
+        kilocode_users.openrouter_upstream_safety_identifier,
+        'openrouter_upstream_safety_identifier',
+        mode
+      )},
+      openrouter_downstream_safety_identifier = ${safetyIdentifierAssignment(
+        kilocode_users.openrouter_downstream_safety_identifier,
+        'openrouter_downstream_safety_identifier',
+        mode
+      )},
+      vercel_downstream_safety_identifier = ${safetyIdentifierAssignment(
+        kilocode_users.vercel_downstream_safety_identifier,
+        'vercel_downstream_safety_identifier',
+        mode
+      )}
+    FROM (VALUES ${sql.join(
+      updates.map(
+        update =>
+          sql`(${update.id}, ${update.openrouter_upstream_safety_identifier}, ${update.openrouter_downstream_safety_identifier}, ${update.vercel_downstream_safety_identifier})`
+      ),
+      sql`, `
+    )}) AS safety_identifier_updates(id, openrouter_upstream_safety_identifier, openrouter_downstream_safety_identifier, vercel_downstream_safety_identifier)
+    WHERE ${kilocode_users.id} = safety_identifier_updates.id
+  `);
+}
+
+export async function POST(
+  request: NextRequest
+): Promise<NextResponse<BackfillBatchResponse | { error: string }>> {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  let totalProcessed = 0;
+  const parsed = BackfillRequestSchema.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
+  }
+  const { mode } = parsed.data;
+  let cursor = parsed.data.cursor;
 
-  for (let i = 0; i < BATCHES_PER_REQUEST; i++) {
+  let totalProcessed = 0;
+  let batches = 0;
+  let exhausted = false;
+
+  while (batches < BATCHES_PER_REQUEST && !exhausted) {
+    const afterCursor = cursor === undefined ? undefined : lt(kilocode_users.id, cursor);
     const rows = await db
       .select({ id: kilocode_users.id })
       .from(kilocode_users)
-      .where(missingAny)
-      .orderBy(desc(kilocode_users.created_at))
+      .where(mode === 'missing' ? and(missingAny, afterCursor) : afterCursor)
+      .orderBy(desc(kilocode_users.id))
       .limit(BATCH_SIZE);
+
+    batches += 1;
+
+    if (rows.length === 0) {
+      exhausted = true;
+      break;
+    }
 
     const updates: SafetyIdentifierUpdate[] = [];
     for (const user of rows) {
@@ -80,35 +166,22 @@ export async function POST(): Promise<NextResponse<BackfillBatchResponse | { err
       });
     }
 
-    if (updates.length > 0) {
-      await db.execute(sql`
-        UPDATE ${kilocode_users}
-        SET
-          openrouter_upstream_safety_identifier = COALESCE(${kilocode_users.openrouter_upstream_safety_identifier}, safety_identifier_updates.openrouter_upstream_safety_identifier),
-          openrouter_downstream_safety_identifier = COALESCE(${kilocode_users.openrouter_downstream_safety_identifier}, safety_identifier_updates.openrouter_downstream_safety_identifier),
-          vercel_downstream_safety_identifier = COALESCE(${kilocode_users.vercel_downstream_safety_identifier}, safety_identifier_updates.vercel_downstream_safety_identifier)
-        FROM (VALUES ${sql.join(
-          updates.map(
-            update =>
-              sql`(${update.id}, ${update.openrouter_upstream_safety_identifier}, ${update.openrouter_downstream_safety_identifier}, ${update.vercel_downstream_safety_identifier})`
-          ),
-          sql`, `
-        )}) AS safety_identifier_updates(id, openrouter_upstream_safety_identifier, openrouter_downstream_safety_identifier, vercel_downstream_safety_identifier)
-        WHERE ${kilocode_users.id} = safety_identifier_updates.id
-      `);
-    }
+    await writeSafetyIdentifiers(updates, mode);
 
-    const processed = rows.length;
-
-    totalProcessed += processed;
-
-    if (processed < BATCH_SIZE) {
-      break;
+    totalProcessed += rows.length;
+    cursor = rows[rows.length - 1].id;
+    if (rows.length < BATCH_SIZE) {
+      exhausted = true;
     }
   }
 
-  return NextResponse.json({
+  const response: BackfillBatchResponse = {
     processed: totalProcessed,
-    remaining: totalProcessed === BATCH_SIZE * BATCHES_PER_REQUEST,
-  });
+    remaining: !exhausted,
+  };
+  if (mode === 'recompute' && !exhausted && cursor !== undefined) {
+    response.cursor = cursor;
+  }
+
+  return NextResponse.json(response);
 }

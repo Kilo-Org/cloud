@@ -41,6 +41,57 @@ describe('generateProviderSpecificHash', () => {
   });
 });
 
+describe('deployment pseudonym key', () => {
+  const testUserId = 'test-user-123';
+
+  /**
+   * Replaces `process.env` for the rest of the test, dropping the deployment
+   * key unless the test sets it. Restored by `afterEach`.
+   */
+  function useEnv(overrides: {
+    NODE_ENV?: NodeJS.ProcessEnv['NODE_ENV'];
+    AI_GATEWAY_PSEUDONYM_KEY?: string;
+  }) {
+    jest.restoreAllMocks();
+    const nextEnv = { ...process.env, ...overrides };
+    if (!('AI_GATEWAY_PSEUDONYM_KEY' in overrides)) {
+      delete nextEnv.AI_GATEWAY_PSEUDONYM_KEY;
+    }
+    return jest.replaceProperty(process, 'env', nextEnv as NodeJS.ProcessEnv);
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('generates different pseudonyms for the same user under different deployment keys', () => {
+    useEnv({ AI_GATEWAY_PSEUDONYM_KEY: 'first-deployment-key' });
+    const firstKeyHash = generateProviderSpecificHash(testUserId, OPENROUTER);
+
+    useEnv({ AI_GATEWAY_PSEUDONYM_KEY: 'second-deployment-key' });
+    const secondKeyHash = generateProviderSpecificHash(testUserId, OPENROUTER);
+
+    expect(firstKeyHash).not.toBe(secondKeyHash);
+  });
+
+  it('refuses to pseudonymize in production without the deployment key', () => {
+    useEnv({ NODE_ENV: 'production' });
+
+    expect(() => generateProviderSpecificHash(testUserId, OPENROUTER)).toThrow(
+      /Missing required environment variable AI_GATEWAY_PSEUDONYM_KEY/
+    );
+  });
+
+  it('keys a non-production fallback that differs from a configured deployment key', () => {
+    useEnv({ NODE_ENV: 'test' });
+    const fallbackHash = generateProviderSpecificHash(testUserId, OPENROUTER);
+
+    useEnv({ AI_GATEWAY_PSEUDONYM_KEY: 'configured-deployment-key' });
+
+    expect(generateProviderSpecificHash(testUserId, OPENROUTER)).not.toBe(fallbackHash);
+  });
+});
+
 describe('session tracking identifiers', () => {
   const userId = 'oauth/test-user';
   const sessionId = 'conversation-1';

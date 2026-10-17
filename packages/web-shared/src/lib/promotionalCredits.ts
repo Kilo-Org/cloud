@@ -175,15 +175,12 @@ export async function grantCreditForCategoryConfig(
       return await executeGrant({ entity, options, promotion, dbOrTx: tx, amount_usd });
     });
   } catch (error: unknown) {
-    let errorMessage = 'Unknown error';
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    } else if (typeof error === 'object' && error !== null) {
-      errorMessage = JSON.stringify(error);
-    } else if (error !== undefined && error !== null) {
-      errorMessage = String(error);
-    }
-    return { success: false, message: errorMessage };
+    // Error details are reported to internal monitoring; callers and users
+    // get a generic message.
+    captureException(error, {
+      tags: { source: 'promotional_credits_grant' },
+    });
+    return { success: false, message: 'Failed to apply promotional credit' };
   }
 }
 
@@ -194,8 +191,11 @@ const PROMO_CAP_LOCK_NAMESPACE = 'promo-credit-cap';
  * caller's transaction. The lock key is namespaced so it cannot contend with
  * other features' advisory locks. Released automatically on commit/rollback.
  */
-async function takePromoCapLock(dbOrTx: DbOrTx, promoCreditCategory: string): Promise<void> {
-  await dbOrTx.execute(
+async function takePromoCapLock(
+  tx: DrizzleTransaction,
+  promoCreditCategory: string
+): Promise<void> {
+  await tx.execute(
     sql`SELECT pg_advisory_xact_lock(hashtext(${`${PROMO_CAP_LOCK_NAMESPACE}:${promoCreditCategory}`}))`
   );
 }

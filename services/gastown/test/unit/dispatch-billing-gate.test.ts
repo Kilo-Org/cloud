@@ -50,13 +50,22 @@ function makeCtx(overrides: Partial<SchedulingContext> = {}): SchedulingContext 
 describe('dispatchAgent container start gating', () => {
   it('returns false without touching state when starts are blocked', async () => {
     const prepareContainerBilling = vi.fn().mockResolvedValue(undefined);
+    const getRigConfig = vi.fn();
+    const emitEvent = vi.fn();
     const ctx = makeCtx({
       containerStartsBlocked: () => true,
       prepareContainerBilling,
+      getRigConfig,
+      emitEvent,
     });
     const result = await dispatchAgent(ctx, makeAgent(), makeBead());
     expect(result).toBe(false);
+    // Gate closes before any billing or rig work happens.
     expect(prepareContainerBilling).not.toHaveBeenCalled();
+    expect(getRigConfig).not.toHaveBeenCalled();
+    expect(emitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'agent.dispatch_failed', reason: 'container starts blocked' })
+    );
   });
 
   it('proceeds past the gate when starts are not blocked', async () => {
@@ -67,5 +76,8 @@ describe('dispatchAgent container start gating', () => {
     });
     const result = await dispatchAgent(ctx, makeAgent(), makeBead());
     expect(result).toBe(false);
+    // Past the gate: the rig lookup ran and no gate event was emitted.
+    expect(ctx.getRigConfig).toHaveBeenCalled();
+    expect(ctx.emitEvent).not.toHaveBeenCalled();
   });
 });

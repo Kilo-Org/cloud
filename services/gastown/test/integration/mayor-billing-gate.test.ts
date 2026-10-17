@@ -57,6 +57,11 @@ describe('Mayor paths while container starts are paused', () => {
     await town.setContainerRunPolicy('automatic');
     const result = await town.sendMayorMessage('hello mayor');
     expect(result.agentId).toBeTruthy();
-    expect(['idle', 'active', 'starting']).toContain(result.sessionStatus);
+    // Prove the gate cleared: the dispatch attempt went all the way to
+    // the container start (mock runtime accepts /agents/start), which the
+    // paused tests above never reach.
+    expect(result.sessionStatus).toBe('starting');
+    const agent = await town.getAgentAsync(result.agentId);
+    expect(agent?.status).toBe('working');
   });
 });

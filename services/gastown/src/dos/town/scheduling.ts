@@ -65,6 +65,14 @@ export async function dispatchAgent(
 ): Promise<boolean> {
   if (ctx.containerStartsBlocked()) {
     console.warn(`${LOG} dispatchAgent: container starts blocked, skipping agent=${agent.id}`);
+    ctx.emitEvent({
+      event: 'agent.dispatch_failed',
+      townId: ctx.townId,
+      agentId: agent.id,
+      beadId: bead.bead_id,
+      role: agent.role,
+      reason: 'container starts blocked',
+    });
     return false;
   }
   try {

@@ -511,6 +511,13 @@ Infrastructure containers (`postgres` on 5432, `redis` on 6379, `redis-http` on 
 
 The Next.js dev script reads `REDIS_URL` and `UPSTASH_REDIS_REST_URL` from the shell, then from the env files, and falls back to `redis://localhost:6379` and `http://localhost:8079`. It also exports `UPSTASH_REDIS_REST_TOKEN=example_token` for the shared `@upstash/redis` REST helper; `REDIS_URL` serves Chat SDK state because `@chat-adapter/state-redis` uses the Redis TCP protocol.
 
+## Admin webhook inspection
+
+Webhook request records and request logs use the session-viewer permission contract
+(`is_admin` and `can_view_sessions`). Local admin fixtures used to inspect these
+records must have both flags enabled. This applies to personal and organization
+triggers.
+
 ## First credit-pack purchase email
 
 The backend schedules one marketing email after the first production credit-pack purchase, across Apple and Google combined.

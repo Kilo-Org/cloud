@@ -163,7 +163,7 @@ export const adminWebhookTriggersRouter = createTRPCRouter({
       );
     }),
 
-  listRequests: adminProcedure
+  listRequests: sessionViewerProcedure
     .input(AdminTriggerRequestsInput)
     .query(async ({ input }): Promise<EnrichedCapturedRequest[]> => {
       const { scope, id } = resolveScope(input);

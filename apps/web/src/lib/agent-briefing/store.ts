@@ -21,9 +21,9 @@ import {
   type BriefingReport,
   type BriefingPreferences,
 } from '@kilocode/app-shared/agent-briefing';
-import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { collectBriefingEvidence } from './evidence';
 import { nextBriefingTime, validateBriefingSchedule } from './schedule';
+const DEFAULT_BRIEFING_MODEL = '~deepseek/deepseek-flash-latest';
 
 export type BriefingReportRow = typeof agent_briefing_reports.$inferSelect;
 const factsSchema = briefingReportSchema.pick({
@@ -122,13 +122,13 @@ export async function getBriefingPreferences(
     morningEnd: row.morning_end,
     language: row.language,
     notificationsEnabled: row.notifications_enabled,
-    defaultModel: PRIMARY_DEFAULT_MODEL,
+    defaultModel: DEFAULT_BRIEFING_MODEL,
     contexts: contexts.map(context => {
       const setting = settings.find(value => value.context_key === context.id);
       return {
         context,
         aiEnabled: setting?.ai_enabled ?? false,
-        model: setting?.model ?? PRIMARY_DEFAULT_MODEL,
+        model: setting?.model ?? DEFAULT_BRIEFING_MODEL,
         maxDurationSeconds: setting?.max_duration_seconds ?? DEFAULT_BRIEFING_MAX_DURATION_SECONDS,
         maxSpendMicrodollars:
           setting?.max_spend_microdollars ?? DEFAULT_BRIEFING_MAX_SPEND_MICRODOLLARS,

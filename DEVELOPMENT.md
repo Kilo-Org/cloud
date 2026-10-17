@@ -580,6 +580,7 @@ Dismissal restores live status across devices; report history remains available.
 The backend owns scheduling, report revisions, optional paid summaries, and notification dispatch.
 AI summaries and briefing notifications require separate opt-ins.
 Summary settings include a model override and finite generation time and spend limits.
+The default summary model is `~deepseek/deepseek-flash-latest`.
 The structured report remains available when generation fails or reaches a limit.
 
 Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.

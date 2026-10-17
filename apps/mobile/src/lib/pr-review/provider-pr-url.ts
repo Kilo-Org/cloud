@@ -40,8 +40,13 @@ type SplitUrl = {
  * Split `http(s)://host[:port]/a/b` into its parts without `URL` — Hermes
  * does not guarantee full WHATWG parsing. Returns `null` for any other
  * scheme, a missing host, or credentials in the authority.
+ *
+ * Exported because it is the ONE http(s) reader in the app: the paste/share
+ * resolver above and the provider-link helpers in `provider-pr-ref` both
+ * decide what counts as a usable URL from its answer, so the scheme,
+ * credential and host rules cannot drift apart.
  */
-function splitHttpUrl(href: string): SplitUrl | null {
+export function splitHttpUrl(href: string): SplitUrl | null {
   const match = /^(https?):\/\/([^/?#@]+)([^?#]*)/i.exec(href);
   if (!match) {
     return null;

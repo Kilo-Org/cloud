@@ -14,6 +14,7 @@ import {
   normalizePrThreadsPages,
   providerCapabilitiesIdentity,
   type PrThreadsPageModel,
+  selectOverviewWebUrl,
 } from './provider-pr-queries';
 import { githubPrRef, isProviderScopeReady, type ProviderPrScope } from './provider-pr-ref';
 
@@ -469,6 +470,13 @@ describe('normalizeProviderOverview', () => {
     });
   });
 
+  it('carries the provider web URL the server resolved for the loaded PR/MR', () => {
+    // The ref alone does not name a host; this URL is the read's own answer.
+    expect(normalizeProviderOverview(summary).webUrl).toBe(
+      'https://gitlab.example.com/group/sub/repo/-/merge_requests/12'
+    );
+  });
+
   it('derives merge affordances from the provider capabilities', () => {
     const gitlab = normalizeProviderOverview(summary);
     const bitbucket = normalizeProviderOverview({
@@ -481,5 +489,19 @@ describe('normalizeProviderOverview', () => {
     expect(bitbucket.repo.allowMergeCommit).toBe(true);
     // Two same-named repositories on different providers stay apart.
     expect(gitlab.prNodeId).not.toBe(bitbucket.prNodeId);
+  });
+});
+
+describe('selectOverviewWebUrl', () => {
+  it('reads the provider web URL off a loaded read model', () => {
+    expect(selectOverviewWebUrl({ webUrl: 'https://gl.example.com/g/r/-/merge_requests/1' })).toBe(
+      'https://gl.example.com/g/r/-/merge_requests/1'
+    );
+  });
+
+  it('answers null for a GitHub answer, a pending read, or no URL', () => {
+    expect(selectOverviewWebUrl(undefined)).toBeNull();
+    expect(selectOverviewWebUrl({ number: 7 })).toBeNull();
+    expect(selectOverviewWebUrl({ webUrl: null })).toBeNull();
   });
 });

@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrReviewChecksSection } from './pr-review-checks-section';
 
+import { ProviderPrWebUrlProvider } from '@/lib/pr-review/provider-pr-ref';
+
 type Run = {
   name: string;
   status: string;
@@ -99,15 +101,20 @@ function run(name: string, status: string, conclusion: string | null): Run {
 
 let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function mount() {
+/** The URL the review screen publishes for this PR (the GitHub arm's host). */
+const PR_WEB_URL = 'https://github.com/kilo/cloud/pull/7';
+
+function mount(serverWebUrl: string | null = PR_WEB_URL) {
   act(() => {
     mounted = TestRenderer.create(
-      createElement(PrReviewChecksSection, {
-        owner: 'kilo',
-        repo: 'cloud',
-        number: 7,
-        headSha: 'abc123',
-      })
+      <ProviderPrWebUrlProvider value={serverWebUrl}>
+        {createElement(PrReviewChecksSection, {
+          owner: 'kilo',
+          repo: 'cloud',
+          number: 7,
+          headSha: 'abc123',
+        })}
+      </ProviderPrWebUrlProvider>
     );
   });
   const renderer = mounted;
@@ -255,6 +262,14 @@ describe('PrReviewChecksSection empty state', () => {
     expect(textNodes(renderer, 'prReview.checks.noChecksReported')).toHaveLength(1);
     expect(statusRows(renderer)).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(1);
+  });
+
+  it('offers no link until the screen publishes the loaded PR URL', () => {
+    setRuns([]);
+    const renderer = mount(null);
+
+    expect(textNodes(renderer, 'prReview.checks.noChecksReported')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
   });
 });
 

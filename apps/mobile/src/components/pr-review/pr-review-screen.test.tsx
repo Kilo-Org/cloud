@@ -424,6 +424,49 @@ describe('PrReviewScreen share action', () => {
       vi.mocked(React.useContext).mockReturnValue(null);
     }
   });
+
+  it('shares the merge request URL the read returned', () => {
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: {
+        platform: 'gitlab',
+        projectPath: 'group/repo',
+        mrIid: 12,
+        // The instance the reader opened on, kept as identity.
+        instanceHint: 'https://gitlab.staging.example',
+      },
+      organizationId: null,
+    });
+    prQueryResult = {
+      data: {
+        title: 'Bump the dep',
+        webUrl: 'https://gl.example.com/group/repo/-/merge_requests/12',
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    try {
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'group', repo: 'repo', number: 12 });
+      const button = findElement({
+        node: element,
+        type: 'Button',
+        prop: 'accessibilityLabel',
+        value: 'Share merge request',
+      });
+      if (!button) {
+        throw new Error('Share button not found');
+      }
+      expect(button.props).toEqual(expect.objectContaining({ disabled: false }));
+      (button.props as { onPress: () => void }).onPress();
+
+      expect(shareMock).toHaveBeenCalledWith({
+        message: 'Bump the dep\nhttps://gl.example.com/group/repo/-/merge_requests/12',
+      });
+    } finally {
+      vi.mocked(React.useContext).mockReturnValue(null);
+    }
+  });
 });
 
 describe('PrReviewScreen Merge action', () => {

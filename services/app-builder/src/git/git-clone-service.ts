@@ -7,6 +7,7 @@ import git from '@ashishkumar472/cf-git';
 import { MemFS } from './memfs';
 import { logger, formatError } from '../utils/logger';
 import { resolveHeadSymref, formatPacketLine } from './git-protocol-utils';
+import { isValidRefName } from './git-receive-pack-service';
 import type { RepositoryBuildOptions } from '../types';
 
 export class GitCloneService {
@@ -64,7 +65,7 @@ export class GitCloneService {
 
       // HEAD ref with capabilities (symref first per convention)
       const capabilities = [
-        ...(symrefTarget ? [`symref=HEAD:${symrefTarget}`] : []),
+        ...(symrefTarget && isValidRefName(symrefTarget) ? [`symref=HEAD:${symrefTarget}`] : []),
         'side-band-64k',
         'thin-pack',
         'ofs-delta',
@@ -74,6 +75,7 @@ export class GitCloneService {
       response += formatPacketLine(headLine);
 
       for (const branch of branches) {
+        if (!isValidRefName(`refs/heads/${branch}`)) continue;
         try {
           const oid = await git.resolveRef({
             fs,

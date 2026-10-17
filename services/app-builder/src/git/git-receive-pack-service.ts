@@ -20,6 +20,27 @@ function sanitizeStatusMessage(msg: string): string {
   return msg.replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1f]/g, '');
 }
 
+/**
+ * Git ref-name rules, restricted to refs/ (receive-pack only updates refs/*).
+ * Rejects control bytes, spaces, and per-component invalid patterns so a name
+ * is safe to persist and to place in a single pkt-line.
+ */
+export function isValidRefName(name: string): boolean {
+  if (!name.startsWith('refs/')) return false;
+  if (name.length > 1024) return false;
+  for (const ch of name) {
+    const code = ch.charCodeAt(0);
+    if (code <= 0x20 || code === 0x7f) return false;
+  }
+  if (/[~^:?*[\]\\]/.test(name)) return false;
+  if (name.includes('@{')) return false;
+  if (name.endsWith('/') || name.endsWith('.') || name.endsWith('.lock')) return false;
+  const components = name.split('/');
+  return components.every(
+    c => c.length > 0 && !c.startsWith('.') && !c.includes('..') && !c.endsWith('.lock')
+  );
+}
+
 export class GitReceivePackService {
   /**
    * Handle info/refs request for receive-pack service
@@ -48,7 +69,7 @@ export class GitReceivePackService {
 
       // Capabilities for receive-pack (symref first per convention)
       const capabilities = [
-        ...(symrefTarget ? [`symref=HEAD:${symrefTarget}`] : []),
+        ...(symrefTarget && isValidRefName(symrefTarget) ? [`symref=HEAD:${symrefTarget}`] : []),
         'report-status',
         'report-status-v2',
         'delete-refs',
@@ -64,6 +85,7 @@ export class GitReceivePackService {
         response += formatPacketLine(headLine);
 
         for (const branch of branches) {
+          if (!isValidRefName(`refs/heads/${branch}`)) continue;
           try {
             const oid = await git.resolveRef({
               fs,
@@ -159,6 +181,8 @@ export class GitReceivePackService {
 
     if (oldOid.length !== 40 || newOid.length !== 40) return null;
 
+    if (!isValidRefName(refName)) return null;
+
     return { oldOid, newOid, refName };
   }
 
@@ -181,7 +205,7 @@ export class GitReceivePackService {
     try {
       const { commands, packfileStart } = this.parsePktLines(requestData);
       result.refUpdates = commands;
-      let indexedOids: Set<string> | undefined;
+      const indexedOids = new Set<string>();
 
       if (packfileStart < requestData.length) {
         const packfileData = requestData.slice(packfileStart);
@@ -247,7 +271,9 @@ export class GitReceivePackService {
               filepath: packPath,
               gitdir: '.git',
             });
-            indexedOids = new Set(indexResult.oids);
+            for (const oid of indexResult.oids) {
+              indexedOids.add(oid);
+            }
           } catch (indexError) {
             const errorMessage =
               indexError instanceof Error ? indexError.message : String(indexError);
@@ -299,7 +325,7 @@ export class GitReceivePackService {
             continue;
           }
 
-          if (indexedOids && !indexedOids.has(cmd.newOid)) {
+          if (!indexedOids.has(cmd.newOid)) {
             let objectExists = false;
             try {
               await git.readObject({ fs, dir: '/', oid: cmd.newOid });
@@ -398,14 +424,15 @@ export class GitReceivePackService {
     chunks.push(this.createSidebandPacket(1, encoder.encode(formatPacketLine(unpackStatus))));
 
     for (const cmd of commands) {
+      const safeRefName = isValidRefName(cmd.refName) ? cmd.refName : '';
       let status: string;
       if (globalError) {
-        status = `ng ${cmd.refName} ${sanitizeStatusMessage(globalError.message)}\n`;
+        status = `ng ${safeRefName} ${sanitizeStatusMessage(globalError.message)}\n`;
       } else {
         const refError = errors.find(e => e.kind === 'ref' && e.refName === cmd.refName);
         status = refError
-          ? `ng ${cmd.refName} ${sanitizeStatusMessage(refError.message)}\n`
-          : `ok ${cmd.refName}\n`;
+          ? `ng ${safeRefName} ${sanitizeStatusMessage(refError.message)}\n`
+          : `ok ${safeRefName}\n`;
       }
       chunks.push(this.createSidebandPacket(1, encoder.encode(formatPacketLine(status))));
     }

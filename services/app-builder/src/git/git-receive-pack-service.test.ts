@@ -376,6 +376,135 @@ describe('GitReceivePackService', () => {
       expect(result.errors.filter(e => e.includes('packfile'))).toHaveLength(0);
     });
 
+    it('rejects ref update with no packfile when newOid is absent from the repo', async () => {
+      const fs = new MemFS();
+      const bogusOid = 'dead'.repeat(10);
+      const requestData = buildPushRequest(
+        [{ oldOid: zeroOid, newOid: bogusOid, refName: 'refs/heads/main' }],
+        new Uint8Array(0)
+      );
+
+      const { result, response } = await GitReceivePackService.handleReceivePack(fs, requestData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors.some(e => e.includes('not found in the repository'))).toBe(true);
+      await expect(fs.readFile('.git/refs/heads/main')).rejects.toThrow('ENOENT');
+
+      const status = parseReportStatus(response);
+      expect(status.refs[0].status).toBe('ng');
+    });
+
+    it('with no packfile, allows existing objects and rejects absent ones per ref', async () => {
+      const fs = new MemFS();
+      const { packBytes, blobOid } = buildValidPackfile('seed');
+      const seedRequest = buildPushRequest(
+        [{ oldOid: zeroOid, newOid: blobOid, refName: 'refs/heads/main' }],
+        packBytes
+      );
+      await GitReceivePackService.handleReceivePack(fs, seedRequest);
+
+      const bogusOid = 'dead'.repeat(10);
+      const noPackRequest = buildPushRequest(
+        [
+          { oldOid: zeroOid, newOid: blobOid, refName: 'refs/heads/other' },
+          { oldOid: zeroOid, newOid: bogusOid, refName: 'refs/heads/bad' },
+        ],
+        new Uint8Array(0)
+      );
+      const { result } = await GitReceivePackService.handleReceivePack(fs, noPackRequest);
+
+      const otherRef = await fs.readFile('.git/refs/heads/other', { encoding: 'utf8' });
+      expect(String(otherRef)).toContain(blobOid);
+      await expect(fs.readFile('.git/refs/heads/bad')).rejects.toThrow('ENOENT');
+      expect(result.errors.some(e => e.includes('refs/heads/bad'))).toBe(true);
+    });
+
+    it('drops ref update commands whose ref name contains control characters', async () => {
+      const fs = new MemFS();
+      const craftedRef = 'refs/heads/x\nok refs/heads/main';
+      const line = `${zeroOid} ${fakeNewOid} ${craftedRef}\n`;
+      const lengthHex = (line.length + 4).toString(16).padStart(4, '0');
+      const requestData = new TextEncoder().encode(lengthHex + line + '0000');
+
+      const { commands } = GitReceivePackService.parsePktLines(requestData);
+      expect(commands).toHaveLength(0);
+
+      await GitReceivePackService.handleReceivePack(fs, requestData);
+      await expect(fs.readFile('.git/refs/heads/main')).rejects.toThrow('ENOENT');
+    });
+
+    it('drops ref update commands with CR or NUL in the ref name', async () => {
+      const crRef = 'refs/heads/x\rmore';
+      const nulRef = 'refs/heads/x\0y';
+      const line = `${zeroOid} ${fakeNewOid} ${crRef}\n`;
+      const lengthHex = (line.length + 4).toString(16).padStart(4, '0');
+      const data = new TextEncoder().encode(lengthHex + line + '0000');
+      expect(GitReceivePackService.parsePktLines(data).commands).toHaveLength(0);
+
+      // NUL acts as the capabilities separator, truncating the ref name to
+      // its valid prefix — no control bytes survive into the command.
+      const line2 = `${zeroOid} ${fakeNewOid} ${nulRef}`;
+      const data2 = new TextEncoder().encode(
+        (line2.length + 4).toString(16).padStart(4, '0') + line2 + '0000'
+      );
+      const { commands: commands2 } = GitReceivePackService.parsePktLines(data2);
+      expect(commands2).toHaveLength(1);
+      expect(commands2[0].refName).toBe('refs/heads/x');
+    });
+
+    it('drops ref update commands with invalid git ref names', () => {
+      const invalid = [
+        'refs/heads/.hidden',
+        'refs/heads/x.lock',
+        'refs/heads/a..b',
+        'refs/heads/x/',
+        'refs/heads/',
+        'refs/',
+        'refs/heads/x y z extra space name',
+        'heads/main',
+      ];
+      for (const refName of invalid) {
+        const line = `${zeroOid} ${fakeNewOid} ${refName}\n`;
+        const data = new TextEncoder().encode(
+          (line.length + 4).toString(16).padStart(4, '0') + line + '0000'
+        );
+        expect(GitReceivePackService.parsePktLines(data).commands, refName).toHaveLength(0);
+      }
+    });
+
+    it('accepts valid multi-component ref names', () => {
+      const valid = ['refs/heads/feature/x', 'refs/tags/v1.0', 'refs/notes/commits'];
+      for (const refName of valid) {
+        const line = `${zeroOid} ${fakeNewOid} ${refName}\n`;
+        const data = new TextEncoder().encode(
+          (line.length + 4).toString(16).padStart(4, '0') + line + '0000'
+        );
+        const { commands } = GitReceivePackService.parsePktLines(data);
+        expect(commands, refName).toHaveLength(1);
+        expect(commands[0].refName).toBe(refName);
+      }
+    });
+
+    it('omits symref capability when the resolved target is not a valid ref name', async () => {
+      const fs = new MemFS();
+      await fs.writeFile('.git/HEAD', 'ref: refs/heads/bad\rname');
+      await fs.writeFile('.git/refs/heads/bad\rname', fakeNewOid);
+
+      const response = await GitReceivePackService.handleInfoRefs(fs);
+      expect(response).not.toContain('symref=');
+      expect(response.includes('bad\rname')).toBe(false);
+    });
+
+    it('sanitizes ref names in report-status lines', () => {
+      const craftedRef = 'refs/heads/x\nok refs/heads/main';
+      const commands = [{ oldOid: zeroOid, newOid: fakeNewOid, refName: craftedRef }];
+      const response = GitReceivePackService.generateReportStatus(commands, []);
+      const text = new TextDecoder().decode(response);
+
+      expect(text).not.toContain('ok refs/heads/main');
+      expect(text).not.toContain('\n\n');
+    });
+
     it('reports ng for all refs when packfile exceeds size limit', async () => {
       const fs = new MemFS();
       const oversizedPack = new Uint8Array(MAX_OBJECT_SIZE + 1);

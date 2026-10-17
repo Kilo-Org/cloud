@@ -436,4 +436,74 @@ describe('grantCreditForCategory', () => {
     const expectedExpiry = new Date(beforeTime.getTime() + 2 * millisecondsInDay);
     expect(expiryDate.getTime()).toBeCloseTo(expectedExpiry.getTime(), -3); // Within 1000ms
   });
+
+  it('applies total_redemptions_allowed', async () => {
+    const cap = 3;
+    const attempts = 10;
+    const promoConfig: PromoCreditCategoryConfig = {
+      credit_category: 'PARALLEL_CAP_TEST',
+      amount_usd: 10,
+      total_redemptions_allowed: cap,
+    };
+
+    const users = await Promise.all(Array.from({ length: attempts }, () => insertTestUser()));
+
+    const results = await Promise.all(
+      users.map(user =>
+        grantCreditForCategoryConfig(
+          { organization: null, user },
+          { credit_category: 'PARALLEL_CAP_TEST', counts_as_selfservice: false },
+          promoConfig
+        )
+      )
+    );
+
+    const succeeded = results.filter(r => r.success);
+    expect(succeeded.length).toBe(cap);
+
+    const rows = await db
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.credit_category, 'PARALLEL_CAP_TEST'));
+    expect(rows.length).toBe(cap);
+  });
+
+  it('returns a failure result when the redemption count is unavailable', async () => {
+    const user = await insertTestUser();
+    const promoConfig: PromoCreditCategoryConfig = {
+      credit_category: 'COUNT_QUERY_TEST',
+      amount_usd: 10,
+      total_redemptions_allowed: 5,
+    };
+
+    const result = await db.transaction(async tx => {
+      const failing = new Proxy(tx, {
+        get(target, prop, receiver) {
+          if (prop === 'select') {
+            return () => {
+              throw new Error('select unavailable');
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+      return grantCreditForCategoryConfig(
+        { organization: null, user },
+        {
+          credit_category: 'COUNT_QUERY_TEST',
+          counts_as_selfservice: false,
+          dbOrTx: failing as never,
+        },
+        promoConfig
+      );
+    });
+
+    expect(result.success).toBe(false);
+
+    const rows = await db
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.credit_category, 'COUNT_QUERY_TEST'));
+    expect(rows).toHaveLength(0);
+  });
 });

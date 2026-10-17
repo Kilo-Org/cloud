@@ -183,6 +183,8 @@ export const caseResults = sqliteTable(
     rep: integer('rep').notNull().default(0),
     // 1 when the case was killed by the wall-clock timeout, 0 otherwise.
     timed_out: integer('timed_out').notNull().default(0),
+    // PROMPT_TRANSPORT_REVISION of the CLI call that produced this result.
+    prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   // The composite PK's leftmost column already serves run_id-prefix lookups
   // (count/fetch by run); no separate run_id index is needed.
@@ -202,6 +204,7 @@ export const pendingDeciderOutputs = sqliteTable(
     case_id: text('case_id').notNull(),
     rep: integer('rep').notNull(),
     payload: text('payload').notNull(),
+    prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   table => [
     primaryKey({ columns: [table.run_id, table.model, table.variant, table.case_id, table.rep] }),
@@ -394,6 +397,33 @@ export const benchmarkProfiles = sqliteTable(
     primaryKey({
       columns: [table.router, table.model, table.variant, table.engine_identity, table.repetitions],
     }),
+  ]
+);
+
+/**
+ * Ready registry rows queued to re-measure the cases the revision-1 prompt transport
+ * measured unreliably. Kept beside the profile so the profile stays `ready` on its
+ * previous run and keeps serving: a run claims the row (`run_id`), copies the previous
+ * run's other results, measures the affected cases, and only on completion moves the
+ * profile's provenance to the new run.
+ */
+export const profileRemeasures = sqliteTable(
+  'profile_remeasures',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    run_id: text('run_id'),
+    requested_at: text('requested_at').notNull(),
+    claimed_at: text('claimed_at'),
+  },
+  table => [
+    primaryKey({
+      columns: [table.router, table.model, table.variant, table.engine_identity, table.repetitions],
+    }),
+    index('IDX_profile_remeasures_run').on(table.run_id),
   ]
 );
 

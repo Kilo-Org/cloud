@@ -555,6 +555,7 @@ endpoints reject frontier. The classifier-winner endpoint returns the shared win
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
 | `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
+| `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action}`) |
 | `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
@@ -653,6 +654,41 @@ first flips it to `running`, so it is still measured exactly once.
   new needed measuring).
 
 Long waits stay `Benchmarking` in the UI; there is no second timeout state in v1.
+
+### Prompt transport re-measure
+
+Every result row carries `prompt_revision` (`PROMPT_TRANSPORT_REVISION` in
+`src/prompt-transport.ts`). Revision 1 passed the prompt as a `kilo run` argument, which
+quoted prompts containing a space and escaped their inner `"`, and omitted long-context
+snapshots. Revision 2 materializes the snapshot and writes the prompt verbatim to stdin.
+`argvAffectedCases(router)` lists the cases revision 1 measured unreliably: every
+long-context case, and efficient cases whose prompt has an inner `"` and whose check is
+`exact`, `contains_all` or `regex` (frontier inner-quote cases join when
+`REMEASURE_FRONTIER_INNER_QUOTE_CASES` is set). The engine identity does not change.
+
+A re-measure claims the pair in `profile_remeasures`, not on the profile: the profile stays
+`ready` on its previous run, so the platform table, owner tables and status keep serving.
+The re-measure run copies the previous run's results except the affected revision-1 rows,
+so only those cases are scheduled, under the normal scheduler caps. When the run completes,
+the profile's `run_id` moves to it, the claim is removed, and the platform table republishes
+as after any decider run. A failed run, a dead lane or an orphaned claim drops the claim and
+keeps the previous measurement; an unwritten run returns the claim to the queue. Prior-case
+reuse never copies an affected revision-1 row into a new run.
+
+Runbook, after the whole stack is merged and deployed (the migration applies on deploy):
+
+1. Dry run (writes nothing): `POST /admin/registry/remeasure-prompt-transport` with
+   `{"action":"dry-run"}`, or `{"router":"efficient","action":"dry-run"}` for one router.
+   Each router reports its affected pairs, affected results, and projected spend: the
+   measured cost of each affected result plus, for long-context cases, the snapshot's
+   prompt tokens at the catalog prompt price. `unknownCostResults` counts results this
+   estimate cannot price.
+2. Queue: the same call with `"action":"request"`. The next drain (at most one minute)
+   starts the runs.
+3. Verify: the dry run reports `pairs: 0` per router, `profile_remeasures` is empty, and
+   `GET /admin/routing-table` shows a new version.
+4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
+   its run.
 
 ### Sparse custom routing tables
 

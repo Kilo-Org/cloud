@@ -162,6 +162,13 @@
       "when": 1792168659121,
       "tag": "0022_burly_ben_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1792206371119,
+      "tag": "0023_dashing_king_cobra",
+      "breakpoints": true
     }
   ]
 }

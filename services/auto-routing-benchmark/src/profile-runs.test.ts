@@ -76,6 +76,9 @@ vi.mock('./db', async importOriginal => {
     recordLaneFailure: vi.fn(),
     failOrphanedRunningProfiles: vi.fn(),
     releaseProfileClaims: vi.fn(),
+    listQueuedRemeasures: vi.fn().mockResolvedValue([]),
+    copyRemeasureBaselines: vi.fn().mockResolvedValue(0),
+    settleRemeasuresForRun: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -540,6 +543,7 @@ describe('decider run completion', () => {
       last_event_types: 'x',
       rep: 0,
       timed_out: 0,
+      prompt_revision: 2,
     }));
   }
 

@@ -152,7 +152,14 @@ export default function SessionDetailScreen() {
       owner.generation,
       owner.userId,
     ]),
-    enabled: isAuthenticatedOwner(owner) && routeOrganizationId === undefined && sessionId !== null,
+    // A param that cannot be a real session id never starts a metadata read:
+    // the composer fallback above renders instead, so the doomed id can never
+    // fire the read even when the route was opened without an organization.
+    enabled:
+      isAuthenticatedOwner(owner) &&
+      routeOrganizationId === undefined &&
+      sessionId !== null &&
+      isPlausibleKiloSessionId(sessionId),
   });
 
   // The account that owns this device's persisted transcript. The live

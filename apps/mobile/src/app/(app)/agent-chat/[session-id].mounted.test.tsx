@@ -577,19 +577,20 @@ describe('SessionDetailScreen invalid session-id', () => {
     // A malformed or hand-built deep link can deliver a segment that can never
     // resolve to a session (the all-zeros UUID was observed in the wild from a
     // press on the Agents New session button). The id fails the server-side
-    // shape (`ses_` + 26 chars), so the route renders the composer the user
-    // asked for instead of mounting a session screen that can only end in
-    // "Not found".
+    // shape, so the route renders the composer the user asked for instead of
+    // mounting a session screen that can only end in "Not found".
+    // No `organizationId` param: this is the exact shape the in-the-wild deep
+    // link carried, whose metadata gate would otherwise stay enabled.
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': '00000000-0000-0000-0000-000000000000',
-      organizationId: 'global-org',
     });
     const renderer = await mountRoute();
 
     expect(findByType(renderer.root, 'NewSessionScreenBody')).toHaveLength(1);
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
     expect(findByType(renderer.root, 'InvalidRouteState')).toHaveLength(0);
-    // The doomed id never starts a metadata read.
+    // The doomed id never starts a metadata read, even with the gate's other
+    // conditions (confirmed owner, no organization route) all true.
     expect(queryEnabled()).toBe(false);
   });
 });

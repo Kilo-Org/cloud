@@ -9,6 +9,21 @@ import {
   resetRuntimeContract,
   runtimeSpecForContract,
 } from './runtime-contract.js';
+import {
+  clearRuntimeLaunchIntent,
+  readRuntimeLaunchIntent,
+  rotateRuntimeLaunchNonce,
+  writeRuntimeLaunchIntent,
+  type RuntimeLaunchIntent,
+  type RuntimeLaunchSelection,
+} from './runtime-launch-intent.js';
+import {
+  launchSandbox,
+  RuntimeLaunchSettlementError,
+  resolveRuntimeLaunchSelection,
+  type RuntimeLaunchEffects,
+  type RuntimeLaunchOps,
+} from '../../sandbox-control/runtime-launch.js';
 import { DurableObject } from 'cloudflare:workers';
 import { getSandbox, type Sandbox } from '@cloudflare/sandbox';
 import { z } from 'zod';
@@ -48,6 +63,7 @@ import {
   createCloudflareProviderAdapter,
   decodeCloudflareProviderRef,
 } from '../../sandbox-control/cloudflare-provider.js';
+import { RuntimeInstallerError } from '../../sandbox-control/runtime-release-loader.js';
 import { parseControlPlaneCredential } from '../../sandbox-control/managed-credential.js';
 import {
   sandboxProviderConfigurationSchema,
@@ -55,6 +71,7 @@ import {
   type ProviderAdapter,
   type ProviderAllocationIntent,
   type ProviderCreateIntent,
+  type ProviderLaunchToken,
   type ProviderStartSource,
   type SandboxProviderConfiguration,
 } from '../../sandbox-control/provider.js';
@@ -208,6 +225,8 @@ import { agentSandboxProviderSchema, type AgentSandboxProvider, type Env } from 
 import { sandboxSessionPeerNamespace } from '../peer-bindings.js';
 import migrations from './drizzle/migrations';
 import {
+  allocationIsReleased,
+  allocationStartupDeadlineAt,
   connectionMatches,
   initialAllocationState,
   nextAllocationAlarmAt,
@@ -261,6 +280,7 @@ import {
   readRepositoryLaunch,
   recordRepositoryLaunch,
   repositoryLaunchOptions,
+  type RepositoryLaunchDecision,
   type RepositoryPreparationFailure,
 } from './repository-launch.js';
 import {
@@ -289,6 +309,13 @@ const OWNER_KEY = 'control_plane_owner';
 /** Backstop over the container DO's own capture timeout; the wrapper waits slightly longer. */
 const REPOSITORY_CAPTURE_CALL_MS = 5 * 60_000 + 5_000;
 const ALLOCATION_ROW_ID = 'current';
+/**
+ * The launch timeout message, compared in the create catch so a cold launch that
+ * overruns its own absolute deadline reports `runtime_artifact_deadline`
+ * (typed, no retry) rather than a generic creation timeout. There is one
+ * absolute budget with no extra grace.
+ */
+const SANDBOX_LAUNCH_TIMEOUT_MESSAGE = 'Sandbox launch timed out';
 
 export type StoredProviderPin = {
   provider: AgentSandboxProvider;
@@ -570,7 +597,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private readonly operations: { tail: Promise<unknown> } = { tail: Promise.resolve() };
   private provider: ProviderAdapter;
   private providerPin: StoredProviderPin | null = null;
-  private createInFlight = false;
+  private creatingAllocationId: string | null = null;
   private readonly repositoryCaptures = new Map<
     string,
     { allocationId: string | null; ok?: boolean }
@@ -643,7 +670,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       currentPin: () => this.providerPin,
       readAllocation: () => this.readAllocation(),
       requireOwner: () => this.requireOwner(),
-      isCreateInFlight: () => this.createInFlight,
+      isCreateInFlight: () => this.creatingAllocationId !== null,
       provider: () => this.provider,
       timers: () => this.sandboxTimers(),
       stopRef: (ref, allocationId) => this.stopRef(ref, allocationId),
@@ -669,6 +696,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const state = await this.readAllocation();
       if (state.kind === 'stopped') {
         const pin = this.pinFromInput(input);
+        if (
+          this.provider.runtimeExecution !== undefined &&
+          !allocationIsReleased(state) &&
+          !this.sameStopTarget(this.providerPin ?? this.defaultPin('cloudflare'), pin)
+        ) {
+          await this.applyEvent({
+            type: 'stop-requested',
+            at: Date.now(),
+            reason: 'sandbox_stopped',
+          });
+          throw new ProviderCreationError('invalid_configuration');
+        }
         await this.writeProviderPin(pin);
         this.providerPin = pin;
         this.provider = this.createProviderAdapter(pin);
@@ -881,6 +920,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
           request: parsed,
           exclusive: routes.length === target.length,
           storage: this.ctx.storage,
+          intentStorage: this.ctx.storage.kv,
+          provider: this.provider,
           allocation: state,
           hasConnection: this.boundWrapperSocket(state) !== null,
         }),
@@ -933,10 +974,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // failed route cannot keep the sandbox looking shared forever.
       await this.revokeWorktreeRoutes(handoff.targetSessionIds);
       if (handoff.plan.action === 'stop') {
-        // Fence by allocation identity: a sibling prepare may have created a new
-        // allocation while the provider stop ran off-queue.
+        // Fence by identity, launch nonce and outer deadline: a same-id fallback
+        // may have rotated the nonce off-queue, so a stop of the old nonce must
+        // not clear the replacement.
         const current = await this.readAllocation();
-        if (current.allocationId === handoff.plan.allocationId) {
+        const currentRead = readRuntimeLaunchIntent(this.ctx.storage.kv, current.allocationId);
+        const currentLaunchId = currentRead.kind === 'intent' ? currentRead.intent.launchId : null;
+        if (
+          current.allocationId === handoff.plan.allocationId &&
+          current.createDeadlineAt === handoff.plan.deadlineAt &&
+          currentLaunchId === handoff.plan.launchId
+        ) {
           await this.applyEvent({ type: 'provider-gone', at: Date.now() });
         }
       }
@@ -1025,8 +1073,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
   /** Deletion phase 2: the bounded provider call, outside the serial queue. */
   private async confirmWorktreeRemoval(plan: WorktreeDeletionPlan): Promise<boolean> {
     if (plan.action === 'complete') return true;
+    const token =
+      plan.allocationId === null || plan.launchId === null || plan.deadlineAt === null
+        ? undefined
+        : { launchId: plan.launchId, createDeadlineAt: plan.deadlineAt };
     if (plan.action === 'stop') {
-      return this.stopProviderConfirmed(plan.providerRef, plan.allocationId);
+      return this.stopProviderConfirmed(plan.providerRef, plan.allocationId, token);
     }
     return (await this.observeWorktreeRuntime(plan.providerRef)).status === 'terminal';
   }
@@ -1682,7 +1734,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await this.recoverRepositoryPreparationFailures();
       const state = await this.readAllocation();
       await failExpiredRoutes(this.routeContext(state));
-      if (state.kind === 'creating' && this.createInFlight) {
+      const coldExpiryReason = this.bootstrapExpiryReason(state);
+      const startupDeadlineAt = allocationStartupDeadlineAt(state);
+      // A committed ref means a launch attempt owns the deadline. A null ref is
+      // the short create retry pause, which must keep the generic retry.
+      const coldCreatingExpired =
+        coldExpiryReason !== null &&
+        state.kind === 'creating' &&
+        state.providerRef !== null &&
+        startupDeadlineAt !== null &&
+        Date.now() >= startupDeadlineAt;
+      const nativeCreatingExpired =
+        this.provider.runtimeExecution !== undefined &&
+        startupDeadlineAt !== null &&
+        Date.now() >= startupDeadlineAt;
+      if (
+        state.kind === 'creating' &&
+        this.creatingAllocationId === state.allocationId &&
+        !coldCreatingExpired &&
+        !nativeCreatingExpired
+      ) {
         // N2: the in-flight attempt owns the create deadline. Keep a backstop;
         // it will dispatch its own result and re-arm.
         for (const entry of await this.billingSchedule.dueEntries()) {
@@ -1693,6 +1764,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         await this.ctx.storage.setAlarm(
           Math.min(
             Date.now() + this.sandboxTimers().providerCreateMs,
+            coldExpiryReason === null ? Infinity : (startupDeadlineAt ?? Infinity),
             (await earliestRouteDeadlineAt(this.db)) ?? Infinity,
             this.earliestHelloDeadlineAt() ?? Infinity,
             this.billingSchedule.snapshotEarliestDue() ?? Infinity
@@ -1700,12 +1772,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         return;
       }
+      const coldStartingExpired =
+        coldExpiryReason !== null &&
+        state.kind === 'starting' &&
+        state.firstConnectDeadlineAt !== null &&
+        Date.now() >= state.firstConnectDeadlineAt;
       await this.applyEvent({
         type: 'tick',
         at: Date.now(),
         nextAllocationId: crypto.randomUUID(),
         retryAllowed: await this.retryAllowed(),
+        ...(coldExpiryReason !== null ? { bootstrapExpiryReason: coldExpiryReason } : {}),
       });
+      if ((coldCreatingExpired || coldStartingExpired) && coldExpiryReason !== null) {
+        await this.failPreparingRoutes(coldExpiryReason);
+      }
       try {
         await withTimeout(
           this.runBillingAlarm(),
@@ -1952,6 +2033,30 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async applyEvent(event: AllocationEvent): Promise<void> {
     const previous = await this.readAllocation();
+    if (this.provider.runtimeExecution !== undefined) {
+      const deadlineAt = allocationStartupDeadlineAt(previous);
+      const expiredUncommitted =
+        event.type === 'tick' &&
+        previous.kind === 'creating' &&
+        previous.providerRef === null &&
+        deadlineAt !== null &&
+        event.at >= deadlineAt &&
+        this.launchTokenFor(previous) !== undefined &&
+        (await readRepositoryLaunch(this.ctx.storage))?.allocationId === previous.allocationId;
+      const needsCleanup =
+        event.type === 'ensure' && previous.kind === 'stopped' && !allocationIsReleased(previous);
+      if (needsCleanup || expiredUncommitted) {
+        await this.applyEvent({
+          type: 'stop-requested',
+          at: event.at,
+          reason:
+            event.type === 'tick'
+              ? (event.bootstrapExpiryReason ?? 'connection_lost')
+              : 'sandbox_stopped',
+        });
+        return;
+      }
+    }
     const timers = { ...this.sandboxTimers() };
     if (
       this.currentProvider() === 'cloudflare-containers' &&
@@ -1966,7 +2071,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
     }
     const { state, effects, stopReason } = reduceAllocation(previous, event, timers);
-    await this.writeAllocation(state, previous);
+    try {
+      await this.writeAllocation(state, previous);
+    } catch (error) {
+      // A present but malformed runtime-release configuration throws before the
+      // identity transaction. Fail the preparing routes at once with the typed
+      // reason and terminalize the just-minted identity, so no silent preparing
+      // work survives the rollback and no physical work starts.
+      if (
+        error instanceof ProviderCreationError &&
+        error.permanentReason === 'invalid_configuration' &&
+        previous.allocationId !== state.allocationId
+      ) {
+        await this.failPreparingRoutes('invalid_configuration');
+        await this.writeAllocation(initialAllocationState(), previous);
+        await this.armAlarm(initialAllocationState());
+        return;
+      }
+      throw error;
+    }
     if (
       previous.kind !== state.kind ||
       previous.stopAttempt !== state.stopAttempt ||
@@ -2077,6 +2200,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       };
     }
     let selectedPin: StoredProviderPin | undefined;
+    const nativeCleanupPending =
+      state.kind === 'stopped' &&
+      this.provider.runtimeExecution !== undefined &&
+      !allocationIsReleased(state);
     try {
       if (
         sandboxSelection !== undefined &&
@@ -2091,6 +2218,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
           source.kiloToken
         );
       }
+      if (
+        nativeCleanupPending &&
+        selectedPin !== undefined &&
+        !this.sameStopTarget(this.providerPin ?? this.defaultPin('cloudflare'), selectedPin)
+      )
+        throw new ProviderCreationError('invalid_configuration');
       if (
         state.kind !== 'stopped' &&
         (selectedPin?.egressAllowlist !== undefined ||
@@ -2109,6 +2242,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
         attemptId,
         'invalid_configuration'
       );
+      if (nativeCleanupPending)
+        await this.applyEvent({
+          type: 'stop-requested',
+          at: Date.now(),
+          reason: 'sandbox_stopped',
+        });
       return routeView(route, state.kind === 'connected');
     }
     // H1: apply the Worker-selected provider pin before the first attempt. The
@@ -3134,6 +3273,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // `create-failed` with no retry, a confirmed stop and `provider-gone` can
     // all reach `stopped` without arming an alarm, so sweep expired routes now.
     await failExpiredRoutes(ctx);
+    if (this.provider.runtimeExecution !== undefined && !allocationIsReleased(next)) {
+      await this.failPreparingRoutes('workspace_setup_failed', 'cleanup_unconfirmed');
+      await this.armAlarm(next);
+      return;
+    }
     if (previous.kind !== 'stopping') {
       // A direct `provider-gone` keeps ready routes; they lose the sandbox.
       await dropReadyRoutes(ctx, 'sandbox_lost');
@@ -3909,7 +4053,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async runEffect(effect: AllocationEffect, state: AllocationState): Promise<void> {
     switch (effect.type) {
       case 'create':
-        if (this.createInFlight) return;
+        if (this.creatingAllocationId === effect.allocationId) return;
         // H3: the provider call runs off the serialized queue; its result
         // re-enters through applyEvent fenced on allocationId.
         this.ctx.waitUntil(this.runCreate(effect.allocationId));
@@ -3927,16 +4071,58 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async runCreate(allocationId: string): Promise<void> {
-    this.createInFlight = true;
+    this.creatingAllocationId = allocationId;
+    const pin = this.providerPin ?? this.defaultPin('cloudflare');
+    const creationOwner = {
+      provider: this.provider,
+      allocationName: pin.allocationName ?? this.sandboxId,
+    };
     try {
       const state = await this.readAllocation();
       if (state.kind !== 'creating' || state.allocationId !== allocationId) return;
       let createdRef: string | null = null;
       try {
-        const credential = generateSandboxCredential();
-        await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
-        const pin = this.providerPin ?? this.defaultPin('cloudflare');
-        const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
+        const createDeadline =
+          state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
+
+        // Resolve the repository launch options BEFORE any creation: native
+        // source resolution and the launch decision must see the waiting routes,
+        // never a re-derived view after the container already exists.
+        const launch = repositoryLaunchOptions(
+          await listRoutes(this.db),
+          await readRepositoryLaunch(this.ctx.storage)
+        );
+        logControlDiagnostic('snapshot_launch', {
+          sandboxId: this.sandboxId,
+          allocationId,
+          reason: launch.reason,
+          preparingRoutes: launch.preparingRouteCount,
+          distinctKeys: launch.distinctKeyCount,
+          skip: launch.skipped,
+          repoKey: launch.options.repoKey?.slice(0, 16),
+        });
+        if (launch.skipped) {
+          await notifyPreparingRoutes(this.routeContext(state), {
+            step: 'snapshot_fallback',
+            detail: 'Previous snapshot startup failed. Retrying without a snapshot.',
+          });
+        }
+        // Persist a placeholder before the launch so a `hello` accepted while it
+        // runs confirms this allocation, and that confirmation outlives the
+        // allocation stopping before the launch resolves.
+        const began = await this.enqueue(async () => {
+          const current = await this.readAllocation();
+          if (current.kind !== 'creating' || current.allocationId !== allocationId) return false;
+          await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped);
+          return true;
+        });
+        if (!began) return;
+
+        // Consume the immutable persisted selection. A present malformed or
+        // mismatched record fails closed before any physical work.
+        const selection = this.launchSelectionFor(allocationId);
+        const token = this.launchTokenFor(state);
+
         if (pin.billing) {
           await assertContainerCapacity(this.env, {
             subject: pin.billing.subject,
@@ -3945,8 +4131,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
             billingOrigin: pin.billing.metadata?.origin,
           });
         }
-        const createDeadline =
-          state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
         if (pin.provider === 'vercel') {
           let admission: 'admitted' | 'blocked' | 'unavailable' | 'retry' = 'retry';
           let admissionRejected = false;
@@ -3996,10 +4180,53 @@ export class SandboxControlV2 extends DurableObject<Env> {
           allocationName: pin.allocationName ?? this.sandboxId,
           containment: this.resolvedContainment(),
           ...(pin.billing === null ? {} : { billing: pin.billing }),
+          ...(token === undefined ? {} : { launchToken: token }),
         };
+        const ops = creationOwner.provider.runtimeExecution?.(intent);
+        // An explicit release on a provider without runtime execution ops (the
+        // deprecated SDK sandbox or Vercel) fails here, before provider.create
+        // or any physical start. It is never silently substituted with baked.
+        if (selection.kind === 'release' && (ops === undefined || token === undefined)) {
+          await this.failCreationRoutes(allocationId, false, 'invalid_configuration');
+          return;
+        }
+        // Build the wrapper credential and its hash with no durable write here:
+        // the owner commits both under a still-live allocation, so a late
+        // preparation can never overwrite a replacement's credential.
+        const credential = generateSandboxCredential();
+        const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
+        const credentialHash = await hashSandboxCredential(credential);
+
+        if (ops !== undefined && token !== undefined) {
+          await this.runNativeLaunch({
+            allocationId,
+            pin,
+            selection,
+            launch,
+            ops,
+            launchToken: token,
+            createDeadline,
+            launchEnv,
+            credentialHash,
+            setCreatedRef: ref => {
+              createdRef = ref;
+            },
+          });
+          return;
+        }
+
+        // ---- Existing baked path (SDK / Vercel / legacy native reconcile) ----
+        const committed = await this.commitInitialCredentials({
+          allocationId,
+          launchId: token?.launchId,
+          outerDeadlineAt: createDeadline,
+          hash: credentialHash,
+        });
+        if (!committed) return;
+
         // N2: create and launch share one bound (the create deadline).
         const created = await withTimeout(
-          this.provider.create(intent),
+          creationOwner.provider.create(intent),
           remainingMs(createDeadline),
           'Sandbox create timed out'
         );
@@ -4040,44 +4267,27 @@ export class SandboxControlV2 extends DurableObject<Env> {
         });
         const current = await this.readAllocation();
         if (current.kind !== 'creating' || current.allocationId !== allocationId) {
-          const confirmed = await this.stopRef(createdRef, allocationId);
+          const confirmed = await this.stopRef(createdRef, allocationId, token, creationOwner);
           if (pin.provider === 'vercel')
             await this.settleStoppedCreatedVercelRef(createdRef, confirmed);
           return;
         }
         const launchDeadline = current.createDeadlineAt ?? createDeadline;
-        const launch = repositoryLaunchOptions(
-          await listRoutes(this.db),
-          await readRepositoryLaunch(this.ctx.storage)
-        );
-        logControlDiagnostic('snapshot_launch', {
-          sandboxId: this.sandboxId,
-          allocationId,
-          reason: launch.reason,
-          preparingRoutes: launch.preparingRouteCount,
-          distinctKeys: launch.distinctKeyCount,
-          skip: launch.skipped,
-          repoKey: launch.options.repoKey?.slice(0, 16),
-        });
-        if (launch.skipped) {
-          await notifyPreparingRoutes(this.routeContext(current), {
-            step: 'snapshot_fallback',
-            detail: 'Previous snapshot startup failed. Retrying without a snapshot.',
-          });
-        }
-        // Persist a placeholder before the launch so a `hello` accepted while it
-        // runs confirms this allocation, and that confirmation outlives the
-        // allocation stopping before the launch resolves.
-        await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped);
-        if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+        if (Date.now() >= launchDeadline) throw new Error(SANDBOX_LAUNCH_TIMEOUT_MESSAGE);
+        // One absolute creation deadline: the cold bootstrap and the native
+        // container installer both carry the same deadline, so preflight, SDK
+        // start, install, probe and wrapper startup do not reset it per phase.
         const launchOptions = {
           ...launch.options,
-          ...(pin.provider === 'cloudflare-containers' ? { deadlineAt: launchDeadline } : {}),
+          ...(pin.provider === 'vercel' ? {} : { deadlineAt: launchDeadline }),
         };
+        // One absolute budget, no extra grace: the provider classifies its own
+        // absolute-deadline failure, and the create catch maps a cold backstop
+        // timeout to `runtime_artifact_deadline` before the generic branch.
         let launched = await withTimeout(
-          this.provider.launch(createdRef, launchEnv, launchOptions),
+          creationOwner.provider.launch(createdRef, launchEnv, launchOptions),
           remainingMs(launchDeadline),
-          'Sandbox launch timed out'
+          SANDBOX_LAUNCH_TIMEOUT_MESSAGE
         );
         if (launched.snapshotFailed) {
           const imageCredential = generateSandboxCredential();
@@ -4087,20 +4297,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
             pin.provider
           );
           const imageCredentialHash = await hashSandboxCredential(imageCredential);
+          let cleanupToken: ProviderLaunchToken | undefined;
           const ownsCleanup = await this.enqueue(async () => {
             const latest = await this.readAllocation();
             if (latest.kind !== 'creating' || latest.allocationId !== allocationId) return false;
-            if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+            if (Date.now() >= launchDeadline) throw new Error(SANDBOX_LAUNCH_TIMEOUT_MESSAGE);
             await this.ctx.storage.put(CREDENTIAL_HASH_KEY, imageCredentialHash);
+            cleanupToken = this.launchTokenFor(latest);
             return true;
           });
           if (!ownsCleanup) {
             await this.recordLaunch(allocationId, launched.startSource);
             return;
           }
-          if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+          if (Date.now() >= launchDeadline) throw new Error(SANDBOX_LAUNCH_TIMEOUT_MESSAGE);
           const confirmed = await withTimeout(
-            this.stopRef(createdRef, allocationId),
+            this.stopRef(createdRef, allocationId, cleanupToken, creationOwner),
             remainingMs(launchDeadline),
             'Sandbox cleanup stop timed out'
           );
@@ -4108,7 +4320,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           const afterCleanup = await this.readAllocation();
           if (afterCleanup.kind !== 'creating' || afterCleanup.allocationId !== allocationId)
             return;
-          if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+          if (Date.now() >= launchDeadline) throw new Error(SANDBOX_LAUNCH_TIMEOUT_MESSAGE);
           logControlDiagnostic('snapshot_fallback', {
             sandboxId: this.sandboxId,
             allocationId,
@@ -4123,13 +4335,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
             detail: 'Starting sandbox without a snapshot',
           });
           launched = await withTimeout(
-            this.provider.launch(createdRef, imageLaunchEnv, {
+            creationOwner.provider.launch(createdRef, imageLaunchEnv, {
               ...launch.options,
               skipRepository: true,
               deadlineAt: launchDeadline,
             }),
             remainingMs(launchDeadline),
-            'Sandbox launch timed out'
+            SANDBOX_LAUNCH_TIMEOUT_MESSAGE
           );
           if (launched.snapshotFailed) throw new Error('Sandbox image launch failed');
         }
@@ -4139,6 +4351,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
           at: Date.now(),
           allocationId,
           providerRef: createdRef,
+          // Only a native release launch carries an attempt deadline that
+          // tightens the first-connect window; the baked path keeps its
+          // per-phase first-connect window.
         });
       } catch (error) {
         logControlDiagnostic(
@@ -4157,6 +4372,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
           await this.failCreationRoutes(allocationId, false, 'container_limit_reached');
           return;
         }
+        // A typed cold-bootstrap failure is permanent for this descriptor: fail
+        // the routes with the one reason and stop the allocation. It never
+        // counts as a repository snapshot failure, so no snapshot is evicted or
+        // retried from the base.
+        if (error instanceof RuntimeInstallerError) {
+          await this.failCreationRoutes(allocationId, false, error.reason);
+          return;
+        }
         if (error instanceof ProviderCreationError && error.permanentReason !== null) {
           await this.failCreationRoutes(allocationId, false, error.permanentReason);
           return;
@@ -4167,15 +4390,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (createdRef !== null) {
           const latest = await this.readAllocation();
           if (latest.kind === 'creating' && latest.allocationId === allocationId) {
-            const confirmed = await this.stopRef(createdRef, allocationId);
-            if (this.currentProvider() === 'vercel')
+            const confirmed = await this.stopRef(
+              createdRef,
+              allocationId,
+              this.launchTokenFor(latest),
+              creationOwner
+            );
+            if (pin.provider === 'vercel')
               await this.settleStoppedCreatedVercelRef(createdRef, confirmed);
           }
         }
         await this.dispatchCreateFailed(allocationId);
       }
     } finally {
-      this.createInFlight = false;
+      if (this.creatingAllocationId === allocationId) this.creatingAllocationId = null;
       await this.enqueue(() => this.recoverRepositoryPreparationFailures());
     }
   }
@@ -4219,8 +4447,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async recoverRepositoryPreparationFailures(): Promise<void> {
-    if (this.createInFlight) return;
     const state = await this.readAllocation();
+    if (this.creatingAllocationId === state.allocationId) return;
     if (state.kind !== 'connected' && state.kind !== 'disconnected') return;
     const launch = await readRepositoryLaunch(this.ctx.storage);
     if (launch?.allocationId !== state.allocationId) return;
@@ -4267,7 +4495,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         preparationFailures: [...preparationFailures, failure],
       });
     }
-    if (this.createInFlight) return true;
+    if (this.creatingAllocationId === state.allocationId) return true;
     logControlDiagnostic('snapshot_fallback', {
       sandboxId: this.sandboxId,
       allocationId: state.allocationId,
@@ -4284,6 +4512,58 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async dispatchCreateFailed(allocationId: string): Promise<void> {
+    const cleanup = await this.enqueue(async () => {
+      const state = await this.readAllocation();
+      if (state.kind !== 'creating' || state.allocationId !== allocationId)
+        return { kind: 'stale' } as const;
+      if (this.provider.runtimeExecution === undefined) return { kind: 'legacy' } as const;
+      const token = this.launchTokenFor(state);
+      if (token === undefined && state.providerRef === null) return { kind: 'legacy' } as const;
+      return {
+        kind: 'native',
+        ref: state.providerRef,
+        token,
+        owner: {
+          provider: this.provider,
+          allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+        },
+      } as const;
+    });
+    if (cleanup.kind === 'stale') return;
+    if (cleanup.kind === 'native') {
+      const confirmed = await this.stopProviderConfirmed(
+        cleanup.ref,
+        allocationId,
+        cleanup.token,
+        cleanup.owner
+      );
+      await this.enqueue(async () => {
+        const current = await this.readAllocation();
+        if (current.kind !== 'creating' || current.allocationId !== allocationId) return;
+        const token = this.launchTokenFor(current);
+        if (
+          token?.launchId !== cleanup.token?.launchId ||
+          token?.createDeadlineAt !== cleanup.token?.createDeadlineAt
+        )
+          return;
+        if (!confirmed) {
+          await this.applyEvent({
+            type: 'stop-requested',
+            at: Date.now(),
+            reason: 'workspace_setup_failed',
+          });
+          return;
+        }
+        await this.applyEvent({
+          type: 'create-failed',
+          at: Date.now(),
+          allocationId,
+          nextAllocationId: crypto.randomUUID(),
+          retryAllowed: await this.retryAllowed(),
+        });
+      });
+      return;
+    }
     await this.dispatchResult({
       type: 'create-failed',
       at: Date.now(),
@@ -4293,19 +4573,249 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  private async stopRef(ref: string, allocationId: string | null): Promise<boolean> {
+  private async stopRef(
+    ref: string,
+    allocationId: string | null,
+    token?: ProviderLaunchToken,
+    owner = {
+      provider: this.provider,
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+    }
+  ): Promise<boolean> {
+    const intent: ProviderAllocationIntent | null =
+      token === undefined
+        ? null
+        : { intentId: allocationId ?? '', createdAt: Date.now(), launchToken: token };
     const result = await withTimeout(
-      this.provider.stop(ref, null),
+      owner.provider.stop(ref, intent),
       this.sandboxTimers().providerStopAttemptMs,
       'Sandbox cleanup stop timed out'
     ).catch(() => 'retryable' as const);
     logControlDiagnostic('stop_origin', {
       origin: 'cleanup',
-      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+      allocationName: owner.allocationName,
       allocationId,
       result,
     });
     return result === 'terminal';
+  }
+
+  /**
+   * The persisted launch token captured BEFORE an off-queue stop, never looked
+   * up by ref or id afterward, so a delayed stop cannot retire a replacement
+   * nonce. Absent for a legacy record or a state without an allocation identity,
+   * which must never destroy a versioned replacement.
+   */
+  private launchTokenFor(state: AllocationState): ProviderLaunchToken | undefined {
+    if (state.allocationId === null || state.createDeadlineAt === null) return undefined;
+    const read = readRuntimeLaunchIntent(this.ctx.storage.kv, state.allocationId);
+    if (read.kind !== 'intent') return undefined;
+    return { launchId: read.intent.launchId, createDeadlineAt: state.createDeadlineAt };
+  }
+
+  /** The persisted launch nonce for an allocation, never a re-derived value. */
+  private launchIdFor(allocationId: string): string | null {
+    const read = readRuntimeLaunchIntent(this.ctx.storage.kv, allocationId);
+    return read.kind === 'intent' ? read.intent.launchId : null;
+  }
+
+  /**
+   * Commit the initial wrapper credential hash under the owner queue. It is
+   * fenced on the creating identity, the SQL outer deadline and the persisted
+   * launch nonce, so a late preparation whose allocation has since stopped or
+   * been replaced cannot overwrite a replacement's credential.
+   */
+  private async commitInitialCredentials(input: {
+    allocationId: string;
+    launchId: string | undefined;
+    outerDeadlineAt: number;
+    hash: string;
+  }): Promise<boolean> {
+    return this.enqueue(async () => {
+      const latest = await this.readAllocation();
+      if (latest.kind !== 'creating' || latest.allocationId !== input.allocationId) return false;
+      if (latest.createDeadlineAt !== input.outerDeadlineAt) return false;
+      const read = readRuntimeLaunchIntent(this.ctx.storage.kv, input.allocationId);
+      // A legacy record without an intent predates the versioned nonce; the
+      // identity and deadline fence above still holds it to this allocation.
+      if (read.kind === 'malformed') return false;
+      if (read.kind === 'intent' && read.intent.launchId !== input.launchId) return false;
+      this.ctx.storage.kv.put(CREDENTIAL_HASH_KEY, input.hash);
+      return true;
+    });
+  }
+
+  /**
+   * The common native-runtime launch. It reserves ownership (which commits
+   * billing and the source facts) before any slow preflight, commits the
+   * provider ref and initial credential under the owner queue, runs the trusted
+   * preflight, starts exactly once, reconciles the phase, then settles and
+   * acknowledges. A confirmed physical snapshot failure rotates the launch nonce
+   * and credential atomically, under the unchanged outer deadline.
+   */
+  private async runNativeLaunch(input: {
+    allocationId: string;
+    pin: StoredProviderPin;
+    selection: RuntimeLaunchSelection;
+    launch: RepositoryLaunchDecision;
+    ops: RuntimeLaunchOps;
+    launchToken: ProviderLaunchToken;
+    createDeadline: number;
+    launchEnv: Record<string, string>;
+    credentialHash: string;
+    setCreatedRef: (ref: string) => void;
+  }): Promise<void> {
+    let effectiveDeadlineAt = input.createDeadline;
+    let committedRef: string | null = null;
+    let credentialHash = input.credentialHash;
+    let currentLaunchId = input.launchToken.launchId;
+    const effects: RuntimeLaunchEffects = {
+      grantSecret: async () => {
+        const secret = await withTimeout(
+          resolveSecret(this.env.NEXTAUTH_SECRET),
+          1_000,
+          'Runtime artifact grant secret lookup timed out'
+        ).catch(() => null);
+        return secret ?? null;
+      },
+      onReserved: async ({ providerRef, attemptDeadlineAt, phase }, launchId) => {
+        effectiveDeadlineAt = Math.min(attemptDeadlineAt, input.createDeadline);
+        return this.enqueue(async () => {
+          const latest = await this.readAllocation();
+          if (latest.kind !== 'creating' || latest.allocationId !== input.allocationId)
+            return false;
+          if (latest.createDeadlineAt !== input.createDeadline) return false;
+          if (this.launchIdFor(input.allocationId) !== launchId) return false;
+          committedRef = providerRef;
+          input.setCreatedRef(providerRef);
+          if (phase === 'reserved') this.ctx.storage.kv.put(CREDENTIAL_HASH_KEY, credentialHash);
+          await this.applyEvent({
+            type: 'provider-ref',
+            at: Date.now(),
+            allocationId: input.allocationId,
+            providerRef,
+            firstConnectDeadlineAt: effectiveDeadlineAt,
+          });
+          return true;
+        });
+      },
+      rotateFallbackNonce: async ({ previousLaunchId, outerDeadlineAt }) => {
+        const freshCredential = generateSandboxCredential();
+        const freshEnv = await this.wrapperLaunchEnv(
+          freshCredential,
+          input.allocationId,
+          input.pin.provider
+        );
+        const freshHash = await hashSandboxCredential(freshCredential);
+        const freshLaunchId = crypto.randomUUID();
+        const rotated = await this.enqueue(async () => {
+          const latest = await this.readAllocation();
+          if (latest.kind !== 'creating' || latest.allocationId !== input.allocationId)
+            return false;
+          if (latest.createDeadlineAt !== outerDeadlineAt) return false;
+          try {
+            // Compare the exact old nonce and commit the fresh nonce and wrapper
+            // credential together; the selection is untouched.
+            this.db.transaction(() => {
+              rotateRuntimeLaunchNonce(
+                this.ctx.storage.kv,
+                input.allocationId,
+                previousLaunchId,
+                freshLaunchId
+              );
+              this.ctx.storage.kv.put(CREDENTIAL_HASH_KEY, freshHash);
+            });
+            credentialHash = freshHash;
+            currentLaunchId = freshLaunchId;
+          } catch {
+            return false;
+          }
+          return true;
+        });
+        if (!rotated) throw new Error('Fallback launch nonce rotation lost ownership');
+        return { launchId: freshLaunchId, launchEnv: freshEnv };
+      },
+    };
+
+    let result: Awaited<ReturnType<typeof launchSandbox>>;
+    try {
+      result = await launchSandbox({
+        ops: input.ops,
+        selection: input.selection,
+        allocationId: input.allocationId,
+        launchId: input.launchToken.launchId,
+        outerDeadlineAt: input.createDeadline,
+        reader: this.env.RUNTIME_RELEASE_BUCKET,
+        effects,
+        launchEnv: input.launchEnv,
+        ...(input.launch.options.repoKey === undefined
+          ? {}
+          : { repoKey: input.launch.options.repoKey }),
+        ...(input.launch.options.skipRepository === undefined
+          ? {}
+          : { skipRepository: input.launch.options.skipRepository }),
+        failureRetention: true,
+      });
+    } catch (error) {
+      if (!(error instanceof RuntimeLaunchSettlementError)) throw error;
+      const latest = await this.readAllocation();
+      if (
+        latest.allocationId !== input.allocationId ||
+        latest.createDeadlineAt !== input.createDeadline ||
+        this.launchIdFor(input.allocationId) !== currentLaunchId
+      )
+        return;
+      result = error.outcome;
+    }
+
+    if (result.kind === 'handoff') {
+      // recordRepositoryLaunch/dispatchCreated remain the owner's: the common
+      // workflow never writes the route effect.
+      await this.recordLaunch(input.allocationId, result.startSource);
+      await this.dispatchResult({
+        type: 'created',
+        at: Date.now(),
+        allocationId: input.allocationId,
+        providerRef: committedRef ?? '',
+        // The effective native attempt deadline tightens the first-connect
+        // admission without overwriting the SQL outer create deadline.
+        firstConnectDeadlineAt: effectiveDeadlineAt,
+      });
+      return;
+    }
+    if (result.kind === 'ownership-lost') {
+      const stillOwned = await this.enqueue(async () => {
+        const latest = await this.readAllocation();
+        return (
+          latest.kind === 'creating' &&
+          latest.allocationId === input.allocationId &&
+          latest.createDeadlineAt === input.createDeadline &&
+          this.launchIdFor(input.allocationId) === currentLaunchId
+        );
+      });
+      if (stillOwned) await this.dispatchCreateFailed(input.allocationId);
+      return;
+    }
+    if (result.kind === 'installer-failed') {
+      await this.failCreationRoutes(input.allocationId, false, result.reason);
+      return;
+    }
+    if (result.kind === 'deadline') {
+      await this.failCreationRoutes(
+        input.allocationId,
+        false,
+        input.selection.kind === 'release' ? 'runtime_artifact_deadline' : 'connection_lost'
+      );
+      return;
+    }
+    if (result.kind === 'unsupported-release') {
+      await this.failCreationRoutes(input.allocationId, false, 'invalid_configuration');
+      return;
+    }
+    // `snapshot-failed` (a skipped repository image start rejected),
+    // `reservation-failed` and a receipt-less `bootstrap-failed` are generic,
+    // retryable creation failures: no snapshot penalty and no image fallback.
+    await this.dispatchCreateFailed(input.allocationId);
   }
 
   private async settleStoppedCreatedVercelRef(ref: string, confirmed: boolean): Promise<void> {
@@ -4344,10 +4854,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const state = await this.readAllocation();
     if (state.kind !== 'stopping' || state.stopAttempt !== stopAttempt || state.stopPending) return;
     const pin = this.providerPin ?? this.defaultPin('cloudflare');
+    const token = this.launchTokenFor(state);
     const intent: ProviderAllocationIntent = {
       intentId: state.allocationId ?? '',
       createdAt: Date.now(),
       allocationName: pin.allocationName ?? this.sandboxId,
+      ...(token === undefined ? {} : { launchToken: token }),
     };
     let confirmed = false;
     try {
@@ -4382,18 +4894,23 @@ export class SandboxControlV2 extends DurableObject<Env> {
    */
   private async stopProviderConfirmed(
     providerRef: string | null,
-    allocationId: string | null
+    allocationId: string | null,
+    token?: ProviderLaunchToken,
+    owner = {
+      provider: this.provider,
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+    }
   ): Promise<boolean> {
-    const pin = this.providerPin ?? this.defaultPin('cloudflare');
     const intent: ProviderAllocationIntent = {
       intentId: allocationId ?? '',
       createdAt: Date.now(),
-      allocationName: pin.allocationName ?? this.sandboxId,
+      allocationName: owner.allocationName,
+      ...(token === undefined ? {} : { launchToken: token }),
     };
     try {
       return (
         (await withTimeout(
-          this.provider.stop(providerRef, intent),
+          owner.provider.stop(providerRef, intent),
           this.sandboxTimers().providerStopAttemptMs,
           'Worktree deletion stop timed out'
         )) === 'terminal'
@@ -4413,9 +4930,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async observeWorktreeRuntime(
     providerRef: string | null
   ): Promise<{ status: 'active' | 'terminal' | 'unknown' }> {
+    if (providerRef === null) return { status: 'unknown' };
     try {
       return await withTimeout(
-        this.provider.observe(providerRef),
+        this.provider.observe(providerRef, null),
         this.sandboxTimers().providerStopAttemptMs,
         'Worktree runtime observation timed out'
       );
@@ -4567,6 +5085,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
         this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
         ws.close(1008, 'Runtime contract mismatch');
         return;
+      }
+      const admissionState = await this.readAllocation();
+      const coldExpiryReason = this.bootstrapExpiryReason(admissionState);
+      if (coldExpiryReason !== null) {
+        const admissionDeadline = allocationStartupDeadlineAt(admissionState);
+        if (admissionDeadline !== null && Date.now() >= admissionDeadline) {
+          this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
+          ws.close(1008, 'shutdown');
+          await this.failPreparingRoutes(coldExpiryReason);
+          await this.applyEvent({
+            type: 'stop-requested',
+            at: Date.now(),
+            reason: coldExpiryReason,
+          });
+          return;
+        }
       }
       const connectionId = crypto.randomUUID();
       this.releaseBoundSockets(ws, frame.allocationId);
@@ -4922,7 +5456,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
             );
           }
         }
-        if (state.providerRef !== null) {
+        if (
+          state.providerRef !== null ||
+          (this.provider.runtimeExecution !== undefined && this.launchTokenFor(state) !== undefined)
+        ) {
           await this.applyEvent({ type: 'stop-requested', at: Date.now(), reason });
           return;
         }
@@ -4935,6 +5472,28 @@ export class SandboxControlV2 extends DurableObject<Env> {
         retryAllowed: retryable && (await this.retryAllowed()),
       });
     });
+  }
+
+  /**
+   * A cold first-connect expiry is one specific user-visible failure: fail every
+   * preparing route with the one reason instead of leaving them to their own
+   * attempt deadline (which would report a generic preparation timeout).
+   */
+  private async failPreparingRoutes(
+    reason: ControlPlaneFailureReason,
+    stage = 'create_failed'
+  ): Promise<void> {
+    const state = await this.readAllocation();
+    for (const route of await listRoutes(this.db)) {
+      if (route.state !== 'preparing') continue;
+      await failCurrentAttempt(
+        this.routeContext(state),
+        route.sessionId,
+        route.attemptId,
+        reason,
+        stage
+      );
+    }
   }
 
   private async recordVercelBillingLifetime(evidence: {
@@ -4959,8 +5518,66 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   // --- provider selection -----------------------------------------------------
 
+  private sameStopTarget(left: StoredProviderPin, right: StoredProviderPin): boolean {
+    const identity = (pin: StoredProviderPin) =>
+      JSON.stringify([
+        pin.provider,
+        pin.configuration,
+        pin.allocationName ?? this.sandboxId,
+        pin.containment ?? false,
+        pin.egressAllowlist ?? null,
+      ]);
+    return identity(left) === identity(right);
+  }
+
   private ensureVercelBillingRuntime() {
     return this.billingRuntime.ensureRuntime();
+  }
+
+  /**
+   * The launch selection for a new allocation identity, chosen ONCE from Worker
+   * configuration and persisted transactionally. Unsupported providers reject an
+   * explicit release before physical work; only missing legacy metadata stays baked.
+   */
+  private allocationLaunchSelection(): RuntimeLaunchSelection {
+    const descriptor = this.env.RUNTIME_RELEASE_DESCRIPTOR;
+    const hasDescriptor = descriptor !== undefined && descriptor.trim() !== '';
+    try {
+      // The trusted origin only defaults when a descriptor is present; an
+      // artifact origin alone is an incomplete explicit configuration.
+      return resolveRuntimeLaunchSelection({
+        descriptor,
+        artifactOrigin: hasDescriptor
+          ? (this.env.RUNTIME_ARTIFACT_ORIGIN ?? this.env.WORKER_URL)
+          : this.env.RUNTIME_ARTIFACT_ORIGIN,
+      });
+    } catch {
+      // A present but malformed explicit configuration must fail closed at the
+      // identity boundary, never silently select baked.
+      throw new ProviderCreationError('invalid_configuration');
+    }
+  }
+
+  /**
+   * The persisted launch selection for an existing allocation. A missing legacy
+   * record reconciles baked; a present but malformed or mismatched record throws
+   * so the caller fails closed instead of adopting today's descriptor.
+   */
+  private launchSelectionFor(allocationId: string): RuntimeLaunchSelection {
+    const read = readRuntimeLaunchIntent(this.ctx.storage.kv, allocationId);
+    if (read.kind === 'malformed') throw new ProviderCreationError('invalid_configuration');
+    return read.kind === 'intent' ? read.intent.selection : { kind: 'baked' };
+  }
+
+  private bootstrapExpiryReason(state: AllocationState): ControlPlaneFailureReason | null {
+    if (state.allocationId === null) return null;
+    const read = readRuntimeLaunchIntent(this.ctx.storage.kv, state.allocationId);
+    if (read.kind === 'malformed') return 'invalid_configuration';
+    if (read.kind !== 'intent') return null;
+    if (read.intent.selection.kind === 'release') return 'runtime_artifact_deadline';
+    return this.provider.runtimeExecution !== undefined && state.firstConnectDeadlineAt !== null
+      ? 'connection_lost'
+      : null;
   }
 
   private createProviderAdapter(pin: StoredProviderPin): ProviderAdapter {
@@ -5049,13 +5666,29 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async writeAllocation(state: AllocationState, previous?: AllocationState): Promise<void> {
     const row = stateToRow(state);
+    const identityChanged = previous !== undefined && previous.allocationId !== state.allocationId;
+    // Choose the launch selection once, at the allocation-identity boundary, so
+    // the row, the runtime contract and the immutable launch intent commit or
+    // roll back together (synchronous `storage.kv` inside the SQL transaction).
+    const intent: RuntimeLaunchIntent | null = identityChanged
+      ? state.allocationId === null
+        ? null
+        : {
+            version: 1,
+            allocationId: state.allocationId,
+            launchId: crypto.randomUUID(),
+            selection: this.allocationLaunchSelection(),
+          }
+      : null;
     this.db.transaction(tx => {
       tx.insert(allocationTable)
         .values(row)
         .onConflictDoUpdate({ target: allocationTable.id, set: row })
         .run();
-      if (previous !== undefined && previous.allocationId !== state.allocationId) {
+      if (identityChanged) {
         resetRuntimeContract(this.ctx.storage.kv, state.allocationId);
+        if (intent === null) clearRuntimeLaunchIntent(this.ctx.storage.kv);
+        else writeRuntimeLaunchIntent(this.ctx.storage.kv, intent);
       }
     });
     if (

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { load } from 'js-yaml';
+import { cloudAgentRuntimeChanged } from './cloud-agent-runtime-changes.mjs';
 
 function workflow(name) {
   return load(readFileSync(new URL(`../.github/workflows/${name}.yml`, import.meta.url), 'utf8'));
@@ -67,7 +68,10 @@ test('successful main CI selects the tested deployment SHA', () => {
   assert.equal(ci.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
 
   for (const job of ['check-production-db-startup', 'run-migrations', 'stage-app']) {
-    assert.equal(production.jobs[job].needs, 'check-changes');
+    assert.deepEqual(
+      production.jobs[job].needs,
+      job === 'run-migrations' ? ['check-changes', 'prepare-cloud-agent-runtime'] : 'check-changes'
+    );
     assert.match(production.jobs[job].if, /should_deploy == 'true'/);
   }
   for (const job of [
@@ -78,6 +82,291 @@ test('successful main CI selects the tested deployment SHA', () => {
   ]) {
     assert.match(staging.jobs[job].if, /should_deploy == 'true'/);
     assert.ok([staging.jobs[job].needs].flat().includes('check-changes'));
+  }
+});
+
+test('Cloud Agent release preparation gates migrations and binds both Worker deploy paths', () => {
+  const release = workflow('cloud-agent-runtime-release');
+  const admission = workflow('cloud-agent-runtime-admission');
+  assert.deepEqual(Object.keys(release.on), ['workflow_call']);
+  assert.deepEqual(Object.keys(admission.on), ['workflow_call']);
+  assert.equal(release.permissions.contents, 'read');
+  assert.equal(release.permissions.actions, 'read');
+  assert.equal(release.concurrency['cancel-in-progress'], false);
+  assert.equal(release.jobs.release.needs, 'admit-source');
+  assert.equal(
+    release.jobs['admit-source'].uses,
+    './.github/workflows/cloud-agent-runtime-admission.yml'
+  );
+  const guard = admission.jobs.admit.steps.map(step => step.run ?? '').join('\n');
+  assert.match(guard, /test "\$GITHUB_REF" = refs\/heads\/main/);
+  assert.match(guard, /schedule\|workflow_dispatch/);
+  assert.match(guard, /git merge-base --is-ancestor "\$SOURCE_SHA" origin\/main/);
+  assert.match(guard, /head_sha=\$SOURCE_SHA/);
+  assert.match(guard, /\.head_sha == .*\$SOURCE_SHA/);
+  assert.match(guard, /\.event == \\"push\\"/);
+  assert.match(guard, /\.conclusion == \\"success\\"/);
+  const preparation = production.jobs['prepare-cloud-agent-runtime'];
+  assert.equal(preparation.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
+  assert.equal(preparation.with.base_sha, '${{ needs.check-changes.outputs.base_sha }}');
+  assert.ok(production.jobs['run-migrations'].needs.includes('prepare-cloud-agent-runtime'));
+  assert.ok(production.jobs['record-deployment'].needs.includes('prepare-cloud-agent-runtime'));
+  assert.match(
+    production.jobs['record-deployment'].if,
+    /needs\.prepare-cloud-agent-runtime\.result == 'success'/
+  );
+  assert.equal(
+    production.jobs['deploy-workers'].with.cloud_agent_runtime_artifact,
+    '${{ needs.prepare-cloud-agent-runtime.outputs.artifact_name }}'
+  );
+  const releaseSteps = release.jobs.release.steps;
+  const validateIndex = releaseSteps.findIndex(
+    step => step.name === 'Validate release inputs and select Bun'
+  );
+  const publishIndex = releaseSteps.findIndex(
+    step => step.name === 'Publish or reuse verified runtime candidates'
+  );
+  assert.ok(validateIndex >= 0 && validateIndex < publishIndex);
+  assert.equal(releaseSteps[validateIndex].env.CLOUDFLARE_API_TOKEN, undefined);
+  assert.match(releaseSteps[publishIndex].run, /runtime:release prepare/);
+  assert.match(
+    releaseSteps.find(step => step.id === 'changes').run,
+    /node scripts\/cloud-agent-runtime-changes\.mjs "\$BASE_SHA" HEAD/
+  );
+  assert.match(
+    workers.jobs['detect-changes'].steps.find(step => step.name === 'Find changed workers').run,
+    /node scripts\/cloud-agent-runtime-changes\.mjs "\$BASE_SHA" HEAD/
+  );
+  assert.match(
+    workers.jobs['prepare-cloud-agent-runtime'].if,
+    /inputs\.worker == 'services\/cloud-agent-next'/
+  );
+  assert.doesNotMatch(workers.jobs['prepare-cloud-agent-runtime'].if, /inputs\.worker == ''/);
+  for (const jobName of ['deploy-manual', 'deploy-changed']) {
+    const job = workers.jobs[jobName];
+    assert.ok(job.needs.includes('admit-cloud-agent-source'));
+    assert.ok(job.needs.includes('prepare-cloud-agent-runtime'));
+    const verification = job.steps.findIndex(
+      step => step.name === 'Verify Cloud Agent release and deployment order'
+    );
+    const deployment = job.steps.findIndex(step =>
+      step.uses?.startsWith('cloudflare/wrangler-action@')
+    );
+    assert.ok(verification >= 0 && verification < deployment);
+    assert.match(job.steps[verification].run, /runtime:release verify/);
+    assert.match(
+      job.steps[deployment].with.command,
+      /--config wrangler\.runtime-release\.json --tag runtime-ci-/
+    );
+    assert.equal(job.steps.find(step => step.name === 'Checkout code').with['fetch-depth'], 0);
+  }
+  const ciSteps = Object.values(ci.jobs).flatMap(job => job.steps ?? []);
+  assert.ok(ciSteps.some(step => step.run?.includes('runtime:release validate')));
+  const baseCheck = ciSteps.find(step => step.run?.includes('runtime:release check-base'));
+  assert.equal(baseCheck.if, "steps.runtime_inputs.outputs.base_changed == 'true'");
+});
+
+test('Cloud Agent source admission rejects untrusted or untested sources and retains an older tested SHA', () => {
+  const admission = workflow('cloud-agent-runtime-admission').jobs.admit.steps;
+  const trustedScript = admission.find(step => step.name === 'Require trusted main execution').run;
+  const greenScript = admission.find(
+    step => step.name === 'Admit the exact CI-green main source'
+  ).run;
+  const root = mkdtempSync(join(tmpdir(), 'runtime-admission-'));
+  try {
+    const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+    git('init', '-b', 'main');
+    writeFileSync(join(root, 'source.txt'), 'tested source');
+    git('add', 'source.txt');
+    git(
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '-m',
+      'tested source'
+    );
+    const tested = git('rev-parse', 'HEAD');
+    writeFileSync(join(root, 'source.txt'), 'main advanced');
+    git('add', 'source.txt');
+    git(
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '-m',
+      'main advanced'
+    );
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    git('checkout', '--detach', tested);
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    writeFileSync(
+      join(bin, 'gh'),
+      '#!/bin/sh\ncase "$2" in *"head_sha=$SOURCE_SHA"*) ;; *) exit 1 ;; esac\nprintf "%s\\n" "$CI_ADMITTED"\n',
+      { mode: 0o755 }
+    );
+    const environment = {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      GITHUB_REF: 'refs/heads/main',
+      GITHUB_EVENT_NAME: 'schedule',
+      GITHUB_REPOSITORY: 'fixture/cloud',
+      SOURCE_SHA: tested,
+      CI_ADMITTED: 'true',
+    };
+    const invoke = (script, overrides = {}) =>
+      spawnSync('bash', ['-c', script], {
+        cwd: root,
+        env: { ...environment, ...overrides },
+        encoding: 'utf8',
+      });
+    assert.equal(invoke(trustedScript).status, 0);
+    assert.equal(invoke(greenScript).status, 0);
+    assert.notEqual(invoke(trustedScript, { GITHUB_REF: 'refs/heads/feature' }).status, 0);
+    assert.notEqual(invoke(trustedScript, { GITHUB_EVENT_NAME: 'pull_request' }).status, 0);
+    assert.notEqual(invoke(trustedScript, { SOURCE_SHA: 'unsafe;source' }).status, 0);
+    for (const CI_ADMITTED of ['false', ''])
+      assert.notEqual(invoke(greenScript, { CI_ADMITTED }).status, 0);
+    assert.notEqual(invoke(greenScript, { SOURCE_SHA: git('rev-parse', 'origin/main') }).status, 0);
+    assert.equal(git('rev-parse', 'HEAD'), tested);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('Cloud Agent change detection owns one complete deployment range and skips unrelated code', () => {
+  const root = mkdtempSync(join(tmpdir(), 'runtime-changes-'));
+  try {
+    const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+    const commit = message => {
+      git('add', '.');
+      git(
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        'commit',
+        '-m',
+        message
+      );
+      return git('rev-parse', 'HEAD');
+    };
+    git('init', '-b', 'main');
+    const directory = join(root, 'services/cloud-agent-next/wrapper/src');
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, 'main.ts'), 'runtime-a');
+    const baseline = commit('baseline');
+    writeFileSync(join(root, 'unrelated.txt'), 'unrelated code');
+    const unrelated = commit('unrelated');
+    assert.equal(cloudAgentRuntimeChanged(baseline, unrelated, root), false);
+    writeFileSync(join(directory, 'main.ts'), 'runtime-b');
+    const runtime = commit('runtime change');
+    writeFileSync(join(root, 'unrelated.txt'), 'another unrelated change');
+    const target = commit('later unrelated commit');
+    assert.equal(cloudAgentRuntimeChanged(baseline, target, root), true);
+    assert.equal(cloudAgentRuntimeChanged(runtime, target, root), false);
+    assert.equal(cloudAgentRuntimeChanged('', target, root), true);
+    assert.throws(() => cloudAgentRuntimeChanged('invalid-ref', target, root), /Cannot compare/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the actual Worker matrix includes Cloud Agent changes and skips unrelated code and missing staging', () => {
+  const root = mkdtempSync(join(tmpdir(), 'runtime-worker-matrix-'));
+  const matrixScript = workers.jobs['detect-changes'].steps.find(
+    step => step.name === 'Find changed workers'
+  ).run;
+  try {
+    const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+    const commit = message => {
+      git('add', '.');
+      git(
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        'commit',
+        '-m',
+        message
+      );
+      return git('rev-parse', 'HEAD');
+    };
+    git('init', '-b', 'main');
+    mkdirSync(join(root, 'scripts'));
+    writeFileSync(
+      join(root, 'scripts/cloud-agent-runtime-changes.mjs'),
+      readFileSync(new URL('./cloud-agent-runtime-changes.mjs', import.meta.url))
+    );
+    const cloud = join(root, 'services/cloud-agent-next');
+    mkdirSync(cloud, { recursive: true });
+    writeFileSync(join(cloud, 'wrangler.jsonc'), '{"name":"cloud-agent-next","env":{}}');
+    writeFileSync(join(cloud, 'runtime.ts'), 'runtime-a');
+    const other = join(root, 'services/other-worker');
+    mkdirSync(other);
+    writeFileSync(
+      join(other, 'wrangler.jsonc'),
+      '{"name":"other-worker","env":{"staging":{"name":"other-worker-staging"}}}'
+    );
+    writeFileSync(join(root, '.gitignore'), '.matrix-output\n');
+    const baseline = commit('matrix baseline');
+    const matrix = (base, environment = 'production') => {
+      const output = join(root, '.matrix-output');
+      writeFileSync(output, '');
+      const script = matrixScript
+        .replaceAll('${{ inputs.base_sha }}', base)
+        .replaceAll('${{ inputs.target_environment }}', environment);
+      const result = spawnSync('bash', ['-e', '-c', script], {
+        cwd: root,
+        env: { ...process.env, GITHUB_OUTPUT: output },
+        encoding: 'utf8',
+      });
+      assert.equal(result.status, 0, result.stderr);
+      const value = readFileSync(output, 'utf8')
+        .split('\n')
+        .find(line => line.startsWith('matrix='));
+      assert.ok(value, 'matrix output must exist');
+      return JSON.parse(value.slice('matrix='.length));
+    };
+    writeFileSync(join(root, 'unrelated.txt'), 'unrelated');
+    commit('unrelated change');
+    assert.deepEqual(matrix(baseline), []);
+    writeFileSync(join(cloud, 'runtime.ts'), 'runtime-b');
+    const runtime = commit('Cloud Agent changed');
+    assert.deepEqual(matrix(baseline), ['services/cloud-agent-next']);
+    assert.deepEqual(matrix(baseline, 'staging'), []);
+    mkdirSync(join(root, '.github/workflows'), { recursive: true });
+    writeFileSync(
+      join(root, '.github/workflows/cloud-agent-runtime-admission.yml'),
+      'source admission change'
+    );
+    commit('release policy changed');
+    assert.deepEqual(matrix(runtime), ['services/cloud-agent-next']);
+    const output = join(root, '.matrix-output');
+    const failingScript = matrixScript
+      .replaceAll('${{ inputs.base_sha }}', 'invalid-ref')
+      .replaceAll('${{ inputs.target_environment }}', 'production');
+    writeFileSync(output, '');
+    const failed = spawnSync('bash', ['-e', '-c', failingScript], {
+      cwd: root,
+      env: { ...process.env, GITHUB_OUTPUT: output },
+      encoding: 'utf8',
+    });
+    assert.notEqual(failed.status, 0);
+    assert.equal(readFileSync(output, 'utf8'), '');
+    rmSync(join(root, 'scripts/cloud-agent-runtime-changes.mjs'));
+    const missing = spawnSync('bash', ['-e', '-c', failingScript], {
+      cwd: root,
+      env: { ...process.env, GITHUB_OUTPUT: output },
+      encoding: 'utf8',
+    });
+    assert.notEqual(missing.status, 0);
+    assert.equal(readFileSync(output, 'utf8'), '');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

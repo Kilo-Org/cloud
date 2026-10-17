@@ -10,7 +10,14 @@ import type {
   ContainersObservation,
   SandboxContainers,
 } from '../sandbox-containers/SandboxContainers.js';
+import type {
+  RuntimeLaunchOps,
+  RuntimeReserveResult,
+  RuntimeStartResult,
+} from './runtime-launch.js';
+import type { RuntimeLaunchObservation } from './runtime-launch-phase.js';
 import { withDORetry } from '../utils/do-retry.js';
+import { withTimeout } from '@kilocode/worker-utils';
 import {
   decodeCloudflareProviderRef,
   encodeCloudflareProviderRef,
@@ -54,10 +61,12 @@ export function createCloudflareContainersProviderAdapter(deps: {
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
 }): ProviderAdapter {
   const instance = deps.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
+  const intentContainment = (intent: ProviderAllocationIntent): boolean =>
+    Boolean(intent.containment?.kilocode || intent.containment?.github);
   const encodeIntentProviderRef = (intent: ProviderAllocationIntent): string =>
     encodeCloudflareProviderRef({
       sandboxId: intent.allocationName ?? deps.logicalSandboxId,
-      containment: Boolean(intent.containment?.kilocode || intent.containment?.github),
+      containment: intentContainment(intent),
       instanceId: intent.intentId,
     });
 
@@ -132,6 +141,126 @@ export function createCloudflareContainersProviderAdapter(deps: {
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
+    runtimeExecution(intent): RuntimeLaunchOps | undefined {
+      // Only a persisted launch token can bind a native reservation; without one
+      // no ops exist and an explicit release selection fails before any work.
+      const token = intent.launchToken;
+      if (token === undefined) return undefined;
+      const providerRef = encodeIntentProviderRef(intent);
+      const containment = intentContainment(intent);
+      const getContainer = () => deps.getContainer(deps.logicalSandboxId);
+      const call = <T>(
+        operationName: string,
+        run: (stub: DurableObjectStub<SandboxContainers>) => Promise<T>,
+        budgetMs: number = DEADLINE_MS.stopAttempt
+      ): Promise<T> =>
+        withTimeout(
+          withDORetry<DurableObjectStub<SandboxContainers>, T>(getContainer, run, operationName),
+          Math.max(1, budgetMs),
+          `${operationName} timed out`
+        );
+      const remainingRpcMs = (deadlineAt: number) =>
+        Math.max(1, Math.min(DEADLINE_MS.stopAttempt, deadlineAt - Date.now()));
+      return {
+        async reserveLaunch(input): Promise<RuntimeReserveResult> {
+          // The durable native reservation commits first; billing admission
+          // follows and, on failure, retires the reservation with no start.
+          const reserved = await call<RuntimeReserveResult>(
+            'reserveSandboxContainersLaunch',
+            stub =>
+              stub.reserveNativeLaunch({
+                ...input,
+                providerRef,
+                instance,
+                containment,
+                ...(deps.egressAllowlist === undefined
+                  ? {}
+                  : { egressAllowlist: deps.egressAllowlist }),
+              }),
+            input.outerDeadlineAt > Date.now()
+              ? remainingRpcMs(input.outerDeadlineAt)
+              : DEADLINE_MS.stopAttempt
+          );
+          if (
+            reserved.kind === 'refused' &&
+            ['image_unavailable', 'invalid_launch_record', 'invalid_retirements'].includes(
+              reserved.reason
+            )
+          )
+            throw new ProviderCreationError('invalid_configuration');
+          if (reserved.kind !== 'reserved' || Date.now() >= reserved.attemptDeadlineAt)
+            return reserved;
+          try {
+            await withTimeout(
+              ensureBillingAdmission(providerRef, intent.billing),
+              remainingRpcMs(reserved.attemptDeadlineAt),
+              'Native billing admission timed out'
+            );
+          } catch (error) {
+            await call<void>('retireSandboxContainersLaunch', stub =>
+              stub.retireNativeLaunch({
+                providerRef,
+                launchId: input.launchId,
+                outerDeadlineAt: input.outerDeadlineAt,
+              })
+            ).catch(() => undefined);
+            throw error;
+          }
+          return reserved;
+        },
+        async startLaunch(input): Promise<RuntimeStartResult> {
+          try {
+            return await call<RuntimeStartResult>(
+              'startSandboxContainersLaunch',
+              stub =>
+                stub.startNativeLaunch({
+                  ...input,
+                  providerRef,
+                  env: {
+                    ...input.env,
+                    CONTROL_WORKLOAD_LIMIT_MB:
+                      input.env['CONTROL_WORKLOAD_LIMIT_MB'] ??
+                      String(containersBillingIdentity(instance).capacity.memoryMiB),
+                    PROVIDER_INSTANCE_ID: providerRef,
+                    WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
+                  },
+                }),
+              remainingRpcMs(input.attemptDeadlineAt)
+            );
+          } catch {
+            // An exhausted or ambiguous transport is a normalized unknown, never
+            // a rejection: the durable issuance fence reconciles it and the
+            // physical start is never repeated.
+            return { kind: 'unknown', reason: 'transport' };
+          }
+        },
+        async observeLaunch(input) {
+          try {
+            return await call<RuntimeLaunchObservation>(
+              'observeSandboxContainersLaunch',
+              stub => stub.observeNativeLaunch(input),
+              remainingRpcMs(input.deadlineAt)
+            );
+          } catch {
+            // An observation transport failure is a process-unknown, reconciled
+            // under the same nonce and bound.
+            return { process: 'unknown' } as const;
+          }
+        },
+        settleLaunch: input =>
+          call<boolean>('settleSandboxContainersLaunch', stub => stub.settleNativeLaunch(input)),
+        acknowledgeLaunch: input =>
+          call<void>(
+            'acknowledgeSandboxContainersLaunch',
+            stub => stub.acknowledgeNativeLaunch(input),
+            5_000
+          ),
+        retireLaunch: input =>
+          call<void>('retireSandboxContainersLaunch', stub => stub.retireNativeLaunch(input)),
+        destroyLaunch: input =>
+          call<boolean>('destroySandboxContainersLaunch', stub => stub.destroyNativeLaunch(input)),
+      };
+    },
     async launch(ref, env, options) {
       const owned = decodeOwnedProviderRef(ref);
       if (owned === null) {
@@ -198,20 +327,28 @@ export function createCloudflareContainersProviderAdapter(deps: {
       }
     },
     async stop(ref, intent) {
-      const resolved = resolveProviderRef(ref, intent);
       const diagnostic = {
         provider: 'cloudflare-containers',
         allocationName: deps.logicalSandboxId,
         intentId: intent?.intentId,
       };
-      if (resolved === null || decodeOwnedProviderRef(resolved) === null) {
+      // A null ref travels through with the exact captured token, so the DO uses
+      // the current ref only when the nonce matches and never fabricates a ref.
+      // A named ref must still be owned by this allocation, and a null ref with no
+      // token cannot identify the plan.
+      if (
+        (ref !== null && decodeOwnedProviderRef(ref) === null) ||
+        (ref === null && intent?.launchToken === undefined)
+      ) {
         logControlDiagnostic('native_stop', { ...diagnostic, result: 'invalid_reference' });
         return 'retryable';
       }
       const startedAt = Date.now();
       logControlDiagnostic('native_stop', { ...diagnostic, result: 'started' });
       try {
-        const result = await deps.getContainer(deps.logicalSandboxId).stop(resolved);
+        const result = await deps
+          .getContainer(deps.logicalSandboxId)
+          .stop(ref, intent?.launchToken);
         logControlDiagnostic('native_stop', {
           ...diagnostic,
           result,

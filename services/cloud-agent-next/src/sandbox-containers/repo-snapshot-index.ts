@@ -82,3 +82,63 @@ function warn(operation: string, error: unknown): void {
     })
     .warn('Repository snapshot index unavailable');
 }
+
+/** Why one start chose its source. Logged verbatim and never a secret. */
+export type StartSourceReason =
+  | 'index_unavailable'
+  | 'no_repo_key'
+  | 'skipped'
+  | 'not_allowed'
+  | 'index_miss'
+  | 'retries_exhausted'
+  | 'index_hit';
+
+/**
+ * The one start-source rule, shared by the legacy launch path and the native
+ * reservation. It decides image vs repository from the snapshot index for the
+ * launch's `repoKey` and image, and always has an image fallback, so a start is
+ * never blocked by a missing or failed snapshot.
+ */
+export type StartSourceDecision =
+  | { kind: 'image'; reason: Exclude<StartSourceReason, 'index_hit'>; attempts?: number }
+  | {
+      kind: 'repository';
+      reason: 'index_hit';
+      snapshotId: string;
+      indexKey: string;
+      ageMs?: number;
+      size?: number;
+    };
+
+export async function decideStartSource(input: {
+  index: RepoSnapshotIndex | null;
+  image: string;
+  repoKey: string | undefined;
+  skipRepository: boolean;
+  allowRepository: boolean;
+  failures: { snapshotId: string; attempts: number } | undefined;
+}): Promise<StartSourceDecision> {
+  if (input.index === null) return { kind: 'image', reason: 'index_unavailable' };
+  if (input.repoKey === undefined) return { kind: 'image', reason: 'no_repo_key' };
+  const indexKey = await repoSnapshotIndexKey(input.repoKey, input.image);
+  if (input.skipRepository) return { kind: 'image', reason: 'skipped' };
+  if (!input.allowRepository) return { kind: 'image', reason: 'not_allowed' };
+  const entry = await input.index.lookup(indexKey);
+  if (entry === null) return { kind: 'image', reason: 'index_miss' };
+  const failures = input.failures;
+  if (
+    failures?.snapshotId === entry.snapshotId &&
+    failures.attempts >= REPO_SNAPSHOT_MAX_START_FAILURES
+  ) {
+    return { kind: 'image', reason: 'retries_exhausted', attempts: failures.attempts };
+  }
+  // An entry written before `capturedAt` logs no age.
+  return {
+    kind: 'repository',
+    reason: 'index_hit',
+    snapshotId: entry.snapshotId,
+    indexKey,
+    ...(entry.capturedAt === undefined ? {} : { ageMs: Date.now() - entry.capturedAt }),
+    ...(entry.size === undefined ? {} : { size: entry.size }),
+  };
+}

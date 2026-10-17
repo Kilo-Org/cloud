@@ -1019,6 +1019,26 @@ function buildServiceDefs(): ServiceDef[] {
       '0.0.0.0',
     ];
 
+    // A cold-local session runs a generated Wrangler config so the sandbox class
+    // it starts in selects the runtime-free image. The value is folded into the
+    // command so `dev:restart` reproduces the exact same launch; only the plain
+    // `cloud-agent-next` worker reads it. `--persist-to` keeps the shared
+    // `.wrangler/state` (a config inside `.wrangler/` would otherwise persist to
+    // `.wrangler/.wrangler/state` and miss the published runtime objects).
+    if (name === 'cloud-agent-next') {
+      const config = process.env.CLOUD_AGENT_NEXT_WRANGLER_CONFIG;
+      if (config !== undefined && config !== '') {
+        command.splice(
+          command.indexOf('--port'),
+          0,
+          '--config',
+          config,
+          '--persist-to',
+          '.wrangler/state'
+        );
+      }
+    }
+
     defs.push({
       name,
       type: 'worker',

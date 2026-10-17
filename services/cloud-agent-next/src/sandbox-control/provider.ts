@@ -8,6 +8,7 @@ import {
 import { z } from 'zod';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
+import type { RuntimeLaunchOps } from './runtime-launch.js';
 
 export type ProviderCreationCause =
   | 'insufficient_credits'
@@ -70,12 +71,26 @@ export function observeFromWrapperObservation(status: WrapperObservationStatus):
   return 'active';
 }
 
+/** The persisted launch token a Stop must carry to fence a retired nonce. */
+export type ProviderLaunchToken = {
+  /** The physical launch nonce from `runtime_launch`. */
+  launchId: string;
+  /** The outer allocation deadline that owns retirement retention. */
+  createDeadlineAt: number;
+};
+
 /** The canonical create intent plus the target identity fields a provider needs. */
 export type ProviderAllocationIntent = {
   intentId: string;
   createdAt: number;
   allocationName?: string;
   containment?: CredentialContainmentRequirements;
+  /**
+   * The launch token captured before an off-queue stop, so a delayed stop cannot
+   * retire a replacement nonce by re-reading today's intent. Absent on the
+   * legacy tokenless path, which must never destroy a versioned replacement.
+   */
+  launchToken?: ProviderLaunchToken;
 };
 
 export type ProviderCreateIntent = ProviderAllocationIntent & {
@@ -132,4 +147,12 @@ export type ProviderAdapter = {
    * provider is a failure the caller treats as fail-closed.
    */
   applyContainedCredentials?(ref: string, grants: readonly SessionCredentialGrant[]): Promise<void>;
+  /**
+   * Build the native runtime execution operations the common cold-runtime
+   * workflow consumes, closing over the persisted intent, billing admission and
+   * config. Absent, or `undefined` for an intent with no persisted launch token,
+   * means no runtime execution support, and an explicit release selection fails
+   * before any physical work.
+   */
+  runtimeExecution?: (intent: ProviderCreateIntent) => RuntimeLaunchOps | undefined;
 };

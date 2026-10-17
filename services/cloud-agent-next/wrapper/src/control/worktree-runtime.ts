@@ -27,6 +27,7 @@ import {
   type SessionEventIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
+import { resolveKiloExecutable } from '../../../src/shared/runtime-distribution.js';
 import {
   createWrapperKiloClient,
   type KiloServerHandle,
@@ -331,6 +332,12 @@ export function buildWorktreeKiloEnvironment(
     name.startsWith('KILO') ||
     name.startsWith('OPENCODE');
 
+  // The `KILO*` filter below strips the installer's selection from the inherited
+  // loop. Copy the trusted inherited value aside so only that copy is put back
+  // after the profile environment is applied; a profile value never selects the
+  // executable (amendment "cold session without a snapshot").
+  const inheritedKiloCliPath = inherited.KILO_RUNTIME_CLI_PATH;
+
   for (const [name, value] of Object.entries(inherited)) {
     if (value !== undefined && !isRuntimeOwned(name) && !INHERITED_GIT_CREDENTIALS.has(name)) {
       env[name] = value;
@@ -389,6 +396,10 @@ export function buildWorktreeKiloEnvironment(
     XDG_STATE_HOME: path.join(home, '.local', 'state'),
     XDG_RUNTIME_DIR: path.join(home, '.run'),
     KILO_PLATFORM: 'cloud-agent',
+    // Keep even an empty or non-absolute inherited value: `resolveKiloExecutable`
+    // must see a present-but-invalid selection and fail, never fall back to the
+    // baked path that the runtime-free image does not have.
+    ...(inheritedKiloCliPath !== undefined ? { KILO_RUNTIME_CLI_PATH: inheritedKiloCliPath } : {}),
     ...(runtimeConfig?.githubReviewTarget
       ? {
           [GITHUB_REVIEW_TARGET_ENV]: serializeGitHubReviewTarget(runtimeConfig.githubReviewTarget),
@@ -418,10 +429,14 @@ export async function startWorktreeKiloServer(
   const processes = createOwnedProcessScope(placement);
   options.onProcessScope?.(processes);
   const credential = createKiloServerCredential();
-  const proc = processes.spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
-    cwd: options.directory,
-    env: { ...options.env, ...credential.env },
-  });
+  const proc = processes.spawn(
+    resolveKiloExecutable(options.env),
+    ['serve', '--hostname=127.0.0.1', '--port=0'],
+    {
+      cwd: options.directory,
+      env: { ...options.env, ...credential.env },
+    }
+  );
   const processObserver = processes.observeChild(proc);
   if (processObserver) options.onProcessObserver?.(processObserver);
   proc.stderr.resume();

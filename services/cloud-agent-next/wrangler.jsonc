@@ -177,6 +177,10 @@
       "binding": "R2_BUCKET",
       "bucket_name": "kilocode-sessions",
     },
+    {
+      "binding": "RUNTIME_RELEASE_BUCKET",
+      "bucket_name": "kilocode-cloud-agent-releases",
+    },
   ],
   // SandboxSmall and SandboxCodeReview receive no traffic: every non-contained sandbox runs
   // in Sandbox. SandboxDIND remains for stop/delete of persisted devcontainer sessions.
@@ -542,6 +546,10 @@
         {
           "binding": "R2_BUCKET",
           "bucket_name": "kilocode-sessions-dev",
+        },
+        {
+          "binding": "RUNTIME_RELEASE_BUCKET",
+          "bucket_name": "kilocode-cloud-agent-releases-dev",
         },
       ],
       "containers": [

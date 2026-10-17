@@ -1,0 +1,9 @@
+ARG KILO_NATIVE_BASE_IMAGE
+FROM ${KILO_NATIVE_BASE_IMAGE}
+
+ARG KILO_LOCAL_CA_PEM_B64
+RUN set -eu; \
+    test -n "$KILO_LOCAL_CA_PEM_B64"; \
+    printf '%s' "$KILO_LOCAL_CA_PEM_B64" | base64 -d > /usr/local/share/ca-certificates/kilo-native-local.crt; \
+    update-ca-certificates
+ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/kilo-native-local.crt

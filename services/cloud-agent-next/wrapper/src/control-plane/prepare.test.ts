@@ -90,7 +90,7 @@ describe('replacement workspace local recovery', () => {
     }
   );
 
-  it('imports nonempty ingest history but recovers the newer local file before snapshot upload', async () => {
+  it('never captures a recovery-bearing clone and keeps the recovered file over older ingest', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-local-precedence-'));
     const directory = path.join(root, 'workspace');
     const imported = path.join(root, 'imported.json');
@@ -121,13 +121,7 @@ describe('replacement workspace local recovery', () => {
           },
         ],
       };
-      const harness = createHarness(FAST_TIMERS, {
-        capture: true,
-        beforeCapture: async () => {
-          expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('newer local\n');
-          expect(harness.ensureCalls()).toBe(0);
-        },
-      });
+      const harness = createHarness(FAST_TIMERS, { capture: true });
       harness.setSessionExists(false);
       harness.setRestore(async () =>
         restoreSession(routeSpec().kiloSessionId, directory, undefined, {
@@ -135,6 +129,7 @@ describe('replacement workspace local recovery', () => {
           env: {
             ...process.env,
             PATH: `${bin}:${process.env.PATH}`,
+            KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
             KILO_SESSION_INGEST_URL: 'https://ingest.test',
             KILOCODE_TOKEN: 'test-token',
           },
@@ -149,10 +144,135 @@ describe('replacement workspace local recovery', () => {
         })
       );
       expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('newer local\n');
-      expect(harness.captureRequests).toHaveLength(1);
-      expect(JSON.parse(await fs.readFile(imported, 'utf8')).sessionDiff).toEqual(
-        snapshot.sessionDiff
+      expect(harness.captureRequests).toHaveLength(0);
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps recovered tracked and added bytes on a stamped same-allocation restart with older ingest', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-restart-recovery-'));
+    const directory = path.join(root, 'workspace');
+    const imported = path.join(root, 'imported.json');
+    const bin = path.join(root, 'bin');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [
+        { file: 'tracked.txt', status: 'modified', after: 'older tracked\n' },
+        { file: 'added.txt', status: 'added', after: 'older added\n' },
+      ],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'tracked.txt'), 'recovered tracked\n');
+      await fs.writeFile(path.join(directory, 'added.txt'), 'recovered added\n');
+      await fs.writeFile(path.join(bin, 'kilo'), `#!/bin/sh\ncp "$2" "${imported}"\n`, {
+        mode: 0o755,
+      });
+      const harness = createHarness(FAST_TIMERS, { capture: true, hasGit: true });
+      harness.setStamp({
+        allocationId: 'alloc-current',
+        commit: 'c',
+        capturedAt: NOW,
+        generation: 0,
+      });
+      harness.setSessionExists(false);
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions()[0]?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
       );
+      await harness.manager.prepare(
+        routeSpec({
+          directory,
+          git: { url: 'https://github.com/acme/repo.git' },
+          capture: true,
+          worktreeRecovery: {
+            files: [
+              { path: 'tracked.txt', status: 'modified', patch: 'saved' },
+              { path: 'added.txt', status: 'added', patch: 'saved' },
+            ],
+          },
+        })
+      );
+      expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
+      expect(await fs.readFile(path.join(directory, 'tracked.txt'), 'utf8')).toBe(
+        'recovered tracked\n'
+      );
+      expect(await fs.readFile(path.join(directory, 'added.txt'), 'utf8')).toBe(
+        'recovered added\n'
+      );
+      expect(harness.captureRequests).toHaveLength(0);
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('imports ingest files for a prepare with no recovery', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-no-recovery-'));
+    const directory = path.join(root, 'workspace');
+    const bin = path.join(root, 'bin');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [{ file: 'lost.txt', status: 'modified', after: 'older ingest\n' }],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'lost.txt'), 'base\n');
+      await fs.writeFile(
+        path.join(bin, 'kilo'),
+        `#!/bin/sh\ncp "$2" "${path.join(root, 'imported.json')}"\n`,
+        {
+          mode: 0o755,
+        }
+      );
+      const harness = createHarness(FAST_TIMERS, { capture: true });
+      harness.setSessionExists(false);
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions()[0]?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
+      );
+      await harness.manager.prepare(
+        routeSpec({
+          directory,
+          git: { url: 'https://github.com/acme/repo.git' },
+          capture: true,
+        })
+      );
+      expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+      expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('older ingest\n');
+      expect(harness.captureRequests).toHaveLength(1);
       expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
     } finally {
       fetchSpy.mockRestore();
@@ -203,6 +323,258 @@ describe('replacement workspace local recovery', () => {
     expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
     expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
     expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+  });
+
+  it('keeps two repeated unstamped crashes unstamped before the fallback import', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-deferred-crash-'));
+    const directory = path.join(root, 'workspace');
+    const bin = path.join(root, 'bin');
+    const imported = path.join(root, 'imported.json');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [
+        { file: 'tracked.txt', status: 'modified', after: 'older tracked\n' },
+        { file: 'added.txt', status: 'added', after: 'older added\n' },
+      ],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'tracked.txt'), 'local base\n');
+      await fs.writeFile(path.join(bin, 'kilo'), `#!/bin/sh\ncp "$2" "${imported}"\n`, {
+        mode: 0o755,
+      });
+      const harness = createHarness(FAST_TIMERS, {
+        recoverWorktree: async () => {
+          throw new Error('conflicting patch');
+        },
+      });
+      harness.setSessionExists(false);
+      // First and second prepares crash before the deferred import returns.
+      harness.setRestore(async () => {
+        throw new Error('import failed');
+      });
+      const crashed = routeSpec({
+        directory,
+        git: { url: 'https://github.com/acme/repo.git' },
+        worktreeRecovery: recovery,
+      });
+      await harness.manager.prepare(crashed);
+      expect(harness.stamp()).toBeNull();
+      await harness.manager.prepare(crashed);
+      expect(harness.stamp()).toBeNull();
+      // The third prepare imports the older tracked and added bytes, then stamps.
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions().at(-1)?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
+      );
+      await harness.manager.prepare(crashed);
+      expect(harness.restoreOptions().at(-1)?.restoreFiles).toBe(true);
+      expect(await fs.readFile(path.join(directory, 'tracked.txt'), 'utf8')).toBe(
+        'older tracked\n'
+      );
+      expect(await fs.readFile(path.join(directory, 'added.txt'), 'utf8')).toBe('older added\n');
+      expect(harness.stamp()).not.toBeNull();
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['throw', 'zero-applied'])(
+    'leaves no current-allocation stamp before the deferred import for %s',
+    async kind => {
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-deferred-gate-'));
+      const directory = path.join(root, 'workspace');
+      const bin = path.join(root, 'bin');
+      const snapshot = {
+        info: { id: routeSpec().kiloSessionId, version: '2' },
+        messages: [],
+        sessionDiff: [
+          { file: 'tracked.txt', status: 'modified', after: 'older tracked\n' },
+          { file: 'added.txt', status: 'added', after: 'older added\n' },
+        ],
+      };
+      const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify(snapshot), { status: 200 })
+      );
+      let releaseImport: () => void = () => undefined;
+      const importGate = new Promise<void>(resolve => {
+        releaseImport = resolve;
+      });
+      try {
+        await fs.mkdir(directory);
+        await fs.mkdir(bin);
+        expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+        await fs.writeFile(path.join(directory, 'tracked.txt'), 'local base\n');
+        await fs.writeFile(path.join(bin, 'kilo'), `#!/bin/sh\ncp "$2" "${root}/imported.json"\n`, {
+          mode: 0o755,
+        });
+        const harness = createHarness(FAST_TIMERS, {
+          recoverWorktree:
+            kind === 'throw'
+              ? async () => {
+                  throw new Error('conflicting patch');
+                }
+              : async () => ({
+                  applied: 0,
+                  total: 1,
+                  skipped: 1,
+                  skippedDiffs: [{ file: 'lost.txt', reason: 'patch_apply_failed' as const }],
+                }),
+          beforeEnsure: async () => {
+            await importGate;
+          },
+        });
+        harness.setSessionExists(false);
+        harness.setRestore(async () =>
+          restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+            restoreFiles: harness.restoreOptions().at(-1)?.restoreFiles !== false,
+            env: {
+              ...process.env,
+              PATH: `${bin}:${process.env.PATH}`,
+              KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+              KILO_SESSION_INGEST_URL: 'https://ingest.test',
+              KILOCODE_TOKEN: 'test-token',
+            },
+          })
+        );
+        const run = harness.manager.prepare(
+          routeSpec({
+            directory,
+            git: { url: 'https://github.com/acme/repo.git' },
+            worktreeRecovery: recovery,
+          })
+        );
+        for (let attempt = 0; attempt < 200 && harness.ensureCalls() === 0; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 5));
+        }
+        expect(harness.ensureCalls()).toBeGreaterThan(0);
+        // Held inside the deferred import: the current-allocation stamp is absent.
+        expect(harness.stamp()).toBeNull();
+        releaseImport();
+        await run;
+        expect(await fs.readFile(path.join(directory, 'tracked.txt'), 'utf8')).toBe(
+          'older tracked\n'
+        );
+        expect(await fs.readFile(path.join(directory, 'added.txt'), 'utf8')).toBe('older added\n');
+        expect(harness.stamp()).not.toBeNull();
+      } finally {
+        fetchSpy.mockRestore();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('keeps a sibling from adopting or emptying the directory during a held deferred import', async () => {
+    let releaseImport: () => void = () => undefined;
+    const importGate = new Promise<void>(resolve => {
+      releaseImport = resolve;
+    });
+    let importStarted = false;
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async () => ({
+        applied: 0,
+        total: 1,
+        skipped: 1,
+        skippedDiffs: [{ file: 'lost.txt', reason: 'patch_apply_failed' as const }],
+      }),
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => {
+      importStarted = true;
+      await importGate;
+      return {
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: { applied: 1, skipped: 0, total: 1 },
+      };
+    });
+    const directory = '/tmp/prepare-sibling';
+    const spec = (sessionId: string) =>
+      routeSpec({
+        sessionId,
+        directory,
+        git: { url: 'https://github.com/acme/repo.git' },
+        worktreeRecovery: recovery,
+      });
+    const first = harness.manager.prepare(spec('ses_first_sibling'));
+    for (let attempt = 0; attempt < 200 && !importStarted; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    expect(importStarted).toBe(true);
+    const ensureDuringHold = harness.ensureCalls();
+    const restoreDuringHold = harness.restoreCalls();
+    const second = harness.manager.prepare(spec('ses_second_sibling'));
+    await new Promise(resolve => setTimeout(resolve, 20));
+    // The sibling is queued behind the held lock: no adoption, no emptying, and
+    // no second import started.
+    expect(harness.emptyCalls).toHaveLength(0);
+    expect(harness.clearedHomes).toHaveLength(0);
+    expect(harness.ensureCalls()).toBe(ensureDuringHold);
+    expect(harness.restoreCalls()).toBe(restoreDuringHold);
+    releaseImport();
+    await Promise.all([first, second]);
+    // After the first prepare stamps, the sibling sees the same allocation.
+    expect(harness.logs.some(line => line.includes('inspection=same'))).toBe(true);
+  });
+
+  it('releases a deferred per-session runtime when released during the deferred import', async () => {
+    let releasePreparation: () => void = () => undefined;
+    const gate = new Promise<void>(resolve => {
+      releasePreparation = resolve;
+    });
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async () => {
+        throw new Error('conflicting patch');
+      },
+      beforeEnsure: async () => {
+        await gate;
+      },
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => ({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    }));
+    const sessionId = 'ses_00000000000000000000000000';
+    const run = harness.manager.prepare(
+      routeSpec({
+        sessionId,
+        directory: '/tmp/prepare-deferred-release',
+        git: { url: 'https://github.com/acme/repo.git' },
+        runtimeIsolation: 'per-session',
+        worktreeRecovery: recovery,
+      })
+    );
+    for (let attempt = 0; attempt < 200 && harness.ensureCalls() === 0; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    expect(harness.ensureCalls()).toBeGreaterThan(0);
+    // Stop/supersede while the deferred import holds the lock.
+    harness.manager.release(sessionId);
+    releasePreparation();
+    await run;
+    expect(harness.stamp()).toBeNull();
+    expect(harness.releaseCalls).toHaveLength(1);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
   });
 });
 

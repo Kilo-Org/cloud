@@ -18,6 +18,7 @@ import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import type {
   ProviderAdapter,
+  ProviderAllocationIntent,
   ProviderCreateIntent,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
@@ -108,6 +109,7 @@ type FakeProvider = {
   stopCalls: (string | null)[];
   stopResult: StopResult;
   observeStatus: 'active' | 'terminal' | 'unknown';
+  observeIntents: (ProviderAllocationIntent | null)[];
 };
 
 function createFakeProvider(): FakeProvider {
@@ -117,6 +119,7 @@ function createFakeProvider(): FakeProvider {
     stopCalls: [],
     stopResult: 'terminal',
     observeStatus: 'active',
+    observeIntents: [],
   };
   provider.adapter = {
     async ensureBillingAdmission() {},
@@ -127,7 +130,8 @@ function createFakeProvider(): FakeProvider {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
-    async observe(ref) {
+    async observe(ref, intent) {
+      provider.observeIntents.push(intent);
       return { status: provider.observeStatus, ...(ref === null ? {} : { providerRef: ref }) };
     },
     async stop(ref) {
@@ -410,6 +414,36 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
     const state = await sandbox.getAllocationState();
     expect(state.kind).toBe('stopped');
     expect(state.unconfirmedProviderRef).toBeNull();
+  });
+
+  it('completes deletion of a stopped Vercel allocation with a retained identity but no ref', async () => {
+    const sandboxId = `ses-${'c'.repeat(47)}f`;
+    const provider = createFakeProvider();
+    const sandbox = await injectProvider(sandboxId, provider);
+    await runInDurableObject(sandbox, instance => {
+      Object.assign(instance, { admitVercelCreate: async () => 'admitted' });
+    });
+    await sandbox.ensureAllocation({
+      provider: 'vercel',
+      configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
+      allocationName: sandboxId,
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const allocationId = (await sandbox.getAllocationState()).allocationId;
+    expect(allocationId).not.toBeNull();
+    await patchAllocation(sandbox, {
+      state: 'stopped',
+      provider_ref: null,
+      unconfirmed_provider_ref: null,
+    });
+    provider.stopResult = 'retryable';
+    const kilo = kiloSessionId();
+    const result = await sandbox.deleteWorktreeResources({
+      ...deletionInput({ sandboxId, worktreeId: worktreeId(), sessionIds: [kilo] }),
+      location: { sandboxId, provider: 'vercel' },
+    });
+    expect(result).toEqual({ deleted: true, sessionIds: [kilo] });
+    expect(provider.stopCalls).toEqual([]);
   });
 
   it('does not treat an exhausted stop ladder as a confirmed stop, then succeeds on retry', async () => {
@@ -721,6 +755,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
 
     expect(result).toEqual({ deleted: true, sessionIds: [kiloA] });
     expect(provider.stopCalls).toHaveLength(0);
+    expect(provider.observeIntents).toEqual([null]);
     await expect(sandbox.status({ sessionId: sessionA })).resolves.toMatchObject({
       view: { state: 'unknown' },
     });

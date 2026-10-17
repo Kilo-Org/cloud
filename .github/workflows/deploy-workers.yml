@@ -32,6 +32,11 @@ on:
         required: false
         default: ''
         type: string
+      cloud_agent_runtime_artifact:
+        description: 'Verified Cloud Agent candidate evidence from the early release gate'
+        required: false
+        default: ''
+        type: string
       target_environment:
         description: 'Worker environment to deploy to'
         required: false
@@ -40,14 +45,38 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: deploy-workers-${{ inputs.target_environment }}
   cancel-in-progress: false
 
 jobs:
+  admit-cloud-agent-source:
+    if: >-
+      inputs.worker == 'services/cloud-agent-next' || inputs.cloud_agent_runtime_artifact != '' ||
+      (inputs.worker == '' && inputs.base_sha != '' && inputs.target_environment == 'production')
+    uses: ./.github/workflows/cloud-agent-runtime-admission.yml
+    with:
+      source_sha: ${{ inputs.source_sha || github.sha }}
+
+  prepare-cloud-agent-runtime:
+    if: >-
+      inputs.cloud_agent_runtime_artifact == '' &&
+      inputs.worker == 'services/cloud-agent-next'
+    uses: ./.github/workflows/cloud-agent-runtime-release.yml
+    with:
+      source_sha: ${{ inputs.source_sha || github.sha }}
+      base_sha: ${{ inputs.base_sha }}
+      target_environment: ${{ inputs.target_environment }}
+    secrets: inherit
+
   deploy-manual:
-    if: inputs.worker != ''
+    needs: [prepare-cloud-agent-runtime, admit-cloud-agent-source]
+    if: >-
+      !cancelled() && inputs.worker != '' &&
+      contains(fromJSON('["success","skipped"]'), needs.admit-cloud-agent-source.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.prepare-cloud-agent-runtime.result)
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 25
     name: Deploy ${{ inputs.worker }}
@@ -57,6 +86,7 @@ jobs:
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -71,6 +101,24 @@ jobs:
         working-directory: ${{ inputs.worker }}
         run: pnpm install --frozen-lockfile
 
+      - name: Download Cloud Agent release evidence
+        if: inputs.worker == 'services/cloud-agent-next'
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: ${{ inputs.cloud_agent_runtime_artifact || needs.prepare-cloud-agent-runtime.outputs.artifact_name }}
+          path: services/cloud-agent-next/.wrangler/runtime-release
+
+      - name: Verify Cloud Agent release and deployment order
+        if: inputs.worker == 'services/cloud-agent-next'
+        working-directory: services/cloud-agent-next
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
+          CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: pnpm run runtime:release verify --source-sha "$SOURCE_SHA" --environment "$TARGET_ENVIRONMENT"
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
@@ -80,7 +128,7 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+          command: ${{ format('{0}{1}', inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment), inputs.worker == 'services/cloud-agent-next' && format(' --config wrangler.runtime-release.json --tag runtime-ci-{0}', inputs.source_sha || github.sha) || '') }}
 
   detect-changes:
     if: inputs.worker == '' && inputs.base_sha != ''
@@ -200,6 +248,11 @@ jobs:
           for dir in "${DEPLOYABLE[@]}"; do
             if [ "$TARGET_ENVIRONMENT" != "production" ] && ! has_named_environment "$dir/wrangler.jsonc"; then
               echo "Skipping $dir: wrangler.jsonc does not define env.$TARGET_ENVIRONMENT"
+            elif [ "$dir" = services/cloud-agent-next ]; then
+              changed=$(node scripts/cloud-agent-runtime-changes.mjs "$BASE_SHA" HEAD)
+              if [ "$changed" = true ]; then
+                CHANGED+=("$dir")
+              fi
             elif ! git diff --quiet "$BASE_SHA" HEAD -- "$dir/" packages pnpm-lock.yaml pnpm-workspace.yaml patches; then
               CHANGED+=("$dir")
             fi
@@ -213,8 +266,11 @@ jobs:
           fi
 
   deploy-changed:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
+    needs: [detect-changes, prepare-cloud-agent-runtime, admit-cloud-agent-source]
+    if: >-
+      !cancelled() && needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != '' &&
+      contains(fromJSON('["success","skipped"]'), needs.admit-cloud-agent-source.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.prepare-cloud-agent-runtime.result)
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 25
     environment: ${{ inputs.target_environment }}
@@ -228,6 +284,7 @@ jobs:
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -242,6 +299,24 @@ jobs:
         working-directory: ${{ matrix.worker }}
         run: pnpm install --frozen-lockfile
 
+      - name: Download Cloud Agent release evidence
+        if: matrix.worker == 'services/cloud-agent-next'
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: ${{ inputs.cloud_agent_runtime_artifact || needs.prepare-cloud-agent-runtime.outputs.artifact_name }}
+          path: services/cloud-agent-next/.wrangler/runtime-release
+
+      - name: Verify Cloud Agent release and deployment order
+        if: matrix.worker == 'services/cloud-agent-next'
+        working-directory: services/cloud-agent-next
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
+          CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: pnpm run runtime:release verify --source-sha "$SOURCE_SHA" --environment "$TARGET_ENVIRONMENT"
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
@@ -251,4 +326,4 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+          command: ${{ format('{0}{1}', inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment), matrix.worker == 'services/cloud-agent-next' && format(' --config wrangler.runtime-release.json --tag runtime-ci-{0}', inputs.source_sha || github.sha) || '') }}

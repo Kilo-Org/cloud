@@ -82,8 +82,25 @@ export type AllocationEvent =
    * The provider ref is known. Committed before `launch` (N4), so an accepted
    * `hello` never observes a null ref.
    */
-  | { type: 'provider-ref'; at: number; allocationId: string; providerRef: string }
-  | { type: 'created'; at: number; allocationId: string; providerRef: string }
+  | {
+      type: 'provider-ref';
+      at: number;
+      allocationId: string;
+      providerRef: string;
+      firstConnectDeadlineAt?: number;
+    }
+  | {
+      type: 'created';
+      at: number;
+      allocationId: string;
+      providerRef: string;
+      /**
+       * Absolute epoch-ms first-connect deadline. The cold bootstrap passes the
+       * one launch deadline here, so preflight, install, probe and wrapper
+       * startup share it. Absent keeps the per-phase first-connect window.
+       */
+      firstConnectDeadlineAt?: number;
+    }
   | {
       type: 'create-failed';
       at: number;
@@ -129,6 +146,14 @@ export type AllocationEvent =
       nextAllocationId: string;
       /** Whether the routes table still has a pending attempt deadline (M2). */
       retryAllowed: boolean;
+      /**
+       * The one reason the cold bootstrap owns when its absolute deadline
+       * expires, for a create or a first connect alike. The DO sets it from the
+       * trusted cold-launch config; absent keeps the existing generic behavior
+       * (`connection_lost`, or the create retry), so baked and Vercel admission
+       * are unchanged. Not persisted.
+       */
+      bootstrapExpiryReason?: ControlPlaneFailureReason;
     };
 
 export type AllocationEffect =
@@ -148,6 +173,12 @@ export type AllocationReduction = {
 };
 
 const NO_EFFECTS: AllocationEffect[] = [];
+
+export function allocationIsReleased(state: AllocationState): boolean {
+  return (
+    state.kind === 'stopped' && state.allocationId === null && state.unconfirmedProviderRef === null
+  );
+}
 
 function maxStopAttempts(timers: SandboxTimers): number {
   return timers.providerStopLadderMs.length + 1;
@@ -170,6 +201,8 @@ function enterStopping(
       kind: 'stopping',
       stopAttempt: 1,
       stopPending: false,
+      providerRef: state.providerRef ?? state.unconfirmedProviderRef,
+      unconfirmedProviderRef: null,
       stopAt: at + timers.providerStopAttemptMs,
     },
     effects: [{ type: 'stop', stopAttempt: 1 }],
@@ -179,12 +212,21 @@ function enterStopping(
 
 /**
  * The stop ladder ran out of attempts without a provider confirmation (spec §9).
- * The state is `stopped` for routing, but the provider ref is kept as the only
- * evidence the physical sandbox may still run. Deletion must not read `stopped`
- * as a confirmed stop while this ref is present.
+ * The state is `stopped` for routing, but the physical evidence is kept: the
+ * provider ref (which may be null when a reservation never started) plus the
+ * allocation identity and outer create deadline. Retaining the identity keeps
+ * `runtime_launch` valid across the exhausted stop, so a later deletion or
+ * replay can still fence the reserved token instead of reading `stopped` as a
+ * confirmed stop. A confirmed stop or a provider-gone observation resets all of
+ * it through `initialAllocationState`.
  */
 function stoppedAfterUnconfirmedStop(state: AllocationState): AllocationState {
-  return { ...initialAllocationState(), unconfirmedProviderRef: state.providerRef };
+  return {
+    ...initialAllocationState(),
+    allocationId: state.allocationId,
+    createDeadlineAt: state.createDeadlineAt,
+    unconfirmedProviderRef: state.providerRef,
+  };
 }
 
 /** Supersede a hung attempt with a new id, so its late result cannot apply. */
@@ -239,6 +281,13 @@ export function connectionMatches(
   );
 }
 
+export function allocationStartupDeadlineAt(state: AllocationState): number | null {
+  if (state.kind === 'starting') return state.firstConnectDeadlineAt;
+  if (state.kind !== 'creating') return null;
+  if (state.createDeadlineAt === null) return state.firstConnectDeadlineAt;
+  return Math.min(state.createDeadlineAt, state.firstConnectDeadlineAt ?? Infinity);
+}
+
 export function reduceAllocation(
   state: AllocationState,
   event: AllocationEvent,
@@ -263,7 +312,22 @@ export function reduceAllocation(
         return { state, effects: NO_EFFECTS };
       }
       if (state.allocationId !== event.allocationId) return { state, effects: NO_EFFECTS };
-      return { state: { ...state, providerRef: event.providerRef }, effects: NO_EFFECTS };
+      return {
+        state: {
+          ...state,
+          providerRef: event.providerRef,
+          ...(state.kind === 'creating' && event.firstConnectDeadlineAt !== undefined
+            ? {
+                firstConnectDeadlineAt: Math.min(
+                  state.firstConnectDeadlineAt ?? Infinity,
+                  state.createDeadlineAt ?? Infinity,
+                  event.firstConnectDeadlineAt
+                ),
+              }
+            : {}),
+        },
+        effects: NO_EFFECTS,
+      };
     }
 
     case 'created': {
@@ -275,7 +339,10 @@ export function reduceAllocation(
           ...state,
           kind: 'starting',
           providerRef: event.providerRef,
-          firstConnectDeadlineAt: event.at + timers.wrapperFirstConnectMs,
+          firstConnectDeadlineAt: Math.min(
+            state.firstConnectDeadlineAt ?? Infinity,
+            event.firstConnectDeadlineAt ?? event.at + timers.wrapperFirstConnectMs
+          ),
         },
         effects: NO_EFFECTS,
       };
@@ -294,6 +361,7 @@ export function reduceAllocation(
             allocationId: event.nextAllocationId,
             providerRef: null,
             createDeadlineAt: event.at + timers.providerCreateRetryMs,
+            firstConnectDeadlineAt: null,
           },
           effects: NO_EFFECTS,
         };
@@ -339,17 +407,14 @@ export function reduceAllocation(
     }
 
     case 'provider-gone': {
-      // The provider reports the sandbox gone: proof of a physical stop, so a
-      // preserved unconfirmed ref is cleared even when routing was already
-      // `stopped` from an exhausted ladder.
-      if (state.kind === 'stopped') {
-        return { state: { ...state, unconfirmedProviderRef: null }, effects: NO_EFFECTS };
-      }
+      // The provider reports the sandbox gone: proof of a physical stop. Clear
+      // routing and any preserved unconfirmed ref, allocation identity and outer
+      // deadline retained for an exhausted stop ladder.
       return { state: initialAllocationState(), effects: NO_EFFECTS };
     }
 
     case 'stop-requested': {
-      if (state.kind === 'stopped' || state.kind === 'stopping') {
+      if (allocationIsReleased(state) || state.kind === 'stopping') {
         return { state, effects: NO_EFFECTS };
       }
       return enterStopping(state, event.at, timers, event.reason);
@@ -382,8 +447,16 @@ function reduceTick(
 ): AllocationReduction {
   switch (state.kind) {
     case 'creating': {
-      if (state.createDeadlineAt === null || event.at < state.createDeadlineAt) {
+      const deadlineAt = allocationStartupDeadlineAt(state);
+      if (deadlineAt === null || event.at < deadlineAt) {
         return { state, effects: NO_EFFECTS };
+      }
+      // A committed provider ref means a launch attempt owns this deadline: the
+      // ref is written before the launch, so the SDK may not have started it yet.
+      // A null ref is the short create retry pause, whose deadline is a pause,
+      // not a launch budget; it keeps the generic retry below.
+      if (event.bootstrapExpiryReason !== undefined && state.providerRef !== null) {
+        return enterStopping(state, event.at, timers, event.bootstrapExpiryReason);
       }
       if (event.retryAllowed) {
         return {
@@ -392,6 +465,7 @@ function reduceTick(
             allocationId: event.nextAllocationId,
             providerRef: null,
             createDeadlineAt: event.at + timers.providerCreateMs,
+            firstConnectDeadlineAt: null,
           },
           effects: [{ type: 'create', allocationId: event.nextAllocationId }],
         };
@@ -403,7 +477,14 @@ function reduceTick(
       if (state.firstConnectDeadlineAt === null || event.at < state.firstConnectDeadlineAt) {
         return { state, effects: NO_EFFECTS };
       }
-      return enterStopping(state, event.at, timers, 'connection_lost');
+      // The cold bootstrap deadline is owned by the trusted config, so it
+      // reports the launch deadline reason instead of `connection_lost`.
+      return enterStopping(
+        state,
+        event.at,
+        timers,
+        event.bootstrapExpiryReason ?? 'connection_lost'
+      );
     }
 
     case 'connected': {
@@ -464,7 +545,7 @@ export function nextAllocationAlarmAt(
 ): number | null {
   switch (state.kind) {
     case 'creating':
-      return state.createDeadlineAt;
+      return allocationStartupDeadlineAt(state);
     case 'starting':
       return state.firstConnectDeadlineAt;
     case 'connected': {

@@ -38,6 +38,14 @@ import type { SessionCredentialGrant } from './session-credentials.js';
 import { buildControlNetworkPolicy } from './session-credentials.js';
 import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { leaseAtLeastMs } from './deadlines.js';
+import {
+  type RuntimeLaunchProcessProbe,
+  type RuntimeLaunchProcessStatus,
+  type RuntimeLaunchReceiptReader,
+  observeRuntimeLaunchPhase,
+} from './runtime-launch-phase.js';
+import { runtimeLaunchReceiptPath } from './runtime-launch-receipt.js';
+import { runtimeInstallerReasonForCode } from './runtime-release-loader.js';
 
 /**
  * The shared provider-adapter contract, exercised against the three real
@@ -601,5 +609,267 @@ describe('provider-specific contract differences', () => {
         [] as readonly SessionCredentialGrant[]
       )
     ).rejects.toThrow(/Invalid Vercel sandbox provider reference/);
+  });
+});
+
+/**
+ * The Cloudflare SDK launch phase. `startProcess` returns a snapshot whose
+ * `exitCode` is unset, so the phase reads the receipt and a bounded fresh
+ * `getProcess` DTO. `waitForExit` is never used: its SSE stream does not cancel
+ * on timeout. The metadata preflight is covered by the loader Workers test;
+ * these cases prove the phase contract.
+ */
+describe('cloudflare runtime launch phase', () => {
+  const LAUNCH_ID = 'launch-0001';
+  const DEADLINE = 10_000;
+  const asReceipt = (body: unknown) => JSON.stringify(body);
+  const handoff = asReceipt({ launchId: LAUNCH_ID, outcome: 'handoff' });
+  const failed = (code: number) =>
+    asReceipt({ launchId: LAUNCH_ID, outcome: 'installer_failed', code });
+
+  /** A reader that returns each content once, then repeats the last. */
+  function readerWith(...contents: readonly (string | undefined)[]): RuntimeLaunchReceiptReader {
+    let call = 0;
+    return {
+      async readFile(path) {
+        if (path !== runtimeLaunchReceiptPath(LAUNCH_ID)) throw new Error('not found');
+        const content = contents[Math.min(call, contents.length - 1)];
+        call += 1;
+        if (content === undefined) throw new Error('not found');
+        return { success: true, content };
+      },
+    };
+  }
+
+  type Info = { status: RuntimeLaunchProcessStatus; exitCode?: number } | null;
+  const running: Info = { status: 'running' };
+  const terminal = (code: number): Info => ({ status: 'completed', exitCode: code });
+  /** A terminal DTO that omits the exit code (killed / errored / completed). */
+  const terminalUnknown = (status: RuntimeLaunchProcessStatus = 'killed'): Info => ({ status });
+
+  /** A probe that returns each DTO once, then repeats the last. */
+  function probeWith(...infos: readonly Info[]): RuntimeLaunchProcessProbe {
+    let call = 0;
+    return {
+      async getProcess() {
+        const info = infos[Math.min(call, infos.length - 1)];
+        call += 1;
+        return info;
+      },
+    };
+  }
+
+  const noClock = () => ({ now: () => 0, sleep: async () => undefined });
+
+  it('returns on a handoff receipt without waiting for the supervisor', async () => {
+    const outcome = await observeRuntimeLaunchPhase(
+      readerWith(handoff),
+      probeWith(running),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(outcome).toEqual({ kind: 'handoff' });
+  });
+
+  it('reads a handoff before a later supervisor exit, so an exit 73 is not an artifact failure', async () => {
+    const outcome = await observeRuntimeLaunchPhase(
+      readerWith(handoff),
+      probeWith(terminal(73)),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(outcome).toEqual({ kind: 'handoff' });
+  });
+
+  it('returns a valid installer failure receipt by itself, without a terminal DTO', async () => {
+    const outcome = await observeRuntimeLaunchPhase(
+      readerWith(failed(77)),
+      probeWith(running),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(outcome).toEqual({ kind: 'installer-failed', code: 77 });
+    if (outcome.kind === 'installer-failed') {
+      expect(runtimeInstallerReasonForCode(outcome.code)).toBe('runtime_supervisor_missing');
+    }
+  });
+
+  it('reads a valid current receipt before the clock: a running process with code 71 is unauthorized, not deadline', async () => {
+    const outcome = await observeRuntimeLaunchPhase(
+      readerWith(failed(71)),
+      probeWith(running),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      { now: () => DEADLINE + 292, sleep: async () => undefined }
+    );
+    expect(outcome).toEqual({ kind: 'installer-failed', code: 71 });
+    if (outcome.kind === 'installer-failed') {
+      expect(runtimeInstallerReasonForCode(outcome.code)).toBe('runtime_artifact_unauthorized');
+    }
+  });
+
+  it('does not let a disagreeing terminal DTO override a valid receipt', async () => {
+    const outcome = await observeRuntimeLaunchPhase(
+      readerWith(failed(71)),
+      probeWith(terminal(70)),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(outcome).toEqual({ kind: 'installer-failed', code: 71 });
+  });
+
+  it('owns the deadline reason at the clock, even for an installer deadline code', async () => {
+    const code75 = await observeRuntimeLaunchPhase(
+      readerWith(failed(75)),
+      probeWith(running),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(code75).toEqual({ kind: 'deadline' });
+
+    const noReceipt = await observeRuntimeLaunchPhase(
+      readerWith(undefined),
+      probeWith(running),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      { now: () => DEADLINE, sleep: async () => undefined }
+    );
+    expect(noReceipt).toEqual({ kind: 'deadline' });
+  });
+
+  it('owns the deadline when the receipt stays stale or invalid to the clock', async () => {
+    const stale = await observeRuntimeLaunchPhase(
+      readerWith(asReceipt({ launchId: 'someone-else', outcome: 'installer_failed', code: 71 })),
+      probeWith(running),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      { now: () => DEADLINE, sleep: async () => undefined }
+    );
+    expect(stale).toEqual({ kind: 'deadline' });
+
+    const invalid = await observeRuntimeLaunchPhase(
+      readerWith('{"launchId":"launch-00'),
+      probeWith(running),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      { now: () => DEADLINE, sleep: async () => undefined }
+    );
+    expect(invalid).toEqual({ kind: 'deadline' });
+  });
+
+  it('keeps polling a partial (invalid) receipt while running and settles on the final write', async () => {
+    const outcome = await observeRuntimeLaunchPhase(
+      readerWith('{"launchId":"launch-00', failed(73)),
+      probeWith(running, running, terminal(73)),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(outcome).toEqual({ kind: 'installer-failed', code: 73 });
+  });
+
+  it('never infers an artifact reason from a missing, malformed, or id-mismatched receipt', async () => {
+    const missing = await observeRuntimeLaunchPhase(
+      readerWith(undefined),
+      probeWith(terminal(70)),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(missing).toEqual({ kind: 'bootstrap-failed' });
+
+    const malformed = await observeRuntimeLaunchPhase(
+      readerWith('{not json'),
+      probeWith(terminal(73)),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(malformed).toEqual({ kind: 'bootstrap-failed' });
+
+    const rawCode = await observeRuntimeLaunchPhase(
+      readerWith('73'),
+      probeWith(terminal(73)),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(rawCode).toEqual({ kind: 'bootstrap-failed' });
+
+    const unknownCode = await observeRuntimeLaunchPhase(
+      readerWith(failed(78)),
+      probeWith(terminal(78)),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(unknownCode).toEqual({ kind: 'bootstrap-failed' });
+
+    const wrongId = await observeRuntimeLaunchPhase(
+      readerWith(asReceipt({ launchId: 'someone-else', outcome: 'handoff' })),
+      probeWith(terminal(0)),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(wrongId).toEqual({ kind: 'bootstrap-failed' });
+  });
+
+  it('reports a generic fast failure when the process is terminal but no receipt exists', async () => {
+    const outcome = await observeRuntimeLaunchPhase(
+      readerWith(undefined),
+      probeWith(running, terminal(0)),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(outcome).toEqual({ kind: 'bootstrap-failed' });
+  });
+
+  it('lets a valid receipt win over a terminal DTO with no exit code, else fails generically', async () => {
+    // A valid receipt is the authority even when the DTO is terminal-unknown.
+    const withReceipt = await observeRuntimeLaunchPhase(
+      readerWith(failed(71)),
+      probeWith(terminalUnknown('killed')),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(withReceipt).toEqual({ kind: 'installer-failed', code: 71 });
+
+    // With no valid receipt, a killed/errored/completed DTO that omits exitCode
+    // must not fake an agreed code or stall to the deadline: it fails generically
+    // and promptly.
+    const withoutReceipt = await observeRuntimeLaunchPhase(
+      readerWith(undefined),
+      probeWith(running, terminalUnknown('error')),
+      'proc',
+      LAUNCH_ID,
+      DEADLINE,
+      noClock()
+    );
+    expect(withoutReceipt).toEqual({ kind: 'bootstrap-failed' });
   });
 });

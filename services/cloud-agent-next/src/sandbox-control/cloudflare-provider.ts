@@ -174,21 +174,23 @@ export function createCloudflareProviderAdapter(deps: {
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
-    async launch(ref, env) {
+    async launch(ref, env, _options) {
       const parsed = decodeCloudflareProviderRef(ref);
       if (!parsed || parsed.sandboxId !== deps.sandboxId) {
         throw new ProviderCreationError('invalid_configuration');
       }
       const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
       if (parsed.containment) await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);
-      await sandbox.startProcess(CONTROL_SUPERVISOR_PATH, {
-        cwd: '/',
-        env: {
-          ...env,
-          PROVIDER_INSTANCE_ID: ref,
-          WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
-        },
-      });
+      const launchEnv = {
+        ...env,
+        PROVIDER_INSTANCE_ID: ref,
+        WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
+      };
+      // The SDK sandbox is deprecated for this project and no longer selects a
+      // runtime release: it always starts the baked supervisor. An explicit
+      // release selection is executed only by a provider with runtime execution
+      // operations, and is rejected by the common workflow otherwise.
+      await sandbox.startProcess(CONTROL_SUPERVISOR_PATH, { cwd: '/', env: launchEnv });
       return { startSource: 'image' };
     },
     async observe(ref, intent) {

@@ -461,13 +461,21 @@ describe('repository snapshot launch', () => {
     ]);
     expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
     expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-    expect(provider.launchEnvs[1]).toEqual({
-      ...provider.launchEnvs[0],
-      SANDBOX_CONTROL_CREDENTIAL: expect.any(String),
-    });
-    expect(provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
-      provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
-    );
+    const first = provider.launchEnvs[0];
+    const second = provider.launchEnvs[1];
+    // The credential rotates per launch; stable identity fields do not.
+    expect(second.SANDBOX_CONTROL_CREDENTIAL).not.toBe(first.SANDBOX_CONTROL_CREDENTIAL);
+    expect(second.SANDBOX_CONTROL_URL).toBe(first.SANDBOX_CONTROL_URL);
+    expect(second.PROVIDER_INSTANCE_ID).toBe(first.PROVIDER_INSTANCE_ID);
+    expect(second.CONTROL_PLANE_ALLOCATION_ID).toBe(first.CONTROL_PLANE_ALLOCATION_ID);
+    // When WORKER_URL is set, the per-launch diagnostic identity rotates too.
+    // Assert rotation by named field, never by diffing raw env objects, which
+    // would print a synthetic log-upload grant.
+    if (first.CONTROL_WRAPPER_INSTANCE_ID !== undefined) {
+      expect(second.CONTROL_WRAPPER_INSTANCE_ID).toBeDefined();
+      expect(second.CONTROL_WRAPPER_INSTANCE_ID).not.toBe(first.CONTROL_WRAPPER_INSTANCE_ID);
+      expect(second.CONTROL_LOG_UPLOAD_GRANT).not.toBe(first.CONTROL_LOG_UPLOAD_GRANT);
+    }
     expect(provider.launchDeadlines[0]).toEqual(expect.any(Number));
     expect(provider.launchDeadlines[0]).toBe(launchDeadline);
     expect(provider.launchDeadlines[1]).toBe(launchDeadline);

@@ -755,6 +755,15 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   ) {
     sessionEnv.NEXT_PUBLIC_POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   }
+  // Pin the plain cloud-agent-next worker to a generated Wrangler config so a
+  // cold-local session uses the runtime-free image. Persisted into the session
+  // environment so `dev:restart cloud-agent-next` keeps the same config.
+  if (
+    process.env.CLOUD_AGENT_NEXT_WRANGLER_CONFIG !== undefined &&
+    process.env.CLOUD_AGENT_NEXT_WRANGLER_CONFIG !== ''
+  ) {
+    sessionEnv.CLOUD_AGENT_NEXT_WRANGLER_CONFIG = process.env.CLOUD_AGENT_NEXT_WRANGLER_CONFIG;
+  }
   const deletionMockEnv = resolveDeletionMockSessionEnv({
     serviceNames,
     mockPort: getService('deletion-mock').port,

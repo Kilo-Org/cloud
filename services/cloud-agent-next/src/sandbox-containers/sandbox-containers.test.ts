@@ -2342,16 +2342,18 @@ describe('SandboxContainers repository snapshots', () => {
     const { kv } = fakeKv({ [key]: { snapshotId: 'snap-repo' } });
     const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: kv } });
     const outbound = attachOutbound(instance);
-    container.identityAfterStart = 'ambiguous';
+    const start = container.start.bind(container);
+    vi.spyOn(container, 'start').mockImplementation(options => {
+      container.startBehavior = options?.containerSnapshot === undefined ? 'ok' : 'reject';
+      container.identityAfterStart = 'supervisor';
+      start(options);
+    });
     const policy = { egressAllowlist: ['example.com'] };
     const pending = launchFromRepo(instance, REF_A, policy);
-    await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
-    await vi.advanceTimersByTimeAsync(300_000);
     const first = await pending;
     expect(first.snapshotFailed).toBe(true);
     expect(readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
     await expect(instance.stop(REF_A)).resolves.toBe('terminal');
-    container.identityAfterStart = 'supervisor';
     await launchFromRepo(instance, REF_A, { ...policy, skipRepository: true });
 
     expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, false]);
@@ -2519,7 +2521,7 @@ describe('SandboxContainers repository snapshots', () => {
     }
   );
 
-  it('falls back when the snapshot supervisor cannot start and retries the snapshot on the next start', async () => {
+  it('does not penalise the snapshot when its supervisor identity never confirms', async () => {
     vi.useFakeTimers();
     const key = await indexKeyFor();
     const store = fakeKv({ [key]: { snapshotId: 'snap-broken' } });
@@ -2530,32 +2532,19 @@ describe('SandboxContainers repository snapshots', () => {
         options?.containerSnapshot === undefined ? 'supervisor' : 'ambiguous';
       start(options);
     });
-    const launched = expect(launchWithImageFallback(instance, REF_A)).resolves.toEqual({
-      started: true,
-      startSource: 'image',
-    });
+    const launched = expect(launchWithImageFallback(instance, REF_A)).rejects.toThrow(
+      'wrapper exec timed out'
+    );
     await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
     await vi.advanceTimersByTimeAsync(300_000);
     await launched;
+    // A readiness/identity timeout is not a confirmed physical snapshot
+    // failure: it records no penalty and issues no image start.
+    expect(container.startCalls).toHaveLength(1);
+    expect(readRecord().repositoryStartFailures).toBeUndefined();
     expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-broken' });
-    expect(readRecord().repositoryStartFailures).toEqual({
-      snapshotId: 'snap-broken',
-      attempts: 1,
-    });
     expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
-
     startSpy.mockRestore();
-    container.identityAfterStart = 'supervisor';
-    await expect(launchFromRepo(instance, REF_B)).resolves.toEqual({
-      started: true,
-      startSource: 'repository',
-    });
-    expect(container.startCalls[1]).toEqual(nativeStartOptions('standard-2'));
-    expect(container.startCalls[2]).toMatchObject({ containerSnapshot: { id: 'snap-broken' } });
-    expect(readRecord().repositoryStartFailures).toEqual({
-      snapshotId: 'snap-broken',
-      attempts: 1,
-    });
   });
 
   it('marks nothing when an image start fails', async () => {
@@ -2646,10 +2635,9 @@ describe('SandboxContainers repository snapshots', () => {
       const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
       container.identityAfterStart = 'ambiguous';
       const launch = launchFromRepo(instance, REF_A);
-      const failed =
-        source === 'repository'
-          ? expect(launch).resolves.toMatchObject({ snapshotFailed: true })
-          : expect(launch).rejects.toThrow('wrapper exec timed out');
+      // An unconfirmed identity is a generic timeout for either source. It is
+      // not a physical snapshot rejection, so no image fallback is selected.
+      const failed = expect(launch).rejects.toThrow('wrapper exec timed out');
       await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
       const budget = source === 'repository' ? 300_000 : 90_000;
       await vi.advanceTimersByTimeAsync(budget - 1_000);
@@ -2669,9 +2657,9 @@ describe('SandboxContainers repository snapshots', () => {
     const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
     container.identityAfterStart = 'ambiguous';
 
-    const failed = expect(
-      launchFromRepo(instance, REF_A, { deadlineAt: 15_000 })
-    ).resolves.toMatchObject({ snapshotFailed: true });
+    const failed = expect(launchFromRepo(instance, REF_A, { deadlineAt: 15_000 })).rejects.toThrow(
+      'wrapper exec timed out'
+    );
     await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
     await vi.advanceTimersByTimeAsync(5_000);
     await failed;

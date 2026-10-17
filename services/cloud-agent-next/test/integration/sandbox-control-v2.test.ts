@@ -39,6 +39,7 @@ import {
 } from '../../src/sandbox-control/session-credentials.js';
 import type {
   ProviderAdapter,
+  ProviderAllocationIntent,
   ProviderCreateIntent,
   SandboxProviderConfiguration,
   StopResult,
@@ -64,6 +65,24 @@ import {
 import { FakeSessionPeer } from './helpers/fake-session-peer.js';
 import { waitFor } from './wait-for.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
+import {
+  bakedLaunchCommand,
+  type RuntimeLaunchOps,
+  type RuntimeReserveResult,
+  type RuntimeStartResult,
+} from '../../src/sandbox-control/runtime-launch.js';
+import type { RuntimeLaunchObservation } from '../../src/sandbox-control/runtime-launch-phase.js';
+import {
+  writeRuntimeLaunchIntent,
+  type RuntimeLaunchIntent,
+} from '../../src/control-plane/sandbox/runtime-launch-intent.js';
+import { RUNTIME_CONTRACT_KEY } from '../../src/control-plane/sandbox/runtime-contract.js';
+import {
+  runtimeArtifactObjectKey,
+  sha256Hex,
+} from '../../src/sandbox-control/runtime-artifact-store.js';
+import { runtimeReleaseDescriptorSchema } from '../../src/shared/runtime-release.js';
+import type { RuntimeArtifactReader } from '../../src/sandbox-control/runtime-release-loader.js';
 
 const SANDBOX_ID = 'sbx__control_v2_smoke';
 const CUTOVER_SANDBOX_ID = 'sbx__control_v2_cutover';
@@ -71,6 +90,34 @@ const CUSTOM_ALLOCATION_NAME = 'usr-shared-allocation-name';
 const LEGACY_ALLOCATION_NAME = 'usr-legacy-shared-allocation';
 const MINUTE = 60 * 1000;
 const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
+
+/**
+ * A schema-valid release descriptor for tests that only exercise selection
+ * consumption and routing; the two artifact reads are satisfied only by a
+ * seeded object store, so a release that reaches preflight needs one.
+ */
+const RUNTIME_SHA_A = 'a'.repeat(64);
+const RUNTIME_SHA_B = 'b'.repeat(64);
+const VALID_RUNTIME_DESCRIPTOR = JSON.stringify({
+  format: 1,
+  bootstrap: 1,
+  platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
+  abi: 'kilo-runtime-base-v1',
+  cliVersion: '1.0.0',
+  cliExecutable: 'kilo',
+  wrapperSdkVersion: '1.0.0',
+  protocol: 'v1',
+  artifacts: [
+    { role: 'cli', sha256: RUNTIME_SHA_A, transferBytes: 10, expandedBytes: 4, fileCount: 1 },
+    { role: 'control', sha256: RUNTIME_SHA_B, transferBytes: 10, expandedBytes: 4, fileCount: 1 },
+  ],
+  caps: { maxTransferBytes: 100, maxExpandedBytes: 100, maxFileCount: 10 },
+  inventory: [
+    ['cli', 'kilo', 0o755, 4, RUNTIME_SHA_A],
+    ['control', 'x/y', 0o644, 4, RUNTIME_SHA_B],
+  ],
+});
+const RUNTIME_ORIGIN = 'https://runtime.example.com';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
@@ -119,9 +166,36 @@ function containedGrant(
 
 type FakeProviderOptions = {
   failFirstCreate?: boolean;
+  failFirstLaunch?: string;
   gateCreate?: boolean;
   gateLaunch?: boolean;
   gateStop?: boolean;
+  /** Attach runtime execution ops so a new allocation drives the common workflow. */
+  native?: boolean;
+};
+
+type FakeNativeState = {
+  activeLaunchId: string | null;
+  reserve: { launchId: string; skipRepository: boolean; outerDeadlineAt: number }[];
+  start: { launchId: string; command: string; env: Record<string, string> }[];
+  settled: { launchId: string; outcome: string }[];
+  acked: string[];
+  destroyed: string[];
+  retired: string[];
+  /** Overrides the reservation attempt bound; defaults to the outer deadline. */
+  attemptDeadlineAt?: number;
+  reserveHook?: (input: {
+    launchId: string;
+    skipRepository?: true;
+    outerDeadlineAt: number;
+  }) => Promise<RuntimeReserveResult>;
+  startHook?: (input: {
+    launchId: string;
+    skipRepository: boolean;
+  }) => Promise<RuntimeStartResult> | RuntimeStartResult;
+  observeHook?: (input: {
+    launchId: string;
+  }) => Promise<RuntimeLaunchObservation> | RuntimeLaunchObservation;
 };
 
 type FakeProvider = {
@@ -131,13 +205,78 @@ type FakeProvider = {
   refs: string[];
   launchEnvs: Record<string, string>[];
   stopCalls: (string | null)[];
+  stopIntents: (ProviderAllocationIntent | null)[];
   stopResults: StopResult[];
   leaseCalls: number[];
   leaseRefs: string[];
   createGates: Array<(value: { providerRef: string }) => void>;
   launchGates: Array<(error?: unknown) => void>;
   stopGates: Array<(result: StopResult) => void>;
+  native?: FakeNativeState;
 };
+
+/** Runtime execution ops over the fake native state; the launch token is required. */
+function fakeNativeOps(provider: FakeProvider, intent: ProviderCreateIntent): RuntimeLaunchOps {
+  const native = provider.native;
+  if (native === undefined) throw new Error('native state is not attached');
+  if (intent.launchToken === undefined)
+    throw new Error('runtime execution requires a launch token');
+  return {
+    async reserveLaunch(input) {
+      native.reserve.push({
+        launchId: input.launchId,
+        skipRepository: input.skipRepository === true,
+        outerDeadlineAt: input.outerDeadlineAt,
+      });
+      if (native.retired.includes(input.launchId)) return { kind: 'refused', reason: 'retired' };
+      if (native.activeLaunchId !== null && native.activeLaunchId !== input.launchId)
+        return { kind: 'refused', reason: 'allocation_owned' };
+      native.activeLaunchId = input.launchId;
+      const reserved: RuntimeReserveResult =
+        native.reserveHook !== undefined
+          ? await native.reserveHook(input)
+          : {
+              kind: 'reserved',
+              phase: 'reserved',
+              providerRef: `mem_${input.launchId}`,
+              startSource: input.skipRepository === true ? 'image' : 'repository',
+              attemptDeadlineAt: native.attemptDeadlineAt ?? input.outerDeadlineAt,
+            };
+      if (native.retired.includes(input.launchId)) return { kind: 'refused', reason: 'retired' };
+      if (
+        (reserved.kind === 'refused' || reserved.kind === 'unavailable') &&
+        native.activeLaunchId === input.launchId
+      )
+        native.activeLaunchId = null;
+      return reserved;
+    },
+    async startLaunch(input) {
+      native.start.push({ launchId: input.launchId, command: input.command, env: input.env });
+      if (native.startHook !== undefined) return native.startHook(input);
+      return { kind: 'issued' };
+    },
+    async observeLaunch(input) {
+      if (native.observeHook !== undefined) return native.observeHook(input);
+      return { process: 'supervisor' };
+    },
+    async settleLaunch({ launchId, result }) {
+      native.settled.push({ launchId, outcome: result.kind });
+      return true;
+    },
+    async acknowledgeLaunch({ launchId }) {
+      native.acked.push(launchId);
+    },
+    async retireLaunch({ launchId }) {
+      native.retired.push(launchId);
+      if (native.activeLaunchId === launchId) native.activeLaunchId = null;
+    },
+    async destroyLaunch({ launchId }) {
+      native.destroyed.push(launchId);
+      if (native.activeLaunchId === launchId) native.activeLaunchId = null;
+      return true;
+    },
+  };
+}
 
 function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
   const provider: FakeProvider = {
@@ -147,15 +286,34 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
     refs: [],
     launchEnvs: [],
     stopCalls: [],
+    stopIntents: [],
     stopResults: [],
     leaseCalls: [],
     leaseRefs: [],
     createGates: [],
     launchGates: [],
     stopGates: [],
+    ...(options.native === true
+      ? {
+          native: {
+            activeLaunchId: null,
+            reserve: [],
+            start: [],
+            settled: [],
+            acked: [],
+            destroyed: [],
+            retired: [],
+          },
+        }
+      : {}),
   };
   provider.adapter = {
     async ensureBillingAdmission() {},
+    ...(options.native === true
+      ? {
+          runtimeExecution: (intent: ProviderCreateIntent) => fakeNativeOps(provider, intent),
+        }
+      : {}),
     async create(intent: ProviderCreateIntent) {
       provider.createCalls += 1;
       provider.createInputs.push(intent);
@@ -171,6 +329,9 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
     },
     async launch(_ref, env) {
       provider.launchEnvs.push({ ...env });
+      if (options.failFirstLaunch !== undefined && provider.launchEnvs.length === 1) {
+        throw new Error(options.failFirstLaunch);
+      }
       if (options.gateLaunch) {
         await new Promise<void>((resolve, reject) => {
           provider.launchGates.push(error => (error === undefined ? resolve() : reject(error)));
@@ -181,12 +342,20 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
     },
-    async stop(ref) {
+    async stop(ref, intent) {
       provider.stopCalls.push(ref);
-      if (options.gateStop) {
-        return new Promise<StopResult>(resolve => provider.stopGates.push(resolve));
+      provider.stopIntents.push(intent);
+      const result = options.gateStop
+        ? await new Promise<StopResult>(resolve => provider.stopGates.push(resolve))
+        : (provider.stopResults.shift() ?? 'terminal');
+      const token = intent?.launchToken;
+      if (result === 'terminal' && provider.native !== undefined && token !== undefined) {
+        if (!provider.native.retired.includes(token.launchId))
+          provider.native.retired.push(token.launchId);
+        if (provider.native.activeLaunchId === token.launchId)
+          provider.native.activeLaunchId = null;
       }
-      return provider.stopResults.shift() ?? 'terminal';
+      return result;
     },
     async ensureLeaseAtLeast(ref, ms) {
       provider.leaseCalls.push(ms);
@@ -213,6 +382,13 @@ type StartOptions = {
   egressMode?: EgressMode;
   egressAllowlist?: string[];
   sandboxKind?: StoredProviderPin['sandboxKind'];
+  /** Trusted cold-launch descriptor; consumed into the persisted launch selection. */
+  runtimeDescriptor?: string;
+  /** Trusted artifact origin used with a runtime descriptor. */
+  artifactOrigin?: string;
+  artifactReader?: RuntimeArtifactReader;
+  /** Shrink sandbox timers (e.g. `providerCreateMs`) for expiry tests. */
+  timers?: Partial<typeof TIMERS>;
 };
 
 /** Injects the fake adapter, then triggers `ensure` through a real DO RPC so
@@ -232,9 +408,26 @@ async function startAllocation(
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
-      ...(options.meter === undefined
+      ...(options.meter === undefined &&
+      options.runtimeDescriptor === undefined &&
+      options.artifactOrigin === undefined &&
+      options.artifactReader === undefined
         ? {}
-        : { env: { ...instance.env, CONTAINER_USAGE_METER: options.meter } }),
+        : {
+            env: {
+              ...instance.env,
+              ...(options.meter === undefined ? {} : { CONTAINER_USAGE_METER: options.meter }),
+              ...(options.runtimeDescriptor === undefined
+                ? {}
+                : { RUNTIME_RELEASE_DESCRIPTOR: options.runtimeDescriptor }),
+              ...(options.artifactOrigin === undefined
+                ? {}
+                : { RUNTIME_ARTIFACT_ORIGIN: options.artifactOrigin }),
+              ...(options.artifactReader === undefined
+                ? {}
+                : { RUNTIME_RELEASE_BUCKET: options.artifactReader }),
+            },
+          }),
       ...(options.admissionError === undefined
         ? {}
         : options.admissionError === 'hang'
@@ -254,6 +447,9 @@ async function startAllocation(
                   throw new Error(options.admissionError);
                 },
               }),
+      ...(options.timers === undefined
+        ? {}
+        : { sandboxTimers: () => ({ ...TIMERS, ...options.timers }) }),
     });
   });
   if (options.preparingRoute !== undefined) {
@@ -330,6 +526,20 @@ function readProviderPin(stub: DurableObjectStub<SandboxControlV2>) {
   });
 }
 
+function readDeadlines(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const rows = await db
+      .select({
+        firstConnect: allocationTable.first_connect_deadline_at,
+        create: allocationTable.create_deadline_at,
+      })
+      .from(allocationTable)
+      .where(eq(allocationTable.id, 'current'));
+    return rows[0] ?? null;
+  });
+}
+
 async function setDeadline(
   stub: DurableObjectStub<SandboxControlV2>,
   patch: Partial<{
@@ -361,7 +571,10 @@ async function releaseGate(
   });
 }
 
-function launchIdentity(provider: FakeProvider): { credential: string; allocationId: string } {
+function launchIdentity(provider: Pick<FakeProvider, 'launchEnvs'>): {
+  credential: string;
+  allocationId: string;
+} {
   const env = provider.launchEnvs[0];
   if (!env) throw new Error('provider.launch was not called');
   const credential = env.SANDBOX_CONTROL_CREDENTIAL;
@@ -2144,7 +2357,10 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await waitFor(async () =>
       expect(
         await runInDurableObject(stub, instance =>
-          Promise.resolve((instance as unknown as { createInFlight: boolean }).createInFlight)
+          Promise.resolve(
+            (instance as unknown as { creatingAllocationId: string | null })
+              .creatingAllocationId !== null
+          )
         )
       ).toBe(false)
     );
@@ -2575,6 +2791,46 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       return db.select().from(routesTable).where(eq(routesTable.session_id, 'workspace_alarm'));
     });
     expect(row[0]).toMatchObject({ state: 'failed', reason: 'preparation_timeout' });
+  });
+
+  it('fails an explicit release on a provider without runtime execution before any physical work', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      runtimeDescriptor: VALID_RUNTIME_DESCRIPTOR,
+      artifactOrigin: RUNTIME_ORIGIN,
+      preparingRoute: 'workspace_release_unsupported',
+    });
+    await waitFor(async () =>
+      expect(
+        (await stub.status({ sessionId: 'workspace_release_unsupported' })).view
+      ).toMatchObject({
+        state: 'failed',
+        reason: 'invalid_configuration',
+      })
+    );
+    // The deprecated SDK sandbox has no runtime execution ops: nothing is
+    // created or started, and baked is never substituted for the release.
+    expect(provider.createCalls).toBe(0);
+    expect(provider.launchEnvs).toHaveLength(0);
+    expect((await readState(stub)).kind).not.toBe('starting');
+  });
+
+  it('fails a malformed release configuration at the identity boundary without physical work', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      runtimeDescriptor: '{"format":1,"bootstrap":1}',
+      preparingRoute: 'workspace_release_malformed',
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'workspace_release_malformed' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'invalid_configuration',
+      })
+    );
+    expect(provider.createCalls).toBe(0);
+    expect(provider.launchEnvs).toHaveLength(0);
+    // The just-minted identity is rolled back with the failed routes.
+    expect((await readState(stub)).allocationId).toBeNull();
   });
 
   it.each(['provider-gone', 'confirmed-stop'] as const)(
@@ -3576,5 +3832,545 @@ describe('SandboxControlV2 previewTarget', () => {
     });
     expect(observed.result).toEqual({ status: 'not_running' });
     expect(observed.enqueueCalls).toBe(0);
+  });
+});
+
+/** The raw persisted launch intent, read without a public debug surface. */
+function readRawLaunchIntent(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, (_instance, state) =>
+    Promise.resolve(state.storage.kv.get('runtime_launch') as RuntimeLaunchIntent | undefined)
+  );
+}
+
+function readRawRuntimeContract(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, (_instance, state) =>
+    Promise.resolve(state.storage.kv.get(RUNTIME_CONTRACT_KEY))
+  );
+}
+
+function applyStopRequested(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, async instance => {
+    await (
+      instance as unknown as {
+        applyEvent: (event: unknown) => Promise<void>;
+      }
+    ).applyEvent({ type: 'stop-requested', at: Date.now(), reason: 'sandbox_stopped' });
+    return instance.getAllocationState();
+  });
+}
+
+/**
+ * The coordinator's real production caller (`runCreate`) drives the common
+ * `launchSandbox` workflow through a stateful `runtimeExecution` fake, and the
+ * runtime launch intent persists across reconstruction with the exact nonce and
+ * selection. It exercises the real SQL+KV transaction, not a memory map.
+ */
+describe('SandboxControlV2 native runtime launch', () => {
+  it('drives the common native workflow to a handoff under the persisted nonce', async () => {
+    const provider = createFakeProvider({ native: true });
+    const stub = await startAllocation(provider, { preparingRoute: 'workspace_native_handoff' });
+    await waitFor(() => expect(provider.native?.start).toHaveLength(1));
+    const raw = await readRawLaunchIntent(stub);
+    if (raw === undefined) throw new Error('launch intent was not persisted');
+    // The reservation used the persisted physical nonce, not a freshly minted one.
+    expect(provider.native?.reserve).toEqual([
+      {
+        launchId: raw.launchId,
+        skipRepository: false,
+        outerDeadlineAt: (await readDeadlines(stub))?.create,
+      },
+    ]);
+    expect(provider.native?.start[0].launchId).toBe(raw.launchId);
+    expect(provider.native?.start[0].command).toBe(bakedLaunchCommand());
+    // The common workflow owns the physical start: no provider.create/launch.
+    expect(provider.createCalls).toBe(0);
+    expect(provider.launchEnvs).toHaveLength(0);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+    const deadlines = await readDeadlines(stub);
+    // The effective attempt deadline (from reserve) tightens the first-connect
+    // admission without overwriting the SQL outer create deadline.
+    expect(deadlines?.firstConnect).toBe(deadlines?.create);
+    expect(provider.native?.settled).toEqual([{ launchId: raw.launchId, outcome: 'handoff' }]);
+    // A handoff never acknowledges: the receipt is the phase authority.
+    expect(provider.native?.acked).toEqual([]);
+  });
+
+  it('loses ownership and starts nothing when a Stop arrives before the reservation commits', async () => {
+    let releaseReserve!: () => void;
+    const gate = new Promise<void>(resolve => {
+      releaseReserve = resolve;
+    });
+    const provider = createFakeProvider({ native: true });
+    provider.native!.reserveHook = async input => {
+      await gate;
+      return {
+        kind: 'reserved',
+        phase: 'reserved',
+        providerRef: `mem_${input.launchId}`,
+        startSource: 'repository',
+        attemptDeadlineAt: input.outerDeadlineAt,
+      };
+    };
+    const stub = await startAllocation(provider, {});
+    await waitFor(() => expect(provider.native?.reserve).toHaveLength(1));
+    // A Stop before the reservation resolves fences the nonce: the owner refuses
+    // to commit the ref, so nothing starts and the late reservation cannot
+    // mutate the allocation after it has stopped.
+    const afterStop = await applyStopRequested(stub);
+    expect(afterStop.kind).toBe('stopping');
+    releaseReserve();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(provider.native?.start).toHaveLength(0);
+    expect(provider.native?.settled).toHaveLength(0);
+    expect(provider.native?.destroyed).toHaveLength(0);
+    expect((await readState(stub)).kind).toBe('stopped');
+  }, 20_000);
+
+  it('rotates the nonce and wrapper credential on a confirmed snapshot failure under the unchanged outer deadline', async () => {
+    const provider = createFakeProvider({ native: true });
+    let starts = 0;
+    provider.native!.startHook = () => {
+      starts += 1;
+      return starts === 1 ? { kind: 'snapshot-failed' } : { kind: 'issued' };
+    };
+    const stub = await startAllocation(provider, { preparingRoute: 'workspace_native_fallback' });
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+    const native = provider.native!;
+    expect(native.reserve).toHaveLength(2);
+    expect(native.reserve[0].skipRepository).toBe(false);
+    expect(native.reserve[1].skipRepository).toBe(true);
+    // The failed physical start was destroyed exactly once, under its own nonce.
+    expect(native.destroyed).toEqual([native.start[0].launchId]);
+    // The wrapper credential and the launch nonce both rotate for the fallback.
+    expect(native.start[1].env.SANDBOX_CONTROL_CREDENTIAL).not.toBe(
+      native.start[0].env.SANDBOX_CONTROL_CREDENTIAL
+    );
+    expect(native.start[1].launchId).not.toBe(native.start[0].launchId);
+    const raw = await readRawLaunchIntent(stub);
+    expect(raw?.launchId).toBe(native.start[1].launchId);
+    const deadlines = await readDeadlines(stub);
+    expect(deadlines?.create).not.toBeNull();
+    // The outer create deadline is unchanged by the fallback.
+    expect(deadlines?.firstConnect).toBe(deadlines?.create);
+    const identity = launchIdentity({ launchEnvs: [native.start[1].env] });
+    const wrapper = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential: identity.credential,
+    });
+    try {
+      expect(
+        await wrapper.hello({
+          wrapperId: 'wr_native_fallback',
+          allocationId: identity.allocationId,
+        })
+      ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('connected'));
+    } finally {
+      wrapper.close();
+    }
+  });
+
+  it('maps a native observation deadline to the typed runtime_artifact_deadline', async () => {
+    const provider = createFakeProvider({ native: true });
+    provider.native!.attemptDeadlineAt = Date.now() - 1;
+    provider.native!.observeHook = () => ({ process: 'running' });
+    const stub = await startAllocation(provider, {
+      preparingRoute: 'workspace_native_deadline',
+      runtimeDescriptor: VALID_RUNTIME_DESCRIPTOR,
+      artifactOrigin: RUNTIME_ORIGIN,
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'workspace_native_deadline' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'runtime_artifact_deadline',
+      })
+    );
+    expect(provider.native?.start).toHaveLength(0);
+    expect(provider.native?.acked).toEqual([]);
+    expect(provider.native?.settled.map(value => value.outcome)).toEqual(['deadline']);
+  });
+
+  async function publishRuntimeFixture(): Promise<string> {
+    const descriptor = runtimeReleaseDescriptorSchema.parse(JSON.parse(VALID_RUNTIME_DESCRIPTOR));
+    for (const artifact of descriptor.artifacts) {
+      const bytes = new TextEncoder().encode(artifact.role === 'cli' ? 'cli-blob01' : 'ctl-blob01');
+      artifact.sha256 = await sha256Hex(bytes);
+      artifact.transferBytes = bytes.byteLength;
+      for (const entry of descriptor.inventory) {
+        if (entry[0] === artifact.role) entry[4] = artifact.sha256;
+      }
+      await env.RUNTIME_RELEASE_BUCKET.put(runtimeArtifactObjectKey(artifact.sha256), bytes);
+    }
+    return JSON.stringify(descriptor);
+  }
+
+  it('commits the native phase bound before delayed R2 release preflight', async () => {
+    const provider = createFakeProvider({ native: true });
+    const descriptor = await publishRuntimeFixture();
+    provider.native!.attemptDeadlineAt = Date.now() + 30_000;
+    provider.native!.observeHook = ({ launchId }) => ({
+      receipt: JSON.stringify({ launchId, outcome: 'handoff' }),
+      process: 'supervisor',
+    });
+    let releaseHead = () => {};
+    const gate = new Promise<void>(resolve => {
+      releaseHead = resolve;
+    });
+    let reads = 0;
+    const bucket = {
+      head: async (key: string) => {
+        reads += 1;
+        await gate;
+        return env.RUNTIME_RELEASE_BUCKET.head(key);
+      },
+    };
+    const stub = await startAllocation(provider, {
+      preparingRoute: 'workspace_native_preflight',
+      runtimeDescriptor: descriptor,
+      artifactOrigin: RUNTIME_ORIGIN,
+      artifactReader: bucket,
+    });
+    try {
+      await waitFor(() => expect(reads).toBe(1));
+      const deadlines = await readDeadlines(stub);
+      expect(deadlines?.firstConnect).toBe(provider.native!.attemptDeadlineAt);
+      expect(deadlines!.create!).toBeGreaterThan(deadlines!.firstConnect!);
+      expect(provider.native!.start).toHaveLength(0);
+    } finally {
+      await releaseGate(stub, releaseHead);
+    }
+    await waitFor(() => expect(provider.native!.start).toHaveLength(1));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+  });
+
+  it('rejects a late first hello during creation at the persisted phase bound after configuration changes', async () => {
+    const provider = createFakeProvider({ native: true });
+    const descriptor = await publishRuntimeFixture();
+    provider.native!.attemptDeadlineAt = Date.now() + 30_000;
+    let releaseObserve = () => {};
+    const gate = new Promise<void>(resolve => {
+      releaseObserve = resolve;
+    });
+    provider.native!.observeHook = async ({ launchId }) => {
+      await gate;
+      return { receipt: JSON.stringify({ launchId, outcome: 'handoff' }), process: 'supervisor' };
+    };
+    const sessionId = 'workspace_native_phase_hello';
+    const stub = await startAllocation(provider, {
+      preparingRoute: sessionId,
+      runtimeDescriptor: descriptor,
+      artifactOrigin: RUNTIME_ORIGIN,
+    });
+    let wrapper: FakeWrapper | undefined;
+    try {
+      await waitFor(() => expect(provider.native!.start).toHaveLength(1));
+      const initial = await readDeadlines(stub);
+      await runInDurableObject(stub, instance => {
+        Object.assign(instance, {
+          env: {
+            ...instance.env,
+            RUNTIME_RELEASE_DESCRIPTOR: undefined,
+            RUNTIME_ARTIFACT_ORIGIN: undefined,
+          },
+        });
+      });
+      await setDeadline(stub, { first_connect_deadline_at: Date.now() - 1 });
+      expect((await readDeadlines(stub))?.create).toBe(initial?.create);
+      const identity = launchIdentity({ launchEnvs: [provider.native!.start[0].env] });
+      wrapper = await FakeWrapper.connect({
+        sandboxId: SANDBOX_ID,
+        credential: identity.credential,
+      });
+      expect(
+        await wrapper.hello({ wrapperId: 'wr_native_late', allocationId: identity.allocationId })
+      ).toEqual({ type: 'shutdown', reason: 'hello_rejected' });
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId })).view).toMatchObject({
+          state: 'failed',
+          reason: 'runtime_artifact_deadline',
+        })
+      );
+    } finally {
+      wrapper?.close();
+      await releaseGate(stub, releaseObserve);
+    }
+    expect(provider.native!.start).toHaveLength(1);
+    expect((await readState(stub)).kind).not.toBe('connected');
+  });
+
+  it('confirms native cleanup before retrying a receipt-less crash and preserves the retry pause', async () => {
+    const provider = createFakeProvider({ native: true });
+    const native = provider.native!;
+    native.observeHook = () => ({ process: native.start.length === 1 ? 'terminal' : 'supervisor' });
+    const stub = await startAllocation(provider, {
+      preparingRoute: 'workspace_native_crash_retry',
+    });
+    await waitFor(async () => {
+      expect(native.start).toHaveLength(1);
+      expect(provider.stopCalls).toHaveLength(1);
+      expect(native.activeLaunchId).toBeNull();
+      expect((await readState(stub)).kind).toBe('creating');
+    });
+    expect(provider.stopIntents[0]?.launchToken).toEqual({
+      launchId: native.reserve[0].launchId,
+      createDeadlineAt: native.reserve[0].outerDeadlineAt,
+    });
+    const retry = await readDeadlines(stub);
+    expect(retry!.create! - Date.now()).toBeGreaterThan(TIMERS.providerCreateRetryMs - 2_000);
+    expect(native.reserve).toHaveLength(1);
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(native.start).toHaveLength(2));
+    expect(native.activeLaunchId).toBe(native.start[1].launchId);
+    expect(native.activeLaunchId).not.toBe(native.start[0].launchId);
+    expect(provider.stopCalls).toHaveLength(1);
+    expect(native.retired).toEqual([native.reserve[0].launchId]);
+  });
+
+  it('expires a never-returning native reserve and starts its replacement without waiting for the old call', async () => {
+    const provider = createFakeProvider({ native: true });
+    const native = provider.native!;
+    let release = () => {};
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    native.reserveHook = async input => {
+      if (native.reserve.length === 1) await gate;
+      return {
+        kind: 'reserved',
+        phase: 'reserved',
+        providerRef: `mem_${input.launchId}`,
+        startSource: 'image',
+        attemptDeadlineAt: input.outerDeadlineAt,
+      };
+    };
+    const stub = await startAllocation(provider, {
+      preparingRoute: 'workspace_native_hung_reserve',
+      timers: { providerCreateMs: 1_000 },
+    });
+    try {
+      await waitFor(() => expect(native.reserve).toHaveLength(1));
+      await waitFor(
+        async () => {
+          await runAlarm(stub);
+          expect(native.reserve).toHaveLength(2);
+          expect(native.start).toHaveLength(1);
+        },
+        { timeout: 4_000 }
+      );
+      expect(provider.stopCalls[0]).toBeNull();
+      expect(provider.stopIntents[0]?.launchToken).toEqual({
+        launchId: native.reserve[0].launchId,
+        createDeadlineAt: native.reserve[0].outerDeadlineAt,
+      });
+      expect(native.retired).toContain(native.reserve[0].launchId);
+      expect(native.activeLaunchId).toBe(native.reserve[1].launchId);
+    } finally {
+      await releaseGate(stub, release);
+    }
+    expect(native.start).toHaveLength(1);
+  });
+
+  it('retains an unconfirmed native owner and lets a fresh preparation retry cleanup', async () => {
+    const provider = createFakeProvider({ native: true });
+    const native = provider.native!;
+    native.observeHook = () => ({ process: native.start.length === 1 ? 'terminal' : 'supervisor' });
+    provider.stopResults.push(
+      ...Array.from({ length: TIMERS.providerStopLadderMs.length + 3 }, () => 'retryable' as const)
+    );
+    const sessionId = 'workspace_native_cleanup_recovery';
+    const { result: stub, failures } = await captureRouteFailures(async () => {
+      const stub = await startAllocation(provider, { preparingRoute: sessionId });
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('stopping'));
+      expect((await stub.status({ sessionId })).view).toMatchObject({ state: 'preparing' });
+      for (let attempt = 0; attempt <= TIMERS.providerStopLadderMs.length; attempt += 1) {
+        await waitFor(async () => {
+          const current = await readState(stub);
+          expect(current.kind === 'stopped' || current.stopPending).toBe(true);
+        });
+        if ((await readState(stub)).kind === 'stopped') break;
+        await setDeadline(stub, { stop_at: Date.now() - 1 });
+        await runAlarm(stub);
+      }
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+      return stub;
+    });
+    expect(failures).toEqual([
+      expect.objectContaining({ reason: 'workspace_setup_failed', stage: 'cleanup_unconfirmed' }),
+    ]);
+    const retained = await readState(stub);
+    expect(retained.allocationId).not.toBeNull();
+    expect(retained.unconfirmedProviderRef).not.toBeNull();
+    expect(native.reserve).toHaveLength(1);
+    expect(native.activeLaunchId).toBe(native.reserve[0].launchId);
+    expect((await stub.status({ sessionId })).view).toMatchObject({
+      state: 'failed',
+      reason: 'workspace_setup_failed',
+    });
+    provider.stopResults.length = 0;
+    await insertPreparingRoute(stub, {
+      sessionId: sessionId + '_retry',
+      attemptDeadlineAt: Date.now() + MINUTE,
+    });
+    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: SANDBOX_ID });
+    await waitFor(() => expect(native.start).toHaveLength(2));
+    expect(native.activeLaunchId).toBe(native.start[1].launchId);
+  });
+
+  it('keeps the turn preparing when native cleanup times out before a confirmed ladder retry', async () => {
+    const provider = createFakeProvider({ native: true, gateStop: true });
+    const native = provider.native!;
+    native.observeHook = () => ({ process: native.start.length === 1 ? 'terminal' : 'supervisor' });
+    const sessionId = 'workspace_native_transient_cleanup';
+    const { result: stub, failures } = await captureRouteFailures(async () => {
+      const stub = await startAllocation(provider, {
+        preparingRoute: sessionId,
+        timers: { providerStopAttemptMs: 1_000 },
+      });
+      try {
+        await waitFor(() => expect(provider.stopGates).toHaveLength(2));
+        expect((await stub.status({ sessionId })).view).toMatchObject({ state: 'preparing' });
+        await releaseGate(stub, () => provider.stopGates[1]('terminal'));
+        await waitFor(() => expect(native.start).toHaveLength(2));
+        return stub;
+      } finally {
+        await releaseGate(stub, () => {
+          provider.stopGates[0]?.('terminal');
+          provider.stopGates[1]?.('terminal');
+        });
+      }
+    });
+    expect((await stub.status({ sessionId })).view).toMatchObject({ state: 'preparing' });
+    expect(failures).toEqual([]);
+    expect(provider.stopCalls).toHaveLength(2);
+    expect(native.activeLaunchId).toBe(native.start[1].launchId);
+  });
+
+  it('never falls back on a typed installer failure and acknowledges the retained receipt', async () => {
+    const provider = createFakeProvider({ native: true });
+    provider.native!.observeHook = ({ launchId }) => ({
+      receipt: JSON.stringify({ launchId, outcome: 'installer_failed', code: 71 }),
+      process: 'running',
+    });
+    const stub = await startAllocation(provider, {
+      preparingRoute: 'workspace_native_typed',
+      runtimeDescriptor: await publishRuntimeFixture(),
+      artifactOrigin: RUNTIME_ORIGIN,
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'workspace_native_typed' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'runtime_artifact_unauthorized',
+      })
+    );
+    expect(provider.native?.destroyed).toHaveLength(0);
+    expect(provider.native?.acked).toEqual([provider.native?.start[0].launchId]);
+  });
+
+  it('rolls back the allocation row, the launch intent and the runtime contract together', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, { preparingRoute: 'workspace_native_rollback' });
+    const before = await readState(stub);
+    const beforeIntent = await readRawLaunchIntent(stub);
+    const beforeContract = await readRawRuntimeContract(stub);
+    await runInDurableObject(stub, async (instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const internals = instance as unknown as { db: typeof db };
+      expect(() =>
+        internals.db.transaction(tx => {
+          tx.update(allocationTable)
+            .set({ allocation_id: 'rollback-alloc' })
+            .where(eq(allocationTable.id, 'current'))
+            .run();
+          state.storage.kv.put(RUNTIME_CONTRACT_KEY, {
+            allocationId: 'rollback-alloc',
+            mode: 'pending',
+          });
+          writeRuntimeLaunchIntent(state.storage.kv, {
+            version: 1,
+            allocationId: 'rollback-alloc',
+            launchId: 'rollback-launch',
+            selection: { kind: 'baked' },
+          });
+          throw new Error('forced rollback');
+        })
+      ).toThrow('forced rollback');
+    });
+    // Every write inside the real Durable Object transaction rolled back: the
+    // SQL row keeps its identity and both sync KV records are unchanged.
+    expect((await readState(stub)).allocationId).toBe(before.allocationId);
+    expect(await readRawLaunchIntent(stub)).toEqual(beforeIntent);
+    expect(await readRawRuntimeContract(stub)).toEqual(beforeContract);
+    expect((await readRawLaunchIntent(stub))?.allocationId).not.toBe('rollback-alloc');
+  });
+
+  it('retains the exact selection and nonce across reconstruction when the Worker configuration changes', async () => {
+    const provider = createFakeProvider({ native: true });
+    const stub = await startAllocation(provider, {
+      preparingRoute: 'workspace_native_reconstruct',
+    });
+    await waitFor(() => expect(provider.native?.start).toHaveLength(1));
+    const original = await readRawLaunchIntent(stub);
+    if (original === undefined) throw new Error('launch intent was not persisted');
+    const allocationId = original.allocationId;
+
+    await evictDurableObject(stub);
+    await runInDurableObject(stub, async instance => {
+      // A changed Worker selection must not be adopted by a reconstruction.
+      Object.assign(instance, {
+        env: {
+          ...instance.env,
+          RUNTIME_RELEASE_DESCRIPTOR: VALID_RUNTIME_DESCRIPTOR,
+          RUNTIME_ARTIFACT_ORIGIN: RUNTIME_ORIGIN,
+        },
+      });
+      await instance.getAllocationState();
+    });
+
+    const rehydrated = await readRawLaunchIntent(stub);
+    expect(rehydrated).toEqual(original);
+    const selection = await runInDurableObject(stub, instance =>
+      Promise.resolve(
+        (instance as unknown as { launchSelectionFor: (id: string) => unknown }).launchSelectionFor(
+          allocationId
+        )
+      )
+    );
+    expect(selection).toEqual({ kind: 'baked' });
+  });
+
+  it('fails closed on a mismatched launch intent without physical work', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, { preparingRoute: 'workspace_native_mismatch' });
+    const allocationId = (await readState(stub)).allocationId;
+    if (allocationId === null) throw new Error('expected an allocation identity');
+    const createCallsBefore = provider.createCalls;
+    const launchCallsBefore = provider.launchEnvs.length;
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.kv.put('runtime_launch', {
+        version: 1,
+        allocationId: 'stale-allocation',
+        launchId: 'stale-launch',
+        selection: { kind: 'baked' },
+      });
+    });
+    const outcome = await runInDurableObject(stub, instance => {
+      const resolve = (
+        instance as unknown as { launchSelectionFor: (id: string) => unknown }
+      ).launchSelectionFor.bind(instance);
+      try {
+        resolve(allocationId);
+        return { threw: false as const };
+      } catch (error) {
+        return { threw: true as const, error };
+      }
+    });
+    expect(outcome.threw).toBe(true);
+    if (outcome.threw) expect(outcome.error).toBeInstanceOf(ProviderCreationError);
+    // The corrupted record is not overwritten and no new provider work was issued.
+    expect((await readRawLaunchIntent(stub))?.allocationId).toBe('stale-allocation');
+    expect(provider.createCalls).toBe(createCallsBefore);
+    expect(provider.launchEnvs).toHaveLength(launchCallsBefore);
   });
 });

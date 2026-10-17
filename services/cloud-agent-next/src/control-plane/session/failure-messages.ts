@@ -22,6 +22,14 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   prompt_failed: 'Prompt delivery failed',
   sandbox_stopped: 'The sandbox stopped while waiting for an answer',
   execution_limit: 'The turn exceeded its time limit',
+  runtime_artifact_missing: 'The packaged runtime is not available for this environment',
+  runtime_artifact_unavailable: 'The packaged runtime could not be downloaded',
+  runtime_artifact_integrity: 'The packaged runtime failed verification',
+  runtime_artifact_unauthorized: 'The packaged runtime download was not authorized',
+  runtime_base_incompatible: 'The packaged runtime is not compatible with this environment',
+  runtime_install_probe_failed: 'The packaged runtime did not install correctly',
+  runtime_supervisor_missing: 'The packaged runtime is missing its supervisor',
+  runtime_artifact_deadline: 'The packaged runtime did not start in time',
 };
 
 export function isControlPlaneFailureReason(value: string): value is ControlPlaneFailureReason {

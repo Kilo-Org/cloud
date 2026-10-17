@@ -642,3 +642,26 @@ test('parses comma-separated service lists', () => {
   ]);
   assert.deepEqual(parseServiceList(undefined), []);
 });
+
+test('injects a cold-local Wrangler config into the plain cloud-agent-next worker only', () => {
+  const config = '.wrangler/wrangler.cold-local.jsonc';
+  const initialOffset = portOffset;
+  try {
+    process.env.CLOUD_AGENT_NEXT_WRANGLER_CONFIG = config;
+    applyPortOffset(initialOffset);
+
+    const command = getService('cloud-agent-next').command.join(' ');
+    assert.match(
+      command,
+      /pnpm run dev --config \.wrangler\/wrangler\.cold-local\.jsonc --persist-to \.wrangler\/state --port/
+    );
+    assert.equal(getService('cloudflare-session-ingest').command.includes('--config'), false);
+  } finally {
+    delete process.env.CLOUD_AGENT_NEXT_WRANGLER_CONFIG;
+    applyPortOffset(initialOffset);
+  }
+});
+
+test('leaves the plain cloud-agent-next worker without a config flag by default', () => {
+  assert.equal(getService('cloud-agent-next').command.includes('--config'), false);
+});

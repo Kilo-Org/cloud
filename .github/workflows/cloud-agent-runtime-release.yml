@@ -1,0 +1,121 @@
+name: Prepare Cloud Agent Runtime Release
+
+on:
+  workflow_call:
+    inputs:
+      source_sha:
+        required: true
+        type: string
+      base_sha:
+        default: ''
+        type: string
+      target_environment:
+        default: production
+        type: string
+    outputs:
+      artifact_name:
+        value: ${{ jobs.release.outputs.artifact_name }}
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: cloud-agent-runtime-release-${{ inputs.target_environment }}
+  cancel-in-progress: false
+
+jobs:
+  admit-source:
+    uses: ./.github/workflows/cloud-agent-runtime-admission.yml
+    with:
+      source_sha: ${{ inputs.source_sha }}
+
+  release:
+    needs: admit-source
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 40
+    environment: ${{ inputs.target_environment }}
+    outputs:
+      artifact_name: ${{ steps.evidence.outputs.artifact_name }}
+    steps:
+      - name: Checkout exact source
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Detect Cloud Agent release work
+        id: changes
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+        run: |
+          set -euo pipefail
+          changed=$(node scripts/cloud-agent-runtime-changes.mjs "$BASE_SHA" HEAD)
+          if [ "$changed" = false ]; then
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup pnpm
+        if: steps.changes.outputs.required == 'true'
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        if: steps.changes.outputs.required == 'true'
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        if: steps.changes.outputs.required == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate release inputs and select Bun
+        if: steps.changes.outputs.required == 'true'
+        id: inputs
+        working-directory: services/cloud-agent-next
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: |
+          set -euo pipefail
+          pnpm run runtime:release validate --environment "$TARGET_ENVIRONMENT"
+          bun_version=$(pnpm exec tsx -e 'import { RUNTIME_DISTRIBUTION } from "./src/shared/runtime-distribution.ts"; console.log(RUNTIME_DISTRIBUTION.bun)')
+          echo "bun_version=$bun_version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup compatible Bun
+        if: steps.changes.outputs.required == 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ steps.inputs.outputs.bun_version }}
+
+      - name: Publish or reuse verified runtime candidates
+        if: steps.changes.outputs.required == 'true'
+        working-directory: services/cloud-agent-next
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
+          CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: pnpm run runtime:release prepare --source-sha "$SOURCE_SHA" --environment "$TARGET_ENVIRONMENT"
+
+      - name: Identify release evidence
+        if: steps.changes.outputs.required == 'true'
+        id: evidence
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: echo "artifact_name=cloud-agent-runtime-$TARGET_ENVIRONMENT-$SOURCE_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+
+      - name: Retain exact release evidence
+        if: steps.changes.outputs.required == 'true'
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: ${{ steps.evidence.outputs.artifact_name }}
+          path: services/cloud-agent-next/.wrangler/runtime-release/*.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30

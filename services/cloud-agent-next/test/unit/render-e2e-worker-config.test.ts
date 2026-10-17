@@ -14,9 +14,12 @@ import { parse } from 'jsonc-parser';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  buildColdLocalDevVarsContent,
+  buildColdLocalWorkerConfig,
   buildE2eWorkerConfig,
   buildLocalDevVarsContent,
   buildLocalE2eWorkerConfig,
+  buildNativeColdWorkerConfig,
   requireE2eInternalSecret,
   renderLocal,
 } from '../e2e/deploy/render-e2e-worker-config.mjs';
@@ -462,8 +465,359 @@ describe('local e2e worker config', () => {
   });
 });
 
-const VALID_SECRET = 'e2e-internal-secret-0123456789';
+describe('cold-local worker config', () => {
+  const DESCRIPTOR = '{"format":1,"marker":"exact-publisher-output"}';
+  const ORIGIN = 'https://host.docker.internal:9599';
+  const CA_PEM = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n';
 
+  it('targets the real Worker, keeps env.dev, and embeds the exact descriptor and origin', () => {
+    const config = buildColdLocalWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    expect(config.main).toBe('../src/index.ts');
+    expect(config.$schema).toBe('../node_modules/wrangler/config-schema.json');
+    expect('routes' in config).toBe(false);
+    expect(config.env.dev.vars.RUNTIME_RELEASE_DESCRIPTOR).toBe(DESCRIPTOR);
+    expect(config.env.dev.vars.RUNTIME_ARTIFACT_ORIGIN).toBe(ORIGIN);
+    // The cold profile is the real Worker: no e2e entry or callback sink.
+    expect(JSON.stringify(config)).not.toContain('E2eCallbackSink');
+    expect(config.compatibility_flags).not.toContain('global_fetch_strictly_public');
+  });
+
+  it('points only the started sandbox class at the runtime-free image', () => {
+    const source = readSourceConfig();
+    const sourceByClass = new Map<
+      string,
+      { image?: string; images?: Record<string, { dockerfile: string }> }
+    >(
+      source.env.dev.containers.map(
+        (entry: { class_name: string }) => [entry.class_name, entry] as const
+      )
+    );
+    const config = buildColdLocalWorkerConfig(source, {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    const sandbox = config.env.dev.containers.find(
+      (entry: { class_name: string }) => entry.class_name === 'Sandbox'
+    );
+    expect(sandbox.image).toBe('../Dockerfile.runtime-free');
+
+    for (const entry of config.env.dev.containers as {
+      class_name: string;
+      image?: string;
+      images?: Record<string, { dockerfile: string }>;
+    }[]) {
+      if (entry.class_name === 'Sandbox') continue;
+      const original = sourceByClass.get(entry.class_name);
+      if (entry.image !== undefined) {
+        expect(entry.image, entry.class_name).toBe(`../${original?.image?.replace(/^\.\//, '')}`);
+      }
+      for (const [name, spec] of Object.entries(entry.images ?? {})) {
+        expect(spec.dockerfile, `${entry.class_name}.${name}`).toBe(
+          `../${original?.images?.[name]?.dockerfile.replace(/^\.\//, '')}`
+        );
+        expect(spec.dockerfile, `${entry.class_name}.${name}`).not.toBe(
+          '../Dockerfile.runtime-free'
+        );
+      }
+    }
+  });
+
+  it('keeps release storage separate and binds a custom local publication bucket', () => {
+    const source = readSourceConfig();
+    const config = buildColdLocalWorkerConfig(source, {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+      runtimeReleaseBucket: 'isolated-local-runtime-releases',
+    });
+    expect(
+      config.env.dev.r2_buckets.find(
+        (binding: { binding: string }) => binding.binding === 'RUNTIME_RELEASE_BUCKET'
+      ).bucket_name
+    ).toBe('isolated-local-runtime-releases');
+    expect(
+      config.env.dev.r2_buckets.find(
+        (binding: { binding: string }) => binding.binding === 'R2_BUCKET'
+      ).bucket_name
+    ).toBe('kilocode-sessions-dev');
+    expect(config.r2_buckets).toEqual(source.r2_buckets);
+    expect(() =>
+      buildColdLocalWorkerConfig(source, {
+        runtimeReleaseDescriptor: DESCRIPTOR,
+        artifactOrigin: ORIGIN,
+        runtimeReleaseBucket: 'kilocode-sessions-dev',
+      })
+    ).toThrow('separate from session storage');
+  });
+
+  it('resolves every relative container image from the generated .wrangler location', () => {
+    const config = buildColdLocalWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    const images = [
+      ...(config.containers ?? []).map((entry: { image: string }) => entry.image),
+      ...(config.env.dev.containers ?? []).map((entry: { image: string }) => entry.image),
+      ...(config.env.dev.containers ?? []).flatMap(
+        (entry: { images?: Record<string, { dockerfile?: string }> }) =>
+          Object.values(entry.images ?? {}).map(spec => spec.dockerfile)
+      ),
+    ];
+    for (const image of images) {
+      if (typeof image !== 'string') continue;
+      expect(existsSync(resolve(process.cwd(), '.wrangler', image)), image).toBe(true);
+    }
+  });
+
+  it('bakes the local CA as a base64 build var only when one is given', () => {
+    const withCa = buildColdLocalWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+      localCaPem: CA_PEM,
+    });
+    const sandbox = withCa.env.dev.containers.find(
+      (entry: { class_name: string }) => entry.class_name === 'Sandbox'
+    );
+    expect(sandbox.image_vars.KILO_LOCAL_CA_PEM_B64).toBe(
+      Buffer.from(CA_PEM, 'utf8').toString('base64')
+    );
+
+    const withoutCa = buildColdLocalWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    const plain = withoutCa.env.dev.containers.find(
+      (entry: { class_name: string }) => entry.class_name === 'Sandbox'
+    );
+    expect(plain.image_vars?.KILO_LOCAL_CA_PEM_B64).toBeUndefined();
+  });
+
+  it('puts buildVars on the selected class image_vars and merges with the CA', () => {
+    const config = buildColdLocalWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+      localCaPem: CA_PEM,
+      // The version value is the shared owner's; the renderer only carries it.
+      buildVars: { BUN_VERSION: '1.2.3' },
+    });
+    for (const entry of config.env.dev.containers as {
+      class_name: string;
+      image_vars?: Record<string, string>;
+    }[]) {
+      if (entry.class_name === 'Sandbox') {
+        expect(entry.image_vars?.BUN_VERSION).toBe('1.2.3');
+        expect(entry.image_vars?.KILO_LOCAL_CA_PEM_B64).toBe(
+          Buffer.from(CA_PEM, 'utf8').toString('base64')
+        );
+      } else {
+        expect(entry.image_vars?.BUN_VERSION, entry.class_name).toBeUndefined();
+      }
+    }
+  });
+
+  it('rejects a missing descriptor, a missing origin and an over-cap descriptor', () => {
+    const source = readSourceConfig();
+    expect(() =>
+      buildColdLocalWorkerConfig(source, { runtimeReleaseDescriptor: '', artifactOrigin: ORIGIN })
+    ).toThrow(/runtimeReleaseDescriptor/);
+    expect(() =>
+      buildColdLocalWorkerConfig(source, {
+        runtimeReleaseDescriptor: DESCRIPTOR,
+        artifactOrigin: '',
+      })
+    ).toThrow(/artifactOrigin/);
+    expect(() =>
+      buildColdLocalWorkerConfig(source, {
+        runtimeReleaseDescriptor: 'x'.repeat(65_537),
+        artifactOrigin: ORIGIN,
+      })
+    ).toThrow(/above the 65536 cap/);
+  });
+
+  it('does not mutate the source config', () => {
+    const source = readSourceConfig();
+    const snapshot = structuredClone(source);
+    buildColdLocalWorkerConfig(source, {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    expect(source).toEqual(snapshot);
+    expect(source.containers[0].image).toBe('./Dockerfile');
+  });
+});
+
+describe('native cold-local worker config', () => {
+  const DESCRIPTOR = '{"format":1,"marker":"native-publisher-output"}';
+  const ORIGIN = 'https://host.docker.internal:9599';
+  const CA_PEM = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n';
+  const MANAGED =
+    'registry.cloudflare.com/0123456789abcdef0123456789abcdef/kilo-native@sha256:' + 'f'.repeat(64);
+
+  function nativeEntry(config: { env: { dev: { containers: unknown } } }) {
+    return (
+      config.env.dev.containers as {
+        class_name: string;
+        image?: string;
+        images?: Record<
+          string,
+          { dockerfile?: string; image?: string; build_vars?: Record<string, string> }
+        >;
+        image_vars?: Record<string, string>;
+      }[]
+    ).find(entry => entry.class_name === 'SandboxContainers');
+  }
+
+  it('targets the real Worker and embeds the exact descriptor and origin without e2e wiring', () => {
+    const config = buildNativeColdWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    expect(config.main).toBe('../src/index.ts');
+    expect('routes' in config).toBe(false);
+    expect(config.env.dev.vars.RUNTIME_RELEASE_DESCRIPTOR).toBe(DESCRIPTOR);
+    expect(config.env.dev.vars.RUNTIME_ARTIFACT_ORIGIN).toBe(ORIGIN);
+    expect(JSON.stringify(config)).not.toContain('E2eCallbackSink');
+    expect(config.compatibility_flags).not.toContain('global_fetch_strictly_public');
+  });
+
+  it('points the native class at images.app only and leaves the SDK Sandbox harness separate', () => {
+    const source = readSourceConfig();
+    const sourceSdk = source.env.dev.containers.find(
+      (entry: { class_name: string }) => entry.class_name === 'Sandbox'
+    );
+    const config = buildNativeColdWorkerConfig(source, {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    const native = nativeEntry(config as never);
+    expect(native).toBeDefined();
+    expect(native?.image).toBeUndefined();
+    expect(Object.keys(native?.images ?? {})).toEqual(['app']);
+    expect(native?.images?.app.dockerfile).toBe('../Dockerfile.containers.runtime-free');
+    expect(native?.images?.app.image).toBeUndefined();
+
+    const sdk = (config.env.dev.containers as { class_name: string; image?: string }[]).find(
+      entry => entry.class_name === 'Sandbox'
+    );
+    expect(sdk?.image).toBe(`../${sourceSdk.image.replace(/^\.\//, '')}`);
+  });
+
+  it('selects a verified managed image when one is supplied', () => {
+    const config = buildNativeColdWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+      managedImage: MANAGED,
+    });
+    const native = nativeEntry(config as never);
+    expect(native?.images?.app.image).toBe(MANAGED);
+    expect(native?.images?.app.dockerfile).toBeUndefined();
+    // The image branch accepts image only: no build_vars may remain.
+    expect(native?.images?.app.build_vars).toBeUndefined();
+  });
+
+  it('derives a local CA image from the prepared native base without changing the production recipe', () => {
+    const config = buildNativeColdWorkerConfig(readSourceConfig(), {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+      localCaPem: CA_PEM,
+      nativeBaseImage: 'kilo-native-runtime-free:prepared',
+      buildVars: { BUN_VERSION: '1.2.3' },
+    });
+    const native = nativeEntry(config as never);
+    expect(native?.images?.app.dockerfile).toBe(
+      '../test/e2e/deploy/Dockerfile.native-runtime-free-local'
+    );
+    expect(native?.images?.app.build_vars?.BUN_VERSION).toBeUndefined();
+    expect(native?.images?.app.build_vars?.KILO_NATIVE_BASE_IMAGE).toBe(
+      'kilo-native-runtime-free:prepared'
+    );
+    expect(native?.images?.app.build_vars?.KILO_LOCAL_CA_PEM_B64).toBe(
+      Buffer.from(CA_PEM, 'utf8').toString('base64')
+    );
+  });
+
+  it('rejects local CA overrides without a prepared base or on an immutable managed image', () => {
+    const options = {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+      localCaPem: CA_PEM,
+    };
+    expect(() => buildNativeColdWorkerConfig(readSourceConfig(), options)).toThrow(
+      /prepared runtime-free base/
+    );
+    expect(() =>
+      buildNativeColdWorkerConfig(readSourceConfig(), { ...options, managedImage: MANAGED })
+    ).toThrow(/managed native image/);
+  });
+
+  it('keeps the release bucket separate and rejects a shared session bucket', () => {
+    const source = readSourceConfig();
+    const config = buildNativeColdWorkerConfig(source, {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+      runtimeReleaseBucket: 'isolated-native-releases',
+    });
+    expect(
+      config.env.dev.r2_buckets.find(
+        (binding: { binding: string }) => binding.binding === 'RUNTIME_RELEASE_BUCKET'
+      ).bucket_name
+    ).toBe('isolated-native-releases');
+    expect(() =>
+      buildNativeColdWorkerConfig(source, {
+        runtimeReleaseDescriptor: DESCRIPTOR,
+        artifactOrigin: ORIGIN,
+        runtimeReleaseBucket: 'kilocode-sessions-dev',
+      })
+    ).toThrow('separate from session storage');
+  });
+
+  it('rejects a missing descriptor, a missing origin, and an absent native class', () => {
+    const source = readSourceConfig();
+    expect(() =>
+      buildNativeColdWorkerConfig(source, { runtimeReleaseDescriptor: '', artifactOrigin: ORIGIN })
+    ).toThrow(/runtimeReleaseDescriptor/);
+    expect(() =>
+      buildNativeColdWorkerConfig(source, {
+        runtimeReleaseDescriptor: DESCRIPTOR,
+        artifactOrigin: '',
+      })
+    ).toThrow(/artifactOrigin/);
+    expect(() =>
+      buildNativeColdWorkerConfig(source, {
+        runtimeReleaseDescriptor: DESCRIPTOR,
+        artifactOrigin: ORIGIN,
+        nativeClasses: ['SandboxMissing'],
+      })
+    ).toThrow(/missing from env.dev.containers/);
+  });
+
+  it('does not mutate the source config', () => {
+    const source = readSourceConfig();
+    const snapshot = structuredClone(source);
+    buildNativeColdWorkerConfig(source, {
+      runtimeReleaseDescriptor: DESCRIPTOR,
+      artifactOrigin: ORIGIN,
+    });
+    expect(source).toEqual(snapshot);
+    expect(JSON.stringify(source)).not.toContain('runtime-free');
+  });
+});
+
+describe('buildColdLocalDevVarsContent', () => {
+  it('preserves every line verbatim and normalizes the trailing newline', () => {
+    expect(buildColdLocalDevVarsContent('WORKER_URL=http://x\nNEXTAUTH_SECRET=abc')).toBe(
+      'WORKER_URL=http://x\nNEXTAUTH_SECRET=abc\n'
+    );
+  });
+
+  it('refuses empty content', () => {
+    expect(() => buildColdLocalDevVarsContent('   \n')).toThrow(/empty/);
+  });
+});
+
+const VALID_SECRET = 'e2e-internal-secret-0123456789';
 describe('requireE2eInternalSecret', () => {
   it('accepts a value that satisfies the deployment rules', () => {
     expect(requireE2eInternalSecret(VALID_SECRET)).toBe(VALID_SECRET);

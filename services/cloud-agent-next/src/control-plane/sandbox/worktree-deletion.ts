@@ -26,7 +26,12 @@ import {
   sessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 import type { AllocationState } from './allocation.js';
+import type { ProviderAdapter } from '../../sandbox-control/provider.js';
 import type { RouteRecord } from './routes.js';
+import {
+  readRuntimeLaunchIntent,
+  type RuntimeLaunchIntentStorage,
+} from './runtime-launch-intent.js';
 
 export const WORKTREE_DELETION_PREFIX = 'worktree_deletion/';
 
@@ -96,14 +101,24 @@ export type WorktreeDeletionPlan = {
   exclusive: boolean;
   /** Allocation identity at planning time; a changed id fences the stop event. */
   allocationId: string | null;
-  /** The ref to stop for `action: 'stop'`. */
+  /** The provider ref to stop for `action: 'stop'`. */
   providerRef: string | null;
+  /**
+   * The launch nonce captured at planning time. A same-id fallback rotates this
+   * nonce, so settlement must compare it as well as the id and deadline.
+   */
+  launchId: string | null;
+  /** The outer create deadline at planning time; a replacement keeps it but the id/nonce fence it. */
+  deadlineAt: number | null;
 };
 
 export type WorktreeDeletionBeginInput = {
   request: ControlPlaneWorktreeDeletionInput;
   exclusive: boolean;
   storage: DurableObjectStorage;
+  /** Synchronous KV surface for the launch intent (same storage, `ctx.storage.kv`). */
+  intentStorage: RuntimeLaunchIntentStorage;
+  provider: ProviderAdapter;
   allocation: AllocationState;
   hasConnection: boolean;
 };
@@ -111,19 +126,17 @@ export type WorktreeDeletionBeginInput = {
 export async function beginWorktreeDeletion(
   input: WorktreeDeletionBeginInput
 ): Promise<WorktreeDeletionPlan> {
-  const { request, exclusive, storage, allocation, hasConnection } = input;
+  const { request, exclusive, storage, intentStorage, allocation, hasConnection } = input;
+  const launchRead = readRuntimeLaunchIntent(intentStorage, allocation.allocationId);
+  const launchId = launchRead.kind === 'intent' ? launchRead.intent.launchId : null;
+  const deadlineAt = allocation.createDeadlineAt;
+  const identity = { allocationId: allocation.allocationId, launchId, deadlineAt };
   const previous = await loadWorktreeDeletionJournal(storage, request.worktreeId);
   const sessionIds = [...new Set([...(previous?.sessionIds ?? []), ...request.sessionIds])];
   const scopedCleanupConfirmed =
     previous?.resourcesCleaned === true && previous.sessionIds.length === sessionIds.length;
   if (scopedCleanupConfirmed && (!exclusive || previous.destroyed)) {
-    return {
-      action: 'replay',
-      journal: previous,
-      exclusive,
-      allocationId: allocation.allocationId,
-      providerRef: null,
-    };
+    return { action: 'replay', journal: previous, exclusive, providerRef: null, ...identity };
   }
 
   const journal: WorktreeRuntimeDeletionJournal = {
@@ -136,33 +149,33 @@ export async function beginWorktreeDeletion(
   await storage.put(journalKey(request.worktreeId), journal);
 
   if (allocation.kind === 'stopped') {
-    // FIX 1: `stopped` alone is not proof. Only a null unconfirmed ref means the
-    // provider confirmed the stop (or never started); otherwise keep the ref and
-    // require a fresh confirmation before reporting success.
-    if (allocation.unconfirmedProviderRef === null) {
+    // A native reservation can exist without a ref. Other providers cannot stop
+    // by token, so a retained identity alone is not a cleanup target for them.
+    if (allocation.unconfirmedProviderRef !== null) {
       return {
-        action: 'complete',
+        action: 'stop',
         journal,
         exclusive,
-        allocationId: allocation.allocationId,
-        providerRef: null,
+        providerRef: allocation.unconfirmedProviderRef,
+        ...identity,
       };
     }
-    return {
-      action: 'stop',
-      journal,
-      exclusive,
-      allocationId: allocation.allocationId,
-      providerRef: allocation.unconfirmedProviderRef,
-    };
+    if (
+      input.provider.runtimeExecution !== undefined &&
+      allocation.allocationId !== null &&
+      launchId !== null
+    ) {
+      return { action: 'stop', journal, exclusive, providerRef: null, ...identity };
+    }
+    return { action: 'complete', journal, exclusive, providerRef: null, ...identity };
   }
   if (exclusive) {
     return {
       action: 'stop',
       journal,
       exclusive,
-      allocationId: allocation.allocationId,
       providerRef: allocation.providerRef,
+      ...identity,
     };
   }
   if (hasConnection) {
@@ -170,20 +183,14 @@ export async function beginWorktreeDeletion(
     // wrapper's delete-worktree operation (spec §6 "Billing..."). The caller
     // derives the checkout directory from the request, so this never fails
     // closed for a missing route.
-    return {
-      action: 'shared',
-      journal,
-      exclusive,
-      allocationId: allocation.allocationId,
-      providerRef: null,
-    };
+    return { action: 'shared', journal, exclusive, providerRef: null, ...identity };
   }
   return {
     action: 'observe',
     journal,
     exclusive,
-    allocationId: allocation.allocationId,
     providerRef: allocation.providerRef,
+    ...identity,
   };
 }
 

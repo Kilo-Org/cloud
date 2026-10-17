@@ -140,8 +140,9 @@ export function exportContainsTurn(data: unknown, input: ExportTurnInput): boole
  * `host.docker.internal`; the host-side driver reaches the same port on
  * `localhost`.
  */
-function resolveSessionIngestBaseUrl(): string | undefined {
-  const raw = process.env.KILO_SESSION_INGEST_URL ?? process.env.SESSION_INGEST_WORKER_URL;
+function resolveSessionIngestBaseUrl(override?: string): string | undefined {
+  const raw =
+    override ?? process.env.KILO_SESSION_INGEST_URL ?? process.env.SESSION_INGEST_WORKER_URL;
   if (!raw) return undefined;
   try {
     const url = new URL(raw);
@@ -152,23 +153,27 @@ function resolveSessionIngestBaseUrl(): string | undefined {
   }
 }
 
+function exportAuthorization(config: DriverConfig): string {
+  if (config.bearerToken !== undefined) return `Bearer ${config.bearerToken}`;
+  return `Bearer ${mintApiToken(config.user, config.nextAuthSecret)}`;
+}
+
 async function fetchSessionExport(
   resources: ExportDiagnosticResources,
   kiloSessionId: string,
-  signal: AbortSignal
-): Promise<unknown | null> {
-  const baseUrl = resolveSessionIngestBaseUrl();
+  signal: AbortSignal,
+  baseUrlOverride?: string
+): Promise<unknown> {
+  const baseUrl = resolveSessionIngestBaseUrl(baseUrlOverride);
   if (!baseUrl) return null;
   const url = `${baseUrl}/api/session/${encodeURIComponent(kiloSessionId)}/export`;
   const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${mintApiToken(resources.config.user, resources.config.nextAuthSecret)}`,
-    },
+    headers: { Authorization: exportAuthorization(resources.config) },
     signal,
   });
   if (!response.ok) return null;
   try {
-    return (await response.json()) as unknown;
+    return await response.json();
   } catch {
     return null;
   }
@@ -197,4 +202,42 @@ export async function bestEffortExportDiagnostic(
   } catch {
     return 'unknown';
   }
+}
+
+/**
+ * Driver-facing REQUIRED assertion: the export must contain the completed turn
+ * with the assistant marker. Unlike `bestEffortExportDiagnostic` this throws,
+ * so the driver cannot claim a transcript turn without the export evidence.
+ * Reuses `fetchSessionExport`/`exportContainsTurn`; it duplicates no logic.
+ */
+export async function requireSessionExportTurn(
+  resources: ExportDiagnosticResources,
+  input: ExportDiagnosticInput,
+  baseUrlOverride?: string
+): Promise<void> {
+  await resources.within('session-export turn', async signal => {
+    const bounded = AbortSignal.any([signal, AbortSignal.timeout(EXPORT_DIAGNOSTIC_TIMEOUT_MS)]);
+    const deadlineAt = Date.now() + EXPORT_DIAGNOSTIC_TIMEOUT_MS;
+    let sawExport = false;
+    while (!bounded.aborted) {
+      const data = await fetchSessionExport(
+        resources,
+        input.kiloSessionId,
+        bounded,
+        baseUrlOverride
+      ).catch(() => null);
+      if (data !== null) {
+        sawExport = true;
+        if (exportContainsTurn(data, input)) return;
+      }
+      const remaining = deadlineAt - Date.now();
+      if (remaining <= 0) break;
+      await new Promise(resolve => setTimeout(resolve, Math.min(250, remaining)));
+    }
+    throw new Error(
+      sawExport
+        ? `session export does not contain the completed turn ${input.messageId}`
+        : `session export is unavailable for ${input.kiloSessionId}; set --ingest-url or KILO_SESSION_INGEST_URL`
+    );
+  });
 }

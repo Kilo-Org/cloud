@@ -24,6 +24,15 @@ jobs:
     with:
       workflow_file: deploy-production.yml
 
+  prepare-cloud-agent-runtime:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_deploy == 'true'
+    uses: ./.github/workflows/cloud-agent-runtime-release.yml
+    with:
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
+      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+    secrets: inherit
+
   check-production-db-startup:
     needs: check-changes
     if: needs.check-changes.outputs.should_deploy == 'true'
@@ -58,7 +67,7 @@ jobs:
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
 
   run-migrations:
-    needs: check-changes
+    needs: [check-changes, prepare-cloud-agent-runtime]
     if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
@@ -142,6 +151,7 @@ jobs:
         check-production-db-startup,
         run-migrations,
         check-changes,
+        prepare-cloud-agent-runtime,
         stage-app,
         stage-ai-gateway,
         promote-app,
@@ -151,6 +161,7 @@ jobs:
       ${{
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
+        needs.prepare-cloud-agent-runtime.result == 'success' &&
         needs.check-production-db-startup.result == 'success' &&
         needs.run-migrations.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
@@ -162,6 +173,7 @@ jobs:
     with:
       base_sha: ${{ needs.check-changes.outputs.base_sha }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
+      cloud_agent_runtime_artifact: ${{ needs.prepare-cloud-agent-runtime.outputs.artifact_name }}
     secrets: inherit
 
   # The kilo-mcp changelog, GitHub Release and SBOM. It runs after every
@@ -320,6 +332,7 @@ jobs:
     needs:
       [
         check-changes,
+        prepare-cloud-agent-runtime,
         check-production-db-startup,
         run-migrations,
         stage-app,
@@ -334,6 +347,7 @@ jobs:
       ${{
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
+        needs.prepare-cloud-agent-runtime.result == 'success' &&
         needs.check-production-db-startup.result == 'success' &&
         needs.run-migrations.result == 'success' &&
         needs.stage-app.result == 'success' &&

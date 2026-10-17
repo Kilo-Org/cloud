@@ -911,6 +911,11 @@ async function installBuilder(config: ProviderConfig, sessionId: string): Promis
         'command -v rg >/dev/null',
         'git-lfs version >/dev/null',
         'kilo --version >/dev/null',
+        // The shared runtime-distribution owner selects `/usr/local/bin/kilo`
+        // (DEFAULT_KILO_EXECUTABLE_PATH) for an explicit path, not PATH. A
+        // snapshot whose global npm prefix differs would pass `kilo --version`
+        // via PATH yet be unusable later; fail the build here instead.
+        'test -x /usr/local/bin/kilo',
       ].join('\n'),
     },
   ];

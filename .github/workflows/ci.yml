@@ -551,7 +551,7 @@ jobs:
     needs: [changes, typecheck, lint, format-check, drizzle-check]
     if: needs.changes.outputs.cloud_agent_next == 'true'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     env:
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
@@ -573,6 +573,7 @@ jobs:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -603,6 +604,20 @@ jobs:
           bun install --production
           ln -sfn "$build_dir/wrapper/node_modules" "$build_dir/node_modules"
           bun run build.ts --install-dir "$build_dir/bin"
+
+      - name: Run serialized runtime installer process cases
+        if: needs.changes.outputs.cloud_agent_next == 'true'
+        run: bun services/cloud-agent-next/scripts/runtime-installer.ts
+
+      - name: Validate Cloud Agent release inputs without credentials
+        id: runtime_inputs
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: pnpm --filter cloud-agent-next runtime:release validate --base-sha "$BASE_SHA"
+
+      - name: Check changed native runtime-free base locally
+        if: steps.runtime_inputs.outputs.base_changed == 'true'
+        run: pnpm --filter cloud-agent-next runtime:release check-base
 
       - name: Test cloud-agent-next checkers
         run: pnpm --filter cloud-agent-next test:checkers

@@ -11,6 +11,7 @@ import type {
 } from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import { RUNTIME_CREDENTIAL_PROXY_AUDIENCE } from '../../../src/shared/runtime-credential-proxy-handle.js';
+import { resolveKiloExecutable } from '../../../src/shared/runtime-distribution.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../kilo-api.js';
 import { createOwnedProcessScope, type OwnedProcessScope } from '../control/owned-processes.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
@@ -232,10 +233,14 @@ async function defaultSpawnKiloProcess(input: KiloProcessSpawnInput): Promise<Ki
   input.onProcessScope?.(processes);
   const credential = createKiloServerCredential();
   // Own process group via the owned-process scope's detached spawn.
-  const proc = processes.spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
-    cwd: input.directory,
-    env: { ...input.env, ...credential.env },
-  });
+  const proc = processes.spawn(
+    resolveKiloExecutable(input.env),
+    ['serve', '--hostname=127.0.0.1', '--port=0'],
+    {
+      cwd: input.directory,
+      env: { ...input.env, ...credential.env },
+    }
+  );
   proc.stderr.resume();
   const exited = new Promise<void>(resolve => {
     proc.once('exit', () => resolve());

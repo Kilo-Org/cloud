@@ -547,10 +547,11 @@ export async function bootToCompletion(
       Math.max(1, Math.min(budgetMs, deadline.remaining(`${label} terminal`))),
       messageId
     );
+    const terminalType = terminal?.streamEventType ?? 'none';
     if (!isMessageCompleted(terminal, messageId)) {
       const reason = failureReasonFromEvent(terminal);
       throw new Error(
-        `${label} boot turn ${messageId} did not complete: terminal=${terminal?.streamEventType ?? 'none'}` +
+        `${label} boot turn ${messageId} did not complete: terminal=${terminalType}` +
           (reason === undefined ? '' : ` reason=${reason}`)
       );
     }

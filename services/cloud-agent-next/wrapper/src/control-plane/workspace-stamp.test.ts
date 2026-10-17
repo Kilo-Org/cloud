@@ -87,11 +87,16 @@ describe('planning a stamp', () => {
   });
 
   it('captures a fresh clone as generation 0 and nothing else a clone did not make', () => {
-    expect(planStamp({ cloning: true, adopted: false, previous: null, now })).toEqual({
+    expect(
+      planStamp({ cloning: true, adopted: false, previous: null, recovery: undefined, now })
+    ).toEqual({
       lineage: { capturedAt: now, generation: 0 },
       capture: true,
     });
-    expect(planStamp({ cloning: false, adopted: false, previous: null, now }).capture).toBe(false);
+    expect(
+      planStamp({ cloning: false, adopted: false, previous: null, recovery: undefined, now })
+        .capture
+    ).toBe(false);
   });
 
   it('refreshes an adopted snapshot once it is old enough', () => {
@@ -99,6 +104,7 @@ describe('planning a stamp', () => {
       cloning: false,
       adopted: true,
       previous: previous(SNAPSHOT_REFRESH_AFTER_MS, 1),
+      recovery: undefined,
       now,
     });
     expect(plan).toEqual({ lineage: { capturedAt: now, generation: 2 }, capture: true });
@@ -109,12 +115,32 @@ describe('planning a stamp', () => {
       cloning: false,
       adopted: true,
       previous: previous(SNAPSHOT_REFRESH_AFTER_MS - 1, 1),
+      recovery: undefined,
       now,
     });
     expect(plan).toEqual({
       lineage: { capturedAt: now - SNAPSHOT_REFRESH_AFTER_MS + 1, generation: 1 },
       capture: false,
     });
+  });
+
+  it('never captures a recovery-bearing preparation and does not advance adopted lineage', () => {
+    const recovery = {
+      files: [{ path: 'lost.txt', status: 'added' as const, patch: 'saved' }],
+    };
+    const due = planStamp({
+      cloning: false,
+      adopted: true,
+      previous: previous(SNAPSHOT_REFRESH_AFTER_MS, 3),
+      recovery,
+      now,
+    });
+    expect(due).toEqual({
+      lineage: { capturedAt: now - SNAPSHOT_REFRESH_AFTER_MS, generation: 3 },
+      capture: false,
+    });
+    const clone = planStamp({ cloning: true, adopted: false, previous: null, recovery, now });
+    expect(clone).toEqual({ lineage: { capturedAt: now, generation: 0 }, capture: false });
   });
 
   it('rebuilds instead of refreshing once a due snapshot is at the generation cap', () => {

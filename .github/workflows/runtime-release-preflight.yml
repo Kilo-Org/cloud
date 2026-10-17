@@ -1,0 +1,70 @@
+name: Runtime Release Preflight
+
+# Read-only verification of one published runtime release. It never publishes,
+# deploys, or repairs anything: a missing object fails the run. Manual dispatch
+# only, so it can never run on its own or wire into a production deploy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      descriptor_sha256:
+        description: 'Evidence descriptor SHA-256 to verify (lowercase hex)'
+        required: true
+        type: string
+      bucket:
+        description: 'R2 bucket that holds the runtime artifacts'
+        required: false
+        default: kilocode-cloud-agent-releases
+        type: string
+      target:
+        description: 'R2 target the preflight reads'
+        required: false
+        default: remote
+        type: choice
+        options:
+          - remote
+          - local
+
+# Read-only. No deploy, no publish, no release write.
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-release-preflight
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    name: Preflight runtime release
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Credentials are forwarded through the environment only; the script never
+      # prints them and `wrangler` reads them from its own auth environment.
+      - name: Preflight the published release
+        working-directory: services/cloud-agent-next
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DESCRIPTOR_SHA256: ${{ inputs.descriptor_sha256 }}
+          BUCKET: ${{ inputs.bucket }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          args=(--descriptor-sha256 "${DESCRIPTOR_SHA256}" --bucket "${BUCKET}")
+          if [ "${TARGET}" = "remote" ]; then args+=(--remote); else args+=(--local); fi
+          pnpm exec tsx scripts/runtime-release-preflight.ts "${args[@]}"

@@ -5,7 +5,7 @@ jest.mock('@/lib/slack-bot/model-allow-list', () => ({
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations, platform_integrations } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { PLATFORM, INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
@@ -17,6 +17,7 @@ describe('upsertLinearInstallation', () => {
   let user: User;
   let otherUser: User;
   const originalFetch = globalThis.fetch;
+  const createdOrganizationIds: string[] = [];
 
   beforeAll(async () => {
     user = await insertTestUser({
@@ -32,6 +33,7 @@ describe('upsertLinearInstallation', () => {
   beforeEach(() => {
     // Stub revoke endpoint so revokeLinearToken doesn't hit the network.
     globalThis.fetch = (async () => new Response(null, { status: 200 })) as typeof fetch;
+    jest.mocked(getDefaultAllowedModel).mockReset();
   });
 
   afterEach(async () => {
@@ -52,6 +54,18 @@ describe('upsertLinearInstallation', () => {
           eq(platform_integrations.owned_by_user_id, otherUser.id)
         )
       );
+    if (createdOrganizationIds.length > 0) {
+      await db
+        .delete(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.LINEAR),
+            inArray(platform_integrations.owned_by_organization_id, createdOrganizationIds)
+          )
+        );
+      await db.delete(organizations).where(inArray(organizations.id, createdOrganizationIds));
+      createdOrganizationIds.length = 0;
+    }
   });
 
   test('inserts a new row when no existing installation', async () => {
@@ -175,16 +189,36 @@ describe('upsertLinearInstallation', () => {
       .insert(organizations)
       .values({ name: `Linear Model Org ${crypto.randomUUID()}` })
       .returning();
+    createdOrganizationIds.push(organization.id);
 
     jest.mocked(getDefaultAllowedModel).mockResolvedValue(null);
 
     const result = await upsertLinearInstallation({
       owner: { type: 'org', id: organization.id },
-      organizationId: 'workspace-org',
+      organizationId: `workspace-org-blocked-${crypto.randomUUID()}`,
       organizationName: 'Workspace Org',
       botUserId: 'bot-1',
     });
 
     expect(result.metadata).not.toHaveProperty('model_slug');
+  });
+
+  test('stores the allowed model for an organization installation', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `Linear Model Org ${crypto.randomUUID()}` })
+      .returning();
+    createdOrganizationIds.push(organization.id);
+
+    jest.mocked(getDefaultAllowedModel).mockResolvedValue('test/allowed-model');
+
+    const result = await upsertLinearInstallation({
+      owner: { type: 'org', id: organization.id },
+      organizationId: `workspace-org-allowed-${crypto.randomUUID()}`,
+      organizationName: 'Workspace Org',
+      botUserId: 'bot-1',
+    });
+
+    expect(result.metadata).toMatchObject({ model_slug: 'test/allowed-model' });
   });
 });

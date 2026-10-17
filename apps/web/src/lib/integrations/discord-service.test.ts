@@ -204,7 +204,6 @@ describe('discord-service organization install model', () => {
   };
 
   beforeEach(() => {
-    jest.restoreAllMocks();
     mockLimit.mockReset();
     mockInsertValues.mockReset();
     mockInsertReturning.mockReset();

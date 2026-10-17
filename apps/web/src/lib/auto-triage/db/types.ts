@@ -70,7 +70,7 @@ export type UpdateTicketParams = {
   actionTaken?: TriageAction;
   actionMetadata?: Record<string, unknown>;
   errorMessage?: string;
-  startedAt?: Date;
+  startedAt?: Date | null;
   completedAt?: Date;
 };
 

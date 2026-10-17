@@ -156,9 +156,11 @@ async function exportableOrganizations(userId: string): Promise<{ id: string; na
       SELECT orgs.id, orgs.name
       FROM organization_memberships memberships
       JOIN organizations orgs ON orgs.parent_organization_id = memberships.organization_id
+      JOIN organizations parent_orgs ON parent_orgs.id = memberships.organization_id
       WHERE memberships.kilo_user_id = ${userId}
         AND memberships.role IN (${EXPORT_ROLES_SQL})
         AND orgs.deleted_at IS NULL
+        AND parent_orgs.deleted_at IS NULL
     )
     SELECT id, name FROM exportable ORDER BY name, id
   `);

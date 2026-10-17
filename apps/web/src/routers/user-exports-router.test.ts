@@ -465,6 +465,9 @@ describe('user exports router guards and serialization', () => {
         role,
       });
       const caller = await createCallerForUser(owner.id);
+      expect(
+        (await caller.userExports.exportableOrganizations()).organizations.map(org => org.id)
+      ).toContain(child.id);
 
       await expect(
         caller.userExports.requestOrganization({ organizationId: child.id })
@@ -475,6 +478,9 @@ describe('user exports router guards and serialization', () => {
         .update(organizations)
         .set({ deleted_at: new Date().toISOString() })
         .where(eq(organizations.id, parent.id));
+      expect(
+        (await caller.userExports.exportableOrganizations()).organizations.map(org => org.id)
+      ).not.toContain(child.id);
 
       await expect(
         caller.userExports.requestOrganization({ organizationId: child.id })
@@ -488,6 +494,9 @@ describe('user exports router guards and serialization', () => {
         kilo_user_id: owner.id,
         role,
       });
+      expect(
+        (await caller.userExports.exportableOrganizations()).organizations.map(org => org.id)
+      ).toContain(child.id);
       await expect(
         caller.userExports.requestOrganization({ organizationId: child.id })
       ).resolves.toMatchObject({ subjectType: 'organization' });

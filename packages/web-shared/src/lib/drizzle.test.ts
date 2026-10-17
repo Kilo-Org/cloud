@@ -1,9 +1,14 @@
 import {
+  cleanupDbForTest,
   pool,
   db,
   selectReplicaUrl,
   shouldExitOnPoolError,
+  sql,
 } from '@kilocode/web-shared/lib/drizzle';
+import { exa_usage_log, http_ip, http_user_agent } from '@kilocode/db/schema';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 
 describe('drizzle', () => {
   describe('pool', () => {
@@ -130,6 +135,102 @@ describe('drizzle', () => {
           euReplicaUrls: [],
         })
       ).toBe(primaryUrl);
+    });
+  });
+
+  describe('cleanupDbForTest', () => {
+    async function publicRelations() {
+      const { rows } = await db.execute<{ name: string }>(sql`
+        SELECT format('%I', c.relname) AS name
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relname <> 'migrations'
+        ORDER BY c.relname
+      `);
+      return rows.map(row => row.name);
+    }
+
+    async function nonEmptyRelations() {
+      const relations = await publicRelations();
+      const { rows } = await db.execute<{ name: string; rows: string }>(
+        sql.raw(
+          relations
+            .map(name => `SELECT '${name}' AS name, count(*) AS rows FROM ONLY ${name}`)
+            .join(' UNION ALL ')
+        )
+      );
+      return rows.filter(row => Number(row.rows) > 0);
+    }
+
+    async function usedOwnedSequences() {
+      const { rows } = await db.execute<{ name: string }>(sql`
+        SELECT s.seqrelid::regclass::text AS name
+        FROM pg_sequence s
+        JOIN pg_depend d ON d.classid = 'pg_class'::regclass AND d.objid = s.seqrelid
+          AND d.refclassid = 'pg_class'::regclass AND d.deptype IN ('a', 'i')
+        JOIN pg_class t ON t.oid = d.refobjid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = 'public' AND pg_sequence_last_value(s.seqrelid) IS NOT NULL
+      `);
+      return rows.map(row => row.name);
+    }
+
+    beforeEach(cleanupDbForTest);
+
+    it('empties every table and partition, including FK-dependent rows', async () => {
+      const owner = await insertTestUser();
+      const organization = await createTestOrganization('Cleanup pin', owner.id, 0);
+      await db.insert(exa_usage_log).values({
+        kilo_user_id: owner.id,
+        organization_id: organization.id,
+        path: '/search',
+        cost_microdollars: 1,
+      });
+      const removed = await insertTestUser();
+      await db.execute(sql`DELETE FROM kilocode_users WHERE id = ${removed.id}`);
+      expect((await nonEmptyRelations()).length).toBeGreaterThanOrEqual(3);
+
+      await cleanupDbForTest();
+
+      expect(await nonEmptyRelations()).toEqual([]);
+    });
+
+    it('restarts identity and serial sequences, with or without rows', async () => {
+      const first = await db
+        .insert(http_user_agent)
+        .values([{ http_user_agent: 'a' }, { http_user_agent: 'b' }])
+        .returning();
+      expect(first.map(row => row.http_user_agent_id)).toEqual([1, 2]);
+      await db.execute(sql`SELECT nextval(pg_get_serial_sequence('http_ip', 'http_ip_id'))`);
+      expect(await usedOwnedSequences()).toEqual(
+        expect.arrayContaining(['http_user_agent_http_user_agent_id_seq', 'http_ip_http_ip_id_seq'])
+      );
+
+      await cleanupDbForTest();
+
+      expect(await usedOwnedSequences()).toEqual([]);
+      const [agent] = await db.insert(http_user_agent).values({ http_user_agent: 'c' }).returning();
+      const [ip] = await db.insert(http_ip).values({ http_ip: '127.0.0.1' }).returning();
+      expect(agent.http_user_agent_id).toBe(1);
+      expect(ip.http_ip_id).toBe(1);
+    });
+
+    it('leaves every emptied heap with zero pages, as TRUNCATE does', async () => {
+      const owner = await insertTestUser();
+      await createTestOrganization('Cleanup heap pin', owner.id, 0);
+
+      await cleanupDbForTest();
+
+      const { rows } = await db.execute<{ name: string }>(sql`
+        SELECT c.relname AS name
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND c.relkind = 'r'
+          AND c.relname <> 'migrations'
+          AND pg_relation_size(c.oid) > 0
+      `);
+      expect(rows).toEqual([]);
     });
   });
 });

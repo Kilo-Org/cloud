@@ -58,6 +58,13 @@ describe('pageFromPathname', () => {
     }
   });
 
+  it('keeps inherited object-key names out of the label vocabulary', () => {
+    const inherited = ['constructor', 'toString', 'hasOwnProperty', '__proto__'];
+    for (const section of inherited) {
+      expect(pageFromPathname(`/gastown/${townId}/${section}`, townId)).toBe('other');
+    }
+  });
+
   it('labels org-scoped town routes', () => {
     expect(pageFromPathname(`/organizations/org-9/gastown/${townId}/merges`, townId)).toBe(
       'merges'

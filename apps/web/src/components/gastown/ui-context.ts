@@ -71,7 +71,8 @@ export function pageFromPathname(pathname: string, townId: string): string {
   if (section === 'rigs') {
     return rigId && RIG_ID_PATTERN.test(rigId) ? `rig-detail (rigId: ${rigId})` : 'rigs';
   }
-  return SECTION_PAGES[section] ? section : UNKNOWN_PAGE;
+  // Own properties only: inherited names such as `toString` are not page labels.
+  return Object.hasOwn(SECTION_PAGES, section) ? section : UNKNOWN_PAGE;
 }
 
 function drawerResourceToXml(resource: ResourceRef): string {

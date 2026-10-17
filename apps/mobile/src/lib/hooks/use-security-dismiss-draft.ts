@@ -36,16 +36,13 @@ const SecurityDismissDraftSchema = z.object({
 
 export type SecurityDismissDraft = z.infer<typeof SecurityDismissDraftSchema>;
 
-/** Runtime shape guard for a persisted dismiss draft, passed to `loadDraft`. */
+/**
+ * Runtime shape guard for a persisted dismiss draft, passed to `loadDraft`.
+ * Pure: a draft recorded before `lastErrorKey` existed has no field to narrow,
+ * so consumers default a missing key to null where they read it.
+ */
 export function isSecurityDismissDraft(value: unknown): value is SecurityDismissDraft {
-  const result = SecurityDismissDraftSchema.safeParse(value);
-  if (!result.success) {
-    return false;
-  }
-  // A draft recorded before `lastErrorKey` existed reads back without the
-  // field; re-assign the schema's default so consumers always see it.
-  Object.assign(value as object, result.data);
-  return true;
+  return SecurityDismissDraftSchema.safeParse(value).success;
 }
 
 type SecurityDismissDraftController = {
@@ -143,9 +140,11 @@ export type SecurityDismissFailure = {
  */
 export function securityDismissFailureCopy(draft: {
   lastError: string | null;
-  lastErrorKey: string | null;
+  lastErrorKey: string | null | undefined;
 }): string {
-  return draft.lastErrorKey === null ? (draft.lastError ?? '') : i18n.t(draft.lastErrorKey);
+  // A draft recorded before the key existed reads back without the field.
+  const key = draft.lastErrorKey ?? null;
+  return key === null ? (draft.lastError ?? '') : i18n.t(key);
 }
 
 /**
@@ -173,7 +172,8 @@ export async function listSecurityDismissFailures(
       failures.push({
         findingId,
         lastError: draft.lastError,
-        lastErrorKey: draft.lastErrorKey,
+        // A draft recorded before the key existed reads back without it.
+        lastErrorKey: draft.lastErrorKey ?? null,
         retryable: draft.retryable,
       });
     }

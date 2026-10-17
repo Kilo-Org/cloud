@@ -284,13 +284,14 @@ describe('useSecurityDismissDraft refresh and flush', () => {
     });
     await waitFor(() => latest?.draft?.lastError === 'boom');
 
+    // A legacy draft recorded before `lastErrorKey` existed has no field.
     expect(latest?.draft).toEqual({
       reason: 'not_used',
       comment: '',
       lastError: 'boom',
-      lastErrorKey: null,
       retryable: true,
     });
+    expect('lastErrorKey' in (latest?.draft ?? {})).toBe(false);
   });
 
   it('flushes the pending write on unmount so a kill inside the window does not drop it', async () => {

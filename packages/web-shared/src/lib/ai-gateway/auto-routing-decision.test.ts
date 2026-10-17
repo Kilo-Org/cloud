@@ -407,12 +407,34 @@ describe('fetchCustomRouterDecision', () => {
     });
   });
 
-  it('reports an internal worker error as unavailable', async () => {
-    mockedFetch.mockResolvedValueOnce(errorResponse('internal_error', 500));
+  it.each([
+    ['internal_error', 500],
+    ['unauthorized', 401],
+    ['forbidden', 403],
+    ['quota_exceeded', 429],
+    ['invalid_request', 400],
+  ])(
+    'reports the worker %s error as unavailable instead of passing it to the caller',
+    async (code, status) => {
+      const onError = jest.fn();
+      mockedFetch.mockResolvedValueOnce(errorResponse(code, status));
 
-    expect(await fetchCustomRouterDecision(customParams(), options)).toEqual({
-      kind: 'unavailable',
-    });
+      expect(await fetchCustomRouterDecision(customParams(), { ...options, onError })).toEqual({
+        kind: 'unavailable',
+      });
+      expect(onError).toHaveBeenCalledWith('Efficient auto decision request failed', {
+        error: `status ${status}`,
+      });
+    }
+  );
+
+  it('does not log an expected router rejection as a failure', async () => {
+    const onError = jest.fn();
+    mockedFetch.mockResolvedValueOnce(errorResponse('router_not_found', 404));
+
+    await fetchCustomRouterDecision(customParams(), { ...options, onError });
+
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it.each([

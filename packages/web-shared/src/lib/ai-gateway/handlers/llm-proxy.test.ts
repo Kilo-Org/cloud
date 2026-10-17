@@ -2561,6 +2561,18 @@ describe('custom routers and signed auto decisions', () => {
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     });
 
+    it('rejects a decision header that names an auto model id', async () => {
+      const response = await requestWithDecision(
+        { model: 'kilo-auto/custom/mine' },
+        'kilo-auto/custom/mine'
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ error: { reason: 'auto_model' } });
+      expect(mockedFetchCustomRouterDecision).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
     it('answers 503 when the gateway has no decision secret', async () => {
       mockDecisionSecret = '';
 

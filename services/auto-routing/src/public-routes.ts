@@ -29,6 +29,7 @@ import {
   authenticateCaller,
   CustomRouterError,
   customRouterErrorResponse,
+  DEPENDENCY_RETRY_AFTER_SECONDS,
   loadPayerBalanceUsd,
   loadOrganizationBalanceUsd,
   type Caller,
@@ -104,16 +105,36 @@ export const publicDecideHandler = publicHandler(async c => {
   requirePaidUsageBalance(balanceUsd);
   // The organization model policy filters gateway entries for any router used in that
   // organization's context, including a member's personal router.
-  const deniedModelIds =
+  const gatewayModelIds = router.entries.flatMap(entry =>
+    entry.kind === 'gateway' ? [entry.model] : []
+  );
+  const policyDeniedModelIds =
     caller.organizationId === null
       ? []
       : await deniedOrganizationModelIds(c.env, {
           userId: caller.userId,
           organizationId: caller.organizationId,
-          modelIds: router.entries.flatMap(entry =>
-            entry.kind === 'gateway' ? [entry.model] : []
-          ),
+          modelIds: gatewayModelIds,
         });
+  // An unreadable policy admits no gateway entry. The listed client entries can still serve;
+  // without one the request is retryable, not a permanently unavailable router.
+  if (
+    policyDeniedModelIds === null &&
+    !router.entries.some(
+      entry =>
+        entry.kind === 'client' &&
+        request.clientEntries.some(
+          listed => listed.provider === entry.provider && listed.model === entry.model
+        )
+    )
+  ) {
+    throw new CustomRouterError(
+      'internal_error',
+      'Organization model policy is temporarily unavailable',
+      DEPENDENCY_RETRY_AFTER_SECONDS
+    );
+  }
+  const deniedModelIds = policyDeniedModelIds ?? gatewayModelIds;
 
   const body = { model: request.model, messages: request.messages, tools: request.tools };
   const input = normalizeClassifierInput('chat_completions', body);

@@ -272,7 +272,7 @@ export class TownDO extends DurableObject<Env> {
       emitEvent: data => this.emitEvent(data),
       prepareContainerBilling: async () => {
         await this.prepareContainerBilling();
-        if (isContainerUsageMeteringEnabled(this.env) && !this.containerStartsBlocked()) {
+        if (!this.containerStartsBlocked()) {
           await getTownContainerStub(this.env, this.townId).warmUp();
         }
       },
@@ -2855,14 +2855,12 @@ export class TownDO extends DurableObject<Env> {
       });
     }
 
-    if (isContainerUsageMeteringEnabled(this.env) && this.containerStartsBlocked()) {
+    if (this.containerStartsBlocked()) {
       logger.warn('sendMayorMessage: container starts blocked, not starting container', {
         townId,
       });
       return { agentId: mayor.id, sessionStatus: 'idle' };
     }
-
-    await getTownContainerStub(this.env, townId).warmUp();
 
     const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
@@ -3073,14 +3071,12 @@ export class TownDO extends DurableObject<Env> {
 
     logger.setTags({ agentId: mayor.id });
 
-    if (isContainerUsageMeteringEnabled(this.env) && this.containerStartsBlocked()) {
+    if (this.containerStartsBlocked()) {
       logger.warn('ensureMayor: container starts blocked, not starting container', {
         townId,
       });
       return { agentId: mayor.id, sessionStatus: 'idle' };
     }
-
-    await getTownContainerStub(this.env, townId).warmUp();
 
     // Check if the container is already running AND the SDK has a live
     // session for the mayor. The SDK can be torn down (serverPort=0,

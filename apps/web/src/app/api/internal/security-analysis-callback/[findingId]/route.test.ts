@@ -110,10 +110,18 @@ describe('security analysis callback rollback ingress', () => {
     const request = await callbackRequest();
     jest.useFakeTimers();
     try {
-      mockFetch.mockImplementation(() => new Promise<Response>(() => {}));
+      let fetchStarted!: () => void;
+      const started = new Promise<void>(resolve => {
+        fetchStarted = resolve;
+      });
+      mockFetch.mockImplementation(() => {
+        // Resolves once the bounded fetch armed its budget timer.
+        fetchStarted();
+        return new Promise<Response>(() => {});
+      });
 
       const pending = POST(request, { params: Promise.resolve({ findingId }) });
-      await jest.advanceTimersByTimeAsync(0);
+      await started;
       await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
 
       const response = await pending;

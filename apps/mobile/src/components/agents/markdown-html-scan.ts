@@ -126,11 +126,11 @@ function paragraphBreaks(value: string): number[] {
 }
 
 /**
- * Code spans one scan looks for before it stops. Past the budget the rest of the
- * value is copied verbatim, so the number of spans a render assembles is bounded
- * and the HTML in the rest renders through the HTML engine. The copy runs from
- * the trip point to the end, so a tag the HTML engine opened before the trip
- * point closes there too: nothing in the rest is re-read as markup.
+ * Code spans one scan looks for before it stops. Past the budget no further code
+ * span is looked for, so the number of spans a render assembles is bounded. The
+ * rest carries the `unclosed` shape: with no element open the tree reader skips
+ * it whole (copied verbatim), and inside an open element it is text the reader
+ * keeps scanning, so an open element's close tag still parses as markup.
  */
 const MAX_CODE_SPANS = 4096;
 
@@ -194,9 +194,8 @@ export function scanMarkdownCode(value: string): MaskRange[] {
       }
     } else if (char === '`') {
       if (spans === MAX_CODE_SPANS) {
-        // The rest is copied verbatim: no further code span is looked for, and
-        // the HTML it holds renders through the HTML engine like any other HTML
-        // markdown cannot express. An unclosed span, not a bare range: a bare
+        // No further code span is looked for, so the HTML in the rest renders
+        // through the HTML engine. An unclosed span, not a bare range: a bare
         // one would swallow an open element's close tag, which parses as a real
         // close tag in the previous scan.
         ranges.push({ start: index, end: value.length, unclosed: true });

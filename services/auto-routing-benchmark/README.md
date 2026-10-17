@@ -731,10 +731,11 @@ entry keys the owner's CLI measures); this worker has no PostgreSQL access.
   provider, model, variant, engine identity, and repetitions. They hold a rollup of the
   owner's uploads: accuracy, errors, timeouts, mean cost, p50/p95 latency, and per-route
   summaries. `client_case_results` keeps each uploaded output with its cost, duration,
-  exit code, timeout flag, score, and grader cost. Each row also carries a `revision`,
-  incremented whenever a replacement overwrites a stored case: the rollup is written only
-  if every stored upload still carries the revision the view was computed from, so a
-  concurrent upload's newer view is never overwritten by a stale one. Client rows never
+  exit code, timeout flag, score, and grader cost. Each upload takes the next value of the
+  profile's `upload_seq` as its `revision`, so revisions never repeat, even after a case is
+  deleted and uploaded again: the rollup is written only if every stored upload still
+  carries the revision the view was computed from, so a stale view never overwrites a
+  newer one. A failed grader charge deletes only the upload with its own revision. Client rows never
   feed the platform table and are never copied into `benchmark_profiles`.
 - A client profile is `ready` once one uploaded case ran without error, `failed` once every
   planned case repetition was uploaded and none did, and `pending` otherwise. Latency comes

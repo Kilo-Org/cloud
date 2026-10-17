@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "999b6855-bfe6-499e-a17e-2325654a33dc",
+  "id": "09819ac0-dfe3-423d-91f4-ee97b6918685",
   "prevId": "9047be3f-3c00-4ccb-bb58-304425bdf40e",
   "tables": {
     "benchmark_config": {
@@ -704,7 +704,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1
+          "default": 0
         }
       },
       "indexes": {},
@@ -884,6 +884,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'[]'"
+        },
+        "upload_seq": {
+          "name": "upload_seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "created_at": {
           "name": "created_at",

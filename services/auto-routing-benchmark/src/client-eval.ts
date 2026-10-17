@@ -227,7 +227,7 @@ export async function gradeClientEvalResult(
     throw new ClientEvalError('internal_error', 'The grader is unavailable; retry the upload.');
   }
 
-  const saved = await saveClientCaseResult(db, {
+  const revision = await saveClientCaseResult(db, {
     profile_id: profile.id,
     case_id: request.caseId,
     rep: request.rep,
@@ -241,7 +241,7 @@ export async function gradeClientEvalResult(
     grader_cost_usd: grade.costUsd,
     uploaded_at: nowIso,
   });
-  if (!saved) {
+  if (revision === null) {
     await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
     return { score: (await getClientCase(db, caseKey))?.score ?? grade.score };
   }
@@ -271,7 +271,7 @@ export async function gradeClientEvalResult(
         () => false
       );
     if (!billed) {
-      await deleteClientCaseUpload(db, { ...caseKey, uploadedAt: nowIso });
+      await deleteClientCaseUpload(db, { ...caseKey, revision });
       await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
       throw new ClientEvalError(
         'internal_error',

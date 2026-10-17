@@ -18,8 +18,17 @@ export const DECIDER_CLI_TIMEOUT_MS = 180_000;
 // Appended to every decider prompt: the agent harness tends to wrap answers
 // in prose ("The output is: ..."), which strict mechanical checks reject.
 // One uniform instruction across all candidate models keeps grading fair.
-export const FINAL_ANSWER_SUFFIX =
+const FINAL_ANSWER_SUFFIX =
   '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
+
+/**
+ * The exact `kilo run` prompt for a decider case. The CLI has no system-prompt flag, so the
+ * system prompt is folded in. The platform container and client evals (ADR 0005) both send
+ * this string, so their measurements in one custom router share byte-identical prompts.
+ */
+export function deciderCliPrompt(benchCase: Pick<DeciderCase, 'systemPrompt' | 'userPrompt'>) {
+  return `${benchCase.systemPrompt}\n\n${benchCase.userPrompt}${FINAL_ANSWER_SUFFIX}`;
+}
 
 export function isRetryableContainerAvailabilityError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -46,9 +55,7 @@ export type ContainerRunResponse = {
  * Run one decider case through the `kilo` CLI inside a Cloudflare Container.
  *
  * `instanceName` is the precomputed DO instance name; the caller owns the
- * keying so chunks for the same model/repetition share a stable instance. The
- * CLI has no system-prompt flag, so we fold the system prompt into the user
- * prompt.
+ * keying so chunks for the same model/repetition share a stable instance.
  */
 export async function runDeciderCaseViaCli(
   env: Env,
@@ -74,7 +81,7 @@ export async function runDeciderCaseViaCli(
   const { instanceName, model, benchCase, kiloToken, kiloApiUrl, orgId } = params;
   const variant = params.variant !== undefined ? params.variant : (params.reasoningEffort ?? null);
   const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(instanceName));
-  const prompt = `${benchCase.systemPrompt}\n\n${benchCase.userPrompt}${FINAL_ANSWER_SUFFIX}`;
+  const prompt = deciderCliPrompt(benchCase);
 
   const startedAt = Date.now();
   const response = await stub.fetch(

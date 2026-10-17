@@ -439,8 +439,9 @@ export type ClientEvalCaseRequest = z.infer<typeof ClientEvalCaseRequestSchema>;
 export const ClientEvalCaseResponseSchema = z.object({
   caseId: CaseIdSchema,
   baseRouter: AutoRouterSchema,
-  systemPrompt: z.string(),
-  userPrompt: z.string(),
+  // The exact `kilo run` prompt the platform container sends for this case. The CLI must pass it
+  // verbatim so client and platform measurements in one custom router share byte-identical prompts.
+  prompt: z.string().min(1),
   timeoutMs: z.number().int().positive(),
 });
 export type ClientEvalCaseResponse = z.infer<typeof ClientEvalCaseResponseSchema>;

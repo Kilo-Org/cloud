@@ -26,9 +26,7 @@ describe('parseImageLoadUrl', () => {
   const encoded = encodeURIComponent('https://example.com/a b.png');
 
   it('decodes the payload of a gated image Load link', () => {
-    expect(parseImageLoadUrl(`kilo-image-load:${encoded}`)).toBe(
-      'https://example.com/a b.png'
-    );
+    expect(parseImageLoadUrl(`kilo-image-load:${encoded}`)).toBe('https://example.com/a b.png');
   });
 
   it('returns null for a link without the scheme', () => {
@@ -37,7 +35,7 @@ describe('parseImageLoadUrl', () => {
 
   it.each(['kilo-image-load:%', 'kilo-image-load:%E0%A4%A'])(
     'returns null for a malformed percent escape %s',
-    (url) => {
+    url => {
       expect(() => decodeURIComponent(url.slice('kilo-image-load:'.length))).toThrow();
       expect(parseImageLoadUrl(url)).toBeNull();
     }

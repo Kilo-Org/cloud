@@ -499,6 +499,9 @@ export const clientProfiles = sqliteTable(
       .$type<BenchmarkModelSummary[]>()
       .notNull()
       .default(sql`'[]'`),
+    // Last upload revision handed out for this profile. Never decreases, so a case deleted
+    // and uploaded again gets a revision no earlier rollup view has seen.
+    upload_seq: integer('upload_seq').notNull().default(0),
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
@@ -534,9 +537,9 @@ export const clientCaseResults = sqliteTable(
     score: real('score').notNull(),
     grader_cost_usd: real('grader_cost_usd').notNull(),
     uploaded_at: text('uploaded_at').notNull(),
-    // Per-upload version, incremented whenever a stored case is replaced. Two uploads can
-    // share a millisecond, so this is what tells a rollup view apart from the uploads it saw.
-    revision: integer('revision').notNull().default(1),
+    // This upload's revision from the profile's `upload_seq`, unique within the profile even
+    // across same-millisecond uploads and delete-and-reinsert; the rollup guard compares it.
+    revision: integer('revision').notNull().default(0),
   },
   table => [primaryKey({ columns: [table.profile_id, table.case_id, table.rep] })]
 );

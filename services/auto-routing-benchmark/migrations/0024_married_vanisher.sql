@@ -12,6 +12,7 @@ CREATE TABLE `profile_remeasures` (
 --> statement-breakpoint
 CREATE INDEX `IDX_profile_remeasures_run` ON `profile_remeasures` (`run_id`);--> statement-breakpoint
 ALTER TABLE `case_results` ADD `prompt_revision` integer DEFAULT 1 NOT NULL;--> statement-breakpoint
-ALTER TABLE `client_case_results` ADD `revision` integer DEFAULT 1 NOT NULL;--> statement-breakpoint
+ALTER TABLE `client_case_results` ADD `revision` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE `client_profiles` ADD `upload_seq` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE `pending_decider_outputs` ADD `prompt_revision` integer DEFAULT 1 NOT NULL;--> statement-breakpoint
 ALTER TABLE `scheduler_executions` ADD `prompt_revision` integer DEFAULT 1 NOT NULL;

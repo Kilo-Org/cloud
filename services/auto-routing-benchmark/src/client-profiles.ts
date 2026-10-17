@@ -163,39 +163,51 @@ export async function getClientCase(
 }
 
 /**
- * Store an upload, replacing a stored case that did not run. Returns false when a
- * case that ran is already stored, for example by a concurrent upload.
+ * Store an upload under the profile's next upload revision, replacing a stored case that
+ * did not run. Returns the stored revision, or null when a case that ran is already
+ * stored, for example by a concurrent upload.
  */
 export async function saveClientCaseResult(
   db: D1Database,
   row: Omit<ClientCaseResultRow, 'revision'>
-): Promise<boolean> {
-  const result = await drizzle(db)
-    .insert(clientCaseResults)
-    .values({ ...row, revision: 1 })
-    .onConflictDoUpdate({
-      target: [clientCaseResults.profile_id, clientCaseResults.case_id, clientCaseResults.rep],
-      set: {
-        route_key: row.route_key,
-        output: row.output,
-        cost_usd: row.cost_usd,
-        duration_ms: row.duration_ms,
-        exit_code: row.exit_code,
-        timed_out: row.timed_out,
-        score: row.score,
-        grader_cost_usd: row.grader_cost_usd,
-        uploaded_at: row.uploaded_at,
-        revision: sql`${clientCaseResults.revision} + 1`,
-      },
-      setWhere: not(ranSuccessfully),
-    });
-  return (result.meta.changes ?? 0) > 0;
+): Promise<number | null> {
+  const orm = drizzle(db);
+  const [, stored] = await orm.batch([
+    orm
+      .update(clientProfiles)
+      .set({ upload_seq: sql`${clientProfiles.upload_seq} + 1` })
+      .where(eq(clientProfiles.id, row.profile_id)),
+    orm
+      .insert(clientCaseResults)
+      .values({
+        ...row,
+        revision: sql`(SELECT ${clientProfiles.upload_seq} FROM ${clientProfiles} WHERE ${clientProfiles.id} = ${row.profile_id})`,
+      })
+      .onConflictDoUpdate({
+        target: [clientCaseResults.profile_id, clientCaseResults.case_id, clientCaseResults.rep],
+        set: {
+          route_key: row.route_key,
+          output: row.output,
+          cost_usd: row.cost_usd,
+          duration_ms: row.duration_ms,
+          exit_code: row.exit_code,
+          timed_out: row.timed_out,
+          score: row.score,
+          grader_cost_usd: row.grader_cost_usd,
+          uploaded_at: row.uploaded_at,
+          revision: sql`excluded.revision`,
+        },
+        setWhere: not(ranSuccessfully),
+      })
+      .returning({ revision: clientCaseResults.revision }),
+  ]);
+  return stored[0]?.revision ?? null;
 }
 
-/** Remove one upload, matched by its upload time, after its grading could not be billed. */
+/** Remove one upload, matched by its revision, after its grading could not be billed. */
 export async function deleteClientCaseUpload(
   db: D1Database,
-  key: { profileId: string; caseId: string; rep: number; uploadedAt: string }
+  key: { profileId: string; caseId: string; rep: number; revision: number }
 ): Promise<void> {
   await drizzle(db)
     .delete(clientCaseResults)
@@ -204,7 +216,7 @@ export async function deleteClientCaseUpload(
         eq(clientCaseResults.profile_id, key.profileId),
         eq(clientCaseResults.case_id, key.caseId),
         eq(clientCaseResults.rep, key.rep),
-        eq(clientCaseResults.uploaded_at, key.uploadedAt)
+        eq(clientCaseResults.revision, key.revision)
       )
     );
 }

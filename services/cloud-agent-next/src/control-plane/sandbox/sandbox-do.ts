@@ -290,7 +290,8 @@ import type {
   GetWorktreeFileOutput,
   RefreshWorktreeChangesOutput,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
-import type { WorktreeChangesReady, WorktreeRecovery } from '../../shared/worktree-changes-wire.js';
+import type { WorktreeRecovery } from '../../shared/worktree-changes-wire.js';
+import type { WorktreeChangesReady } from '../worktree-changes-ready.js';
 import type { WorktreeChangesContext } from '../../sandbox-session/worktree-changes.js';
 import { buildNativeEgressAllowlist } from '../../sandbox-control/egress-policy.js';
 import { nativeEgressAllowlistSchema } from '../../sandbox-containers/egress-policy.js';

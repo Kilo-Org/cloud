@@ -12,7 +12,7 @@ import type {
   ControlPlaneRouteUpdate,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { Env } from '../../../src/types.js';
-import type { WorktreeChangesReady } from '../../../src/shared/worktree-changes-wire.js';
+import type { WorktreeChangesReady } from '../../../src/control-plane/worktree-changes-ready.js';
 
 export type RecordedRouteUpdate = { sessionId: string; update: ControlPlaneRouteUpdate };
 export type RecordedEvents = { sessionId: string; notification: ControlPlaneEventsNotification };

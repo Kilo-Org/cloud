@@ -134,7 +134,7 @@ import {
 import {
   worktreeChangesReadySchema,
   type WorktreeChangesReady,
-} from '../../shared/worktree-changes-wire.js';
+} from '../worktree-changes-ready.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
 import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';

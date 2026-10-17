@@ -7,7 +7,6 @@ import type {
   WorktreeSnapshotCapture as PublicWorktreeSnapshotCapture,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import { z } from 'zod';
-import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 
 export const MAX_WORKTREE_CHANGES_FILES = 1_000;
 export const MAX_WORKTREE_CHANGES_BYTES = 256 * 1024;
@@ -63,11 +62,6 @@ function hasAtMostLines(text: string, limit: number): boolean {
 }
 
 const revisionSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
-export const worktreeChangesReadySchema = z
-  .object({ worktreeId: cloudAgentWorktreeIdSchema, revision: revisionSchema })
-  .strict();
-export type WorktreeChangesReady = z.infer<typeof worktreeChangesReadySchema>;
-
 const commitSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
 const baseRefSchema = z
   .string()

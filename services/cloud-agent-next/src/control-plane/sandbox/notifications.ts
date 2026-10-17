@@ -3,7 +3,7 @@ import type {
   ControlPlaneOutcome,
   ControlPlaneRouteUpdate,
 } from '../../shared/control-plane-protocol.js';
-import type { WorktreeChangesReady } from '../../shared/worktree-changes-wire.js';
+import type { WorktreeChangesReady } from '../worktree-changes-ready.js';
 
 export const SANDBOX_NOTIFICATION_LIMITS = {
   count: 1_000,

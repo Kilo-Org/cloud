@@ -6,6 +6,7 @@ import {
   getBenchmarkRoutingTable,
   getBenchmarkRegistry,
   requeueBenchmarkRegistry,
+  registerOwnerBenchmarkProfiles,
 } from './auto-routing-benchmark-admin-client';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -253,5 +254,53 @@ describe('auto routing benchmark admin client', () => {
       'https://benchmark-worker.example.com/admin/registry/requeue?router=frontier',
       'https://benchmark-worker.example.com/admin/routing-table?router=frontier',
     ]);
+  });
+
+  it('registers owner profiles for the requested base router', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ statuses: [] }),
+    });
+
+    const result = await registerOwnerBenchmarkProfiles({
+      router: 'frontier',
+      ownerType: 'org',
+      ownerId: 'org-1',
+      entries: [{ model: 'anthropic/claude-sonnet-4' }],
+    });
+
+    expect(result).toEqual({ ok: true });
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      'https://benchmark-worker.example.com/admin/profiles/register?router=frontier'
+    );
+    expect(JSON.parse(init.body as string)).toEqual({
+      router: 'frontier',
+      ownerType: 'org',
+      ownerId: 'org-1',
+      entries: [{ model: 'anthropic/claude-sonnet-4' }],
+    });
+  });
+
+  it('keeps the worker error for a rejected profile registration', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'Custom profiles are only supported by the efficient router' }),
+    });
+
+    const result = await registerOwnerBenchmarkProfiles({
+      router: 'frontier',
+      ownerType: 'user',
+      ownerId: 'user-1',
+      entries: [{ model: 'anthropic/claude-sonnet-4' }],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      error: { error: 'Custom profiles are only supported by the efficient router' },
+    });
   });
 });

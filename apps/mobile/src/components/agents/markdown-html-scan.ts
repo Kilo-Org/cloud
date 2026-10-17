@@ -128,7 +128,9 @@ function paragraphBreaks(value: string): number[] {
 /**
  * Code spans one scan looks for before it stops. Past the budget the rest of the
  * value is copied verbatim, so the number of spans a render assembles is bounded
- * and the HTML in the rest renders through the HTML engine.
+ * and the HTML in the rest renders through the HTML engine. The copy runs from
+ * the trip point to the end, so a tag the HTML engine opened before the trip
+ * point closes there too: nothing in the rest is re-read as markup.
  */
 const MAX_CODE_SPANS = 4096;
 

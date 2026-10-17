@@ -46,16 +46,18 @@ describe('deployment pseudonym key', () => {
 
   /**
    * Replaces `process.env` for the rest of the test, dropping the deployment
-   * key unless the test sets it. Restored by `afterEach`.
+   * key and the Vercel environment unless the test sets them. Restored by
+   * `afterEach`.
    */
   function useEnv(overrides: {
     NODE_ENV?: NodeJS.ProcessEnv['NODE_ENV'];
+    VERCEL_ENV?: string;
     AI_GATEWAY_PSEUDONYM_KEY?: string;
   }) {
     jest.restoreAllMocks();
     const nextEnv = { ...process.env, ...overrides };
-    if (!('AI_GATEWAY_PSEUDONYM_KEY' in overrides)) {
-      delete nextEnv.AI_GATEWAY_PSEUDONYM_KEY;
+    for (const name of ['AI_GATEWAY_PSEUDONYM_KEY', 'VERCEL_ENV'] as const) {
+      if (!(name in overrides)) delete nextEnv[name];
     }
     return jest.replaceProperty(process, 'env', nextEnv as NodeJS.ProcessEnv);
   }
@@ -75,11 +77,20 @@ describe('deployment pseudonym key', () => {
   });
 
   it('refuses to pseudonymize in production without the deployment key', () => {
-    useEnv({ NODE_ENV: 'production' });
+    useEnv({ NODE_ENV: 'production', VERCEL_ENV: 'production' });
 
     expect(() => generateProviderSpecificHash(testUserId, OPENROUTER)).toThrow(
       /Missing required environment variable AI_GATEWAY_PSEUDONYM_KEY/
     );
+  });
+
+  it('keys the non-production fallback on a preview deployment that has no deployment key', () => {
+    useEnv({ NODE_ENV: 'test' });
+    const fallbackHash = generateProviderSpecificHash(testUserId, OPENROUTER);
+
+    useEnv({ NODE_ENV: 'production', VERCEL_ENV: 'preview' });
+
+    expect(generateProviderSpecificHash(testUserId, OPENROUTER)).toBe(fallbackHash);
   });
 
   it('keys a non-production fallback that differs from a configured deployment key', () => {

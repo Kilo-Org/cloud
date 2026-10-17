@@ -15,16 +15,19 @@ const PSEUDONYM_KEY_ENV_VAR = 'AI_GATEWAY_PSEUDONYM_KEY';
 
 /**
  * The literal that keyed these identifiers before the variable above existed.
- * Development, preview and test keep it so local databases, fixtures and tests
- * stay stable. Production throws instead of falling back: an unkeyed hash is
- * reproducible by anyone who can read this file.
+ * Development, preview and test keep the same fallback key so they share one
+ * known non-production value; the identifiers themselves change, because the
+ * construction is now an HMAC. Production throws instead of falling back.
  */
 const NON_PRODUCTION_PSEUDONYM_KEY = 'd20250815';
 
 function getPseudonymKey(): string {
   const configured = getEnvVariable(PSEUDONYM_KEY_ENV_VAR).trim();
   if (configured) return configured;
-  if (process.env.NODE_ENV === 'production') {
+  // A Vercel preview deployment also runs with `NODE_ENV=production`, so the
+  // Vercel environment wins when it is present; outside Vercel the process mode
+  // decides.
+  if ((process.env.VERCEL_ENV ?? process.env.NODE_ENV) === 'production') {
     throw new Error(
       `Missing required environment variable ${PSEUDONYM_KEY_ENV_VAR}; run \`pnpm web:env set ${PSEUDONYM_KEY_ENV_VAR}\` so upstream pseudonyms are keyed with a deployment secret`
     );

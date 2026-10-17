@@ -202,7 +202,9 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
       mode: settings.mode ?? DEFAULT_AUTO_ROUTING_MODE,
       models: settings.pool.map(entry => entry.model),
     };
-    if (!CustomRouterEntriesSchema.safeParse(convertedOwnerPoolRouter(conversion).entries).success) {
+    if (
+      !CustomRouterEntriesSchema.safeParse(convertedOwnerPoolRouter(conversion).entries).success
+    ) {
       invalidPool.push(ownerKey);
       continue;
     }

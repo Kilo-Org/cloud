@@ -166,10 +166,22 @@ describe(`POST ${OWNER_POOL_CONVERSION_PATH}`, () => {
 
     test.each([
       ['other entries', { mode: 'best_accuracy', base: 'efficient', models: [FLASH] }],
-      ['the same size and another model', { mode: 'best_accuracy', base: 'efficient', models: [SONNET, 'openai/gpt-5'] }],
-      ['the same entries in another mode', { mode: 'cost_per_accuracy', base: 'efficient', models: [SONNET, FLASH] }],
-      ['the same entries on another base', { mode: 'best_accuracy', base: 'frontier', models: [SONNET, FLASH] }],
-      ['the same entries and another default', { mode: 'best_accuracy', base: 'efficient', models: [FLASH, SONNET] }],
+      [
+        'the same size and another model',
+        { mode: 'best_accuracy', base: 'efficient', models: [SONNET, 'openai/gpt-5'] },
+      ],
+      [
+        'the same entries in another mode',
+        { mode: 'cost_per_accuracy', base: 'efficient', models: [SONNET, FLASH] },
+      ],
+      [
+        'the same entries on another base',
+        { mode: 'best_accuracy', base: 'frontier', models: [SONNET, FLASH] },
+      ],
+      [
+        'the same entries and another default',
+        { mode: 'best_accuracy', base: 'efficient', models: [FLASH, SONNET] },
+      ],
     ] as const)(
       'reports slug_taken when the owner has its own efficient router with %s',
       async (_label, own) => {

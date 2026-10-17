@@ -96,15 +96,10 @@ describe('classifyOrganizationEntitlement', () => {
   it.each([
     'active',
     'pending_cancel',
-    'incomplete',
-    'incomplete_expired',
     'trialing',
     'past_due',
-    'canceled',
-    'unpaid',
-    'paused',
   ] satisfies OrganizationSeatPurchaseSubscriptionStatus[])(
-    'treats %s seat purchases as paid entitlement until ended',
+    'treats %s seat purchases as a paying subscription',
     subscriptionStatus => {
       expect(classify({}, subscriptionStatus)).toMatchObject({
         bypassReason: 'paid_seat_purchase',
@@ -116,13 +111,32 @@ describe('classifyOrganizationEntitlement', () => {
     }
   );
 
-  it('does not treat ended seat purchases as paid entitlement', () => {
-    expect(classify({}, 'ended')).toMatchObject({
-      bypassReason: null,
-      displayStatus: 'trial_expired_hard',
-      hasEntitlement: false,
+  it.each([
+    'incomplete',
+    'incomplete_expired',
+    'canceled',
+    'unpaid',
+    'paused',
+    'ended',
+  ] satisfies OrganizationSeatPurchaseSubscriptionStatus[])(
+    'keeps trial enforcement for %s seat purchases',
+    subscriptionStatus => {
+      expect(classify({}, subscriptionStatus)).toMatchObject({
+        bypassReason: null,
+        displayStatus: 'trial_expired_hard',
+        hasEntitlement: false,
+        hasPaidSeatEntitlement: false,
+        isTrialExpiredForEnforcement: true,
+      });
+    }
+  );
+
+  it('reports require_seats_disabled when require_seats is off and no paying subscription exists', () => {
+    expect(classify({ require_seats: false }, 'incomplete')).toMatchObject({
+      bypassReason: 'require_seats_disabled',
+      displayStatus: 'subscribed',
+      hasEntitlement: true,
       hasPaidSeatEntitlement: false,
-      isTrialExpiredForEnforcement: true,
     });
   });
 

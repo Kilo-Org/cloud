@@ -166,28 +166,37 @@ describe(`POST ${OWNER_POOL_CONVERSION_PATH}`, () => {
 
     test.each([
       ['other entries', { mode: 'best_accuracy' as const, models: [FLASH] }],
-      ['the same entries in another mode', { mode: 'cost_per_accuracy' as const, models: [SONNET, FLASH] }],
-    ])('reports slug_taken when the owner has its own efficient router with %s', async (_label, own) => {
-      await db.insert(auto_routing_custom_routers).values({
-        owned_by_user_id: user.id,
-        created_by_user_id: user.id,
-        slug: 'efficient',
-        name: 'My own',
-        base_router: 'efficient',
-        mode: own.mode,
-        entries: own.models.map(model => ({ kind: 'gateway' as const, model })),
-        default_entry_key: customRouterEntryKey({ kind: 'gateway', model: own.models[0] ?? FLASH }),
-      });
-      const [ownRouter] = await routers();
+      [
+        'the same entries in another mode',
+        { mode: 'cost_per_accuracy' as const, models: [SONNET, FLASH] },
+      ],
+    ])(
+      'reports slug_taken when the owner has its own efficient router with %s',
+      async (_label, own) => {
+        await db.insert(auto_routing_custom_routers).values({
+          owned_by_user_id: user.id,
+          created_by_user_id: user.id,
+          slug: 'efficient',
+          name: 'My own',
+          base_router: 'efficient',
+          mode: own.mode,
+          entries: own.models.map(model => ({ kind: 'gateway' as const, model })),
+          default_entry_key: customRouterEntryKey({
+            kind: 'gateway',
+            model: own.models[0] ?? FLASH,
+          }),
+        });
+        const [ownRouter] = await routers();
 
-      const results = await convert(userConversion(user));
+        const results = await convert(userConversion(user));
 
-      expect(results).toEqual([
-        expect.objectContaining({ outcome: 'slug_taken', noticesSent: 0, noticesFailed: 0 }),
-      ]);
-      expect(await routers()).toEqual([ownRouter]);
-      expect(mockedSendViaMailgun).not.toHaveBeenCalled();
-    });
+        expect(results).toEqual([
+          expect.objectContaining({ outcome: 'slug_taken', noticesSent: 0, noticesFailed: 0 }),
+        ]);
+        expect(await routers()).toEqual([ownRouter]);
+        expect(mockedSendViaMailgun).not.toHaveBeenCalled();
+      }
+    );
 
     test('reports failed for one conversion without failing the rest of the batch', async () => {
       const other = await insertTestUser();

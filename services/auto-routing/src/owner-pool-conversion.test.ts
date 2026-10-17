@@ -19,6 +19,8 @@ function objectIdFor(name: string): string {
 }
 
 const stored = new Map<string, StoredOwnerSettings | Error>();
+const marked = new Map<string, string>();
+let markError: Error | null = null;
 const dbFrom = vi.fn();
 const dbLimit = vi.fn();
 let ownerRows: string[] = [];
@@ -35,23 +37,32 @@ const env = {
     get: (id: { toString(): string }) => ({
       readStoredSettings: async () => {
         const value = stored.get(id.toString());
-        if (value === undefined) return { mode: null, pool: null, invalidPool: false };
+        if (value === undefined) return storedSettings({ mode: null, pool: null });
         if (value instanceof Error) throw value;
         return value;
+      },
+      markConverted: async (at: string) => {
+        if (markError) throw markError;
+        marked.set(id.toString(), at);
       },
     }),
   },
 };
 
+function storedSettings(
+  settings: Pick<StoredOwnerSettings, 'mode' | 'pool'> & Partial<StoredOwnerSettings>
+): StoredOwnerSettings {
+  return { invalidMode: false, invalidPool: false, convertedAt: null, ...settings };
+}
+
 function setOwner(
   ownerType: 'user' | 'org',
   id: string,
-  settings: Omit<StoredOwnerSettings, 'invalidPool'> | Error,
-  invalidPool = false
+  settings: (Pick<StoredOwnerSettings, 'mode' | 'pool'> & Partial<StoredOwnerSettings>) | Error
 ) {
   stored.set(
     objectIdFor(`${ownerType}:${id}`),
-    settings instanceof Error ? settings : { ...settings, invalidPool }
+    settings instanceof Error ? settings : storedSettings(settings)
   );
   return objectIdFor(`${ownerType}:${id}`);
 }
@@ -106,6 +117,8 @@ function respondCreated() {
 
 beforeEach(() => {
   stored.clear();
+  marked.clear();
+  markError = null;
   ownerRows = [];
   dbFrom.mockReset();
   dbLimit.mockReset();
@@ -148,7 +161,11 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     const modeOnly = setOwner('user', 'u3', { mode: 'best_accuracy', pool: null });
     const failed = setOwner('user', 'u4', new Error('storage unavailable'));
     const orgId = setOwner('org', 'u1', { mode: null, pool: [{ model: 'org/model' }] });
-    const invalid = setOwner('user', 'u5', { mode: 'best_accuracy', pool: null }, true);
+    const invalid = setOwner('user', 'u5', {
+      mode: 'best_accuracy',
+      pool: null,
+      invalidPool: true,
+    });
     ownerRows = ['u1', 'u2', 'u3', 'u4', 'u5'];
 
     const response = await scan({
@@ -164,15 +181,19 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
       scanned: 5,
       nextCursor: 'u5',
       matchedObjectIds: [withMode, withoutMode, modeOnly, failed, invalid],
+      alreadyConverted: 0,
       conversions: 2,
       droppedModeOnly: 1,
       readFailed: ['user:u4'],
       invalidPool: ['user:u5'],
+      invalidMode: [],
       needsAttention: [],
       outcomes: { ...NO_OUTCOMES, created: 2 },
       noticesSent: 2,
       noticesFailed: 0,
+      aborted: false,
     });
+    expect([...marked.keys()]).toEqual([withMode, withoutMode]);
     expect(dbFrom).toHaveBeenCalledWith(kilocode_users);
     expect(dbLimit).toHaveBeenCalledWith(5);
     expect(webFetch).toHaveBeenCalledTimes(1);
@@ -277,14 +298,140 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
   it.each([
     ['a non-2xx response', async () => new Response('boom', { status: 502 })],
     ['an invalid response', async () => Response.json({ results: [] })],
-  ])('fails the scan with 500 on %s', async (_label, respond) => {
+    ['a network error', async () => Promise.reject(new Error('connection reset'))],
+  ])('aborts the page with 503 and reports every owner failed on %s', async (_label, respond) => {
     const id = setOwner('user', 'u1', { mode: null, pool: [{ model: 'a/b' }] });
     ownerRows = ['u1'];
     webFetch.mockImplementation(respond);
 
     const response = await scan({ ownerType: 'user', objectIds: [id], after: null, dryRun: false });
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      aborted: true,
+      needsAttention: ['failed user:u1'],
+      outcomes: { ...NO_OUTCOMES, failed: 1 },
+    });
+    expect(marked.size).toBe(0);
+  });
+
+  it('keeps and marks the batches that succeeded when a later batch fails, without posting the rest', async () => {
+    ownerRows = Array.from({ length: 60 }, (_, index) => `u${String(index).padStart(3, '0')}`);
+    const objectIds = ownerRows.map(id =>
+      setOwner('user', id, { mode: null, pool: [{ model: 'a/b' }] })
+    );
+    const created = webFetch.getMockImplementation();
+    let calls = 0;
+    webFetch.mockImplementation(async (url, init) => {
+      calls += 1;
+      if (calls === 1 && created) return created(url, init);
+      return new Response('boom', { status: 500 });
+    });
+
+    const response = await scan({ ownerType: 'user', objectIds, after: null, dryRun: false });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      aborted: true,
+      outcomes: { ...NO_OUTCOMES, created: 25, failed: 35 },
+    });
+    expect(marked.size).toBe(25);
+    expect(webFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('aborts when the endpoint reports every conversion of a batch failed', async () => {
+    ownerRows = Array.from({ length: 30 }, (_, index) => `u${String(index).padStart(3, '0')}`);
+    const objectIds = ownerRows.map(id =>
+      setOwner('user', id, { mode: null, pool: [{ model: 'a/b' }] })
+    );
+    webFetch.mockImplementation(async (_url, init) =>
+      Response.json({
+        results: requestBody(init).conversions.map(conversion => ({
+          owner: conversion.owner,
+          outcome: 'failed',
+          modelId: 'kilo-auto/custom/efficient',
+          noticesSent: 0,
+          noticesFailed: 0,
+        })),
+      })
+    );
+
+    const response = await scan({ ownerType: 'user', objectIds, after: null, dryRun: false });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      aborted: true,
+      outcomes: { ...NO_OUTCOMES, failed: 30 },
+    });
+    expect(webFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips owners an earlier run converted', async () => {
+    const done = setOwner('user', 'u1', {
+      mode: null,
+      pool: [{ model: 'a/b' }],
+      convertedAt: '2026-10-17T00:00:00.000Z',
+    });
+    const fresh = setOwner('user', 'u2', { mode: null, pool: [{ model: 'a/b' }] });
+    ownerRows = ['u1', 'u2'];
+
+    const response = await scan({
+      ownerType: 'user',
+      objectIds: [done, fresh],
+      after: null,
+      dryRun: false,
+    });
+
+    await expect(response.json()).resolves.toMatchObject({ alreadyConverted: 1, conversions: 1 });
+    expect(webRequests()[0]?.conversions.map(conversion => conversion.owner.id)).toEqual(['u2']);
+    expect([...marked.keys()]).toEqual([fresh]);
+  });
+
+  it('reports a pool whose models cannot be gateway entries as invalid and posts nothing for it', async () => {
+    const id = setOwner('user', 'u1', { mode: null, pool: [{ model: 'client:ollama/llama' }] });
+    ownerRows = ['u1'];
+
+    const response = await scan({ ownerType: 'user', objectIds: [id], after: null, dryRun: false });
+
+    await expect(response.json()).resolves.toMatchObject({
+      invalidPool: ['user:u1'],
+      conversions: 0,
+    });
+    expect(webFetch).not.toHaveBeenCalled();
+  });
+
+  it('converts an invalid stored mode with the default mode and lists it', async () => {
+    const id = setOwner('user', 'u1', { mode: null, pool: [{ model: 'a/b' }], invalidMode: true });
+    ownerRows = ['u1'];
+
+    const response = await scan({ ownerType: 'user', objectIds: [id], after: null, dryRun: false });
+
+    await expect(response.json()).resolves.toMatchObject({ invalidMode: ['user:u1'] });
+    expect(webRequests()[0]?.conversions[0]?.mode).toBe('cost_per_accuracy');
+  });
+
+  it('lists owners whose notice failed or whose marker could not be stored', async () => {
+    const id = setOwner('user', 'u1', { mode: null, pool: [{ model: 'a/b' }] });
+    ownerRows = ['u1'];
+    markError = new Error('storage unavailable');
+    webFetch.mockImplementation(async (_url, init) =>
+      Response.json({
+        results: requestBody(init).conversions.map(conversion => ({
+          owner: conversion.owner,
+          outcome: 'created',
+          modelId: 'kilo-auto/custom/efficient',
+          noticesSent: 0,
+          noticesFailed: 1,
+        })),
+      })
+    );
+
+    const response = await scan({ ownerType: 'user', objectIds: [id], after: null, dryRun: false });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      needsAttention: ['notice_failed user:u1', 'mark_failed user:u1'],
+    });
   });
 
   it.each([null, 'Bearer wrong-secret'])('rejects authorization %s', async authorization => {

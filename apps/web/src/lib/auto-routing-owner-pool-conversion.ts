@@ -1,6 +1,7 @@
 import 'server-only';
 
 import {
+  CustomRouterEntriesSchema,
   MAX_CUSTOM_ROUTERS_PER_OWNER,
   convertedOwnerPoolRouter,
   customRouterEntryKey,
@@ -61,6 +62,7 @@ async function insertConvertedRouter(
         entries: auto_routing_custom_routers.entries,
         mode: auto_routing_custom_routers.mode,
         baseRouter: auto_routing_custom_routers.base_router,
+        defaultEntryKey: auto_routing_custom_routers.default_entry_key,
       })
       .from(auto_routing_custom_routers)
       .where(
@@ -69,9 +71,11 @@ async function insertConvertedRouter(
       .limit(1);
     if (sameSlug) {
       const existingKeys = new Set(sameSlug.entries.map(customRouterEntryKey));
+      // Entry order is not compared: routing ranks the whole pool, and the default is compared.
       const holdsPool =
         sameSlug.mode === router.mode &&
         sameSlug.baseRouter === router.baseRouter &&
+        sameSlug.defaultEntryKey === router.defaultEntryKey &&
         existingKeys.size === router.entries.length &&
         router.entries.every(entry => existingKeys.has(customRouterEntryKey(entry)));
       return holdsPool ? 'exists' : 'slug_taken';
@@ -127,6 +131,13 @@ async function sendNotices(
     reportFailure(error);
     return { noticesSent: 0, noticesFailed: 1 };
   }
+  if (recipients.length === 0) {
+    warnExceptInTest('Owner pool conversion notice has no recipient', {
+      ownerType: owner.type,
+      ownerId: owner.id,
+    });
+    return { noticesSent: 0, noticesFailed: 1 };
+  }
 
   const outcomes = await Promise.all(
     recipients.map(async to => {
@@ -164,6 +175,9 @@ async function convertOwnerPool(
   ): OwnerPoolConversionResult => ({ owner, outcome, modelId: router.modelId, ...notices });
 
   try {
+    if (!CustomRouterEntriesSchema.safeParse(router.entries).success) {
+      throw new Error('Converted pool entries are not valid custom router entries');
+    }
     const converted = await findOwner(owner);
     if (!converted) return result('owner_not_found');
 
@@ -173,7 +187,7 @@ async function convertOwnerPool(
         outcome,
         ownerType: owner.type,
         ownerId: owner.id,
-        cap: MAX_CUSTOM_ROUTERS_PER_OWNER,
+        ...(outcome === 'router_cap_reached' ? { cap: MAX_CUSTOM_ROUTERS_PER_OWNER } : {}),
       });
     }
     if (outcome !== 'created') return result(outcome);

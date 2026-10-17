@@ -155,7 +155,7 @@ describe(`POST ${OWNER_POOL_CONVERSION_PATH}`, () => {
       await convert(userConversion(user));
       const [created] = await routers();
 
-      const results = await convert(userConversion(user, [FLASH, SONNET]));
+      const results = await convert(userConversion(user));
 
       expect(results).toEqual([
         expect.objectContaining({ outcome: 'exists', noticesSent: 0, noticesFailed: 0 }),
@@ -165,12 +165,12 @@ describe(`POST ${OWNER_POOL_CONVERSION_PATH}`, () => {
     });
 
     test.each([
-      ['other entries', { mode: 'best_accuracy' as const, models: [FLASH] }],
-      [
-        'the same entries in another mode',
-        { mode: 'cost_per_accuracy' as const, models: [SONNET, FLASH] },
-      ],
-    ])(
+      ['other entries', { mode: 'best_accuracy', base: 'efficient', models: [FLASH] }],
+      ['the same size and another model', { mode: 'best_accuracy', base: 'efficient', models: [SONNET, 'openai/gpt-5'] }],
+      ['the same entries in another mode', { mode: 'cost_per_accuracy', base: 'efficient', models: [SONNET, FLASH] }],
+      ['the same entries on another base', { mode: 'best_accuracy', base: 'frontier', models: [SONNET, FLASH] }],
+      ['the same entries and another default', { mode: 'best_accuracy', base: 'efficient', models: [FLASH, SONNET] }],
+    ] as const)(
       'reports slug_taken when the owner has its own efficient router with %s',
       async (_label, own) => {
         await db.insert(auto_routing_custom_routers).values({
@@ -178,13 +178,10 @@ describe(`POST ${OWNER_POOL_CONVERSION_PATH}`, () => {
           created_by_user_id: user.id,
           slug: 'efficient',
           name: 'My own',
-          base_router: 'efficient',
+          base_router: own.base,
           mode: own.mode,
           entries: own.models.map(model => ({ kind: 'gateway' as const, model })),
-          default_entry_key: customRouterEntryKey({
-            kind: 'gateway',
-            model: own.models[0] ?? FLASH,
-          }),
+          default_entry_key: customRouterEntryKey({ kind: 'gateway', model: own.models[0] }),
         });
         const [ownRouter] = await routers();
 
@@ -197,6 +194,14 @@ describe(`POST ${OWNER_POOL_CONVERSION_PATH}`, () => {
         expect(mockedSendViaMailgun).not.toHaveBeenCalled();
       }
     );
+
+    test('reports failed and writes nothing for a pool model that cannot be a gateway entry', async () => {
+      const results = await convert(userConversion(user, ['client:ollama/llama']));
+
+      expect(results).toEqual([expect.objectContaining({ outcome: 'failed' })]);
+      expect(await routers()).toHaveLength(0);
+      expect(mockedSendViaMailgun).not.toHaveBeenCalled();
+    });
 
     test('reports failed for one conversion without failing the rest of the batch', async () => {
       const other = await insertTestUser();

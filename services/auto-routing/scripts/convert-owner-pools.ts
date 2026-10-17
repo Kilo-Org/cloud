@@ -1,7 +1,9 @@
 import { parseArgs } from 'node:util';
 import {
   OWNER_POOL_CONVERSION_SCAN_PATH,
+  OwnerPoolConversionOutcomeSchema,
   OwnerPoolConversionScanResponseSchema,
+  type OwnerPoolConversionOutcome,
   type OwnerPoolConversionScanResponse,
 } from '@kilocode/auto-routing-contracts';
 
@@ -75,15 +77,17 @@ async function listStoredObjectIds(
   return ids;
 }
 
-function parseResume(value: string | undefined): { ownerType: OwnerType; cursor: string } | null {
+// `<type>:` with an empty cursor starts that owner type from its first id.
+function parseResume(
+  value: string | undefined
+): { ownerType: OwnerType; cursor: string | null } | null {
   if (value === undefined) return null;
   const separator = value.indexOf(':');
-  const ownerType = value.slice(0, separator);
-  const cursor = value.slice(separator + 1);
-  if (separator < 1 || !cursor || !OWNER_TYPES.includes(ownerType as OwnerType)) {
-    throw new Error('--resume must be <user|org>:<cursor>');
+  const ownerType = OWNER_TYPES.find(type => type === value.slice(0, separator));
+  if (separator < 1 || ownerType === undefined) {
+    throw new Error('--resume must be <user|org>:<cursor> (an empty cursor starts that type)');
   }
-  return { ownerType: ownerType as OwnerType, cursor };
+  return { ownerType, cursor: value.slice(separator + 1) || null };
 }
 
 async function main(): Promise<void> {
@@ -121,50 +125,69 @@ async function main(): Promise<void> {
   console.log(`Listed ${objectIds.length} ${CLASS_NAME} objects with stored data`);
 
   const matched = new Set<string>();
-  const outcomes: Record<string, number> = {};
+  const outcomes = Object.fromEntries(
+    OwnerPoolConversionOutcomeSchema.options.map(outcome => [outcome, 0])
+  ) as Record<OwnerPoolConversionOutcome, number>;
   const readFailed: string[] = [];
   const invalidPool: string[] = [];
+  const invalidMode: string[] = [];
   const needsAttention: string[] = [];
+  let alreadyConverted = 0;
   let conversions = 0;
   let droppedModeOnly = 0;
   let noticesSent = 0;
   let noticesFailed = 0;
+  const add = (result: OwnerPoolConversionScanResponse) => {
+    for (const id of result.matchedObjectIds) matched.add(id);
+    for (const outcome of OwnerPoolConversionOutcomeSchema.options) {
+      outcomes[outcome] += result.outcomes[outcome] ?? 0;
+    }
+    readFailed.push(...result.readFailed);
+    invalidPool.push(...result.invalidPool);
+    invalidMode.push(...result.invalidMode);
+    needsAttention.push(...result.needsAttention);
+    alreadyConverted += result.alreadyConverted;
+    conversions += result.conversions;
+    droppedModeOnly += result.droppedModeOnly;
+    noticesSent += result.noticesSent;
+    noticesFailed += result.noticesFailed;
+  };
 
   const startIndex = resume ? OWNER_TYPES.indexOf(resume.ownerType) : 0;
   for (const ownerType of OWNER_TYPES.slice(startIndex)) {
     let after: string | null = resume?.ownerType === ownerType ? resume.cursor : null;
     do {
-      const resumeHint =
-        after === null ? 'a rerun without --resume' : `--resume ${ownerType}:${after}`;
-      let result: OwnerPoolConversionScanResponse;
+      // Converted owners are marked in their Durable Object, so retrying a page skips them.
+      const retryHint = `retry with --resume ${ownerType}:${after ?? ''}`;
+      let response: Response;
+      let body: unknown;
       try {
-        const response = await fetch(target, {
+        response = await fetch(target, {
           method: 'POST',
           headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
           body: JSON.stringify({ ownerType, objectIds, after, limit, dryRun }),
           signal: AbortSignal.timeout(300_000),
           redirect: 'error',
         });
-        if (!response.ok) throw new Error(`scan responded ${response.status}`);
-        result = OwnerPoolConversionScanResponseSchema.parse(await response.json());
+        body = await response.json();
       } catch (error) {
         const reason = error instanceof Error ? error.message : 'scan failed';
-        throw new Error(`${reason}; retry with ${resumeHint} (conversions are idempotent)`);
+        throw new Error(`${reason}; ${retryHint}`);
       }
-      for (const id of result.matchedObjectIds) matched.add(id);
-      for (const [outcome, count] of Object.entries(result.outcomes)) {
-        outcomes[outcome] = (outcomes[outcome] ?? 0) + count;
+      const result = OwnerPoolConversionScanResponseSchema.safeParse(body);
+      if (!result.success) {
+        throw new Error(`scan responded ${response.status} without a summary; ${retryHint}`);
       }
-      readFailed.push(...result.readFailed);
-      invalidPool.push(...result.invalidPool);
-      needsAttention.push(...result.needsAttention);
-      conversions += result.conversions;
-      droppedModeOnly += result.droppedModeOnly;
-      noticesSent += result.noticesSent;
-      noticesFailed += result.noticesFailed;
-      after = result.nextCursor;
+      add(result.data);
+      if (result.data.aborted) {
+        console.error(
+          `The web endpoint failed a whole batch; owners needing attention so far:\n${needsAttention.join('\n')}`
+        );
+        throw new Error(`scan aborted; ${retryHint}`);
+      }
+      after = result.data.nextCursor;
       console.log(
-        `${ownerType}: scanned ${result.scanned}, matched ${result.matchedObjectIds.length}, conversions ${result.conversions}; cursor ${after === null ? 'done' : `${ownerType}:${after}`}`
+        `${ownerType}: scanned ${result.data.scanned}, matched ${result.data.matchedObjectIds.length}, conversions ${result.data.conversions}; cursor ${after === null ? 'done' : `${ownerType}:${after}`}`
       );
     } while (after !== null);
   }
@@ -177,11 +200,13 @@ async function main(): Promise<void> {
         listed: objectIds.length,
         matched: matched.size,
         unmatched: unmatched?.length ?? 'not audited on a resumed run',
+        alreadyConverted,
         conversions,
         outcomes,
         droppedModeOnly,
         readFailed,
         invalidPool,
+        invalidMode,
         needsAttention,
         noticesSent,
         noticesFailed,
@@ -200,12 +225,13 @@ async function main(): Promise<void> {
   const clean =
     readFailed.length === 0 &&
     invalidPool.length === 0 &&
+    invalidMode.length === 0 &&
     needsAttention.length === 0 &&
     noticesFailed === 0 &&
     (unmatched?.length ?? 0) === 0;
   if (!clean) {
     console.error(
-      'Some owners need attention; see readFailed, invalidPool, needsAttention, and unmatched.'
+      'Some owners need attention; see readFailed, invalidPool, invalidMode, needsAttention, and unmatched.'
     );
     process.exitCode = 1;
   }

@@ -5,7 +5,9 @@ function createModeDO(initial: Record<string, unknown>) {
   const entries = new Map(Object.entries(initial));
   const storage = {
     get: vi.fn(async (keys: string[]) => new Map(keys.map(key => [key, entries.get(key)]))),
-    put: vi.fn(),
+    put: vi.fn(async (key: string, value: unknown) => {
+      entries.set(key, value);
+    }),
     delete: vi.fn(),
     transaction: vi.fn(),
   };
@@ -16,31 +18,35 @@ function createModeDO(initial: Record<string, unknown>) {
   return { modeDO, storage, entries };
 }
 
-describe('AutoRoutingModeConfigDO.readStoredSettings', () => {
+const NOTHING_STORED = {
+  mode: null,
+  pool: null,
+  invalidMode: false,
+  invalidPool: false,
+  convertedAt: null,
+};
+
+describe('AutoRoutingModeConfigDO', () => {
   it('returns nulls when nothing is stored', async () => {
     const { modeDO } = createModeDO({});
-    await expect(modeDO.readStoredSettings()).resolves.toEqual({
-      mode: null,
-      pool: null,
-      invalidPool: false,
-    });
+    await expect(modeDO.readStoredSettings()).resolves.toEqual(NOTHING_STORED);
   });
 
   it('returns the stored mode and pool in pool order', async () => {
     const pool = [{ model: 'b/chat' }, { model: 'a/chat' }];
     const { modeDO } = createModeDO({ mode: 'best_accuracy', pool });
     await expect(modeDO.readStoredSettings()).resolves.toEqual({
+      ...NOTHING_STORED,
       mode: 'best_accuracy',
       pool,
-      invalidPool: false,
     });
   });
 
-  it('drops an invalid mode and flags an invalid pool instead of treating it as absent', async () => {
+  it('flags an invalid stored mode and pool instead of treating them as absent', async () => {
     const { modeDO } = createModeDO({ mode: 'fastest', pool: [{ model: '' }] });
     await expect(modeDO.readStoredSettings()).resolves.toEqual({
-      mode: null,
-      pool: null,
+      ...NOTHING_STORED,
+      invalidMode: true,
       invalidPool: true,
     });
   });
@@ -51,13 +57,25 @@ describe('AutoRoutingModeConfigDO.readStoredSettings', () => {
     });
 
     await expect(modeDO.readStoredSettings()).resolves.toEqual({
-      mode: null,
+      ...NOTHING_STORED,
       pool: [{ model: 'a/chat' }, { model: 'b/chat' }],
-      invalidPool: false,
     });
     expect(entries.get('pool')).toHaveLength(3);
     expect(storage.put).not.toHaveBeenCalled();
     expect(storage.delete).not.toHaveBeenCalled();
     expect(storage.transaction).not.toHaveBeenCalled();
+  });
+
+  it('records the conversion and reports it on later reads, keeping the stored pool', async () => {
+    const pool = [{ model: 'a/chat' }];
+    const { modeDO } = createModeDO({ pool });
+
+    await modeDO.markConverted('2026-10-17T00:00:00.000Z');
+
+    await expect(modeDO.readStoredSettings()).resolves.toEqual({
+      ...NOTHING_STORED,
+      pool,
+      convertedAt: '2026-10-17T00:00:00.000Z',
+    });
   });
 });

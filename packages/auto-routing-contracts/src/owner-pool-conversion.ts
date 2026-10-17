@@ -81,16 +81,24 @@ export const OwnerPoolConversionScanResponseSchema = z.object({
   scanned: z.number().int().nonnegative(),
   nextCursor: z.string().nullable(),
   matchedObjectIds: z.array(z.string()),
+  // Owners an earlier run already converted; they are skipped.
+  alreadyConverted: z.number().int().nonnegative(),
   conversions: z.number().int().nonnegative(),
   droppedModeOnly: z.number().int().nonnegative(),
   // `<ownerType>:<ownerId>` keys.
   readFailed: z.array(z.string()),
   invalidPool: z.array(z.string()),
-  // `<outcome> <ownerType>:<ownerId>` for every OWNER_POOL_CONVERSION_ATTENTION_OUTCOMES result.
+  // Converted with the default mode because the stored mode was invalid.
+  invalidMode: z.array(z.string()),
+  // `<reason> <ownerType>:<ownerId>`: every OWNER_POOL_CONVERSION_ATTENTION_OUTCOMES result,
+  // `notice_failed` when an owner got no notice, and `mark_failed` when the conversion marker
+  // could not be stored.
   needsAttention: z.array(z.string()),
   outcomes: z.record(OwnerPoolConversionOutcomeSchema, z.number().int().nonnegative()),
   noticesSent: z.number().int().nonnegative(),
   noticesFailed: z.number().int().nonnegative(),
+  // The web endpoint failed a whole batch; the rest of the page was not posted.
+  aborted: z.boolean(),
 });
 export type OwnerPoolConversionScanResponse = z.infer<typeof OwnerPoolConversionScanResponseSchema>;
 

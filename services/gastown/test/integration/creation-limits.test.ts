@@ -1,6 +1,10 @@
 import { env, runDurableObjectAlarm } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
-import { MAX_RIGS_PER_TOWN, MAX_TOWNS_PER_OWNER, WATCHDOG_BATCH_SIZE } from '../../src/dos/creation-limits';
+import {
+  MAX_RIGS_PER_TOWN,
+  MAX_TOWNS_PER_OWNER,
+  WATCHDOG_BATCH_SIZE,
+} from '../../src/dos/creation-limits';
 
 function getUserStub(name: string) {
   return env.GASTOWN_USER.get(env.GASTOWN_USER.idFromName(name));
@@ -16,9 +20,9 @@ describe('GastownUserDO creation limits', () => {
     for (let i = 0; i < MAX_TOWNS_PER_OWNER; i++) {
       await stub.createTown({ name: `t${i}`, owner_user_id: 'u1' });
     }
-    await expect(
-      stub.createTown({ name: 'over', owner_user_id: 'u1' })
-    ).rejects.toThrow(/maximum number of towns/);
+    await expect(stub.createTown({ name: 'over', owner_user_id: 'u1' })).rejects.toThrow(
+      /maximum number of towns/
+    );
   });
 
   it('should free capacity when a town is deleted', async () => {

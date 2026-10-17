@@ -107,9 +107,7 @@ export class GastownUserDO extends DurableObject<Env> {
   }
 
   private countTowns(): number {
-    const rows = [
-      ...query(this.sql, /* sql */ `SELECT COUNT(*) AS n FROM ${user_towns}`, []),
-    ];
+    const rows = [...query(this.sql, /* sql */ `SELECT COUNT(*) AS n FROM ${user_towns}`, [])];
     return rows.length > 0 ? Number((rows[0] as Record<string, unknown>).n ?? 0) : 0;
   }
 

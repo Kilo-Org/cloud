@@ -3,7 +3,15 @@ import type {
   OrganizationEntitlementBypassReason,
   OrganizationEntitlementClassification,
   OrganizationEntitlementInput,
+  OrganizationSeatPurchaseSubscriptionStatus,
 } from './types';
+
+const PAID_SEAT_ENTITLEMENT_STATUSES: readonly OrganizationSeatPurchaseSubscriptionStatus[] = [
+  'active',
+  'trialing',
+  'past_due',
+  'pending_cancel',
+];
 
 export function classifyOrganizationEntitlement({
   organization,
@@ -17,7 +25,8 @@ export function classifyOrganizationEntitlement({
   );
   const trialStatus = getOrgTrialStatusFromDays(daysRemaining);
   const hasPaidSeatEntitlement =
-    latestSeatPurchaseStatus != null && latestSeatPurchaseStatus !== 'ended';
+    latestSeatPurchaseStatus != null &&
+    PAID_SEAT_ENTITLEMENT_STATUSES.includes(latestSeatPurchaseStatus);
 
   let bypassReason: OrganizationEntitlementBypassReason = null;
   if (hasPaidSeatEntitlement) {

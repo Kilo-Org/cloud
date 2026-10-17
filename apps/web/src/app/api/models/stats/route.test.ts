@@ -102,10 +102,12 @@ describe('GET /api/models/stats', () => {
     expect(dynamic).toBe('force-dynamic');
   });
 
-  test('filters active rows without changing database order or flags', async () => {
+  test('filters to public rows without changing database order or flags', async () => {
     entries = [
       entry({ id: 'null', codingIndex: null }),
       entry({ id: 'inactive', isActive: false, codingIndex: '100' }),
+      entry({ id: 'stealth', isStealth: true, codingIndex: '90' }),
+      entry({ id: 'internal', openrouterId: 'kilo-internal/stats-list', codingIndex: '88' }),
       entry({ id: 'high', codingIndex: '95.5' }),
       entry({ id: 'medium', codingIndex: '85.3' }),
       entry({ id: 'null-active', isActive: null }),
@@ -167,8 +169,6 @@ describe('GET /api/models/stats', () => {
   });
 
   test.each([
-    { isStealth: true },
-    { openrouterId: 'kilo-internal/stats-list' },
     { benchmarks: { ...siblings, enkrypt: { ...benchmark, ingestedAt: 'invalid' } } },
     {
       benchmarks: {
@@ -176,12 +176,21 @@ describe('GET /api/models/stats', () => {
         enkrypt: { ...benchmark, ingestedAt: '2026-08-27T00:00:00.001Z' },
       },
     },
-  ])('withholds nonpublic or malformed Enkrypt %j', async overrides => {
+  ])('withholds malformed Enkrypt %j', async overrides => {
     entries = [entry(overrides)];
     const [model] = await models();
     expect(model.benchmarks).toEqual(siblings);
     expect(model.openrouterData).not.toHaveProperty('enkrypt');
   });
+
+  test.each([{ isStealth: true }, { openrouterId: 'kilo-internal/stats-list' }])(
+    'omits nonpublic row %j from the payload entirely',
+    async overrides => {
+      entries = [entry(overrides), entry({ id: 'public' })];
+      const data: ModelStats[] = await models();
+      expect(data.map(stat => stat.id)).toEqual(['public']);
+    }
+  );
 
   test('withholds scores from an expired snapshot even when the model metadata is returned', async () => {
     jest

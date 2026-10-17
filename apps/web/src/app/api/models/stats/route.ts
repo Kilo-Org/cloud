@@ -1,7 +1,10 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { publishEnkryptModelStats } from '@kilocode/web-shared/lib/model-stats/enkrypt-publication';
+import {
+  publishEnkryptModelStats,
+  isEnkryptPublicModel,
+} from '@kilocode/web-shared/lib/model-stats/enkrypt-publication';
 import { getModelStatsSnapshot } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 
 export const revalidate = 0;
@@ -11,14 +14,14 @@ const headers = { 'Cache-Control': 'no-store' };
 
 /**
  * GET /api/models/stats
- * Returns all active model statistics
+ * Returns public model statistics
  */
 export async function GET(_request: NextRequest) {
   try {
     const snapshot = await getModelStatsSnapshot();
     return NextResponse.json(
       snapshot.entries
-        .filter(({ stat }) => stat.isActive === true)
+        .filter(({ stat }) => isEnkryptPublicModel(stat))
         .map(({ stat, verification }) => publishEnkryptModelStats(stat, snapshot, verification)),
       { headers }
     );

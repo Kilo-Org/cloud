@@ -745,7 +745,8 @@ pnpm dev:start auto-routing
 
 This brings up the auto-routing worker (:8810), this worker (:8814), and the
 Next.js gateway (:3000). Logs land in `dev/logs/*.log`; the tmux session is
-`kilo-dev-<worktree>`.
+`kilo-dev-<worktree>`. The `predev` script applies this worker's D1 migrations to
+the local database before `wrangler dev` starts, so a fresh stack has every table.
 
 ### Required env / secrets
 
@@ -762,6 +763,21 @@ Next.js gateway (:3000). Logs land in `dev/logs/*.log`; the tmux session is
 ```bash
 SECRET=$(grep '^INTERNAL_API_SECRET=' ../../.env.local | cut -d= -f2- | tr -d '"')
 curl -s http://localhost:8814/admin/config -H "Authorization: Bearer $SECRET"
+```
+
+A fresh local database has no benchmark configuration, and none is fabricated
+(ADR 0002): profile admission, owner-pool tables, custom routers, and client evals
+answer 400 `benchmark config not set` until one is saved. Save one per base router
+you use, with models from your local catalog, through the admin panel's Benchmarks
+tab or this call (repeat with `?router=frontier` for frontier):
+
+```bash
+curl -s -X PUT 'http://localhost:8814/admin/config?router=efficient' \
+  -H "Authorization: Bearer $SECRET" -H 'content-type: application/json' \
+  -H 'x-updated-by: you@kilocode.ai' \
+  -d '{"classifierModels":["<system-one-model>"],"deciderModels":[{"id":"<catalog-model>"}],
+       "minAccuracy":0.7,"switchCostFactor":3,"benchmarkUserId":null,
+       "updatedAt":null,"updatedBy":null}'
 ```
 
 Decider runs use the worker's default benchmark user and org unless
@@ -784,7 +800,9 @@ pnpm typecheck && pnpm test
 ```
 
 Migrations apply on deploy via the `predeploy` hook
-(`wrangler d1 migrations apply auto-routing-benchmark --remote`).
+(`wrangler d1 migrations apply auto-routing-benchmark --remote`), and to the local
+database via the `predev` hook (`--local`; `CI=1` skips wrangler's confirmation prompt,
+which would otherwise block the dev runner's tmux pane).
 
 Inspect local D1 by copying the sqlite out (direct reads often hit miniflare
 locks):

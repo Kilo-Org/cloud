@@ -39,6 +39,8 @@ function currentPrefix(text: string): string | null {
   return result.userPromptPrefix;
 }
 
+const FIXTURE_DIRS = ['apps/web/src/lib/utils/testdata', 'apps/web/src/tests/req_sample'];
+
 function fixtureStrings(): string[] {
   const root = path.resolve(import.meta.dirname, '../../..');
   const strings: string[] = [];
@@ -55,16 +57,11 @@ function fixtureStrings(): string[] {
       Object.values(value).forEach(walk);
     }
   };
-  for (const dir of ['apps/web/src/lib/utils/testdata', 'apps/web/src/tests/req_sample']) {
+  for (const dir of FIXTURE_DIRS) {
     const full = path.join(root, dir);
-    let names: string[];
-    try {
-      names = readdirSync(full);
-    } catch {
-      continue;
-    }
+    const names = readdirSync(full).filter(name => name.endsWith('.json'));
+    expect(names.length, `${dir} lists request fixtures`).toBeGreaterThan(0);
     for (const name of names) {
-      if (!name.endsWith('.json')) continue;
       walk(JSON.parse(readFileSync(path.join(full, name), 'utf-8')));
     }
   }

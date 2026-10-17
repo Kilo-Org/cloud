@@ -1,11 +1,16 @@
+jest.mock('@/lib/slack-bot/model-allow-list', () => ({
+  getDefaultAllowedModel: jest.fn(),
+}));
+
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { platform_integrations } from '@kilocode/db/schema';
+import { organizations, platform_integrations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { PLATFORM, INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
+import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { LinearWorkspaceAlreadyConnectedError, upsertLinearInstallation } from './linear-service';
 
 describe('upsertLinearInstallation', () => {
@@ -163,5 +168,23 @@ describe('upsertLinearInstallation', () => {
     );
 
     expect(calls).toEqual([]);
+  });
+
+  test('stores no model for an organization installation when the resolver returns no model', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `Linear Model Org ${crypto.randomUUID()}` })
+      .returning();
+
+    jest.mocked(getDefaultAllowedModel).mockResolvedValue(null);
+
+    const result = await upsertLinearInstallation({
+      owner: { type: 'org', id: organization.id },
+      organizationId: 'workspace-org',
+      organizationName: 'Workspace Org',
+      botUserId: 'bot-1',
+    });
+
+    expect(result.metadata).not.toHaveProperty('model_slug');
   });
 });

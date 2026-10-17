@@ -2498,6 +2498,7 @@
       "title": "ត្រងវគ្គ",
       "platformCloud": "ក្លោដ",
       "platformExtension": "ផ្នែកបន្ថែម",
+      "platformDesktop": "កុំព្យូទ័រ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

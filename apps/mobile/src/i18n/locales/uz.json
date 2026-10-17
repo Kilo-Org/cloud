@@ -2498,6 +2498,7 @@
       "title": "Sessiyalarni filtrlash",
       "platformCloud": "Bulut",
       "platformExtension": "Kengaytma",
+      "platformDesktop": "Ish stoli",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

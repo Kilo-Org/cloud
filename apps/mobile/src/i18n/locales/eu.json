@@ -2498,6 +2498,7 @@
       "title": "Iragazi saioak",
       "platformCloud": "Hodeia",
       "platformExtension": "Luzapena",
+      "platformDesktop": "Mahaigaina",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

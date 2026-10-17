@@ -2020,6 +2020,7 @@
       "title": "Filtrowanie sesji",
       "platformCloud": "Chmura",
       "platformExtension": "Rozszerzenie",
+      "platformDesktop": "Aplikacja desktopowa",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

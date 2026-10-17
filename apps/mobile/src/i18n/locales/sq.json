@@ -2498,6 +2498,7 @@
       "title": "Filtro seancat",
       "platformCloud": "Reja",
       "platformExtension": "Shtesa",
+      "platformDesktop": "Desktop",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

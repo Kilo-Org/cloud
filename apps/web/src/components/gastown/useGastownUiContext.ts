@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { useDrawerStack, type ResourceRef } from './DrawerStack';
+import { buildContextXml, pageFromPathname, type ActivityEntry } from './ui-context';
 import { getToken } from '@/lib/gastown/trpc';
 
 /**
@@ -14,84 +15,9 @@ import { getToken } from '@/lib/gastown/trpc';
  * when starting a new session.
  */
 
-type ActivityEntry = {
-  timestamp: string;
-  action: 'page_view' | 'object_view';
-  page?: string;
-  objectType?: string;
-  objectId?: string;
-};
-
 const MAX_ACTIVITY_ENTRIES = 10;
 const SYNC_DEBOUNCE_MS = 2_000;
 const SYNC_RETRY_MS = 10_000;
-
-/** Derive a human-readable page label from the pathname. */
-function pageFromPathname(pathname: string, townId: string): string {
-  const base = `/gastown/${townId}`;
-  if (pathname === base) return 'town-overview';
-  const suffix = pathname.slice(base.length + 1);
-  if (suffix.startsWith('rigs/')) {
-    const rigId = suffix.split('/')[1];
-    return rigId ? `rig-detail (rigId: ${rigId})` : 'rigs';
-  }
-  if (suffix.startsWith('beads')) return 'beads';
-  if (suffix.startsWith('agents')) return 'agents';
-  if (suffix.startsWith('merges')) return 'merges';
-  if (suffix.startsWith('mail')) return 'mail';
-  if (suffix.startsWith('observability')) return 'observability';
-  if (suffix.startsWith('settings')) return 'settings';
-  return suffix || 'town-overview';
-}
-
-function drawerResourceToXml(resource: ResourceRef): string {
-  switch (resource.type) {
-    case 'bead':
-      return `<viewing-object type="bead" id="${resource.beadId}" rig-id="${resource.rigId}" />`;
-    case 'agent':
-      return `<viewing-object type="agent" id="${resource.agentId}" rig-id="${resource.rigId}" />`;
-    case 'convoy':
-      return `<viewing-object type="convoy" id="${resource.convoyId}" />`;
-    case 'event':
-      return `<viewing-object type="event" />`;
-  }
-}
-
-function formatAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 60_000) return `${Math.round(diff / 1000)}s ago`;
-  if (diff < 3600_000) return `${Math.round(diff / 60_000)}m ago`;
-  return `${Math.round(diff / 3600_000)}h ago`;
-}
-
-export function buildContextXml(
-  page: string,
-  drawerResource: ResourceRef | null,
-  recentActivity: ActivityEntry[]
-): string {
-  const lines: string[] = ['<user-context>'];
-  lines.push(`  <current-view page="${page}" />`);
-
-  if (drawerResource) {
-    lines.push(`  ${drawerResourceToXml(drawerResource)}`);
-  }
-
-  if (recentActivity.length > 0) {
-    lines.push('  <recent-actions>');
-    for (const entry of recentActivity) {
-      const ago = formatAgo(entry.timestamp);
-      if (entry.action === 'page_view') {
-        lines.push(`    - ${ago}: Navigated to ${entry.page ?? 'unknown'}`);
-      } else if (entry.objectType) {
-        lines.push(`    - ${ago}: Viewed ${entry.objectType} ${entry.objectId ?? ''}`);
-      }
-    }
-    lines.push('  </recent-actions>');
-  }
-
-  lines.push('</user-context>');
-  return lines.join('\n');
-}
 
 /**
  * Hook that tracks the user's dashboard navigation and syncs the context

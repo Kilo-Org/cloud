@@ -2,7 +2,8 @@
 // Select the workspaces whose typecheck and lint results a change can alter.
 //
 // Usage: node scripts/affected-workspaces.mjs <base-sha>
-// Prints JSON: { full, reasons, full_checks, dirs, packages }.
+// Prints JSON: { full, reasons, full_checks, dirs, packages, test_only_dirs,
+// test_only_packages, test_only_files }.
 //
 // A workspace is affected when one of its files changed, or when it reads an
 // affected workspace. A workspace reads another through a workspace:* entry in
@@ -10,6 +11,12 @@
 // or `include` entry, a config alias) that reaches into the other workspace. A
 // workspace also reads every workspace nested inside it. A change that this
 // script cannot attribute to a workspace selects everything (`full: true`).
+//
+// A test file that reads another workspace's files as data (a relative path
+// that is not a module specifier) does not make its workspace affected: the
+// data cannot change its types, lint results or exports. When a file in the
+// workspace it reads changes, only the reader's tests need to run
+// (`test_only_*`), and nothing that reads the reader follows.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { posix } from 'node:path';
@@ -52,6 +59,22 @@ const NEUTRAL = [
 
 const SOURCE_GLOBS = ['ts', 'tsx', 'mts', 'cts', 'js', 'mjs', 'cjs', 'json', 'jsonc'];
 
+const TEST_FILE = /(^|\/)__tests__\/|\.(test|spec)\.[^/]+$/;
+
+// Calls whose first argument is a module specifier.
+const MODULE_CALLS = new Set([
+  'import',
+  'require',
+  'mock',
+  'doMock',
+  'unmock',
+  'doUnmock',
+  'importActual',
+  'importMock',
+  'requireActual',
+  'requireMock',
+]);
+
 const git = (...args) =>
   execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 
@@ -82,14 +105,44 @@ function owner(dirs, file) {
   return best;
 }
 
-// [file, repository path] for every quoted relative path in workspace sources.
+// Whether the quoted literal at `index` is a module specifier: it follows
+// `from` or `import`, or it is the first argument of a MODULE_CALLS call, with
+// or without a type argument (`importActual<typeof import('x')>('x')`).
+export function isModuleSpecifier(text, index) {
+  let i = index - 1;
+  const skipSpace = () => {
+    while (i >= 0 && /\s/.test(text[i])) i--;
+  };
+  skipSpace();
+  const call = text[i] === '(';
+  if (call) {
+    i--;
+    skipSpace();
+    if (text[i] === '>' && text[i - 1] !== '=') {
+      for (let depth = 0; i >= 0; i--) {
+        if (text[i] === '>' && text[i - 1] !== '=') depth++;
+        else if (text[i] === '<' && --depth === 0) break;
+      }
+      i--;
+      skipSpace();
+    }
+  }
+  const end = i + 1;
+  while (i >= 0 && /[\w$]/.test(text[i])) i--;
+  const word = text.slice(i + 1, end);
+  return call ? MODULE_CALLS.has(word) : word === 'from' || word === 'import';
+}
+
+// [file, repository path, read as a path] for every quoted relative path in
+// workspace sources. The last item is false for a module specifier.
 function relativeReferences(dirs) {
   let out = '';
   try {
     out = git(
       'grep',
       '-I',
-      '-o',
+      '-l',
+      '-z',
       '-E',
       `['"](\\.\\./)+[^'"\`$ ]*['"]`,
       '--',
@@ -99,14 +152,14 @@ function relativeReferences(dirs) {
     if (error.status !== 1) throw error;
   }
   const references = [];
-  for (const line of out.split('\n')) {
-    const split = line.indexOf(':');
-    if (split < 0) continue;
-    const file = line.slice(0, split);
-    const literal = line.slice(split + 2, -1).split('*')[0];
-    const target = posix.normalize(posix.join(posix.dirname(file), literal)).replace(/\/$/, '');
-    if (target.startsWith('..')) continue;
-    references.push([file, target]);
+  for (const file of out.split('\0').filter(Boolean)) {
+    const text = readFileSync(file, 'utf8');
+    for (const match of text.matchAll(/['"]((?:\.\.\/)+[^'"`$ \n]*)['"]/g)) {
+      const literal = match[1].split('*')[0];
+      const target = posix.normalize(posix.join(posix.dirname(file), literal)).replace(/\/$/, '');
+      if (target.startsWith('..')) continue;
+      references.push([file, target, !isModuleSpecifier(text, match.index)]);
+    }
   }
   return references;
 }
@@ -139,14 +192,22 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
       dir
     );
   }
-  // Root paths (outside every workspace) that a workspace reads.
+  // Root paths (outside every workspace) that a workspace reads, with the test
+  // file that reads it as data, if one does.
   const rootReads = [];
-  for (const [file, target] of references) {
+  // [reader, workspace, test file]: the test file reads the workspace's files
+  // as data.
+  const testReads = [];
+  for (const [file, target, asPath] of references) {
     const from = owner(dirs, file);
     const to = owner(dirs, target);
-    if (to) read(from, to);
-    else if (from) rootReads.push([target, from]);
+    const testFile = asPath && TEST_FILE.test(file) ? file : null;
+    if (to && testFile) testReads.push([from, to, file]);
+    else if (to) read(from, to);
+    else if (from) rootReads.push([target, from, testFile]);
   }
+  // [reader, test file]: the test file reads changed data.
+  const tested = [];
 
   const reasons = [];
   const fullChecks = new Set();
@@ -155,6 +216,9 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
     const dir = owner(dirs, file);
     if (dir) {
       if (!file.endsWith('.md')) changed.add(dir);
+      for (const [reader, workspace, testFile] of testReads) {
+        if (file.startsWith(`${workspace}/`)) tested.push([reader, testFile]);
+      }
       for (const [pattern, reader] of EXTRA_INPUTS) {
         if (pattern.test(file) && readers.has(reader)) changed.add(reader);
       }
@@ -179,7 +243,10 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
     const rootReaders = rootReads.filter(
       ([target]) => file === target || file.startsWith(`${target}/`)
     );
-    for (const [, reader] of rootReaders) changed.add(reader);
+    for (const [, reader, testFile] of rootReaders) {
+      if (testFile) tested.push([reader, testFile]);
+      else changed.add(reader);
+    }
     const owned = OWNED.find(([pattern]) => pattern.test(file));
     if (owned) changed.add(owned[1]);
     if (owned || rootReaders.length || NEUTRAL.some(pattern => pattern.test(file))) continue;
@@ -195,6 +262,14 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
     affected.add(dir);
     queue.push(...readers.get(dir));
   }
+  // Workspaces that only need their tests run, with the test files that read
+  // changed data.
+  const testOnly = new Map();
+  for (const [reader, file] of tested) {
+    if (reader && !affected.has(reader)) {
+      testOnly.set(reader, (testOnly.get(reader) ?? new Set()).add(file));
+    }
+  }
   return {
     full,
     reasons,
@@ -202,6 +277,9 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
     full_checks: full ? ['lint', 'typecheck'] : [...fullChecks].sort(),
     dirs: [...affected].sort(),
     packages: [...affected].map(dir => nameOf.get(dir)).sort(),
+    test_only_dirs: [...testOnly.keys()].sort(),
+    test_only_packages: [...testOnly.keys()].map(dir => nameOf.get(dir)).sort(),
+    test_only_files: [...testOnly.values()].flatMap(files => [...files]).sort(),
   };
 }
 

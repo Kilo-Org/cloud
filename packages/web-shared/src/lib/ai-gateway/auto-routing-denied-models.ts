@@ -122,6 +122,12 @@ function dataCollectionRequiredCandidates(
   );
 }
 
+export async function dataCollectionRequiredAutoRoutingCandidates(
+  candidateIds: ReadonlyArray<string>
+): Promise<string[]> {
+  return dataCollectionRequiredCandidates(candidateIds, await getDataCollectionRequiredModelIds());
+}
+
 export async function collectDataCollectionRequiredAutoRoutingModelIds(
   owner: AutoRoutingOwner
 ): Promise<string[]> {
@@ -148,9 +154,7 @@ export async function deniedAutoRoutingModelIdsForMember(
     isDataCollectionExplicitlyDisallowed(
       getEffectiveProviderPrivacy(undefined, policy.dataCollection)
     )
-      ? getDataCollectionRequiredModelIds().then(requiredIds =>
-          dataCollectionRequiredCandidates(candidateIds, requiredIds)
-        )
+      ? dataCollectionRequiredAutoRoutingCandidates(candidateIds)
       : [],
   ]);
   return [...new Set([...deniedByPolicy, ...deniedByPrivacy])];

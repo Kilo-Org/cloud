@@ -120,11 +120,7 @@ describe('organization access kilo_admin_elevation telemetry', () => {
         0
       );
       const childOwner = await insertTestUser({ is_admin: false });
-      const child = await createTestOrganization(
-        `child-${crypto.randomUUID()}`,
-        childOwner.id,
-        0
-      );
+      const child = await createTestOrganization(`child-${crypto.randomUUID()}`, childOwner.id, 0);
       await db
         .update(organizations)
         .set({ parent_organization_id: parent.id })

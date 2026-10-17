@@ -64,7 +64,10 @@ describe('dispatchAgent container start gating', () => {
     expect(prepareContainerBilling).not.toHaveBeenCalled();
     expect(getRigConfig).not.toHaveBeenCalled();
     expect(emitEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ event: 'agent.dispatch_failed', reason: 'container starts blocked' })
+      expect.objectContaining({
+        event: 'agent.dispatch_failed',
+        reason: 'container starts blocked',
+      })
     );
   });
 

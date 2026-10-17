@@ -113,6 +113,8 @@ function bitbucketErrorToTrpcError(error: BitbucketReviewError): TRPCError {
       return new TRPCError({ code: 'NOT_FOUND', message: error.message });
     case 'forbidden':
       return new TRPCError({ code: 'FORBIDDEN', message: error.message });
+    case 'reconnect':
+      return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
     case 'bad_request':
       return new TRPCError({ code: 'BAD_REQUEST', message: error.message });
     default:
@@ -261,6 +263,8 @@ function gitlabErrorToTrpcError(error: GitLabReviewError): TRPCError {
       return new TRPCError({ code: 'NOT_FOUND', message: error.message });
     case 'forbidden':
       return new TRPCError({ code: 'FORBIDDEN', message: error.message });
+    case 'reconnect':
+      return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
     case 'bad_request':
       return new TRPCError({ code: 'BAD_REQUEST', message: error.message });
     default:

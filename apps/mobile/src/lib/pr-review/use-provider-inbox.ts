@@ -20,7 +20,10 @@ import { useCallback, useMemo } from 'react';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { useBitbucketReadiness, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useOrganization } from '@/lib/organization-context';
-import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
+import {
+  classifyPrReviewQueryState,
+  type PrReviewQueryState,
+} from '@/lib/pr-review/classify-pr-review-query-state';
 import {
   githubPrRef,
   type ProviderPrPlatform,
@@ -66,7 +69,9 @@ export type MergedProviderInbox = {
   readonly items: readonly ProviderInboxRow[];
   readonly isPending: boolean;
   /** Set only when EVERY enabled provider failed its first page. */
-  readonly firstPageErrorState: ReturnType<typeof classifyPrReviewQueryState> | null;
+  readonly firstPageErrorState: PrReviewQueryState | null;
+  /** Provider of that failure, so the reconnect state re-checks the right one. */
+  readonly firstPageErrorPlatform: ProviderPrPlatform | null;
   /** A later page failed, or one provider failed while another loaded. */
   readonly laterPageError: boolean;
   readonly hasNextPage: boolean;
@@ -143,15 +148,14 @@ export function mergeProviderInboxSources(
   // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; flatMap already copies so nothing shared is mutated
   decorated.sort((left, right) => right.ms - left.ms);
   const items = decorated.map(entry => entry.row);
-  const failed = active.filter(source => source.error !== null && source.error !== undefined);
-  const firstPageFailures = failed.filter(source => !source.hasLoadedPages);
+  const firstPageFailures = active.filter(source => source.error != null && !source.hasLoadedPages);
   const allFailed = active.length > 0 && firstPageFailures.length === active.length;
-  const firstError = firstPageFailures[0]?.error;
   return {
     items,
     isPending: items.length === 0 && active.some(source => source.isPending),
-    firstPageErrorState: allFailed && firstError ? classifyPrReviewQueryState(firstError) : null,
-    laterPageError: !allFailed && failed.length > 0,
+    firstPageErrorState: allFailed ? classifyPrReviewQueryState(firstPageFailures[0]?.error) : null,
+    firstPageErrorPlatform: allFailed ? (firstPageFailures[0]?.platform ?? null) : null,
+    laterPageError: !allFailed && active.some(source => source.error != null),
     hasNextPage: active.some(source => source.hasNextPage),
     isFetchingNextPage: active.some(source => source.isFetchingNextPage),
   };

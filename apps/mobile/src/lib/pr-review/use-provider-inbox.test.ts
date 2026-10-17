@@ -236,7 +236,27 @@ describe('mergeProviderInboxSources', () => {
       source({ platform: 'gitlab', error, hasLoadedPages: false }),
     ]);
     expect(merged.firstPageErrorState).toEqual(classifyPrReviewQueryState(error));
+    // The terminal state belongs to the FIRST failed provider, so the
+    // reconnect notice can re-check that provider instead of GitHub.
+    expect(merged.firstPageErrorPlatform).toBe('github');
     expect(merged.laterPageError).toBe(false);
+  });
+
+  it('names the only enabled provider when it alone fails', () => {
+    const merged = mergeProviderInboxSources([
+      source({ platform: 'gitlab', error: new Error('gitlab down'), hasLoadedPages: false }),
+      source({ platform: 'bitbucket', enabled: false }),
+    ]);
+    expect(merged.firstPageErrorPlatform).toBe('gitlab');
+  });
+
+  it('names no provider when another provider answered', () => {
+    const merged = mergeProviderInboxSources([
+      source({ platform: 'github', rows: githubRows }),
+      source({ platform: 'gitlab', error: new Error('gitlab down'), hasLoadedPages: false }),
+    ]);
+    expect(merged.firstPageErrorState).toBeNull();
+    expect(merged.firstPageErrorPlatform).toBeNull();
   });
 
   it('keeps a working provider visible when another one fails', () => {

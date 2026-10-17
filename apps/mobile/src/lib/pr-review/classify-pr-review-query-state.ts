@@ -12,7 +12,11 @@
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { i18n } from '@/i18n';
 
-type PrReviewQueryState =
+/**
+ * The PR-review error-to-view contract. Owned here so every screen and pure
+ * selector imports the name instead of inferring it from the classifier.
+ */
+export type PrReviewQueryState =
   | {
       /**
        * The fetch failed with a transient error (network, 5xx, etc.). The

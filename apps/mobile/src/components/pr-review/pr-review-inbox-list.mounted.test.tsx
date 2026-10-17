@@ -27,6 +27,8 @@ const inboxState = vi.hoisted(() => ({
     isDraft: boolean;
   }[],
   firstPageErrorState: null as { kind: string } | null,
+  firstPageErrorPlatform: null as 'github' | 'gitlab' | 'bitbucket' | null,
+  organizationId: null as string | null,
   laterPageError: false,
 }));
 
@@ -88,6 +90,9 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
 }));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: inboxState.organizationId }),
+}));
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getPrReviewPath: (owner: string, repo: string, number: number) => `/${owner}/${repo}/${number}`,
 }));
@@ -106,6 +111,7 @@ vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
       updatedAt: item.updatedAt,
     })),
     firstPageErrorState: inboxState.firstPageErrorState,
+    firstPageErrorPlatform: inboxState.firstPageErrorPlatform,
     laterPageError: inboxState.laterPageError,
   }),
 }));
@@ -341,5 +347,34 @@ describe('PrReviewInboxList row metadata (long repository)', () => {
         node => String(node.type) === 'Text' && node.props.children === 'prReview.terms.pullRequest'
       )
     ).toHaveLength(1);
+  });
+});
+
+// The explorer saw an organization member's inbox say "Access denied" when the
+// organization's GitLab connection needed reconnecting. The reconnect state
+// must name THAT provider and its organization, because the notice's
+// connection check has no route scope on this provider-neutral surface and
+// would otherwise re-check GitHub, which cannot fix a GitLab connection.
+describe('PrReviewInboxList reconnect state', () => {
+  beforeEach(() => {
+    insetsState.left = 0;
+    insetsState.right = 0;
+    inboxState.query.isPending = false;
+    inboxState.items = [];
+    inboxState.laterPageError = false;
+    inboxState.firstPageErrorState = { kind: 'reconnect' };
+    inboxState.firstPageErrorPlatform = 'gitlab';
+    inboxState.organizationId = 'org-1';
+  });
+
+  it('passes the failing provider and the organization to the reconnect notice', () => {
+    const renderer = mountInboxList();
+
+    const notices = renderer.root.findAll(node => String(node.type) === 'PrReviewReconnectNotice');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props).toMatchObject({ platform: 'gitlab', organizationId: 'org-1' });
+    // The permission view is the state this fix removes for an organization
+    // member's own inbox.
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
   });
 });

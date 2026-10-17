@@ -634,6 +634,22 @@ export async function listChecks(
 }
 
 /**
+ * The inbox lists the acting account's own review requests, so a provider
+ * permission refusal on that read is the CONNECTION's — there is no
+ * merge-request role in play. Left as `forbidden` it becomes the member's
+ * "you don't have permission to view this" state, which is wrong for someone
+ * who does have organization access; the connection needs reconnecting.
+ */
+function classifyInboxError(error: unknown): GitLabReviewError {
+  const classified = classifyGitLabError(error);
+  if (classified.kind !== 'forbidden') return classified;
+  return new GitLabReviewError(
+    'reconnect',
+    'Your GitLab connection cannot read your review requests. Reconnect GitLab and try again.'
+  );
+}
+
+/**
  * Open merge requests awaiting the acting user's review. Each item carries
  * platform, project path, and the connected instance origin, so the list can
  * never navigate into a different provider's repo.
@@ -643,8 +659,8 @@ export async function listInbox(
   cursor?: string,
   instanceHint?: string
 ): Promise<ProviderPrInboxPage> {
-  const access = await authorizeOwner(owner, instanceHint);
   try {
+    const access = await authorizeOwner(owner, instanceHint);
     const me = await fetchGitLabUser(access.accessToken, access.instanceUrl);
     const identity = `gitlab-inbox:${owner.type === 'user' ? owner.userId : `${owner.organizationId}:${owner.userId}`}`;
     const page = decodePageCursor(cursor, identity);
@@ -672,13 +688,19 @@ export async function listInbox(
     for (const mr of mergeRequests) {
       const ref = inboxRefFrom(mr, access.instanceUrl);
       if (!ref) continue;
+      // The adapter's author type omits `avatar_url`, but the list API
+      // returns it; narrow instead of asserting the field into existence.
+      const avatarUrl =
+        mr.author && 'avatar_url' in mr.author && typeof mr.author.avatar_url === 'string'
+          ? mr.author.avatar_url
+          : null;
       items.push({
         ref,
         title: mr.title,
         author: mr.author
           ? {
               login: mr.author.username,
-              avatarUrl: (mr.author as { avatar_url?: string | null }).avatar_url ?? null,
+              avatarUrl,
             }
           : null,
         state: mapMergeRequestState(mr.state),
@@ -688,7 +710,7 @@ export async function listInbox(
     }
     return { items, nextCursor: cursorForPage(identity, page, mergeRequests.length) };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyInboxError(error);
   }
 }
 

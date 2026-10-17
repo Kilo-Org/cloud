@@ -11,6 +11,7 @@ import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User, OperationLedgerRow } from '@kilocode/db/schema';
 import { providerPrRefKey } from '@kilocode/app-shared/provider-review';
 import { GitLabReviewError } from '@/lib/provider-review/gitlab-authorization';
+import { BitbucketReviewError } from '@/lib/provider-review/bitbucket-authorization';
 import { GITLAB_STALE_HEAD_REASON } from '@/lib/provider-review/gitlab-write';
 import {
   BITBUCKET_AUTO_MERGE_UNSUPPORTED_REASON,
@@ -367,6 +368,39 @@ describe('providerReviewRouter identity derivation', () => {
       expect.any(String),
       undefined
     );
+  });
+});
+
+// ----- provider connection failures -------------------------------------------------
+
+// A provider connection that must be re-established is the mobile reconnect
+// state (PRECONDITION_FAILED), never FORBIDDEN: the member's Kilo access is not
+// what failed.
+describe('providerReviewRouter reconnect classification', () => {
+  it('maps a reconnect-classified GitLab inbox failure to PRECONDITION_FAILED', async () => {
+    gitlabRead.listInbox.mockRejectedValueOnce(new GitLabReviewError('reconnect', 'reconnect it'));
+
+    await expect(
+      caller.listInbox({ platform: 'gitlab', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', message: 'reconnect it' });
+  });
+
+  it('maps a reconnect-classified Bitbucket inbox failure to PRECONDITION_FAILED', async () => {
+    bitbucketRead.listInbox.mockRejectedValueOnce(
+      new BitbucketReviewError('reconnect', 'reconnect it')
+    );
+
+    await expect(
+      caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', message: 'reconnect it' });
+  });
+
+  it('still maps a genuine permission refusal to FORBIDDEN', async () => {
+    gitlabRead.listInbox.mockRejectedValueOnce(new GitLabReviewError('forbidden', 'denied'));
+
+    await expect(
+      caller.listInbox({ platform: 'gitlab', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });
 

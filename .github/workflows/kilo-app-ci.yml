@@ -273,6 +273,10 @@ jobs:
   # step drops from 84 s to 36 s per shard (2 vCPU -> 4 vCPU), against a ~15 s
   # fixed setup that does not change. Four vCPU pays for itself: the mobile row
   # gets shorter while its vCPU-seconds rise by about 2%.
+  #
+  # The label is `vars.RUNNER_MEDIUM_LABEL` (blacksmith-4vcpu-ubuntu-2404, 4 vCPU
+  # and 16 GB; a shard peaks at 0.6 GB). Repo variables are not exposed to fork
+  # pull requests, so the job falls back to `ubuntu-latest` there.
   mobile-test:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.mobile == 'true'

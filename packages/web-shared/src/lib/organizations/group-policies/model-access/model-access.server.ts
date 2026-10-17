@@ -152,10 +152,7 @@ export async function getEffectiveModelDecision(
   if (await isModelRestrictionExempt(modelId)) {
     return { allowed: true };
   }
-  if (
-    policy.memberGrant.mode === 'organization_baseline' &&
-    policy.organizationModelDenyList.includes(normalizedModelId)
-  ) {
+  if (policy.organizationModelDenyList.includes(normalizedModelId)) {
     return { allowed: false, denialSource: 'organization_model' };
   }
   const exclusiveProviders = getKiloExclusiveInferenceProviderRestriction(modelId);
@@ -169,10 +166,9 @@ export async function getEffectiveModelDecision(
     ? new Set(policy.organizationProviderCeiling)
     : undefined;
 
+  // The organization deny list and provider ceiling are hard constraints that no
+  // member grant can exceed; every grant path routes through this decision.
   async function decisionWithinOrganizationBaseline(): Promise<EffectiveModelDecision> {
-    if (policy.organizationModelDenyList.includes(normalizedModelId)) {
-      return { allowed: false, denialSource: 'organization_model' };
-    }
     if (!organizationRoutes) return { allowed: true };
     const modelProviders = currentModelProviders ?? (await providerLookup(modelId));
     if (modelProviders.size === 0) {
@@ -191,23 +187,42 @@ export async function getEffectiveModelDecision(
     return await decisionWithinOrganizationBaseline();
   }
   if (policy.memberGrant.modelAllowList.includes(normalizedModelId)) {
-    return { allowed: true };
+    return await decisionWithinOrganizationBaseline();
   }
   if (policy.memberGrant.providerAllowList.length > 0) {
     const modelProviders = currentModelProviders ?? (await providerLookup(modelId));
     const memberProviders = new Set(policy.memberGrant.providerAllowList);
     const eligibleProviderRoutes = getEligibleProviderRoutes(modelProviders, memberProviders);
+    if (organizationRoutes) {
+      for (const provider of [...eligibleProviderRoutes]) {
+        if (!organizationRoutes.has(provider)) eligibleProviderRoutes.delete(provider);
+      }
+    }
     if (eligibleProviderRoutes.size > 0) {
-      if (policy.memberGrant.includeOrganizationBaseline) {
-        const baselineDecision = await decisionWithinOrganizationBaseline();
-        if (baselineDecision.allowed && !baselineDecision.eligibleProviderRoutes) {
+      const baselineDecision = policy.memberGrant.includeOrganizationBaseline
+        ? await decisionWithinOrganizationBaseline()
+        : undefined;
+      if (baselineDecision) {
+        if (!baselineDecision.allowed) {
           return baselineDecision;
         }
-        baselineDecision.eligibleProviderRoutes?.forEach(provider =>
+        if (!baselineDecision.eligibleProviderRoutes) {
+          return baselineDecision;
+        }
+        baselineDecision.eligibleProviderRoutes.forEach(provider =>
           eligibleProviderRoutes.add(provider)
         );
       }
       return { allowed: true, eligibleProviderRoutes };
+    }
+    if (policy.memberGrant.includeOrganizationBaseline) {
+      const baselineDecision = await decisionWithinOrganizationBaseline();
+      if (baselineDecision.allowed) {
+        return baselineDecision;
+      }
+    }
+    if (organizationRoutes) {
+      return { allowed: false, denialSource: 'organization_provider' };
     }
   }
   if (policy.memberGrant.includeOrganizationBaseline) {

@@ -35,6 +35,7 @@ export type GitLabReviewOwner =
 export type GitLabReviewErrorKind =
   | 'not_found'
   | 'forbidden'
+  | 'reconnect'
   | 'stale_head'
   | 'bad_request'
   | 'retryable';
@@ -67,7 +68,14 @@ export class GitLabApiStatusError extends Error {
   }
 }
 
-/** GitLab status → kind: 404 not_found, 401/403 forbidden, 409 stale head, 5xx/429 retryable. */
+/**
+ * GitLab status → kind: 404 not_found, 401 reconnect, 403 forbidden, 409 stale
+ * head, 5xx/429 retryable.
+ *
+ * A 401 is the credential this layer minted being refused, so the remedy is a
+ * reconnect; 403 is a real refusal of the acting user's GitLab role on the
+ * merge request.
+ */
 export function classifyGitLabStatus(status: number): GitLabReviewError {
   if (status === 404) {
     return new GitLabReviewError(
@@ -75,7 +83,13 @@ export function classifyGitLabStatus(status: number): GitLabReviewError {
       'The GitLab merge request or project was not found, or you do not have access to it.'
     );
   }
-  if (status === 401 || status === 403) {
+  if (status === 401) {
+    return new GitLabReviewError(
+      'reconnect',
+      'Your GitLab connection is no longer valid. Reconnect GitLab and try again.'
+    );
+  }
+  if (status === 403) {
     return new GitLabReviewError(
       'forbidden',
       'Your GitLab role does not allow this action on this merge request.'
@@ -110,7 +124,12 @@ function classifyTrpcError(code: TRPCError['code']): GitLabReviewError {
     case 'NOT_FOUND':
       return new GitLabReviewError('not_found', 'GitLab integration not found.');
     case 'UNAUTHORIZED':
-      return new GitLabReviewError('forbidden', 'Your GitLab connection is no longer valid.');
+      // The credential broker refused the stored credential: the connection
+      // must be re-established. The member's organization access is intact.
+      return new GitLabReviewError(
+        'reconnect',
+        'Your GitLab connection is no longer valid. Reconnect GitLab and try again.'
+      );
     case 'SERVICE_UNAVAILABLE':
       return new GitLabReviewError('retryable', 'GitLab credentials are temporarily unavailable.');
     default:
@@ -205,7 +224,10 @@ async function resolveIntegration(
     );
   }
   if (integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
-    throw new GitLabReviewError('not_found', 'The GitLab connection is no longer active.');
+    throw new GitLabReviewError(
+      'reconnect',
+      'The GitLab connection is no longer active. Reconnect GitLab to continue.'
+    );
   }
 
   const instanceUrl = readInstanceUrl(integration);

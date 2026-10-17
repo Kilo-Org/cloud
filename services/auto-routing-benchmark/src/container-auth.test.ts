@@ -2,6 +2,8 @@ import { EventEmitter } from 'node:events';
 import type { ServerOptions } from 'node:http';
 import { Readable } from 'node:stream';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { deciderCliPrompt } from './cli-runner';
+import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 
 type ContainerChild = EventEmitter & {
   pid: number;
@@ -171,6 +173,28 @@ it('/run sends the prompt on stdin and disables automatic ingest while preservin
     kilo: { type: 'api', key: 'test-benchmark-token', organizationId: 'test-org' },
   });
   mocks.children[0].emit('close', 0);
+  expect((await pending.done).status).toBe(200);
+});
+
+it.each([
+  [
+    'an ordinary case with spaces and quotes',
+    DECIDER_CASES.find(c => !c.longContext && c.userPrompt.includes('"')),
+  ],
+  ['a long-context case over 128 KiB', FRONTIER_CASES.find(c => c.longContext)],
+])('/run passes %s to the CLI byte for byte on stdin', async (_kind, benchCase) => {
+  if (!benchCase) throw new Error('dataset needs the case');
+  const prompt = deciderCliPrompt(benchCase);
+  if (benchCase.longContext) expect(Buffer.byteLength(prompt)).toBeGreaterThan(128 * 1024);
+  else expect(prompt).toMatch(/ .*"/s);
+  await loadServer();
+  const pending = request('/run', { ...runBody, prompt });
+  await flushServer();
+  const child = mocks.children[0];
+  if (!child) throw new Error('CLI was not spawned');
+  expect(child.stdin.end).toHaveBeenCalledExactlyOnceWith(prompt);
+  expect(mocks.spawn.mock.calls[0][1]).not.toContain(prompt);
+  child.emit('close', 0);
   expect((await pending.done).status).toBe(200);
 });
 

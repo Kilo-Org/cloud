@@ -45,7 +45,7 @@ describe('runDeciderCaseViaCli prompt', () => {
     return body.prompt;
   }
 
-  it('sends an ordinary case unchanged', async () => {
+  it('sends an ordinary case without a snapshot', async () => {
     const ordinary = DECIDER_CASES.find(c => !c.longContext);
     if (!ordinary) throw new Error('dataset needs an ordinary case');
     expect(await sentPrompt(ordinary)).toBe(

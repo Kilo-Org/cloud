@@ -23,9 +23,10 @@ const FINAL_ANSWER_SUFFIX =
   '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
 
 /**
- * The exact `kilo run` prompt for a decider case. Long-context cases carry their
- * generated workspace snapshot, as the offline sweep and candidate screen send them.
- * The CLI has no system-prompt flag, so the system prompt is folded in.
+ * The exact text `kilo run` sends to the model for a decider case: the container writes it
+ * to the CLI's stdin, which the CLI uses verbatim. Long-context cases carry their generated
+ * workspace snapshot, as the offline sweep and candidate screen send them. The CLI has no
+ * system-prompt flag, so the system prompt is folded in.
  */
 export function deciderCliPrompt(benchCase: DeciderCase): string {
   const prompts = materializeLongContext(benchCase);

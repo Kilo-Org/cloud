@@ -75,7 +75,8 @@ function absolutizeKiloLinks(html: string, sourceUrl: string): string {
 // and follow the apps/web convention of pairing `target="_blank"` with
 // `rel="noopener noreferrer"` even when the source document leaves `rel` out.
 function enforceRelOnBlankTargets(_tagName: string, attribs: sanitizeHtml.Attributes) {
-  if (attribs.target !== '_blank') {
+  // HTML keyword attributes are ASCII case-insensitive.
+  if (attribs.target?.trim().toLowerCase() !== '_blank') {
     return { tagName: 'a', attribs };
   }
 

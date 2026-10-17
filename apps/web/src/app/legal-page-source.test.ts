@@ -128,5 +128,8 @@ describe('extractLegalMainHtml', () => {
       '<a href="https://kilo.ai/y" target="_blank" rel="nofollow noopener noreferrer">two</a>'
     );
     expect(extractMain('<a href="/z">three</a>')).toBe('<a href="https://kilo.ai/z">three</a>');
+    expect(extractMain('<a href="/w" target="_BLANK">four</a>')).toBe(
+      '<a href="https://kilo.ai/w" target="_BLANK" rel="noopener noreferrer">four</a>'
+    );
   });
 });

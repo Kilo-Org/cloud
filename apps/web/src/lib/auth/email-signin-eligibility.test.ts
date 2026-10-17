@@ -36,4 +36,9 @@ describe('isNewAccountEligibleForMagicLink', () => {
 
     await expect(isNewAccountEligibleForMagicLink('new@example.top')).resolves.toBe(false);
   });
+
+  it('rejects a malformed address before any domain lookup', async () => {
+    await expect(isNewAccountEligibleForMagicLink('not-an-email')).resolves.toBe(false);
+    expect(mockIsEmailBlacklistedByDomainAsync).not.toHaveBeenCalled();
+  });
 });

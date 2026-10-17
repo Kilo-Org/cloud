@@ -213,6 +213,23 @@ function getSignupIp(requestHeaders?: Headers): string | null {
   return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 }
 
+/**
+ * Public suffixes that hand out free subdomains. Each subdomain is its own registrable domain,
+ * so a farm could rotate them to stay under Bouncer's per-domain count; count the suffix instead.
+ */
+const FREE_SUBDOMAIN_SUFFIXES: Record<string, true> = {
+  'biz.id': true,
+  'my.id': true,
+  'web.id': true,
+};
+
+/** The domain Bouncer counts: the registrable domain, or a free-subdomain suffix as a whole. */
+function signupEmailDomain(host: string): string {
+  const domain = getDomain(host, { allowPrivateDomains: true }) ?? host;
+  const suffix = domain.slice(domain.indexOf('.') + 1);
+  return Object.hasOwn(FREE_SUBDOMAIN_SUFFIXES, suffix) ? suffix : domain;
+}
+
 async function checkNormalizedEmailUnique(
   normalizedEmail: string,
   tx: DrizzleTransaction
@@ -610,7 +627,7 @@ export async function createOrUpdateUser(
   const operationId = signupOperationId(normalizedEmail);
   const bouncerIp = bareIpLiteral(signupIp ?? undefined);
   if (!IS_DEVELOPMENT) {
-    // Subdomains of one registrable domain share Bouncer's domain counter.
+    // Subdomains of one registrable domain, and of one free-subdomain suffix, share a counter.
     const emailHost = normalizedEmail.slice(normalizedEmail.lastIndexOf('@') + 1);
     const verdict = bouncerIp
       ? await signupDecide({
@@ -618,7 +635,7 @@ export async function createOrUpdateUser(
           ip: bouncerIp,
           ja4: normalizeJa4(requestHeaders?.get('x-vercel-ja4-digest')),
           method: args.provider,
-          emailDomain: getDomain(emailHost, { allowPrivateDomains: true }) ?? emailHost,
+          emailDomain: signupEmailDomain(emailHost),
         })
       : null;
     console.info('[auth] Bouncer signup admission', {

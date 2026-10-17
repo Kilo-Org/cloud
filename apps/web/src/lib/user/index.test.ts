@@ -1173,8 +1173,11 @@ describe('User', () => {
 
     it.each([
       ['mail.team.example.test', 'example.test'],
-      ['x.my.id', 'x.my.id'],
-    ])('sends the registrable domain of %s as %s', async (host, emailDomain) => {
+      ['x.my.id', 'my.id'],
+      ['mail.shop.web.id', 'web.id'],
+      ['x.biz.id', 'biz.id'],
+      ['x.co.id', 'x.co.id'],
+    ])('sends %s as the counted email domain %s', async (host, emailDomain) => {
       const result = await createOrUpdateUser(
         {
           google_user_email: `bouncer-domain@${host}`,

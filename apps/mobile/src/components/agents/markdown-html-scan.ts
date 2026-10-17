@@ -115,27 +115,45 @@ function blockCodeRanges(value: string): MaskRange[] {
 }
 
 const PARAGRAPH_BREAK = /\n[ \t]*(?:\n|$)/g;
-const BACKTICK_RUN = /`+/y;
 
-/** The end of the inline run that holds `from`: a blank line, a code block, or the value end. */
-function inlineRunEnd(value: string, from: number, nextBlock: MaskRange | undefined): number {
-  PARAGRAPH_BREAK.lastIndex = from;
-  const blank = PARAGRAPH_BREAK.exec(value)?.index ?? value.length;
-  return Math.min(blank, nextBlock?.start ?? value.length);
+/** The start of every blank-line separator in `value`, in order. */
+function paragraphBreaks(value: string): number[] {
+  const breaks: number[] = [];
+  for (const match of value.matchAll(PARAGRAPH_BREAK)) {
+    breaks.push(match.index);
+  }
+  return breaks;
 }
 
 /**
- * The code span opening at `start`, a run of backticks: it closes at the next
- * run of the same length in its inline run. An unclosed one in the last inline
- * run is still streaming, so it runs to the end; elsewhere it is literal text.
+ * Code spans one scan looks for before it stops. Past the budget the rest of the
+ * value is copied verbatim, so the number of spans a render assembles is bounded
+ * and the HTML in the rest renders through the HTML engine.
  */
-function codeSpanAt(value: string, start: number, nextBlock: MaskRange | undefined) {
-  BACKTICK_RUN.lastIndex = start;
-  const length = BACKTICK_RUN.exec(value)?.[0].length ?? 1;
-  const limit = inlineRunEnd(value, start, nextBlock);
-  const closing = new RegExp(`(?<!\`)\`{${length}}(?!\`)`).exec(value.slice(start + length, limit));
-  if (closing) {
-    return { range: { start, end: start + length + closing.index + length }, length };
+const MAX_CODE_SPANS = 4096;
+
+/**
+ * The code span opening at `start`, a run of backticks: it closes at the next
+ * run of the same length in its inline run, the part of the value before
+ * `limit`. An unclosed one in the last inline run is still streaming, so it runs
+ * to the end; elsewhere it is literal text.
+ */
+function codeSpanAt(value: string, start: number, limit: number) {
+  let length = 0;
+  while (value[start + length] === '`') {
+    length += 1;
+  }
+  // Runs of any other length are skipped whole, so the walk visits each run of
+  // the inline run at most once.
+  for (let at = value.indexOf('`', start + length); at !== -1 && at < limit; ) {
+    let run = 1;
+    while (value[at + run] === '`') {
+      run += 1;
+    }
+    if (run === length) {
+      return { range: { start, end: at + length }, length };
+    }
+    at = value.indexOf('`', at + run);
   }
   const range: MaskRange | null =
     limit === value.length ? { start, end: value.length, unclosed: true } : null;
@@ -149,8 +167,11 @@ function codeSpanAt(value: string, start: number, nextBlock: MaskRange | undefin
  */
 export function scanMarkdownCode(value: string): MaskRange[] {
   const blocks = blockCodeRanges(value);
+  const breaks = paragraphBreaks(value);
   const ranges: MaskRange[] = [];
   let blockIndex = 0;
+  let breakIndex = 0;
+  let spans = 0;
   let index = 0;
   while (index < value.length) {
     const block = blocks[blockIndex];
@@ -170,7 +191,22 @@ export function scanMarkdownCode(value: string): MaskRange[] {
         blockIndex += 1;
       }
     } else if (char === '`') {
-      const span = codeSpanAt(value, index, block);
+      if (spans === MAX_CODE_SPANS) {
+        // The rest is copied verbatim: no further code span is looked for, and
+        // the HTML it holds renders through the HTML engine like any other HTML
+        // markdown cannot express.
+        ranges.push({ start: index, end: value.length });
+        break;
+      }
+      spans += 1;
+      // The span closes within its inline run: the first blank line at or after
+      // it, or the next code block, whichever comes first. Both cursors only
+      // move forward, so the whole scan walks each of them once.
+      while (breakIndex < breaks.length && (breaks[breakIndex] ?? 0) < index) {
+        breakIndex += 1;
+      }
+      const limit = Math.min(breaks[breakIndex] ?? value.length, block?.start ?? value.length);
+      const span = codeSpanAt(value, index, limit);
       if (span.range) {
         ranges.push(span.range);
       }

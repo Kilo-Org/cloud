@@ -1786,7 +1786,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedApplyResolvedAutoModel.mockImplementation(async params => {
       const isCandidateAllowed = params.isAutoFreeCandidateAllowed;
       expect(isCandidateAllowed).toBeDefined();
-      expect(await isCandidateAllowed?.('stepfun/step-5-preview-free')).toBe(false);
+      expect(await isCandidateAllowed?.('vendor/model:free')).toBe(false);
       return { kind: 'no_free_models_available' };
     });
 
@@ -1796,7 +1796,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(response.status).toBe(503);
     expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
       expect.anything(),
-      'stepfun/step-5-preview-free'
+      'vendor/model:free'
     );
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });

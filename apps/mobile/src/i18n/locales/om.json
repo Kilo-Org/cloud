@@ -2498,6 +2498,7 @@
       "title": "Turtiiwwan calali",
       "platformCloud": "Duumessa",
       "platformExtension": "Dabalata",
+      "platformDesktop": "Kompiitara",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

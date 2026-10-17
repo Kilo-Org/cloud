@@ -2498,6 +2498,7 @@
       "title": "Φιλτράρισμα συνεδριών",
       "platformCloud": "Νέφος",
       "platformExtension": "Επέκταση",
+      "platformDesktop": "Εφαρμογή υπολογιστή",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

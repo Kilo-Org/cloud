@@ -5,6 +5,7 @@ import {
   customRouterEntryKey,
   customRouterEntryRef,
   resolveEffectivePolicy,
+  type AutoRouter,
   type BenchmarkConfig,
   type BenchmarkPair,
   type CandidatePricing,
@@ -47,6 +48,7 @@ import {
   type ProfileRow,
 } from './profiles';
 import { variantFromStorage } from './reasoning-effort';
+import { deciderCasesForRouter } from './run';
 import { buildCustomRoutingTable } from './routing-table-builder';
 
 type ModelCatalog = z.infer<typeof BenchmarkModelCatalogSchema>;
@@ -101,23 +103,36 @@ export async function resolveCustomRouterEntries(
 /**
  * ADR 0005 custom-router currency: a pair serves its current-identity ready
  * measurement, otherwise its newest ready measurement from an older identity,
- * flagged stale. Platform tables never use this; they require exact identity.
+ * flagged stale. A current measurement that does not yet cover every planned case
+ * (a client eval in progress) yields to a stale one, so the entry keeps the routes the
+ * new measurement has not reached; with no stale one, the partial current one serves.
+ * Platform tables never use this; they require exact identity.
  */
 export function newestReadyMeasurement<T extends { status: string }>(
   rows: readonly T[],
   isCurrent: (row: T) => boolean,
-  measuredAt: (row: T) => string
+  measuredAt: (row: T) => string,
+  isComplete: (row: T) => boolean = () => true
 ): { row: T; stale: boolean } | null {
   const ready = rows.filter(row => row.status === 'ready');
   const current = ready.find(isCurrent);
-  if (current) return { row: current, stale: false };
+  if (current && isComplete(current)) return { row: current, stale: false };
   let newest: T | null = null;
-  for (const row of ready) if (!newest || measuredAt(row) > measuredAt(newest)) newest = row;
-  return newest ? { row: newest, stale: true } : null;
+  for (const row of ready) {
+    if (isCurrent(row)) continue;
+    if (!newest || measuredAt(row) > measuredAt(newest)) newest = row;
+  }
+  if (newest) return { row: newest, stale: true };
+  return current ? { row: current, stale: false } : null;
 }
 
 const platformMeasuredAt = (row: ProfileRow) => row.completed_at ?? row.updated_at;
 const clientMeasuredAt = (row: ClientProfileRow) => row.updated_at;
+
+function clientProfileComplete(router: AutoRouter, repetitions: number) {
+  const planned = deciderCasesForRouter(router).length * repetitions;
+  return (row: ClientProfileRow) => row.results >= planned;
+}
 
 // Client pricing is per million tokens; absent pricing means $0 (ADR 0005).
 function clientCandidatePricing(pricing: ClientModelPricing | null): CandidatePricing {
@@ -216,7 +231,8 @@ export async function assembleCustomRouterTable(
       const served = newestReadyMeasurement(
         clientRows.get(clientPairKey(ref, variant)) ?? [],
         row => isCurrentClientProfile(row, current),
-        clientMeasuredAt
+        clientMeasuredAt,
+        clientProfileComplete(context.baseRouter, current.repetitions)
       );
       if (served) clientReady.push({ profile: served.row, stale: served.stale });
     }
@@ -279,9 +295,10 @@ type MeasuredStatus = Exclude<CustomRouterEntryStatus, 'missing' | 'stale'>;
 function measurementStatus<T extends { status: MeasuredStatus; failure_reason: string | null }>(
   rows: readonly T[],
   isCurrent: (row: T) => boolean,
-  measuredAt: (row: T) => string
+  measuredAt: (row: T) => string,
+  isComplete?: (row: T) => boolean
 ): { status: CustomRouterEntryStatus; failureReason: string | null } {
-  const served = newestReadyMeasurement(rows, isCurrent, measuredAt);
+  const served = newestReadyMeasurement(rows, isCurrent, measuredAt, isComplete);
   if (served) return { status: served.stale ? 'stale' : 'ready', failureReason: null };
   const currentRow = rows.find(isCurrent);
   if (!currentRow) return { status: 'missing', failureReason: null };
@@ -338,7 +355,8 @@ export async function lookupCustomRouterStatuses(
             ...measurementStatus(
               clientRows.get(clientPairKey(ref, variant)) ?? [],
               row => isCurrentClientProfile(row, current),
-              clientMeasuredAt
+              clientMeasuredAt,
+              clientProfileComplete(context.baseRouter, current.repetitions)
             ),
           })),
         };

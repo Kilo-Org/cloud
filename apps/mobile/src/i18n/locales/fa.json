@@ -2498,6 +2498,7 @@
       "title": "فیلتر نشست‌ها",
       "platformCloud": "ابری",
       "platformExtension": "افزونه",
+      "platformDesktop": "دسکتاپ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

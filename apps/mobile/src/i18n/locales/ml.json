@@ -2498,6 +2498,7 @@
       "title": "സെഷനുകൾ ഫിൽട്ടർ ചെയ്യുക",
       "platformCloud": "ക്ലൗഡ്",
       "platformExtension": "എക്സ്റ്റൻഷൻ",
+      "platformDesktop": "ഡെസ്ക്ടോപ്പ്",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

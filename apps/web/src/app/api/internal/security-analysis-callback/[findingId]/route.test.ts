@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { NextRequest } from 'next/server';
+import { CONTROL_PLANE_UPSTREAM_BUDGET_MS } from '@/lib/bounded-service-fetch';
 import type * as routeModule from './route';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -103,5 +104,25 @@ describe('security analysis callback rollback ingress', () => {
 
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ error: 'Queue unavailable' });
+  });
+
+  it('answers 504 when the Worker never responds, instead of holding the request open', async () => {
+    const request = await callbackRequest();
+    jest.useFakeTimers();
+    try {
+      mockFetch.mockImplementation(() => new Promise<Response>(() => {}));
+
+      const pending = POST(request, { params: Promise.resolve({ findingId }) });
+      await jest.advanceTimersByTimeAsync(0);
+      await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+
+      const response = await pending;
+      expect(response.status).toBe(504);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Security analysis Worker did not respond in time',
+      });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

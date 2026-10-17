@@ -27,7 +27,7 @@ import { formatError } from '@kilocode/worker-utils';
 import type { UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
 import type { Hono } from 'hono';
 import type * as z from 'zod';
-import { DECIDER_CLI_TIMEOUT_MS, FINAL_ANSWER_SUFFIX } from './cli-runner';
+import { DECIDER_CLI_TIMEOUT_MS, deciderCliPrompt } from './cli-runner';
 import {
   clientCaseKey,
   clientPairKey,
@@ -46,7 +46,6 @@ import {
   resolveCustomRouterEntries,
   type CatalogSource,
 } from './custom-routers';
-import { materializeLongContext } from './datasets/long-context';
 import { createDeciderJudge } from './decider-judge';
 import { buildGraderUsage, writeGraderUsage } from './grader-usage';
 import { gradeDeciderOutput, type DeciderJudge } from './grading';
@@ -143,12 +142,10 @@ export async function planClientEval(
 
 /** The prompt exactly as the platform container sends it; golden answers stay here. */
 export function clientEvalCase(request: InternalClientEvalCaseRequest): ClientEvalCaseResponse {
-  const prompts = materializeLongContext(findCase(request.baseRouter, request.caseId));
   return {
     caseId: request.caseId,
     baseRouter: request.baseRouter,
-    systemPrompt: prompts.systemPrompt,
-    userPrompt: `${prompts.userPrompt}${FINAL_ANSWER_SUFFIX}`,
+    prompt: deciderCliPrompt(findCase(request.baseRouter, request.caseId)),
     timeoutMs: DECIDER_CLI_TIMEOUT_MS,
   };
 }

@@ -9,6 +9,8 @@ import {
   type InternalClientEvalResultRequest,
 } from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
+import * as z from 'zod';
+import { runDeciderCaseViaCli } from './cli-runner';
 import {
   ClientEvalError,
   clientEvalCase,
@@ -18,7 +20,7 @@ import {
 } from './client-eval';
 import { listOwnerClientProfiles, rollUpClientCases } from './client-profiles';
 import { saveBenchmarkConfig } from './config';
-import { DECIDER_CASES } from './datasets/decider-cases';
+import { DECIDER_CASES, type DeciderCase } from './datasets/decider-cases';
 import type { DeciderJudge } from './grading';
 import { app } from './index';
 import { computeEngineIdentity } from './run';
@@ -278,24 +280,42 @@ describe('client eval (real SQLite)', () => {
 });
 
 describe('clientEvalCase', () => {
-  it('serves the prompt the platform container sends, without the check', () => {
-    const served = clientEvalCase({ ...context, caseId: exactCase.id });
-    expect(served).toMatchObject({
-      caseId: exactCase.id,
-      systemPrompt: exactCase.systemPrompt,
+  async function platformPrompt(benchCase: DeciderCase): Promise<string> {
+    let sent = '';
+    const env = {
+      BENCH_RUNNER: {
+        idFromName: (name: string) => name,
+        get: () => ({
+          fetch: async (request: Request) => {
+            sent = z.object({ prompt: z.string() }).parse(await request.json()).prompt;
+            return Response.json({ exitCode: 0, durationMs: 1, stdoutLines: [], stderrTail: '' });
+          },
+        }),
+      },
+    } as unknown as Env;
+    await runDeciderCaseViaCli(env, {
+      instanceName: 'benchmark-slot:0',
+      model: 'vendor/model',
+      benchCase,
+      kiloToken: 'token',
+      kiloApiUrl: 'https://api.test',
+    });
+    return sent;
+  }
+
+  it.each([
+    ['an ordinary', exactCase],
+    ['a long-context', DECIDER_CASES.find(c => c.longContext)],
+  ])('serves the exact platform container prompt for %s case', async (_kind, benchCase) => {
+    if (!benchCase) throw new Error('dataset needs the case');
+    const served = clientEvalCase({ ...context, caseId: benchCase.id });
+    expect(served).toEqual({
+      caseId: benchCase.id,
+      baseRouter: 'efficient',
+      prompt: await platformPrompt(benchCase),
       timeoutMs: 180_000,
     });
-    expect(served.userPrompt.startsWith(exactCase.userPrompt)).toBe(true);
-    expect(served.userPrompt).toContain('IMPORTANT: Your final message must contain ONLY');
-    expect(JSON.stringify(served)).not.toContain('"check"');
-  });
-
-  it('materializes long-context cases', () => {
-    const longCase = DECIDER_CASES.find(c => c.longContext);
-    if (!longCase) throw new Error('dataset needs a long-context case');
-    const served = clientEvalCase({ ...context, caseId: longCase.id });
-    expect(served.userPrompt.length).toBeGreaterThan(longCase.userPrompt.length * 10);
-    expect(served.userPrompt).toContain('BEGIN WORKSPACE SNAPSHOT');
+    expect(served.prompt).toContain(benchCase.userPrompt);
   });
 
   it('rejects case ids outside the base router dataset', () => {

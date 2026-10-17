@@ -11,7 +11,7 @@
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_triage_tickets, type AutoTriageTicket } from '@kilocode/db/schema';
-import { eq, and, count } from 'drizzle-orm';
+import { eq, and, count, inArray, sql } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareTriagePayload } from '../triggers/prepare-triage-payload';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -27,54 +27,39 @@ export interface DispatchResult {
   activeCount: number;
 }
 
+function ownerTicketCondition(owner: Owner) {
+  return owner.type === 'org'
+    ? eq(auto_triage_tickets.owned_by_organization_id, owner.id)
+    : eq(auto_triage_tickets.owned_by_user_id, owner.id);
+}
+
+interface TicketReservation {
+  activeCount: number;
+  reserved: AutoTriageTicket[];
+  remainingPending: number;
+}
+
 /**
- * Try to dispatch pending tickets for an owner
- * Checks available slots and dispatches up to available capacity
+ * Reserve pending tickets for dispatch.
+ *
+ * The pending -> 'analyzing' transition and the concurrency-slot budget are
+ * decided inside one transaction serialized by a per-owner advisory lock, so
+ * overlapping triggers for the same owner process disjoint sets. Each ticket
+ * is claimed with a status-conditional UPDATE that moves it only while it is
+ * still 'pending' and returns the claimed rows.
  */
-export async function tryDispatchPendingTickets(owner: Owner): Promise<DispatchResult> {
-  try {
-    logExceptInTest(`[tryDispatchPendingTickets] Starting dispatch check`, { owner });
+async function reservePendingTicketsForDispatch(owner: Owner): Promise<TicketReservation> {
+  return await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext('auto-triage-dispatch'), hashtext(${`${owner.type}:${owner.id}`}))`
+    );
 
-    // 1. Get pending tickets for this owner (FIFO)
-    // Fetch one extra to check if there are more pending beyond max concurrent
-    const pendingTickets = await db
-      .select()
-      .from(auto_triage_tickets)
-      .where(
-        and(
-          owner.type === 'org'
-            ? eq(auto_triage_tickets.owned_by_organization_id, owner.id)
-            : eq(auto_triage_tickets.owned_by_user_id, owner.id),
-          eq(auto_triage_tickets.status, 'pending')
-        )
-      )
-      .orderBy(auto_triage_tickets.created_at)
-      .limit(AUTO_TRIAGE_CONSTANTS.MAX_CONCURRENT_TICKETS_PER_OWNER + 1);
-
-    logExceptInTest('[tryDispatchPendingTickets] Found pending tickets', {
-      owner,
-      pendingCount: pendingTickets.length,
-    });
-
-    // 2. If no pending tickets, return early without querying active count
-    if (pendingTickets.length === 0) {
-      return { dispatched: 0, pending: 0, activeCount: 0 };
-    }
-
-    // 3. Only query active count if we have pending tickets to potentially dispatch
-    const activeCountResult = await db
+    const activeCountResult = await tx
       .select({ count: count() })
       .from(auto_triage_tickets)
-      .where(
-        and(
-          owner.type === 'org'
-            ? eq(auto_triage_tickets.owned_by_organization_id, owner.id)
-            : eq(auto_triage_tickets.owned_by_user_id, owner.id),
-          eq(auto_triage_tickets.status, 'analyzing')
-        )
-      );
+      .where(and(ownerTicketCondition(owner), eq(auto_triage_tickets.status, 'analyzing')));
 
-    const activeCount = activeCountResult[0]?.count || 0;
+    const activeCount = Number(activeCountResult[0]?.count) || 0;
     const availableSlots = AUTO_TRIAGE_CONSTANTS.MAX_CONCURRENT_TICKETS_PER_OWNER - activeCount;
 
     logExceptInTest('[tryDispatchPendingTickets] Active count check', {
@@ -83,20 +68,78 @@ export async function tryDispatchPendingTickets(owner: Owner): Promise<DispatchR
       availableSlots,
     });
 
-    // 4. If no slots available, return early
+    const pendingCondition = and(ownerTicketCondition(owner), eq(auto_triage_tickets.status, 'pending'));
+
     if (availableSlots <= 0) {
-      logExceptInTest('[tryDispatchPendingTickets] No slots available', { owner, activeCount });
-      return { dispatched: 0, pending: pendingTickets.length, activeCount };
+      const remaining = await tx
+        .select({ count: count() })
+        .from(auto_triage_tickets)
+        .where(pendingCondition);
+      return { activeCount, reserved: [], remainingPending: Number(remaining[0]?.count) || 0 };
     }
 
-    // 5. Limit pending tickets to available slots and dispatch them
-    const ticketsToDispatch = pendingTickets.slice(0, availableSlots);
+    // Fetch one extra to check if there are more pending beyond max concurrent
+    const candidates = await tx
+      .select()
+      .from(auto_triage_tickets)
+      .where(pendingCondition)
+      .orderBy(auto_triage_tickets.created_at)
+      .limit(AUTO_TRIAGE_CONSTANTS.MAX_CONCURRENT_TICKETS_PER_OWNER + 1);
+
+    const remainingPendingExtra = Math.max(candidates.length - availableSlots, 0);
+
+    if (candidates.length === 0) {
+      return { activeCount, reserved: [], remainingPending: 0 };
+    }
+
+    const slice = candidates.slice(0, availableSlots);
+    const reserved = await tx
+      .update(auto_triage_tickets)
+      .set({ status: 'analyzing', started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .where(
+        and(
+          inArray(
+            auto_triage_tickets.id,
+            slice.map(ticket => ticket.id)
+          ),
+          eq(auto_triage_tickets.status, 'pending')
+        )
+      )
+      .returning();
+
+    return { activeCount, reserved, remainingPending: remainingPendingExtra };
+  });
+}
+
+/**
+ * Try to dispatch pending tickets for an owner
+ * Checks available slots and dispatches up to available capacity
+ */
+export async function tryDispatchPendingTickets(owner: Owner): Promise<DispatchResult> {
+  try {
+    logExceptInTest(`[tryDispatchPendingTickets] Starting dispatch check`, { owner });
+
+    const { activeCount, reserved, remainingPending } = await reservePendingTicketsForDispatch(owner);
+
+    logExceptInTest('[tryDispatchPendingTickets] Reserved pending tickets', {
+      owner,
+      reservedCount: reserved.length,
+    });
+
+    // If no tickets reserved, return early
+    if (reserved.length === 0) {
+      logExceptInTest('[tryDispatchPendingTickets] No slots available', { owner, activeCount });
+      return { dispatched: 0, pending: remainingPending, activeCount };
+    }
+
     let dispatched = 0;
-    for (const ticket of ticketsToDispatch) {
+    const failed: string[] = [];
+    for (const ticket of reserved) {
       try {
         await dispatchTicket(ticket, owner);
         dispatched++;
       } catch (error) {
+        failed.push(ticket.id);
         errorExceptInTest('[tryDispatchPendingTickets] Failed to dispatch ticket', {
           ticketId: ticket.id,
           error,
@@ -105,18 +148,30 @@ export async function tryDispatchPendingTickets(owner: Owner): Promise<DispatchR
           tags: { operation: 'dispatch-pending-ticket' },
           extra: { ticketId: ticket.id, owner },
         });
+        // Return the ticket to 'pending' so a later pass can retry it
+        try {
+          await updateTriageTicketStatus(ticket.id, 'pending', {
+            expectedStatus: 'analyzing',
+            errorMessage: 'Dispatch failed',
+          });
+        } catch (resetError) {
+          errorExceptInTest('[tryDispatchPendingTickets] Failed to reset ticket after dispatch error', {
+            ticketId: ticket.id,
+            error: resetError,
+          });
+        }
       }
     }
 
     logExceptInTest('[tryDispatchPendingTickets] Dispatch complete', {
       owner,
       dispatched,
-      total: ticketsToDispatch.length,
+      total: reserved.length,
     });
 
     return {
       dispatched,
-      pending: ticketsToDispatch.length - dispatched,
+      pending: remainingPending + failed.length,
       activeCount: activeCount + dispatched,
     };
   } catch (error) {
@@ -152,10 +207,8 @@ async function dispatchTicket(ticket: AutoTriageTicket, owner: Owner): Promise<v
     agentConfig,
   });
 
-  // 3. Update status to "analyzing" (no longer pending)
-  await updateTriageTicketStatus(ticket.id, 'analyzing');
-
-  // 4. Dispatch to Cloudflare Worker to create TriageOrchestrator DO
+  // 3. Dispatch to Cloudflare Worker to create TriageOrchestrator DO
+  // The status was already set to 'analyzing' when the ticket was reserved.
   await triageWorkerClient.dispatchTriage(payload);
 
   logExceptInTest('[dispatchTicket] Ticket dispatched successfully', {

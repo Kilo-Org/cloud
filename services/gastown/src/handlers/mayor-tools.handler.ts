@@ -69,8 +69,8 @@ const MayorSlingBatchBody = z
 const MayorMailBody = z.object({
   rig_id: z.string().min(1),
   to_agent_id: z.string().min(1),
-  subject: z.string().min(1),
-  body: z.string().min(1),
+  subject: z.string().min(1).max(200),
+  body: z.string().min(1).max(4000),
   from_agent_id: z.string().min(1),
 });
 
@@ -271,6 +271,10 @@ export async function handleMayorSendMail(c: Context<GastownEnv>, params: { town
   );
 
   const town = getTownDOStub(c.env, params.townId);
+  const recipient = await town.getAgentAsync(parsed.data.to_agent_id);
+  if (!recipient) {
+    return c.json(resError('Agent not found'), 404);
+  }
   await town.sendMail({
     from_agent_id: parsed.data.from_agent_id,
     to_agent_id: parsed.data.to_agent_id,

@@ -9,8 +9,8 @@ import type { GastownEnv } from '../gastown.worker';
 const SendMailBody = z.object({
   from_agent_id: z.string().min(1),
   to_agent_id: z.string().min(1),
-  subject: z.string().min(1),
-  body: z.string().min(1),
+  subject: z.string().min(1).max(200),
+  body: z.string().min(1).max(4000),
 });
 
 export async function handleSendMail(c: Context<GastownEnv>, _params: { rigId: string }) {
@@ -27,6 +27,10 @@ export async function handleSendMail(c: Context<GastownEnv>, _params: { rigId: s
   }
   const townId = c.get('townId');
   const town = getTownDOStub(c.env, townId);
+  const recipient = await town.getAgentAsync(parsed.data.to_agent_id);
+  if (!recipient) {
+    return c.json(resError('Agent not found'), 404);
+  }
   await town.sendMail(parsed.data);
   return c.json(resSuccess({ sent: true }), 201);
 }

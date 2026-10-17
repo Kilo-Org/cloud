@@ -1989,6 +1989,22 @@ export class TownDO extends DurableObject<Env> {
     mail.sendMail(this.sql, input);
   }
 
+  /** Test hook: backdate created_at on a recipient's open message beads. */
+  async debugBackdateMessageBead(agentId: string, ageMs: number): Promise<void> {
+    const cutoff = new Date(Date.now() - ageMs).toISOString();
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.created_at} = ?
+        WHERE ${beads.type} = 'message'
+          AND ${beads.assignee_agent_bead_id} = ?
+          AND ${beads.status} = 'open'
+      `,
+      [cutoff, agentId]
+    );
+  }
+
   async checkMail(agentId: string): Promise<Mail[]> {
     return mail.checkMail(this.sql, agentId);
   }
@@ -4549,6 +4565,15 @@ export class TownDO extends DurableObject<Env> {
           events.pruneOldEvents(this.sql, 7 * 24 * 60 * 60 * 1000);
         } catch (err) {
           logger.warn('alarm: event pruning failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }),
+      Promise.resolve().then(() => {
+        try {
+          mail.sweepStaleMail(this.sql);
+        } catch (err) {
+          logger.warn('alarm: stale mail sweep failed', {
             error: err instanceof Error ? err.message : String(err),
           });
         }

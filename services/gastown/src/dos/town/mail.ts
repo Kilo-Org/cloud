@@ -26,7 +26,72 @@ export function initMailTables(_sql: SqlStorage): void {
   // Initialization happens in beads.initBeadTables().
 }
 
+/** Maximum subject length for a mail message. */
+export const MAIL_SUBJECT_MAX_LENGTH = 200;
+/** Maximum body length for a mail message. */
+export const MAIL_BODY_MAX_LENGTH = 4000;
+/** Maximum number of open message beads a single recipient can hold. */
+export const MAX_OPEN_MESSAGES_PER_RECIPIENT = 50;
+/** Delivery batch size for readAndDeliverMail and getPendingMailForWorkingAgents. */
+export const MAIL_DELIVERY_BATCH = 50;
+/** Open message beads older than this are closed by the alarm sweep. Matches event pruning. */
+export const MAIL_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type MailValidationError =
+  | 'UNKNOWN_RECIPIENT'
+  | 'MAIL_TOO_LARGE'
+  | 'MAILBOX_FULL';
+
+/**
+ * Thrown by sendMail when the message violates a mail rule.
+ * Carries a stable code for programmatic handling at the RPC boundary.
+ */
+export class MailRuleError extends Error {
+  constructor(
+    readonly code: MailValidationError,
+    message: string
+  ) {
+    super(message);
+    this.name = 'MailRuleError';
+  }
+}
+
 export function sendMail(sql: SqlStorage, input: SendMailInput): void {
+  const recipient = getAgent(sql, input.to_agent_id);
+  if (!recipient) {
+    throw new MailRuleError(
+      'UNKNOWN_RECIPIENT',
+      `Recipient agent ${input.to_agent_id} does not exist in this town`
+    );
+  }
+
+  if (input.subject.length > MAIL_SUBJECT_MAX_LENGTH || input.body.length > MAIL_BODY_MAX_LENGTH) {
+    throw new MailRuleError(
+      'MAIL_TOO_LARGE',
+      `Mail exceeds size limits (subject <= ${MAIL_SUBJECT_MAX_LENGTH}, body <= ${MAIL_BODY_MAX_LENGTH})`
+    );
+  }
+
+  const openRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT count(*) AS cnt FROM ${beads}
+        WHERE ${beads.type} = 'message'
+          AND ${beads.assignee_agent_bead_id} = ?
+          AND ${beads.status} = 'open'
+      `,
+      [input.to_agent_id]
+    ),
+  ];
+  const openCount = typeof openRows[0]?.cnt === 'number' ? openRows[0].cnt : 0;
+  if (openCount >= MAX_OPEN_MESSAGES_PER_RECIPIENT) {
+    throw new MailRuleError(
+      'MAILBOX_FULL',
+      `Recipient ${input.to_agent_id} already holds ${openCount} open message(s)`
+    );
+  }
+
   const id = generateId();
   const timestamp = now();
 
@@ -68,7 +133,6 @@ export function sendMail(sql: SqlStorage, input: SendMailInput): void {
   );
 
   // Log bead event if the recipient has a hooked bead
-  const recipient = getAgent(sql, input.to_agent_id);
   if (recipient?.current_hook_bead_id) {
     logBeadEvent(sql, {
       beadId: recipient.current_hook_bead_id,
@@ -93,8 +157,9 @@ export function readAndDeliverMail(sql: SqlStorage, agentId: string): Mail[] {
           AND ${beads.assignee_agent_bead_id} = ?
           AND ${beads.status} = 'open'
         ORDER BY ${beads.created_at} ASC
+        LIMIT ?
       `,
-      [agentId]
+      [agentId, MAIL_DELIVERY_BATCH]
     ),
   ];
 
@@ -156,8 +221,9 @@ export function getPendingMailForWorkingAgents(sql: SqlStorage): Map<string, Mai
           AND ${beads.status} = 'open'
           AND ${agent_metadata.status} = 'working'
         ORDER BY ${beads.created_at} ASC
+        LIMIT ?
       `,
-      []
+      [MAIL_DELIVERY_BATCH]
     ),
   ];
 
@@ -188,4 +254,39 @@ export function getPendingMailForWorkingAgents(sql: SqlStorage): Map<string, Mai
   }
 
   return grouped;
+}
+
+/**
+ * Close open message beads that can never be delivered:
+ * - the recipient agent no longer exists, or
+ * - the message is older than the retention window (recipient never read it).
+ * Returns the number of beads closed. Runs on the Town DO alarm.
+ */
+export function sweepStaleMail(sql: SqlStorage, retentionMs: number = MAIL_RETENTION_MS): number {
+  const cutoff = new Date(Date.now() - retentionMs).toISOString();
+  const timestamp = now();
+
+  const closed = [
+    ...query(
+      sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.status} = 'closed',
+            ${beads.columns.closed_at} = ?,
+            ${beads.columns.updated_at} = ?
+        WHERE ${beads.type} = 'message'
+          AND ${beads.status} = 'open'
+          AND (
+            NOT EXISTS (
+              SELECT 1 FROM ${agent_metadata}
+              WHERE ${agent_metadata.bead_id} = ${beads.assignee_agent_bead_id}
+            )
+            OR ${beads.created_at} < ?
+          )
+      `,
+      [timestamp, timestamp, cutoff]
+    ),
+  ];
+
+  return closed.length;
 }

@@ -36,10 +36,11 @@ jobs:
       ai_gateway_secure_proxy: ${{ steps.filter_secure_proxy.outputs.ai_gateway_secure_proxy || steps.filter_secure_proxy_retry.outputs.ai_gateway_secure_proxy }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
       # JSON from scripts/affected-workspaces.mjs, and the typecheck and lint
-      # groups it needs.
+      # groups and cloud-agent-next parts it needs.
       affected: ${{ steps.affected.outputs.affected }}
       typecheck_groups: ${{ steps.affected.outputs.typecheck_groups }}
       lint_groups: ${{ steps.affected.outputs.lint_groups }}
+      cloud_agent_next_parts: ${{ steps.affected.outputs.cloud_agent_next_parts }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
@@ -193,18 +194,13 @@ jobs:
               - '.github/workflows/ci.yml'
               - 'package.json'
               - 'pnpm-lock.yaml'
-      - name: Detect changed workspaces with tests
-        id: workspaces
-        run: |
-          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web --exclude apps/mobile)
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-
       # Pull requests check only the workspaces a change can affect. Main
       # pushes and the merge queue pass no base, which selects every workspace.
       - name: Detect affected workspaces
         id: affected
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+          CLOUD_AGENT_NEXT_CHANGED: ${{ steps.filter.outputs.cloud_agent_next || steps.filter_retry.outputs.cloud_agent_next }}
         run: |
           affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA")
           jq . <<< "$affected"
@@ -219,11 +215,32 @@ jobs:
               (select($all or ($d | index("apps/extension"))) | "trpc"),
               (select($all or ($d - ["apps/mobile", "apps/extension"] | length > 0)) | "rest")
             ]' <<< "$affected")
+          # Every part when cloud-agent-next is affected. When only its tests
+          # read changed data, the unit part covers a reading test under src/,
+          # scripts/ or test/unit/; any other reading test runs every part.
+          cloud_agent_next_parts=$(jq -c --arg changed "$CLOUD_AGENT_NEXT_CHANGED" '
+            ["unit", "workers", "wrapper-process", "other"] as $all |
+            if $changed == "true" or (.packages | index("cloud-agent-next")) then $all
+            else [.test_only_files[] | select(startswith("services/cloud-agent-next/"))
+              | if test("^services/cloud-agent-next/(src|scripts|test/unit)/.+\\.test\\.ts$") then "unit" else $all[] end
+            ] | unique end' <<< "$affected")
           {
             echo "affected=$(jq -c . <<< "$affected")"
             echo "typecheck_groups=$typecheck_groups"
             echo "lint_groups=$lint_groups"
+            echo "cloud_agent_next_parts=$cloud_agent_next_parts"
           } >> "$GITHUB_OUTPUT"
+
+      # Also test the workspaces whose tests read changed data
+      # (test_only_dirs); their typecheck and lint stay skipped.
+      - name: Detect changed workspaces with tests
+        id: workspaces
+        env:
+          AFFECTED: ${{ steps.affected.outputs.affected }}
+        run: |
+          mapfile -t includes < <(jq -r '.test_only_dirs[] | ("--include", .)' <<< "$AFFECTED")
+          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web --exclude apps/mobile "${includes[@]}")
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   # The CI wiring and plugin manifest checks. No job waits for this one, so it
   # adds no time before the workspace checks start; the required `test` job
@@ -476,10 +493,10 @@ jobs:
 
   # The web Jest suite is the slowest suite in CI. Eight shards run it in
   # parallel; the `test` job below reports the combined result under the
-  # required check name.
+  # required check name. It also runs when a web test reads changed data.
   web-test:
     needs: changes
-    if: needs.changes.outputs.kilocode_backend == 'true'
+    if: needs.changes.outputs.kilocode_backend == 'true' || contains(fromJSON(needs.changes.outputs.affected).test_only_packages, 'web')
     name: web-test (${{ matrix.shard }}/8)
     strategy:
       fail-fast: false
@@ -794,19 +811,21 @@ jobs:
   cloud-agent-next:
     needs: changes
     # On a pull request, also run when a dependency of cloud-agent-next
-    # changed (for example packages/db). Main pushes and the merge queue keep
-    # the path filter alone.
+    # changed (for example packages/db), or only the parts that hold a test
+    # reading changed data (cloud_agent_next_parts). Main pushes and the merge
+    # queue keep the path filter alone.
     if: >-
       needs.changes.outputs.cloud_agent_next == 'true' ||
       (github.event_name == 'pull_request' &&
-      contains(fromJSON(needs.changes.outputs.affected).packages, 'cloud-agent-next'))
+      needs.changes.outputs.cloud_agent_next_parts != '[]')
     # The suite runs as four parallel parts; test:all chains the same suites.
     strategy:
       fail-fast: false
       matrix:
-        # process.test.ts alone takes about as long as the rest of the wrapper
-        # suite, so it runs as its own part.
-        part: [unit, workers, wrapper-process, other]
+        # unit, workers, wrapper-process and other. process.test.ts alone
+        # takes about as long as the rest of the wrapper suite, so it runs as
+        # its own part.
+        part: ${{ fromJSON(needs.changes.outputs.cloud_agent_next_parts) }}
     name: cloud-agent-next (${{ matrix.part }})
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 15

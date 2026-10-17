@@ -79,9 +79,10 @@ jobs:
             | grep -Eq '^apps/mobile/|^packages/trpc/|^apps/web/src/routers/|^packages/web-shared/src/routers/|^packages/app-shared/|^packages/kilo-chat/|^packages/kilo-chat-hooks/|^packages/event-service/|^packages/notifications/|^packages/cloud-agent-sdk/|^pnpm-lock\.yaml$|^\.github/workflows/kilo-app-ci\.yml$|^\.github/workflows/ci\.yml$|^scripts/stacked-ci\.test\.mjs$'; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
           # The app also reads every workspace it depends on, directly or
-          # through a relative import. A detection error runs the suite.
+          # through a relative import, and its tests may read other
+          # workspaces' files as data. A detection error runs the suite.
           elif ! affected=$(node scripts/affected-workspaces.mjs "$(git rev-parse "${base}^{commit}")") \
-            || ! selected=$(jq -r '.full or (.packages | index("kilo-app") != null)' <<< "$affected") \
+            || ! selected=$(jq -r '.full or (.packages + .test_only_packages | index("kilo-app") != null)' <<< "$affected") \
             || [ "$selected" != false ]; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
           else

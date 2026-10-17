@@ -199,6 +199,27 @@ export function checkMail(sql: SqlStorage, agentId: string): Mail[] {
   return readAndDeliverMail(sql, agentId);
 }
 
+/** Close the given message beads by id. */
+export function closeMessageBeads(sql: SqlStorage, beadIds: string[]): void {
+  if (beadIds.length === 0) return;
+
+  const timestamp = now();
+  const placeholders = beadIds.map(() => '?').join(', ');
+  const params: unknown[] = [timestamp, timestamp, ...beadIds];
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${beads}
+      SET ${beads.columns.status} = 'closed',
+          ${beads.columns.closed_at} = ?,
+          ${beads.columns.updated_at} = ?
+      WHERE ${beads.type} = 'message'
+        AND ${beads.bead_id} IN (${placeholders})
+    `,
+    params as [unknown, unknown] & unknown[]
+  );
+}
+
 /**
  * Find open mail addressed to agents that are currently working.
  * Returns a map of agentId → Mail[] so the caller can push each batch

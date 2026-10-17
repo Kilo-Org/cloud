@@ -4988,8 +4988,10 @@ export class TownDO extends DurableObject<Env> {
       const sent = await dispatch.sendMessageToAgent(this.env, this.townId, agentId, prompt);
 
       if (sent) {
-        // Mark delivered only after the container accepted the message
-        mail.readAndDeliverMail(this.sql, agentId);
+        mail.closeMessageBeads(
+          this.sql,
+          messages.map(m => m.id)
+        );
         if (
           messages.some(
             m =>

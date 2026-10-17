@@ -108,7 +108,7 @@ export function AgentFormSheet({
       variant,
       disabledTools,
     };
-    const problem = validateAgentForm(state);
+    const problem = validateAgentForm(state, existingSlugs);
     if (problem !== null) {
       setError(problem);
       return;
@@ -138,8 +138,11 @@ export function AgentFormSheet({
           label={t('profiles.agents.slug')}
           defaultValue={initial.slug}
           error={
-            error === 'slug-required' || error === 'slug-invalid' || error === 'slug-conflict'
-              ? t(ERROR_KEYS[error])
+            error === 'slug-required' ||
+            error === 'slug-invalid' ||
+            error === 'slug-conflict' ||
+            slugConflictFromServer
+              ? t(ERROR_KEYS[error ?? 'slug-conflict'])
               : undefined
           }
           disabled={isSaving}

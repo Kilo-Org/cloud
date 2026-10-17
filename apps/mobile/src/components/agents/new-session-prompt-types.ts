@@ -62,6 +62,17 @@ export type NewSessionPromptProps = {
    * the preferred floor.
    */
   cardTop?: number;
+  /**
+   * The block directly under the card that must stay inside the frame, in
+   * points: the Run on row (`mt-5`, its label, its `mb-2`, and the selector or
+   * target line), measured by the host. The frame fit reserves it — keeping a
+   * line of air under it — while the input still keeps its floor beside it, so
+   * a long draft cannot grow the card over the row. Where whole lines cannot
+   * hold both (a phone with the keyboard up), the floor wins and the row
+   * scrolls into view. Omitted or unmeasured keeps `0`, which owes nothing
+   * below the card.
+   */
+  belowCardHeight?: number;
   /** True for the Continue clone entry: hides the composer, paperclip, paste, and voice. */
   isCloneEntry?: boolean;
 };

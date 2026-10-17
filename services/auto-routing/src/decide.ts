@@ -346,7 +346,7 @@ export type RoutingPrerequisites = {
   capabilities: ModelCapabilitiesMap;
   routingTable: RoutingTable | null;
   shadowRoutingTable: RoutingTable | null;
-  // Owner pools and custom routers fail closed on candidates without an active capability row.
+  // Custom routers fail closed on candidates without an active capability row.
   customTable: boolean;
 };
 

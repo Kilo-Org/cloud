@@ -12,7 +12,7 @@ const RETURN_URL_COOKIE_MAX_AGE = 60 * 30; // 30 minutes
 export function getSafeReturnUrlPath(url: string): string | null {
   const hasNonPathCharacter =
     url.includes('\\') ||
-    [...url].some((char) => {
+    [...url].some(char => {
       const code = char.charCodeAt(0);
       return code < 0x20 || code === 0x7f;
     });

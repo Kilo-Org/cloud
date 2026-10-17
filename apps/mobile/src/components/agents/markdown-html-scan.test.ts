@@ -27,4 +27,12 @@ describe('convertHtmlToMarkdown on a body dense with code spans', () => {
       `**head** x< ${'`a`b'.repeat(20)}**tail**`
     );
   });
+
+  it('keeps HTML parsing past the budget', () => {
+    // The budget trips inside the spans, and the emphasis around them still
+    // closes: the tail's close tag parses as markup, like it would without the
+    // budget, instead of being copied into the emphasis as text.
+    const value = `<b>${'`x`'.repeat(4097)}</b>`;
+    expect(convertHtmlToMarkdown(value)).toBe(`**${'`x`'.repeat(4097)}**`);
+  });
 });

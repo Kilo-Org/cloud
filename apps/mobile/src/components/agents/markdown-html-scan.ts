@@ -196,8 +196,10 @@ export function scanMarkdownCode(value: string): MaskRange[] {
       if (spans === MAX_CODE_SPANS) {
         // The rest is copied verbatim: no further code span is looked for, and
         // the HTML it holds renders through the HTML engine like any other HTML
-        // markdown cannot express.
-        ranges.push({ start: index, end: value.length });
+        // markdown cannot express. An unclosed span, not a bare range: a bare
+        // one would swallow an open element's close tag, which parses as a real
+        // close tag in the previous scan.
+        ranges.push({ start: index, end: value.length, unclosed: true });
         break;
       }
       spans += 1;

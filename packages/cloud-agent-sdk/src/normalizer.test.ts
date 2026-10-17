@@ -182,6 +182,7 @@ describe('normalize', () => {
         sessionID: 'ses-1',
         messageID: 'msg-1',
         type: 'tool',
+        state: { status: 'running' },
       };
       const result = normalize(
         createRaw('message.part.updated', { part, time: 1_772_214_640_111 })
@@ -205,6 +206,41 @@ describe('normalize', () => {
       // for a null result, so it cannot prove the event was recognized.
       expect(result).toEqual({ type: 'message.part.updated', part });
       expect(Object.hasOwn(result as object, 'time')).toBe(false);
+    });
+
+    it('returns null for a tool part with no readable state', () => {
+      const base = { id: 'p-1', sessionID: 'ses-1', messageID: 'msg-1', type: 'tool' };
+      const states: unknown[] = [
+        undefined,
+        null,
+        [],
+        'running',
+        {},
+        { status: 42 },
+        { status: '' },
+      ];
+
+      for (const state of states) {
+        const part = state === undefined ? base : { ...base, state };
+        expect(normalize(createRaw('message.part.updated', { part }))).toBeNull();
+      }
+    });
+
+    it('keeps a tool part whose state carries a non-empty status string', () => {
+      const part = {
+        id: 'p-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+        state: { status: 'completed', attachments: 'not-an-array' },
+      };
+
+      // The state's identity is what the boundary checks; its contents are
+      // reduced at the chat-processor seam.
+      expect(normalize(createRaw('message.part.updated', { part }))).toEqual({
+        type: 'message.part.updated',
+        part,
+      });
     });
   });
 
@@ -2210,6 +2246,7 @@ describe('normalizeCliEvent', () => {
         sessionID: 'ses-1',
         messageID: 'msg-1',
         type: 'tool',
+        state: { status: 'running' },
       };
       expect(normalizeCliEvent('message.part.updated', { part, time: 42 })).toEqual({
         type: 'message.part.updated',

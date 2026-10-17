@@ -1,4 +1,4 @@
-import type { Part, FilePart, StepFinishPart, ToolPart } from './types';
+import type { Part, FilePart, StepFinishPart, ToolPart, ToolState } from './types';
 
 function isFilePart(part: Part): part is FilePart {
   return part.type === 'file';
@@ -6,6 +6,60 @@ function isFilePart(part: Part): part is FilePart {
 
 function isToolPart(part: Part): part is ToolPart {
   return part.type === 'tool';
+}
+
+/**
+ * A tool part's `state`, validated well enough to read. The wire and the
+ * replay paths do not guarantee the field: the per-event schema checks the
+ * part's identity, and a replay hands stored parts to the seam, so `state` can
+ * be absent, null, a non-object, or carry a `status` that is not a string even
+ * though the generated `ToolPart` declares a full `ToolState`. Returns `null`
+ * for all of those, so callers skip a part they cannot read.
+ *
+ * The declared union cannot be recovered by narrowing (`in`/`typeof` give an
+ * object with unknown members); it is then trusted only for the members each
+ * reader validates for itself — `status`, `Array.isArray(attachments)`, and a
+ * numeric `time.end`.
+ */
+function toolStateOf(part: ToolPart): ToolState | null {
+  const state: unknown = part.state;
+  if (typeof state !== 'object' || state === null || Array.isArray(state)) {
+    return null;
+  }
+  if (!('status' in state) || typeof state.status !== 'string' || state.status.length === 0) {
+    return null;
+  }
+  const validated: ToolState = state as ToolState;
+  return validated;
+}
+
+/**
+ * An attachment entry the chat pipeline can consume. Its `mime` is read with
+ * `startsWith` and its `url` is passed on as the data URL, so both must be
+ * strings; any other entry is dropped.
+ */
+function isToolAttachment(attachment: unknown): attachment is FilePart {
+  if (typeof attachment !== 'object' || attachment === null || Array.isArray(attachment)) {
+    return false;
+  }
+  if (!('mime' in attachment) || typeof attachment.mime !== 'string') return false;
+  if (!('url' in attachment) || typeof attachment.url !== 'string') return false;
+  return true;
+}
+
+/**
+ * The attachments of a completed tool part that downstream consumers can use,
+ * or an empty list. Empty for every other `state.status`, and for a part whose
+ * `state` or `state.attachments` is not usable, so every consumer reads a plain
+ * list of readable entries.
+ */
+export function toolPartAttachments(part: Part): readonly FilePart[] {
+  if (!isToolPart(part)) return [];
+  const state = toolStateOf(part);
+  if (state === null || state.status !== 'completed' || !Array.isArray(state.attachments)) {
+    return [];
+  }
+  return state.attachments.filter(isToolAttachment);
 }
 
 function stripFilePartContent(part: FilePart): FilePart {
@@ -34,15 +88,20 @@ export function stripPartContentIfFile(part: Part): Part {
   if (isFilePart(part)) {
     return stripFilePartContent(part);
   }
-  if (isToolPart(part) && part.state.status === 'completed' && part.state.attachments) {
-    const strippedAttachments = part.state.attachments.map(stripFilePartContent);
-    return {
-      ...part,
-      state: {
-        ...part.state,
-        attachments: strippedAttachments,
-      },
-    };
+  if (isToolPart(part)) {
+    const state = toolStateOf(part);
+    if (state !== null && state.status === 'completed' && Array.isArray(state.attachments)) {
+      const strippedAttachments = state.attachments
+        .filter(isToolAttachment)
+        .map(stripFilePartContent);
+      return {
+        ...part,
+        state: {
+          ...state,
+          attachments: strippedAttachments,
+        },
+      };
+    }
   }
   return part;
 }
@@ -75,16 +134,20 @@ export function normalizeMissingPartText(part: Part): Part {
  * time, so a settled tool state is ordered by the `time.end` it stamped when it
  * settled. An unsettled part carries no ordering evidence.
  *
- * `state.time` is read defensively: ingest-frame compaction persists a part
- * with only `state.status` (`services/cloud-agent-next/src/shared/ingest-frame.ts`
- * `compactMessagePart`), so a replayed terminal can arrive with no time at all.
- * It then carries no ordering evidence rather than throwing.
+ * The state is read defensively at every level: a part arriving from the wire
+ * or a replay can carry no usable `state` at all, and ingest-frame compaction
+ * persists a part with only `state.status`
+ * (`services/cloud-agent-next/src/shared/ingest-frame.ts` `compactMessagePart`),
+ * so a replayed terminal can arrive with no time. Either case carries no
+ * ordering evidence.
  */
 export function partSettledAt(part: Part): number | undefined {
   if (part.type !== 'tool') return undefined;
-  const state = part.state;
+  const state = toolStateOf(part);
+  if (state === null) return undefined;
   if (state.status === 'completed' || state.status === 'error') {
-    return state.time?.end;
+    const end = state.time?.end;
+    return typeof end === 'number' ? end : undefined;
   }
   return undefined;
 }
@@ -110,6 +173,49 @@ export function normalizeMissingPatchFiles(part: Part): Part {
     return part;
   }
   return { ...part, files: [] };
+}
+
+/**
+ * A tool part's `state` decides how every reader treats the part: the stored
+ * lifecycle merge ranks `state.status`, the transcript renders the completed
+ * output, and the attachment sink reads `state.attachments[].mime`. The wire
+ * and the replay paths do not guarantee any of it (the per-event schema is
+ * `.passthrough()`, and a replay hands stored parts to this seam), so a part
+ * can arrive with no `state`, a null one, or a `state.status` that is not a
+ * string.
+ *
+ * Such a part is DROPPED (returns `null`): nothing renderable is lost, no state
+ * is invented for it, and skipping the write leaves any previously stored good
+ * version of the same part id in place instead of replacing it with an
+ * unreadable one. A part with a usable `status` is kept, with
+ * `state.attachments` reduced to the entries downstream consumers can read.
+ *
+ * Identity-preserving: when nothing needs fixing the SAME object is returned
+ * so memoized stored messages keep their reference.
+ */
+export function normalizeToolPartState(part: Part): Part | null {
+  if (!isToolPart(part)) {
+    return part;
+  }
+  const state = toolStateOf(part);
+  if (state === null) {
+    return null;
+  }
+  if (state.status !== 'completed') {
+    return part;
+  }
+  const attachments = state.attachments;
+  if (attachments === undefined) {
+    return part;
+  }
+  if (!Array.isArray(attachments)) {
+    return { ...part, state: { ...state, attachments: [] } };
+  }
+  const conforming = attachments.filter(isToolAttachment);
+  if (conforming.length === attachments.length) {
+    return part;
+  }
+  return { ...part, state: { ...state, attachments: conforming } };
 }
 
 /**

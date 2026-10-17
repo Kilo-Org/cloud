@@ -300,8 +300,19 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
   const sink: TransportSink = {
     onChatEvent(event) {
-      chatProcessor.process(event);
-      config.onEvent?.(event);
+      // Keep one event's failure from taking the events after it: report and
+      // carry on rather than surfacing a session error for a single chat
+      // event, so the transcript keeps streaming.
+      try {
+        chatProcessor.process(event);
+      } catch (error) {
+        console.error(`[Session] Failed to process ${event.type}:`, error);
+      }
+      try {
+        config.onEvent?.(event);
+      } catch (error) {
+        console.error(`[Session] Event listener threw on ${event.type}:`, error);
+      }
     },
     onServiceEvent(event) {
       serviceState.process(event);

@@ -185,11 +185,16 @@ export function compileGlob(pattern: string): CompiledGlob {
         }
       } else {
         // `**/` is empty or anything ending in `/`: every reachable position
-        // stays reachable, and so does every position after a `/`.
+        // stays reachable, and so does every position at or after the first
+        // one whose preceding character is `/`.
+        let min = path.length;
+        for (let index = 0; index < currentCount; index += 1) {
+          min = Math.min(min, currentList[index]);
+        }
         for (let position = 0; position <= path.length; position += 1) {
           if (
             currentFlags[position] !== 0 ||
-            (position > 0 && path.charCodeAt(position - 1) === SLASH)
+            (position > min && path.charCodeAt(position - 1) === SLASH)
           ) {
             pushNext(position);
           }

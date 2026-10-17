@@ -134,6 +134,10 @@ describe('compileGlob', () => {
     expect(compileGlob('docs/**/a.md').matches('docs/x/y/a.md')).toBe(true);
     expect(compileGlob('a/**b/c').matches('a/x/yb/c')).toBe(true);
     expect(compileGlob('a/**b/c').matches('a/yb/z')).toBe(false);
+    // A directory wildcard only extends forward from a reachable position.
+    expect(compileGlob('a/a**/a').matches('a/a')).toBe(false);
+    expect(compileGlob('a/a**/a').matches('a/a/a')).toBe(true);
+    expect(compileGlob('a**/a').matches('a/a')).toBe(true);
     expect(compileGlob('*').tokenCount).toBe(1);
   });
 

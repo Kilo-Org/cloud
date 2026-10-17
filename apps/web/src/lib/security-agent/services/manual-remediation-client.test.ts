@@ -156,7 +156,14 @@ describe('remediation Worker call sites', () => {
     async ({ submit }) => {
       jest.useFakeTimers();
       try {
-        mockFetch.mockImplementation(() => new Promise<Response>(() => {}));
+        // The platform errors a fetch (and its body) when the request signal
+        // aborts; emulate that so the bound behaves as in production.
+        mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+          const signal = init?.signal as AbortSignal;
+          return new Promise<Response>((_resolve, reject) =>
+            signal.addEventListener('abort', () => reject(signal.reason))
+          );
+        });
 
         let settled = false;
         const outcome = submit().catch((error: unknown) => {

@@ -401,6 +401,140 @@ describe('contributor champions service', () => {
     expect(allEvents).toHaveLength(2);
   });
 
+  it('sync stores no email and links no Kilo account when no commit is attributed to the PR author', async () => {
+    await insertTestUser({ google_user_email: 'redirected@example.com' });
+    mockedGrantCredit.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      amount_usd: 50,
+      credit_transaction_id: 'test-tx',
+    });
+
+    mockedFetchWithBackoff.mockImplementation(async url => {
+      const parsedUrl = toUrl(url);
+      if (parsedUrl.pathname.endsWith('/pulls/7201/commits')) {
+        return jsonResponse([
+          {
+            author: { login: 'unrelated-maintainer' },
+            commit: { author: { email: 'redirected@example.com' } },
+          },
+          {
+            author: null,
+            commit: { author: { email: 'redirected@example.com' } },
+          },
+        ]);
+      }
+
+      if (
+        parsedUrl.pathname.endsWith('/search/issues') &&
+        parsedUrl.searchParams.get('page') === '1'
+      ) {
+        return jsonResponse({
+          total_count: 1,
+          items: [
+            {
+              number: 7201,
+              html_url: 'https://github.com/Kilo-Org/kilocode/pull/7201',
+              title: 'Foreign commit email',
+              pull_request: { merged_at: daysAgo(3) },
+              user: {
+                login: 'unattributed-committer',
+                id: 999201,
+                type: 'User',
+                html_url: 'https://github.com/unattributed-committer',
+              },
+            },
+          ],
+        });
+      }
+
+      if (parsedUrl.pathname.endsWith('/search/issues')) {
+        return jsonResponse({ total_count: 1, items: [] });
+      }
+
+      throw new Error(`Unexpected GitHub request in test: ${url}`);
+    });
+
+    const syncResult = await syncContributorChampionData();
+    expect(syncResult.insertedContributionEvents).toBe(1);
+
+    const events = await db.select().from(contributor_champion_events);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.github_author_email).toBeNull();
+
+    const leaderboard = await getContributorChampionLeaderboard();
+    const row = leaderboard.find(value => value.githubLogin === 'unattributed-committer');
+    const contributorId = row?.contributorId;
+    if (!contributorId) throw new Error('Contributor missing from leaderboard');
+
+    expect(row?.email).toBeNull();
+    expect(row?.linkedUserId).toBeNull();
+
+    const enrollment = await enrollContributorChampion({ contributorId, tier: 'ambassador' });
+    expect(enrollment.creditGranted).toBe(false);
+    expect(mockedGrantCredit).not.toHaveBeenCalled();
+  });
+
+  it('sync keeps the email of a commit the PR author is attributed for', async () => {
+    await insertTestUser({ google_user_email: 'attributed@example.com' });
+
+    mockedFetchWithBackoff.mockImplementation(async url => {
+      const parsedUrl = toUrl(url);
+      if (parsedUrl.pathname.endsWith('/pulls/7202/commits')) {
+        return jsonResponse([
+          {
+            author: { login: 'unrelated-maintainer' },
+            commit: { author: { email: 'redirected@example.com' } },
+          },
+          {
+            author: { login: 'attributed-committer' },
+            commit: { author: { email: 'attributed@example.com' } },
+          },
+        ]);
+      }
+
+      if (
+        parsedUrl.pathname.endsWith('/search/issues') &&
+        parsedUrl.searchParams.get('page') === '1'
+      ) {
+        return jsonResponse({
+          total_count: 1,
+          items: [
+            {
+              number: 7202,
+              html_url: 'https://github.com/Kilo-Org/kilocode/pull/7202',
+              title: 'Attributed commit email',
+              pull_request: { merged_at: daysAgo(3) },
+              user: {
+                login: 'attributed-committer',
+                id: 999202,
+                type: 'User',
+                html_url: 'https://github.com/attributed-committer',
+              },
+            },
+          ],
+        });
+      }
+
+      if (parsedUrl.pathname.endsWith('/search/issues')) {
+        return jsonResponse({ total_count: 1, items: [] });
+      }
+
+      throw new Error(`Unexpected GitHub request in test: ${url}`);
+    });
+
+    await syncContributorChampionData();
+
+    const events = await db.select().from(contributor_champion_events);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.github_author_email).toBe('attributed@example.com');
+
+    const leaderboard = await getContributorChampionLeaderboard();
+    const row = leaderboard.find(value => value.githubLogin === 'attributed-committer');
+    expect(row?.email).toBe('attributed@example.com');
+    expect(row?.linkedUserId).toBeTruthy();
+  });
+
   it('returns profile badge only for enrolled memberships', async () => {
     const user = await insertTestUser({ google_user_email: 'badge-user@example.com' });
     const contributorId = await insertContributor({

@@ -1506,6 +1506,10 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
 
   it('leaves failed confirmation through Back to sessions', async () => {
     confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
+    // The composer-under-session shape the fix exists for: the not-found
+    // screen sits above the New session composer, and "Back to sessions" must
+    // remove both rather than reveal what was below.
+    navigationRoutes.unshift('agent-chat/new');
     const renderer = await mountRoute();
     const back = findByType(renderer.root, 'Button').find(button =>
       findByType(button, 'Text').some(text => text.children.includes('Back to sessions'))
@@ -1514,6 +1518,7 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       pressControl(back);
     });
 
+    // Truncated to the tabs entry: the composer is no longer on the stack.
     expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
     expect(rootRequests).toEqual([]);
   });

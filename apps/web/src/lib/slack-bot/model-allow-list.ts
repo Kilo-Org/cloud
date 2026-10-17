@@ -57,7 +57,9 @@ export async function getDefaultAllowedModel(
   }
 
   // No candidate passed `isAllowed`: the policy allows none of them, so there is
-  // no default model to return.
+  // no default model to return. This is the contract's no-model result; the
+  // install paths pass the policy-exempt bot default, so they resolve that model
+  // and this branch is reached through the resolver's own default argument.
   console.warn('[SlackBot] No allowed model found; org policy blocks all preferred models');
   return null;
 }

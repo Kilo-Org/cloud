@@ -319,9 +319,9 @@ export class GastownOrgDO extends DurableObject<Env> {
     ]);
 
     if (towns.length === 0) {
-      // Cycle complete — reset the cursor and wait for the next interval.
+      // Cycle complete — reset the cursor and let the alarm lapse. The
+      // watchdog re-arms through armWatchdogIfNeeded when a town is created.
       await this.ctx.storage.delete('watchdog_cursor');
-      await this.ctx.storage.setAlarm(Date.now() + WATCHDOG_INTERVAL_MS);
       return;
     }
 

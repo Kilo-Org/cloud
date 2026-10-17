@@ -1,6 +1,7 @@
 import { env, runDurableObjectAlarm } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import {
+  isCreationLimitError,
   MAX_RIGS_PER_TOWN,
   MAX_TOWNS_PER_OWNER,
   WATCHDOG_BATCH_SIZE,
@@ -76,6 +77,25 @@ describe('GastownUserDO creation limits', () => {
       default_branch: 'main',
     });
     expect(rig.town_id).toBe(other.id);
+  });
+});
+
+describe('CreationLimitError RPC mapping', () => {
+  it('should match the caller-side error and strip the serialization prefix', async () => {
+    const stub = getUserStub(`limits-mapping-${crypto.randomUUID()}`);
+    for (let i = 0; i < MAX_TOWNS_PER_OWNER; i++) {
+      await stub.createTown({ name: `t${i}`, owner_user_id: 'u1' });
+    }
+    let caught: unknown = null;
+    try {
+      await stub.createTown({ name: 'over', owner_user_id: 'u1' });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(isCreationLimitError(caught)).toBe(true);
+    expect((caught as Error).message).not.toContain('CreationLimitError:');
+    expect((caught as Error).message).toContain('maximum number of towns');
   });
 });
 

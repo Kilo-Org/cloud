@@ -24,10 +24,10 @@ if (userAgent.startsWith('pnpm/')) {
   process.exit(0);
 }
 
-if (execPath.includes('pnpm')) {
+const installer = userAgent.split(' ')[0] || 'an unknown installer';
+const execName = execPath ? path.basename(execPath) : '';
+if (['pnpm', 'pnpm.cjs', 'pnpm.mjs'].includes(execName)) {
   process.exit(0);
 }
 
-const installer = userAgent.split(' ')[0] || 'an unknown installer';
-const execName = execPath ? path.basename(execPath) : '';
 fail(execName ? `${installer} (${execName})` : installer);

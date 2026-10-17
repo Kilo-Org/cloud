@@ -50,6 +50,11 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
+const mockGetDefaultAllowedModel = jest.fn();
+jest.mock('@/lib/slack-bot/model-allow-list', () => ({
+  getDefaultAllowedModel: (...args: unknown[]) => mockGetDefaultAllowedModel(...args),
+}));
+
 import type { Owner } from '@/lib/integrations/core/types';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
@@ -64,6 +69,7 @@ import {
 } from './slack-service';
 
 const owner = { type: 'user', id: 'user-1' } satisfies Owner;
+const orgOwner = { type: 'org', id: 'org-1' } satisfies Owner;
 
 function buildSlackIntegration(overrides: Record<string, unknown> = {}) {
   return {
@@ -279,6 +285,7 @@ describe('upsertSlackInstallation', () => {
     mockWriteSlackCredential.mockReset();
     mockWriteSlackCredential.mockResolvedValue({ id: 'credential-1' });
     mockCaptureException.mockReset();
+    mockGetDefaultAllowedModel.mockReset();
   });
 
   it('preserves the selected model when refreshing an existing installation', async () => {
@@ -334,6 +341,88 @@ describe('upsertSlackInstallation', () => {
         }),
       })
     );
+  });
+
+  it('stores no model for a new organization installation when the policy allows none', async () => {
+    mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockGetDefaultAllowedModel.mockResolvedValue(null);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner: orgOwner, teamId: 'T123', installation });
+
+    expect(mockGetDefaultAllowedModel).toHaveBeenCalledWith(orgOwner.id, DEFAULT_BOT_MODEL);
+    const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect('model_slug' in inserted.metadata).toBe(false);
+    expect(inserted.metadata).toMatchObject({
+      access_token: 'xoxb-new-token',
+      bot_user_id: 'U_NEW_BOT',
+    });
+  });
+
+  it('stores the allowed model for a new organization installation', async () => {
+    mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockGetDefaultAllowedModel.mockResolvedValue('test/allowed-model');
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner: orgOwner, teamId: 'T123', installation });
+
+    const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect(inserted.metadata.model_slug).toBe('test/allowed-model');
+  });
+
+  it('drops a non-string stored model value on reinstall', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({
+        owned_by_user_id: null,
+        owned_by_organization_id: orgOwner.id,
+        metadata: { access_token: 'xoxb-old-token', model_slug: 42 },
+      }),
+    ]);
+    mockGetDefaultAllowedModel.mockResolvedValue(null);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner: orgOwner, teamId: 'T123', installation });
+
+    const updated = mockUpdateSet.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect('model_slug' in updated.metadata).toBe(false);
+    expect(updated.metadata.access_token).toBe('xoxb-new-token');
+  });
+
+  it('preserves the selected model on reinstall', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({
+        owned_by_user_id: null,
+        owned_by_organization_id: orgOwner.id,
+        metadata: { access_token: 'xoxb-old-token', model_slug: 'anthropic/claude-sonnet-4.5' },
+      }),
+    ]);
+    mockGetDefaultAllowedModel.mockResolvedValue(null);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner: orgOwner, teamId: 'T123', installation });
+
+    const updated = mockUpdateSet.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect(updated.metadata.model_slug).toBe('anthropic/claude-sonnet-4.5');
   });
 
   it('rejects installing a Slack workspace connected to another owner', async () => {

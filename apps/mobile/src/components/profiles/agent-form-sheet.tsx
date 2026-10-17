@@ -141,7 +141,7 @@ export function AgentFormSheet({
             error === 'slug-required' ||
             error === 'slug-invalid' ||
             error === 'slug-conflict' ||
-            slugConflictFromServer
+            (slugConflictFromServer && error === null)
               ? t(ERROR_KEYS[error ?? 'slug-conflict'])
               : undefined
           }

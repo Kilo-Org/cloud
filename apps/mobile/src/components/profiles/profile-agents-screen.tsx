@@ -227,6 +227,7 @@ export function ProfileAgentsScreen({
               model={row.model}
               onEdit={() => {
                 setForm({ source });
+                setServerSlugConflict(false);
               }}
               onDelete={() => {
                 confirmDelete(source);

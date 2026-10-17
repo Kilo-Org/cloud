@@ -366,6 +366,31 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     expect(webFetch).toHaveBeenCalledTimes(1);
   });
 
+  it('reports a small all-failed batch without aborting, so one failing owner never blocks a run', async () => {
+    const id = setOwner('user', 'u1', { mode: null, pool: [{ model: 'a/b' }] });
+    ownerRows = ['u1'];
+    webFetch.mockImplementation(async (_url, init) =>
+      Response.json({
+        results: requestBody(init).conversions.map(conversion => ({
+          owner: conversion.owner,
+          outcome: 'failed',
+          modelId: 'kilo-auto/custom/efficient',
+          noticesSent: 0,
+          noticesFailed: 0,
+        })),
+      })
+    );
+
+    const response = await scan({ ownerType: 'user', objectIds: [id], after: null, dryRun: false });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      aborted: false,
+      needsAttention: ['failed user:u1'],
+    });
+    expect(marked.size).toBe(0);
+  });
+
   it('skips owners an earlier run converted', async () => {
     const done = setOwner('user', 'u1', {
       mode: null,

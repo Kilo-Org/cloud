@@ -22,6 +22,7 @@ import type { HonoEnv } from './hono-env';
 import type { StoredOwnerSettings } from './routing-mode';
 
 const READ_CONCURRENCY = 10;
+const OUTAGE_BATCH_SIZE = 5;
 
 const ScanRequestSchema = z.object({
   ownerType: CustomRouterScopeSchema,
@@ -119,9 +120,10 @@ async function postChunk(
 }
 
 /**
- * Keeps every result a batch already produced. When the endpoint fails a whole batch (transport
- * error, bad response, or every conversion `failed`), the rest of the page is reported `failed`
- * without being posted, so an outage stops the run instead of failing owner by owner.
+ * Keeps every result a batch already produced. A transport failure, a bad response, or a batch of
+ * at least OUTAGE_BATCH_SIZE conversions that all failed is treated as an outage: the rest of the
+ * page is reported `failed` without being posted. A smaller all-failed batch (for example a retry
+ * that holds only one persistently failing owner) is reported and the run continues.
  */
 async function postConversions(
   env: Env,
@@ -133,7 +135,11 @@ async function postConversions(
   for (let start = 0; start < conversions.length; start += MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST) {
     const chunk = conversions.slice(start, start + MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST);
     const chunkResults = await postChunk(url, secret, chunk);
-    if (chunkResults === null || chunkResults.every(result => result.outcome === 'failed')) {
+    if (
+      chunkResults === null ||
+      (chunk.length >= OUTAGE_BATCH_SIZE &&
+        chunkResults.every(result => result.outcome === 'failed'))
+    ) {
       results.push(...(chunkResults ?? chunk.map(unpostedResult)));
       results.push(...conversions.slice(start + chunk.length).map(unpostedResult));
       return { results, aborted: true };

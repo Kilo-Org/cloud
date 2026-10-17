@@ -226,6 +226,8 @@ describe(`POST ${OWNER_POOL_CONVERSION_PATH}`, () => {
       );
 
       expect(results.map(result => result.outcome)).toEqual(['failed', 'created']);
+      const owners = (await routers()).map(row => row.owned_by_user_id);
+      expect(owners).toEqual([other.id]);
       expect(mockedCaptureException).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'connection reset' }),
         expect.objectContaining({ extra: { ownerType: 'user', ownerId: user.id } })
@@ -323,6 +325,49 @@ describe(`POST ${OWNER_POOL_CONVERSION_PATH}`, () => {
       expect(sentEmails()[0]?.html).toContain(
         `${NEXTAUTH_URL}/organizations/${organization.id}/providers-and-models`
       );
+    });
+
+    test('counts a failed notice when the organization has no owner, admin, or billing manager', async () => {
+      const organization = await createTestOrganization('Nobody', user.id, 0);
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.organization_id, organization.id));
+
+      const results = await convert({
+        owner: { type: 'org', id: organization.id },
+        mode: 'cost_per_accuracy',
+        models: [FLASH],
+      });
+
+      expect(results).toEqual([
+        expect.objectContaining({ outcome: 'created', noticesSent: 0, noticesFailed: 1 }),
+      ]);
+      expect(await routers()).toHaveLength(1);
+      expect(mockedSendViaMailgun).not.toHaveBeenCalled();
+    });
+
+    test('reports slug_taken for an organization that already has a different efficient router', async () => {
+      const organization = await createTestOrganization('Taken', user.id, 0);
+      await db.insert(auto_routing_custom_routers).values({
+        owned_by_organization_id: organization.id,
+        created_by_user_id: user.id,
+        slug: 'efficient',
+        name: 'Team router',
+        base_router: 'efficient',
+        mode: 'best_accuracy',
+        entries: [{ kind: 'gateway', model: SONNET }],
+        default_entry_key: customRouterEntryKey({ kind: 'gateway', model: SONNET }),
+      });
+
+      const results = await convert({
+        owner: { type: 'org', id: organization.id },
+        mode: 'cost_per_accuracy',
+        models: [FLASH],
+      });
+
+      expect(results).toEqual([expect.objectContaining({ outcome: 'slug_taken' })]);
+      expect(await routers()).toHaveLength(1);
+      expect(mockedSendViaMailgun).not.toHaveBeenCalled();
     });
   });
 

@@ -137,10 +137,20 @@ async function main(): Promise<void> {
   let droppedModeOnly = 0;
   let noticesSent = 0;
   let noticesFailed = 0;
+  // Owner keys are printed as each page arrives: those owners are marked converted, so a rerun
+  // after a crash skips them and could not report them again.
   const add = (result: OwnerPoolConversionScanResponse) => {
     for (const id of result.matchedObjectIds) matched.add(id);
     for (const outcome of OwnerPoolConversionOutcomeSchema.options) {
       outcomes[outcome] += result.outcomes[outcome] ?? 0;
+    }
+    for (const [label, keys] of [
+      ['readFailed', result.readFailed],
+      ['invalidPool', result.invalidPool],
+      ['invalidMode', result.invalidMode],
+      ['needsAttention', result.needsAttention],
+    ] as const) {
+      for (const key of keys) console.log(`${label}: ${key}`);
     }
     readFailed.push(...result.readFailed);
     invalidPool.push(...result.invalidPool);
@@ -152,88 +162,96 @@ async function main(): Promise<void> {
     noticesSent += result.noticesSent;
     noticesFailed += result.noticesFailed;
   };
-
-  const startIndex = resume ? OWNER_TYPES.indexOf(resume.ownerType) : 0;
-  for (const ownerType of OWNER_TYPES.slice(startIndex)) {
-    let after: string | null = resume?.ownerType === ownerType ? resume.cursor : null;
-    do {
-      // Converted owners are marked in their Durable Object, so retrying a page skips them.
-      const retryHint = `retry with --resume ${ownerType}:${after ?? ''}`;
-      let response: Response;
-      let body: unknown;
-      try {
-        response = await fetch(target, {
-          method: 'POST',
-          headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ ownerType, objectIds, after, limit, dryRun }),
-          signal: AbortSignal.timeout(300_000),
-          redirect: 'error',
-        });
-        body = await response.json();
-      } catch (error) {
-        const reason = error instanceof Error ? error.message : 'scan failed';
-        throw new Error(`${reason}; ${retryHint}`);
-      }
-      const result = OwnerPoolConversionScanResponseSchema.safeParse(body);
-      if (!result.success) {
-        throw new Error(`scan responded ${response.status} without a summary; ${retryHint}`);
-      }
-      add(result.data);
-      if (result.data.aborted) {
-        console.error(
-          `The web endpoint failed a whole batch; owners needing attention so far:\n${needsAttention.join('\n')}`
-        );
-        throw new Error(`scan aborted; ${retryHint}`);
-      }
-      after = result.data.nextCursor;
-      console.log(
-        `${ownerType}: scanned ${result.data.scanned}, matched ${result.data.matchedObjectIds.length}, conversions ${result.data.conversions}; cursor ${after === null ? 'done' : `${ownerType}:${after}`}`
-      );
-    } while (after !== null);
-  }
-
-  const unmatched = resume ? null : objectIds.filter(id => !matched.has(id));
-  console.log(
-    JSON.stringify(
-      {
-        dryRun,
-        listed: objectIds.length,
-        matched: matched.size,
-        unmatched: unmatched?.length ?? 'not audited on a resumed run',
-        alreadyConverted,
-        conversions,
-        outcomes,
-        droppedModeOnly,
-        readFailed,
-        invalidPool,
-        invalidMode,
-        needsAttention,
-        noticesSent,
-        noticesFailed,
-      },
-      null,
-      2
-    )
-  );
-  if (unmatched === null) {
+  let completed = false;
+  const printSummary = () => {
+    const unmatched = resume || !completed ? null : objectIds.filter(id => !matched.has(id));
     console.log(
-      'A resumed run skips owners before its cursor; audit unmatched objects with a full --dry-run.'
+      JSON.stringify(
+        {
+          dryRun,
+          completed,
+          listed: objectIds.length,
+          matched: matched.size,
+          unmatched: unmatched?.length ?? 'not audited on a resumed or interrupted run',
+          alreadyConverted,
+          conversions,
+          outcomes,
+          droppedModeOnly,
+          readFailed,
+          invalidPool,
+          invalidMode,
+          needsAttention,
+          noticesSent,
+          noticesFailed,
+        },
+        null,
+        2
+      )
     );
-  } else if (unmatched.length > 0) {
-    console.log(`Unmatched object ids:\n${unmatched.join('\n')}`);
-  }
-  const clean =
-    readFailed.length === 0 &&
-    invalidPool.length === 0 &&
-    invalidMode.length === 0 &&
-    needsAttention.length === 0 &&
-    noticesFailed === 0 &&
-    (unmatched?.length ?? 0) === 0;
-  if (!clean) {
-    console.error(
-      'Some owners need attention; see readFailed, invalidPool, invalidMode, needsAttention, and unmatched.'
+    if (unmatched === null) {
+      console.log('Audit unmatched objects with a full --dry-run from the start.');
+    } else if (unmatched.length > 0) {
+      console.log(`Unmatched object ids:\n${unmatched.join('\n')}`);
+    }
+    return (
+      completed &&
+      readFailed.length === 0 &&
+      invalidPool.length === 0 &&
+      invalidMode.length === 0 &&
+      needsAttention.length === 0 &&
+      noticesFailed === 0 &&
+      (unmatched?.length ?? 0) === 0
     );
-    process.exitCode = 1;
+  };
+
+  try {
+    const startIndex = resume ? OWNER_TYPES.indexOf(resume.ownerType) : 0;
+    for (const ownerType of OWNER_TYPES.slice(startIndex)) {
+      let after: string | null = resume?.ownerType === ownerType ? resume.cursor : null;
+      do {
+        // Converted owners are marked in their Durable Object, so retrying a page skips them.
+        const retryHint = `retry with --resume ${ownerType}:${after ?? ''}`;
+        let response: Response;
+        let body: unknown;
+        try {
+          response = await fetch(target, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+            body: JSON.stringify({ ownerType, objectIds, after, limit, dryRun }),
+            signal: AbortSignal.timeout(300_000),
+            redirect: 'error',
+          });
+          body = await response.json();
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : 'scan failed';
+          throw new Error(
+            `${reason}; ${retryHint}. Owners reported failed on an interrupted page may have a router without a notice; check them by hand.`
+          );
+        }
+        const result = OwnerPoolConversionScanResponseSchema.safeParse(body);
+        if (!result.success) {
+          throw new Error(`scan responded ${response.status} without a summary; ${retryHint}`);
+        }
+        add(result.data);
+        if (result.data.aborted) {
+          throw new Error(
+            `the web endpoint failed a whole batch; ${retryHint}. To skip a single owner that keeps failing, resume after its id: --resume ${ownerType}:<ownerId>.`
+          );
+        }
+        after = result.data.nextCursor;
+        console.log(
+          `${ownerType}: scanned ${result.data.scanned}, matched ${result.data.matchedObjectIds.length}, conversions ${result.data.conversions}; cursor ${after === null ? 'done' : `${ownerType}:${after}`}`
+        );
+      } while (after !== null);
+    }
+    completed = true;
+  } finally {
+    if (!printSummary()) {
+      console.error(
+        'Some owners need attention; see readFailed, invalidPool, invalidMode, needsAttention, and unmatched.'
+      );
+      process.exitCode = 1;
+    }
   }
 }
 

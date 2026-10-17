@@ -546,8 +546,9 @@ beforeEach(() => {
   queryState.fetchStatus = 'fetching';
   queryState.error = null;
   queryState.data = {};
-  // A settled read this mount: fresh for the open the guard measures from.
-  queryState.dataUpdatedAt = Date.now();
+  // No successful read yet (dataUpdatedAt 0); tests that need the
+  // rendered-session guard armed set a fresh timestamp after mounting.
+  queryState.dataUpdatedAt = 0;
   queryState.refetch.mockReset();
   secureStoreMock.getItemAsync.mockReset();
   secureStoreMock.getItemAsync.mockResolvedValue(null);
@@ -916,6 +917,9 @@ describe('SessionDetailScreen valid session-id', () => {
       expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
       const manager = managers.at(-1)?.manager;
 
+      // The metadata read landed during this open: its success timestamp is
+      // fresh for the open the rendered-session guard measures from.
+      queryState.dataUpdatedAt = Date.now();
       // A denial arriving on a background refresh after the session rendered
       // must not blank the screen: the cached metadata beside the error still
       // scopes the provider, and the transcript stays for the reader.
@@ -929,6 +933,23 @@ describe('SessionDetailScreen valid session-id', () => {
       expect(transcriptText(renderer, 'RootText')).toBe('Account A root row');
     }
   );
+
+  it('retires a session whose metadata was cached by a previous mount', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    const renderer = await mountRoute();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+
+    // The row in the query cache succeeded on a PREVIOUS mount: its timestamp
+    // predates this open, so the rendered-session guard does not arm and the
+    // denial retires the screen immediately.
+    queryState.dataUpdatedAt = 1;
+    queryState.isError = true;
+    queryState.error = { data: { code: 'NOT_FOUND' } };
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry')).toBeUndefined();
+  });
 
   it('renders the session content with the parsed session-id and enables the query', async () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });

@@ -264,6 +264,14 @@ export default function SessionDetailScreen() {
     metadataErrorCode === 'NOT_FOUND' ||
     metadataErrorCode === 'UNAUTHORIZED' ||
     metadataErrorCode === 'FORBIDDEN';
+  // Arm the rendered-session guard BEFORE the denial branch: a fresh read's
+  // data is already in place on the render that also carries a denial (a
+  // background refetch failing on the same render its cached data sits
+  // beside), and the guard must be armed from that data. A previous mount's
+  // cached row carries an earlier `dataUpdatedAt`, so it never arms.
+  if (sessionQuery.data != null && sessionQuery.dataUpdatedAt >= openStart.current.startedAt) {
+    sessionRendered.current = rawSessionId;
+  }
   // A failed background refresh does not invalidate owner-scoped cached
   // metadata. Keep its provider mounted; only an authoritative denial retires it.
   // A retryable metadata failure must not blank a session either: the device may
@@ -356,17 +364,6 @@ export default function SessionDetailScreen() {
   // Same-scope metadata is background work once the transcript has mounted.
   // Confirmation/reconnection must not replace it with the initial skeleton.
   displayedProviderKey.current = providerKey;
-  // Mark "this open rendered the session from a successful read" only when the
-  // read's data is fresh for this open (its `dataUpdatedAt` is not from a
-  // previous mount's cached row). A cache-hot reopen of a session that was
-  // since deleted or lost access keeps the immediate retirement; a fresh open
-  // that later hits a background-refetch denial keeps its rendered session.
-  // `dataUpdatedAt` is 0 until a read succeeds.
-  const readIsFreshForThisOpen =
-    sessionQuery.dataUpdatedAt === 0 || sessionQuery.dataUpdatedAt >= openStart.current.startedAt;
-  if (sessionQuery.data != null && readIsFreshForThisOpen) {
-    sessionRendered.current = rawSessionId;
-  }
 
   return (
     <AgentSessionProvider

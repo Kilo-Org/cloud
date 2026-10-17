@@ -1683,6 +1683,45 @@ describe('cli-sessions-v2-router', () => {
       }
     });
 
+    it('should throw UNAUTHORIZED when the caller has no access to the session organization', async () => {
+      const orgSessionId = 'ses_test_share_v2_org_membership_required';
+      await db.insert(cli_sessions_v2).values({
+        session_id: orgSessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'webhook',
+        organization_id: testOrganization.id,
+      });
+
+      try {
+        await db
+          .delete(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, testOrganization.id),
+              eq(organization_memberships.kilo_user_id, regularUser.id)
+            )
+          );
+
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.cliSessionsV2.shareForWebhookTrigger({
+            kilo_session_id: orgSessionId,
+            trigger_id: testTriggerId,
+          })
+        ).rejects.toThrow('You do not have access to this organization');
+      } finally {
+        await db
+          .delete(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, testOrganization.id),
+              eq(organization_memberships.kilo_user_id, regularUser.id)
+            )
+          );
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, orgSessionId));
+      }
+    });
+
     it('should throw NOT_FOUND for non-existent trigger', async () => {
       const caller = await createCallerForUser(regularUser.id);
 

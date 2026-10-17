@@ -104,6 +104,12 @@ export default function SessionDetailScreen() {
   if (openStart.current.sessionId !== rawSessionId) {
     openStart.current = { sessionId: rawSessionId, startedAt: Date.now() };
   }
+  const sessionRendered = useRef<string | null>(null);
+  if (sessionRendered.current !== null && sessionRendered.current !== rawSessionId) {
+    // A reused route instance opening a different session restarts the
+    // rendered guard with the clock.
+    sessionRendered.current = null;
+  }
   // Narrow the metadata invalidation to this session's own query key. The whole
   // `cliSessionsV2` procedure prefix would also invalidate the stored
   // `cliSessionsV2.list` pages behind this pushed route, so returning to the app
@@ -114,51 +120,6 @@ export default function SessionDetailScreen() {
     trpc.cliSessionsV2.get.queryKey({ session_id: sessionId ?? '' }),
     [['modelPreferences']],
   ]);
-  const sessionQuery = useQuery({
-    ...trpc.cliSessionsV2.get.queryOptions(
-      { session_id: sessionId ?? '' },
-      {
-        retry: (failureCount, error) => {
-          // The restored-scope path must not get the young-route retry: its
-          // terminal retirement (the hint's transcript retires the moment the
-          // live account is denied) is a deliberate account-boundary signal,
-          // and delaying it for 8s would leave another account's scope on
-          // screen. The spawned retry keeps its spawned-only contract.
-          const errorCode =
-            (error as { data?: { code?: string } } | null)?.data?.code ??
-            (error as { code?: string } | null)?.code;
-          return (
-            shouldRetryNotFoundOnSpawnedRoute({ spawned, attempt: failureCount, errorCode }) ||
-            (!owner.restored &&
-              shouldRetryNotFoundOnYoungRoute({
-                attempt: failureCount,
-                errorCode,
-              }))
-          );
-        },
-        // kilocode_change - C3b: TanStack Query's default retryDelay is
-        // exponential backoff (1s, 2s, 4s, 8s, ... capped at 30s), which
-        // would stretch the 8-attempt ceiling well past the "~8s is
-        // generous" budget the spawned-row window actually needs. Pin a
-        // flat 1s cadence so 8 attempts stay close to 8 seconds elapsed,
-        // matching the plan's stated timing. Only in effect while a retry is
-        // allowed at all (the `spawned=1` NOT_FOUND path, or the young-route
-        // NOT_FOUND path when the scope is not a restored identity) —
-        // everywhere else `retry` already returns `false` on the first
-        // failure, so this delay is never consulted.
-        retryDelay: 1000,
-      }
-    ),
-    // Isolate account metadata while preserving the typed tRPC key and prefix invalidation.
-    queryHash: hashKey([
-      ...trpc.cliSessionsV2.get.queryKey({ session_id: sessionId ?? '' }),
-      owner.authEpoch,
-      owner.generation,
-      owner.userId,
-    ]),
-    enabled: isAuthenticatedOwner(owner) && routeOrganizationId === undefined && sessionId !== null,
-  });
-
   // The account that owns this device's persisted transcript. The live
   // confirmation wins; the id restored from the encrypted read cache keeps the
   // cached transcript readable only when the account cannot be confirmed at all
@@ -168,20 +129,67 @@ export default function SessionDetailScreen() {
   // account's rows. Sign-in clears the prior hint before storing new credentials;
   // a fresh sign-in is not a restore, so the route must stay pending
   // (`identityPending`) until `user.getMe` answers.
+  // Declared before the metadata query so the retry callback can scope its
+  // NOT_FOUND skip to the hint that is actually in play.
   const restoredUserId = useRestoredAccountId(owner.authEpoch, owner.restored);
+  const sessionQuery = useQuery(
+    {
+      ...trpc.cliSessionsV2.get.queryOptions(
+        { session_id: sessionId ?? '' },
+        {
+          retry: (failureCount, error) => {
+            // The restored-scope path must not get the young-route retry: its
+            // terminal retirement (the hint's transcript retires the moment the
+            // live account is denied) is a deliberate account-boundary signal,
+            // and delaying it for 8s would leave the hint's scope on screen.
+            // The skip is scoped to the hint that is actually in play
+            // (`restoredUserId`), not to the process-wide `owner.restored`
+            // flag, so every later open on a confirmed owner still gets the
+            // retry.
+            const errorCode =
+              (error as { data?: { code?: string } } | null)?.data?.code ??
+              (error as { code?: string } | null)?.code;
+            return (
+              shouldRetryNotFoundOnSpawnedRoute({ spawned, attempt: failureCount, errorCode }) ||
+              (restoredUserId === null &&
+                shouldRetryNotFoundOnYoungRoute({
+                  attempt: failureCount,
+                  errorCode,
+                }))
+            );
+          },
+          // kilocode_change - C3b: TanStack Query's default retryDelay is
+          // exponential backoff (1s, 2s, 4s, 8s, ... capped at 30s), which
+          // would stretch the 8-attempt ceiling well past the "~8s is
+          // generous" budget the spawned-row window actually needs. Pin a
+          // flat 1s cadence so 8 attempts stay close to 8 seconds elapsed,
+          // matching the plan's stated timing. Only in effect while a retry is
+          // allowed at all (the `spawned=1` NOT_FOUND path, or the young-route
+          // NOT_FOUND path when the scope is not a restored identity) —
+          // everywhere else `retry` already returns `false` on the first
+          // failure, so this delay is never consulted.
+          retryDelay: 1000,
+        }
+      ),
+      // Isolate account metadata while preserving the typed tRPC key and prefix invalidation.
+      queryHash: hashKey([
+        ...trpc.cliSessionsV2.get.queryKey({ session_id: sessionId ?? '' }),
+        owner.authEpoch,
+        owner.generation,
+        owner.userId,
+      ]),
+      enabled:
+        isAuthenticatedOwner(owner) && routeOrganizationId === undefined && sessionId !== null,
+    }
+    // The route renders the session's own subtree; no suspense boundary.
+  );
+
+  // Sign-in clears the prior hint before storing new credentials.
   const sessionScopeUserId = owner.userId ?? restoredUserId;
   const identityPending = sessionScopeUserId === null;
   const identityFailed = identityPending && confirmation.isError;
   const providerKey = `${owner.generation}:${sessionScopeUserId}:${sessionId}:${routeOrganizationId ?? 'personal'}`;
   const displayedProviderKey = useRef<string | null>(null);
-  // Whether THIS route instance has rendered the session subtree (the provider
-  // below mounted). A denial that arrives after that point — a background
-  // refetch answering NOT_FOUND / UNAUTHORIZED / FORBIDDEN for a session this
-  // mount demonstrably loaded — must not blank the screen. Deliberately a ref
-  // on this mount, not `sessionQuery.data != null`: the in-memory query cache
-  // can hold a stale row from a previous mount for a session that was since
-  // deleted or lost access, and that denial must still retire the screen.
-  const sessionRenderedThisMount = useRef(false);
 
   const displayScope = {
     organizationId: routeOrganizationId ?? sessionQuery.data?.organization_id ?? null,
@@ -261,15 +269,15 @@ export default function SessionDetailScreen() {
   // A retryable metadata failure must not blank a session either: the device may
   // still hold its persisted transcript, so mount the session and let the SDK
   // paint the cached content and surface the retryable failure in place. Only a
-  // denial (deleted session / lost access) replaces the screen with the error —
-  // and only when this mount has not rendered the session yet (see the ref
-  // above), so a background-refetch denial never blanks a rendered session.
+  // denial replaces the screen with the error — and only when this open has not
+  // rendered the session yet (see the `sessionRendered` ref above), so a
+  // background-refetch denial never blanks a rendered session.
   if (
     identityFailed ||
     (routeOrganizationId === undefined &&
       sessionQuery.isError &&
       metadataAccessDenied &&
-      !sessionRenderedThisMount.current)
+      sessionRendered.current !== rawSessionId)
   ) {
     // An identity failure stays retriable. An authoritative metadata denial
     // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) can't be recovered by retrying, so
@@ -348,13 +356,16 @@ export default function SessionDetailScreen() {
   // Same-scope metadata is background work once the transcript has mounted.
   // Confirmation/reconnection must not replace it with the initial skeleton.
   displayedProviderKey.current = providerKey;
-  // Mark "this mount rendered the session from a successful metadata read"
-  // only when the live account is confirmed (`owner.userId` set). The
-  // restored-scope mount renders the hint's transcript with no metadata
-  // success (its read is pending or paused), and its retirement on a denial
-  // after confirmation must stay immediate — see the denial branch above.
-  if (owner.userId !== null && sessionQuery.data != null) {
-    sessionRenderedThisMount.current = true;
+  // Mark "this open rendered the session from a successful read" only when the
+  // read's data is fresh for this open (its `dataUpdatedAt` is not from a
+  // previous mount's cached row). A cache-hot reopen of a session that was
+  // since deleted or lost access keeps the immediate retirement; a fresh open
+  // that later hits a background-refetch denial keeps its rendered session.
+  // `dataUpdatedAt` is 0 until a read succeeds.
+  const readIsFreshForThisOpen =
+    sessionQuery.dataUpdatedAt === 0 || sessionQuery.dataUpdatedAt >= openStart.current.startedAt;
+  if (sessionQuery.data != null && readIsFreshForThisOpen) {
+    sessionRendered.current = rawSessionId;
   }
 
   return (

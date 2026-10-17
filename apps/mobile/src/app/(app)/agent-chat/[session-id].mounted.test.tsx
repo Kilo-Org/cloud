@@ -88,6 +88,10 @@ const queryState = vi.hoisted(() => ({
   fetchStatus: 'fetching' as 'fetching' | 'paused' | 'idle',
   error: null as { data?: { code?: string } } | null,
   data: null as { organization_id?: string | null; id?: string } | null,
+  // Epoch ms of the successful read, or 0 before one. The route's
+  // rendered-session guard reads this to tell a fresh open's data from a
+  // previous mount's cached row.
+  dataUpdatedAt: 0,
   refetch: vi.fn(),
 }));
 
@@ -379,9 +383,22 @@ async function updateRoute(renderer: TestRenderer.ReactTestRenderer) {
   });
 }
 
+function metadataQueryOptions(): { enabled?: boolean; queryKey?: string[] } | undefined {
+  // The route mounts its metadata query after `useRestoredAccountId`'s
+  // `user.getMe` read, so the shared `useQuery` mock sees both; the metadata
+  // call is the last one whose query key is not the getMe key.
+  const calls = useQueryMock.mock.calls as { queryKey?: string[]; enabled?: boolean }[][];
+  for (let index = calls.length - 1; index >= 0; index -= 1) {
+    const options = calls[index]?.[0];
+    if (options?.queryKey?.[0] !== 'user') {
+      return options;
+    }
+  }
+  return undefined;
+}
+
 function queryEnabled(): boolean | undefined {
-  const options = useQueryMock.mock.calls[0]?.[0] as { enabled?: boolean } | undefined;
-  return options?.enabled;
+  return metadataQueryOptions()?.enabled;
 }
 
 function queryInput(): { session_id?: string } | undefined {
@@ -529,6 +546,8 @@ beforeEach(() => {
   queryState.fetchStatus = 'fetching';
   queryState.error = null;
   queryState.data = {};
+  // A settled read this mount: fresh for the open the guard measures from.
+  queryState.dataUpdatedAt = Date.now();
   queryState.refetch.mockReset();
   secureStoreMock.getItemAsync.mockReset();
   secureStoreMock.getItemAsync.mockResolvedValue(null);

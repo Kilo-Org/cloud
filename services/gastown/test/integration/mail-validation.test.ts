@@ -175,6 +175,50 @@ describe('mail validation and delivery limits', () => {
     expect(remaining.length).toBeLessThanOrEqual(50);
   });
 
+  it('keeps mail from a second recipient deliverable when the first fills the batch', async () => {
+    const sender = await town.registerAgent({
+      role: 'polecat',
+      name: 'S8',
+      identity: `mailval-s8-${townName}`,
+    });
+    const busy = await town.registerAgent({
+      role: 'polecat',
+      name: 'R8',
+      identity: `mailval-r8-${townName}`,
+    });
+    const other = await town.registerAgent({
+      role: 'polecat',
+      name: 'R9',
+      identity: `mailval-r9-${townName}`,
+    });
+    await town.updateAgentStatus(busy.id, 'working');
+    await town.updateAgentStatus(other.id, 'working');
+
+    // The busy agent's mail has the older created_at, so it fills the batch.
+    for (let i = 0; i < 50; i++) {
+      await town.sendMail({
+        from_agent_id: sender.id,
+        to_agent_id: busy.id,
+        subject: `Filler ${i}`,
+        body: `Body ${i}`,
+      });
+    }
+    await town.sendMail({
+      from_agent_id: sender.id,
+      to_agent_id: other.id,
+      subject: 'Beyond the window',
+      body: 'Must survive the tick',
+    });
+
+    await runDurableObjectAlarm(town);
+
+    // The second recipient's message sits past the batch window; it stays
+    // open and is delivered on a later tick.
+    const otherMail = await town.checkMail(other.id);
+    expect(otherMail).toHaveLength(1);
+    expect(otherMail[0].subject).toBe('Beyond the window');
+  });
+
   it('closes mail whose recipient was deleted and mail past the retention window', async () => {
     const sender = await town.registerAgent({
       role: 'polecat',

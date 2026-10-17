@@ -174,8 +174,12 @@ export function readAndDeliverMail(sql: SqlStorage, agentId: string): Mail[] {
     delivered_at: null,
   }));
 
-  // Batch-close all open message beads for this agent in a single UPDATE
+  // Close exactly the beads returned above; each delivery step covers the
+  // messages it reports.
   const timestamp = now();
+  const selectedIds = mailBeads.map(mb => mb.bead_id);
+  const placeholders = selectedIds.map(() => '?').join(', ');
+  const params: unknown[] = [timestamp, timestamp, ...selectedIds];
   query(
     sql,
     /* sql */ `
@@ -183,11 +187,9 @@ export function readAndDeliverMail(sql: SqlStorage, agentId: string): Mail[] {
       SET ${beads.columns.status} = 'closed',
           ${beads.columns.closed_at} = ?,
           ${beads.columns.updated_at} = ?
-      WHERE ${beads.type} = 'message'
-        AND ${beads.assignee_agent_bead_id} = ?
-        AND ${beads.status} = 'open'
+      WHERE ${beads.bead_id} IN (${placeholders})
     `,
-    [timestamp, timestamp, agentId]
+    params as [unknown, unknown] & unknown[]
   );
 
   return messages;
@@ -280,6 +282,7 @@ export function sweepStaleMail(sql: SqlStorage, retentionMs: number = MAIL_RETEN
             )
             OR ${beads.created_at} < ?
           )
+          RETURNING ${beads.bead_id}
       `,
       [timestamp, timestamp, cutoff]
     ),

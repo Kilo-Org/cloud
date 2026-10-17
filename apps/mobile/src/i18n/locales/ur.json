@@ -2498,6 +2498,7 @@
       "title": "سیشن فلٹر کریں",
       "platformCloud": "کلاؤڈ",
       "platformExtension": "ایکسٹینشن",
+      "platformDesktop": "ڈیسک ٹاپ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

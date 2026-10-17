@@ -1986,6 +1986,7 @@
       "title": "세션 필터링",
       "platformCloud": "클라우드",
       "platformExtension": "확장 프로그램",
+      "platformDesktop": "데스크톱",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

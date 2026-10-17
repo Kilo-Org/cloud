@@ -74,6 +74,7 @@ export const subjects = {
   kiloPassOrgBlocked: 'Action required: Update Kilo Pass assignments',
   userDataExportReady: 'Your Kilo data export is ready',
   dataExportDownloadCode: 'Your Kilo data export download code',
+  autoRoutingPoolConverted: 'Kilo: Your Efficient model pool is now a custom router',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -216,6 +217,30 @@ export async function sendKiloPassOrgBlockedEmail(
     templateVars: {
       organization_name: props.organizationName,
       manage_url: `${NEXTAUTH_URL}/organizations/${props.organizationId}/subscriptions/kilo-pass`,
+    },
+  });
+}
+
+export async function sendAutoRoutingPoolConvertedEmail(
+  to: string,
+  props: {
+    routerName: string;
+    modelId: string;
+    organization: { id: string; name: string } | null;
+  }
+): Promise<SendResult> {
+  return send({
+    to,
+    templateName: 'autoRoutingPoolConverted',
+    templateVars: {
+      pool_owner: props.organization
+        ? renderNonAutolinkedText(props.organization.name)
+        : 'your account',
+      router_name: props.routerName,
+      model_id: props.modelId,
+      manage_url: props.organization
+        ? `${NEXTAUTH_URL}/organizations/${props.organization.id}/providers-and-models`
+        : `${NEXTAUTH_URL}/profile`,
     },
   });
 }

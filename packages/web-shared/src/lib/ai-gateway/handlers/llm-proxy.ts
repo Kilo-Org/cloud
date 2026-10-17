@@ -486,8 +486,8 @@ export async function handleLlmProxyRequest(
       }
       const owner = { userId: user.id, organizationId: organizationId ?? null };
       const deniedModelIds = await autoRoutingDenials(
-        policy => collectDeniedAutoRoutingModelIds(policy, owner),
-        () => collectDataCollectionRequiredAutoRoutingModelIds(owner)
+        collectDeniedAutoRoutingModelIds,
+        collectDataCollectionRequiredAutoRoutingModelIds
       );
       const result = await fetchEfficientAutoDecision({
         ...decisionRequest(owner),

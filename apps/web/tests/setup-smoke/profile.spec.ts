@@ -14,21 +14,6 @@ test.describe('local setup smoke', () => {
     const postgresUrl = process.env.POSTGRES_URL;
     if (!postgresUrl) throw new Error('POSTGRES_URL must be set for setup smoke tests');
 
-    await page.route('**/api/auto-routing/mode', async route => {
-      const request = route.request();
-      await route.fulfill({
-        status: request.method() === 'GET' ? 200 : 405,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          ownerType: 'user',
-          ownerId: `setup-smoke-${uniqueId}`,
-          mode: 'cost_per_accuracy',
-          configuredMode: null,
-          defaultMode: 'cost_per_accuracy',
-        }),
-      });
-    });
-
     const { db, pool } = createDrizzleClient({
       connectionString: postgresUrl,
       poolConfig: {
@@ -62,6 +47,6 @@ test.describe('local setup smoke', () => {
     await expect(profileCard.getByRole('button', { name: 'Edit profile' })).toBeVisible();
     await expect(profileCard.getByText(testEmail, { exact: true })).toBeVisible();
 
-    await expect(page.getByText('Auto routing', { exact: true })).toBeVisible();
+    await expect(page.getByText('Custom routers', { exact: true })).toBeVisible();
   });
 });

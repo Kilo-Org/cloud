@@ -96,6 +96,9 @@ vi.mock('./db', async importOriginal => {
     countCaseResultsByLane: vi.fn().mockResolvedValue([]),
     listLaneFailures: vi.fn().mockResolvedValue([]),
     reuseDeciderCaseResults: vi.fn().mockResolvedValue(0),
+    listQueuedRemeasures: vi.fn().mockResolvedValue([]),
+    copyRemeasureBaselines: vi.fn().mockResolvedValue(0),
+    settleRemeasuresForRun: vi.fn().mockResolvedValue(undefined),
     markStaleRunsFailed: vi.fn(),
     listStaleRunningDeciderRuns: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
@@ -120,7 +123,6 @@ vi.mock('./profiles', async importOriginal => {
   return {
     ...actual,
     registerProfiles: vi.fn(),
-    lookupProfileStatuses: vi.fn(),
   };
 });
 
@@ -147,7 +149,7 @@ import {
   markStaleRunsFailed,
   replaceConfig,
 } from './db';
-import { lookupProfileStatuses, ProfileQuotaExceededError, registerProfiles } from './profiles';
+import { ProfileQuotaExceededError, registerProfiles } from './profiles';
 
 const tokenGet = vi.fn<() => Promise<string>>();
 const queueSendBatch = vi.fn();
@@ -270,7 +272,6 @@ beforeEach(() => {
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
   vi.mocked(registerProfiles).mockReset();
-  vi.mocked(lookupProfileStatuses).mockReset();
   queueSendBatch.mockResolvedValue(undefined);
 });
 
@@ -946,68 +947,41 @@ function stubCatalog(): void {
 }
 
 describe('owner model aliases', () => {
-  it.each(['register', 'status'])(
-    'shares concrete pairs and maps %s statuses back to each requested model',
-    async action => {
-      vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
-      stubCatalog();
-      const statuses = [
-        { entry: { model: 'a/b', variant: 'low' }, status: 'ready' as const, failureReason: null },
-        {
-          entry: { model: 'a/b', variant: 'high' },
-          status: 'failed' as const,
-          failureReason: 'Benchmark failed',
-        },
-      ];
-      vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses });
-      vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({ statuses });
-      const entries = [{ model: '~a/latest' }, { model: '~a/fast-latest' }, { model: 'a/b' }];
-      const response = await authedPost(`/admin/profiles/${action}`, {
-        ownerType: 'user',
-        ownerId: 'u1',
-        entries,
-        retryEntries: [{ model: '~a/latest' }],
-      });
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
-        statuses: statuses.flatMap(status =>
-          entries.map(entry => ({ ...status, entry: { ...status.entry, model: entry.model } }))
-        ),
-      });
-      const pairs = [
-        { model: 'a/b', variant: 'low' },
-        { model: 'a/b', variant: 'high' },
-      ];
-      if (action === 'register') {
-        expect(registerProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
-          ownerType: 'user',
-          ownerId: 'u1',
-          pairs,
-          retryPairs: pairs,
-        });
-      } else {
-        expect(lookupProfileStatuses).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
-          pairs,
-        });
-      }
-    }
-  );
-
-  it('assembles custom tables from the resolved pairs of alias pool entries', async () => {
+  it('shares concrete pairs and maps register statuses back to each requested model', async () => {
     vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
     stubCatalog();
-    const response = await authedPost('/admin/custom-routing-table', {
-      entries: [{ model: '~a/latest' }, { model: 'a/b' }],
+    const statuses = [
+      { entry: { model: 'a/b', variant: 'low' }, status: 'ready' as const, failureReason: null },
+      {
+        entry: { model: 'a/b', variant: 'high' },
+        status: 'failed' as const,
+        failureReason: 'Benchmark failed',
+      },
+    ];
+    vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses });
+    const entries = [{ model: '~a/latest' }, { model: '~a/fast-latest' }, { model: 'a/b' }];
+    const response = await authedPost('/admin/profiles/register', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries,
+      retryEntries: [{ model: '~a/latest' }],
     });
     expect(response.status).toBe(200);
-    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.anything(),
-      [
-        { model: 'a/b', variant: 'low' },
-        { model: 'a/b', variant: 'high' },
-      ]
-    );
+    await expect(response.json()).resolves.toEqual({
+      statuses: statuses.flatMap(status =>
+        entries.map(entry => ({ ...status, entry: { ...status.entry, model: entry.model } }))
+      ),
+    });
+    const pairs = [
+      { model: 'a/b', variant: 'low' },
+      { model: 'a/b', variant: 'high' },
+    ];
+    expect(registerProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+      ownerType: 'user',
+      ownerId: 'u1',
+      pairs,
+      retryPairs: pairs,
+    });
   });
 });
 
@@ -1140,121 +1114,6 @@ describe('POST /admin/profiles/register', () => {
   });
 });
 
-describe('POST /admin/profiles/status', () => {
-  it('returns 400 when benchmark config is not set', async () => {
-    const res = await authedPost('/admin/profiles/status', {
-      entries: [{ model: 'a/b' }],
-    });
-    expect(res.status).toBe(400);
-    expect(lookupProfileStatuses).not.toHaveBeenCalled();
-  });
-
-  it('returns current statuses', async () => {
-    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
-    vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({
-      statuses: [{ entry: { model: 'a/b', variant: null }, status: 'ready', failureReason: null }],
-    });
-
-    const res = await authedPost('/admin/profiles/status', {
-      entries: [{ model: 'a/b' }],
-    });
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
-      statuses: [{ entry: { model: 'a/b', variant: null }, status: 'ready', failureReason: null }],
-    });
-  });
-
-  it('looks up every catalog effort and reports missing models as failed', async () => {
-    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
-    stubCatalog();
-    const statuses = [
-      { entry: { model: 'a/b', variant: 'low' }, status: 'ready' as const, failureReason: null },
-      { entry: { model: 'a/b', variant: 'high' }, status: 'pending' as const, failureReason: null },
-    ];
-    vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({ statuses });
-
-    const res = await authedPost('/admin/profiles/status', {
-      entries: [{ model: 'gone/model' }, { model: 'a/b' }],
-    });
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
-      statuses: [
-        ...statuses,
-        {
-          entry: { model: 'gone/model', variant: null },
-          status: 'failed',
-          failureReason: 'Model is unavailable in the current catalog.',
-        },
-      ],
-    });
-    expect(lookupProfileStatuses).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
-      pairs: [
-        { model: 'a/b', variant: 'low' },
-        { model: 'a/b', variant: 'high' },
-      ],
-    });
-  });
-
-  it('skips lookup when every model is missing from the catalog', async () => {
-    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
-    stubCatalog();
-
-    const res = await authedPost('/admin/profiles/status', {
-      entries: [{ model: 'gone/model' }],
-    });
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
-      statuses: [
-        {
-          entry: { model: 'gone/model', variant: null },
-          status: 'failed',
-          failureReason: 'Model is unavailable in the current catalog.',
-        },
-      ],
-    });
-    expect(lookupProfileStatuses).not.toHaveBeenCalled();
-  });
-});
-
-describe('POST /admin/custom-routing-table', () => {
-  it('assembles from every catalog effort of the supported pool models', async () => {
-    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
-    stubCatalog();
-    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValueOnce([]);
-
-    const res = await authedPost('/admin/custom-routing-table', {
-      entries: [{ model: 'a/b' }, { model: 'gone/model' }, { model: 'c/d' }],
-    });
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ table: null });
-    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.objectContaining({ repetitions: TEST_CONFIG.deciderRepetitions }),
-      [
-        { model: 'a/b', variant: 'low' },
-        { model: 'a/b', variant: 'high' },
-        { model: 'c/d', variant: null },
-      ]
-    );
-  });
-
-  it('returns a null table without a registry read when no model is in the catalog', async () => {
-    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
-    stubCatalog();
-
-    const res = await authedPost('/admin/custom-routing-table', {
-      entries: [{ model: 'gone/model' }],
-    });
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ table: null });
-    expect(listReadyCurrentProfilesForEntries).not.toHaveBeenCalled();
-  });
-});
-
 describe('router selection', () => {
   it('saves frontier config using query router and its independent thresholds', async () => {
     const response = await authedPut('/admin/config?router=frontier', {
@@ -1324,24 +1183,21 @@ describe('router selection', () => {
     expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
   });
 
-  it('rejects invalid routers and frontier owner profiles', async () => {
+  it('rejects invalid routers', async () => {
     expect((await authedGet('/admin/config?router=unknown')).status).toBe(400);
-    expect((await authedPost('/admin/profiles/register?router=frontier', {})).status).toBe(400);
-    expect(registerProfiles).not.toHaveBeenCalled();
   });
 
-  it('does not inspect owner queue coverage for frontier', async () => {
+  it('inspects owner queue coverage for frontier', async () => {
     vi.mocked(getConfigRows).mockResolvedValue({
       ...TEST_CONFIG_ROWS,
       config: { ...TEST_CONFIG_ROWS.config, router: 'frontier' },
     });
     const response = await authedGet('/admin/registry?router=frontier');
     expect(response.status).toBe(200);
-    expect(countCurrentProfilesByStatus).toHaveBeenCalledOnce();
     expect(countCurrentProfilesByStatus).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({ router: 'frontier' }),
-      'platform'
+      'user'
     );
   });
 });
@@ -1375,14 +1231,24 @@ describe('body router selection', () => {
     );
   });
 
-  it('rejects frontier owner profiles selected through the body', async () => {
+  it('admits frontier owner profiles under the frontier config', async () => {
+    vi.mocked(getConfigRows).mockImplementation(async (_db, router = 'efficient') => ({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, router },
+    }));
+    vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses: [] });
     const response = await authedPost('/admin/profiles/register', {
       router: 'frontier',
       ownerType: 'user',
       ownerId: 'owner',
       entries: [{ model: 'a/b' }],
     });
-    expect(response.status).toBe(400);
-    expect(registerProfiles).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(getConfigRows).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
+    expect(registerProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      expect.objectContaining({ ownerId: 'owner' })
+    );
   });
 });

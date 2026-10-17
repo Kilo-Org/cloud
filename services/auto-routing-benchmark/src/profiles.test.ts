@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
+import { MAX_POOL_ENTRIES, type BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import type * as DbSchemaModule from './db-schema';
 import type * as DrizzleOrmModule from 'drizzle-orm';
 import type { ProfileRow } from './profiles';
@@ -363,10 +363,7 @@ import {
   classifyProfileAdmission,
   computeQuotaRetryAt,
   isCurrentBenchmarkProfile,
-  lookupProfileStatuses,
-  MISSING_PROFILE_FAILURE_REASON,
   pendingRegisterUpsertStatement,
-  pendingStatusInsertStatement,
   PROFILE_ADMISSION_LIMIT,
   PROFILE_ADMISSION_WINDOW_MS,
   ProfileQuotaExceededError,
@@ -406,7 +403,7 @@ function profileRow(
 /**
  * Build production admission statements (real builders) and apply them through
  * the mock batch path. Exercises chargedEventInsertStatement /
- * pendingRegisterUpsertStatement / pendingStatusInsertStatement so a missing
+ * pendingRegisterUpsertStatement so a missing
  * __stmt tag or broken builder wiring fails these race tests.
  */
 async function applyProductionAdmissionBatch(opts: {
@@ -416,7 +413,6 @@ async function applyProductionAdmissionBatch(opts: {
     entry: BenchmarkPair;
   }>;
   registerUpserts?: BenchmarkPair[];
-  statusInserts?: BenchmarkPair[];
   nowIso?: string;
 }): Promise<void> {
   const { drizzle } = await import('drizzle-orm/d1');
@@ -430,6 +426,7 @@ async function applyProductionAdmissionBatch(opts: {
       chargedEventInsertStatement(orm, {
         owner_type: ev.ownerType,
         owner_id: ev.ownerId,
+        router: 'efficient',
         model: ev.entry.model,
         variant: variantToStorage(ev.entry.variant),
         engine_identity: ENGINE,
@@ -441,13 +438,6 @@ async function applyProductionAdmissionBatch(opts: {
   for (const entry of opts.registerUpserts ?? []) {
     stmts.push(
       pendingRegisterUpsertStatement(orm, buildPendingUpsertValues(entry, current, nowIso)) as {
-        __stmt?: PendingStmt;
-      }
-    );
-  }
-  for (const entry of opts.statusInserts ?? []) {
-    stmts.push(
-      pendingStatusInsertStatement(orm, buildPendingUpsertValues(entry, current, nowIso)) as {
         __stmt?: PendingStmt;
       }
     );
@@ -840,9 +830,8 @@ describe('registerProfiles', () => {
     expect(current?.status).toBe('pending');
   });
 
-  it('allows 10 charged admissions in 24h and rejects the 11th with nothing written', async () => {
+  it('allows the rolling limit of charged admissions and rejects one more with nothing written', async () => {
     const owner = { ownerType: 'user' as const, ownerId: 'quota-user' };
-    // Seed 10 prior charged events in the window.
     for (let i = 0; i < PROFILE_ADMISSION_LIMIT; i++) {
       store.seedEvent({
         owner_type: owner.ownerType,
@@ -900,7 +889,7 @@ describe('registerProfiles', () => {
 
   it('rejects the whole batch when any charged admission would exceed quota', async () => {
     const owner = { ownerType: 'user' as const, ownerId: 'batch-quota' };
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < PROFILE_ADMISSION_LIMIT - 1; i++) {
       store.seedEvent({
         owner_type: owner.ownerType,
         owner_id: owner.ownerId,
@@ -911,7 +900,7 @@ describe('registerProfiles', () => {
         admitted_at: new Date(NOW.getTime() - 60_000).toISOString(),
       });
     }
-    // 9 existing + 2 new charged = 11 → reject both, write nothing.
+    // One below the limit + 2 new charged → reject both, write nothing.
     await expect(
       registerProfiles({} as D1Database, config, {
         ...owner,
@@ -921,10 +910,10 @@ describe('registerProfiles', () => {
     ).rejects.toBeInstanceOf(ProfileQuotaExceededError);
 
     expect(store.profiles.size).toBe(0);
-    expect(store.events).toHaveLength(9);
+    expect(store.events).toHaveLength(PROFILE_ADMISSION_LIMIT - 1);
   });
 
-  it('counts ten admitted models rather than expanded effort pairs for quota', async () => {
+  it('counts admitted models rather than expanded effort pairs for quota', async () => {
     const owner = { ownerType: 'user' as const, ownerId: 'model-quota' };
     const efforts = ['low', 'medium', 'high'];
     const pairs = Array.from(
@@ -932,11 +921,18 @@ describe('registerProfiles', () => {
       (_, i) => `vendor/m-${i}`
     ).flatMap(model => efforts.map(variant => entry(model, variant)));
 
-    const result = await registerProfiles({} as D1Database, config, {
-      ...owner,
-      pairs,
-      now: NOW,
-    });
+    const perRequest = MAX_POOL_ENTRIES * efforts.length;
+    const results = [];
+    for (let offset = 0; offset < pairs.length; offset += perRequest) {
+      results.push(
+        await registerProfiles({} as D1Database, config, {
+          ...owner,
+          pairs: pairs.slice(offset, offset + perRequest),
+          now: NOW,
+        })
+      );
+    }
+    const result = { statuses: results.flatMap(r => r.statuses) };
 
     expect(result.statuses).toHaveLength(pairs.length);
     expect(result.statuses.every(s => s.status === 'pending')).toBe(true);
@@ -983,7 +979,7 @@ describe('registerProfiles', () => {
       registerProfiles({} as D1Database, config, {
         ownerType: 'user',
         ownerId: 'u1',
-        pairs: Array.from({ length: PROFILE_ADMISSION_LIMIT + 1 }, (_, i) => entry(`many/${i}`)),
+        pairs: Array.from({ length: MAX_POOL_ENTRIES + 1 }, (_, i) => entry(`many/${i}`)),
         now: NOW,
       })
     ).rejects.toBeInstanceOf(ProfileValidationError);
@@ -1000,12 +996,6 @@ describe('registerProfiles', () => {
         now: NOW,
       })
     ).rejects.toThrow('Duplicate benchmark pair');
-    await expect(
-      lookupProfileStatuses({} as D1Database, config, {
-        pairs: [entry('dup/m'), entry('dup/m')],
-        now: NOW,
-      })
-    ).rejects.toBeInstanceOf(ProfileValidationError);
     expect(store.profiles.size).toBe(0);
 
     const result = await registerProfiles({} as D1Database, config, {
@@ -1035,107 +1025,5 @@ describe('registerProfiles', () => {
         store.profilePk(profileRow({ model: 'retry/m', variant: 'high', status: 'failed' }))
       )?.status
     ).toBe('failed');
-  });
-});
-
-describe('lookupProfileStatuses', () => {
-  it('returns current statuses without charging', async () => {
-    store.seedProfile(profileRow({ model: 'a/ready', status: 'ready' }));
-    store.seedProfile(profileRow({ model: 'a/fail', status: 'failed', failure_reason: 'nope' }));
-
-    const result = await lookupProfileStatuses({} as D1Database, config, {
-      pairs: [entry('a/ready'), entry('a/fail')],
-      now: NOW,
-    });
-
-    expect(result.statuses).toEqual([
-      { entry: entry('a/ready'), status: 'ready', failureReason: null },
-      { entry: entry('a/fail'), status: 'failed', failureReason: 'nope' },
-    ]);
-    expect(store.events).toHaveLength(0);
-  });
-
-  it('inserts a free pending row for stale profiles and reports pending', async () => {
-    const stale = profileRow({
-      model: 'stale/m',
-      status: 'ready',
-      engine_identity: 'v-old:engine',
-    });
-    store.seedProfile(stale);
-
-    const result = await lookupProfileStatuses({} as D1Database, config, {
-      pairs: [entry('stale/m')],
-      now: NOW,
-    });
-
-    expect(result.statuses[0]).toEqual({
-      entry: entry('stale/m'),
-      status: 'pending',
-      failureReason: null,
-    });
-    expect(store.events).toHaveLength(0);
-    expect(store.profiles.get(store.profilePk(stale))?.status).toBe('ready');
-    const current = [...store.profiles.values()].find(
-      r => r.model === 'stale/m' && r.engine_identity === ENGINE
-    );
-    expect(current?.status).toBe('pending');
-  });
-
-  it('preserves a concurrent current row on stale status-lookup insert race', async () => {
-    const stale = profileRow({
-      model: 'race/stale',
-      status: 'ready',
-      engine_identity: 'v-old:engine',
-    });
-    store.seedProfile(stale);
-    // Concurrent writer already created the current ready row.
-    store.seedProfile(
-      profileRow({
-        model: 'race/stale',
-        status: 'ready',
-        run_id: 'winner-run',
-        completed_at: '2026-07-28T08:00:00.000Z',
-      })
-    );
-
-    // Lookup sees current ready → reports it, no charge.
-    const withCurrent = await lookupProfileStatuses({} as D1Database, config, {
-      pairs: [entry('race/stale')],
-      now: NOW,
-    });
-    expect(withCurrent.statuses[0]?.status).toBe('ready');
-    expect(
-      store.profiles.get(
-        store.profilePk(profileRow({ model: 'race/stale', status: 'ready', run_id: 'winner-run' }))
-      )?.run_id
-    ).toBe('winner-run');
-
-    // Explicit do_nothing race via real status builder: must not clobber ready.
-    await applyProductionAdmissionBatch({
-      statusInserts: [entry('race/stale')],
-    });
-    const current = store.profiles.get(
-      store.profilePk(profileRow({ model: 'race/stale', status: 'ready' }))
-    );
-    expect(current?.status).toBe('ready');
-    expect(current?.run_id).toBe('winner-run');
-    expect(store.events).toHaveLength(0);
-  });
-
-  it('reports missing as failed without admitting', async () => {
-    const result = await lookupProfileStatuses({} as D1Database, config, {
-      pairs: [entry('never/seen')],
-      now: NOW,
-    });
-
-    expect(result.statuses).toEqual([
-      {
-        entry: entry('never/seen'),
-        status: 'failed',
-        failureReason: MISSING_PROFILE_FAILURE_REASON,
-      },
-    ]);
-    expect(store.profiles.size).toBe(0);
-    expect(store.events).toHaveLength(0);
   });
 });

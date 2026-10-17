@@ -4,10 +4,8 @@ import {
   AutoRoutingClassifierModelResponseSchema,
   AutoRoutingDecisionResponseSchema,
   AutoRoutingDecisionSchema,
-  AutoRoutingSettingsResponseSchema,
   MirrorPayloadSchema,
   RoutingConstraintsSchema,
-  UpdateAutoRoutingSettingsRequestSchema,
   UpdateClassifierModelRequestSchema,
   detectRequiredInputModalities,
   estimateRoutingTokens,
@@ -17,7 +15,6 @@ import {
   BenchmarkConfigSchema,
   BenchmarkDeciderModelSchema,
   BenchmarkModelSummarySchema,
-  BenchmarkProfileStatusesRequestSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   RegisterBenchmarkProfilesRequestSchema,
@@ -575,65 +572,6 @@ describe('AutoRoutingDecisionSchema variant compatibility', () => {
   });
 });
 
-describe('owner pool settings wire contracts', () => {
-  it('accepts null pool (inherit) on update', () => {
-    const parsed = UpdateAutoRoutingSettingsRequestSchema.parse({
-      ownerType: 'user',
-      ownerId: 'user-1',
-      mode: null,
-      pool: null,
-    });
-    expect(parsed.pool).toBeNull();
-  });
-
-  it('accepts a configured pool on settings response with statuses', () => {
-    const parsed = AutoRoutingSettingsResponseSchema.parse({
-      ownerType: 'org',
-      ownerId: 'org-1',
-      mode: 'cost_per_accuracy',
-      configuredMode: null,
-      defaultMode: 'cost_per_accuracy',
-      configuredPool: [{ model: 'a/b' }],
-      poolStatuses: [{ entry: { model: 'a/b', variant: null }, status: 'pending' }],
-    });
-    expect(parsed.poolStatuses).toHaveLength(1);
-  });
-
-  it('accepts optional retryEntries that are a subset of pool by poolEntryKey', () => {
-    const pool = [{ model: 'a/b' }, { model: 'c/d' }];
-    const parsed = UpdateAutoRoutingSettingsRequestSchema.parse({
-      ownerType: 'user',
-      ownerId: 'user-1',
-      mode: 'cost_per_accuracy',
-      pool,
-      retryEntries: [{ model: 'c/d' }],
-    });
-    expect(parsed.retryEntries).toEqual([{ model: 'c/d' }]);
-  });
-
-  it('rejects retryEntries that are not in pool', () => {
-    const result = UpdateAutoRoutingSettingsRequestSchema.safeParse({
-      ownerType: 'user',
-      ownerId: 'user-1',
-      mode: null,
-      pool: [{ model: 'a/b' }],
-      retryEntries: [{ model: 'other/model' }],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects retryEntries when pool is null', () => {
-    const result = UpdateAutoRoutingSettingsRequestSchema.safeParse({
-      ownerType: 'user',
-      ownerId: 'user-1',
-      mode: null,
-      pool: null,
-      retryEntries: [{ model: 'a/b' }],
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
 describe('benchmark profile request entry bounds', () => {
   const eleven = Array.from({ length: 11 }, (_, i) => ({
     model: `model/${i}`,
@@ -653,15 +591,6 @@ describe('benchmark profile request entry bounds', () => {
         ownerId: 'u1',
         entries: eleven.slice(0, 10),
       }).success
-    ).toBe(true);
-  });
-
-  it('bounds BenchmarkProfileStatusesRequestSchema entries at 10', () => {
-    expect(BenchmarkProfileStatusesRequestSchema.safeParse({ entries: eleven }).success).toBe(
-      false
-    );
-    expect(
-      BenchmarkProfileStatusesRequestSchema.safeParse({ entries: eleven.slice(0, 1) }).success
     ).toBe(true);
   });
 

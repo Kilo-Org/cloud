@@ -8,6 +8,7 @@ import { selectRowPlatformPresentation, sessionPlatformIconKind } from './sessio
 vi.mock('@/components/ui/icons', () => ({
   Cloud: () => null,
   Code: () => null,
+  Monitor: () => null,
   Terminal: () => null,
 }));
 vi.mock('@/components/icons/github-icon', () => ({
@@ -30,6 +31,10 @@ describe('sessionPlatformIconKind', () => {
   it('maps vscode and agent-manager to code', () => {
     expect(sessionPlatformIconKind('vscode')).toBe('code');
     expect(sessionPlatformIconKind('agent-manager')).toBe('code');
+  });
+
+  it('maps desktop to desktop', () => {
+    expect(sessionPlatformIconKind('desktop')).toBe('desktop');
   });
 
   it('maps slack to slack', () => {

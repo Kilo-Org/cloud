@@ -4,10 +4,10 @@
  * Enumerates every procedure from the live `rootRouter` (never a hand-written
  * list), shapes deterministic catalog rows, preserves author-edited summaries
  * from the committed `services/kilo-mcp/catalog.json`, and generates missing
- * summaries with the Kilo CLI (`kilo run`, pinned model + variant). Summaries
- * are never generated at MCP runtime: the committed catalog is the only runtime
- * artifact, and authors edit its summaries by hand. See dump.ts for the CLI
- * entry point.
+ * summaries with the Kilo CLI (`kilo run`, one summarizer model + variant for
+ * every run). Summaries are never generated at MCP runtime: the committed
+ * catalog is the only runtime artifact, and authors edit its summaries by hand.
+ * See dump.ts for the CLI entry point.
  *
  * Queries and mutations are published wholesale; paths with an internal-only
  * segment (`admin`, `dev`, `test`) and subscriptions stay internal. `debug`
@@ -83,10 +83,11 @@ const CONTEXT_CHAR_LIMIT = 4_000;
 const FILE_CONTEXT_CHAR_LIMIT = 60_000;
 
 /**
- * Pinned summarizer: the same model and reasoning effort for every generated
- * summary, so catalog text stays consistent across runs and authors.
+ * One summarizer for every generated summary: the same model family and reasoning
+ * effort across runs and authors. The `-latest` alias follows each new DeepSeek
+ * Flash build, so catalog wording can shift when a new build ships.
  */
-export const SUMMARY_MODEL = 'kilo/deepseek/deepseek-v4.1-flash';
+export const SUMMARY_MODEL = 'kilo/~deepseek/deepseek-flash-latest';
 export const SUMMARY_VARIANT = 'max';
 /** `kilo run` invocation timeout: a whole batch (file source included) must fit. */
 const SUMMARY_RUN_TIMEOUT_MS = 10 * 60 * 1000;

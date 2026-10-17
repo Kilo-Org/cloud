@@ -2498,6 +2498,7 @@
       "title": "Tātarihia ngā wātū",
       "platformCloud": "Kapua",
       "platformExtension": "Toronga",
+      "platformDesktop": "Rorohiko",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

@@ -54,6 +54,14 @@ const mockSessions: SessionsListItem[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 minutes ago
     createdOnPlatform: 'agent-manager', // Agent Manager badge
   },
+  {
+    sessionId: 'session-ghi-desktop',
+    repository: 'user/data-pipeline',
+    prompt: 'Profile the notebook and speed up the slow cells',
+    mode: 'code',
+    createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(), // 45 minutes ago
+    createdOnPlatform: 'desktop', // Desktop badge
+  },
 ];
 
 export const Default: Story = {

@@ -31,14 +31,15 @@ import { DECIDER_CLI_TIMEOUT_MS, deciderCliPrompt } from './cli-runner';
 import {
   clientCaseKey,
   clientPairKey,
+  deleteClientCaseUpload,
   ensureClientProfile,
-  getClientCaseScore,
+  getClientCase,
   groupClientProfilesByPair,
-  insertClientCaseResult,
   isCurrentClientProfile,
   listClientCaseKeys,
   listOwnerClientProfiles,
   refreshClientProfileRollup,
+  saveClientCaseResult,
 } from './client-profiles';
 import { getBenchmarkConfig } from './config';
 import {
@@ -127,7 +128,8 @@ export async function planClientEval(
     const served = newestReadyMeasurement(
       rows,
       row => isCurrentClientProfile(row, current),
-      row => row.updated_at
+      row => row.updated_at,
+      row => row.results >= cases.length * current.repetitions
     );
     if (served?.stale) staleEntries.push({ entry, variant });
   }
@@ -150,11 +152,16 @@ export function clientEvalCase(request: InternalClientEvalCaseRequest): ClientEv
   };
 }
 
+// D1 caps one value at 2 MB; three UTF-8 bytes per UTF-16 unit keeps the stored output well
+// below it. The output is kept for diagnostics; grading uses the full upload.
+const STORED_OUTPUT_MAX_LENGTH = 200_000;
+
 /**
  * Grade one uploaded case with the platform graders and roll it into the owner's
- * client profile. Judged grading is billed to the paying owner before the result is
- * stored, under an id derived from the case, so a retried upload bills once. A case
- * repetition that was already stored returns its score without grading again.
+ * client profile. The graded case is stored before judged grading is billed to the
+ * paying owner, and removed again when billing fails, so a retry never bills twice for
+ * one stored case. A case that already ran returns its stored score; one that did not
+ * (nonzero exit or timeout) is replaced by the new upload.
  */
 export async function gradeClientEvalResult(
   db: D1Database,
@@ -201,8 +208,12 @@ export async function gradeClientEvalResult(
     nowIso
   );
   const caseKey = { profileId: profile.id, caseId: request.caseId, rep: request.rep };
-  const stored = await getClientCaseScore(db, caseKey);
-  if (stored !== null) return { score: stored };
+  const plannedResults = deciderCasesForRouter(request.baseRouter).length * current.repetitions;
+  const stored = await getClientCase(db, caseKey);
+  if (stored?.ran) {
+    await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
+    return { score: stored.score };
+  }
 
   const ran = request.exitCode === 0 && !request.timedOut && request.output.length > 0;
   const grade = ran
@@ -216,10 +227,31 @@ export async function gradeClientEvalResult(
     throw new ClientEvalError('internal_error', 'The grader is unavailable; retry the upload.');
   }
 
+  const saved = await saveClientCaseResult(db, {
+    profile_id: profile.id,
+    case_id: request.caseId,
+    rep: request.rep,
+    route_key: taxonomyRouteKey(benchCase),
+    output: request.output.slice(0, STORED_OUTPUT_MAX_LENGTH),
+    cost_usd: request.costUsd,
+    duration_ms: Math.round(request.durationMs),
+    exit_code: request.exitCode,
+    timed_out: request.timedOut,
+    score: grade.score,
+    grader_cost_usd: grade.costUsd,
+    uploaded_at: nowIso,
+  });
+  if (!saved) {
+    await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
+    return { score: (await getClientCase(db, caseKey))?.score ?? grade.score };
+  }
+
   if (grade.costUsd > 0) {
     const usage = await buildGraderUsage(
       request.billing,
       [
+        request.billing.userId,
+        request.billing.organizationId,
         request.ownerType,
         request.ownerId,
         request.baseRouter,
@@ -237,6 +269,7 @@ export async function gradeClientEvalResult(
       .writeUsage(usage)
       .catch((): UsageWriteOutcome => ({ kind: 'unavailable', reason: 'request_failed' }));
     if (outcome.kind === 'unavailable') {
+      await deleteClientCaseUpload(db, { ...caseKey, uploadedAt: nowIso });
       throw new ClientEvalError(
         'internal_error',
         'Grader usage was not recorded; retry the upload.'
@@ -244,27 +277,7 @@ export async function gradeClientEvalResult(
     }
   }
 
-  const inserted = await insertClientCaseResult(db, {
-    profile_id: profile.id,
-    case_id: request.caseId,
-    rep: request.rep,
-    route_key: taxonomyRouteKey(benchCase),
-    output: request.output,
-    cost_usd: request.costUsd,
-    duration_ms: Math.round(request.durationMs),
-    exit_code: request.exitCode,
-    timed_out: request.timedOut,
-    score: grade.score,
-    grader_cost_usd: grade.costUsd,
-    uploaded_at: nowIso,
-  });
-  if (!inserted) return { score: (await getClientCaseScore(db, caseKey)) ?? grade.score };
-  await refreshClientProfileRollup(
-    db,
-    profile,
-    deciderCasesForRouter(request.baseRouter).length * current.repetitions,
-    nowIso
-  );
+  await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
   return { score: grade.score };
 }
 

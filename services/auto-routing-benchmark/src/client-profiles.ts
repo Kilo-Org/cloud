@@ -5,7 +5,7 @@ import {
   type CustomRouterEntryRef,
   type CustomRouterScope,
 } from '@kilocode/auto-routing-contracts';
-import { and, eq, inArray, lte } from 'drizzle-orm';
+import { and, eq, inArray, lte, not, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import type { CaseResultRow } from './db';
 import { clientCaseResults, clientProfiles, type ClientProfileStatus } from './db-schema';
@@ -135,12 +135,21 @@ export async function ensureClientProfile(
   return row;
 }
 
-export async function getClientCaseScore(
+// A case ran when the CLI exited 0 without a timeout, the platform's reuse rule. Other
+// stored cases are re-planned and an upload replaces them, so an endpoint that was down
+// once does not keep its pair failed until the next engine version.
+const ranSuccessfully = sql`(${clientCaseResults.exit_code} IS NOT NULL AND ${clientCaseResults.exit_code} = 0 AND ${clientCaseResults.timed_out} = 0)`;
+
+export async function getClientCase(
   db: D1Database,
   key: { profileId: string; caseId: string; rep: number }
-): Promise<number | null> {
+): Promise<{ score: number; ran: boolean } | null> {
   const [row] = await drizzle(db)
-    .select({ score: clientCaseResults.score })
+    .select({
+      score: clientCaseResults.score,
+      exitCode: clientCaseResults.exit_code,
+      timedOut: clientCaseResults.timed_out,
+    })
     .from(clientCaseResults)
     .where(
       and(
@@ -149,19 +158,56 @@ export async function getClientCaseScore(
         eq(clientCaseResults.rep, key.rep)
       )
     );
-  return row?.score ?? null;
+  return row ? { score: row.score, ran: row.exitCode === 0 && !row.timedOut } : null;
 }
 
-/** Returns false when a concurrent upload already stored this case repetition. */
-export async function insertClientCaseResult(
+/**
+ * Store an upload, replacing a stored case that did not run. Returns false when a
+ * case that ran is already stored, for example by a concurrent upload.
+ */
+export async function saveClientCaseResult(
   db: D1Database,
   row: ClientCaseResultRow
 ): Promise<boolean> {
-  const result = await drizzle(db).insert(clientCaseResults).values(row).onConflictDoNothing();
+  const result = await drizzle(db)
+    .insert(clientCaseResults)
+    .values(row)
+    .onConflictDoUpdate({
+      target: [clientCaseResults.profile_id, clientCaseResults.case_id, clientCaseResults.rep],
+      set: {
+        route_key: row.route_key,
+        output: row.output,
+        cost_usd: row.cost_usd,
+        duration_ms: row.duration_ms,
+        exit_code: row.exit_code,
+        timed_out: row.timed_out,
+        score: row.score,
+        grader_cost_usd: row.grader_cost_usd,
+        uploaded_at: row.uploaded_at,
+      },
+      setWhere: not(ranSuccessfully),
+    });
   return (result.meta.changes ?? 0) > 0;
 }
 
-/** Completed `${caseId}\0${rep}` keys per profile id. */
+/** Remove one upload, matched by its upload time, after its grading could not be billed. */
+export async function deleteClientCaseUpload(
+  db: D1Database,
+  key: { profileId: string; caseId: string; rep: number; uploadedAt: string }
+): Promise<void> {
+  await drizzle(db)
+    .delete(clientCaseResults)
+    .where(
+      and(
+        eq(clientCaseResults.profile_id, key.profileId),
+        eq(clientCaseResults.case_id, key.caseId),
+        eq(clientCaseResults.rep, key.rep),
+        eq(clientCaseResults.uploaded_at, key.uploadedAt)
+      )
+    );
+}
+
+/** `${caseId}\0${rep}` keys of cases that ran, per profile id. */
 export async function listClientCaseKeys(
   db: D1Database,
   profileIds: readonly string[]
@@ -177,7 +223,10 @@ export async function listClientCaseKeys(
       })
       .from(clientCaseResults)
       .where(
-        inArray(clientCaseResults.profile_id, profileIds.slice(offset, offset + ID_BATCH_SIZE))
+        and(
+          inArray(clientCaseResults.profile_id, profileIds.slice(offset, offset + ID_BATCH_SIZE)),
+          ranSuccessfully
+        )
       );
     for (const row of rows) {
       const set = keys.get(row.profileId) ?? new Set<string>();

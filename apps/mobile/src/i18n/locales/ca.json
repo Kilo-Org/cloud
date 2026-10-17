@@ -2531,6 +2531,7 @@
       "title": "Filtre de sessions",
       "platformCloud": "Núvol",
       "platformExtension": "Extensió",
+      "platformDesktop": "Escriptori",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

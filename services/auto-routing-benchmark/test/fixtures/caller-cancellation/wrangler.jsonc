@@ -1,6 +1,7 @@
 {
   "name": "caller-cancellation-fixture",
   "main": "worker.ts",
+  "compatibility_date": "2026-05-15",
   "durable_objects": { "bindings": [{ "name": "RELAY", "class_name": "Relay" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Relay"] }],
 }

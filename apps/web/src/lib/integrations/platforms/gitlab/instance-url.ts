@@ -338,7 +338,7 @@ function parseIpv6ToBytes(hostname: string): Uint8Array | null {
     const groups = part.split(':');
     const values: number[] = [];
     for (let i = 0; i < groups.length; i++) {
-      let group = groups[i];
+      const group = groups[i];
       const last = i === groups.length - 1;
       if (group.includes('.')) {
         if (!last) {

@@ -67,9 +67,7 @@ async function fetchBounded(url: string, init?: RequestInit): Promise<Response> 
 
   const rawHeaders = response.headers;
   const contentLength =
-    rawHeaders && typeof rawHeaders.get === 'function'
-      ? rawHeaders.get('content-length')
-      : null;
+    rawHeaders && typeof rawHeaders.get === 'function' ? rawHeaders.get('content-length') : null;
   if (contentLength && Number(contentLength) > MAX_GITLAB_RESPONSE_BYTES) {
     const error = new Error('GitLab response exceeded size limit');
     await response.body?.cancel();
@@ -98,9 +96,7 @@ async function fetchBounded(url: string, init?: RequestInit): Promise<Response> 
     chunks.push(buffer);
   }
 
-  const body = responseStatusForbidsBody(response.status)
-    ? null
-    : Buffer.concat(chunks);
+  const body = responseStatusForbidsBody(response.status) ? null : Buffer.concat(chunks);
   return new Response(body, {
     status: response.status,
     statusText: response.statusText,

@@ -119,4 +119,14 @@ describe('extractLegalMainHtml', () => {
   test('keeps entity text readable', () => {
     expect(extractMain('<p>a &amp; b &lt;tag&gt;</p>')).toBe('<p>a &amp; b &lt;tag&gt;</p>');
   });
+
+  test('pairs new-tab links with the site-wide rel convention', () => {
+    expect(extractMain('<a href="/x" target="_blank">one</a>')).toBe(
+      '<a href="https://kilo.ai/x" target="_blank" rel="noopener noreferrer">one</a>'
+    );
+    expect(extractMain('<a href="/y" target="_blank" rel="nofollow">two</a>')).toBe(
+      '<a href="https://kilo.ai/y" target="_blank" rel="nofollow noopener noreferrer">two</a>'
+    );
+    expect(extractMain('<a href="/z">three</a>')).toBe('<a href="https://kilo.ai/z">three</a>');
+  });
 });

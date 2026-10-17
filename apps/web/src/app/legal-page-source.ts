@@ -71,6 +71,20 @@ function absolutizeKiloLinks(html: string, sourceUrl: string): string {
   return html.replaceAll(/(href|src)="\/(?!\/)/g, `$1="${new URL('/', sourceUrl)}`);
 }
 
+// The marketing site opens its external links in a new tab; keep that behavior
+// and follow the apps/web convention of pairing `target="_blank"` with
+// `rel="noopener noreferrer"` even when the source document leaves `rel` out.
+function enforceRelOnBlankTargets(_tagName: string, attribs: sanitizeHtml.Attributes) {
+  if (attribs.target !== '_blank') {
+    return { tagName: 'a', attribs };
+  }
+
+  const rel = new Set(attribs.rel?.split(/\s+/).filter(Boolean));
+  rel.add('noopener');
+  rel.add('noreferrer');
+  return { tagName: 'a', attribs: { ...attribs, rel: [...rel].join(' ') } };
+}
+
 function sanitizeLegalContent(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: LEGAL_CONTENT_ALLOWED_TAGS,
@@ -78,6 +92,7 @@ function sanitizeLegalContent(html: string): string {
     allowedSchemes: LEGAL_CONTENT_ALLOWED_SCHEMES,
     allowProtocolRelative: false,
     disallowedTagsMode: 'discard',
+    transformTags: { a: enforceRelOnBlankTargets },
   });
 }
 

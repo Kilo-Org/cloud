@@ -11,7 +11,7 @@ const requested = 'kilo-auto/balanced';
 
 const framesFor = (kind: ApiKind, costs: object = {}): readonly unknown[] => {
   const { inconsistent, ...rest } = costs as { inconsistent?: boolean };
-  const totals = inconsistent ? { input: 5, cached: 1000 } : { input: 10, cached: 7 };
+  const totals = inconsistent === true ? { input: 5, cached: 1000 } : { input: 10, cached: 7 };
   if (kind === 'messages') {
     return [
       {
@@ -142,11 +142,7 @@ it.each<ApiKind>(['chat_completions', 'responses'])(
   }
 );
 
-it('floors the derived non-cached count of the chat shape at zero', () => {
-  expect(readCached(5, 2, 1000)).toMatchObject({ inputTokens: 0, cacheReadTokens: 1000 });
-});
-
-it('floors the derived non-cached count of the responses shape at zero', () => {
+it('floors the derived non-cached count of both OpenAI shapes at zero', () => {
   expect(readCached(5, 2, 1000)).toMatchObject({ inputTokens: 0, cacheReadTokens: 1000 });
 });
 

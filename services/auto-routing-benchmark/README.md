@@ -717,7 +717,7 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
 | Route | Request | Behavior |
 |---|---|---|
 | `POST /v1/eval/plan` | `InternalClientEvalPlanRequestSchema` | Every (entry, variant, case, repetition) without a current-engine upload, plus `staleEntries` that still serve an older-engine measurement |
-| `POST /v1/eval/case` | `InternalClientEvalCaseRequestSchema` | The case prompt as the platform container sends it (long-context cases materialized, final-answer suffix appended) and the 180-second timeout; checks and golden answers stay here |
+| `POST /v1/eval/case` | `InternalClientEvalCaseRequestSchema` | `prompt`: the exact `kilo run` prompt the platform container sends (`deciderCliPrompt`, so client and platform rows share byte-identical prompts), and the 180-second timeout; checks and golden answers stay here |
 | `POST /v1/eval/result` | `InternalClientEvalResultRequestSchema` | Grade with the platform graders, store, roll up the profile, return the score |
 
 - An upload for another engine identity returns `stale_engine_identity` (409); the CLI

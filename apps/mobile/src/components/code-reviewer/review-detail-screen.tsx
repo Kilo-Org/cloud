@@ -187,7 +187,9 @@ export function ReviewDetailScreen({
           {review.status === 'failed' || review.error_message ? (
             <View className="rounded-lg bg-danger-tile-bg p-3">
               <Text className="text-xs text-destructive" numberOfLines={4}>
-                {reviewFailureLabel(t, review.error_message, review.terminal_reason)}
+                {review.status === 'failed'
+                  ? reviewFailureLabel(t, review.error_message, review.terminal_reason)
+                  : review.error_message}
               </Text>
             </View>
           ) : null}

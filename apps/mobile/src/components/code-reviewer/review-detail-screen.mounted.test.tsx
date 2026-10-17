@@ -384,6 +384,7 @@ describe('ReviewDetailScreen outcome-first order', () => {
     const texts = renderScreen();
     expect(texts).toContain(i18n.t(key));
     expect(texts).not.toContain(errorMessage);
+    expect(texts).toContain('failed');
     expect(texts.indexOf('failed')).toBeLessThan(texts.indexOf(i18n.t(key)));
   });
 
@@ -409,6 +410,21 @@ describe('ReviewDetailScreen outcome-first order', () => {
       tokenUsage: { input: 0, output: 0 },
     };
     expect(renderScreen()).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+  });
+
+  it.each(['cancelled', 'interrupted'])('preserves the reason for a %s review', status => {
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status,
+        terminal_reason: 'superseded',
+        error_message: 'Superseded by new push',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain('Superseded by new push');
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
   });
 
   it('uses existing localized copy for a typed action-required failure', () => {

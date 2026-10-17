@@ -1,7 +1,9 @@
 import {
   normalizeMissingPartText,
   normalizeMissingPatchFiles,
+  normalizeToolPartState,
   stripPartContentIfFile,
+  toolPartAttachments,
 } from './part-utils';
 import type { ChatEvent } from './normalizer';
 import type { SessionStorage } from './storage/types';
@@ -66,15 +68,14 @@ function emitToolAttachmentsBeforeStrip(
   onToolAttachment: NonNullable<ChatProcessorOptions['onToolAttachment']>
 ): void {
   if (part.type !== 'tool') return;
-  const toolPart = part;
-  if (toolPart.state.status !== 'completed' || !toolPart.state.attachments) return;
-
-  for (const attachment of toolPart.state.attachments) {
+  // Reads the state defensively: an un-normalized part can carry no usable
+  // `state` at all, and the emitter must not throw on one.
+  for (const attachment of toolPartAttachments(part)) {
     const isImage = attachment.mime.startsWith('image/');
-    if (!isImage && toolPart.tool !== 'send_file') continue;
+    if (!isImage && part.tool !== 'send_file') continue;
     if (attachment.url === '') continue;
     try {
-      onToolAttachment(toolPart.id, {
+      onToolAttachment(part.id, {
         mime: attachment.mime,
         ...(attachment.filename ? { filename: attachment.filename } : {}),
         dataUrl: attachment.url,
@@ -117,8 +118,14 @@ function createChatProcessor(
           // text/reasoning parts (KILO-APP-99) and `files` on patch parts
           // (KILO-APP-BZ), and the empty-text guard below must also see
           // textless updates so they cannot clobber already streamed text.
+          // A `tool` part with no readable state is skipped.
           // Identity-preserving for everything else.
-          const normalized = normalizeMissingPatchFiles(normalizeMissingPartText(event.part));
+          const normalized = normalizeToolPartState(
+            normalizeMissingPatchFiles(normalizeMissingPartText(event.part))
+          );
+          if (normalized === null) {
+            break;
+          }
           if (options?.onToolAttachment) {
             emitToolAttachmentsBeforeStrip(normalized, options.onToolAttachment);
           }

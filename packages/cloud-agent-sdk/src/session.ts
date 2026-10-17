@@ -298,10 +298,25 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     void resolveAndConnect(connectGeneration);
   }
 
+  function emitEventToListener(event: NormalizedEvent): void {
+    try {
+      config.onEvent?.(event);
+    } catch (error) {
+      console.error(`[Session] Event listener threw on ${event.type}:`, error);
+    }
+  }
+
   const sink: TransportSink = {
     onChatEvent(event) {
-      chatProcessor.process(event);
-      config.onEvent?.(event);
+      // Keep one event's failure from taking the events after it: report and
+      // carry on rather than surfacing a session error for a single chat
+      // event, so the transcript keeps streaming.
+      try {
+        chatProcessor.process(event);
+      } catch (error) {
+        console.error(`[Session] Failed to process ${event.type}:`, error);
+      }
+      emitEventToListener(event);
     },
     onServiceEvent(event) {
       serviceState.process(event);
@@ -325,7 +340,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         storage.deleteMessage(event.messageId);
       }
       if (event.type === 'cloud.message.completed') replayedQueuedMessages.delete(event.messageId);
-      config.onEvent?.(event);
+      emitEventToListener(event);
     },
     onReplayStarted: () => {
       replaying = true;

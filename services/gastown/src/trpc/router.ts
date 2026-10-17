@@ -13,6 +13,7 @@ import { getTownDOStub } from '../dos/Town.do';
 import { getTownContainerStub } from '../dos/TownContainer.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
 import { getGastownOrgStub } from '../dos/GastownOrg.do';
+import { isCreationLimitError } from '../dos/creation-limits';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
@@ -349,7 +350,15 @@ export const gastownRouter = router({
     .mutation(async ({ ctx, input }) => {
       const user = userFromCtx(ctx);
       const userStub = getGastownUserStub(ctx.env, user.id);
-      const town = await userStub.createTown({ name: input.name, owner_user_id: user.id });
+      let town;
+      try {
+        town = await userStub.createTown({ name: input.name, owner_user_id: user.id });
+      } catch (err) {
+        if (isCreationLimitError(err)) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+        }
+        throw err;
+      }
 
       // Store kilocode token so agents can auth with the Kilo LLM gateway
       const kilocodeToken = await mintKilocodeToken(ctx.env, user);
@@ -509,13 +518,21 @@ export const gastownRouter = router({
         console.warn('[gastown-trpc] createRig: git credential refresh failed', err);
       }
 
-      const rig = await ownerStub.createRig({
-        town_id: input.townId,
-        name: input.name,
-        git_url: input.gitUrl,
-        default_branch: input.defaultBranch,
-        platform_integration_id: input.platformIntegrationId,
-      });
+      let rig;
+      try {
+        rig = await ownerStub.createRig({
+          town_id: input.townId,
+          name: input.name,
+          git_url: input.gitUrl,
+          default_branch: input.defaultBranch,
+          platform_integration_id: input.platformIntegrationId,
+        });
+      } catch (err) {
+        if (isCreationLimitError(err)) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+        }
+        throw err;
+      }
 
       // Configure the Town DO with rig metadata so dispatchAgent can find it.
       // If this fails, roll back the rig creation to avoid an orphaned record.
@@ -1562,11 +1579,19 @@ export const gastownRouter = router({
       if (!membership || membership.role === 'billing_manager')
         throw new TRPCError({ code: 'FORBIDDEN' });
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
-      const town = await stub.createTown({
-        name: input.name,
-        owner_org_id: input.organizationId,
-        created_by_user_id: ctx.userId,
-      });
+      let town;
+      try {
+        town = await stub.createTown({
+          name: input.name,
+          owner_org_id: input.organizationId,
+          created_by_user_id: ctx.userId,
+        });
+      } catch (err) {
+        if (isCreationLimitError(err)) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+        }
+        throw err;
+      }
 
       // Mint kilocode token so the mayor can start without waiting for rig creation
       const user = userFromCtx(ctx);
@@ -1668,13 +1693,21 @@ export const gastownRouter = router({
         console.warn('[gastown-trpc] createOrgRig: git credential refresh failed', err);
       }
 
-      const rig = await orgStub.createRig({
-        town_id: input.townId,
-        name: input.name,
-        git_url: input.gitUrl,
-        default_branch: input.defaultBranch,
-        platform_integration_id: input.platformIntegrationId,
-      });
+      let rig;
+      try {
+        rig = await orgStub.createRig({
+          town_id: input.townId,
+          name: input.name,
+          git_url: input.gitUrl,
+          default_branch: input.defaultBranch,
+          platform_integration_id: input.platformIntegrationId,
+        });
+      } catch (err) {
+        if (isCreationLimitError(err)) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+        }
+        throw err;
+      }
 
       try {
         await townStub.configureRig({

@@ -3,6 +3,13 @@ import { createTableOrgTowns, org_towns, OrgTownRecord } from '../db/tables/org-
 import { createTableUserRigs, user_rigs, UserRigRecord } from '../db/tables/user-rigs.table';
 import { query } from '../util/query.util';
 import { getTownDOStub } from './Town.do';
+import {
+  CreationLimitError,
+  MAX_RIGS_PER_TOWN,
+  MAX_TOWNS_PER_OWNER,
+  WATCHDOG_BATCH_RETRY_MS,
+  WATCHDOG_BATCH_SIZE,
+} from './creation-limits';
 
 const ORG_LOG = '[GastownOrg.do]';
 
@@ -63,6 +70,13 @@ export class GastownOrgDO extends DurableObject<Env> {
     created_by_user_id: string;
   }): Promise<OrgTownRecord> {
     await this.ensureInitialized();
+    const townCount = this.countTowns();
+    if (townCount >= MAX_TOWNS_PER_OWNER) {
+      throw new CreationLimitError(
+        'TOWN_LIMIT',
+        `This organization has reached the maximum number of towns (${MAX_TOWNS_PER_OWNER}). Delete a town before creating a new one.`
+      );
+    }
     const id = generateId();
     const timestamp = now();
     console.log(
@@ -92,6 +106,13 @@ export class GastownOrgDO extends DurableObject<Env> {
     await this.armWatchdogIfNeeded();
 
     return town;
+  }
+
+  private countTowns(): number {
+    const rows = [
+      ...query(this.sql, /* sql */ `SELECT COUNT(*) AS n FROM ${org_towns}`, []),
+    ];
+    return rows.length > 0 ? Number((rows[0] as Record<string, unknown>).n ?? 0) : 0;
   }
 
   async getTownAsync(townId: string): Promise<OrgTownRecord | null> {
@@ -142,6 +163,14 @@ export class GastownOrgDO extends DurableObject<Env> {
       throw new Error(`Town ${input.town_id} not found`);
     }
 
+    const rigCount = this.countRigsForTown(input.town_id);
+    if (rigCount >= MAX_RIGS_PER_TOWN) {
+      throw new CreationLimitError(
+        'RIG_LIMIT',
+        `This town has reached the maximum number of rigs (${MAX_RIGS_PER_TOWN}). Delete a rig before adding a new one.`
+      );
+    }
+
     const id = generateId();
     const timestamp = now();
 
@@ -175,6 +204,17 @@ export class GastownOrgDO extends DurableObject<Env> {
     if (!rig) throw new Error('Failed to create rig');
     console.log(`${ORG_LOG} createRig: created rig id=${rig.id}`);
     return rig;
+  }
+
+  private countRigsForTown(townId: string): number {
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `SELECT COUNT(*) AS n FROM ${user_rigs} WHERE ${user_rigs.columns.town_id} = ?`,
+        [townId]
+      ),
+    ];
+    return rows.length > 0 ? Number((rows[0] as Record<string, unknown>).n ?? 0) : 0;
   }
 
   async getRigAsync(rigId: string): Promise<UserRigRecord | null> {
@@ -257,15 +297,35 @@ export class GastownOrgDO extends DurableObject<Env> {
    * alarm is firing and re-arm it if not. This is the external observer
    * that catches a silently broken alarm handler.
    *
+   * Towns are processed in bounded batches per tick, resuming from a
+   * persisted cursor so per-tick work stays proportional to the batch
+   * size regardless of how many towns the org holds.
+   *
    * See #442 — replaces the Boot agent's role from local Gastown.
    */
   async alarm(): Promise<void> {
     await this.ensureInitialized();
+    const cursor = (await this.ctx.storage.get<string>('watchdog_cursor')) ?? null;
+
     const towns = OrgTownRecord.array().parse([
-      ...query(this.sql, /* sql */ `SELECT * FROM ${org_towns}`, []),
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${org_towns}
+          WHERE (${org_towns.columns.created_at}, ${org_towns.columns.id}) > (?, ?)
+          ORDER BY ${org_towns.columns.created_at}, ${org_towns.columns.id}
+          LIMIT ${WATCHDOG_BATCH_SIZE}
+        `,
+        [cursor?.split('|')[0] ?? '', cursor?.split('|')[1] ?? '']
+      ),
     ]);
 
-    if (towns.length === 0) return;
+    if (towns.length === 0) {
+      // Cycle complete — reset the cursor and wait for the next interval.
+      await this.ctx.storage.delete('watchdog_cursor');
+      await this.ctx.storage.setAlarm(Date.now() + WATCHDOG_INTERVAL_MS);
+      return;
+    }
 
     console.log(`${ORG_LOG} watchdog: checking ${towns.length} town(s)`);
 
@@ -281,8 +341,33 @@ export class GastownOrgDO extends DurableObject<Env> {
       }
     }
 
-    // Re-arm the watchdog
-    await this.ctx.storage.setAlarm(Date.now() + WATCHDOG_INTERVAL_MS);
+    const last = towns[towns.length - 1];
+    await this.ctx.storage.put('watchdog_cursor', `${last.created_at}|${last.id}`);
+
+    // Re-arm: shortly when this tick filled the whole batch so the cycle
+    // continues promptly, otherwise at the regular interval.
+    const reachedEnd = towns.length < WATCHDOG_BATCH_SIZE;
+    await this.ctx.storage.setAlarm(
+      Date.now() + (reachedEnd ? WATCHDOG_INTERVAL_MS : WATCHDOG_BATCH_RETRY_MS)
+    );
+    if (reachedEnd) await this.ctx.storage.delete('watchdog_cursor');
+  }
+
+  /** Diagnostic: how many towns remain past the current watchdog cursor. */
+  async watchdogStatus(): Promise<{ remaining: number; cursor: string | null }> {
+    await this.ensureInitialized();
+    const cursor = (await this.ctx.storage.get<string>('watchdog_cursor')) ?? null;
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT COUNT(*) AS n FROM ${org_towns}
+          WHERE (${org_towns.columns.created_at}, ${org_towns.columns.id}) > (?, ?)
+        `,
+        [cursor?.split('|')[0] ?? '', cursor?.split('|')[1] ?? '']
+      ),
+    ];
+    return { remaining: Number((rows[0] as Record<string, unknown>).n ?? 0), cursor };
   }
 }
 

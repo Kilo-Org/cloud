@@ -100,17 +100,24 @@ export default function SessionDetailScreen() {
   // the user tapped, not from when SessionDetailContent happens to mount.
   // Keyed on the session id: a reused route instance opening a different
   // session restarts the clock.
-  const openStart = useRef({ sessionId: rawSessionId, startedAt: Date.now() });
+  //
+  // `beganOnRestoredIdentity` records whether the persisted identity hint
+  // scoped this open: credentials restored from storage, with the live
+  // account still unconfirmed. A pending fresh sign-in also has no live id,
+  // but it carries no hint scope, so it is not this case. Captured here
+  // because the live `getMe` confirms seconds later, after which the resolved
+  // scope can no longer tell the hint's scope from the live one.
+  const openStart = useRef({
+    sessionId: rawSessionId,
+    startedAt: Date.now(),
+    beganOnRestoredIdentity: owner.userId === null && owner.restored,
+  });
   if (openStart.current.sessionId !== rawSessionId) {
-    openStart.current = { sessionId: rawSessionId, startedAt: Date.now() };
-  }
-  // Whether this open began on the restored identity rather than a confirmed
-  // account. Captured at the open's first render: on a cold-start-restored
-  // process the live `getMe` confirms seconds later, so a later read of the
-  // resolved scope could never tell the hint's scope from the live one.
-  const openBeganOnRestoredIdentity = useRef(owner.userId === null);
-  if (openStart.current.sessionId !== rawSessionId) {
-    openBeganOnRestoredIdentity.current = owner.userId === null;
+    openStart.current = {
+      sessionId: rawSessionId,
+      startedAt: Date.now(),
+      beganOnRestoredIdentity: owner.userId === null && owner.restored,
+    };
   }
   const sessionRendered = useRef<string | null>(null);
   if (sessionRendered.current !== null && sessionRendered.current !== rawSessionId) {
@@ -159,7 +166,7 @@ export default function SessionDetailScreen() {
               (error as { code?: string } | null)?.code;
             return (
               shouldRetryNotFoundOnSpawnedRoute({ spawned, attempt: failureCount, errorCode }) ||
-              (!openBeganOnRestoredIdentity.current &&
+              (!openStart.current.beganOnRestoredIdentity &&
                 shouldRetryNotFoundOnYoungRoute({
                   attempt: failureCount,
                   errorCode,

@@ -492,7 +492,12 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'NewSessionRepositorySection')).not.toBeNull();
     expect(findTextContent(element, t => t === 'Run on')).toBe(false);
     expect(findTextContent(element, t => t === 'Run on: ')).toBe(false);
-    expect(findTextContent(element, t => t === 'To run on your computer, start Kilo there and leave it running.')).toBe(false);
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(false);
   });
 
   // ── Case 3: Remote, selector shown ──
@@ -512,7 +517,12 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: true,
       runOnInstance: INSTANCE,
     });
-    expect(findTextContent(element, t => t === 'To run on your computer, start Kilo there and leave it running.')).toBe(true);
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(true);
   });
 
   // ── Case 4: Remote, selector hidden ──

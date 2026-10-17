@@ -11,7 +11,6 @@ import {
 } from '../shared/container-intercept.js';
 import {
   CONTROL_PROCESS_MATCH,
-  CONTROL_SUPERVISOR_PATH,
   CONTROL_WRAPPER_LOG_PATH,
 } from '../sandbox-control/container-paths.js';
 import { CONTROL_PLANE_NATIVE_LOGS_ENV } from '../shared/control-diagnostics.js';
@@ -47,6 +46,7 @@ import {
   type MainProcessObservation,
 } from './main-process.js';
 import type { Env } from '../types.js';
+import type { ProviderStartupCommand } from '../sandbox-control/provider.js';
 import {
   nativeEgressAllowlistSchema,
   nativeEgressPolicySchema,
@@ -67,6 +67,7 @@ export type ContainersStartSource = 'image' | 'repository';
 
 export type ContainersLaunchInput = {
   allocationRef: string;
+  command: ProviderStartupCommand;
   env: Record<string, string>;
   instance: ContainerInstanceSize;
   containment?: boolean;
@@ -374,7 +375,7 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   /**
-   * Issue the native supervisor as PID 1: fence, start, confirm identity, mark
+   * Issue the supplied command as PID 1: fence, start, confirm identity, mark
    * running. Containment is installed by the caller, which owns its ordering
    * before any physical call.
    */
@@ -407,7 +408,13 @@ export class SandboxContainers extends DurableObject<Env> {
     const started = await this.runStart(start, async () => {
       const issuedAt = Date.now();
       await this.startContainerAndActivateBilling(container, record, start.options);
-      await this.awaitSupervisorMainProcess(container, start.source, issuedAt, input.deadlineAt);
+      await this.awaitSupervisorMainProcess(
+        container,
+        input.command,
+        start.source,
+        issuedAt,
+        input.deadlineAt
+      );
     });
     if (!started) return { started: false, startSource: 'repository', snapshotFailed: true };
     await this.writeRunning(ref, 'clear');
@@ -432,6 +439,7 @@ export class SandboxContainers extends DurableObject<Env> {
       source: 'image',
       options: this.startOptions(
         input.instance,
+        input.command,
         this.nativeLaunchEnv(
           input.env,
           input.containment === true || input.egressAllowlist !== undefined
@@ -480,6 +488,7 @@ export class SandboxContainers extends DurableObject<Env> {
       source: 'repository',
       options: this.startOptions(
         input.instance,
+        input.command,
         this.nativeLaunchEnv(
           input.env,
           input.containment === true || input.egressAllowlist !== undefined
@@ -774,7 +783,7 @@ export class SandboxContainers extends DurableObject<Env> {
       const start = await this.resolveStart(input, record.startSource === 'repository');
       return this.issueNativeSupervisor(record, ref, start, input);
     }
-    if ((await this.settleRunningMainProcess(record, ref)) === 'supervisor') {
+    if ((await this.settleRunningMainProcess(record, ref, input.command)) === 'started') {
       return { started: true, startSource: recordedStartSource(record) };
     }
     // The image default `sleep infinity` still owns the container; the wrapper
@@ -792,7 +801,7 @@ export class SandboxContainers extends DurableObject<Env> {
       if (container.running !== true) {
         throw new Error('Container stopped before the wrapper exec');
       }
-      await this.startWrapper(container, input.env, interception);
+      await this.startWrapper(container, input.command, input.env, interception);
     } else {
       await this.activateBillingIfRunning(container, record);
     }
@@ -808,18 +817,19 @@ export class SandboxContainers extends DurableObject<Env> {
    */
   private async settleRunningMainProcess(
     record: ContainersRecord,
-    ref: string
-  ): Promise<'supervisor' | 'sleep'> {
+    ref: string,
+    command: ProviderStartupCommand
+  ): Promise<'started' | 'sleep'> {
     const container = this.requiredContainer();
-    const identity = await this.readMainProcessIdentity(container);
+    const identity = await this.readMainProcessIdentity(container, command);
     if (identity === 'ambiguous') {
       await this.activateBillingIfRunning(container, record);
       throw new Error('Main process identity is ambiguous');
     }
-    if (identity === 'supervisor') {
+    if (identity === 'supervisor' || identity === 'startup') {
       await this.activateBillingIfRunning(container, record);
       await this.writeRunning(ref, 'clear');
-      return 'supervisor';
+      return 'started';
     }
     return 'sleep';
   }
@@ -846,7 +856,7 @@ export class SandboxContainers extends DurableObject<Env> {
     if (input.containment === true || input.egressAllowlist !== undefined) {
       await this.installOutboundProxy(container, input.egressAllowlist);
     }
-    if ((await this.settleRunningMainProcess(stored, ref)) === 'supervisor') {
+    if ((await this.settleRunningMainProcess(stored, ref, input.command)) === 'started') {
       return { started: true, startSource: recordedStartSource(stored) };
     }
     const probe = await this.probeWrapper(container);
@@ -924,6 +934,7 @@ export class SandboxContainers extends DurableObject<Env> {
    */
   private async startWrapper(
     container: Container,
+    command: ProviderStartupCommand,
     env: Record<string, string>,
     containment: boolean
   ): Promise<void> {
@@ -937,7 +948,7 @@ export class SandboxContainers extends DurableObject<Env> {
         await this.rollbackToNotStarted();
         throw new WrapperExecTimeoutError();
       }
-      const handle = await this.awaitWrapperExec(container, env, containment, deadlineAt);
+      const handle = await this.awaitWrapperExec(container, command, env, containment, deadlineAt);
       if (handle.pid > 0) return;
 
       // `pid: 0` means Docker has not spawned the process yet. Probe repeatedly
@@ -996,6 +1007,7 @@ export class SandboxContainers extends DurableObject<Env> {
 
   private async awaitWrapperExec(
     container: Container,
+    command: ProviderStartupCommand,
     env: Record<string, string>,
     containment: boolean,
     deadlineAt: number
@@ -1004,7 +1016,7 @@ export class SandboxContainers extends DurableObject<Env> {
     // after expiry.
     if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
     return this.awaitContainerCall(
-      container.exec(['/bin/sh', CONTROL_SUPERVISOR_PATH], {
+      container.exec([...command.argv], {
         env: this.nativeLaunchEnv(env, containment),
         cwd: '/',
       }),
@@ -1066,19 +1078,19 @@ export class SandboxContainers extends DurableObject<Env> {
 
   private startOptions(
     instance: ContainerInstanceSize,
+    command: ProviderStartupCommand,
     env: Record<string, string>,
     egressAllowlist?: string[],
     snapshotId?: string
   ): ContainerStartupOptions {
-    // Native issuance: the main process is the supervisor, not the image default
-    // `sleep infinity`. The supervisor script is already in the image.
+    // The supplied command runs first, including on a repository restore.
     return {
       ...(snapshotId === undefined
         ? { image: this.containerImage() }
         : { containerSnapshot: { id: snapshotId } }),
       instance,
       enableInternet: egressAllowlist === undefined,
-      entrypoint: ['/bin/sh', CONTROL_SUPERVISOR_PATH],
+      entrypoint: [...command.argv],
       env,
     };
   }
@@ -1098,12 +1110,17 @@ export class SandboxContainers extends DurableObject<Env> {
     };
   }
 
-  private async readMainProcessIdentity(container: Container): Promise<MainProcessIdentity> {
-    return (await this.observeMainProcess(container, Date.now() + PROBE_TIMEOUT_MS)).identity;
+  private async readMainProcessIdentity(
+    container: Container,
+    command: ProviderStartupCommand
+  ): Promise<MainProcessIdentity> {
+    return (await this.observeMainProcess(container, command, Date.now() + PROBE_TIMEOUT_MS))
+      .identity;
   }
 
   private async observeMainProcess(
     container: Container,
+    command: ProviderStartupCommand,
     deadlineAt: number
   ): Promise<MainProcessObservation> {
     try {
@@ -1115,7 +1132,7 @@ export class SandboxContainers extends DurableObject<Env> {
       if (output.exitCode !== 0) {
         return { kind: 'exit_code', identity: 'ambiguous', exitCode: output.exitCode };
       }
-      return observeCmdline(new Uint8Array(output.stdout));
+      return observeCmdline(new Uint8Array(output.stdout), command);
     } catch (error) {
       if (error instanceof WrapperExecTimeoutError)
         return { kind: 'deadline', identity: 'ambiguous' };
@@ -1124,7 +1141,7 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   /**
-   * Confirm the native start issued the supervisor as PID 1, bounded by the
+   * Confirm PID 1 is the supplied command or stable supervisor, bounded by the
    * start-source readiness deadline. This is identity, not a wrapper-child
    * poll: a deadline without a match, or a container that stops first, throws
    * and does not exec.
@@ -1135,6 +1152,7 @@ export class SandboxContainers extends DurableObject<Env> {
    */
   private async awaitSupervisorMainProcess(
     container: Container,
+    command: ProviderStartupCommand,
     source: ContainersStartSource,
     issuedAt: number,
     launchDeadlineAt?: number
@@ -1151,10 +1169,10 @@ export class SandboxContainers extends DurableObject<Env> {
       if (container.running !== true) {
         throw new Error('Container stopped before the supervisor main process was confirmed');
       }
-      const observation = await this.observeMainProcess(container, deadlineAt);
+      const observation = await this.observeMainProcess(container, command, deadlineAt);
       checks += 1;
       if (observation.kind !== 'deadline') lastCompleted = observation;
-      if (observation.identity === 'supervisor') {
+      if (observation.identity === 'supervisor' || observation.identity === 'startup') {
         this.logSupervisorConfirm('ready', source, issuedAt, checks);
         return;
       }

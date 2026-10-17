@@ -189,12 +189,25 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 
 ## 6. Sandbox DO
 
+### Startup modes
+
+The Sandbox DO selects the first process of a sandbox. The provider runs it and does not interpret it.
+The mode says where the runtime (Kilo and the supervisor) comes from: the image or a download.
+
+- **Contract.** `launch(ref, { command, env }, options)` takes the command as an argv; a script is
+  `['/bin/sh', '-c', script]`. Native uses it as the start entrypoint, and as the exec on a
+  `sleep infinity` main process. Vercel runs it without a login shell. The Sandbox SDK runs it
+  with `startProcess`. A provider never chooses a Kilo version, reads a release descriptor or owns
+  a deadline other than `deadlineAt`.
+- **`preinstalled`.** `preinstalled-startup.ts` supplies `['/bin/sh', CONTROL_SUPERVISOR_PATH]`.
+  The image holds Kilo and the supervisor. There is no download and no grant.
+
 ### Allocation state
 
 | State | Leaves to | On | Timer |
 |---|---|---|---|
 | `stopped` | `creating` | `prepare` for a session | — |
-| `creating` | `starting` | Provider created the sandbox and launched the supervisor | Provider call 2 min |
+| `creating` | `starting` | Provider created the sandbox and launched the startup command | Provider call 2 min |
 | `creating` | `creating` or `stopped` | Transient create error: retry after a 10 s pause while a route deadline remains, else stop | — |
 | `creating` | `stopping` or `stopped` | Classified permanent create/launch error: fail preparing routes immediately; an owned physical ref uses the existing stop ladder | Existing ladder when a ref exists |
 | `starting` | `connected` | Wrapper `hello` accepted | 5 min without `hello` → `stopping` |
@@ -745,18 +758,20 @@ protections.
 
 ### Supervisor
 
-The provider launch command starts a small supervisor loop that runs the wrapper. After a non-zero
+The startup command starts a small supervisor loop that runs the wrapper. After a non-zero
 exit it restarts the wrapper with 1 s to 30 s backoff, at most 5 times in 10 minutes. Exit code 0
 ends the loop; that is the wrapper's terminal `shutdown` path, while a SIGTERM sent to the wrapper
 alone is non-zero and restarts. If the loop gives up, the Sandbox DO `starting` or `disconnected`
 timer stops the sandbox.
 
-The provider launch command is not the only starter. On the native Cloudflare Containers runtime the
-container main process is the supervisor: `start()` is issued with `['/bin/sh', supervisor-path]` as
-its entrypoint, and PID 1 identity (`/proc/1/cmdline`) is the issuance confirmation, bounded by the
-wrapper readiness deadline. PID 1 identity is not wrapper readiness: the wrapper socket and the
-Sandbox DO `starting` timer stay the readiness owner, and no provider poll or wrapper-child probe is
-added for that path. Sandbox SDK and Vercel still exec the supervisor against a living PID 1.
+On the native Cloudflare Containers runtime the container main process is the startup command:
+`start()` is issued with it as the entrypoint. In `preinstalled` mode that is
+`['/bin/sh', supervisor-path]`. In `downloaded` mode it is the bootstrap, which execs the same argv
+after install. PID 1 identity (`/proc/1/cmdline`) is the issuance confirmation when it is either
+argv, bounded by the wrapper readiness deadline. PID 1 identity is not wrapper readiness: the
+wrapper socket and the Sandbox DO `starting` timer stay the readiness owner, and no provider poll or
+wrapper-child probe is added for that path. Sandbox SDK and Vercel run the startup command against
+a living PID 1.
 
 A native attempt that already issued the main process does not start another supervisor when that
 process is gone; the persisted `exec_pending` fence is not reset, and the next allocation may start a

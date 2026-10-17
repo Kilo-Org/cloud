@@ -64,6 +64,7 @@ import {
   type VercelProviderLocator,
 } from '../../sandbox-control/vercel-provider.js';
 import { buildControlWrapperLaunchEnv } from '../../sandbox-control/wrapper-launch-env.js';
+import { preinstalledStartup } from '../../sandbox-control/preinstalled-startup.js';
 import {
   kiloTokenHasRuntimeAuthorization,
   prepareCredentialGrant,
@@ -3914,6 +3915,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const credential = generateSandboxCredential();
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
         const pin = this.providerPin ?? this.defaultPin('cloudflare');
+        const startupCommand = preinstalledStartup();
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
         if (pin.billing) {
           await assertContainerCapacity(this.env, {
@@ -4053,7 +4055,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
           ...(pin.provider === 'cloudflare-containers' ? { deadlineAt: launchDeadline } : {}),
         };
         let launched = await withTimeout(
-          this.provider.launch(createdRef, launchEnv, launchOptions),
+          this.provider.launch(
+            createdRef,
+            { command: startupCommand, env: launchEnv },
+            launchOptions
+          ),
           remainingMs(launchDeadline),
           'Sandbox launch timed out'
         );
@@ -4101,11 +4107,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
             detail: 'Starting sandbox without a snapshot',
           });
           launched = await withTimeout(
-            this.provider.launch(createdRef, imageLaunchEnv, {
-              ...launch.options,
-              skipRepository: true,
-              deadlineAt: launchDeadline,
-            }),
+            this.provider.launch(
+              createdRef,
+              { command: startupCommand, env: imageLaunchEnv },
+              {
+                ...launch.options,
+                skipRepository: true,
+                deadlineAt: launchDeadline,
+              }
+            ),
             remainingMs(launchDeadline),
             'Sandbox launch timed out'
           );

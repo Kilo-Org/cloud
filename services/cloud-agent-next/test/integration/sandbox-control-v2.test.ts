@@ -1,3 +1,4 @@
+import { preinstalledStartup } from '../../src/sandbox-control/preinstalled-startup.js';
 import {
   env,
   evictAllDurableObjects,
@@ -169,7 +170,7 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
       }
       return { providerRef: ref };
     },
-    async launch(_ref, env) {
+    async launch(_ref, { env }) {
       provider.launchEnvs.push({ ...env });
       if (options.gateLaunch) {
         await new Promise<void>((resolve, reject) => {
@@ -3111,7 +3112,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
         containment: false,
         instanceId: 'reconstructed-allocation',
       });
-      await reconstructed.provider.launch(ref, {});
+      await reconstructed.provider.launch(ref, { command: preinstalledStartup(), env: {} });
     });
     expect(launches).toHaveLength(1);
     expect(launches[0]?.egressAllowlist).toEqual(expected);

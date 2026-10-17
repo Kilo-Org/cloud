@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
+import { getCallbackReportParams } from '@/lib/integrations/oauth/callback-params';
 import {
   exchangeDoltHubOAuthCode,
   upsertDoltHubInstallation,
@@ -54,18 +55,11 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
       );
     }
 
-    // Build a redacted copy of the callback query params so we never write
-    // the raw `code` (a short-lived credential) into Sentry/logs even if a
-    // future change adds another logging path here.
-    const redactedParams = Object.fromEntries(
-      Array.from(searchParams.entries()).map(([k, v]) => [k, k === 'code' ? '***' : v])
-    );
-
     if (!code) {
       captureMessage('DoltHub callback missing code', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
-        extra: { state, allParams: redactedParams },
+        extra: { state, allParams: getCallbackReportParams(searchParams) },
       });
 
       return NextResponse.redirect(
@@ -81,7 +75,7 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
       captureMessage('DoltHub callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
-        extra: { code: '***', state, allParams: redactedParams },
+        extra: { code: '***', state, allParams: getCallbackReportParams(searchParams) },
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }

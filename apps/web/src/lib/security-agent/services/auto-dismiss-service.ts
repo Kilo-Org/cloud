@@ -554,6 +554,11 @@ export async function autoDismissEligibleFindings(
  * Get count of findings eligible for auto-dismiss.
  * Useful for showing in UI before running bulk dismiss.
  *
+ * The count is independent of the configured confidence threshold: it reports every finding the
+ * triage policy accepts, broken down by confidence, so the caller can apply its own threshold
+ * (autoDismissEligibleFindings skips findings below `auto_dismiss_confidence_threshold`) or show
+ * the breakdown before deciding.
+ *
  * @param owner - The security review owner (org or user)
  * @param userId - The user performing the action (for audit/permissions)
  */

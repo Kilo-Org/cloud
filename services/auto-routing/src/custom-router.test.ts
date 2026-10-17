@@ -281,6 +281,7 @@ async function errorCode(res: Response) {
 const fetchMock = vi.fn<typeof fetch>();
 let gatewayDeniedModelIds: string[] = [];
 let gatewayFailuresLeft = 0;
+let gatewayFailureStatus = 503;
 let blacklistedDomainsConfig: string | null = null;
 let redisAvailable = true;
 
@@ -307,6 +308,7 @@ beforeEach(() => {
   customTable = rankedTable;
   gatewayDeniedModelIds = [];
   gatewayFailuresLeft = 0;
+  gatewayFailureStatus = 503;
   blacklistedDomainsConfig = null;
   redisAvailable = true;
   fetchMock.mockReset().mockImplementation(async (input, init) => {
@@ -314,7 +316,7 @@ beforeEach(() => {
     if (url.startsWith('https://gateway.example.test')) {
       if (gatewayFailuresLeft > 0) {
         gatewayFailuresLeft--;
-        return new Response('down', { status: 503 });
+        return new Response('down', { status: gatewayFailureStatus });
       }
       return Response.json({ deniedModelIds: gatewayDeniedModelIds });
     }
@@ -463,6 +465,16 @@ describe('public custom router decide', () => {
   it('skips the organization policy for a personal context', async () => {
     await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
     expect(gatewayCalls()).toHaveLength(0);
+  });
+
+  it('does not retry a policy failure that cannot clear', async () => {
+    gatewayFailuresLeft = 2;
+    gatewayFailureStatus = 404;
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody({ clientEntries: [] }), {
+      'X-KiloCode-OrganizationId': ORG_ID,
+    });
+    expect(res.status).toBe(500);
+    expect(gatewayCalls()).toHaveLength(1);
   });
 
   it('retries a transient organization policy failure once', async () => {

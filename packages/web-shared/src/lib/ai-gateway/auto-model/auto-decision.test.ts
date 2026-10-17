@@ -142,4 +142,11 @@ describe('checkAutoDecision', () => {
       await check({ model: clientModel }, { ...payload, model: clientModel, variant: null })
     ).toEqual({ kind: 'rejected', reason: 'client_entry' });
   });
+
+  it('rejects a decision that names an auto model instead of a pool entry', async () => {
+    const autoModel = 'kilo-auto/custom/mine';
+    expect(
+      await check({ model: autoModel }, { ...payload, model: autoModel, variant: null })
+    ).toEqual({ kind: 'rejected', reason: 'auto_model' });
+  });
 });

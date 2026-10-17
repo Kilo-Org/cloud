@@ -28,6 +28,16 @@ export function clearOrganizationPolicyCache(): void {
   blacklistedDomains = null;
 }
 
+class DeniedModelsResponseError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`gateway denied-models responded ${status}`);
+    this.name = 'DeniedModelsResponseError';
+    this.status = status;
+  }
+}
+
 async function fetchDeniedModelIds(
   env: GatewayPolicyEnv,
   request: AutoRoutingDeniedModelsRequest
@@ -41,8 +51,16 @@ async function fetchDeniedModelIds(
     body: JSON.stringify(request),
     signal: AbortSignal.timeout(DENIED_MODELS_ATTEMPT_TIMEOUT_MS),
   });
-  if (!res.ok) throw new Error(`gateway denied-models responded ${res.status}`);
+  if (!res.ok) throw new DeniedModelsResponseError(res.status);
   return AutoRoutingDeniedModelsResponseSchema.parse(await res.json()).deniedModelIds;
+}
+
+// Network errors, timeouts, 429, and 5xx can clear on a second attempt. Any other status (a
+// wrong secret, a contract mismatch, a route not deployed yet) fails the same way again.
+function isTransientLookupFailure(error: unknown): boolean {
+  return (
+    !(error instanceof DeniedModelsResponseError) || error.status === 429 || error.status >= 500
+  );
 }
 
 async function fetchDeniedModelIdsWithRetry(
@@ -60,6 +78,7 @@ async function fetchDeniedModelIdsWithRetry(
           ...formatError(error),
         })
       );
+      if (!isTransientLookupFailure(error)) return null;
     }
   }
   return null;

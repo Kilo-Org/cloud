@@ -19,11 +19,14 @@ function parseLines(spy: jest.SpiedFunction<typeof console.log>): Record<string,
 }
 
 let savedSampleRate: string | undefined;
+let savedMobileSampleRate: string | undefined;
 let logSpy: jest.SpiedFunction<typeof console.log>;
 
 beforeEach(() => {
   savedSampleRate = process.env.TRPC_TIMING_SAMPLE_RATE;
+  savedMobileSampleRate = process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE;
   delete process.env.TRPC_TIMING_SAMPLE_RATE;
+  delete process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE;
   logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 });
 
@@ -32,6 +35,11 @@ afterEach(() => {
     delete process.env.TRPC_TIMING_SAMPLE_RATE;
   } else {
     process.env.TRPC_TIMING_SAMPLE_RATE = savedSampleRate;
+  }
+  if (savedMobileSampleRate === undefined) {
+    delete process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE;
+  } else {
+    process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE = savedMobileSampleRate;
   }
   jest.restoreAllMocks();
 });
@@ -66,6 +74,55 @@ describe('readClientDimensions', () => {
       requestId: 'req-123',
     });
   });
+
+  test('records an unrecognized client or platform as other', () => {
+    expect(
+      readClientDimensions(
+        new Headers({
+          'x-kilo-client': 'mobile-handheld',
+          'x-kilo-app-platform': 'windows',
+        })
+      )
+    ).toEqual({
+      client: 'other',
+      platform: 'other',
+      version: null,
+      requestId: null,
+    });
+  });
+
+  test('treats an empty client or platform header as absent', () => {
+    expect(
+      readClientDimensions(new Headers({ 'x-kilo-client': '', 'x-kilo-app-platform': '' }))
+    ).toMatchObject({ client: null, platform: null });
+  });
+
+  test('drops a version that is malformed, empty or too long', () => {
+    for (const version of ['1.2.3-beta', 'not-a-version', '', '1'.repeat(33)]) {
+      expect(
+        readClientDimensions(new Headers({ ...MOBILE_HEADERS, 'x-kilo-app-version': version }))
+          .version
+      ).toBeNull();
+    }
+    expect(
+      readClientDimensions(new Headers({ ...MOBILE_HEADERS, 'x-kilo-app-version': '1.2.3' }))
+        .version
+    ).toBe('1.2.3');
+  });
+
+  test('drops a request id outside the allowed charset or length', () => {
+    for (const requestId of ['req 123', 'req/123', 'a'.repeat(65)]) {
+      expect(
+        readClientDimensions(new Headers({ ...MOBILE_HEADERS, 'x-kilo-request-id': requestId }))
+          .requestId
+      ).toBeNull();
+    }
+    expect(
+      readClientDimensions(
+        new Headers({ ...MOBILE_HEADERS, 'x-kilo-request-id': '2f1c0d3e-4a5b-6789:00.11_a' })
+      ).requestId
+    ).toBe('2f1c0d3e-4a5b-6789:00.11_a');
+  });
 });
 
 describe('isMobileDimensions', () => {
@@ -78,7 +135,7 @@ describe('isMobileDimensions', () => {
 });
 
 describe('shouldLogTiming', () => {
-  test('always logs mobile, even at rate 0', () => {
+  test('logs mobile at the mobile rate while the base rate is 0', () => {
     process.env.TRPC_TIMING_SAMPLE_RATE = '0';
     expect(shouldLogTiming({ client: 'mobile' })).toBe(true);
   });
@@ -101,10 +158,32 @@ describe('shouldLogTiming', () => {
     random.mockReturnValue(0.5);
     expect(shouldLogTiming({ client: 'extension' })).toBe(false);
   });
+
+  test('applies the base rate to an unrecognized client value', () => {
+    process.env.TRPC_TIMING_SAMPLE_RATE = '0';
+    expect(shouldLogTiming({ client: 'mobile2' })).toBe(false);
+    expect(shouldLogTiming({ client: 'MOBILE' })).toBe(false);
+    expect(shouldLogTiming({ client: 'other' })).toBe(false);
+  });
+
+  test('samples the mobile client at the configured mobile rate', () => {
+    process.env.TRPC_TIMING_SAMPLE_RATE = '1';
+    process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE = '0';
+    expect(shouldLogTiming({ client: 'mobile' })).toBe(false);
+
+    process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE = 'not-a-number';
+    expect(shouldLogTiming({ client: 'mobile' })).toBe(true);
+  });
+
+  test('the mobile rate never applies to another client', () => {
+    process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE = '1';
+    process.env.TRPC_TIMING_SAMPLE_RATE = '0';
+    expect(shouldLogTiming({ client: 'extension' })).toBe(false);
+  });
 });
 
 describe('buildTimingLine', () => {
-  test('includes userId only on a mobile line', () => {
+  test('includes userId from the authenticated context, for any client', () => {
     const mobile = buildTimingLine({
       surface: 'trpc',
       path: 'user.getMe',
@@ -137,8 +216,30 @@ describe('buildTimingLine', () => {
       userId: 'u1',
       dimensions: readClientDimensions(new Headers({ 'x-kilo-client': 'extension' })),
     });
-    expect(sampled).not.toHaveProperty('userId');
-    expect(sampled).toMatchObject({ client: 'extension', type: 'trpc_timing' });
+    expect(sampled).toMatchObject({ client: 'extension', type: 'trpc_timing', userId: 'u1' });
+  });
+
+  test('omits userId for an unauthenticated request', () => {
+    const anonymous = buildTimingLine({
+      surface: 'trpc',
+      path: 'kiloPass.getState',
+      procedureType: 'query',
+      durationMs: 8,
+      ok: true,
+      userId: null,
+      dimensions: readClientDimensions(new Headers(MOBILE_HEADERS)),
+    });
+    expect(anonymous).not.toHaveProperty('userId');
+
+    const missing = buildTimingLine({
+      surface: 'trpc',
+      path: 'kiloPass.getState',
+      procedureType: 'query',
+      durationMs: 8,
+      ok: true,
+      dimensions: readClientDimensions(new Headers(MOBILE_HEADERS)),
+    });
+    expect(missing).not.toHaveProperty('userId');
   });
 });
 
@@ -181,6 +282,30 @@ describe('withRestTiming', () => {
     });
     expect(line.durationMs).toEqual(expect.any(Number));
     expect(line).not.toHaveProperty('userId');
+  });
+
+  test('records an unrecognized client, platform and shape as other or null', async () => {
+    const handler = jest.fn(async () => new Response('ok', { status: 200 }));
+    const wrapped = withRestTiming('/api/openrouter/[...path]', handler);
+    const request = new Request('https://app.kilo.ai/api/openrouter/chat/completions', {
+      method: 'POST',
+      headers: {
+        'x-kilo-client': 'mobile-handheld',
+        'x-kilo-app-platform': 'executor',
+        'x-kilo-app-version': 'v1.2.3',
+        'x-kilo-request-id': 'r'.repeat(300),
+      },
+    });
+
+    await wrapped(request, undefined);
+
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(parseLines(logSpy)[0]).toMatchObject({
+      client: 'other',
+      platform: 'other',
+      version: null,
+      requestId: null,
+    });
   });
 
   test('logs and re-throws when the handler throws', async () => {
@@ -269,8 +394,8 @@ describe('withRestTiming', () => {
 });
 
 // The extension's model calls land on `/api/gateway/v1/chat/completions` at
-// high volume, so a non-mobile REST line is sampled like a tRPC line while
-// mobile stays at 100%.
+// high volume, so a non-mobile REST line is sampled at the shared rate while
+// mobile follows its own configured rate (default 100%).
 describe('withRestTiming sampling policy', () => {
   const gatewayRequest = (headers?: Record<string, string>) =>
     new Request('https://app.kilo.ai/api/gateway/v1/chat/completions', {
@@ -315,5 +440,30 @@ describe('withRestTiming sampling policy', () => {
       expect.objectContaining({ type: 'api_timing', client: 'extension' }),
       expect.objectContaining({ type: 'api_timing', client: null }),
     ]);
+  });
+
+  test('at rate 0, an unrecognized client value is not logged', async () => {
+    process.env.TRPC_TIMING_SAMPLE_RATE = '0';
+    const wrapped = withRestTiming(
+      '/api/gateway/[...path]',
+      jest.fn(async () => new Response('ok', { status: 200 }))
+    );
+
+    await wrapped(gatewayRequest({ 'x-kilo-client': 'mobile-app' }), undefined);
+    await wrapped(gatewayRequest({ 'x-kilo-client': 'MOBILE' }), undefined);
+
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  test('the mobile line follows the configured mobile rate', async () => {
+    process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE = '0';
+    const wrapped = withRestTiming(
+      '/api/gateway/[...path]',
+      jest.fn(async () => new Response('ok', { status: 200 }))
+    );
+
+    await wrapped(gatewayRequest(MOBILE_HEADERS), undefined);
+
+    expect(logSpy).not.toHaveBeenCalled();
   });
 });

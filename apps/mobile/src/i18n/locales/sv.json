@@ -3664,7 +3664,7 @@
       "nameRequired": "Ange ett agentnamn",
       "slugRequired": "Ange en agentsnigel",
       "slugInvalid": "Slug måste börja med en bokstav och endast använda små bokstäver, siffror och bindestreck",
-      "slugConflict": "Den snigeln är reserverad av en inbyggd agent",
+      "slugConflict": "Den slugen används redan av en inbyggd agent eller en annan agent i den här profilen",
       "edit": "Redigera agent"
     },
     "slashCommands": {

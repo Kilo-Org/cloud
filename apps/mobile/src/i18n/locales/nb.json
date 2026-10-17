@@ -3664,7 +3664,7 @@
       "nameRequired": "Skriv inn et agentnavn",
       "slugRequired": "Skriv inn en agentsnegl",
       "slugInvalid": "Slug må starte med en bokstav og kun bruke små bokstaver, sifre og bindestreker",
-      "slugConflict": "Den sneglen er reservert av en innebygd agent",
+      "slugConflict": "Det sluget er allerede i bruk av en innebygd agent eller en annen agent i denne profilen",
       "edit": "Rediger agent"
     },
     "slashCommands": {

@@ -3787,7 +3787,7 @@
       "nameRequired": "Cuir isteach ainm gníomhaire",
       "slugRequired": "Cuir isteach seilide gníomhaire",
       "slugInvalid": "Caithfidh sluga tosú le litir agus gan ach litreacha beaga, digití agus daiseanna a úsáid",
-      "slugConflict": "Tá an seilide sin curtha in áirithe ag gníomhaire ionsuite",
+      "slugConflict": "Tá an slug sin in úsáid cheana ag gníomhaire ionsuite nó ag gníomhaire eile sa phróifíl seo",
       "edit": "Cuir gníomhaire in eagar"
     },
     "slashCommands": {

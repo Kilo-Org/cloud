@@ -3664,7 +3664,7 @@
       "nameRequired": "Nhập tên đại lý",
       "slugRequired": "Nhập sên đại lý",
       "slugInvalid": "Slug phải bắt đầu bằng một chữ cái và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
-      "slugConflict": "Con sên đó được bảo lưu bởi một tác nhân tích hợp",
+      "slugConflict": "Slug đó đã được một tác nhân tích hợp sẵn hoặc tác nhân khác trong hồ sơ này sử dụng",
       "edit": "Chỉnh sửa đại lý"
     },
     "slashCommands": {

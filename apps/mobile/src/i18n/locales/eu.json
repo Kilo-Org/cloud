@@ -3664,7 +3664,7 @@
       "nameRequired": "Sartu agentearen izena",
       "slugRequired": "Sartu agente bare bat",
       "slugInvalid": "Slug-ek letra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
-      "slugConflict": "Bare hori integratutako agente batek erreserbatzen du",
+      "slugConflict": "Slug hori dagoeneko erabiltzen du agenta integratu batek edo profil honetako beste agente batek",
       "edit": "Editatu agentea"
     },
     "slashCommands": {

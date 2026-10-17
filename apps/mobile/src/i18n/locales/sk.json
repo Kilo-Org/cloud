@@ -3746,7 +3746,7 @@
       "nameRequired": "Zadajte meno agenta",
       "slugRequired": "Zadajte agenta slimáka",
       "slugInvalid": "Slug musí začínať písmenom a používať iba malé písmená, číslice a pomlčky",
-      "slugConflict": "Ten slimák je rezervovaný vstavaným agentom",
+      "slugConflict": "Tento slug už používa vstavaný agent alebo iný agent v tomto profile",
       "edit": "Upraviť zástupcu"
     },
     "slashCommands": {

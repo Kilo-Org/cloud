@@ -3664,7 +3664,7 @@
       "nameRequired": "ໃສ່ຊື່ຕົວແທນ",
       "slugRequired": "ໃສ່ຕົວແທນ slug",
       "slugInvalid": "Slug ຈະຕ້ອງເລີ່ມຕົ້ນດ້ວຍຕົວອັກສອນ ແລະໃຊ້ແຕ່ຕົວພິມນ້ອຍ, ຕົວເລກ, ແລະ dashes",
-      "slugConflict": "slug ນັ້ນຖືກສະຫງວນໄວ້ໂດຍຕົວແທນທີ່ສ້າງຂຶ້ນ",
+      "slugConflict": "slug ນັ້ນຖືກໃຊ້ແລ້ວໂດຍ agent ໃນຕົວ ຫຼື agent ອື່ນໃນໂປຼໄຟລ໌ນີ້",
       "edit": "ແກ້ໄຂຕົວແທນ"
     },
     "slashCommands": {

@@ -3664,7 +3664,7 @@
       "nameRequired": "Geli magaca wakiilka",
       "slugRequired": "Geli slug wakiilka",
       "slugInvalid": "Slug waa in uu ku bilaabmaa xaraf oo waa in uu isticmaalo xarfo yaryar, lambar, iyo dashes",
-      "slugConflict": "Dabaqyadaas waxaa xafiday wakiil ku dhex jira",
+      "slugConflict": "Slug-gaas horey waa la isticmaalay wakheel gudbiyey ama wakheel kale oo xiriirkan",
       "edit": "Wakiilka wax ka beddel"
     },
     "slashCommands": {

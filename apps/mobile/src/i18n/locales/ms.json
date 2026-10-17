@@ -3664,7 +3664,7 @@
       "nameRequired": "Masukkan nama ejen",
       "slugRequired": "Masukkan slug ejen",
       "slugInvalid": "Slug mesti bermula dengan huruf dan hanya menggunakan huruf kecil, digit dan sempang",
-      "slugConflict": "Slug itu ditempah oleh ejen terbina dalam",
+      "slugConflict": "Slug itu sudah digunakan oleh ejen terbina dalam atau ejen lain dalam profil ini",
       "edit": "Edit ejen"
     },
     "slashCommands": {

@@ -3664,7 +3664,7 @@
       "nameRequired": "Tẹ orukọ aṣoju sii",
       "slugRequired": "Tẹ slug oluranlowo",
       "slugInvalid": "Slug gbọdọ bẹrẹ pẹlu lẹta kan ko si lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
-      "slugConflict": "Slug yẹn wa ni ipamọ nipasẹ aṣoju ti a ṣe sinu",
+      "slugConflict": "Slug yẹn ti wa ni lilo pẹlu aṣojú ti a fi sori ẹrọ tabi aṣojú miiran ninu profaili yii",
       "edit": "Aṣoju Ṣatunkọ"
     },
     "slashCommands": {

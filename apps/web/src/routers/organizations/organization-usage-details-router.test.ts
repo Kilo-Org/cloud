@@ -196,19 +196,19 @@ describe('organizations usage details trpc router', () => {
           member.organizations.usageDetails.getRecommendations({
             organizationId: testOrganization.id,
           })
-        ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
         await expect(
           owner.organizations.usageDetails.dismissRecommendation({
             organizationId: testOrganization.id,
             recommendationKey: 'org-sso-not-configured',
           })
-        ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
         await expect(
           owner.organizations.usageDetails.restoreRecommendation({
             organizationId: testOrganization.id,
             recommendationKey: 'org-sso-not-configured',
           })
-        ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
       } finally {
         await db
           .update(organizations)

@@ -504,6 +504,7 @@ describe('rollUpClientCases', () => {
     score: 0,
     grader_cost_usd: 0,
     uploaded_at: '',
+    revision: 1,
   });
 
   it('fails a profile only once every planned case failed', () => {

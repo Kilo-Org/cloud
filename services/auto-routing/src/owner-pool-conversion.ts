@@ -235,9 +235,16 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
 
   const { results, notPosted, aborted, consecutiveFailed } =
     dryRun || conversions.length === 0
-      ? { results: [], notPosted: [], aborted: false, consecutiveFailed: parsed.data.consecutiveFailed }
+      ? {
+          results: [],
+          notPosted: [],
+          aborted: false,
+          consecutiveFailed: parsed.data.consecutiveFailed,
+        }
       : await postConversions(c.env, conversions, parsed.data.consecutiveFailed);
-  const notPostedKeys = notPosted.map(conversion => `${conversion.owner.type}:${conversion.owner.id}`);
+  const notPostedKeys = notPosted.map(
+    conversion => `${conversion.owner.type}:${conversion.owner.id}`
+  );
 
   const outcomes = Object.fromEntries(
     OwnerPoolConversionOutcomeSchema.options.map(outcome => [outcome, 0])

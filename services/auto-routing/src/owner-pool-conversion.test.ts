@@ -301,22 +301,30 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     ['a non-2xx response', async () => new Response('boom', { status: 502 })],
     ['an invalid response', async () => Response.json({ results: [] })],
     ['a network error', async () => Promise.reject(new Error('connection reset'))],
-  ])('aborts the page with 503 and reports every owner as not posted on %s', async (_label, respond) => {
-    const id = setOwner('user', 'u1', { mode: null, pool: [{ model: 'a/b' }] });
-    ownerRows = ['u1'];
-    webFetch.mockImplementation(respond);
+  ])(
+    'aborts the page with 503 and reports every owner as not posted on %s',
+    async (_label, respond) => {
+      const id = setOwner('user', 'u1', { mode: null, pool: [{ model: 'a/b' }] });
+      ownerRows = ['u1'];
+      webFetch.mockImplementation(respond);
 
-    const response = await scan({ ownerType: 'user', objectIds: [id], after: null, dryRun: false });
+      const response = await scan({
+        ownerType: 'user',
+        objectIds: [id],
+        after: null,
+        dryRun: false,
+      });
 
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toMatchObject({
-      aborted: true,
-      notPosted: ['user:u1'],
-      needsAttention: [],
-      outcomes: NO_OUTCOMES,
-    });
-    expect(marked.size).toBe(0);
-  });
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({
+        aborted: true,
+        notPosted: ['user:u1'],
+        needsAttention: [],
+        outcomes: NO_OUTCOMES,
+      });
+      expect(marked.size).toBe(0);
+    }
+  );
 
   it('keeps and marks the batches that succeeded when a later batch fails, without posting the rest', async () => {
     ownerRows = Array.from({ length: 60 }, (_, index) => `u${String(index).padStart(3, '0')}`);
@@ -365,7 +373,8 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
       aborted: true,
-      outcomes: { ...NO_OUTCOMES, failed: 30 },
+      outcomes: { ...NO_OUTCOMES, failed: 25 },
+      notPosted: ownerRows.slice(25).map(id => `user:${id}`),
     });
     expect(webFetch).toHaveBeenCalledTimes(1);
   });
@@ -482,11 +491,19 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
   });
 
   it('aborts on a retry that turns scattered failures into a consecutive run', async () => {
-    ownerRows = ['u1', 'u2', 'u3', 'u4', 'u5'];
+    ownerRows = ['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7'];
     const objectIds = ownerRows.map(id =>
       setOwner('user', id, { mode: null, pool: [{ model: 'a/b' }] })
     );
-    const first = ['failed', 'created', 'failed', 'created', 'failed'] as const;
+    const first = [
+      'failed',
+      'created',
+      'failed',
+      'created',
+      'failed',
+      'created',
+      'failed',
+    ] as const;
     webFetch.mockImplementationOnce(async (_url, init) =>
       Response.json({
         results: requestBody(init).conversions.map((conversion, index) => ({
@@ -505,10 +522,18 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     await expect(firstRun.json()).resolves.toMatchObject({
       aborted: false,
       consecutiveFailed: 1,
-      needsAttention: ['failed user:u1', 'failed user:u3', 'failed user:u5'],
+      needsAttention: ['failed user:u1', 'failed user:u3', 'failed user:u5', 'failed user:u7'],
     });
 
-    // The retry skips the two owners that converted, so the three failures are consecutive.
+    // The retry skips the three owners that converted; its four failures plus the carried one
+    // reach the outage threshold even though no run alone had five.
+    for (const id of ['u2', 'u4', 'u6']) {
+      setOwner('user', id, {
+        mode: null,
+        pool: [{ model: 'a/b' }],
+        convertedAt: '2026-10-17T00:00:00.000Z',
+      });
+    }
     webFetch.mockImplementationOnce(async (_url, init) =>
       Response.json({
         results: requestBody(init).conversions.map(conversion => ({
@@ -530,7 +555,7 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     });
 
     expect(retry.status).toBe(503);
-    await expect(retry.json()).resolves.toMatchObject({ aborted: true, consecutiveFailed: 4 });
+    await expect(retry.json()).resolves.toMatchObject({ aborted: true, consecutiveFailed: 5 });
   });
 
   it('reports exists when a retry follows a transport abort, so the notice is checked rather than sent twice', async () => {

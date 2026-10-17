@@ -17,6 +17,7 @@ permissions:
 
 # Optional repo/org variables for runner migration:
 # - RUNNER_DEFAULT_LABEL=blacksmith-2vcpu-ubuntu-2404
+# - RUNNER_MEDIUM_LABEL=blacksmith-4vcpu-ubuntu-2404
 # - RUNNER_LARGE_LABEL=blacksmith-8vcpu-ubuntu-2404
 jobs:
   changes:

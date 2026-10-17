@@ -25,6 +25,7 @@
     "error": "chyba: {{error}}",
     "back": "Zpět",
     "somethingWentWrong": "Něco se pokazilo.",
+    "actionNotRecorded": "Tuto akci se nepodařilo zaznamenat. Zkus to později.",
     "couldNotOpen": "Nepodařilo se otevřít {{label}}.",
     "link": "odkaz",
     "takingLonger": "Trvá to déle, než se očekávalo. Tuto obrazovku můžeš zavřít a stav zkontrolovat později.",
@@ -809,7 +810,6 @@
       "mergeResultDefaultError": "GitHub nedokončil sloučení.",
       "mergeResultNotCompleted": "{{term}} nebyl sloučen. Zkontroluj jeho stav a zkus to znovu.",
       "ambiguous": "Výsledek se nepodařilo potvrdit. Před dalším pokusem zkontroluj PR.",
-      "persistenceFailed": "Tuto akci se nepodařilo zaznamenat. Zkus to později.",
       "forbidden": "K této akci nemáš oprávnění."
     },
     "capabilities": {
@@ -1970,7 +1970,12 @@
       "syncMayNotHaveCompleted": "Synchronizace se možná nedokončila. Opakováním sjednoťte její stav, nebo ji zahoďte.",
       "syncInProgress": "Synchronizace bezpečnostních nálezů již probíhá. Zkuste to znovu.",
       "dismissalInProgress": "Zamítání tohoto nálezu již probíhá. Zkuste to znovu.",
-      "couldNotReadPendingSyncs": "Čekající synchronizace se nepodařilo načíst. Zkuste to znovu."
+      "couldNotReadPendingSyncs": "Čekající synchronizace se nepodařilo načíst. Zkuste to znovu.",
+      "ambiguous": "Výsledek se nepodařilo potvrdit. Před dalším pokusem zkontrolujte bezpečnostní kontrolu.",
+      "settleFailed": "Akce proběhla, ale výsledek se nám nepodařilo zaznamenat. Zkuste to znovu.",
+      "replayFailed": "Tato akce neproběhla. Zkuste to znovu.",
+      "actionFailed": "Tuto akci se nepodařilo dokončit. Zkuste to znovu.",
+      "actionBlocked": "Tuto akci se nepodařilo dokončit. Problém je nutné nejprve vyřešit, teprve pak můžete akci zopakovat."
     },
     "analysisState": {
       "queued": "Analýza ve frontě",

@@ -25,6 +25,7 @@
     "error": "erro: {{error}}",
     "back": "Voltar",
     "somethingWentWrong": "Algo correu mal.",
+    "actionNotRecorded": "Não foi possível registar esta ação. Tenta novamente mais tarde.",
     "couldNotOpen": "Não foi possível abrir {{label}}.",
     "link": "ligação",
     "takingLonger": "Está a demorar mais do que o esperado. Podes fechar este ecrã e voltar a verificar.",
@@ -793,7 +794,6 @@
       "mergeResultDefaultError": "O GitHub não concluiu a integração.",
       "mergeResultNotCompleted": "O {{term}} não foi integrado. Verifica o estado e tenta novamente.",
       "ambiguous": "Não foi possível confirmar o resultado. Verifica o PR antes de tentar novamente.",
-      "persistenceFailed": "Não foi possível registar esta ação. Tenta novamente mais tarde.",
       "forbidden": "Não tens permissão para executar esta ação."
     },
     "capabilities": {
@@ -1947,7 +1947,12 @@
       "syncMayNotHaveCompleted": "Uma sincronização pode ter ficado incompleta. Tenta novamente para atualizar o estado ou descarta a operação.",
       "syncInProgress": "Já está em curso uma sincronização de segurança. Tenta novamente.",
       "dismissalInProgress": "Esta ocorrência já está a ser descartada. Tenta novamente.",
-      "couldNotReadPendingSyncs": "Não foi possível ler as sincronizações pendentes. Tenta novamente."
+      "couldNotReadPendingSyncs": "Não foi possível ler as sincronizações pendentes. Tenta novamente.",
+      "ambiguous": "Não foi possível confirmar o resultado. Verifica a revisão de segurança antes de tentar novamente.",
+      "settleFailed": "A ação foi concluída, mas não foi possível registar o resultado. Tenta novamente.",
+      "replayFailed": "Esta ação não foi concluída. Tenta novamente.",
+      "actionFailed": "Não foi possível concluir esta ação. Tenta novamente.",
+      "actionBlocked": "Não foi possível concluir esta ação. O problema tem de ser resolvido antes de tentares novamente."
     },
     "analysisState": {
       "queued": "Análise na fila",

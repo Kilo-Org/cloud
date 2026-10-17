@@ -25,6 +25,7 @@
     "error": "napaka: {{error}}",
     "back": "Nazaj",
     "somethingWentWrong": "Nekaj je šlo narobe.",
+    "actionNotRecorded": "Tega dejanja ni bilo mogoče zabeležiti. Poskusi znova pozneje.",
     "couldNotOpen": "Ni bilo mogoče odpreti: {{label}}.",
     "link": "povezava",
     "takingLonger": "To traja dlje od pričakovanega. Ta zaslon lahko zapreš in pozneje preveriš znova.",
@@ -809,7 +810,6 @@
       "mergeResultDefaultError": "GitHub ni dokončal združitve.",
       "mergeResultNotCompleted": "Ta {{term}} ni bil združen. Preveri njegovo stanje in poskusi znova.",
       "ambiguous": "Dejanja ni bilo mogoče potrditi — pred ponovnim poskusom preveri PR.",
-      "persistenceFailed": "Tega dejanja ni bilo mogoče zabeležiti. Poskusi znova pozneje.",
       "forbidden": "Dejanje ni dovoljeno."
     },
     "capabilities": {
@@ -1970,7 +1970,12 @@
       "syncMayNotHaveCompleted": "Sinhronizacija se morda ni končala. Poskusi znova, da uskladiš njeno stanje, ali jo zavrzi.",
       "syncInProgress": "Sinhronizacija varnostnih ugotovitev že poteka. Poskusi znova.",
       "dismissalInProgress": "Ta zavrnitev že poteka. Poskusi znova.",
-      "couldNotReadPendingSyncs": "Čakajočih sinhronizacij ni bilo mogoče prebrati. Poskusi znova."
+      "couldNotReadPendingSyncs": "Čakajočih sinhronizacij ni bilo mogoče prebrati. Poskusi znova.",
+      "ambiguous": "Dejanja ni bilo mogoče potrditi — pred ponovnim poskusom preveri varnostni pregled.",
+      "settleFailed": "Dejanje je bilo izvedeno, a rezultata nismo mogli zabeležiti. Poskusi znova.",
+      "replayFailed": "To dejanje se ni izvedlo. Poskusi znova.",
+      "actionFailed": "Tega dejanja ni bilo mogoče dokončati. Poskusi znova.",
+      "actionBlocked": "Tega dejanja ni bilo mogoče dokončati. Težavo je treba najprej odpraviti."
     },
     "analysisState": {
       "queued": "Analiza v čakalni vrsti",

@@ -25,6 +25,7 @@
     "error": "àṣìṣe: {{error}}",
     "back": "Padà",
     "somethingWentWrong": "Àṣìṣe kan ṣẹlẹ̀.",
+    "actionNotRecorded": "A kò lè ṣe àkọsílẹ̀ ìgbésẹ̀ yìí. Jọ̀wọ́ tún gbìyànjú nígbà mìíràn.",
     "couldNotOpen": "A kò lè ṣí {{label}}.",
     "link": "ọ̀nà àsopọ̀",
     "takingLonger": "Èyí ń pẹ́ ju bí a ti retí lọ. O lè ti èyí pa kí o tún ṣàyẹ̀wò.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub kò parí ìdàpọ̀ náà.",
       "mergeResultNotCompleted": "A kò darapọ̀ {{term}}. Ṣàyẹ̀wò ipò rẹ̀, tún sì gbìyànjú.",
       "ambiguous": "A kò lè jẹ́rìí sí i — ṣàyẹ̀wò PR náà kí o tó tún gbìyànjú.",
-      "persistenceFailed": "A kò lè ṣe àkọsílẹ̀ ìgbésẹ̀ yìí. Jọ̀wọ́ tún gbìyànjú nígbà mìíràn.",
       "forbidden": "A kò gbà á láàyè."
     },
     "capabilities": {
@@ -1924,7 +1924,12 @@
       "syncMayNotHaveCompleted": "Ó ṣeé ṣe kí ìmúṣiṣẹ́pọ̀ kan má tíì parí. Tún gbìyànjú láti mú dátà bá ara rẹ̀ mu, tàbí kọ̀ ọ́ sílẹ̀.",
       "syncInProgress": "Ìmúṣiṣẹ́pọ̀ ààbò kan ti ń lọ lọ́wọ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "dismissalInProgress": "Ìkọ̀sílẹ̀ yìí ti ń lọ lọ́wọ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "couldNotReadPendingSyncs": "A kò lè ka àwọn ìmúṣiṣẹ́pọ̀ tó ń dúró. Gbìyànjú lẹ́ẹ̀kan sí i."
+      "couldNotReadPendingSyncs": "A kò lè ka àwọn ìmúṣiṣẹ́pọ̀ tó ń dúró. Gbìyànjú lẹ́ẹ̀kan sí i.",
+      "ambiguous": "A kò lè jẹ́rìí sí i — ṣàyẹ̀wò ìwádìí ààbò náà kí o tó tún gbìyànjú.",
+      "settleFailed": "A ti parun iṣẹ́ náà, ṣùgbọ́n a kò lè ṣàkósílẹ̀ èrè rẹ̀. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+      "replayFailed": "Iṣẹ́ yìí kò parun. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+      "actionFailed": "A kò lè parun iṣẹ́ yìí. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+      "actionBlocked": "A kò lè parun iṣẹ́ yìí. Ìṣòro yìí gbọ́dọ̀ túnsẹ̀ kí a tó lè gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "analysisState": {
       "queued": "Ìtúpalẹ̀ wà ní ìlà ìdúró",

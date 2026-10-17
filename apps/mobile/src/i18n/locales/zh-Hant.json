@@ -25,6 +25,7 @@
     "error": "錯誤：{{error}}",
     "back": "返回",
     "somethingWentWrong": "發生錯誤。",
+    "actionNotRecorded": "無法記錄此操作。請稍後再試。",
     "couldNotOpen": "無法開啟 {{label}}。",
     "link": "連結",
     "takingLonger": "此操作所需時間比預期更長。你可以關閉此畫面，稍後再查看。",
@@ -1412,7 +1413,12 @@
       "syncMayNotHaveCompleted": "同步可能尚未完成。請再試一次以確認同步狀態，或捨棄這次同步。",
       "syncInProgress": "資安資料正在同步中。請再試一次。",
       "dismissalInProgress": "此忽略動作已在進行中。請再試一次。",
-      "couldNotReadPendingSyncs": "無法讀取待處理的同步。請再試一次。"
+      "couldNotReadPendingSyncs": "無法讀取待處理的同步。請再試一次。",
+      "ambiguous": "無法確認操作結果。請先查看安全性審查，再試一次。",
+      "settleFailed": "操作已完成，但我們無法記錄結果。請再試一次。",
+      "replayFailed": "此操作未完成。請再試一次。",
+      "actionFailed": "無法完成此操作。請再試一次。",
+      "actionBlocked": "無法完成此操作。必須先修正此問題，才能重試。"
     },
     "analysisState": {
       "queued": "等待分析",
@@ -2937,7 +2943,6 @@
       "mergeResultDefaultError": "GitHub 未完成合併。",
       "mergeResultNotCompleted": "{{term}}未合併。檢查其狀態後重試。",
       "ambiguous": "無法確認操作結果。請先檢查 PR，再試一次。",
-      "persistenceFailed": "無法記錄此操作。請稍後再試。",
       "forbidden": "沒有執行此操作的權限。"
     },
     "capabilities": {

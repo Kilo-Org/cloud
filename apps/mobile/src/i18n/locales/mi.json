@@ -25,6 +25,7 @@
     "error": "hapa: {{error}}",
     "back": "Hoki",
     "somethingWentWrong": "Kua puta he hapa.",
+    "actionNotRecorded": "Kāore i taea e mātou te tuhi i tēnei mahi. Whakamātau anō ā muri ake.",
     "couldNotOpen": "Kāore i taea te whakatuwhera i {{label}}.",
     "link": "hono",
     "takingLonger": "Kei te roa ake tēnei i te wā i whakaarotia. Ka taea e koe te kati i tēnei, ka tiro anō ā muri ake.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "Kāore a GitHub i whakaoti i te whakakotahitanga.",
       "mergeResultNotCompleted": "Kāore i whakakotahitia te {{term}}. Tirohia tōna tūnga, ka ngana anō.",
       "ambiguous": "Kāore i taea te whakaū — tirohia te PR i mua i te whakamātau anō.",
-      "persistenceFailed": "Kāore i taea e mātou te tuhi i tēnei mahi. Whakamātau anō ā muri ake.",
       "forbidden": "Kāore e whakaaetia."
     },
     "capabilities": {
@@ -1924,7 +1924,12 @@
       "syncMayNotHaveCompleted": "Kāore pea i oti tētahi tukutahi. Whakamātau anō kia whakaōritea ngā raraunga, whakakorea rānei.",
       "syncInProgress": "Kei te haere kē tētahi tukutahi haumarutanga. Whakamātau anō.",
       "dismissalInProgress": "Kei te haere tonu tēnei whakakorenga. Whakamātau anō.",
-      "couldNotReadPendingSyncs": "Kāore i taea te pānui i ngā tukutahi e tatari ana. Whakamātau anō."
+      "couldNotReadPendingSyncs": "Kāore i taea te pānui i ngā tukutahi e tatari ana. Whakamātau anō.",
+      "ambiguous": "Kāore i taea te whakaū — tirohia te arotake haumarutanga i mua i te whakamātau anō.",
+      "settleFailed": "Oti te mahi, engari kāore i taea te tuhi i te hua. Whakamātau anō.",
+      "replayFailed": "Kāore i oti tēnei mahi. Whakamātau anō.",
+      "actionFailed": "Kāore i taea te oti i tēnei mahi. Whakamātau anō.",
+      "actionBlocked": "Kāore i taea te oti i tēnei mahi. Me whakatika te raru i te tuatahi."
     },
     "analysisState": {
       "queued": "Kei te rārangi tatari te tātari",

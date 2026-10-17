@@ -25,6 +25,7 @@
     "error": "hiba: {{error}}",
     "back": "Vissza",
     "somethingWentWrong": "Hiba történt.",
+    "actionNotRecorded": "Nem sikerült rögzíteni ezt a műveletet. Próbáld újra később.",
     "couldNotOpen": "Nem sikerült megnyitni: {{label}}.",
     "link": "hivatkozás",
     "takingLonger": "Ez tovább tart a vártnál. Bezárhatod, és később újra ellenőrizheted.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "A GitHub nem fejezte be az összevonást.",
       "mergeResultNotCompleted": "A {{term}} nem lett összevonva. Ellenőrizd az állapotát, és próbáld újra.",
       "ambiguous": "Nem sikerült megerősíteni a művelet eredményét. Újrapróbálkozás előtt ellenőrizd a PR-t.",
-      "persistenceFailed": "Nem sikerült rögzíteni ezt a műveletet. Próbáld újra később.",
       "forbidden": "Nincs jogosultságod ehhez a művelethez."
     },
     "capabilities": {
@@ -1924,7 +1924,12 @@
       "syncMayNotHaveCompleted": "Lehet, hogy egy szinkronizálás nem fejeződött be. Az állapot egyeztetéséhez próbáld újra, vagy vesd el.",
       "syncInProgress": "Már folyamatban van egy biztonsági szinkronizálás. Próbáld újra.",
       "dismissalInProgress": "Ez az elvetés már folyamatban van. Próbáld újra.",
-      "couldNotReadPendingSyncs": "Nem sikerült beolvasni a függőben lévő szinkronizálásokat. Próbáld újra."
+      "couldNotReadPendingSyncs": "Nem sikerült beolvasni a függőben lévő szinkronizálásokat. Próbáld újra.",
+      "ambiguous": "Nem sikerült megerősíteni a művelet eredményét. Újrapróbálkozás előtt ellenőrizd a biztonsági áttekintést.",
+      "settleFailed": "A művelet lefutott, de nem sikerült rögzítenünk az eredményt. Próbáld újra.",
+      "replayFailed": "Ez a művelet nem fejeződött be. Próbáld újra.",
+      "actionFailed": "Nem sikerült befejezni ezt a műveletet. Próbáld újra.",
+      "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell."
     },
     "analysisState": {
       "queued": "Elemzés várólistán",

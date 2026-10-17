@@ -25,6 +25,7 @@
     "error": "kuskure: {{error}}",
     "back": "Koma baya",
     "somethingWentWrong": "An samu matsala.",
+    "actionNotRecorded": "Ba mu iya adana wannan aikin ba. Sake gwadawa daga baya.",
     "couldNotOpen": "Ba a iya buɗe {{label}} ba.",
     "link": "mahaɗi",
     "takingLonger": "Wannan yana ɗaukan lokaci fiye da yadda ake tsammani. Za ka iya rufe wannan ka sake duba.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub bai kammala haɗawa ba.",
       "mergeResultNotCompleted": "Ba a haɗa {{term}} ba. Duba yanayinsa ka sake gwadawa.",
       "ambiguous": "Ba a iya tabbatarwa ba — duba PR kafin ka sake gwadawa.",
-      "persistenceFailed": "Ba mu iya adana wannan aikin ba. Sake gwadawa daga baya.",
       "forbidden": "Ba a ba da izini ba."
     },
     "capabilities": {
@@ -1924,7 +1924,12 @@
       "syncMayNotHaveCompleted": "Wataƙila ba a kammala daidaitawa ba. Sake gwadawa don tabbatar da halinta, ko ka yi watsi da ita.",
       "syncInProgress": "Tuni ake daidaita bayanan tsaro. Sake gwadawa.",
       "dismissalInProgress": "Tuni ake aiwatar da wannan watsi. Sake gwadawa.",
-      "couldNotReadPendingSyncs": "Ba a iya karanta daidaitawar da ke jira ba. Sake gwadawa."
+      "couldNotReadPendingSyncs": "Ba a iya karanta daidaitawar da ke jira ba. Sake gwadawa.",
+      "ambiguous": "Ba a iya tabbatarwa ba — duba bitar tsaro kafin ka sake gwadawa.",
+      "settleFailed": "An kammala aikin, amma ba mu iya rubuta sakamakon ba. Sake gwadawa.",
+      "replayFailed": "Wannan aikin bai kammala ba. Sake gwadawa.",
+      "actionFailed": "Ba za a iya kammala wannan aikin ba. Sake gwadawa.",
+      "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa."
     },
     "analysisState": {
       "queued": "Nazarin yana layin jira",

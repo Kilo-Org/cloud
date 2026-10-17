@@ -25,6 +25,7 @@
     "error": "fallo: {{error}}",
     "back": "Atrás",
     "somethingWentWrong": "Se ha producido un error.",
+    "actionNotRecorded": "No se pudo registrar esta acción. Inténtalo de nuevo más tarde.",
     "couldNotOpen": "No se pudo abrir {{label}}.",
     "link": "enlace",
     "takingLonger": "Esto está tardando más de lo esperado. Puedes cerrarlo y comprobarlo de nuevo.",
@@ -1419,7 +1420,12 @@
       "syncMayNotHaveCompleted": "Es posible que una sincronización no se haya completado. Reinténtala para actualizar su estado o descártala.",
       "syncInProgress": "Ya hay una sincronización de seguridad en curso. Inténtalo de nuevo.",
       "dismissalInProgress": "Este descarte ya está en curso. Inténtalo de nuevo.",
-      "couldNotReadPendingSyncs": "No se pudieron leer las sincronizaciones pendientes. Inténtalo de nuevo."
+      "couldNotReadPendingSyncs": "No se pudieron leer las sincronizaciones pendientes. Inténtalo de nuevo.",
+      "ambiguous": "No se pudo confirmar el resultado. Comprueba la revisión de seguridad antes de volver a intentarlo.",
+      "settleFailed": "La acción se completó, pero no pudimos registrar el resultado. Inténtalo de nuevo.",
+      "replayFailed": "Esta acción no se completó. Inténtalo de nuevo.",
+      "actionFailed": "No se pudo completar esta acción. Inténtalo de nuevo.",
+      "actionBlocked": "No se pudo completar esta acción. Hay que solucionar el problema antes de poder reintentarlo."
     },
     "analysisState": {
       "queued": "Análisis en cola",
@@ -2977,7 +2983,6 @@
       "mergeResultDefaultError": "GitHub no completó la fusión.",
       "mergeResultNotCompleted": "No se ha fusionado {{term}}. Comprueba su estado e inténtalo de nuevo.",
       "ambiguous": "No se pudo confirmar el resultado. Comprueba la PR antes de volver a intentarlo.",
-      "persistenceFailed": "No se pudo registrar esta acción. Inténtalo de nuevo más tarde.",
       "forbidden": "No tienes permiso para realizar esta acción."
     },
     "capabilities": {

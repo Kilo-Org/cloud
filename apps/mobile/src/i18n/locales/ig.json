@@ -25,6 +25,7 @@
     "error": "njehie: {{error}}",
     "back": "Laghachi azụ",
     "somethingWentWrong": "Enwere njehie.",
+    "actionNotRecorded": "Anyị enweghị ike ịdekọ omume a. Biko nwaa ọzọ ma emechaa.",
     "couldNotOpen": "Enweghị ike imepe {{label}}.",
     "link": "njikọ",
     "takingLonger": "Nke a na-ewe oge karịa ka a tụrụ anya. Ị nwere ike imechi nke a ma lelee ọzọ.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub emechaghị njikọta ahụ.",
       "mergeResultNotCompleted": "Ejighị {{term}} ọnụ. Lelee ọnọdụ ya ma gbalịa ọzọ.",
       "ambiguous": "Enweghị ike ịchọpụta ma emechara ya — lelee PR ahụ tupu ị nwaa ọzọ.",
-      "persistenceFailed": "Anyị enweghị ike ịdekọ omume a. Biko nwaa ọzọ ma emechaa.",
       "forbidden": "A machibidoro nke a."
     },
     "capabilities": {
@@ -1924,7 +1924,12 @@
       "syncMayNotHaveCompleted": "O nwere ike ịbụ na mmekọrịta data ezubeghị. Nwaa ọzọ ka data kwekọọ, ma ọ bụ tufuo ya.",
       "syncInProgress": "Mmekọrịta data nchebe amalitela. Biko nwaa ọzọ.",
       "dismissalInProgress": "Mwepụ a amalitela. Biko nwaa ọzọ.",
-      "couldNotReadPendingSyncs": "Enweghị ike ịgụ mmekọrịta data ndị na-echere. Nwaa ọzọ."
+      "couldNotReadPendingSyncs": "Enweghị ike ịgụ mmekọrịta data ndị na-echere. Nwaa ọzọ.",
+      "ambiguous": "Enweghị ike ịchọpụta ma emechara ya — lelee nyocha nchebe tupu ị nwaa ọzọ.",
+      "settleFailed": "Emechara omume a, mana anyị enweghị ike dekọọ nsonaazụ ya. Biko nwaa ọzọ.",
+      "replayFailed": "Omume a emechaghị. Biko nwaa ọzọ.",
+      "actionFailed": "Enweghị ike imecha omume a. Biko nwaa ọzọ.",
+      "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ."
     },
     "analysisState": {
       "queued": "Nyocha dị n'ahịrị",

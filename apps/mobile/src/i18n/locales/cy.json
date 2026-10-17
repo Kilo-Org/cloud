@@ -25,6 +25,7 @@
     "error": "gwall: {{error}}",
     "back": "Yn ôl",
     "somethingWentWrong": "Aeth rhywbeth o'i le.",
+    "actionNotRecorded": "Ni lwyddwyd i gofnodi'r weithred hon. Rhowch gynnig eto yn nes ymlaen.",
     "couldNotOpen": "Ni lwyddwyd i agor {{label}}.",
     "link": "dolen",
     "takingLonger": "Mae hyn yn cymryd yn hirach na'r disgwyl. Gallwch gau hwn ac edrych eto.",
@@ -841,7 +842,6 @@
       "mergeResultDefaultError": "Ni chwblhaodd GitHub y cyfuno.",
       "mergeResultNotCompleted": "Ni chafodd y {{term}} ei uno. Gwiriwch ei gyflwr a rhoi cynnig arall arni.",
       "ambiguous": "Ni lwyddwyd i gadarnhau'r canlyniad — gwiriwch y PR cyn rhoi cynnig eto.",
-      "persistenceFailed": "Ni lwyddwyd i gofnodi'r weithred hon. Rhowch gynnig eto yn nes ymlaen.",
       "forbidden": "Ni chaniateir hyn."
     },
     "capabilities": {
@@ -2016,7 +2016,12 @@
       "syncMayNotHaveCompleted": "Efallai na chwblhawyd y cysoniad. Ceisiwch eto i gysoni'r statws, neu hepgorwch y cysoniad.",
       "syncInProgress": "Mae cysoniad diogelwch eisoes ar y gweill. Ceisiwch eto.",
       "dismissalInProgress": "Mae'r broses ddiystyru hon eisoes ar y gweill. Ceisiwch eto.",
-      "couldNotReadPendingSyncs": "Ni ellid darllen y cysoniadau sy'n aros. Ceisiwch eto."
+      "couldNotReadPendingSyncs": "Ni ellid darllen y cysoniadau sy'n aros. Ceisiwch eto.",
+      "ambiguous": "Ni lwyddwyd i gadarnhau'r canlyniad — gwiriwch yr adolygiad diogelwch cyn rhoi cynnig eto.",
+      "settleFailed": "Cafodd y weithred ei chwblhau, ond ni allem gofnodi'r canlyniad. Ceisiwch eto.",
+      "replayFailed": "Ni chwblhawyd y weithred hon. Ceisiwch eto.",
+      "actionFailed": "Ni chafodd y weithred hon ei chwblhau. Ceisiwch eto.",
+      "actionBlocked": "Ni chafodd y weithred hon ei chwblhau. Rhaid trwsio'r broblem yn gyntaf."
     },
     "analysisState": {
       "queued": "Dadansoddiad mewn ciw",

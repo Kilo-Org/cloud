@@ -25,6 +25,7 @@
     "error": "错误：{{error}}",
     "back": "返回",
     "somethingWentWrong": "出了点问题。",
+    "actionNotRecorded": "无法记录此操作。请稍后重试。",
     "couldNotOpen": "无法打开 {{label}}。",
     "link": "链接",
     "takingLonger": "用时比预期更长。你可以关闭此页面，稍后再查看。",
@@ -1412,7 +1413,12 @@
       "syncMayNotHaveCompleted": "同步可能尚未完成。请重试以核对同步状态，或放弃此次同步。",
       "syncInProgress": "已有安全同步正在进行。请重试。",
       "dismissalInProgress": "此忽略操作正在进行中。请重试。",
-      "couldNotReadPendingSyncs": "无法读取待处理的同步。请重试。"
+      "couldNotReadPendingSyncs": "无法读取待处理的同步。请重试。",
+      "ambiguous": "无法确认操作结果，请先查看安全审查再重试。",
+      "settleFailed": "操作已完成，但我们无法记录结果。请重试。",
+      "replayFailed": "此操作未完成。请重试。",
+      "actionFailed": "无法完成此操作。请重试。",
+      "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。"
     },
     "analysisState": {
       "queued": "分析排队中",
@@ -2937,7 +2943,6 @@
       "mergeResultDefaultError": "GitHub 未完成合并。",
       "mergeResultNotCompleted": "{{term}}未合并。检查其状态后重试。",
       "ambiguous": "无法确认操作结果，请先检查 PR 再重试。",
-      "persistenceFailed": "无法记录此操作。请稍后重试。",
       "forbidden": "无权执行此操作。"
     },
     "capabilities": {

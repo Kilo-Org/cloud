@@ -25,6 +25,7 @@
     "error": "hitilafu: {{error}}",
     "back": "Rudi",
     "somethingWentWrong": "Hitilafu imetokea.",
+    "actionNotRecorded": "Hatukuweza kurekodi kitendo hiki. Tafadhali jaribu tena baadaye.",
     "couldNotOpen": "Imeshindikana kufungua {{label}}.",
     "link": "kiungo",
     "takingLonger": "Hii inachukua muda mrefu kuliko ilivyotarajiwa. Unaweza kuifunga na kuangalia tena.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub haikukamilisha muunganisho.",
       "mergeResultNotCompleted": "{{term}} haikuunganishwa. Angalia hali yake na ujaribu tena.",
       "ambiguous": "Imeshindikana kuthibitisha matokeo — angalia PR kabla ya kujaribu tena.",
-      "persistenceFailed": "Hatukuweza kurekodi kitendo hiki. Tafadhali jaribu tena baadaye.",
       "forbidden": "Kitendo hiki hakiruhusiwi."
     },
     "capabilities": {
@@ -1924,7 +1924,12 @@
       "syncMayNotHaveCompleted": "Huenda usawazishaji haujakamilika. Jaribu tena ili kupatanisha hali yake au uuondoe.",
       "syncInProgress": "Usawazishaji wa usalama tayari unaendelea. Tafadhali jaribu tena.",
       "dismissalInProgress": "Uondoaji huu tayari unaendelea. Tafadhali jaribu tena.",
-      "couldNotReadPendingSyncs": "Imeshindikana kusoma usawazishaji unaosubiri. Jaribu tena."
+      "couldNotReadPendingSyncs": "Imeshindikana kusoma usawazishaji unaosubiri. Jaribu tena.",
+      "ambiguous": "Imeshindikana kuthibitisha matokeo — angalia ukaguzi wa usalama kabla ya kujaribu tena.",
+      "settleFailed": "Kitendo kimekamilika, lakini hatukuweza kurekodi matokeo yake. Tafadhali jaribu tena.",
+      "replayFailed": "Kitendo hiki hakikukamilika. Tafadhali jaribu tena.",
+      "actionFailed": "Imeshindikana kukamilisha kitendo hiki. Tafadhali jaribu tena.",
+      "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza."
     },
     "analysisState": {
       "queued": "Uchambuzi uko kwenye foleni",

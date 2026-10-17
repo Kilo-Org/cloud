@@ -25,6 +25,7 @@
     "error": "fout: {{error}}",
     "back": "Terug",
     "somethingWentWrong": "Er is iets misgegaan.",
+    "actionNotRecorded": "We konden deze actie niet vastleggen. Probeer het later opnieuw.",
     "couldNotOpen": "{{label}} kon niet worden geopend.",
     "link": "koppeling",
     "takingLonger": "Dit duurt langer dan verwacht. Je kunt dit sluiten en later opnieuw controleren.",
@@ -1412,7 +1413,12 @@
       "syncMayNotHaveCompleted": "Een synchronisatie is mogelijk niet voltooid. Probeer het opnieuw om de status bij te werken of verwerp de synchronisatie.",
       "syncInProgress": "Er wordt al een beveiligingssynchronisatie uitgevoerd. Probeer het opnieuw.",
       "dismissalInProgress": "Deze afwijzing wordt al verwerkt. Probeer het opnieuw.",
-      "couldNotReadPendingSyncs": "De openstaande synchronisaties konden niet worden gelezen. Probeer het opnieuw."
+      "couldNotReadPendingSyncs": "De openstaande synchronisaties konden niet worden gelezen. Probeer het opnieuw.",
+      "ambiguous": "Het resultaat kon niet worden bevestigd. Controleer de beveiligingscontrole voordat je het opnieuw probeert.",
+      "settleFailed": "De actie is voltooid, maar we konden het resultaat niet vastleggen. Probeer het opnieuw.",
+      "replayFailed": "Deze actie is niet voltooid. Probeer het opnieuw.",
+      "actionFailed": "Deze actie kon niet worden voltooid. Probeer het opnieuw.",
+      "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost."
     },
     "analysisState": {
       "queued": "Analyse in de wachtrij",
@@ -2937,7 +2943,6 @@
       "mergeResultDefaultError": "GitHub heeft het samenvoegen niet voltooid.",
       "mergeResultNotCompleted": "De {{term}} is niet samengevoegd. Controleer de status en probeer het opnieuw.",
       "ambiguous": "Het resultaat kon niet worden bevestigd. Controleer de PR voordat je het opnieuw probeert.",
-      "persistenceFailed": "We konden deze actie niet vastleggen. Probeer het later opnieuw.",
       "forbidden": "Je hebt geen toestemming voor deze actie."
     },
     "capabilities": {

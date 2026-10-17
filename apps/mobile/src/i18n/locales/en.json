@@ -25,6 +25,7 @@
     "error": "error: {{error}}",
     "back": "Back",
     "somethingWentWrong": "Something went wrong",
+    "actionNotRecorded": "We could not record this action. Please try again later.",
     "couldNotOpen": "Could not open {{label}}",
     "link": "link",
     "takingLonger": "This is taking longer than expected. You can close this and check again.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub did not complete the merge.",
       "mergeResultNotCompleted": "The {{term}} was not merged. Check its state and try again.",
       "ambiguous": "Couldn't confirm — check the PR before retrying.",
-      "persistenceFailed": "We could not record this action. Please try again later.",
       "forbidden": "Forbidden"
     },
     "capabilities": {
@@ -1924,7 +1924,12 @@
       "syncMayNotHaveCompleted": "A sync may not have completed. Retry to reconcile it, or discard.",
       "syncInProgress": "A security sync is already in progress. Please try again.",
       "dismissalInProgress": "This dismissal is already in progress. Please try again.",
-      "couldNotReadPendingSyncs": "Could not read pending syncs. Try again."
+      "couldNotReadPendingSyncs": "Could not read pending syncs. Try again.",
+      "ambiguous": "Couldn't confirm — check the security review before retrying.",
+      "settleFailed": "The action completed, but we could not record the result. Please try again.",
+      "replayFailed": "This action did not complete. Please try again.",
+      "actionFailed": "Could not complete this action. Please try again.",
+      "actionBlocked": "Could not complete this action. The problem needs fixing before you can retry."
     },
     "analysisState": {
       "queued": "Analysis queued",

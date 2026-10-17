@@ -19,7 +19,10 @@ import {
   useSecurityAgentCapability,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
-import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
+import {
+  securityDismissFailureCopy,
+  useSecurityDismissDraft,
+} from '@/lib/hooks/use-security-dismiss-draft';
 import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
@@ -170,7 +173,8 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
 
   // A pre-accept dismissal failure (no command id) leaves a durable draft; the
   // retry card restores it until the user retries or discards it.
-  const dismissFailure = dismissDraft.draft?.lastError ?? null;
+  const draft = dismissDraft.draft;
+  const dismissFailure = draft?.lastError != null ? securityDismissFailureCopy(draft) : null;
 
   return (
     <View className="flex-1 bg-background">

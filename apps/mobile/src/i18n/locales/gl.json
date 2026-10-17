@@ -25,6 +25,7 @@
     "error": "erro: {{error}}",
     "back": "Atrás",
     "somethingWentWrong": "Produciuse un erro.",
+    "actionNotRecorded": "Non puidemos rexistrar esta acción. Téntao de novo máis tarde.",
     "couldNotOpen": "Non se puido abrir {{label}}.",
     "link": "ligazón",
     "takingLonger": "Isto leva máis tempo do esperado. Podes pechalo e comprobalo de novo.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub non completou a fusión.",
       "mergeResultNotCompleted": "A {{term}} non se fusionou. Comproba o seu estado e inténtao de novo.",
       "ambiguous": "Non se puido confirmar. Comproba a PR antes de tentalo de novo.",
-      "persistenceFailed": "Non puidemos rexistrar esta acción. Téntao de novo máis tarde.",
       "forbidden": "Non tes permiso para realizar esta acción."
     },
     "capabilities": {
@@ -1924,7 +1924,12 @@
       "syncMayNotHaveCompleted": "É posible que unha sincronización non rematase. Téntaa de novo para actualizar o seu estado ou descártaa.",
       "syncInProgress": "Xa hai unha sincronización de seguridade en curso. Téntao de novo.",
       "dismissalInProgress": "Este descarte xa está en curso. Téntao de novo.",
-      "couldNotReadPendingSyncs": "Non se puideron ler as sincronizacións pendentes. Téntao de novo."
+      "couldNotReadPendingSyncs": "Non se puideron ler as sincronizacións pendentes. Téntao de novo.",
+      "ambiguous": "Non se puido confirmar. Comproba a revisión de seguridade antes de tentalo de novo.",
+      "settleFailed": "A acción completouse, pero non puidemos rexistrar o resultado. Téntao de novo.",
+      "replayFailed": "Esta acción non se completou. Téntao de novo.",
+      "actionFailed": "Non se puido completar esta acción. Téntao de novo.",
+      "actionBlocked": "Non se puido completar esta acción. Tes que resolver o problema antes de tentalo de novo."
     },
     "analysisState": {
       "queued": "Análise na cola",

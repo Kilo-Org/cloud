@@ -9,3 +9,5 @@ export default function GlobalError() {
     </html>
   );
 }
+
+// ci-probe 1

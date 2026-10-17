@@ -15,7 +15,9 @@ type GlobToken =
   | { kind: StarKind };
 
 function isStar(token: GlobToken): token is { kind: StarKind } {
-  return token.kind === 'segment-star' || token.kind === 'segments-star' || token.kind === 'any-star';
+  return (
+    token.kind === 'segment-star' || token.kind === 'segments-star' || token.kind === 'any-star'
+  );
 }
 
 /** Prefix function (Knuth-Morris-Pratt) so a literal run is located in one path pass. */
@@ -185,7 +187,10 @@ export function compileGlob(pattern: string): CompiledGlob {
         // `**/` is empty or anything ending in `/`: every reachable position
         // stays reachable, and so does every position after a `/`.
         for (let position = 0; position <= path.length; position += 1) {
-          if (currentFlags[position] !== 0 || (position > 0 && path.charCodeAt(position - 1) === SLASH)) {
+          if (
+            currentFlags[position] !== 0 ||
+            (position > 0 && path.charCodeAt(position - 1) === SLASH)
+          ) {
             pushNext(position);
           }
         }

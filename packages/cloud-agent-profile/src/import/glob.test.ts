@@ -34,12 +34,12 @@ function referenceMatch(pattern: string, path: string): boolean {
     }
     if (char === '?') {
       return (
-        pathIndex < path.length &&
-        path[pathIndex] !== '/' &&
-        walk(globIndex + 1, pathIndex + 1)
+        pathIndex < path.length && path[pathIndex] !== '/' && walk(globIndex + 1, pathIndex + 1)
       );
     }
-    return pathIndex < path.length && path[pathIndex] === char && walk(globIndex + 1, pathIndex + 1);
+    return (
+      pathIndex < path.length && path[pathIndex] === char && walk(globIndex + 1, pathIndex + 1)
+    );
   };
   return walk(0, 0);
 }

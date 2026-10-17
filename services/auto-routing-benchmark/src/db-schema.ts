@@ -188,6 +188,8 @@ export const caseResults = sqliteTable(
     rep: integer('rep').notNull().default(0),
     // 1 when the case was killed by the wall-clock timeout, 0 otherwise.
     timed_out: integer('timed_out').notNull().default(0),
+    // PROMPT_TRANSPORT_REVISION of the CLI call that produced this result.
+    prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   // The composite PK's leftmost column already serves run_id-prefix lookups
   // (count/fetch by run); no separate run_id index is needed.
@@ -207,6 +209,7 @@ export const pendingDeciderOutputs = sqliteTable(
     case_id: text('case_id').notNull(),
     rep: integer('rep').notNull(),
     payload: text('payload').notNull(),
+    prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   table => [
     primaryKey({ columns: [table.run_id, table.model, table.variant, table.case_id, table.rep] }),
@@ -276,6 +279,10 @@ export const schedulerExecutions = sqliteTable(
     case_id: text('case_id').notNull(),
     token: text('token').notNull(),
     started_at: integer('started_at').notNull().default(0),
+    // The prompt transport the worker that opened this paid call used, so a container
+    // result recovered by a later deploy is stored under the transport that produced it.
+    // A pre-migration worker leaves the default, which is the argv transport.
+    prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   table => [
     primaryKey({ columns: [table.run_id, table.model, table.variant, table.rep, table.case_id] }),
@@ -403,6 +410,33 @@ export const benchmarkProfiles = sqliteTable(
 );
 
 /**
+ * Ready registry rows queued to re-measure the cases the revision-1 prompt transport
+ * measured unreliably. Kept beside the profile so the profile stays `ready` on its
+ * previous run and keeps serving: a run claims the row (`run_id`), copies the previous
+ * run's other results, measures the affected cases, and only on completion moves the
+ * profile's provenance to the new run.
+ */
+export const profileRemeasures = sqliteTable(
+  'profile_remeasures',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    run_id: text('run_id'),
+    requested_at: text('requested_at').notNull(),
+    claimed_at: text('claimed_at'),
+  },
+  table => [
+    primaryKey({
+      columns: [table.router, table.model, table.variant, table.engine_identity, table.repetitions],
+    }),
+    index('IDX_profile_remeasures_run').on(table.run_id),
+  ]
+);
+
+/**
  * Rolling owner admission ledger for the 24h profile request quota, counted per
  * base router. One row per charged model admission (new under current engine, or
  * explicit failed retry). Stale engine-drift re-admissions are free and do not
@@ -500,6 +534,9 @@ export const clientCaseResults = sqliteTable(
     score: real('score').notNull(),
     grader_cost_usd: real('grader_cost_usd').notNull(),
     uploaded_at: text('uploaded_at').notNull(),
+    // Per-upload version, incremented whenever a stored case is replaced. Two uploads can
+    // share a millisecond, so this is what tells a rollup view apart from the uploads it saw.
+    revision: integer('revision').notNull().default(1),
   },
   table => [primaryKey({ columns: [table.profile_id, table.case_id, table.rep] })]
 );

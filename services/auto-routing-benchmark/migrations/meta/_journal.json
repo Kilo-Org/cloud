@@ -169,6 +169,13 @@
       "when": 1792180639453,
       "tag": "0023_spicy_jasper_sitwell",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1792212465240,
+      "tag": "0024_flashy_monster_badoon",
+      "breakpoints": true
     }
   ]
 }

@@ -120,9 +120,9 @@ export function compileGlob(pattern: string): CompiledGlob {
   let currentCount = 0;
   let nextCount = 0;
 
-  // Each set is described by its own index list, so a set is cleared in
-  // so clearing is proportional to the set size, and the flag doubles as the dedupe check
-  // (`**/` both copies the current set and extends it).
+  // Each set is described by its own index list, so clearing is proportional
+  // to the set size, and the flag doubles as the dedupe check (`**/` both
+  // copies the current set and extends it).
   const pushNext = (position: number): void => {
     if (nextFlags[position] !== 0) return;
     nextFlags[position] = 1;

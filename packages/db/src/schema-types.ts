@@ -2396,6 +2396,9 @@ export const EndpointSchema = z.object({
       discount: z.number().optional(),
     })
     .optional(),
+  // Vercel AI Gateway endpoint data policy flags; OpenRouter does not set them.
+  has_zdr: z.boolean().optional().catch(undefined),
+  has_no_training: z.boolean().optional().catch(undefined),
 });
 
 export type Endpoint = z.infer<typeof EndpointSchema>;

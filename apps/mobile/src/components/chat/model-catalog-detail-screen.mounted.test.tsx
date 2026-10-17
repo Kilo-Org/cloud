@@ -98,7 +98,7 @@ async function renderSummary(
   await i18n.changeLanguage(language);
   detail.current = { ...BASE_DETAIL, contextLength };
   let renderer: TestRenderer.ReactTestRenderer | undefined;
-  await act(async () => {
+  await act(() => {
     renderer = TestRenderer.create(
       createElement(ModelCatalogDetailScreen, { id: REPO, key: language })
     );

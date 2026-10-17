@@ -469,6 +469,28 @@ describe('fetchGitLabProjects', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it('reports an error when a single page returns more than the item cap', async () => {
+    const hugePage = Array.from({ length: 10001 }, (_, i) => ({
+      id: i + 1,
+      name: `project-${i}`,
+      path_with_namespace: `group/project-${i}`,
+      visibility: 'private',
+      archived: false,
+    }));
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => hugePage,
+        headers: { get: () => null },
+      })
+    );
+
+    await expect(fetchGitLabProjects('test-token')).rejects.toThrow(
+      'GitLab pagination limit exceeded: project listing returned more than 10000 items'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('reports an error when a provider signals a huge x-total-pages with full pages', async () => {
     const branches = Array.from({ length: 100 }, (_, i) => ({
       name: `branch-${i}`,

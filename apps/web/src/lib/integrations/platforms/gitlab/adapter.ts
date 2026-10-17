@@ -459,6 +459,7 @@ export async function fetchGitLabProjects(
       continue;
     }
 
+    checkGitLabPaginationBounds(page, projects.length, 'project listing');
     break;
   }
 

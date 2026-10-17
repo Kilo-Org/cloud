@@ -182,6 +182,51 @@ describe('tryDispatchPendingTickets', () => {
     expect(row?.status).toBe('pending');
   });
 
+  it('holds at most one reservation at a time while dispatching', async () => {
+    for (let i = 0; i < 3; i++) {
+      await insertPendingTicket();
+    }
+
+    const analyzingAtDispatch: number[] = [];
+    mockDispatchTriage.mockImplementation(async () => {
+      analyzingAtDispatch.push(await countByStatus('analyzing'));
+    });
+
+    await tryDispatchPendingTickets(owner);
+
+    expect(analyzingAtDispatch).toEqual([1, 2, 3]);
+    expect(await countByStatus('analyzing')).toBe(3);
+  });
+
+  it('does not leave an error message on a ticket that recovers from a dispatch failure', async () => {
+    const ticket = await insertPendingTicket();
+    mockDispatchTriage.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+    await tryDispatchPendingTickets(owner);
+
+    const [afterFailure] = await db
+      .select({
+        status: auto_triage_tickets.status,
+        errorMessage: auto_triage_tickets.error_message,
+      })
+      .from(auto_triage_tickets)
+      .where(eq(auto_triage_tickets.id, ticket.id));
+    expect(afterFailure?.status).toBe('pending');
+    expect(afterFailure?.errorMessage).toBeNull();
+
+    await tryDispatchPendingTickets(owner);
+
+    const [afterRecovery] = await db
+      .select({
+        status: auto_triage_tickets.status,
+        errorMessage: auto_triage_tickets.error_message,
+      })
+      .from(auto_triage_tickets)
+      .where(eq(auto_triage_tickets.id, ticket.id));
+    expect(afterRecovery?.status).toBe('analyzing');
+    expect(afterRecovery?.errorMessage).toBeNull();
+  });
+
   it('does not reset an analyzing ticket without the expected status', async () => {
     const ticket = await insertPendingTicket();
     await db
@@ -189,7 +234,9 @@ describe('tryDispatchPendingTickets', () => {
       .set({ status: 'failed' })
       .where(eq(auto_triage_tickets.id, ticket.id));
 
-    await updateTriageTicketStatus(ticket.id, 'pending', { expectedStatus: 'analyzing' });
+    await updateTriageTicketStatus(ticket.id, 'pending', {
+      expectedStatus: 'analyzing',
+    });
 
     const [row] = await db
       .select({ status: auto_triage_tickets.status })

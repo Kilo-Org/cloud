@@ -11,7 +11,7 @@
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_triage_tickets, type AutoTriageTicket } from '@kilocode/db/schema';
-import { eq, and, count, inArray, sql } from 'drizzle-orm';
+import { eq, and, count, notInArray, sql } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareTriagePayload } from '../triggers/prepare-triage-payload';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -33,22 +33,27 @@ function ownerTicketCondition(owner: Owner) {
     : eq(auto_triage_tickets.owned_by_user_id, owner.id);
 }
 
-interface TicketReservation {
+interface TicketClaim {
+  ticket: AutoTriageTicket | null;
   activeCount: number;
-  reserved: AutoTriageTicket[];
   remainingPending: number;
 }
 
 /**
- * Reserve pending tickets for dispatch.
+ * Claim the next pending ticket for dispatch.
  *
- * The pending -> 'analyzing' transition and the concurrency-slot budget are
- * decided inside one transaction serialized by a per-owner advisory lock, so
- * overlapping triggers for the same owner process disjoint sets. Each ticket
- * is claimed with a status-conditional UPDATE that moves it only while it is
- * still 'pending' and returns the claimed rows.
+ * The slot budget, the pending-row selection, and the pending -> 'analyzing'
+ * transition happen inside one transaction serialized by a per-owner advisory
+ * lock, so overlapping triggers for the same owner never observe the same
+ * pending set. The status-conditional UPDATE only applies while the row is
+ * still 'pending' and returns the claimed row; callers dispatch only what this
+ * returns. One ticket is claimed per call so a pass never holds more than one
+ * reservation at a time.
  */
-async function reservePendingTicketsForDispatch(owner: Owner): Promise<TicketReservation> {
+async function claimNextPendingTicket(
+  owner: Owner,
+  excludedTicketIds: string[]
+): Promise<TicketClaim> {
   return await db.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext('auto-triage-dispatch'), hashtext(${`${owner.type}:${owner.id}`}))`
@@ -62,41 +67,45 @@ async function reservePendingTicketsForDispatch(owner: Owner): Promise<TicketRes
     const activeCount = Number(activeCountResult[0]?.count) || 0;
     const availableSlots = AUTO_TRIAGE_CONSTANTS.MAX_CONCURRENT_TICKETS_PER_OWNER - activeCount;
 
-    logExceptInTest('[tryDispatchPendingTickets] Active count check', {
-      owner,
-      activeCount,
-      availableSlots,
-    });
-
     const pendingCondition = and(
       ownerTicketCondition(owner),
       eq(auto_triage_tickets.status, 'pending')
     );
 
+    const pendingCountResult = await tx
+      .select({ count: count() })
+      .from(auto_triage_tickets)
+      .where(pendingCondition);
+    const pendingCount = Number(pendingCountResult[0]?.count) || 0;
+
+    logExceptInTest('[tryDispatchPendingTickets] Slot check', {
+      owner,
+      activeCount,
+      availableSlots,
+      pendingCount,
+    });
+
     if (availableSlots <= 0) {
-      const remaining = await tx
-        .select({ count: count() })
-        .from(auto_triage_tickets)
-        .where(pendingCondition);
-      return { activeCount, reserved: [], remainingPending: Number(remaining[0]?.count) || 0 };
+      return { ticket: null, activeCount, remainingPending: pendingCount };
     }
 
-    // Fetch one extra to check if there are more pending beyond max concurrent
-    const candidates = await tx
+    const claimableCondition =
+      excludedTicketIds.length > 0
+        ? and(pendingCondition, notInArray(auto_triage_tickets.id, excludedTicketIds))
+        : pendingCondition;
+
+    const [candidate] = await tx
       .select()
       .from(auto_triage_tickets)
-      .where(pendingCondition)
+      .where(claimableCondition)
       .orderBy(auto_triage_tickets.created_at)
-      .limit(AUTO_TRIAGE_CONSTANTS.MAX_CONCURRENT_TICKETS_PER_OWNER + 1);
+      .limit(1);
 
-    const remainingPendingExtra = Math.max(candidates.length - availableSlots, 0);
-
-    if (candidates.length === 0) {
-      return { activeCount, reserved: [], remainingPending: 0 };
+    if (!candidate) {
+      return { ticket: null, activeCount, remainingPending: pendingCount };
     }
 
-    const slice = candidates.slice(0, availableSlots);
-    const reserved = await tx
+    const [claimed] = await tx
       .update(auto_triage_tickets)
       .set({
         status: 'analyzing',
@@ -104,17 +113,19 @@ async function reservePendingTicketsForDispatch(owner: Owner): Promise<TicketRes
         updated_at: new Date().toISOString(),
       })
       .where(
-        and(
-          inArray(
-            auto_triage_tickets.id,
-            slice.map(ticket => ticket.id)
-          ),
-          eq(auto_triage_tickets.status, 'pending')
-        )
+        and(eq(auto_triage_tickets.id, candidate.id), eq(auto_triage_tickets.status, 'pending'))
       )
       .returning();
 
-    return { activeCount, reserved, remainingPending: remainingPendingExtra };
+    if (!claimed) {
+      return { ticket: null, activeCount, remainingPending: pendingCount };
+    }
+
+    return {
+      ticket: claimed,
+      activeCount: activeCount + 1,
+      remainingPending: pendingCount - 1,
+    };
   });
 }
 
@@ -124,30 +135,34 @@ async function reservePendingTicketsForDispatch(owner: Owner): Promise<TicketRes
  */
 export async function tryDispatchPendingTickets(owner: Owner): Promise<DispatchResult> {
   try {
-    logExceptInTest(`[tryDispatchPendingTickets] Starting dispatch check`, { owner });
-
-    const { activeCount, reserved, remainingPending } =
-      await reservePendingTicketsForDispatch(owner);
-
-    logExceptInTest('[tryDispatchPendingTickets] Reserved pending tickets', {
+    logExceptInTest(`[tryDispatchPendingTickets] Starting dispatch check`, {
       owner,
-      reservedCount: reserved.length,
     });
 
-    // If no tickets reserved, return early
-    if (reserved.length === 0) {
-      logExceptInTest('[tryDispatchPendingTickets] No slots available', { owner, activeCount });
-      return { dispatched: 0, pending: remainingPending, activeCount };
-    }
-
     let dispatched = 0;
-    const failed: string[] = [];
-    for (const ticket of reserved) {
+    let pending = 0;
+    let activeCount = 0;
+    const failedTicketIds: string[] = [];
+
+    // Claim and dispatch one ticket per iteration. Each claim re-reads the
+    // owner's active count under the advisory lock, so the concurrency ceiling
+    // holds across overlapping passes, while only the ticket about to be
+    // dispatched is ever reserved.
+    for (;;) {
+      const claim = await claimNextPendingTicket(owner, failedTicketIds);
+      pending = claim.remainingPending;
+      activeCount = claim.activeCount;
+
+      if (!claim.ticket) {
+        break;
+      }
+
+      const ticket = claim.ticket;
       try {
         await dispatchTicket(ticket, owner);
         dispatched++;
       } catch (error) {
-        failed.push(ticket.id);
+        failedTicketIds.push(ticket.id);
         errorExceptInTest('[tryDispatchPendingTickets] Failed to dispatch ticket', {
           ticketId: ticket.id,
           error,
@@ -156,11 +171,12 @@ export async function tryDispatchPendingTickets(owner: Owner): Promise<DispatchR
           tags: { operation: 'dispatch-pending-ticket' },
           extra: { ticketId: ticket.id, owner },
         });
-        // Return the ticket to 'pending' so a later pass can retry it
+        // Return the ticket to 'pending' so a later pass can retry it. The
+        // failure is logged and captured; no error message is persisted, so a
+        // recovered ticket does not keep rendering a stale dispatch error.
         try {
           await updateTriageTicketStatus(ticket.id, 'pending', {
             expectedStatus: 'analyzing',
-            errorMessage: 'Dispatch failed',
             startedAt: null,
           });
         } catch (resetError) {
@@ -178,16 +194,15 @@ export async function tryDispatchPendingTickets(owner: Owner): Promise<DispatchR
     logExceptInTest('[tryDispatchPendingTickets] Dispatch complete', {
       owner,
       dispatched,
-      total: reserved.length,
+      pending,
     });
 
-    return {
-      dispatched,
-      pending: remainingPending + failed.length,
-      activeCount: activeCount + dispatched,
-    };
+    return { dispatched, pending, activeCount };
   } catch (error) {
-    errorExceptInTest('[tryDispatchPendingTickets] Error during dispatch', { owner, error });
+    errorExceptInTest('[tryDispatchPendingTickets] Error during dispatch', {
+      owner,
+      error,
+    });
     captureException(error, {
       tags: { operation: 'try-dispatch-pending-tickets' },
       extra: { owner },

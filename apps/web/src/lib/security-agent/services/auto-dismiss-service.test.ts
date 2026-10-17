@@ -537,6 +537,44 @@ describe('maybeAutoDismissAnalysis', () => {
       expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
     });
 
+    it('skips bulk candidates below the configured confidence threshold', async () => {
+      const triageCandidate = (
+        confidence: NonNullable<SecurityFindingAnalysis['triage']>['confidence']
+      ): SecurityFindingAnalysis => ({
+        triage: {
+          suggestedAction: 'dismiss',
+          confidence,
+          needsSandboxAnalysis: false,
+          needsSandboxReasoning: 'No runtime path',
+          triageAt: '2026-06-16T10:00:00.000Z',
+        },
+        analyzedAt: '2026-06-16T10:00:00.000Z',
+      });
+      mockBulkFindings.push(
+        { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', analysis: triageCandidate('high') },
+        { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', analysis: triageCandidate('medium') }
+      );
+      mockGetSecurityAgentConfig.mockResolvedValue({
+        auto_dismiss_enabled: true,
+        auto_dismiss_confidence_threshold: 'high',
+      } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
+
+      await expect(
+        autoDismissEligibleFindings(
+          { userId: 'user-1' },
+          {
+            type: SecurityAuditLogActorType.CustomerUser,
+            id: 'user-1',
+            email: 'owner@example.com',
+            name: 'Owner Example',
+          }
+        )
+      ).resolves.toEqual({ dismissed: 1, skipped: 1, errors: 0 });
+
+      expect(mockUpdatedRows).toHaveLength(1);
+      expect(mockAuditRows).toHaveLength(1);
+    });
+
     it('looks up the owner GitHub integration once and writes back every dismissal', async () => {
       const eligibleAnalysis: SecurityFindingAnalysis = {
         triage: {

@@ -15,6 +15,9 @@ import {
   providerPrWebUrl,
 } from './provider-pr-ref';
 
+/** A URL whose authority carries userinfo, assembled from parts. */
+const CREDENTIAL_URL = ['https://user', ':secret@', 'gitlab.example.com'].join('');
+
 describe('isProviderPrPlatform', () => {
   it('accepts the three supported platforms', () => {
     expect(['github', 'gitlab', 'bitbucket'].every(value => isProviderPrPlatform(value))).toBe(
@@ -42,7 +45,7 @@ describe('parseProviderPrRoute', () => {
     });
   });
 
-  it('carries the GitLab instance hint from the query param', () => {
+  it('reduces the GitLab instance query param to its origin', () => {
     expect(
       parseProviderPrRoute({
         platform: 'gitlab',
@@ -55,6 +58,32 @@ describe('parseProviderPrRoute', () => {
       mrIid: 3,
       instanceHint: 'https://gitlab.example.com',
     });
+    // Scheme and host are lowercased, the port is kept, and the path, query
+    // and fragment are dropped: the hint is an origin.
+    expect(
+      parseProviderPrRoute({
+        platform: 'gitlab',
+        identity: ['group', 'repo', '3'],
+        instance: 'HTTPS://GitLab.Example.COM:8443/group/repo/-/merge_requests/3?x=1#note_2',
+      })
+    ).toMatchObject({ instanceHint: 'https://gitlab.example.com:8443' });
+  });
+
+  it('drops a GitLab instance param that is not an http(s) URL with a host', () => {
+    const identity = ['group', 'repo', '3'];
+    for (const instance of [
+      'gitlab.example.com',
+      'ftp://gitlab.example.com',
+      'https://',
+      CREDENTIAL_URL,
+      'gopher://gitlab.example.com/x',
+      'not a url',
+      '',
+    ]) {
+      expect(parseProviderPrRoute({ platform: 'gitlab', identity, instance })).toMatchObject({
+        instanceHint: undefined,
+      });
+    }
   });
 
   it('parses a Bitbucket workspace/repo/id triple', () => {
@@ -232,26 +261,56 @@ describe('labels and keys', () => {
   });
 
   it('builds the provider web URL for GitHub and Bitbucket', () => {
-    expect(providerPrWebUrl(githubPrRef('octocat', 'hello', 7))).toBe(
+    expect(providerPrWebUrl({ ref: githubPrRef('octocat', 'hello', 7), serverWebUrl: null })).toBe(
       'https://github.com/octocat/hello/pull/7'
     );
     expect(
-      providerPrWebUrl({ platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 })
+      providerPrWebUrl({
+        ref: { platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 },
+        serverWebUrl: '',
+      })
     ).toBe('https://bitbucket.org/acme/api/pull-requests/42');
   });
 
-  it('builds a GitLab URL from the instance hint and none without it', () => {
+  it('builds a GitLab URL from the loaded merge request', () => {
+    const ref = {
+      platform: 'gitlab',
+      projectPath: 'group/sub/repo',
+      mrIid: 12,
+      // The instance hint is part of the ref's identity; the URL below is
+      // the one the read returned for the loaded merge request.
+      instanceHint: 'https://gitlab.staging.example',
+    } as const;
     expect(
       providerPrWebUrl({
-        platform: 'gitlab',
-        projectPath: 'group/sub/repo',
-        mrIid: 12,
-        instanceHint: 'https://gitlab.example.com/',
+        ref,
+        serverWebUrl: 'https://gitlab.example.com/group/sub/repo/-/merge_requests/12',
       })
     ).toBe('https://gitlab.example.com/group/sub/repo/-/merge_requests/12');
+    // A trailing slash, query and fragment are decoration, not part of the URL.
     expect(
-      providerPrWebUrl({ platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 })
-    ).toBeNull();
+      providerPrWebUrl({
+        ref,
+        serverWebUrl: 'https://gitlab.example.com/g/r/-/merge_requests/1/?x=1#note_9',
+      })
+    ).toBe('https://gitlab.example.com/g/r/-/merge_requests/1');
+  });
+
+  it('has no GitLab URL until a read provides one', () => {
+    const ref = {
+      platform: 'gitlab',
+      projectPath: 'group/repo',
+      mrIid: 1,
+      instanceHint: 'https://gitlab.staging.example',
+    } as const;
+    const webUrl = (serverWebUrl: string | null) => providerPrWebUrl({ ref, serverWebUrl });
+    expect(webUrl(null)).toBeNull();
+    // Bitbucket reports an empty `webUrl`; a GitLab shape that is not an
+    // absolute http(s) URL names no host either.
+    expect(webUrl('')).toBeNull();
+    expect(webUrl('gitlab.example.com/group/repo/-/merge_requests/1')).toBeNull();
+    expect(webUrl('gopher://gitlab.example.com/x')).toBeNull();
+    expect(webUrl(`${CREDENTIAL_URL}/x`)).toBeNull();
   });
 
   it('splits a nested project path so owner + repo rebuilds it', () => {

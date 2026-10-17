@@ -26,6 +26,7 @@ import {
 import { type Href } from 'expo-router';
 import { createContext, createElement, type ReactNode, useContext, useMemo } from 'react';
 
+import { splitHttpUrl } from '@/lib/pr-review/provider-pr-url';
 import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
 export { providerPrRefKey, type GitHubPrRef, type ProviderPrPlatform, type ProviderPrRef };
@@ -107,23 +108,62 @@ export function providerPrTriple(ref: ProviderPrRef): ProviderPrTriple {
 }
 
 /**
- * The provider's own web URL for this PR/MR, or null when it cannot be
- * built. A GitLab ref reached by a deep link may carry no instance hint, and
- * the hint is the only thing that names the host — guessing gitlab.com would
- * hand a self-managed user a link into a stranger's project.
+ * The identity of a loaded PR/MR plus the provider's own URL for it: the URL
+ * the read returned for that surface, or null before it answers.
  */
-export function providerPrWebUrl(ref: ProviderPrRef): string | null {
+export type ProviderPrLink = {
+  readonly ref: ProviderPrRef;
+  readonly serverWebUrl: string | null;
+};
+
+/**
+ * The provider's own web URL for this PR/MR, or null when it cannot be
+ * built.
+ *
+ * GitHub and Bitbucket host every repository, so the ref is the whole input
+ * and the host is a constant. On GitLab the host is whichever instance the
+ * server resolved the request against, so it arrives as `link.serverWebUrl`
+ * — the loaded PR/MR's own `webUrl`. A link whose request has not loaded, or
+ * whose server answer carries no URL, has none, and the callers render no
+ * link at all rather than a guessed `gitlab.com`.
+ */
+export function providerPrWebUrl(link: ProviderPrLink): string | null {
+  const { ref, serverWebUrl } = link;
   if (ref.platform === 'github') {
     return `https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}`;
   }
   if (ref.platform === 'bitbucket') {
     return `https://bitbucket.org/${ref.workspace}/${ref.repoSlug}/pull-requests/${ref.prId}`;
   }
-  if (!ref.instanceHint) {
+  return absoluteHttpUrl(serverWebUrl);
+}
+
+/**
+ * The GitLab instance a route param names, as `scheme://host[:port]`, or
+ * `undefined` when the param is not an http(s) URL with a host. The path,
+ * query, fragment and any credentials are dropped, so the hint is an
+ * origin — the same shape the paste/share resolver produces, which is what
+ * keeps the recents key (`gitlabInstanceOrigin`) folding them together.
+ */
+function gitlabInstanceHint(value: string | null): string | undefined {
+  if (value === null) {
+    return undefined;
+  }
+  const parts = splitHttpUrl(value.trim());
+  return parts ? `${parts.scheme}://${parts.host}` : undefined;
+}
+
+/**
+ * An absolute http(s) URL as the app names it — scheme, host and path, with
+ * the query, fragment and trailing separators dropped — or null when `href`
+ * is not an absolute http(s) URL.
+ */
+function absoluteHttpUrl(href: string | null | undefined): string | null {
+  const parts = splitHttpUrl((href ?? '').trim());
+  if (!parts) {
     return null;
   }
-  const base = ref.instanceHint.replace(/\/+$/, '');
-  return `${base}/${ref.projectPath}/-/merge_requests/${ref.mrIid}`;
+  return `${parts.scheme}://${parts.host}/${parts.segments.join('/')}`.replace(/\/+$/, '');
 }
 
 /**
@@ -219,7 +259,7 @@ export function parseProviderPrRoute(params: {
       ? githubPrRef(first, second, number)
       : { platform: 'bitbucket', workspace: first, repoSlug: second, prId: number };
   }
-  const instanceHint = parseParam(params.instance) ?? undefined;
+  const instanceHint = gitlabInstanceHint(parseParam(params.instance));
   return { platform: 'gitlab', projectPath: path.join('/'), mrIid: number, instanceHint };
 }
 
@@ -294,6 +334,32 @@ export function useProviderPrScope(fallback: ProviderPrTriple): ProviderPrScope 
  */
 export function useProviderPrScopeOrNull(): ProviderPrScope | null {
   return useContext(ProviderPrScopeContext);
+}
+
+// ── the loaded provider URL ────────────────────────────────────────────
+// The ref names which PR/MR is open but not, on GitLab, which host serves
+// it: that is whatever instance the server resolved the read against. The
+// screen that loads the overview publishes the resulting URL here, so the
+// deep surfaces below it — the checks section, the discussion rows — link
+// out to the provider through one value the screen resolved.
+
+const ProviderPrWebUrlContext = createContext<string | null>(null);
+
+/**
+ * Publish the loaded PR/MR's provider web URL to every surface below. Null
+ * (the default, and what the GitHub route publishes) means "no provider URL
+ * for this surface", which every consumer renders as no link at all.
+ */
+export function ProviderPrWebUrlProvider({
+  value,
+  children,
+}: Readonly<{ value: string | null; children: ReactNode }>) {
+  return createElement(ProviderPrWebUrlContext.Provider, { value }, children);
+}
+
+/** The loaded PR/MR's provider web URL, or null when none is loaded. */
+export function useProviderPrWebUrl(): string | null {
+  return useContext(ProviderPrWebUrlContext);
 }
 
 export function providerPrCapabilities(platform: ProviderPrPlatform): ProviderReviewCapabilities {

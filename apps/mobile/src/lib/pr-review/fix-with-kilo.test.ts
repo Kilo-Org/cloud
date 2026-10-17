@@ -57,25 +57,52 @@ describe('prCommentAnchor', () => {
 
 describe('prCommentWebUrl', () => {
   it('anchors a GitHub review comment', () => {
-    expect(prCommentWebUrl(GITHUB_REF, 'review', 55)).toBe(
+    expect(prCommentWebUrl({ ref: GITHUB_REF, serverWebUrl: null }, 'review', 55)).toBe(
       'https://github.com/octocat/hello/pull/7#discussion_r55'
     );
   });
 
-  it('anchors a GitLab note on the hinted instance', () => {
-    expect(prCommentWebUrl(GITLAB_REF_WITH_HINT, 'conversation', 9)).toBe(
-      'https://gitlab.example.com/group/sub/repo/-/merge_requests/12#note_9'
-    );
+  it('anchors a GitLab note on the instance the read resolved', () => {
+    expect(
+      prCommentWebUrl(
+        {
+          ref: GITLAB_REF_WITH_HINT,
+          serverWebUrl: 'https://gitlab.example.com/group/sub/repo/-/merge_requests/12',
+        },
+        'conversation',
+        9
+      )
+    ).toBe('https://gitlab.example.com/group/sub/repo/-/merge_requests/12#note_9');
+    // The ref keeps the instance it was opened on as identity; the anchor
+    // follows the URL the read returned for the loaded merge request.
+    expect(
+      prCommentWebUrl(
+        {
+          ref: GITLAB_REF_WITH_HINT,
+          serverWebUrl: 'https://gitlab.other.example/group/sub/repo/-/merge_requests/12',
+        },
+        'conversation',
+        9
+      )
+    ).toBe('https://gitlab.other.example/group/sub/repo/-/merge_requests/12#note_9');
   });
 
   it('anchors a Bitbucket comment', () => {
-    expect(prCommentWebUrl(BITBUCKET_REF, 'review', 3)).toBe(
+    expect(prCommentWebUrl({ ref: BITBUCKET_REF, serverWebUrl: null }, 'review', 3)).toBe(
       'https://bitbucket.org/acme/api/pull-requests/42#comment-3'
     );
   });
 
-  it('returns null for a GitLab MR with no instance hint to name a host', () => {
-    expect(prCommentWebUrl(GITLAB_REF_WITHOUT_HINT, 'review', 9)).toBeNull();
+  it('returns null for a GitLab MR with no loaded URL to name a host', () => {
+    expect(
+      prCommentWebUrl({ ref: GITLAB_REF_WITHOUT_HINT, serverWebUrl: null }, 'review', 9)
+    ).toBeNull();
+    expect(
+      prCommentWebUrl({ ref: GITLAB_REF_WITH_HINT, serverWebUrl: null }, 'review', 9)
+    ).toBeNull();
+    expect(
+      prCommentWebUrl({ ref: GITLAB_REF_WITH_HINT, serverWebUrl: '' }, 'review', 9)
+    ).toBeNull();
   });
 });
 

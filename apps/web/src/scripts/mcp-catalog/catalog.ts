@@ -4,10 +4,10 @@
  * Enumerates every procedure from the live `rootRouter` (never a hand-written
  * list), shapes deterministic catalog rows, preserves author-edited summaries
  * from the committed `services/kilo-mcp/catalog.json`, and generates missing
- * summaries with the Kilo CLI (`kilo run`, pinned model + variant). Summaries
- * are never generated at MCP runtime: the committed catalog is the only runtime
- * artifact, and authors edit its summaries by hand. See dump.ts for the CLI
- * entry point.
+ * summaries with the Kilo CLI (`kilo run`, one summarizer model + variant for
+ * every run). Summaries are never generated at MCP runtime: the committed
+ * catalog is the only runtime artifact, and authors edit its summaries by hand.
+ * See dump.ts for the CLI entry point.
  *
  * Queries and mutations are published wholesale; paths with an internal-only
  * segment (`admin`, `dev`, `test`) and subscriptions stay internal. `debug`

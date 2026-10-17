@@ -169,13 +169,27 @@ export const githubAppsRouter = createTRPCRouter({
       url.searchParams.set('code_challenge_method', 'S256');
       return { authorizationUrl: url.toString() };
     }),
-  // List all integrations
+  // Display contract shared by personal and organization integration pickers.
   listIntegrations: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
     }
     const owner = resolveOwner(ctx, input?.organizationId);
-    return githubAppsService.listIntegrations(owner);
+    const integrations = await githubAppsService.listIntegrations(owner);
+    return integrations.map(integration => ({
+      id: integration.id,
+      platform: integration.platform,
+      integration_status: integration.integration_status,
+      platform_account_id: integration.platform_account_id,
+      platform_account_login: integration.platform_account_login,
+      repository_access: integration.repository_access,
+      repositories: integration.repositories,
+      repositories_synced_at: integration.repositories_synced_at,
+      suspended_at: integration.suspended_at,
+      installed_at: integration.installed_at,
+      created_at: integration.created_at,
+      updated_at: integration.updated_at,
+    }));
   }),
 
   listOrganizationInstallations: baseProcedure

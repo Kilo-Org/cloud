@@ -146,6 +146,7 @@ jest.mock('@/lib/github-pr-review/dev-seed', () => ({
 }));
 
 let createCaller: (ctx: { user: User }) => {
+  listIntegrations: (input?: { organizationId?: string }) => Promise<unknown[]>;
   listOrganizationInstallations: (input: { organizationId: string }) => Promise<{
     canAdd: boolean;
     canConnectExisting: boolean;
@@ -257,6 +258,44 @@ describe('githubAppsRouter organization install capability', () => {
     mockCreateInstallState.mockResolvedValue('install-token');
     mockListIntegrations.mockResolvedValue([]);
     mockUninstallApp.mockResolvedValue({ success: true, message: 'GitHub App uninstalled' });
+  });
+
+  it('returns the integration display contract', async () => {
+    const integration = organizationIntegration();
+    integration.metadata = {
+      pending_approval: {
+        requester: { kilo_user_email: 'fixture@example.com', kilo_user_name: 'Fixture' },
+        github_requester: { login: 'fixture-requester' },
+      },
+      completed_installation: {
+        requester: { kilo_user_email: 'fixture@example.com', kilo_user_name: 'Fixture' },
+        github_requester: { login: 'fixture-requester' },
+      },
+    };
+    mockListIntegrations.mockResolvedValue([integration]);
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+    const expected = {
+      id: integration.id,
+      platform: integration.platform,
+      integration_status: integration.integration_status,
+      platform_account_id: integration.platform_account_id,
+      platform_account_login: integration.platform_account_login,
+      repository_access: integration.repository_access,
+      repositories: integration.repositories,
+      repositories_synced_at: integration.repositories_synced_at,
+      suspended_at: integration.suspended_at,
+      installed_at: integration.installed_at,
+      created_at: integration.created_at,
+      updated_at: integration.updated_at,
+    };
+
+    await expect(caller.listIntegrations({ organizationId })).resolves.toEqual([expected]);
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user: expect.objectContaining({ id: 'member-user' }) }),
+      organizationId,
+      undefined
+    );
+    await expect(caller.listIntegrations()).resolves.toEqual([expected]);
   });
 
   it.each(organizationManageRoles)(

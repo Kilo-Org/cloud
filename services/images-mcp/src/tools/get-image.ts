@@ -1,5 +1,6 @@
 import type { ImageMCPTokenClaims } from '../auth/jwt';
-import type { createR2Client } from '../r2/client';
+import { scopedObjectKey } from '../r2/object-key';
+import type { R2Client } from '../r2/client';
 
 const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
@@ -13,18 +14,13 @@ type MCPImageContent = {
 type GetImageParams = {
   sourcePath: string;
   claims: ImageMCPTokenClaims;
-  r2: ReturnType<typeof createR2Client>;
+  r2: R2Client;
 };
 
 async function getImage(params: GetImageParams): Promise<MCPImageContent> {
   const { sourcePath, claims, r2 } = params;
 
-  // Validate sourcePath doesn't contain path traversal
-  if (sourcePath.includes('..') || sourcePath.startsWith('/')) {
-    throw new Error('Access denied: invalid source path');
-  }
-
-  const fullSourceKey = `${claims.src_prefix}${sourcePath}`;
+  const fullSourceKey = scopedObjectKey(claims.src_prefix, sourcePath);
 
   // Read from source bucket
   const sourceObject = await r2.getObject(claims.src_bucket, fullSourceKey);

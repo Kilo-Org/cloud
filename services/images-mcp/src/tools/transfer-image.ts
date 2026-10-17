@@ -1,5 +1,6 @@
 import type { ImageMCPTokenClaims } from '../auth/jwt';
-import type { createR2Client } from '../r2/client';
+import { scopedObjectKey } from '../r2/object-key';
+import type { R2Client } from '../r2/client';
 
 const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
@@ -7,19 +8,14 @@ const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
 type TransferImageParams = {
   sourcePath: string;
   claims: ImageMCPTokenClaims;
-  r2: ReturnType<typeof createR2Client>;
+  r2: R2Client;
   bucketPublicUrls: Record<string, string>;
 };
 
 async function transferImage(params: TransferImageParams): Promise<string> {
   const { sourcePath, claims, r2, bucketPublicUrls } = params;
 
-  // Validate sourcePath doesn't contain path traversal
-  if (sourcePath.includes('..') || sourcePath.startsWith('/')) {
-    throw new Error('Access denied: invalid source path');
-  }
-
-  const fullSourceKey = `${claims.src_prefix}${sourcePath}`;
+  const fullSourceKey = scopedObjectKey(claims.src_prefix, sourcePath);
 
   // Read from source bucket
   const sourceObject = await r2.getObject(claims.src_bucket, fullSourceKey);
@@ -46,7 +42,7 @@ async function transferImage(params: TransferImageParams): Promise<string> {
     throw new Error('Invalid source path: no filename');
   }
 
-  const destKey = `${claims.dst_prefix}${filename}`;
+  const destKey = scopedObjectKey(claims.dst_prefix, filename);
 
   // Read body into ArrayBuffer since we can't tee a ReadableStream across fetch calls
   const arrayBuffer = await new Response(sourceObject.body).arrayBuffer();

@@ -1,5 +1,6 @@
 import { AwsClient } from 'aws4fetch';
 import { XMLParser } from 'fast-xml-parser';
+import { objectUrl } from './object-key';
 
 type R2Config = {
   accessKeyId: string;
@@ -50,7 +51,22 @@ function parseListObjectsV2Response(xml: string): R2ListResult {
   return { objects, isTruncated, nextContinuationToken };
 }
 
-function createR2Client(config: R2Config) {
+type R2Client = {
+  getObject: (bucket: string, key: string) => Promise<R2Object | null>;
+  putObject: (
+    bucket: string,
+    key: string,
+    body: ReadableStream | ArrayBuffer,
+    options: { contentType: string }
+  ) => Promise<void>;
+  listObjects: (
+    bucket: string,
+    prefix: string,
+    options?: { maxKeys?: number; continuationToken?: string }
+  ) => Promise<R2ListResult>;
+};
+
+function createR2Client(config: R2Config): R2Client {
   const aws = new AwsClient({
     accessKeyId: config.accessKeyId,
     secretAccessKey: config.secretAccessKey,
@@ -59,7 +75,7 @@ function createR2Client(config: R2Config) {
   });
 
   async function getObject(bucket: string, key: string): Promise<R2Object | null> {
-    const url = new URL(`/${bucket}/${key}`, config.endpoint);
+    const url = objectUrl(config.endpoint, bucket, key);
     const response = await aws.fetch(url.toString(), { method: 'GET' });
 
     if (response.status === 404) {
@@ -91,7 +107,7 @@ function createR2Client(config: R2Config) {
     body: ReadableStream | ArrayBuffer,
     options: { contentType: string }
   ): Promise<void> {
-    const url = new URL(`/${bucket}/${key}`, config.endpoint);
+    const url = objectUrl(config.endpoint, bucket, key);
     const response = await aws.fetch(url.toString(), {
       method: 'PUT',
       headers: { 'Content-Type': options.contentType },
@@ -134,4 +150,4 @@ function createR2Client(config: R2Config) {
   return { getObject, putObject, listObjects };
 }
 
-export { createR2Client, type R2Object, type R2ListEntry, type R2ListResult };
+export { createR2Client, type R2Client, type R2Object, type R2ListEntry, type R2ListResult };

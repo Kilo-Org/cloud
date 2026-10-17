@@ -229,12 +229,25 @@ export async function closeAllDrizzleConnections(): Promise<void> {
 
 export type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+// Public tables that are not partitions; a partitioned root covers its partitions.
+const cleanupRoots = drizzleSql`
+  roots AS (
+    SELECT c.oid, c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p')
+      AND c.relname <> 'migrations'
+      AND NOT EXISTS (SELECT 1 FROM pg_inherits i WHERE i.inhrelid = c.oid)
+  )
+`;
+
 /**
  * Leaves the database as `TRUNCATE <every public table> RESTART IDENTITY CASCADE`
  * would: every table and partition empty, every owned identity/serial sequence
  * restarted. TRUNCATE recreates the files of all ~250 tables and their indexes on
- * every call; this only touches tables whose heap has pages. A table without pages
- * holds no tuples, so the set never misses rows.
+ * every call; this only deletes from tables whose heap has pages. A table without
+ * pages holds no tuples, so the set never misses rows.
  *
  * `session_replication_role = replica` skips FK checks and ON DELETE actions,
  * which is safe because every table holding rows is emptied in the same
@@ -242,61 +255,65 @@ export type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]
  */
 export async function cleanupDbForTest(): Promise<void> {
   // Use primary for test cleanup to ensure consistency
-  const { rows } = await primaryDb.execute<{ kind: 'table' | 'sequence'; sql: string }>(drizzleSql`
-    WITH RECURSIVE roots AS (
-      SELECT c.oid, c.relname
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'public'
-        AND c.relkind IN ('r', 'p')
-        AND c.relname <> 'migrations'
-        AND NOT EXISTS (SELECT 1 FROM pg_inherits i WHERE i.inhrelid = c.oid)
-    ),
-    tree AS (
-      SELECT oid AS root, oid AS rel FROM roots
-      UNION ALL
-      SELECT tree.root, i.inhrelid FROM tree JOIN pg_inherits i ON i.inhparent = tree.rel
-    ),
-    -- Materialized so pg_sequence_last_value only ever sees sequence OIDs.
-    owned AS MATERIALIZED (
-      SELECT s.seqrelid, s.seqstart
-      FROM tree
-      JOIN pg_depend d
-        ON d.refclassid = 'pg_class'::regclass
-        AND d.refobjid = tree.rel
-        AND d.classid = 'pg_class'::regclass
-        AND d.deptype IN ('a', 'i')
-      JOIN pg_sequence s ON s.seqrelid = d.objid
-    )
-    SELECT 'table' AS kind, format('%I', roots.relname) AS sql
-    FROM roots
-    JOIN tree ON tree.root = roots.oid
-    GROUP BY roots.oid, roots.relname
-    HAVING bool_or(pg_relation_size(tree.rel) > 0)
-    UNION ALL
-    SELECT 'sequence', format('setval(%s, %s, false)', seqrelid, seqstart)
-    FROM owned
-    WHERE pg_sequence_last_value(seqrelid) IS NOT NULL
-  `);
-  const tables = rows.filter(row => row.kind === 'table').map(row => row.sql);
-  const sequenceResets = rows.filter(row => row.kind === 'sequence').map(row => row.sql);
-  if (tables.length === 0 && sequenceResets.length === 0) return;
+  const emptied = await primaryDb.transaction(async tx => {
+    const { rows: roots } = await tx.execute<{ name: string }>(drizzleSql`
+      WITH ${cleanupRoots}
+      SELECT format('%I', relname) AS name FROM roots ORDER BY relname
+    `);
+    if (roots.length === 0) return [];
+    // Blocks writers on every table until commit, as TRUNCATE's lock did, so the
+    // set below cannot go stale. A fixed order keeps concurrent cleanups from
+    // deadlocking.
+    await tx.execute(
+      drizzleSql.raw(
+        `LOCK TABLE ${roots.map(root => root.name).join(', ')} IN SHARE ROW EXCLUSIVE MODE`
+      )
+    );
 
-  await primaryDb.transaction(async tx => {
+    const { rows } = await tx.execute<{ kind: 'table' | 'sequence'; sql: string }>(drizzleSql`
+      WITH RECURSIVE ${cleanupRoots},
+      tree AS (
+        SELECT oid AS root, oid AS rel FROM roots
+        UNION ALL
+        SELECT tree.root, i.inhrelid FROM tree JOIN pg_inherits i ON i.inhparent = tree.rel
+      ),
+      -- Materialized so pg_sequence_last_value only ever sees sequence OIDs.
+      owned AS MATERIALIZED (
+        SELECT s.seqrelid, s.seqstart
+        FROM tree
+        JOIN pg_depend d
+          ON d.refclassid = 'pg_class'::regclass
+          AND d.refobjid = tree.rel
+          AND d.classid = 'pg_class'::regclass
+          AND d.deptype IN ('a', 'i')
+        JOIN pg_sequence s ON s.seqrelid = d.objid
+      )
+      SELECT 'table' AS kind, format('%I', roots.relname) AS sql
+      FROM roots
+      JOIN tree ON tree.root = roots.oid
+      GROUP BY roots.oid, roots.relname
+      HAVING bool_or(pg_relation_size(tree.rel) > 0)
+      UNION ALL
+      SELECT 'sequence', format('setval(%s, %s, false)', seqrelid, seqstart)
+      FROM owned
+      WHERE pg_sequence_last_value(seqrelid) IS NOT NULL
+    `);
+    const tables = rows.filter(row => row.kind === 'table').map(row => row.sql);
+    const sequenceResets = rows.filter(row => row.kind === 'sequence').map(row => row.sql);
+
     const statements: string[] = [];
     if (tables.length > 0) {
       statements.push(
-        // Waits for in-flight writers, as TRUNCATE's lock does.
-        `LOCK TABLE ${tables.join(', ')} IN SHARE ROW EXCLUSIVE MODE`,
         'SET LOCAL session_replication_role = replica',
         ...tables.map(table => `DELETE FROM ${table}`)
       );
     }
     if (sequenceResets.length > 0) statements.push(`SELECT ${sequenceResets.join(', ')}`);
-    await tx.execute(drizzleSql.raw(statements.join(';\n')));
+    if (statements.length > 0) await tx.execute(drizzleSql.raw(statements.join(';\n')));
+    return tables;
   });
 
   // Shrinks the emptied heaps back to zero pages, as TRUNCATE leaves them, so the
   // next file inserts into a fresh heap and the next cleanup skips these tables.
-  if (tables.length > 0) await primaryDb.execute(drizzleSql.raw(`VACUUM ${tables.join(', ')}`));
+  if (emptied.length > 0) await primaryDb.execute(drizzleSql.raw(`VACUUM ${emptied.join(', ')}`));
 }

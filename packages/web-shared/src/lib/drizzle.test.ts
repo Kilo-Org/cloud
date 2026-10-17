@@ -225,7 +225,10 @@ describe('drizzle', () => {
         SELECT c.relname AS name
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname = 'public' AND c.relkind = 'r' AND pg_relation_size(c.oid) > 0
+        WHERE n.nspname = 'public'
+          AND c.relkind = 'r'
+          AND c.relname <> 'migrations'
+          AND pg_relation_size(c.oid) > 0
       `);
       expect(rows).toEqual([]);
     });

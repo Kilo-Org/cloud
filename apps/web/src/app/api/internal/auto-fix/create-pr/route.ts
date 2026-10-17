@@ -29,6 +29,8 @@ interface CreatePRPayload {
   ticketId: string;
   sessionId: string;
   branchName?: string; // Optional: actual branch name created by agent (defaults to session/{sessionId})
+  // Optional: owner/repo the branch was pushed to when it is a fork of the ticket repository.
+  headRepoFullName?: string;
   githubToken: string;
   config: {
     pr_base_branch: string;
@@ -148,6 +150,7 @@ The changes implement the fix as described in the original issue.
 
       const pr = await createPullRequest({
         repoFullName: ticket.repo_full_name,
+        headRepoFullName: payload.headRepoFullName,
         baseBranch,
         headBranch: branchName,
         title: prTitle,

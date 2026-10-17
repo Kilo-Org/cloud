@@ -2,6 +2,7 @@ import {
   fitCallbackJobToQueueLimit,
   type CallbackJobQueueFitResult,
 } from '../../callbacks/queue-payload.js';
+import { callbackHeadRepoFullName } from '../../callbacks/head-repository.js';
 import type { CallbackJob, CallbackTarget } from '../../callbacks/types.js';
 import { renderRecentActivity } from '../../callbacks/recent-activity.js';
 import { logger } from '../../logger.js';
@@ -243,6 +244,7 @@ export function createMessageCallbacks(
               }),
             }),
         lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
+        headRepoFullName: callbackHeadRepoFullName(metadata),
         kiloSessionId,
         lastAssistantMessageText,
         recentActivity,

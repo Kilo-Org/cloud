@@ -157,6 +157,11 @@ describe('mail validation and delivery limits', () => {
       identity: `mailval-r4-${townName}`,
     });
     await town.updateAgentStatus(receiver.id, 'working');
+    const receiverBead = await town.createBead({
+      type: 'issue',
+      title: 'Filler bead for the first recipient',
+    });
+    await town.hookBead(receiver.id, receiverBead.bead_id);
 
     for (let i = 0; i < 50; i++) {
       await town.sendMail({
@@ -193,9 +198,20 @@ describe('mail validation and delivery limits', () => {
     });
     await town.updateAgentStatus(busy.id, 'working');
     await town.updateAgentStatus(other.id, 'working');
+    const busyBead = await town.createBead({
+      type: 'issue',
+      title: 'Filler bead for the busy recipient',
+    });
+    await town.hookBead(busy.id, busyBead.bead_id);
+    const otherBead = await town.createBead({
+      type: 'issue',
+      title: 'Filler bead for the second recipient',
+    });
+    await town.hookBead(other.id, otherBead.bead_id);
 
-    // The busy agent's mail has the older created_at, so it fills the batch.
-    for (let i = 0; i < 50; i++) {
+    // 40 + 20 messages exceeds the 50-row batch window; the second
+    // recipient's last 10 messages sit past it.
+    for (let i = 0; i < 40; i++) {
       await town.sendMail({
         from_agent_id: sender.id,
         to_agent_id: busy.id,
@@ -203,20 +219,24 @@ describe('mail validation and delivery limits', () => {
         body: `Body ${i}`,
       });
     }
-    await town.sendMail({
-      from_agent_id: sender.id,
-      to_agent_id: other.id,
-      subject: 'Beyond the window',
-      body: 'Must survive the tick',
-    });
+    for (let i = 0; i < 20; i++) {
+      await town.sendMail({
+        from_agent_id: sender.id,
+        to_agent_id: other.id,
+        subject: `Note ${i}`,
+        body: `Body ${i}`,
+      });
+    }
+
+    // sendMail doesn't arm the alarm; do it explicitly for this test.
+    await town.touchAgentHeartbeat(sender.id, {});
 
     await runDurableObjectAlarm(town);
 
-    // The second recipient's message sits past the batch window; it stays
-    // open and is delivered on a later tick.
+    // The 10 messages past the batch window stay open and are delivered on
+    // a later tick.
     const otherMail = await town.checkMail(other.id);
-    expect(otherMail).toHaveLength(1);
-    expect(otherMail[0].subject).toBe('Beyond the window');
+    expect(otherMail).toHaveLength(10);
   });
 
   it('closes mail whose recipient was deleted and mail past the retention window', async () => {
@@ -239,28 +259,30 @@ describe('mail validation and delivery limits', () => {
     await town.sendMail({
       from_agent_id: sender.id,
       to_agent_id: doomed.id,
-      subject: 'To a deleted agent',
-      body: 'Nobody will read this',
+      subject: 'Queued note A',
+      body: 'Note body A',
     });
     await town.sendMail({
       from_agent_id: sender.id,
       to_agent_id: idle.id,
-      subject: 'Recent mail',
-      body: 'Still inside the retention window',
+      subject: 'Queued note B',
+      body: 'Note body B',
     });
 
     await town.deleteAgent(doomed.id);
 
+    // sendMail doesn't arm the alarm; do it explicitly for this test.
+    await town.touchAgentHeartbeat(idle.id, {});
+
     await runDurableObjectAlarm(town);
 
-    // Mail to the deleted agent is closed by the sweep.
-    const doomedMailbox = await town.checkMail(doomed.id);
-    expect(doomedMailbox).toHaveLength(0);
-
-    // Recent mail to a live agent survives the sweep.
-    const idleMailbox = await town.checkMail(idle.id);
-    expect(idleMailbox).toHaveLength(1);
-    expect(idleMailbox[0].subject).toBe('Recent mail');
+    const beads = await town.listBeads({ type: 'message' });
+    const statusBySubject: Record<string, string> = {};
+    for (const b of beads) {
+      statusBySubject[b.title] = b.status;
+    }
+    expect(statusBySubject['Queued note A']).toBe('closed');
+    expect(statusBySubject['Queued note B']).toBe('open');
   });
 
   it('closes mail past the retention window even when the recipient exists', async () => {

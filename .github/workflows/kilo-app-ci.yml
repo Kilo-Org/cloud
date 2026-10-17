@@ -267,6 +267,16 @@ jobs:
 
   # Eight shards run the mobile Vitest suite in parallel; the `test` job below
   # reports the combined result under the required check name.
+  #
+  # The shard's `Test` step is CPU-bound and the jobs start together, so the
+  # runner size sets the wall clock of the whole row: measured on a work VM the
+  # step drops from 84 s to 36 s per shard (2 vCPU -> 4 vCPU), against a ~15 s
+  # fixed setup that does not change. Four vCPU pays for itself: the mobile row
+  # gets shorter while its vCPU-seconds rise by about 2%.
+  #
+  # The label is `vars.RUNNER_MEDIUM_LABEL` (blacksmith-4vcpu-ubuntu-2404, 4 vCPU
+  # and 16 GB; a shard peaks at 0.6 GB). Repo variables are not exposed to fork
+  # pull requests, so the job falls back to `ubuntu-latest` there.
   mobile-test:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.mobile == 'true'
@@ -275,7 +285,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1

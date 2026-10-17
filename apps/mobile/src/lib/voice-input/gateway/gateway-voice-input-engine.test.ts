@@ -526,9 +526,10 @@ describe('recording file cleanup', () => {
     });
 
     await startAndStop(harness);
-    await vi.waitFor(() => {
-      expect(harness.deleteRecording).not.toHaveBeenCalled();
-    });
+    // Negative check: while the upload is still pending, nothing may be
+    // deleted yet. drain() lets pending continuations land before asserting.
+    await drain();
+    expect(harness.deleteRecording).not.toHaveBeenCalled();
 
     harness.engine.abort();
     uploadResolvers[0]?.({ ok: true, text: 'too late' });

@@ -111,7 +111,7 @@ export async function runOwnerPoolConversion(params: {
           const escape =
             page.data.abortReason === 'consecutive_failures' && lastFailed !== undefined
               ? ` If these owners keep failing, --resume ${lastFailed} skips them and posts the page's notPosted owners next.`
-              : '';
+              : ' The failed batch may already have applied; those owners come back as `exists` on the retry.';
           throw new Error(
             `the web endpoint looks unavailable (${page.data.abortReason ?? 'aborted'}); fix it, then ${retryHint}.${escape}`
           );

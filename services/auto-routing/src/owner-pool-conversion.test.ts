@@ -2,9 +2,10 @@ import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from '@kilocode/db';
 import { kilocode_users, organizations } from '@kilocode/db';
-import type {
-  OwnerPoolConversionOutcome,
-  OwnerPoolConversionRequest,
+import {
+  MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST as BATCH,
+  type OwnerPoolConversionOutcome,
+  type OwnerPoolConversionRequest,
 } from '@kilocode/auto-routing-contracts';
 import { app } from './index';
 import { matchOwnerObjects } from './owner-pool-conversion';
@@ -285,21 +286,19 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     expect(webFetch).not.toHaveBeenCalled();
   });
 
-  it('chunks conversions at 25 per web request', async () => {
-    ownerRows = Array.from({ length: 60 }, (_, index) => `u${String(index).padStart(3, '0')}`);
-    const objectIds = ownerRows.map(id =>
-      setOwner('user', id, { mode: null, pool: [{ model: 'a/b' }] })
-    );
+  it(`chunks conversions at ${BATCH} per web request`, async () => {
+    ownerRows = ownerIdsFor(BATCH * 2 + 2);
+    const objectIds = poolOwners(ownerRows);
 
     const response = await scan({ ownerType: 'user', objectIds, after: null, dryRun: false });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      conversions: 60,
-      outcomes: { created: 60 },
-      noticesSent: 60,
+      conversions: ownerRows.length,
+      outcomes: { created: ownerRows.length },
+      noticesSent: ownerRows.length,
     });
-    expect(webRequests().map(request => request.conversions.length)).toEqual([25, 25, 10]);
+    expect(webRequests().map(request => request.conversions.length)).toEqual([BATCH, BATCH, 2]);
     expect(webRequests().flatMap(request => request.conversions.map(c => c.owner.id))).toEqual(
       ownerRows
     );
@@ -330,6 +329,10 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
       needsAttention: ['slug_taken user:u2', 'router_cap_reached user:u3', 'failed user:u4'],
       outcomes: { ...NO_OUTCOMES, created: 1, slug_taken: 1, router_cap_reached: 1, failed: 1 },
     });
+    // Owners reported for manual handling are settled, so a rerun neither reposts nor relists
+    // them; only the failed owner is retried.
+    expect([...marked.keys()]).toEqual(objectIds.slice(0, 3));
+    expect([...failedMarks.keys()]).toEqual([objectIds[3]]);
   });
 
   it.each([
@@ -378,7 +381,7 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
   );
 
   it('marks each batch as it returns, so a later failed batch never leaves converted owners unmarked', async () => {
-    ownerRows = ownerIdsFor(60);
+    ownerRows = ownerIdsFor(BATCH * 3);
     const objectIds = poolOwners(ownerRows);
     const created = webFetch.getMockImplementation();
     let markedBeforeSecondBatch = -1;
@@ -394,18 +397,18 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     await expect(response.json()).resolves.toMatchObject({
       aborted: true,
       abortReason: 'batch_failed',
-      outcomes: { ...NO_OUTCOMES, created: 25 },
-      notPosted: ownerRows.slice(25).map(id => `user:${id}`),
+      outcomes: { ...NO_OUTCOMES, created: BATCH },
+      notPosted: ownerRows.slice(BATCH).map(id => `user:${id}`),
     });
-    expect(markedBeforeSecondBatch).toBe(25);
-    expect(marked.size).toBe(25);
+    expect(markedBeforeSecondBatch).toBe(BATCH);
+    expect(marked.size).toBe(BATCH);
     expect(webFetch).toHaveBeenCalledTimes(2);
   });
 
   it('counts a failure run that spans two batches', async () => {
-    ownerRows = ownerIdsFor(27);
+    ownerRows = ownerIdsFor(BATCH + 2);
     const objectIds = poolOwners(ownerRows);
-    const failing = new Set(ownerRows.slice(22));
+    const failing = new Set(ownerRows.slice(BATCH - 3));
     respondOutcomes(id => (failing.has(id) ? 'failed' : 'created'));
 
     const response = await scan({ ownerType: 'user', objectIds, after: null, dryRun: false });
@@ -415,28 +418,59 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
       aborted: true,
       abortReason: 'consecutive_failures',
       consecutiveFailed: 5,
-      outcomes: { ...NO_OUTCOMES, created: 22, failed: 5 },
+      outcomes: { ...NO_OUTCOMES, created: BATCH - 3, failed: 5 },
       notPosted: [],
     });
-    expect(webRequests().map(request => request.conversions.length)).toEqual([25, 2]);
+    expect(webRequests().map(request => request.conversions.length)).toEqual([BATCH, 2]);
   });
 
-  it('stops posting after the page budget and resumes after the last owner posted', async () => {
-    ownerRows = ownerIdsFor(30);
+  it('stops posting after the page budget, reports only what it posted, and the next page picks up the rest', async () => {
+    ownerRows = ownerIdsFor(BATCH * 3);
     const objectIds = poolOwners(ownerRows);
-    vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValue(200_000);
+    const now = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const created = webFetch.getMockImplementation();
+    webFetch.mockImplementation(async (url, init) => {
+      now.mockReturnValue(200_000);
+      if (!created) throw new Error('Expected the default web response');
+      return created(url, init);
+    });
 
-    const response = await scan({ ownerType: 'user', objectIds, after: null, dryRun: false });
+    const first = await scan({ ownerType: 'user', objectIds, after: null, dryRun: false });
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    expect(first.status).toBe(200);
+    await expect(first.json()).resolves.toMatchObject({
       aborted: false,
-      nextCursor: ownerRows[24],
-      outcomes: { ...NO_OUTCOMES, created: 25 },
+      scanned: BATCH,
+      conversions: BATCH,
+      matchedObjectIds: objectIds.slice(0, BATCH),
+      nextCursor: ownerRows[BATCH - 1],
+      outcomes: { ...NO_OUTCOMES, created: BATCH },
       notPosted: [],
     });
     expect(webFetch).toHaveBeenCalledTimes(1);
-    expect(marked.size).toBe(25);
+    expect(marked.size).toBe(BATCH);
+
+    now.mockRestore();
+    respondCreated();
+    const allOwners = ownerRows;
+    ownerRows = allOwners.slice(BATCH);
+
+    const next = await scan({
+      ownerType: 'user',
+      objectIds,
+      after: allOwners[BATCH - 1],
+      dryRun: false,
+    });
+
+    await expect(next.json()).resolves.toMatchObject({
+      scanned: BATCH * 2,
+      conversions: BATCH * 2,
+      outcomes: { ...NO_OUTCOMES, created: BATCH * 2 },
+    });
+    expect(webRequests().flatMap(request => request.conversions.map(c => c.owner.id))).toEqual(
+      allOwners
+    );
+    expect(marked.size).toBe(BATCH * 3);
   });
 
   it('records failed owners and settles owners that no longer exist', async () => {
@@ -481,8 +515,8 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     await expect(response.json()).resolves.toMatchObject({
       aborted: true,
       abortReason: 'consecutive_failures',
-      outcomes: { ...NO_OUTCOMES, failed: 25 },
-      notPosted: ownerRows.slice(25).map(id => `user:${id}`),
+      outcomes: { ...NO_OUTCOMES, failed: BATCH },
+      notPosted: ownerRows.slice(BATCH).map(id => `user:${id}`),
     });
     expect(webFetch).toHaveBeenCalledTimes(1);
   });
@@ -728,6 +762,17 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     await expect(response.json()).resolves.toMatchObject({
       needsAttention: ['notice_failed user:u1', 'mark_failed user:u1'],
     });
+  });
+
+  it('does not report a lost failure marker, since the owner is already listed as failed', async () => {
+    const id = setOwner('user', 'u1', { mode: null, pool: [{ model: 'a/b' }] });
+    ownerRows = ['u1'];
+    markError = new Error('storage unavailable');
+    respondOutcomes(() => 'failed');
+
+    const response = await scan({ ownerType: 'user', objectIds: [id], after: null, dryRun: false });
+
+    await expect(response.json()).resolves.toMatchObject({ needsAttention: ['failed user:u1'] });
   });
 
   it.each([null, 'Bearer wrong-secret'])('rejects authorization %s', async authorization => {

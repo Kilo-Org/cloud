@@ -23,7 +23,8 @@ import type { StoredOwnerSettings } from './routing-mode';
 
 const READ_CONCURRENCY = 10;
 const OUTAGE_CONSECUTIVE_FAILURES = 5;
-// One batch runs up to 25 conversions with their notices in sequence on the web side.
+// A batch's conversions and notices run in sequence on the web side; the batch size keeps one well
+// inside this, so a timeout means the endpoint is stuck rather than slow.
 const BATCH_TIMEOUT_MS = 90_000;
 // No new batch starts after this, so a page plus its last batch ends well inside the operator
 // script's 300 s request timeout.
@@ -130,14 +131,15 @@ async function postChunk(
  *
  * A batch request that fails or times out, or OUTAGE_CONSECUTIVE_FAILURES `failed` results in a row
  * (counted across batches and, through the request, across pages), means the web endpoint looks
- * unavailable: the owners not yet posted are returned as `notPosted`. Owners that failed in an
+ * unavailable: the owners from that batch on are returned as `notPosted`. Owners that failed in an
  * earlier attempt neither extend nor reset the run, so retrying them cannot fake an outage. No
- * batch starts after PAGE_POST_BUDGET_MS; the page then ends early and the next page resumes after
- * the last owner posted (`stoppedAfter`).
+ * batch starts once the page has run PAGE_POST_BUDGET_MS; the page then ends early and the next
+ * page resumes after the last owner posted (`stoppedAfter`).
  */
 async function postConversions(params: {
   env: Env;
   conversions: readonly OwnerPoolConversion[];
+  pageStartedAt: number;
   previousConsecutiveFailed: number;
   previouslyFailed: ReadonlySet<string>;
   onBatch: (results: readonly OwnerPoolConversionResult[]) => Promise<void>;
@@ -151,12 +153,11 @@ async function postConversions(params: {
   const { conversions, previouslyFailed, onBatch } = params;
   const secret = await params.env.INTERNAL_API_SECRET_PROD.get();
   const url = new URL(OWNER_POOL_CONVERSION_PATH, params.env.KILO_WEB_API_BASE_URL);
-  const startedAt = Date.now();
   const results: OwnerPoolConversionResult[] = [];
   let consecutiveFailed = params.previousConsecutiveFailed;
   for (let start = 0; start < conversions.length; start += MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST) {
     const lastPosted = conversions[start - 1];
-    if (lastPosted && Date.now() - startedAt > PAGE_POST_BUDGET_MS) {
+    if (lastPosted && Date.now() - params.pageStartedAt > PAGE_POST_BUDGET_MS) {
       return {
         results,
         notPosted: [],
@@ -196,14 +197,25 @@ async function postConversions(params: {
   return { results, notPosted: [], abortReason: null, consecutiveFailed, stoppedAfter: null };
 }
 
-// Owners the conversion has handled for good; a rerun skips them.
+// Owners the conversion is done with, converted or reported for manual handling; a rerun skips
+// them. Only `failed` owners are retried.
 const SETTLED_OUTCOMES: ReadonlySet<OwnerPoolConversionOutcome> = new Set([
   'created',
   'exists',
   'owner_not_found',
+  'slug_taken',
+  'router_cap_reached',
 ]);
 
+type ReadKind =
+  | 'readFailed'
+  | 'alreadyConverted'
+  | 'invalidPool'
+  | 'droppedModeOnly'
+  | 'conversion';
+
 export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
+  const pageStartedAt = Date.now();
   let rawBody: unknown;
   try {
     rawBody = await c.req.json();
@@ -232,30 +244,26 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
     }
   });
 
+  const kindByOwner = new Map<string, ReadKind>();
+  const invalidModeOwners = new Set<string>();
   const conversions: OwnerPoolConversion[] = [];
   const objectIdByOwner = new Map<string, string>();
   const previouslyFailed = new Set<string>();
-  const readFailed: string[] = [];
-  const invalidPool: string[] = [];
-  const invalidMode: string[] = [];
-  let alreadyConverted = 0;
-  let droppedModeOnly = 0;
   for (const { match, settings } of reads) {
-    const ownerKey = `${ownerType}:${match.ownerId}`;
     if (settings === null) {
-      readFailed.push(ownerKey);
+      kindByOwner.set(match.ownerId, 'readFailed');
       continue;
     }
     if (settings.convertedAt !== null) {
-      alreadyConverted += 1;
+      kindByOwner.set(match.ownerId, 'alreadyConverted');
       continue;
     }
     if (settings.invalidPool) {
-      invalidPool.push(ownerKey);
+      kindByOwner.set(match.ownerId, 'invalidPool');
       continue;
     }
     if (settings.pool === null) {
-      droppedModeOnly += 1;
+      kindByOwner.set(match.ownerId, 'droppedModeOnly');
       continue;
     }
     const conversion: OwnerPoolConversion = {
@@ -266,10 +274,11 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
     if (
       !CustomRouterEntriesSchema.safeParse(convertedOwnerPoolRouter(conversion).entries).success
     ) {
-      invalidPool.push(ownerKey);
+      kindByOwner.set(match.ownerId, 'invalidPool');
       continue;
     }
-    if (settings.invalidMode) invalidMode.push(ownerKey);
+    kindByOwner.set(match.ownerId, 'conversion');
+    if (settings.invalidMode) invalidModeOwners.add(match.ownerId);
     if (settings.failedAt !== null) previouslyFailed.add(match.ownerId);
     objectIdByOwner.set(match.ownerId, match.objectId);
     conversions.push(conversion);
@@ -278,19 +287,24 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
   const markedAt = new Date().toISOString();
   const markFailedKeys: string[] = [];
   const recordBatch = async (batch: readonly OwnerPoolConversionResult[]) => {
-    const failedKeys = await mapBounded(batch, READ_CONCURRENCY, async result => {
+    const lostKeys = await mapBounded(batch, READ_CONCURRENCY, async result => {
       const objectId = objectIdByOwner.get(result.owner.id);
-      const settled = SETTLED_OUTCOMES.has(result.outcome);
-      if (objectId === undefined || (!settled && result.outcome !== 'failed')) return null;
-      try {
-        const stub = stubFor(objectId);
-        await (settled ? stub.markConverted(markedAt) : stub.markFailed(markedAt));
-        return null;
-      } catch {
-        return `${result.owner.type}:${result.owner.id}`;
+      if (objectId === undefined) return null;
+      const stub = stubFor(objectId);
+      if (SETTLED_OUTCOMES.has(result.outcome)) {
+        try {
+          await stub.markConverted(markedAt);
+          return null;
+        } catch {
+          return `${result.owner.type}:${result.owner.id}`;
+        }
       }
+      // The owner is already reported as `failed`; a lost failure marker only means a retry
+      // counts it toward the outage threshold again.
+      if (result.outcome === 'failed') await stub.markFailed(markedAt).catch(() => {});
+      return null;
     });
-    for (const key of failedKeys) if (key !== null) markFailedKeys.push(key);
+    for (const key of lostKeys) if (key !== null) markFailedKeys.push(key);
   };
 
   const posted =
@@ -305,6 +319,7 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
       : await postConversions({
           env: c.env,
           conversions,
+          pageStartedAt,
           previousConsecutiveFailed: parsed.data.consecutiveFailed,
           previouslyFailed,
           onBatch: recordBatch,
@@ -313,6 +328,19 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
   const notPostedKeys = posted.notPosted.map(
     conversion => `${conversion.owner.type}:${conversion.owner.id}`
   );
+
+  // A page that stopped early reports only the owners up to its resume point; the next page
+  // lists and counts the rest.
+  const lastIndex = stoppedAfter === null ? ownerIds.length - 1 : ownerIds.indexOf(stoppedAfter);
+  const inPage = new Set(ownerIds.slice(0, lastIndex + 1));
+  const ownersOf = (kind: ReadKind) =>
+    [...kindByOwner].filter(([ownerId, k]) => k === kind && inPage.has(ownerId));
+  const keysOf = (kind: ReadKind) => ownersOf(kind).map(([ownerId]) => `${ownerType}:${ownerId}`);
+  const readFailed = keysOf('readFailed');
+  const invalidPool = keysOf('invalidPool');
+  const invalidMode = ownersOf('conversion')
+    .filter(([ownerId]) => invalidModeOwners.has(ownerId))
+    .map(([ownerId]) => `${ownerType}:${ownerId}`);
 
   const outcomes = Object.fromEntries(
     OwnerPoolConversionOutcomeSchema.options.map(outcome => [outcome, 0])
@@ -335,12 +363,14 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
 
   const aborted = abortReason !== null;
   const summary: OwnerPoolConversionScanResponse = {
-    scanned: ownerIds.length,
+    scanned: inPage.size,
     nextCursor: stoppedAfter ?? (ownerIds.length === limit ? (ownerIds.at(-1) ?? null) : null),
-    matchedObjectIds: matches.map(match => match.objectId),
-    alreadyConverted,
-    conversions: conversions.length,
-    droppedModeOnly,
+    matchedObjectIds: matches
+      .filter(match => inPage.has(match.ownerId))
+      .map(match => match.objectId),
+    alreadyConverted: ownersOf('alreadyConverted').length,
+    conversions: ownersOf('conversion').length,
+    droppedModeOnly: ownersOf('droppedModeOnly').length,
     readFailed,
     invalidPool,
     invalidMode,
@@ -364,10 +394,10 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
       scanned: summary.scanned,
       nextCursor: summary.nextCursor,
       stoppedEarly: stoppedAfter !== null,
-      matched: matches.length,
-      alreadyConverted,
+      matched: summary.matchedObjectIds.length,
+      alreadyConverted: summary.alreadyConverted,
       conversions: summary.conversions,
-      droppedModeOnly,
+      droppedModeOnly: summary.droppedModeOnly,
       readFailed: readFailed.length,
       invalidPool: invalidPool.length,
       invalidMode: invalidMode.length,

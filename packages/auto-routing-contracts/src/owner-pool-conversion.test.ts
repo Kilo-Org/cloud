@@ -72,31 +72,45 @@ describe('OwnerPoolConversionSchema', () => {
 });
 
 describe('OwnerPoolConversionScanResponseSchema', () => {
-  it('reads a summary from a worker deployed before the newer fields', () => {
-    const parsed = OwnerPoolConversionScanResponseSchema.parse({
-      scanned: 1,
-      nextCursor: null,
-      matchedObjectIds: [],
-      alreadyConverted: 0,
-      conversions: 0,
-      droppedModeOnly: 0,
-      readFailed: [],
-      invalidPool: [],
-      invalidMode: [],
-      needsAttention: [],
-      outcomes: {
-        created: 0,
-        exists: 0,
-        slug_taken: 0,
-        router_cap_reached: 0,
-        owner_not_found: 0,
-        failed: 0,
-      },
-      noticesSent: 0,
-      noticesFailed: 0,
-      aborted: false,
-    });
+  const olderSummary = {
+    scanned: 1,
+    nextCursor: null,
+    matchedObjectIds: [],
+    alreadyConverted: 0,
+    conversions: 0,
+    droppedModeOnly: 0,
+    readFailed: [],
+    invalidPool: [],
+    invalidMode: [],
+    needsAttention: [],
+    outcomes: {
+      created: 0,
+      exists: 0,
+      slug_taken: 0,
+      router_cap_reached: 0,
+      owner_not_found: 0,
+      failed: 0,
+    },
+    noticesSent: 0,
+    noticesFailed: 0,
+    aborted: false,
+  };
 
-    expect(parsed).toMatchObject({ notPosted: [], abortReason: null, consecutiveFailed: 0 });
+  it('reads a summary from a worker deployed before the newer fields', () => {
+    expect(OwnerPoolConversionScanResponseSchema.parse(olderSummary)).toMatchObject({
+      notPosted: [],
+      abortReason: null,
+      consecutiveFailed: 0,
+    });
+  });
+
+  it('reads an abort reason this script does not know as unknown rather than failing the run', () => {
+    expect(
+      OwnerPoolConversionScanResponseSchema.parse({
+        ...olderSummary,
+        aborted: true,
+        abortReason: 'page_timeout',
+      }).abortReason
+    ).toBeNull();
   });
 });

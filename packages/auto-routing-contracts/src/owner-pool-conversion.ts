@@ -13,9 +13,9 @@ export const OWNER_POOL_CONVERSION_PATH = '/api/internal/auto-routing/owner-pool
 export const CONVERTED_ROUTER_SLUG = 'efficient';
 export const CONVERTED_ROUTER_NAME = 'Efficient';
 export const CONVERTED_ROUTER_BASE: AutoRouter = 'efficient';
-// Conversions run one by one and send their notices inline, so a batch stays well inside the
-// web route's duration limit.
-export const MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST = 25;
+// Conversions run one by one and send their notices inline. Small batches keep each request far
+// inside the worker's per-batch timeout, so a slow batch is not reported lost while it still runs.
+export const MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST = 5;
 
 export const OwnerPoolConversionOwnerSchema = z.object({
   type: CustomRouterScopeSchema,
@@ -105,11 +105,13 @@ export const OwnerPoolConversionScanResponseSchema = z.object({
   // The page stopped posting because the web endpoint looks unavailable.
   aborted: z.boolean(),
   // Fields below are defaulted so a newer script still reads a worker deployed before them.
-  // `<ownerType>:<ownerId>` keys the endpoint never received: not failures, and retried as is.
+  // `<ownerType>:<ownerId>` keys of a stopped page that were not posted, or whose batch answer
+  // was lost. They need no manual action: resuming posts them, and one whose batch had already
+  // applied comes back as `exists`.
   notPosted: z.array(z.string()).default([]),
   // `batch_failed`: a batch request failed or timed out. `consecutive_failures`: too many owners
-  // that had not failed before failed in a row.
-  abortReason: z.enum(['batch_failed', 'consecutive_failures']).nullable().default(null),
+  // that had not failed before failed in a row. An unknown reason reads as null.
+  abortReason: z.enum(['batch_failed', 'consecutive_failures']).nullable().catch(null),
   // New `failed` results in a row at the end of this page; the next page request carries it on.
   consecutiveFailed: z.number().int().nonnegative().default(0),
 });

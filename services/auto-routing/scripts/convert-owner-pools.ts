@@ -138,8 +138,8 @@ async function main(): Promise<void> {
   if (!clean) {
     console.error(
       completed
-        ? 'Some owners need attention; see readFailed, invalidPool, invalidMode, needsAttention, notPosted, and unmatched.'
-        : 'The run did not complete (completed: false); handle the owners listed so far, including notPosted, then resume as printed above.'
+        ? 'Some owners need attention; see readFailed, invalidPool, invalidMode, needsAttention, and unmatched.'
+        : 'The run did not complete (completed: false). Handle the needsAttention owners listed so far, then resume as printed above; notPosted owners need no action, the resume posts them.'
     );
     process.exitCode = 1;
   }

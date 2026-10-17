@@ -347,7 +347,7 @@ async function requestPlatformBenchmarks(params: {
   }
 }
 
-export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
+async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
   const key = `auto-routing-custom-routers:${owner.type}:${owner.id}`;
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
 }
@@ -427,7 +427,7 @@ function assertCanCreate(existing: { slug: string }[], slug: string): void {
   }
 }
 
-export async function ownerRouterSlugs(
+async function ownerRouterSlugs(
   executor: DrizzleTransaction | typeof db,
   owner: CustomRouterOwner
 ): Promise<{ slug: string }[]> {

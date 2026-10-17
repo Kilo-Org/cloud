@@ -249,13 +249,6 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         organization_name: 'Acme Corp',
         manage_url: `${NEXTAUTH_URL}/organizations/${orgId}/subscriptions/kilo-pass`,
       };
-    case 'autoRoutingPoolConverted':
-      return {
-        pool_owner: 'Acme Corp',
-        router_name: 'Efficient',
-        model_id: 'kilo-auto/custom/org/efficient',
-        manage_url: `${organization_url}/providers-and-models`,
-      };
     case 'kiloPassDuplicateCardCanceled':
       return { support_url: `mailto:${SUPPORT_EMAIL}` };
     case 'userDataExportReady':

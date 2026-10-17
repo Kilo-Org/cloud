@@ -106,4 +106,3 @@ Every template must include this branding footer below the content table:
 | `recommendationsDigest.html` | `organization_name`, `adopted_summary`, `open_count`, `recommendations_section`, `dashboard_url`, `year` | — |
 | `spendAlert.html` | `scope_name`, `kind_label`, `amount_usd`, `threshold_usd`, `spend_url`, `cta_label`, `year`. One email per authorized billing contact; the single CTA opens that scope's spend view (`/usage` for a personal scope, `/organizations/<id>/usage-details` for an organization). | — |
 | `kiloPassOrgBlocked.html` | `organization_name`, `manage_url`, `year` | — |
-| `autoRoutingPoolConverted.html` | `pool_owner`, `router_name`, `model_id`, `manage_url`, `year`. ADR 0005 cutover notice: the owner's saved Efficient pool became a custom router. `manage_url` is `/profile` for a user and `/organizations/<id>/providers-and-models` for an organization. | — |

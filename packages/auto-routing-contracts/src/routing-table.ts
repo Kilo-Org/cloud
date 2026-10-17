@@ -49,11 +49,6 @@ export const EfficientModelPoolSchema = z
   });
 export type EfficientModelPool = z.infer<typeof EfficientModelPoolSchema>;
 
-export const PersistedEfficientModelPoolSchema = z
-  .array(PoolEntrySchema)
-  .transform(entries => [...new Map(entries.map(entry => [entry.model, entry])).values()])
-  .pipe(EfficientModelPoolSchema);
-
 export const CandidatePricingSchema = z.object({
   promptUsdPerToken: z.number().nonnegative(),
   completionUsdPerToken: z.number().nonnegative(),

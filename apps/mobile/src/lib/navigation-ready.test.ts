@@ -10,16 +10,18 @@ const listeners = vi.hoisted(() => ({
   ready: undefined as (() => void) | undefined,
 }));
 
+function addListenerMock(event: 'state' | 'ready', listener: () => void): () => void {
+  listeners[event] = listener;
+  const remove = (): void => {
+    listeners[event] = undefined;
+  };
+  return remove;
+}
+
 vi.mock('expo-router', () => ({
   useNavigationContainerRef: () => ({
     isReady: isReadyMock,
-    addListener: (event: 'state' | 'ready', callback: () => void): (() => void) => {
-      listeners[event] = callback;
-      const remove = (): void => {
-        listeners[event] = undefined;
-      };
-      return remove;
-    },
+    addListener: addListenerMock,
   }),
 }));
 

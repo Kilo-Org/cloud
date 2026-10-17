@@ -4,9 +4,32 @@ import {
   CONTROL_DIAGNOSTIC_STRING_CHARSET,
   CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH,
 } from '../sandbox-control/diagnostics.js';
-import { mainProcessObservationFields, observeCmdline } from './main-process.js';
+import {
+  classifyMainProcess,
+  mainProcessObservationFields,
+  observeCmdline,
+} from './main-process.js';
 
 const encode = (value: string) => new TextEncoder().encode(value);
+
+describe('supplied PID 1 identity', () => {
+  const command = { argv: ['/bin/sh', '-c', 'exec /opt/selected/start'] };
+
+  it('requires the exact supplied argv, including argument boundaries', () => {
+    expect(classifyMainProcess(encode(`${command.argv.join('\0')}\0`), command)).toBe('startup');
+    expect(classifyMainProcess(encode(command.argv.join(' ')), command)).toBe('ambiguous');
+    expect(classifyMainProcess(encode(`${command.argv.join('\0')}\0extra`), command)).toBe(
+      'ambiguous'
+    );
+  });
+
+  it('also accepts the stable supervisor after exec', () => {
+    expect(classifyMainProcess(encode(`/bin/sh\0${CONTROL_SUPERVISOR_PATH}\0`), command)).toBe(
+      'supervisor'
+    );
+    expect(classifyMainProcess(encode('sleep\0infinity\0'), command)).toBe('sleep');
+  });
+});
 
 describe('mainProcessObservationFields', () => {
   it('reports that no read completed', () => {

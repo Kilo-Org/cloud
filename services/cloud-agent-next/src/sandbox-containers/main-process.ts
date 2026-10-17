@@ -1,7 +1,8 @@
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import { diagnosticCause, type ControlDiagnosticFields } from '../sandbox-control/diagnostics.js';
+import type { ProviderStartupCommand } from '../sandbox-control/provider.js';
 
-export type MainProcessIdentity = 'sleep' | 'supervisor' | 'ambiguous';
+export type MainProcessIdentity = 'sleep' | 'supervisor' | 'startup' | 'ambiguous';
 
 /**
  * One read of `/proc/1/cmdline` and the identity it decided. Everything except a
@@ -34,20 +35,27 @@ function withoutTrailingNul(cmdline: Uint8Array): Uint8Array {
 }
 
 /**
- * Classify PID 1 from its `/proc/1/cmdline` bytes. The two known main processes
- * are the image default `sleep infinity` and the native supervisor entrypoint;
- * a trailing NUL is tolerated. Timeout, non-zero, empty, and anything else is
- * ambiguous and must fail the launch rather than guess.
+ * Classify PID 1 from its exact argv bytes, allowing a trailing NUL. The supplied
+ * startup command and stable supervisor confirm issuance. The image default
+ * `sleep infinity` leaves the existing exec path available.
  */
-export function classifyMainProcess(cmdline: Uint8Array): MainProcessIdentity {
+export function classifyMainProcess(
+  cmdline: Uint8Array,
+  command?: ProviderStartupCommand
+): MainProcessIdentity {
   const trimmed = withoutTrailingNul(cmdline);
-  if (bytesEqual(trimmed, MAIN_PROCESS_SLEEP_CMDLINE)) return 'sleep';
   if (bytesEqual(trimmed, MAIN_PROCESS_SUPERVISOR_CMDLINE)) return 'supervisor';
+  if (command && bytesEqual(trimmed, new TextEncoder().encode(command.argv.join('\0'))))
+    return 'startup';
+  if (bytesEqual(trimmed, MAIN_PROCESS_SLEEP_CMDLINE)) return 'sleep';
   return 'ambiguous';
 }
 
-export function observeCmdline(cmdline: Uint8Array): MainProcessObservation {
-  return { kind: 'cmdline', identity: classifyMainProcess(cmdline), cmdline };
+export function observeCmdline(
+  cmdline: Uint8Array,
+  command?: ProviderStartupCommand
+): MainProcessObservation {
+  return { kind: 'cmdline', identity: classifyMainProcess(cmdline, command), cmdline };
 }
 
 /**

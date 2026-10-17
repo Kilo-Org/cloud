@@ -18,7 +18,8 @@ import type {
   ProviderCreateIntent,
 } from './provider.js';
 import { ProviderCreationError } from './provider.js';
-import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
+import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
+import { shellQuote } from '../kilo/utils.js';
 import { parseWrapperProcScanOutput, WRAPPER_PROC_SCAN_COMMAND } from './wrapper-proc-scan.js';
 import { withDORetry } from '../utils/do-retry.js';
 
@@ -174,14 +175,14 @@ export function createCloudflareProviderAdapter(deps: {
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
-    async launch(ref, env) {
+    async launch(ref, { command, env }) {
       const parsed = decodeCloudflareProviderRef(ref);
       if (!parsed || parsed.sandboxId !== deps.sandboxId) {
         throw new ProviderCreationError('invalid_configuration');
       }
       const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
       if (parsed.containment) await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);
-      await sandbox.startProcess(CONTROL_SUPERVISOR_PATH, {
+      await sandbox.startProcess(command.argv.map(shellQuote).join(' '), {
         cwd: '/',
         env: {
           ...env,

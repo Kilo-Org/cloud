@@ -96,7 +96,7 @@ function createFakeProvider(
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(ref, launchEnv, launchOptions) {
+    async launch(ref, { env: launchEnv }, launchOptions) {
       const launchIndex = provider.launchEnvs.length;
       provider.launchEnvs.push({ ...launchEnv });
       const { deadlineAt, ...recordedOptions } = launchOptions ?? {};

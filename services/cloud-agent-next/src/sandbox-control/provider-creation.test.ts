@@ -1,3 +1,4 @@
+import { preinstalledStartup } from './preinstalled-startup.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ContainerConcurrencyLimitError } from '../container-concurrency.js';
 import {
@@ -98,9 +99,16 @@ describe('native egress policy forwarding', () => {
       const created = await provider.create({ intentId: 'egress-attempt', createdAt: 0 });
       if ('unresolved' in created) throw new Error('Expected provider reference');
       await provider.launch(created.providerRef, {
-        SANDBOX_CONTROL_URL: 'wss://agent.example.com',
+        command: preinstalledStartup(),
+        env: {
+          SANDBOX_CONTROL_URL: 'wss://agent.example.com',
+        },
       });
-      await provider.launch(created.providerRef, {}, { skipRepository: true });
+      await provider.launch(
+        created.providerRef,
+        { command: preinstalledStartup(), env: {} },
+        { skipRepository: true }
+      );
       for (const [input] of launchWrapper.mock.calls) {
         if (egressAllowlist === undefined) expect(input).not.toHaveProperty('egressAllowlist');
         else expect(input.egressAllowlist).toEqual(egressAllowlist);
@@ -420,7 +428,9 @@ describe('Vercel runtime metadata', () => {
           expect.objectContaining({ snapshotId: config.snapshotId })
         );
       }
-      expect(await provider.launch(providerRef, {})).toEqual({ startSource: 'image' });
+      expect(
+        await provider.launch(providerRef, { command: preinstalledStartup(), env: {} })
+      ).toEqual({ startSource: 'image' });
       expect(restClient.executeCommand).toHaveBeenCalledOnce();
       expect(await provider.observe(providerRef, intent)).toEqual({ status: 'active' });
       expect(await provider.stop(providerRef, intent)).toBe('terminal');

@@ -47,6 +47,7 @@ function printUsage(): void {
   console.log('Examples:');
   console.log('  pnpm dev:seed app:condensed-history evgeny@kilocode.ai');
   console.log('  pnpm -s dev:seed app:condensed-history evgeny@kilocode.ai --json');
+  console.log('  pnpm dev:seed app:condensed-history fake@example.com --legacy-runtime');
 }
 
 function sleep(ms: number): Promise<void> {

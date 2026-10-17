@@ -1807,6 +1807,8 @@ export const cliSessionsV2Router = createTRPCRouter({
             });
           }
         }
+      } else if (session.cloud_agent_session_id) {
+        console.debug('Stored runtime identifier is unsupported; returning historical metadata');
       }
 
       return {

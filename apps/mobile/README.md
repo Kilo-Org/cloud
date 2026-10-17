@@ -73,6 +73,14 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
 
+## Diagram host checks
+
+Mermaid uses a packaged renderer and a shared HTML host document.
+Run `pnpm --filter web exec playwright install chromium`, then
+`pnpm --filter web run test:mobile-mermaid` for its browser regression suite.
+The suite needs no backend or signed-in account and includes flowcharts and
+data-image diagrams.
+
 ## Quick Chat backends
 
 Kilo remains the default backend. Custom backends use the harness SDK's remote

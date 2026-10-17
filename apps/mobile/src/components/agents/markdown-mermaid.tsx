@@ -8,6 +8,7 @@ import { z } from 'zod';
 import MERMAID_SCRIPT_ASSET from '@/../assets/vendor/mermaid-11.12.0.min.txt';
 
 import { CodeBlock } from './code-block';
+import { HOST_PAGE, MERMAID_VERSION, SCRIPT_FILE_NAME } from './markdown-mermaid-host';
 import { type MarkdownPalette } from './markdown-palette';
 
 /**
@@ -24,41 +25,12 @@ import { type MarkdownPalette } from './markdown-palette';
  * old script. The page is app code, so it is rewritten once per process and a
  * page edit ships even when the Mermaid version stays the same.
  */
-const MERMAID_VERSION = '11.12.0';
 const HOST_DIRECTORY_NAME = 'mermaid-host';
-const SCRIPT_FILE_NAME = `mermaid-${MERMAID_VERSION}.js`;
 const PAGE_FILE_NAME = `diagram-${MERMAID_VERSION}.html`;
 
 type MermaidHost = { pageUri: string; directoryUri: string };
 
 let mermaidHost: Promise<MermaidHost> | null = null;
-
-/**
- * The static page every diagram loads. It renders nothing until the app
- * calls `window.kiloRenderDiagram` with the diagram source and colors.
- */
-const HOST_PAGE = `<!doctype html><html><head>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<style>html,body{margin:0;padding:0;}#d{display:flex;justify-content:center;}</style>
-<script src="${SCRIPT_FILE_NAME}"></script></head><body><div id="d"></div><script>
-const post = m => window.ReactNativeWebView.postMessage(JSON.stringify(m));
-window.kiloRenderDiagram = ({ source, dark, background }) => {
-  document.documentElement.style.background = background;
-  document.body.style.background = background;
-  try {
-    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: dark ? 'dark' : 'default' });
-    mermaid.render('g', source).then(({ svg }) => {
-      const host = document.getElementById('d');
-      host.innerHTML = svg;
-      // The SVG scales to the page width, which can still be settling when it
-      // first lays out; report the height again whenever the host resizes.
-      const report = () => post({ kind: 'height', height: Math.ceil(host.getBoundingClientRect().height) });
-      new ResizeObserver(report).observe(host);
-      requestAnimationFrame(report);
-    }).catch(() => post({ kind: 'error' }));
-  } catch (e) { post({ kind: 'error' }); }
-};
-</script></body></html>`;
 
 async function prepareMermaidHost(): Promise<MermaidHost> {
   const directory = new Directory(Paths.cache, HOST_DIRECTORY_NAME);

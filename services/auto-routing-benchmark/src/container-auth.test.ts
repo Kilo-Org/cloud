@@ -7,6 +7,7 @@ type ContainerChild = EventEmitter & {
   pid: number;
   stdout: EventEmitter;
   stderr: EventEmitter;
+  stdin: { on: (event: string, listener: () => void) => void; end: (data: string) => void };
   kill: (signal: string) => void;
 };
 
@@ -41,6 +42,7 @@ function createChild() {
     pid: 12345,
     stdout: new EventEmitter(),
     stderr: new EventEmitter(),
+    stdin: { on: vi.fn(), end: vi.fn() },
     kill: vi.fn(),
   });
   mocks.children.push(child);
@@ -143,7 +145,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-it('/run disables automatic ingest while preserving API/gateway authentication', async () => {
+it('/run sends the prompt on stdin and disables automatic ingest while preserving authentication', async () => {
   await loadServer();
   const pending = request('/run', runBody);
   await flushServer();
@@ -158,9 +160,10 @@ it('/run disables automatic ingest while preserving API/gateway authentication',
     'kilo/test-model',
     '--variant',
     'high',
-    'test prompt',
   ]);
   const options = mocks.spawn.mock.calls[0][2];
+  expect(options.stdio).toEqual(['pipe', 'pipe', 'pipe']);
+  expect(mocks.children[0].stdin.end).toHaveBeenCalledWith('test prompt');
   expect(options.env.KILO_DISABLE_SESSION_INGEST).toBe('1');
   expect(options.env.KILO_API_URL).toBe('https://example.test');
   expect(options.env.KILO_ORG_ID).toBe('test-org');
@@ -182,7 +185,8 @@ it('/warmup only initializes the local database once, including concurrent calle
   expect(mocks.spawn).toHaveBeenCalledOnce();
   expect(mocks.spawn.mock.calls[0][0]).toBe('kilo');
   expect(mocks.spawn.mock.calls[0][1]).toEqual(['db', 'path']);
-  const { env } = mocks.spawn.mock.calls[0][2];
+  const { env, stdio } = mocks.spawn.mock.calls[0][2];
+  expect(stdio).toEqual(['ignore', 'pipe', 'pipe']);
   expect(env.KILO_DISABLE_SESSION_INGEST).toBe('1');
   expect(env.KILO_AUTH_CONTENT).toBeUndefined();
   expect(env.KILO_API_URL).toBeUndefined();

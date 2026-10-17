@@ -2498,6 +2498,7 @@
       "title": "Sivano ny fotoam-piasana",
       "platformCloud": "An-tserasera",
       "platformExtension": "Fanitarana",
+      "platformDesktop": "Solosaina",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

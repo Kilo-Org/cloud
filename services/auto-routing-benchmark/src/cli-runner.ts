@@ -1,6 +1,7 @@
 import type { PaidExecutionKey } from './scheduler';
 import { parseKiloRunEvents } from './kilo-events';
 import type { DeciderCase } from './datasets/decider-cases';
+import { materializeLongContext } from './datasets/long-context';
 
 export type CliRunResult = {
   text: string;
@@ -22,12 +23,15 @@ const FINAL_ANSWER_SUFFIX =
   '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
 
 /**
- * The exact `kilo run` prompt for a decider case. The CLI has no system-prompt flag, so the
- * system prompt is folded in. The platform container and client evals (ADR 0005) both send
- * this string, so their measurements in one custom router share byte-identical prompts.
+ * The exact `kilo run` prompt for a decider case. Long-context cases carry their
+ * generated workspace snapshot, as the offline sweep and candidate screen send them.
+ * The CLI has no system-prompt flag, so the system prompt is folded in. The platform
+ * container and client evals (ADR 0005) both send this string, so their measurements in
+ * one custom router share byte-identical prompts.
  */
-export function deciderCliPrompt(benchCase: Pick<DeciderCase, 'systemPrompt' | 'userPrompt'>) {
-  return `${benchCase.systemPrompt}\n\n${benchCase.userPrompt}${FINAL_ANSWER_SUFFIX}`;
+export function deciderCliPrompt(benchCase: DeciderCase): string {
+  const prompts = materializeLongContext(benchCase);
+  return `${prompts.systemPrompt}\n\n${prompts.userPrompt}${FINAL_ANSWER_SUFFIX}`;
 }
 
 export function isRetryableContainerAvailabilityError(error: unknown): boolean {

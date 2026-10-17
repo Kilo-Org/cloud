@@ -1986,6 +1986,7 @@
       "title": "Lọc phiên",
       "platformCloud": "Đám mây",
       "platformExtension": "Tiện ích mở rộng",
+      "platformDesktop": "Máy tính",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

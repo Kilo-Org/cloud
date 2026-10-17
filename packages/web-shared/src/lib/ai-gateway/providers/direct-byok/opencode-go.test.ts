@@ -148,6 +148,22 @@ describe('OpenCode Go session headers', () => {
     ]);
   });
 
+  test('forwards Muse Responses requests without rewriting the body', () => {
+    const body = {
+      model: 'muse-spark-1.3-contributor',
+      input: 'Hello',
+      reasoning: { effort: 'high' as const },
+    };
+    const request: GatewayRequest = { kind: 'responses', body: structuredClone(body) };
+    const context = createContext({ model: 'opencode-go/muse-spark-1.3-contributor', request });
+
+    openCodeGo.transformRequest(context);
+
+    expect(request.body).toEqual(body);
+    expect(context.extraHeaders['x-opencode-session']).toEqual(expect.any(String));
+    expect(context.extraHeaders).not.toHaveProperty('x-api-key');
+  });
+
   test('replaces the OpenRouter reasoning object with reasoning_effort', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
@@ -225,6 +241,17 @@ describe('getAiSdkProvider', () => {
       expect(getAiSdkProvider(model, 'opencode-go')).toBe('anthropic');
     }
   );
+
+  test.each(['opencode-go/muse-spark-1.2-contributor', 'opencode-go/muse-spark-1.3-contributor'])(
+    'uses the Responses API for OpenCode Go model %s',
+    model => {
+      expect(getAiSdkProvider(model, 'opencode-go')).toBe('openai');
+    }
+  );
+
+  test('uses the Responses API for Muse models through the gateway', () => {
+    expect(getAiSdkProvider('meta/muse-spark-1.2', null)).toBe('openai');
+  });
 
   test('uses Chat Completions for MiniMax models from other direct providers', () => {
     expect(getAiSdkProvider('minimax/minimax-m2.5', 'chutes-byok')).toBeUndefined();

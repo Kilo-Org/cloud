@@ -304,19 +304,23 @@ describe('clientEvalCase', () => {
   }
 
   it.each([
-    ['an ordinary', exactCase],
-    ['a long-context', DECIDER_CASES.find(c => c.longContext)],
-  ])('serves the exact platform container prompt for %s case', async (_kind, benchCase) => {
-    if (!benchCase) throw new Error('dataset needs the case');
-    const served = clientEvalCase({ ...context, caseId: benchCase.id });
-    expect(served).toEqual({
-      caseId: benchCase.id,
-      baseRouter: 'efficient',
-      prompt: await platformPrompt(benchCase),
-      timeoutMs: 180_000,
-    });
-    expect(served.prompt).toContain(benchCase.userPrompt);
-  });
+    ['an ordinary', exactCase, false],
+    ['a long-context', DECIDER_CASES.find(c => c.longContext), true],
+  ])(
+    'serves the exact platform container prompt for %s case',
+    async (_kind, benchCase, longContext) => {
+      if (!benchCase) throw new Error('dataset needs the case');
+      const served = clientEvalCase({ ...context, caseId: benchCase.id });
+      expect(served).toEqual({
+        caseId: benchCase.id,
+        baseRouter: 'efficient',
+        prompt: await platformPrompt(benchCase),
+        timeoutMs: 180_000,
+      });
+      expect(served.prompt).toContain(benchCase.userPrompt);
+      expect(served.prompt.includes('BEGIN WORKSPACE SNAPSHOT')).toBe(longContext);
+    }
+  );
 
   it('rejects case ids outside the base router dataset', () => {
     expect(() =>

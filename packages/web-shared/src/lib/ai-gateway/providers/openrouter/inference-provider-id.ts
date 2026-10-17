@@ -58,6 +58,9 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'perplexity',
   'phala',
   'poolside',
+  // Not an OpenRouter provider: only Vercel AI Gateway serves reflection/beam-free.
+  // OpenRouter offers Beam only as a paid model through third-party providers.
+  'reflection',
   'reka',
   'relace',
   'sail-research',

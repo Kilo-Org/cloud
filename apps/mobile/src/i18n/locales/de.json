@@ -3641,7 +3641,7 @@
       "add": "Agent hinzufügen",
       "empty": "Noch keine Agenten",
       "name": "Name des Agenten",
-      "slug": "Slug des Agents",
+      "slug": "Slug des Agenten",
       "description": "Beschreibung des Agenten",
       "model": "Modellüberschreibung",
       "modelPlaceholder": "Sitzungsstandard verwenden",

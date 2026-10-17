@@ -2383,7 +2383,10 @@ export const cliSessionsV2Router = createTRPCRouter({
         : eq(cli_sessions_v2.kilo_user_id, ctx.user.id);
 
       const [session] = await db
-        .select({ kilo_user_id: cli_sessions_v2.kilo_user_id })
+        .select({
+          kilo_user_id: cli_sessions_v2.kilo_user_id,
+          organization_id: cli_sessions_v2.organization_id,
+        })
         .from(cli_sessions_v2)
         .where(and(eq(cli_sessions_v2.session_id, input.kilo_session_id), ownerCondition))
         .limit(1);
@@ -2393,6 +2396,12 @@ export const cliSessionsV2Router = createTRPCRouter({
           code: 'NOT_FOUND',
           message: 'Session not found',
         });
+      }
+
+      // Publishing an org-scoped session requires current organization
+      // membership, consistent with the other session access paths.
+      if (session.organization_id) {
+        await ensureOrganizationAccess(ctx, session.organization_id);
       }
 
       try {

@@ -20,6 +20,18 @@ const RIG_TABLE_CREATE = /* sql */ `
 
 const RIG_INDEX = /* sql */ `CREATE UNIQUE INDEX IF NOT EXISTS idx_rigs_name ON rigs(name)`;
 
+/**
+ * Lenient read of a stored rig override. Configs persisted before the agent
+ * limit fields had upper bounds may hold values above the current ceilings;
+ * an out-of-range limit field is dropped (falling back to the town value)
+ * while every other stored override still validates strictly. New writes
+ * (updateRigConfig) parse strictly through RigOverrideConfigSchema.
+ */
+const StoredRigOverrideConfigSchema = RigOverrideConfigSchema.extend({
+  max_concurrent_polecats: z.number().int().min(1).max(50).optional().catch(undefined),
+  max_dispatch_attempts: z.number().int().min(1).max(20).optional().catch(undefined),
+});
+
 export const RigRecord = z.object({
   id: z.string(),
   name: z.string(),
@@ -34,7 +46,7 @@ export const RigRecord = z.object({
         return {};
       }
     })
-    .pipe(RigOverrideConfigSchema),
+    .pipe(StoredRigOverrideConfigSchema),
   created_at: z.string(),
 });
 

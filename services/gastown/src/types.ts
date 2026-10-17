@@ -383,8 +383,8 @@ export const RigOverrideConfigSchema = z.object({
   git_push_flags: z.string().optional(),
 
   // Agent limits
-  max_concurrent_polecats: z.number().int().positive().optional(),
-  max_dispatch_attempts: z.number().int().positive().optional(),
+  max_concurrent_polecats: z.number().int().positive().max(50).optional(),
+  max_dispatch_attempts: z.number().int().positive().max(20).optional(),
 });
 
 export type RigOverrideConfig = z.infer<typeof RigOverrideConfigSchema>;

@@ -246,6 +246,19 @@ export type EffectiveConfig = {
 };
 
 /**
+ * Upper ceilings for per-rig agent limits. Mirrors the bounds on
+ * RigOverrideConfigSchema and the rig settings form (max 50 concurrent
+ * polecats, max 20 dispatch attempts).
+ */
+const MAX_CONCURRENT_POLECATS_CEILING = 50;
+const MAX_DISPATCH_ATTEMPTS_CEILING = 20;
+
+function clampLimit(value: number | undefined, ceiling: number): number | undefined {
+  if (value === undefined) return undefined;
+  return Math.min(Math.max(1, Math.floor(value)), ceiling);
+}
+
+/**
  * Merge a rig's override config on top of town config, returning a fully
  * resolved EffectiveConfig for dispatch. When rigOverride is null/undefined,
  * all values fall back to town-level defaults (behavior identical to today).
@@ -287,9 +300,14 @@ export function resolveRigConfig(
       mayor: townConfig.custom_instructions?.mayor,
     },
     git_push_flags: rigOverride?.git_push_flags,
-    max_concurrent_polecats:
+    max_concurrent_polecats: clampLimit(
       rigOverride?.max_concurrent_polecats ?? townConfig.max_polecats_per_rig,
-    max_dispatch_attempts: rigOverride?.max_dispatch_attempts,
+      MAX_CONCURRENT_POLECATS_CEILING
+    ),
+    max_dispatch_attempts: clampLimit(
+      rigOverride?.max_dispatch_attempts,
+      MAX_DISPATCH_ATTEMPTS_CEILING
+    ),
   };
 }
 

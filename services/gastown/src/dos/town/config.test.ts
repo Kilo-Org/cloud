@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { TownConfigSchema } from '../../types';
-import { getTownConfig, resolveModel } from './config';
+import { TownConfigSchema, type TownConfig } from '../../types';
+import { getTownConfig, resolveModel, resolveRigConfig } from './config';
 
 const HARDCODED_FALLBACK = 'anthropic/claude-sonnet-4.6';
 
@@ -137,6 +137,49 @@ describe('resolveModel backward compatibility', () => {
     });
     // refinery: no role override, no default → hardcoded
     expect(resolveModel(configNoDefault, null, 'refinery')).toBe(HARDCODED_FALLBACK);
+  });
+});
+
+describe('resolveRigConfig agent limits', () => {
+  it('passes through in-range override values unchanged', () => {
+    const town = TownConfigSchema.parse({});
+    const resolved = resolveRigConfig(town, {
+      max_concurrent_polecats: 10,
+      max_dispatch_attempts: 5,
+    });
+    expect(resolved.max_concurrent_polecats).toBe(10);
+    expect(resolved.max_dispatch_attempts).toBe(5);
+  });
+
+  it('falls back to the town ceiling when the override is absent', () => {
+    const town = TownConfigSchema.parse({ max_polecats_per_rig: 50 });
+    const resolved = resolveRigConfig(town, null);
+    expect(resolved.max_concurrent_polecats).toBe(50);
+    expect(resolved.max_dispatch_attempts).toBeUndefined();
+  });
+
+  it('clamps an above-ceiling concurrency override to 50', () => {
+    const town = TownConfigSchema.parse({});
+    const resolved = resolveRigConfig(town, { max_concurrent_polecats: 100000 });
+    expect(resolved.max_concurrent_polecats).toBe(50);
+  });
+
+  it('clamps an above-ceiling dispatch attempts override to 20', () => {
+    const town = TownConfigSchema.parse({});
+    const resolved = resolveRigConfig(town, { max_dispatch_attempts: 100000 });
+    expect(resolved.max_dispatch_attempts).toBe(20);
+  });
+
+  it('clamps the town fallback when it exceeds the ceiling', () => {
+    const town = { ...TownConfigSchema.parse({}), max_polecats_per_rig: 999 };
+    const resolved = resolveRigConfig(town as TownConfig, null);
+    expect(resolved.max_concurrent_polecats).toBe(50);
+  });
+
+  it('raises a zero override to the minimum of 1', () => {
+    const town = TownConfigSchema.parse({});
+    const resolved = resolveRigConfig(town, { max_concurrent_polecats: 0 });
+    expect(resolved.max_concurrent_polecats).toBe(1);
   });
 });
 

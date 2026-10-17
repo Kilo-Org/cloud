@@ -104,6 +104,14 @@ export default function SessionDetailScreen() {
   if (openStart.current.sessionId !== rawSessionId) {
     openStart.current = { sessionId: rawSessionId, startedAt: Date.now() };
   }
+  // Whether this open began on the restored identity rather than a confirmed
+  // account. Captured at the open's first render: on a cold-start-restored
+  // process the live `getMe` confirms seconds later, so a later read of the
+  // resolved scope could never tell the hint's scope from the live one.
+  const openBeganOnRestoredIdentity = useRef(owner.userId === null);
+  if (openStart.current.sessionId !== rawSessionId) {
+    openBeganOnRestoredIdentity.current = owner.userId === null;
+  }
   const sessionRendered = useRef<string | null>(null);
   if (sessionRendered.current !== null && sessionRendered.current !== rawSessionId) {
     // A reused route instance opening a different session restarts the
@@ -142,16 +150,16 @@ export default function SessionDetailScreen() {
             // terminal retirement (the hint's transcript retires the moment the
             // live account is denied) is a deliberate account-boundary signal,
             // and delaying it for 8s would leave the hint's scope on screen.
-            // The skip is scoped to the hint that is actually in play
-            // (`restoredUserId`), not to the process-wide `owner.restored`
-            // flag, so every later open on a confirmed owner still gets the
-            // retry.
+            // The skip is scoped to the OPEN that began on the restored
+            // identity, not to the resolved id: after the live confirmation a
+            // cold-start-restored process resolves a non-null id, and every
+            // later open on that confirmed owner must still get the retry.
             const errorCode =
               (error as { data?: { code?: string } } | null)?.data?.code ??
               (error as { code?: string } | null)?.code;
             return (
               shouldRetryNotFoundOnSpawnedRoute({ spawned, attempt: failureCount, errorCode }) ||
-              (restoredUserId === null &&
+              (!openBeganOnRestoredIdentity.current &&
                 shouldRetryNotFoundOnYoungRoute({
                   attempt: failureCount,
                   errorCode,

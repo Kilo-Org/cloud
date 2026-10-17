@@ -55,9 +55,6 @@ const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
 // ink in flight). The slot never gives up its box, in either motion branch.
 export const BUTTON_BUSY_SLOT_CLASS = 'h-[20px] w-[20px] shrink-0 items-center justify-center';
 
-// Spinner color per variant, matching that variant's text color (see
-// buttonTextVariants below). accent-soft's foreground isn't in useThemeColors
-// but is identical in both themes (global.css --accent-soft-foreground).
 /**
  * The visible text of the button's children, for a label a loading button can
  * hand to the accessibility layer when the caller gave none. Text children
@@ -91,6 +88,9 @@ function flattenChildrenText(children: React.ReactNode): string | undefined {
   return text === '' ? undefined : text;
 }
 
+// Spinner color per variant, matching that variant's text color (see
+// buttonTextVariants below). accent-soft's foreground isn't in useThemeColors
+// but is identical in both themes (global.css --accent-soft-foreground).
 function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): string {
   if (variant === 'outline' || variant === 'secondary' || variant === 'ghost') {
     return colors.foreground;

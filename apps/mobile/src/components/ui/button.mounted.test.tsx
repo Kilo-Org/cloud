@@ -172,11 +172,13 @@ describe('Button native target contract', () => {
   it('names a loading button from its visible text so the settled state reads the label again', () => {
     // No caller label: Button derives one from the child text, so the
     // `busy: true → false` transition rewrites the Android node's accessible
-    // name from the busy state back to the visible label.
-    const busy = renderButton({ loading: true });
+    // name from the busy state back to the visible label. Passing
+    // `accessibilityLabel: undefined` overrides the default renderButton label
+    // so these assertions only pass when the derivation itself runs.
+    const busy = renderButton({ loading: true, accessibilityLabel: undefined });
     expect(busy.props.accessibilityLabel).toBe('Retry');
 
-    const ready = renderButton({ loading: false });
+    const ready = renderButton({ loading: false, accessibilityLabel: undefined });
     expect(ready.props.accessibilityState).toEqual({
       disabled: false,
       busy: false,
@@ -188,8 +190,8 @@ describe('Button native target contract', () => {
     expect(named.props.accessibilityLabel).toBe('Retry request');
 
     // A button that never opted into loading is untouched: no derived label.
-    const plain = renderButton({});
-    expect(plain.props.accessibilityLabel).toBe('Retry');
+    const plain = renderButton({ accessibilityLabel: undefined });
+    expect(plain.props.accessibilityLabel).toBeUndefined();
   });
 
   it('does not name an icon-only loading button from its non-text children', () => {

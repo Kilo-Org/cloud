@@ -381,7 +381,7 @@ describe('control-plane worktree changes (B10)', () => {
       expect((await sandbox.getAllocationState()).kind).toBe('disconnected')
     );
     await runInDurableObject(sandbox, async (_instance, state) => {
-      await deleteRoute(drizzle(state.storage), sessionId);
+      await deleteRoute(drizzle(state.storage), state.storage.kv, sessionId);
     });
     const saved = await first.getWorktreeChanges();
     expect(saved.snapshot).not.toBeNull();

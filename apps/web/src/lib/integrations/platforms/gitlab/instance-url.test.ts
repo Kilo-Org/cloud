@@ -117,6 +117,7 @@ describe('GitLab instance URL safety', () => {
     ['https://[fc00::1]', 'unique local'],
     ['https://[fe80::1]', 'link local'],
     ['https://[fec0::1]', 'deprecated site local'],
+    ['https://[fee0::1]', 'site local upper half'],
     ['https://[ff02::1]', 'multicast'],
   ])('rejects embedded-IPv4 and special-purpose IPv6 literal %p (%s)', async url => {
     await expect(assertGitLabUrlResolvesSafely(url)).rejects.toThrow('not allowed');

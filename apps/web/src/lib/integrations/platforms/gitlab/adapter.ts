@@ -58,15 +58,10 @@ async function fetchGitLabOnce(url: string, init?: RequestInit): Promise<Respons
 }
 
 async function fetchBounded(url: string, init?: RequestInit): Promise<Response> {
-  const signals: AbortSignal[] = [];
-  if (init?.signal) {
-    signals.push(init.signal);
-  } else {
-    signals.push(AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS));
-  }
+  const signal = init?.signal ?? AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS);
   const response = await fetch(url, {
     ...init,
-    signal: signals.length === 1 ? signals[0] : AbortSignal.any(signals),
+    signal,
     redirect: 'manual',
   });
 

@@ -259,7 +259,7 @@ function isUnsafeIpv6(hostname: string): boolean {
     // Discard-only (100::/64)
     return true;
   }
-  if (hex(0) === 0x3fff && (bytes[1] & 0xf0) === 0xf0) {
+  if (hex(0) === 0x3fff && (bytes[2] & 0xf0) === 0x00) {
     // Documentation (3fff::/20)
     return true;
   }
@@ -275,7 +275,7 @@ function isUnsafeIpv6(hostname: string): boolean {
     // Multicast (ff00::/8)
     return true;
   }
-  if (hex(0) === 0xfec0 && (bytes[2] & 0xf0) === 0x00 && hex(4) === 0 && hex(6) === 0) {
+  if ((bytes[0] & 0xff) === 0xfe && (bytes[1] & 0xc0) === 0xc0) {
     // Deprecated site-local (fec0::/10)
     return true;
   }

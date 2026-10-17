@@ -162,12 +162,13 @@ export async function getTriageTicketByRepoAndIssue(
 
 /**
  * Updates triage ticket status and optional fields
- * Can update session_id, classification, confidence, and other fields
+ * Can update session_id, classification, confidence, and other fields.
+ * Pass `expectedStatus` to restrict the update to rows still in that state.
  */
 export async function updateTriageTicketStatus(
   ticketId: string,
   status: TriageStatus,
-  updates: UpdateTicketParams = {}
+  updates: UpdateTicketParams & { expectedStatus?: TriageStatus; startedAt?: Date | null } = {}
 ): Promise<void> {
   try {
     const updateData: Partial<typeof auto_triage_tickets.$inferInsert> = {
@@ -213,7 +214,7 @@ export async function updateTriageTicketStatus(
       updateData.error_message = updates.errorMessage;
     }
     if (updates.startedAt !== undefined) {
-      updateData.started_at = updates.startedAt.toISOString();
+      updateData.started_at = updates.startedAt ? updates.startedAt.toISOString() : null;
     }
     if (updates.completedAt !== undefined) {
       updateData.completed_at = updates.completedAt.toISOString();
@@ -233,7 +234,14 @@ export async function updateTriageTicketStatus(
     await db
       .update(auto_triage_tickets)
       .set(updateData)
-      .where(eq(auto_triage_tickets.id, ticketId));
+      .where(
+        updates.expectedStatus
+          ? and(
+              eq(auto_triage_tickets.id, ticketId),
+              eq(auto_triage_tickets.status, updates.expectedStatus)
+            )
+          : eq(auto_triage_tickets.id, ticketId)
+      );
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updateTriageTicketStatus' },

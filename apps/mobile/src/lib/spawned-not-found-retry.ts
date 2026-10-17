@@ -57,3 +57,28 @@ export function shouldRetryNotFoundOnSpawnedRoute({
   }
   return attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS;
 }
+
+/**
+ * The same NOT_FOUND retry budget for every OTHER navigation into this route:
+ * session-row pushes, deep links, app actions, and notification opens. The
+ * parent ingest write is not synchronous with any of those reads either — the
+ * session-detail surface answers a first-tick `NOT_FOUND` for a session that
+ * genuinely exists with a permanent, no-retry screen. The same 8×1s budget
+ * the spawned path uses bounds the wait; a stale or deleted session still
+ * reaches the permanent state after the window closes.
+ *
+ * Non-NOT_FOUND codes and retries beyond the budget return false, so the
+ * route's own terminal handling owns everything else.
+ */
+export function shouldRetryNotFoundOnYoungRoute({
+  attempt,
+  errorCode,
+}: {
+  attempt: number;
+  errorCode: string | undefined;
+}): boolean {
+  if (errorCode !== 'NOT_FOUND') {
+    return false;
+  }
+  return attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS;
+}

@@ -277,6 +277,63 @@ describe('client eval (real SQLite)', () => {
       'stale_engine_identity'
     );
   });
+
+  it('rejects eval calls without the internal secret', async () => {
+    const response = await app.request(
+      'https://bench.example.com/v1/eval/plan',
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' },
+      { INTERNAL_API_SECRET_PROD: { get: async () => 'bench-token' } } as unknown as Env
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('re-plans a case that did not run and lets a new upload replace it', async () => {
+    expect(
+      await gradeClientEvalResult(db, CONFIG, upload({ exitCode: 1, output: 'down' }), deps)
+    ).toEqual({ score: 0 });
+    const plan = await planClientEval(db, CONFIG, context, deps.source);
+    expect(plan.items).toContainEqual(
+      expect.objectContaining({ variant: 'low', caseId: exactCase.id, rep: 0 })
+    );
+
+    expect(await gradeClientEvalResult(db, CONFIG, upload(), deps)).toEqual({ score: 1 });
+    const [profile] = await listOwnerClientProfiles(db, context, 'efficient');
+    expect(profile).toMatchObject({ status: 'ready', results: 1, errors: 0, accuracy: 1 });
+  });
+
+  it('refreshes the profile rollup when a stored case is uploaded again', async () => {
+    await gradeClientEvalResult(db, CONFIG, upload(), deps);
+    sqlite.exec(`UPDATE client_profiles SET results = 0, accuracy = NULL, status = 'pending'`);
+    expect(await gradeClientEvalResult(db, CONFIG, upload(), deps)).toEqual({ score: 1 });
+    const [profile] = await listOwnerClientProfiles(db, context, 'efficient');
+    expect(profile).toMatchObject({ status: 'ready', results: 1, accuracy: 1 });
+  });
+
+  it('grades the full output but stores a bounded copy', async () => {
+    const output = `${'é'.repeat(300_000)}\n${exactAnswer}`;
+    expect(await gradeClientEvalResult(db, CONFIG, upload({ output }), deps)).toEqual({ score: 1 });
+    expect(sqlite.prepare('SELECT length(output) AS n FROM client_case_results').get()).toEqual({
+      n: 200_000,
+    });
+  });
+
+  it('bills each payer under its own usage id', async () => {
+    const judged = { caseId: judgedCase.id };
+    writeUsage.mockResolvedValueOnce({ kind: 'unavailable', reason: 'not_recorded' });
+    await expect(gradeClientEvalResult(db, CONFIG, upload(judged), deps)).rejects.toMatchObject({
+      code: 'internal_error',
+    });
+    await gradeClientEvalResult(
+      db,
+      CONFIG,
+      upload({ ...judged, billing: { userId: 'user-2', organizationId: ORG_ID } }),
+      deps
+    );
+    const [first, second] = writeUsage.mock.calls.map(([usage]) => usage.core);
+    expect(second).toMatchObject({ kilo_user_id: 'user-2' });
+    expect(second?.id).not.toBe(first?.id);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM client_case_results').get()).toEqual({ n: 1 });
+  });
 });
 
 describe('clientEvalCase', () => {

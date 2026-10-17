@@ -8,6 +8,7 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { assembleCustomRouterTable, lookupCustomRouterStatuses } from './custom-routers';
+import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity } from './run';
 
 const CONFIG: BenchmarkConfig = {
@@ -109,13 +110,14 @@ describe('custom router tables and statuses (real SQLite)', () => {
     ownerId?: string;
     variant?: string;
     status?: 'pending' | 'ready' | 'failed';
+    results?: number;
   }) {
     sqlite
       .prepare(
         `INSERT INTO client_profiles (id, owner_type, owner_id, router, entry_kind, provider, model,
           variant, engine_identity, repetitions, status, results, accuracy, route_summaries,
           created_at, updated_at)
-         VALUES (?, 'user', ?, 'efficient', 'client', 'ollama', 'qwen3:32b', ?, ?, 1, ?, 20, ?, ?, ?, ?)`
+         VALUES (?, 'user', ?, 'efficient', 'client', 'ollama', 'qwen3:32b', ?, ?, 1, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         row.id,
@@ -123,6 +125,7 @@ describe('custom router tables and statuses (real SQLite)', () => {
         row.variant ?? 'low',
         row.engine ?? ENGINE,
         row.status ?? 'ready',
+        row.results ?? DECIDER_CASES.length,
         row.accuracy,
         JSON.stringify([summary(LOCAL, row.variant ?? 'low', row.accuracy)]),
         row.updatedAt,
@@ -182,6 +185,23 @@ describe('custom router tables and statuses (real SQLite)', () => {
     clientProfile({ id: 'old', engine: OLD_ENGINE, accuracy: 0.8, updatedAt: '2026-10-09' });
     const { table } = await assembleCustomRouterTable(db, CONFIG, clientOnly, source);
     expect(candidates(table)).toEqual([expect.objectContaining({ accuracy: 0.9, stale: false })]);
+  });
+
+  it('keeps serving a complete stale measurement while the current one is partial', async () => {
+    clientProfile({ id: 'partial', accuracy: 1, updatedAt: '2026-10-12', results: 3 });
+    clientProfile({ id: 'old', engine: OLD_ENGINE, accuracy: 0.8, updatedAt: '2026-10-01' });
+    const { table } = await assembleCustomRouterTable(db, CONFIG, clientOnly, source);
+    expect(candidates(table)).toEqual([expect.objectContaining({ accuracy: 0.8, stale: true })]);
+    const status = await lookupCustomRouterStatuses(db, CONFIG, clientOnly, source);
+    expect(status.entries[0]?.variants).toEqual([
+      { variant: 'low', status: 'stale', failureReason: null },
+    ]);
+  });
+
+  it('serves a partial current measurement when no stale one exists', async () => {
+    clientProfile({ id: 'partial', accuracy: 1, updatedAt: '2026-10-12', results: 3 });
+    const { table } = await assembleCustomRouterTable(db, CONFIG, clientOnly, source);
+    expect(candidates(table)).toEqual([expect.objectContaining({ accuracy: 1, stale: false })]);
   });
 
   it('uses the newest ready measurement among older engines', async () => {

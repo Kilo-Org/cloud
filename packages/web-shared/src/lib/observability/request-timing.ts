@@ -4,6 +4,12 @@
  * Pure module: no `server-only`, no database. The tRPC timing middleware and
  * the REST route wrapper both build their structured log line here, so the two
  * surfaces carry the same client dimensions and join on `requestId`.
+ *
+ * Each dimension comes from a request header, so `readClientDimensions` bounds
+ * and validates every one of them before it reaches the log line: a known value
+ * passes, an unrecognized non-empty value is recorded as `'other'`, and a
+ * version or request id outside the accepted shape is left out. Both sample
+ * rates are deployment configuration.
  */
 
 /** Same shape the min-version helper reads (`lib/trpc/min-version.ts`). */
@@ -17,14 +23,44 @@ export type ClientDimensions = {
 };
 
 const DEFAULT_SAMPLE_RATE = 0.01;
+const DEFAULT_MOBILE_SAMPLE_RATE = 1;
+
+/**
+ * Client and platform values the first-party apps send. A non-empty value
+ * outside the list is recorded as `'other'`.
+ */
+const KNOWN_CLIENTS = ['mobile', 'web', 'extension'] as const;
+const KNOWN_PLATFORMS = ['ios', 'android'] as const;
+const OTHER = 'other';
+
+/** Same pattern the min-version helper enforces (`lib/trpc/min-version.ts`). */
+const VERSION_PATTERN = /^\d+(\.\d+)*$/;
+const VERSION_MAX_LENGTH = 32;
+
+/** Accepted request-id shape: 1-64 characters from a bounded character set. */
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
+
+/** An absent or empty header is `null`; a known value passes; anything else is `'other'`. */
+function readAllowlisted(
+  raw: string | null | undefined,
+  allowlist: readonly string[]
+): string | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  return allowlist.includes(raw) ? raw : OTHER;
+}
 
 /** Header names the app already sends on every request. */
 export function readClientDimensions(headersList?: TimingHeaders | null): ClientDimensions {
+  const version = headersList?.get('x-kilo-app-version') ?? null;
+  const requestId = headersList?.get('x-kilo-request-id') ?? null;
   return {
-    client: headersList?.get('x-kilo-client') ?? null,
-    platform: headersList?.get('x-kilo-app-platform') ?? null,
-    version: headersList?.get('x-kilo-app-version') ?? null,
-    requestId: headersList?.get('x-kilo-request-id') ?? null,
+    client: readAllowlisted(headersList?.get('x-kilo-client'), KNOWN_CLIENTS),
+    platform: readAllowlisted(headersList?.get('x-kilo-app-platform'), KNOWN_PLATFORMS),
+    version:
+      version !== null && version.length <= VERSION_MAX_LENGTH && VERSION_PATTERN.test(version)
+        ? version
+        : null,
+    requestId: requestId !== null && REQUEST_ID_PATTERN.test(requestId) ? requestId : null,
   };
 }
 
@@ -34,20 +70,26 @@ export function isMobileDimensions(client: string | null | undefined): boolean {
 }
 
 /**
- * Mobile is always logged (100%); every other client is sampled at
- * `TRPC_TIMING_SAMPLE_RATE` (default `0.01`). A malformed value falls back to
- * the default. The env var is read per call so tests can set it.
+ * The mobile client is the only one with a separate rate: `TRPC_TIMING_MOBILE_SAMPLE_RATE`
+ * (default `1`), while every other client is sampled at `TRPC_TIMING_SAMPLE_RATE`
+ * (default `0.01`). Both rates are deployment configuration and both apply to
+ * every request; `client` is the dimension returned by `readClientDimensions`.
+ * A malformed value falls back to its default. The env vars are read per call so
+ * tests can set them.
  */
 export function shouldLogTiming({ client }: { client: string | null | undefined }): boolean {
-  if (isMobileDimensions(client)) return true;
-  return Math.random() < readSampleRate();
+  const mobile = isMobileDimensions(client);
+  const rate = readRate(
+    mobile ? process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE : process.env.TRPC_TIMING_SAMPLE_RATE,
+    mobile ? DEFAULT_MOBILE_SAMPLE_RATE : DEFAULT_SAMPLE_RATE
+  );
+  return Math.random() < rate;
 }
 
-function readSampleRate(): number {
-  const raw = process.env.TRPC_TIMING_SAMPLE_RATE;
-  if (raw === undefined || raw.trim() === '') return DEFAULT_SAMPLE_RATE;
+function readRate(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === '') return fallback;
   const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) return DEFAULT_SAMPLE_RATE;
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) return fallback;
   return parsed;
 }
 
@@ -83,8 +125,9 @@ export type TimingLine = {
 
 /**
  * Build the object that gets `JSON.stringify`-ed to the structured log line.
- * `userId` is included only on a mobile line, so a sampled non-mobile line
- * never carries it.
+ * `userId` is included whenever the caller has an authenticated context, so the
+ * emission rule never depends on a request header. The REST surface passes no
+ * userId.
  */
 export function buildTimingLine(input: TimingLineInput): TimingLine {
   const { surface, path, route, procedureType, method, durationMs, ok, userId, dimensions } = input;
@@ -102,7 +145,7 @@ export function buildTimingLine(input: TimingLineInput): TimingLine {
   if (route !== undefined) line.route = route;
   if (procedureType !== undefined) line.procedureType = procedureType;
   if (method !== undefined) line.method = method;
-  if (isMobileDimensions(dimensions.client) && userId != null) line.userId = userId;
+  if (userId != null) line.userId = userId;
   return line;
 }
 

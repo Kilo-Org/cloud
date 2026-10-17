@@ -38,13 +38,16 @@ function runTiming(
 
 let savedLogging: string | undefined;
 let savedSampleRate: string | undefined;
+let savedMobileSampleRate: string | undefined;
 let logSpy: jest.SpiedFunction<typeof console.log>;
 
 beforeEach(() => {
   savedLogging = process.env.TRPC_TIMING_LOGGING;
   savedSampleRate = process.env.TRPC_TIMING_SAMPLE_RATE;
+  savedMobileSampleRate = process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE;
   process.env.TRPC_TIMING_LOGGING = '1';
   delete process.env.TRPC_TIMING_SAMPLE_RATE;
+  delete process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE;
   logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 });
 
@@ -53,6 +56,8 @@ afterEach(() => {
   else process.env.TRPC_TIMING_LOGGING = savedLogging;
   if (savedSampleRate === undefined) delete process.env.TRPC_TIMING_SAMPLE_RATE;
   else process.env.TRPC_TIMING_SAMPLE_RATE = savedSampleRate;
+  if (savedMobileSampleRate === undefined) delete process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE;
+  else process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE = savedMobileSampleRate;
   jest.restoreAllMocks();
 });
 
@@ -81,7 +86,7 @@ describe('timingMiddleware', () => {
     expect(lines()[0].durationMs).toEqual(expect.any(Number));
   });
 
-  test('always logs mobile even at rate 0', async () => {
+  test('logs mobile at the mobile rate while the base rate is 0', async () => {
     process.env.TRPC_TIMING_SAMPLE_RATE = '0';
 
     await runTiming();
@@ -98,7 +103,7 @@ describe('timingMiddleware', () => {
     expect(logSpy).not.toHaveBeenCalled();
   });
 
-  test('logs a sampled non-mobile line without userId', async () => {
+  test('logs a sampled non-mobile line with the authenticated userId', async () => {
     process.env.TRPC_TIMING_SAMPLE_RATE = '1';
 
     await runTiming({ path: 'kiloPass.getState', ctx: extensionCtx() });
@@ -109,8 +114,31 @@ describe('timingMiddleware', () => {
       type: 'trpc_timing',
       path: 'kiloPass.getState',
       client: 'extension',
+      userId: 'u1',
     });
-    expect(line).not.toHaveProperty('userId');
+  });
+
+  test('omits userId for an unauthenticated request', async () => {
+    process.env.TRPC_TIMING_SAMPLE_RATE = '1';
+
+    await runTiming({
+      path: 'kiloPass.getState',
+      ctx: { user: null, headersList: new Headers(EXTENSION_HEADERS) },
+    });
+
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(lines()[0]).not.toHaveProperty('userId');
+  });
+
+  test('samples an unrecognized client value at the base rate', async () => {
+    process.env.TRPC_TIMING_SAMPLE_RATE = '0';
+
+    await runTiming({
+      path: 'kiloPass.getState',
+      ctx: { user: null, headersList: new Headers({ 'x-kilo-client': 'mobile2' }) },
+    });
+
+    expect(logSpy).not.toHaveBeenCalled();
   });
 
   test('emits nothing when TRPC_TIMING_LOGGING is unset', async () => {

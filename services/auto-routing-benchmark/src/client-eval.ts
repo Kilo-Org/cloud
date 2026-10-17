@@ -247,7 +247,7 @@ export async function gradeClientEvalResult(
   }
 
   if (grade.costUsd > 0) {
-    const usage = await buildGraderUsage(
+    const billed = await buildGraderUsage(
       request.billing,
       [
         request.billing.userId,
@@ -264,12 +264,15 @@ export async function gradeClientEvalResult(
       ],
       grade.costUsd,
       nowIso
-    );
-    const outcome = await deps
-      .writeUsage(usage)
-      .catch((): UsageWriteOutcome => ({ kind: 'unavailable', reason: 'request_failed' }));
-    if (outcome.kind === 'unavailable') {
+    )
+      .then(usage => deps.writeUsage(usage))
+      .then(
+        outcome => outcome.kind !== 'unavailable',
+        () => false
+      );
+    if (!billed) {
       await deleteClientCaseUpload(db, { ...caseKey, uploadedAt: nowIso });
+      await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
       throw new ClientEvalError(
         'internal_error',
         'Grader usage was not recorded; retry the upload.'

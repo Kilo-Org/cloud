@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
-import { isSecuritySyncRetryable } from '@/lib/security-agent-ledger';
+import { isSecuritySyncRetryable, securityMutationCopyKey } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -91,7 +91,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     const comment = commentRef.current.trim();
     // Record the intent before the request so a pre-accept failure (no
     // command id) leaves a durable draft the retry card can restore.
-    dismissDraft.persist({ reason, comment, lastError: null, retryable: null });
+    dismissDraft.persist({ reason, comment, lastError: null, retryable: null, lastErrorKey: null });
     dismissFinding.mutate(
       { findingId, reason, comment: comment || undefined },
       {
@@ -108,6 +108,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             reason,
             comment,
             lastError: error.message,
+            lastErrorKey: securityMutationCopyKey(error),
             retryable: isSecuritySyncRetryable(error),
           });
         },
@@ -117,14 +118,15 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   // Persist the reason and comment as the user types (debounced by the drafts
   // module), so a typed draft survives leave and reopen without a submit. The
-  // existing `lastError`/`retryable` are preserved: editing an unresolved
-  // failure must not clear the retry card until the user re-submits.
+  // existing `lastError`/`lastErrorKey`/`retryable` are preserved: editing an
+  // unresolved failure must not clear the retry card until the user re-submits.
   const persistOnType = (nextReason: DismissReason | null, nextComment: string) => {
     const existing = dismissDraft.draft;
     dismissDraft.persist({
       reason: nextReason ?? '',
       comment: nextComment,
       lastError: existing?.lastError ?? null,
+      lastErrorKey: existing?.lastErrorKey ?? null,
       retryable: existing?.retryable ?? null,
     });
   };

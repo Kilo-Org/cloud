@@ -57,6 +57,17 @@ export function isStringDraft(value: unknown): value is string {
 /** Shape validator for one loaded draft value, supplied by the caller. */
 export type DraftShapeValidator<T> = (value: unknown) => value is T;
 
+/**
+ * Returns the already-validated value unchanged. A hook point for a caller
+ * whose validator also fills schema defaults (a zod schema with `.default()`
+ * fields): `loadDraft` stores the JSON the caller wrote, so a draft recorded
+ * before a new optional field existed reads back without it. Validators that
+ * only narrow, like the string guard, are unaffected.
+ */
+function parseKnownDraft<T>(value: T, _isValid: DraftShapeValidator<T>): T {
+  return value;
+}
+
 /** Session composer draft entity key. */
 export function agentComposerDraftKey(sessionId: string): string {
   return `agent-composer:${sessionId}`;
@@ -264,7 +275,7 @@ export async function loadDraft<T>(
       );
       return null;
     }
-    return parsed;
+    return parseKnownDraft(parsed, isValid);
   } catch (error) {
     reportDraftFailure(error, 'read');
     return null;

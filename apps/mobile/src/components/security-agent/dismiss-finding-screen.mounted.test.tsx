@@ -90,6 +90,7 @@ vi.mock('@/lib/hooks/use-security-findings', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
+  securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
@@ -361,6 +362,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       reason: 'not_used',
       comment: '',
       lastError: null,
+      lastErrorKey: null,
       retryable: null,
     });
   });
@@ -403,6 +405,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       reason: 'not_used',
       comment: '',
       lastError: IN_PROGRESS_COPY,
+      lastErrorKey: 'securityAgent.mutations.dismissalInProgress',
       retryable: true,
     });
   });
@@ -426,6 +429,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       reason: 'not_used',
       comment: '',
       lastError: CONFIGURATION_COPY,
+      lastErrorKey: 'securityAgent.mutations.serviceNotConfiguredResubmit',
       retryable: false,
     });
   });
@@ -440,6 +444,7 @@ describe('DismissFindingScreen draft persistence on type', () => {
       reason: 'not_used',
       comment: '',
       lastError: null,
+      lastErrorKey: null,
       retryable: null,
     });
   });
@@ -455,6 +460,7 @@ describe('DismissFindingScreen draft persistence on type', () => {
       reason: '',
       comment: 'some context',
       lastError: null,
+      lastErrorKey: null,
       retryable: null,
     });
   });

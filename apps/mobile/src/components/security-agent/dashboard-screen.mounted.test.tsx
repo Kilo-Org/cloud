@@ -153,6 +153,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissFailures: () => dismissFailures,
+  securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
 }));
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
   useMutationOutbox: () => outbox,

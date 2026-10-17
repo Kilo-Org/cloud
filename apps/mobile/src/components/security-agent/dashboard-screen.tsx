@@ -35,7 +35,10 @@ import {
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
 import { isSecuritySyncRetryable, securitySyncReconcileCopy } from '@/lib/security-agent-ledger';
-import { useSecurityDismissFailures } from '@/lib/hooks/use-security-dismiss-draft';
+import {
+  securityDismissFailureCopy,
+  useSecurityDismissFailures,
+} from '@/lib/hooks/use-security-dismiss-draft';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -331,7 +334,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         {dismissFailures.failures.map(failure => (
           <SecurityCommandRetryCard
             key={failure.findingId}
-            lastError={failure.lastError}
+            lastError={securityDismissFailureCopy(failure)}
             retryable={failure.retryable === true}
             onRetry={() => {
               router.push(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));

@@ -21,6 +21,8 @@ import {
   inviteUserToOrganization,
   getOrganizationMembers,
   acceptOrganizationInvite,
+  isOrganizationMember,
+  markOrganizationAsDeleted,
 } from './organizations';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@kilocode/web-shared/lib/organizations/constants';
@@ -62,6 +64,31 @@ describe('Organizations', () => {
 
       expect(enterprise.settings.recommendations_digest_enabled).toBe(true);
       expect(teams.settings.recommendations_digest_enabled).toBeUndefined();
+    });
+  });
+
+  describe('isOrganizationMember', () => {
+    test('returns true for a member of an active organization', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Active membership', user.id);
+
+      await expect(isOrganizationMember(organization.id, user.id)).resolves.toBe(true);
+    });
+
+    test('returns false for a member of a soft-deleted organization', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Deleted membership', user.id);
+      await markOrganizationAsDeleted(organization.id);
+
+      await expect(isOrganizationMember(organization.id, user.id)).resolves.toBe(false);
+    });
+
+    test('returns false for a user who is not a member', async () => {
+      const user = await insertTestUser();
+      const nonMember = await insertTestUser();
+      const organization = await createOrganization('Membership of another user', user.id);
+
+      await expect(isOrganizationMember(organization.id, nonMember.id)).resolves.toBe(false);
     });
   });
 

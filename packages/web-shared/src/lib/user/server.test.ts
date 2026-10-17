@@ -41,6 +41,7 @@ import {
 import { kilocode_users, organizations } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { generateApiToken, JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
@@ -620,6 +621,28 @@ describe('getUserFromAuth', () => {
 
     expect(result.authFailedResponse).toBeNull();
     expect(result.organizationId).toBe(organization.id);
+  });
+
+  test('rejects a token whose organization context was soft-deleted', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'deleted-organization-pepper' });
+    const organization = await createTestOrganization(
+      `Deleted Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    await markOrganizationAsDeleted(organization.id);
+    const token = generateApiToken(user);
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        [ORGANIZATION_ID_HEADER]: organization.id,
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(403);
   });
 
   test('allows API-token authentication for users from SSO-protected domains', async () => {

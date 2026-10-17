@@ -824,13 +824,19 @@ export async function isOrganizationMember(
   userId: User['id'],
   fromDb: typeof db = db
 ) {
-  const result = await fromDb.query.organization_memberships.findFirst({
-    where: and(
-      eq(organization_memberships.organization_id, organizationId),
-      eq(organization_memberships.kilo_user_id, userId)
-    ),
-  });
-  return !!result;
+  const rows = await fromDb
+    .select({ id: organization_memberships.id })
+    .from(organization_memberships)
+    .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, userId),
+        isNull(organizations.deleted_at)
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
 }
 
 export function getAcceptInviteUrl(inviteToken: OrganizationInvitation['token']): string {

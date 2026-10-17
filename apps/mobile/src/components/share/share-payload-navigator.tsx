@@ -1,9 +1,4 @@
-import {
-  type Href,
-  usePathname,
-  useRootNavigationState,
-  useRouter,
-} from 'expo-router';
+import { type Href, usePathname, useRootNavigationState, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 
 import {

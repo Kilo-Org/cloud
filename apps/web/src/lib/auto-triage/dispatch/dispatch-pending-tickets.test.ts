@@ -21,11 +21,7 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import {
-  auto_triage_tickets,
-  organizations,
-  type AutoTriageTicket,
-} from '@kilocode/db/schema';
+import { auto_triage_tickets, organizations, type AutoTriageTicket } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { tryDispatchPendingTickets } from './dispatch-pending-tickets';
 import { updateTriageTicketStatus } from '../db/triage-tickets';
@@ -64,7 +60,12 @@ describe('tryDispatchPendingTickets', () => {
   afterEach(async () => {
     await db
       .delete(auto_triage_tickets)
-      .where(and(eq(auto_triage_tickets.owned_by_organization_id, organizationId), eq(auto_triage_tickets.repo_full_name, REPO)));
+      .where(
+        and(
+          eq(auto_triage_tickets.owned_by_organization_id, organizationId),
+          eq(auto_triage_tickets.repo_full_name, REPO)
+        )
+      );
   });
 
   afterAll(async () => {
@@ -92,12 +93,21 @@ describe('tryDispatchPendingTickets', () => {
     const rows = await db
       .select({ id: auto_triage_tickets.id })
       .from(auto_triage_tickets)
-      .where(and(eq(auto_triage_tickets.owned_by_organization_id, organizationId), eq(auto_triage_tickets.status, status)));
+      .where(
+        and(
+          eq(auto_triage_tickets.owned_by_organization_id, organizationId),
+          eq(auto_triage_tickets.status, status)
+        )
+      );
     return rows.length;
   }
 
   it('processes disjoint ticket sets across concurrent calls', async () => {
-    const tickets = [await insertPendingTicket(), await insertPendingTicket(), await insertPendingTicket()];
+    const tickets = [
+      await insertPendingTicket(),
+      await insertPendingTicket(),
+      await insertPendingTicket(),
+    ];
 
     // Two concurrent calls each dispatch a disjoint subset covering all tickets.
     const [first, second] = await Promise.all([

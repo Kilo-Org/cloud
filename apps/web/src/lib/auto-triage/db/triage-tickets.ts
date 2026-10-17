@@ -236,7 +236,10 @@ export async function updateTriageTicketStatus(
       .set(updateData)
       .where(
         updates.expectedStatus
-          ? and(eq(auto_triage_tickets.id, ticketId), eq(auto_triage_tickets.status, updates.expectedStatus))
+          ? and(
+              eq(auto_triage_tickets.id, ticketId),
+              eq(auto_triage_tickets.status, updates.expectedStatus)
+            )
           : eq(auto_triage_tickets.id, ticketId)
       );
   } catch (error) {

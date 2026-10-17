@@ -68,7 +68,10 @@ async function reservePendingTicketsForDispatch(owner: Owner): Promise<TicketRes
       availableSlots,
     });
 
-    const pendingCondition = and(ownerTicketCondition(owner), eq(auto_triage_tickets.status, 'pending'));
+    const pendingCondition = and(
+      ownerTicketCondition(owner),
+      eq(auto_triage_tickets.status, 'pending')
+    );
 
     if (availableSlots <= 0) {
       const remaining = await tx
@@ -95,7 +98,11 @@ async function reservePendingTicketsForDispatch(owner: Owner): Promise<TicketRes
     const slice = candidates.slice(0, availableSlots);
     const reserved = await tx
       .update(auto_triage_tickets)
-      .set({ status: 'analyzing', started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .set({
+        status: 'analyzing',
+        started_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .where(
         and(
           inArray(
@@ -119,7 +126,8 @@ export async function tryDispatchPendingTickets(owner: Owner): Promise<DispatchR
   try {
     logExceptInTest(`[tryDispatchPendingTickets] Starting dispatch check`, { owner });
 
-    const { activeCount, reserved, remainingPending } = await reservePendingTicketsForDispatch(owner);
+    const { activeCount, reserved, remainingPending } =
+      await reservePendingTicketsForDispatch(owner);
 
     logExceptInTest('[tryDispatchPendingTickets] Reserved pending tickets', {
       owner,
@@ -155,10 +163,13 @@ export async function tryDispatchPendingTickets(owner: Owner): Promise<DispatchR
             errorMessage: 'Dispatch failed',
           });
         } catch (resetError) {
-          errorExceptInTest('[tryDispatchPendingTickets] Failed to reset ticket after dispatch error', {
-            ticketId: ticket.id,
-            error: resetError,
-          });
+          errorExceptInTest(
+            '[tryDispatchPendingTickets] Failed to reset ticket after dispatch error',
+            {
+              ticketId: ticket.id,
+              error: resetError,
+            }
+          );
         }
       }
     }

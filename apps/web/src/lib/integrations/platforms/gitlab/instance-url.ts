@@ -306,7 +306,13 @@ function embeddedIpv4Bytes(bytes: Uint8Array): Uint8Array | null {
     return bytes.slice(12, 16);
   }
   const firstEightZero = bytes.slice(0, 8).every(byte => byte === 0);
-  if (firstEightZero && bytes[8] === 0xff && bytes[9] === 0xff && bytes[10] === 0 && bytes[11] === 0) {
+  if (
+    firstEightZero &&
+    bytes[8] === 0xff &&
+    bytes[9] === 0xff &&
+    bytes[10] === 0 &&
+    bytes[11] === 0
+  ) {
     // IPv4-translated (::ffff:0:0:0/96)
     return bytes.slice(12, 16);
   }

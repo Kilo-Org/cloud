@@ -25,7 +25,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { GatewayAppConfig } from './config';
 import { createGatewayRepository, type GatewayRepository } from './repository';
 import { configSecretAad, nowIso, randomToken } from './crypto';
-import { validatePublicHttpsDestination } from './discovery-service';
+import { validatePublicHttpsDestination } from './outbound';
 import type { GatewayDiscoveryService } from './discovery-service';
 import { createAuditService } from './audit-service';
 import { revokeGrantIdsWithTx } from './oauth-grant-service';

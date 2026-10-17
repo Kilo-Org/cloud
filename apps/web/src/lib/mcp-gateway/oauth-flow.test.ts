@@ -835,7 +835,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('discovers provider metadata during OAuth config creation', async () => {
     const config = await createTestConfig();
-    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const services = createGatewayServices({ config, requestImpl: providerDiscoveryFetch });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,
@@ -855,7 +855,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('prefers explicit provider scopes over discovered challenge scopes', async () => {
     const config = await createTestConfig();
-    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const services = createGatewayServices({ config, requestImpl: providerDiscoveryFetch });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,
@@ -870,7 +870,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('revokes existing grants when provider scopes change', async () => {
     const config = await createTestConfig();
-    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const services = createGatewayServices({ config, requestImpl: providerDiscoveryFetch });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,
@@ -908,7 +908,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('persists initial static provider credentials atomically without a version rotation', async () => {
     const config = await createTestConfig();
-    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const services = createGatewayServices({ config, requestImpl: providerDiscoveryFetch });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,
@@ -932,7 +932,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('rejects partial initial static provider credentials', async () => {
     const config = await createTestConfig();
-    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const services = createGatewayServices({ config, requestImpl: providerDiscoveryFetch });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
 
     await expect(
@@ -948,7 +948,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('rejects oauth_dynamic configs when the provider has no registration endpoint', async () => {
     const config = await createTestConfig();
-    const fetchImpl: typeof fetch = async input => {
+    const requestImpl: typeof fetch = async input => {
       const url =
         typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url === 'https://example.com/.well-known/oauth-protected-resource') {
@@ -971,7 +971,7 @@ describe('MCP gateway app OAuth flow', () => {
       }
       throw new Error(`Unexpected discovery fetch: ${url}`);
     };
-    const services = createGatewayServices({ config, fetchImpl });
+    const services = createGatewayServices({ config, requestImpl });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     await expect(
       services.configService.createPersonalConfig({
@@ -986,7 +986,7 @@ describe('MCP gateway app OAuth flow', () => {
   it('identifies Kilo when dynamically registering with a provider', async () => {
     const config = await createTestConfig();
     let registrationBody: unknown = null;
-    const fetchImpl: typeof fetch = async (input, init) => {
+    const requestImpl: typeof fetch = async (input, init) => {
       const url =
         typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const discovery = providerDiscoveryResponse(url);
@@ -1000,7 +1000,7 @@ describe('MCP gateway app OAuth flow', () => {
       }
       throw new Error(`Unexpected fetch: ${url}`);
     };
-    const services = createGatewayServices({ config, fetchImpl });
+    const services = createGatewayServices({ config, requestImpl });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,
@@ -1050,7 +1050,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('uses resolved provider scopes for dashboard sign-in', async () => {
     const config = await createTestConfig();
-    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const services = createGatewayServices({ config, requestImpl: providerDiscoveryFetch });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,
@@ -1085,7 +1085,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('consumes provider state when the provider returns an error', async () => {
     const config = await createTestConfig();
-    const fetchImpl: typeof fetch = async input => {
+    const requestImpl: typeof fetch = async input => {
       const url =
         typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const discovery = providerDiscoveryResponse(url);
@@ -1105,7 +1105,7 @@ describe('MCP gateway app OAuth flow', () => {
       }
       throw new Error(`Unexpected fetch: ${url}`);
     };
-    const services = createGatewayServices({ config, fetchImpl });
+    const services = createGatewayServices({ config, requestImpl });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,
@@ -1185,7 +1185,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('rejects a provider token response without an explicit bearer token type', async () => {
     const config = await createTestConfig();
-    const fetchImpl: typeof fetch = async input => {
+    const requestImpl: typeof fetch = async input => {
       const url =
         typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const discovery = providerDiscoveryResponse(url);
@@ -1205,7 +1205,7 @@ describe('MCP gateway app OAuth flow', () => {
       }
       throw new Error(`Unexpected fetch: ${url}`);
     };
-    const services = createGatewayServices({ config, fetchImpl });
+    const services = createGatewayServices({ config, requestImpl });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,
@@ -1268,7 +1268,7 @@ describe('MCP gateway app OAuth flow', () => {
   it('persists a provider grant before final authorization code issuance', async () => {
     const config = await createTestConfig();
     let tokenRequestBody = '';
-    const fetchImpl: typeof fetch = async (input, init) => {
+    const requestImpl: typeof fetch = async (input, init) => {
       const url =
         typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const discovery = providerDiscoveryResponse(url);
@@ -1290,7 +1290,7 @@ describe('MCP gateway app OAuth flow', () => {
       }
       throw new Error(`Unexpected fetch: ${url}`);
     };
-    const services = createGatewayServices({ config, fetchImpl });
+    const services = createGatewayServices({ config, requestImpl });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,
@@ -1374,7 +1374,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('keeps grant versions strictly advancing across replacement', async () => {
     const config = await createTestConfig();
-    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const services = createGatewayServices({ config, requestImpl: providerDiscoveryFetch });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,
@@ -1428,7 +1428,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('requires provider reauthorization for needs-reauth instances', async () => {
     const config = await createTestConfig();
-    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const services = createGatewayServices({ config, requestImpl: providerDiscoveryFetch });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,

@@ -12,13 +12,14 @@ import { createAuthorizationService } from './authorization-service';
 import { createTokenService } from './token-service';
 import { createConfigService } from './config-service';
 import { createDiscoveryService } from './discovery-service';
+import type { GatewayOutboundRequest } from './outbound';
 import { createAvailableService } from './available-service';
 
 export function createGatewayServices(
   params: {
     config?: GatewayAppConfig;
     database?: typeof db;
-    fetchImpl?: typeof fetch;
+    requestImpl?: GatewayOutboundRequest;
   } = {}
 ) {
   const config = params.config ?? getGatewayAppConfig();
@@ -28,14 +29,14 @@ export function createGatewayServices(
   const oauthGrantService = createOAuthGrantService(repository);
   const clientService = createOAuthClientService({ repository, config, oauthGrantService });
   const grantService = createGrantService({ repository, config });
-  const discoveryService = createDiscoveryService({ fetchImpl: params.fetchImpl });
+  const discoveryService = createDiscoveryService({ requestImpl: params.requestImpl });
   const providerOAuthService = createProviderOAuthService({
     repository,
     routeService,
     grantService,
     oauthGrantService,
     config,
-    fetchImpl: params.fetchImpl,
+    requestImpl: params.requestImpl,
   });
   const authorizationService = createAuthorizationService({
     repository,

@@ -282,6 +282,36 @@ beforeEach(() => {
 
 describe('CreditsCard balance state', () => {
   it.each([
+    { name: 'expired grants', future: false },
+    { name: 'mixed grants', future: true },
+  ])('excludes elapsed expiry dates from $name', async ({ future }) => {
+    const now = Date.parse('2026-10-17T12:00:00Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [
+        { balance_mUsd: 1_900_000, expiry_date: '2026-06-17T12:00:00Z' },
+        { balance_mUsd: 3_000_000, expiry_date: '2026-10-17T12:00:00Z' },
+        { balance_mUsd: 7_000_000, expiry_date: null },
+        ...(future ? [{ balance_mUsd: 2_000_000, expiry_date: '2026-12-17T12:00:00Z' }] : []),
+      ],
+    });
+    try {
+      const { texts, unmount } = await mountCard();
+      try {
+        await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
+        const notes = texts().filter(text => text.includes('in bonus credits'));
+        expect(notes).toEqual(future ? ['$2.00 in bonus credits expiring 12/17/2026'] : []);
+      } finally {
+        unmount();
+      }
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it.each([
     { orgs: [], options: ['Personal', 'Cancel'], choice: 0, expected: null, label: 'Personal' },
     {
       orgs: [{ organizationId: 'org-a', organizationName, role: 'owner' }],

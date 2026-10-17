@@ -11,6 +11,13 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 - PostHog feature flag infrastructure and the version-aware registry remain available for future flags.
 - KiloClaw tab visibility still depends on instance ownership.
 
+## Profile credits
+
+The bonus-credit subtitle includes only grants with an expiry strictly after the
+current render time. Elapsed grants and non-expiring credits do not contribute to
+its amount or earliest expiry, for both personal and organization accounts.
+The balance continues to come from the balance query.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

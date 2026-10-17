@@ -50,7 +50,7 @@ const flashListMock = vi.hoisted(
         )
       );
       const empty = props.data.length === 0 ? props.ListEmptyComponent : null;
-      return createElement('FlashList', null, props.ListHeaderComponent, ...rows, empty);
+      return createElement('FlashList', props, props.ListHeaderComponent, ...rows, empty);
     }
 );
 
@@ -190,6 +190,17 @@ async function mount(): Promise<TestRenderer.ReactTestRenderer> {
   return ref.current;
 }
 
+/** The FlashList the success state renders, so a test can inspect its list props. */
+function flashListOf(root: TestRenderer.ReactTestInstance): {
+  props: { contentContainerStyle?: { paddingBottom?: number } };
+} {
+  const list = findByType(root, 'FlashList')[0];
+  if (!list) {
+    throw new Error('FlashList not found');
+  }
+  return list as { props: { contentContainerStyle?: { paddingBottom?: number } } };
+}
+
 describe('InstancePickerScreen list', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -242,6 +253,32 @@ describe('InstancePickerScreen list', () => {
     // through FlashList when the instance data is an empty array.
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     expect(radios(renderer.root)).toHaveLength(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('clears the gesture bar with the detail-screen floor, not the raw inset', async () => {
+    // A zero reported bottom inset: the floor still keeps the sheet's bottom
+    // action above the Android gesture navigation bar.
+    insets.bottom = 0;
+    const renderer = await mount();
+
+    const style = flashListOf(renderer.root).props.contentContainerStyle;
+    expect(style?.paddingBottom).toBe(32);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps a reported bottom inset larger than the floor', async () => {
+    insets.bottom = 34;
+    const renderer = await mount();
+
+    const style = flashListOf(renderer.root).props.contentContainerStyle;
+    expect(style?.paddingBottom).toBe(50);
 
     act(() => {
       renderer.unmount();

@@ -3,6 +3,7 @@ jest.mock('node:https', () => ({ request: jest.fn() }));
 
 import { resolve4, resolve6 } from 'node:dns/promises';
 import { request as httpsRequest } from 'node:https';
+import { gzipSync } from 'node:zlib';
 import {
   connectedAddress,
   recordHttpsRequests,
@@ -92,5 +93,35 @@ describe('requestPublicHttps', () => {
     expect(request.options.headers.host).toBe('[2606:4700:4700::1111]');
     expect(request.options.servername).toBeUndefined();
     expect(connectedAddress(request)).toBe('2606:4700:4700::1111');
+  });
+
+  it('decodes compressed responses and reports the decoded body', async () => {
+    jest.mocked(resolve4).mockResolvedValue(['93.184.216.34']);
+    const payload = Buffer.from(JSON.stringify({ resource: 'https://service.example/mcp' }));
+    recordHttpsRequests(() => ({
+      headers: { 'content-encoding': 'gzip', 'content-length': String(payload.byteLength) },
+      body: gzipSync(payload),
+    }));
+
+    const response = await requestPublicHttps('https://service.example/metadata');
+
+    expect(response.headers.get('content-encoding')).toBeNull();
+    expect(response.headers.get('content-length')).toBeNull();
+    await expect(response.json()).resolves.toEqual({ resource: 'https://service.example/mcp' });
+  });
+
+  it('bounds the request and honors an abort signal', async () => {
+    jest.mocked(resolve4).mockResolvedValue(['93.184.216.34']);
+    const recorded = recordHttpsRequests(() => ({ body: '{}' }));
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      requestPublicHttps('https://service.example/metadata', { signal: controller.signal })
+    ).rejects.toMatchObject({ code: 'temporarily_unavailable' });
+
+    const request = recorded[0] as RecordedRequest;
+    expect(request.request.setTimeout).toHaveBeenCalledWith(30_000, expect.any(Function));
+    expect(request.request.destroy).toHaveBeenCalled();
   });
 });

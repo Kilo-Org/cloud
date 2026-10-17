@@ -2,6 +2,12 @@ import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
 import { request as httpsRequest } from 'node:https';
 
+export type RecordedRequestHandle = EventEmitter & {
+  end: (chunk?: Buffer) => void;
+  destroy: jest.Mock;
+  setTimeout: jest.Mock;
+};
+
 export type RecordedRequest = {
   options: {
     hostname: string;
@@ -18,12 +24,13 @@ export type RecordedRequest = {
     ) => void;
   };
   body: Buffer | null;
+  request: RecordedRequestHandle;
 };
 
 export type HttpsReply = {
   status?: number;
   headers?: Record<string, string | string[]>;
-  body?: string;
+  body?: string | Buffer;
 };
 
 /**
@@ -35,18 +42,15 @@ export function recordHttpsRequests(
 ): RecordedRequest[] {
   const recorded: RecordedRequest[] = [];
   jest.mocked(httpsRequest).mockImplementation(((options: unknown, onResponse: unknown) => {
-    const request = new EventEmitter() as EventEmitter & {
-      end: (chunk?: Buffer) => void;
-      destroy: () => void;
+    const request = new EventEmitter() as RecordedRequestHandle;
+    const recordedRequest: RecordedRequest = {
+      options: options as RecordedRequest['options'],
+      body: null,
+      request,
     };
-    let body: Buffer | null = null;
+    recorded.push(recordedRequest);
     request.end = (chunk?: Buffer) => {
-      body = chunk ?? null;
-      const recordedRequest: RecordedRequest = {
-        options: options as RecordedRequest['options'],
-        body,
-      };
-      recorded.push(recordedRequest);
+      recordedRequest.body = chunk ?? null;
       queueMicrotask(() => {
         const result = reply(recordedRequest);
         const response = Readable.from([Buffer.from(result.body ?? '')]) as Readable & {
@@ -61,6 +65,7 @@ export function recordHttpsRequests(
       });
     };
     request.destroy = jest.fn();
+    request.setTimeout = jest.fn();
     return request;
   }) as never);
   return recorded;

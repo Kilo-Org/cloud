@@ -351,18 +351,12 @@ async function getPullRequestAuthorEmail(options: {
   const commits = PULL_REQUEST_COMMITS_SCHEMA.parse(await response.json());
   const authorLoginLower = options.authorLogin.toLowerCase();
 
+  // Only an email from a commit GitHub attributes to the PR author identifies the contributor.
   for (const commit of commits) {
     const commitAuthorLogin = commit.author?.login;
     const commitEmail = commit.commit.author?.email;
     if (!commitAuthorLogin || !commitEmail) continue;
     if (commitAuthorLogin.toLowerCase() === authorLoginLower) {
-      return commitEmail.toLowerCase();
-    }
-  }
-
-  for (const commit of commits) {
-    const commitEmail = commit.commit.author?.email;
-    if (commitEmail) {
       return commitEmail.toLowerCase();
     }
   }

@@ -377,10 +377,11 @@ function RootLayoutNav({
 
   // Reopen the screen the user was on before an RTL reload: the target rides
   // in a ref (the SecureStore read is one-shot), and the navigation runs only
-  // after the root navigator's mount effects — direct, or via the deferred
-  // effect when readiness flips later. Both the target and the runner live in
-  // refs so the effects can call the runner without re-firing on renders.
+  // after the root navigator's mount effects. The stash bumps a state epoch,
+  // so the deferred effect re-runs after the target lands — the effect cannot
+  // observe a bare ref.
   const languageReturnTargetRef = useRef<LanguageReturnTarget | null>(null);
+  const [languageReturnEpoch, setLanguageReturnEpoch] = useState(0);
   const routerRef = useRef(router);
   routerRef.current = router;
   const runLanguageReturnNavigationRef = useRef<(() => void) | null>(null);
@@ -452,6 +453,7 @@ function RootLayoutNav({
       }
       if (returnTarget !== null) {
         languageReturnTargetRef.current = returnTarget;
+        setLanguageReturnEpoch(epoch => epoch + 1);
         if (navigationReady) {
           runLanguageReturnNavigation();
         }
@@ -486,13 +488,15 @@ function RootLayoutNav({
   }, [languageHasLoaded, navigationReady, router, setLanguageReady]);
 
   // Deferred half of the language return: fires when the navigator finishes
-  // mounting after prepareLanguage stashed the target.
+  // mounting after prepareLanguage stashed the target (the epoch bump makes
+  // this effect re-run after the stash, so a stash landing after the ready
+  // flip is still consumed).
   useEffect(() => {
     if (!navigationReady || languageReturnTargetRef.current === null) {
       return;
     }
     runLanguageReturnNavigation();
-  }, [navigationReady, router]);
+  }, [navigationReady, languageReturnEpoch, router]);
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';

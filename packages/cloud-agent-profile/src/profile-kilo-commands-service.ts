@@ -1,6 +1,7 @@
 import type { WorkerDb } from '@kilocode/db';
 import {
   agent_environment_profile_kilo_commands,
+  agent_environment_profiles,
   type AgentEnvironmentProfileKiloCommand,
 } from '@kilocode/db/schema';
 import { and, eq, count, asc } from 'drizzle-orm';
@@ -32,6 +33,8 @@ export {
 };
 export type { KiloCommandCreateInput, KiloCommandUpdateInput };
 
+type KiloCommandWriteTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
+
 function toResponse(row: AgentEnvironmentProfileKiloCommand): ProfileKiloCommandResponse {
   return {
     id: row.id,
@@ -48,8 +51,11 @@ function toResponse(row: AgentEnvironmentProfileKiloCommand): ProfileKiloCommand
   };
 }
 
-async function assertCommandLimit(db: WorkerDb, profileId: string): Promise<void> {
-  const [row] = await db
+async function assertCommandLimit(
+  tx: KiloCommandWriteTransaction,
+  profileId: string
+): Promise<void> {
+  const [row] = await tx
     .select({ n: count() })
     .from(agent_environment_profile_kilo_commands)
     .where(eq(agent_environment_profile_kilo_commands.profile_id, profileId));
@@ -104,22 +110,33 @@ export async function createKiloCommand(
   owner: ProfileOwner
 ): Promise<{ id: string }> {
   await verifyProfileOwnership(db, profileId, owner);
-  await assertCommandLimit(db, profileId);
 
-  const [row] = await db
-    .insert(agent_environment_profile_kilo_commands)
-    .values({
-      profile_id: profileId,
-      name: input.name,
-      description: input.description ?? null,
-      template: input.template,
-      agent: input.agent ?? null,
-      model: input.model ?? null,
-      subtask: input.subtask ?? false,
-    })
-    .returning({ id: agent_environment_profile_kilo_commands.id });
+  return await db.transaction(async tx => {
+    // Lock the owning profile row so the cap count and the insert are one
+    // serialized unit, keeping concurrent creates within the per-profile cap.
+    await tx
+      .select({ id: agent_environment_profiles.id })
+      .from(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.id, profileId))
+      .for('update');
 
-  return { id: row.id };
+    await assertCommandLimit(tx, profileId);
+
+    const [row] = await tx
+      .insert(agent_environment_profile_kilo_commands)
+      .values({
+        profile_id: profileId,
+        name: input.name,
+        description: input.description ?? null,
+        template: input.template,
+        agent: input.agent ?? null,
+        model: input.model ?? null,
+        subtask: input.subtask ?? false,
+      })
+      .returning({ id: agent_environment_profile_kilo_commands.id });
+
+    return { id: row.id };
+  });
 }
 
 export async function updateKiloCommand(

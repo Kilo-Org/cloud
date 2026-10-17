@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { destroyDeciderCliContainer, runDeciderCaseViaCli, warmUpCliContainer } from './cli-runner';
+import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
+import { materializeLongContext } from './datasets/long-context';
 
 const benchCase = {
   id: 'case-1',
@@ -20,6 +22,52 @@ async function readJsonBody(request: Request) {
   return JSON.parse(await request.clone().text()) as Record<string, unknown>;
 }
 
+const FINAL_ANSWER =
+  '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
+
+describe('runDeciderCaseViaCli prompt', () => {
+  async function sentPrompt(benchCase: (typeof DECIDER_CASES)[number]) {
+    const fetch = vi.fn(async (_request: Request) =>
+      Response.json({ exitCode: 0, durationMs: 1, stdoutLines: [], stderrTail: '' })
+    );
+    const { env } = createEnv(fetch);
+    await runDeciderCaseViaCli(env, {
+      instanceName: 'run:model:0',
+      model: 'vendor/model',
+      benchCase,
+      kiloToken: 'kilo-user-token',
+      kiloApiUrl: 'http://host.docker.internal:3000',
+    });
+    const request = fetch.mock.calls[0]?.[0];
+    if (!request) throw new Error('no container request');
+    const body = await readJsonBody(request);
+    if (typeof body.prompt !== 'string') throw new Error('prompt missing');
+    return body.prompt;
+  }
+
+  it('sends an ordinary case unchanged', async () => {
+    const ordinary = DECIDER_CASES.find(c => !c.longContext);
+    if (!ordinary) throw new Error('dataset needs an ordinary case');
+    expect(await sentPrompt(ordinary)).toBe(
+      `${ordinary.systemPrompt}\n\n${ordinary.userPrompt}${FINAL_ANSWER}`
+    );
+  });
+
+  it.each([
+    ['efficient', DECIDER_CASES],
+    ['frontier', FRONTIER_CASES],
+  ])('sends a %s long-context case with its workspace snapshot', async (_router, cases) => {
+    const longCase = cases.find(c => c.longContext);
+    if (!longCase) throw new Error('dataset needs a long-context case');
+    const materialized = materializeLongContext(longCase);
+    const prompt = await sentPrompt(longCase);
+    expect(prompt).toBe(
+      `${materialized.systemPrompt}\n\n${materialized.userPrompt}${FINAL_ANSWER}`
+    );
+    expect(prompt).toContain('BEGIN WORKSPACE SNAPSHOT');
+    expect(prompt.length).toBeGreaterThan(longCase.userPrompt.length * 10);
+  });
+});
 describe('runDeciderCaseViaCli', () => {
   it('passes orgId through to the container run request when provided', async () => {
     const fetch = vi.fn(async (_request: Request) =>

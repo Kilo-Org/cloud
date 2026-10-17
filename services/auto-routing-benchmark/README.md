@@ -733,6 +733,11 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
   The D1 live-slot uniqueness constraint and claim tokens protect container ownership.
   CLI runs remain serialized because they share SQLite state.
 - `/warmup` initializes the local CLI database once per container without making an inference request.
+- The case prompt reaches `kilo run` on stdin, never as an argument. Long-context cases are
+  materialized with their workspace snapshot (up to about 640 KB for 160k-token targets),
+  which exceeds Linux's 128 KiB limit on one argument, and `kilo run` re-quotes argument
+  messages that contain spaces. With no positional message the CLI reads stdin to EOF and
+  sends it verbatim as the user message.
 - The server handles SIGTERM and drains the CLI case it already accepted, then exits.
   A case still queued when SIGTERM arrives is refused with `503` instead of starting a new
   paid call, so a rollout is never charged for work it interrupts. Idle containers therefore

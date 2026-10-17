@@ -267,7 +267,7 @@ describe('effective organization model access', () => {
     expect(decision).toMatchObject({ allowed: false, denialSource: 'organization_model' });
   });
 
-  it('allows provider grants beyond the organization baseline', async () => {
+  it('clips provider grants to the organization provider ceiling', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
@@ -286,11 +286,10 @@ describe('effective organization model access', () => {
       'shared/model',
       async () => new Set(['google', 'openai'])
     );
-    expect(decision.allowed).toBe(true);
-    expect([...decision.eligibleProviderRoutes!]).toEqual(['google', 'openai']);
+    expect(decision).toEqual({ allowed: true, eligibleProviderRoutes: new Set(['openai']) });
   });
 
-  it('allows selected model grants beyond the organization baseline', async () => {
+  it('keeps selected model grants inside the organization provider ceiling', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         groupPolicies: [
@@ -312,10 +311,10 @@ describe('effective organization model access', () => {
       'google/gemini',
       async () => new Set(['google'])
     );
-    expect(decision).toEqual({ allowed: true });
+    expect(decision).toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 
-  it('allows selected group models denied by the organization baseline', async () => {
+  it('denies deny-listed models to selected model grants', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
@@ -336,10 +335,7 @@ describe('effective organization model access', () => {
 
     await expect(
       getEffectiveModelDecision(policy, 'openai/o3', currentSnapshotLookup)
-    ).resolves.toEqual({ allowed: true });
-    await expect(
-      getEffectiveModelDecision(policy, 'anthropic/claude', currentSnapshotLookup)
-    ).resolves.toMatchObject({ allowed: true });
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 
   it('keeps organization restrictions as the baseline without an additive grant', async () => {
@@ -380,7 +376,7 @@ describe('effective organization model access', () => {
     ).resolves.toMatchObject({ allowed: true });
     await expect(
       getEffectiveModelDecision(policy, 'google/gemini', async () => new Set(['google']))
-    ).resolves.toEqual({ allowed: true });
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 
   it('hides restricted exclusive models when every restricted provider is disabled', async () => {
@@ -514,7 +510,7 @@ describe('effective organization model access', () => {
       ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
     });
 
-    it('routes member provider grants through the granted real providers', async () => {
+    it('denies routers whose member grant routes fall outside the ceiling', async () => {
       const policy = evaluateEffectiveModelAccessPolicy(
         context({
           groupPolicies: [
@@ -534,10 +530,38 @@ describe('effective organization model access', () => {
 
       const decision = await getEffectiveModelDecision(policy, ROUTER, routerLookup);
 
-      expect(decision).toEqual({
-        allowed: true,
-        eligibleProviderRoutes: new Set([VIRTUAL_PROVIDER.slug, 'google']),
-      });
+      expect(decision).toEqual({ allowed: false, denialSource: 'organization_provider' });
+    });
+
+    it('clips member provider grants to the organization provider ceiling', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(
+        context({
+          organization: {
+            ...context().organization,
+            settings: { provider_allow_list: ['openai'], model_deny_list: [] },
+          },
+          groupPolicies: [
+            [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: [],
+                  provider_allow_list: [VIRTUAL_PROVIDER.slug, 'google'],
+                },
+              },
+            ],
+          ],
+        })
+      );
+
+      const decision = await getEffectiveModelDecision(
+        policy,
+        ROUTER,
+        async modelId => new Set(modelId === ROUTER ? [VIRTUAL_PROVIDER.slug] : ['google'])
+      );
+
+      expect(decision).toEqual({ allowed: false, denialSource: 'organization_provider' });
     });
 
     it('does not widen routes for models served by real providers', async () => {

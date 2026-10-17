@@ -127,25 +127,17 @@ describe('inbox rows', () => {
 });
 
 describe('mergeProviderInboxSources', () => {
-  it('parses each row timestamp exactly once per merge', () => {
+  it('merges every enabled provider newest-first, parsing each timestamp once', () => {
     // The comparator used to call `parseTimestamp` on BOTH operands of every
     // comparison, so a three-provider merge re-parsed its timestamps O(n log n)
     // times. The merge decorates once, so the count equals the row count.
     const spy = vi.mocked(parseTimestampSpy).mockClear();
-    mergeProviderInboxSources([
-      source({ platform: 'github', rows: githubRows }),
-      source({ platform: 'gitlab', rows: gitlabRows }),
-      source({ platform: 'bitbucket', rows: bitbucketRows }),
-    ]);
-    expect(spy).toHaveBeenCalledTimes(3);
-  });
-
-  it('merges every enabled provider newest-first', () => {
     const merged = mergeProviderInboxSources([
       source({ platform: 'github', rows: githubRows }),
       source({ platform: 'gitlab', rows: gitlabRows }),
       source({ platform: 'bitbucket', rows: bitbucketRows }),
     ]);
+    expect(spy).toHaveBeenCalledTimes(3);
     expect(merged.items.map(row => row.title)).toEqual(['GitLab MR', 'GitHub PR', 'Bitbucket PR']);
   });
 
@@ -240,14 +232,13 @@ describe('mergeProviderInboxSources', () => {
     // reconnect notice can re-check that provider instead of GitHub.
     expect(merged.firstPageErrorPlatform).toBe('github');
     expect(merged.laterPageError).toBe(false);
-  });
-
-  it('names the only enabled provider when it alone fails', () => {
-    const merged = mergeProviderInboxSources([
-      source({ platform: 'gitlab', error: new Error('gitlab down'), hasLoadedPages: false }),
-      source({ platform: 'bitbucket', enabled: false }),
-    ]);
-    expect(merged.firstPageErrorPlatform).toBe('gitlab');
+    // Only the enabled ones count: a disabled source neither fails nor names.
+    expect(
+      mergeProviderInboxSources([
+        source({ platform: 'gitlab', error: new Error('gitlab down'), hasLoadedPages: false }),
+        source({ platform: 'bitbucket', enabled: false }),
+      ]).firstPageErrorPlatform
+    ).toBe('gitlab');
   });
 
   it('names no provider when another provider answered', () => {
@@ -257,14 +248,6 @@ describe('mergeProviderInboxSources', () => {
     ]);
     expect(merged.firstPageErrorState).toBeNull();
     expect(merged.firstPageErrorPlatform).toBeNull();
-  });
-
-  it('keeps a working provider visible when another one fails', () => {
-    const merged = mergeProviderInboxSources([
-      source({ platform: 'github', rows: githubRows }),
-      source({ platform: 'gitlab', error: new Error('gitlab down'), hasLoadedPages: false }),
-    ]);
-    expect(merged.firstPageErrorState).toBeNull();
     expect(merged.items.map(row => row.title)).toEqual(['GitHub PR']);
     expect(merged.laterPageError).toBe(true);
   });
@@ -281,9 +264,6 @@ describe('mergeProviderInboxSources', () => {
     expect(merged.firstPageErrorState).toBeNull();
     expect(merged.laterPageError).toBe(true);
     expect(merged.items).toHaveLength(1);
-  });
-
-  it('has a next page while any provider still has one', () => {
     expect(
       mergeProviderInboxSources([
         source({ platform: 'github' }),

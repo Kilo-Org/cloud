@@ -34,11 +34,15 @@ function toolStateOf(part: ToolPart): ToolState | null {
 }
 
 /**
- * An attachment entry the chat pipeline can consume. Its `mime` is read with
- * `startsWith` and its `url` is passed on as the data URL, so both must be
- * strings; any other entry is dropped.
+ * A tool attachment entry the chat pipeline can read. `mime` is passed to
+ * `startsWith` and `url` is the data URL handed to the attachment sink, so the
+ * predicate checks both; anything else the entry carries is a file part's field
+ * on the wire and is preserved when the stored part is written back, but is not
+ * claimed here.
  */
-function isToolAttachment(attachment: unknown): attachment is FilePart {
+type ReadableToolAttachment = { mime: string; url: string } & Partial<FilePart>;
+
+function isToolAttachment(attachment: unknown): attachment is ReadableToolAttachment {
   if (typeof attachment !== 'object' || attachment === null || Array.isArray(attachment)) {
     return false;
   }
@@ -48,12 +52,35 @@ function isToolAttachment(attachment: unknown): attachment is FilePart {
 }
 
 /**
+ * The stored form of one tool attachment: the bytes (`url`) and the source text
+ * are dropped, the entry's other fields are kept.
+ *
+ * The assertion restores the declared slot type: `ToolStateCompleted.attachments`
+ * is `Array<FilePart>`, and the entry came from that list, while this seam
+ * validates only the members the pipeline reads (`isToolAttachment`).
+ */
+function stripToolAttachmentContent(attachment: ReadableToolAttachment): FilePart {
+  const stripped = { ...attachment, url: '' };
+  const source = stripped.source;
+  if (
+    source !== undefined &&
+    'text' in source &&
+    typeof source.text === 'object' &&
+    source.text !== null &&
+    'value' in source.text
+  ) {
+    stripped.source = { ...source, text: { ...source.text, value: '' } };
+  }
+  return stripped as FilePart;
+}
+
+/**
  * The attachments of a completed tool part that downstream consumers can use,
  * or an empty list. Empty for every other `state.status`, and for a part whose
  * `state` or `state.attachments` is not usable, so every consumer reads a plain
  * list of readable entries.
  */
-export function toolPartAttachments(part: Part): readonly FilePart[] {
+export function toolPartAttachments(part: Part): readonly ReadableToolAttachment[] {
   if (!isToolPart(part)) return [];
   const state = toolStateOf(part);
   if (state === null || state.status !== 'completed' || !Array.isArray(state.attachments)) {
@@ -93,7 +120,7 @@ export function stripPartContentIfFile(part: Part): Part {
     if (state !== null && state.status === 'completed' && Array.isArray(state.attachments)) {
       const strippedAttachments = state.attachments
         .filter(isToolAttachment)
-        .map(stripFilePartContent);
+        .map(stripToolAttachmentContent);
       return {
         ...part,
         state: {

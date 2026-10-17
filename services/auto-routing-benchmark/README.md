@@ -686,7 +686,10 @@ so only those cases are scheduled, under the normal scheduler caps. When the run
 the profile's `run_id` moves to it, the claim is removed, and the platform table republishes
 as after any decider run. A failed run, a dead lane or an orphaned claim drops the claim and
 keeps the previous measurement; an unwritten run returns the claim to the queue. Prior-case
-reuse never copies an affected revision-1 row into a new run.
+reuse never copies an affected revision-1 row into a new run. A container result recovered
+after its caller died is stamped with the revision the paid call was opened under
+(`scheduler_executions.prompt_revision`, defaulting to 1 for calls opened before this
+change), so output a previous deploy produced stays re-measurable instead of being trusted.
 
 Runbook, after the whole stack is merged and deployed (the migration applies on deploy):
 

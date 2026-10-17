@@ -2398,9 +2398,9 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      // Publishing an org-scoped session requires current organization
-      // membership, consistent with the other session access paths.
-      if (session.organization_id) {
+      // A personal trigger publishes an organization-scoped session only for a
+      // current member of that organization.
+      if (!input.organization_id && session.organization_id) {
         await ensureOrganizationAccess(ctx, session.organization_id);
       }
 

@@ -97,12 +97,15 @@ async function renderSummary(
 ): Promise<{ labels: string[]; text: string[] }> {
   await i18n.changeLanguage(language);
   detail.current = { ...BASE_DETAIL, contextLength };
-  let renderer: TestRenderer.ReactTestRenderer | undefined;
+  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+    current: undefined,
+  };
   await act(() => {
-    renderer = TestRenderer.create(
+    rendererRef.current = TestRenderer.create(
       createElement(ModelCatalogDetailScreen, { id: REPO, key: language })
     );
   });
+  const renderer = rendererRef.current;
   if (!renderer) {
     throw new Error('renderer was not created');
   }

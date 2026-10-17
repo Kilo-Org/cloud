@@ -220,17 +220,9 @@ async function executeGrant({
 
   if (typeof promotion.total_redemptions_allowed === 'number') {
     // The count is read on the granting transaction; a query error here
-    // propagates and rolls the transaction back.
-    let totalRedemptions: number;
-    try {
-      totalRedemptions = await getTotalRedemptions(dbOrTx, promotion.credit_category);
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'promotional_credits_redemption_count' },
-        extra: { promoCreditCategory: promotion.credit_category },
-      });
-      throw error;
-    }
+    // propagates and rolls the transaction back, and the outer catch
+    // reports it.
+    const totalRedemptions = await getTotalRedemptions(dbOrTx, promotion.credit_category);
     if (totalRedemptions >= promotion.total_redemptions_allowed) {
       return {
         success: false,

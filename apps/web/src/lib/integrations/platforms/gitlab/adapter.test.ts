@@ -17,6 +17,7 @@ import {
   createProjectWebhook,
   deleteProjectWebhook,
   fetchGitLabProjects,
+  fetchGitLabBranches,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
 } from './adapter';
@@ -423,6 +424,120 @@ describe('fetchGitLabProjects', () => {
       'https://gitlab.com/api/v4/projects?membership=true&per_page=100&page=2&archived=false',
       expect.anything()
     );
+  });
+
+  it('treats a missing x-next-page on a full page as the last page', async () => {
+    const fullPage = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      name: `project-${i}`,
+      path_with_namespace: `group/project-${i}`,
+      visibility: 'private',
+      archived: false,
+    }));
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => fullPage,
+        headers: { get: () => null },
+      })
+    );
+
+    const projects = await fetchGitLabProjects('test-token');
+    expect(projects).toHaveLength(100);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports an error when x-next-page advances beyond the page cap', async () => {
+    const fullPage = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      name: `project-${i}`,
+      path_with_namespace: `group/project-${i}`,
+      visibility: 'private',
+      archived: false,
+    }));
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => fullPage,
+        headers: { get: (name: string) => (name === 'x-next-page' ? '999999' : null) },
+      })
+    );
+
+    await expect(fetchGitLabProjects('test-token')).rejects.toThrow(
+      'GitLab pagination limit exceeded: project listing returned more than 100 pages'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports an error when a single page returns more than the item cap', async () => {
+    const hugePage = Array.from({ length: 10001 }, (_, i) => ({
+      id: i + 1,
+      name: `project-${i}`,
+      path_with_namespace: `group/project-${i}`,
+      visibility: 'private',
+      archived: false,
+    }));
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => hugePage,
+        headers: { get: () => null },
+      })
+    );
+
+    await expect(fetchGitLabProjects('test-token')).rejects.toThrow(
+      'GitLab pagination limit exceeded: project listing returned more than 10000 items'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports an error when a provider signals a huge x-total-pages with full pages', async () => {
+    const branches = Array.from({ length: 100 }, (_, i) => ({
+      name: `branch-${i}`,
+      commit: { id: 'abc' },
+    }));
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => branches,
+        headers: { get: (name: string) => (name === 'x-total-pages' ? '999999' : null) },
+      })
+    );
+
+    await expect(fetchGitLabBranches('test-token', 123)).rejects.toThrow(
+      'GitLab pagination limit exceeded: branch listing returned more than 100 pages'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a non-numeric x-total-pages as a single page', async () => {
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => [{ name: 'main', commit: { id: 'abc' } }],
+        headers: { get: (name: string) => (name === 'x-total-pages' ? 'not-a-number' : null) },
+      })
+    );
+
+    const branches = await fetchGitLabBranches('test-token', 123);
+    expect(branches.map(b => b.name)).toEqual(['main']);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('terminates normally when a provider reports a finite x-total-pages', async () => {
+    let call = 0;
+    mockFetch.mockImplementation(() => {
+      call++;
+      return Promise.resolve({
+        ok: true,
+        json: async () => [{ name: call === 1 ? 'main' : 'feature', commit: { id: 'abc' } }],
+        headers: { get: (name: string) => (name === 'x-total-pages' ? '2' : null) },
+      });
+    });
+
+    const branches = await fetchGitLabBranches('test-token', 123);
+    expect(branches.map(b => b.name)).toEqual(['main', 'feature']);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
 

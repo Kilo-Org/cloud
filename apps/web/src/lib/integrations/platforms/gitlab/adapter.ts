@@ -24,6 +24,26 @@ const DEFAULT_GITLAB_URL = DEFAULT_GITLAB_INSTANCE_URL;
 const MAX_GITLAB_REDIRECTS = 5;
 const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
 const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
+const MAX_GITLAB_PAGINATION_PAGES = 100;
+const MAX_GITLAB_PAGINATION_ITEMS = 10_000;
+
+/**
+ * Enforces the server-side pagination bounds for every paginating helper in this
+ * adapter: pagination continues only within MAX_GITLAB_PAGINATION_PAGES pages and
+ * MAX_GITLAB_PAGINATION_ITEMS items, and exceeding either bound fails with an error.
+ */
+function checkGitLabPaginationBounds(page: number, itemCount: number, context: string): void {
+  if (page > MAX_GITLAB_PAGINATION_PAGES) {
+    throw new Error(
+      `GitLab pagination limit exceeded: ${context} returned more than ${MAX_GITLAB_PAGINATION_PAGES} pages`
+    );
+  }
+  if (itemCount > MAX_GITLAB_PAGINATION_ITEMS) {
+    throw new Error(
+      `GitLab pagination limit exceeded: ${context} returned more than ${MAX_GITLAB_PAGINATION_ITEMS} items`
+    );
+  }
+}
 
 async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): Promise<Response> {
   const response = await fetchGitLabOnce(url, init);
@@ -434,12 +454,13 @@ export async function fetchGitLabProjects(
 
     const nextPage = Number.parseInt(response.headers.get('x-next-page') || '', 10);
     if (Number.isInteger(nextPage) && nextPage > page) {
+      checkGitLabPaginationBounds(nextPage, projects.length, 'project listing');
       page = nextPage;
       continue;
     }
 
-    if (data.length < perPage) break;
-    page++;
+    checkGitLabPaginationBounds(page, projects.length, 'project listing');
+    break;
   }
 
   logExceptInTest('GitLab projects fetched', { count: projects.length });
@@ -498,7 +519,9 @@ export async function fetchGitLabBranches(
     const data = (await response.json()) as GitLabBranch[];
     branches.push(...data);
 
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, branches.length, 'branch listing');
     if (page >= totalPages) break;
     page++;
   }
@@ -1095,7 +1118,9 @@ export async function findKiloReviewNote(
     const data = (await response.json()) as GitLabNote[];
     notes.push(...data);
 
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, notes.length, 'MR note listing');
     if (page >= totalPages) break;
     page++;
   }
@@ -1244,7 +1269,9 @@ export async function hasMRNoteWithMarker(
       return true;
     }
 
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, page * perPage, 'MR note marker search');
     if (page >= totalPages) break;
     page++;
   }
@@ -1301,7 +1328,9 @@ export async function fetchMRInlineComments(
     const data = (await response.json()) as GitLabDiscussion[];
     discussions.push(...data);
 
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, discussions.length, 'MR discussion listing');
     if (page >= totalPages) break;
     page++;
   }

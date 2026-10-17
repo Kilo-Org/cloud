@@ -34,23 +34,24 @@ describe('Mayor paths while container starts are paused', () => {
     await town.setContainerRunPolicy('paused_by_user');
   });
 
-  it('ensureMayor reports idle and does not start the container', async () => {
-    const result = await town.ensureMayor();
-    expect(result.agentId).toBeTruthy();
-    expect(result.sessionStatus).toBe('idle');
-
-    const agent = await town.getAgentAsync(result.agentId);
-    expect(agent?.status).toBe('idle');
-    expect(agent?.role).toBe('mayor');
+  it('ensureMayor rejects while starts are paused', async () => {
+    let error: unknown = null;
+    try {
+      await town.ensureMayor();
+    } catch (err) {
+      error = err;
+    }
+    expect(String(error)).toMatch(/paused/i);
   });
 
-  it('sendMayorMessage reports idle and does not start the container', async () => {
-    const result = await town.sendMayorMessage('hello mayor');
-    expect(result.agentId).toBeTruthy();
-    expect(result.sessionStatus).toBe('idle');
-
-    const agent = await town.getAgentAsync(result.agentId);
-    expect(agent?.status).toBe('idle');
+  it('sendMayorMessage rejects while starts are paused', async () => {
+    let error: unknown = null;
+    try {
+      await town.sendMayorMessage('hello mayor');
+    } catch (err) {
+      error = err;
+    }
+    expect(String(error)).toMatch(/paused/i);
   });
 
   it('clears once the pause is lifted', async () => {

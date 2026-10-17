@@ -74,6 +74,7 @@ import {
   type UsageActor,
   type UsageContext,
 } from '../billing/container-usage.billing';
+import { ContainerBillingError } from '../billing/ContainerBilling.error';
 import { BeadPriority } from '../types';
 import type {
   TownConfig,
@@ -2856,10 +2857,13 @@ export class TownDO extends DurableObject<Env> {
     }
 
     if (this.containerStartsBlocked()) {
-      logger.warn('sendMayorMessage: container starts blocked, not starting container', {
+      logger.warn('sendMayorMessage: container starts blocked, refusing prompt', {
         townId,
       });
-      return { agentId: mayor.id, sessionStatus: 'idle' };
+      throw new ContainerBillingError(
+        'CONTAINER_PAUSED',
+        'Automatic starts are paused for this Gas Town'
+      );
     }
 
     const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
@@ -3072,10 +3076,13 @@ export class TownDO extends DurableObject<Env> {
     logger.setTags({ agentId: mayor.id });
 
     if (this.containerStartsBlocked()) {
-      logger.warn('ensureMayor: container starts blocked, not starting container', {
+      logger.warn('ensureMayor: container starts blocked, refusing start', {
         townId,
       });
-      return { agentId: mayor.id, sessionStatus: 'idle' };
+      throw new ContainerBillingError(
+        'CONTAINER_PAUSED',
+        'Automatic starts are paused for this Gas Town'
+      );
     }
 
     // Check if the container is already running AND the SDK has a live

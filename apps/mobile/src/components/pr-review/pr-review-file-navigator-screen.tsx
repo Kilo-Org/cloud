@@ -108,9 +108,11 @@ export function PrReviewFileNavigatorScreen() {
 
 /**
  * The sheet's failure states, split the same way the Overview and Discussion
- * bodies split them: a permission denial, a missing PR/MR and a broken
- * connection are terminal and carry no retry, because retrying the identical
- * request cannot change any of them. Only a transient failure gets the CTA.
+ * bodies split them: a permission denial is terminal and carries no retry. A
+ * missing PR/MR is terminal only on GitHub — GitLab folds its connection
+ * failures into the same NOT_FOUND, so provider scopes get the recovery row.
+ * A broken connection gets the reconnect notice and only a transient failure
+ * gets the plain retry CTA.
  */
 function NavigatorError({
   error,

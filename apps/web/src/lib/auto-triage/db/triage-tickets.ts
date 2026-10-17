@@ -214,7 +214,7 @@ export async function updateTriageTicketStatus(
       updateData.error_message = updates.errorMessage;
     }
     if (updates.startedAt !== undefined) {
-      updateData.started_at = updates.startedAt.toISOString();
+      updateData.started_at = updates.startedAt ? updates.startedAt.toISOString() : null;
     }
     if (updates.completedAt !== undefined) {
       updateData.completed_at = updates.completedAt.toISOString();

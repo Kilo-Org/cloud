@@ -161,6 +161,7 @@ export async function tryDispatchPendingTickets(owner: Owner): Promise<DispatchR
           await updateTriageTicketStatus(ticket.id, 'pending', {
             expectedStatus: 'analyzing',
             errorMessage: 'Dispatch failed',
+            startedAt: null,
           });
         } catch (resetError) {
           errorExceptInTest(

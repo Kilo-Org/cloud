@@ -125,6 +125,33 @@ describe('provider-neutral URL field', () => {
     expect(mocks.push).not.toHaveBeenCalled();
   });
 
+  it('empty clipboard preserves the entered link and reports feedback without opening it', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)(
+      'https://github.com/octocat/hello-world/pull/42'
+    );
+    mocks.clipboard.current = '   ';
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.toastError).toHaveBeenCalledTimes(1);
+    expect(mocks.push).not.toHaveBeenCalled();
+    const after = render();
+    const open = find(
+      after,
+      'Button',
+      p => p.accessibilityLabel === 'Open pull request or merge request'
+    );
+    expect(propsOf(open).disabled).toBe(false);
+    (propsOf(open).onPress as () => void)();
+    expect(mocks.push).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello-world/42');
+  });
+
   it('paste replaces the field and opens a GitLab MR straight away', async () => {
     mocks.clipboard.current = 'https://gitlab.com/acme/api/-/merge_requests/3';
     const tree = await renderLoaded();

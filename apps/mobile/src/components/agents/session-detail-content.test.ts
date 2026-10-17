@@ -183,6 +183,17 @@ vi.mock('expo-router', () => ({
     replace: (href: string) => {
       navigationRoutes.splice(-1, 1, href);
     },
+    // The POP_TO end state "Back to sessions" relies on: find the destination
+    // at or below the current index, truncate everything above it; with no
+    // match, drop the current route and land on the destination.
+    dismissTo: (href: string) => {
+      const index = navigationRoutes.lastIndexOf(href.split('?')[0]);
+      if (index === -1) {
+        navigationRoutes.splice(0, navigationRoutes.length, href);
+      } else {
+        navigationRoutes.splice(index + 1);
+      }
+    },
     push: (href: string) => {
       navigationRoutes.push(href);
     },
@@ -1124,7 +1135,7 @@ describe('SessionDetailContent display scope', () => {
     act(onPress);
     expect(openRenameModal).toHaveBeenCalledOnce();
     pressHeaderBack(renderer);
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
     expect(globalContext.organizationId).toBe('global-org');
     expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
   });
@@ -2365,7 +2376,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
     );
   });
 
@@ -2405,7 +2416,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
     );
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
     );
   });
 });

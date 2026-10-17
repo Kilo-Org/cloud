@@ -2,7 +2,6 @@
 // eslint-disable-next-line import/no-nodejs-modules -- The compiler's CommonJS export is the only way to load it under vitest.
 import { createRequire } from 'node:module';
 import tailwindcss from '@tailwindcss/postcss';
-import { type Href } from 'expo-router';
 import postcss from 'postcss';
 import { type ComponentProps, createElement } from 'react';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
@@ -10,6 +9,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { ScreenHeader, shouldStackHeaderActions } from './screen-header';
 import { OfflineBannerSpaceProvider } from './offline-banner-space';
@@ -18,6 +18,9 @@ const routerState = vi.hoisted(() => ({
   routes: ['previous-screen', 'session-detail'],
   back: vi.fn(),
   replace: vi.fn<(href: string) => void>(),
+  // POP_TO semantics: find the destination at or below the current index and
+  // truncate everything above it; with no match, replace the current route.
+  dismissTo: vi.fn<(href: string) => void>(),
   canGoBack: vi.fn(() => true),
 }));
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
@@ -232,6 +235,10 @@ describe('ScreenHeader mounted', () => {
     });
     routerState.replace.mockReset().mockImplementation(href => {
       routerState.routes.splice(-1, 1, href);
+    });
+    routerState.dismissTo.mockReset().mockImplementation(href => {
+      const index = routerState.routes.lastIndexOf(href.split('?')[0]);
+      routerState.routes = index === -1 ? [href] : routerState.routes.slice(0, index + 1);
     });
     routerState.canGoBack.mockReset().mockImplementation(() => routerState.routes.length > 1);
     i18nManager.isRTL = false;
@@ -454,7 +461,7 @@ describe('ScreenHeader mounted', () => {
 
   it.each([
     { history: ['previous-screen', 'session-detail'], destination: 'previous-screen' },
-    { history: ['session-detail'], destination: '/(app)/(tabs)/(2_agents)' },
+    { history: ['session-detail'], destination: '/(app)/(tabs)/(2_agents)/' },
   ])(
     'returns from $history without retaining the session or opening its title',
     ({ history, destination }) => {
@@ -462,7 +469,7 @@ describe('ScreenHeader mounted', () => {
       let titleOpened = false;
       const renderer = renderHeader({
         title: 'Session',
-        backFallback: '/(app)/(tabs)/(2_agents)' as Href,
+        backFallback: AGENTS_SESSIONS_HREF,
         onTitlePress: () => {
           titleOpened = true;
         },
@@ -482,8 +489,8 @@ describe('ScreenHeader mounted', () => {
 
   it.each([
     { history: true, backFallback: undefined },
-    { history: true, backFallback: '/(app)/(tabs)/(2_agents)' as Href },
-    { history: false, backFallback: '/(app)/(tabs)/(2_agents)' as Href },
+    { history: true, backFallback: AGENTS_SESSIONS_HREF },
+    { history: false, backFallback: AGENTS_SESSIONS_HREF },
   ] as const)(
     'preserves custom onBack precedence for history=$history, fallback=$backFallback',
     ({ history, backFallback }) => {
@@ -552,7 +559,7 @@ describe('ScreenHeader mounted', () => {
     const explicitlyHidden = renderHeader({
       title: 'Sessions',
       showBackButton: false,
-      backFallback: '/(app)/(tabs)/(2_agents)' as Href,
+      backFallback: AGENTS_SESSIONS_HREF,
     });
     expect(backPressableCount(explicitlyHidden.root)).toBe(0);
   });

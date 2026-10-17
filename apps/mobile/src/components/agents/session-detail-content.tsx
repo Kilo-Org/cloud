@@ -211,6 +211,7 @@ import {
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
 import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -1594,7 +1595,10 @@ export function SessionDetailContent({
   }, [manager, t]);
 
   const handleBackToSessions = useCallback(() => {
-    router.replace('/(app)/(tabs)/(2_agents)' as Href);
+    // POP_TO reuses the `(tabs)` route under this screen and truncates every
+    // `agent-chat` route above it, so a composer still on the stack under a
+    // missing session is gone with it.
+    router.dismissTo(AGENTS_SESSIONS_HREF);
   }, [router]);
 
   const handleModelSelect = useCallback(
@@ -2255,7 +2259,7 @@ export function SessionDetailContent({
             // line ("Moving-average empty windo…").
             reserveTitleSpace
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-            backFallback={'/(app)/(tabs)/(2_agents)' as Href}
+            backFallback={AGENTS_SESSIONS_HREF}
             headerRight={headerRight}
             headerRightShrinks
             className="pb-1"

@@ -504,6 +504,17 @@ beforeEach(() => {
     replace: (href: string) => {
       navigationRoutes.splice(-1, 1, href);
     },
+    // The POP_TO end state the component relies on: find the destination at or
+    // below the current index, truncate everything above it; with no match,
+    // drop the current route and land on the destination.
+    dismissTo: (href: string) => {
+      const index = navigationRoutes.lastIndexOf(href.split('?')[0]);
+      if (index === -1) {
+        navigationRoutes.splice(0, navigationRoutes.length, href);
+      } else {
+        navigationRoutes.splice(index + 1);
+      }
+    },
   });
   useQueryMock.mockReset();
   useQueryMock.mockImplementation(
@@ -1376,7 +1387,7 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     });
 
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
     );
     expect(rootRequests).toEqual([]);
   });
@@ -1503,7 +1514,7 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       pressControl(back);
     });
 
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
     expect(rootRequests).toEqual([]);
   });
 

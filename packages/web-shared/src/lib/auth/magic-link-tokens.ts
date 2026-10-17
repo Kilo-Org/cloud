@@ -187,98 +187,87 @@ export async function reserveSignInCode(
         sql`${magic_link_tokens.expires_at} > NOW()`
       );
 
-  const [row] = await db.select().from(magic_link_tokens).where(lookupWhere).limit(1);
+  return db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sign-in-code:${normalizedEmail}`}, 0))`
+    );
 
-  if (!row) {
-    return 'invalid';
-  }
+    const [row] = await tx
+      .select()
+      .from(magic_link_tokens)
+      .for('update')
+      .where(lookupWhere)
+      .limit(1);
 
-  if (row.attempts >= SIGN_IN_CODE_MAX_ATTEMPTS) {
-    return 'too_many_attempts';
-  }
+    if (!row) {
+      return 'invalid';
+    }
 
-  const token_hash = hashSignInCode(normalizedEmail, code);
-  if (row.token_hash === token_hash) {
-    const reserved = await db
-      .update(magic_link_tokens)
-      .set({
-        reserved_until: sql`NOW() + interval '${sql.raw(String(SIGN_IN_CODE_RESERVATION_MINUTES))} minutes'`,
-      })
-      .where(
-        and(
-          eq(magic_link_tokens.token_hash, token_hash),
+    if (row.attempts >= SIGN_IN_CODE_MAX_ATTEMPTS) {
+      return 'too_many_attempts';
+    }
+
+    const token_hash = hashSignInCode(normalizedEmail, code);
+    if (row.token_hash === token_hash) {
+      const reserved = await tx
+        .update(magic_link_tokens)
+        .set({
+          reserved_until: sql`NOW() + interval '${sql.raw(String(SIGN_IN_CODE_RESERVATION_MINUTES))} minutes'`,
+        })
+        .where(
+          and(
+            eq(magic_link_tokens.token_hash, token_hash),
+            eq(magic_link_tokens.email, normalizedEmail),
+            eq(magic_link_tokens.purpose, 'sign_in_code'),
+            isNull(magic_link_tokens.consumed_at),
+            sql`${magic_link_tokens.expires_at} > NOW()`,
+            sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`,
+            sql`(${magic_link_tokens.reserved_until} IS NULL OR ${magic_link_tokens.reserved_until} < NOW())`
+          )
+        )
+        .returning();
+
+      if (reserved[0]) {
+        return 'ok';
+      }
+
+      if (row.reserved_until && new Date(row.reserved_until) > new Date()) {
+        return 'in_progress';
+      }
+      return 'invalid';
+    }
+
+    // Count the attempt first, while the row is locked.
+    // Key by challenge_id when available, otherwise by email; the email-keyed
+    // path matches the live row for the email regardless of challenge_id.
+    const incrementWhere = challengeId
+      ? and(
+          eq(magic_link_tokens.challenge_id, challengeId),
+          eq(magic_link_tokens.purpose, 'sign_in_code'),
+          isNull(magic_link_tokens.consumed_at),
+          sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
+        )
+      : and(
           eq(magic_link_tokens.email, normalizedEmail),
           eq(magic_link_tokens.purpose, 'sign_in_code'),
           isNull(magic_link_tokens.consumed_at),
-          sql`${magic_link_tokens.expires_at} > NOW()`,
-          sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`,
-          sql`(${magic_link_tokens.reserved_until} IS NULL OR ${magic_link_tokens.reserved_until} < NOW())`
-        )
-      )
-      .returning();
+          sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
+        );
 
-    if (reserved[0]) {
-      return 'ok';
+    await tx
+      .update(magic_link_tokens)
+      .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
+      .where(incrementWhere);
+
+    // ponytail: remove legacy counter and no-challenge path when
+    // native_signin_code_legacy_no_challenge_count drains to 0 for
+    // 7 consecutive days — all shipped clients must send a challengeId.
+    if (!challengeId) {
+      captureMessage('native_signin_code_legacy_no_challenge_count: 1');
     }
 
-    const [current] = await db
-      .select({
-        attempts: magic_link_tokens.attempts,
-        reserved_until: magic_link_tokens.reserved_until,
-      })
-      .from(magic_link_tokens)
-      .where(
-        and(
-          eq(magic_link_tokens.token_hash, token_hash),
-          eq(magic_link_tokens.email, normalizedEmail),
-          eq(magic_link_tokens.purpose, 'sign_in_code'),
-          isNull(magic_link_tokens.consumed_at)
-        )
-      )
-      .limit(1);
-
-    if (!current) {
-      return 'invalid';
-    }
-    if (current.attempts >= SIGN_IN_CODE_MAX_ATTEMPTS) {
-      return 'too_many_attempts';
-    }
-    if (current.reserved_until && new Date(current.reserved_until) > new Date()) {
-      return 'in_progress';
-    }
     return 'invalid';
-  }
-
-  // Increment attempts: key by challenge_id when available, otherwise by email.
-  // The legacy email-keyed path matches the live row regardless of challenge_id,
-  // so a no-challenge caller cannot bypass the budget of a challenge-bound row.
-  const incrementWhere = challengeId
-    ? and(
-        eq(magic_link_tokens.challenge_id, challengeId),
-        eq(magic_link_tokens.purpose, 'sign_in_code'),
-        isNull(magic_link_tokens.consumed_at),
-        sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
-      )
-    : and(
-        eq(magic_link_tokens.email, normalizedEmail),
-        eq(magic_link_tokens.purpose, 'sign_in_code'),
-        isNull(magic_link_tokens.consumed_at),
-        sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
-      );
-
-  await db
-    .update(magic_link_tokens)
-    .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
-    .where(incrementWhere);
-
-  // ponytail: remove legacy counter and no-challenge path when
-  // native_signin_code_legacy_no_challenge_count drains to 0 for
-  // 7 consecutive days — all shipped clients must send a challengeId.
-  if (!challengeId) {
-    captureMessage('native_signin_code_legacy_no_challenge_count: 1');
-  }
-
-  return 'invalid';
+  });
 }
 
 /**

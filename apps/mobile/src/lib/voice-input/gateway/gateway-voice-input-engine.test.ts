@@ -526,8 +526,12 @@ describe('recording file cleanup', () => {
     });
 
     await startAndStop(harness);
-    // Negative check: while the upload is still pending, nothing may be
-    // deleted yet. drain() lets pending continuations land before asserting.
+    // The upload must be in flight before abort(), so the abort exercises the
+    // upload-abort path; then the bounded drain lets pending continuations land
+    // before the negative check.
+    await vi.waitFor(() => {
+      expect(uploadResolvers).toHaveLength(1);
+    });
     await drain();
     expect(harness.deleteRecording).not.toHaveBeenCalled();
 

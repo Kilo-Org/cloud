@@ -2856,8 +2856,17 @@ export class TownDO extends DurableObject<Env> {
       });
     }
 
-    if (this.containerStartsBlocked()) {
+    if (this._billingBlocked) {
       logger.warn('sendMayorMessage: container starts blocked, refusing prompt', {
+        townId,
+      });
+      throw new ContainerBillingError(
+        'INSUFFICIENT_CREDITS',
+        'Container billing requires additional credits before automatic restart'
+      );
+    }
+    if (this._containerRunPolicy === 'paused_by_user') {
+      logger.warn('sendMayorMessage: container starts paused, refusing prompt', {
         townId,
       });
       throw new ContainerBillingError(
@@ -3075,8 +3084,17 @@ export class TownDO extends DurableObject<Env> {
 
     logger.setTags({ agentId: mayor.id });
 
-    if (this.containerStartsBlocked()) {
+    if (this._billingBlocked) {
       logger.warn('ensureMayor: container starts blocked, refusing start', {
+        townId,
+      });
+      throw new ContainerBillingError(
+        'INSUFFICIENT_CREDITS',
+        'Container billing requires additional credits before automatic restart'
+      );
+    }
+    if (this._containerRunPolicy === 'paused_by_user') {
+      logger.warn('ensureMayor: container starts paused, refusing start', {
         townId,
       });
       throw new ContainerBillingError(

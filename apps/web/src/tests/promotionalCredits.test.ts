@@ -459,14 +459,13 @@ describe('grantCreditForCategory', () => {
     );
 
     const succeeded = results.filter(r => r.success);
-    expect(succeeded.length).toBeLessThanOrEqual(cap);
+    expect(succeeded.length).toBe(cap);
 
     const rows = await db
       .select({ id: credit_transactions.id })
       .from(credit_transactions)
       .where(eq(credit_transactions.credit_category, 'PARALLEL_CAP_TEST'));
-    expect(rows.length).toBe(succeeded.length);
-    expect(rows.length).toBeLessThanOrEqual(cap);
+    expect(rows.length).toBe(cap);
   });
 
   it('returns a failure result when the redemption count is unavailable', async () => {

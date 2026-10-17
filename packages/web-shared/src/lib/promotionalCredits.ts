@@ -174,12 +174,9 @@ export async function grantCreditForCategoryConfig(
       }
       return await executeGrant({ entity, options, promotion, dbOrTx: tx, amount_usd });
     });
-  } catch (error: unknown) {
-    // Error details are reported to internal monitoring; callers and users
-    // get a generic message.
-    captureException(error, {
-      tags: { source: 'promotional_credits_grant' },
-    });
+  } catch {
+    // Callers and users get a generic message; the specific failure is
+    // reported where it occurs.
     return { success: false, message: 'Failed to apply promotional credit' };
   }
 }
@@ -220,9 +217,17 @@ async function executeGrant({
 
   if (typeof promotion.total_redemptions_allowed === 'number') {
     // The count is read on the granting transaction; a query error here
-    // propagates and rolls the transaction back, and the outer catch
-    // reports it.
-    const totalRedemptions = await getTotalRedemptions(dbOrTx, promotion.credit_category);
+    // propagates and rolls the transaction back.
+    let totalRedemptions: number;
+    try {
+      totalRedemptions = await getTotalRedemptions(dbOrTx, promotion.credit_category);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'promotional_credits_redemption_count' },
+        extra: { promoCreditCategory: promotion.credit_category },
+      });
+      throw error;
+    }
     if (totalRedemptions >= promotion.total_redemptions_allowed) {
       return {
         success: false,

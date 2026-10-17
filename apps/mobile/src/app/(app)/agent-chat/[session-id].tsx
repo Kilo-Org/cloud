@@ -34,7 +34,10 @@ import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
 import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
-import { shouldRetryNotFoundOnSpawnedRoute } from '@/lib/spawned-not-found-retry';
+import {
+  shouldRetryNotFoundOnSpawnedRoute,
+  shouldRetryNotFoundOnYoungRoute,
+} from '@/lib/spawned-not-found-retry';
 import { useTRPC } from '@/lib/trpc';
 
 export default function SessionDetailScreen() {
@@ -125,6 +128,12 @@ export default function SessionDetailScreen() {
             // defensively walk a couple of shapes because TRPC
             // versions across this app occasionally wrap the code
             // one level deeper.
+            errorCode:
+              (error as { data?: { code?: string } } | null)?.data?.code ??
+              (error as { code?: string } | null)?.code,
+          }) ||
+          shouldRetryNotFoundOnYoungRoute({
+            attempt: failureCount,
             errorCode:
               (error as { data?: { code?: string } } | null)?.data?.code ??
               (error as { code?: string } | null)?.code,
@@ -241,6 +250,15 @@ export default function SessionDetailScreen() {
     metadataErrorCode === 'NOT_FOUND' ||
     metadataErrorCode === 'UNAUTHORIZED' ||
     metadataErrorCode === 'FORBIDDEN';
+  // A denial that arrives on a background refresh AFTER this route's metadata
+  // read has succeeded (a flaky proxy later answering NOT_FOUND / UNAUTHORIZED
+  // / FORBIDDEN for a session the account demonstrably loaded) must not blank
+  // a rendered session: the cached metadata beside the error still scopes the
+  // provider, and the transcript below it is this account's own. A denial with
+  // no cached metadata is a first-load answer (including the restored-scope
+  // path, where the hint's transcript must retire the moment the live account
+  // is denied) and stays terminal.
+  const metadataPreviouslyLoaded = sessionQuery.data != null;
   // A failed background refresh does not invalidate owner-scoped cached
   // metadata. Keep its provider mounted; only an authoritative denial retires it.
   // A retryable metadata failure must not blank a session either: the device may
@@ -249,7 +267,10 @@ export default function SessionDetailScreen() {
   // denial (deleted session / lost access) replaces the screen with the error.
   if (
     identityFailed ||
-    (routeOrganizationId === undefined && sessionQuery.isError && metadataAccessDenied)
+    (routeOrganizationId === undefined &&
+      sessionQuery.isError &&
+      metadataAccessDenied &&
+      !metadataPreviouslyLoaded)
   ) {
     // An identity failure stays retriable. An authoritative metadata denial
     // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) can't be recovered by retrying, so

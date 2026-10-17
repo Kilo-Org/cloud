@@ -889,6 +889,28 @@ describe('SessionDetailScreen valid session-id', () => {
     expect(managers.at(-1)?.manager).toBe(manager);
   });
 
+  it.each(['NOT_FOUND', 'UNAUTHORIZED', 'FORBIDDEN'])(
+    'keeps the mounted transcript when a background metadata refresh returns %s',
+    async code => {
+      useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+      const renderer = await mountRoute();
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      const manager = managers.at(-1)?.manager;
+
+      // A denial arriving on a background refresh after the session rendered
+      // must not blank the screen: the cached metadata beside the error still
+      // scopes the provider, and the transcript stays for the reader.
+      queryState.isError = true;
+      queryState.error = { data: { code } };
+      await updateRoute(renderer);
+
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+      expect(managers.at(-1)?.manager).toBe(manager);
+      expect(transcriptText(renderer, 'RootText')).toBe('Account A root row');
+    }
+  );
+
   it('renders the session content with the parsed session-id and enables the query', async () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
     const renderer = await mountRoute();
@@ -1265,6 +1287,10 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     { code: 'UNAUTHORIZED', variant: 'permission' },
   ])('keeps $code terminal with no retry action', async ({ code, variant }) => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    // First-load denial: no cached metadata beside the error (the
+    // background-refetch denial with cached data keeps the session mounted —
+    // see the mounted-transcript suite above).
+    queryState.data = null;
     queryState.isError = true;
     queryState.error = { data: { code } };
     const renderer = await mountRoute();

@@ -77,7 +77,6 @@ export function ResumeConfigModal({
   isLoadingModels = false,
   orgDefaultModel,
 }: ResumeConfigModalProps) {
-  // Derive defaults from session
   const sessionGitUrl = session.git_url;
   const sessionGitBranch = session.git_branch;
   const sessionTitle = session.title;
@@ -90,7 +89,6 @@ export function ResumeConfigModal({
       ? session.last_model
       : orgDefaultModel;
 
-  // Form state
   const [mode, setMode] = useState<ResumeConfig['mode']>(defaultMode || 'code');
   const [model, setModel] = useState<string>(defaultModel || '');
   const [envVars, setEnvVars] = useState<Record<string, string>>({});
@@ -101,12 +99,10 @@ export function ResumeConfigModal({
     setMode(defaultMode || 'code');
   }, [defaultMode]);
 
-  // Sync model when session changes
   useEffect(() => {
     setModel(defaultModel || '');
   }, [defaultModel]);
 
-  // Auto-select first model if none selected and models are available
   const effectiveModel = useMemo(() => {
     if (model) return model;
     if (defaultModel && modelOptions.some(m => m.id === defaultModel)) return defaultModel;
@@ -119,7 +115,6 @@ export function ResumeConfigModal({
       model: effectiveModel,
     };
 
-    // Only include optional fields if they have values
     if (Object.keys(envVars).length > 0) {
       config.envVars = envVars;
     }

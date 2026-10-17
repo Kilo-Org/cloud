@@ -1662,15 +1662,34 @@ async function findExistingReviewWithDatabase(
   return review || null;
 }
 
-async function findReviewByLegacyUniqueKeyWithDatabase(
+/**
+ * Resolves the row that blocked an idempotent insert after the scope-exact lookup missed.
+ *
+ * Every unique index on `cloud_agent_code_reviews` is keyed by `platform_integration_id`, so the
+ * row an insert conflicts with always shares the caller's integration, repo, PR and head SHA.
+ * Unlike the scope-exact lookup this ignores `manual_config`: a manual review already publishing
+ * through the provider for the same head SHA wins the active publisher index, and returning it
+ * keeps the insert idempotent. The owner and platform predicates keep the winner inside the
+ * caller's review scope.
+ */
+async function findConflictWinnerWithDatabase(
   database: CodeReviewDatabase,
-  params: Pick<CreateReviewParams, 'repoFullName' | 'prNumber' | 'headSha'>
+  scope: ReviewScope,
+  params: Pick<CreateReviewParams, 'repoFullName' | 'prNumber' | 'headSha'> & {
+    platformIntegrationId: string;
+  }
 ): Promise<CloudAgentCodeReview | null> {
   const [review] = await database
     .select()
     .from(cloud_agent_code_reviews)
     .where(
       and(
+        // Same owner predicate as reviewScopeConditions: the winner must belong to the caller.
+        scope.owner.type === 'org'
+          ? eq(cloud_agent_code_reviews.owned_by_organization_id, scope.owner.id)
+          : eq(cloud_agent_code_reviews.owned_by_user_id, scope.owner.id),
+        eq(cloud_agent_code_reviews.platform, scope.platform),
+        eq(cloud_agent_code_reviews.platform_integration_id, params.platformIntegrationId),
         eq(cloud_agent_code_reviews.repo_full_name, params.repoFullName),
         eq(cloud_agent_code_reviews.pr_number, params.prNumber),
         eq(cloud_agent_code_reviews.head_sha, params.headSha)
@@ -1729,7 +1748,14 @@ export async function createCodeReviewIfAbsentInTransaction(
 
   const existing =
     (await findExistingReviewWithDatabase(tx, scope, params.headSha)) ??
-    (await findReviewByLegacyUniqueKeyWithDatabase(tx, params));
+    (params.platformIntegrationId
+      ? await findConflictWinnerWithDatabase(tx, scope, {
+          platformIntegrationId: params.platformIntegrationId,
+          repoFullName: params.repoFullName,
+          prNumber: params.prNumber,
+          headSha: params.headSha,
+        })
+      : null);
   if (!existing) throw new Error('Code review conflict winner not found');
   return { reviewId: existing.id, created: false };
 }

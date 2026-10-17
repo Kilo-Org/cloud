@@ -257,6 +257,125 @@ describe('review identity', () => {
     expect(result).toEqual({ reviewId: existingReviewId, created: false });
   });
 
+  it('resolves the conflict winner only within the requesting review scope', async () => {
+    const repoFullName = `${REPO}-scope-mismatch-conflict`;
+    const headSha = 'scope-mismatch-conflict-head-sha';
+    const [existingRow] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: secondUser.id,
+        platform_integration_id: secondIntegrationId,
+        repo_full_name: repoFullName,
+        pr_number: 27,
+        pr_url: `https://github.com/${repoFullName}/pull/27`,
+        pr_title: 'scope mismatch conflict',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/scope-mismatch-conflict',
+        head_sha: headSha,
+        platform: 'github',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    createdReviewIds.push(existingRow.id);
+
+    const scope = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platform: 'github' as const,
+      repoFullName,
+      prNumber: 27,
+      platformIntegrationId: secondIntegrationId,
+    };
+    const params = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: secondIntegrationId,
+      repoFullName,
+      prNumber: 27,
+      prUrl: `https://github.com/${repoFullName}/pull/27`,
+      prTitle: 'scope mismatch conflict',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/scope-mismatch-conflict',
+      headSha,
+      platform: 'github' as const,
+      triggerSource: 'webhook' as const,
+    };
+
+    await expect(
+      db.transaction(tx => createCodeReviewIfAbsentInTransaction(tx, scope, params))
+    ).rejects.toThrow('Code review conflict winner not found');
+
+    await expect(
+      db.transaction(tx =>
+        createCodeReviewIfAbsentInTransaction(
+          tx,
+          { ...scope, owner: { type: 'user', id: secondUser.id, userId: secondUser.id } },
+          { ...params, owner: { type: 'user', id: secondUser.id, userId: secondUser.id } }
+        )
+      )
+    ).resolves.toEqual({ reviewId: existingRow.id, created: false });
+  });
+
+  it('reuses the same-owner manual provider review at the same head SHA', async () => {
+    const repoFullName = `${REPO}-manual-provider-conflict`;
+    const headSha = 'manual-provider-conflict-head-sha';
+    const manualConfig: ManualCodeReviewConfig = {
+      agentConfig: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'anthropic/claude-sonnet-4.6',
+      },
+      instructions: null,
+      outputMode: 'provider',
+    };
+    const [manualRow] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: firstUser.id,
+        platform_integration_id: firstIntegrationId,
+        repo_full_name: repoFullName,
+        pr_number: 28,
+        pr_url: `https://github.com/${repoFullName}/pull/28`,
+        pr_title: 'manual provider conflict',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/manual-provider-conflict',
+        head_sha: headSha,
+        platform: 'github',
+        manual_config: manualConfig,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    createdReviewIds.push(manualRow.id);
+
+    const result = await db.transaction(tx =>
+      createCodeReviewIfAbsentInTransaction(
+        tx,
+        {
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+          platform: 'github',
+          repoFullName,
+          prNumber: 28,
+          platformIntegrationId: firstIntegrationId,
+        },
+        {
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+          platformIntegrationId: firstIntegrationId,
+          repoFullName,
+          prNumber: 28,
+          prUrl: `https://github.com/${repoFullName}/pull/28`,
+          prTitle: 'manual provider conflict',
+          prAuthor: 'octocat',
+          baseRef: 'main',
+          headRef: 'feature/manual-provider-conflict',
+          headSha,
+          platform: 'github',
+          triggerSource: 'webhook',
+        }
+      )
+    );
+
+    expect(result).toEqual({ reviewId: manualRow.id, created: false });
+  });
+
   it('rejects duplicate reviews in the same organization scope', async () => {
     const params = {
       owner: { type: 'org' as const, id: organizationId, userId: firstUser.id },

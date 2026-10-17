@@ -28,6 +28,12 @@ function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
 }
 
+/** A tRPC CONFLICT from the agent mutations is the per-profile slug unique index. */
+function isSlugConflict(error: unknown): boolean {
+  const code = (error as { data?: { code?: unknown } } | null | undefined)?.data?.code;
+  return code === 'CONFLICT';
+}
+
 type AgentRowViewProps = Readonly<{
   name: string;
   slug: string;
@@ -132,11 +138,6 @@ export function ProfileAgentsScreen({
 
   const closeForm = () => {
     setForm(null);
-  };
-
-  const isSlugConflict = (error: unknown): boolean => {
-    const code = (error as { data?: { code?: unknown } } | null | undefined)?.data?.code;
-    return code === 'CONFLICT';
   };
 
   const saveAgent = async (

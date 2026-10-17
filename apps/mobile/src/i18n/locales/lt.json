@@ -1974,7 +1974,8 @@
       "ambiguous": "Nepavyko patvirtinti rezultato — prieš bandydamas dar kartą patikrink saugumo peržiūrą.",
       "settleFailed": "Veiksmas buvo atliktas, bet nepavyko įrašyti rezultato. Bandyk dar kartą.",
       "replayFailed": "Šis veiksmas nebuvo užbaigtas. Bandyk dar kartą.",
-      "actionFailed": "Nepavyko užbaigti šio veiksmo. Bandyk dar kartą."
+      "actionFailed": "Nepavyko užbaigti šio veiksmo. Bandyk dar kartą.",
+      "actionBlocked": "Nepavyko užbaigti šio veiksmo. Iš pradžių reikia išspręsti problemą."
     },
     "analysisState": {
       "queued": "Analizė eilėje",

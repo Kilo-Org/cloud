@@ -1928,7 +1928,8 @@
       "ambiguous": "Ba a iya tabbatarwa ba — duba bitar tsaro kafin ka sake gwadawa.",
       "settleFailed": "An kammala aikin, amma ba mu iya rubuta sakamakon ba. Sake gwadawa.",
       "replayFailed": "Wannan aikin bai kammala ba. Sake gwadawa.",
-      "actionFailed": "Ba za a iya kammala wannan aikin ba. Sake gwadawa."
+      "actionFailed": "Ba za a iya kammala wannan aikin ba. Sake gwadawa.",
+      "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa."
     },
     "analysisState": {
       "queued": "Nazarin yana layin jira",

@@ -1417,7 +1417,8 @@
       "ambiguous": "Die Aktion konnte nicht bestätigt werden. Prüfe die Sicherheitsüberprüfung, bevor du es erneut versuchst.",
       "settleFailed": "Die Aktion wurde abgeschlossen, aber wir konnten das Ergebnis nicht speichern. Bitte versuche es erneut.",
       "replayFailed": "Diese Aktion wurde nicht abgeschlossen. Bitte versuche es erneut.",
-      "actionFailed": "Diese Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut."
+      "actionFailed": "Diese Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
+      "actionBlocked": "Diese Aktion konnte nicht abgeschlossen werden. Das Problem muss behoben werden, bevor du es erneut versuchen kannst."
     },
     "analysisState": {
       "queued": "Analyse in der Warteschlange",

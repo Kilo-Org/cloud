@@ -1928,7 +1928,8 @@
       "ambiguous": "Imeshindikana kuthibitisha matokeo — angalia ukaguzi wa usalama kabla ya kujaribu tena.",
       "settleFailed": "Kitendo kimekamilika, lakini hatukuweza kurekodi matokeo yake. Tafadhali jaribu tena.",
       "replayFailed": "Kitendo hiki hakikukamilika. Tafadhali jaribu tena.",
-      "actionFailed": "Imeshindikana kukamilisha kitendo hiki. Tafadhali jaribu tena."
+      "actionFailed": "Imeshindikana kukamilisha kitendo hiki. Tafadhali jaribu tena.",
+      "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza."
     },
     "analysisState": {
       "queued": "Uchambuzi uko kwenye foleni",

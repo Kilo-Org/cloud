@@ -1928,7 +1928,8 @@
       "ambiguous": "Pa t ka konfime — tcheke revizyon sekirite a anvan ou eseye ankò.",
       "settleFailed": "Aksyon an fini, men nou pa t ka anrejistre rezilta a. Tanpri eseye ankò.",
       "replayFailed": "Aksyon sa a pa fini. Tanpri eseye ankò.",
-      "actionFailed": "Pa t ka fini aksyon sa a. Tanpri eseye ankò."
+      "actionFailed": "Pa t ka fini aksyon sa a. Tanpri eseye ankò.",
+      "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò."
     },
     "analysisState": {
       "queued": "Analiz nan ke",

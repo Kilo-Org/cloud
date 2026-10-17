@@ -1928,7 +1928,8 @@
       "ambiguous": "Handlingen kunne ikke bekræftes. Tjek sikkerhedsgennemgangen, før du prøver igen.",
       "settleFailed": "Handlingen blev gennemført, men vi kunne ikke registrere resultatet. Prøv igen.",
       "replayFailed": "Denne handling blev ikke gennemført. Prøv igen.",
-      "actionFailed": "Handlingen kunne ikke gennemføres. Prøv igen."
+      "actionFailed": "Handlingen kunne ikke gennemføres. Prøv igen.",
+      "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen."
     },
     "analysisState": {
       "queued": "Analyse i kø",

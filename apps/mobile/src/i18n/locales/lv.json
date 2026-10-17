@@ -1951,7 +1951,8 @@
       "ambiguous": "Neizdevās apstiprināt rezultātu — pirms atkārtota mēģinājuma pārbaudi drošības pārskatījumu.",
       "settleFailed": "Darbība tika pabeigta, bet mēs nevarējām reģistrēt rezultātu. Lūdzu, mēģini vēlreiz.",
       "replayFailed": "Šī darbība netika pabeigta. Lūdzu, mēģini vēlreiz.",
-      "actionFailed": "Neizdevās pabeigt šo darbību. Lūdzu, mēģini vēlreiz."
+      "actionFailed": "Neizdevās pabeigt šo darbību. Lūdzu, mēģini vēlreiz.",
+      "actionBlocked": "Neizdevās pabeigt šo darbību. Vispirms jāatrisina problēma, lai varētu mēģināt vēlreiz."
     },
     "analysisState": {
       "queued": "Analīze rindā",

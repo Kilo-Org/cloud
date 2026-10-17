@@ -1928,7 +1928,8 @@
       "ambiguous": "Nuk u konfirmua — kontrollo rishikimin e sigurisë përpara se të provosh përsëri.",
       "settleFailed": "Veprimi u krye, por nuk mundëm ta regjistronim rezultatin. Provo përsëri.",
       "replayFailed": "Ky veprim nuk u krye. Provo përsëri.",
-      "actionFailed": "Ky veprim nuk u përfundua dot. Provo përsëri."
+      "actionFailed": "Ky veprim nuk u përfundua dot. Provo përsëri.",
+      "actionBlocked": "Ky veprim nuk u përfundua dot. Problemi duhet zgjidhur përpara se të provosh përsëri."
     },
     "analysisState": {
       "queued": "Analiza në radhë",

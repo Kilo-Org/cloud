@@ -1951,7 +1951,8 @@
       "ambiguous": "No s'ha pogut confirmar l'acció. Comprova la revisió de seguretat abans de tornar-ho a provar.",
       "settleFailed": "L'acció s'ha completat, però no hem pogut registrar el resultat. Torna-ho a provar.",
       "replayFailed": "Aquesta acció no s'ha completat. Torna-ho a provar.",
-      "actionFailed": "No s'ha pogut completar aquesta acció. Torna-ho a provar."
+      "actionFailed": "No s'ha pogut completar aquesta acció. Torna-ho a provar.",
+      "actionBlocked": "No s'ha pogut completar aquesta acció. Cal resoldre el problema abans de poder tornar-ho a provar."
     },
     "analysisState": {
       "queued": "Anàlisi en cua",

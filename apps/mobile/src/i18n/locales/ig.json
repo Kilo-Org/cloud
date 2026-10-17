@@ -1928,7 +1928,8 @@
       "ambiguous": "Enweghị ike ịchọpụta ma emechara ya — lelee nyocha nchebe tupu ị nwaa ọzọ.",
       "settleFailed": "Emechara omume a, mana anyị enweghị ike dekọọ nsonaazụ ya. Biko nwaa ọzọ.",
       "replayFailed": "Omume a emechaghị. Biko nwaa ọzọ.",
-      "actionFailed": "Enweghị ike imecha omume a. Biko nwaa ọzọ."
+      "actionFailed": "Enweghị ike imecha omume a. Biko nwaa ọzọ.",
+      "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ."
     },
     "analysisState": {
       "queued": "Nyocha dị n'ahịrị",

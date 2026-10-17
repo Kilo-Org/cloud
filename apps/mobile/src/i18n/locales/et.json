@@ -1928,7 +1928,8 @@
       "ambiguous": "Toimingu õnnestumist ei õnnestunud kinnitada — kontrolli turvalisuse läbivaadet enne uuesti proovimist.",
       "settleFailed": "Toiming lõppes edukalt, kuid me ei suutnud tulemust salvestada. Proovi uuesti.",
       "replayFailed": "Toimingut ei lõpetatud. Proovi uuesti.",
-      "actionFailed": "Seda toimingut ei õnnestunud lõpule viia. Proovi uuesti."
+      "actionFailed": "Seda toimingut ei õnnestunud lõpule viia. Proovi uuesti.",
+      "actionBlocked": "Seda toimingut ei õnnestunud lõpule viia. Probleem tuleb kõigepealt lahendada."
     },
     "analysisState": {
       "queued": "Analüüs järjekorras",

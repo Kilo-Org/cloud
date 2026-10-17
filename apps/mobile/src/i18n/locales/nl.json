@@ -1417,7 +1417,8 @@
       "ambiguous": "Het resultaat kon niet worden bevestigd. Controleer de beveiligingscontrole voordat je het opnieuw probeert.",
       "settleFailed": "De actie is voltooid, maar we konden het resultaat niet vastleggen. Probeer het opnieuw.",
       "replayFailed": "Deze actie is niet voltooid. Probeer het opnieuw.",
-      "actionFailed": "Deze actie kon niet worden voltooid. Probeer het opnieuw."
+      "actionFailed": "Deze actie kon niet worden voltooid. Probeer het opnieuw.",
+      "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost."
     },
     "analysisState": {
       "queued": "Analyse in de wachtrij",

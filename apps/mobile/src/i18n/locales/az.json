@@ -1928,7 +1928,8 @@
       "ambiguous": "Nəticəni təsdiqləmək mümkün olmadı — yenidən cəhd etməzdən əvvəl təhlükəsizlik icmalını yoxla.",
       "settleFailed": "İş tamamlandı, lakin nəticəni qeyd edə bilmədik. Yenidən cəhd et.",
       "replayFailed": "Bu iş tamamlanmadı. Yenidən cəhd et.",
-      "actionFailed": "Bu işi tamamlamaq mümkün olmadı. Yenidən cəhd et."
+      "actionFailed": "Bu işi tamamlamaq mümkün olmadı. Yenidən cəhd et.",
+      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",

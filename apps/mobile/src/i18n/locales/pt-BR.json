@@ -1393,7 +1393,8 @@
       "ambiguous": "Não foi possível confirmar — verifique a revisão de segurança antes de tentar novamente.",
       "settleFailed": "A ação foi concluída, mas não foi possível registrar o resultado. Tente novamente.",
       "replayFailed": "Esta ação não foi concluída. Tente novamente.",
-      "actionFailed": "Não foi possível concluir esta ação. Tente novamente."
+      "actionFailed": "Não foi possível concluir esta ação. Tente novamente.",
+      "actionBlocked": "Não foi possível concluir esta ação. É preciso corrigir o problema antes de tentar novamente."
     },
     "analysisState": {
       "queued": "Análise na fila",

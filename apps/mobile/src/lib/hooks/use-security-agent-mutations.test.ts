@@ -627,7 +627,9 @@ describe('ledger marker copy per surface', () => {
       data: { code: 'FORBIDDEN' },
     });
     const mappedForbidden = mapSecurityDismissOperationError(forbidden);
-    expect(mappedForbidden.message).toBe('Could not complete this action. Please try again.');
+    expect(mappedForbidden.message).toBe(
+      'Could not complete this action. The problem needs fixing before you can retry.'
+    );
     expect(isSecuritySyncRetryable(mappedForbidden)).toBe(false);
   });
 });

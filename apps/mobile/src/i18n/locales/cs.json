@@ -1974,7 +1974,8 @@
       "ambiguous": "Výsledek se nepodařilo potvrdit. Před dalším pokusem zkontrolujte bezpečnostní kontrolu.",
       "settleFailed": "Akce proběhla, ale výsledek se nám nepodařilo zaznamenat. Zkuste to znovu.",
       "replayFailed": "Tato akce neproběhla. Zkuste to znovu.",
-      "actionFailed": "Tuto akci se nepodařilo dokončit. Zkuste to znovu."
+      "actionFailed": "Tuto akci se nepodařilo dokončit. Zkuste to znovu.",
+      "actionBlocked": "Tuto akci se nepodařilo dokončit. Problém je nutné nejprve vyřešit, teprve pak můžete akci zopakovat."
     },
     "analysisState": {
       "queued": "Analýza ve frontě",

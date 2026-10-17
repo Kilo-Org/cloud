@@ -1393,7 +1393,8 @@
       "ambiguous": "Impossible de confirmer le résultat. Vérifiez la révision de sécurité avant de réessayer.",
       "settleFailed": "L'action a été effectuée, mais nous n'avons pas pu enregistrer le résultat. Réessayez.",
       "replayFailed": "Cette action n'a pas abouti. Réessayez.",
-      "actionFailed": "Impossible d'effectuer cette action. Réessayez."
+      "actionFailed": "Impossible d'effectuer cette action. Réessayez.",
+      "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer."
     },
     "analysisState": {
       "queued": "Analyse en file d'attente",

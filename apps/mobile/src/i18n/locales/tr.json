@@ -1417,7 +1417,8 @@
       "ambiguous": "İşlemin sonucu doğrulanamadı. Tekrar denemeden önce güvenlik incelemesini kontrol et.",
       "settleFailed": "İşlem tamamlandı, ancak sonucu kaydedemedik. Lütfen tekrar dene.",
       "replayFailed": "Bu işlem tamamlanmadı. Lütfen tekrar dene.",
-      "actionFailed": "Bu işlem tamamlanamadı. Lütfen tekrar dene."
+      "actionFailed": "Bu işlem tamamlanamadı. Lütfen tekrar dene.",
+      "actionBlocked": "Bu işlem tamamlanamadı. Yeniden denemeden önce sorunun düzeltilmesi gerekiyor."
     },
     "analysisState": {
       "queued": "Analiz kuyruğa alındı",

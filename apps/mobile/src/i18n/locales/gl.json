@@ -1928,7 +1928,8 @@
       "ambiguous": "Non se puido confirmar. Comproba a revisión de seguridade antes de tentalo de novo.",
       "settleFailed": "A acción completouse, pero non puidemos rexistrar o resultado. Téntao de novo.",
       "replayFailed": "Esta acción non se completou. Téntao de novo.",
-      "actionFailed": "Non se puido completar esta acción. Téntao de novo."
+      "actionFailed": "Non se puido completar esta acción. Téntao de novo.",
+      "actionBlocked": "Non se puido completar esta acción. Tes que resolver o problema antes de tentalo de novo."
     },
     "analysisState": {
       "queued": "Análise na cola",

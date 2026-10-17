@@ -1997,7 +1997,8 @@
       "ambiguous": "Ma stajniex nikkonfermaw ir-riżultat — iċċekkja r-reviżjoni tas-sigurtà qabel terġa' tipprova.",
       "settleFailed": "L-azzjoni tlestiet, imma ma stajniex nirreġistraw ir-riżultat. Jekk jogħġbok erġa' pprova.",
       "replayFailed": "Din l-azzjoni ma tlestietx. Jekk jogħġbok erġa' pprova.",
-      "actionFailed": "Ma stajniex nikkompletaw din l-azzjoni. Jekk jogħġbok erġa' pprova."
+      "actionFailed": "Ma stajniex nikkompletaw din l-azzjoni. Jekk jogħġbok erġa' pprova.",
+      "actionBlocked": "Ma stajniex nikkompletaw din l-azzjoni. Il-problema trid titfixxa qabel ma tista' terġa' tipprova."
     },
     "analysisState": {
       "queued": "Analiżi fil-kju",

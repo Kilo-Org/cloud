@@ -1928,7 +1928,8 @@
       "ambiguous": "Kunde inte bekräfta resultatet. Kontrollera säkerhetsgranskningen innan du försöker igen.",
       "settleFailed": "Åtgärden slutfördes, men vi kunde inte registrera resultatet. Försök igen.",
       "replayFailed": "Den här åtgärden slutfördes inte. Försök igen.",
-      "actionFailed": "Det gick inte att slutföra den här åtgärden. Försök igen."
+      "actionFailed": "Det gick inte att slutföra den här åtgärden. Försök igen.",
+      "actionBlocked": "Det gick inte att slutföra den här åtgärden. Problemet måste åtgärdas innan du kan försöka igen."
     },
     "analysisState": {
       "queued": "Analys i kö",

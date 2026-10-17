@@ -241,9 +241,10 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
     useDismissSecurityFinding('personal');
 
     // The server's English reason is not a catalog string, so the surface reads
-    // the localized generic sentence while the raw rejection stays as `cause`.
+    // the localized terminal-fallback sentence while the raw rejection stays as
+    // `cause`.
     await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
-      message: 'Could not complete this action. Please try again.',
+      message: 'Could not complete this action. The problem needs fixing before you can retry.',
     });
     expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
   });

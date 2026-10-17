@@ -1928,7 +1928,8 @@
       "ambiguous": "Tidak dapat mengesahkan hasil tindakan. Semak semakan keselamatan sebelum mencuba lagi.",
       "settleFailed": "Tindakan telah selesai, tetapi kami tidak dapat merekodkan hasilnya. Sila cuba lagi.",
       "replayFailed": "Tindakan ini tidak selesai. Sila cuba lagi.",
-      "actionFailed": "Tindakan ini tidak dapat disiapkan. Sila cuba lagi."
+      "actionFailed": "Tindakan ini tidak dapat disiapkan. Sila cuba lagi.",
+      "actionBlocked": "Tindakan ini tidak dapat disiapkan. Masalah ini perlu diselesaikan terlebih dahulu."
     },
     "analysisState": {
       "queued": "Analisis dalam baris gilir",

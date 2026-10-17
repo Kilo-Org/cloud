@@ -1928,7 +1928,8 @@
       "ambiguous": "Kunne ikke bekrefte resultatet. Sjekk sikkerhetsgjennomgangen før du prøver igjen.",
       "settleFailed": "Handlingen ble fullført, men vi kunne ikke registrere resultatet. Prøv igjen.",
       "replayFailed": "Denne handlingen ble ikke fullført. Prøv igjen.",
-      "actionFailed": "Kunne ikke fullføre denne handlingen. Prøv igjen."
+      "actionFailed": "Kunne ikke fullføre denne handlingen. Prøv igjen.",
+      "actionBlocked": "Kunne ikke fullføre denne handlingen. Problemet må løses før du kan prøve igjen."
     },
     "analysisState": {
       "queued": "Analyse i kø",

@@ -1951,7 +1951,8 @@
       "ambiguous": "Nu s-a putut confirma rezultatul — verifică revizuirea de securitate înainte de a încerca din nou.",
       "settleFailed": "Acțiunea s-a finalizat, dar nu am putut înregistra rezultatul. Încearcă din nou.",
       "replayFailed": "Această acțiune nu s-a finalizat. Încearcă din nou.",
-      "actionFailed": "Această acțiune nu a putut fi finalizată. Încearcă din nou."
+      "actionFailed": "Această acțiune nu a putut fi finalizată. Încearcă din nou.",
+      "actionBlocked": "Această acțiune nu a putut fi finalizată. Problema trebuie rezolvată înainte de a încerca din nou."
     },
     "analysisState": {
       "queued": "Analiză în coadă",

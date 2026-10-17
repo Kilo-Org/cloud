@@ -1417,7 +1417,8 @@
       "ambiguous": "無法確認操作結果。請先查看安全性審查，再試一次。",
       "settleFailed": "操作已完成，但我們無法記錄結果。請再試一次。",
       "replayFailed": "此操作未完成。請再試一次。",
-      "actionFailed": "無法完成此操作。請再試一次。"
+      "actionFailed": "無法完成此操作。請再試一次。",
+      "actionBlocked": "無法完成此操作。必須先修正此問題，才能重試。"
     },
     "analysisState": {
       "queued": "等待分析",

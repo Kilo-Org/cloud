@@ -1928,7 +1928,8 @@
       "ambiguous": "Lama xaqiijin karin — hubi dib-u-eegista amniga ka hor intaadan mar kale isku dayin.",
       "settleFailed": "Ficilka waa la dhammeeyay, laakiin ma awoodin inaan galmeeyno natiijada. Fadlan mar kale isku day.",
       "replayFailed": "Ficilkan lama dhammeeyn. Fadlan mar kale isku day.",
-      "actionFailed": "Ficilkan lama dhammeeyi karin. Fadlan mar kale isku day."
+      "actionFailed": "Ficilkan lama dhammeeyi karin. Fadlan mar kale isku day.",
+      "actionBlocked": "Ficilkan lama dhammeeyi karin. Waa in dhibaatadan horay loo xalliyo."
     },
     "analysisState": {
       "queued": "Falanqaynta ayaa safan",

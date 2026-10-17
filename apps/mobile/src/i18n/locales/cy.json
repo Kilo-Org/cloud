@@ -2020,7 +2020,8 @@
       "ambiguous": "Ni lwyddwyd i gadarnhau'r canlyniad — gwiriwch yr adolygiad diogelwch cyn rhoi cynnig eto.",
       "settleFailed": "Cafodd y weithred ei chwblhau, ond ni allem gofnodi'r canlyniad. Ceisiwch eto.",
       "replayFailed": "Ni chwblhawyd y weithred hon. Ceisiwch eto.",
-      "actionFailed": "Ni chafodd y weithred hon ei chwblhau. Ceisiwch eto."
+      "actionFailed": "Ni chafodd y weithred hon ei chwblhau. Ceisiwch eto.",
+      "actionBlocked": "Ni chafodd y weithred hon ei chwblhau. Rhaid trwsio'r broblem yn gyntaf."
     },
     "analysisState": {
       "queued": "Dadansoddiad mewn ciw",

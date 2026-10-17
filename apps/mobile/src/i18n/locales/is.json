@@ -1928,7 +1928,8 @@
       "ambiguous": "Ekki tókst að staðfesta niðurstöðuna — athugaðu öryggisskoðunina áður en þú reynir aftur.",
       "settleFailed": "Aðgerðinni var lokið, en okkur tókst ekki að skrá niðurstöðuna. Reyndu aftur.",
       "replayFailed": "Þessari aðgerð var ekki lokið. Reyndu aftur.",
-      "actionFailed": "Ekki tókst að ljúka þessari aðgerð. Reyndu aftur."
+      "actionFailed": "Ekki tókst að ljúka þessari aðgerð. Reyndu aftur.",
+      "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur."
     },
     "analysisState": {
       "queued": "Greining í biðröð",

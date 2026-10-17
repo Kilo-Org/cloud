@@ -1431,7 +1431,8 @@
       "ambiguous": "Nie udało się potwierdzić wyniku — sprawdź przegląd bezpieczeństwa przed ponowną próbą.",
       "settleFailed": "Akcja została wykonana, ale nie udało się nam zapisać wyniku. Spróbuj ponownie.",
       "replayFailed": "Ta akcja nie została ukończona. Spróbuj ponownie.",
-      "actionFailed": "Nie udało się ukończyć tej akcji. Spróbuj ponownie."
+      "actionFailed": "Nie udało się ukończyć tej akcji. Spróbuj ponownie.",
+      "actionBlocked": "Nie udało się ukończyć tej akcji. Najpierw należy rozwiązać problem."
     },
     "analysisState": {
       "queued": "Analiza w kolejce",

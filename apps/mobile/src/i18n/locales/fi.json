@@ -1928,7 +1928,8 @@
       "ambiguous": "Toiminnon onnistumista ei voitu vahvistaa. Tarkista tietoturvakatsaus ennen kuin yrität uudelleen.",
       "settleFailed": "Toiminto valmistui, mutta emme voineet tallentaa tulosta. Yritä uudelleen.",
       "replayFailed": "Tämä toiminto ei valmistunut. Yritä uudelleen.",
-      "actionFailed": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen."
+      "actionFailed": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen.",
+      "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin."
     },
     "analysisState": {
       "queued": "Analyysi jonossa",

@@ -1928,7 +1928,8 @@
       "ambiguous": "Ezin izan da berretsi — egiaztatu segurtasun-azterketa berriro saiatu aurretik.",
       "settleFailed": "Ekintza burutu da, baina ezin izan dugu emaitza erregistratu. Saiatu berriro.",
       "replayFailed": "Ekintza hau ez da burutu. Saiatu berriro.",
-      "actionFailed": "Ezin izan da ekintza hau burutu. Saiatu berriro."
+      "actionFailed": "Ezin izan da ekintza hau burutu. Saiatu berriro.",
+      "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik."
     },
     "analysisState": {
       "queued": "Azterketa ilaran",

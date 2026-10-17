@@ -1424,7 +1424,8 @@
       "ambiguous": "No se pudo confirmar el resultado. Comprueba la revisión de seguridad antes de volver a intentarlo.",
       "settleFailed": "La acción se completó, pero no pudimos registrar el resultado. Inténtalo de nuevo.",
       "replayFailed": "Esta acción no se completó. Inténtalo de nuevo.",
-      "actionFailed": "No se pudo completar esta acción. Inténtalo de nuevo."
+      "actionFailed": "No se pudo completar esta acción. Inténtalo de nuevo.",
+      "actionBlocked": "No se pudo completar esta acción. Hay que solucionar el problema antes de poder reintentarlo."
     },
     "analysisState": {
       "queued": "Análisis en cola",

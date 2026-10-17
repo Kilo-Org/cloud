@@ -1951,7 +1951,8 @@
       "ambiguous": "Nije moguće potvrditi ishod — provjeri pregled sigurnosti prije ponovnog pokušaja.",
       "settleFailed": "Radnja je izvršena, ali nismo mogli zabilježiti rezultat. Pokušaj ponovno.",
       "replayFailed": "Ova radnja nije dovršena. Pokušaj ponovno.",
-      "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovno."
+      "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovno.",
+      "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem je potrebno riješiti prije ponovnog pokušaja."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",

@@ -1928,7 +1928,8 @@
       "ambiguous": "Amal natijasini tasdiqlab bo'lmadi — qayta urinishdan oldin xavfsizlik ko'rigini tekshiring.",
       "settleFailed": "Amal bajarildi, ammo natijani qayd etishimiz mumkin bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "replayFailed": "Bu amal tugallanmadi. Iltimos, qayta urinib ko'ring.",
-      "actionFailed": "Bu amalni tugallab bo'lmadi. Iltimos, qayta urinib ko'ring."
+      "actionFailed": "Bu amalni tugallab bo'lmadi. Iltimos, qayta urinib ko'ring.",
+      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak."
     },
     "analysisState": {
       "queued": "Tahlil navbatda",

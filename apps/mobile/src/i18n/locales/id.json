@@ -1417,7 +1417,8 @@
       "ambiguous": "Hasil tindakan belum dapat dipastikan. Periksa tinjauan keamanan sebelum mencoba lagi.",
       "settleFailed": "Tindakan telah selesai, tetapi kami tidak dapat mencatat hasilnya. Coba lagi.",
       "replayFailed": "Tindakan ini tidak selesai. Coba lagi.",
-      "actionFailed": "Tindakan ini tidak dapat diselesaikan. Coba lagi."
+      "actionFailed": "Tindakan ini tidak dapat diselesaikan. Coba lagi.",
+      "actionBlocked": "Tindakan ini tidak dapat diselesaikan. Masalahnya harus diperbaiki terlebih dahulu sebelum mencoba lagi."
     },
     "analysisState": {
       "queued": "Analisis dalam antrean",

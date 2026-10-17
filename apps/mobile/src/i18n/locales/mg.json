@@ -1928,7 +1928,8 @@
       "ambiguous": "Tsy voamarina ny vokatra — jereo ny fanamarinana ny fiarovana alohan'ny hanandramana indray.",
       "settleFailed": "Vita ny hetsika, fa tsy voatahiry ny vokatra. Andramo indray azafady.",
       "replayFailed": "Tsy vita ity hetsika ity. Andramo indray azafady.",
-      "actionFailed": "Tsy azo vitaina ity hetsika ity. Andramo indray azafady."
+      "actionFailed": "Tsy azo vitaina ity hetsika ity. Andramo indray azafady.",
+      "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana."
     },
     "analysisState": {
       "queued": "Voalahatra ny famakafakana",

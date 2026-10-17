@@ -115,20 +115,25 @@ function ledgerMarkerCopy(error: Error): string | null {
 /**
  * Maps any failure onto the copy its surface shows. A known marker keeps its
  * exact catalog sentence; the in-progress duplicate keeps the surface's copy;
- * everything else reads the generic sentence, because the server's own English
- * explanation cannot be translated on the device. Retryability is decided from
- * the raw error before its message is replaced.
+ * everything else reads one localized fallback sentence, because the server's
+ * own English explanation cannot be translated on the device. The fallback
+ * follows the retry class a terminal rejection gets: its controls stay down,
+ * so the copy must not tell the reader to try again. Retryability is decided
+ * from the raw error before its message is replaced.
  */
 function mapSecurityOperationError(error: unknown, surface: SecurityErrorSurface): Error {
   const retryable = isSecuritySyncRetryable(error);
   const marker = error instanceof Error ? ledgerMarkerCopy(error) : null;
-  const fallback = isOperationInProgress(error)
+  const inProgress = isOperationInProgress(error);
+  const fallback = inProgress
     ? i18n.t(
         surface === 'sync'
           ? 'securityAgent.mutations.syncInProgress'
           : 'securityAgent.mutations.dismissalInProgress'
       )
-    : i18n.t('securityAgent.mutations.actionFailed');
+    : i18n.t(
+        retryable ? 'securityAgent.mutations.actionFailed' : 'securityAgent.mutations.actionBlocked'
+      );
   return new SecurityMutationError(marker ?? fallback, retryable, error);
 }
 

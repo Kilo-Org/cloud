@@ -1928,7 +1928,8 @@
       "ambiguous": "Kon nie bevestig nie — kyk na die sekuriteitshersiening voordat jy weer probeer.",
       "settleFailed": "Die aksie is voltooi, maar ons kon nie die resultaat vaslê nie. Probeer asseblief weer.",
       "replayFailed": "Hierdie aksie het nie voltooi nie. Probeer asseblief weer.",
-      "actionFailed": "Kon nie hierdie aksie voltooi nie. Probeer asseblief weer."
+      "actionFailed": "Kon nie hierdie aksie voltooi nie. Probeer asseblief weer.",
+      "actionBlocked": "Hierdie aksie kon nie voltooi word nie. Die probleem moet eers reggemaak word voordat jy weer kan probeer."
     },
     "analysisState": {
       "queued": "Ontleding in die tou",

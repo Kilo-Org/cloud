@@ -1928,7 +1928,8 @@
       "ambiguous": "Nem sikerült megerősíteni a művelet eredményét. Újrapróbálkozás előtt ellenőrizd a biztonsági áttekintést.",
       "settleFailed": "A művelet lefutott, de nem sikerült rögzítenünk az eredményt. Próbáld újra.",
       "replayFailed": "Ez a művelet nem fejeződött be. Próbáld újra.",
-      "actionFailed": "Nem sikerült befejezni ezt a műveletet. Próbáld újra."
+      "actionFailed": "Nem sikerült befejezni ezt a műveletet. Próbáld újra.",
+      "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell."
     },
     "analysisState": {
       "queued": "Elemzés várólistán",

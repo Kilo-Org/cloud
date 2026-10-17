@@ -1928,7 +1928,8 @@
       "ambiguous": "A kò lè jẹ́rìí sí i — ṣàyẹ̀wò ìwádìí ààbò náà kí o tó tún gbìyànjú.",
       "settleFailed": "A ti parun iṣẹ́ náà, ṣùgbọ́n a kò lè ṣàkósílẹ̀ èrè rẹ̀. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "replayFailed": "Iṣẹ́ yìí kò parun. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "actionFailed": "A kò lè parun iṣẹ́ yìí. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
+      "actionFailed": "A kò lè parun iṣẹ́ yìí. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+      "actionBlocked": "A kò lè parun iṣẹ́ yìí. Ìṣòro yìí gbọ́dọ̀ túnsẹ̀ kí a tó lè gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "analysisState": {
       "queued": "Ìtúpalẹ̀ wà ní ìlà ìdúró",

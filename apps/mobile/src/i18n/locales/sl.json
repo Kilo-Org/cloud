@@ -1974,7 +1974,8 @@
       "ambiguous": "Dejanja ni bilo mogoče potrditi — pred ponovnim poskusom preveri varnostni pregled.",
       "settleFailed": "Dejanje je bilo izvedeno, a rezultata nismo mogli zabeležiti. Poskusi znova.",
       "replayFailed": "To dejanje se ni izvedlo. Poskusi znova.",
-      "actionFailed": "Tega dejanja ni bilo mogoče dokončati. Poskusi znova."
+      "actionFailed": "Tega dejanja ni bilo mogoče dokončati. Poskusi znova.",
+      "actionBlocked": "Tega dejanja ni bilo mogoče dokončati. Težavo je treba najprej odpraviti."
     },
     "analysisState": {
       "queued": "Analiza v čakalni vrsti",

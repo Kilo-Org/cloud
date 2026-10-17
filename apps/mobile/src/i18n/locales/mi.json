@@ -1928,7 +1928,8 @@
       "ambiguous": "Kāore i taea te whakaū — tirohia te arotake haumarutanga i mua i te whakamātau anō.",
       "settleFailed": "Oti te mahi, engari kāore i taea te tuhi i te hua. Whakamātau anō.",
       "replayFailed": "Kāore i oti tēnei mahi. Whakamātau anō.",
-      "actionFailed": "Kāore i taea te oti i tēnei mahi. Whakamātau anō."
+      "actionFailed": "Kāore i taea te oti i tēnei mahi. Whakamātau anō.",
+      "actionBlocked": "Kāore i taea te oti i tēnei mahi. Me whakatika te raru i te tuatahi."
     },
     "analysisState": {
       "queued": "Kei te rārangi tatari te tātari",

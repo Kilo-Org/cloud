@@ -1928,7 +1928,8 @@
       "ambiguous": "Couldn't confirm — check the security review before retrying.",
       "settleFailed": "The action completed, but we could not record the result. Please try again.",
       "replayFailed": "This action did not complete. Please try again.",
-      "actionFailed": "Could not complete this action. Please try again."
+      "actionFailed": "Could not complete this action. Please try again.",
+      "actionBlocked": "Could not complete this action. The problem needs fixing before you can retry."
     },
     "analysisState": {
       "queued": "Analysis queued",

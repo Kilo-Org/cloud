@@ -449,10 +449,12 @@ export default function CloudChatPage({
   const changesViewOpen = canOpenChanges && changesViewScope === fileScope;
   const [resolvedFileScope, setResolvedFileScope] = useState(fileScope);
   const filesVisible = canOpenChanges && resolvedFileScope === fileScope;
+  // Commits come from the loaded chat, so they follow its own access, not the workspace's.
+  const commitsVisible = filesVisible && currentSessionCanOpenChanges;
   const [commitsCache, setCommitsCache] = useState<{
     infos: StoredMessage['info'][];
     commits: readonly SessionCommit[];
-    filesVisible: boolean;
+    commitsVisible: boolean;
     value: ReadonlyMap<string, readonly SessionCommit[]>;
   } | null>(null);
   const messageInfosForCommits = [...staticMessages, ...dynamicMessages].map(
@@ -461,7 +463,7 @@ export default function CloudChatPage({
   let commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]>;
   if (
     commitsCache !== null &&
-    commitsCache.filesVisible === filesVisible &&
+    commitsCache.commitsVisible === commitsVisible &&
     commitsCache.commits === commits &&
     commitsCache.infos.length === messageInfosForCommits.length &&
     commitsCache.infos.every((info, index) => info === messageInfosForCommits[index])
@@ -470,12 +472,12 @@ export default function CloudChatPage({
   } else {
     commitsAfterMessage = commitsByMessageAnchor(
       [...staticMessages, ...dynamicMessages],
-      filesVisible ? commits : []
+      commitsVisible ? commits : []
     );
     setCommitsCache({
       infos: messageInfosForCommits,
       commits,
-      filesVisible,
+      commitsVisible,
       value: commitsAfterMessage,
     });
   }

@@ -91,7 +91,6 @@ export function OptionList<T extends string, TSaveResult>({
             <Button
               variant="outline"
               size="sm"
-              loading={pending !== null}
               className="mt-3 self-start"
               accessibilityLabel={t('common.retry')}
               onPress={() => {

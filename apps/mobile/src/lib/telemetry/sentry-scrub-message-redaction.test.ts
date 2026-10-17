@@ -4,6 +4,8 @@ import { scrubBreadcrumb, scrubEvent } from './sentry-scrub';
 
 // Assembled from parts: the fixture is a URL component, not a credential URI.
 const USERINFO = ['user', 'abcdefghijklmnopqrst'].join(':');
+const OPAQUE_RUN = 'abcdefghijklmnopqrst';
+const FRAGMENT_URL = `https://example.com/oauth/callback#${OPAQUE_RUN}`;
 
 /**
  * The scrubber's message and URL coverage: the payload text Sentry shows — the
@@ -97,7 +99,7 @@ describe('scrubEvent URL reduction', () => {
 
   it('reduces request.url to its origin and path', () => {
     const fragment = scrubEvent({
-      request: { url: 'https://example.com/oauth/callback#abcdefghijklmnopqrst' },
+      request: { url: FRAGMENT_URL },
     });
     const userinfo = scrubEvent({
       request: { url: `https://${USERINFO}@api.example.com/v1/latency` },
@@ -112,7 +114,7 @@ describe('scrubBreadcrumb URL reduction', () => {
   it('strips a fragment from breadcrumb data.url', () => {
     const breadcrumb = {
       category: 'navigation',
-      data: { url: 'https://example.com/oauth/callback#abcdefghijklmnopqrst' },
+      data: { url: FRAGMENT_URL },
     };
 
     const result = scrubBreadcrumb(breadcrumb);

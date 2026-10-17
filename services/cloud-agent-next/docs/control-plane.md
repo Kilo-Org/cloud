@@ -952,6 +952,12 @@ Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `hear
 worktree-deletion requests (`worktree.prepareDeletion`, `worktree.delete`; both answer with
 `worktree.result`). Terminal bytes use the existing wrapper-to-Session-DO terminal socket.
 
+### Startup mode rollout
+
+- An image change requires capture to key a snapshot with the image that the allocation started
+  with. Capture uses that recorded image, including after a Worker deploy. A legacy running
+  allocation with no recorded image skips capture until the next allocation.
+
 ### Preview
 
 Preview reaches a dev server in a live interactive (`workspace_*`) sandbox through a dedicated

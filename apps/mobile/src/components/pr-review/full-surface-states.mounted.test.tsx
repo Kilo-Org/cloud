@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewOverview } from './pr-review-overview';
+import { PrReviewUnavailableActions } from './pr-review-unavailable-actions';
 import { PrReviewCommentComposerScreen } from './pr-review-comment-composer-screen';
 import { PrReviewReviewSubmitScreen } from './pr-review-review-submit-screen';
 import { PrReviewMergeScreen } from './pr-review-merge-screen';
@@ -198,6 +199,38 @@ describe('PR Overview full-body states', () => {
           String(node.type) === 'Button' && node.props.accessibilityLabel === 'Check connection'
       )
     ).toHaveLength(1);
+    unmount();
+  });
+
+  it('gives a provider not-found its retry and connection-check actions while GitHub keeps the install CTA', async () => {
+    query.error.data.code = 'NOT_FOUND';
+    const scope: ProviderPrScope = {
+      ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
+      organizationId: null,
+    };
+    const { renderer, unmount } = await renderWithProviders(
+      <ProviderPrScopeProvider value={scope}>
+        {createElement(PrReviewOverview, overviewProps)}
+      </ProviderPrScopeProvider>
+    );
+    const body = renderer.root.find(node => String(node.type) === 'EmptyState');
+    // The provider actions row replaces GitHub's install CTA. The mocked
+    // EmptyState never renders its action slot, so the row is asserted
+    // structurally; its buttons are covered by the component's own suite.
+    expect(body.props.action.type).toBe(PrReviewUnavailableActions);
+    body.props.action.props.onRetry();
+    expect(query.refetch).toHaveBeenCalledOnce();
+    unmount();
+  });
+
+  it('keeps the GitHub not-found arm on the install CTA only', async () => {
+    query.error.data.code = 'NOT_FOUND';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, overviewProps)
+    );
+    const body = renderer.root.find(node => String(node.type) === 'EmptyState');
+    expect(String(body.props.action.type)).toBe('Button');
+    expect(body.props.action.props.children.props.children).toBe('Install the Kilo GitHub App');
     unmount();
   });
 

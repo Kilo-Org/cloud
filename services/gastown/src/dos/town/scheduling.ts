@@ -33,6 +33,7 @@ type SchedulingContext = {
   resolveKilocodeToken: () => Promise<string | undefined>;
   emitEvent: (data: Omit<GastownEventData, 'userId' | 'delivery'>) => void;
   prepareContainerBilling: () => Promise<void>;
+  containerStartsBlocked: () => boolean;
 };
 
 type RigConfig = {
@@ -62,6 +63,10 @@ export async function dispatchAgent(
   bead: Bead,
   options?: { systemPromptOverride?: string }
 ): Promise<boolean> {
+  if (ctx.containerStartsBlocked()) {
+    console.warn(`${LOG} dispatchAgent: container starts blocked, skipping agent=${agent.id}`);
+    return false;
+  }
   try {
     const rigId = agent.rig_id ?? rigs.listRigs(ctx.sql)[0]?.id ?? '';
     const rigConfig = rigId ? await ctx.getRigConfig(rigId) : null;

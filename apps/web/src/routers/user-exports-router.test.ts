@@ -450,6 +450,53 @@ describe('user exports router guards and serialization', () => {
     else await expect(request).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
+  it.each(['owner', 'admin'] as const)(
+    'resolves child export access across organization lifecycle states for %s',
+    async role => {
+      const parent = await createTestOrganization('Export Lifecycle Parent', stranger.id, 0);
+      const child = await createTestOrganization('Export Lifecycle Child', stranger.id, 0);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await db.insert(organization_memberships).values({
+        organization_id: parent.id,
+        kilo_user_id: owner.id,
+        role,
+      });
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.userExports.requestOrganization({ organizationId: child.id })
+      ).resolves.toMatchObject({ subjectType: 'organization' });
+      const exportId = await insertReadyOrganizationExport(owner.id, child.id);
+
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, parent.id));
+
+      await expect(
+        caller.userExports.requestOrganization({ organizationId: child.id })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      await expect(caller.userExports.requestDownloadCode({ exportId })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+
+      await db.insert(organization_memberships).values({
+        organization_id: child.id,
+        kilo_user_id: owner.id,
+        role,
+      });
+      await expect(
+        caller.userExports.requestOrganization({ organizationId: child.id })
+      ).resolves.toMatchObject({ subjectType: 'organization' });
+      await expect(caller.userExports.requestDownloadCode({ exportId })).resolves.toHaveProperty(
+        'challengeId'
+      );
+    }
+  );
+
   // A regular member of the organization exports their own data and nothing else. They
   // are not an owner or admin, so the organization's export is not theirs to request,
   // and an admin colleague's export is not theirs to see.

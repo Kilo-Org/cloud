@@ -83,10 +83,11 @@ const CONTEXT_CHAR_LIMIT = 4_000;
 const FILE_CONTEXT_CHAR_LIMIT = 60_000;
 
 /**
- * Pinned summarizer: the same model and reasoning effort for every generated
- * summary, so catalog text stays consistent across runs and authors.
+ * One summarizer for every generated summary: the same model family and reasoning
+ * effort across runs and authors. The `-latest` alias follows each new DeepSeek
+ * Flash build, so catalog wording can shift when a new build ships.
  */
-export const SUMMARY_MODEL = 'kilo/deepseek/deepseek-v4.1-flash';
+export const SUMMARY_MODEL = 'kilo/~deepseek/deepseek-flash-latest';
 export const SUMMARY_VARIANT = 'max';
 /** `kilo run` invocation timeout: a whole batch (file source included) must fit. */
 const SUMMARY_RUN_TIMEOUT_MS = 10 * 60 * 1000;

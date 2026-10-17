@@ -111,6 +111,8 @@ describe('GitLab instance URL safety', () => {
     ['https://[2002:7f00:1::]', '6to4 loopback'],
     ['https://[::ffff:127.0.0.1]', 'IPv4-mapped loopback dotted'],
     ['https://[::ffff:7f00:1]', 'IPv4-mapped loopback hex'],
+    ['https://[::ffff:0:127.0.0.1]', 'IPv4-translated loopback dotted'],
+    ['https://[::ffff:0:7f00:1]', 'IPv4-translated loopback hex'],
     ['https://[100::1]', 'discard-only'],
     ['https://[3fff::1]', 'documentation 3fff'],
     ['https://[2001:db8::1]', 'documentation 2001:db8'],
@@ -128,6 +130,7 @@ describe('GitLab instance URL safety', () => {
     ['https://[2606:4700::6810:85e5]', 'ordinary public IPv6'],
     ['https://[::ffff:8.8.8.8]', 'IPv4-mapped public dotted'],
     ['https://[::ffff:808:808]', 'IPv4-mapped public hex'],
+    ['https://[::ffff:0:808:808]', 'IPv4-translated public hex'],
     ['https://[2002:808:808::]', '6to4 public'],
   ])('accepts safe public IPv6 literal %p (%s)', async url => {
     await expect(assertGitLabUrlResolvesSafely(url)).resolves.toBeUndefined();

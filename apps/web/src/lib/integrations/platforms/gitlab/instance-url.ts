@@ -305,6 +305,11 @@ function embeddedIpv4Bytes(bytes: Uint8Array): Uint8Array | null {
     // IPv4-mapped (::ffff:0:0/96)
     return bytes.slice(12, 16);
   }
+  const firstEightZero = bytes.slice(0, 8).every(byte => byte === 0);
+  if (firstEightZero && bytes[8] === 0xff && bytes[9] === 0xff && bytes[10] === 0 && bytes[11] === 0) {
+    // IPv4-translated (::ffff:0:0:0/96)
+    return bytes.slice(12, 16);
+  }
   if (bytes[0] === 0x20 && bytes[1] === 0x02) {
     // 6to4 (2002::/16) embeds the IPv4 in bytes 2-5
     return bytes.slice(2, 6);

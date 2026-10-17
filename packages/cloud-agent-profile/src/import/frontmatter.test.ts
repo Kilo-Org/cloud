@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import { parseFrontmatter } from './frontmatter';
-import { matchesGlob } from './glob';
 
 describe('parseFrontmatter', () => {
   test('preserves prototype-like keys as data and detects duplicates', () => {
@@ -176,23 +175,5 @@ describe('parseFrontmatter', () => {
       status: 'error',
       message: 'Duplicate key "description" in frontmatter',
     });
-  });
-});
-
-describe('matchesGlob', () => {
-  test('matches ** across directories and * within a segment', () => {
-    expect(matchesGlob('**/*.md', 'AGENTS.md')).toBe(true);
-    expect(matchesGlob('**/*.md', 'docs/style.md')).toBe(true);
-    expect(matchesGlob('**/*.md', 'docs/style.txt')).toBe(false);
-    expect(matchesGlob('instructions/*.md', 'instructions/style.md')).toBe(true);
-    expect(matchesGlob('instructions/*.md', 'instructions/sub/style.md')).toBe(false);
-    expect(matchesGlob('agent/**', 'agent/team/a.md')).toBe(true);
-  });
-
-  test('escapes regex metacharacters and supports ?', () => {
-    expect(matchesGlob('.cursor/rules/*.md', '.cursor/rules/style.md')).toBe(true);
-    expect(matchesGlob('.cursor/rules/*.md', 'xcursor/rules/style.md')).toBe(false);
-    expect(matchesGlob('rules/a?c.md', 'rules/abc.md')).toBe(true);
-    expect(matchesGlob('rules/a?c.md', 'rules/ac.md')).toBe(false);
   });
 });

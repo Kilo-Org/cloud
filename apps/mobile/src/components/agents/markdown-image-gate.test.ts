@@ -2,7 +2,7 @@ import { type TFunction } from 'i18next';
 import { marked } from 'marked';
 import { describe, expect, it, vi } from 'vitest';
 
-import { findMarkdownImages, gateMarkdownImages } from './markdown-image-gate';
+import { findMarkdownImages, gateMarkdownImages, parseImageLoadUrl } from './markdown-image-gate';
 
 // The trusted-image-host store reaches SecureStore, Sentry and the toast
 // bridge on import; this suite only rewrites markdown.
@@ -21,6 +21,28 @@ const IMAGE = '![a](https://evil.example/x.png)';
 function gate(value: string): string {
   return gateMarkdownImages(value, findMarkdownImages(value), t);
 }
+
+describe('parseImageLoadUrl', () => {
+  const encoded = encodeURIComponent('https://example.com/a b.png');
+
+  it('decodes the payload of a gated image Load link', () => {
+    expect(parseImageLoadUrl(`kilo-image-load:${encoded}`)).toBe(
+      'https://example.com/a b.png'
+    );
+  });
+
+  it('returns null for a link without the scheme', () => {
+    expect(parseImageLoadUrl('https://example.com/x.png')).toBeNull();
+  });
+
+  it.each(['kilo-image-load:%', 'kilo-image-load:%E0%A4%A'])(
+    'returns null for a malformed percent escape %s',
+    (url) => {
+      expect(() => decodeURIComponent(url.slice('kilo-image-load:'.length))).toThrow();
+      expect(parseImageLoadUrl(url)).toBeNull();
+    }
+  );
+});
 
 describe('gateMarkdownImages', () => {
   it('rewrites an image and leaves no fetchable copy', () => {

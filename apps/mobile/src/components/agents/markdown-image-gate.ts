@@ -59,9 +59,12 @@ export function isMarkdownImageDisplayable(href: string): boolean {
 
 /** The image URI behind a gated image's "Load" link, or null for any other link. */
 export function parseImageLoadUrl(url: string): string | null {
-  return url.startsWith(IMAGE_LOAD_SCHEME)
-    ? decodeURIComponent(url.slice(IMAGE_LOAD_SCHEME.length))
-    : null;
+  if (!url.startsWith(IMAGE_LOAD_SCHEME)) return null;
+  try {
+    return decodeURIComponent(url.slice(IMAGE_LOAD_SCHEME.length));
+  } catch {
+    return null;
+  }
 }
 
 function escapeMarkdownText(text: string): string {

@@ -380,7 +380,7 @@ describe('upsertSlackInstallation', () => {
     expect(inserted.metadata.model_slug).toBe('test/allowed-model');
   });
 
-  it('clears a stale model on an organization installation when the policy allows none', async () => {
+  it('drops a non-string stored model value on reinstall', async () => {
     mockLimit.mockResolvedValue([
       buildSlackIntegration({
         owned_by_user_id: null,
@@ -401,6 +401,28 @@ describe('upsertSlackInstallation', () => {
     const updated = mockUpdateSet.mock.calls[0][0] as { metadata: Record<string, unknown> };
     expect('model_slug' in updated.metadata).toBe(false);
     expect(updated.metadata.access_token).toBe('xoxb-new-token');
+  });
+
+  it('preserves the selected model on reinstall', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({
+        owned_by_user_id: null,
+        owned_by_organization_id: orgOwner.id,
+        metadata: { access_token: 'xoxb-old-token', model_slug: 'anthropic/claude-sonnet-4.5' },
+      }),
+    ]);
+    mockGetDefaultAllowedModel.mockResolvedValue(null);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner: orgOwner, teamId: 'T123', installation });
+
+    const updated = mockUpdateSet.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect(updated.metadata.model_slug).toBe('anthropic/claude-sonnet-4.5');
   });
 
   it('rejects installing a Slack workspace connected to another owner', async () => {

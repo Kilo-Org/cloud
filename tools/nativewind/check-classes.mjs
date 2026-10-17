@@ -229,8 +229,11 @@ function checkCompilerStillDropsThese() {
   let compile;
   try {
     ({ compile } = require('react-native-css/compiler'));
-  } catch {
-    console.warn('check-classes: react-native-css not resolvable, skipped the compiler assertions');
+  } catch (error) {
+    const detail = error instanceof Error ? error.message.split('\n')[0] : String(error);
+    fail(
+      `check-classes: react-native-css/compiler did not resolve (${detail}) — run pnpm install; the compiler pins cannot be verified without it`
+    );
     return;
   }
   const firstValue = css => {

@@ -534,6 +534,9 @@ export const clientCaseResults = sqliteTable(
     score: real('score').notNull(),
     grader_cost_usd: real('grader_cost_usd').notNull(),
     uploaded_at: text('uploaded_at').notNull(),
+    // Per-upload version, incremented whenever a stored case is replaced. Two uploads can
+    // share a millisecond, so this is what tells a rollup view apart from the uploads it saw.
+    revision: integer('revision').notNull().default(1),
   },
   table => [primaryKey({ columns: [table.profile_id, table.case_id, table.rep] })]
 );

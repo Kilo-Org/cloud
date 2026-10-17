@@ -168,11 +168,11 @@ export async function getClientCase(
  */
 export async function saveClientCaseResult(
   db: D1Database,
-  row: ClientCaseResultRow
+  row: Omit<ClientCaseResultRow, 'revision'>
 ): Promise<boolean> {
   const result = await drizzle(db)
     .insert(clientCaseResults)
-    .values(row)
+    .values({ ...row, revision: 1 })
     .onConflictDoUpdate({
       target: [clientCaseResults.profile_id, clientCaseResults.case_id, clientCaseResults.rep],
       set: {
@@ -185,6 +185,7 @@ export async function saveClientCaseResult(
         score: row.score,
         grader_cost_usd: row.grader_cost_usd,
         uploaded_at: row.uploaded_at,
+        revision: sql`${clientCaseResults.revision} + 1`,
       },
       setWhere: not(ranSuccessfully),
     });
@@ -265,6 +266,7 @@ async function listGradedClientCases(
           score: clientCaseResults.score,
           grader_cost_usd: clientCaseResults.grader_cost_usd,
           uploaded_at: clientCaseResults.uploaded_at,
+          revision: clientCaseResults.revision,
         })
         .from(clientCaseResults)
         .where(
@@ -375,7 +377,7 @@ export async function refreshClientProfileRollup(
 ): Promise<void> {
   const cases = await listGradedClientCases(db, [profile.id]);
   const rollup = rollUpClientCases(profile, cases, plannedResults);
-  const uploads = JSON.stringify(cases.map(row => [row.case_id, row.rep, row.uploaded_at]));
+  const uploads = JSON.stringify(cases.map(row => [row.case_id, row.rep, row.revision]));
   await drizzle(db)
     .update(clientProfiles)
     .set({ ...rollup, updated_at: nowIso })
@@ -386,7 +388,7 @@ export async function refreshClientProfileRollup(
         sql`NOT EXISTS (
           SELECT 1 FROM ${clientCaseResults}
           WHERE ${clientCaseResults.profile_id} = ${profile.id}
-            AND (${clientCaseResults.case_id}, ${clientCaseResults.rep}, ${clientCaseResults.uploaded_at})
+            AND (${clientCaseResults.case_id}, ${clientCaseResults.rep}, ${clientCaseResults.revision})
               NOT IN (SELECT value ->> 0, value ->> 1, value ->> 2 FROM json_each(${uploads}))
         )`
       )

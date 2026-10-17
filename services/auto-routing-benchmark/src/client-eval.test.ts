@@ -353,10 +353,13 @@ describe('client eval (real SQLite)', () => {
     });
   });
 
-  it('drops a stale rollup when a concurrent upload replaces a case in place', async () => {
+  it('drops a stale rollup when a concurrent upload replaces a case in the same millisecond', async () => {
     await gradeClientEvalResult(db, CONFIG, upload({ exitCode: 1, output: 'down' }), deps);
     const [profile] = await listOwnerClientProfiles(db, context, 'efficient');
     if (!profile) throw new Error('profile missing');
+    const uploads = sqlite
+      .prepare('SELECT uploaded_at FROM client_case_results ORDER BY case_id')
+      .all();
     let raced = false;
     const racing = new Proxy(db, {
       get(target, property) {
@@ -364,9 +367,10 @@ describe('client eval (real SQLite)', () => {
           return (query: string) => {
             if (!raced && /^update "client_profiles"/i.test(query)) {
               raced = true;
+              // A replacement that keeps the same wall clock, so only the upload
+              // revision can tell the view apart from the stored uploads.
               sqlite.exec(`
-                UPDATE client_case_results SET exit_code = 0, score = 1,
-                  uploaded_at = '2099-01-01T00:00:00.000Z';
+                UPDATE client_case_results SET exit_code = 0, score = 1, revision = revision + 1;
                 UPDATE client_profiles SET status = 'ready', updated_at = 'fresh';
               `);
             }
@@ -381,6 +385,9 @@ describe('client eval (real SQLite)', () => {
 
     await refreshClientProfileRollup(racing, profile, planned, '2099-01-02T00:00:00.000Z');
     expect(raced).toBe(true);
+    expect(
+      sqlite.prepare('SELECT uploaded_at FROM client_case_results ORDER BY case_id').all()
+    ).toEqual(uploads);
     expect(sqlite.prepare('SELECT status, results, updated_at FROM client_profiles').get()).toEqual(
       { status: 'ready', results: 1, updated_at: 'fresh' }
     );

@@ -12,7 +12,8 @@
  * A failed refresh is negatively cached for `failureBackoffMs`: callers keep
  * receiving the last-known-good or default value and no new fetch is attempted
  * until the window passes, so an outage does not amplify into one failing fetch
- * per request.
+ * per request. A failure does not make the stored value younger; once the
+ * backoff window passes the next call refreshes normally.
  */
 
 export const FAILURE_BACKOFF_MS = 30_000;
@@ -62,9 +63,11 @@ export function createCachedFetch<T>(
         return value;
       } catch {
         // A failure is observed once, by the caller that started the refresh;
-        // concurrent callers share this promise, so it never rejects.
+        // concurrent callers share this promise, so it never rejects. The
+        // stored clock resets, so the freshness check cannot mask the backoff
+        // window with a still-fresh last-known-good value.
         const value = cached?.value ?? defaultValue;
-        cached = { value, at: Date.now(), retryAfterMs: Date.now() + failureBackoffMs };
+        cached = { value, at: 0, retryAfterMs: Date.now() + failureBackoffMs };
         return value;
       } finally {
         inFlight = null;

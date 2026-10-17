@@ -19,6 +19,7 @@ import {
   type ClientEvalDeps,
 } from './client-eval';
 import {
+  deleteClientCaseUpload,
   listOwnerClientProfiles,
   refreshClientProfileRollup,
   rollUpClientCases,
@@ -398,6 +399,34 @@ describe('client eval (real SQLite)', () => {
     ).toEqual({ status: 'ready', accuracy: 1, updated_at: '2099-01-03T00:00:00.000Z' });
   });
 
+  it('never reissues a revision after a case is deleted and uploaded again', async () => {
+    const judged = { caseId: judgedCase.id };
+    const revisions = () =>
+      sqlite
+        .prepare('SELECT revision FROM client_case_results')
+        .all()
+        .map(row => row.revision);
+    await gradeClientEvalResult(db, CONFIG, upload({ ...judged, exitCode: 1 }), deps);
+    expect(revisions()).toEqual([1]);
+    writeUsage.mockRejectedValueOnce(new Error('network'));
+    await expect(gradeClientEvalResult(db, CONFIG, upload(judged), deps)).rejects.toMatchObject({
+      code: 'internal_error',
+    });
+    expect(revisions()).toEqual([]);
+
+    await gradeClientEvalResult(db, CONFIG, upload({ ...judged, exitCode: 1 }), deps);
+    expect(revisions()).toEqual([3]);
+    const [profile] = await listOwnerClientProfiles(db, context, 'efficient');
+    if (!profile) throw new Error('profile missing');
+    await deleteClientCaseUpload(db, {
+      profileId: profile.id,
+      caseId: judgedCase.id,
+      rep: 0,
+      revision: 1,
+    });
+    expect(revisions()).toEqual([3]);
+  });
+
   it('bills each payer under its own usage id', async () => {
     const judged = { caseId: judgedCase.id };
     writeUsage.mockResolvedValueOnce({ kind: 'unavailable', reason: 'not_recorded' });
@@ -489,6 +518,7 @@ describe('rollUpClientCases', () => {
     p50_latency_ms: null,
     p95_latency_ms: null,
     route_summaries: [],
+    upload_seq: 0,
     created_at: '',
     updated_at: '',
   };

@@ -52,6 +52,7 @@ export class FakeSessionPeer {
       onWorktreeChangesReady: async notification => {
         this.received.push({ kind: 'worktree_changes', sessionId });
         this.worktreeChanges.push({ sessionId, notification });
+        return true;
       },
       issueRuntimeCredentialProxyGrant: async () => null,
     };
@@ -80,7 +81,7 @@ export function createRuntimeProxyMintingPeer(
     // A deliberately long, live delegation so handoff selection can pick this
     // synthetic member without a real authorization store.
     getRuntimeProxyDelegationExpiresAt: async () => Date.now() + 24 * 60 * 60_000,
-    onWorktreeChangesReady: async () => undefined,
+    onWorktreeChangesReady: async () => true,
     issueRuntimeCredentialProxyGrant: async (fence: ControlRuntimeCredentialProxyFence) => {
       const { userId, kiloSessionId } = identity(sessionId);
       const now = Date.now();

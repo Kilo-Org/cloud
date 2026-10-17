@@ -422,6 +422,43 @@ describe('control-plane worktree changes (B10)', () => {
     wrapper.close();
   }, 15_000);
 
+  it('stops notifying a reader after its session is deleted', async () => {
+    const sessionId = newSessionId();
+    const siblingId = newSessionId();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createFakeProvider();
+    const first = await startSessionWithSandbox({ sessionId, sandboxId, provider, worktreeId });
+    const second = await startSessionWithSandbox({
+      sessionId: siblingId,
+      sandboxId,
+      provider,
+      worktreeId,
+    });
+    const sandbox = sandboxes.getByName(sandboxId);
+    const wrapper = await connectAndHello(provider, sandboxId, 'wr_deleted_reader');
+    await markRouteReady(first, wrapper, sessionId);
+    await markRouteReady(second, wrapper, siblingId);
+    await settleCaptures(wrapper);
+    await first.getWorktreeChanges();
+    const subscriberKey = `worktree_changes/${worktreeId}/subscribers/${sessionId}`;
+    const subscribed = () =>
+      runInDurableObject(
+        sandbox,
+        (_instance, state) => state.storage.kv.get(subscriberKey) !== undefined
+      );
+    expect(await subscribed()).toBe(true);
+
+    await first.deleteSession();
+    const refresh = second.refreshWorktreeChanges();
+    const frame = await awaitFrame(wrapper, 'worktree.snapshot');
+    replySnapshot(wrapper, frame);
+    await expect(refresh).resolves.toMatchObject({ status: 'refreshed' });
+
+    await waitFor(async () => expect(await subscribed()).toBe(false));
+    wrapper.close();
+  }, 15_000);
+
   it('promotes newer historical sibling captures with lower revisions and rejects older seeds after eviction', async () => {
     const sessionId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;

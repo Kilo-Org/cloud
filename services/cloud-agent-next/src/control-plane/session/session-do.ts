@@ -1508,12 +1508,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  async onWorktreeChangesReady(notification: WorktreeChangesReady): Promise<void> {
+  async onWorktreeChangesReady(notification: WorktreeChangesReady): Promise<boolean> {
     await this.initialized;
     const parsed = worktreeChangesReadySchema.parse(notification);
-    await this.enqueue(async () => {
-      if (this.metadata?.workspace?.worktreeId !== parsed.worktreeId) return;
+    return this.enqueue(async () => {
+      if (this.metadata?.workspace?.worktreeId !== parsed.worktreeId) return false;
       this.worktreeChanges.ready(parsed.revision);
+      return true;
     });
   }
 

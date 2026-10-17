@@ -22,6 +22,11 @@ export type SharedWorktreeChangesInput = {
   saved?: { snapshot: WorktreeChangesSnapshot; files: WorktreeFileRecord[] };
 };
 
+/** The marker of a session that reads the worktree's changes and gets its ready notifications. */
+export function worktreeSubscriberKey(worktreeId: string, sessionId: string): string {
+  return `worktree_changes/${worktreeId}/subscribers/${sessionId}`;
+}
+
 export function createSharedWorktreeChanges(deps: {
   storage: DurableObjectStorage;
   capture(input: ControlPlaneWorktreeCaptureInput): Promise<ControlPlaneControlResult>;

@@ -282,6 +282,7 @@ import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import {
   createSharedWorktreeChanges,
+  worktreeSubscriberKey,
   type SharedWorktreeChangesInput,
 } from './worktree-changes.js';
 import type {
@@ -372,7 +373,8 @@ export type ControlPlaneSessionPeer = {
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   onEvents(notification: ControlPlaneEventsNotification): Promise<void>;
   onOutcome(outcome: ControlPlaneOutcome): Promise<void>;
-  onWorktreeChangesReady(notification: WorktreeChangesReady): Promise<void>;
+  /** False when the session no longer reads the worktree, so it is not notified again. */
+  onWorktreeChangesReady(notification: WorktreeChangesReady): Promise<boolean>;
   /**
    * R1: the Session DO owns the grant and mints the runtime credential proxy
    * handle. The Sandbox DO passes its own allocation fence so the Session DO
@@ -1054,7 +1056,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!worktreeId) return;
     const sessionIds = new Set([context.session.sessionId]);
     for (const [, sessionId] of this.ctx.storage.kv.list({
-      prefix: `worktree_changes/${worktreeId}/subscribers/`,
+      prefix: worktreeSubscriberKey(worktreeId, ''),
     })) {
       sessionIds.add(z.string().parse(sessionId));
     }
@@ -1082,7 +1084,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     ) {
       return;
     }
-    const key = `worktree_changes/${worktreeId}/subscribers/${session.sessionId}`;
+    const key = worktreeSubscriberKey(worktreeId, session.sessionId);
     if (this.ctx.storage.kv.get(key) === undefined) {
       this.ctx.storage.kv.put(key, session.sessionId);
     }
@@ -3938,7 +3940,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
           case 'outcome':
             return target.onOutcome(notification.payload);
           case 'worktree_changes':
-            return target.onWorktreeChangesReady(notification.payload);
+            return target.onWorktreeChangesReady(notification.payload).then(subscribed => {
+              // A deleted or moved session leaves; a later read subscribes it again.
+              if (subscribed === false) {
+                this.ctx.storage.kv.delete(
+                  worktreeSubscriberKey(notification.payload.worktreeId, sessionId)
+                );
+              }
+            });
         }
       },
       `notification.${notification.kind}`,

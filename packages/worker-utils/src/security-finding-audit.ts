@@ -420,8 +420,59 @@ function pickPresent<T extends Record<string, unknown>>(values: T): Partial<T> {
   return Object.fromEntries(entries) as Partial<T>;
 }
 
-const DISALLOWED_AUDIT_JSON_KEY_PATTERN =
-  /(^|_)(actor|recipient|email|prompt|rawmarkdown|raw_markdown|transcript|assistant|provider_response|authorization|auth_header|cookie|token|secret|password|credential|headers|raw_error)(_|$)/i;
+const DISALLOWED_AUDIT_JSON_KEY_PHRASES = [
+  'actor',
+  'recipient',
+  'email',
+  'prompt',
+  'rawmarkdown',
+  'raw_markdown',
+  'transcript',
+  'assistant',
+  'provider_response',
+  'authorization',
+  'auth_header',
+  'cookie',
+  'token',
+  'secret',
+  'password',
+  'credential',
+  'headers',
+  'raw_error',
+] as const;
+
+const DISALLOWED_AUDIT_JSON_KEY_PATTERN = new RegExp(
+  `(^|_)(${DISALLOWED_AUDIT_JSON_KEY_PHRASES.join('|')})(_|$)`,
+  'i'
+);
+
+const DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS: Record<string, true> = {};
+for (const phrase of DISALLOWED_AUDIT_JSON_KEY_PHRASES) {
+  DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS[phrase.replace(/_/g, '')] = true;
+}
+
+function auditJsonKeyTokens(key: string): string[] {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map(token => token.toLowerCase());
+}
+
+function isDisallowedAuditJsonKey(key: string): boolean {
+  if (DISALLOWED_AUDIT_JSON_KEY_PATTERN.test(key)) return true;
+
+  const tokens = auditJsonKeyTokens(key);
+  for (let index = 0; index < tokens.length; index += 1) {
+    const single = DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS[tokens[index]] === true;
+    const pair =
+      index + 1 < tokens.length &&
+      DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS[tokens[index] + tokens[index + 1]] === true;
+    if (single || pair) return true;
+  }
+  return false;
+}
+
 const EMAIL_VALUE_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const EMAIL_VALUE_REPLACEMENT_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 
@@ -466,7 +517,7 @@ function validateSafeAuditJson(
   if (value && typeof value === 'object') {
     for (const [key, child] of Object.entries(value)) {
       const childPath = [...path, key];
-      if (DISALLOWED_AUDIT_JSON_KEY_PATTERN.test(key)) {
+      if (isDisallowedAuditJsonKey(key)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `Audit JSON field is not allowed: ${childPath.join('.')}`,

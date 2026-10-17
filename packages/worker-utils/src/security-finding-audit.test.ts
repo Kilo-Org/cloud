@@ -207,6 +207,76 @@ describe('security finding audit contract', () => {
     ).toThrow('appears to contain an email');
   });
 
+  it('rejects camelCase, snake_case, and kebab-case sensitive keys', () => {
+    const disallowedKeys = [
+      'accessToken',
+      'access_token',
+      'access-token',
+      'X-Access-Token',
+      'authorizationHeader',
+      'authorization_header',
+      'clientSecret',
+      'client_secret',
+      'userPassword',
+      'user_password',
+      'userEmail',
+      'user_email',
+      'authHeader',
+      'auth_header',
+      'providerResponse',
+      'provider_response',
+      'rawMarkdown',
+      'raw_markdown',
+      'rawmarkdown',
+      'rawError',
+      'raw_error',
+      'actorEmail',
+      'transcriptText',
+      'cookieJar',
+      'credentialId',
+    ];
+
+    for (const key of disallowedKeys) {
+      expect(() =>
+        buildSecurityFindingAuditLogValues({ ...baseInput, metadata: { [key]: 1 } })
+      ).toThrow(/Audit JSON field is not allowed/);
+      expect(() =>
+        buildSecurityFindingAuditLogValues({ ...baseInput, afterState: { [key]: 1 } })
+      ).toThrow(/Audit JSON field is not allowed/);
+    }
+
+    expect(() =>
+      buildSecurityFindingAuditLogValues({
+        ...baseInput,
+        metadata: { accessToken: 'Bearer abc123' },
+      })
+    ).toThrow(/Audit JSON field is not allowed: accessToken/);
+  });
+
+  it('allows keys where a denied word is only part of another word', () => {
+    const allowedKeys = [
+      'tokenizer',
+      'emailish',
+      'secretary',
+      'authorizedBy',
+      'prompting',
+      'actorish',
+      'assistants',
+      'cookies',
+      'credentialed',
+    ];
+
+    for (const key of allowedKeys) {
+      expect(
+        buildSecurityFindingAuditLogValues({ ...baseInput, metadata: { [key]: 'value' } })
+      ).toBeDefined();
+    }
+
+    expect(() =>
+      buildSecurityFindingAuditLogValues({ ...baseInput, metadata: { tokenCount: 3 } })
+    ).toThrow(/Audit JSON field is not allowed/);
+  });
+
   it('uses deterministic escaped event keys', () => {
     expect(deriveSecurityFindingAuditEventKey(['owner:user_123', 'finding/42'])).toBe(
       'security_finding_audit:v1:owner%3Auser_123:finding%2F42'

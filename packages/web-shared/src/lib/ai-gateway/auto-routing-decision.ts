@@ -1,6 +1,5 @@
 import {
   AutoRoutingDecisionResponseSchema,
-  CUSTOM_ROUTER_ERROR_HTTP_STATUS,
   CustomRouterErrorResponseSchema,
   detectRequiredInputModalities,
   estimateRoutingTokens,
@@ -119,10 +118,12 @@ async function postDecision(
     status = response.status;
     if (!response.ok) {
       outcome = 'http_error';
-      onError('Efficient auto decision request failed', { error: `status ${response.status}` });
       const rejection = CustomRouterErrorResponseSchema.safeParse(
         await response.json().catch(() => null)
       );
+      if (!rejection.success || !isCallerRejection(rejection.data.error.code)) {
+        onError('Efficient auto decision request failed', { error: `status ${response.status}` });
+      }
       return rejection.success
         ? { kind: 'rejected', error: rejection.data.error }
         : { kind: 'failed' };
@@ -183,6 +184,14 @@ export type CustomRouterDecisionOutcome =
   | { kind: 'rejected'; code: CustomRouterErrorCode; message: string }
   | { kind: 'unavailable' };
 
+// Only rejections about the caller's router reach the client. Any other worker error (an internal
+// secret mismatch, a quota, an internal fault) is the gateway's problem, not the caller's.
+const CALLER_REJECTIONS = ['router_not_found', 'custom_router_unavailable'] as const;
+
+function isCallerRejection(code: CustomRouterErrorCode): boolean {
+  return (CALLER_REJECTIONS as readonly CustomRouterErrorCode[]).includes(code);
+}
+
 // A custom router never falls back outside its pool (ADR 0005 invariant 2), so a worker that
 // cannot answer is reported as such instead of turning into a static fallback model.
 export async function fetchCustomRouterDecision(
@@ -202,7 +211,7 @@ export async function fetchCustomRouterDecision(
   if (outcome.kind === 'ok') {
     return { kind: 'ok', decision: outcome.response.decision, costUsd: outcome.response.cost };
   }
-  if (outcome.kind === 'rejected' && CUSTOM_ROUTER_ERROR_HTTP_STATUS[outcome.error.code] < 500) {
+  if (outcome.kind === 'rejected' && isCallerRejection(outcome.error.code)) {
     return { kind: 'rejected', code: outcome.error.code, message: outcome.error.message };
   }
   return { kind: 'unavailable' };

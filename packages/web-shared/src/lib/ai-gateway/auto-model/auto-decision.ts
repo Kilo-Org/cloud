@@ -1,4 +1,5 @@
 import {
+  isVirtualAutoModelId,
   parseCustomRouterCandidateModel,
   verifyAutoDecision,
 } from '@kilocode/auto-routing-contracts';
@@ -13,6 +14,7 @@ export type AutoDecisionRejection =
   | 'organization_mismatch'
   | 'model_mismatch'
   | 'client_entry'
+  | 'auto_model'
   | 'variant_unavailable';
 
 export type AutoDecisionCheck =
@@ -40,6 +42,10 @@ export async function checkAutoDecision(params: {
   // The CLI dispatches client picks itself; the gateway cannot serve them.
   if (parseCustomRouterCandidateModel(payload.model)?.kind === 'client') {
     return { kind: 'rejected', reason: 'client_entry' };
+  }
+  // A decision names one concrete pool entry; an auto model would re-enter routing.
+  if (isVirtualAutoModelId(payload.model)) {
+    return { kind: 'rejected', reason: 'auto_model' };
   }
   if (payload.model.toLowerCase() !== params.model.toLowerCase()) {
     return { kind: 'rejected', reason: 'model_mismatch' };

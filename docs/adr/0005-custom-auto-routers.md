@@ -91,7 +91,8 @@ The benchmark worker stays the only writer of measurements and routing tables.
 | Any other entry, including Kilo-stored direct-BYOK IDs | Owner's CLI | Owner | Owner-scoped client profiles |
 
 - Platform-paid admission is limited to 20 new models per base router per owner per rolling 24
-  hours. Ready and pending models do not count.
+  hours. Ready and pending models do not count. A save over the limit gets `quota_exceeded`
+  (HTTP 429) with `retryAt`, and every other validation runs before admission.
 - The frontier base gets an owner queue, as the efficient base has today.
 - Client profiles are keyed by (owner, base router, entry key, variant, engine identity,
   repetitions). They are never shared with another owner or promoted to the platform.
@@ -108,12 +109,15 @@ The benchmark worker stays the only writer of measurements and routing tables.
 `kilo auto eval <router>` runs missing and stale client pairs. It shows an estimate and asks for
 confirmation. It requires Docker for every case. It runs each case in a local image built from
 `node:22-slim` with the host's CLI version installed, the same base as the platform container.
-Local endpoints are reached through `host.docker.internal`.
+The host's CLI version must be a published version; a source or branch build must pass
+`--cli-version <version>`. Local endpoints are reached through `host.docker.internal`.
 
 1. The CLI asks for a plan. The plan lists (entry, variant, case, repetition) items that have no
    current result.
-2. The CLI fetches the prompt of each case. The golden answer and the check never leave the
-   benchmark worker.
+2. The CLI fetches the prompt of each case. The prompt is the exact `kilo run` argument that the
+   platform runner sends, built by one function for both paths, so client and platform rows are
+   measured on identical input. The golden answer and the check never leave the benchmark
+   worker.
 3. The CLI uploads each output with cost, duration, exit code, and timeout state.
 4. The benchmark worker grades the output with the platform graders. It bills judged-grader
    cost to the owner as usage model `auto-routing/grader`. An owner with an insufficient balance
@@ -148,10 +152,18 @@ that the CLI can serve. Otherwise it sends the custom model ID to the gateway.
 - The request carries the raw OpenAI-format `messages` and `tools`, the session ID, and the
   client entries this CLI can serve. The worker runs the gateway's normalization.
 - The worker drops client entries that the CLI did not list.
+- Organization model policy (group-policy grants, provider limits, the deny list, and the
+  data-collection rule) runs in the gateway. The worker asks the gateway for the denied gateway
+  entries through an internal endpoint, so one implementation applies on both paths. On a
+  transient failure, the worker retries once. If the lookup still fails, listed client entries
+  can serve; otherwise the worker returns a retryable error, never `custom_router_unavailable`.
+- Users in a blocked email domain get `forbidden` on every public route. If the blocked-domain
+  list cannot load, the worker returns a retryable error.
 - The response names the chosen entry and variant, and a signed decision ID.
 - When the pick is a gateway model, the CLI calls the gateway with the concrete model ID and the
-  `X-Kilo-Auto-Decision` header. The gateway verifies the decision, checks that the model
-  matches, and records the custom router ID as `auto_model`.
+  `X-Kilo-Auto-Decision` header. The gateway verifies the decision, checks that the user,
+  organization, model, and variant match, and records the custom router ID as `auto_model`. A
+  decision for a client entry or a `kilo-auto/*` model is rejected.
 - Client picks are recorded only in the worker decision log. The CLI reports no client usage.
 
 Authentication, organization membership, and balance checks shared by the gateway and the
@@ -161,7 +173,12 @@ worker live in an internal package.
 
 Older CLIs, OpenClaw, and API clients send the custom model ID to the gateway. The gateway calls
 the internal `/decide` with the custom router reference. The worker considers gateway entries
-only.
+only. The gateway passes `router_not_found` and `custom_router_unavailable` to the caller; any
+other worker failure is a retryable `auto_routing_unavailable`. The gateway does not fall back to
+a model outside the pool.
+
+The `kilo-auto-frontier-routing` flag gates only the platform frontier table. A custom router with
+a frontier base serves its own pool and does not read that table, so the flag does not apply.
 
 ### Null decisions
 
@@ -173,7 +190,7 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
 
 1. Ship custom routers behind the PostHog flag `kilo-auto-custom-routers`. The flag gates router
    creation, the `/models` listing, and the web editor. A router can exist only for a flagged
-   owner, so the workers need no flag check.
+   owner, so the gateway and the workers need no flag check.
 2. At graduation, one deploy does the cutover:
    - Each saved owner pool becomes a custom router with slug `efficient`, base `efficient`, the
      owner's configured mode, and the first pool entry as the default member.

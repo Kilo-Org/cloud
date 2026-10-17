@@ -63,7 +63,8 @@ function stripToolAttachmentContent(attachment: ReadableToolAttachment): FilePar
   const stripped = { ...attachment, url: '' };
   const source = stripped.source;
   if (
-    source !== undefined &&
+    typeof source === 'object' &&
+    source !== null &&
     'text' in source &&
     typeof source.text === 'object' &&
     source.text !== null &&

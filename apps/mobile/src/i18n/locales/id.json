@@ -25,6 +25,7 @@
     "error": "kesalahan: {{error}}",
     "back": "Kembali",
     "somethingWentWrong": "Terjadi kesalahan.",
+    "actionNotRecorded": "Kami tidak dapat mencatat tindakan ini. Silakan coba lagi nanti.",
     "couldNotOpen": "Tidak dapat membuka {{label}}.",
     "link": "tautan",
     "takingLonger": "Proses ini memakan waktu lebih lama dari perkiraan. Kamu dapat menutup layar ini dan memeriksa kembali.",
@@ -1412,7 +1413,11 @@
       "syncMayNotHaveCompleted": "Sinkronisasi mungkin belum selesai. Coba lagi untuk menyelaraskan statusnya, atau batalkan.",
       "syncInProgress": "Sinkronisasi keamanan sedang berlangsung. Coba lagi.",
       "dismissalInProgress": "Pengabaian temuan ini sedang diproses. Coba lagi.",
-      "couldNotReadPendingSyncs": "Tidak dapat membaca sinkronisasi yang tertunda. Coba lagi."
+      "couldNotReadPendingSyncs": "Tidak dapat membaca sinkronisasi yang tertunda. Coba lagi.",
+      "ambiguous": "Hasil tindakan belum dapat dipastikan. Periksa tinjauan keamanan sebelum mencoba lagi.",
+      "settleFailed": "Tindakan telah selesai, tetapi kami tidak dapat mencatat hasilnya. Coba lagi.",
+      "replayFailed": "Tindakan ini tidak selesai. Coba lagi.",
+      "actionFailed": "Tindakan ini tidak dapat diselesaikan. Coba lagi."
     },
     "analysisState": {
       "queued": "Analisis dalam antrean",
@@ -2937,7 +2942,6 @@
       "mergeResultDefaultError": "GitHub tidak menyelesaikan penggabungan.",
       "mergeResultNotCompleted": "{{term}} tidak digabungkan. Periksa statusnya lalu coba lagi.",
       "ambiguous": "Hasil tindakan belum dapat dipastikan. Periksa PR sebelum mencoba lagi.",
-      "persistenceFailed": "Kami tidak dapat mencatat tindakan ini. Silakan coba lagi nanti.",
       "forbidden": "Akses tidak diizinkan."
     },
     "capabilities": {

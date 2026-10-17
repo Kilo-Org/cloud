@@ -25,6 +25,7 @@
     "error": "viga: {{error}}",
     "back": "Tagasi",
     "somethingWentWrong": "Midagi läks valesti.",
+    "actionNotRecorded": "Seda toimingut ei õnnestunud salvestada. Proovi hiljem uuesti.",
     "couldNotOpen": "Avamine ebaõnnestus: {{label}}.",
     "link": "veebilink",
     "takingLonger": "See võtab oodatust kauem aega. Sa võid selle sulgeda ja hiljem uuesti vaadata.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub ei lõpetanud ühendamist.",
       "mergeResultNotCompleted": "{{term}} ei liidetud. Kontrolli olekut ja proovi uuesti.",
       "ambiguous": "Toimingu õnnestumist ei õnnestunud kinnitada — kontrolli PR-i enne uuesti proovimist.",
-      "persistenceFailed": "Seda toimingut ei õnnestunud salvestada. Proovi hiljem uuesti.",
       "forbidden": "See toiming pole lubatud."
     },
     "capabilities": {
@@ -1924,7 +1924,11 @@
       "syncMayNotHaveCompleted": "Sünkroonimine ei pruukinud lõppeda. Oleku ühtlustamiseks proovi uuesti või loobu.",
       "syncInProgress": "Turbesünkroonimine on juba käimas. Proovi uuesti.",
       "dismissalInProgress": "See kõrvalejätmine on juba käimas. Proovi uuesti.",
-      "couldNotReadPendingSyncs": "Ootel sünkroonimisi ei õnnestunud lugeda. Proovi uuesti."
+      "couldNotReadPendingSyncs": "Ootel sünkroonimisi ei õnnestunud lugeda. Proovi uuesti.",
+      "ambiguous": "Toimingu õnnestumist ei õnnestunud kinnitada — kontrolli turvalisuse läbivaadet enne uuesti proovimist.",
+      "settleFailed": "Toiming lõppes edukalt, kuid me ei suutnud tulemust salvestada. Proovi uuesti.",
+      "replayFailed": "Toimingut ei lõpetatud. Proovi uuesti.",
+      "actionFailed": "Seda toimingut ei õnnestunud lõpule viia. Proovi uuesti."
     },
     "analysisState": {
       "queued": "Analüüs järjekorras",

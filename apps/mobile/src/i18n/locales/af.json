@@ -25,6 +25,7 @@
     "error": "fout: {{error}}",
     "back": "Terug",
     "somethingWentWrong": "Iets het verkeerd geloop.",
+    "actionNotRecorded": "Ons kon nie hierdie aksie aanteken nie. Probeer asseblief later weer.",
     "couldNotOpen": "Kon nie {{label}} oopmaak nie.",
     "link": "skakel",
     "takingLonger": "Dit neem langer as verwag. Jy kan dit toemaak en weer nagaan.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub het nie die samevoeging voltooi nie.",
       "mergeResultNotCompleted": "Die {{term}} is nie saamgevoeg nie. Gaan sy status na en probeer weer.",
       "ambiguous": "Kon nie bevestig nie — kyk na die PR voordat jy weer probeer.",
-      "persistenceFailed": "Ons kon nie hierdie aksie aanteken nie. Probeer asseblief later weer.",
       "forbidden": "Toegang is verbode."
     },
     "capabilities": {
@@ -1924,7 +1924,11 @@
       "syncMayNotHaveCompleted": "'N Sinkronisasie is dalk nie voltooi nie. Probeer weer om die status daarvan na te gaan en by te werk, of laat vaar dit.",
       "syncInProgress": "'N Sekuriteitsinkronisasie is reeds aan die gang. Probeer asseblief weer.",
       "dismissalInProgress": "Hierdie verwerping is reeds aan die gang. Probeer asseblief weer.",
-      "couldNotReadPendingSyncs": "Kon nie hangende sinkronisasies lees nie. Probeer weer."
+      "couldNotReadPendingSyncs": "Kon nie hangende sinkronisasies lees nie. Probeer weer.",
+      "ambiguous": "Kon nie bevestig nie — kyk na die sekuriteitshersiening voordat jy weer probeer.",
+      "settleFailed": "Die aksie is voltooi, maar ons kon nie die resultaat vaslê nie. Probeer asseblief weer.",
+      "replayFailed": "Hierdie aksie het nie voltooi nie. Probeer asseblief weer.",
+      "actionFailed": "Kon nie hierdie aksie voltooi nie. Probeer asseblief weer."
     },
     "analysisState": {
       "queued": "Ontleding in die tou",

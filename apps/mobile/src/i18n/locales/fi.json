@@ -25,6 +25,7 @@
     "error": "virhe: {{error}}",
     "back": "Takaisin",
     "somethingWentWrong": "Jokin meni pieleen.",
+    "actionNotRecorded": "Emme voineet tallentaa tätä toimintoa. Yritä myöhemmin uudelleen.",
     "couldNotOpen": "Avaaminen epäonnistui: {{label}}.",
     "link": "linkki",
     "takingLonger": "Tämä kestää odotettua kauemmin. Voit sulkea tämän ja tarkistaa myöhemmin.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub ei saattanut yhdistämistä loppuun.",
       "mergeResultNotCompleted": "{{term}} ei yhdistynyt. Tarkista sen tila ja yritä uudelleen.",
       "ambiguous": "Toiminnon onnistumista ei voitu vahvistaa. Tarkista PR ennen kuin yrität uudelleen.",
-      "persistenceFailed": "Emme voineet tallentaa tätä toimintoa. Yritä myöhemmin uudelleen.",
       "forbidden": "Toiminto ei ole sallittu."
     },
     "capabilities": {
@@ -1924,7 +1924,11 @@
       "syncMayNotHaveCompleted": "Synkronointi on ehkä kesken. Yritä uudelleen sen tilan selvittämiseksi tai hylkää se.",
       "syncInProgress": "Tietoturvasynkronointi on jo käynnissä. Yritä uudelleen.",
       "dismissalInProgress": "Tämä hylkäys on jo käynnissä. Yritä uudelleen.",
-      "couldNotReadPendingSyncs": "Odottavia synkronointeja ei voitu lukea. Yritä uudelleen."
+      "couldNotReadPendingSyncs": "Odottavia synkronointeja ei voitu lukea. Yritä uudelleen.",
+      "ambiguous": "Toiminnon onnistumista ei voitu vahvistaa. Tarkista tietoturvakatsaus ennen kuin yrität uudelleen.",
+      "settleFailed": "Toiminto valmistui, mutta emme voineet tallentaa tulosta. Yritä uudelleen.",
+      "replayFailed": "Tämä toiminto ei valmistunut. Yritä uudelleen.",
+      "actionFailed": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen."
     },
     "analysisState": {
       "queued": "Analyysi jonossa",

@@ -34,12 +34,7 @@ import {
   useSecurityAgentRepositories,
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
-import {
-  isSecurityConfigurationError,
-  isSecuritySyncRetryable,
-  securityConfigurationCopy,
-  securitySyncReconcileCopy,
-} from '@/lib/hooks/use-security-agent-mutations';
+import { isSecuritySyncRetryable, securitySyncReconcileCopy } from '@/lib/security-agent-ledger';
 import { useSecurityDismissFailures } from '@/lib/hooks/use-security-dismiss-draft';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -330,11 +325,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         ) : null}
 
         {triggerSync.isError ? (
-          <Text className="text-xs text-destructive">
-            {isSecurityConfigurationError(triggerSync.error)
-              ? securityConfigurationCopy()
-              : triggerSync.error.message}
-          </Text>
+          <Text className="text-xs text-destructive">{triggerSync.error.message}</Text>
         ) : null}
 
         {dismissFailures.failures.map(failure => (

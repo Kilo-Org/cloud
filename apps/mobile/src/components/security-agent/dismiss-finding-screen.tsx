@@ -14,11 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
-import {
-  isSecurityConfigurationError,
-  isSecuritySyncRetryable,
-  securityConfigurationCopy,
-} from '@/lib/hooks/use-security-agent-mutations';
+import { isSecuritySyncRetryable } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -111,9 +107,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           dismissDraft.persist({
             reason,
             comment,
-            lastError: isSecurityConfigurationError(error)
-              ? securityConfigurationCopy()
-              : error.message,
+            lastError: error.message,
             retryable: isSecuritySyncRetryable(error),
           });
         },
@@ -277,11 +271,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         </View>
 
         {dismissFinding.isError && (
-          <Text className="text-sm text-destructive">
-            {isSecurityConfigurationError(dismissFinding.error)
-              ? securityConfigurationCopy()
-              : dismissFinding.error.message}
-          </Text>
+          <Text className="text-sm text-destructive">{dismissFinding.error.message}</Text>
         )}
 
         <Button disabled={!reason || dismissFinding.isPending || dismissBlocked} onPress={onSubmit}>

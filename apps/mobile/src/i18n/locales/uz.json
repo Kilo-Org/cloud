@@ -25,6 +25,7 @@
     "error": "xato: {{error}}",
     "back": "Orqaga",
     "somethingWentWrong": "Xatolik yuz berdi.",
+    "actionNotRecorded": "Bu amalni qayd etib bo'lmadi. Keyinroq qayta urinib ko'ring.",
     "couldNotOpen": "{{label}}ni ochib bo'lmadi.",
     "link": "havola",
     "takingLonger": "Bu kutilganidan uzoqroq davom etmoqda. Bu oynani yopib, keyin qayta tekshirishingiz mumkin.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub birlashtirishni yakunlamadi.",
       "mergeResultNotCompleted": "{{term}} birlashtirilmadi. Holatini tekshiring va qayta urinib ko‘ring.",
       "ambiguous": "Amal natijasini tasdiqlab bo'lmadi — qayta urinishdan oldin PRni tekshiring.",
-      "persistenceFailed": "Bu amalni qayd etib bo'lmadi. Keyinroq qayta urinib ko'ring.",
       "forbidden": "Bu amalni bajarishga ruxsat yo'q."
     },
     "capabilities": {
@@ -1924,7 +1924,11 @@
       "syncMayNotHaveCompleted": "Sinxronlash yakunlanmagan bo'lishi mumkin. Uning holatini aniqlashtirish uchun qayta urinib ko'ring yoki bekor qiling.",
       "syncInProgress": "Xavfsizlik ma'lumotlari allaqachon sinxronlanmoqda. Iltimos, qayta urinib ko'ring.",
       "dismissalInProgress": "Bu muammo allaqachon rad etilmoqda. Iltimos, qayta urinib ko'ring.",
-      "couldNotReadPendingSyncs": "Kutilayotgan sinxronlashlar haqidagi ma'lumotlarni o'qib bo'lmadi. Qayta urinib ko'ring."
+      "couldNotReadPendingSyncs": "Kutilayotgan sinxronlashlar haqidagi ma'lumotlarni o'qib bo'lmadi. Qayta urinib ko'ring.",
+      "ambiguous": "Amal natijasini tasdiqlab bo'lmadi — qayta urinishdan oldin xavfsizlik ko'rigini tekshiring.",
+      "settleFailed": "Amal bajarildi, ammo natijani qayd etishimiz mumkin bo'lmadi. Iltimos, qayta urinib ko'ring.",
+      "replayFailed": "Bu amal tugallanmadi. Iltimos, qayta urinib ko'ring.",
+      "actionFailed": "Bu amalni tugallab bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "analysisState": {
       "queued": "Tahlil navbatda",

@@ -25,6 +25,7 @@
     "error": "problema: {{error}}",
     "back": "Bumalik",
     "somethingWentWrong": "Nagkaroon ng problema.",
+    "actionNotRecorded": "Hindi namin maitala ang aksiyong ito. Pakisubukan muli mamaya.",
     "couldNotOpen": "Hindi mabuksan ang {{label}}.",
     "link": "link sa pahina",
     "takingLonger": "Mas tumatagal ito kaysa sa inaasahan. Maaari mong isara ito at tingnan muli.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "Hindi nakumpleto ng GitHub ang pag-merge.",
       "mergeResultNotCompleted": "Hindi na-merge ang {{term}}. Suriin ang katayuan nito at subukang muli.",
       "ambiguous": "Hindi makumpirma — suriin ang PR bago subukan muli.",
-      "persistenceFailed": "Hindi namin maitala ang aksiyong ito. Pakisubukan muli mamaya.",
       "forbidden": "Hindi pinapayagan ang aksiyong ito."
     },
     "capabilities": {
@@ -1924,7 +1924,11 @@
       "syncMayNotHaveCompleted": "Maaaring hindi natapos ang isang pag-sync. Subukang muli para maitugma ang data, o itapon ito.",
       "syncInProgress": "May pag-sync na ng data ng seguridad na kasalukuyang isinasagawa. Pakisubukang muli.",
       "dismissalInProgress": "Isinasagawa na ang pagbalewalang ito. Pakisubukang muli.",
-      "couldNotReadPendingSyncs": "Hindi mabasa ang mga nakabinbing pag-sync. Subukang muli."
+      "couldNotReadPendingSyncs": "Hindi mabasa ang mga nakabinbing pag-sync. Subukang muli.",
+      "ambiguous": "Hindi makumpirma — suriin ang pagsusuri sa seguridad bago subukan muli.",
+      "settleFailed": "Nagawa ang aksyon, ngunit hindi namin mai-record ang resulta. Pakisubukang muli.",
+      "replayFailed": "Hindi natapos ang aksyon na ito. Pakisubukang muli.",
+      "actionFailed": "Hindi magawang matapos ang aksyon na ito. Pakisubukang muli."
     },
     "analysisState": {
       "queued": "Nakapila ang pagsusuri",

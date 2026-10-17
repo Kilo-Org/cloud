@@ -25,6 +25,7 @@
     "error": "lỗi: {{error}}",
     "back": "Quay lại",
     "somethingWentWrong": "Đã xảy ra lỗi.",
+    "actionNotRecorded": "Không thể ghi nhận thao tác này. Vui lòng thử lại sau.",
     "couldNotOpen": "Không thể mở {{label}}.",
     "link": "liên kết",
     "takingLonger": "Quá trình này đang mất nhiều thời gian hơn dự kiến. Bạn có thể đóng màn hình này rồi kiểm tra lại sau.",
@@ -1412,7 +1413,11 @@
       "syncMayNotHaveCompleted": "Một lần đồng bộ có thể chưa hoàn tất. Hãy thử lại để cập nhật trạng thái hoặc hủy bỏ.",
       "syncInProgress": "Một lần đồng bộ bảo mật đang diễn ra. Vui lòng thử lại.",
       "dismissalInProgress": "Việc bỏ qua này đang được xử lý. Vui lòng thử lại.",
-      "couldNotReadPendingSyncs": "Không thể đọc thông tin các lần đồng bộ đang chờ. Hãy thử lại."
+      "couldNotReadPendingSyncs": "Không thể đọc thông tin các lần đồng bộ đang chờ. Hãy thử lại.",
+      "ambiguous": "Không thể xác nhận — hãy kiểm tra bản đánh giá bảo mật trước khi thử lại.",
+      "settleFailed": "Hành động đã hoàn tất, nhưng chúng tôi không thể ghi lại kết quả. Vui lòng thử lại.",
+      "replayFailed": "Hành động này chưa hoàn tất. Vui lòng thử lại.",
+      "actionFailed": "Không thể hoàn tất hành động này. Vui lòng thử lại."
     },
     "analysisState": {
       "queued": "Đang chờ phân tích",
@@ -2937,7 +2942,6 @@
       "mergeResultDefaultError": "GitHub chưa hoàn tất việc hợp nhất.",
       "mergeResultNotCompleted": "{{term}} chưa được hợp nhất. Kiểm tra trạng thái và thử lại.",
       "ambiguous": "Không thể xác nhận — hãy kiểm tra PR trước khi thử lại.",
-      "persistenceFailed": "Không thể ghi nhận thao tác này. Vui lòng thử lại sau.",
       "forbidden": "Bạn không có quyền thực hiện thao tác này."
     },
     "capabilities": {

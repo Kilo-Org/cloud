@@ -25,6 +25,7 @@
     "error": "khalad: {{error}}",
     "back": "Dib u noqo",
     "somethingWentWrong": "Waxbaa khaldamay.",
+    "actionNotRecorded": "Falkan lama diiwaangelin karin. Fadlan mar kale isku day waqti dambe.",
     "couldNotOpen": "{{label}} lama furi karin.",
     "link": "xiriiriye",
     "takingLonger": "Tani waxay qaadanaysaa waqti ka badan intii la filayay. Waad xiri kartaa tan oo mar kale hubin kartaa.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub ma dhammaystirin isku-darka.",
       "mergeResultNotCompleted": "{{term}} lama isku darin. Xaaladdiisa hubi kadibna mar kale isku day.",
       "ambiguous": "Lama xaqiijin karin — hubi PR-ka ka hor intaadan mar kale isku dayin.",
-      "persistenceFailed": "Falkan lama diiwaangelin karin. Fadlan mar kale isku day waqti dambe.",
       "forbidden": "Lama oggola."
     },
     "capabilities": {
@@ -1924,7 +1924,11 @@
       "syncMayNotHaveCompleted": "Waxaa laga yaabaa in isku waafajin aysan dhammaan. Mar kale isku day si aad xaaladdeeda u waafajiso, ama iska dhaaf.",
       "syncInProgress": "Isku waafajinta amniga ayaa durba socota. Fadlan mar kale isku day.",
       "dismissalInProgress": "Iska dhaafiddan ayaa durba socota. Fadlan mar kale isku day.",
-      "couldNotReadPendingSyncs": "Isku waafajinta sugaysa lama akhrin karin. Mar kale isku day."
+      "couldNotReadPendingSyncs": "Isku waafajinta sugaysa lama akhrin karin. Mar kale isku day.",
+      "ambiguous": "Lama xaqiijin karin — hubi dib-u-eegista amniga ka hor intaadan mar kale isku dayin.",
+      "settleFailed": "Ficilka waa la dhammeeyay, laakiin ma awoodin inaan galmeeyno natiijada. Fadlan mar kale isku day.",
+      "replayFailed": "Ficilkan lama dhammeeyn. Fadlan mar kale isku day.",
+      "actionFailed": "Ficilkan lama dhammeeyi karin. Fadlan mar kale isku day."
     },
     "analysisState": {
       "queued": "Falanqaynta ayaa safan",

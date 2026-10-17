@@ -25,6 +25,7 @@
     "error": "feil: {{error}}",
     "back": "Tilbake",
     "somethingWentWrong": "Noe gikk galt.",
+    "actionNotRecorded": "Vi kunne ikke registrere denne handlingen. Prøv igjen senere.",
     "couldNotOpen": "Kunne ikke åpne {{label}}.",
     "link": "lenke",
     "takingLonger": "Dette tar lengre tid enn forventet. Du kan lukke denne siden og sjekke igjen senere.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub fullførte ikke flettingen.",
       "mergeResultNotCompleted": "{{term}} ble ikke flettet. Sjekk statusen og prøv på nytt.",
       "ambiguous": "Kunne ikke bekrefte resultatet. Sjekk PR-en før du prøver igjen.",
-      "persistenceFailed": "Vi kunne ikke registrere denne handlingen. Prøv igjen senere.",
       "forbidden": "Du har ikke tilgang."
     },
     "capabilities": {
@@ -1924,7 +1924,11 @@
       "syncMayNotHaveCompleted": "En synkronisering er kanskje ikke fullført. Prøv igjen for å avklare statusen, eller forkast forsøket.",
       "syncInProgress": "En sikkerhetssynkronisering pågår allerede. Prøv igjen.",
       "dismissalInProgress": "Denne avvisningen pågår allerede. Prøv igjen.",
-      "couldNotReadPendingSyncs": "Kunne ikke hente synkroniseringene som venter. Prøv igjen."
+      "couldNotReadPendingSyncs": "Kunne ikke hente synkroniseringene som venter. Prøv igjen.",
+      "ambiguous": "Kunne ikke bekrefte resultatet. Sjekk sikkerhetsgjennomgangen før du prøver igjen.",
+      "settleFailed": "Handlingen ble fullført, men vi kunne ikke registrere resultatet. Prøv igjen.",
+      "replayFailed": "Denne handlingen ble ikke fullført. Prøv igjen.",
+      "actionFailed": "Kunne ikke fullføre denne handlingen. Prøv igjen."
     },
     "analysisState": {
       "queued": "Analyse i kø",

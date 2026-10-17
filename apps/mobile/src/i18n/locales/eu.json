@@ -25,6 +25,7 @@
     "error": "errorea: {{error}}",
     "back": "Atzera",
     "somethingWentWrong": "Zerbait gaizki joan da.",
+    "actionNotRecorded": "Ezin izan dugu ekintza hau erregistratu. Saiatu berriro geroago.",
     "couldNotOpen": "Ezin izan da {{label}} ireki.",
     "link": "esteka",
     "takingLonger": "Uste baino denbora gehiago behar da. Hau itxi eta geroago berriro begira dezakezu.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub-ek ez du bateratzea amaitu.",
       "mergeResultNotCompleted": "{{term}} ez da bateratu. Egiaztatu egoera eta saiatu berriro.",
       "ambiguous": "Ezin izan da berretsi — egiaztatu PR-a berriro saiatu aurretik.",
-      "persistenceFailed": "Ezin izan dugu ekintza hau erregistratu. Saiatu berriro geroago.",
       "forbidden": "Ez dago baimenduta."
     },
     "capabilities": {
@@ -1924,7 +1924,11 @@
       "syncMayNotHaveCompleted": "Baliteke sinkronizazioa amaitu gabe geratu izana. Saiatu berriro haren egoera eguneratzeko, edo baztertu.",
       "syncInProgress": "Segurtasun-sinkronizazio bat jada martxan dago. Saiatu berriro.",
       "dismissalInProgress": "Baztertze hau jada martxan dago. Saiatu berriro.",
-      "couldNotReadPendingSyncs": "Ezin izan dira zain dauden sinkronizazioak irakurri. Saiatu berriro."
+      "couldNotReadPendingSyncs": "Ezin izan dira zain dauden sinkronizazioak irakurri. Saiatu berriro.",
+      "ambiguous": "Ezin izan da berretsi — egiaztatu segurtasun-azterketa berriro saiatu aurretik.",
+      "settleFailed": "Ekintza burutu da, baina ezin izan dugu emaitza erregistratu. Saiatu berriro.",
+      "replayFailed": "Ekintza hau ez da burutu. Saiatu berriro.",
+      "actionFailed": "Ezin izan da ekintza hau burutu. Saiatu berriro."
     },
     "analysisState": {
       "queued": "Azterketa ilaran",

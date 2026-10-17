@@ -25,6 +25,7 @@
     "error": "fehler: {{error}}",
     "back": "Zurück",
     "somethingWentWrong": "Etwas ist schiefgelaufen.",
+    "actionNotRecorded": "Wir konnten diese Aktion nicht speichern. Bitte versuche es später erneut.",
     "couldNotOpen": "{{label}} konnte nicht geöffnet werden.",
     "link": "link",
     "takingLonger": "Das dauert länger als erwartet. Du kannst diese Ansicht schließen und später erneut nachsehen.",
@@ -1412,7 +1413,11 @@
       "syncMayNotHaveCompleted": "Eine Synchronisierung wurde möglicherweise nicht abgeschlossen. Wiederhole sie zum Abgleich oder verwirf sie.",
       "syncInProgress": "Die Sicherheitsbefunde werden bereits synchronisiert. Bitte versuche es erneut.",
       "dismissalInProgress": "Dieser Befund wird bereits verworfen. Bitte versuche es erneut.",
-      "couldNotReadPendingSyncs": "Ausstehende Synchronisierungen konnten nicht gelesen werden. Versuche es erneut."
+      "couldNotReadPendingSyncs": "Ausstehende Synchronisierungen konnten nicht gelesen werden. Versuche es erneut.",
+      "ambiguous": "Die Aktion konnte nicht bestätigt werden. Prüfe die Sicherheitsüberprüfung, bevor du es erneut versuchst.",
+      "settleFailed": "Die Aktion wurde abgeschlossen, aber wir konnten das Ergebnis nicht speichern. Bitte versuche es erneut.",
+      "replayFailed": "Diese Aktion wurde nicht abgeschlossen. Bitte versuche es erneut.",
+      "actionFailed": "Diese Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut."
     },
     "analysisState": {
       "queued": "Analyse in der Warteschlange",
@@ -2937,7 +2942,6 @@
       "mergeResultDefaultError": "GitHub hat die Zusammenführung nicht abgeschlossen.",
       "mergeResultNotCompleted": "Der {{term}} wurde nicht zusammengeführt. Prüfe seinen Status und versuche es erneut.",
       "ambiguous": "Die Aktion konnte nicht bestätigt werden. Prüfe den PR, bevor du es erneut versuchst.",
-      "persistenceFailed": "Wir konnten diese Aktion nicht speichern. Bitte versuche es später erneut.",
       "forbidden": "Du hast keine Berechtigung für diese Aktion."
     },
     "capabilities": {

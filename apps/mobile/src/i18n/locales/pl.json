@@ -25,6 +25,7 @@
     "error": "błąd: {{error}}",
     "back": "Wstecz",
     "somethingWentWrong": "Coś poszło nie tak.",
+    "actionNotRecorded": "Nie udało się zapisać tej operacji. Spróbuj ponownie później.",
     "couldNotOpen": "Nie udało się otworzyć: {{label}}.",
     "link": "odnośnik",
     "takingLonger": "To trwa dłużej niż zwykle. Możesz zamknąć ten ekran i sprawdzić ponownie później.",
@@ -1426,7 +1427,11 @@
       "syncMayNotHaveCompleted": "Synchronizacja mogła się nie zakończyć. Ponów próbę, aby uzgodnić jej stan, lub ją odrzuć.",
       "syncInProgress": "Synchronizacja problemów z bezpieczeństwem już trwa. Spróbuj ponownie.",
       "dismissalInProgress": "Odrzucanie tego problemu już trwa. Spróbuj ponownie.",
-      "couldNotReadPendingSyncs": "Nie udało się odczytać oczekujących synchronizacji. Spróbuj ponownie."
+      "couldNotReadPendingSyncs": "Nie udało się odczytać oczekujących synchronizacji. Spróbuj ponownie.",
+      "ambiguous": "Nie udało się potwierdzić wyniku — sprawdź przegląd bezpieczeństwa przed ponowną próbą.",
+      "settleFailed": "Akcja została wykonana, ale nie udało się nam zapisać wyniku. Spróbuj ponownie.",
+      "replayFailed": "Ta akcja nie została ukończona. Spróbuj ponownie.",
+      "actionFailed": "Nie udało się ukończyć tej akcji. Spróbuj ponownie."
     },
     "analysisState": {
       "queued": "Analiza w kolejce",
@@ -3017,7 +3022,6 @@
       "mergeResultDefaultError": "GitHub nie ukończył scalania.",
       "mergeResultNotCompleted": "{{term}} nie został scalony. Sprawdź jego stan i spróbuj ponownie.",
       "ambiguous": "Nie udało się potwierdzić wyniku — sprawdź PR przed ponowną próbą.",
-      "persistenceFailed": "Nie udało się zapisać tej operacji. Spróbuj ponownie później.",
       "forbidden": "Nie masz uprawnień do tej operacji."
     },
     "capabilities": {

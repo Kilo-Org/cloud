@@ -25,6 +25,7 @@
     "error": "ስህተት: {{error}}",
     "back": "ተመለስ",
     "somethingWentWrong": "ችግር ተከስቷል።",
+    "actionNotRecorded": "ይህን እርምጃ መመዝገብ አልቻልንም። በኋላ እንደገና ሞክር።",
     "couldNotOpen": "{{label}}ን መክፈት አልተቻለም።",
     "link": "አገናኝ",
     "takingLonger": "ይህ ከተጠበቀው በላይ ጊዜ እየወሰደ ነው። ይህን ዘግተህ እንደገና መፈተሽ ትችላለህ።",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub ውህደቱን አላጠናቀቀም።",
       "mergeResultNotCompleted": "{{term}} አልተዋሃደም። ሁኔታውን ያረጋግጡ እና እንደገና ይሞክሩ።",
       "ambiguous": "ማረጋገጥ አልተቻለም — እንደገና ከመሞከርህ በፊት PRን ፈትሽ።",
-      "persistenceFailed": "ይህን እርምጃ መመዝገብ አልቻልንም። በኋላ እንደገና ሞክር።",
       "forbidden": "ይህ እርምጃ አይፈቀድም።"
     },
     "capabilities": {
@@ -1924,7 +1924,11 @@
       "syncMayNotHaveCompleted": "ማመሳሰሉ ያልተጠናቀቀ ሊሆን ይችላል። ሁኔታውን ለማስተካከል እንደገና ይሞክሩ፣ ወይም ጥያቄውን ያስወግዱ።",
       "syncInProgress": "የደህንነት ማመሳሰል ቀድሞውኑ በሂደት ላይ ነው። እባክዎ እንደገና ይሞክሩ።",
       "dismissalInProgress": "ግኝቱን የማስወገድ ሂደት አስቀድሞ ተጀምሯል። እባክዎ እንደገና ይሞክሩ።",
-      "couldNotReadPendingSyncs": "በመጠባበቅ ላይ ያሉ የማመሳሰል ጥያቄዎችን ማንበብ አልተቻለም። እንደገና ይሞክሩ።"
+      "couldNotReadPendingSyncs": "በመጠባበቅ ላይ ያሉ የማመሳሰል ጥያቄዎችን ማንበብ አልተቻለም። እንደገና ይሞክሩ።",
+      "ambiguous": "ማረጋገጥ አልተቻለም — እንደገና ከመሞከርዎ በፊት የደህንነት ግምገማውን ይፈትሹ።",
+      "settleFailed": "እርምጃው ተጠናቋል፣ ግን ውጤቱን መመዝገብ አልቻልንም። እባክዎ እንደገና ይሞክሩ።",
+      "replayFailed": "ይህ እርምጃ አልተጠናቀቀም። እባክዎ እንደገና ይሞክሩ።",
+      "actionFailed": "ይህን እርምጃ ማጠናቀቅ አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
     },
     "analysisState": {
       "queued": "ትንተናው ወረፋ ይዟል",

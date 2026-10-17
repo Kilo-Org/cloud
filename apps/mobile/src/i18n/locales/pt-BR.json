@@ -25,6 +25,7 @@
     "error": "erro: {{error}}",
     "back": "Voltar",
     "somethingWentWrong": "Algo deu errado.",
+    "actionNotRecorded": "Não foi possível registrar esta ação. Tente novamente mais tarde.",
     "couldNotOpen": "Não foi possível abrir {{label}}.",
     "link": "endereço do link",
     "takingLonger": "Isso está demorando mais que o esperado. Você pode fechar esta tela e verificar novamente.",
@@ -1388,7 +1389,11 @@
       "syncMayNotHaveCompleted": "Uma sincronização pode não ter sido concluída. Tente novamente para atualizar o status ou descarte-a.",
       "syncInProgress": "Uma sincronização de segurança já está em andamento. Tente novamente.",
       "dismissalInProgress": "O descarte já está em andamento. Tente novamente.",
-      "couldNotReadPendingSyncs": "Não foi possível ler as sincronizações pendentes. Tente novamente."
+      "couldNotReadPendingSyncs": "Não foi possível ler as sincronizações pendentes. Tente novamente.",
+      "ambiguous": "Não foi possível confirmar — verifique a revisão de segurança antes de tentar novamente.",
+      "settleFailed": "A ação foi concluída, mas não foi possível registrar o resultado. Tente novamente.",
+      "replayFailed": "Esta ação não foi concluída. Tente novamente.",
+      "actionFailed": "Não foi possível concluir esta ação. Tente novamente."
     },
     "analysisState": {
       "queued": "Análise na fila",
@@ -2977,7 +2982,6 @@
       "mergeResultDefaultError": "O GitHub não concluiu a mesclagem.",
       "mergeResultNotCompleted": "O {{term}} não foi mesclado. Verifique o estado e tente novamente.",
       "ambiguous": "Não foi possível confirmar — verifique o PR antes de tentar novamente.",
-      "persistenceFailed": "Não foi possível registrar esta ação. Tente novamente mais tarde.",
       "forbidden": "Você não tem permissão para realizar esta ação."
     },
     "capabilities": {

@@ -87,7 +87,7 @@ export function mutationErrorDisplay(
   // `reconcile_pending`. Use the bad-request kind (no retry CTA) with the
   // honest server copy, not the surface-specific validation copy.
   if (isPrOperationPersistenceFailed(rawError)) {
-    return { kind: 'bad-request', message: i18n.t('prReview.operation.persistenceFailed') };
+    return { kind: 'bad-request', message: i18n.t('common.actionNotRecorded') };
   }
   if (classification.kind === 'forbidden') {
     return { kind: 'forbidden', message: classification.message };

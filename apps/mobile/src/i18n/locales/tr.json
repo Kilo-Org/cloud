@@ -25,6 +25,7 @@
     "error": "hata: {{error}}",
     "back": "Geri",
     "somethingWentWrong": "Bir sorun oluştu.",
+    "actionNotRecorded": "Bu işlemi kaydedemedik. Lütfen daha sonra tekrar dene.",
     "couldNotOpen": "{{label}} açılamadı.",
     "link": "bağlantı",
     "takingLonger": "Bu işlem beklenenden uzun sürüyor. Bu ekranı kapatıp tekrar kontrol edebilirsin.",
@@ -1412,7 +1413,11 @@
       "syncMayNotHaveCompleted": "Bir eşitleme tamamlanmamış olabilir. Durumunu güncellemek için tekrar dene veya işlemden vazgeç.",
       "syncInProgress": "Bir güvenlik eşitlemesi zaten devam ediyor. Lütfen tekrar dene.",
       "dismissalInProgress": "Bu yok sayma işlemi zaten devam ediyor. Lütfen tekrar dene.",
-      "couldNotReadPendingSyncs": "Bekleyen eşitlemeler okunamadı. Tekrar dene."
+      "couldNotReadPendingSyncs": "Bekleyen eşitlemeler okunamadı. Tekrar dene.",
+      "ambiguous": "İşlemin sonucu doğrulanamadı. Tekrar denemeden önce güvenlik incelemesini kontrol et.",
+      "settleFailed": "İşlem tamamlandı, ancak sonucu kaydedemedik. Lütfen tekrar dene.",
+      "replayFailed": "Bu işlem tamamlanmadı. Lütfen tekrar dene.",
+      "actionFailed": "Bu işlem tamamlanamadı. Lütfen tekrar dene."
     },
     "analysisState": {
       "queued": "Analiz kuyruğa alındı",
@@ -2937,7 +2942,6 @@
       "mergeResultDefaultError": "GitHub birleştirmeyi tamamlamadı.",
       "mergeResultNotCompleted": "{{term}} birleştirilmedi. Durumunu kontrol et ve tekrar dene.",
       "ambiguous": "İşlemin sonucu doğrulanamadı. Tekrar denemeden önce PR'ı kontrol et.",
-      "persistenceFailed": "Bu işlemi kaydedemedik. Lütfen daha sonra tekrar dene.",
       "forbidden": "Bu işlem için iznin yok."
     },
     "capabilities": {

@@ -25,6 +25,7 @@
     "error": "fel: {{error}}",
     "back": "Tillbaka",
     "somethingWentWrong": "Något gick fel.",
+    "actionNotRecorded": "Vi kunde inte registrera den här åtgärden. Försök igen senare.",
     "couldNotOpen": "Kunde inte öppna {{label}}.",
     "link": "länk",
     "takingLonger": "Det här tar längre tid än väntat. Du kan stänga vyn och kontrollera igen.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub slutförde inte sammanslagningen.",
       "mergeResultNotCompleted": "{{term}} slogs inte samman. Kontrollera statusen och försök igen.",
       "ambiguous": "Kunde inte bekräfta resultatet. Kontrollera PR:en innan du försöker igen.",
-      "persistenceFailed": "Vi kunde inte registrera den här åtgärden. Försök igen senare.",
       "forbidden": "Du saknar behörighet."
     },
     "capabilities": {
@@ -1924,7 +1924,11 @@
       "syncMayNotHaveCompleted": "En synkronisering kanske inte har slutförts. Försök igen för att stämma av statusen, eller kasta begäran.",
       "syncInProgress": "En säkerhetssynkronisering pågår redan. Försök igen.",
       "dismissalInProgress": "Den här avskrivningen pågår redan. Försök igen.",
-      "couldNotReadPendingSyncs": "Kunde inte läsa väntande synkroniseringar. Försök igen."
+      "couldNotReadPendingSyncs": "Kunde inte läsa väntande synkroniseringar. Försök igen.",
+      "ambiguous": "Kunde inte bekräfta resultatet. Kontrollera säkerhetsgranskningen innan du försöker igen.",
+      "settleFailed": "Åtgärden slutfördes, men vi kunde inte registrera resultatet. Försök igen.",
+      "replayFailed": "Den här åtgärden slutfördes inte. Försök igen.",
+      "actionFailed": "Det gick inte att slutföra den här åtgärden. Försök igen."
     },
     "analysisState": {
       "queued": "Analys i kö",

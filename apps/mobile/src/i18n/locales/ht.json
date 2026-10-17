@@ -25,6 +25,7 @@
     "error": "erè: {{error}}",
     "back": "Tounen",
     "somethingWentWrong": "Gen yon pwoblèm.",
+    "actionNotRecorded": "Nou pa t ka anrejistre aksyon sa a. Tanpri eseye ankò pita.",
     "couldNotOpen": "Pa t ka louvri {{label}}.",
     "link": "lyen",
     "takingLonger": "Sa ap pran plis tan pase sa nou te prevwa. Ou ka fèmen ekran sa a epi tcheke ankò.",
@@ -777,7 +778,6 @@
       "mergeResultDefaultError": "GitHub pa t fini fizyon an.",
       "mergeResultNotCompleted": "Yo pa t fizyone {{term}} lan. Tcheke estati li epi eseye ankò.",
       "ambiguous": "Pa t ka konfime — tcheke PR a anvan ou eseye ankò.",
-      "persistenceFailed": "Nou pa t ka anrejistre aksyon sa a. Tanpri eseye ankò pita.",
       "forbidden": "Aksyon sa a entèdi."
     },
     "capabilities": {
@@ -1924,7 +1924,11 @@
       "syncMayNotHaveCompleted": "Yon senkronizasyon ka pa t fini. Eseye ankò pou mete eta li ajou, oswa abandone li.",
       "syncInProgress": "Yon senkronizasyon sekirite deja an pwosesis. Tanpri eseye ankò.",
       "dismissalInProgress": "Rejè sa a deja an pwosesis. Tanpri eseye ankò.",
-      "couldNotReadPendingSyncs": "Nou pa t ka li senkronizasyon ki an atant yo. Eseye ankò."
+      "couldNotReadPendingSyncs": "Nou pa t ka li senkronizasyon ki an atant yo. Eseye ankò.",
+      "ambiguous": "Pa t ka konfime — tcheke revizyon sekirite a anvan ou eseye ankò.",
+      "settleFailed": "Aksyon an fini, men nou pa t ka anrejistre rezilta a. Tanpri eseye ankò.",
+      "replayFailed": "Aksyon sa a pa fini. Tanpri eseye ankò.",
+      "actionFailed": "Pa t ka fini aksyon sa a. Tanpri eseye ankò."
     },
     "analysisState": {
       "queued": "Analiz nan ke",

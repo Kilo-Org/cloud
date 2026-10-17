@@ -25,6 +25,7 @@
     "error": "오류: {{error}}",
     "back": "뒤로",
     "somethingWentWrong": "문제가 발생했습니다.",
+    "actionNotRecorded": "이 작업을 기록하지 못했습니다. 나중에 다시 시도하세요.",
     "couldNotOpen": "{{label}}을(를) 열지 못했습니다.",
     "link": "링크",
     "takingLonger": "예상보다 시간이 더 걸리고 있습니다. 이 화면을 닫고 나중에 다시 확인할 수 있습니다.",
@@ -1412,7 +1413,11 @@
       "syncMayNotHaveCompleted": "동기화가 완료되지 않았을 수 있습니다. 다시 시도하여 상태를 확인하거나 요청을 취소하세요.",
       "syncInProgress": "보안 동기화가 이미 진행 중입니다. 다시 시도하세요.",
       "dismissalInProgress": "이 문제의 무시 처리가 이미 진행 중입니다. 다시 시도하세요.",
-      "couldNotReadPendingSyncs": "대기 중인 동기화 정보를 불러올 수 없습니다. 다시 시도하세요."
+      "couldNotReadPendingSyncs": "대기 중인 동기화 정보를 불러올 수 없습니다. 다시 시도하세요.",
+      "ambiguous": "작업 결과를 확인하지 못했습니다. 다시 시도하기 전에 보안 검토를 확인하세요.",
+      "settleFailed": "작업이 완료되었지만 결과를 기록하지 못했습니다. 다시 시도하세요.",
+      "replayFailed": "이 작업은 완료되지 않았습니다. 다시 시도하세요.",
+      "actionFailed": "이 작업을 완료하지 못했습니다. 다시 시도하세요."
     },
     "analysisState": {
       "queued": "분석 대기 중",
@@ -2937,7 +2942,6 @@
       "mergeResultDefaultError": "GitHub가 병합을 완료하지 않았습니다.",
       "mergeResultNotCompleted": "{{term}}이(가) 병합되지 않았습니다. 상태를 확인하고 다시 시도하세요.",
       "ambiguous": "작업 결과를 확인하지 못했습니다. 다시 시도하기 전에 PR을 확인하세요.",
-      "persistenceFailed": "이 작업을 기록하지 못했습니다. 나중에 다시 시도하세요.",
       "forbidden": "이 작업을 수행할 권한이 없습니다."
     },
     "capabilities": {

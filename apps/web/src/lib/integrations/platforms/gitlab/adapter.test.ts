@@ -455,7 +455,7 @@ describe('fetchGitLabProjects', () => {
       visibility: 'private',
       archived: false,
     }));
-    mockFetch.mockImplementation((url: string) =>
+    mockFetch.mockImplementation(() =>
       Promise.resolve({
         ok: true,
         json: async () => fullPage,

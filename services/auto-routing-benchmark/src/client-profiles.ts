@@ -5,7 +5,7 @@ import {
   type CustomRouterEntryRef,
   type CustomRouterScope,
 } from '@kilocode/auto-routing-contracts';
-import { and, eq, inArray, lte, not, sql } from 'drizzle-orm';
+import { and, eq, inArray, not, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import type { CaseResultRow } from './db';
 import { clientCaseResults, clientProfiles, type ClientProfileStatus } from './db-schema';
@@ -360,8 +360,9 @@ export function rollUpClientCases(
 }
 
 /**
- * Recompute the profile summary from every stored case. Concurrent uploads each
- * write their own view; the `results` guard keeps the most complete one.
+ * Recompute the profile summary from every stored case. Concurrent uploads each write
+ * their own view; the guard keeps only a view computed from the cases stored at write
+ * time, so a stale view never overwrites a newer one and a removed case lowers the count.
  */
 export async function refreshClientProfileRollup(
   db: D1Database,
@@ -377,7 +378,12 @@ export async function refreshClientProfileRollup(
   await drizzle(db)
     .update(clientProfiles)
     .set({ ...rollup, updated_at: nowIso })
-    .where(and(eq(clientProfiles.id, profile.id), lte(clientProfiles.results, rollup.results)));
+    .where(
+      and(
+        eq(clientProfiles.id, profile.id),
+        sql`(SELECT COUNT(*) FROM ${clientCaseResults} WHERE ${clientCaseResults.profile_id} = ${profile.id}) = ${rollup.results}`
+      )
+    );
 }
 
 export async function getClientRoutingCaseResults(

@@ -317,6 +317,38 @@ describe('client eval (real SQLite)', () => {
     });
   });
 
+  it('stores nothing when building the usage record fails before the write', async () => {
+    await expect(
+      gradeClientEvalResult(
+        db,
+        CONFIG,
+        upload({
+          caseId: judgedCase.id,
+          billing: { userId: 'user-1', organizationId: 'not-a-uuid' },
+        }),
+        deps
+      )
+    ).rejects.toMatchObject({ code: 'internal_error' });
+    expect(writeUsage).not.toHaveBeenCalled();
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM client_case_results').get()).toEqual({ n: 0 });
+  });
+
+  it('lowers the rollup when a replacing upload is removed after billing fails', async () => {
+    const judged = { caseId: judgedCase.id };
+    await gradeClientEvalResult(db, CONFIG, upload({ ...judged, exitCode: 1 }), deps);
+    expect((await listOwnerClientProfiles(db, context, 'efficient'))[0]?.results).toBe(1);
+    writeUsage.mockRejectedValueOnce(new Error('network'));
+    await expect(gradeClientEvalResult(db, CONFIG, upload(judged), deps)).rejects.toMatchObject({
+      code: 'internal_error',
+    });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM client_case_results').get()).toEqual({ n: 0 });
+    expect((await listOwnerClientProfiles(db, context, 'efficient'))[0]).toMatchObject({
+      results: 0,
+      accuracy: null,
+      status: 'pending',
+    });
+  });
+
   it('bills each payer under its own usage id', async () => {
     const judged = { caseId: judgedCase.id };
     writeUsage.mockResolvedValueOnce({ kind: 'unavailable', reason: 'not_recorded' });

@@ -10,7 +10,13 @@ const RETURN_URL_COOKIE_MAX_AGE = 60 * 30; // 30 minutes
  * same-origin path.
  */
 export function getSafeReturnUrlPath(url: string): string | null {
-  if (!url.startsWith('/') || /[\u0000-\u001F\u007F\\]/.test(url)) {
+  const hasNonPathCharacter =
+    url.includes('\\') ||
+    [...url].some((char) => {
+      const code = char.charCodeAt(0);
+      return code < 0x20 || code === 0x7f;
+    });
+  if (!url.startsWith('/') || hasNonPathCharacter) {
     return null;
   }
 

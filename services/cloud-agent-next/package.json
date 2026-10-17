@@ -38,7 +38,9 @@
     "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck",
     "typecheck:fake-llm": "tsgo --noEmit -p tsconfig.fake-llm.json",
     "snapshot:vercel": "tsx scripts/vercel-snapshot.ts",
-    "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs"
+    "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs",
+    "test:runtime-installer": "tsx --test --test-concurrency=1 test/runtime-installer/*.test.ts",
+    "runtime:publish": "tsx scripts/publish-runtime.ts"
   },
   "dependencies": {
     "@cloudflare/sandbox": "0.12.9",
@@ -74,6 +76,7 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "aws4fetch": "catalog:"
   }
 }

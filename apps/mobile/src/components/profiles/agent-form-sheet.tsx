@@ -37,10 +37,14 @@ const VISIBILITY_OPTIONS: readonly { value: AgentVisibility; labelKey: string }[
 
 type AgentFormSheetProps = Readonly<{
   agent: AgentSource | null;
+  /** Slugs of the profile's other agents, so a duplicate fails validation inline. */
+  existingSlugs: readonly string[];
   organizationId?: string;
   isSaving: boolean;
   onClose: () => void;
   onSave: (payload: { slug: string; name: string; config: Record<string, unknown> }) => void;
+  /** A server-side slug conflict, shown on the slug field like a validation error. */
+  slugConflictFromServer?: boolean;
 }>;
 
 /**
@@ -59,10 +63,12 @@ type AgentFormSheetProps = Readonly<{
  */
 export function AgentFormSheet({
   agent,
+  existingSlugs,
   organizationId,
   isSaving,
   onClose,
   onSave,
+  slugConflictFromServer = false,
 }: Readonly<AgentFormSheetProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();

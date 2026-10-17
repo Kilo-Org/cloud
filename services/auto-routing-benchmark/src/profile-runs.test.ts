@@ -103,6 +103,7 @@ import {
   countCurrentProfilesByStatus,
   getLatestRoutingTable,
   listReadyCurrentProfilesForEntries,
+  listQueuedRemeasures,
   listStaleRunningDeciderRuns,
   failOrphanedRunningProfiles,
   recordLaneFailure,
@@ -241,6 +242,7 @@ beforeEach(() => {
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
+  vi.mocked(listQueuedRemeasures).mockResolvedValue([]);
   vi.mocked(markProfilesRunningForRun).mockImplementation(async (_db, _runId, entries) => [
     ...entries,
   ]);
@@ -875,6 +877,25 @@ describe('drainQueue', () => {
     expect(insertRun).toHaveBeenCalledOnce();
     expect(scheduleRunChunks).toHaveBeenCalledOnce();
     expect(queueSend).not.toHaveBeenCalled();
+  });
+
+  it('reserves batch space for a queued re-measure ahead of a full pending backlog', async () => {
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue(
+      Array.from({ length: 100 }, (_, i) => ({
+        model: `m/${String(i).padStart(3, '0')}`,
+        variant: '',
+        requested_at: '2026-06-01T00:00:00.000Z',
+      }))
+    );
+    vi.mocked(listQueuedRemeasures).mockResolvedValue([
+      { model: 'm/repair', variant: '', requested_at: '2026-06-05T00:00:00.000Z' },
+    ]);
+    const result = await drainQueue(env, 'platform');
+    expect(result!.entryCount).toBe(100);
+    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
+    expect(modelRows).toHaveLength(100);
+    expect(modelRows[0].model).toBe('m/repair');
+    expect(modelRows.at(-1)?.model).toBe('m/098');
   });
 
   it("drainQueues('both') starts one run per queue", async () => {

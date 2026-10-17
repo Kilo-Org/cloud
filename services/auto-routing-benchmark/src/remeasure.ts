@@ -71,6 +71,12 @@ export async function planPromptTransportRemeasure(
   const frontierInnerQuotes = params.frontierInnerQuotes ?? REMEASURE_FRONTIER_INNER_QUOTE_CASES;
   const affected = argvAffectedCases(params.router, { frontierInnerQuotes });
   const casesById = new Map<string, DeciderCase>(affected.map(c => [c.id, c]));
+  // Materializing a snapshot builds a few hundred KB, so price each case once.
+  const snapshotTokensByCase = new Map(
+    affected
+      .filter(benchCase => benchCase.longContext)
+      .map(benchCase => [benchCase.id, snapshotPromptTokens(benchCase)])
+  );
   const { results } = await db
     .prepare(`
       SELECT p.model, p.variant, p.platform_requested, p.user_requested,
@@ -119,8 +125,7 @@ export async function planPromptTransportRemeasure(
       pairs.set(key, pair);
     }
     pair.affectedResults += 1;
-    const benchCase = casesById.get(row.case_id);
-    const snapshotTokens = benchCase ? snapshotPromptTokens(benchCase) : 0;
+    const snapshotTokens = snapshotTokensByCase.get(row.case_id) ?? 0;
     const promptPrice = params.prices.get(row.model)?.promptUsdPerToken;
     if (row.cost_usd === null || (snapshotTokens > 0 && promptPrice === undefined)) {
       unknownCostResults += 1;

@@ -1,88 +1,19 @@
 import 'server-only';
-import { resolve4, resolve6 } from 'node:dns/promises';
 import { z } from 'zod';
 import {
   ProviderAuthorizationServerMetadataSchema,
   RemoteProtectedResourceMetadataSchema,
   createGatewayError,
   GatewayErrorCode,
-  isIpAddress,
-  isPublicIp,
 } from '@kilocode/mcp-gateway';
+import {
+  requestPublicHttps,
+  validatePublicHttpsUrl,
+  type GatewayOutboundRequest,
+} from './outbound';
 
 const maxDiscoveryBodyBytes = 128 * 1024;
 const dynamicProviderClientName = 'Kilo MCP Gateway';
-
-export function validatePublicHttpsUrl(value: string): URL {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw createGatewayError(GatewayErrorCode.InvalidRequest, 'Invalid URL', 400);
-  }
-  if (url.protocol !== 'https:') {
-    throw createGatewayError(
-      GatewayErrorCode.InvalidRequest,
-      'Remote endpoint must use HTTPS',
-      400
-    );
-  }
-  if (url.username || url.password || url.hash) {
-    throw createGatewayError(
-      GatewayErrorCode.InvalidRequest,
-      'Remote endpoint must not contain credentials or fragment',
-      400
-    );
-  }
-  const hostname = url.hostname.toLowerCase();
-  if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-    throw createGatewayError(
-      GatewayErrorCode.InvalidRequest,
-      'Remote endpoint must be publicly reachable',
-      400
-    );
-  }
-  if (isIpAddress(hostname) && !isPublicIp(hostname)) {
-    throw createGatewayError(
-      GatewayErrorCode.InvalidRequest,
-      'Remote endpoint must be publicly reachable',
-      400
-    );
-  }
-  return url;
-}
-
-async function resolvePublicHostname(hostname: string): Promise<void> {
-  if (isIpAddress(hostname)) {
-    if (!isPublicIp(hostname)) {
-      throw createGatewayError(
-        GatewayErrorCode.InvalidRequest,
-        'Remote endpoint must be publicly reachable',
-        400
-      );
-    }
-    return;
-  }
-  const [ipv4, ipv6] = await Promise.all([
-    resolve4(hostname).catch(() => [] as string[]),
-    resolve6(hostname).catch(() => [] as string[]),
-  ]);
-  const addresses = [...ipv4, ...ipv6];
-  if (addresses.length === 0) {
-    throw createGatewayError(
-      GatewayErrorCode.InvalidRequest,
-      'Remote endpoint DNS could not be validated',
-      400
-    );
-  }
-  if (addresses.some(address => !isPublicIp(address))) {
-    throw createGatewayError(
-      GatewayErrorCode.InvalidRequest,
-      'Remote endpoint resolves to a non-public destination',
-      400
-    );
-  }
-}
 
 async function readCappedJson(response: Response): Promise<unknown> {
   if (!response.body) {
@@ -117,15 +48,8 @@ async function readCappedJson(response: Response): Promise<unknown> {
   }
 }
 
-export async function validatePublicHttpsDestination(value: string): Promise<URL> {
-  const url = validatePublicHttpsUrl(value);
-  await resolvePublicHostname(url.hostname.toLowerCase());
-  return url;
-}
-
-async function fetchJson(url: URL, fetchImpl: typeof fetch): Promise<unknown> {
-  await validatePublicHttpsDestination(url.toString());
-  const response = await fetchImpl(url.toString(), {
+async function fetchJson(url: URL, request: GatewayOutboundRequest): Promise<unknown> {
+  const response = await request(url.toString(), {
     method: 'GET',
     headers: { Accept: 'application/json' },
     redirect: 'manual',
@@ -158,24 +82,22 @@ function parseProviderChallenge(header: string | null): ProviderChallenge {
   };
 }
 
-export function createDiscoveryService(params: { fetchImpl?: typeof fetch }) {
-  const fetchImpl = params.fetchImpl ?? fetch;
+export function createDiscoveryService(params: { requestImpl?: GatewayOutboundRequest }) {
+  const requestImpl = params.requestImpl ?? requestPublicHttps;
 
   async function discoverRemoteProvider(remoteUrl: string) {
-    const endpoint = await validatePublicHttpsDestination(remoteUrl);
+    const endpoint = validatePublicHttpsUrl(remoteUrl);
     const metadataUrl = new URL('/.well-known/oauth-protected-resource', endpoint.origin);
-    const metadataRaw = await fetchJson(metadataUrl, fetchImpl);
+    const metadataRaw = await fetchJson(metadataUrl, requestImpl);
     let metadata = metadataRaw ? RemoteProtectedResourceMetadataSchema.parse(metadataRaw) : null;
-    const endpointResponse = await fetchImpl(endpoint.toString(), {
+    const endpointResponse = await requestImpl(endpoint.toString(), {
       method: 'GET',
       redirect: 'manual',
     });
     const challenge = parseProviderChallenge(endpointResponse.headers.get('www-authenticate'));
     if (!metadata && challenge.resourceMetadataUrl) {
-      const challengeMetadataUrl = await validatePublicHttpsDestination(
-        challenge.resourceMetadataUrl
-      );
-      const challengeMetadataRaw = await fetchJson(challengeMetadataUrl, fetchImpl);
+      const challengeMetadataUrl = validatePublicHttpsUrl(challenge.resourceMetadataUrl);
+      const challengeMetadataRaw = await fetchJson(challengeMetadataUrl, requestImpl);
       metadata = challengeMetadataRaw
         ? RemoteProtectedResourceMetadataSchema.parse(challengeMetadataRaw)
         : null;
@@ -186,13 +108,13 @@ export function createDiscoveryService(params: { fetchImpl?: typeof fetch }) {
 
     const candidates = await Promise.all(
       authorizationServers.map(async issuer => {
-        const issuerUrl = await validatePublicHttpsDestination(issuer);
+        const issuerUrl = validatePublicHttpsUrl(issuer);
         const metadataCandidates = [
           new URL('/.well-known/oauth-authorization-server', issuerUrl.origin),
           new URL('/.well-known/openid-configuration', issuerUrl.origin),
         ];
         for (const candidate of metadataCandidates) {
-          const raw = await fetchJson(candidate, fetchImpl);
+          const raw = await fetchJson(candidate, requestImpl);
           if (!raw) continue;
           const parsed = ProviderAuthorizationServerMetadataSchema.parse(raw);
           if (parsed.issuer !== issuerUrl.toString() && parsed.issuer !== issuerUrl.origin)
@@ -217,8 +139,8 @@ export function createDiscoveryService(params: { fetchImpl?: typeof fetch }) {
     registrationEndpoint: string;
     redirectUri: string;
   }) {
-    const endpoint = await validatePublicHttpsDestination(paramsInput.registrationEndpoint);
-    const response = await fetchImpl(endpoint.toString(), {
+    const endpoint = validatePublicHttpsUrl(paramsInput.registrationEndpoint);
+    const response = await requestImpl(endpoint.toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({

@@ -33,7 +33,12 @@ import type { GatewayRouteService } from './route-service';
 import type { GatewayGrantService } from './grant-service';
 import type { GatewayOAuthGrantService } from './oauth-grant-service';
 import { configSecretAad, expiresAtIso, hashToken, pkceChallenge, randomToken } from './crypto';
-import { validatePublicHttpsDestination } from './discovery-service';
+import {
+  requestPublicHttps,
+  validatePublicHttpsDestination,
+  validatePublicHttpsUrl,
+  type GatewayOutboundRequest,
+} from './outbound';
 import { createAuditService } from './audit-service';
 
 const secretScheme = 'mcp-gateway-credential-rsa-aes-256-gcm';
@@ -141,9 +146,9 @@ export function createProviderOAuthService(params: {
   grantService: GatewayGrantService;
   oauthGrantService: GatewayOAuthGrantService;
   config: GatewayAppConfig;
-  fetchImpl?: typeof fetch;
+  requestImpl?: GatewayOutboundRequest;
 }) {
-  const fetchImpl = params.fetchImpl ?? fetch;
+  const requestImpl = params.requestImpl ?? requestPublicHttps;
 
   function decryptSecret(encryptedSecret: string, configId: string, kind: string): unknown {
     const decrypted = decryptKeyedEnvelope(
@@ -174,14 +179,12 @@ export function createProviderOAuthService(params: {
         400
       );
     }
-    const registrationEndpoint = await validatePublicHttpsDestination(
-      paramsInput.metadata.registration_endpoint
-    );
+    const registrationEndpoint = validatePublicHttpsUrl(paramsInput.metadata.registration_endpoint);
     const redirectUri = new URL(
       '/api/mcp-gateway/oauth/mcp/callback',
       params.config.appBaseUrl
     ).toString();
-    const response = await fetchImpl(registrationEndpoint.toString(), {
+    const response = await requestImpl(registrationEndpoint.toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
@@ -584,7 +587,6 @@ export function createProviderOAuthService(params: {
         throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
       }
     }
-    await validatePublicHttpsDestination(state.tokenEndpoint);
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       code: paramsInput.code,
@@ -598,7 +600,7 @@ export function createProviderOAuthService(params: {
     if (state.providerResource) {
       body.set('resource', state.providerResource);
     }
-    const response = await fetchImpl(state.tokenEndpoint, {
+    const response = await requestImpl(state.tokenEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
       body,

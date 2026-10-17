@@ -12,7 +12,9 @@ import {
 // procedure without the rest of the settings router.
 export const listAvailableModelsProcedure = organizationMemberProcedure
   .input(
-    OrganizationIdInputSchema.extend({ audience: z.enum(ORGANIZATION_MODEL_AUDIENCES).optional() })
+    OrganizationIdInputSchema.extend({
+      audience: z.enum(ORGANIZATION_MODEL_AUDIENCES).default('member'),
+    })
   )
   .output(z.custom<OpenRouterModelsResponse>())
   .query(async ({ input, ctx }) => {

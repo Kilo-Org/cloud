@@ -1,33 +1,28 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { normalizeClassifierInput } from './normalize';
 
 // Differential test: the scan-based extraction must agree with the regex
 // pipeline the previous implementation shipped, on every input. The previous
-// pipeline is extracted from the base revision of this file so the comparison
-// tracks the actual code under review.
+// pipeline is embedded verbatim below, as a shallow checkout does not carry
+// the base revision's blob.
 function previousCleanPromptText(): (text: string) => string {
-  const base = 'd38649d7e3';
-  const source = execSync(`git show ${base}:packages/auto-routing-contracts/src/normalize.ts`, {
-    cwd: path.resolve(import.meta.dirname, '../..'),
-    maxBuffer: 16 * 1024 * 1024,
-  }).toString();
-  const start = source.indexOf('function cleanPromptText(text: string): string {');
-  const end = source.indexOf('\n}', start);
-  if (start < 0 || end < 0) throw new Error('cleanPromptText not found in the base revision');
-  const body = source
-    .slice(start, end + 2)
-    .replace(
-      'function cleanPromptText(text: string): string {',
-      'function cleanPromptText(text) {'
-    );
-  return (
-    // eslint-disable-next-line no-eval -- The oracle is the previous revision's
-    // own function body, extracted from git and evaluated as a one-off.
-    (0, eval)(`(${body}\n)`) as (text: string) => string
-  );
+  return function cleanPromptText(text) {
+    const taskText = text.match(/<task>\s*([\s\S]*?)\s*<\/task>/i)?.[1] ?? text;
+
+    return taskText
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, ' ')
+      .replace(/<environment_details>[\s\S]*?<\/environment_details>/gi, ' ')
+      .replace(/<file(?:\s[^>]*)?>[\s\S]*?<\/file>/gi, ' ')
+      .replace(/<file_content(?:\s[^>]*)?>[\s\S]*?<\/file_content>/gi, ' ')
+      .replace(/<read_file>[\s\S]*?<\/read_file>/gi, ' ')
+      .replace(/<search_files>[\s\S]*?<\/search_files>/gi, ' ')
+      .replace(/^\[[^\]]+\]\s+Result:\s*/i, ' ')
+      .replace(/\[ERROR\][\s\S]*/i, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
 }
 
 function prefixFrom(text: string, clean: (t: string) => string): string | null {
@@ -60,7 +55,7 @@ function fixtureStrings(): string[] {
       Object.values(value).forEach(walk);
     }
   };
-  for (const dir of ['apps/web/src/lib/utils/testdata', 'apps/web/tests/req_sample']) {
+  for (const dir of ['apps/web/src/lib/utils/testdata', 'apps/web/src/tests/req_sample']) {
     const full = path.join(root, dir);
     let names: string[];
     try {

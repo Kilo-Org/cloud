@@ -171,7 +171,12 @@ Copy lives in `src/i18n/locales/en.json`. The other 86 catalogs are reviewed
 against the screens their keys render on, so a key's name and its context are
 what a translator has to work from.
 
-- Add and edit copy in `en.json` only. Never hand-edit another catalog.
+- Add and edit copy in `en.json` only. Never hand-edit another catalog. The one
+  exception is a value-level correction of a confirmed mistranslation in an
+  existing non-English entry (a wrong word, not a style preference): fix the
+  value in place, keep the key name, placeholders, and English copy unchanged,
+  verify the corrected string on the screen that renders it, and say so in the
+  pull request. Do not rewrite surrounding entries.
 - Search `en.json` for the string before you add a key. If the copy already
   exists, reuse that key. `pnpm check:i18n` fails when two keys hold the same copy.
 - Put copy used by more than one section under `common.`.

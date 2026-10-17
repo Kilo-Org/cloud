@@ -3612,7 +3612,7 @@
       "empty": "MCP サーバーはまだありません",
       "name": "サーバー名",
       "type": "サーバーの種類",
-      "localType": "地元",
+      "localType": "ローカル",
       "remoteType": "リモート",
       "command": "コマンドライン",
       "url": "URL",

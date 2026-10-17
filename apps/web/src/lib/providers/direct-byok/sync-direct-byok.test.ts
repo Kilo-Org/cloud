@@ -395,6 +395,7 @@ describe('syncDirectByokModels database snapshots', () => {
           nvidia: { models: providerModels },
           'alibaba-token-plan': { models: {} },
           edenai: { models: {} },
+          gmicloud: { models: {} },
           'zai-coding-plan': { models: {} },
           'ollama-cloud': { models: {} },
           'opencode-go': { models: openCodeGoModels },

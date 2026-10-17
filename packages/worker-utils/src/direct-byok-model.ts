@@ -14,6 +14,7 @@ export const DIRECT_BYOK_PROVIDER_IDS = [
   'byteplus-coding',
   'chutes-byok',
   'edenai',
+  'gmicloud-byok',
   'kimi-coding',
   'inceptron-byok',
   'martian',

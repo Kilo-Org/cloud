@@ -246,6 +246,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   }),
   modelsDevFetcher('alibaba-token-plan', 'alibaba-token-plan'),
   modelsDevFetcher('edenai', 'edenai', 'https://api.edenai.run/v3/models'),
+  modelsDevFetcher('gmicloud-byok', 'gmicloud'),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud', 'https://ollama.com/v1/models'),
   modelsDevFetcher('opencode-go', 'opencode-go', 'https://opencode.ai/zen/go/v1/models'),

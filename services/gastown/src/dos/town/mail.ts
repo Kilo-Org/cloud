@@ -37,10 +37,7 @@ export const MAIL_DELIVERY_BATCH = 50;
 /** Open message beads older than this are closed by the alarm sweep. Matches event pruning. */
 export const MAIL_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type MailValidationError =
-  | 'UNKNOWN_RECIPIENT'
-  | 'MAIL_TOO_LARGE'
-  | 'MAILBOX_FULL';
+export type MailValidationError = 'UNKNOWN_RECIPIENT' | 'MAIL_TOO_LARGE' | 'MAILBOX_FULL';
 
 /**
  * Thrown by sendMail when the message violates a mail rule.

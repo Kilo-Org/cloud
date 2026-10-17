@@ -8,6 +8,8 @@ import {
   type TownConfigUpdate,
   type MergeStrategy,
   type RigOverrideConfig,
+  MAX_CONCURRENT_POLECATS_CEILING,
+  MAX_DISPATCH_ATTEMPTS_CEILING,
 } from '../../types';
 import { resolveGitHubTokenString } from './town-scm';
 
@@ -244,14 +246,6 @@ export type EffectiveConfig = {
   max_concurrent_polecats: number | undefined;
   max_dispatch_attempts: number | undefined;
 };
-
-/**
- * Upper ceilings for per-rig agent limits. Mirrors the bounds on
- * RigOverrideConfigSchema and the rig settings form (max 50 concurrent
- * polecats, max 20 dispatch attempts).
- */
-const MAX_CONCURRENT_POLECATS_CEILING = 50;
-const MAX_DISPATCH_ATTEMPTS_CEILING = 20;
 
 function clampLimit(value: number | undefined, ceiling: number): number | undefined {
   if (value === undefined) return undefined;

@@ -5,7 +5,12 @@
 
 import { z } from 'zod';
 import { query } from '../../util/query.util';
-import { type RigOverrideConfig, RigOverrideConfigSchema } from '../../types';
+import {
+  type RigOverrideConfig,
+  RigOverrideConfigSchema,
+  MAX_CONCURRENT_POLECATS_CEILING,
+  MAX_DISPATCH_ATTEMPTS_CEILING,
+} from '../../types';
 
 const RIG_TABLE_CREATE = /* sql */ `
   CREATE TABLE IF NOT EXISTS "rigs" (
@@ -28,8 +33,20 @@ const RIG_INDEX = /* sql */ `CREATE UNIQUE INDEX IF NOT EXISTS idx_rigs_name ON 
  * (updateRigConfig) parse strictly through RigOverrideConfigSchema.
  */
 const StoredRigOverrideConfigSchema = RigOverrideConfigSchema.extend({
-  max_concurrent_polecats: z.number().int().min(1).max(50).optional().catch(undefined),
-  max_dispatch_attempts: z.number().int().min(1).max(20).optional().catch(undefined),
+  max_concurrent_polecats: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_CONCURRENT_POLECATS_CEILING)
+    .optional()
+    .catch(undefined),
+  max_dispatch_attempts: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_DISPATCH_ATTEMPTS_CEILING)
+    .optional()
+    .catch(undefined),
 });
 
 export const RigRecord = z.object({

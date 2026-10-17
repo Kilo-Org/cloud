@@ -349,6 +349,14 @@ export type TownConfig = z.infer<typeof TownConfigSchema>;
 
 // -- Rig Override Configuration --
 
+/**
+ * Upper ceilings for per-rig agent limits. Shared by the rig override schema,
+ * the lenient stored-config read, and the dispatch resolution so they cannot
+ * drift; the rig settings form uses the same values.
+ */
+export const MAX_CONCURRENT_POLECATS_CEILING = 50;
+export const MAX_DISPATCH_ATTEMPTS_CEILING = 20;
+
 export const RigOverrideConfigSchema = z.object({
   // Model overrides (override townConfig.default_model / role_models)
   default_model: z.string().optional(),
@@ -383,8 +391,13 @@ export const RigOverrideConfigSchema = z.object({
   git_push_flags: z.string().optional(),
 
   // Agent limits
-  max_concurrent_polecats: z.number().int().positive().max(50).optional(),
-  max_dispatch_attempts: z.number().int().positive().max(20).optional(),
+  max_concurrent_polecats: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_CONCURRENT_POLECATS_CEILING)
+    .optional(),
+  max_dispatch_attempts: z.number().int().positive().max(MAX_DISPATCH_ATTEMPTS_CEILING).optional(),
 });
 
 export type RigOverrideConfig = z.infer<typeof RigOverrideConfigSchema>;

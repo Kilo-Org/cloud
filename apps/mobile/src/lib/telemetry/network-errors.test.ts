@@ -23,6 +23,9 @@ import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
 let events: TelemetryEvent[] = [];
 let breadcrumbs: TelemetryBreadcrumb[] = [];
 
+// Assembled from parts: the fixture is a URL component, not a credential URI.
+const USERINFO = ['user', 'abcdefghijklmnopqrst'].join(':');
+
 beforeEach(() => {
   events = [];
   breadcrumbs = [];
@@ -86,6 +89,18 @@ describe('stripQueryString', () => {
       'https://example.com/api/trpc/a.b'
     );
   });
+
+  it('keeps origin and path for a fragment suffix', () => {
+    expect(stripQueryString('https://example.com/oauth/callback#abcdefghijklmnopqrst')).toBe(
+      'https://example.com/oauth/callback'
+    );
+  });
+
+  it('keeps origin and path when the authority carries userinfo', () => {
+    expect(stripQueryString(`https://${USERINFO}@example.com/api/trpc/a.b`)).toBe(
+      'https://example.com/api/trpc/a.b'
+    );
+  });
 });
 
 describe('normalizeUrlPath', () => {
@@ -99,6 +114,12 @@ describe('normalizeUrlPath', () => {
 
   it('keeps a path-only URL unchanged', () => {
     expect(normalizeUrlPath('/api/trpc/a.b')).toBe('/api/trpc/a.b');
+  });
+
+  it('keeps the path of a URL whose only suffix is a fragment', () => {
+    expect(normalizeUrlPath('https://api.example.com/api/trpc/session.list#section')).toBe(
+      '/api/trpc/session.list'
+    );
   });
 
   it('returns / for an absolute URL with no path and empty for a non-string', () => {
@@ -438,6 +459,21 @@ describe('createNetworkErrorFetch', () => {
     // The message drops the scheme, host, and port so it is stable across
     // environments and worktrees.
     expect(errorMessageOf(event)).toBe('POST /api/trpc/a.b -> 412');
+  });
+
+  it('(d3) reports the network path without a fragment', async () => {
+    const response = new Response('stale', { status: 412 });
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response));
+
+    await wrapped('https://example.com/api/trpc/a.b#abcdefghijklmnopqrst', {
+      method: 'POST',
+    });
+
+    const event = reportedEvent();
+    expect(event?.contexts?.network).toMatchObject({ url: 'https://example.com/api/trpc/a.b' });
+    expect(errorMessageOf(event)).toBe('POST /api/trpc/a.b -> 412');
+    expect(JSON.stringify(event)).not.toContain('abcdefghijklmnopqrst');
+    expect(JSON.stringify(event?.fingerprint)).not.toContain('access_token');
   });
 
   it('(e) does not report a 200 response', async () => {

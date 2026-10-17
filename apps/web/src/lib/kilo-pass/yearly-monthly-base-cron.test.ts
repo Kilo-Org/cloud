@@ -13,8 +13,9 @@ import {
   KiloPassCadence,
   KiloPassTier,
   KiloPassIssuanceSource,
+  KiloPassPaymentProvider,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { runKiloPassYearlyMonthlyBaseCron } from '@/lib/kilo-pass/yearly-monthly-base-cron';
@@ -223,5 +224,97 @@ describe('runKiloPassYearlyMonthlyBaseCron', () => {
 
     // Should never exceed 12 total issuances (1 invoice + up to 11 cron = 12 max)
     expect(allIssuances.length).toBeLessThanOrEqual(12);
+  });
+
+  test('yearly subscription at the 12-issuance cap is not selected again after one run', async () => {
+    // Period starts with the invoice-sourced issuance; all 12 months are already issued.
+    const invoiceIssuanceMonth = '2024-12-01';
+    const subscriptionStartedAt = '2024-12-01T00:00:00.000Z';
+    const now = new Date('2025-12-15T00:00:00.000Z');
+    const dueAtIso = '2025-12-01T00:00:00.000Z';
+
+    const user = await insertTestUser();
+
+    const inserted = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        ...stripeSubscriptionFields(),
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+        started_at: subscriptionStartedAt,
+        ended_at: null,
+        current_streak_months: 0,
+        next_yearly_issue_at: dueAtIso,
+      })
+      .returning({ subscriptionId: kilo_pass_subscriptions.id });
+
+    const subscriptionId = inserted[0]?.subscriptionId;
+    expect(subscriptionId).toBeTruthy();
+    if (!subscriptionId) throw new Error('Failed to insert kilo_pass_subscriptions row');
+
+    // Seed the full yearly period: 1 invoice-sourced issuance + 11 cron-sourced issuances.
+    await db.insert(kilo_pass_issuances).values({
+      kilo_pass_subscription_id: subscriptionId,
+      issue_month: invoiceIssuanceMonth,
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripe_invoice_id: `in_seed_invoice_${crypto.randomUUID()}`,
+    });
+    await db.insert(kilo_pass_issuances).values(
+      Array.from({ length: 11 }, (_, i) => ({
+        kilo_pass_subscription_id: subscriptionId,
+        issue_month: `2025-${String(i + 1).padStart(2, '0')}-01`,
+        source: KiloPassIssuanceSource.Cron,
+      }))
+    );
+
+    await runKiloPassYearlyMonthlyBaseCron(db, { now });
+
+    // The cap branch advanced the cursor past `now`, so the subscription
+    // leaves the due set for this period.
+    const afterFirstRun = await db
+      .select({ nextYearlyIssueAt: kilo_pass_subscriptions.next_yearly_issue_at })
+      .from(kilo_pass_subscriptions)
+      .where(eq(kilo_pass_subscriptions.id, subscriptionId))
+      .limit(1);
+    const cursorAfterFirstRun = afterFirstRun[0]?.nextYearlyIssueAt;
+    expect(cursorAfterFirstRun).toBeTruthy();
+    if (!cursorAfterFirstRun) throw new Error('Expected next_yearly_issue_at to be set');
+    expect(new Date(cursorAfterFirstRun).toISOString()).toBe('2026-01-01T00:00:00.000Z');
+
+    // Second run: the subscription is no longer in the due set.
+    const dueSubscriptions = await db
+      .select({ subscriptionId: kilo_pass_subscriptions.id })
+      .from(kilo_pass_subscriptions)
+      .where(
+        and(
+          eq(kilo_pass_subscriptions.cadence, KiloPassCadence.Yearly),
+          inArray(kilo_pass_subscriptions.status, ['active', 'paused']),
+          eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.Stripe),
+          isNotNull(kilo_pass_subscriptions.stripe_subscription_id),
+          isNotNull(kilo_pass_subscriptions.next_yearly_issue_at),
+          lte(kilo_pass_subscriptions.next_yearly_issue_at, now.toISOString())
+        )
+      );
+    expect(dueSubscriptions.map(row => row.subscriptionId)).not.toContain(subscriptionId);
+
+    await runKiloPassYearlyMonthlyBaseCron(db, { now });
+
+    // The second run issued nothing further for the subscription.
+    const afterSecondRun = await db
+      .select({ nextYearlyIssueAt: kilo_pass_subscriptions.next_yearly_issue_at })
+      .from(kilo_pass_subscriptions)
+      .where(eq(kilo_pass_subscriptions.id, subscriptionId))
+      .limit(1);
+    expect(new Date(afterSecondRun[0]!.nextYearlyIssueAt!).toISOString()).toBe(
+      '2026-01-01T00:00:00.000Z'
+    );
+
+    const issuanceCount = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(kilo_pass_issuances)
+      .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId));
+    expect(issuanceCount[0]?.count).toBe(12);
   });
 });

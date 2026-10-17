@@ -71,6 +71,15 @@ async function issueYearlyCadenceMonthlyBaseOnce(
   const issueMonth = computeIssueMonth(dayjs(nextYearlyIssueAt).utc());
   const nextYearlyIssueAtNewIso = dayjs(nextYearlyIssueAt).utc().add(1, 'month').toISOString();
 
+  // Use GREATEST() to ensure monotonic advancement - prevents regression under overlapping runs.
+  // Persist before the cap check so every step, including a skipped one, leaves the due set.
+  await tx
+    .update(kilo_pass_subscriptions)
+    .set({
+      next_yearly_issue_at: sql`GREATEST(${kilo_pass_subscriptions.next_yearly_issue_at}, ${nextYearlyIssueAtNewIso})`,
+    })
+    .where(eq(kilo_pass_subscriptions.id, subscriptionId));
+
   // Count total issuances since the last invoice-sourced issuance (start of yearly period)
   const lastInvoiceIssuance = await tx
     .select({ issueMonth: kilo_pass_issuances.issue_month })
@@ -98,7 +107,7 @@ async function issueYearlyCadenceMonthlyBaseOnce(
 
     const count = totalIssuances[0]?.count ?? 0;
     if (count >= 12) {
-      // All 12 months issued for this yearly period — skip but still advance cursor
+      // All 12 months issued for this yearly period — cursor already advanced above
       return {
         issueMonth,
         nextYearlyIssueAtNewIso: dayjs(nextYearlyIssueAt).utc().add(1, 'month').toISOString(),
@@ -139,14 +148,6 @@ async function issueYearlyCadenceMonthlyBaseOnce(
       baseAmountUsd,
     });
   }
-
-  // Use GREATEST() to ensure monotonic advancement - prevents regression under overlapping runs.
-  await tx
-    .update(kilo_pass_subscriptions)
-    .set({
-      next_yearly_issue_at: sql`GREATEST(${kilo_pass_subscriptions.next_yearly_issue_at}, ${nextYearlyIssueAtNewIso})`,
-    })
-    .where(eq(kilo_pass_subscriptions.id, subscriptionId));
 
   return {
     issueMonth,

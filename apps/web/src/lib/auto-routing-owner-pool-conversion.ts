@@ -57,7 +57,11 @@ async function insertConvertedRouter(
   return db.transaction(async tx => {
     await lockOwner(tx, owner);
     const [sameSlug] = await tx
-      .select({ entries: auto_routing_custom_routers.entries })
+      .select({
+        entries: auto_routing_custom_routers.entries,
+        mode: auto_routing_custom_routers.mode,
+        baseRouter: auto_routing_custom_routers.base_router,
+      })
       .from(auto_routing_custom_routers)
       .where(
         and(customRouterOwnerCondition(owner), eq(auto_routing_custom_routers.slug, router.slug))
@@ -66,6 +70,8 @@ async function insertConvertedRouter(
     if (sameSlug) {
       const existingKeys = new Set(sameSlug.entries.map(customRouterEntryKey));
       const holdsPool =
+        sameSlug.mode === router.mode &&
+        sameSlug.baseRouter === router.baseRouter &&
         existingKeys.size === router.entries.length &&
         router.entries.every(entry => existingKeys.has(customRouterEntryKey(entry)));
       return holdsPool ? 'exists' : 'slug_taken';

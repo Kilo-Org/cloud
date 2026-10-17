@@ -164,16 +164,19 @@ describe(`POST ${OWNER_POOL_CONVERSION_PATH}`, () => {
       expect(mockedSendViaMailgun).toHaveBeenCalledTimes(1);
     });
 
-    test('reports slug_taken when the owner already has a different efficient router', async () => {
+    test.each([
+      ['other entries', { mode: 'best_accuracy' as const, models: [FLASH] }],
+      ['the same entries in another mode', { mode: 'cost_per_accuracy' as const, models: [SONNET, FLASH] }],
+    ])('reports slug_taken when the owner has its own efficient router with %s', async (_label, own) => {
       await db.insert(auto_routing_custom_routers).values({
         owned_by_user_id: user.id,
         created_by_user_id: user.id,
         slug: 'efficient',
         name: 'My own',
-        base_router: 'frontier',
-        mode: 'cost_per_accuracy',
-        entries: [{ kind: 'gateway', model: FLASH }],
-        default_entry_key: customRouterEntryKey({ kind: 'gateway', model: FLASH }),
+        base_router: 'efficient',
+        mode: own.mode,
+        entries: own.models.map(model => ({ kind: 'gateway' as const, model })),
+        default_entry_key: customRouterEntryKey({ kind: 'gateway', model: own.models[0] ?? FLASH }),
       });
       const [ownRouter] = await routers();
 

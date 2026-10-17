@@ -45,9 +45,9 @@ export type OwnerPoolConversionRequest = z.infer<typeof OwnerPoolConversionReque
 
 export const OwnerPoolConversionOutcomeSchema = z.enum([
   'created',
-  // The owner's `efficient` router already holds this pool; re-runs land here.
+  // The owner's `efficient` router already holds this pool, mode, and base; re-runs land here.
   'exists',
-  // The owner has its own `efficient` router with other entries; the pool was not converted.
+  // The owner has its own `efficient` router that differs; the pool was not converted.
   'slug_taken',
   'router_cap_reached',
   'owner_not_found',

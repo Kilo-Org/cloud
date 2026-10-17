@@ -21,7 +21,10 @@ import {
   inviteUserToOrganization,
   getOrganizationMembers,
   acceptOrganizationInvite,
+  updateOrganizationSettings,
 } from './organizations';
+import { getOrganizationGroupPolicyContext } from './organization-group-policy-context.server';
+import { bumpOrganizationGroupPolicyRevision } from './organization-groups';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@kilocode/web-shared/lib/organizations/constants';
 
@@ -1706,6 +1709,102 @@ describe('Organizations', () => {
         expect(membership?.invited_by).toBe(admin.id);
       });
 
+      test('should advance the group-policy revision for the accepted membership', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const before = await getOrganizationGroupPolicyContext({
+          organizationId: organization.id,
+          subject: { type: 'defaultAccess' },
+        });
+        expect(before.policyRevision).toBe(0);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+        expect(result.success).toBe(true);
+
+        const after = await getOrganizationGroupPolicyContext({
+          organizationId: organization.id,
+          subject: { type: 'member', kiloUserId: invitee.id },
+        });
+        expect(after.policyRevision).toBe(1);
+      });
+
+      test('should increment an existing group-policy revision for the accepted membership', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const seededRevision = await db.transaction(tx =>
+          bumpOrganizationGroupPolicyRevision(tx, organization.id, owner.id)
+        );
+        expect(seededRevision).toBe(1);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+        expect(result.success).toBe(true);
+
+        const after = await getOrganizationGroupPolicyContext({
+          organizationId: organization.id,
+          subject: { type: 'member', kiloUserId: invitee.id },
+        });
+        expect(after.policyRevision).toBe(2);
+      });
+
+      test('should not advance the group-policy revision when the invitee is already a member', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+        // Membership arrives after the invitation, so acceptance takes the
+        // already-a-member branch and inserts no row.
+        await addUserToOrganization(organization.id, invitee.id, 'member');
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+        expect(result.success).toBe(true);
+
+        // The already-a-member branch inserts nothing: the membership keeps the
+        // row addUserToOrganization created (no invited_by from the invite).
+        const memberships = await db
+          .select({
+            invitedBy: organization_memberships.invited_by,
+            role: organization_memberships.role,
+          })
+          .from(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, organization.id),
+              eq(organization_memberships.kilo_user_id, invitee.id)
+            )
+          );
+        expect(memberships).toEqual([{ invitedBy: null, role: 'member' }]);
+
+        const after = await getOrganizationGroupPolicyContext({
+          organizationId: organization.id,
+          subject: { type: 'member', kiloUserId: invitee.id },
+        });
+        expect(after.policyRevision).toBe(1);
+      });
+
       test('should update invitation timestamps correctly', async () => {
         const owner = await insertTestUser();
         const invitee = await insertTestUser();
@@ -2108,6 +2207,45 @@ describe('Organizations', () => {
 
         expect(userLimit).toBeTruthy();
         expect(fromMicrodollars(userLimit!.microdollar_limit)).toBe(DEFAULT_MEMBER_DAILY_LIMIT_USD);
+      });
+    });
+
+    describe('updateOrganizationSettings', () => {
+      test('rejects an invalid settings object and leaves the stored settings unchanged', async () => {
+        const owner = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        await expect(
+          updateOrganizationSettings(organization.id, {
+            // @ts-expect-error testing runtime validation with an unsupported data_collection value
+            data_collection: 'maybe',
+          })
+        ).rejects.toThrow();
+
+        const [stored] = await db
+          .select({ settings: organizations.settings })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(stored?.settings).toEqual(organization.settings);
+      });
+
+      test('persists only the keys the settings schema declares', async () => {
+        const owner = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const updated = await updateOrganizationSettings(organization.id, {
+          data_collection: 'deny',
+          // @ts-expect-error testing that keys outside the settings schema are dropped
+          unknown_setting: true,
+        });
+
+        expect(updated).toEqual({ data_collection: 'deny' });
+
+        const [stored] = await db
+          .select({ settings: organizations.settings })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(stored?.settings).toEqual({ data_collection: 'deny' });
       });
     });
   });

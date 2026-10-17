@@ -752,6 +752,10 @@ export async function acceptOrganizationInvite(
         invited_by: invitation.invited_by,
       });
 
+      // A real membership insert changes group-policy evaluation, so advance the
+      // same revision signal addUserToOrganization uses for the SSO path.
+      await bumpOrganizationGroupPolicyRevision(tx, invitation.organization_id, userId);
+
       await skipCustomerSourceSurveyForOrgJoin(userId, tx);
 
       // If the invitation predates the account, the account was created after
@@ -794,7 +798,7 @@ export async function acceptOrganizationInvite(
         tx,
       });
 
-      logExceptInTest(`Invitation ${inviteToken} accepted by ${userId}`);
+      logExceptInTest(`Invitation ${invitation.id} accepted by ${userId}`);
       return successResult({
         invitation: updatedInvitation,
         organizationId: invitation.organization_id,
@@ -870,14 +874,15 @@ export async function updateOrganizationSettings(
   settings: OrganizationSettings,
   txn?: DrizzleTransaction
 ): Promise<OrganizationSettings> {
+  const validated = OrganizationSettingsSchema.parse(settings);
   await (txn || db)
     .update(organizations)
     .set({
-      settings,
+      settings: validated,
     })
     .where(eq(organizations.id, organizationId));
 
-  return settings;
+  return validated;
 }
 
 // Atomically update the recommendations-digest flag inside the settings JSONB

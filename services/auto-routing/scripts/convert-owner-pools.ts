@@ -244,7 +244,7 @@ async function main(): Promise<void> {
           const failed = result.data.needsAttention.filter(entry => entry.startsWith('failed '));
           const escape =
             failed.length > 0
-              ? ` If this keeps aborting because those owners keep failing, resume past the last one with --resume ${ownerType}:<ownerId>; that skips the unposted owners listed above, so handle them by hand.`
+              ? ` If this keeps aborting because those owners keep failing, resume past the last one with --resume ${ownerType}:<ownerId>: that skips them and posts the page's notPosted owners next.`
               : '';
           throw new Error(
             `the web endpoint looks unavailable (a failed batch or repeated failed conversions); fix it, then ${retryHint}.${escape}`

@@ -222,7 +222,7 @@ export function validateAgentForm(
   if (!AGENT_SLUG_PATTERN.test(slug)) {
     return 'slug-invalid';
   }
-  if (BUILTIN_AGENT_SLUGS.has(slug) || otherSlugs.includes(slug)) {
+  if (BUILTIN_AGENT_SLUGS.has(slug) || otherSlugs.some(item => item.toLowerCase() === slug)) {
     return 'slug-conflict';
   }
   if (state.name.trim().length === 0) {

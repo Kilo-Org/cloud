@@ -3664,7 +3664,7 @@
       "nameRequired": "Masukkan nama agen",
       "slugRequired": "Masukkan siput agen",
       "slugInvalid": "Siput harus dimulai dengan huruf dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
-      "slugConflict": "Siput itu dicadangkan oleh agen bawaan",
+      "slugConflict": "Slug tersebut sudah digunakan oleh agen bawaan atau agen lain di profil ini",
       "edit": "Sunting agen"
     },
     "slashCommands": {

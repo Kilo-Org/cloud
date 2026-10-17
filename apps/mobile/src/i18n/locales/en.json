@@ -3664,7 +3664,7 @@
       "nameRequired": "Enter an agent name",
       "slugRequired": "Enter an agent slug",
       "slugInvalid": "Slug must start with a letter and use only lowercase letters, digits, and dashes",
-      "slugConflict": "That slug is reserved by a built-in agent",
+      "slugConflict": "That slug is already taken by a built-in or another agent in this profile",
       "edit": "Edit agent"
     },
     "slashCommands": {

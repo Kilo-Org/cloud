@@ -3664,7 +3664,7 @@
       "nameRequired": "Sláðu inn nafn umboðsmanns",
       "slugRequired": "Sláðu inn umboðssnigl",
       "slugInvalid": "Snigl verður að byrja á bókstaf og nota aðeins lágstafi, tölustafi og strik",
-      "slugConflict": "Sá snigill er frátekinn af innbyggðum umboðsmanni",
+      "slugConflict": "Þetta slug er þegar í notkun hjá innbyggðum umboðsmanni eða öðrum umboðsmanni í þessu prófíli",
       "edit": "Breyta umboðsmanni"
     },
     "slashCommands": {

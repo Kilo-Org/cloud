@@ -3664,7 +3664,7 @@
       "nameRequired": "Maglagay ng pangalan ng ahente",
       "slugRequired": "Maglagay ng agent slug",
       "slugInvalid": "Ang slug ay dapat magsimula sa isang titik at gumamit lamang ng maliliit na titik, digit, at gitling",
-      "slugConflict": "Ang slug na iyon ay nakalaan ng isang built-in na ahente",
+      "slugConflict": "Ginagamit na ng isang built-in na agent o iba pang agent sa profile na ito ang slug na iyon",
       "edit": "I-edit ang ahente"
     },
     "slashCommands": {

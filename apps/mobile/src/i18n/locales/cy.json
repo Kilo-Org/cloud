@@ -3828,7 +3828,7 @@
       "nameRequired": "Rhowch enw asiant",
       "slugRequired": "Rhowch wlithen asiant",
       "slugInvalid": "Rhaid i wlithen ddechrau gyda llythyren a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
-      "slugConflict": "Mae'r wlithen honno'n cael ei chadw gan asiant adeiledig",
+      "slugConflict": "Mae'r slug hwnnw eisoes yn cael ei ddefnyddio gan asiant adeiledig neu asiant arall yn y proffil hwn",
       "edit": "Golygu asiant"
     },
     "slashCommands": {

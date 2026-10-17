@@ -3664,7 +3664,7 @@
       "nameRequired": "Whakauruhia he ingoa māngai",
       "slugRequired": "Whakauruhia he slug māngai",
       "slugInvalid": "Me timata te Slug ki te reta me te whakamahi i nga reta iti, nga mati me nga tohu",
-      "slugConflict": "Ka rahuitia taua maaka e tetahi māngai whakauru",
+      "slugConflict": "Kei te whakamahia tērā slug e tētahi ahatanga o roto, e tētahi ahatanga kē rānei o tēnei kōtaha",
       "edit": "Whakatikatika māngai"
     },
     "slashCommands": {

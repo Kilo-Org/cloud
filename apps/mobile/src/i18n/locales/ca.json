@@ -3705,7 +3705,7 @@
       "nameRequired": "Introduïu un nom d'agent",
       "slugRequired": "Introduïu un llimac d'agent",
       "slugInvalid": "Slug ha de començar amb una lletra i utilitzar només lletres minúscules, dígits i guions",
-      "slugConflict": "Aquest llimac està reservat per un agent integrat",
+      "slugConflict": "Aquest slug ja l'utilitza un agent integrat o un altre agent d'aquest perfil",
       "edit": "Edita l'agent"
     },
     "slashCommands": {

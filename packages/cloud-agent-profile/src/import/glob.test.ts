@@ -134,11 +134,19 @@ describe('compileGlob', () => {
     expect(compileGlob('docs/**/a.md').matches('docs/x/y/a.md')).toBe(true);
     expect(compileGlob('a/**b/c').matches('a/x/yb/c')).toBe(true);
     expect(compileGlob('a/**b/c').matches('a/yb/z')).toBe(false);
-    // A directory wildcard only extends forward from a reachable position.
+    expect(compileGlob('*').tokenCount).toBe(1);
+  });
+
+  test('extends a directory wildcard forward from a reached path position', () => {
+    // `**/` is optional, and when it consumes anything it consumes forward from
+    // a reached position, so a separator before that position opens nothing.
     expect(compileGlob('a/a**/a').matches('a/a')).toBe(false);
     expect(compileGlob('a/a**/a').matches('a/a/a')).toBe(true);
+    expect(compileGlob('a/a**/a').matches('a/a/a/a')).toBe(true);
+    // Its empty alternative keeps the surrounding literals adjacent.
+    expect(compileGlob('a**/a').matches('aa')).toBe(true);
     expect(compileGlob('a**/a').matches('a/a')).toBe(true);
-    expect(compileGlob('*').tokenCount).toBe(1);
+    expect(compileGlob('a**/a').matches('a/xa')).toBe(false);
   });
 
   test('matches the same set as the previous translation', () => {
@@ -156,7 +164,7 @@ describe('compileGlob', () => {
     }
   });
 
-  test('matches nested instruction globs across directories', () => {
+  test('does not match a literal the path lacks, however many directories it spans', () => {
     const deepPath = `${Array.from({ length: 60 }, (_, index) => `d${index}`).join('/')}/other.md`;
     const budgetMs = 500;
     for (const groups of [8, 12, 32, 128]) {

@@ -652,7 +652,7 @@ describe('instruction glob import limits', () => {
     expect(preview.config.instructions).toEqual([{ name: 'style', content: 'Directory body' }]);
   });
 
-  test('imports an archive whose instruction glob spans many directories', () => {
+  test('parses an archive whose instruction glob spans many directories', () => {
     const deepPath = Array.from({ length: 40 }, (_, index) => `d${index}`).join('/');
     const glob = `${'**/'.repeat(12)}NEVER-EXIST.md`;
     const started = performance.now();

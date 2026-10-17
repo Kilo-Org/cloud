@@ -946,7 +946,13 @@ jobs:
       matrix:
         workspace: ${{ fromJson(needs.changes.outputs.workspace_matrix) }}
     name: test (${{ matrix.workspace.name }})
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    # The suites listed here spend 40 s or more in `Run tests` on 2 vCPU and
+    # their work is parallel across files, so the extra two vCPUs pay off:
+    # measured on a work VM the run step drops by 2.2x-2.5x (kilo-chat 134 s ->
+    # 61 s, kilo-extension 73 s -> 28 s, auto-routing-benchmark 92 s -> 35 s; the
+    # numbers include the runner's own startup). Everything else in the matrix
+    # is setup-bound, where a bigger runner only adds cost.
+    runs-on: ${{ (contains(fromJson('["kilo-chat","kilo-extension","auto-routing-benchmark"]'), matrix.workspace.name) && vars.RUNNER_MEDIUM_LABEL) || vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1

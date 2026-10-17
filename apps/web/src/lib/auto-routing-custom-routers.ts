@@ -50,6 +50,12 @@ import * as z from 'zod';
 import { buildEligibleCatalog, type EligibleCatalog } from '@/lib/auto-routing-pool-validation';
 
 const BENCHMARK_REGISTER_BATCH_SIZE = 10;
+// 400 bodies from benchmark workers that cannot benchmark the requested base router: a worker
+// that predates frontier owner profiles, or one without a saved config for that router.
+const UNSUPPORTED_BASE_ROUTER_ERRORS = [
+  'only supported by the efficient router',
+  'benchmark config not set',
+];
 
 export class CustomRouterApiError extends Error {
   readonly code: CustomRouterErrorCode;
@@ -324,6 +330,15 @@ async function requestPlatformBenchmarks(params: {
         result.quota.retryAt
       );
     }
+    if (
+      result.status === 400 &&
+      UNSUPPORTED_BASE_ROUTER_ERRORS.some(fragment => result.error.error.includes(fragment))
+    ) {
+      throw new CustomRouterApiError(
+        'invalid_request',
+        `baseRouter: Benchmarks for the ${params.baseRouter} base router are not available yet. Choose another base router.`
+      );
+    }
     if (result.status === 400) {
       throw new CustomRouterApiError('invalid_request', result.error.error);
     }
@@ -425,8 +440,10 @@ async function ownerRouterSlugs(
 }
 
 /**
- * Catalog validation and benchmark admission make network calls, so they run before the write
- * transaction; the transaction holds the owner lock only for the database checks and the write.
+ * Every check a request can fail (schema, slug, default entry, caps, catalog) runs before benchmark
+ * admission, which spends the owner's quota and is the gate for quota_exceeded. The write
+ * transaction holds the owner lock only for the database work; its re-checks fail only when a
+ * concurrent write for the same owner wins the race.
  */
 export async function createCustomRouterResponse(
   context: CustomRouterRequestContext,

@@ -287,6 +287,40 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
     });
 
+    test('maps a benchmark worker without frontier owner profiles to a base router error', async () => {
+      mockedRegister.mockResolvedValue({
+        ok: false,
+        status: 400,
+        error: { error: 'Custom profiles are only supported by the efficient router' },
+      });
+
+      const created = await create(routerBody({ baseRouter: 'frontier' }));
+
+      expect(created.status).toBe(400);
+      expect(created.body).toMatchObject({
+        error: {
+          code: 'invalid_request',
+          message: expect.stringContaining('frontier base router are not available yet'),
+        },
+      });
+      expect(mockedRegister).toHaveBeenCalledWith(expect.objectContaining({ router: 'frontier' }));
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
+    });
+
+    test('reports other benchmark worker failures as internal errors without saving', async () => {
+      mockedRegister.mockResolvedValue({
+        ok: false,
+        status: 503,
+        error: { error: 'Service unavailable' },
+      });
+
+      const created = await create(routerBody());
+
+      expect(created.status).toBe(500);
+      expect(created.body).toMatchObject({ error: { code: 'internal_error' } });
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
+    });
+
     test('lists only personal routers outside an organization context', async () => {
       const organization = await createTestOrganization('Acme', user.id, 0);
       await create(routerBody());
@@ -339,6 +373,7 @@ describe('/api/auto-routing/custom-routers', () => {
 
       expect(created.status).toBe(400);
       expect(created.body).toMatchObject({ error: { code: 'invalid_request' } });
+      expect(mockedRegister).not.toHaveBeenCalled();
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
     });
 
@@ -355,6 +390,7 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(eleventh.body).toMatchObject({
         error: { code: 'invalid_request', message: expect.stringContaining('at most 10') },
       });
+      expect(mockedRegister).toHaveBeenCalledTimes(10);
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(10);
     });
 
@@ -376,6 +412,20 @@ describe('/api/auto-routing/custom-routers', () => {
           params('user', 'coding')
         )
       );
+      const unknownModel = await errorOf(
+        await updateRouter(
+          request('/user/coding', {
+            method: 'PATCH',
+            body: {
+              baseRouter: 'frontier',
+              entries: [gateway('vendor/unknown')],
+              defaultEntryKey: customRouterEntryKey(gateway('vendor/unknown')),
+            },
+          }),
+          params('user', 'coding')
+        )
+      );
+      expect(mockedRegister).toHaveBeenCalledTimes(1);
       const moved = await updateRouter(
         request('/user/coding', {
           method: 'PATCH',
@@ -389,7 +439,9 @@ describe('/api/auto-routing/custom-routers', () => {
 
       expect(entriesOnly.status).toBe(400);
       expect(defaultOutsidePool.status).toBe(400);
+      expect(unknownModel.status).toBe(400);
       expect(moved.status).toBe(200);
+      expect(mockedRegister).toHaveBeenCalledTimes(2);
       const { router } = (await moved.json()) as CustomRouterResponse;
       expect(router.defaultEntryKey).toBe(customRouterEntryKey(gateway(FLASH)));
       expect(router.entries.map(entry => entry.key)).toEqual([

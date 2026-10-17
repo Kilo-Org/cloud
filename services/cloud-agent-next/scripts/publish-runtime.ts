@@ -116,12 +116,10 @@ export function inventoryFromCliTarball(
 }
 
 function writeOctal(value: number, length: number): string {
-  return (
-    value
-      .toString(8)
-      .padStart(length - 1, '0')
-      .slice(0, length - 1) + '\0'
-  );
+  const digits = value.toString(8);
+  if (!Number.isSafeInteger(value) || value < 0 || digits.length >= length)
+    throw new Error('tar numeric field overflow');
+  return digits.padStart(length - 1, '0') + '\0';
 }
 
 /** Build a deterministic ustar byte stream for regular files. */
@@ -130,7 +128,9 @@ export function writeTarEntries(entries: readonly TarEntry[]): Uint8Array {
   for (const entry of [...entries].sort((left, right) => (left.path < right.path ? -1 : 1))) {
     const header = new Uint8Array(512);
     const encoder = new TextEncoder();
-    header.set(encoder.encode(entry.path).subarray(0, 100), 0);
+    const name = encoder.encode(entry.path);
+    if (name.byteLength > 100) throw new Error('tar path exceeds the ustar name field');
+    header.set(name, 0);
     header.set(encoder.encode(writeOctal(entry.mode, 8)), 100);
     header.set(encoder.encode(writeOctal(0, 8)), 108);
     header.set(encoder.encode(writeOctal(0, 8)), 116);

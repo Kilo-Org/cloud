@@ -302,7 +302,7 @@ void test('cached verified archives repair a changed extracted file through fres
   assert.equal(requests.length, count);
 });
 
-void test('the grant is absent from probe, supervisor, argv, retained processes and created platform files', async () => {
+void test('after handoff the grant is absent from probe, supervisor, argv, retained processes and created platform files', async () => {
   const root = await setup();
   const observed = await succeeds(root, await fixtureRuntime());
   assert.equal(JSON.stringify(observed).includes(grant), false);
@@ -547,4 +547,24 @@ void test('a CLI that exits successfully with the wrong selected version fails i
   const runtime = await fixtureRuntime();
   runtime.descriptor.cliVersion = '9.9.9';
   await fails(root, runtime, 'cli_probe_failed', 76);
+});
+
+void test('a first-install alias failure leaves a complete active target for installed aliases', async () => {
+  const root = await setup();
+  await fs.mkdir(path.join(root, 'platform/kilo-git-credential'));
+  const runtime = await fixtureRuntime();
+  select(runtime);
+  const result = await run(root, runtime).completed;
+  assert.equal(result.code, 73);
+  assert.deepEqual(reports, [{ allocationId, code: 'artifact_invalid', authenticated: true }]);
+  const active = await fs.readlink(path.join(root, 'platform/active'));
+  const release = active.replace('/opt/kilo-cloud', path.join(root, 'platform'));
+  const control = (await fs.readlink(path.join(release, 'control'))).replace(
+    '/opt/kilo-cloud',
+    path.join(root, 'platform')
+  );
+  assert.equal(
+    (await fs.stat(path.join(control, 'usr/local/bin/kilocode-control-plane-wrapper.js'))).isFile(),
+    true
+  );
 });

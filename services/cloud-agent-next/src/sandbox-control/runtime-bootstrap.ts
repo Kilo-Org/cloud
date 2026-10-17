@@ -267,12 +267,13 @@ async function install() {
   fs.symlinkSync(control, path.join(staging, 'control'));
   const release = path.join(namespace, randomUUID());
   fs.renameSync(staging, release);
+  // Every alias resolves through active, including during the first install.
+  atomicLink(release, path.join(C.root, 'active'));
   for (const alias of C.aliases) {
     realDirectory(path.dirname(alias));
     const relative = alias === C.credentialHelperLink ? C.credentialHelper.slice(1) : alias.slice(1);
     atomicLink(path.join(C.root, 'active', 'control', relative), alias);
   }
-  atomicLink(release, path.join(C.root, 'active'));
   collect(previous ? [release, previous] : [release]);
   process.stdout.write(safePath(cli, C.descriptor.cliExecutable));
 }

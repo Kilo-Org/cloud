@@ -46,18 +46,23 @@ function scanRuntimeArchive(tar) {
     return sum;
   }
   function paxPath(data) {
-    const text = new TextDecoder('utf-8').decode(data);
+    const decoder = new TextDecoder('utf-8', { fatal: true });
     let index = 0;
     let found = null;
-    while (index < text.length) {
-      const space = text.indexOf(' ', index);
-      if (space === -1) break;
-      const length = parseInt(text.slice(index, space), 10);
-      if (!isFinite(length) || length <= 0 || index + length > text.length) break;
-      const record = text.slice(space + 1, index + length - 1);
+    while (index < data.byteLength) {
+      const space = data.indexOf(32, index);
+      if (space === -1) fail('invalid PAX record length');
+      const digits = decoder.decode(data.subarray(index, space));
+      if (!/^[1-9][0-9]*$/.test(digits)) fail('invalid PAX record length');
+      const length = Number(digits);
+      const end = index + length;
+      if (!Number.isSafeInteger(length) || end > data.byteLength || end <= space + 1 || data[end - 1] !== 10)
+        fail('invalid PAX record span');
+      const record = decoder.decode(data.subarray(space + 1, end - 1));
       const equals = record.indexOf('=');
-      if (equals !== -1 && record.slice(0, equals) === 'path') found = record.slice(equals + 1);
-      index += length;
+      if (equals === -1) fail('invalid PAX record');
+      if (record.slice(0, equals) === 'path') found = record.slice(equals + 1);
+      index = end;
     }
     return found;
   }

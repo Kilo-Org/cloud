@@ -9,6 +9,7 @@ import {
   publishRuntimeRelease,
   scanTar,
   sha256,
+  writeTarEntries,
 } from './publish-runtime.js';
 import {
   runtimeArtifactObjectKey,
@@ -114,4 +115,39 @@ describe('runtime packaging and publication', () => {
       await fs.rm(directory, { recursive: true, force: true });
     }
   });
+});
+
+it('reads byte-counted PAX records after non-ASCII metadata', () => {
+  function record(key: string, value: string) {
+    const tail = ` ${key}=${value}\n`;
+    let length = Buffer.byteLength(tail) + 1;
+    while (Buffer.byteLength(String(length) + tail) !== length)
+      length = Buffer.byteLength(String(length) + tail);
+    return `${length}${tail}`;
+  }
+  const data = Buffer.from(record('comment', 'métadata') + record('path', 'package/renamed-kilo'));
+  const extension = writeTarEntries([{ path: 'PaxHeaders/path', mode: 0o644, bytes: data }]);
+  extension[156] = 120;
+  extension.fill(32, 148, 156);
+  let checksum = 0;
+  for (const byte of extension.subarray(0, 512)) checksum += byte;
+  extension.set(Buffer.from(checksum.toString(8).padStart(7, '0') + '\0'), 148);
+  const file = writeTarEntries([{ path: 'fallback-name', mode: 0o755, bytes: Buffer.from('cli') }]);
+  const archive = Buffer.concat([
+    extension.subarray(0, 512 + Math.ceil(data.byteLength / 512) * 512),
+    file,
+  ]);
+  expect(scanTar(archive).files.map(entry => entry.path)).toEqual(['package/renamed-kilo']);
+});
+
+it('rejects tar field overflow instead of truncating names or numbers', () => {
+  expect(() =>
+    writeTarEntries([{ path: 'a'.repeat(101), mode: 0o755, bytes: Buffer.from('x') }])
+  ).toThrow('path');
+  expect(() =>
+    writeTarEntries([{ path: 'é'.repeat(51), mode: 0o755, bytes: Buffer.from('x') }])
+  ).toThrow('path');
+  expect(() =>
+    writeTarEntries([{ path: 'file', mode: Number.MAX_SAFE_INTEGER, bytes: Buffer.from('x') }])
+  ).toThrow('numeric');
 });

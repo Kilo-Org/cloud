@@ -18,7 +18,11 @@ import {
   planClientEval,
   type ClientEvalDeps,
 } from './client-eval';
-import { listOwnerClientProfiles, rollUpClientCases } from './client-profiles';
+import {
+  listOwnerClientProfiles,
+  refreshClientProfileRollup,
+  rollUpClientCases,
+} from './client-profiles';
 import { saveBenchmarkConfig } from './config';
 import { DECIDER_CASES, type DeciderCase } from './datasets/decider-cases';
 import type { DeciderJudge } from './grading';
@@ -349,6 +353,51 @@ describe('client eval (real SQLite)', () => {
     });
   });
 
+  it('drops a stale rollup when a concurrent upload replaces a case in the same millisecond', async () => {
+    await gradeClientEvalResult(db, CONFIG, upload({ exitCode: 1, output: 'down' }), deps);
+    const [profile] = await listOwnerClientProfiles(db, context, 'efficient');
+    if (!profile) throw new Error('profile missing');
+    const uploads = sqlite
+      .prepare('SELECT uploaded_at FROM client_case_results ORDER BY case_id')
+      .all();
+    let raced = false;
+    const racing = new Proxy(db, {
+      get(target, property) {
+        if (property === 'prepare') {
+          return (query: string) => {
+            if (!raced && /^update "client_profiles"/i.test(query)) {
+              raced = true;
+              // A replacement that keeps the same wall clock, so only the upload
+              // revision can tell the view apart from the stored uploads.
+              sqlite.exec(`
+                UPDATE client_case_results SET exit_code = 0, score = 1, revision = revision + 1;
+                UPDATE client_profiles SET status = 'ready', updated_at = 'fresh';
+              `);
+            }
+            return target.prepare(query);
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const planned = 2 * 2 * DECIDER_CASES.length;
+
+    await refreshClientProfileRollup(racing, profile, planned, '2099-01-02T00:00:00.000Z');
+    expect(raced).toBe(true);
+    expect(
+      sqlite.prepare('SELECT uploaded_at FROM client_case_results ORDER BY case_id').all()
+    ).toEqual(uploads);
+    expect(sqlite.prepare('SELECT status, results, updated_at FROM client_profiles').get()).toEqual(
+      { status: 'ready', results: 1, updated_at: 'fresh' }
+    );
+
+    await refreshClientProfileRollup(db, profile, planned, '2099-01-03T00:00:00.000Z');
+    expect(
+      sqlite.prepare('SELECT status, accuracy, updated_at FROM client_profiles').get()
+    ).toEqual({ status: 'ready', accuracy: 1, updated_at: '2099-01-03T00:00:00.000Z' });
+  });
+
   it('bills each payer under its own usage id', async () => {
     const judged = { caseId: judgedCase.id };
     writeUsage.mockResolvedValueOnce({ kind: 'unavailable', reason: 'not_recorded' });
@@ -455,6 +504,7 @@ describe('rollUpClientCases', () => {
     score: 0,
     grader_cost_usd: 0,
     uploaded_at: '',
+    revision: 1,
   });
 
   it('fails a profile only once every planned case failed', () => {

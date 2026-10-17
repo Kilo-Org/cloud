@@ -7,6 +7,7 @@ import {
   type BenchmarkSchedulerSettingKey,
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
+import { PROMPT_TRANSPORT_REVISION } from './prompt-transport';
 
 export type PaidExecutionKey = {
   runId: string;
@@ -764,8 +765,9 @@ export async function beginPaidCase(
 ): Promise<boolean> {
   const result = await db
     .prepare(`
-    INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token, started_at)
-    SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (
+    INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token, started_at,
+      prompt_revision)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (
       SELECT 1 FROM scheduler_chunks WHERE run_id = ? AND model = ? AND variant = ? AND rep = ?
         AND token = ? AND status = 'active' AND lease_until > ?
         AND EXISTS (SELECT 1 FROM json_each(case_ids) WHERE value = ?)
@@ -780,6 +782,7 @@ export async function beginPaidCase(
       key.caseId,
       key.token,
       now,
+      PROMPT_TRANSPORT_REVISION,
       key.runId,
       key.model,
       key.variant,
@@ -792,13 +795,20 @@ export async function beginPaidCase(
   return result.meta.changes > 0;
 }
 
-export async function hasPaidCase(db: D1Database, key: PaidExecutionKey): Promise<boolean> {
+/**
+ * The prompt transport that opened this case's paid call, or null when no paid call is
+ * ledgered. An execution first opened before this transport existed keeps its default.
+ */
+export async function getPaidCasePromptRevision(
+  db: D1Database,
+  key: PaidExecutionKey
+): Promise<number | null> {
   const row = await db
-    .prepare(`SELECT 1 FROM scheduler_executions
+    .prepare(`SELECT prompt_revision FROM scheduler_executions
     WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)
     .bind(key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
-    .first();
-  return row !== null;
+    .first<{ prompt_revision: number }>();
+  return row?.prompt_revision ?? null;
 }
 
 /** When the ledgered paid call for this case started, whichever claim token opened it. */

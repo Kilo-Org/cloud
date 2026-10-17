@@ -1,9 +1,11 @@
 import * as z from 'zod';
 import {
+  AUTO_ROUTERS,
   AutoRouterSchema,
   CUSTOM_ROUTER_STATUS_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
   CustomRouterBenchmarkContextSchema,
+  type AutoRouter,
   DEFAULT_AUTO_ROUTER,
   BenchmarkConfigSchema,
   BenchmarkSchedulerOverridesSchema,
@@ -54,10 +56,17 @@ import { loadRunProgress } from './run-progress';
 import { getSchedulerOverrides, resolveSchedulerConfig, saveSchedulerOverrides } from './scheduler';
 import type { HonoEnv } from './hono-env';
 import {
+  catalogCandidatePrices,
   fetchBenchmarkModelCatalog,
   mapProfileStatusesToRequestedModels,
   platformRegistryEntries,
 } from './platform-models';
+import { planPromptTransportRemeasure } from './remeasure';
+
+const RemeasureRequestSchema = z.object({
+  router: AutoRouterSchema.optional(),
+  action: z.enum(['dry-run', 'request', 'cancel']).default('dry-run'),
+});
 
 const DebugCliRequestSchema = z.object({
   model: z.string().trim().min(1),
@@ -252,6 +261,37 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       platformEntries,
     });
   });
+
+  // Re-measure the cases the revision-1 prompt transport measured unreliably, for ready
+  // pairs that keep serving their previous run until the new one completes.
+  app.post(
+    '/admin/registry/remeasure-prompt-transport',
+    zodJsonValidator(RemeasureRequestSchema, { errorMessage: 'Invalid re-measure request' }),
+    async c => {
+      const { router, action } = c.req.valid('json');
+      const catalog = await fetchBenchmarkModelCatalog(c.env).catch(() => null);
+      const prices = catalog ? catalogCandidatePrices(catalog) : new Map();
+      const reports = [];
+      const skippedRouters: AutoRouter[] = [];
+      for (const selected of router ? [router] : AUTO_ROUTERS) {
+        const config = await getBenchmarkConfig(c.env.BENCH_DB, selected);
+        if (!config) {
+          skippedRouters.push(selected);
+          continue;
+        }
+        reports.push(
+          await planPromptTransportRemeasure(c.env.BENCH_DB, {
+            router: selected,
+            engineIdentity: computeEngineIdentity('decider', selected),
+            repetitions: config.deciderRepetitions,
+            action,
+            prices,
+          })
+        );
+      }
+      return c.json({ action, catalogPrices: catalog !== null, skippedRouters, routers: reports });
+    }
+  );
 
   // Admin requeue of failed registry rows. Charges no owner quota — an owner's
   // own Retry goes through /admin/profiles/register and is quota-charged there.

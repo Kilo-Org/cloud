@@ -193,6 +193,7 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
       noticesFailed: 0,
       aborted: false,
       consecutiveFailed: 0,
+      notPosted: [],
     });
     expect([...marked.keys()]).toEqual([withMode, withoutMode]);
     expect(dbFrom).toHaveBeenCalledWith(kilocode_users);
@@ -300,7 +301,7 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     ['a non-2xx response', async () => new Response('boom', { status: 502 })],
     ['an invalid response', async () => Response.json({ results: [] })],
     ['a network error', async () => Promise.reject(new Error('connection reset'))],
-  ])('aborts the page with 503 and reports every owner failed on %s', async (_label, respond) => {
+  ])('aborts the page with 503 and reports every owner as not posted on %s', async (_label, respond) => {
     const id = setOwner('user', 'u1', { mode: null, pool: [{ model: 'a/b' }] });
     ownerRows = ['u1'];
     webFetch.mockImplementation(respond);
@@ -310,8 +311,9 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
       aborted: true,
-      needsAttention: ['failed user:u1'],
-      outcomes: { ...NO_OUTCOMES, failed: 1 },
+      notPosted: ['user:u1'],
+      needsAttention: [],
+      outcomes: NO_OUTCOMES,
     });
     expect(marked.size).toBe(0);
   });
@@ -334,7 +336,8 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
       aborted: true,
-      outcomes: { ...NO_OUTCOMES, created: 25, failed: 35 },
+      outcomes: { ...NO_OUTCOMES, created: 25 },
+      notPosted: ownerRows.slice(25).map(id => `user:${id}`),
     });
     expect(marked.size).toBe(25);
     expect(webFetch).toHaveBeenCalledTimes(2);
@@ -475,6 +478,86 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     const response = await scan({ ownerType: 'user', objectIds: [id], after: null, dryRun: false });
 
     await expect(response.json()).resolves.toMatchObject({ needsAttention: ['exists user:u1'] });
+    expect([...marked.keys()]).toEqual([id]);
+  });
+
+  it('aborts on a retry that turns scattered failures into a consecutive run', async () => {
+    ownerRows = ['u1', 'u2', 'u3', 'u4', 'u5'];
+    const objectIds = ownerRows.map(id =>
+      setOwner('user', id, { mode: null, pool: [{ model: 'a/b' }] })
+    );
+    const first = ['failed', 'created', 'failed', 'created', 'failed'] as const;
+    webFetch.mockImplementationOnce(async (_url, init) =>
+      Response.json({
+        results: requestBody(init).conversions.map((conversion, index) => ({
+          owner: conversion.owner,
+          outcome: first[index],
+          modelId: 'kilo-auto/custom/efficient',
+          noticesSent: first[index] === 'created' ? 1 : 0,
+          noticesFailed: 0,
+        })),
+      })
+    );
+
+    const firstRun = await scan({ ownerType: 'user', objectIds, after: null, dryRun: false });
+
+    expect(firstRun.status).toBe(200);
+    await expect(firstRun.json()).resolves.toMatchObject({
+      aborted: false,
+      consecutiveFailed: 1,
+      needsAttention: ['failed user:u1', 'failed user:u3', 'failed user:u5'],
+    });
+
+    // The retry skips the two owners that converted, so the three failures are consecutive.
+    webFetch.mockImplementationOnce(async (_url, init) =>
+      Response.json({
+        results: requestBody(init).conversions.map(conversion => ({
+          owner: conversion.owner,
+          outcome: 'failed',
+          modelId: 'kilo-auto/custom/efficient',
+          noticesSent: 0,
+          noticesFailed: 0,
+        })),
+      })
+    );
+
+    const retry = await scan({
+      ownerType: 'user',
+      objectIds,
+      after: null,
+      dryRun: false,
+      consecutiveFailed: 1,
+    });
+
+    expect(retry.status).toBe(503);
+    await expect(retry.json()).resolves.toMatchObject({ aborted: true, consecutiveFailed: 4 });
+  });
+
+  it('reports exists when a retry follows a transport abort, so the notice is checked rather than sent twice', async () => {
+    const id = setOwner('user', 'u1', { mode: null, pool: [{ model: 'a/b' }] });
+    ownerRows = ['u1'];
+    webFetch.mockRejectedValueOnce(new Error('connection reset'));
+
+    const aborted = await scan({ ownerType: 'user', objectIds: [id], after: null, dryRun: false });
+
+    expect(aborted.status).toBe(503);
+
+    webFetch.mockImplementationOnce(async (_url, init) =>
+      Response.json({
+        results: requestBody(init).conversions.map(conversion => ({
+          owner: conversion.owner,
+          outcome: 'exists',
+          modelId: 'kilo-auto/custom/efficient',
+          noticesSent: 0,
+          noticesFailed: 0,
+        })),
+      })
+    );
+
+    const retry = await scan({ ownerType: 'user', objectIds: [id], after: null, dryRun: false });
+
+    expect(retry.status).toBe(200);
+    await expect(retry.json()).resolves.toMatchObject({ needsAttention: ['exists user:u1'] });
     expect([...marked.keys()]).toEqual([id]);
   });
 

@@ -90,16 +90,6 @@ async function mapBounded<T, R>(
   return results;
 }
 
-function unpostedResult(conversion: OwnerPoolConversion): OwnerPoolConversionResult {
-  return {
-    owner: conversion.owner,
-    outcome: 'failed',
-    modelId: convertedOwnerPoolRouter(conversion).modelId,
-    noticesSent: 0,
-    noticesFailed: 0,
-  };
-}
-
 async function postChunk(
   url: URL,
   secret: string,
@@ -124,14 +114,23 @@ async function postChunk(
 /**
  * Keeps every result a batch already produced. A transport failure, a bad response, or
  * OUTAGE_CONSECUTIVE_FAILURES `failed` results in a row (counted across batches and, through the
- * request, across pages) is treated as an outage: the rest of the page is reported `failed`
- * without being posted. One owner that keeps failing never reaches the threshold on its own.
+ * request, across pages) is treated as an outage. Owners after that point are not posted and are
+ * reported separately from real failures, so nothing is lost and nothing is blamed on them.
+ *
+ * A retry marks every owner that converted, which can turn scattered failures into a run of
+ * consecutive ones and abort the page again. The operator's escape is to resume at the last
+ * failing owner, accepting that the unposted owners of that page are skipped and reported.
  */
 async function postConversions(
   env: Env,
   conversions: readonly OwnerPoolConversion[],
   previousConsecutiveFailed: number
-): Promise<{ results: OwnerPoolConversionResult[]; aborted: boolean; consecutiveFailed: number }> {
+): Promise<{
+  results: OwnerPoolConversionResult[];
+  notPosted: OwnerPoolConversion[];
+  aborted: boolean;
+  consecutiveFailed: number;
+}> {
   const secret = await env.INTERNAL_API_SECRET_PROD.get();
   const url = new URL(OWNER_POOL_CONVERSION_PATH, env.KILO_WEB_API_BASE_URL);
   const results: OwnerPoolConversionResult[] = [];
@@ -139,16 +138,29 @@ async function postConversions(
   for (let start = 0; start < conversions.length; start += MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST) {
     const chunk = conversions.slice(start, start + MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST);
     const chunkResults = await postChunk(url, secret, chunk);
-    for (const result of chunkResults ?? []) {
+    if (chunkResults === null) {
+      // The request may still have applied; a retry reports those owners `exists`.
+      return {
+        results,
+        notPosted: conversions.slice(start),
+        aborted: true,
+        consecutiveFailed,
+      };
+    }
+    for (const result of chunkResults) {
       consecutiveFailed = result.outcome === 'failed' ? consecutiveFailed + 1 : 0;
     }
-    results.push(...(chunkResults ?? chunk.map(unpostedResult)));
-    if (chunkResults === null || consecutiveFailed >= OUTAGE_CONSECUTIVE_FAILURES) {
-      results.push(...conversions.slice(start + chunk.length).map(unpostedResult));
-      return { results, aborted: true, consecutiveFailed };
+    results.push(...chunkResults);
+    if (consecutiveFailed >= OUTAGE_CONSECUTIVE_FAILURES) {
+      return {
+        results,
+        notPosted: conversions.slice(start + chunk.length),
+        aborted: true,
+        consecutiveFailed,
+      };
     }
   }
-  return { results, aborted: false, consecutiveFailed };
+  return { results, notPosted: [], aborted: false, consecutiveFailed };
 }
 
 export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
@@ -221,10 +233,11 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
     conversions.push(conversion);
   }
 
-  const { results, aborted, consecutiveFailed } =
+  const { results, notPosted, aborted, consecutiveFailed } =
     dryRun || conversions.length === 0
-      ? { results: [], aborted: false, consecutiveFailed: parsed.data.consecutiveFailed }
+      ? { results: [], notPosted: [], aborted: false, consecutiveFailed: parsed.data.consecutiveFailed }
       : await postConversions(c.env, conversions, parsed.data.consecutiveFailed);
+  const notPostedKeys = notPosted.map(conversion => `${conversion.owner.type}:${conversion.owner.id}`);
 
   const outcomes = Object.fromEntries(
     OwnerPoolConversionOutcomeSchema.options.map(outcome => [outcome, 0])
@@ -276,6 +289,7 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
     outcomes,
     noticesSent,
     noticesFailed,
+    notPosted: notPostedKeys,
     aborted,
     consecutiveFailed,
   };
@@ -299,6 +313,7 @@ export const ownerPoolConversionScanHandler: Handler<HonoEnv> = async c => {
       outcomes,
       noticesSent,
       noticesFailed,
+      notPosted: notPostedKeys.length,
     })
   );
   return c.json(summary, aborted ? 503 : 200);

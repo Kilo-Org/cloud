@@ -132,6 +132,7 @@ async function main(): Promise<void> {
   const invalidPool: string[] = [];
   const invalidMode: string[] = [];
   const needsAttention: string[] = [];
+  const notPosted: string[] = [];
   let alreadyConverted = 0;
   let conversions = 0;
   let droppedModeOnly = 0;
@@ -150,6 +151,7 @@ async function main(): Promise<void> {
       ['invalidPool', result.invalidPool],
       ['invalidMode', result.invalidMode],
       ['needsAttention', result.needsAttention],
+      ['notPosted', result.notPosted],
     ] as const) {
       for (const key of keys) console.log(`${label}: ${key}`);
     }
@@ -157,6 +159,7 @@ async function main(): Promise<void> {
     invalidPool.push(...result.invalidPool);
     invalidMode.push(...result.invalidMode);
     needsAttention.push(...result.needsAttention);
+    notPosted.push(...result.notPosted);
     alreadyConverted += result.alreadyConverted;
     conversions += result.conversions;
     droppedModeOnly += result.droppedModeOnly;
@@ -182,6 +185,7 @@ async function main(): Promise<void> {
           invalidPool,
           invalidMode,
           needsAttention,
+          notPosted,
           noticesSent,
           noticesFailed,
         },
@@ -227,7 +231,7 @@ async function main(): Promise<void> {
         } catch (error) {
           const reason = error instanceof Error ? error.message : 'scan failed';
           throw new Error(
-            `${reason}; ${retryHint}. Owners on the interrupted page whose router was already created come back as \`exists\` on the retry; send them their notice by hand.`
+            `${reason}; ${retryHint}. Owners on the interrupted page whose router already exists come back as \`exists\`; check Mailgun or Sentry for their notice before sending it by hand.`
           );
         }
         const result = OwnerPoolConversionScanResponseSchema.safeParse(body);
@@ -237,8 +241,13 @@ async function main(): Promise<void> {
         add(result.data);
         consecutiveFailed = result.data.consecutiveFailed;
         if (result.data.aborted) {
+          const failed = result.data.needsAttention.filter(entry => entry.startsWith('failed '));
+          const escape =
+            failed.length > 0
+              ? ` If this keeps aborting because those owners keep failing, resume past the last one with --resume ${ownerType}:<ownerId>; that skips the unposted owners listed above, so handle them by hand.`
+              : '';
           throw new Error(
-            `the web endpoint looks unavailable (a failed batch or repeated failed conversions); fix it, then ${retryHint}`
+            `the web endpoint looks unavailable (a failed batch or repeated failed conversions); fix it, then ${retryHint}.${escape}`
           );
         }
         after = result.data.nextCursor;

@@ -35,7 +35,7 @@
     "connectGithub": "Haɗa GitHub",
     "cost": "Farashi",
     "discard": "Yi watsi",
-    "findings": "Sakamakon bincike",
+    "findings": "Matsalolin da aka gano",
     "mergeRequest": "buƙatar haɗawa",
     "notConnected": "Ba a haɗa ba",
     "notifications": "Sanarwa",
@@ -835,7 +835,7 @@
       "chat": "Saƙonnin tattaunawa",
       "kiloclaw": "Ayyukan KiloClaw",
       "balance": "Faɗakarwar ragowar kuɗi",
-      "security": "Sakamakon binciken tsaro",
+      "security": "Matsalolin tsaro da aka gano",
       "spend": "Faɗakarwar kashe kuɗi",
       "followedSessions": "Zaman da ake bibiya"
     },
@@ -851,8 +851,8 @@
       "kiloclawActivityUnavailable": "Fara kwafin KiloClaw don samun ayyukan KiloClaw.",
       "balanceAlertsSubtitle": "gargaɗin ƙarancin kuɗin ƙungiya",
       "balanceAlertsUnavailable": "Shiga ƙungiya don samun gargaɗin kuɗi.",
-      "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA",
-      "securityFindingsUnavailable": "Kunna Wakilin tsaro na Kilo a kan wani iyaka don samun sakamakon binciken tsaro.",
+      "securityFindingsSubtitle": "sabbin matsalolin da aka gano da tunatarwar SLA",
+      "securityFindingsUnavailable": "Kunna Wakilin tsaro na Kilo a kan wani iyaka don samun matsalolin tsaro da aka gano.",
       "spendAlertsSubtitle": "wucewar iyaka da hauhawar sa'a",
       "spendAlertsToggle": "Rukunin faɗakarwar kashe kuɗi"
     },

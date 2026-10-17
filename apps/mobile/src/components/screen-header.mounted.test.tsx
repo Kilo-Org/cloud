@@ -237,7 +237,7 @@ describe('ScreenHeader mounted', () => {
       routerState.routes.splice(-1, 1, href);
     });
     routerState.dismissTo.mockReset().mockImplementation(href => {
-      const index = routerState.routes.lastIndexOf(href.split('?')[0]);
+      const index = routerState.routes.lastIndexOf(href.split('?')[0] ?? href);
       routerState.routes = index === -1 ? [href] : routerState.routes.slice(0, index + 1);
     });
     routerState.canGoBack.mockReset().mockImplementation(() => routerState.routes.length > 1);

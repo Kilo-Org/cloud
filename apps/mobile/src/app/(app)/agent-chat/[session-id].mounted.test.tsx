@@ -508,7 +508,7 @@ beforeEach(() => {
     // below the current index, truncate everything above it; with no match,
     // drop the current route and land on the destination.
     dismissTo: (href: string) => {
-      const index = navigationRoutes.lastIndexOf(href.split('?')[0]);
+      const index = navigationRoutes.lastIndexOf(href.split('?')[0] ?? href);
       if (index === -1) {
         navigationRoutes.splice(0, navigationRoutes.length, href);
       } else {

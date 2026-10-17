@@ -172,6 +172,7 @@
   "ga": ["block", "commit", "open", "open pull request", "reply"],
   "gl": ["enabled", "none", "open", "open pull request", "review"],
   "gu": ["a security finding needs attention", "block", "merge", "open", "open pull request"],
+  "ha": ["stopped"],
   "he": [
     "completed",
     "created",

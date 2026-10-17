@@ -279,6 +279,10 @@ export const schedulerExecutions = sqliteTable(
     case_id: text('case_id').notNull(),
     token: text('token').notNull(),
     started_at: integer('started_at').notNull().default(0),
+    // The prompt transport the worker that opened this paid call used, so a container
+    // result recovered by a later deploy is stored under the transport that produced it.
+    // A pre-migration worker leaves the default, which is the argv transport.
+    prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   table => [
     primaryKey({ columns: [table.run_id, table.model, table.variant, table.rep, table.case_id] }),

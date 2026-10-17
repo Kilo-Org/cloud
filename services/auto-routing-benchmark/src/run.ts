@@ -103,7 +103,7 @@ import {
   beginPaidCase,
   claimScheduledChunks,
   clearUnbilledCase,
-  hasPaidCase,
+  getPaidCasePromptRevision,
   cooldownProviders,
   deferChunk,
   failChunk,
@@ -957,8 +957,10 @@ export async function drainQueue(
       pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
     }
   }
-  // New measurements first; queued re-measures of ready rows fill the rest of the batch.
-  const queued = [...pending, ...(await listQueuedRemeasures(env.BENCH_DB, current, queue))];
+  // Queued re-measures of ready rows are reserved ahead of the pending backlog, so an
+  // operator's repair starts on the next drain instead of waiting for the backlog.
+  const remeasures = await listQueuedRemeasures(env.BENCH_DB, current, queue);
+  const queued = [...remeasures, ...pending.slice(0, Math.max(0, maxEntries - remeasures.length))];
   if (queued.length === 0) return null;
 
   const batch = queued.slice(0, maxEntries);
@@ -1173,7 +1175,10 @@ export async function acceptContainerCaseResult(env: Env, body: unknown): Promis
   const parsed = ContainerCaseResultSchema.safeParse(body);
   if (!parsed.success) return false;
   const { execution, outcome } = parsed.data;
-  if (!(await hasPaidCase(env.BENCH_DB, execution))) return false;
+  // The container was spawned by whatever worker opened the paid call, which may have run
+  // the previous transport. Stamp its output with that revision, not this deploy's.
+  const promptRevision = await getPaidCasePromptRevision(env.BENCH_DB, execution);
+  if (promptRevision === null) return false;
   if (outcome.kind === 'not_started') {
     await clearUnbilledCase(env.BENCH_DB, execution);
   } else {
@@ -1186,7 +1191,11 @@ export async function acceptContainerCaseResult(env: Env, body: unknown): Promis
         case_id: execution.caseId,
         rep: execution.rep,
       },
-      { result: parseContainerRunResponse(outcome.response, Date.now()), retried: false }
+      {
+        result: parseContainerRunResponse(outcome.response, Date.now()),
+        retried: false,
+        promptRevision,
+      }
     );
   }
   console.log(

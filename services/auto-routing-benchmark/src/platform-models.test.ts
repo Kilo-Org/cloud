@@ -4,7 +4,8 @@ import {
   BenchmarkModelCatalogSchema,
   catalogCandidatePrices,
   catalogModelProviders,
-  fetchPlatformRegistryEntries,
+  fetchBenchmarkModelCatalog,
+  catalogSupportsBenchmarkPair,
   platformRegistryEntries,
 } from './platform-models';
 
@@ -163,17 +164,6 @@ describe('platform catalog expansion', () => {
     ).toEqual([{ model: 'vendor/current', variant: 'thinking' }]);
   });
 
-  it('keeps an alias when its target is absent from the catalog', () => {
-    expect(
-      platformRegistryEntries(
-        { deciderModels: [{ id: '~vendor/latest' }] },
-        BenchmarkModelCatalogSchema.parse({
-          data: [{ id: '~vendor/latest', alias_target: 'vendor/missing' }],
-        })
-      )
-    ).toEqual([{ model: '~vendor/latest', variant: null }]);
-  });
-
   it('requests a new concrete pair when an alias is retargeted', () => {
     const config = { deciderModels: [{ id: '~vendor/latest' }] };
     const entriesForTarget = (target: string) =>
@@ -224,10 +214,69 @@ describe('platform catalog expansion', () => {
     ]);
   });
 
-  it('rejects missing selected models rather than treating unavailable metadata as nonreasoning', () => {
-    expect(() =>
-      platformRegistryEntries({ deciderModels: [{ id: 'missing/model' }] }, catalog)
-    ).toThrow(/missing from Kilo catalog/);
+  it('keeps available entries runnable when another selected model is missing', () => {
+    expect(
+      platformRegistryEntries(
+        { deciderModels: [{ id: 'missing/model' }, { id: 'plain/model' }] },
+        catalog
+      )
+    ).toEqual([{ model: 'plain/model', variant: null }]);
+  });
+
+  it('requires tool support and current concrete variants for exact admission', () => {
+    const executable = BenchmarkModelCatalogSchema.parse({
+      data: [
+        { id: 'tools/model', supported_parameters: ['tools'] },
+        { id: 'text/model', supported_parameters: ['temperature'] },
+        { id: 'unknown/model', supported_parameters: [] },
+        { id: '~vendor/latest', alias_target: 'tools/model' },
+        {
+          id: 'reasoning/model',
+          opencode: { variants: { high: { reasoning: { effort: 'high' } } } },
+        },
+      ],
+    });
+    expect(catalogSupportsBenchmarkPair(executable, { model: 'tools/model', variant: null })).toBe(
+      true
+    );
+    expect(
+      catalogSupportsBenchmarkPair(executable, { model: 'unknown/model', variant: null })
+    ).toBe(true);
+    expect(catalogSupportsBenchmarkPair(executable, { model: 'text/model', variant: null })).toBe(
+      false
+    );
+    expect(
+      catalogSupportsBenchmarkPair(executable, { model: '~vendor/latest', variant: null })
+    ).toBe(false);
+    expect(
+      catalogSupportsBenchmarkPair(executable, { model: 'tools/model', variant: 'high' })
+    ).toBe(false);
+    expect(
+      catalogSupportsBenchmarkPair(executable, { model: 'reasoning/model', variant: 'high' })
+    ).toBe(true);
+    expect(
+      catalogSupportsBenchmarkPair(executable, { model: 'reasoning/model', variant: 'low' })
+    ).toBe(false);
+    expect(
+      catalogSupportsBenchmarkPair(executable, { model: 'reasoning/model', variant: null })
+    ).toBe(false);
+    expect(
+      platformRegistryEntries(
+        { deciderModels: [{ id: 'text/model' }, { id: 'tools/model' }] },
+        executable
+      )
+    ).toEqual([{ model: 'tools/model', variant: null }]);
+  });
+
+  it('does not execute an alias whose concrete target is absent', () => {
+    expect(
+      platformRegistryEntries(
+        { deciderModels: [{ id: '~vendor/latest' }] },
+        BenchmarkModelCatalogSchema.parse({
+          data: [{ id: '~vendor/latest', alias_target: 'vendor/missing' }],
+        })
+      )
+    ).toEqual([]);
   });
 
   it('validates catalog reasoning control values at runtime', () => {
@@ -260,9 +309,8 @@ describe('platform catalog expansion', () => {
   it('fails closed on catalog HTTP errors', async () => {
     const env = { KILO_WEB_API_BASE_URL: 'https://app.test' };
     await expect(
-      fetchPlatformRegistryEntries(
+      fetchBenchmarkModelCatalog(
         env,
-        { deciderModels: [{ id: 'm' }] },
         vi.fn<typeof fetch>().mockResolvedValue(new Response('unavailable', { status: 503 }))
       )
     ).rejects.toThrow(/catalog failed: HTTP 503/);
@@ -281,10 +329,7 @@ describe('platform catalog expansion', () => {
     if (!address || typeof address === 'string') throw new Error('Missing local server port');
     try {
       await expect(
-        fetchPlatformRegistryEntries(
-          { KILO_WEB_API_BASE_URL: `http://127.0.0.1:${address.port}` },
-          { deciderModels: [{ id: 'm' }] }
-        )
+        fetchBenchmarkModelCatalog({ KILO_WEB_API_BASE_URL: `http://127.0.0.1:${address.port}` })
       ).rejects.toMatchObject({ name: expect.stringMatching(/^(AbortError|TimeoutError)$/) });
     } finally {
       clearTimeout(finishBody);

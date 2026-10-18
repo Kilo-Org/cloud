@@ -41,7 +41,6 @@ import {
   getSummariesForRuns,
   getRoutingCaseResultsForEntries,
   insertRun,
-  collapsePendingOwnerAliasRows,
   listLaneFailures,
   listPendingCurrentProfiles,
   listReadyCurrentProfilesForEntries,
@@ -82,6 +81,7 @@ import {
   DECIDER_CLI_TIMEOUT_MS,
   destroyDeciderCliContainer,
   isRetryableContainerAvailabilityError,
+  isExactModelUnavailableResult,
   parseContainerRunResponse,
   runDeciderCaseViaCli,
   warmUpCliContainer,
@@ -89,12 +89,18 @@ import {
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import {
   catalogCandidatePrices,
-  concreteAliasPair,
+  catalogSupportsBenchmarkPair,
   fetchBenchmarkModelCatalog,
-  fetchPlatformRegistryEntries,
-  platformRegistryEntries,
 } from './platform-models';
 import { pickClassifierWinner } from './winner';
+import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
+import { fetchBenchmarkUserToken } from './benchmark-token';
+import {
+  PLATFORM_SUBSCRIPTION_OWNER,
+  servingSubscriptionSnapshot,
+  snapshotPairs,
+  syncSubscriptionSnapshot,
+} from './subscriptions';
 import {
   acquireInitializationLease,
   beginPaidCase,
@@ -104,6 +110,7 @@ import {
   cooldownProviders,
   deferChunk,
   failChunk,
+  failScheduledEntry,
   finishChunk,
   getChunk,
   getPaidCaseStartedAt,
@@ -402,7 +409,14 @@ export async function syncPlatformRegistry(
 ): Promise<{ desiredEntries: number }> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return { desiredEntries: 0 };
-  const desired = await fetchPlatformRegistryEntries(env, config, fetchImpl);
+  const snapshot = await syncSubscriptionSnapshot(
+    env,
+    config,
+    PLATFORM_SUBSCRIPTION_OWNER,
+    config.deciderModels.map(model => ({ model: model.id })),
+    { fetchImpl }
+  );
+  const desired = snapshotPairs(snapshot);
   await syncPlatformRegistryRows(
     env.BENCH_DB,
     {
@@ -441,11 +455,28 @@ export async function publishPlatformRoutingTable(
     repetitions: config.deciderRepetitions,
   };
   const catalog = await fetchBenchmarkModelCatalog(env, fetchImpl);
-  const desired = platformRegistryEntries(config, catalog);
+  const snapshot = await servingSubscriptionSnapshot(
+    env.BENCH_DB,
+    config,
+    PLATFORM_SUBSCRIPTION_OWNER
+  );
+  if (
+    snapshot.some(
+      entry =>
+        entry.model.startsWith('~') &&
+        entry.servingPairs.length > 0 &&
+        (entry.resolutionError ||
+          entry.servingPairs.some(
+            serving =>
+              !entry.pairs.some(
+                target => target.model === serving.model && target.variant === serving.variant
+              )
+          ))
+    )
+  )
+    return null;
+  const desired = snapshotPairs(snapshot, true);
   const prices = catalogCandidatePrices(catalog);
-  // Reconcile against the live catalog before the settled guard. A new effort
-  // must become pending, and a removed effort must stop blocking publication.
-  await syncPlatformRegistryRows(env.BENCH_DB, current, desired);
   const queueCounts = await countCurrentProfilesByStatus(env.BENCH_DB, current, 'platform');
   const unsettled = queueCounts
     .filter(row => row.status === 'pending' || row.status === 'running')
@@ -930,8 +961,7 @@ export async function drainQueue(
     return null;
   }
 
-  // Chained platform runs must also revalidate efforts before claiming work.
-  // Catalog failure cannot schedule stale configurations.
+  // Reconcile saved snapshots, not the live alias targets.
   if (queue === 'platform') await syncPlatformRegistry(env, fetch, router);
 
   const engineIdentity = computeEngineIdentity('decider', router);
@@ -939,26 +969,42 @@ export async function drainQueue(
   const maxEntries = 100;
 
   const current = { router, engineIdentity, repetitions };
-  let pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
-  if (queue === 'user' && pending.some(row => row.model.startsWith('~'))) {
-    const catalog = await fetchBenchmarkModelCatalog(env);
-    const aliases = pending.flatMap(row => {
-      if (!row.model.startsWith('~')) return [];
-      const alias = { model: row.model, variant: row.variant };
-      const target = concreteAliasPair(catalog, {
+  const pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
+  if (pending.length === 0) return null;
+  const catalog = await fetchExecutableBenchmarkModelCatalog(env, config);
+  const unavailable = pending.filter(
+    row =>
+      !catalogSupportsBenchmarkPair(catalog, {
         model: row.model,
         variant: variantFromStorage(row.variant),
-      });
-      return target === undefined ? [] : [{ alias, target }];
-    });
-    if (aliases.length > 0) {
-      await collapsePendingOwnerAliasRows(env.BENCH_DB, current, aliases);
-      pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
-    }
+      })
+  );
+  if (unavailable.length > 0) {
+    await env.BENCH_DB.batch(
+      unavailable.map(row =>
+        env.BENCH_DB.prepare(
+          "UPDATE benchmark_profiles SET status = 'failed', failure_reason = ?, updated_at = ? WHERE router = ? AND model = ? AND variant = ? AND engine_identity = ? AND repetitions = ? AND status = 'pending'"
+        ).bind(
+          'Model or variant is unavailable in the executable benchmark catalog.',
+          new Date().toISOString(),
+          router,
+          row.model,
+          row.variant,
+          engineIdentity,
+          repetitions
+        )
+      )
+    );
   }
-  if (pending.length === 0) return null;
+  const available = pending.filter(row =>
+    catalogSupportsBenchmarkPair(catalog, {
+      model: row.model,
+      variant: variantFromStorage(row.variant),
+    })
+  );
+  if (available.length === 0) return null;
 
-  const batch = pending.slice(0, maxEntries);
+  const batch = available.slice(0, maxEntries);
   const entries: RunModelEntry[] = batch.map(row => ({
     model: row.model,
     variant: variantFromStorage(row.variant),
@@ -1008,7 +1054,10 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
   if (initialized) return true;
   const { run, models } = (await getRunWithModels(env.BENCH_DB, runId)) ?? {};
   if (!run || !models || run.status !== 'running') return false;
-  const catalog = await fetchBenchmarkModelCatalog(env);
+  const catalog = await fetchExecutableBenchmarkModelCatalog(env, {
+    benchmarkUserId: run.benchmark_user_id,
+    benchmarkOrgId: run.benchmark_org_id,
+  });
   return scheduleRunChunks(env.BENCH_DB, {
     runId,
     entries: models
@@ -1137,6 +1186,11 @@ class AmbiguousBenchmarkExecutionError extends Error {
 
 class BenchmarkThrottleError extends Error {}
 
+class BenchmarkModelUnavailableError extends Error {}
+
+export const PROFILE_MODEL_UNAVAILABLE_FAILURE_REASON =
+  'Exact benchmark model or variant is unavailable to the benchmark CLI; retry after availability is restored.';
+
 const ContainerCaseResultSchema = z.object({
   execution: z.object({
     runId: z.string(),
@@ -1183,7 +1237,10 @@ export async function acceptContainerCaseResult(env: Env, body: unknown): Promis
         case_id: execution.caseId,
         rep: execution.rep,
       },
-      { result: parseContainerRunResponse(outcome.response, Date.now()), retried: false }
+      {
+        result: parseContainerRunResponse(outcome.response, Date.now(), execution.model),
+        retried: false,
+      }
     );
   }
   console.log(
@@ -1223,7 +1280,15 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
     const outputDeadline =
       error instanceof AmbiguousBenchmarkExecutionError ? error.outputDeadline : null;
     const awaitingOutput = outputDeadline !== null && Date.now() < outputDeadline;
-    if (awaitingOutput) {
+    if (error instanceof BenchmarkModelUnavailableError) {
+      await markProfilesFailedForEntries(
+        env.BENCH_DB,
+        claim.run_id,
+        [{ model: claim.model, variant: claim.variant }],
+        PROFILE_MODEL_UNAVAILABLE_FAILURE_REASON
+      );
+      await failScheduledEntry(env.BENCH_DB, claim);
+    } else if (awaitingOutput) {
       await env.BENCH_QUEUE.send(
         {
           runId: claim.run_id,
@@ -1273,17 +1338,20 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         runId: claim.run_id,
         model: claim.model,
         attempt: claim.attempts,
-        reason: awaitingOutput
-          ? 'awaiting_output'
-          : error instanceof AmbiguousBenchmarkExecutionError
-            ? 'ambiguous_execution'
-            : error instanceof DeciderGraderRetryError
-              ? 'grading'
-              : isRetryableContainerAvailabilityError(error)
-                ? 'container_capacity'
-                : error instanceof BenchmarkThrottleError
-                  ? 'provider_throttle'
-                  : 'infrastructure',
+        reason:
+          error instanceof BenchmarkModelUnavailableError
+            ? 'model_unavailable'
+            : awaitingOutput
+              ? 'awaiting_output'
+              : error instanceof AmbiguousBenchmarkExecutionError
+                ? 'ambiguous_execution'
+                : error instanceof DeciderGraderRetryError
+                  ? 'grading'
+                  : isRetryableContainerAvailabilityError(error)
+                    ? 'container_capacity'
+                    : error instanceof BenchmarkThrottleError
+                      ? 'provider_throttle'
+                      : 'infrastructure',
         ...formatError(error),
       })
     );
@@ -1678,6 +1746,7 @@ async function processDeciderJob(
         // (transient empty completion: a lone step_finish with cost 0). Mirror
         // the production classifier's policy and retry once.
         if (
+          isExactModelUnavailableResult(first, message.model) ||
           first.exitCode !== 0 ||
           first.text.length > 0 ||
           /(?:\b429\b|rate.?limit|throttl)/i.test(first.stderrTail)
@@ -1685,7 +1754,9 @@ async function processDeciderJob(
           return { result: first, retried: false };
         }
         startedAt = Date.now();
-        await restartPaidCase(env.BENCH_DB, execution, startedAt);
+        if (!(await restartPaidCase(env.BENCH_DB, execution, startedAt))) {
+          return { result: first, retried: false };
+        }
         const retry = await invokeCli();
         retry.costUsd =
           retry.costUsd === null && first.costUsd === null
@@ -1712,6 +1783,9 @@ async function processDeciderJob(
               throw new DeciderGraderRetryError('Pending decider output could not be saved');
             }
           );
+        }
+        if (isExactModelUnavailableResult(result, message.model)) {
+          throw new BenchmarkModelUnavailableError(PROFILE_MODEL_UNAVAILABLE_FAILURE_REASON);
         }
         const grade =
           result.exitCode === 0 && result.text.length > 0
@@ -1771,38 +1845,6 @@ async function processDeciderJob(
   if (graderFailure) throw graderFailure;
 
   return;
-}
-
-const TokenResponseSchema = z.object({ token: z.string().min(1), expiresAt: z.string() });
-
-// Calls apps/web's internal endpoint to mint a short-lived user API token for
-// the decider CLI. Never logs the token.
-export async function fetchBenchmarkUserToken(
-  env: Env,
-  userId: string,
-  organizationId: string | null = null
-): Promise<string> {
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
-  const response = await fetch(
-    `${env.KILO_WEB_API_BASE_URL}/api/internal/auto-routing-benchmark/token`,
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${secret}`,
-      },
-      body: JSON.stringify({ userId, ...(organizationId ? { organizationId } : {}) }),
-    }
-  );
-  if (!response.ok) {
-    const detail = (await response.text().catch(() => '')).slice(0, 200);
-    throw new Error(`token mint failed: HTTP ${response.status} ${detail}`);
-  }
-  const parsedToken = TokenResponseSchema.safeParse(await response.json());
-  if (!parsedToken.success) {
-    throw new Error('token mint returned unexpected response shape');
-  }
-  return parsedToken.data.token;
 }
 
 function failedRow(

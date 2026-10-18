@@ -10,7 +10,11 @@ import { clearModelCapabilitiesCache } from './model-capabilities';
 import type * as ModelCapabilitiesModule from './model-capabilities';
 import { clearCustomRoutingTableCache } from './decide';
 import { AutoRoutingDecisionCacheDO, clearClassificationHotCache } from './decision-cache';
-import { clearAutoRoutingSettingsCache } from './routing-mode';
+import {
+  AutoRoutingModeConfigDO,
+  clearAutoRoutingSettingsCache,
+  type AutoRoutingOwnerSettings,
+} from './routing-mode';
 import { app } from './index';
 import { ClassifierRunError, type ClassifierRunResult } from './model-classifier';
 import type * as DbModule from '@kilocode/db';
@@ -275,6 +279,26 @@ function decideRequest(payload: unknown) {
   });
 }
 
+function ownerSettingsObject(initial: AutoRoutingOwnerSettings) {
+  let settings = initial;
+  const object = new AutoRoutingModeConfigDO({} as DurableObjectState, env as unknown as Env);
+  vi.spyOn(object, 'getSettings').mockImplementation(async () => settings);
+  vi.spyOn(object, 'getPool').mockImplementation(async () => settings.pool);
+  const setSettings = vi.spyOn(object, 'setSettings').mockImplementation(async next => {
+    settings = next;
+  });
+  return {
+    object,
+    setSettings,
+    get mode() {
+      return settings.mode;
+    },
+    get pool() {
+      return settings.pool;
+    },
+  };
+}
+
 describe('auto routing worker', () => {
   beforeEach(async () => {
     clearClassifierConfigCache();
@@ -332,6 +356,9 @@ describe('auto routing worker', () => {
     });
     benchmarkFetch.mockReset();
     benchmarkFetch.mockImplementation(async (url: string) => {
+      if (String(url).includes('/admin/profiles/subscriptions')) {
+        return Response.json({ statuses: [] });
+      }
       if (String(url).includes('/admin/classifier-winner')) {
         return { ok: true, status: 200, json: async () => ({ winner: null }) };
       }
@@ -1152,35 +1179,12 @@ describe('auto routing worker', () => {
       mode?: AutoRoutingMode | null;
       pool?: EfficientModelPool | null;
     }) {
-      let mode: AutoRoutingMode | null = initial?.mode ?? null;
-      let poolValue: EfficientModelPool | null = initial?.pool ?? null;
-      const setSettings = vi.fn(
-        async (settings: { mode: AutoRoutingMode | null; pool: EfficientModelPool | null }) => {
-          mode = settings.mode;
-          poolValue = settings.pool;
-        }
-      );
-      modeConfigGet.mockImplementation(() => ({
-        getMode: vi.fn(async () => mode),
-        setMode: vi.fn(async (next: AutoRoutingMode | null) => {
-          mode = next;
-        }),
-        getPool: vi.fn(async () => poolValue),
-        setPool: vi.fn(async (next: EfficientModelPool | null) => {
-          poolValue = next;
-        }),
-        getSettings: vi.fn(async () => ({ mode, pool: poolValue })),
-        setSettings,
-      }));
-      return {
-        get mode() {
-          return mode;
-        },
-        get pool() {
-          return poolValue;
-        },
-        setSettings,
-      };
+      const store = ownerSettingsObject({
+        mode: initial?.mode ?? null,
+        pool: initial?.pool ?? null,
+      });
+      modeConfigGet.mockImplementation(() => store.object);
+      return store;
     }
 
     it('GET without pool skips the status fetch', async () => {
@@ -1203,6 +1207,9 @@ describe('auto routing worker', () => {
     it('GET with pool returns statuses from the benchmark worker', async () => {
       ownerSettingsStore({ mode: null, pool });
       benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/profiles/subscriptions')) {
+          return Response.json({ statuses: [] });
+        }
         if (String(url).includes('/admin/profiles/status')) {
           return {
             ok: true,
@@ -1230,13 +1237,24 @@ describe('auto routing worker', () => {
       });
       expect(benchmarkFetch).toHaveBeenCalledWith(
         expect.stringContaining('/admin/profiles/status'),
-        expect.objectContaining({ method: 'POST' })
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            router: 'efficient',
+            ownerType: 'user',
+            ownerId: 'user-1',
+            entries: pool,
+          }),
+        })
       );
     });
 
     it('GET returns 502 when status fetch fails for a configured pool', async () => {
       ownerSettingsStore({ mode: null, pool });
       benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/profiles/subscriptions')) {
+          return Response.json({ statuses: [] });
+        }
         if (String(url).includes('/admin/profiles/status')) {
           return { ok: false, status: 500, text: async () => 'boom', json: async () => ({}) };
         }
@@ -1262,6 +1280,9 @@ describe('auto routing worker', () => {
     it('PUT persists only after successful register and reuses register statuses', async () => {
       const store = ownerSettingsStore();
       benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/profiles/subscriptions')) {
+          return Response.json({ statuses: [] });
+        }
         if (String(url).includes('/admin/profiles/register')) {
           return {
             ok: true,
@@ -1307,6 +1328,9 @@ describe('auto routing worker', () => {
       const store = ownerSettingsStore({ mode: 'cost_per_accuracy', pool: null });
       const retryAt = '2026-07-29T00:00:00.000Z';
       benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/profiles/subscriptions')) {
+          return Response.json({ statuses: [] });
+        }
         if (String(url).includes('/admin/profiles/register')) {
           return {
             ok: false,
@@ -1367,6 +1391,12 @@ describe('auto routing worker', () => {
         expect.stringContaining('/admin/profiles/register'),
         expect.anything()
       );
+      expect(benchmarkFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/admin/profiles/subscriptions'),
+        expect.objectContaining({
+          body: JSON.stringify({ ownerType: 'user', ownerId: 'user-1', entries: null }),
+        })
+      );
     });
 
     it('PUT forwards retryEntries on register and persists only after success', async () => {
@@ -1374,6 +1404,9 @@ describe('auto routing worker', () => {
       const retryEntries = [{ model: 'custom/chat' }];
       let registerBody: unknown;
       benchmarkFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (String(url).includes('/admin/profiles/subscriptions')) {
+          return Response.json({ statuses: [] });
+        }
         if (String(url).includes('/admin/profiles/register')) {
           const body = init?.body;
           registerBody =
@@ -1442,14 +1475,8 @@ describe('auto routing worker', () => {
     };
 
     function setOwnerPool(nextPool: EfficientModelPool | null) {
-      modeConfigGet.mockImplementation(() => ({
-        getMode: vi.fn(async () => null),
-        setMode: vi.fn(async () => undefined),
-        getPool: vi.fn(async () => nextPool),
-        setPool: vi.fn(async () => undefined),
-        getSettings: vi.fn(async () => ({ mode: null, pool: nextPool })),
-        setSettings: vi.fn(async () => undefined),
-      }));
+      const store = ownerSettingsObject({ mode: null, pool: nextPool });
+      modeConfigGet.mockImplementation(() => store.object);
     }
 
     it('uses the custom routing table when a pool is configured', async () => {
@@ -1463,6 +1490,9 @@ describe('auto routing worker', () => {
         },
       ]);
       benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/profiles/subscriptions')) {
+          return Response.json({ statuses: [] });
+        }
         if (String(url).includes('/admin/custom-routing-table')) {
           return {
             ok: true,
@@ -1520,6 +1550,9 @@ describe('auto routing worker', () => {
           },
         ]);
         benchmarkFetch.mockImplementation(async (url: string) => {
+          if (String(url).includes('/admin/profiles/subscriptions')) {
+            return Response.json({ statuses: [] });
+          }
           if (String(url).includes('/admin/custom-routing-table')) {
             return {
               ok: true,
@@ -1561,7 +1594,12 @@ describe('auto routing worker', () => {
         expect(benchmarkFetch).toHaveBeenCalledWith(
           expect.stringContaining('/admin/custom-routing-table'),
           expect.objectContaining({
-            body: JSON.stringify({ router: 'efficient', entries: [{ model: '~pool/latest' }] }),
+            body: JSON.stringify({
+              router: 'efficient',
+              ownerType: 'user',
+              ownerId: 'user-1',
+              entries: [{ model: '~pool/latest' }],
+            }),
           })
         );
       }
@@ -1571,6 +1609,9 @@ describe('auto routing worker', () => {
       setOwnerPool(pool);
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/profiles/subscriptions')) {
+          return Response.json({ statuses: [] });
+        }
         if (String(url).includes('/admin/custom-routing-table')) {
           return { ok: false, status: 500, text: async () => 'fail', json: async () => ({}) };
         }
@@ -1624,6 +1665,9 @@ describe('auto routing worker', () => {
         },
       ]);
       benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/profiles/subscriptions')) {
+          return Response.json({ statuses: [] });
+        }
         if (String(url).includes('/admin/custom-routing-table')) {
           return {
             ok: true,
@@ -1662,6 +1706,126 @@ describe('auto routing worker', () => {
           additionalModelIds: ['pool/chat'],
         })
       );
+    });
+
+    it('keeps identical alias pools isolated by the owner serving snapshot', async () => {
+      const aliases: EfficientModelPool = [{ model: '~pool/latest' }];
+      const firstOwner = ownerSettingsObject({ mode: null, pool: aliases });
+      const secondOwner = ownerSettingsObject({ mode: null, pool: aliases });
+      modeConfigGet.mockImplementation((id: string) =>
+        id === 'user:user-1' ? firstOwner.object : secondOwner.object
+      );
+      dbWhereCaps.mockResolvedValue(
+        ['pool/old', 'pool/new'].map(openrouterId => ({
+          openrouterId,
+          inputModalities: [],
+          contextLength: 1_000_000,
+          isActive: true,
+        }))
+      );
+      benchmarkFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (String(url).includes('/admin/profiles/subscriptions')) {
+          return Response.json({ statuses: [] });
+        }
+        if (String(url).includes('/admin/custom-routing-table')) {
+          if (typeof init?.body !== 'string')
+            throw new Error('Expected a JSON custom-table request.');
+          const body = JSON.parse(init.body) as { ownerId: string };
+          const model = body.ownerId === 'user-1' ? 'pool/old' : 'pool/new';
+          return Response.json({
+            table: {
+              ...customTable,
+              version: model,
+              routes: {
+                'implementation/feature_development': [
+                  {
+                    ...customTable.routes['implementation/feature_development'][0],
+                    model,
+                  },
+                ],
+              },
+            },
+          });
+        }
+        return Response.json({ winner: null });
+      });
+
+      const firstResponse = await decideRequest(mirrorPayload());
+      const secondResponse = await decideRequest(
+        mirrorPayload({ userId: 'user-2', sessionId: 'other-session' })
+      );
+      await expect(firstResponse.json()).resolves.toMatchObject({
+        decision: { model: 'pool/old' },
+      });
+      await expect(secondResponse.json()).resolves.toMatchObject({
+        decision: { model: 'pool/new' },
+      });
+      expect(
+        benchmarkFetch.mock.calls.filter(([url]) =>
+          String(url).includes('/admin/custom-routing-table')
+        )
+      ).toHaveLength(2);
+    });
+
+    it('keeps the active target through cache refreshes while an alias replacement is pending', async () => {
+      let now = Date.now();
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+      const aliases: EfficientModelPool = [{ model: '~pool/latest' }];
+      setOwnerPool(aliases);
+      dbWhereCaps.mockResolvedValue(
+        ['pool/old', 'pool/new'].map(openrouterId => ({
+          openrouterId,
+          inputModalities: [],
+          contextLength: 1_000_000,
+          isActive: true,
+        }))
+      );
+      let activeModel = 'pool/old';
+      benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/profiles/subscriptions')) {
+          return Response.json({
+            statuses: [{ entry: { model: 'pool/new', variant: null }, status: 'pending' }],
+          });
+        }
+        if (String(url).includes('/admin/custom-routing-table')) {
+          return Response.json({
+            table: {
+              ...customTable,
+              version: activeModel,
+              routes: {
+                'implementation/feature_development': [
+                  {
+                    ...customTable.routes['implementation/feature_development'][0],
+                    model: activeModel,
+                  },
+                ],
+              },
+            },
+          });
+        }
+        return Response.json({ winner: null });
+      });
+
+      const first = await decideRequest(mirrorPayload({ sessionId: 'initial' }));
+      await expect(first.json()).resolves.toMatchObject({
+        decision: { model: 'pool/old' },
+      });
+      now += 60_001;
+      const pending = await decideRequest(mirrorPayload({ sessionId: 'pending' }));
+      await expect(pending.json()).resolves.toMatchObject({
+        decision: { model: 'pool/old' },
+      });
+      activeModel = 'pool/new';
+      now += 60_001;
+      const ready = await decideRequest(mirrorPayload({ sessionId: 'ready' }));
+      await expect(ready.json()).resolves.toMatchObject({
+        decision: { model: 'pool/new' },
+      });
+      expect(
+        benchmarkFetch.mock.calls
+          .filter(([url]) => String(url).includes('/admin/profiles/subscriptions'))
+          .map(([, init]) => JSON.parse(String(init?.body)))
+      ).toEqual([]);
     });
   });
 

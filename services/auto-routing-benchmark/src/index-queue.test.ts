@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as RunModule from './run';
 
+vi.mock('./subscriptions', () => ({ dailyReconcileSubscriptions: vi.fn() }));
+import { dailyReconcileSubscriptions } from './subscriptions';
+
 vi.mock('./run', async importOriginal => {
   const actual = await importOriginal<typeof RunModule>();
   return {
@@ -49,6 +52,7 @@ beforeEach(() => {
   vi.mocked(processDeadLetter).mockResolvedValue(undefined);
   vi.mocked(processJob).mockResolvedValue(undefined);
   send.mockReset().mockResolvedValue(undefined);
+  vi.mocked(dailyReconcileSubscriptions).mockResolvedValue(undefined);
 });
 
 describe('queue handler — DLQ branch', () => {
@@ -140,6 +144,7 @@ describe('scheduled router queues', () => {
     await worker.scheduled({ cron: '*/5 * * * *' } as ScheduledController, env);
     expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'efficient');
     expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'frontier');
+    expect(dailyReconcileSubscriptions).not.toHaveBeenCalled();
   });
 
   it('reconciles, drains, and republishes both routers at the platform cadence', async () => {
@@ -149,8 +154,16 @@ describe('scheduled router queues', () => {
     vi.mocked(publishPlatformRoutingTable).mockResolvedValue(null);
     await worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env);
     expect(sweepStaleRuns).toHaveBeenCalledTimes(2);
+    expect(dailyReconcileSubscriptions).toHaveBeenCalledTimes(2);
     for (const router of ['efficient', 'frontier'] as const) {
       expect(syncPlatformRegistry).toHaveBeenCalledWith(env, fetch, router);
+      expect(dailyReconcileSubscriptions).toHaveBeenCalledWith(env, router);
+      const dailyCall = vi.mocked(dailyReconcileSubscriptions).mock.invocationCallOrder[
+        router === 'efficient' ? 0 : 1
+      ];
+      expect(dailyCall).toBeLessThan(
+        vi.mocked(syncPlatformRegistry).mock.invocationCallOrder[router === 'efficient' ? 0 : 1]
+      );
       expect(drainQueues).toHaveBeenCalledWith(
         env,
         router === 'frontier' ? 'platform' : 'both',
@@ -160,6 +173,29 @@ describe('scheduled router queues', () => {
       expect(publishPlatformRoutingTable).toHaveBeenCalledWith(env, fetch, router);
     }
     expect(sweepStaleRunsAndDrain).not.toHaveBeenCalled();
+  });
+
+  it('keeps daily drain and publication running when subscription reconciliation fails', async () => {
+    vi.mocked(sweepStaleRuns).mockResolvedValue([]);
+    vi.mocked(syncPlatformRegistry).mockResolvedValue({ desiredEntries: 0 });
+    vi.mocked(drainQueues).mockResolvedValue([]);
+    vi.mocked(publishPlatformRoutingTable).mockResolvedValue(null);
+    vi.mocked(dailyReconcileSubscriptions).mockRejectedValueOnce(new Error('catalog unavailable'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env);
+
+    expect(syncPlatformRegistry).toHaveBeenCalledWith(env, fetch, 'efficient');
+    expect(drainQueues).toHaveBeenCalledWith(env, 'both', undefined, 'efficient');
+    expect(publishPlatformRoutingTable).toHaveBeenCalledWith(env, fetch, 'efficient');
+    expect(warn).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: 'benchmark_subscription_daily_failed',
+        category: 'daily_reconciliation',
+        router: 'efficient',
+      })
+    );
+    warn.mockRestore();
   });
 
   it('still drains frontier when the efficient drain fails and reports the failure', async () => {

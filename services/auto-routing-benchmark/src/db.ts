@@ -40,6 +40,7 @@ import {
   variantToStorage,
 } from './reasoning-effort';
 import type { OfflineSweep } from './scoreboard/schema';
+import { noLiveBenchmarkChunks } from './profile-entry-claims';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -404,6 +405,13 @@ export async function reuseDeciderCaseResults(
               AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
               AND source.model = ? AND source.variant = ?
               AND source.error IS NULL AND source.timed_out = 0 AND source.exit_code = 0
+              AND NOT EXISTS (
+                SELECT 1 FROM benchmark_profiles AS profile
+                WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+                  AND profile.repetitions = run.repetitions AND profile.model = source.model
+                  AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+                  AND run.started_at < profile.invalidated_at
+              )
           )
           INSERT INTO case_results (
             run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
@@ -430,10 +438,18 @@ export async function reuseDeciderCaseResults(
             WHERE run.kind = 'decider' AND run.status IN ('completed', 'failed')
               AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
               AND source.model = ? AND source.variant = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM benchmark_profiles AS profile
+                WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+                  AND profile.repetitions = run.repetitions AND profile.model = source.model
+                  AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+                  AND run.started_at < profile.invalidated_at
+              )
               AND CASE WHEN json_valid(source.payload) THEN
                 json_type(source.payload, '$.result.exitCode') = 'integer'
                 AND json_extract(source.payload, '$.result.exitCode') = 0
                 AND json_type(source.payload, '$.result.timedOut') = 'false'
+                AND json_extract(source.payload, '$.result.unavailableModelId') IS NULL
               ELSE 0 END
               AND NOT EXISTS (
                 SELECT 1 FROM case_results AS graded
@@ -603,6 +619,7 @@ const PendingDeciderOutputSchema = z.object({
     eventCount: z.number(),
     lastEventTypes: z.array(z.string()),
     timedOut: z.boolean(),
+    unavailableModelId: z.string().min(1).optional(),
   }),
   retried: z.boolean(),
 });
@@ -1161,60 +1178,6 @@ export async function listPendingCurrentProfiles(
     );
 }
 
-/**
- * Move owner requests off pending alias rows whose concrete catalog target is
- * resolvable, so the owner queue never measures an alias beside its target.
- * Each alias still pending and owner-requested hands its flag to its concrete
- * pair (created pending when absent); a null target only drops the flag
- * because that variant no longer exists on the target. Running, failed and
- * ready alias rows are left untouched.
- */
-export async function collapsePendingOwnerAliasRows(
-  db: D1Database,
-  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
-  aliases: readonly {
-    alias: { model: string; variant: string };
-    target: { model: string; variant: string | null } | null;
-  }[],
-  nowIso: string = new Date().toISOString()
-): Promise<void> {
-  const router = current.router ?? 'efficient';
-  const aliasKey = [router, current.engineIdentity, current.repetitions] as const;
-  const stmts = aliases.flatMap(({ alias, target }) => {
-    const unflag = db
-      .prepare(
-        `UPDATE benchmark_profiles SET user_requested = 0, updated_at = ?
-         WHERE router = ? AND engine_identity = ? AND repetitions = ? AND model = ? AND variant = ?
-           AND status = 'pending' AND user_requested = 1`
-      )
-      .bind(nowIso, ...aliasKey, alias.model, alias.variant);
-    if (!target) return [unflag];
-    const claimTarget = db
-      .prepare(
-        `INSERT INTO benchmark_profiles
-           (router, model, variant, engine_identity, repetitions, status, run_id, failure_reason,
-            requested_at, updated_at, completed_at, platform_requested, user_requested)
-         SELECT router, ?, ?, engine_identity, repetitions, 'pending', NULL, NULL,
-                requested_at, ?, NULL, 0, 1
-         FROM benchmark_profiles
-         WHERE router = ? AND engine_identity = ? AND repetitions = ? AND model = ? AND variant = ?
-           AND status = 'pending' AND user_requested = 1
-         ON CONFLICT (router, model, variant, engine_identity, repetitions)
-         DO UPDATE SET user_requested = 1`
-      )
-      .bind(
-        target.model,
-        variantToStorage(target.variant),
-        nowIso,
-        ...aliasKey,
-        alias.model,
-        alias.variant
-      );
-    return [claimTarget, unflag];
-  });
-  if (stmts.length > 0) await db.batch(stmts);
-}
-
 /** Registry row counts per status for one queue's current-engine rows. */
 export async function countCurrentProfilesByStatus(
   db: D1Database,
@@ -1298,6 +1261,13 @@ export async function requeueFailedCurrentProfiles(
         eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
+        noLiveBenchmarkChunks({
+          router: benchmarkProfiles.router,
+          model: benchmarkProfiles.model,
+          variant: benchmarkProfiles.variant,
+          engineIdentity: benchmarkProfiles.engine_identity,
+          repetitions: benchmarkProfiles.repetitions,
+        }),
         queueFilter
       )
     );

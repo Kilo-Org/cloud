@@ -32,7 +32,37 @@ describe('scheduler initialization across dispatch ticks (production migrations 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(NOW);
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ data: [] }));
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      const headers = new Headers(init?.headers);
+      if (url.href === 'https://app.test/api/internal/auto-routing-benchmark/token') {
+        if (typeof init?.body !== 'string') throw new Error('Expected a JSON token request.');
+        expect(init?.method).toBe('POST');
+        expect(headers.get('authorization')).toBe(`Bearer ${'internal-test-secret'}`);
+        expect(JSON.parse(init.body)).toEqual({
+          userId: 'scheduler-user',
+          organizationId: 'scheduler-org',
+        });
+        return Response.json({
+          token: 'scheduler-test-token',
+          expiresAt: new Date(NOW + 60 * 60_000).toISOString(),
+        });
+      }
+      if (url.href === 'https://api.test/api/organizations/scheduler-org/models') {
+        expect(headers.get('authorization')).toBe(`Bearer ${'scheduler-test-token'}`);
+        expect(headers.get('X-KiloCode-OrganizationId')).toBe('scheduler-org');
+        return Response.json({
+          data: sqlite
+            .prepare('SELECT DISTINCT model FROM run_models')
+            .all()
+            .map(row => ({
+              id: row.model,
+              supported_parameters: ['tools'],
+            })),
+        });
+      }
+      throw new Error(`Unexpected fixture request: ${url.href}`);
+    });
     sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
     setupDb = sqliteD1(sqlite);
@@ -53,6 +83,8 @@ describe('scheduler initialization across dispatch ticks (production migrations 
       },
       BENCHMARK_SCHEDULER_CONFIG: '{}',
       KILO_WEB_API_BASE_URL: 'https://app.test',
+      KILO_CLI_API_URL: 'https://api.test',
+      INTERNAL_API_SECRET_PROD: { get: async () => 'internal-test-secret' },
     } as unknown as Env;
   });
 
@@ -72,8 +104,10 @@ describe('scheduler initialization across dispatch ticks (production migrations 
       .prepare(`
       INSERT INTO benchmark_runs (
         id, router, kind, purpose, status, started_at,
-        min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity
-      ) VALUES (?, 'efficient', 'decider', ?, 'running', ?, 0.7, 3, 0, ?, 'scheduler-init-test')
+        min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
+        benchmark_user_id, benchmark_org_id
+      ) VALUES (?, 'efficient', 'decider', ?, 'running', ?, 0.7, 3, 0, ?, 'scheduler-init-test',
+        'scheduler-user', 'scheduler-org')
     `)
       .run(id, purpose, new Date(NOW).toISOString(), repetitions);
     const model = sqlite.prepare(

@@ -11,15 +11,10 @@ import {
   type EfficientModelPool,
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
-import {
-  BenchmarkProfileQuotaError,
-  fetchBenchmarkProfileStatuses,
-  registerBenchmarkProfiles,
-} from './benchmark-origin';
 import type { HonoEnv } from './hono-env';
 import {
   clearAutoRoutingSettingsCache,
-  getConfiguredAutoRoutingSettings,
+  getSubscribedAutoRoutingSettings,
   setAutoRoutingSettings,
 } from './routing-mode';
 
@@ -50,26 +45,14 @@ export const getRoutingSettingsHandler: Handler<HonoEnv> = async c => {
     return c.json({ error: 'Invalid routing settings owner' }, 400);
   }
 
-  const configured = await getConfiguredAutoRoutingSettings(c.env, parsed.data);
-  if (configured.pool === null) {
-    return c.json(
-      settingsResponse({
-        ...parsed.data,
-        configuredMode: configured.mode,
-        configuredPool: null,
-        poolStatuses: [],
-      })
-    );
-  }
-
   try {
-    const statuses = await fetchBenchmarkProfileStatuses(c.env, configured.pool);
+    const { settings, statuses } = await getSubscribedAutoRoutingSettings(c.env, parsed.data);
     return c.json(
       settingsResponse({
         ...parsed.data,
-        configuredMode: configured.mode,
-        configuredPool: configured.pool,
-        poolStatuses: statuses.statuses,
+        configuredMode: settings.mode,
+        configuredPool: settings.pool,
+        poolStatuses: statuses,
       })
     );
   } catch {
@@ -90,34 +73,17 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
     return c.json({ error: 'Invalid routing settings' }, 400);
   }
 
-  const { ownerType, ownerId, mode, pool, retryEntries } = parsed.data;
-
-  let poolStatuses: BenchmarkProfileEntryStatus[] = [];
-  if (pool !== null) {
-    try {
-      const registered = await registerBenchmarkProfiles(c.env, {
-        ownerType,
-        ownerId,
-        entries: pool,
-        ...(retryEntries !== undefined ? { retryEntries } : {}),
-      });
-      poolStatuses = registered.statuses;
-    } catch (error) {
-      if (error instanceof BenchmarkProfileQuotaError) {
-        return c.json(
-          BenchmarkProfileQuotaErrorSchema.parse({
-            error: error.message,
-            retryAt: error.retryAt,
-          }),
-          429
-        );
-      }
-      return c.json({ error: 'Failed to register benchmark profiles' }, 502);
+  const { ownerType, ownerId, mode, pool } = parsed.data;
+  let poolStatuses: BenchmarkProfileEntryStatus[];
+  try {
+    const result = await setAutoRoutingSettings(c.env, parsed.data);
+    if ('quota' in result) {
+      return c.json(BenchmarkProfileQuotaErrorSchema.parse(result.quota), 429);
     }
+    poolStatuses = result.statuses;
+  } catch {
+    return c.json({ error: 'Failed to save routing settings' }, 502);
   }
-
-  // Persist only after successful admission (or when clearing the pool).
-  await setAutoRoutingSettings(c.env, { ownerType, ownerId }, { mode, pool });
   clearAutoRoutingSettingsCache();
 
   return c.json(

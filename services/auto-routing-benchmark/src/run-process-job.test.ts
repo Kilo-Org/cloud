@@ -7,6 +7,13 @@ import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import type * as ConfigModule from './config';
 
 import type * as SchedulerModule from './scheduler';
+import type * as SubscriptionsModule from './subscriptions';
+
+vi.mock('./subscriptions', async importOriginal => ({
+  ...(await importOriginal<typeof SubscriptionsModule>()),
+  syncSubscriptionSnapshot: vi.fn(),
+  servingSubscriptionSnapshot: vi.fn(),
+}));
 
 vi.mock('./scheduler', async importOriginal => {
   const actual = await importOriginal<typeof SchedulerModule>();
@@ -19,6 +26,7 @@ vi.mock('./scheduler', async importOriginal => {
     cooldownProviders: vi.fn(),
     deferChunk: vi.fn(),
     failChunk: vi.fn(),
+    failScheduledEntry: vi.fn(),
     finishChunk: vi.fn(),
     getChunk: vi.fn(),
     getPaidCaseStartedAt: vi.fn(),
@@ -63,6 +71,7 @@ vi.mock('./db', async importOriginal => {
     listPendingCurrentProfiles: vi.fn(),
     listStaleRunningDeciderRuns: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
+    markProfilesFailedForEntries: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
@@ -109,11 +118,13 @@ import {
   listLaneFailures,
   listStaleRunningDeciderRuns,
   markRunCompleted,
+  markProfilesFailedForEntries,
   recordLaneFailure,
   saveRoutingTable,
   upsertCaseResult,
 } from './db';
 import { getBenchmarkConfig } from './config';
+import { servingSubscriptionSnapshot, syncSubscriptionSnapshot } from './subscriptions';
 import { processJob, acceptContainerCaseResult, PAID_OUTPUT_WAIT_MS } from './run';
 import { createDeciderJudge } from './decider-judge';
 import { createSystemOneClient } from './openrouter';
@@ -127,6 +138,7 @@ import {
   deferChunk,
   failChunk,
   finishChunk,
+  failScheduledEntry,
   getChunk,
   getPaidCaseStartedAt,
   hasUnsettledChunks,
@@ -267,6 +279,7 @@ beforeEach(() => {
   queueSend.mockResolvedValue(undefined);
   vi.mocked(startChunk).mockResolvedValue(true);
   vi.mocked(beginPaidCase).mockResolvedValue(true);
+  vi.mocked(restartPaidCase).mockResolvedValue(true);
   vi.mocked(getPaidCaseStartedAt).mockResolvedValue(null);
   vi.mocked(hasPaidCase).mockResolvedValue(true);
   vi.mocked(claimScheduledChunks).mockResolvedValue([]);
@@ -293,6 +306,16 @@ beforeEach(() => {
     updatedAt: null,
     updatedBy: null,
   });
+  const snapshot = [
+    {
+      model,
+      pairs: [{ model, variant: 'max' }],
+      servingPairs: [{ model, variant: 'max' }],
+      resolutionError: null,
+    },
+  ];
+  vi.mocked(syncSubscriptionSnapshot).mockResolvedValue(snapshot);
+  vi.mocked(servingSubscriptionSnapshot).mockResolvedValue(snapshot);
   vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
   vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
@@ -307,7 +330,7 @@ beforeEach(() => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async url =>
-      String(url).includes('/api/openrouter/models')
+      String(url).endsWith('/models')
         ? Response.json({
             data: [
               { id: model, opencode: { variants: { max: { reasoning: { effort: 'max' } } } } },
@@ -320,6 +343,8 @@ beforeEach(() => {
   vi.mocked(countCaseResultsByLane).mockResolvedValue([]);
   vi.mocked(listLaneFailures).mockResolvedValue([]);
   vi.mocked(recordLaneFailure).mockResolvedValue(undefined);
+  vi.mocked(markProfilesFailedForEntries).mockResolvedValue(undefined);
+  vi.mocked(failScheduledEntry).mockResolvedValue(undefined);
   vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set());
   vi.mocked(getPendingDeciderOutput).mockResolvedValue(null);
   vi.mocked(savePendingDeciderOutput).mockResolvedValue(undefined);
@@ -631,6 +656,114 @@ describe('processJob — legacy whole-run migration', () => {
 
 describe('processJob — scheduler waits and paid-call safety', () => {
   it.each([
+    { exitCode: 1, stderrTail: `Error: Model not found: kilo/${model}` },
+    { exitCode: 0, stderrTail: '', unavailableModelId: `kilo/${model}` },
+  ])(
+    'fails unavailable exact entries immediately without scoring or retrying inference: %j',
+    async unavailable => {
+      const claim = mockClaim({ variant: 'high', rep: 1 });
+      mockRunSnapshot([
+        { model, variant: 'high' },
+        { model, variant: 'low' },
+        { model: 'other/model', variant: '' },
+      ]);
+      vi.mocked(hasUnsettledChunks).mockResolvedValue(true);
+      vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: '',
+        ...unavailable,
+      });
+
+      await processJob(env, deciderMessage());
+
+      expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+      expect(restartPaidCase).not.toHaveBeenCalled();
+      expect(clearUnbilledCase).not.toHaveBeenCalled();
+      expect(upsertCaseResult).not.toHaveBeenCalled();
+      expect(savePendingDeciderOutput).toHaveBeenCalledTimes(1);
+      expect(markProfilesFailedForEntries).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        runId,
+        [{ model, variant: 'high' }],
+        expect.stringContaining('unavailable')
+      );
+      expect(failScheduledEntry).toHaveBeenCalledWith(env.BENCH_DB, claim);
+      expect(markRunCompleted).not.toHaveBeenCalled();
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(queueSend).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { stderrTail: 'Model not found: kilo/another/model', costUsd: null, timedOut: false },
+    { stderrTail: `Model not found: kilo/${model}`, costUsd: 0.01, timedOut: false },
+    { stderrTail: `Model not found: kilo/${model}`, costUsd: null, timedOut: true },
+  ])(
+    'keeps mismatched, billed, or timed-out CLI failures as measured results: %j',
+    async failure => {
+      vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: '',
+        exitCode: 1,
+        ...failure,
+      });
+      await processJob(env, deciderMessage());
+      expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+      expect(upsertCaseResult).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.objectContaining({
+          score: 0,
+          cost_usd: failure.costUsd,
+          timed_out: failure.timedOut ? 1 : 0,
+        })
+      );
+      expect(markProfilesFailedForEntries).not.toHaveBeenCalled();
+      expect(failScheduledEntry).not.toHaveBeenCalled();
+    }
+  );
+
+  it('recovers terminal unavailable output after a profile write failure without paying again', async () => {
+    const result = {
+      ...successfulCliResult,
+      text: '',
+      exitCode: 1,
+      stderrTail: `Model not found: kilo/${model}`,
+    };
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce(result);
+    vi.mocked(markProfilesFailedForEntries).mockRejectedValueOnce(new Error('D1 unavailable'));
+    await expect(processJob(env, deciderMessage())).rejects.toThrow('D1 unavailable');
+    vi.mocked(getPendingDeciderOutput).mockResolvedValueOnce({ result, retried: false });
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    expect(beginPaidCase).toHaveBeenCalledTimes(1);
+    expect(failScheduledEntry).toHaveBeenCalledTimes(1);
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+  });
+
+  it('grades unrelated entries normally after an exact model becomes unavailable', async () => {
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      exitCode: 1,
+      stderrTail: `Model not found: kilo/${model}`,
+    });
+    await processJob(env, deciderMessage());
+    mockRunSnapshot([{ model: 'other/model', variant: '' }]);
+    mockClaim({ id: 'other-chunk', model: 'other/model' });
+
+    await processJob(env, { ...deciderMessage(), claimId: 'other-chunk', model: 'other/model' });
+
+    expect(upsertCaseResult).toHaveBeenCalledTimes(1);
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ model: 'other/model', exit_code: 0 })
+    );
+    expect(markProfilesFailedForEntries).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
     'container /run failed: HTTP 503 There is no Container instance available at this time. This is likely because you have reached your max concurrent instance count.',
     'container /run failed: HTTP 503 Maximum number of running container instances exceeded',
     'container /run failed: HTTP 503 There is no container instance that can be provided to this Durable Object, try again later',
@@ -759,6 +892,22 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     const restartCall = vi.mocked(restartPaidCase).mock.invocationCallOrder[0];
     expect(restartCall).toBeGreaterThan(firstCall);
     expect(restartCall).toBeLessThan(retryCall);
+    expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+  });
+
+  it('keeps the original measured failure without another call when the ledger refuses a retry', async () => {
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      costUsd: 0.01,
+    });
+    vi.mocked(restartPaidCase).mockResolvedValueOnce(false);
+    await processJob(env, deciderMessage());
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ score: 0, cost_usd: 0.01, retried: false })
+    );
     expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
   });
 

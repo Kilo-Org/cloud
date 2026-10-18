@@ -80,6 +80,8 @@ const env = {
   BENCH_QUEUE: { send: queueSend, sendBatch: queueSendBatch },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
   KILO_WEB_API_BASE_URL: 'https://app.test',
+  KILO_CLI_API_URL: 'https://api.test',
+  INTERNAL_API_SECRET_PROD: { get: async () => 'internal-test-secret' },
 } as unknown as Env;
 
 function deadLetterMessage() {
@@ -198,7 +200,7 @@ describe('processDeadLetter — legacy migration', () => {
         best_accuracy_switch_threshold: 0.05,
         max_concurrency: 0,
         benchmark_user_id: 'user-1',
-        benchmark_org_id: null,
+        benchmark_org_id: 'benchmark-org-snapshot',
         repetitions: 2,
         classifier_max_p95_latency_ms: null,
         purpose: 'platform',
@@ -212,9 +214,42 @@ describe('processDeadLetter — legacy migration', () => {
 
   it('schedules the whole run instead of recording death for a legacy shard', async () => {
     mockRun();
-    const fetcher = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(Response.json({ data: [] }));
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      const headers = new Headers(init?.headers);
+      if (url.href === 'https://app.test/api/internal/auto-routing-benchmark/token') {
+        if (typeof init?.body !== 'string') throw new Error('Expected a JSON token request.');
+        expect(init?.method).toBe('POST');
+        expect(headers.get('authorization')).toBe(`Bearer ${'internal-test-secret'}`);
+        expect(JSON.parse(init.body)).toMatchObject({
+          userId: 'user-1',
+          organizationId: 'benchmark-org-snapshot',
+        });
+        return Response.json({
+          token: 'dead-letter-test-token',
+          expiresAt: '2026-10-18T13:00:00.000Z',
+        });
+      }
+      if (url.href === 'https://api.test/api/organizations/benchmark-org-snapshot/models') {
+        expect(headers.get('authorization')).toBe(`Bearer ${'dead-letter-test-token'}`);
+        expect(headers.get('X-KiloCode-OrganizationId')).toBe('benchmark-org-snapshot');
+        return Response.json({
+          data: [
+            {
+              id: 'b/dead',
+              supported_parameters: ['tools'],
+              opencode: {
+                variants: {
+                  high: { reasoning: { effort: 'high' } },
+                  low: { reasoning: { effort: 'low' } },
+                },
+              },
+            },
+          ],
+        });
+      }
+      throw new Error(`Unexpected fixture request: ${url.href}`);
+    });
     try {
       await processDeadLetter(env, {
         runId,

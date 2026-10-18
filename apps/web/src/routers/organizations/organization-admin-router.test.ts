@@ -38,7 +38,7 @@ let testOrganization: Organization;
 describe('organization admin router', () => {
   beforeAll(async () => {
     adminUser = await insertTestUser({
-      google_user_email: 'admin-org-admin@admin.example.com',
+      google_user_email: 'admin-org-admin@kilocode.ai',
       google_user_name: 'Admin Org Admin User',
       is_admin: true,
       can_manage_credits: true,

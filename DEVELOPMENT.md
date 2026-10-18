@@ -397,6 +397,7 @@ The personal, organization-member, and shared-services settings cards show the r
 - `subscription_sharing_workplace_individual_usage_limit_exceeded` selects the Business notice.
 - **Copy request for admin** copies a message for the user's ChatGPT workspace admin.
 - Copying does not send the message, change the limit, or switch billing.
+- If clipboard access fails, the notice reveals a selectable request for manual copying.
 - A successful request or a reconnect clears the recorded notice.
 
 ### Running workers locally

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { OpenAILogo } from '@/components/auth/OpenAILogo';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -62,9 +63,18 @@ export function ChatGptUsageLimitContent({ code }: { code: string | null }) {
               {copyState === 'copied'
                 ? 'Request copied. Send it to your workspace admin.'
                 : copyState === 'error'
-                  ? 'Could not copy the request. Try again.'
+                  ? 'Could not copy the request. Select and copy the message below.'
                   : null}
             </p>
+            {copyState === 'error' ? (
+              <Textarea
+                aria-label="Request for workspace admin"
+                readOnly
+                rows={6}
+                value={BUSINESS_ADMIN_REQUEST}
+                onFocus={event => event.currentTarget.select()}
+              />
+            ) : null}
           </>
         ) : (
           <>

@@ -30,6 +30,7 @@ import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rol
 import {
   assertContainerCapacity,
   getContainerCapacityFailureReason,
+  LOW_BALANCE_CONTAINER_LIMIT,
 } from '../../container-concurrency.js';
 import { BillingScheduleTable } from '../../sandbox-control/billing-schedule.js';
 import { createVercelBillingRuntime, type VercelBillingRuntime } from './vercel-billing-runtime.js';
@@ -451,6 +452,7 @@ function stateToRow(state: AllocationState): typeof allocationTable.$inferInsert
     allocation_id: state.allocationId,
     connection_id: state.connectionId,
     provider_ref: state.providerRef,
+    admission_limit: state.admissionLimit,
     wrapper_id: state.wrapperId,
     last_frame_at: state.lastFrameAt,
     last_activity_at: state.lastActivityAt,
@@ -469,6 +471,7 @@ function rowToState(row: AllocationRow): AllocationState {
     allocationId: row.allocation_id,
     connectionId: row.connection_id,
     providerRef: row.provider_ref,
+    admissionLimit: row.admission_limit,
     wrapperId: row.wrapper_id,
     lastFrameAt: row.last_frame_at,
     lastActivityAt: row.last_activity_at,
@@ -3915,14 +3918,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
         const pin = this.providerPin ?? this.defaultPin('cloudflare');
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
+        let admissionLimit: number | null = null;
         if (pin.billing) {
-          await assertContainerCapacity(this.env, {
-            subject: pin.billing.subject,
-            actor: pin.billing.actor,
-            instanceId: pin.billing.sandboxId,
-            checkpoint: 'control-plane-create',
-            billingOrigin: pin.billing.metadata?.origin,
-          });
+          admissionLimit =
+            (await assertContainerCapacity(this.env, {
+              subject: pin.billing.subject,
+              actor: pin.billing.actor,
+              instanceId: pin.billing.sandboxId,
+              checkpoint: 'control-plane-create',
+              billingOrigin: pin.billing.metadata?.origin,
+            })) ?? null;
         }
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
@@ -4016,6 +4021,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           at: Date.now(),
           allocationId,
           providerRef: createdRef,
+          admissionLimit,
         });
         const current = await this.readAllocation();
         if (current.kind !== 'creating' || current.allocationId !== allocationId) {
@@ -5152,8 +5158,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
-   * Derived from the routes table on every lookup, so no route write can leave
-   * it stale. SQLite extracts only the origin; an unreadable credential source
+   * Routes are read on every lookup, so no route write can leave the policy
+   * stale. SQLite extracts only the origin; an unreadable credential source
    * keeps the longer interactive window.
    */
   private sandboxIdleTimeoutMs(state: AllocationState | null): number {
@@ -5168,7 +5174,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       })
       .from(routesTable)
       .all();
-    return routes.some(route => route.state === 'preparing' || route.readable === 0) ||
+    if (routes.some(route => route.state === 'preparing' || route.readable === 0)) {
+      return timers.idleMs;
+    }
+    return state.admissionLimit !== LOW_BALANCE_CONTAINER_LIMIT &&
       sandboxIdlePolicyForOrigins(routes.map(route => route.origin)) === 'interactive'
       ? timers.idleMs
       : timers.unattendedIdleMs;

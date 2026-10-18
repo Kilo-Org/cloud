@@ -318,11 +318,14 @@ A session blocked only on questions or permissions does not need compute. Pendin
 are tracked separately; answering one does not clear another, and an independent runnable
 tool still counts. A parent waiting on a blocked child can sleep, while another working
 session or descendant retains compute. Once a connected sandbox has had no activity for
-1 minute, the next inactive heartbeat stops it if all routes are unattended. A sandbox
-with at least one interactive origin (`cloud-agent-web`), a route still preparing,
-no routes, or an unreadable stored origin keeps the 10-minute idle window. Unrecognized
-or missing origins are unattended. The Sandbox DO derives this policy from its routes
-without a cache.
+1 minute, the next inactive heartbeat stops it if all routes are unattended or the
+allocation was admitted at the low-balance container limit. A route still preparing
+or an unreadable credential source always keeps the 10-minute idle window. Otherwise,
+a funded allocation with an interactive origin (`cloud-agent-web`) or no routes keeps
+10 minutes. Unrecognized or missing origins are unattended. The Sandbox DO reads its
+routes without a cache and persists the create-time admission limit on the allocation;
+route joins and later balance changes do not reclassify that physical allocation.
+Existing allocations without a stored limit retain the origin-only policy until replacement.
 
 The 1-minute rule is checked only on an inactive heartbeat, never on a disconnect or
 reconnect. The existing allocation idle backstop (10 min), heartbeat deadline (45 s),

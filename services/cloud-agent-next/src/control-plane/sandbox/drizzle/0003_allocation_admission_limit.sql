@@ -1,0 +1,1 @@
+ALTER TABLE `allocation` ADD `admission_limit` integer;

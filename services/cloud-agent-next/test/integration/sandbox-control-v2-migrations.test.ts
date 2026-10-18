@@ -34,6 +34,7 @@ const migrationLog = sqliteTable('__drizzle_migrations', {
 type MigrationDb = ReturnType<typeof drizzle>;
 
 const EXPECTED_ALLOCATION_COLUMNS: ColumnSignature[] = [
+  { name: 'admission_limit', type: 'integer', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'allocation_id', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'connection_id', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'create_deadline_at', type: 'integer', notnull: 0, dflt_value: null, pk: 0 },
@@ -67,6 +68,7 @@ const EXPECTED_ROUTES_COLUMNS: ColumnSignature[] = [
 const CONSOLIDATED_MIGRATION_AT = 1790455891314;
 const SCOPE_GRANTS_MIGRATION_AT = 1790793579352;
 const REPO_KEY_MIGRATION_AT = 1790860790832;
+const ADMISSION_LIMIT_MIGRATION_AT = 1792351442725;
 
 const OLD_FOUR_MIGRATIONS = {
   journal: {
@@ -164,7 +166,7 @@ afterEach(async () => {
 });
 
 describe('sandbox control V2 consolidated migrations', () => {
-  it('applies the consolidated migration and the repo key migration to a fresh database', async () => {
+  it('applies all sandbox migrations to a fresh database', async () => {
     const stub = newSandboxStub();
     await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
@@ -183,6 +185,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         { hash: '', created_at: CONSOLIDATED_MIGRATION_AT },
         { hash: '', created_at: SCOPE_GRANTS_MIGRATION_AT },
         { hash: '', created_at: REPO_KEY_MIGRATION_AT },
+        { hash: '', created_at: ADMISSION_LIMIT_MIGRATION_AT },
       ]);
       const applied = appliedMigrations(db);
       await migrate(db, migrations);
@@ -190,7 +193,7 @@ describe('sandbox control V2 consolidated migrations', () => {
     });
   });
 
-  it('skips the consolidated migration but adds the repo key on a database already migrated by the old four, preserving data', async () => {
+  it('upgrades the old four migrations without losing data or guessing the admission limit', async () => {
     const stub = newSandboxStub();
     await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
@@ -202,7 +205,14 @@ describe('sandbox control V2 consolidated migrations', () => {
       const oldApplied = appliedMigrations(db);
       expect(oldApplied.at(-1)?.created_at).toBe(1790511032804);
 
-      await db.insert(allocationTable).values({
+      const oldAllocation = sqliteTable('allocation', {
+        id: text('id').primaryKey(),
+        state: text('state').notNull(),
+        stop_attempt: integer('stop_attempt').notNull(),
+        stop_pending: integer('stop_pending', { mode: 'boolean' }).notNull(),
+        unconfirmed_provider_ref: text('unconfirmed_provider_ref'),
+      });
+      await db.insert(oldAllocation).values({
         id: 'current',
         state: 'stopped',
         stop_attempt: 0,
@@ -222,9 +232,13 @@ describe('sandbox control V2 consolidated migrations', () => {
       expect(appliedMigrations(db).slice(oldApplied.length)).toEqual([
         { hash: '', created_at: SCOPE_GRANTS_MIGRATION_AT },
         { hash: '', created_at: REPO_KEY_MIGRATION_AT },
+        { hash: '', created_at: ADMISSION_LIMIT_MIGRATION_AT },
       ]);
       expect(db.select().from(scopeGrants).all()).toEqual([]);
-      expect(columnSignatures(db, 'allocation')).toEqual(oldAllocationColumns);
+      expect(columnSignatures(db, 'allocation')).toEqual(EXPECTED_ALLOCATION_COLUMNS);
+      expect(
+        columnSignatures(db, 'allocation').filter(column => column.name !== 'admission_limit')
+      ).toEqual(oldAllocationColumns);
       expect(columnSignatures(db, 'routes')).toEqual(EXPECTED_ROUTES_COLUMNS);
       expect(columnSignatures(db, 'routes').filter(column => column.name !== 'repo_key')).toEqual(
         oldRoutesColumns
@@ -232,6 +246,7 @@ describe('sandbox control V2 consolidated migrations', () => {
       expect(db.select().from(allocationTable).get()).toMatchObject({
         id: 'current',
         state: 'stopped',
+        admission_limit: null,
         unconfirmed_provider_ref: '{"fixture":"old-provider-ref"}',
       });
       expect(db.select().from(routesTable).get()).toMatchObject({

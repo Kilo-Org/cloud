@@ -5,6 +5,8 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { AllocationState } from '../../src/control-plane/sandbox/allocation.js';
+import * as containerConcurrency from '../../src/container-concurrency.js';
+import { controlPlaneSandboxSelectionSchema } from '../../src/control-plane/session/sandbox-selection.js';
 import {
   allocation as allocationTable,
   routes as routesTable,
@@ -194,6 +196,48 @@ async function runAlarm(stub: DurableObjectStub<SandboxControlV2>): Promise<void
   await runInDurableObject(stub, instance => instance.alarm());
 }
 
+async function heartbeatAfterIdle(
+  stub: DurableObjectStub<SandboxControlV2>,
+  idleForMs: number,
+  active = false
+): Promise<void> {
+  await runInDurableObject(stub, async (instance, state) => {
+    const now = Date.now();
+    drizzle(state.storage, { logger: false })
+      .update(allocationTable)
+      .set({ last_activity_at: now - idleForMs, last_frame_at: now })
+      .where(eq(allocationTable.id, 'current'))
+      .run();
+    const socket = state.getWebSockets()[0];
+    if (!socket) throw new Error('Missing wrapper socket');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      await instance.webSocketMessage(
+        socket,
+        JSON.stringify({ type: 'heartbeat', active, degraded: false })
+      );
+    } finally {
+      clock.mockRestore();
+    }
+  });
+}
+
+function prepareWithBilling(sessionId: string, orgId: string, origin = 'cloud-agent-web') {
+  const input = prepareInput(sessionId, origin);
+  return {
+    ...input,
+    credentials: { ...input.credentials, orgId },
+    sandboxSelection: controlPlaneSandboxSelectionSchema.parse({
+      provider: 'cloudflare',
+      billing: {
+        sandboxId: SANDBOX_ID,
+        subject: { type: 'org', id: orgId },
+        actor: { type: 'user', id: input.credentials.userId },
+      },
+    }),
+  };
+}
+
 function readAlarm(stub: DurableObjectStub<SandboxControlV2>): Promise<number | null> {
   return runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
 }
@@ -246,6 +290,7 @@ async function connectAndHello(
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await reset();
 });
 
@@ -1284,6 +1329,180 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(provider.stopCalls).toEqual([provider.refs[0]]);
     expect(await readRouteRow(stub, SESSION)).toBeNull();
   });
+
+  it.each([
+    {
+      limit: containerConcurrency.LOW_BALANCE_CONTAINER_LIMIT,
+      origin: 'cloud-agent-web',
+      idleMs: TIMERS.unattendedIdleMs,
+    },
+    {
+      limit: containerConcurrency.USER_CONTAINER_LIMIT,
+      origin: 'cloud-agent-web',
+      idleMs: TIMERS.idleMs,
+    },
+    {
+      limit: containerConcurrency.USER_CONTAINER_LIMIT,
+      origin: 'slack',
+      idleMs: TIMERS.unattendedIdleMs,
+    },
+  ])(
+    'stops a $origin allocation admitted at limit $limit exactly at $idleMs ms, including after eviction',
+    async ({ limit, origin, idleMs }) => {
+      const admission = vi
+        .spyOn(containerConcurrency, 'assertContainerCapacity')
+        .mockResolvedValue(limit);
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      await stub.prepare(prepareWithBilling(SESSION, 'org_initial', origin));
+      const { wrapper } = await connectAndHello(provider);
+      expect(await wrapper.next()).toMatchObject({ type: 'session.prepare' });
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+      expect(admission).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+        subject: { type: 'org', id: 'org_initial' },
+        actor: { type: 'user', id: 'user_123' },
+        instanceId: SANDBOX_ID,
+        checkpoint: 'control-plane-create',
+        billingOrigin: undefined,
+      });
+      expect((await readState(stub)).admissionLimit).toBe(limit);
+      await evictAllDurableObjects();
+      const { peer } = await setup(provider);
+      expect((await readState(stub)).admissionLimit).toBe(limit);
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(idleMs);
+
+      await heartbeatAfterIdle(stub, TIMERS.idleMs, true);
+      expect((await readState(stub)).kind).toBe('connected');
+      if (idleMs > TIMERS.unattendedIdleMs) {
+        await heartbeatAfterIdle(stub, TIMERS.unattendedIdleMs);
+        expect((await readState(stub)).kind).toBe('connected');
+      }
+      await heartbeatAfterIdle(stub, idleMs - 1);
+      expect((await readState(stub)).kind).toBe('connected');
+      expect(provider.stopCalls).toEqual([]);
+      await heartbeatAfterIdle(stub, idleMs);
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+      expect(provider.stopCalls).toEqual([provider.refs[0]]);
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+          expect.objectContaining({ state: 'lost', reason: 'sandbox_stopped' })
+        )
+      );
+      expect(admission).toHaveBeenCalledTimes(1);
+      expect((await readState(stub)).admissionLimit).toBeNull();
+      wrapper.close();
+    }
+  );
+
+  it.each([
+    {
+      initialLimit: containerConcurrency.LOW_BALANCE_CONTAINER_LIMIT,
+      joiningLimit: containerConcurrency.USER_CONTAINER_LIMIT,
+    },
+    {
+      initialLimit: containerConcurrency.USER_CONTAINER_LIMIT,
+      joiningLimit: containerConcurrency.LOW_BALANCE_CONTAINER_LIMIT,
+    },
+  ])(
+    'keeps allocation limit $initialLimit when a route from tier $joiningLimit joins',
+    async ({ initialLimit, joiningLimit }) => {
+      const admission = vi
+        .spyOn(containerConcurrency, 'assertContainerCapacity')
+        .mockResolvedValue(initialLimit);
+      const provider = createFakeProvider();
+      const { stub, peer } = await setup(provider);
+      await stub.prepare(prepareWithBilling(SESSION, 'org_initial'));
+      const { wrapper, allocationId } = await connectAndHello(provider);
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+      admission.mockResolvedValue(joiningLimit);
+      await stub.prepare(prepareWithBilling(SESSION_NEXT, 'org_joining'));
+      expect(await wrapper.next()).toMatchObject({ type: 'session.prepare' });
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
+      await heartbeatAfterIdle(stub, TIMERS.unattendedIdleMs);
+      expect((await readState(stub)).kind).toBe('connected');
+      wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+      await waitFor(async () =>
+        expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('ready')
+      );
+      expect(await stub.prepare(prepareWithBilling(SESSION_NEXT, 'org_joining'))).toMatchObject({
+        state: 'ready',
+      });
+      expect(await readState(stub)).toMatchObject({ allocationId, admissionLimit: initialLimit });
+      const idleMs =
+        initialLimit === containerConcurrency.LOW_BALANCE_CONTAINER_LIMIT
+          ? TIMERS.unattendedIdleMs
+          : TIMERS.idleMs;
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(idleMs);
+      if (initialLimit === containerConcurrency.USER_CONTAINER_LIMIT) {
+        await heartbeatAfterIdle(stub, TIMERS.unattendedIdleMs);
+        expect((await readState(stub)).kind).toBe('connected');
+      }
+      await heartbeatAfterIdle(stub, idleMs);
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+      expect(provider.createCalls).toBe(1);
+      expect(provider.stopCalls).toEqual([provider.refs[0]]);
+      expect(admission).toHaveBeenCalledTimes(1);
+      for (const sessionId of [SESSION, SESSION_NEXT]) {
+        await waitFor(() =>
+          expect(peer.routeUpdatesFor(sessionId)).toContainEqual(
+            expect.objectContaining({ state: 'lost', reason: 'sandbox_stopped' })
+          )
+        );
+      }
+      wrapper.close();
+    }
+  );
+
+  it.each(['preparing', 'unreadable'] as const)(
+    'keeps the long window for a low-balance allocation while its route is %s',
+    async guard => {
+      vi.spyOn(containerConcurrency, 'assertContainerCapacity').mockResolvedValue(
+        containerConcurrency.LOW_BALANCE_CONTAINER_LIMIT
+      );
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      const input = prepareWithBilling(SESSION, 'org_initial');
+      await stub.prepare(input);
+      const { wrapper } = await connectAndHello(provider);
+      await wrapper.next();
+      if (guard === 'unreadable') {
+        wrapper.send({ type: 'session.ready', sessionId: SESSION });
+        await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+        await runInDurableObject(stub, (_instance, state) => {
+          drizzle(state.storage, { logger: false })
+            .update(routesTable)
+            .set({ credential_source: '{not json' })
+            .where(eq(routesTable.session_id, SESSION))
+            .run();
+        });
+      }
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
+      await heartbeatAfterIdle(stub, TIMERS.unattendedIdleMs);
+      expect((await readState(stub)).kind).toBe('connected');
+      expect(provider.stopCalls).toEqual([]);
+      if (guard === 'preparing') {
+        wrapper.send({ type: 'session.ready', sessionId: SESSION });
+        await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+      } else {
+        await runInDurableObject(stub, (_instance, state) => {
+          drizzle(state.storage, { logger: false })
+            .update(routesTable)
+            .set({ credential_source: JSON.stringify(input.credentials) })
+            .where(eq(routesTable.session_id, SESSION))
+            .run();
+        });
+      }
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.unattendedIdleMs);
+      await heartbeatAfterIdle(stub, TIMERS.unattendedIdleMs);
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+      expect(provider.stopCalls).toEqual([provider.refs[0]]);
+      wrapper.close();
+    }
+  );
 
   it.each([
     'code-review',

@@ -14,6 +14,7 @@ export const allocation = sqliteTable('allocation', {
   allocation_id: text('allocation_id'),
   connection_id: text('connection_id'),
   provider_ref: text('provider_ref'),
+  admission_limit: integer('admission_limit'),
   wrapper_id: text('wrapper_id'),
   last_frame_at: integer('last_frame_at'),
   last_activity_at: integer('last_activity_at'),

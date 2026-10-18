@@ -31,12 +31,12 @@ function userCapacity(live: number, limit = USER_CONTAINER_LIMIT): ContainerCapa
 
 describe('assertContainerCapacity', () => {
   it.each([LOW_BALANCE_CONTAINER_LIMIT, USER_CONTAINER_LIMIT])(
-    'admits a user below %i containers and rejects another start at the limit',
+    'returns the admitted user limit %i and rejects another start at the limit',
     async limit => {
       const readCapacity = vi.fn(async () => userCapacity(limit - 1, limit));
       await expect(
         assertContainerCapacity(env, request(), { readCapacity })
-      ).resolves.toBeUndefined();
+      ).resolves.toBe(limit);
       expect(readCapacity).toHaveBeenCalledWith(request());
 
       readCapacity.mockResolvedValue(userCapacity(limit, limit));
@@ -72,7 +72,9 @@ describe('assertContainerCapacity', () => {
       ...userCapacity(USER_CONTAINER_LIMIT - 1),
       organizationCapacity,
     ]);
-    await expect(assertContainerCapacity(env, org, { readCapacity })).resolves.toBeUndefined();
+    await expect(assertContainerCapacity(env, org, { readCapacity })).resolves.toBe(
+      USER_CONTAINER_LIMIT
+    );
 
     readCapacity.mockResolvedValue([
       ...userCapacity(0),
@@ -97,7 +99,7 @@ describe('assertContainerCapacity', () => {
     const readCapacity = vi.fn(async () => userCapacity(1_000));
     await expect(
       assertContainerCapacity(env, request(overrides), { readCapacity })
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(USER_CONTAINER_LIMIT);
     expect(readCapacity).not.toHaveBeenCalled();
   });
 

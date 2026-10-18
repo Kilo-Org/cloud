@@ -55,7 +55,7 @@ async function interval(overrides: Partial<NewContainerUsageInterval> = {}): Pro
   });
 }
 
-function assertCapacity(input: ContainerCapacityRequest): Promise<void> {
+function assertCapacity(input: ContainerCapacityRequest) {
   return assertContainerCapacity({} as Pick<Env, 'HYPERDRIVE'>, input, {
     readCapacity: current => readContainerCapacity(reader, current),
   });

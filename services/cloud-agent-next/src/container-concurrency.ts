@@ -194,7 +194,7 @@ export async function assertContainerCapacity(
   env: Pick<Env, 'HYPERDRIVE' | 'CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED'>,
   request: ContainerCapacityRequest,
   dependencies: CapacityDependencies = {}
-): Promise<void> {
+): Promise<number | undefined> {
   // Test Workers use fake providers or share one funded test account across
   // the suite. Production leaves this flag unset and enforces admission.
   if (env.CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true') return;
@@ -224,7 +224,7 @@ export async function assertContainerCapacity(
     throw new ContainerCapacityUnavailableError();
   }
   const exceeded = checks.find(check => check.live >= check.limit);
-  if (!exceeded) return;
+  if (!exceeded) return checks.find(check => check.subject.type === 'user')?.limit;
   const { subject, live, limit } = exceeded;
   logger
     .withTags({ logTag: 'container_limit_reached', sandboxId: request.instanceId })

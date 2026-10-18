@@ -32,6 +32,8 @@ export type AllocationState = {
   allocationId: string | null;
   connectionId: string | null;
   providerRef: string | null;
+  /** Create-time balance-tier limit; null when admission did not classify the allocation. */
+  admissionLimit: number | null;
   wrapperId: string | null;
   lastFrameAt: number | null;
   lastActivityAt: number | null;
@@ -63,6 +65,7 @@ export function initialAllocationState(): AllocationState {
     allocationId: null,
     connectionId: null,
     providerRef: null,
+    admissionLimit: null,
     wrapperId: null,
     lastFrameAt: null,
     lastActivityAt: null,
@@ -82,7 +85,13 @@ export type AllocationEvent =
    * The provider ref is known. Committed before `launch` (N4), so an accepted
    * `hello` never observes a null ref.
    */
-  | { type: 'provider-ref'; at: number; allocationId: string; providerRef: string }
+  | {
+      type: 'provider-ref';
+      at: number;
+      allocationId: string;
+      providerRef: string;
+      admissionLimit: number | null;
+    }
   | { type: 'created'; at: number; allocationId: string; providerRef: string }
   | {
       type: 'create-failed';
@@ -263,7 +272,10 @@ export function reduceAllocation(
         return { state, effects: NO_EFFECTS };
       }
       if (state.allocationId !== event.allocationId) return { state, effects: NO_EFFECTS };
-      return { state: { ...state, providerRef: event.providerRef }, effects: NO_EFFECTS };
+      return {
+        state: { ...state, providerRef: event.providerRef, admissionLimit: event.admissionLimit },
+        effects: NO_EFFECTS,
+      };
     }
 
     case 'created': {

@@ -9,6 +9,7 @@ import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
 import { CHAT_BACKENDS_KEY, ORGANIZATION_PERSONAL_STORAGE_KEY } from '@/lib/storage-keys';
+import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 
 // The mobile-app gate runs `vitest related` over ~170 files concurrently with
 // the device stack, so every real timer in this file stretches several-fold.
@@ -2492,8 +2493,7 @@ describe('auth-transition queue and sign-out failure matrix', () => {
 
   it('runs every other batch member, the preference clears, and state reset when one batch member rejects', async () => {
     const { getCtx, unmount } = await mountQueueTest();
-    const { clearLastOpenedSession } = await import('@/lib/last-opened-session');
-    vi.mocked(clearLastOpenedSession).mockRejectedValueOnce(new Error('storage down'));
+    vi.mocked(clearRecentPrs).mockRejectedValueOnce(new Error('storage down'));
 
     await act(async () => {
       await getCtx().signOut();

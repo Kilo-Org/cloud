@@ -42,7 +42,6 @@ const SHRINK_SENTINEL = 'zz_unused_shrink_sentinel';
 const REQUIRED_USAGE_DESCRIPTIONS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
-  'NSLocationWhenInUseUsageDescription',
   'NSUserTrackingUsageDescription',
 ];
 const BLOCKED_PERMISSIONS = [

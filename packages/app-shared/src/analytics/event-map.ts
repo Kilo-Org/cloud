@@ -48,7 +48,6 @@ export const STARTUP_OUTCOMES = [
   'language-error',
 ] as const;
 
-
 /** Terminal-outcome base fields (DEC-05). */
 export const SESSION_CREATE_FAILURE_STAGES = [
   'report',

@@ -196,6 +196,8 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
    - The migrated row is canonical for both model IDs. Edits do not update separate copies.
    - Preserve independently inherited organization modes during the overlap. An explicit
      custom mode edit replaces inheritance.
+   - At cutover, inherited modes stop applying. An inherited router keeps the stored
+     `cost_per_accuracy` default unless its owner explicitly selects another mode beforehand.
    - Keep the migrated slug and base stable; reject deletion until graduation.
    - Migrated owners and authorized organization editors can use their router without the flag.
      This does not enable unrelated router creation.
@@ -207,6 +209,8 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
    Use a staffed cutover window and allow a full notice period before graduation.
    Retain the private campaign directory across retries. Provider acceptance is not proof of
    inbox delivery; inspect delivery failures and suppressed recipients separately.
+   The notice tells organization billing contacts to share the organization model ID with members
+   and update shared integrations.
 5. During the notice period, both IDs use the shared pool. Repeat discovery before cutover.
    Refresh the reviewed campaign for new recipients without resetting delivery history.
    Give late recipients the full notice period; postpone cutover when necessary.
@@ -217,6 +221,10 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
    - Remove the rollout flag. Do not reconvert pools or resend the advance notice.
 7. Delete the owner settings Durable Object in a separate, later deployment after verification.
    Its deletion permanently removes the stored legacy settings.
+
+Owners with a configured mode but no saved pool are outside this migration and pool-notice cohort.
+Their Efficient override resets to the platform default at cutover. Include this separate behavior
+change in release communications; the pool blast does not notify those owners.
 
 ### Operator commands
 

@@ -26,9 +26,9 @@
                   Your custom Auto pool is ready now
                 </h1>
                 <p style="margin: 0 0 18px">
-                  We have moved your saved Efficient Auto pool into a custom router. Your models,
-                  routing mode, and default model are preserved. Select the new model ID below now
-                  to keep using your own pool after the upcoming change.
+                  We have moved your saved Efficient Auto pool into a custom router. Your saved
+                  models are preserved. Select the new model ID below now to keep using your own
+                  pool after the upcoming change.
                 </p>
                 <ul style="margin: 0 0 18px; padding-left: 20px">
                   {{ routers }}
@@ -44,6 +44,15 @@
                   platform-managed pool. Your custom router will keep your own pool, so update your
                   model selection and any integrations to the new ID before the date above. There is
                   no need to recreate your pool.
+                </p>
+                <p style="margin: 0 0 18px">
+                  If your pool inherits a routing mode, select a mode explicitly under Custom
+                  routers before the cutover. Inherited settings stop applying then. Without an
+                  explicit selection, the custom router uses Best accuracy per dollar.
+                </p>
+                <p style="margin: 0 0 18px">
+                  For organization pools, share the new organization model ID with your team and
+                  update its shared integrations.
                 </p>
                 <p style="margin: 0 0 22px">
                   Questions? Reply to this email or contact {{ support_email }}.

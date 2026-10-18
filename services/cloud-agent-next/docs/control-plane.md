@@ -309,10 +309,16 @@ The wrapper heartbeat (every 5 s) carries `active`. Each Kilo process owns a nat
 session supervisor that observes every session before Cloud route filtering, including
 unrouted sessions, subagents and autonomous continuations. Its running or stopping
 executions keep compute active independently of accepted Cloud messages and UI selection.
-Preparation, bounded prompt delivery, finalization and recent terminal input also contribute.
+Preparation, bounded prompt delivery and finalization also contribute.
 The 2-minute delivery budget excludes legitimate serialized command/summarization waits
 described below. A follow-up waiting behind a serialized command adds no compute activity of
 its own; the command's live native execution decides it. An accepted UI turn alone is not activity.
+
+Terminal presence and browser-to-PTY input do not contribute activity or renew the provider
+lease. Recent terminal input is tracked for diagnostics only. An interactive terminal without
+an agent turn lets the sandbox stop after the applicable idle window, even if terminal input
+continues. This is the intended trade-off, not a regression: terminal-only workloads must not
+keep a sandbox alive indefinitely.
 
 A session blocked only on questions or permissions does not need compute. Pending requests
 are tracked separately; answering one does not clear another, and an independent runnable
@@ -327,8 +333,10 @@ without a cache.
 The 1-minute rule is checked only on an inactive heartbeat, never on a disconnect or
 reconnect. The existing allocation idle backstop (10 min), heartbeat deadline (45 s),
 reconnect window (90 s), and provider lease (11 min) are unchanged. Active heartbeats
-renew that provider lease (`ensureLeaseAtLeast`); inactive heartbeats still prove wrapper
-liveness. A reconnect does not manufacture activity or extend the existing idle clock.
+refresh `lastActivityAt` and renew that provider lease (`ensureLeaseAtLeast`). Accepted `hello`
+and heartbeat frames still update `lastFrameAt` for liveness; inactive heartbeats do not refresh
+activity or renew the lease. A reconnect also updates liveness only: it does not reset `lastActivityAt`,
+extend the existing idle window or renew the provider lease.
 Native supervision does not schedule future wakeups after compute has stopped.
 
 ### Billing, credentials and deletion

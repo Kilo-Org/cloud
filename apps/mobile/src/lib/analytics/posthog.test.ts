@@ -265,8 +265,8 @@ describe('captureEvent privacy and gates', () => {
   it('drops payload keys that name a prohibited data class before capture', async () => {
     const { initPostHog, captureEvent } = await loadModule();
     initPostHog();
-    captureEvent(dynamicName('onboarding-entered'), {
-      surface: 'claw',
+    captureEvent(dynamicName('sample-event'), {
+      surface: 'agents',
       email: 'a@b.co',
       session_id: 'x',
       repo_name: 'acme/app',
@@ -274,8 +274,8 @@ describe('captureEvent privacy and gates', () => {
       ok_count: 1,
     });
 
-    expect(hoisted.client.capture).toHaveBeenCalledWith('onboarding-entered', {
-      surface: 'claw',
+    expect(hoisted.client.capture).toHaveBeenCalledWith('sample-event', {
+      surface: 'agents',
       ok_count: 1,
     });
   });
@@ -286,14 +286,14 @@ describe('captureEvent privacy and gates', () => {
     try {
       const { initPostHog, captureEvent } = await loadModule();
       initPostHog();
-      captureEvent(dynamicName('onboarding-entered'), {
-        surface: 'claw',
+      captureEvent(dynamicName('sample-event'), {
+        surface: 'agents',
         repo_name: 'acme/app',
         session_id: 'x',
       });
 
       expect(warn).toHaveBeenCalledWith(
-        'Analytics onboarding-entered: redacted prohibited properties repo_name, session_id'
+        'Analytics sample-event: redacted prohibited properties repo_name, session_id'
       );
     } finally {
       vi.stubGlobal('__DEV__', false);

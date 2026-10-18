@@ -101,12 +101,9 @@
     "scheduled": "زمانبندیشده",
     "keepEditing": "ادامه ویرایش",
     "keepRunning": "ادامه اجرا",
-    "kiloclaw": "KiloClaw",
     "newSession": "نشست جدید",
-    "noKiloclawInstances": "هیچ نمونه‌ای از KiloClaw وجود ندارد",
     "noModelsAvailable": "مدلی در دسترس نیست",
     "notFound": "پیدا نشد.",
-    "online": "آنلاین",
     "open": "باز کردن {{name}}",
     "openPullRequest": "پول ریکوئست باز",
     "pending": "در انتظار",
@@ -257,7 +254,8 @@
     "renamePasskey": "تغییر نام کلید عبور",
     "removePasskey": "حذف کلید عبور",
     "removePasskeyTitle": "کلید عبور حذف شود؟",
-    "removePasskeyMessage": "دیگر نمی‌توانید با این کلید عبور وارد شوید."
+    "removePasskeyMessage": "دیگر نمی‌توانید با این کلید عبور وارد شوید.",
+    "changelog": "تازه‌ها"
   },
   "preferences": {
     "general": "عمومی",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "اعلان‌ها فقط وقوع یک رویداد را نشان می‌دهند. برای خواندن پیام، Kilo را باز کنید.",
     "channel": {
       "agentProgress": "پیشرفت عامل",
-      "chat": "پیام‌های گفت‌وگو",
-      "kiloclaw": "فعالیت KiloClaw",
       "balance": "هشدارهای موجودی",
       "security": "یافته‌های امنیتی",
       "spend": "هشدارهای هزینه",
       "followedSessions": "نشست‌های دنبال‌شده"
     },
     "category": {
-      "chatMessagesSubtitle": "پاسخ‌های گفت‌وگوهای شما",
       "agentAttentionTitle": "عامل به شما نیاز دارد",
       "agentAttentionSubtitle": "پرسش‌ها، درخواست مجوز و نیاز به پاسخ شما",
       "agentUpdatesTitle": "به‌روزرسانی‌های عامل",
       "agentUpdatesSubtitle": "پیام‌های عامل در حین انجام کار",
       "sessionStatusTitle": "وضعیت نشست",
       "sessionStatusSubtitle": "تمام‌شده / ناموفق / آمادهٔ کنترل",
-      "kiloclawActivitySubtitle": "نمونه آماده/ناموفق، اقدامات زمان‌بندی‌شده",
-      "kiloclawActivityUnavailable": "برای دریافت فعالیت KiloClaw، یک نمونه KiloClaw راه‌اندازی کنید.",
       "balanceAlertsSubtitle": "هشدارهای موجودی کم سازمان",
       "balanceAlertsUnavailable": "برای دریافت هشدارهای موجودی، به یک سازمان بپیوندید.",
       "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "خانه",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}، برگهٔ {{position}} از {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "تغییر نمونه",
-      "couldNotLoadInstances": "بارگذاری نمونه‌ها ممکن نشد.",
-      "noInstancesDescription": "برای شروع گفت‌وگو یک نمونه راه‌اندازی کنید.",
-      "setUpKiloclaw": "راه‌اندازی KiloClaw",
-      "currentInstance": "{{title}}، فعلی"
-    },
     "conversation": {
-      "failedToLoad": "بارگذاری گفت‌وگو ممکن نشد.",
-      "notFound": "گفت‌وگو پیدا نشد.",
       "untitled": "بدون عنوان",
-      "leaveTitle": "از گفت‌وگو خارج می‌شوید؟",
-      "leaveMessage": "این گفت‌وگو از فهرست شما حذف می‌شود.",
-      "openHint": "گفت‌وگو را باز می‌کند. برای دیدن گزینه‌های تغییر نام و خروج، لمس کنید و نگه دارید.",
-      "unread": "خوانده‌نشده",
-      "optionsFor": "گزینه‌های گفت‌وگوی {{title}}",
-      "options": "گزینه‌های گفت‌وگو",
-      "renameTitle": "تغییر نام گفت‌وگو",
-      "renamePlaceholder": "نام جدید",
-      "couldNotReachBot": "دسترسی به ربات ممکن نشد. لطفاً دوباره تلاش کنید.",
-      "messageDeliveryFailed": "تحویل پیام به ربات ممکن نشد.",
-      "couldNotSignIn": "ورود به گفت‌وگو ممکن نشد.",
-      "couldNotRefreshMessages": "تازه‌سازی پیام‌ها ممکن نشد.",
-      "couldNotLoadHistory": "بارگذاری تاریخچه گفت‌وگو ممکن نشد.",
-      "leave": "خروج",
-      "untitledConversation": "گفت‌وگوی بدون عنوان",
-      "createFailed": "ایجاد گفت‌وگو ممکن نشد.",
-      "leaveFailed": "خروج از گفت‌وگو ممکن نشد."
-    },
-    "reactions": {
-      "common": "متداول",
-      "reactWith": "واکنش با {{reaction}}",
-      "accessibility": "واکنش {{emoji}}، {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "در حال پاسخ به",
-      "cancelReply": "لغو پاسخ",
-      "openInstance": "باز کردن نمونه",
-      "attachFile": "پیوست فایل",
-      "cancelEdit": "لغو ویرایش"
+      "renamePlaceholder": "نام جدید"
     },
     "conversationList": {
-      "couldNotLoad": "بارگذاری گفت‌وگوها ممکن نشد.",
-      "emptyTitle": "هنوز گفت‌وگویی وجود ندارد",
-      "emptyDescription": "برای صحبت با نمونه KiloClaw خود، یک گفت‌وگو ایجاد کنید.",
-      "create": "ایجاد گفت‌وگو",
-      "newConversation": "گفت‌وگوی جدید",
-      "openInstanceSettings": "باز کردن تنظیمات نمونه",
       "today": "امروز",
       "yesterday": "دیروز",
-      "thisWeek": "این هفته",
       "older": "قدیمی‌تر"
     },
     "attachment": {
-      "open": "باز کردن {{filename}}",
-      "openFailed": "باز کردن پیوست ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
-      "attachFailed": "پیوست کردن فایل ممکن نشد.",
-      "limit": "می‌توانید حداکثر {{displayCount}} فایل پیوست کنید.",
-      "sizeRejection": "حجم {{filename}} از سقف مجاز پیوست، یعنی {{limit}}، بیشتر است.",
-      "unreadable": "خواندن {{filename}} ممکن نشد.",
-      "pastedImage": "تصویر جای‌گذاری‌شده",
-      "defaultName": "پیوست",
       "classificationDenied": "نمی‌توان فایل‌های اجرایی را پیوست کرد.",
       "classificationEmpty": "فایل خالی است.",
       "classificationTooLarge": "حجم فایل‌ها باید حداکثر ۲۰ مگابایت باشد.",
@@ -943,426 +883,17 @@
       "networkError": "خطایی در شبکه رخ داد.",
       "uploadFailed": "بارگذاری ناموفق بود.",
       "nothingToPaste": "چیزی برای جای‌گذاری وجود ندارد.",
-      "metadataStripFailed": "حذف فراداده عکس ممکن نشد.",
-      "limit_one": "می‌توانید حداکثر {{displayCount}} فایل پیوست کنید.",
-      "limit_other": "می‌توانید حداکثر {{displayCount}} فایل پیوست کنید."
+      "metadataStripFailed": "حذف فراداده عکس ممکن نشد."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}، {{status}}",
-      "retryUploading": "تلاش مجدد برای بارگذاری {{filename}}",
-      "remove": "حذف {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[پیام حذف‌شده]",
-      "yourMessage": "پیام شما",
-      "messageFrom": "پیام {{author}}",
-      "moreActions": "اقدامات بیشتر",
-      "notDelivered": "تحویل نشده",
-      "edited": "(ویرایش‌شده)",
-      "image": "تصویر"
+      "accessibility": "{{filename}}، {{status}}"
     },
     "messageActions": {
-      "copied": "کپی شد",
-      "copyFailed": "کپی کردن ممکن نشد.",
-      "title": "اقدامات پیام",
-      "deleteTitle": "پیام حذف شود؟",
-      "deleteMessage": "این کار پیام را از گفت‌وگو حذف می‌کند.",
-      "deleteFailed": "حذف پیام ممکن نشد.",
-      "removeReactionFailed": "حذف واکنش ممکن نشد.",
-      "addReactionFailed": "افزودن واکنش ممکن نشد.",
-      "retrySend": "تلاش دوباره برای ارسال",
-      "moreReactions": "واکنش‌های بیشتر",
-      "edit": "ویرایش",
-      "sendFailed": "ارسال پیام ممکن نشد.",
-      "retrySendFailed": "تلاش دوباره برای ارسال پیام ناموفق بود.",
-      "editFailed": "ویرایش پیام ممکن نشد.",
-      "executeFailed": "اجرای اقدام ممکن نشد."
+      "edit": "ویرایش"
     },
     "attachmentPicker": {
-      "takePhoto": "گرفتن عکس",
-      "photoLibrary": "گالری عکس",
-      "files": "فایل",
       "cameraAccessMessage": "برای گرفتن عکس، دسترسی به دوربین را در تنظیمات فعال کنید."
-    },
-    "typingIndicator": {
-      "someone": "شخصی",
-      "typing_one": "{{name}} در حال تایپ است...",
-      "typing": "{{names}} در حال تایپ هستند…",
-      "typing_other": "{{names}} در حال تایپ هستند…"
-    },
-    "botStatus": {
-      "offline": "آفلاین",
-      "loadingUser": "در حال بارگذاری اطلاعات کاربر...",
-      "waitingForStatus": "در انتظار وضعیت ربات...",
-      "offlineMessage": "ربات آفلاین است. پس از اتصال دوباره، تبادل پیام‌ها از سر گرفته می‌شود."
-    },
-    "errors": {
-      "notAllowed": "این کار مجاز نیست.",
-      "messageTooLong": "پیام بیش از حد طولانی است. تعداد نویسه‌های آن باید کمتر از {{limit}} باشد.",
-      "titleTooLong": "عنوان بیش از حد طولانی است. تعداد نویسه‌های آن باید کمتر از {{limit}} باشد.",
-      "messageEmpty": "پیام نمی‌تواند خالی باشد."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "بارگذاری نمونه‌های KiloClaw ممکن نشد.",
-    "billing": {
-      "title": "صورت‌حساب",
-      "continueMonthToMonth": "ادامه با پرداخت ماهانه",
-      "plan": "طرح",
-      "finalTermEnds": "پایان آخرین دوره",
-      "afterFinalTerm": "پس از آخرین دوره",
-      "lessThanOneDay": "کمتر از ۱ روز",
-      "ends": "پایان",
-      "expires": "انقضا",
-      "noActivePlan": "طرح فعالی وجود ندارد",
-      "noActivePlanDescription": "شما اشتراک فعال KiloClaw ندارید.",
-      "managedByAdmin": "مدیر سازمان شما صورت‌حساب را مدیریت می‌کند.",
-      "couldNotLoad": "بارگذاری اطلاعات صورت‌حساب ممکن نشد.",
-      "manageOnWeb": "مدیریت صورت‌حساب در وب",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "آخرین دورهٔ طرح Commit شما در {{date}} تمام می‌شود. برای ادامه، طرح Standard را با هزینهٔ {{price}} انتخاب کنید؛ در غیر این صورت، میزبانی پایان می‌یابد.",
-      "freeTrial": "دورهٔ آزمایشی رایگان",
-      "hostingEnds": "میزبانی پایان می‌یابد",
-      "renews": "تمدید",
-      "standardMonthToMonth": "طرح Standard با پرداخت ماهانه",
-      "standardStartsOn": "طرح Standard از {{date}} با هزینهٔ {{price}} شروع می‌شود.",
-      "yourStandardMonthlyPrice": "هزینهٔ ماهانهٔ طرح Standard شما",
-      "perMonth": "/ماه",
-      "earlybirdAccessUntil": "دسترسی طرح Earlybird تا {{date}} ادامه دارد.",
-      "earlybirdEnding": "تا پایان طرح Earlybird، {{remaining}} باقی مانده است.",
-      "paymentPastDue": "مهلت پرداخت گذشته است. لطفاً روش پرداخت خود را به‌روزرسانی کنید.",
-      "subscriptionCancels": "اشتراک در {{date}} لغو می‌شود.",
-      "trialDaysRemaining": "از دورهٔ آزمایشی، {{remaining}} باقی مانده است.",
-      "trialEndingSoon": "دورهٔ آزمایشی به‌زودی تمام می‌شود. زمان باقی‌مانده: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "کامیت"
-    },
-    "changelog": {
-      "title": "تازه‌ها",
-      "couldNotLoad": "بارگذاری فهرست تغییرات ممکن نشد.",
-      "noUpdates": "هنوز به‌روزرسانی‌ای وجود ندارد",
-      "noUpdatesDescription": "جزئیات تغییرات اینجا نمایش داده می‌شوند.",
-      "recentUpdates": "به‌روزرسانی‌های اخیر",
-      "manageVersion": "مدیریت نسخه",
-      "redeployRequired": "نیازمند استقرار مجدد",
-      "redeploySuggested": "استقرار مجدد پیشنهادی",
-      "upgradeRequired": "نیازمند ارتقا"
-    },
-    "dashboard": {
-      "title": "داشبورد",
-      "couldNotLoad": "بارگذاری داشبورد ممکن نشد.",
-      "renameInstance": "تغییر نام نمونه",
-      "renamePlaceholder": "نام جدید (حداکثر ۵۰ نویسه)",
-      "someDetailsFailed": "بارگذاری برخی اطلاعات لحظه‌ای ممکن نشد.",
-      "destroy": "حذف",
-      "destroyMessage": "این کار نمونهٔ KiloClaw شما و همهٔ داده‌های آن را برای همیشه حذف می‌کند. این کار برگشت‌پذیر نیست.",
-      "destroyTitle": "حذف نمونه",
-      "instance": "نمونه",
-      "couldNotCheckStatus": "بررسی وضعیت سرویس ممکن نشد.",
-      "dangerZone": "عملیات پرخطر",
-      "destroying": "در حال حذف…",
-      "serviceDegraded": "عملکرد سرویس مختل است — برای مشاهدهٔ وضعیت ضربه بزنید",
-      "up": "فعال"
-    },
-    "channels": {
-      "title": "کانال‌ها",
-      "couldNotLoad": "بارگذاری کانال‌ها ممکن نشد.",
-      "noChannels": "کانالی در دسترس نیست",
-      "noChannelsDescription": "گزینه‌های اتصال به کانال‌ها اینجا نمایش داده می‌شوند.",
-      "connected": "{{label}} متصل شد",
-      "disconnectMessage": "{{label}} حذف شود؟ اتصال این کانال قطع می‌شود.",
-      "disconnectTitle": "قطع اتصال کانال"
-    },
-    "devicePairing": {
-      "title": "جفت‌سازی دستگاه",
-      "refreshRequests": "بازخوانی درخواست‌های جفت‌سازی",
-      "couldNotLoad": "بارگذاری درخواست‌های جفت‌سازی ممکن نشد.",
-      "noPending": "درخواستی در انتظار تأیید نیست",
-      "noPendingDescription": "درخواست‌های جفت‌سازی کانال‌ها و دستگاه‌ها اینجا نمایش داده می‌شوند.",
-      "channelRequests": "درخواست‌های کانال",
-      "deviceRequests": "درخواست‌های دستگاه",
-      "approveDeviceMessage": "به {{platform}} اجازه داده شود به نمونهٔ شما متصل شود؟",
-      "approveDeviceTitle": "تأیید دستگاه",
-      "approveMessage": "به {{label}} (کد: {{code}}) اجازه داده شود به نمونهٔ شما متصل شود؟",
-      "approveTitle": "تأیید درخواست جفت‌سازی",
-      "unknownDevice": "دستگاه ناشناخته"
-    },
-    "execPolicy": {
-      "title": "خط‌مشی اجرا",
-      "couldNotLoad": "بارگذاری سیاست اجرای فرمان‌ها ممکن نشد.",
-      "alwaysAsk": "همیشه با تأیید",
-      "alwaysAskDescription": "پیش از اجرای هر فرمان تأیید بگیرید. این حالت بیشترین امنیت را دارد.",
-      "neverAsk": "بدون تأیید",
-      "neverAskDescription": "فرمان‌ها را بدون تأیید اجرا کنید. این حالت سریع‌تر است، اما امنیت کمتری دارد."
-    },
-    "google": {
-      "title": "حساب Google",
-      "couldNotLoad": "بارگذاری وضعیت حساب Google ممکن نشد.",
-      "disconnected": "اتصال حساب Google قطع شد. برای اعمال این تغییر، نمونهٔ خود را دوباره مستقر کنید.",
-      "setupCommand": "فرمان راه‌اندازی",
-      "setupCommandHelp": "برای اتصال حساب Google، این فرمان را در ترمینال رایانهٔ خود اجرا کنید. Docker باید روی آن رایانه نصب باشد.",
-      "failedToLoadCommand": "بارگذاری فرمان راه‌اندازی ممکن نشد.",
-      "gmailNotifications": "اعلان‌های Gmail",
-      "disconnect": "قطع اتصال حساب Google",
-      "copied": "کپی شد",
-      "copyCommand": "کپی فرمان",
-      "disconnectConfirm": "قطع اتصال",
-      "disconnectMessage": "حساب Google از این نمونه حذف شود؟ این کار اعلان‌های Gmail را غیرفعال می‌کند. پس از قطع اتصال، نمونه را دوباره مستقر کنید تا تغییرات اعمال شوند.",
-      "disconnectTitle": "قطع اتصال Google"
-    },
-    "modelList": {
-      "noMatches": "مدلی مطابق با جستجوی شما پیدا نشد",
-      "noModelsDescription": "مدل‌ها به‌محض در دسترس بودن، اینجا نمایش داده می‌شوند.",
-      "noResultsFor": "نتیجه‌ای برای «{{query}}» پیدا نشد."
-    },
-    "secrets": {
-      "title": "اطلاعات محرمانه",
-      "couldNotLoad": "بارگذاری اطلاعات محرمانه ممکن نشد.",
-      "noSecrets": "اطلاعات محرمانه‌ای در دسترس نیست",
-      "noSecretsDescription": "گزینه‌های اتصال با اطلاعات محرمانه اینجا نمایش داده می‌شوند.",
-      "removeMessage": "{{label}} حذف شود؟ این ابزار دسترسی به اطلاعات احراز هویت خود را از دست می‌دهد.",
-      "removeTitle": "حذف اطلاعات محرمانه",
-      "saved": "{{label}} ذخیره شد",
-      "hide": "مخفی کردن {{label}}",
-      "show": "نمایش {{label}}",
-      "allFieldsRequired": "برای اتصال {{label}}، باید همهٔ فیلدها را پر کنید.",
-      "setupGuideFallback": "راهنمای راه‌اندازی",
-      "setupGuideA11y": "راهنمای راه‌اندازی {{label}}",
-      "setupGuide": "راهنمای راه‌اندازی",
-      "saving": "در حال ذخیره…",
-      "removing": "در حال حذف…",
-      "updateToken": "به‌روزرسانی توکن"
-    },
-    "versionPin": {
-      "title": "تثبیت نسخه",
-      "couldNotLoad": "بارگذاری اطلاعات نسخه ممکن نشد.",
-      "couldNotLoadMore": "بارگذاری نسخه‌های بیشتر ممکن نشد.",
-      "loadMore": "بارگذاری نسخه‌های بیشتر",
-      "showingLatest": "۱۰۰ نسخهٔ اخیر نمایش داده می‌شوند.",
-      "availableVersions": "نسخه‌های موجود",
-      "noVersions": "نسخه‌ای در دسترس نیست",
-      "noVersionsDescription": "نسخه‌های در دسترس OpenClaw اینجا نمایش داده می‌شوند.",
-      "unpin": "لغو تثبیت",
-      "unpinMessage": "به آخرین نسخهٔ در دسترس برگردید؟",
-      "unpinTitle": "لغو تثبیت نسخه",
-      "confirmPin": "تأیید تثبیت",
-      "followingLatest": "همگام با آخرین نسخه",
-      "latest": "آخرین نسخه",
-      "pin": "تثبیت",
-      "pinnedByAdmin": "مدیر، نسخه را تثبیت کرده است. برای تغییر آن با مدیر خود تماس بگیرید.",
-      "pinnedTo": "تثبیت‌شده روی {{version}}",
-      "reasonOptional": "دلیل (اختیاری)",
-      "reasonPlaceholder": "دلیل تثبیت این نسخه",
-      "replaceAdminPin": "جایگزینی نسخهٔ تثبیت‌شدهٔ مدیر",
-      "replacesAdminPin": "این کار نسخهٔ تثبیت‌شدهٔ مدیر را جایگزین می‌کند (نسخهٔ فعلی: {{label}})."
-    },
-    "redeploy": "استقرار مجدد",
-    "redeployMessage": "مطمئن هستید که می‌خواهید این نمونه را دوباره مستقر کنید؟",
-    "redeployTitle": "استقرار مجدد نمونه",
-    "controls": {
-      "redeploying": "در حال استقرار مجدد…",
-      "restart": "راه‌اندازی مجدد",
-      "restartOpenClawMessage": "مطمئن هستید که می‌خواهید پردازش OpenClaw را دوباره راه‌اندازی کنید؟",
-      "restartOpenClawTitle": "راه‌اندازی مجدد OpenClaw",
-      "restarting": "در حال راه‌اندازی مجدد…",
-      "start": "راه‌اندازی",
-      "startMessage": "مطمئن هستید که می‌خواهید این نمونه را راه‌اندازی کنید؟",
-      "startTitle": "راه‌اندازی نمونه",
-      "stop": "توقف",
-      "stopMessage": "مطمئن هستید می‌خواهید این نمونه را متوقف کنید؟",
-      "stopTitle": "توقف نمونه",
-      "stopping": "در حال توقف…"
-    },
-    "empty": {
-      "finishingSetup": "در حال تکمیل راه‌اندازی",
-      "finishingSetupDescription": "کمی صبر کنید، در حال تکمیل تنظیمات حساب شما هستیم. این کار معمولاً زمان کمی می‌برد.",
-      "getStarted": "شروع",
-      "noInstancesDescription": "برای اجرای عامل‌های کدنویسی، اولین نمونهٔ خود را بسازید."
-    },
-    "instance": {
-      "backToInstances": "بازگشت به نمونه‌ها",
-      "couldNotLoad": "بارگذاری نمونه ممکن نشد.",
-      "notFound": "نمونه پیدا نشد",
-      "notFoundDescription": "ممکن است این نمونه حذف شده باشد یا پیوند دیگر معتبر نباشد."
-    },
-    "list": {
-      "createInstance": "ساخت نمونه",
-      "organizations": "سازمان‌ها",
-      "accessIssue": {
-        "trialExpired": "دورهٔ آزمایشی تمام شده است؛ برای ادامهٔ استفاده از این نمونه اشتراک بگیرید",
-        "subscriptionCanceled": "اشتراک غیرفعال است؛ برای ادامهٔ استفاده از این نمونه دوباره اشتراک بگیرید",
-        "subscriptionPastDue": "پرداخت با مشکل روبه‌رو شده است؛ برای ادامهٔ استفاده از این نمونه اطلاعات صورت‌حساب را به‌روزرسانی کنید",
-        "quarantined": "نمونه قرنطینه شده است و نیاز به بررسی دستی دارد",
-        "multipleCurrentConflict": "حساب به بازبینی نیاز دارد",
-        "nonCanonicalEarlybird": "طرح قدیمی نیاز به بررسی دارد"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "گفت‌وگو با {{name}}",
-        "ready": "{{name}} آماده است",
-        "warmedUp": "همه‌چیز آماده است. هر وقت آماده بودید، سلام کنید."
-      },
-      "flow": {
-        "genericErrorBody": "در حال حاضر نتوانستیم راه‌اندازی نمونهٔ شما را کامل کنیم.",
-        "manualReviewBody": "پیش از ساخت نمونه، باید وضعیت حساب شما بررسی شود. در kilo.ai ادامه دهید.",
-        "manualReviewTitle": "راه‌اندازی نیاز به بررسی دستی دارد",
-        "openKiloAi": "باز کردن kilo.ai",
-        "provisioning": "تأمین منابع",
-        "review": "بازبینی",
-        "identityTitle": "هویت ربات شما",
-        "couldNotLoad": "بارگذاری وضعیت راه‌اندازی ممکن نشد.",
-        "finishingSetup": "راه‌اندازی رو به پایان است. کمی صبر کنید تا تنظیمات حسابتان را کامل کنیم.",
-        "ready": "آماده",
-        "settingUp": "در حال راه‌اندازی…"
-      },
-      "unavailableDescription": "برای آماده‌سازی نمونه، باید اشتراک فعال KiloClaw داشته باشید. نمونه‌ها و اشتراک‌های موجود به کار عادی خود ادامه می‌دهند.",
-      "unavailableTitle": "نمونه‌های جدید KiloClaw در دسترس نیستند",
-      "identity": {
-        "chooseAvatar": "انتخاب آواتار",
-        "namePlaceholder": "نام ربات شما",
-        "selectAvatar": "انتخاب {{name}} به‌عنوان آواتار",
-        "personality": "شخصیت",
-        "changePersonality": "تغییر شخصیت",
-        "location": "موقعیت",
-        "locationPlaceholder": "شهر یا منطقه (اختیاری)",
-        "useCurrentLocation": "استفاده از موقعیت فعلی",
-        "locationDeniedTitle": "دسترسی به موقعیت مجاز نیست",
-        "locationDeniedMessage": "برای استفاده از موقعیت فعلی، دسترسی به موقعیت را در تنظیمات فعال کنید.",
-        "locationValidationFailed": "تأیید موقعیت ممکن نشد.",
-        "locationResolveFailed": "نتوانستیم موقعیت شما را پیدا کنیم. می‌توانید آن را به‌صورت دستی ویرایش کنید.",
-        "locationGetFailed": "نتوانستیم موقعیت شما را دریافت کنیم. آن را به‌صورت دستی وارد کنید.",
-        "nature": {
-          "aiAssistantLabel": "دستیار هوش مصنوعی",
-          "aiAssistantVibe": "مفید، توانمند، حرفه‌ای",
-          "digitalCreatureLabel": "موجود دیجیتال",
-          "digitalCreatureVibe": "عجیب، زنده، کمی غیرقابل پیش‌بینی",
-          "virtualCompanionLabel": "همراه مجازی",
-          "virtualCompanionVibe": "صمیمی، همراه و دلسوز",
-          "somethingWeirderLabel": "چیزی عجیب‌تر…",
-          "somethingWeirderVibe": "خودتان تعریفش کنید"
-        }
-      },
-      "notifications": {
-        "mockMessage": "تمام شد! خلاصه‌ای را که خواسته بودید آماده کردم. هر وقت آماده باشید، می‌توانید آن را بخوانید.",
-        "settingUp": "در حال راه‌اندازی اعلان‌ها…",
-        "stayInTheLoop": "اطلاع از پیشرفت کارها",
-        "getNotified": "با پایان هر کار {{name}}، اعلان بگیرید تا هیچ پاسخی را از دست ندهید.",
-        "now": "اکنون",
-        "skipForNow": "فعلاً نه",
-        "couldNotEnable": "فعال‌سازی اعلان‌ها ممکن نشد."
-      },
-      "provisioning": {
-        "queryErrorTitle": "بررسی وضعیت راه‌اندازی ممکن نشد",
-        "queryErrorBody": "هنگام بررسی راه‌اندازی {{name}}، اتصال قطع شد. ممکن است راه‌اندازی همچنان ادامه داشته باشد. دوباره تلاش کنید یا کمی بعد برگردید.",
-        "stoppedTitle": "راه‌اندازی متوقف شد",
-        "stoppedBody": "نمونهٔ {{name}} هنگام راه‌اندازی به‌طور غیرمنتظره متوقف شد.",
-        "stalledTitle": "راه‌اندازی پیش نمی‌رود",
-        "stalledBody": "نتوانستیم راه‌اندازی {{name}} را تمام کنیم. دوباره تلاش کنید، یا اگر این مشکل ادامه یافت به {{supportEmail}} ایمیل بزنید.",
-        "timeoutTitle": "بیش از حد انتظار طول می‌کشد",
-        "timeoutBody": "راه‌اندازی {{name}} بیش از حد معمول طول می‌کشد (بیش از {{displayMinutes}} دقیقه).",
-        "continueInBackground": "ادامه در پس‌زمینه",
-        "settingUp": "در حال راه‌اندازی {{name}}",
-        "connectingToAgent": "در حال اتصال به عامل",
-        "startingSandbox": "در حال راه‌اندازی محیط ایزوله",
-        "backgroundHint": "این کار معمولاً کمتر از یک دقیقه طول می‌کشد. می‌توانید این صفحه را ببندید؛ کار در پس‌زمینه ادامه پیدا می‌کند."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "کد {{code}}",
-      "gatewayProcess": "پردازش درگاه",
-      "lastExit": "آخرین خروج",
-      "memory": "حافظه",
-      "region": "منطقه",
-      "resources": "منابع",
-      "restarts": "راه‌اندازی‌های مجدد",
-      "state": "وضعیت",
-      "uptime": "زمان فعالیت",
-      "crashed": "متوقف‌شده با خطا",
-      "destroying": "در حال حذف",
-      "provisioned": "منابع آماده",
-      "restarting": "در حال راه‌اندازی مجدد",
-      "running": "در حال اجرا",
-      "shuttingDown": "در حال خاموش‌شدن",
-      "starting": "در حال شروع",
-      "stopped": "متوقف",
-      "stopping": "در حال توقف",
-      "unknown": "نامشخص",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "پیشرفته",
-      "frontierDescription": "بالاترین کارایی. درخواست‌ها را به مدل‌های پیشرفته با قابلیت استدلال می‌فرستد.",
-      "balancedDescription": "تعادل هوشمند بین سرعت و توانایی با هزینه کمتر.",
-      "autoModelA11y": "مدل خودکار {{label}}",
-      "currentModel": "مدل فعلی",
-      "browseAllModels": "یا از میان بیش از ۵۰۰ مدل انتخاب کنید",
-      "browseAllModelsA11y": "مرور همهٔ مدل‌ها، بیش از ۵۰۰ مدل"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "برای ادامهٔ استفاده از KiloClaw، در مرورگر خود به kilo.ai/claw بروید. خرید اشتراک در برنامه ممکن نیست.",
-      "subscriptionCanceledTitle": "خرید اشتراک از وب‌سایت",
-      "subscriptionCanceledBody": "برای استفاده از KiloClaw، در مرورگر خود به kilo.ai/claw بروید. خرید اشتراک در برنامه ممکن نیست.",
-      "subscriptionCanceledCta": "باز کردن kilo.ai/claw",
-      "subscriptionPastDueTitle": "به‌روزرسانی اطلاعات پرداخت در وب",
-      "subscriptionPastDueBody": "آخرین پرداخت شما با مشکل روبه‌رو شد. برای به‌روزرسانی اطلاعات پرداخت، در مرورگر خود به kilo.ai/claw بروید. مدیریت صورت‌حساب در برنامه ممکن نیست.",
-      "quarantinedTitle": "نمونه نیاز به رفع مشکل دارد",
-      "quarantinedBody": "نمونهٔ KiloClaw شما قرنطینه شده است و فعلاً قابل استفاده نیست. برای بازیابی آن به کمک تیم ما نیاز دارید.",
-      "multipleCurrentConflictBody": "بیش از یک اشتراک فعال در حساب شما پیدا کردیم. برای جلوگیری از دریافت هزینهٔ تکراری، ادامهٔ کار را موقتاً متوقف کرده‌ایم.",
-      "multipleCurrentConflictCta": "ادامه در kilo.ai",
-      "nonCanonicalEarlybirdTitle": "طرح قدیمی شناسایی شد",
-      "nonCanonicalEarlybirdBody": "طرح دسترسی زودهنگام شما قبل از استفاده در موبایل نیاز به بررسی دستی دارد.",
-      "iosTitle": "KiloClaw در iOS در دسترس نیست",
-      "iosBody": "دسترسی این حساب به KiloClaw خارج از برنامهٔ iOS مدیریت می‌شود.",
-      "iosContact": "پرسشی دارید؟ به {{supportEmail}} ایمیل بزنید.",
-      "quarantinedCta": "ارسال ایمیل به تیم ما",
-      "nonCanonicalEarlybirdCta": "بررسی طرح خود در kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} نیاز به رسیدگی دارد: {{label}}",
-      "openUnread_one": "باز کردن {{name}}، {{displayCount}} پیام خوانده‌نشده",
-      "openUnread": "باز کردن {{name}}، {{displayCount}} پیام خوانده‌نشده",
-      "openUnread_other": "باز کردن {{name}}، {{displayCount}} پیام خوانده‌نشده",
-      "openSettings": "باز کردن تنظیمات {{name}}",
-      "fixOnKiloAi": "رفع مشکل در kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram، Discord، Slack",
-      "devicePairingDescription": "تأیید درخواست‌های دستگاه",
-      "execPolicyDescription": "تنظیمات امنیتی",
-      "googleDescription": "Gmail، Calendar، Docs",
-      "modelDescription": "انتخاب مدل هوش مصنوعی",
-      "secretsDescription": "اطلاعات احراز هویت رمزنگاری‌شده",
-      "versionPinDescription": "تثبیت روی یک نسخه خاص"
-    },
-    "avatar": {
-      "arcade": "بازی آرکید",
-      "brain": "مغز",
-      "creature": "موجود",
-      "crystal": "کریستال",
-      "custom": "آواتار سفارشی",
-      "dragon": "اژدها",
-      "explorer": "کاوشگر",
-      "flame": "شعله",
-      "lightning": "رعد و برق",
-      "magicWand": "عصای جادویی",
-      "moon": "ماه",
-      "operator": "اپراتور",
-      "orbit": "مدار",
-      "oracle": "پیشگو",
-      "rainbow": "رنگین‌کمان",
-      "robot": "ربات",
-      "satellite": "ماهواره",
-      "sparkles": "درخشش",
-      "strongArm": "بازوی قوی",
-      "talisman": "طلسم"
-    },
-    "remoteSpawnFilesNotSupported": "این نمونه نمی‌تواند فایل دریافت کند.",
-    "instanceSwitcherTitle": "نمونهٔ KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "انتقال {{filename}} به چپ",
       "moveRight": "انتقال {{filename}} به راست"
     },
-    "attachmentPasteHint": {
-      "accessibility": "چسباندن تصویر از کلیپ‌بورد",
-      "label": "تصویر پیدا شد؛ برای چسباندن بزنید"
-    },
     "attachmentPicker": {
       "camera": "دوربین",
       "photoLibrary": "گالری عکس",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "از حساب خود در این دستگاه خارج می‌شوید؟",
     "signOutThisSessionTitle": "از این نشست خارج می‌شوید؟",
     "signOutThisSessionMessage": "دستگاه {{device}} از حساب خارج می‌شود، اما ممکن است تا یک ساعت به API دسترسی داشته باشد.",
-    "webBrowser": "مرورگر وب"
+    "webBrowser": "مرورگر وب",
+    "unknownDevice": "دستگاه ناشناخته"
   },
   "forceUpdate": {
     "couldNotOpenStore": "باز کردن فروشگاه برنامه ممکن نشد.",

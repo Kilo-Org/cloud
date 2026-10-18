@@ -101,12 +101,9 @@
     "scheduled": "Áætlað",
     "keepEditing": "Halda áfram að breyta",
     "keepRunning": "Halda keyrslu áfram",
-    "kiloclaw": "KiloClaw",
     "newSession": "Ný lota",
-    "noKiloclawInstances": "Engin KiloClaw-tilvik",
     "noModelsAvailable": "Engin líkön tiltæk",
     "notFound": "Fannst ekki.",
-    "online": "Á netinu",
     "open": "Opna {{name}}",
     "openPullRequest": "Opna samrunabeiðni",
     "pending": "Í bið",
@@ -257,7 +254,8 @@
     "renamePasskey": "Endurnefna aðgangslykil",
     "removePasskey": "Fjarlægja aðgangslykil",
     "removePasskeyTitle": "Fjarlægja aðgangslykil?",
-    "removePasskeyMessage": "Þú getur ekki lengur skráð þig inn með þessum aðgangslykli."
+    "removePasskeyMessage": "Þú getur ekki lengur skráð þig inn með þessum aðgangslykli.",
+    "changelog": "Nýjungar"
   },
   "preferences": {
     "general": "Almennt",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Tilkynningar láta þig vita að eitthvað hafi gerst. Opnaðu Kilo til að lesa skilaboðin.",
     "channel": {
       "agentProgress": "Framvinda fulltrúa",
-      "chat": "Spjallskilaboð",
-      "kiloclaw": "Virkni í KiloClaw",
       "balance": "Inneignarviðvaranir",
       "security": "Öryggisniðurstöður",
       "spend": "Útgjaldaviðvaranir",
       "followedSessions": "Fylgdar lotur"
     },
     "category": {
-      "chatMessagesSubtitle": "svör í samtölunum þínum",
       "agentAttentionTitle": "Fulltrúinn þarf aðstoð þína",
       "agentAttentionSubtitle": "spurningar og beiðnir um heimild eða svör",
       "agentUpdatesTitle": "Uppfærslur frá fulltrúa",
       "agentUpdatesSubtitle": "skilaboð frá fulltrúanum meðan verkefni er í vinnslu",
       "sessionStatusTitle": "Staða lotu",
       "sessionStatusSubtitle": "lokið / mistókst / tilbúin til stýringar",
-      "kiloclawActivitySubtitle": "tilvik tilbúið eða bilað, tímasettar aðgerðir",
-      "kiloclawActivityUnavailable": "Ræstu KiloClaw-tilvik til að fá KiloClaw-virkni.",
       "balanceAlertsSubtitle": "viðvaranir um lága inneign félagsins",
       "balanceAlertsUnavailable": "Skráðu þig í félag til að fá viðvaranir um inneign.",
       "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Heim",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, flipi, {{position}} af {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Skipta um tilvik",
-      "couldNotLoadInstances": "Ekki tókst að sækja tilvik.",
-      "noInstancesDescription": "Settu upp tilvik til að byrja að spjalla.",
-      "setUpKiloclaw": "Setja upp KiloClaw",
-      "currentInstance": "{{title}}, núverandi"
-    },
     "conversation": {
-      "failedToLoad": "Ekki tókst að sækja samtalið.",
-      "notFound": "Samtalið fannst ekki.",
       "untitled": "Án titils",
-      "leaveTitle": "Yfirgefa samtal?",
-      "leaveMessage": "Þetta fjarlægir það úr listanum þínum.",
-      "openHint": "Opnar samtalið. Haltu inni til að sjá valkosti um að endurnefna eða yfirgefa samtalið.",
-      "unread": "Ólesið",
-      "optionsFor": "Samtalsvalkostir fyrir {{title}}",
-      "options": "Samtalsvalkostir",
-      "renameTitle": "Endurnefna samtal",
-      "renamePlaceholder": "Nýtt nafn",
-      "couldNotReachBot": "Ekki náðist samband við spjallmennið. Reyndu aftur.",
-      "messageDeliveryFailed": "Ekki tókst að koma skilaboðunum til spjallmennisins.",
-      "couldNotSignIn": "Ekki tókst að skrá þig inn í spjallið.",
-      "couldNotRefreshMessages": "Ekki tókst að endurnýja skilaboðin.",
-      "couldNotLoadHistory": "Ekki tókst að sækja samtalsferilinn.",
-      "leave": "Yfirgefa",
-      "untitledConversation": "Samtal án titils",
-      "createFailed": "Ekki tókst að búa til samtal.",
-      "leaveFailed": "Ekki tókst að yfirgefa samtalið."
-    },
-    "reactions": {
-      "common": "Algeng viðbrögð",
-      "reactWith": "Bregðast við með {{reaction}}",
-      "accessibility": "{{emoji}} viðbrögð, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Að svara",
-      "cancelReply": "Hætta við svar",
-      "openInstance": "Opna tilvik",
-      "attachFile": "Hengja skrá við",
-      "cancelEdit": "Hætta við breytingu"
+      "renamePlaceholder": "Nýtt nafn"
     },
     "conversationList": {
-      "couldNotLoad": "Ekki tókst að sækja samtöl.",
-      "emptyTitle": "Engin samtöl enn",
-      "emptyDescription": "Búðu til samtal til að byrja að spjalla við KiloClaw-tilvikið þitt.",
-      "create": "Búa til samtal",
-      "newConversation": "Nýtt samtal",
-      "openInstanceSettings": "Opna stillingar tilviks",
       "today": "Í dag",
       "yesterday": "Í gær",
-      "thisWeek": "Í þessari viku",
       "older": "Eldra"
     },
     "attachment": {
-      "open": "Opna {{filename}}",
-      "openFailed": "Ekki tókst að opna viðhengi. Athugaðu tenginguna og reyndu aftur.",
-      "attachFailed": "Ekki tókst að hengja skrá við.",
-      "limit": "Þú getur hengt allt að {{displayCount}} skrár við.",
-      "sizeRejection": "Skráin {{filename}} er stærri en leyfð hámarksstærð viðhengis, {{limit}}.",
-      "unreadable": "Ekki tókst að lesa {{filename}}.",
-      "pastedImage": "límaða myndin",
-      "defaultName": "Viðhengi",
       "classificationDenied": "Ekki er hægt að hengja keyranlegar skrár við.",
       "classificationEmpty": "Skráin er tóm.",
       "classificationTooLarge": "Skrár verða að vera 20 MB eða minni.",
@@ -943,426 +883,17 @@
       "networkError": "Villa kom upp í nettengingu.",
       "uploadFailed": "Upphleðsla mistókst.",
       "nothingToPaste": "Ekkert er til að líma.",
-      "metadataStripFailed": "Ekki tókst að fjarlægja lýsigögn myndar.",
-      "limit_one": "Þú getur hengt allt að {{displayCount}} skrá við.",
-      "limit_other": "Þú getur hengt allt að {{displayCount}} skrár við."
+      "metadataStripFailed": "Ekki tókst að fjarlægja lýsigögn myndar."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, staða: {{status}}",
-      "retryUploading": "Reyna aftur að hlaða upp {{filename}}",
-      "remove": "Fjarlægja {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[eydd skilaboð]",
-      "yourMessage": "Skilaboðin þín",
-      "messageFrom": "Skilaboð frá {{author}}",
-      "moreActions": "Fleiri aðgerðir",
-      "notDelivered": "Ekki afhent",
-      "edited": "(breytt)",
-      "image": "Mynd"
+      "accessibility": "{{filename}}, staða: {{status}}"
     },
     "messageActions": {
-      "copied": "Afritað",
-      "copyFailed": "Ekki tókst að afrita.",
-      "title": "Aðgerðir fyrir skilaboð",
-      "deleteTitle": "Eyða skilaboðum?",
-      "deleteMessage": "Þetta fjarlægir skilaboðin úr samtalinu.",
-      "deleteFailed": "Ekki tókst að eyða skilaboðunum.",
-      "removeReactionFailed": "Ekki tókst að fjarlægja viðbrögð.",
-      "addReactionFailed": "Ekki tókst að bæta við viðbrögðum.",
-      "retrySend": "Reyna aftur að senda",
-      "moreReactions": "Fleiri viðbrögð",
-      "edit": "Breyta",
-      "sendFailed": "Ekki tókst að senda skilaboðin.",
-      "retrySendFailed": "Ekki tókst að senda skilaboðin aftur.",
-      "editFailed": "Ekki tókst að breyta skilaboðunum.",
-      "executeFailed": "Ekki tókst að framkvæma aðgerðina."
+      "edit": "Breyta"
     },
     "attachmentPicker": {
-      "takePhoto": "Taka mynd",
-      "photoLibrary": "Myndasafn",
-      "files": "Skrár",
       "cameraAccessMessage": "Leyfðu aðgang að myndavélinni í stillingum til að taka mynd."
-    },
-    "typingIndicator": {
-      "someone": "Einhver",
-      "typing_one": "{{name}} er að skrifa…",
-      "typing": "{{names}} eru að skrifa...",
-      "typing_other": "{{names}} eru að skrifa..."
-    },
-    "botStatus": {
-      "offline": "Ótengt",
-      "loadingUser": "Sæki notandaupplýsingar…",
-      "waitingForStatus": "Bíð eftir stöðu spjallmennisins…",
-      "offlineMessage": "Spjallmennið er ótengt. Skilaboð berast aftur þegar það tengist á ný."
-    },
-    "errors": {
-      "notAllowed": "Þetta er ekki leyfilegt.",
-      "messageTooLong": "Skilaboðin eru of löng. Þau verða að vera styttri en {{limit}} stafir.",
-      "titleTooLong": "Titillinn er of langur. Hann verður að vera styttri en {{limit}} stafir.",
-      "messageEmpty": "Skilaboð mega ekki vera tóm."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Ekki tókst að hlaða KiloClaw-tilvikum.",
-    "billing": {
-      "title": "Greiðslur",
-      "continueMonthToMonth": "Halda áfram með mánaðaráskrift",
-      "plan": "Áætlun",
-      "finalTermEnds": "Síðasta tímabili lýkur",
-      "afterFinalTerm": "Eftir síðasta tímabil",
-      "lessThanOneDay": "Minna en 1 dagur",
-      "ends": "Lýkur",
-      "expires": "Rennur út",
-      "noActivePlan": "Engin virk áskrift",
-      "noActivePlanDescription": "Þú ert ekki með virka KiloClaw-áskrift.",
-      "managedByAdmin": "Stjórnandi fyrirtækisins þíns sér um greiðslur.",
-      "couldNotLoad": "Ekki tókst að hlaða greiðsluupplýsingum.",
-      "manageOnWeb": "Sýsla með greiðslur á vefnum",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Síðasta tímabili Commit-áskriftarinnar þinnar lýkur {{date}}. Haltu áfram með Standard-áskrift á {{price}}, annars lýkur hýsingunni.",
-      "freeTrial": "Ókeypis reynslutímabil",
-      "hostingEnds": "Hýsingu lýkur",
-      "renews": "Endurnýjast",
-      "standardMonthToMonth": "Standard-mánaðaráskrift",
-      "standardStartsOn": "Standard-áskriftin hefst {{date}} á {{price}}.",
-      "yourStandardMonthlyPrice": "mánaðarverð Standard-áskriftarinnar þinnar",
-      "perMonth": "/mán.",
-      "earlybirdAccessUntil": "Earlybird-aðgangurinn gildir til {{date}}.",
-      "earlybirdEnding": "Earlybird-aðganginum lýkur eftir {{remaining}}.",
-      "paymentPastDue": "Greiðsla er í vanskilum. Uppfærðu greiðslumátann þinn.",
-      "subscriptionCancels": "Áskriftinni lýkur {{date}}.",
-      "trialDaysRemaining": "Reynslutímabilið stendur í {{remaining}} til viðbótar.",
-      "trialEndingSoon": "Reynslutímabilinu lýkur fljótlega — {{remaining}} eftir.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Breytingafærsla"
-    },
-    "changelog": {
-      "title": "Nýjungar",
-      "couldNotLoad": "Ekki tókst að hlaða breytingaskrá.",
-      "noUpdates": "Engar uppfærslur ennþá",
-      "noUpdatesDescription": "Færslur í breytingaskrá birtast hér.",
-      "recentUpdates": "Nýlegar uppfærslur",
-      "manageVersion": "Sýsla með útgáfu",
-      "redeployRequired": "Endurdreifingar krafist",
-      "redeploySuggested": "Mælt með endurdreifingu",
-      "upgradeRequired": "Uppfærslu krafist"
-    },
-    "dashboard": {
-      "title": "Mælaborð",
-      "couldNotLoad": "Ekki tókst að hlaða mælaborðinu.",
-      "renameInstance": "Endurnefna tilvik",
-      "renamePlaceholder": "Nýtt nafn (hámark 50 stafir)",
-      "someDetailsFailed": "Ekki tókst að hlaða hluta rauntímaupplýsinganna.",
-      "destroy": "Eyða",
-      "destroyMessage": "Þetta eyðir KiloClaw-tilvikinu þínu og öllum gögnum þess varanlega. Ekki er hægt að afturkalla þessa aðgerð.",
-      "destroyTitle": "Eyða tilviki",
-      "instance": "Tilvik",
-      "couldNotCheckStatus": "Ekki tókst að athuga stöðu þjónustunnar.",
-      "dangerZone": "HÆTTUSVÆÐI",
-      "destroying": "Eyði…",
-      "serviceDegraded": "Truflun á þjónustu — ýttu til að skoða stöðuna",
-      "up": "Í GANGI"
-    },
-    "channels": {
-      "title": "Rásir",
-      "couldNotLoad": "Ekki tókst að hlaða rásum.",
-      "noChannels": "Engar rásir í boði",
-      "noChannelsDescription": "Tengingar við rásir birtast hér.",
-      "connected": "{{label}} tengt",
-      "disconnectMessage": "Fjarlægja {{label}}? Þessi rás verður aftengd.",
-      "disconnectTitle": "Aftengja rás"
-    },
-    "devicePairing": {
-      "title": "Pörun tækja",
-      "refreshRequests": "Endurnýja pörunarbeiðnir",
-      "couldNotLoad": "Ekki tókst að hlaða pörunarbeiðnum.",
-      "noPending": "Engar beiðnir í bið",
-      "noPendingDescription": "Beiðnir um pörun rása og tækja birtast hér.",
-      "channelRequests": "Rásabeiðnir",
-      "deviceRequests": "Tækjabeiðnir",
-      "approveDeviceMessage": "Leyfa {{platform}} að tengjast tilviki þínu?",
-      "approveDeviceTitle": "Samþykkja tæki",
-      "approveMessage": "Leyfa {{label}} (kóði: {{code}}) að tengjast tilviki þínu?",
-      "approveTitle": "Samþykkja pörunarbeiðni",
-      "unknownDevice": "Óþekkt tæki"
-    },
-    "execPolicy": {
-      "title": "Reglur um keyrslu",
-      "couldNotLoad": "Ekki tókst að hlaða reglum um keyrslu skipana.",
-      "alwaysAsk": "Spyrja alltaf",
-      "alwaysAskDescription": "Staðfestu hverja skipun áður en hún er keyrð. Þetta er öruggasti kosturinn.",
-      "neverAsk": "Spyrja aldrei",
-      "neverAskDescription": "Keyrðu skipanir án staðfestingar. Þetta er fljótlegra en óöruggara."
-    },
-    "google": {
-      "title": "Google-reikningur",
-      "couldNotLoad": "Ekki tókst að hlaða stöðu Google-reikningsins.",
-      "disconnected": "Google-reikningurinn hefur verið aftengdur. Endurdreifðu tilvikinu til að breytingin taki gildi.",
-      "setupCommand": "Uppsetningarskipun",
-      "setupCommandHelp": "Keyrðu þessa skipun í skjáhermi á tölvunni þinni til að tengja Google-reikninginn þinn. Docker verður að vera uppsett á tölvunni.",
-      "failedToLoadCommand": "Ekki tókst að hlaða uppsetningarskipuninni.",
-      "gmailNotifications": "Gmail-tilkynningar",
-      "disconnect": "Aftengja Google-reikning",
-      "copied": "Afritað",
-      "copyCommand": "Afrita skipun",
-      "disconnectConfirm": "Aftengja",
-      "disconnectMessage": "Fjarlægja Google-reikninginn þinn úr þessu tilviki? Það slekkur á Gmail-tilkynningum. Endurdreifðu tilvikinu eftir aftengingu til að breytingarnar taki gildi.",
-      "disconnectTitle": "Aftengja Google"
-    },
-    "modelList": {
-      "noMatches": "Engin líkön samsvara leitinni þinni",
-      "noModelsDescription": "Líkön birtast hér þegar þau verða tiltæk.",
-      "noResultsFor": "Engar niðurstöður fundust fyrir „{{query}}“."
-    },
-    "secrets": {
-      "title": "Leyniupplýsingar",
-      "couldNotLoad": "Ekki tókst að hlaða leynigögnum.",
-      "noSecrets": "Engin leynigögn tiltæk",
-      "noSecretsDescription": "Tengingar sem nota leynigögn birtast hér.",
-      "removeMessage": "Fjarlægja {{label}}? Þetta tól missir aðgang að auðkennisupplýsingum sínum.",
-      "removeTitle": "Fjarlægja leynigögn",
-      "saved": "{{label}} vistað",
-      "hide": "Fela {{label}}",
-      "show": "Sýna {{label}}",
-      "allFieldsRequired": "Fylla þarf út alla reiti til að tengja {{label}}.",
-      "setupGuideFallback": "uppsetningarleiðbeiningar",
-      "setupGuideA11y": "Uppsetningarleiðbeiningar fyrir {{label}}",
-      "setupGuide": "Uppsetningarleiðbeiningar",
-      "saving": "Vista…",
-      "removing": "Fjarlægi…",
-      "updateToken": "Uppfæra aðgangsteikn"
-    },
-    "versionPin": {
-      "title": "Útgáfufesting",
-      "couldNotLoad": "Ekki tókst að hlaða útgáfuupplýsingum.",
-      "couldNotLoadMore": "Ekki tókst að hlaða fleiri útgáfum.",
-      "loadMore": "Hlaða fleiri útgáfum",
-      "showingLatest": "Nýjustu 100 útgáfurnar eru sýndar.",
-      "availableVersions": "Tiltækar útgáfur",
-      "noVersions": "Engar útgáfur í boði",
-      "noVersionsDescription": "Tiltækar útgáfur af OpenClaw birtast hér.",
-      "unpin": "Losa festingu",
-      "unpinMessage": "Skipta aftur yfir í nýjustu tiltæku útgáfuna?",
-      "unpinTitle": "Losa útgáfufestingu",
-      "confirmPin": "Staðfesta festingu",
-      "followingLatest": "Fylgir nýjustu útgáfu",
-      "latest": "nýjasta",
-      "pin": "Festa",
-      "pinnedByAdmin": "Stjórnandi hefur fest útgáfuna — hafðu samband við stjórnandann til að breyta henni.",
-      "pinnedTo": "Fest við {{version}}",
-      "reasonOptional": "Ástæða (valfrjáls)",
-      "reasonPlaceholder": "Af hverju festir þú þessa útgáfu?",
-      "replaceAdminPin": "Skipta út festingu stjórnanda",
-      "replacesAdminPin": "Þetta kemur í stað festingar stjórnanda (núna {{label}})."
-    },
-    "redeploy": "Setja aftur í rekstur",
-    "redeployMessage": "Viltu örugglega endurdreifa þessu tilviki?",
-    "redeployTitle": "Endurdreifa tilviki",
-    "controls": {
-      "redeploying": "Endurdreifi…",
-      "restart": "Endurræsa",
-      "restartOpenClawMessage": "Viltu örugglega endurræsa OpenClaw-ferlið?",
-      "restartOpenClawTitle": "Endurræsa OpenClaw",
-      "restarting": "Endurræsi…",
-      "start": "Ræsa",
-      "startMessage": "Viltu örugglega ræsa þetta tilvik?",
-      "startTitle": "Ræsa tilvik",
-      "stop": "Stöðva",
-      "stopMessage": "Viltu örugglega stöðva þetta tilvik?",
-      "stopTitle": "Stöðva tilvik",
-      "stopping": "Stöðva…"
-    },
-    "empty": {
-      "finishingSetup": "Verið er að ljúka uppsetningu",
-      "finishingSetupDescription": "Bíddu aðeins á meðan við göngum frá reikningnum þínum. Þetta tekur yfirleitt aðeins augnablik.",
-      "getStarted": "Byrja",
-      "noInstancesDescription": "Búðu til fyrsta tilvikið þitt til að byrja að keyra forritunarfulltrúa."
-    },
-    "instance": {
-      "backToInstances": "Til baka í tilvikalista",
-      "couldNotLoad": "Ekki tókst að hlaða tilvikinu.",
-      "notFound": "Tilvik fannst ekki",
-      "notFoundDescription": "Þessu tilviki gæti hafa verið eytt eða tengillinn er ekki lengur gildur."
-    },
-    "list": {
-      "createInstance": "Búa til tilvik",
-      "organizations": "Fyrirtæki",
-      "accessIssue": {
-        "trialExpired": "Reynslutímabili lokið — hefja áskrift til að halda áfram að nota tilvikið",
-        "subscriptionCanceled": "Áskrift óvirk — hefja áskrift aftur til að halda áfram að nota tilvikið",
-        "subscriptionPastDue": "Greiðsluvandamál — uppfæra greiðsluupplýsingar til að halda áfram að nota tilvikið",
-        "quarantined": "Tilvik í einangrun, þarf handvirka yfirferð",
-        "multipleCurrentConflict": "Fara þarf yfir reikninginn",
-        "nonCanonicalEarlybird": "Eldri áskrift þarf yfirferð"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Spjalla við {{name}}",
-        "ready": "{{name}} er klárt",
-        "warmedUp": "Allt klárt. Segðu hæ þegar þér hentar."
-      },
-      "flow": {
-        "genericErrorBody": "Ekki tókst að ljúka uppsetningu tilviksins þíns í þetta sinn.",
-        "manualReviewBody": "Yfirfara þarf stöðu reikningsins þíns áður en við getum búið til tilvik. Haltu áfram á kilo.ai.",
-        "manualReviewTitle": "Uppsetning þarf handvirka yfirferð",
-        "openKiloAi": "Opna kilo.ai",
-        "provisioning": "Undirbúningur",
-        "review": "Rýni",
-        "identityTitle": "Auðkenni vélmennisins þíns",
-        "couldNotLoad": "Ekki tókst að hlaða uppsetningarstöðunni.",
-        "finishingSetup": "Uppsetningu er að ljúka — bíddu aðeins á meðan við göngum frá reikningnum þínum.",
-        "ready": "Tilbúið",
-        "settingUp": "Set upp…"
-      },
-      "unavailableDescription": "Virk KiloClaw-áskrift er nauðsynleg til að búa til tilvik. Núverandi tilvik og áskriftir halda áfram að virka eins og áður.",
-      "unavailableTitle": "Ekki hægt að búa til ný KiloClaw-tilvik",
-      "identity": {
-        "chooseAvatar": "Velja prófílmynd",
-        "namePlaceholder": "Nafn vélmennisins",
-        "selectAvatar": "Velja {{name}} sem prófílmynd",
-        "personality": "Persónuleiki",
-        "changePersonality": "Breyta persónuleika",
-        "location": "Staðsetning",
-        "locationPlaceholder": "Borg eða svæði (valfrjálst)",
-        "useCurrentLocation": "Nota núverandi staðsetningu",
-        "locationDeniedTitle": "Aðgangi að staðsetningu neitað",
-        "locationDeniedMessage": "Virkjaðu aðgang að staðsetningu í stillingum til að nota núverandi staðsetningu þína.",
-        "locationValidationFailed": "Ekki tókst að sannreyna staðsetningu.",
-        "locationResolveFailed": "Ekki tókst að ákvarða staðsetningu þína. Þú getur breytt henni handvirkt.",
-        "locationGetFailed": "Ekki tókst að sækja staðsetningu þína. Sláðu hana inn handvirkt.",
-        "nature": {
-          "aiAssistantLabel": "Gervigreindaraðstoðarmaður",
-          "aiAssistantVibe": "Hjálpsamur, hæfur, fagmannlegur",
-          "digitalCreatureLabel": "Stafræn vera",
-          "digitalCreatureVibe": "Sérkennileg, lifandi, svolítið óútreiknanleg",
-          "virtualCompanionLabel": "Stafrænn félagi",
-          "virtualCompanionVibe": "Hlýr, nærverandi og lætur sér annt um þig",
-          "somethingWeirderLabel": "Eitthvað skrýtnara…",
-          "somethingWeirderVibe": "Skilgreindu að eigin vild"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Allt klárt! Ég tók saman það sem þú baðst um. Samantektin bíður þín.",
-        "settingUp": "Set upp tilkynningar…",
-        "stayInTheLoop": "Alltaf með á nótunum",
-        "getNotified": "Fáðu tilkynningu þegar {{name}} lýkur verkefni svo þú missir aldrei af svari.",
-        "now": "núna",
-        "skipForNow": "Sleppa í bili",
-        "couldNotEnable": "Ekki tókst að virkja tilkynningar."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Ekki tókst að athuga stöðu uppsetningar",
-        "queryErrorBody": "Tengingin rofnaði þegar við athuguðum stöðu uppsetningar fyrir {{name}}. Uppsetningin gæti enn verið í gangi. Reyndu aftur eða athugaðu stöðuna eftir smástund.",
-        "stoppedTitle": "Uppsetning stöðvuð",
-        "stoppedBody": "Tilvikið fyrir {{name}} stöðvaðist óvænt við uppsetningu.",
-        "stalledTitle": "Uppsetning stöðnuð",
-        "stalledBody": "Ekki tókst að ljúka uppsetningu fyrir {{name}}. Reyndu aftur eða sendu tölvupóst á {{supportEmail}} ef þetta endurtekur sig.",
-        "timeoutTitle": "Tekur lengri tíma en búist var við",
-        "timeoutBody": "Uppsetning fyrir {{name}} tekur lengri tíma en venjulega (yfir {{displayMinutes}} mínútur).",
-        "continueInBackground": "Halda áfram í bakgrunni",
-        "settingUp": "Uppsetning fyrir {{name}}",
-        "connectingToAgent": "Tengist fulltrúanum",
-        "startingSandbox": "Ræsi sandkassa",
-        "backgroundHint": "Þetta tekur yfirleitt innan við mínútu. Þú getur lokað þessum skjá — við höldum áfram í bakgrunni."
-      }
-    },
-    "status": {
-      "cpu": "ÖRGJÖRVI",
-      "exitCode": "Lokakóði {{code}}",
-      "gatewayProcess": "GÁTTARFERLI",
-      "lastExit": "Síðustu keyrslulok",
-      "memory": "Minni",
-      "region": "Svæði",
-      "resources": "AUÐLINDIR",
-      "restarts": "Endurræsingar",
-      "state": "Staða",
-      "uptime": "Keyrslutími",
-      "crashed": "HRUNIÐ",
-      "destroying": "EYÐING Í GANGI",
-      "provisioned": "UNDIRBÚIÐ",
-      "restarting": "ENDURRÆSING",
-      "running": "Í GANGI",
-      "shuttingDown": "SLEKKUR Á SÉR",
-      "starting": "RÆSING Í GANGI",
-      "stopped": "STÖÐVAÐ",
-      "stopping": "STÖÐVUN Í GANGI",
-      "unknown": "ÓÞEKKT",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Fremstu líkön",
-      "frontierDescription": "Hámarksgeta. Beiðnum er beint til fremstu líkana með rökhugsun.",
-      "balancedDescription": "Gott jafnvægi milli hraða og getu á lægra verði.",
-      "autoModelA11y": "sjálfvirkt líkan: {{label}}",
-      "currentModel": "Núverandi líkan",
-      "browseAllModels": "eða velja úr yfir 500 líkönum",
-      "browseAllModelsA11y": "Skoða öll líkönin, yfir 500 talsins"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Farðu á kilo.ai/claw í vafranum þínum til að halda áfram að nota KiloClaw. Ekki er hægt að hefja áskrift í appinu.",
-      "subscriptionCanceledTitle": "Stofna áskrift á vefnum",
-      "subscriptionCanceledBody": "Farðu á kilo.ai/claw í vafranum þínum til að nota KiloClaw. Ekki er hægt að hefja áskrift í appinu.",
-      "subscriptionCanceledCta": "Opna kilo.ai/claw",
-      "subscriptionPastDueTitle": "Uppfærsla greiðsluupplýsinga á vefnum",
-      "subscriptionPastDueBody": "Vandamál kom upp við síðustu greiðslu þína. Farðu á kilo.ai/claw í vafranum þínum til að uppfæra greiðsluupplýsingarnar. Ekki er hægt að sýsla með greiðslur í appinu.",
-      "quarantinedTitle": "Tilvikið þarfnast lagfæringar",
-      "quarantinedBody": "KiloClaw-tilvikið þitt er í einangrun og ekki hægt að nota það núna. Teymið okkar þarf að aðstoða við að koma því aftur í gang.",
-      "multipleCurrentConflictBody": "Við fundum fleiri en eina virka áskrift á reikningnum þínum. Við settum því þjónustuna í bið til að forðast að rukka þig tvöfalt.",
-      "multipleCurrentConflictCta": "Halda áfram á kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Eldri áskrift fannst",
-      "nonCanonicalEarlybirdBody": "Yfirfara þarf áskriftina þína með snemmbúnum aðgangi handvirkt áður en hægt er að nota hana í símanum.",
-      "iosTitle": "KiloClaw ekki fáanlegt í iOS",
-      "iosBody": "Fyrir þennan reikning er aðgangi að KiloClaw stýrt utan iOS-appsins.",
-      "iosContact": "Spurningar? Sendu tölvupóst á {{supportEmail}}.",
-      "quarantinedCta": "Sendu tölvupóst á teymið okkar",
-      "nonCanonicalEarlybirdCta": "Skoðaðu áskriftina þína á kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} þarfnast athygli: {{label}}",
-      "openUnread_one": "Opna {{name}}, {{displayCount}} ólesin skilaboð",
-      "openUnread": "Opna {{name}}, {{displayCount}} ólesin skilaboð",
-      "openUnread_other": "Opna {{name}}, {{displayCount}} ólesin skilaboð",
-      "openSettings": "Opna stillingar fyrir {{name}}",
-      "fixOnKiloAi": "Laga á kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Samþykkja tækjabeiðnir",
-      "execPolicyDescription": "Öryggisstillingar",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Val á gervigreindarlíkani",
-      "secretsDescription": "Dulkóðaðar auðkennisupplýsingar",
-      "versionPinDescription": "Festa við tiltekna útgáfu"
-    },
-    "avatar": {
-      "arcade": "Spilakassi",
-      "brain": "Heili",
-      "creature": "Vera",
-      "crystal": "Kristall",
-      "custom": "Sérsniðin prófílmynd",
-      "dragon": "Dreki",
-      "explorer": "Landkönnuður",
-      "flame": "Logi",
-      "lightning": "Elding",
-      "magicWand": "Töfrasproti",
-      "moon": "Tungl",
-      "operator": "Stjórnandi",
-      "orbit": "Sporbraut",
-      "oracle": "Völva",
-      "rainbow": "Regnbogi",
-      "robot": "Vélmenni",
-      "satellite": "Gervihnöttur",
-      "sparkles": "Glit",
-      "strongArm": "Sterkur handleggur",
-      "talisman": "Verndargripur"
-    },
-    "remoteSpawnFilesNotSupported": "Þetta tilvik getur ekki tekið við skrám.",
-    "instanceSwitcherTitle": "KiloClaw-tilvik"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Færa {{filename}} til vinstri",
       "moveRight": "Færa {{filename}} til hægri"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Líma mynd af klippispjaldi",
-      "label": "Líma mynd af klippispjaldi"
-    },
     "attachmentPicker": {
       "camera": "Myndavél",
       "photoLibrary": "Myndasafn",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Skrá þetta tæki út?",
     "signOutThisSessionTitle": "Skrá þessa lotu út?",
     "signOutThisSessionMessage": "{{device}} verður skráð út. Það getur haldið API-aðgangi í allt að klukkustund.",
-    "webBrowser": "Vafri"
+    "webBrowser": "Vafri",
+    "unknownDevice": "Óþekkt tæki"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Ekki tókst að opna appverslunina.",

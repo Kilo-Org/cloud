@@ -101,12 +101,9 @@
     "scheduled": "Kuhleliwe",
     "keepEditing": "Qhubeka uhlela",
     "keepRunning": "Yeka kuqhubeke",
-    "kiloclaw": "KiloClaw",
     "newSession": "Iseshini entsha",
-    "noKiloclawInstances": "Awekho amakhophi e-KiloClaw",
     "noModelsAvailable": "Awekho amamodeli atholakalayo",
     "notFound": "Akutholakali.",
-    "online": "Ku-inthanethi",
     "open": "Vula {{name}}",
     "openPullRequest": "Vula i-PR",
     "pending": "Kulindile",
@@ -257,7 +254,8 @@
     "renamePasskey": "Qamba kabusha ukhiye wokungena",
     "removePasskey": "Susa ukhiye wokungena",
     "removePasskeyTitle": "Susa ukhiye wokungena?",
-    "removePasskeyMessage": "Ngeke usakwazi ukungena ngalo khiye wokungena."
+    "removePasskeyMessage": "Ngeke usakwazi ukungena ngalo khiye wokungena.",
+    "changelog": "Okusha"
   },
   "preferences": {
     "general": "Okujwayelekile",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Izaziso zibonisa ukuthi kukhona okwenzekile. Vula i-Kilo ukuze ufunde umlayezo.",
     "channel": {
       "agentProgress": "Inqubekelaphambili yabenzeli",
-      "chat": "Imilayezo yengxoxo",
-      "kiloclaw": "Umsebenzi we-KiloClaw",
       "balance": "Izexwayiso zebhalansi",
       "security": "Okutholakele kwezokuphepha",
       "spend": "Izexwayiso zokusebenzisa imali",
       "followedSessions": "Amaseshini alandiwe"
     },
     "category": {
-      "chatMessagesSubtitle": "izimpendulo ezingxoxweni zakho",
       "agentAttentionTitle": "Umenzeli uyakudinga",
       "agentAttentionSubtitle": "imibuzo, izicelo zemvume nezicelo zempendulo",
       "agentUpdatesTitle": "Izibuyekezo zomenzeli",
       "agentUpdatesSubtitle": "imilayezo evela kumenzeli ngesikhathi esebenza",
       "sessionStatusTitle": "Isimo seseshini",
       "sessionStatusSubtitle": "kuqediwe / kwehlulekile / kulungele ukulawulwa",
-      "kiloclawActivitySubtitle": "uhlelo selulungile/lwehlulekile, izenzo ezihleliwe",
-      "kiloclawActivityUnavailable": "Qala i-instance ye-KiloClaw ukuze uthole umsebenzi we-KiloClaw.",
       "balanceAlertsSubtitle": "izexwayiso zebhalansi ephansi yenhlangano",
       "balanceAlertsUnavailable": "Joyina inhlangano ukuze uthole izexwayiso zebhalansi.",
       "securityFindingsSubtitle": "okutholakele okusha nezikhumbuzo ze-SLA",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Ikhaya",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, ithebhu, {{position}} kwangu-{{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Ukushintsha isistimu",
-      "couldNotLoadInstances": "Asikwazanga ukulayisha amasistimu.",
-      "noInstancesDescription": "Setha isistimu ukuze uqale ukuxoxa.",
-      "setUpKiloclaw": "Setha i-KiloClaw",
-      "currentInstance": "{{title}}, esetshenziswa manje"
-    },
     "conversation": {
-      "failedToLoad": "Asikwazanga ukulayisha ingxoxo.",
-      "notFound": "Ingxoxo ayitholakalanga.",
       "untitled": "Engenasihloko",
-      "leaveTitle": "Uyishiye ingxoxo?",
-      "leaveMessage": "Lokhu kuyisusa ohlwini lwakho.",
-      "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze uthole izinketho zokuqamba kabusha nokushiya.",
-      "unread": "Akukafundwa",
-      "optionsFor": "Izinketho zengxoxo: {{title}}",
-      "options": "Izinketho zengxoxo",
-      "renameTitle": "Ukuqamba kabusha ingxoxo",
-      "renamePlaceholder": "Igama elisha",
-      "couldNotReachBot": "Asikwazanga ukuxhumana nerobhothi. Sicela uzame futhi.",
-      "messageDeliveryFailed": "Umlayezo awukwazanga ukulethwa erobhothini.",
-      "couldNotSignIn": "Asikwazanga ukungena engxoxweni.",
-      "couldNotRefreshMessages": "Asikwazanga ukuvuselela imilayezo.",
-      "couldNotLoadHistory": "Asikwazanga ukulayisha umlando wengxoxo.",
-      "leave": "Shiya",
-      "untitledConversation": "Ingxoxo engenasihloko",
-      "createFailed": "Asikwazanga ukudala ingxoxo.",
-      "leaveFailed": "Asikwazanga ukuphuma engxoxweni."
-    },
-    "reactions": {
-      "common": "Okujwayelekile",
-      "reactWith": "Sabela nge-{{reaction}}",
-      "accessibility": "Ukusabela ngo-{{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Uphendula ku",
-      "cancelReply": "Khansela impendulo",
-      "openInstance": "Vula isistimu",
-      "attachFile": "Namathisela ifayela",
-      "cancelEdit": "Khansela ukuhlela"
+      "renamePlaceholder": "Igama elisha"
     },
     "conversationList": {
-      "couldNotLoad": "Asikwazanga ukulayisha izingxoxo.",
-      "emptyTitle": "Azikho izingxoxo okwamanje",
-      "emptyDescription": "Dala ingxoxo ukuze uqale ukuxoxa nesistimu yakho ye-KiloClaw.",
-      "create": "Dala ingxoxo",
-      "newConversation": "Ingxoxo entsha",
-      "openInstanceSettings": "Vula izilungiselelo zesistimu",
       "today": "Namuhla",
       "yesterday": "Izolo",
-      "thisWeek": "Leli sonto",
       "older": "Okudala"
     },
     "attachment": {
-      "open": "Vula {{filename}}",
-      "openFailed": "Asikwazanga ukuvula okunamathiselwe. Hlola ukuxhumana kwakho bese uzama futhi.",
-      "attachFailed": "Asikwazanga ukunamathisela ifayela.",
-      "limit": "Unganamathisela amafayela afinyelela ku-{{displayCount}}.",
-      "sizeRejection": "Ifayela {{filename}} lidlula umkhawulo wokunamathiselwe ongu-{{limit}}.",
-      "unreadable": "Asikwazanga ukufunda {{filename}}.",
-      "pastedImage": "isithombe esinamathiselwe",
-      "defaultName": "Okunamathiselwe",
       "classificationDenied": "Amafayela aqalisa izinhlelo awakwazi ukunamathiselwa.",
       "classificationEmpty": "Ifayela alinalutho.",
       "classificationTooLarge": "Amafayela kumele abe ngu-20 MB noma ngaphansi.",
@@ -943,426 +883,17 @@
       "networkError": "Kwenzeke iphutha lenethiwekhi.",
       "uploadFailed": "Ukulayisha kwehlulekile.",
       "nothingToPaste": "Akukho ongakunamathisela.",
-      "metadataStripFailed": "Asikwazanga ukususa imininingwane efihliwe yesithombe.",
-      "limit_one": "Unganamathisela ifayela afinyelela ku-{{displayCount}}.",
-      "limit_other": "Unganamathisela amafayela afinyelela ku-{{displayCount}}."
+      "metadataStripFailed": "Asikwazanga ukususa imininingwane efihliwe yesithombe."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Zama futhi ukulayisha {{filename}}",
-      "remove": "Susa {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[umlayezo osusiwe]",
-      "yourMessage": "Umlayezo wakho",
-      "messageFrom": "Umlayezo ovela ku-{{author}}",
-      "moreActions": "Izenzo ezengeziwe",
-      "notDelivered": "Awulethwanga",
-      "edited": "(uhleliwe)",
-      "image": "Isithombe"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Kukopishwe",
-      "copyFailed": "Asikwazanga ukukopisha.",
-      "title": "Izenzo zomlayezo",
-      "deleteTitle": "Ususe umlayezo?",
-      "deleteMessage": "Lokhu kuzosusa umlayezo engxoxweni.",
-      "deleteFailed": "Asikwazanga ukususa umlayezo.",
-      "removeReactionFailed": "Asikwazanga ukususa ukusabela.",
-      "addReactionFailed": "Asikwazanga ukwengeza ukusabela.",
-      "retrySend": "Zama ukuthumela futhi",
-      "moreReactions": "Okunye ukusabela",
-      "edit": "Hlela",
-      "sendFailed": "Asikwazanga ukuthumela umlayezo.",
-      "retrySendFailed": "Asikwazanga ukuphinda sithumele.",
-      "editFailed": "Asikwazanga ukuhlela umlayezo.",
-      "executeFailed": "Asikwazanga ukwenza isenzo."
+      "edit": "Hlela"
     },
     "attachmentPicker": {
-      "takePhoto": "Thatha isithombe",
-      "photoLibrary": "Ilabhulali yezithombe",
-      "files": "Amafayela",
       "cameraAccessMessage": "Vumela ukusetshenziswa kwekhamera kuzilungiselelo ukuze uthathe isithombe."
-    },
-    "typingIndicator": {
-      "someone": "Othile",
-      "typing_one": "{{name}} uyabhala...",
-      "typing": "{{names}} bayabhala...",
-      "typing_other": "{{names}} bayabhala..."
-    },
-    "botStatus": {
-      "offline": "Alixhunyiwe",
-      "loadingUser": "Kulayishwa umsebenzisi...",
-      "waitingForStatus": "Kulindwe isimo serobhothi...",
-      "offlineMessage": "Irobhothi alixhunyiwe. Imilayezo izophinde ithunyelwe lapho selixhumekile futhi."
-    },
-    "errors": {
-      "notAllowed": "Lokhu akuvunyelwe.",
-      "messageTooLong": "Umlayezo mude kakhulu. Wugcine ungaphansi kwezinhlamvu ezingu-{{limit}}.",
-      "titleTooLong": "Isihloko side kakhulu. Sigcine singaphansi kwezinhlamvu ezingu-{{limit}}.",
-      "messageEmpty": "Umlayezo awukwazi ukungabi nalutho."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Asikwazanga ukulayisha amakhophi e-KiloClaw.",
-    "billing": {
-      "title": "Ukukhokha",
-      "continueMonthToMonth": "Qhubeka ukhokha inyanga nenyanga",
-      "plan": "Uhlelo",
-      "finalTermEnds": "Isikhathi sokugcina siphela",
-      "afterFinalTerm": "Ngemva kwesikhathi sokugcina",
-      "lessThanOneDay": "Ngaphansi kosuku olulodwa",
-      "ends": "Kuyaphela",
-      "expires": "Kuphelelwa yisikhathi",
-      "noActivePlan": "Akukho uhlelo olusebenzayo",
-      "noActivePlanDescription": "Awunakho ukubhalisa okusebenzayo kwe-KiloClaw.",
-      "managedByAdmin": "Ukukhokha kulawulwa umphathi wenhlangano yakho.",
-      "couldNotLoad": "Asikwazanga ukulayisha imininingwane yokukhokha.",
-      "manageOnWeb": "Phatha ukukhokha kuwebhu",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Isikhathi sakho sokugcina se-Commit siphela nge-{{date}}. Qhubeka ngohlelo lwe-Standard ngo-{{price}}, kungenjalo ukusingathwa kuzophela.",
-      "freeTrial": "Ukuzama mahhala",
-      "hostingEnds": "Ukusingathwa kuyaphela",
-      "renews": "Kuvuselelwa",
-      "standardMonthToMonth": "I-Standard ekhokhwa inyanga nenyanga",
-      "standardStartsOn": "I-Standard iqala nge-{{date}} ngo-{{price}}.",
-      "yourStandardMonthlyPrice": "intengo yakho yenyanga ye-Standard",
-      "perMonth": "/inyanga",
-      "earlybirdAccessUntil": "Ukufinyelela kwe-Earlybird kuze kube nge-{{date}}.",
-      "earlybirdEnding": "I-Earlybird iyaphela: {{remaining}}.",
-      "paymentPastDue": "Isikhathi sokukhokha sesidlulile. Sicela ubuyekeze indlela yakho yokukhokha.",
-      "subscriptionCancels": "Ukubhalisa kuzokhanselwa nge-{{date}}.",
-      "trialDaysRemaining": "Ukuzama: kusele {{remaining}}.",
-      "trialEndingSoon": "Ukuzama kuzophela maduze: {{remaining}}.",
-      "planName": {
-        "standard": "I-Standard"
-      },
-      "commit": "I-commit"
-    },
-    "changelog": {
-      "title": "Okusha",
-      "couldNotLoad": "Asikwazanga ukulayisha umlando wezinguquko.",
-      "noUpdates": "Azikho izibuyekezo okwamanje",
-      "noUpdatesDescription": "Umlando wezinguquko uzovela lapha.",
-      "recentUpdates": "Izibuyekezo zakamuva",
-      "manageVersion": "Phatha inguqulo",
-      "redeployRequired": "Ukufakwa kabusha kuyadingeka",
-      "redeploySuggested": "Ukufakwa kabusha kuyatuswa",
-      "upgradeRequired": "Ukuthuthukisa kuyadingeka"
-    },
-    "dashboard": {
-      "title": "Ideshibhodi",
-      "couldNotLoad": "Asikwazanga ukulayisha ideshibhodi.",
-      "renameInstance": "Qamba kabusha ikhophi",
-      "renamePlaceholder": "Igama elisha (izinhlamvu ezingeqi ku-50)",
-      "someDetailsFailed": "Asikwazanga ukulayisha eminye imininingwane yamanje.",
-      "destroy": "Susa unomphela",
-      "destroyMessage": "Lokhu kuzosusa unomphela ikhophi yakho ye-KiloClaw nayo yonke idatha yayo. Lesi senzo asikwazi ukuhlehliswa.",
-      "destroyTitle": "Susa ikhophi unomphela",
-      "instance": "Ikhophi",
-      "couldNotCheckStatus": "Asikwazanga ukuhlola isimo sesevisi.",
-      "dangerZone": "INDAWO EYINGOZI",
-      "destroying": "Isuswa unomphela…",
-      "serviceDegraded": "Isevisi ayisebenzi kahle — thepha ukuze ubuke isimo",
-      "up": "IYASEBENZA"
-    },
-    "channels": {
-      "title": "Iziteshi",
-      "couldNotLoad": "Asikwazanga ukulayisha iziteshi.",
-      "noChannels": "Azikho iziteshi ezitholakalayo",
-      "noChannelsDescription": "Ukuxhumana neziteshi kuzovela lapha.",
-      "connected": "{{label}} ixhunyiwe",
-      "disconnectMessage": "Uyasusa {{label}}? Lesi siteshi sizonqanyulwa.",
-      "disconnectTitle": "Nqamula isiteshi"
-    },
-    "devicePairing": {
-      "title": "Ukubhangqa amadivayisi",
-      "refreshRequests": "Vuselela izicelo zokubhangqa",
-      "couldNotLoad": "Asikwazanga ukulayisha izicelo zokubhangqa.",
-      "noPending": "Azikho izicelo ezilindile",
-      "noPendingDescription": "Izicelo zokubhangqa zeziteshi nezamadivayisi zizovela lapha.",
-      "channelRequests": "Izicelo zeziteshi",
-      "deviceRequests": "Izicelo zamadivayisi",
-      "approveDeviceMessage": "Uyayivumela {{platform}} ukuthi ixhumane nekhophi yakho?",
-      "approveDeviceTitle": "Vumela idivayisi",
-      "approveMessage": "Uyayivumela {{label}} (ikhodi: {{code}}) ukuthi ixhumane nekhophi yakho?",
-      "approveTitle": "Vumela isicelo sokubhangqa",
-      "unknownDevice": "Idivayisi engaziwa"
-    },
-    "execPolicy": {
-      "title": "Inqubomgomo yokuqalisa imiyalo",
-      "couldNotLoad": "Asikwazanga ukulayisha inqubomgomo yokusebenzisa imiyalo.",
-      "alwaysAsk": "Buza njalo",
-      "alwaysAskDescription": "Qinisekisa umyalo ngamunye ngaphambi kokuwusebenzisa. Lena indlela ephephe kakhulu.",
-      "neverAsk": "Ungalokothi ubuze",
-      "neverAskDescription": "Sebenzisa imiyalo ngaphandle kokuqinisekisa. Kuyashesha kodwa akuphephile kangako."
-    },
-    "google": {
-      "title": "I-akhawunti ye-Google",
-      "couldNotLoad": "Asikwazanga ukulayisha isimo se-akhawunti ye-Google.",
-      "disconnected": "I-akhawunti ye-Google inqanyuliwe. Faka kabusha ikhophi yakho ukuze ushintsho lusebenze.",
-      "setupCommand": "Umyalo wokusetha",
-      "setupCommandHelp": "Sebenzisa lo myalo kutheminali ekhompyutheni yakho efakwe i-Docker ukuze uxhume i-akhawunti yakho ye-Google.",
-      "failedToLoadCommand": "Asikwazanga ukulayisha umyalo wokusetha.",
-      "gmailNotifications": "Izaziso ze-Gmail",
-      "disconnect": "Nqamula i-akhawunti ye-Google",
-      "copied": "Kukopishwe",
-      "copyCommand": "Kopisha umyalo",
-      "disconnectConfirm": "Nqamula",
-      "disconnectMessage": "Uyasusa i-akhawunti yakho ye-Google kule khophi? Lokhu kuzovala izaziso ze-Gmail. Faka ikhophi kabusha ngemva kokunqamula ukuze izinguquko zisebenze.",
-      "disconnectTitle": "Nqamula i-Google"
-    },
-    "modelList": {
-      "noMatches": "Awekho amamodeli ahambelana nokusesha kwakho",
-      "noModelsDescription": "Amamodeli azovela lapha uma etholakala.",
-      "noResultsFor": "Ayikho imiphumela yokuthi \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Izimfihlo",
-      "couldNotLoad": "Asikwazanga ukulayisha izimfihlo.",
-      "noSecrets": "Azikho izimfihlo ezitholakalayo",
-      "noSecretsDescription": "Ukuxhumana ngamathuluzi asebenzisa izimfihlo kuzovela lapha.",
-      "removeMessage": "Uyasusa {{label}}? Leli thuluzi ngeke lisakwazi ukufinyelela imininingwane yalo yokungena.",
-      "removeTitle": "Susa imfihlo",
-      "saved": "{{label}} ilondoloziwe",
-      "hide": "Fihla {{label}}",
-      "show": "Khombisa {{label}}",
-      "allFieldsRequired": "Zonke izinkambu ziyadingeka ukuze uxhume {{label}}.",
-      "setupGuideFallback": "umhlahlandlela wokusetha",
-      "setupGuideA11y": "umhlahlandlela wokusetha we-{{label}}",
-      "setupGuide": "Umhlahlandlela wokusetha",
-      "saving": "Kuyalondolozwa…",
-      "removing": "Kuyasuswa…",
-      "updateToken": "Buyekeza ithokheni"
-    },
-    "versionPin": {
-      "title": "Ukukhiya inguqulo",
-      "couldNotLoad": "Asikwazanga ukulayisha imininingwane yenguqulo.",
-      "couldNotLoadMore": "Asikwazanga ukulayisha ezinye izinguqulo.",
-      "loadMore": "Layisha ezinye izinguqulo",
-      "showingLatest": "Kuboniswa izinguqulo zakamuva ezingu-100.",
-      "availableVersions": "Izinguqulo ezitholakalayo",
-      "noVersions": "Azikho izinguqulo ezitholakalayo",
-      "noVersionsDescription": "Izinguqulo ze-OpenClaw ezitholakalayo zizovela lapha.",
-      "unpin": "Khulula",
-      "unpinMessage": "Uyabuyela enguqulweni yakamuva etholakalayo?",
-      "unpinTitle": "Khulula inguqulo",
-      "confirmPin": "Qinisekisa ukubopha",
-      "followingLatest": "Ilandela eyakamuva",
-      "latest": "eyakamuva",
-      "pin": "Bopha",
-      "pinnedByAdmin": "Inguqulo iboshwe umphathi — xhumana nomphathi wakho ukuze uyishintshe.",
-      "pinnedTo": "Kuboshelwe ku-{{version}}",
-      "reasonOptional": "Isizathu (asiphoqelekile)",
-      "reasonPlaceholder": "Isizathu sokubopha le nguqulo",
-      "replaceAdminPin": "Shintsha inguqulo eboshwe umphathi",
-      "replacesAdminPin": "Lokhu kushintsha inguqulo eboshwe umphathi (okwamanje {{label}})."
-    },
-    "redeploy": "Faka kabusha",
-    "redeployMessage": "Uqinisekile ukuthi ufuna ukufaka kabusha le khophi?",
-    "redeployTitle": "Faka kabusha ikhophi",
-    "controls": {
-      "redeploying": "Ifakwa kabusha…",
-      "restart": "Qala kabusha",
-      "restartOpenClawMessage": "Uqinisekile ukuthi ufuna ukuqala kabusha inqubo ye-OpenClaw?",
-      "restartOpenClawTitle": "Qala kabusha i-OpenClaw",
-      "restarting": "Iqalwa kabusha…",
-      "start": "Qala",
-      "startMessage": "Uqinisekile ukuthi ufuna ukuqala le khophi?",
-      "startTitle": "Qala ikhophi",
-      "stop": "Misa",
-      "stopMessage": "Uqinisekile ukuthi ufuna ukumisa le khophi?",
-      "stopTitle": "Misa ikhophi",
-      "stopping": "Iyamiswa…"
-    },
-    "empty": {
-      "finishingSetup": "Kuqedelwa ukusetha",
-      "finishingSetupDescription": "Linda isikhashana, siqedela ukusetha i-akhawunti yakho. Lokhu kuvame ukuthatha isikhashana.",
-      "getStarted": "Qala",
-      "noInstancesDescription": "Dala ikhophi yakho yokuqala ukuze uqale ukusebenzisa ama-ejenti okubhala ikhodi."
-    },
-    "instance": {
-      "backToInstances": "Buyela kumakhophi",
-      "couldNotLoad": "Asikwazanga ukulayisha ikhophi.",
-      "notFound": "Ikhophi ayitholakalanga",
-      "notFoundDescription": "Kungenzeka le khophi isuswe unomphela noma isixhumanisi asisasebenzi."
-    },
-    "list": {
-      "createInstance": "Dala ikhophi",
-      "organizations": "Izinhlangano",
-      "accessIssue": {
-        "trialExpired": "Ukuzama kuphelile, bhalisa ukuze uqhubeke usebenzisa le khophi",
-        "subscriptionCanceled": "Ukubhalisa akusebenzi, bhalisa kabusha ukuze uqhubeke usebenzisa le khophi",
-        "subscriptionPastDue": "Kunenkinga yokukhokha, buyekeza imininingwane yokukhokha ukuze uqhubeke usebenzisa le khophi",
-        "quarantined": "Ikhophi ihlukanisiwe, idinga ukubuyekezwa umuntu",
-        "multipleCurrentConflict": "I-akhawunti idinga ukuhlolwa",
-        "nonCanonicalEarlybird": "Uhlelo oludala ludinga ukubuyekezwa"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Xoxa no-{{name}}",
-        "ready": "{{name}} uselungele",
-        "warmedUp": "Konke sekulungile. Bingelela noma nini uma usulungele."
-      },
-      "flow": {
-        "genericErrorBody": "Asikwazanga ukuqeda ukusetha ikhophi yakho njengamanje.",
-        "manualReviewBody": "Isimo se-akhawunti yakho sidinga ukunakwa ngaphambi kokuba sidale ikhophi. Qhubeka ku-kilo.ai.",
-        "manualReviewTitle": "Ukusetha kudinga ukubuyekezwa umuntu",
-        "openKiloAi": "Vula i-kilo.ai",
-        "provisioning": "Ukulungiselela izinsiza",
-        "review": "Ukuhlola",
-        "identityTitle": "Nikeza irobhothi lakho ubunikazi",
-        "couldNotLoad": "Asikwazanga ukulayisha isimo sokusetha kokuqala.",
-        "finishingSetup": "Siqedela ukusetha — linda isikhashana ngenkathi siqedela i-akhawunti yakho.",
-        "ready": "Kulungele",
-        "settingUp": "Kuyasethwa…"
-      },
-      "unavailableDescription": "Kudingeka ukubhalisa okusebenzayo kwe-KiloClaw ukuze kulungiselelwe ikhophi. Amakhophi nokubhalisa okukhona kuqhubeka njengokujwayelekile.",
-      "unavailableTitle": "Amakhophi amasha e-KiloClaw awatholakali",
-      "identity": {
-        "chooseAvatar": "Khetha isithombe sobunikazi",
-        "namePlaceholder": "Igama lerobhothi lakho",
-        "selectAvatar": "Khetha {{name}} njengesithombe sobunikazi",
-        "personality": "Ubuntu",
-        "changePersonality": "Shintsha ubuntu",
-        "location": "Indawo",
-        "locationPlaceholder": "Idolobha noma isifunda (akuphoqelekile)",
-        "useCurrentLocation": "Sebenzisa indawo yamanje",
-        "locationDeniedTitle": "Imvume yokuthola indawo inqatshelwe",
-        "locationDeniedMessage": "Vumela ukutholwa kwendawo kuzilungiselelo ukuze usebenzise indawo yakho yamanje.",
-        "locationValidationFailed": "Indawo ayikwazanga ukuqinisekiswa.",
-        "locationResolveFailed": "Asikwazanga ukuthola indawo yakho. Ungayihlela ngokwakho.",
-        "locationGetFailed": "Asikwazanga ukuthola indawo yakho. Ifake ngokwakho.",
-        "nature": {
-          "aiAssistantLabel": "Umsizi we-AI",
-          "aiAssistantVibe": "Uyasiza, unekhono, usebenza ngobuchwepheshe",
-          "digitalCreatureLabel": "Isidalwa sedijithali",
-          "digitalCreatureVibe": "Sihlukile, siyaphila, asihlale silindeleka",
-          "virtualCompanionLabel": "Umngane wedijithali",
-          "virtualCompanionVibe": "Unobungane, ukhona, uyakukhathalela ngempela",
-          "somethingWeirderLabel": "Okuthile okuxakile nakakhulu…",
-          "somethingWeirderVibe": "Kuchaze wena"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Sengiqedile! Ngihlanganise isifinyezo obusicele. Ngilungele uma nawe usulungele.",
-        "settingUp": "Kusethwa izaziso…",
-        "stayInTheLoop": "Hlala unolwazi",
-        "getNotified": "Thola isaziso lapho {{name}} eqeda umsebenzi ukuze ungaphuthelwa impendulo.",
-        "now": "manje",
-        "skipForNow": "Yeqa okwamanje",
-        "couldNotEnable": "Asikwazanga ukuvula izaziso."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Asikwazanga ukuhlola ukusetha",
-        "queryErrorBody": "Ukuxhumana kunqamukile ngenkathi sihlola ukusethwa kuka-{{name}}. Kungenzeka ukusetha kusaqhubeka. Zama futhi noma ubuye ngemva kwesikhashana.",
-        "stoppedTitle": "Ukusetha kumisiwe",
-        "stoppedBody": "Ikhophi ka-{{name}} ime ngokungalindelekile ngesikhathi sokusetha.",
-        "stalledTitle": "Kukhona okumile",
-        "stalledBody": "Asikwazanga ukuqeda ukusetha kuka-{{name}}. Zama futhi, noma thumela i-imeyili ku-{{supportEmail}} uma lokhu kuqhubeka.",
-        "timeoutTitle": "Kuthatha isikhathi eside kunalokho okulindelekile",
-        "timeoutBody": "Ukusetha kuka-{{name}} kuthatha isikhathi eside kunokujwayelekile (ngaphezu kwemizuzu engu-{{displayMinutes}}).",
-        "continueInBackground": "Qhubeka ngemuva",
-        "settingUp": "Kusethwa u-{{name}}",
-        "connectingToAgent": "Kuxhunywa ku-ejenti",
-        "startingSandbox": "Kuqalwa indawo yokusebenza ehlukanisiwe",
-        "backgroundHint": "Ngokuvamile kuthatha ngaphansi komzuzu. Ungavala lokhu — sizoqhubeka sisebenza ngemuva."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Ikhodi {{code}}",
-      "gatewayProcess": "INQUBO YESANGO LOKUXHUMANA",
-      "lastExit": "Ukuphuma kokugcina",
-      "memory": "Inkumbulo",
-      "region": "Isifunda",
-      "resources": "IZINSIZA",
-      "restarts": "Ukuqalwa kabusha",
-      "state": "Isimo",
-      "uptime": "Isikhathi sokusebenza",
-      "crashed": "IPHUKILE",
-      "destroying": "ISUSWA UNOMPHELA",
-      "provisioned": "ILUNGISELELWE",
-      "restarting": "IQALWA KABUSHA",
-      "running": "KUYASEBENZA",
-      "shuttingDown": "IYAVALWA",
-      "starting": "KUYAQALA",
-      "stopped": "IMISIWE",
-      "stopping": "IYAMISWA",
-      "unknown": "OKUNGAZIWA",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Ehamba phambili",
-      "frontierDescription": "Ukusebenza okuphakeme kakhulu. Isebenzisa amamodeli ahamba phambili anekhono lokucabangisisa.",
-      "balancedDescription": "Isivinini nekhono kulingana kahle ngezindleko eziphansi.",
-      "autoModelA11y": "imodeli ezenzakalelayo ye-{{label}}",
-      "currentModel": "Imodeli yamanje",
-      "browseAllModels": "noma khetha kumamodeli angaphezu kuka-500",
-      "browseAllModelsA11y": "Buka wonke amamodeli angaphezu kuka-500"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Ukuze uqhubeke usebenzisa i-KiloClaw, iya ku-kilo.ai/claw ngesiphequluli sakho. Awukwazi ukubhalisa kulolu hlelo lokusebenza.",
-      "subscriptionCanceledTitle": "Bhalisela uhlelo kuwebhu",
-      "subscriptionCanceledBody": "Ukuze usebenzise i-KiloClaw, iya ku-kilo.ai/claw ngesiphequluli sakho. Awukwazi ukubhalisa kulolu hlelo lokusebenza.",
-      "subscriptionCanceledCta": "Vula i-kilo.ai/claw",
-      "subscriptionPastDueTitle": "Buyekeza imininingwane yokukhokha kuwebhu",
-      "subscriptionPastDueBody": "Sibe nenkinga ngenkokhelo yakho yakamuva. Iya ku-kilo.ai/claw ngesiphequluli sakho ukuze ubuyekeze imininingwane yokukhokha. Awukwazi ukuphatha ukukhokha kulolu hlelo lokusebenza.",
-      "quarantinedTitle": "Ikhophi idinga ukulungiswa",
-      "quarantinedBody": "Ikhophi yakho ye-KiloClaw ihlukanisiwe futhi ayikwazi ukusetshenziswa njengamanje. Ithimba lethu lidinga ukusiza ukuyibuyisela esimweni sokusebenza.",
-      "multipleCurrentConflictBody": "Sithole ukubhalisa okusebenzayo okungaphezu kokukodwa ku-akhawunti yakho. Ngakho simise ukusebenza okwesikhashana ukuze singakukhokhisi kabili.",
-      "multipleCurrentConflictCta": "Qhubeka ku-kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Uhlelo oludala lutholakele",
-      "nonCanonicalEarlybirdBody": "Uhlelo lwakho lokufinyelela kusenesikhathi ludinga ukubuyekezwa umuntu ngaphambi kokuba lusetshenziswe efonini.",
-      "iosTitle": "I-KiloClaw ayitholakali ku-iOS",
-      "iosBody": "Ukufinyelela kwe-KiloClaw kule akhawunti kulawulwa ngaphandle kohlelo lokusebenza lwe-iOS.",
-      "iosContact": "Unemibuzo? Xhumana no-{{supportEmail}}.",
-      "quarantinedCta": "Thumela i-imeyili eqenjini lethu",
-      "nonCanonicalEarlybirdCta": "Hlole uhlelo lwakho ku-kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} idinga ukunakwa: {{label}}",
-      "openUnread_one": "Vula u-{{name}}, umlayezo ongu-{{displayCount}} ongakafundwa",
-      "openUnread": "Vula {{name}}, imilayezo engafundiwe engu-{{displayCount}}",
-      "openUnread_other": "Vula {{name}}, imilayezo engafundiwe engu-{{displayCount}}",
-      "openSettings": "Vula izilungiselelo zika-{{name}}",
-      "fixOnKiloAi": "Lungisa ku-kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Vumela izicelo zamadivayisi",
-      "execPolicyDescription": "Izilungiselelo zokuphepha",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Ukukhetha imodeli ye-AI",
-      "secretsDescription": "Imininingwane yokungena ebethelwe",
-      "versionPinDescription": "Bophela enguqulweni ethile"
-    },
-    "avatar": {
-      "arcade": "Umshini wemidlalo",
-      "brain": "Ubuchopho",
-      "creature": "Isidalwa",
-      "crystal": "Ikristalu",
-      "custom": "Isithombe sobunikazi esenziwe ngokwezifiso",
-      "dragon": "Udrako",
-      "explorer": "Umhloli",
-      "flame": "Ilangabi",
-      "lightning": "Umbane",
-      "magicWand": "Induku yomlingo",
-      "moon": "Inyanga",
-      "operator": "Umqhubi",
-      "orbit": "Umjikelezo",
-      "oracle": "Isibikezeli",
-      "rainbow": "Uthingo",
-      "robot": "Irobhothi",
-      "satellite": "Isathelayithi",
-      "sparkles": "Ukucwebezela",
-      "strongArm": "Ingalo enamandla",
-      "talisman": "Intelezi"
-    },
-    "remoteSpawnFilesNotSupported": "Le khophi ayikwazi ukwamukela amafayela.",
-    "instanceSwitcherTitle": "Ikhophi ye-KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Hambisa {{filename}} kwesokunxele",
       "moveRight": "Hambisa {{filename}} kwesokudla"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Namathisela isithombe esivela ebhodini lokunamathisela",
-      "label": "Isithombe sitholiwe, thepha ukuze usinamathisele"
-    },
     "attachmentPicker": {
       "camera": "Ikhamera",
       "photoLibrary": "Ilabhulali yezithombe",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "Iseshini ikhishiwe ku-akhawunti.",
     "signOutThisDeviceTitle": "Uyafuna ukuphuma ngemvume kule divayisi?",
     "signOutThisSessionTitle": "Uyafuna ukuphuma ngemvume kule seshini?",
-    "signOutThisSessionMessage": "{{device}} izokhishwa ku-akhawunti. Isengafinyelela ku-API isikhathi esifinyelela ehoreni elilodwa."
+    "signOutThisSessionMessage": "{{device}} izokhishwa ku-akhawunti. Isengafinyelela ku-API isikhathi esifinyelela ehoreni elilodwa.",
+    "unknownDevice": "Idivayisi engaziwa"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Asikwazanga ukuvula isitolo sezinhlelo zokusebenza.",

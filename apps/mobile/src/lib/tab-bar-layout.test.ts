@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { i18n } from '@/i18n';
 import {
   getEffectiveTabBarHeight,
   getTabBarHorizontalInset,
@@ -24,7 +23,7 @@ import {
   tabLabelLineCount,
   tabLabelNumberOfLines,
   tabLabelWidth,
-  visibleTabCount,
+  VISIBLE_TAB_COUNT,
 } from '@/lib/tab-bar-layout';
 
 const LAYOUT_SOURCE = readFileSync(
@@ -200,13 +199,12 @@ describe('tabLabelWidth', () => {
   it('measures a wrapped label line by line, but a space-separated label as one line', () => {
     // Only the explicit break splits the label into two lines; a plain space
     // stays on the single line the renderer lays out.
-    expect(tabLabelWidth('Kilo\nClaw')).toBeCloseTo(tabLabelWidth('Kilo'), 5);
+    expect(tabLabelWidth('Quick\nChat')).toBeCloseTo(tabLabelWidth('Quick'), 5);
     expect(tabLabelWidth('Bogga shakhsiga')).toBeCloseTo(15 * (0.6 * 11 + 0.2), 5);
   });
 
   it('counts a plain space as part of the single rendered line', () => {
-    // "Kilo Claw" is one line of 9 glyphs, not the 4-glyph widest word.
-    expect(tabLabelWidth('Kilo Claw')).toBeCloseTo(9 * (0.6 * 11 + 0.2), 5);
+    expect(tabLabelWidth('Quick Chat')).toBeCloseTo(10 * (0.6 * 11 + 0.2), 5);
   });
 
   it('scales the glyph advance (not the tracking) with the system font scale', () => {
@@ -229,9 +227,7 @@ describe('tabLabelFits', () => {
   });
 
   it('rejects a space-separated label that overflows its single rendered line', () => {
-    // "KILO CLAW" renders on one 9-glyph line (61.2dp), so it cannot fit the
-    // 43.3dp label box even though either word alone would.
-    expect(tabLabelFits('Kilo Claw', 160 / 3)).toBe(false);
+    expect(tabLabelFits('Quick Chat', 160 / 3)).toBe(false);
     expect(tabLabelFits('Bogga shakhsiga', 160 / 3)).toBe(false);
   });
 });
@@ -249,16 +245,11 @@ describe('shouldShowTabLabel', () => {
   });
 
   it('drops the labels when any label is too wide for its tab', () => {
-    // Reported geometry: 160dp / 5 tabs = 32dp per tab, 22dp for the label
-    expect(shouldShowTabLabel(1, 160 / 5, ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'])).toBe(
-      false
-    );
+    expect(shouldShowTabLabel(1, 160 / 4, ['Home', 'Agents', 'Chat', 'Profile'])).toBe(false);
   });
 
   it('keeps the labels when every label fits its tab', () => {
-    expect(shouldShowTabLabel(1, 360 / 5, ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'])).toBe(
-      true
-    );
+    expect(shouldShowTabLabel(1, 360 / 4, ['Home', 'Agents', 'Chat', 'Profile'])).toBe(true);
   });
 
   it('drops the labels when a space-separated label overflows its single line', () => {
@@ -292,7 +283,7 @@ describe('tab label shrink floor', () => {
   // platform cap may not be the thing that keeps the labels legible.
   const LABEL_SETS: readonly (readonly string[])[] = [
     ['Home', 'Agents', 'Profile'],
-    ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'],
+    ['Home', 'Agents', 'Chat', 'Profile'],
     ['Home', 'Agents', 'Bogga shakhsiga'],
   ];
   // The label box is the tab item minus its 10dp horizontal padding.
@@ -322,7 +313,7 @@ describe('tab label shrink floor', () => {
   });
 
   it('drops the label row before a label could need a shrink below the floor', () => {
-    const floorBoundLabels = ['Profile', 'Kilo Claw', 'Bogga shakhsiga', '設定'];
+    const floorBoundLabels = ['Profile', 'Quick Chat', 'Bogga shakhsiga', '設定'];
     let checkedWidths = 0;
     for (const label of floorBoundLabels) {
       for (const tabWidth of TAB_WIDTHS) {
@@ -351,8 +342,7 @@ describe('tabLabelNumberOfLines', () => {
   });
 
   it('keeps the two lines for copy that carries its own break', () => {
-    expect(tabLabelNumberOfLines(i18n.t('tabs.kiloclawWrapped'))).toBe(2);
-    expect(tabLabelNumberOfLines('Kilo\nClaw')).toBe(2);
+    expect(tabLabelNumberOfLines('Quick\nChat')).toBe(2);
   });
 });
 
@@ -379,7 +369,6 @@ describe('mirrored tab label metrics', () => {
 
 describe('shouldHideTabBar', () => {
   it('hides tabs for full-screen nested routes', () => {
-    expect(shouldHideTabBar('/chat/sandbox-1/instance-picker', [])).toBe(true);
     expect(shouldHideTabBar('/security-agent/personal/filter', [])).toBe(true);
     expect(shouldHideTabBar('/security-agent/org-1/filter', [])).toBe(true);
   });
@@ -412,45 +401,12 @@ describe('tabAccessibilityLabel', () => {
   });
 });
 
-describe('visibleTabCount', () => {
-  it('counts Home, Agents, Chat, and Profile when KiloClaw is hidden', () => {
-    expect(visibleTabCount(false)).toBe(4);
-  });
-
-  it('adds the KiloClaw tab when visible', () => {
-    expect(visibleTabCount(true)).toBe(5);
-  });
-});
-
-describe('tabBarPosition', () => {
-  const withoutKiloClaw = { showKiloClaw: false };
-  const withKiloClaw = { showKiloClaw: true };
-
-  it('positions Home at 1 regardless of KiloClaw visibility', () => {
-    expect(tabBarPosition('home', withoutKiloClaw)).toBe(1);
-    expect(tabBarPosition('home', withKiloClaw)).toBe(1);
-  });
-
-  it('returns null for a hidden KiloClaw tab', () => {
-    expect(tabBarPosition('kiloclaw', withoutKiloClaw)).toBeNull();
-  });
-
-  it('positions KiloClaw at 2 when shown', () => {
-    expect(tabBarPosition('kiloclaw', withKiloClaw)).toBe(2);
-  });
-
-  it('positions Agents after KiloClaw', () => {
-    expect(tabBarPosition('agents', withoutKiloClaw)).toBe(2);
-    expect(tabBarPosition('agents', withKiloClaw)).toBe(3);
-  });
-
-  it('always positions Chat after Agents', () => {
-    expect(tabBarPosition('chat', withoutKiloClaw)).toBe(3);
-    expect(tabBarPosition('chat', withKiloClaw)).toBe(4);
-  });
-
-  it('positions Profile last regardless of KiloClaw visibility', () => {
-    expect(tabBarPosition('profile', withoutKiloClaw)).toBe(4);
-    expect(tabBarPosition('profile', withKiloClaw)).toBe(5);
+describe('tab navigation', () => {
+  it('renders Home, Agents, Chat, and Profile in order', () => {
+    expect(VISIBLE_TAB_COUNT).toBe(4);
+    expect(tabBarPosition('home')).toBe(1);
+    expect(tabBarPosition('agents')).toBe(2);
+    expect(tabBarPosition('chat')).toBe(3);
+    expect(tabBarPosition('profile')).toBe(4);
   });
 });

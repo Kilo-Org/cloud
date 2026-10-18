@@ -101,12 +101,9 @@
     "scheduled": "Wedi'i drefnu",
     "keepEditing": "Parhau i olygu",
     "keepRunning": "Parhau i redeg",
-    "kiloclaw": "KiloClaw",
     "newSession": "Sesiwn newydd",
-    "noKiloclawInstances": "Dim enghreifftiau KiloClaw",
     "noModelsAvailable": "Dim modelau ar gael",
     "notFound": "Ni ddaethpwyd o hyd i'r eitem.",
-    "online": "Ar-lein",
     "open": "Agor {{name}}",
     "openPullRequest": "Agor cais tynnu",
     "pending": "Yn aros",
@@ -257,7 +254,8 @@
     "renamePasskey": "Ailenwi allwedd mynediad",
     "removePasskey": "Dileu allwedd mynediad",
     "removePasskeyTitle": "Dileu allwedd mynediad?",
-    "removePasskeyMessage": "Ni fyddwch yn gallu mewngofnodi gyda'r allwedd mynediad hon mwyach."
+    "removePasskeyMessage": "Ni fyddwch yn gallu mewngofnodi gyda'r allwedd mynediad hon mwyach.",
+    "changelog": "Beth sy'n newydd"
   },
   "preferences": {
     "general": "Cyffredinol",
@@ -896,23 +894,18 @@
     "previewGenericDescription": "Mae hysbysiadau'n dangos bod rhywbeth wedi digwydd. Agorwch Kilo i'w ddarllen.",
     "channel": {
       "agentProgress": "Cynnydd asiant",
-      "chat": "Negeseuon sgwrs",
-      "kiloclaw": "Gweithgaredd KiloClaw",
       "balance": "Rhybuddion balans",
       "security": "Canfyddiadau diogelwch",
       "spend": "Rhybuddion gwariant",
       "followedSessions": "Sesiynau a ddilynir"
     },
     "category": {
-      "chatMessagesSubtitle": "atebion yn eich sgyrsiau",
       "agentAttentionTitle": "Mae'r asiant angen eich sylw",
       "agentAttentionSubtitle": "cwestiynau a cheisiadau am ganiatâd neu fewnbwn",
       "agentUpdatesTitle": "Diweddariadau asiant",
       "agentUpdatesSubtitle": "negeseuon gan yr asiant yn ystod tasg",
       "sessionStatusTitle": "Statws sesiwn",
       "sessionStatusSubtitle": "wedi gorffen / wedi methu / yn barod i'w reoli",
-      "kiloclawActivitySubtitle": "enghraifft yn barod neu wedi methu, gweithredoedd wedi'u hamserlennu",
-      "kiloclawActivityUnavailable": "Dechreuwch enghraifft KiloClaw i gael gweithgarwch KiloClaw.",
       "balanceAlertsSubtitle": "rhybuddion am falans isel y sefydliad",
       "balanceAlertsUnavailable": "Ymunwch â sefydliad i gael rhybuddion balans.",
       "securityFindingsSubtitle": "canfyddiadau newydd a nodiadau atgoffa SLA",
@@ -932,72 +925,19 @@
   },
   "tabs": {
     "home": "Cartref",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, tab, {{position}} o {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Newid instans",
-      "couldNotLoadInstances": "Ni ellid llwytho'r instansau.",
-      "noInstancesDescription": "Sefydlwch instans i ddechrau sgwrsio.",
-      "setUpKiloclaw": "Sefydlu KiloClaw",
-      "currentInstance": "{{title}}, cyfredol"
-    },
     "conversation": {
-      "failedToLoad": "Ni ellid llwytho'r sgwrs.",
-      "notFound": "Ni chanfuwyd y sgwrs.",
       "untitled": "Heb deitl",
-      "leaveTitle": "Gadael y sgwrs?",
-      "leaveMessage": "Mae hyn yn ei thynnu o'ch rhestr.",
-      "openHint": "Mae hwn yn agor y sgwrs. Pwyswch a daliwch i weld yr opsiynau ailenwi a gadael.",
-      "unread": "Heb ei darllen",
-      "optionsFor": "Opsiynau sgwrs ar gyfer {{title}}",
-      "options": "Opsiynau sgwrs",
-      "renameTitle": "Ailenwi sgwrs",
-      "renamePlaceholder": "Enw newydd",
-      "couldNotReachBot": "Ni ellid cysylltu â'r bot. Ceisiwch eto.",
-      "messageDeliveryFailed": "Ni ellid danfon y neges i'r bot.",
-      "couldNotSignIn": "Ni ellid mewngofnodi i'r sgwrs.",
-      "couldNotRefreshMessages": "Ni ellid adnewyddu'r negeseuon.",
-      "couldNotLoadHistory": "Ni ellid llwytho hanes y sgwrs.",
-      "leave": "Gadael",
-      "untitledConversation": "Sgwrs heb deitl",
-      "createFailed": "Ni ellid creu'r sgwrs.",
-      "leaveFailed": "Ni ellid gadael y sgwrs."
-    },
-    "reactions": {
-      "common": "Cyffredin",
-      "reactWith": "Ymateb gyda {{reaction}}",
-      "accessibility": "Ymateb {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Yn ymateb i",
-      "cancelReply": "Canslo ateb",
-      "openInstance": "Agor instans",
-      "attachFile": "Atodi ffeil",
-      "cancelEdit": "Canslo golygu"
+      "renamePlaceholder": "Enw newydd"
     },
     "conversationList": {
-      "couldNotLoad": "Ni ellid llwytho'r sgyrsiau.",
-      "emptyTitle": "Dim sgyrsiau eto",
-      "emptyDescription": "Crëwch sgwrs i ddechrau sgwrsio â'ch instans KiloClaw.",
-      "create": "Creu sgwrs",
-      "newConversation": "Sgwrs newydd",
-      "openInstanceSettings": "Agor gosodiadau'r instans",
       "today": "Heddiw",
       "yesterday": "Ddoe",
-      "thisWeek": "Yr wythnos hon",
       "older": "Hŷn"
     },
     "attachment": {
-      "open": "Agor {{filename}}",
-      "openFailed": "Ni ellid agor yr atodiad. Gwiriwch eich cysylltiad a cheisiwch eto.",
-      "attachFailed": "Ni ellid atodi'r ffeil.",
-      "limit": "Gallwch atodi hyd at {{displayCount}} ffeil.",
-      "sizeRejection": "Mae {{filename}} yn fwy na'r terfyn maint o {{limit}} ar gyfer atodiadau.",
-      "unreadable": "Ni ellid darllen {{filename}}.",
-      "pastedImage": "y ddelwedd a ludiwyd",
-      "defaultName": "Atodiad",
       "classificationDenied": "Ni ellir atodi ffeiliau gweithredadwy.",
       "classificationEmpty": "Mae'r ffeil yn wag.",
       "classificationTooLarge": "Rhaid i ffeiliau fod yn 20 MB neu lai.",
@@ -1007,438 +947,17 @@
       "networkError": "Digwyddodd gwall rhwydwaith.",
       "uploadFailed": "Methodd yr uwchlwythiad.",
       "nothingToPaste": "Nid oes dim i'w ludo.",
-      "metadataStripFailed": "Ni ellid tynnu metadata'r llun.",
-      "limit_one": "Gallwch atodi hyd at {{displayCount}} ffeil.",
-      "limit_other": "Gallwch atodi hyd at {{displayCount}} ffeil.",
-      "limit_zero": "Gallwch atodi hyd at {{displayCount}} ffeil.",
-      "limit_two": "Gallwch atodi hyd at {{displayCount}} ffeil.",
-      "limit_few": "Gallwch atodi hyd at {{displayCount}} ffeil.",
-      "limit_many": "Gallwch atodi hyd at {{displayCount}} ffeil."
+      "metadataStripFailed": "Ni ellid tynnu metadata'r llun."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Rhoi cynnig eto ar uwchlwytho {{filename}}",
-      "remove": "Tynnu {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[neges wedi'i dileu]",
-      "yourMessage": "Eich neges",
-      "messageFrom": "Neges gan {{author}}",
-      "moreActions": "Mwy o weithredoedd",
-      "notDelivered": "Heb ei danfon",
-      "edited": "(wedi'i golygu)",
-      "image": "Delwedd"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Copïwyd",
-      "copyFailed": "Ni ellid copïo.",
-      "title": "Gweithredoedd neges",
-      "deleteTitle": "Dileu neges?",
-      "deleteMessage": "Bydd hyn yn tynnu'r neges o'r sgwrs.",
-      "deleteFailed": "Ni ellid dileu'r neges.",
-      "removeReactionFailed": "Ni ellid tynnu'r ymateb.",
-      "addReactionFailed": "Ni ellid ychwanegu'r ymateb.",
-      "retrySend": "Anfon eto",
-      "moreReactions": "Mwy o ymatebion",
-      "edit": "Golygu",
-      "sendFailed": "Ni ellid anfon y neges.",
-      "retrySendFailed": "Ni ellid anfon eto.",
-      "editFailed": "Ni ellid golygu'r neges.",
-      "executeFailed": "Ni ellid cyflawni'r weithred."
+      "edit": "Golygu"
     },
     "attachmentPicker": {
-      "takePhoto": "Tynnu llun",
-      "photoLibrary": "Llyfrgell lluniau",
-      "files": "Ffeiliau",
       "cameraAccessMessage": "Caniatâ fynediad i'r camera yn y gosodiadau i dynnu llun."
-    },
-    "typingIndicator": {
-      "someone": "Rhywun",
-      "typing_one": "Mae {{name}} yn teipio...",
-      "typing": "Mae {{names}} yn teipio...",
-      "typing_other": "Mae {{names}} yn teipio...",
-      "typing_zero": "Mae {{names}} yn teipio...",
-      "typing_two": "Mae {{names}} yn teipio...",
-      "typing_few": "Mae {{names}} yn teipio...",
-      "typing_many": "Mae {{names}} yn teipio..."
-    },
-    "botStatus": {
-      "offline": "All-lein",
-      "loadingUser": "Yn llwytho'r defnyddiwr...",
-      "waitingForStatus": "Yn aros am statws y bot...",
-      "offlineMessage": "Mae'r bot all-lein. Bydd negeseuon yn ailddechrau cael eu hanfon pan fydd yn ailgysylltu."
-    },
-    "errors": {
-      "notAllowed": "Ni chaniateir hyn.",
-      "messageTooLong": "Mae'r neges yn rhy hir. Cadwch hi'n fyrrach na {{limit}} nod.",
-      "titleTooLong": "Mae'r teitl yn rhy hir. Cadwch ef yn fyrrach na {{limit}} nod.",
-      "messageEmpty": "Ni all y neges fod yn wag."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Ni lwyddwyd i lwytho'r instansau KiloClaw.",
-    "billing": {
-      "title": "Bilio",
-      "continueMonthToMonth": "Parhau o fis i fis",
-      "plan": "Cynllun",
-      "finalTermEnds": "Daw'r cyfnod olaf i ben",
-      "afterFinalTerm": "Ar ôl y cyfnod olaf",
-      "lessThanOneDay": "Llai nag 1 diwrnod",
-      "ends": "Yn dod i ben",
-      "expires": "Yn dod i ben",
-      "noActivePlan": "Dim cynllun gweithredol",
-      "noActivePlanDescription": "Nid oes gennych danysgrifiad KiloClaw gweithredol.",
-      "managedByAdmin": "Mae gweinyddwr eich sefydliad yn rheoli'r bilio.",
-      "couldNotLoad": "Ni lwyddwyd i lwytho'r wybodaeth bilio.",
-      "manageOnWeb": "Rheoli bilio ar y we",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Daw'ch cyfnod olaf ar gynllun Commit i ben ar {{date}}. Parhewch ar y cynllun Safonol am {{price}}, neu bydd y gwesteio'n dod i ben.",
-      "freeTrial": "Cyfnod prawf am ddim",
-      "hostingEnds": "Daw'r gwesteio i ben",
-      "renews": "Yn adnewyddu",
-      "standardMonthToMonth": "Cynllun Safonol o fis i fis",
-      "standardStartsOn": "Bydd y cynllun Safonol yn dechrau ar {{date}} am {{price}}.",
-      "yourStandardMonthlyPrice": "eich pris misol ar y cynllun Safonol",
-      "perMonth": "/mis",
-      "earlybirdAccessUntil": "Mae mynediad Earlybird ar gael tan {{date}}.",
-      "earlybirdEnding": "Mae mynediad Earlybird yn dod i ben: {{remaining}}.",
-      "paymentPastDue": "Mae'r taliad yn hwyr. Diweddarwch eich dull talu.",
-      "subscriptionCancels": "Caiff y tanysgrifiad ei ganslo ar {{date}}.",
-      "trialDaysRemaining": "Mae {{remaining}} ar ôl o'r cyfnod prawf.",
-      "trialEndingSoon": "Mae'r cyfnod prawf yn dod i ben yn fuan: {{remaining}}.",
-      "planName": {
-        "standard": "Safonol"
-      },
-      "commit": "Cofnod newid"
-    },
-    "changelog": {
-      "title": "Beth sy'n newydd",
-      "couldNotLoad": "Ni lwyddwyd i lwytho'r cofnod newidiadau.",
-      "noUpdates": "Dim diweddariadau eto",
-      "noUpdatesDescription": "Bydd cofnodion newidiadau yn ymddangos yma.",
-      "recentUpdates": "Diweddariadau diweddar",
-      "manageVersion": "Rheoli fersiwn",
-      "redeployRequired": "Angen ail-leoli",
-      "redeploySuggested": "Argymhellir ail-leoli",
-      "upgradeRequired": "Angen uwchraddio"
-    },
-    "dashboard": {
-      "title": "Dangosfwrdd",
-      "couldNotLoad": "Ni lwyddwyd i lwytho'r dangosfwrdd.",
-      "renameInstance": "Ailenwi'r instans",
-      "renamePlaceholder": "Enw newydd (hyd at 50 nod)",
-      "someDetailsFailed": "Ni lwyddwyd i lwytho rhai o'r manylion amser real.",
-      "destroy": "Dinistrio",
-      "destroyMessage": "Bydd hyn yn dinistrio'ch instans KiloClaw a'i holl ddata yn barhaol. Ni ellir dadwneud y weithred hon.",
-      "destroyTitle": "Dinistrio'r instans",
-      "instance": "Instans",
-      "couldNotCheckStatus": "Ni lwyddwyd i wirio statws y gwasanaeth.",
-      "dangerZone": "PARTH PERYGL",
-      "destroying": "Yn dinistrio…",
-      "serviceDegraded": "Mae'r gwasanaeth yn araf neu'n gyfyngedig — tapiwch i weld y statws",
-      "up": "AR WAITH"
-    },
-    "channels": {
-      "title": "Sianeli",
-      "couldNotLoad": "Ni lwyddwyd i lwytho'r sianeli.",
-      "noChannels": "Dim sianeli ar gael",
-      "noChannelsDescription": "Bydd integreiddiadau sianel yn ymddangos yma.",
-      "connected": "{{label}} wedi'i gysylltu",
-      "disconnectMessage": "Tynnu {{label}}? Bydd y sianel hon yn cael ei datgysylltu.",
-      "disconnectTitle": "Datgysylltu sianel"
-    },
-    "devicePairing": {
-      "title": "Paru dyfais",
-      "refreshRequests": "Adnewyddu ceisiadau paru",
-      "couldNotLoad": "Ni lwyddwyd i lwytho'r ceisiadau paru.",
-      "noPending": "Dim ceisiadau'n aros",
-      "noPendingDescription": "Bydd ceisiadau i baru sianeli a dyfeisiau yn ymddangos yma.",
-      "channelRequests": "Ceisiadau sianel",
-      "deviceRequests": "Ceisiadau dyfais",
-      "approveDeviceMessage": "Caniatáu i {{platform}} gysylltu â'ch instans?",
-      "approveDeviceTitle": "Cymeradwyo dyfais",
-      "approveMessage": "Caniatáu i {{label}} (cod: {{code}}) gysylltu â'ch instans?",
-      "approveTitle": "Cymeradwyo cais paru",
-      "unknownDevice": "Dyfais anhysbys"
-    },
-    "execPolicy": {
-      "title": "Polisi rhedeg gorchmynion",
-      "couldNotLoad": "Ni lwyddwyd i lwytho'r polisi gweithredu.",
-      "alwaysAsk": "Gofyn bob amser",
-      "alwaysAskDescription": "Cadarnhewch bob gorchymyn cyn ei weithredu. Dyma'r dewis mwyaf diogel.",
-      "neverAsk": "Peidio byth â gofyn",
-      "neverAskDescription": "Gweithredwch orchmynion heb gadarnhad. Mae hyn yn gyflymach ond yn llai diogel."
-    },
-    "google": {
-      "title": "Cyfrif Google",
-      "couldNotLoad": "Ni lwyddwyd i lwytho statws y cyfrif Google.",
-      "disconnected": "Mae'r cyfrif Google wedi'i ddatgysylltu. Ail-leolwch eich instans i gymhwyso'r newid.",
-      "setupCommand": "Gorchymyn gosod",
-      "setupCommandHelp": "I gysylltu'ch cyfrif Google, rhedwch y gorchymyn hwn mewn terfynell ar eich cyfrifiadur eich hun, gyda Docker wedi'i osod.",
-      "failedToLoadCommand": "Ni lwyddwyd i lwytho'r gorchymyn gosod.",
-      "gmailNotifications": "Hysbysiadau Gmail",
-      "disconnect": "Datgysylltu'r cyfrif Google",
-      "copied": "Copïwyd",
-      "copyCommand": "Copïo gorchymyn",
-      "disconnectConfirm": "Datgysylltu",
-      "disconnectMessage": "Tynnu'ch cyfrif Google o'r instans hwn? Bydd hyn yn analluogi hysbysiadau Gmail. Ail-leolwch yr instans ar ôl datgysylltu i gymhwyso'r newidiadau.",
-      "disconnectTitle": "Datgysylltu Google"
-    },
-    "modelList": {
-      "noMatches": "Dim modelau'n cyfateb i'ch chwiliad",
-      "noModelsDescription": "Bydd modelau yn ymddangos yma pan fyddant ar gael.",
-      "noResultsFor": "Nid oes canlyniadau ar gyfer \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Cyfrinachau",
-      "couldNotLoad": "Ni lwyddwyd i lwytho'r cyfrinachau.",
-      "noSecrets": "Dim cyfrinachau ar gael",
-      "noSecretsDescription": "Bydd integreiddiadau cyfrinach yn ymddangos yma.",
-      "removeMessage": "Tynnu {{label}}? Bydd yr offeryn hwn yn colli mynediad at ei fanylion dilysu.",
-      "removeTitle": "Tynnu cyfrinach",
-      "saved": "{{label}} wedi'i gadw",
-      "hide": "Cuddio {{label}}",
-      "show": "Dangos {{label}}",
-      "allFieldsRequired": "Rhaid llenwi pob maes i gysylltu {{label}}.",
-      "setupGuideFallback": "canllaw gosod",
-      "setupGuideA11y": "canllaw gosod {{label}}",
-      "setupGuide": "Canllaw gosod",
-      "saving": "Yn cadw…",
-      "removing": "Yn tynnu…",
-      "updateToken": "Diweddaru'r tocyn"
-    },
-    "versionPin": {
-      "title": "Cloi'r fersiwn",
-      "couldNotLoad": "Ni lwyddwyd i lwytho'r wybodaeth am fersiynau.",
-      "couldNotLoadMore": "Ni lwyddwyd i lwytho mwy o fersiynau.",
-      "loadMore": "Llwytho mwy o fersiynau",
-      "showingLatest": "Dyma'r 100 fersiwn ddiweddaraf.",
-      "availableVersions": "Fersiynau sydd ar gael",
-      "noVersions": "Dim fersiynau ar gael",
-      "noVersionsDescription": "Bydd fersiynau OpenClaw sydd ar gael yn ymddangos yma.",
-      "unpin": "Datgloi",
-      "unpinMessage": "Newid yn ôl i'r fersiwn ddiweddaraf sydd ar gael?",
-      "unpinTitle": "Datgloi'r fersiwn",
-      "confirmPin": "Cadarnhau cloi'r fersiwn",
-      "followingLatest": "Yn dilyn y fersiwn ddiweddaraf",
-      "latest": "diweddaraf",
-      "pin": "Cloi",
-      "pinnedByAdmin": "Mae'r gweinyddwr wedi cloi'r fersiwn — cysylltwch â'ch gweinyddwr i'w newid.",
-      "pinnedTo": "Wedi cloi ar {{version}}",
-      "reasonOptional": "Rheswm (dewisol)",
-      "reasonPlaceholder": "Rheswm dros gloi'r fersiwn hon",
-      "replaceAdminPin": "Disodli dewis y gweinyddwr",
-      "replacesAdminPin": "Mae hyn yn disodli'r fersiwn y mae'r gweinyddwr wedi cloi arni ({{label}} ar hyn o bryd)."
-    },
-    "redeploy": "Ail-leoli",
-    "redeployMessage": "Ydych chi'n siŵr eich bod am ail-leoli'r instans hwn?",
-    "redeployTitle": "Ail-leoli'r instans",
-    "controls": {
-      "redeploying": "Yn ail-leoli…",
-      "restart": "Ailgychwyn",
-      "restartOpenClawMessage": "Ydych chi'n siŵr eich bod am ailgychwyn y broses OpenClaw?",
-      "restartOpenClawTitle": "Ailgychwyn OpenClaw",
-      "restarting": "Yn ailgychwyn…",
-      "start": "Dechrau",
-      "startMessage": "Ydych chi'n siŵr eich bod am ddechrau'r instans hwn?",
-      "startTitle": "Dechrau'r instans",
-      "stop": "Stopio",
-      "stopMessage": "Ydych chi'n siŵr eich bod am stopio'r instans hwn?",
-      "stopTitle": "Stopio'r instans",
-      "stopping": "Yn stopio…"
-    },
-    "empty": {
-      "finishingSetup": "Yn gorffen gosod",
-      "finishingSetupDescription": "Arhoswch ychydig wrth i ni orffen gosod eich cyfrif. Dim ond ychydig o amser mae hyn yn ei gymryd fel arfer.",
-      "getStarted": "Dechrau arni",
-      "noInstancesDescription": "Crëwch eich instans cyntaf i ddechrau rhedeg asiantau codio."
-    },
-    "instance": {
-      "backToInstances": "Yn ôl i'r instansau",
-      "couldNotLoad": "Ni lwyddwyd i lwytho'r instans.",
-      "notFound": "Instans heb ei ganfod",
-      "notFoundDescription": "Efallai fod yr instans hwn wedi'i ddinistrio, neu nad yw'r ddolen yn ddilys bellach."
-    },
-    "list": {
-      "createInstance": "Creu instans",
-      "organizations": "Sefydliadau",
-      "accessIssue": {
-        "trialExpired": "Mae'r cyfnod prawf wedi dod i ben — tanysgrifiwch i barhau i ddefnyddio'r instans hwn",
-        "subscriptionCanceled": "Mae'r tanysgrifiad yn anweithredol — aildanysgrifiwch i barhau i ddefnyddio'r instans hwn",
-        "subscriptionPastDue": "Mae problem gyda'r taliad — diweddarwch y manylion bilio i barhau i ddefnyddio'r instans hwn",
-        "quarantined": "Instans mewn cwarantîn — angen adolygiad gan berson",
-        "multipleCurrentConflict": "Mae angen adolygiad ar y cyfrif",
-        "nonCanonicalEarlybird": "Mae angen adolygu'r hen gynllun"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Sgwrsio â {{name}}",
-        "ready": "Mae {{name}} yn barod",
-        "warmedUp": "Mae popeth yn barod. Dywedwch helo pan fyddwch yn barod."
-      },
-      "flow": {
-        "genericErrorBody": "Ni lwyddwyd i orffen gosod eich instans ar hyn o bryd.",
-        "manualReviewBody": "Mae angen rhoi sylw i statws eich cyfrif cyn y gallwn greu instans. Parhewch ar kilo.ai.",
-        "manualReviewTitle": "Angen i berson adolygu'r gosod",
-        "openKiloAi": "Agor kilo.ai",
-        "provisioning": "Darparu",
-        "review": "Adolygiad",
-        "identityTitle": "Rhoi hunaniaeth i'ch bot",
-        "couldNotLoad": "Ni lwyddwyd i lwytho statws y gosod cychwynnol.",
-        "finishingSetup": "Rydym yn gorffen gosod — arhoswch wrth i ni gwblhau'ch cyfrif.",
-        "ready": "Yn barod",
-        "settingUp": "Yn gosod…"
-      },
-      "unavailableDescription": "Mae angen tanysgrifiad KiloClaw cyfredol i ddarparu instans. Bydd instansau a thanysgrifiadau presennol yn parhau fel arfer.",
-      "unavailableTitle": "Nid oes instansau KiloClaw newydd ar gael",
-      "identity": {
-        "chooseAvatar": "Dewis afatar",
-        "namePlaceholder": "Enw'ch bot",
-        "selectAvatar": "Dewis {{name}} fel afatar",
-        "personality": "Personoliaeth",
-        "changePersonality": "Newid personoliaeth",
-        "location": "Lleoliad",
-        "locationPlaceholder": "Dinas neu ranbarth (dewisol)",
-        "useCurrentLocation": "Defnyddio'ch lleoliad cyfredol",
-        "locationDeniedTitle": "Gwrthodwyd mynediad at y lleoliad",
-        "locationDeniedMessage": "Galluogwch fynediad at eich lleoliad yn y gosodiadau i ddefnyddio'ch lleoliad cyfredol.",
-        "locationValidationFailed": "Ni lwyddwyd i ddilysu'r lleoliad.",
-        "locationResolveFailed": "Ni lwyddwyd i bennu'ch lleoliad. Gallwch ei olygu â llaw.",
-        "locationGetFailed": "Ni lwyddwyd i gael eich lleoliad. Rhowch ef â llaw.",
-        "nature": {
-          "aiAssistantLabel": "Cynorthwyydd AI",
-          "aiAssistantVibe": "Parod i helpu, galluog, proffesiynol",
-          "digitalCreatureLabel": "Creadur digidol",
-          "digitalCreatureVibe": "Anarferol, bywiog, braidd yn anrhagweladwy",
-          "virtualCompanionLabel": "Cydymaith rhithwir",
-          "virtualCompanionVibe": "Cynnes, sylwgar, yn malio o ddifrif",
-          "somethingWeirderLabel": "Rhywbeth rhyfeddach…",
-          "somethingWeirderVibe": "Diffiniwch ef eich hun"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Wedi gorffen! Rwyf wedi llunio'r crynodeb y gofynnoch amdano. Rwy'n barod pan fyddwch chi.",
-        "settingUp": "Yn gosod hysbysiadau…",
-        "stayInTheLoop": "Cadw'n gyfredol",
-        "getNotified": "Derbyniwch hysbysiad pan fydd {{name}} yn gorffen tasg fel na fyddwch byth yn colli ymateb.",
-        "now": "nawr",
-        "skipForNow": "Hepgor am nawr",
-        "couldNotEnable": "Ni lwyddwyd i alluogi'r hysbysiadau."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Ni lwyddwyd i wirio'r cynnydd",
-        "queryErrorBody": "Collwyd y cysylltiad wrth wirio'r cynnydd wrth osod {{name}}. Efallai fod y gosod yn dal i fynd rhagddo. Rhowch gynnig eto, neu edrychwch eto ymhen ychydig.",
-        "stoppedTitle": "Daeth y gosod i ben",
-        "stoppedBody": "Stopiodd instans {{name}} yn annisgwyl wrth ei osod.",
-        "stalledTitle": "Aeth rhywbeth yn sownd",
-        "stalledBody": "Ni lwyddwyd i orffen gosod {{name}}. Rhowch gynnig eto, neu anfonwch e-bost at {{supportEmail}} os bydd hyn yn dal i ddigwydd.",
-        "timeoutTitle": "Yn cymryd yn hirach na'r disgwyl",
-        "timeoutBody": "Mae gosod {{name}} yn cymryd yn hirach nag arfer (dros {{displayMinutes}} munud).",
-        "continueInBackground": "Parhau yn y cefndir",
-        "settingUp": "Yn gosod {{name}}",
-        "connectingToAgent": "Yn cysylltu â'r asiant",
-        "startingSandbox": "Yn dechrau'r amgylchedd ynysig",
-        "backgroundHint": "Mae hyn fel arfer yn cymryd llai na munud. Gallwch gau hwn — byddwn yn parhau i weithio yn y cefndir."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Cod {{code}}",
-      "gatewayProcess": "PROSES Y PORTH",
-      "lastExit": "Ymadawiad diwethaf",
-      "memory": "Cof",
-      "region": "Rhanbarth",
-      "resources": "ADNODDAU",
-      "restarts": "Ailgychwyniadau",
-      "state": "Cyflwr",
-      "uptime": "Amser ar waith",
-      "crashed": "WEDI CHWALU",
-      "destroying": "YN DINISTRIO",
-      "provisioned": "WEDI'I DDARPARU",
-      "restarting": "YN AILGYCHWYN",
-      "running": "YN RHEDEG",
-      "shuttingDown": "YN DIFFODD",
-      "starting": "YN CYCHWYN",
-      "stopped": "WEDI STOPIO",
-      "stopping": "YN STOPIO",
-      "unknown": "ANHYSBYS",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Blaengar",
-      "frontierDescription": "Y perfformiad gorau. Yn anfon ceisiadau at fodelau blaengar sy'n rhesymu.",
-      "balancedDescription": "Cydbwysedd da rhwng cyflymder a gallu am gost is.",
-      "autoModelA11y": "model awtomatig {{label}}",
-      "currentModel": "Model cyfredol",
-      "browseAllModels": "neu ddewis o blith dros 500 o fodelau",
-      "browseAllModelsA11y": "Pori'r holl fodelau — dros 500 ohonynt"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "I barhau i ddefnyddio KiloClaw, ewch i kilo.ai/claw yn eich porwr. Ni allwch danysgrifio yn yr ap.",
-      "subscriptionCanceledTitle": "Tanysgrifio ar y we",
-      "subscriptionCanceledBody": "I ddefnyddio KiloClaw, ewch i kilo.ai/claw yn eich porwr. Ni allwch danysgrifio yn yr ap.",
-      "subscriptionCanceledCta": "Agor kilo.ai/claw",
-      "subscriptionPastDueTitle": "Diweddaru'r manylion talu ar y we",
-      "subscriptionPastDueBody": "Cawsom broblem gyda'ch taliad diweddaraf. Ewch i kilo.ai/claw yn eich porwr i'w ddiweddaru. Ni allwch reoli'r bilio yn yr ap.",
-      "quarantinedTitle": "Mae angen adfer yr instans",
-      "quarantinedBody": "Mae'ch instans KiloClaw mewn cwarantîn ac ni ellir ei ddefnyddio ar hyn o bryd. Mae angen i'n tîm helpu i'w adfer.",
-      "multipleCurrentConflictBody": "Daethom o hyd i fwy nag un tanysgrifiad gweithredol ar eich cyfrif. Rydym wedi rhoi'r gwasanaeth ar saib i osgoi codi tâl arnoch ddwywaith.",
-      "multipleCurrentConflictCta": "Parhau ar kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Canfuwyd hen gynllun",
-      "nonCanonicalEarlybirdBody": "Rhaid i berson adolygu'ch cynllun mynediad cynnar cyn y gallwch ei ddefnyddio ar eich ffôn.",
-      "iosTitle": "KiloClaw ddim ar gael ar iOS",
-      "iosBody": "Ar gyfer y cyfrif hwn, rheolir mynediad at KiloClaw y tu allan i'r ap iOS.",
-      "iosContact": "Cwestiynau? Cysylltwch â {{supportEmail}}.",
-      "quarantinedCta": "Anfon e-bost i'n tîm",
-      "nonCanonicalEarlybirdCta": "Adolygu eich cynllun ar kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "Mae angen sylw ar {{name}}: {{label}}",
-      "openUnread_one": "Agor {{name}}, {{displayCount}} neges heb ei darllen",
-      "openUnread": "Agor {{name}}, {{displayCount}} o negeseuon heb eu darllen",
-      "openUnread_other": "Agor {{name}}, {{displayCount}} o negeseuon heb eu darllen",
-      "openSettings": "Agor gosodiadau ar gyfer {{name}}",
-      "fixOnKiloAi": "Trwsio ar kilo.ai: {{label}}",
-      "openUnread_zero": "Agor {{name}}, {{displayCount}} neges heb ei darllen",
-      "openUnread_two": "Agor {{name}}, {{displayCount}} neges heb eu darllen",
-      "openUnread_few": "Agor {{name}}, {{displayCount}} neges heb eu darllen",
-      "openUnread_many": "Agor {{name}}, {{displayCount}} neges heb eu darllen"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Cymeradwyo ceisiadau dyfais",
-      "execPolicyDescription": "Gosodiadau diogelwch",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Dewis model AI",
-      "secretsDescription": "Manylion dilysu wedi'u hamgryptio",
-      "versionPinDescription": "Cloi ar fersiwn benodol"
-    },
-    "avatar": {
-      "arcade": "Arcêd",
-      "brain": "Ymennydd",
-      "creature": "Creadur",
-      "crystal": "Crisial",
-      "custom": "Afatar personol",
-      "dragon": "Draig",
-      "explorer": "Fforiwr",
-      "flame": "Fflam",
-      "lightning": "Mellt",
-      "magicWand": "Hudlath",
-      "moon": "Lleuad",
-      "operator": "Gweithredwr",
-      "orbit": "Cylchdro",
-      "oracle": "Oracl",
-      "rainbow": "Enfys",
-      "robot": "Peiriant robotig",
-      "satellite": "Lloeren",
-      "sparkles": "Gwreichion",
-      "strongArm": "Braich gref",
-      "talisman": "Swynogl"
-    },
-    "remoteSpawnFilesNotSupported": "Ni all yr instans hwn dderbyn ffeiliau.",
-    "instanceSwitcherTitle": "Instans KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2674,10 +2193,6 @@
       "moveLeft": "Symud {{filename}} i'r chwith",
       "moveRight": "Symud {{filename}} i'r dde"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Gludo delwedd o'r clipfwrdd",
-      "label": "Canfuwyd delwedd, tapio i'w gludo"
-    },
     "attachmentPicker": {
       "camera": "Y camera",
       "photoLibrary": "Llyfrgell lluniau",
@@ -2897,7 +2412,8 @@
     "signOutThisDeviceTitle": "Allgofnodi'r ddyfais hon?",
     "signOutThisSessionTitle": "Allgofnodi'r sesiwn hon?",
     "signOutThisSessionMessage": "Bydd {{device}} yn cael ei allgofnodi. Gall gadw mynediad at yr API am hyd at awr.",
-    "webBrowser": "Porwr gwe"
+    "webBrowser": "Porwr gwe",
+    "unknownDevice": "Dyfais anhysbys"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Ni lwyddwyd i agor y siop apiau.",

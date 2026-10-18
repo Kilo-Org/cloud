@@ -286,16 +286,16 @@ async function dispatchNeedsInputResponse(
   if (data === null) {
     return false;
   }
+  const path = notificationPathForData(data);
+  if (path === null) {
+    return false;
+  }
   Notifications.clearLastNotificationResponse();
   // Always stash: the gated consumer in `_layout.tsx` owns every navigation.
   // `router.navigate` queues rather than throws when the router is unmounted,
   // so a tap while at the consent/force-update/login gate would navigate past
   // the gate and be dropped by the root redirect.
-  setPendingDeepLink(
-    notificationPathForData(data),
-    'notification',
-    pendingDeepLinkOptionsForData(data)
-  );
+  setPendingDeepLink(path, 'notification', pendingDeepLinkOptionsForData(data));
   return false;
 }
 

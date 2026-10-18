@@ -101,12 +101,9 @@
     "scheduled": "Ajastatud",
     "keepEditing": "Jätka muutmist",
     "keepRunning": "Jätka tööd",
-    "kiloclaw": "KiloClaw",
     "newSession": "Uus seanss",
-    "noKiloclawInstances": "KiloClaw'i eksemplare pole",
     "noModelsAvailable": "Mudeleid pole saadaval",
     "notFound": "Ei leitud.",
-    "online": "Võrgus",
     "open": "Ava {{name}}",
     "openPullRequest": "Ava tõmbetaotlus",
     "pending": "Ootel",
@@ -257,7 +254,8 @@
     "renamePasskey": "Nimeta pääsuvõti ümber",
     "removePasskey": "Eemalda pääsuvõti",
     "removePasskeyTitle": "Eemaldada pääsuvõti?",
-    "removePasskeyMessage": "Sa ei saa enam selle pääsuvõtmega sisse logida."
+    "removePasskeyMessage": "Sa ei saa enam selle pääsuvõtmega sisse logida.",
+    "changelog": "Mis on uut"
   },
   "preferences": {
     "general": "Üldine",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Teavitused annavad märku uuest sündmusest. Sõnumi lugemiseks ava Kilo.",
     "channel": {
       "agentProgress": "Agendi edenemine",
-      "chat": "Vestlussõnumid",
-      "kiloclaw": "KiloClaw'i tegevus",
       "balance": "Saldohoiatused",
       "security": "Turvaleiud",
       "spend": "Kulutushoiatused",
       "followedSessions": "Jälgitud seansid"
     },
     "category": {
-      "chatMessagesSubtitle": "vastused sinu vestlustes",
       "agentAttentionTitle": "Agent vajab sind",
       "agentAttentionSubtitle": "küsimused, loataotlused ja vajalik sisend",
       "agentUpdatesTitle": "Agendi teated",
       "agentUpdatesSubtitle": "agendi sõnumid ülesande ajal",
       "sessionStatusTitle": "Seansi olek",
       "sessionStatusSubtitle": "lõppenud / ebaõnnestunud / juhtimiseks valmis",
-      "kiloclawActivitySubtitle": "eksemplar valmis/ebaõnnestunud, ajastatud toimingud",
-      "kiloclawActivityUnavailable": "Käivita KiloClaw eksemplar, et saada KiloClawi tegevust.",
       "balanceAlertsSubtitle": "organisatsiooni madala saldo hoiatused",
       "balanceAlertsUnavailable": "Liitu organisatsiooniga, et saada saldo hoiatusi.",
       "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Avaleht",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, vahekaart, {{position}}/{{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Eksemplari vahetamine",
-      "couldNotLoadInstances": "Eksemplare ei õnnestunud laadida.",
-      "noInstancesDescription": "Vestluse alustamiseks seadista eksemplar.",
-      "setUpKiloclaw": "Seadista KiloClaw",
-      "currentInstance": "{{title}}, praegune"
-    },
     "conversation": {
-      "failedToLoad": "Vestlust ei õnnestunud laadida.",
-      "notFound": "Vestlust ei leitud.",
       "untitled": "Pealkirjata",
-      "leaveTitle": "Kas lahkuda vestlusest?",
-      "leaveMessage": "Vestlus eemaldatakse sinu loendist.",
-      "openHint": "Avab vestluse. Ümbernimetamise ja lahkumise valikute kuvamiseks vajuta pikalt.",
-      "unread": "Lugemata",
-      "optionsFor": "Vestluse valikud: {{title}}",
-      "options": "Vestluse valikud",
-      "renameTitle": "Vestluse ümbernimetamine",
-      "renamePlaceholder": "Uus nimi",
-      "couldNotReachBot": "Botiga ei õnnestunud ühendust saada. Proovi uuesti.",
-      "messageDeliveryFailed": "Sõnumit ei õnnestunud botile edastada.",
-      "couldNotSignIn": "Vestlusse sisselogimine ebaõnnestus.",
-      "couldNotRefreshMessages": "Sõnumeid ei õnnestunud värskendada.",
-      "couldNotLoadHistory": "Vestluse ajalugu ei õnnestunud laadida.",
-      "leave": "Lahku",
-      "untitledConversation": "Pealkirjata vestlus",
-      "createFailed": "Vestluse loomine ebaõnnestus.",
-      "leaveFailed": "Vestlusest lahkumine ebaõnnestus."
-    },
-    "reactions": {
-      "common": "Levinud",
-      "reactWith": "Reageeri emotikoniga {{reaction}}",
-      "accessibility": "{{emoji}} reaktsioon, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Vastus kasutajale",
-      "cancelReply": "Tühista vastus",
-      "openInstance": "Ava eksemplar",
-      "attachFile": "Lisa fail",
-      "cancelEdit": "Tühista muutmine"
+      "renamePlaceholder": "Uus nimi"
     },
     "conversationList": {
-      "couldNotLoad": "Vestlusi ei õnnestunud laadida.",
-      "emptyTitle": "Vestlusi veel pole",
-      "emptyDescription": "Loo vestlus, et oma KiloClaw' eksemplariga vestelda.",
-      "create": "Loo vestlus",
-      "newConversation": "Uus vestlus",
-      "openInstanceSettings": "Ava eksemplari seaded",
       "today": "Täna",
       "yesterday": "Eile",
-      "thisWeek": "Sel nädalal",
       "older": "Vanemad"
     },
     "attachment": {
-      "open": "Ava {{filename}}",
-      "openFailed": "Manuse avamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
-      "attachFailed": "Faili lisamine ebaõnnestus.",
-      "limit": "Võid lisada kuni {{displayCount}} faili.",
-      "sizeRejection": "Faili {{filename}} suurus ületab manuse lubatud mahu {{limit}}.",
-      "unreadable": "Faili {{filename}} lugemine ebaõnnestus.",
-      "pastedImage": "kleebitud pilt",
-      "defaultName": "Manus",
       "classificationDenied": "Käivitatavaid faile ei saa lisada.",
       "classificationEmpty": "Fail on tühi.",
       "classificationTooLarge": "Faili suurus ei tohi ületada 20 MB.",
@@ -943,426 +883,17 @@
       "networkError": "Tekkis võrguviga.",
       "uploadFailed": "Üleslaadimine ebaõnnestus.",
       "nothingToPaste": "Lõikelaual pole midagi kleepimiseks.",
-      "metadataStripFailed": "Foto metaandmete eemaldamine ebaõnnestus.",
-      "limit_one": "Võid lisada kuni {{displayCount}} faili.",
-      "limit_other": "Võid lisada kuni {{displayCount}} faili."
+      "metadataStripFailed": "Foto metaandmete eemaldamine ebaõnnestus."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Proovi faili {{filename}} üleslaadimist uuesti",
-      "remove": "Eemalda {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[kustutatud sõnum]",
-      "yourMessage": "Sinu sõnum",
-      "messageFrom": "Sõnum kasutajalt {{author}}",
-      "moreActions": "Rohkem toiminguid",
-      "notDelivered": "Pole edastatud",
-      "edited": "(muudetud)",
-      "image": "Pilt"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Kopeeritud",
-      "copyFailed": "Kopeerimine ebaõnnestus.",
-      "title": "Sõnumi toimingud",
-      "deleteTitle": "Kas kustutada sõnum?",
-      "deleteMessage": "See eemaldab sõnumi vestlusest.",
-      "deleteFailed": "Sõnumi kustutamine ebaõnnestus.",
-      "removeReactionFailed": "Reaktsiooni eemaldamine ebaõnnestus.",
-      "addReactionFailed": "Reaktsiooni lisamine ebaõnnestus.",
-      "retrySend": "Saada uuesti",
-      "moreReactions": "Veel reaktsioone",
-      "edit": "Muuda",
-      "sendFailed": "Sõnumi saatmine ebaõnnestus.",
-      "retrySendFailed": "Sõnumi uuesti saatmine ebaõnnestus.",
-      "editFailed": "Sõnumi muutmine ebaõnnestus.",
-      "executeFailed": "Toimingut ei õnnestunud teha."
+      "edit": "Muuda"
     },
     "attachmentPicker": {
-      "takePhoto": "Tee foto",
-      "photoLibrary": "Fototeek",
-      "files": "Failid",
       "cameraAccessMessage": "Pildistamiseks luba seadetes juurdepääs kaamerale."
-    },
-    "typingIndicator": {
-      "someone": "Keegi",
-      "typing_one": "{{name}} kirjutab...",
-      "typing": "{{names}} kirjutavad...",
-      "typing_other": "{{names}} kirjutavad..."
-    },
-    "botStatus": {
-      "offline": "Võrguühenduseta",
-      "loadingUser": "Kasutaja laadimine...",
-      "waitingForStatus": "Oodatakse boti olekut...",
-      "offlineMessage": "Bot on võrguühenduseta. Kui ühendus taastub, jätkub sõnumivahetus."
-    },
-    "errors": {
-      "notAllowed": "See pole lubatud.",
-      "messageTooLong": "Sõnum on liiga pikk. Kasuta vähem kui {{limit}} tähemärki.",
-      "titleTooLong": "Pealkiri on liiga pikk. Kasuta vähem kui {{limit}} tähemärki.",
-      "messageEmpty": "Sõnum ei tohi olla tühi."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw’ eksemplare ei õnnestunud laadida.",
-    "billing": {
-      "title": "Arveldus",
-      "continueMonthToMonth": "Jätka kuutellimusega",
-      "plan": "Plaan",
-      "finalTermEnds": "Viimane periood lõpeb",
-      "afterFinalTerm": "Pärast viimast perioodi",
-      "lessThanOneDay": "Vähem kui 1 päev",
-      "ends": "Lõpeb",
-      "expires": "Aegub",
-      "noActivePlan": "Aktiivne pakett puudub",
-      "noActivePlanDescription": "Sul pole aktiivset KiloClaw’ tellimust.",
-      "managedByAdmin": "Arveldust haldab sinu organisatsiooni administraator.",
-      "couldNotLoad": "Arveldusandmeid ei õnnestunud laadida.",
-      "manageOnWeb": "Halda arveldust veebis",
-      "earlybird": "Varajase liituja pakett",
-      "finalCommitTermEndsOn": "Sinu Commit-paketi viimane periood lõpeb {{date}}. Jätka Standard-paketiga hinnaga {{price}}, muidu majutus lõpeb.",
-      "freeTrial": "Tasuta prooviperiood",
-      "hostingEnds": "Majutus lõpeb",
-      "renews": "Pikendatakse",
-      "standardMonthToMonth": "Standard-paketi kuutellimus",
-      "standardStartsOn": "Standard-pakett hakkab kehtima {{date}} hinnaga {{price}}.",
-      "yourStandardMonthlyPrice": "sinu Standard-paketi kuuhind",
-      "perMonth": "/kuu",
-      "earlybirdAccessUntil": "Varajase liituja pakett annab juurdepääsu kuni {{date}}.",
-      "earlybirdEnding": "Varajase liituja paketi lõpuni on jäänud {{remaining}}.",
-      "paymentPastDue": "Makse tähtaeg on möödunud. Uuenda oma makseviisi.",
-      "subscriptionCancels": "Tellimus lõpeb {{date}}.",
-      "trialDaysRemaining": "Prooviperioodi lõpuni on jäänud {{remaining}}.",
-      "trialEndingSoon": "Prooviperiood lõpeb peagi — jäänud on {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Mis on uut",
-      "couldNotLoad": "Muudatuste logi ei õnnestunud laadida.",
-      "noUpdates": "Uuendusi veel pole",
-      "noUpdatesDescription": "Muudatuste logi kirjed kuvatakse siin.",
-      "recentUpdates": "Hiljutised uuendused",
-      "manageVersion": "Halda versiooni",
-      "redeployRequired": "Vajab taasjuurutamist",
-      "redeploySuggested": "Taasjuurutamine soovitatav",
-      "upgradeRequired": "Vajab uuendamist"
-    },
-    "dashboard": {
-      "title": "Juhtpaneel",
-      "couldNotLoad": "Juhtpaneeli ei õnnestunud laadida.",
-      "renameInstance": "Nimeta eksemplar ümber",
-      "renamePlaceholder": "Uus nimi (kuni 50 märki)",
-      "someDetailsFailed": "Osa reaalajas andmeid ei õnnestunud laadida.",
-      "destroy": "Hävita",
-      "destroyMessage": "See hävitab sinu KiloClaw’ eksemplari ja kõik selle andmed jäädavalt. Seda toimingut ei saa tagasi võtta.",
-      "destroyTitle": "Eksemplari hävitamine",
-      "instance": "Eksemplar",
-      "couldNotCheckStatus": "Teenuse olekut ei õnnestunud kontrollida.",
-      "dangerZone": "OHTLIKUD TOIMINGUD",
-      "destroying": "Hävitamine…",
-      "serviceDegraded": "Teenuse töös on häireid — puuduta oleku vaatamiseks",
-      "up": "TÖÖTAB"
-    },
-    "channels": {
-      "title": "Kanalid",
-      "couldNotLoad": "Kanaleid ei õnnestunud laadida.",
-      "noChannels": "Kanalid puuduvad",
-      "noChannelsDescription": "Siin kuvatakse kanalite liidestused.",
-      "connected": "{{label}} on ühendatud",
-      "disconnectMessage": "Kas eemaldada {{label}}? Selle kanali ühendus katkestatakse.",
-      "disconnectTitle": "Kanali lahtiühendamine"
-    },
-    "devicePairing": {
-      "title": "Seadme sidumine",
-      "refreshRequests": "Värskenda sidumistaotlusi",
-      "couldNotLoad": "Sidumistaotlusi ei õnnestunud laadida.",
-      "noPending": "Ootel taotlusi pole",
-      "noPendingDescription": "Siin kuvatakse kanalite ja seadmete sidumistaotlused.",
-      "channelRequests": "Kanalite taotlused",
-      "deviceRequests": "Seadmete taotlused",
-      "approveDeviceMessage": "Kas lubada seadmel {{platform}} sinu eksemplariga ühenduda?",
-      "approveDeviceTitle": "Seadme kinnitamine",
-      "approveMessage": "Kas lubada ühendus sinu eksemplariga? Taotleja: {{label}} (kood: {{code}}).",
-      "approveTitle": "Sidumistaotluse kinnitamine",
-      "unknownDevice": "Tundmatu seade"
-    },
-    "execPolicy": {
-      "title": "Käitamispoliitika",
-      "couldNotLoad": "Käitamispoliitikat ei õnnestunud laadida.",
-      "alwaysAsk": "Küsi alati",
-      "alwaysAskDescription": "Kinnita iga käsk enne käitamist. Kõige turvalisem.",
-      "neverAsk": "Ära küsi",
-      "neverAskDescription": "Käita käske ilma kinnituseta. Kiirem, kuid vähem turvaline."
-    },
-    "google": {
-      "title": "Google'i konto",
-      "couldNotLoad": "Google'i konto olekut ei õnnestunud laadida.",
-      "disconnected": "Google'i konto on lahti ühendatud. Muudatuse rakendamiseks juuruta oma eksemplar uuesti.",
-      "setupCommand": "Seadistamiskäsk",
-      "setupCommandHelp": "Google'i konto ühendamiseks käivita see käsk oma arvuti terminalis. Arvutisse peab olema installitud Docker.",
-      "failedToLoadCommand": "Seadistamiskäsku ei õnnestunud laadida.",
-      "gmailNotifications": "Gmaili teatised",
-      "disconnect": "Ühenda Google'i konto lahti",
-      "copied": "Kopeeritud",
-      "copyCommand": "Kopeeri käsk",
-      "disconnectConfirm": "Ühenda lahti",
-      "disconnectMessage": "Kas eemaldada oma Google'i konto sellest eksemplarist? See lülitab Gmaili teatised välja. Muudatuste rakendamiseks juuruta eksemplar pärast konto lahtiühendamist uuesti.",
-      "disconnectTitle": "Google'i lahtiühendamine"
-    },
-    "modelList": {
-      "noMatches": "Otsingule vastavaid mudeleid ei leitud",
-      "noModelsDescription": "Siin kuvatakse mudelid, kui need on saadaval.",
-      "noResultsFor": "Otsingule „{{query}}“ ei leitud tulemusi."
-    },
-    "secrets": {
-      "title": "Salajased väärtused",
-      "couldNotLoad": "Salajasi andmeid ei õnnestunud laadida.",
-      "noSecrets": "Salajasi andmeid pole",
-      "noSecretsDescription": "Siin kuvatakse salajasi andmeid kasutavad liidestused.",
-      "removeMessage": "Kas eemaldada {{label}}? See tööriist kaotab juurdepääsu oma autentimisandmetele.",
-      "removeTitle": "Salajaste andmete eemaldamine",
-      "saved": "{{label}} on salvestatud",
-      "hide": "Peida {{label}}",
-      "show": "Kuva {{label}}",
-      "allFieldsRequired": "Ühenduse loomiseks tuleb täita kõik väljad ({{label}}).",
-      "setupGuideFallback": "seadistusjuhend",
-      "setupGuideA11y": "{{label}} seadistusjuhend",
-      "setupGuide": "Seadistusjuhend",
-      "saving": "Salvestamine…",
-      "removing": "Eemaldamine…",
-      "updateToken": "Uuenda pääsutõendit"
-    },
-    "versionPin": {
-      "title": "Versiooni lukustamine",
-      "couldNotLoad": "Versiooniteavet ei õnnestunud laadida.",
-      "couldNotLoadMore": "Lisaversioone ei õnnestunud laadida.",
-      "loadMore": "Laadi veel versioone",
-      "showingLatest": "Kuvatakse 100 uusimat versiooni.",
-      "availableVersions": "Saadaolevad versioonid",
-      "noVersions": "Versioone pole saadaval",
-      "noVersionsDescription": "Siin kuvatakse saadaolevad OpenClaw’ versioonid.",
-      "unpin": "Eemalda lukustus",
-      "unpinMessage": "Kas minna tagasi uusimale saadaolevale versioonile?",
-      "unpinTitle": "Versiooniluku eemaldamine",
-      "confirmPin": "Kinnita versioonilukk",
-      "followingLatest": "Järgitakse uusimat",
-      "latest": "uusim",
-      "pin": "Lukusta",
-      "pinnedByAdmin": "Administraator on versiooni lukustanud. Muutmiseks võta ühendust oma administraatoriga.",
-      "pinnedTo": "Lukustatud versioonile {{version}}",
-      "reasonOptional": "Põhjus (valikuline)",
-      "reasonPlaceholder": "Versiooni lukustamise põhjus",
-      "replaceAdminPin": "Asenda administraatori versioonilukk",
-      "replacesAdminPin": "See asendab administraatori määratud versiooniluku (praegu {{label}})."
-    },
-    "redeploy": "Juuruta uuesti",
-    "redeployMessage": "Kas soovid selle eksemplari kindlasti uuesti juurutada?",
-    "redeployTitle": "Eksemplari uuesti juurutamine",
-    "controls": {
-      "redeploying": "Taasjuurutamine…",
-      "restart": "Taaskäivita",
-      "restartOpenClawMessage": "Kas soovid OpenClaw’ protsessi kindlasti taaskäivitada?",
-      "restartOpenClawTitle": "OpenClaw’ taaskäivitamine",
-      "restarting": "Taaskäivitamine…",
-      "start": "Käivita",
-      "startMessage": "Kas soovid selle eksemplari kindlasti käivitada?",
-      "startTitle": "Eksemplari käivitamine",
-      "stop": "Peata",
-      "stopMessage": "Kas soovid selle eksemplari kindlasti peatada?",
-      "stopTitle": "Eksemplari peatamine",
-      "stopping": "Peatamine…"
-    },
-    "empty": {
-      "finishingSetup": "Seadistamine lõpeb",
-      "finishingSetupDescription": "Oota hetk, viime sinu konto seadistamise lõpule. Tavaliselt kulub selleks vaid hetk.",
-      "getStarted": "Alusta",
-      "noInstancesDescription": "Loo oma esimene eksemplar, et käitada programmeerimisagente."
-    },
-    "instance": {
-      "backToInstances": "Tagasi eksemplaride juurde",
-      "couldNotLoad": "Eksemplari ei õnnestunud laadida.",
-      "notFound": "Eksemplari ei leitud",
-      "notFoundDescription": "See eksemplar võib olla hävitatud või link ei kehti enam."
-    },
-    "list": {
-      "createInstance": "Loo eksemplar",
-      "organizations": "Organisatsioonid",
-      "accessIssue": {
-        "trialExpired": "Prooviperiood lõppes — vormista tellimus, et eksemplari edasi kasutada",
-        "subscriptionCanceled": "Tellimus pole aktiivne — telli uuesti, et eksemplari edasi kasutada",
-        "subscriptionPastDue": "Makseprobleem — uuenda arveldusandmeid, et eksemplari edasi kasutada",
-        "quarantined": "Eksemplar on karantiinis ja vajab käsitsi kontrollimist",
-        "multipleCurrentConflict": "Konto vajab ülevaatamist",
-        "nonCanonicalEarlybird": "Vana pakett vajab kontrollimist"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Ava vestlus: {{name}}",
-        "ready": "{{name}} on valmis",
-        "warmedUp": "Kõik on valmis. Ütle tere, kui oled valmis."
-      },
-      "flow": {
-        "genericErrorBody": "Sinu eksemplari seadistamist ei õnnestunud praegu lõpule viia.",
-        "manualReviewBody": "Enne eksemplari loomist tuleb sinu konto olek üle vaadata. Jätka saidil kilo.ai.",
-        "manualReviewTitle": "Seadistus vajab käsitsi kontrollimist",
-        "openKiloAi": "Ava kilo.ai",
-        "provisioning": "Ressursside eraldamine",
-        "review": "Ülevaatus",
-        "identityTitle": "Sinu boti identiteet",
-        "couldNotLoad": "Esmase seadistuse olekut ei õnnestunud laadida.",
-        "finishingSetup": "Oota hetk, viime seadistuse ja sinu konto ettevalmistamise lõpule.",
-        "ready": "Valmis",
-        "settingUp": "Seadistamine…"
-      },
-      "unavailableDescription": "Eksemplari loomiseks on vaja kehtivat KiloClaw’ tellimust. Olemasolevad eksemplarid ja tellimused toimivad tavapäraselt.",
-      "unavailableTitle": "Uued KiloClaw’ eksemplarid pole saadaval",
-      "identity": {
-        "chooseAvatar": "Vali avatar",
-        "namePlaceholder": "Boti nimi",
-        "selectAvatar": "Vali {{name}} avatariks",
-        "personality": "Iseloom",
-        "changePersonality": "Muuda iseloomu",
-        "location": "Asukoht",
-        "locationPlaceholder": "Linn või piirkond (valikuline)",
-        "useCurrentLocation": "Kasuta praegust asukohta",
-        "locationDeniedTitle": "Juurdepääs asukohale on keelatud",
-        "locationDeniedMessage": "Praeguse asukoha kasutamiseks luba seadetes juurdepääs asukohale.",
-        "locationValidationFailed": "Asukohta ei õnnestunud kontrollida.",
-        "locationResolveFailed": "Sinu asukohta ei õnnestunud määrata. Saad seda käsitsi muuta.",
-        "locationGetFailed": "Sinu asukohta ei õnnestunud tuvastada. Sisesta see käsitsi.",
-        "nature": {
-          "aiAssistantLabel": "Tehisaruabiline",
-          "aiAssistantVibe": "Abivalmis, võimekas, professionaalne",
-          "digitalCreatureLabel": "Digitaalne olend",
-          "digitalCreatureVibe": "Omapärane, elav, pisut ettearvamatu",
-          "virtualCompanionLabel": "Virtuaalne kaaslane",
-          "virtualCompanionVibe": "Soe, kohalolev, siiralt hooliv",
-          "somethingWeirderLabel": "Midagi veidramat…",
-          "somethingWeirderVibe": "Määra ise"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Valmis! Koostasin kokkuvõtte, mida palusid. Vaata seda, kui sulle sobib.",
-        "settingUp": "Teatiste seadistamine…",
-        "stayInTheLoop": "Ole kursis",
-        "getNotified": "Saa teade, kui {{name}} ülesande lõpetab, et ükski vastus märkamata ei jääks.",
-        "now": "nüüd",
-        "skipForNow": "Jäta praegu vahele",
-        "couldNotEnable": "Teatiste lubamine ebaõnnestus."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Seadistuse kontrollimine ebaõnnestus",
-        "queryErrorBody": "Ühendus katkes, kui kontrollisime seadistuse edenemist ({{name}}). Seadistamine võib endiselt jätkuda. Proovi uuesti või vaata veidi hiljem.",
-        "stoppedTitle": "Seadistamine peatati",
-        "stoppedBody": "{{name}} eksemplar peatus seadistamise ajal ootamatult.",
-        "stalledTitle": "Midagi takerdus",
-        "stalledBody": "Seadistust ei õnnestunud lõpule viia ({{name}}). Proovi uuesti. Kui probleem kordub, kirjuta aadressile {{supportEmail}}.",
-        "timeoutTitle": "Võtab oodatust kauem aega",
-        "timeoutBody": "{{name}} seadistamine võtab tavapärasest kauem aega (üle {{displayMinutes}} minuti).",
-        "continueInBackground": "Jätka taustal",
-        "settingUp": "Seadistamine: {{name}}",
-        "connectingToAgent": "Ühendumine agendiga",
-        "startingSandbox": "Liivakasti käivitamine",
-        "backgroundHint": "Tavaliselt kulub selleks alla minuti. Võid selle kuva sulgeda — jätkame taustal."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kood {{code}}",
-      "gatewayProcess": "LÜÜSI PROTSESS",
-      "lastExit": "Viimane väljumine",
-      "memory": "Mälu",
-      "region": "Piirkond",
-      "resources": "RESSURSID",
-      "restarts": "Taaskäivitused",
-      "state": "Olek",
-      "uptime": "Tööaeg",
-      "crashed": "JOOKSIS KOKKU",
-      "destroying": "HÄVITAMINE",
-      "provisioned": "RESSURSID ERALDATUD",
-      "restarting": "TAASKÄIVITAMINE",
-      "running": "TÖÖTAB",
-      "shuttingDown": "VÄLJALÜLITAMINE",
-      "starting": "KÄIVITUB",
-      "stopped": "PEATATUD",
-      "stopping": "PEATAMINE",
-      "unknown": "TEADMATA",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Tipptase",
-      "frontierDescription": "Parim jõudlus. Suunab päringud arutlusvõimega tippmudelitele.",
-      "balancedDescription": "Nutikas tasakaal kiiruse ja võimekuse vahel madalama hinnaga.",
-      "autoModelA11y": "{{label}} automaatne mudel",
-      "currentModel": "Praegune mudel",
-      "browseAllModels": "või vali enam kui 500 mudeli hulgast",
-      "browseAllModelsA11y": "Sirvi enam kui 500 mudelit"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw’ kasutamise jätkamiseks ava brauseris kilo.ai/claw. Rakenduses tellimust vormistada ei saa.",
-      "subscriptionCanceledTitle": "Telli veebis",
-      "subscriptionCanceledBody": "KiloClaw’ kasutamiseks ava brauseris kilo.ai/claw. Rakenduses tellimust vormistada ei saa.",
-      "subscriptionCanceledCta": "Ava kilo.ai/claw",
-      "subscriptionPastDueTitle": "Makseviisi uuendamine veebis",
-      "subscriptionPastDueBody": "Sinu viimase maksega tekkis probleem. Makseviisi uuendamiseks ava brauseris kilo.ai/claw. Rakenduses arveldust hallata ei saa.",
-      "quarantinedTitle": "Eksemplar vajab taastamist",
-      "quarantinedBody": "Sinu KiloClaw’ eksemplar on karantiinis ja seda ei saa praegu kasutada. Selle taastamiseks on vaja meie meeskonna abi.",
-      "multipleCurrentConflictBody": "Leidsime sinu kontolt mitu aktiivset tellimust. Peatasime toimingud, et vältida sinult topelt tasu võtmist.",
-      "multipleCurrentConflictCta": "Jätka saidil kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Tuvastati vana pakett",
-      "nonCanonicalEarlybirdBody": "Sinu varajase ligipääsu pakett vajab enne mobiilis kasutamist käsitsi kontrollimist.",
-      "iosTitle": "KiloClaw pole iOS-is saadaval",
-      "iosBody": "Selle konto juurdepääsu KiloClaw’ teenusele hallatakse väljaspool iOS-i rakendust.",
-      "iosContact": "Kas sul on küsimusi? Kirjuta aadressile {{supportEmail}}.",
-      "quarantinedCta": "Kirjuta meie meeskonnale",
-      "nonCanonicalEarlybirdCta": "Vaata oma pakett üle kilo.ai-s"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} vajab tähelepanu: {{label}}",
-      "openUnread_one": "Ava {{name}}, {{displayCount}} lugemata sõnum",
-      "openUnread": "Ava {{name}}, {{displayCount}} lugemata sõnumit",
-      "openUnread_other": "Ava {{name}}, {{displayCount}} lugemata sõnumit",
-      "openSettings": "Ava {{name}} seaded",
-      "fixOnKiloAi": "Paranda saidil kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Kinnita seadmete sidumistaotlused",
-      "execPolicyDescription": "Turvaseaded",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Tehisarumudeli valik",
-      "secretsDescription": "Krüpteeritud autentimisandmed",
-      "versionPinDescription": "Lukusta kindlale versioonile"
-    },
-    "avatar": {
-      "arcade": "Mängusaal",
-      "brain": "Aju",
-      "creature": "Olend",
-      "crystal": "Kristall",
-      "custom": "Kohandatud avatar",
-      "dragon": "Draakon",
-      "explorer": "Avastaja",
-      "flame": "Leek",
-      "lightning": "Välk",
-      "magicWand": "Võlukepp",
-      "moon": "Kuu",
-      "operator": "Operaator",
-      "orbit": "Orbiit",
-      "oracle": "Oraakel",
-      "rainbow": "Vikerkaar",
-      "robot": "Robotavatar",
-      "satellite": "Satelliit",
-      "sparkles": "Sädelus",
-      "strongArm": "Tugev käsi",
-      "talisman": "Õnneamulett"
-    },
-    "remoteSpawnFilesNotSupported": "See eksemplar ei saa faile vastu võtta.",
-    "instanceSwitcherTitle": "KiloClaw’ eksemplar"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Liiguta {{filename}} vasakule",
       "moveRight": "Liiguta {{filename}} paremale"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Kleebi pilt lõikelaualt",
-      "label": "Lõikelaual on pilt, puuduta kleepimiseks"
-    },
     "attachmentPicker": {
       "camera": "Kaamera",
       "photoLibrary": "Fototeek",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Kas logida sellest seadmest välja?",
     "signOutThisSessionTitle": "Kas logida sellest seansist välja?",
     "signOutThisSessionMessage": "{{device}} logitakse välja. Seadme juurdepääs API-le võib säilida veel kuni tund aega.",
-    "webBrowser": "Veebibrauser"
+    "webBrowser": "Veebibrauser",
+    "unknownDevice": "Tundmatu seade"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Rakendusepoodi ei õnnestunud avada.",

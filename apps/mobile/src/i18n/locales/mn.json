@@ -101,12 +101,9 @@
     "scheduled": "Товлосон",
     "keepEditing": "Үргэлжлүүлэн засварлах",
     "keepRunning": "Үргэлжлүүлэн ажиллуулах",
-    "kiloclaw": "KiloClaw",
     "newSession": "Шинэ сесс",
-    "noKiloclawInstances": "KiloClaw инстанц алга",
     "noModelsAvailable": "Ашиглах боломжтой загвар алга",
     "notFound": "Олдсонгүй.",
-    "online": "Онлайн",
     "open": "{{name}}-г нээх",
     "openPullRequest": "Нэгтгэх хүсэлт нээх",
     "pending": "Хүлээгдэж байна",
@@ -257,7 +254,8 @@
     "renamePasskey": "Нэвтрэх түлхүүрийн нэрийг солих",
     "removePasskey": "Нэвтрэх түлхүүрийг устгах",
     "removePasskeyTitle": "Нэвтрэх түлхүүрийг устгах уу?",
-    "removePasskeyMessage": "Та энэ нэвтрэх түлхүүрээр цаашид нэвтэрч чадахгүй."
+    "removePasskeyMessage": "Та энэ нэвтрэх түлхүүрээр цаашид нэвтэрч чадахгүй.",
+    "changelog": "Шинэ зүйлс"
   },
   "preferences": {
     "general": "Ерөнхий",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Мэдэгдэлд зөвхөн үйл явдал болсныг харуулна. Агуулгыг нь уншихын тулд Kilo-г нээнэ үү.",
     "channel": {
       "agentProgress": "Агентын явц",
-      "chat": "Чатын мессеж",
-      "kiloclaw": "KiloClaw-ийн үйл ажиллагаа",
       "balance": "Үлдэгдлийн анхааруулга",
       "security": "Аюулгүй байдлын илэрсэн асуудал",
       "spend": "Зарцуулалтын анхааруулга",
       "followedSessions": "Дагаж буй сессүүд"
     },
     "category": {
-      "chatMessagesSubtitle": "харилцан яриан дахь хариултууд",
       "agentAttentionTitle": "Агент таны оролцоог хүлээж байна",
       "agentAttentionSubtitle": "асуулт, зөвшөөрөл болон мэдээлэл хүсэх",
       "agentUpdatesTitle": "Агентын шинэчлэлтүүд",
       "agentUpdatesSubtitle": "даалгавар гүйцэтгэх явцад агентаас ирэх мессежүүд",
       "sessionStatusTitle": "Сессийн төлөв",
       "sessionStatusSubtitle": "дууссан / амжилтгүй / удирдахад бэлэн",
-      "kiloclawActivitySubtitle": "инстанц бэлэн/амжилтгүй, төлөвлөсөн үйлдлүүд",
-      "kiloclawActivityUnavailable": "KiloClaw үйл ажиллагаа авахын тулд KiloClaw инстанцыг эхлүүлнэ үү.",
       "balanceAlertsSubtitle": "байгууллагын үлдэгдэл багасах анхааруулга",
       "balanceAlertsUnavailable": "Үлдэгдлийн анхааруулга авахын тулд байгууллагад элсэнэ үү.",
       "securityFindingsSubtitle": "шинээр илэрсэн эмзэг байдал болон SLA сануулга",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Нүүр",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, таб, нийт {{total}} табын {{position}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Инстанц солих",
-      "couldNotLoadInstances": "Инстанцуудыг ачаалж чадсангүй.",
-      "noInstancesDescription": "Чатлаж эхлэхийн тулд инстанц тохируулна уу.",
-      "setUpKiloclaw": "KiloClaw тохируулах",
-      "currentInstance": "{{title}}, одоогийн"
-    },
     "conversation": {
-      "failedToLoad": "Яриаг ачаалж чадсангүй.",
-      "notFound": "Яриа олдсонгүй.",
       "untitled": "Гарчиггүй",
-      "leaveTitle": "Ярианаас гарах уу?",
-      "leaveMessage": "Энэ яриаг таны жагсаалтаас хасна.",
-      "openHint": "Яриаг нээнэ. Нэрийг өөрчлөх эсвэл гарах сонголтыг харахын тулд удаан дарна уу.",
-      "unread": "Уншаагүй",
-      "optionsFor": "{{title}} ярианы сонголтууд",
-      "options": "Ярианы сонголтууд",
-      "renameTitle": "Ярианы нэрийг өөрчлөх",
-      "renamePlaceholder": "Шинэ нэр",
-      "couldNotReachBot": "Боттой холбогдож чадсангүй. Дахин оролдоно уу.",
-      "messageDeliveryFailed": "Мессежийг ботод хүргэж чадсангүй.",
-      "couldNotSignIn": "Чат руу нэвтэрч чадсангүй.",
-      "couldNotRefreshMessages": "Мессежүүдийг шинэчилж чадсангүй.",
-      "couldNotLoadHistory": "Ярианы түүхийг ачаалж чадсангүй.",
-      "leave": "Гарах",
-      "untitledConversation": "Гарчиггүй яриа",
-      "createFailed": "Яриа үүсгэж чадсангүй.",
-      "leaveFailed": "Ярианаас гарч чадсангүй."
-    },
-    "reactions": {
-      "common": "Түгээмэл",
-      "reactWith": "{{reaction}} хариу үйлдэл үзүүлэх",
-      "accessibility": "{{emoji}} хариу үйлдэл, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Хариу өгөх мессеж",
-      "cancelReply": "Хариуг цуцлах",
-      "openInstance": "Инстанц нээх",
-      "attachFile": "Файл хавсаргах",
-      "cancelEdit": "Засварыг цуцлах"
+      "renamePlaceholder": "Шинэ нэр"
     },
     "conversationList": {
-      "couldNotLoad": "Яриануудыг ачаалж чадсангүй.",
-      "emptyTitle": "Одоогоор яриа алга",
-      "emptyDescription": "KiloClaw инстанцтайгаа чатлаж эхлэхийн тулд яриа үүсгэнэ үү.",
-      "create": "Яриа үүсгэх",
-      "newConversation": "Шинэ яриа",
-      "openInstanceSettings": "Инстанцын тохиргоог нээх",
       "today": "Өнөөдөр",
       "yesterday": "Өчигдөр",
-      "thisWeek": "Энэ долоо хоног",
       "older": "Өмнөх"
     },
     "attachment": {
-      "open": "{{filename}} нээх",
-      "openFailed": "Хавсралтыг нээж чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
-      "attachFailed": "Файл хавсаргаж чадсангүй.",
-      "limit": "Та {{displayCount}} хүртэл файл хавсаргах боломжтой.",
-      "sizeRejection": "{{filename}} файлын хэмжээ хавсралтын {{limit}} хязгаараас хэтэрсэн байна.",
-      "unreadable": "{{filename}} файлыг уншиж чадсангүй.",
-      "pastedImage": "буулгасан зураг",
-      "defaultName": "Хавсралт",
       "classificationDenied": "Ажиллуулах файл хавсаргах боломжгүй.",
       "classificationEmpty": "Файл хоосон байна.",
       "classificationTooLarge": "Файлын хэмжээ 20 MB-аас ихгүй байх ёстой.",
@@ -943,426 +883,17 @@
       "networkError": "Сүлжээний алдаа",
       "uploadFailed": "Байршуулж чадсангүй.",
       "nothingToPaste": "Буулгах зүйл алга",
-      "metadataStripFailed": "Зургийн мета өгөгдлийг устгаж чадсангүй.",
-      "limit_one": "Та {{displayCount}} хүртэл файл хавсаргах боломжтой.",
-      "limit_other": "Та {{displayCount}} хүртэл файл хавсаргах боломжтой."
+      "metadataStripFailed": "Зургийн мета өгөгдлийг устгаж чадсангүй."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "{{filename}} файлыг дахин байршуулах",
-      "remove": "{{filename}} файлыг хасах"
-    },
-    "messageBubble": {
-      "deleted": "[устгасан мессеж]",
-      "yourMessage": "Таны мессеж",
-      "messageFrom": "{{author}}-ийн мессеж",
-      "moreActions": "Нэмэлт үйлдлүүд",
-      "notDelivered": "Хүргэгдээгүй",
-      "edited": "(зассан)",
-      "image": "Зураг"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Хуулсан",
-      "copyFailed": "Хуулж чадсангүй.",
-      "title": "Мессежийн үйлдлүүд",
-      "deleteTitle": "Мессеж устгах уу?",
-      "deleteMessage": "Мессежийг энэ ярианаас устгана.",
-      "deleteFailed": "Мессежийг устгаж чадсангүй.",
-      "removeReactionFailed": "Хариу үйлдлийг арилгаж чадсангүй.",
-      "addReactionFailed": "Хариу үйлдэл нэмж чадсангүй.",
-      "retrySend": "Дахин илгээх",
-      "moreReactions": "Бусад хариу үйлдэл",
-      "edit": "Засварлах",
-      "sendFailed": "Мессежийг илгээж чадсангүй.",
-      "retrySendFailed": "Дахин илгээж чадсангүй.",
-      "editFailed": "Мессежийг засаж чадсангүй.",
-      "executeFailed": "Үйлдлийг гүйцэтгэж чадсангүй."
+      "edit": "Засварлах"
     },
     "attachmentPicker": {
-      "takePhoto": "Зураг авах",
-      "photoLibrary": "Зургийн сан",
-      "files": "Файл",
       "cameraAccessMessage": "Зураг авахын тулд тохиргооноос камер ашиглах эрхийг зөвшөөрнө үү."
-    },
-    "typingIndicator": {
-      "someone": "Хэн нэгэн",
-      "typing_one": "{{name}} бичиж байна...",
-      "typing": "{{names}} бичиж байна...",
-      "typing_other": "{{names}} бичиж байна..."
-    },
-    "botStatus": {
-      "offline": "Офлайн",
-      "loadingUser": "Хэрэглэгчийн мэдээллийг ачаалж байна...",
-      "waitingForStatus": "Ботын төлөвийг хүлээж байна...",
-      "offlineMessage": "Бот сүлжээнд холбогдоогүй байна. Дахин холбогдоход мессеж солилцох ажиллагаа үргэлжилнэ."
-    },
-    "errors": {
-      "notAllowed": "Энэ үйлдлийг зөвшөөрөхгүй.",
-      "messageTooLong": "Мессеж хэт урт байна. {{limit}} тэмдэгтээс цөөн болгоно уу.",
-      "titleTooLong": "Гарчиг хэт урт байна. {{limit}} тэмдэгтээс цөөн болгоно уу.",
-      "messageEmpty": "Мессеж хоосон байж болохгүй."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw инстанцуудыг ачаалж чадсангүй.",
-    "billing": {
-      "title": "Төлбөр",
-      "continueMonthToMonth": "Сар бүр төлж үргэлжлүүлэх",
-      "plan": "Төлөвлөгөө",
-      "finalTermEnds": "Сүүлийн гэрээт хугацаа дуусах өдөр",
-      "afterFinalTerm": "Сүүлийн гэрээт хугацааны дараа",
-      "lessThanOneDay": "1 Хоногоос бага",
-      "ends": "Дуусах өдөр",
-      "expires": "Хүчинтэй хугацаа дуусах өдөр",
-      "noActivePlan": "Идэвхтэй багц байхгүй",
-      "noActivePlanDescription": "Танд идэвхтэй KiloClaw захиалга байхгүй.",
-      "managedByAdmin": "Төлбөрийг танай байгууллагын админ удирддаг.",
-      "couldNotLoad": "Төлбөрийн мэдээллийг ачаалж чадсангүй.",
-      "manageOnWeb": "Вэб дээр төлбөрийг удирдах",
-      "earlybird": "Эрт бүртгүүлсний багц",
-      "finalCommitTermEndsOn": "Таны Commit багцын сүүлийн гэрээт хугацаа {{date}} өдөр дуусна. Стандарт багцыг {{price}} үнээр үргэлжлүүлэн ашиглана уу. Үгүй бол хостингийн үйлчилгээ дуусна.",
-      "freeTrial": "Үнэгүй туршилт",
-      "hostingEnds": "Хостингийн үйлчилгээ дуусна",
-      "renews": "Сунгах өдөр",
-      "standardMonthToMonth": "Сар бүр төлөх Стандарт багц",
-      "standardStartsOn": "Стандарт багц {{date}} өдрөөс {{price}} үнээр эхэлнэ.",
-      "yourStandardMonthlyPrice": "таны Стандарт багцын сарын үнэ",
-      "perMonth": "/сар",
-      "earlybirdAccessUntil": "Эрт бүртгүүлсний багцыг {{date}} хүртэл ашиглах эрхтэй.",
-      "earlybirdEnding": "Эрт бүртгүүлсний багц дуусахад {{remaining}} үлдсэн.",
-      "paymentPastDue": "Төлбөр төлөх хугацаа хэтэрсэн. Төлбөрийн аргаа шинэчилнэ үү.",
-      "subscriptionCancels": "Захиалга {{date}} өдөр цуцлагдана.",
-      "trialDaysRemaining": "Туршилтын хугацаа дуусахад {{remaining}} үлдсэн.",
-      "trialEndingSoon": "Туршилтын хугацаа удахгүй дуусна. {{remaining}} үлдсэн.",
-      "planName": {
-        "standard": "Стандарт"
-      },
-      "commit": "Коммит"
-    },
-    "changelog": {
-      "title": "Шинэ зүйлс",
-      "couldNotLoad": "Өөрчлөлтийн бүртгэлийг ачаалж чадсангүй.",
-      "noUpdates": "Шинэчлэлт байхгүй байна",
-      "noUpdatesDescription": "Шинэчлэлтүүдийн мэдээлэл энд харагдана.",
-      "recentUpdates": "Сүүлийн шинэчлэлтүүд",
-      "manageVersion": "Хувилбарыг удирдах",
-      "redeployRequired": "Дахин байршуулах шаардлагатай",
-      "redeploySuggested": "Дахин байршуулахыг зөвлөж байна",
-      "upgradeRequired": "Шинэчлэх шаардлагатай"
-    },
-    "dashboard": {
-      "title": "Хянах самбар",
-      "couldNotLoad": "Хянах самбарыг ачаалж чадсангүй.",
-      "renameInstance": "Инстанцын нэрийг өөрчлөх",
-      "renamePlaceholder": "Шинэ нэр (50 хүртэлх тэмдэгт)",
-      "someDetailsFailed": "Одоогийн зарим мэдээллийг ачаалж чадсангүй.",
-      "destroy": "Устгах",
-      "destroyMessage": "Таны KiloClaw инстанц болон бүх өгөгдлийг бүрмөсөн устгана. Энэ үйлдлийг буцаах боломжгүй.",
-      "destroyTitle": "Инстанцыг устгах",
-      "instance": "Инстанц",
-      "couldNotCheckStatus": "Үйлчилгээний төлөвийг шалгаж чадсангүй.",
-      "dangerZone": "АЮУЛТАЙ БҮС",
-      "destroying": "Устгаж байна…",
-      "serviceDegraded": "Үйлчилгээ доголдож байна — төлөвийг үзэхийн тулд товшино уу",
-      "up": "АЖИЛЛАЖ БАЙНА"
-    },
-    "channels": {
-      "title": "Сувгууд",
-      "couldNotLoad": "Сувгуудыг ачаалж чадсангүй.",
-      "noChannels": "Суваг байхгүй байна",
-      "noChannelsDescription": "Холбох боломжтой сувгууд энд харагдана.",
-      "connected": "{{label}} холбогдсон",
-      "disconnectMessage": "{{label}} сувгийг хасах уу? Энэ сувгийн холболт тасарна.",
-      "disconnectTitle": "Сувгийг салгах"
-    },
-    "devicePairing": {
-      "title": "Төхөөрөмж хослуулах",
-      "refreshRequests": "Хослуулах хүсэлтүүдийг сэргээх",
-      "couldNotLoad": "Хослуулах хүсэлтүүдийг ачаалж чадсангүй.",
-      "noPending": "Хүлээгдэж буй хүсэлт байхгүй",
-      "noPendingDescription": "Суваг болон төхөөрөмж хослуулах хүсэлтүүд энд харагдана.",
-      "channelRequests": "Сувгийн хүсэлтүүд",
-      "deviceRequests": "Төхөөрөмжийн хүсэлтүүд",
-      "approveDeviceMessage": "{{platform}} төхөөрөмжийг таны инстанцад холбохыг зөвшөөрөх үү?",
-      "approveDeviceTitle": "Төхөөрөмжийг зөвшөөрөх",
-      "approveMessage": "{{label}} (код: {{code}}) холболтыг таны инстанцад зөвшөөрөх үү?",
-      "approveTitle": "Хослуулах хүсэлтийг зөвшөөрөх",
-      "unknownDevice": "Тодорхойгүй төхөөрөмж"
-    },
-    "execPolicy": {
-      "title": "Команд ажиллуулах бодлого",
-      "couldNotLoad": "Команд гүйцэтгэх бодлогыг ачаалж чадсангүй.",
-      "alwaysAsk": "Үргэлж асуух",
-      "alwaysAskDescription": "Команд бүрийг гүйцэтгэхээс өмнө баталгаажуулна. Энэ нь хамгийн аюулгүй.",
-      "neverAsk": "Хэзээ ч асуухгүй",
-      "neverAskDescription": "Командуудыг баталгаажуулалгүй гүйцэтгэнэ. Энэ нь хурдан ч аюулгүй байдал багатай."
-    },
-    "google": {
-      "title": "Google бүртгэл",
-      "couldNotLoad": "Google бүртгэлийн төлөвийг ачаалж чадсангүй.",
-      "disconnected": "Google бүртгэлийг салгасан. Өөрчлөлтийг хэрэгжүүлэхийн тулд инстанцаа дахин байршуулна уу.",
-      "setupCommand": "Тохиргооны команд",
-      "setupCommandHelp": "Google бүртгэлээ холбохын тулд Docker суулгасан компьютерынхоо терминалд энэ командыг ажиллуулна уу.",
-      "failedToLoadCommand": "Тохиргооны командыг ачаалж чадсангүй.",
-      "gmailNotifications": "Gmail-ийн мэдэгдлүүд",
-      "disconnect": "Google бүртгэлийг салгах",
-      "copied": "Хуулсан",
-      "copyCommand": "Командыг хуулах",
-      "disconnectConfirm": "Салгах",
-      "disconnectMessage": "Google бүртгэлээ энэ инстанцаас салгах уу? Gmail-ийн мэдэгдлүүд идэвхгүй болно. Өөрчлөлтийг хэрэгжүүлэхийн тулд салгасны дараа инстанцаа дахин байршуулна уу.",
-      "disconnectTitle": "Google-г салгах"
-    },
-    "modelList": {
-      "noMatches": "Хайлтад тохирох загвар олдсонгүй",
-      "noModelsDescription": "Ашиглах боломжтой болсон загварууд энд харагдана.",
-      "noResultsFor": "\"{{query}}\" хайлтаар үр дүн олдсонгүй."
-    },
-    "secrets": {
-      "title": "Нууц утгууд",
-      "couldNotLoad": "Нууц өгөгдлийг ачаалж чадсангүй.",
-      "noSecrets": "Нууц өгөгдөл байхгүй",
-      "noSecretsDescription": "Нууц өгөгдөл ашиглах холболтууд энд харагдана.",
-      "removeMessage": "{{label}} нууц өгөгдлийг устгах уу? Энэ хэрэгсэл нэвтрэх мэдээллээ ашиглах боломжгүй болно.",
-      "removeTitle": "Нууц өгөгдлийг устгах",
-      "saved": "{{label}} хадгалагдсан",
-      "hide": "{{label}}-г нуух",
-      "show": "{{label}}-г харуулах",
-      "allFieldsRequired": "{{label}} холболтыг үүсгэхийн тулд бүх талбарыг бөглөх шаардлагатай.",
-      "setupGuideFallback": "тохируулах заавар",
-      "setupGuideA11y": "{{label}} тохируулах заавар",
-      "setupGuide": "Тохируулах заавар",
-      "saving": "Хадгалж байна…",
-      "removing": "Устгаж байна…",
-      "updateToken": "Токеныг шинэчлэх"
-    },
-    "versionPin": {
-      "title": "Хувилбарыг тогтоох",
-      "couldNotLoad": "Хувилбарын мэдээллийг ачаалж чадсангүй.",
-      "couldNotLoadMore": "Дараагийн хувилбаруудыг ачаалж чадсангүй.",
-      "loadMore": "Дараагийн хувилбаруудыг ачаалах",
-      "showingLatest": "Сүүлийн 100 хувилбарыг харуулж байна.",
-      "availableVersions": "Ашиглах боломжтой хувилбарууд",
-      "noVersions": "Хувилбар байхгүй байна",
-      "noVersionsDescription": "Ашиглах боломжтой OpenClaw хувилбарууд энд харагдана.",
-      "unpin": "Түгжээг тайлах",
-      "unpinMessage": "Хамгийн сүүлийн хувилбарыг ашигладаг горимд буцах уу?",
-      "unpinTitle": "Хувилбарын түгжээг тайлах",
-      "confirmPin": "Түгжихийг баталгаажуулах",
-      "followingLatest": "Сүүлийн хувилбарыг дагана",
-      "latest": "сүүлийн",
-      "pin": "Түгжих",
-      "pinnedByAdmin": "Админ хувилбарыг түгжсэн байна. Өөрчлөхийн тулд админтайгаа холбогдоно уу.",
-      "pinnedTo": "{{version}} хувилбарт түгжсэн",
-      "reasonOptional": "Шалтгаан (заавал биш)",
-      "reasonPlaceholder": "Энэ хувилбарт түгжих шалтгаан",
-      "replaceAdminPin": "Админы түгжсэн хувилбарыг солих",
-      "replacesAdminPin": "Админы түгжсэн хувилбарыг солино (одоогоор {{label}})."
-    },
-    "redeploy": "Дахин байршуулах",
-    "redeployMessage": "Энэ инстанцыг дахин байршуулах уу?",
-    "redeployTitle": "Инстанцыг дахин байршуулах",
-    "controls": {
-      "redeploying": "Дахин байршуулж байна…",
-      "restart": "Дахин эхлүүлэх",
-      "restartOpenClawMessage": "OpenClaw процессыг дахин эхлүүлэх үү?",
-      "restartOpenClawTitle": "OpenClaw-г дахин эхлүүлэх",
-      "restarting": "Дахин эхлүүлж байна…",
-      "start": "Эхлүүлэх",
-      "startMessage": "Энэ инстанцыг эхлүүлэх үү?",
-      "startTitle": "Инстанцыг эхлүүлэх",
-      "stop": "Зогсоох",
-      "stopMessage": "Энэ инстанцыг зогсоох уу?",
-      "stopTitle": "Инстанцыг зогсоох",
-      "stopping": "Зогсоож байна…"
-    },
-    "empty": {
-      "finishingSetup": "Тохиргоог дуусгаж байна",
-      "finishingSetupDescription": "Таны бүртгэлийн тохиргоог дуусгаж байна. Түр хүлээнэ үү. Ихэвчлэн удахгүй дуусдаг.",
-      "getStarted": "Эхлэх",
-      "noInstancesDescription": "Код бичих агентуудыг ажиллуулж эхлэхийн тулд анхны инстанцаа үүсгэнэ үү."
-    },
-    "instance": {
-      "backToInstances": "Инстанцууд руу буцах",
-      "couldNotLoad": "Инстанцыг ачаалж чадсангүй.",
-      "notFound": "Инстанц олдсонгүй",
-      "notFoundDescription": "Энэ инстанцыг устгасан эсвэл холбоос хүчингүй болсон байж болзошгүй."
-    },
-    "list": {
-      "createInstance": "Инстанц үүсгэх",
-      "organizations": "Байгууллагууд",
-      "accessIssue": {
-        "trialExpired": "Туршилтын хугацаа дууссан — инстанцыг үргэлжлүүлэн ашиглахын тулд захиална уу",
-        "subscriptionCanceled": "Захиалга идэвхгүй — инстанцыг үргэлжлүүлэн ашиглахын тулд дахин захиална уу",
-        "subscriptionPastDue": "Төлбөрт асуудал гарсан — инстанцыг үргэлжлүүлэн ашиглахын тулд төлбөрийн мэдээллээ шинэчилнэ үү",
-        "quarantined": "Инстанцыг тусгаарласан — ажилтан шалгах шаардлагатай",
-        "multipleCurrentConflict": "Бүртгэлийг шалгах шаардлагатай",
-        "nonCanonicalEarlybird": "Хуучин багцыг шалгах шаардлагатай"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}}-тай чатлах",
-        "ready": "{{name}} бэлэн боллоо",
-        "warmedUp": "Бүх зүйл бэлэн боллоо. Бэлэн болохоороо мэндчилнэ үү."
-      },
-      "flow": {
-        "genericErrorBody": "Таны инстанцын тохиргоог одоогоор дуусгаж чадсангүй.",
-        "manualReviewBody": "Инстанц үүсгэхээс өмнө таны бүртгэлийн төлөвийг шалгах шаардлагатай. kilo.ai дээр үргэлжлүүлнэ үү.",
-        "manualReviewTitle": "Тохиргоог ажилтан шалгах шаардлагатай",
-        "openKiloAi": "Kilo.ai-г нээх",
-        "provisioning": "Бэлтгэж байна",
-        "review": "Шалгалт",
-        "identityTitle": "Ботын нэр, дүр төрх",
-        "couldNotLoad": "Анхны тохиргооны төлөвийг ачаалж чадсангүй.",
-        "finishingSetup": "Бүртгэлийн тохиргоог дуусгаж байна. Түр хүлээнэ үү.",
-        "ready": "Бэлэн",
-        "settingUp": "Тохируулж байна…"
-      },
-      "unavailableDescription": "Инстанц үүсгэхийн тулд идэвхтэй KiloClaw захиалгатай байх шаардлагатай. Одоо байгаа инстанцууд болон захиалгууд хэвийн үргэлжилнэ.",
-      "unavailableTitle": "Шинэ KiloClaw инстанц үүсгэх боломжгүй",
-      "identity": {
-        "chooseAvatar": "Аватар сонгох",
-        "namePlaceholder": "Ботын нэр",
-        "selectAvatar": "{{name}}-г аватар болгон сонгох",
-        "personality": "Зан чанар",
-        "changePersonality": "Зан чанарыг өөрчлөх",
-        "location": "Байршил",
-        "locationPlaceholder": "Хот эсвэл бүс (заавал биш)",
-        "useCurrentLocation": "Одоогийн байршлыг ашиглах",
-        "locationDeniedTitle": "Байршилд хандах зөвшөөрөлгүй",
-        "locationDeniedMessage": "Одоогийн байршлаа ашиглахын тулд тохиргооноос байршилд хандах зөвшөөрлийг нээнэ үү.",
-        "locationValidationFailed": "Байршлыг баталгаажуулж чадсангүй.",
-        "locationResolveFailed": "Таны байршлыг тодорхойлж чадсангүй. Та үүнийг гараар засах боломжтой.",
-        "locationGetFailed": "Таны байршлыг авч чадсангүй. Байршлаа гараар оруулна уу.",
-        "nature": {
-          "aiAssistantLabel": "Хиймэл оюунт туслах",
-          "aiAssistantVibe": "Тусч, чадварлаг, мэргэжлийн",
-          "digitalCreatureLabel": "Дижитал амьтан",
-          "digitalCreatureVibe": "Этгээд, амьд мэт, бага зэрэг тааварлашгүй",
-          "virtualCompanionLabel": "Виртуал найз",
-          "virtualCompanionVibe": "Халуун дотно, үргэлж хамт, чин сэтгэлээсээ санаа тавьдаг",
-          "somethingWeirderLabel": "Илүү хачирхалтай зүйл…",
-          "somethingWeirderVibe": "Өөрөө тодорхойлно уу"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Бэлэн боллоо! Таны хүссэн хураангуйг бэлдлээ. Та завтай үедээ үзээрэй.",
-        "settingUp": "Мэдэгдлүүдийг тохируулж байна…",
-        "stayInTheLoop": "Мэдэгдэл авах",
-        "getNotified": "Хариуг алдахгүйн тулд {{name}} даалгавраа дуусгахад мэдэгдэл авна уу.",
-        "now": "одоо",
-        "skipForNow": "Одоохондоо алгасах",
-        "couldNotEnable": "Мэдэгдлүүдийг идэвхжүүлж чадсангүй."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Тохиргооны явцыг шалгаж чадсангүй",
-        "queryErrorBody": "{{name}} ботын тохиргооны явцыг шалгаж байхад холболт тасарлаа. Тохиргоо үргэлжилж байж болзошгүй. Дахин оролдох эсвэл түр хүлээгээд шалгана уу.",
-        "stoppedTitle": "Тохиргоо зогссон",
-        "stoppedBody": "{{name}} ботын инстанц тохиргооны явцад гэнэт зогссон.",
-        "stalledTitle": "Тохиргоо гацсан",
-        "stalledBody": "{{name}} ботын тохиргоог дуусгаж чадсангүй. Дахин оролдоно уу. Асуудал давтагдвал {{supportEmail}} хаяг руу имэйл илгээнэ үү.",
-        "timeoutTitle": "Хүлээгдэж байснаас удаан байна",
-        "timeoutBody": "{{name}} ботын тохиргоо ердийнхөөс удаж байна ({{displayMinutes}} минутаас хэтэрсэн).",
-        "continueInBackground": "Ар талд үргэлжлүүлэх",
-        "settingUp": "{{name}}-г тохируулж байна",
-        "connectingToAgent": "Агенттай холбогдож байна",
-        "startingSandbox": "Тусгаарласан орчныг эхлүүлж байна",
-        "backgroundHint": "Ихэвчлэн нэг минут хүрэхгүй хугацаанд дуусдаг. Та энэ цонхыг хааж болно. Тохиргоо ар талд үргэлжилнэ."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Код {{code}}",
-      "gatewayProcess": "ГАРЦЫН ПРОЦЕСС",
-      "lastExit": "Сүүлд зогссон үе",
-      "memory": "Санах ой",
-      "region": "Бүс",
-      "resources": "НӨӨЦ",
-      "restarts": "Дахин эхлүүлсэн тоо",
-      "state": "Төлөв",
-      "uptime": "Ажилласан хугацаа",
-      "crashed": "АЛДААТАЙ ЗОГССОН",
-      "destroying": "УСТГАЖ БАЙНА",
-      "provisioned": "БЭЛТГЭСЭН",
-      "restarting": "ДАХИН ЭХЛҮҮЛЖ БАЙНА",
-      "running": "АЖИЛЛАЖ БАЙНА",
-      "shuttingDown": "УНТРААЖ БАЙНА",
-      "starting": "ЭХЭЛЖ БАЙНА",
-      "stopped": "ЗОГССОН",
-      "stopping": "ЗОГСООЖ БАЙНА",
-      "unknown": "ТОДОРХОЙГҮЙ",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Тэргүүлэх",
-      "frontierDescription": "Хамгийн өндөр гүйцэтгэлтэй. Дүгнэлт хийх чадвартай тэргүүлэх загварууд руу чиглүүлнэ.",
-      "balancedDescription": "Бага зардлаар хурд, чадварыг оновчтой хослуулна.",
-      "autoModelA11y": "{{label}} автомат загвар",
-      "currentModel": "Одоогийн загвар",
-      "browseAllModels": "эсвэл 500+ загвараас сонгох",
-      "browseAllModelsA11y": "Бүх 500+ загварыг үзэх"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw-г үргэлжлүүлэн ашиглахын тулд хөтчөөсөө kilo.ai/claw руу очно уу. Апп дотор захиалах боломжгүй.",
-      "subscriptionCanceledTitle": "Вэб сайтаас захиалга авах",
-      "subscriptionCanceledBody": "KiloClaw ашиглахын тулд хөтчөөсөө kilo.ai/claw руу очно уу. Апп дотор захиалах боломжгүй.",
-      "subscriptionCanceledCta": "Kilo.ai/claw-г нээх",
-      "subscriptionPastDueTitle": "Төлбөрийн мэдээллийг вэбээр шинэчлэх",
-      "subscriptionPastDueBody": "Таны сүүлийн төлбөрт асуудал гарсан. Төлбөрийн мэдээллээ шинэчлэхийн тулд хөтчөөсөө kilo.ai/claw руу орно уу. Апп дотроос төлбөрийг удирдах боломжгүй.",
-      "quarantinedTitle": "Инстанцыг сэргээх шаардлагатай",
-      "quarantinedBody": "Таны KiloClaw инстанцыг тусгаарласан тул одоогоор ашиглах боломжгүй. Манай баг үүнийг сэргээхэд туслах шаардлагатай.",
-      "multipleCurrentConflictBody": "Таны бүртгэлд нэгээс олон идэвхтэй захиалга байна. Давхар төлбөр авахгүйн тулд үйлчилгээг түр зогсоосон.",
-      "multipleCurrentConflictCta": "Kilo.ai дээр үргэлжлүүлэх",
-      "nonCanonicalEarlybirdTitle": "Хуучин багц илэрсэн",
-      "nonCanonicalEarlybirdBody": "Таны эрт бүртгүүлсний багцыг гар утсанд ашиглахаас өмнө ажилтан шалгах шаардлагатай.",
-      "iosTitle": "KiloClaw-ыг iOS дээр ашиглах боломжгүй",
-      "iosBody": "Энэ бүртгэлийн KiloClaw ашиглах эрхийг iOS аппын гадна удирдана.",
-      "iosContact": "Асуух зүйл байна уу? {{supportEmail}} хаяг руу имэйл илгээнэ үү.",
-      "quarantinedCta": "Манай багт имэйл илгээх",
-      "nonCanonicalEarlybirdCta": "Багцаа Kilo.ai дээр шалгах"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} анхаарал шаардаж байна: {{label}}",
-      "openUnread_one": "{{name}}-г нээх, {{displayCount}} уншаагүй зурвас",
-      "openUnread": "{{name}}-г нээх, {{displayCount}} уншаагүй мессеж",
-      "openUnread_other": "{{name}}-г нээх, {{displayCount}} уншаагүй мессеж",
-      "openSettings": "{{name}}-ийн тохиргоог нээх",
-      "fixOnKiloAi": "Kilo.ai дээр засах: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Төхөөрөмжийн хүсэлтүүдийг зөвшөөрөх",
-      "execPolicyDescription": "Аюулгүй байдлын тохиргоо",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Хиймэл оюуны загварын сонголт",
-      "secretsDescription": "Шифрлэсэн нэвтрэх мэдээлэл",
-      "versionPinDescription": "Тодорхой хувилбарт түгжих"
-    },
-    "avatar": {
-      "arcade": "Тоглоомын автомат",
-      "brain": "Тархи",
-      "creature": "Амьтан",
-      "crystal": "Болор",
-      "custom": "Өөрийн аватар",
-      "dragon": "Луу",
-      "explorer": "Судлаач",
-      "flame": "Дөл",
-      "lightning": "Аянга",
-      "magicWand": "Ид шидийн саваа",
-      "moon": "Сар",
-      "operator": "Оператор",
-      "orbit": "Тойрог зам",
-      "oracle": "Зөнч",
-      "rainbow": "Солонго",
-      "robot": "Робот",
-      "satellite": "Хиймэл дагуул",
-      "sparkles": "Гялбаа",
-      "strongArm": "Булчинлаг гар",
-      "talisman": "Сахиус"
-    },
-    "remoteSpawnFilesNotSupported": "Энэ инстанц файл хүлээн авах боломжгүй.",
-    "instanceSwitcherTitle": "KiloClaw инстанц"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}} файлыг зүүн тийш зөөх",
       "moveRight": "{{filename}} файлыг баруун тийш зөөх"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Түр санах ойгоос зураг буулгах",
-      "label": "Зураг илэрлээ, буулгахын тулд товшино уу"
-    },
     "attachmentPicker": {
       "camera": "Камер",
       "photoLibrary": "Зургийн сан",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "Нэвтрэлтийг дуусгалаа.",
     "signOutThisDeviceTitle": "Энэ төхөөрөмжөөс гарах уу?",
     "signOutThisSessionTitle": "Энэ нэвтрэлтийг дуусгах уу?",
-    "signOutThisSessionMessage": "{{device}} төхөөрөмжийг бүртгэлээс гаргана. API-д хандах эрх нь нэг цаг хүртэл хүчинтэй хэвээр байж болно."
+    "signOutThisSessionMessage": "{{device}} төхөөрөмжийг бүртгэлээс гаргана. API-д хандах эрх нь нэг цаг хүртэл хүчинтэй хэвээр байж болно.",
+    "unknownDevice": "Тодорхойгүй төхөөрөмж"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Аппын дэлгүүрийг нээж чадсангүй.",

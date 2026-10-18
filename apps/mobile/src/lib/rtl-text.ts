@@ -109,7 +109,7 @@ export const LTR_TEXT_DIRECTION: TextStyle = { direction: 'ltr', writingDirectio
  * A joined script's letters connect into one shape, so `letter-spacing` — a
  * Latin display device — opens every glyph from its neighbour and splits a word
  * mid-shape («الوكلاء» draws as «الوكلا ء»). This is the script, not the
- * interface direction: a Latin run inside an Arabic interface (`KiloClaw`,
+ * interface direction: a Latin run inside an Arabic interface (`Kilo`,
  * `PR`) joins nothing and keeps its tracking. Arabic, Arabic Supplement,
  * Arabic Extended-B, Arabic Extended-A and the two Arabic Presentation Forms
  * blocks are the ranges a joined Arabic run arrives in. Hebrew is right to

@@ -24,7 +24,6 @@ describe('buildPermissionPromptLocales', () => {
     for (const key of PERMISSION_PROMPT_PLIST_KEYS) {
       expect(locales[tag].ios[key], `${tag}.${key}`).not.toContain('$(');
     }
-    expect(locales[tag].ios.NSLocationWhenInUseUsageDescription, tag).toContain('Kilo');
   });
 
   it('throws when a supported language has no copy', () => {

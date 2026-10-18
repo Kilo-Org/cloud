@@ -25,6 +25,7 @@ describe('browserLandingPath', () => {
       '/sign-in-to-editor',
       '/users/accept-invite/x',
       '/c/promo',
+      '/claw',
       '/',
     ];
     for (const path of unclaimed) {
@@ -87,12 +88,12 @@ describe('isAppLinkClaimed', () => {
 
   it('accepts claimed paths', () => {
     expect(isAppLinkClaimed('/profile')).toBe(true);
-    expect(isAppLinkClaimed('/claw')).toBe(true);
     expect(isAppLinkClaimed('/cloud/sessions')).toBe(true);
   });
 
   it('rejects unclaimed paths', () => {
     expect(isAppLinkClaimed('/organizations/abc123')).toBe(false);
+    expect(isAppLinkClaimed('/claw')).toBe(false);
     expect(isAppLinkClaimed('/account-verification')).toBe(false);
   });
 });
@@ -100,7 +101,7 @@ describe('isAppLinkClaimed', () => {
 describe('resolveHandoffDestination', () => {
   it('returns claimed destinations as-is', () => {
     expect(resolveHandoffDestination('/profile')).toBe('/profile');
-    expect(resolveHandoffDestination('/claw')).toBe('/claw');
+    expect(resolveHandoffDestination('/cloud/sessions')).toBe('/cloud/sessions');
   });
 
   it('falls back to /profile for undefined', () => {
@@ -141,6 +142,7 @@ describe('resolveHandoffDestination', () => {
 
   it('falls back to /profile for unclaimed valid paths', () => {
     expect(resolveHandoffDestination('/account-verification')).toBe(APP_LINK_HANDOFF_FALLBACK);
+    expect(resolveHandoffDestination('/claw')).toBe(APP_LINK_HANDOFF_FALLBACK);
   });
 
   describe('round-trip for every literal claimed webPath', () => {

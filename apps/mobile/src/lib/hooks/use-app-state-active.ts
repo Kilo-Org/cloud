@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 import { createAppStateStore } from '@/lib/hooks/app-state-store';
 
 /**
- * The kilo-chat surfaces gate presence on whether the app is in the
+ * Generic presence subscriptions depend on whether the app is in the
  * foreground. One module-level store means every mounted consumer shares one
  * React Native `AppState` listener and one snapshot.
  *

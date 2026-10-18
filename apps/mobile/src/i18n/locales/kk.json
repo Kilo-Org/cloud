@@ -101,12 +101,9 @@
     "scheduled": "Жоспарланған",
     "keepEditing": "Өңдеуді жалғастыру",
     "keepRunning": "Жұмысты жалғастыру",
-    "kiloclaw": "KiloClaw",
     "newSession": "Жаңа сессия",
-    "noKiloclawInstances": "KiloClaw даналары жоқ",
     "noModelsAvailable": "Қолжетімді модельдер жоқ",
     "notFound": "Табылмады.",
-    "online": "Желіде",
     "open": "{{name}} ашу",
     "openPullRequest": "Біріктіру сұрауын ашу",
     "pending": "Күтілуде",
@@ -257,7 +254,8 @@
     "renamePasskey": "Кіру кілтінің атауын өзгерту",
     "removePasskey": "Кіру кілтін жою",
     "removePasskeyTitle": "Кіру кілті жойылсын ба?",
-    "removePasskeyMessage": "Бұл кіру кілтімен енді кіре алмайсыз."
+    "removePasskeyMessage": "Бұл кіру кілтімен енді кіре алмайсыз.",
+    "changelog": "Жаңалықтар"
   },
   "preferences": {
     "general": "Жалпы",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Хабарландырулар оқиғаның болғанын ғана көрсетеді. Хабарламаны оқу үшін Kilo қолданбасын ашыңыз.",
     "channel": {
       "agentProgress": "Агент барысы",
-      "chat": "Чат хабарламалары",
-      "kiloclaw": "KiloClaw белсенділігі",
       "balance": "Баланс туралы ескертулер",
       "security": "Анықталған қауіпсіздік мәселелері",
       "spend": "Шығыс ескертулері",
       "followedSessions": "Бақыланатын сессиялар"
     },
     "category": {
-      "chatMessagesSubtitle": "сөйлесулеріңіздегі жауаптар",
       "agentAttentionTitle": "Агентке көмегіңіз қажет",
       "agentAttentionSubtitle": "жауап, рұқсат немесе мәлімет қажет",
       "agentUpdatesTitle": "Агенттен жаңалықтар",
       "agentUpdatesSubtitle": "тапсырманы орындау кезінде агент жіберетін хабарламалар",
       "sessionStatusTitle": "Сессия күйі",
       "sessionStatusSubtitle": "аяқталды / сәтсіз аяқталды / басқаруға дайын",
-      "kiloclawActivitySubtitle": "дана дайын / істен шықты, жоспарланған әрекеттер",
-      "kiloclawActivityUnavailable": "KiloClaw әрекетін алу үшін KiloClaw данасын іске қосыңыз.",
       "balanceAlertsSubtitle": "ұйым балансының азайғаны туралы ескертулер",
       "balanceAlertsUnavailable": "Баланс ескертулерін алу үшін ұйымға қосылыңыз.",
       "securityFindingsSubtitle": "жаңа осалдықтар және SLA туралы еске салулар",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Басты",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, қойынды, {{position}}/{{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Дананы ауыстыру",
-      "couldNotLoadInstances": "Даналарды жүктеу мүмкін болмады.",
-      "noInstancesDescription": "Сөйлесуді бастау үшін дананы баптаңыз.",
-      "setUpKiloclaw": "KiloClaw баптау",
-      "currentInstance": "{{title}}, ағымдағы"
-    },
     "conversation": {
-      "failedToLoad": "Чатты жүктеу мүмкін болмады.",
-      "notFound": "Чат табылмады.",
       "untitled": "Атаусыз",
-      "leaveTitle": "Чаттан шығасыз ба?",
-      "leaveMessage": "Чат тізіміңізден алынып тасталады.",
-      "openHint": "Чатты ашады. Атауын өзгерту немесе шығу үшін басып тұрыңыз.",
-      "unread": "Оқылмаған",
-      "optionsFor": "{{title}} чатының әрекеттері",
-      "options": "Чат әрекеттері",
-      "renameTitle": "Чат атауын өзгерту",
-      "renamePlaceholder": "Жаңа атау",
-      "couldNotReachBot": "Ботпен байланысу мүмкін болмады. Қайталап көріңіз.",
-      "messageDeliveryFailed": "Хабарламаны ботқа жеткізу мүмкін болмады.",
-      "couldNotSignIn": "Чатқа кіру мүмкін болмады.",
-      "couldNotRefreshMessages": "Хабарламаларды жаңарту мүмкін болмады.",
-      "couldNotLoadHistory": "Чат тарихын жүктеу мүмкін болмады.",
-      "leave": "Шығу",
-      "untitledConversation": "Атаусыз чат",
-      "createFailed": "Чатты жасау мүмкін болмады.",
-      "leaveFailed": "Чаттан шығу мүмкін болмады."
-    },
-    "reactions": {
-      "common": "Жиі қолданылатын",
-      "reactWith": "{{reaction}} реакциясын қосу",
-      "accessibility": "{{emoji}} реакциясы, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Жауап берілетін хабарлама",
-      "cancelReply": "Жауап беруден бас тарту",
-      "openInstance": "Дананы ашу",
-      "attachFile": "Файлды тіркеу",
-      "cancelEdit": "Өңдеуден бас тарту"
+      "renamePlaceholder": "Жаңа атау"
     },
     "conversationList": {
-      "couldNotLoad": "Чаттарды жүктеу мүмкін болмады.",
-      "emptyTitle": "Әзірге чаттар жоқ",
-      "emptyDescription": "KiloClaw данаңызбен сөйлесу үшін чат жасаңыз.",
-      "create": "Чат жасау",
-      "newConversation": "Жаңа чат",
-      "openInstanceSettings": "Дана баптауларын ашу",
       "today": "Бүгін",
       "yesterday": "Кеше",
-      "thisWeek": "Осы апта",
       "older": "Бұрынырақ"
     },
     "attachment": {
-      "open": "{{filename}} файлын ашу",
-      "openFailed": "Тіркемені ашу мүмкін болмады. Қосылымды тексеріп, қайталап көріңіз.",
-      "attachFailed": "Файлды тіркеу мүмкін болмады.",
-      "limit": "{{displayCount}} файлға дейін тіркеуге болады.",
-      "sizeRejection": "{{filename}} файлының көлемі тіркемелерге рұқсат етілген {{limit}} шегінен асады.",
-      "unreadable": "{{filename}} файлын оқу мүмкін болмады.",
-      "pastedImage": "қойылған сурет",
-      "defaultName": "Тіркеме",
       "classificationDenied": "Орындалатын файлдарды тіркеуге болмайды.",
       "classificationEmpty": "Файл бос.",
       "classificationTooLarge": "Файл көлемі 20 МБ-тан аспауы керек.",
@@ -943,426 +883,17 @@
       "networkError": "Желі қатесі орын алды.",
       "uploadFailed": "Жүктеп салу мүмкін болмады.",
       "nothingToPaste": "Қоятын ештеңе жоқ.",
-      "metadataStripFailed": "Фотосуреттің метадеректерін жою мүмкін болмады.",
-      "limit_one": "{{displayCount}} файлға дейін тіркеуге болады.",
-      "limit_other": "{{displayCount}} файлға дейін тіркеуге болады."
+      "metadataStripFailed": "Фотосуреттің метадеректерін жою мүмкін болмады."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "{{filename}} файлын қайта жүктеп салу",
-      "remove": "{{filename}} файлын алып тастау"
-    },
-    "messageBubble": {
-      "deleted": "[жойылған хабарлама]",
-      "yourMessage": "Сіздің хабарламаңыз",
-      "messageFrom": "{{author}} хабарламасы",
-      "moreActions": "Қосымша әрекеттер",
-      "notDelivered": "Жеткізілмеді",
-      "edited": "(өңделген)",
-      "image": "Сурет"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Көшірілді",
-      "copyFailed": "Көшіру мүмкін болмады.",
-      "title": "Хабарламамен орындалатын әрекеттер",
-      "deleteTitle": "Хабарлама жойылсын ба?",
-      "deleteMessage": "Хабарлама чаттан жойылады.",
-      "deleteFailed": "Хабарламаны жою мүмкін болмады.",
-      "removeReactionFailed": "Реакцияны алып тастау мүмкін болмады.",
-      "addReactionFailed": "Реакцияны қосу мүмкін болмады.",
-      "retrySend": "Қайта жіберу",
-      "moreReactions": "Қосымша реакциялар",
-      "edit": "Өңдеу",
-      "sendFailed": "Хабарламаны жіберу мүмкін болмады.",
-      "retrySendFailed": "Хабарламаны қайта жіберу мүмкін болмады.",
-      "editFailed": "Хабарламаны өңдеу мүмкін болмады.",
-      "executeFailed": "Әрекетті орындау мүмкін болмады."
+      "edit": "Өңдеу"
     },
     "attachmentPicker": {
-      "takePhoto": "Суретке түсіру",
-      "photoLibrary": "Фотосуреттер жинағы",
-      "files": "Файл",
       "cameraAccessMessage": "Фото түсіру үшін параметрлерден камераны пайдалануға рұқсат беріңіз."
-    },
-    "typingIndicator": {
-      "someone": "Біреу",
-      "typing_one": "{{name}} жазып жатыр...",
-      "typing": "{{names}} жазып жатыр...",
-      "typing_other": "{{names}} жазып жатыр..."
-    },
-    "botStatus": {
-      "offline": "Желіде емес",
-      "loadingUser": "Пайдаланушы деректері жүктелуде...",
-      "waitingForStatus": "Бот күйі күтілуде...",
-      "offlineMessage": "Бот желіде емес. Ол қайта қосылғанда хабар алмасу жалғасады."
-    },
-    "errors": {
-      "notAllowed": "Бұл әрекетке рұқсат жоқ.",
-      "messageTooLong": "Хабарлама тым ұзын. Таңба саны {{limit}} мәнінен аз болуы керек.",
-      "titleTooLong": "Атау тым ұзын. Таңба саны {{limit}} мәнінен аз болуы керек.",
-      "messageEmpty": "Хабарлама бос болмауы керек."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw даналарын жүктеу мүмкін болмады.",
-    "billing": {
-      "title": "Төлем",
-      "continueMonthToMonth": "Ай сайынғы төлеммен жалғастыру",
-      "plan": "Жоспар",
-      "finalTermEnds": "Соңғы кезеңнің аяқталуы",
-      "afterFinalTerm": "Соңғы кезеңнен кейін",
-      "lessThanOneDay": "1 Күннен аз",
-      "ends": "Аяқталу күні",
-      "expires": "Мерзімінің аяқталуы",
-      "noActivePlan": "Белсенді тариф жоқ",
-      "noActivePlanDescription": "Сізде белсенді KiloClaw жазылымы жоқ.",
-      "managedByAdmin": "Төлемді ұйымыңыздың әкімшісі басқарады.",
-      "couldNotLoad": "Төлем туралы ақпаратты жүктеу мүмкін болмады.",
-      "manageOnWeb": "Сайтта төлемді басқару",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Commit тарифінің соңғы кезеңі {{date}} күні аяқталады. {{price}} бағасымен Standard тарифіне ауысыңыз, әйтпесе хостинг тоқтатылады.",
-      "freeTrial": "Тегін сынақ мерзімі",
-      "hostingEnds": "Хостинг аяқталады",
-      "renews": "Жаңарады",
-      "standardMonthToMonth": "Ай сайын төленетін Standard тарифі",
-      "standardStartsOn": "Standard тарифі {{date}} күні {{price}} бағасымен басталады.",
-      "yourStandardMonthlyPrice": "standard тарифіңіз бойынша айлық төлем",
-      "perMonth": "/ай",
-      "earlybirdAccessUntil": "Earlybird тарифі {{date}} күніне дейін қолжетімді.",
-      "earlybirdEnding": "Earlybird тарифінің аяқталуына {{remaining}} қалды.",
-      "paymentPastDue": "Төлем мерзімі өтіп кетті. Төлем әдісін жаңартыңыз.",
-      "subscriptionCancels": "Жазылым {{date}} күні тоқтатылады.",
-      "trialDaysRemaining": "Сынақ мерзімінің аяқталуына {{remaining}} қалды.",
-      "trialEndingSoon": "Сынақ мерзімі жақында аяқталады: {{remaining}} қалды.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Коммит"
-    },
-    "changelog": {
-      "title": "Жаңалықтар",
-      "couldNotLoad": "Өзгерістер журналын жүктеу мүмкін болмады.",
-      "noUpdates": "Әзірге жаңарту жоқ",
-      "noUpdatesDescription": "Өзгерістер журналының жазбалары осында көрінеді.",
-      "recentUpdates": "Соңғы жаңартулар",
-      "manageVersion": "Нұсқаны басқару",
-      "redeployRequired": "Қайта орналастыру қажет",
-      "redeploySuggested": "Қайта орналастыру ұсынылады",
-      "upgradeRequired": "Жаңарту қажет"
-    },
-    "dashboard": {
-      "title": "Басқару тақтасы",
-      "couldNotLoad": "Басқару тақтасын жүктеу мүмкін болмады.",
-      "renameInstance": "Дананың атауын өзгерту",
-      "renamePlaceholder": "Жаңа атау (ең көбі 50 таңба)",
-      "someDetailsFailed": "Кейбір ағымдағы мәліметтерді жүктеу мүмкін болмады.",
-      "destroy": "Жою",
-      "destroyMessage": "KiloClaw данаңыз бен оның барлық дерегі біржола жойылады. Бұл әрекетті кері қайтару мүмкін емес.",
-      "destroyTitle": "Дананы жою",
-      "instance": "Дана",
-      "couldNotCheckStatus": "Қызметтің күйін тексеру мүмкін болмады.",
-      "dangerZone": "ҚАУІПТІ АЙМАҚ",
-      "destroying": "Жойылуда…",
-      "serviceDegraded": "Қызметте ақау бар — күйін көру үшін түртіңіз",
-      "up": "ЖҰМЫС ІСТЕП ТҰР"
-    },
-    "channels": {
-      "title": "Арналар",
-      "couldNotLoad": "Арналарды жүктеу мүмкін болмады.",
-      "noChannels": "Қолжетімді арналар жоқ",
-      "noChannelsDescription": "Қосуға болатын арналар осында көрсетіледі.",
-      "connected": "{{label}} қосылды",
-      "disconnectMessage": "{{label}} арнасын жою керек пе? Бұл арна ажыратылады.",
-      "disconnectTitle": "Арнаны ажырату"
-    },
-    "devicePairing": {
-      "title": "Құрылғыны жұптастыру",
-      "refreshRequests": "Жұптастыру сұрауларын жаңарту",
-      "couldNotLoad": "Жұптастыру сұрауларын жүктеу мүмкін болмады.",
-      "noPending": "Күтудегі сұраулар жоқ",
-      "noPendingDescription": "Арналар мен құрылғыларды жұптастыру сұраулары осында көрсетіледі.",
-      "channelRequests": "Арналарды жұптастыру сұраулары",
-      "deviceRequests": "Құрылғыларды жұптастыру сұраулары",
-      "approveDeviceMessage": "{{platform}} құрылғысына данаңызға қосылуға рұқсат беру керек пе?",
-      "approveDeviceTitle": "Құрылғыны мақұлдау",
-      "approveMessage": "Данаңызға мына қосылымды мақұлдау керек пе: {{label}} (код: {{code}})?",
-      "approveTitle": "Жұптастыру сұрауын мақұлдау",
-      "unknownDevice": "Белгісіз құрылғы"
-    },
-    "execPolicy": {
-      "title": "Орындау саясаты",
-      "couldNotLoad": "Командаларды орындау саясатын жүктеу мүмкін болмады.",
-      "alwaysAsk": "Әрқашан сұрау",
-      "alwaysAskDescription": "Әр команданы орындау алдында растау сұралады. Бұл — ең қауіпсіз нұсқа.",
-      "neverAsk": "Ешқашан сұрамау",
-      "neverAskDescription": "Командалар растаусыз орындалады. Бұл жылдамырақ, бірақ қауіпсіздігі төмен."
-    },
-    "google": {
-      "title": "Google аккаунты",
-      "couldNotLoad": "Google тіркелгісінің күйін жүктеу мүмкін болмады.",
-      "disconnected": "Google тіркелгісі ажыратылды. Өзгерісті қолдану үшін данаңызды қайта орналастырыңыз.",
-      "setupCommand": "Орнату командасы",
-      "setupCommandHelp": "Google тіркелгіңізді қосу үшін осы команданы Docker орнатылған өз компьютеріңіздің терминалында орындаңыз.",
-      "failedToLoadCommand": "Орнату командасын жүктеу мүмкін болмады.",
-      "gmailNotifications": "Gmail хабарландырулары",
-      "disconnect": "Google тіркелгісін ажырату",
-      "copied": "Көшірілді",
-      "copyCommand": "Команданы көшіру",
-      "disconnectConfirm": "Ажырату",
-      "disconnectMessage": "Google тіркелгіңізді осы данадан алып тастау керек пе? Gmail хабарландырулары өшіріледі. Өзгерістерді қолдану үшін тіркелгіні ажыратқаннан кейін дананы қайта орналастырыңыз.",
-      "disconnectTitle": "Google-ды ажырату"
-    },
-    "modelList": {
-      "noMatches": "Іздеуіңізге сәйкес модельдер жоқ",
-      "noModelsDescription": "Модельдер қолжетімді болғанда осында көрінеді.",
-      "noResultsFor": "«{{query}}» сұрауы бойынша нәтиже жоқ."
-    },
-    "secrets": {
-      "title": "Құпия деректер",
-      "couldNotLoad": "Құпия деректерді жүктеу мүмкін болмады.",
-      "noSecrets": "Қолжетімді құпия деректер жоқ",
-      "noSecretsDescription": "Құпия деректер арқылы қосылатын қызметтер осында көрсетіледі.",
-      "removeMessage": "{{label}} деректерін жою керек пе? Бұл құрал кіру деректеріне қол жеткізе алмайды.",
-      "removeTitle": "Құпия деректерді жою",
-      "saved": "{{label}} сақталды",
-      "hide": "Жасыру: {{label}}",
-      "show": "Көрсету: {{label}}",
-      "allFieldsRequired": "{{label}} қосылымын орнату үшін барлық өрісті толтыру керек.",
-      "setupGuideFallback": "баптау нұсқаулығы",
-      "setupGuideA11y": "{{label}} орнату нұсқаулығы",
-      "setupGuide": "Баптау нұсқаулығы",
-      "saving": "Сақталуда…",
-      "removing": "Жойылуда…",
-      "updateToken": "Токенді жаңарту"
-    },
-    "versionPin": {
-      "title": "Нұсқаны бекіту",
-      "couldNotLoad": "Нұсқа туралы ақпаратты жүктеу мүмкін болмады.",
-      "couldNotLoadMore": "Қосымша нұсқаларды жүктеу мүмкін болмады.",
-      "loadMore": "Қосымша нұсқаларды жүктеу",
-      "showingLatest": "Соңғы 100 нұсқа көрсетілуде.",
-      "availableVersions": "Қолжетімді нұсқалар",
-      "noVersions": "Қолжетімді нұсқалар жоқ",
-      "noVersionsDescription": "Қолжетімді OpenClaw нұсқалары осында көрінеді.",
-      "unpin": "Бекітуді алып тастау",
-      "unpinMessage": "Соңғы қолжетімді нұсқаға қайту керек пе?",
-      "unpinTitle": "Нұсқаның бекітуін алып тастау",
-      "confirmPin": "Бекітуді растау",
-      "followingLatest": "Әрдайым соңғы нұсқа",
-      "latest": "соңғы",
-      "pin": "Бекіту",
-      "pinnedByAdmin": "Әкімші бекітті — өзгерту үшін әкімшіге хабарласыңыз.",
-      "pinnedTo": "{{version}} нұсқасы бекітілген",
-      "reasonOptional": "Себеп (міндетті емес)",
-      "reasonPlaceholder": "Нұсқаны бекіту себебі",
-      "replaceAdminPin": "Әкімші бекіткен нұсқаны ауыстыру",
-      "replacesAdminPin": "Әкімші бекіткен нұсқа (қазір {{label}}) ауыстырылады."
-    },
-    "redeploy": "Қайта орналастыру",
-    "redeployMessage": "Бұл дананы қайта орналастыру керек пе?",
-    "redeployTitle": "Дананы қайта орналастыру",
-    "controls": {
-      "redeploying": "Қайта орналастырылуда…",
-      "restart": "Қайта іске қосу",
-      "restartOpenClawMessage": "OpenClaw процесін қайта іске қосу керек пе?",
-      "restartOpenClawTitle": "OpenClaw процесін қайта іске қосу",
-      "restarting": "Қайта іске қосылуда…",
-      "start": "Іске қосу",
-      "startMessage": "Бұл дананы іске қосу керек пе?",
-      "startTitle": "Дананы іске қосу",
-      "stop": "Тоқтату",
-      "stopMessage": "Бұл дананы тоқтату керек пе?",
-      "stopTitle": "Дананы тоқтату",
-      "stopping": "Тоқтатылуда…"
-    },
-    "empty": {
-      "finishingSetup": "Баптау аяқталып жатыр",
-      "finishingSetupDescription": "Күте тұрыңыз, тіркелгіңізді реттеп жатырмыз. Әдетте бұл көп уақыт алмайды.",
-      "getStarted": "Бастау",
-      "noInstancesDescription": "Код жазатын агенттерді іске қосу үшін алғашқы данаңызды жасаңыз."
-    },
-    "instance": {
-      "backToInstances": "Даналар тізіміне оралу",
-      "couldNotLoad": "Дананы жүктеу мүмкін болмады.",
-      "notFound": "Дана табылмады",
-      "notFoundDescription": "Бұл дана жойылған немесе сілтеме жарамсыз болуы мүмкін."
-    },
-    "list": {
-      "createInstance": "Дана жасау",
-      "organizations": "Ұйымдар",
-      "accessIssue": {
-        "trialExpired": "Сынақ мерзімі аяқталды — дананы пайдалануды жалғастыру үшін жазылыңыз",
-        "subscriptionCanceled": "Жазылым белсенді емес — дананы пайдалануды жалғастыру үшін қайта жазылыңыз",
-        "subscriptionPastDue": "Төлемде мәселе бар — дананы пайдалануды жалғастыру үшін төлем деректерін жаңартыңыз",
-        "quarantined": "Дана оқшауланған — маманның тексеруі қажет",
-        "multipleCurrentConflict": "Аккаунтты тексеру қажет",
-        "nonCanonicalEarlybird": "Ескі тарифті тексеру қажет"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}} ботымен сөйлесу",
-        "ready": "{{name}} дайын",
-        "warmedUp": "Бәрі дайын. Ыңғайлы кезде сәлем беріңіз."
-      },
-      "flow": {
-        "genericErrorBody": "Қазір данаңызды орнатуды аяқтау мүмкін болмады.",
-        "manualReviewBody": "Дана жасау үшін алдымен тіркелгіңіздің күйін тексеру қажет. kilo.ai сайтында жалғастырыңыз.",
-        "manualReviewTitle": "Орнатуды маман тексеруі керек",
-        "openKiloAi": "Kilo.ai сайтын ашу",
-        "provisioning": "Дайындау",
-        "review": "Тексеру",
-        "identityTitle": "Боттың бейнесін жасау",
-        "couldNotLoad": "Бастапқы орнату күйін жүктеу мүмкін болмады.",
-        "finishingSetup": "Орнату аяқталып жатыр — тіркелгіңізді реттеп болғанша күте тұрыңыз.",
-        "ready": "Дайын",
-        "settingUp": "Орнатылуда…"
-      },
-      "unavailableDescription": "Дананы дайындау үшін белсенді KiloClaw жазылымы қажет. Бұрыннан бар даналар мен жазылымдар әдеттегідей жұмыс істей береді.",
-      "unavailableTitle": "Жаңа KiloClaw даналары қолжетімсіз",
-      "identity": {
-        "chooseAvatar": "Аватар таңдау",
-        "namePlaceholder": "Боттың атауы",
-        "selectAvatar": "{{name}} аватарын таңдау",
-        "personality": "Мінезі",
-        "changePersonality": "Мінезін өзгерту",
-        "location": "Орналасқан жер",
-        "locationPlaceholder": "Қала немесе аймақ (міндетті емес)",
-        "useCurrentLocation": "Қазіргі орналасқан жерді пайдалану",
-        "locationDeniedTitle": "Орналасқан жерді анықтауға рұқсат жоқ",
-        "locationDeniedMessage": "Қазіргі орналасқан жеріңізді пайдалану үшін баптауларда оны анықтауға рұқсат беріңіз.",
-        "locationValidationFailed": "Орналасқан жерді растау мүмкін болмады.",
-        "locationResolveFailed": "Орналасқан жеріңізді анықтау мүмкін болмады. Оны қолмен өңдей аласыз.",
-        "locationGetFailed": "Орналасқан жеріңізді анықтау мүмкін болмады. Оны қолмен енгізіңіз.",
-        "nature": {
-          "aiAssistantLabel": "ЖИ көмекшісі",
-          "aiAssistantVibe": "Көмекке дайын, қабілетті, кәсіби",
-          "digitalCreatureLabel": "Цифрлық жаратылыс",
-          "digitalCreatureVibe": "Өзгеше, жанды, сәл тосын",
-          "virtualCompanionLabel": "Виртуалды серіктес",
-          "virtualCompanionVibe": "Жылы жүзді, әрдайым қасыңызда, шын көңілмен қамқор",
-          "somethingWeirderLabel": "Одан да ерекше бірдеңе…",
-          "somethingWeirderVibe": "Өзіңіз анықтаңыз"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Бәрі дайын! Сіз сұраған қорытындыны жасадым. Ыңғайлы кезде қарай аласыз.",
-        "settingUp": "Хабарландырулар бапталуда…",
-        "stayInTheLoop": "Хабардар болыңыз",
-        "getNotified": "Жауапты жіберіп алмау үшін {{name}} тапсырманы аяқтағанда хабарландыру алыңыз.",
-        "now": "қазір",
-        "skipForNow": "Әзірге өткізіп жіберу",
-        "couldNotEnable": "Хабарландыруларды қосу мүмкін болмады."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Орнатуды тексеру мүмкін болмады",
-        "queryErrorBody": "{{name}} ботын орнату күйін тексеру кезінде байланыс үзілді. Орнату әлі жүріп жатуы мүмкін. Қайталап көріңіз немесе сәл кейінірек тексеріңіз.",
-        "stoppedTitle": "Орнату тоқтатылды",
-        "stoppedBody": "{{name}} данасы орнату кезінде күтпеген жерден тоқтады.",
-        "stalledTitle": "Орнату тұрып қалды",
-        "stalledBody": "{{name}} ботын орнатуды аяқтай алмадық. Қайталап көріңіз. Егер бұл қайталана берсе, {{supportEmail}} мекенжайына жазыңыз.",
-        "timeoutTitle": "Күткеннен ұзаққа созылуда",
-        "timeoutBody": "{{name}} ботын орнату әдеттегіден ұзаққа созылуда ({{displayMinutes}} минуттан асты).",
-        "continueInBackground": "Фонда жалғастыру",
-        "settingUp": "{{name}} орнатылуда",
-        "connectingToAgent": "Агентке қосылып жатыр",
-        "startingSandbox": "Оқшауланған орта іске қосылуда",
-        "backgroundHint": "Әдетте бір минуттан аз уақыт алады. Бұл терезені жабуға болады — біз фонда жұмыс істей береміз."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Аяқталу коды: {{code}}",
-      "gatewayProcess": "ШЛЮЗ ПРОЦЕСІ",
-      "lastExit": "Соңғы аяқталу",
-      "memory": "Жад",
-      "region": "Аймақ",
-      "resources": "РЕСУРСТАР",
-      "restarts": "Қайта іске қосу саны",
-      "state": "Күй",
-      "uptime": "Үздіксіз жұмыс уақыты",
-      "crashed": "АҚАУМЕН ТОҚТАДЫ",
-      "destroying": "ЖОЙЫЛУДА",
-      "provisioned": "ДАЙЫНДАЛДЫ",
-      "restarting": "ҚАЙТА ІСКЕ ҚОСЫЛУДА",
-      "running": "ОРЫНДАЛУДА",
-      "shuttingDown": "ӨШІРІЛУДЕ",
-      "starting": "БАСТАЛУДА",
-      "stopped": "ТОҚТАТЫЛДЫ",
-      "stopping": "ТОҚТАТЫЛУДА",
-      "unknown": "БЕЛГІСІЗ",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Озық",
-      "frontierDescription": "Ең жоғары өнімділік. Пайымдау қабілеті бар озық модельдерге бағыттайды.",
-      "balancedDescription": "Қолжетімді бағамен жылдамдық пен мүмкіндіктің оңтайлы үйлесімі.",
-      "autoModelA11y": "{{label}} автоматты моделі",
-      "currentModel": "Ағымдағы модель",
-      "browseAllModels": "немесе 500+ модельден таңдаңыз",
-      "browseAllModelsA11y": "Барлық 500+ модельді қарау"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw-ды пайдалануды жалғастыру үшін браузерден kilo.ai/claw мекенжайына өтіңіз. Қолданбада жазылу мүмкін емес.",
-      "subscriptionCanceledTitle": "Сайтта жазылу",
-      "subscriptionCanceledBody": "KiloClaw-ды пайдалану үшін браузерден kilo.ai/claw мекенжайына өтіңіз. Қолданбада жазылу мүмкін емес.",
-      "subscriptionCanceledCta": "Kilo.ai/claw бетін ашу",
-      "subscriptionPastDueTitle": "Сайтта төлем деректерін жаңарту",
-      "subscriptionPastDueBody": "Соңғы төлеміңізде мәселе болды. Төлем деректерін жаңарту үшін браузерден kilo.ai/claw мекенжайына өтіңіз. Қолданбада төлемді басқару мүмкін емес.",
-      "quarantinedTitle": "Дананы қалпына келтіру қажет",
-      "quarantinedBody": "KiloClaw данаңыз оқшауланған, сондықтан оны қазір пайдалану мүмкін емес. Оны қалпына келтіру үшін біздің топтың көмегі қажет.",
-      "multipleCurrentConflictBody": "Тіркелгіңізден бірнеше белсенді жазылым табылды. Сізден екі рет төлем алынбауы үшін жұмысты уақытша тоқтаттық.",
-      "multipleCurrentConflictCta": "Kilo.ai сайтында жалғастыру",
-      "nonCanonicalEarlybirdTitle": "Ескі тариф анықталды",
-      "nonCanonicalEarlybirdBody": "Ерте қолжетімділік тарифіңізді телефонда пайдалану үшін оны алдымен маман тексеруі керек.",
-      "iosTitle": "KiloClaw iOS-та қолжетімсіз",
-      "iosBody": "Бұл тіркелгінің KiloClaw қызметіне қол жеткізуі iOS қолданбасынан тыс басқарылады.",
-      "iosContact": "Сұрақтар бар ма? {{supportEmail}} мекенжайына хабарласыңыз.",
-      "quarantinedCta": "Командамызға хат жіберу",
-      "nonCanonicalEarlybirdCta": "Тарифіңізді kilo.ai сайтында қарап шығу"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} данасын тексеру қажет: {{label}}",
-      "openUnread_one": "{{name}} данасын ашу, {{displayCount}} оқылмаған хабарлама",
-      "openUnread": "{{name}} ашу, {{displayCount}} оқылмаған хабарлама",
-      "openUnread_other": "{{name}} ашу, {{displayCount}} оқылмаған хабарлама",
-      "openSettings": "{{name}} баптауларын ашу",
-      "fixOnKiloAi": "Kilo.ai сайтында түзету: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Құрылғыларды жұптастыру сұрауларын мақұлдау",
-      "execPolicyDescription": "Қауіпсіздік баптаулары",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "ЖИ моделін таңдау",
-      "secretsDescription": "Шифрланған кіру деректері",
-      "versionPinDescription": "Нақты нұсқаға бекіту"
-    },
-    "avatar": {
-      "arcade": "Аркада",
-      "brain": "Ми",
-      "creature": "Жаратылыс",
-      "crystal": "Кристалл",
-      "custom": "Жеке аватар",
-      "dragon": "Айдаһар",
-      "explorer": "Зерттеуші",
-      "flame": "Жалын",
-      "lightning": "Найзағай",
-      "magicWand": "Сиқырлы таяқша",
-      "moon": "Ай",
-      "operator": "Оператор",
-      "orbit": "Орбита",
-      "oracle": "Көріпкел",
-      "rainbow": "Кемпірқосақ",
-      "robot": "Робот",
-      "satellite": "Жерсерік",
-      "sparkles": "Жарқылдар",
-      "strongArm": "Мықты қол",
-      "talisman": "Тұмар"
-    },
-    "remoteSpawnFilesNotSupported": "Бұл дана файл қабылдай алмайды.",
-    "instanceSwitcherTitle": "KiloClaw данасы"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}} файлын солға жылжыту",
       "moveRight": "{{filename}} файлын оңға жылжыту"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Алмасу буферінен суретті қою",
-      "label": "Табылған суретті қою"
-    },
     "attachmentPicker": {
       "camera": "Камера",
       "photoLibrary": "Фотосуреттер жинағы",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Бұл құрылғыдан шығасыз ба?",
     "signOutThisSessionTitle": "Бұл сессиядан шығасыз ба?",
     "signOutThisSessionMessage": "{{device}} құрылғысындағы сессия аяқталады. Құрылғы API қызметіне тағы бір сағатқа дейін қол жеткізе алады.",
-    "webBrowser": "Веб-браузер"
+    "webBrowser": "Веб-браузер",
+    "unknownDevice": "Белгісіз құрылғы"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Қолданбалар дүкенін ашу мүмкін болмады.",

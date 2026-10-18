@@ -98,14 +98,7 @@ describe('catalog copy', () => {
     if (tag === 'ka') {
       return;
     }
-    for (const key of [
-      'sessionRow.needsInput',
-      'kiloclaw.dashboard.up',
-      'kiloclaw.status.resources',
-      'kiloclaw.status.running',
-      'kiloclaw.status.starting',
-      'kiloclaw.status.unknown',
-    ] as const) {
+    for (const key of ['sessionRow.needsInput'] as const) {
       const value = i18n.t(key);
       expect(value, key).toBe(value.toLocaleUpperCase(tag));
     }

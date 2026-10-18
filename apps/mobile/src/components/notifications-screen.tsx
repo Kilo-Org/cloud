@@ -1,9 +1,4 @@
-/* eslint-disable max-lines -- The dedicated Notifications screen composes the master
- * OS-permission gate, the push-token registration flow, and 8 per-category toggles
- * with their optimistic-mutation + retry + loading patterns. CATEGORY_META still
- * has eight keys; the KiloClaw row is hidden when useKiloClawTabVisible is false.
- * Extracting subcomponents would re-encode the same hooks. The screen stays a
- * single rendered surface. */
+/* eslint-disable max-lines -- notification settings keep OS permission, registration, and preference mutations together. */
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Application from 'expo-application';
@@ -14,11 +9,9 @@ import {
   Bot,
   KeyRound,
   ListTodo,
-  MessageSquare,
   RefreshCw,
   ShieldAlert,
   Smartphone,
-  Sparkles,
   Wallet,
 } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -50,7 +43,6 @@ import {
   isLatestMutationGeneration,
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
-import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
 import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -113,12 +105,6 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
 /** One row per notification category. */
 const CATEGORY_META = [
   {
-    key: 'chatMessages',
-    titleKey: 'notifications.channel.chat',
-    subtitleKey: 'notifications.category.chatMessagesSubtitle',
-    icon: MessageSquare,
-  },
-  {
     key: 'agentAttention',
     titleKey: 'notifications.category.agentAttentionTitle',
     subtitleKey: 'notifications.category.agentAttentionSubtitle',
@@ -135,12 +121,6 @@ const CATEGORY_META = [
     titleKey: 'notifications.category.sessionStatusTitle',
     subtitleKey: 'notifications.category.sessionStatusSubtitle',
     icon: ListTodo,
-  },
-  {
-    key: 'kiloclawActivity',
-    titleKey: 'notifications.channel.kiloclaw',
-    subtitleKey: 'notifications.category.kiloclawActivitySubtitle',
-    icon: Sparkles,
   },
   {
     key: 'balanceAlerts',
@@ -179,7 +159,6 @@ const CATEGORY_META = [
  * such a row keeps the same meaning in the reader's language.
  */
 const CATEGORY_UNAVAILABLE_SUBTITLE_KEYS: ReadonlyMap<NotificationCategoryKey, string> = new Map([
-  ['kiloclawActivity', 'notifications.category.kiloclawActivityUnavailable'],
   ['balanceAlerts', 'notifications.category.balanceAlertsUnavailable'],
   ['securityFindings', 'notifications.category.securityFindingsUnavailable'],
 ]);
@@ -201,8 +180,7 @@ type UnavailableReasonCode = NonNullable<NotificationCategoryCapability['unavail
 const UNAVAILABLE_REASON_KEY = {
   organizationRequired: 'notifications.category.balanceAlertsUnavailable',
   securityAgentRequired: 'notifications.category.securityFindingsUnavailable',
-  kiloclawInstanceRequired: 'notifications.category.kiloclawActivityUnavailable',
-} satisfies Record<UnavailableReasonCode, string>;
+} satisfies Partial<Record<UnavailableReasonCode, string>>;
 
 /** A code from a newer server must fall back, never render raw. */
 function unavailableReasonKey(code: string | null | undefined): string | undefined {
@@ -211,7 +189,7 @@ function unavailableReasonKey(code: string | null | undefined): string | undefin
   if (code == null || !Object.hasOwn(UNAVAILABLE_REASON_KEY, code)) {
     return undefined;
   }
-  return UNAVAILABLE_REASON_KEY[code as UnavailableReasonCode];
+  return UNAVAILABLE_REASON_KEY[code as keyof typeof UNAVAILABLE_REASON_KEY];
 }
 
 type CategoryRowProps = Readonly<{
@@ -308,7 +286,6 @@ export function NotificationsScreen() {
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const showKiloClawActivity = useKiloClawTabVisible();
   const { token: authToken } = useAuth();
   const isAuthenticated = authToken != null;
 
@@ -636,14 +613,6 @@ export function NotificationsScreen() {
   const previewTerminal = previewErrorCode === 'UNAUTHORIZED';
   const previewDisabled = !notificationsEnabled || isPreviewPending || previewTerminal;
 
-  // Old form: CATEGORY_META always rendered kiloclawActivity. Keep the key in
-  // CATEGORY_META and in notification preferences. Hide the row when the user
-  // has no active instance. Remove this filter only when product deletes the
-  // kiloclawActivity preference.
-  const visibleCategoryMeta = CATEGORY_META.filter(
-    meta => meta.key !== 'kiloclawActivity' || showKiloClawActivity
-  );
-
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.notifications')} />
@@ -799,7 +768,7 @@ export function NotificationsScreen() {
           </Text>
           {preferencesLoading && (
             <>
-              {visibleCategoryMeta.map(meta => (
+              {CATEGORY_META.map(meta => (
                 <View
                   key={meta.key}
                   className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3"
@@ -825,7 +794,7 @@ export function NotificationsScreen() {
           )}
           {preferences && (
             <>
-              {visibleCategoryMeta.map(meta => (
+              {CATEGORY_META.map(meta => (
                 <CategoryRow
                   key={meta.key}
                   meta={meta}

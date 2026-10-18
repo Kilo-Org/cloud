@@ -10,8 +10,6 @@ on:
       - 'apps/mobile/**'
       - 'packages/trpc/**'
       - 'packages/app-shared/**'
-      - 'packages/kilo-chat/**'
-      - 'packages/kilo-chat-hooks/**'
       - 'packages/event-service/**'
       - 'packages/notifications/**'
       - 'packages/cloud-agent-sdk/**'
@@ -89,7 +87,7 @@ jobs:
           # the version-bump branch re-triggers this workflow, and the tag marks the
           # pre-changelog commit, so without the exclusion every release starts the
           # next one. The same exclusion retires the bump-PR merge from the range.
-          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ packages/trpc/ packages/app-shared/ packages/kilo-chat/ packages/kilo-chat-hooks/ packages/event-service/ packages/notifications/ packages/cloud-agent-sdk/ ':(exclude)apps/mobile/CHANGELOG.md')
+          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ packages/trpc/ packages/app-shared/ packages/event-service/ packages/notifications/ packages/cloud-agent-sdk/ ':(exclude)apps/mobile/CHANGELOG.md')
 
           # The bump-version job edits the version line after every submission. Its
           # merged PR must not release the same code again, or every release starts
@@ -199,7 +197,7 @@ jobs:
             exit 1
           fi
           MISSING=""
-          for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID KILO_CHAT_URL EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT; do
+          for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT; do
             if ! printf '%s\n' "$ENV_OUTPUT" | grep -qE "^Name[[:space:]]+${NAME}[[:space:]]*$"; then
               MISSING="$MISSING $NAME"
             fi

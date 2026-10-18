@@ -101,12 +101,9 @@
     "scheduled": "مهال ویش شوی",
     "keepEditing": "سمون ته دوام ورکړئ",
     "keepRunning": "روان یې پرېږدئ",
-    "kiloclaw": "KiloClaw",
     "newSession": "نوې ناسته",
-    "noKiloclawInstances": "د KiloClaw هېڅ انسټنس نشته",
     "noModelsAvailable": "هېڅ ماډل نشته",
     "notFound": "ونه موندل شو.",
-    "online": "آنلاین",
     "open": "{{name}} پرانیزئ",
     "openPullRequest": "پل ریکویسټ پرانیزئ",
     "pending": "په انتظار",
@@ -257,7 +254,8 @@
     "renamePasskey": "د ننوتلو کیلي نوم بدل کړئ",
     "removePasskey": "د ننوتلو کیلي لیرې کړئ",
     "removePasskeyTitle": "د ننوتلو کیلي لیرې شي؟",
-    "removePasskeyMessage": "تاسو به نور د دې ننوتلو کیلي سره ونشئ کولای."
+    "removePasskeyMessage": "تاسو به نور د دې ننوتلو کیلي سره ونشئ کولای.",
+    "changelog": "نوي بدلونونه"
   },
   "preferences": {
     "general": "عمومي",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "خبرتیاوې یوازې د یوې پېښې خبر درکوي. د پیغام د لوستلو لپاره Kilo پرانیزئ.",
     "channel": {
       "agentProgress": "د ایجنټ پرمختګ",
-      "chat": "د خبرو اترو پیغامونه",
-      "kiloclaw": "د KiloClaw فعالیت",
       "balance": "د بیلانس خبرتیاوې",
       "security": "امنیتي موندنې",
       "spend": "د لګښت خبرتیاوې",
       "followedSessions": "تعقیب شوې ناستې"
     },
     "category": {
-      "chatMessagesSubtitle": "ستاسو په خبرو اترو کې ځوابونه",
       "agentAttentionTitle": "ایجنټ ستاسو مرستې ته اړتیا لري",
       "agentAttentionSubtitle": "پوښتنې، د اجازې یا معلوماتو اړتیا",
       "agentUpdatesTitle": "د ایجنټ تازه معلومات",
       "agentUpdatesSubtitle": "د کار پر مهال د ایجنټ پیغامونه",
       "sessionStatusTitle": "د ناستې حالت",
       "sessionStatusSubtitle": "بشپړ شوی / ناکام شوی / د کنټرول لپاره چمتو",
-      "kiloclawActivitySubtitle": "چمتو یا ناکام انسټانس، مهالویش شوې کړنې",
-      "kiloclawActivityUnavailable": "د KiloClaw فعالیت ترلاسه کولو لپاره یو KiloClaw انسټانس پیل کړئ.",
       "balanceAlertsSubtitle": "د سازمان د کم بیلانس خبرداري",
       "balanceAlertsUnavailable": "د بیلانس خبرداریو ترلاسه کولو لپاره یو سازمان ته ورسئ.",
       "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "کور",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}، ټب، له {{total}} څخه {{position}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "د انسټانس بدلول",
-      "couldNotLoadInstances": "انسټانسونه بار نه شول.",
-      "noInstancesDescription": "د خبرو اترو د پیل لپاره یو انسټانس تنظیم کړئ.",
-      "setUpKiloclaw": "KiloClaw تنظیم کړئ",
-      "currentInstance": "{{title}}، اوسنی"
-    },
     "conversation": {
-      "failedToLoad": "خبرې اترې بار نه شوې.",
-      "notFound": "خبرې اترې و نه موندل شوې.",
       "untitled": "بې سرلیکه",
-      "leaveTitle": "له خبرو اترو ووځئ؟",
-      "leaveMessage": "دا به خبرې اترې ستاسو له لړلیک څخه لرې کړي.",
-      "openHint": "خبرې اترې پرانیزي. د نوم بدلولو او وتلو د غوراویو لپاره یې کېکاږئ او ونیسئ.",
-      "unread": "نالوستي",
-      "optionsFor": "د {{title}} خبرو اترو غوراوي",
-      "options": "د خبرو اترو غوراوي",
-      "renameTitle": "د خبرو اترو د نوم بدلول",
-      "renamePlaceholder": "نوی نوم",
-      "couldNotReachBot": "له بوټ سره اړیکه ټینګه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
-      "messageDeliveryFailed": "پیغام بوټ ته و نه رسېد.",
-      "couldNotSignIn": "خبرو اترو ته ننوتل ناکام شول.",
-      "couldNotRefreshMessages": "پیغامونه تازه نه شول.",
-      "couldNotLoadHistory": "د خبرو اترو تاریخچه بار نه شوه.",
-      "leave": "ووځئ",
-      "untitledConversation": "بې سرلیکه خبرې اترې",
-      "createFailed": "خبرې اترې جوړې نه شوې.",
-      "leaveFailed": "له خبرو اترو وتل ناکام شول."
-    },
-    "reactions": {
-      "common": "عام",
-      "reactWith": "په {{reaction}} غبرګون وښایئ",
-      "accessibility": "{{emoji}} غبرګون، {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "ځواب ورته لیکل کېږي",
-      "cancelReply": "ځواب لغوه کړئ",
-      "openInstance": "انسټانس پرانیزئ",
-      "attachFile": "فایل ونښلوئ",
-      "cancelEdit": "سمون لغوه کړئ"
+      "renamePlaceholder": "نوی نوم"
     },
     "conversationList": {
-      "couldNotLoad": "خبرې اترې بار نه شوې.",
-      "emptyTitle": "تر اوسه کومې خبرې اترې نشته",
-      "emptyDescription": "له خپل KiloClaw انسټانس سره د خبرو د پیل لپاره خبرې اترې جوړې کړئ.",
-      "create": "خبرې اترې جوړې کړئ",
-      "newConversation": "نوې خبرې اترې",
-      "openInstanceSettings": "د انسټانس ترتیبات پرانیزئ",
       "today": "نن",
       "yesterday": "پرون",
-      "thisWeek": "دا اوونۍ",
       "older": "پخوانۍ"
     },
     "attachment": {
-      "open": "{{filename}} پرانیزئ",
-      "openFailed": "نښلول شوی فایل پرانیستل نه شو. خپله انټرنېټي اړیکه وګورئ او بیا هڅه وکړئ.",
-      "attachFailed": "فایل و نه نښلول شو.",
-      "limit": "تاسو کولی شئ تر {{displayCount}} پورې فایلونه ونښلوئ.",
-      "sizeRejection": "د {{filename}} کچه د نښلول کېدونکو فایلونو له {{limit}} حد څخه زیاته ده.",
-      "unreadable": "{{filename}} و نه لوستل شو.",
-      "pastedImage": "پیسټ شوی انځور",
-      "defaultName": "ضمیمه",
       "classificationDenied": "د اجرا وړ فایلونه نه شي نښلول کېدای.",
       "classificationEmpty": "فایل تش دی.",
       "classificationTooLarge": "د فایلونو کچه باید 20 MB یا تر دې کمه وي.",
@@ -943,426 +883,17 @@
       "networkError": "په شبکه کې تېروتنه رامنځته شوه.",
       "uploadFailed": "پورته کول ناکام شول.",
       "nothingToPaste": "د پیسټ کولو لپاره څه نشته.",
-      "metadataStripFailed": "د انځور میټاډاټا لرې نه شوه.",
-      "limit_one": "تاسو کولی شئ تر {{displayCount}} پورې فایلونه ونښلوئ.",
-      "limit_other": "تاسو کولی شئ تر {{displayCount}} پورې فایلونه ونښلوئ."
+      "metadataStripFailed": "د انځور میټاډاټا لرې نه شوه."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}، {{status}}",
-      "retryUploading": "د {{filename}} د پورته کولو بیا هڅه وکړئ",
-      "remove": "{{filename}} لرې کړئ"
-    },
-    "messageBubble": {
-      "deleted": "[ړنګ شوی پیغام]",
-      "yourMessage": "ستاسو پیغام",
-      "messageFrom": "له {{author}} څخه پیغام",
-      "moreActions": "نورې کړنې",
-      "notDelivered": "رسېدلی نه دی",
-      "edited": "(سم شوی)",
-      "image": "انځور"
+      "accessibility": "{{filename}}، {{status}}"
     },
     "messageActions": {
-      "copied": "کاپي شوی",
-      "copyFailed": "کاپي کول ناکام شول.",
-      "title": "د پیغام کړنې",
-      "deleteTitle": "پیغام ړنګ شي؟",
-      "deleteMessage": "دا به پیغام له خبرو اترو څخه لرې کړي.",
-      "deleteFailed": "پیغام ړنګ نه شو.",
-      "removeReactionFailed": "غبرګون لرې نه شو.",
-      "addReactionFailed": "غبرګون ورزیات نه شو.",
-      "retrySend": "بیا یې ولېږئ",
-      "moreReactions": "نور غبرګونونه",
-      "edit": "سمون ورکړئ",
-      "sendFailed": "پیغام و نه لېږل شو.",
-      "retrySendFailed": "بیا لېږل ناکام شول.",
-      "editFailed": "پیغام سم نه شو.",
-      "executeFailed": "کړنه اجرا نه شوه."
+      "edit": "سمون ورکړئ"
     },
     "attachmentPicker": {
-      "takePhoto": "انځور واخلئ",
-      "photoLibrary": "د انځورونو کتابتون",
-      "files": "فایلونه",
       "cameraAccessMessage": "د انځور اخیستلو لپاره په امستنو کې کامرې ته د لاسرسي اجازه ورکړئ."
-    },
-    "typingIndicator": {
-      "someone": "یو څوک",
-      "typing_one": "{{name}} لیکي...",
-      "typing": "{{names}} لیکي...",
-      "typing_other": "{{names}} لیکي..."
-    },
-    "botStatus": {
-      "offline": "آفلاین",
-      "loadingUser": "د کارن معلومات بارېږي...",
-      "waitingForStatus": "د بوټ د حالت معلومېدو ته انتظار کېږي...",
-      "offlineMessage": "بوټ آفلاین دی. کله چې بېرته ونښلي، د پیغامونو لېږد به بیا پیل شي."
-    },
-    "errors": {
-      "notAllowed": "اجازه نشته.",
-      "messageTooLong": "پیغام ډېر اوږد دی — د تورو شمېر یې باید له {{limit}} څخه کم وي.",
-      "titleTooLong": "سرلیک ډېر اوږد دی — د تورو شمېر یې باید له {{limit}} څخه کم وي.",
-      "messageEmpty": "پیغام تش نه شي پاتې کېدای."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "د KiloClaw انسټنسونه بار نه شول.",
-    "billing": {
-      "title": "د تادیاتو چارې",
-      "continueMonthToMonth": "میاشتني ګډون ته دوام ورکړئ",
-      "plan": "پلان",
-      "finalTermEnds": "وروستۍ دوره پای ته رسېږي",
-      "afterFinalTerm": "له وروستۍ دورې وروسته",
-      "lessThanOneDay": "له ۱ ورځې لږ",
-      "ends": "پای ته رسېږي",
-      "expires": "اعتبار یې پای ته رسېږي",
-      "noActivePlan": "هېڅ فعال پلان نشته",
-      "noActivePlanDescription": "تاسو د KiloClaw فعال ګډون نه لرئ.",
-      "managedByAdmin": "ستاسو د سازمان مدیر د تادیاتو چارې اداره کوي.",
-      "couldNotLoad": "د تادیاتو معلومات بار نه شول.",
-      "manageOnWeb": "په وېب کې د تادیاتو چارې اداره کړئ",
-      "earlybird": "د لومړني لاسرسي پلان",
-      "finalCommitTermEndsOn": "ستاسو د Commit وروستۍ دوره په {{date}} پای ته رسېږي. په {{price}} بیه د Standard پلان ته دوام ورکړئ، که نه نو کوربه توب پای ته رسېږي.",
-      "freeTrial": "وړیا ازمایښتي موده",
-      "hostingEnds": "کوربه توب پای ته رسېږي",
-      "renews": "تمدیدېږي",
-      "standardMonthToMonth": "د Standard میاشتنی پلان",
-      "standardStartsOn": "د Standard پلان په {{date}} د {{price}} په بیه پیلېږي.",
-      "yourStandardMonthlyPrice": "ستاسو د Standard پلان میاشتنۍ بیه",
-      "perMonth": "/میاشت",
-      "earlybirdAccessUntil": "تر {{date}} پورې د لومړني لاسرسي پلان فعال دی.",
-      "earlybirdEnding": "د لومړني لاسرسي پلان تر پای پورې: {{remaining}}.",
-      "paymentPastDue": "د تادیې نېټه تېره شوې ده. مهرباني وکړئ د تادیې طریقه تازه کړئ.",
-      "subscriptionCancels": "ګډون په {{date}} لغوه کېږي.",
-      "trialDaysRemaining": "د ازمایښتي مودې {{remaining}} پاتې دي.",
-      "trialEndingSoon": "ازمایښتي موده ژر پای ته رسېږي: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "کمېټ"
-    },
-    "changelog": {
-      "title": "نوي بدلونونه",
-      "couldNotLoad": "د بدلونونو لړلیک بار نه شو.",
-      "noUpdates": "تر اوسه تازه معلومات نشته",
-      "noUpdatesDescription": "د بدلونونو لړلیک به دلته ښکاره شي.",
-      "recentUpdates": "وروستي بدلونونه",
-      "manageVersion": "نسخه اداره کړئ",
-      "redeployRequired": "بیا ځای پر ځای کول اړین دي",
-      "redeploySuggested": "بیا ځای پر ځای کول وړاندیز کېږي",
-      "upgradeRequired": "نوې نسخې ته اوښتل اړین دي"
-    },
-    "dashboard": {
-      "title": "ډشبورډ",
-      "couldNotLoad": "ډشبورډ بار نه شو.",
-      "renameInstance": "د انسټنس نوم بدل کړئ",
-      "renamePlaceholder": "نوی نوم (تر ۵۰ تورو پورې)",
-      "someDetailsFailed": "ځینې اوسني جزئیات بار نه شول.",
-      "destroy": "له منځه یې یوسئ",
-      "destroyMessage": "دا به ستاسو د KiloClaw انسټنس او ټول معلومات یې د تل لپاره له منځه یوسي. دا کړنه بېرته نه شي راګرځول کېدای.",
-      "destroyTitle": "د انسټنس له منځه وړل",
-      "instance": "انسټنس",
-      "couldNotCheckStatus": "د خدمت حالت ونه کتل شو.",
-      "dangerZone": "خطرناکې کړنې",
-      "destroying": "له منځه وړل کېږي…",
-      "serviceDegraded": "خدمت سم کار نه کوي — د حالت د لیدلو لپاره ټک وکړئ",
-      "up": "فعال"
-    },
-    "channels": {
-      "title": "چینلونه",
-      "couldNotLoad": "چینلونه بار نه شول.",
-      "noChannels": "هېڅ چینل نشته",
-      "noChannelsDescription": "د چینلونو نښلونې به دلته ښکاره شي.",
-      "connected": "{{label}} ونښلول شو",
-      "disconnectMessage": "{{label}} لرې شي؟ د دې چینل اړیکه به پرې شي.",
-      "disconnectTitle": "د چینل د اړیکې پرې کول"
-    },
-    "devicePairing": {
-      "title": "د وسیلو جوړه کول",
-      "refreshRequests": "د جوړه کولو غوښتنې تازه کړئ",
-      "couldNotLoad": "د جوړه کولو غوښتنې بار نه شوې.",
-      "noPending": "هېڅ غوښتنه په تمه نه ده",
-      "noPendingDescription": "د چینلونو او وسیلو د جوړه کولو غوښتنې به دلته ښکاره شي.",
-      "channelRequests": "د چینل غوښتنې",
-      "deviceRequests": "د وسیلې غوښتنې",
-      "approveDeviceMessage": "{{platform}} ته اجازه ورکوئ چې ستاسو له انسټنس سره ونښلي؟",
-      "approveDeviceTitle": "د وسیلې تایید",
-      "approveMessage": "{{label}} (کوډ: {{code}}) ته اجازه ورکوئ چې ستاسو له انسټنس سره ونښلي؟",
-      "approveTitle": "د جوړه کولو د غوښتنې تایید",
-      "unknownDevice": "نامعلومه وسیله"
-    },
-    "execPolicy": {
-      "title": "د اجرا تګلاره",
-      "couldNotLoad": "د اجرا کولو تګلاره بار نه شوه.",
-      "alwaysAsk": "تل وپوښتئ",
-      "alwaysAskDescription": "هره قومانده له اجرا کولو مخکې تایید کړئ. دا تر ټولو خوندي طریقه ده.",
-      "neverAsk": "هېڅکله مه پوښتئ",
-      "neverAskDescription": "قوماندې له تایید پرته اجرا کړئ. دا چټکه خو لږ خوندي طریقه ده."
-    },
-    "google": {
-      "title": "د Google حساب",
-      "couldNotLoad": "د Google حساب حالت بار نه شو.",
-      "disconnected": "د Google حساب اړیکه پرې شوه. د بدلون د پلي کولو لپاره خپل انسټنس بیا ځای پر ځای کړئ.",
-      "setupCommand": "د چمتو کولو قومانده",
-      "setupCommandHelp": "د خپل Google حساب د نښلولو لپاره دا قومانده د خپل کمپیوټر په ټرمینل کې اجرا کړئ. Docker باید پر کمپیوټر نصب وي.",
-      "failedToLoadCommand": "د چمتو کولو قومانده بار نه شوه.",
-      "gmailNotifications": "د Gmail خبرتیاوې",
-      "disconnect": "د Google حساب اړیکه پرې کړئ",
-      "copied": "کاپي شوی",
-      "copyCommand": "قومانده کاپي کړئ",
-      "disconnectConfirm": "اړیکه پرې کړئ",
-      "disconnectMessage": "خپل Google حساب له دې انسټنس څخه لرې کوئ؟ دا به د Gmail خبرتیاوې غیر فعالې کړي. د بدلونونو د پلي کولو لپاره د اړیکې له پرې کولو وروسته انسټنس بیا ځای پر ځای کړئ.",
-      "disconnectTitle": "د Google د اړیکې پرې کول"
-    },
-    "modelList": {
-      "noMatches": "هېڅ ماډل ستاسو له لټون سره سمون نه لري",
-      "noModelsDescription": "کله چې ماډلونه چمتو شي، دلته به ښکاره شي.",
-      "noResultsFor": "د \"{{query}}\" لپاره هېڅ پایله نشته."
-    },
-    "secrets": {
-      "title": "پټ معلومات",
-      "couldNotLoad": "پټ معلومات بار نه شول.",
-      "noSecrets": "هېڅ پټ معلومات نشته",
-      "noSecretsDescription": "د پټو معلوماتو نښلونې به دلته ښکاره شي.",
-      "removeMessage": "{{label}} لرې شي؟ دا وسیله به د ننوتلو خپلو معلوماتو ته لاسرسی له لاسه ورکړي.",
-      "removeTitle": "د پټو معلوماتو لرې کول",
-      "saved": "{{label}} خوندي شو",
-      "hide": "{{label}} پټ کړئ",
-      "show": "{{label}} ښکاره کړئ",
-      "allFieldsRequired": "د {{label}} د نښلولو لپاره د ټولو برخو ډکول اړین دي.",
-      "setupGuideFallback": "د چمتو کولو لارښود",
-      "setupGuideA11y": "د {{label}} د چمتو کولو لارښود",
-      "setupGuide": "د چمتو کولو لارښود",
-      "saving": "خوندي کېږي…",
-      "removing": "لرې کېږي…",
-      "updateToken": "ټوکن تازه کړئ"
-    },
-    "versionPin": {
-      "title": "د نسخې ثابتول",
-      "couldNotLoad": "د نسخې معلومات بار نه شول.",
-      "couldNotLoadMore": "نورې نسخې بار نه شوې.",
-      "loadMore": "نورې نسخې بار کړئ",
-      "showingLatest": "وروستۍ ۱۰۰ نسخې ښودل کېږي.",
-      "availableVersions": "شته نسخې",
-      "noVersions": "هېڅ نسخه نشته",
-      "noVersionsDescription": "د OpenClaw شته نسخې به دلته ښکاره شي.",
-      "unpin": "ثابتوالی لرې کړئ",
-      "unpinMessage": "بېرته تر ټولو نوې شته نسخې ته اوړئ؟",
-      "unpinTitle": "د نسخې د ثابتوالي لرې کول",
-      "confirmPin": "ثابت ساتل تایید کړئ",
-      "followingLatest": "تل نوې نسخه",
-      "latest": "تر ټولو نوې",
-      "pin": "ثابته یې وساتئ",
-      "pinnedByAdmin": "مدیر نسخه ثابته ساتلې ده — د بدلولو لپاره له خپل مدیر سره اړیکه ونیسئ.",
-      "pinnedTo": "{{version}} نسخه ثابته ساتل شوې",
-      "reasonOptional": "لامل (اختیاري)",
-      "reasonPlaceholder": "ولې دا نسخه ثابته ساتئ؟",
-      "replaceAdminPin": "د مدیر ثابته نسخه بدله کړئ",
-      "replacesAdminPin": "دا د مدیر له خوا ثابته ساتل شوې نسخه بدلوي (اوسنۍ نسخه: {{label}})."
-    },
-    "redeploy": "بیا ځای پر ځای کړئ",
-    "redeployMessage": "ایا ډاډه یاست چې غواړئ دا انسټنس بیا ځای پر ځای کړئ؟",
-    "redeployTitle": "د انسټنس بیا ځای پر ځای کول",
-    "controls": {
-      "redeploying": "بیا ځای پر ځای کېږي…",
-      "restart": "بیا پیل کړئ",
-      "restartOpenClawMessage": "ایا ډاډه یاست چې غواړئ د OpenClaw پروسه بیا پیل کړئ؟",
-      "restartOpenClawTitle": "د OpenClaw بیا پیلول",
-      "restarting": "بیا پیلېږي…",
-      "start": "پیل کړئ",
-      "startMessage": "ایا ډاډه یاست چې غواړئ دا انسټنس پیل کړئ؟",
-      "startTitle": "د انسټنس پیلول",
-      "stop": "ودروئ",
-      "stopMessage": "ایا ډاډه یاست چې غواړئ دا انسټنس ودروئ؟",
-      "stopTitle": "د انسټنس درول",
-      "stopping": "درېږي…"
-    },
-    "empty": {
-      "finishingSetup": "چمتووالی بشپړېږي",
-      "finishingSetupDescription": "لږ تم شئ، موږ ستاسو حساب چمتو کوو. دا عموماً لږ وخت نیسي.",
-      "getStarted": "پیل کړئ",
-      "noInstancesDescription": "د کوډ لیکلو د اجنټانو د چلولو لپاره خپل لومړی انسټنس جوړ کړئ."
-    },
-    "instance": {
-      "backToInstances": "بېرته انسټنسونو ته لاړ شئ",
-      "couldNotLoad": "انسټنس بار نه شو.",
-      "notFound": "انسټنس ونه موندل شو",
-      "notFoundDescription": "کېدای شي دا انسټنس له منځه تللی وي، یا لینک نور اعتبار ونه لري."
-    },
-    "list": {
-      "createInstance": "انسټنس جوړ کړئ",
-      "organizations": "سازمانونه",
-      "accessIssue": {
-        "trialExpired": "ازمایښتي موده پای ته رسېدلې، د دې انسټنس د کارولو د دوام لپاره ګډون وکړئ",
-        "subscriptionCanceled": "ګډون غیر فعال دی، د دې انسټنس د کارولو د دوام لپاره بیا ګډون وکړئ",
-        "subscriptionPastDue": "د تادیې ستونزه شته، د دې انسټنس د کارولو د دوام لپاره د تادیاتو معلومات تازه کړئ",
-        "quarantined": "انسټنس قرنطین شوی، لاسي بیاکتنې ته اړتیا لري",
-        "multipleCurrentConflict": "حساب بیاکتنې ته اړتیا لري",
-        "nonCanonicalEarlybird": "پخوانی پلان بیاکتنې ته اړتیا لري"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "له {{name}} سره خبرې وکړئ",
-        "ready": "{{name}} چمتو دی",
-        "warmedUp": "هر څه چمتو دي. کله چې چمتو یاست، سلام ووایاست."
-      },
-      "flow": {
-        "genericErrorBody": "موږ اوس ونه شو کړای ستاسو د انسټنس چمتو کول بشپړ کړو.",
-        "manualReviewBody": "مخکې له دې چې انسټنس جوړ کړو، ستاسو د حساب حالت باید وکتل شي. په kilo.ai کې دوام ورکړئ.",
-        "manualReviewTitle": "چمتو کول لاسي بیاکتنې ته اړتیا لري",
-        "openKiloAi": "Kilo.ai پرانیزئ",
-        "provisioning": "د سرچینو چمتو کول",
-        "review": "بیاکتنه",
-        "identityTitle": "ستاسو د بوټ هویت",
-        "couldNotLoad": "د لومړني چمتو کولو حالت بار نه شو.",
-        "finishingSetup": "چمتو کول بشپړېږي — لږ تم شئ، موږ ستاسو حساب چمتو کوو.",
-        "ready": "چمتو",
-        "settingUp": "چمتو کېږي…"
-      },
-      "unavailableDescription": "د انسټنس د چمتو کولو لپاره د KiloClaw فعال ګډون اړین دی. شته انسټنسونه او ګډونونه د پخوا په څېر کار کوي.",
-      "unavailableTitle": "د KiloClaw نوي انسټنسونه نشته",
-      "identity": {
-        "chooseAvatar": "اواتار غوره کړئ",
-        "namePlaceholder": "ستاسو د بوټ نوم",
-        "selectAvatar": "{{name}} د اواتار په توګه غوره کړئ",
-        "personality": "شخصیت",
-        "changePersonality": "شخصیت بدل کړئ",
-        "location": "ځای",
-        "locationPlaceholder": "ښار یا سیمه (اختیاري)",
-        "useCurrentLocation": "اوسنی ځای وکاروئ",
-        "locationDeniedTitle": "ځای ته لاسرسی رد شو",
-        "locationDeniedMessage": "د خپل اوسني ځای د کارولو لپاره په ترتیباتو کې ځای ته لاسرسی فعال کړئ.",
-        "locationValidationFailed": "ځای تایید نه شو.",
-        "locationResolveFailed": "ستاسو ځای معلوم نه شو. تاسو یې په لاسي ډول سمولی شئ.",
-        "locationGetFailed": "ستاسو ځای ترلاسه نه شو. په لاسي ډول یې ولیکئ.",
-        "nature": {
-          "aiAssistantLabel": "د مصنوعي ځیرکتیا مرستیال",
-          "aiAssistantVibe": "مرسته کوونکی، وړ، مسلکي",
-          "digitalCreatureLabel": "ډیجیټل مخلوق",
-          "digitalCreatureVibe": "ځانګړی، ژوندی، لږ د اټکل وړ نه دی",
-          "virtualCompanionLabel": "مجازی ملګری",
-          "virtualCompanionVibe": "مهربان، تل درسره، رښتینې پاملرنه کوي",
-          "somethingWeirderLabel": "لا عجیب څه…",
-          "somethingWeirderVibe": "پخپله یې تعریف کړئ"
-        }
-      },
-      "notifications": {
-        "mockMessage": "کار بشپړ شو! هغه لنډیز مې چمتو کړ چې تاسو غوښتی و. هر وخت چې چمتو یاست، زه چمتو یم.",
-        "settingUp": "خبرتیاوې چمتو کېږي…",
-        "stayInTheLoop": "له حاله خبر اوسئ",
-        "getNotified": "کله چې {{name}} یوه دنده بشپړه کړي، خبرتیا ترلاسه کړئ، څو هېڅ ځواب درڅخه پاتې نه شي.",
-        "now": "اوس",
-        "skipForNow": "اوس یې پرېږدئ",
-        "couldNotEnable": "خبرتیاوې فعالې نه شوې."
-      },
-      "provisioning": {
-        "queryErrorTitle": "د چمتو کولو حالت ونه کتل شو",
-        "queryErrorBody": "د {{name}} د چمتو کولو د حالت د کتلو پر مهال زموږ اړیکه پرې شوه. کېدای شي چمتو کول لا روان وي. بیا هڅه وکړئ یا لږ وروسته وګورئ.",
-        "stoppedTitle": "چمتو کول ودرېدل",
-        "stoppedBody": "د {{name}} انسټنس د چمتو کولو پر مهال ناڅاپه ودرېد.",
-        "stalledTitle": "کار په ټپه درېدلی",
-        "stalledBody": "موږ ونه شو کړای د {{name}} چمتو کول بشپړ کړو. بیا هڅه وکړئ، یا که ستونزه تکرارېږي، {{supportEmail}} ته برېښنالیک واستوئ.",
-        "timeoutTitle": "له اټکل ډېر وخت نیسي",
-        "timeoutBody": "د {{name}} چمتو کول تر معمول ډېر وخت نیسي (له {{displayMinutes}} دقیقو ډېر).",
-        "continueInBackground": "په شالید کې دوام ورکړئ",
-        "settingUp": "د {{name}} چمتو کول",
-        "connectingToAgent": "له اجنټ سره نښلېږي",
-        "startingSandbox": "خوندي جلا چاپېریال پیلېږي",
-        "backgroundHint": "معمولا له یوې دقیقې لږ وخت نیسي. تاسو کولی شئ دا وتړئ — موږ به په شالید کې کار ته دوام ورکړو."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "کوډ {{code}}",
-      "gatewayProcess": "د ګېټ وې پروسه",
-      "lastExit": "وروستۍ وتنه",
-      "memory": "حافظه",
-      "region": "سیمه",
-      "resources": "سرچینې",
-      "restarts": "بیا پیلونه",
-      "state": "حالت",
-      "uptime": "د پرله‌پسې فعالیت موده",
-      "crashed": "ناڅاپه بند شوی",
-      "destroying": "له منځه وړل کېږي",
-      "provisioned": "سرچینې چمتو شوې",
-      "restarting": "بیا پیلېږي",
-      "running": "روان",
-      "shuttingDown": "بندېږي",
-      "starting": "پیلېږي",
-      "stopped": "درېدلی",
-      "stopping": "درېږي",
-      "unknown": "نامعلوم",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "مخکښ",
-      "frontierDescription": "تر ټولو لوړه کارکردګي. غوښتنې د استدلال وړ مخکښو ماډلونو ته لېږي.",
-      "balancedDescription": "په لږ لګښت د چټکتیا او وړتیا هوښیار توازن.",
-      "autoModelA11y": "د {{label}} خپلکار ماډل",
-      "currentModel": "اوسنی ماډل",
-      "browseAllModels": "یا له ۵۰۰+ ماډلونو څخه غوره کړئ",
-      "browseAllModelsA11y": "ټول ۵۰۰+ ماډلونه وګورئ"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "د KiloClaw د کارولو د دوام لپاره په خپل براوزر کې kilo.ai/claw ته لاړ شئ. په اپلیکیشن کې ګډون نه شئ اخیستلی.",
-      "subscriptionCanceledTitle": "په ویب کې ګډون وکړئ",
-      "subscriptionCanceledBody": "د KiloClaw د کارولو لپاره په خپل براوزر کې kilo.ai/claw ته لاړ شئ. په اپلیکیشن کې ګډون نه شئ اخیستلی.",
-      "subscriptionCanceledCta": "Kilo.ai/claw پرانیزئ",
-      "subscriptionPastDueTitle": "په وېب کې د تادیې تازه کول",
-      "subscriptionPastDueBody": "ستاسو په وروستۍ تادیه کې ستونزه وه. د تازه کولو لپاره په خپل براوزر کې kilo.ai/claw ته لاړ شئ. په اپلیکیشن کې د تادیاتو چارې نه شئ اداره کولی.",
-      "quarantinedTitle": "انسټنس سمولو ته اړتیا لري",
-      "quarantinedBody": "ستاسو د KiloClaw انسټنس قرنطین شوی او اوس نه شي کارول کېدای. زموږ ټیم باید د بېرته فعالولو لپاره مرسته وکړي.",
-      "multipleCurrentConflictBody": "موږ ستاسو په حساب کې له یوه څخه ډېر فعال ګډونونه وموندل. د دوه ځله پیسو اخیستلو د مخنیوي لپاره مو بهیر درولی دی.",
-      "multipleCurrentConflictCta": "په kilo.ai کې دوام ورکړئ",
-      "nonCanonicalEarlybirdTitle": "پخوانی پلان وموندل شو",
-      "nonCanonicalEarlybirdBody": "ستاسو د لومړني لاسرسي پلان په موبایل کې له کارولو مخکې لاسي بیاکتنې ته اړتیا لري.",
-      "iosTitle": "KiloClaw په iOS کې نشته",
-      "iosBody": "د دې حساب لپاره KiloClaw ته لاسرسی د iOS له اپلیکیشن څخه بهر اداره کېږي.",
-      "iosContact": "پوښتنې لرئ؟ له {{supportEmail}} سره اړیکه ونیسئ.",
-      "quarantinedCta": "زموږ ټیم ته ایمیل واستوئ",
-      "nonCanonicalEarlybirdCta": "خپل پلان په kilo.ai کې وڅېړئ"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} پاملرنې ته اړتیا لري: {{label}}",
-      "openUnread_one": "{{name}} پرانیزئ، {{displayCount}} نالوستی پیغام",
-      "openUnread": "{{name}} پرانیزئ، {{displayCount}} نالوستي پیغامونه",
-      "openUnread_other": "{{name}} پرانیزئ، {{displayCount}} نالوستي پیغامونه",
-      "openSettings": "د {{name}} ترتیبات پرانیزئ",
-      "fixOnKiloAi": "په kilo.ai کې حل کړئ: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram، Discord، Slack",
-      "devicePairingDescription": "د وسیلو غوښتنې تایید کړئ",
-      "execPolicyDescription": "امنیتي ترتیبات",
-      "googleDescription": "Gmail، Calendar، Docs",
-      "modelDescription": "د مصنوعي ځیرکتیا د ماډل ټاکنه",
-      "secretsDescription": "د ننوتلو کوډشوي معلومات",
-      "versionPinDescription": "یوه ځانګړې نسخه ثابته وساتئ"
-    },
-    "avatar": {
-      "arcade": "د لوبو ماشین",
-      "brain": "مغز",
-      "creature": "مخلوق",
-      "crystal": "کریستال",
-      "custom": "د خپلې خوښې اواتار",
-      "dragon": "اژدها",
-      "explorer": "سپړونکی",
-      "flame": "لمبه",
-      "lightning": "برېښنا",
-      "magicWand": "جادویي عصا",
-      "moon": "سپوږمۍ",
-      "operator": "چلوونکی",
-      "orbit": "مدار",
-      "oracle": "وړاندوینه کوونکی",
-      "rainbow": "شنه زرغونه",
-      "robot": "روبوټ",
-      "satellite": "سپوږمکۍ",
-      "sparkles": "ځلاوې",
-      "strongArm": "پیاوړی مټ",
-      "talisman": "طلسم"
-    },
-    "remoteSpawnFilesNotSupported": "دا انسټنس فایلونه نه شي ترلاسه کولی.",
-    "instanceSwitcherTitle": "د KiloClaw انسټنس"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}} کیڼ لوري ته ولېږدوئ",
       "moveRight": "{{filename}} ښي لوري ته ولېږدوئ"
     },
-    "attachmentPasteHint": {
-      "accessibility": "له کلیپ بورډ څخه انځور ولګوئ",
-      "label": "انځور وموندل شو، د لګولو لپاره ټک وکړئ"
-    },
     "attachmentPicker": {
       "camera": "کیمره",
       "photoLibrary": "د انځورونو کتابتون",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "له دې وسیلې حساب وباسم؟",
     "signOutThisSessionTitle": "له دې ناستې ووځم؟",
     "signOutThisSessionMessage": "حساب به له {{device}} څخه وایستل شي. وسیله تر یوه ساعت پورې API ته لاسرسی ساتلی شي.",
-    "webBrowser": "ویب براوزر"
+    "webBrowser": "ویب براوزر",
+    "unknownDevice": "نامعلومه وسیله"
   },
   "forceUpdate": {
     "couldNotOpenStore": "د اپلیکیشنونو پلورنځی پرانیستل نه شو.",

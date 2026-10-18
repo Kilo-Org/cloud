@@ -101,12 +101,9 @@
     "scheduled": "नियोजित",
     "keepEditing": "संपादन सुरू ठेवा",
     "keepRunning": "चालू ठेवा",
-    "kiloclaw": "KiloClaw",
     "newSession": "नवीन सत्र",
-    "noKiloclawInstances": "कोणतेही KiloClaw इन्स्टन्स नाहीत",
     "noModelsAvailable": "कोणतेही मॉडेल उपलब्ध नाही",
     "notFound": "सापडले नाही.",
-    "online": "ऑनलाइन",
     "open": "{{name}} उघडा",
     "openPullRequest": "पुल रिक्वेस्ट उघडा",
     "pending": "प्रलंबित",
@@ -257,7 +254,8 @@
     "renamePasskey": "पासकीचे नाव बदला",
     "removePasskey": "पासकी काढा",
     "removePasskeyTitle": "पासकी काढायची?",
-    "removePasskeyMessage": "आता तुम्ही या पासकीने साइन इन करू शकणार नाही."
+    "removePasskeyMessage": "आता तुम्ही या पासकीने साइन इन करू शकणार नाही.",
+    "changelog": "नवीन बदल"
   },
   "preferences": {
     "general": "सामान्य",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "सूचनांमध्ये फक्त काहीतरी घडल्याचे कळते. संदेश वाचण्यासाठी Kilo उघडा.",
     "channel": {
       "agentProgress": "एजंटची प्रगती",
-      "chat": "चॅटमधील संदेश",
-      "kiloclaw": "KiloClaw मधील घडामोडी",
       "balance": "शिल्लक रकमेच्या सूचना",
       "security": "सुरक्षा निष्कर्ष",
       "spend": "खर्चाच्या सूचना",
       "followedSessions": "फॉलो केलेली सत्रे"
     },
     "category": {
-      "chatMessagesSubtitle": "तुमच्या संभाषणांमधील उत्तरे",
       "agentAttentionTitle": "एजंटला तुमची गरज आहे",
       "agentAttentionSubtitle": "प्रश्नांची उत्तरे, परवानगी किंवा माहिती आवश्यक",
       "agentUpdatesTitle": "एजंटकडून अपडेट",
       "agentUpdatesSubtitle": "काम सुरू असताना एजंटकडून येणारे संदेश",
       "sessionStatusTitle": "सत्राची स्थिती",
       "sessionStatusSubtitle": "पूर्ण / अयशस्वी / नियंत्रणासाठी तयार",
-      "kiloclawActivitySubtitle": "इन्स्टन्स तयार/अयशस्वी, नियोजित क्रिया",
-      "kiloclawActivityUnavailable": "KiloClaw क्रियाकलाप मिळवण्यासाठी KiloClaw इन्स्टन्स सुरू करा.",
       "balanceAlertsSubtitle": "संस्थेची शिल्लक कमी झाल्याच्या सूचना",
       "balanceAlertsUnavailable": "शिल्लक सूचना मिळवण्यासाठी संस्थेत सामील व्हा.",
       "securityFindingsSubtitle": "नवीन निष्कर्ष आणि SLA स्मरणपत्रे",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "होम",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, टॅब, एकूण {{total}} पैकी {{position}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "इन्स्टन्सची निवड",
-      "couldNotLoadInstances": "इन्स्टन्स लोड करता आले नाहीत.",
-      "noInstancesDescription": "चॅट सुरू करण्यासाठी इन्स्टन्सचा सेटअप करा.",
-      "setUpKiloclaw": "KiloClaw चा सेटअप करा",
-      "currentInstance": "{{title}}, सध्याचे"
-    },
     "conversation": {
-      "failedToLoad": "संभाषण लोड करता आले नाही.",
-      "notFound": "संभाषण सापडले नाही.",
       "untitled": "नाव दिलेले नाही",
-      "leaveTitle": "संभाषण सोडायचे?",
-      "leaveMessage": "यामुळे ते तुमच्या यादीतून काढले जाईल.",
-      "openHint": "संभाषण उघडते. नाव बदलण्यासाठी किंवा संभाषण सोडण्यासाठी दाबून ठेवा.",
-      "unread": "न वाचलेले",
-      "optionsFor": "{{title}} या संभाषणाचे पर्याय",
-      "options": "संभाषणाचे पर्याय",
-      "renameTitle": "संभाषणाचे नवीन नाव",
-      "renamePlaceholder": "नवीन नाव",
-      "couldNotReachBot": "बॉटशी संपर्क साधता आला नाही. कृपया पुन्हा प्रयत्न करा.",
-      "messageDeliveryFailed": "संदेश बॉटपर्यंत पोहोचवता आला नाही.",
-      "couldNotSignIn": "चॅटमध्ये साइन इन करता आले नाही.",
-      "couldNotRefreshMessages": "संदेश रिफ्रेश करता आले नाहीत.",
-      "couldNotLoadHistory": "संभाषणाचा इतिहास लोड करता आला नाही.",
-      "leave": "सोडा",
-      "untitledConversation": "नाव न दिलेले संभाषण",
-      "createFailed": "संभाषण तयार करता आले नाही.",
-      "leaveFailed": "संभाषण सोडता आले नाही."
-    },
-    "reactions": {
-      "common": "नेहमीच्या प्रतिक्रिया",
-      "reactWith": "{{reaction}} ही प्रतिक्रिया द्या",
-      "accessibility": "{{emoji}} प्रतिक्रिया, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "या संदेशाला उत्तर",
-      "cancelReply": "उत्तर रद्द करा",
-      "openInstance": "इन्स्टन्स उघडा",
-      "attachFile": "फाइल जोडा",
-      "cancelEdit": "संपादन रद्द करा"
+      "renamePlaceholder": "नवीन नाव"
     },
     "conversationList": {
-      "couldNotLoad": "संभाषणे लोड करता आली नाहीत.",
-      "emptyTitle": "अजून संभाषणे नाहीत",
-      "emptyDescription": "तुमच्या KiloClaw इन्स्टन्सशी चॅट सुरू करण्यासाठी संभाषण तयार करा.",
-      "create": "संभाषण तयार करा",
-      "newConversation": "नवीन संभाषण",
-      "openInstanceSettings": "इन्स्टन्सच्या सेटिंग्ज उघडा",
       "today": "आज",
       "yesterday": "काल",
-      "thisWeek": "या आठवड्यात",
       "older": "जुने"
     },
     "attachment": {
-      "open": "{{filename}} उघडा",
-      "openFailed": "जोडलेली फाइल उघडता आली नाही. तुमचे इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
-      "attachFailed": "फाइल जोडता आली नाही.",
-      "limit": "तुम्ही जास्तीत जास्त {{displayCount}} फाइल जोडू शकता.",
-      "sizeRejection": "{{filename}} या फाइलचा आकार जोडता येणाऱ्या फाइलच्या {{limit}} मर्यादेपेक्षा जास्त आहे.",
-      "unreadable": "{{filename}} वाचता आले नाही.",
-      "pastedImage": "पेस्ट केलेली प्रतिमा",
-      "defaultName": "संलग्नक",
       "classificationDenied": "एक्झिक्युटेबल फाइल जोडता येत नाहीत.",
       "classificationEmpty": "फाइल रिकामी आहे.",
       "classificationTooLarge": "फाइलचा आकार 20 MB किंवा त्यापेक्षा कमी असणे आवश्यक आहे.",
@@ -943,426 +883,17 @@
       "networkError": "नेटवर्कमध्ये त्रुटी आली.",
       "uploadFailed": "अपलोड करता आले नाही.",
       "nothingToPaste": "पेस्ट करण्यासाठी काहीही नाही.",
-      "metadataStripFailed": "फोटोतील मेटाडेटा काढता आला नाही.",
-      "limit_one": "तुम्ही जास्तीत जास्त {{displayCount}} फाइल जोडू शकता.",
-      "limit_other": "तुम्ही जास्तीत जास्त {{displayCount}} फाइल जोडू शकता."
+      "metadataStripFailed": "फोटोतील मेटाडेटा काढता आला नाही."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "{{filename}} पुन्हा अपलोड करा",
-      "remove": "{{filename}} काढा"
-    },
-    "messageBubble": {
-      "deleted": "[हटवलेला संदेश]",
-      "yourMessage": "तुमचा संदेश",
-      "messageFrom": "{{author}} यांचा संदेश",
-      "moreActions": "आणखी कृती",
-      "notDelivered": "पोहोचला नाही",
-      "edited": "(संपादित)",
-      "image": "प्रतिमा"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "कॉपी केले",
-      "copyFailed": "कॉपी करता आले नाही.",
-      "title": "संदेशासाठी कृती",
-      "deleteTitle": "संदेश हटवायचा?",
-      "deleteMessage": "यामुळे संदेश संभाषणातून काढला जाईल.",
-      "deleteFailed": "संदेश हटवता आला नाही.",
-      "removeReactionFailed": "प्रतिक्रिया काढता आली नाही.",
-      "addReactionFailed": "प्रतिक्रिया जोडता आली नाही.",
-      "retrySend": "पुन्हा पाठवा",
-      "moreReactions": "आणखी प्रतिक्रिया",
-      "edit": "संपादित करा",
-      "sendFailed": "संदेश पाठवता आला नाही.",
-      "retrySendFailed": "संदेश पुन्हा पाठवता आला नाही.",
-      "editFailed": "संदेश संपादित करता आला नाही.",
-      "executeFailed": "कृती पूर्ण करता आली नाही."
+      "edit": "संपादित करा"
     },
     "attachmentPicker": {
-      "takePhoto": "फोटो घ्या",
-      "photoLibrary": "फोटो संग्रह",
-      "files": "फाइली",
       "cameraAccessMessage": "फोटो काढण्यासाठी सेटिंग्जमध्ये कॅमेरा वापरण्याची परवानगी द्या."
-    },
-    "typingIndicator": {
-      "someone": "कोणीतरी",
-      "typing_one": "{{name}} टाइप करत आहे...",
-      "typing": "{{names}} टाइप करत आहेत...",
-      "typing_other": "{{names}} टाइप करत आहेत..."
-    },
-    "botStatus": {
-      "offline": "ऑफलाइन",
-      "loadingUser": "वापरकर्त्याची माहिती लोड होत आहे...",
-      "waitingForStatus": "बॉटची स्थिती येण्याची वाट पाहत आहे...",
-      "offlineMessage": "बॉट ऑफलाइन आहे. तो पुन्हा कनेक्ट झाल्यावर संदेशांची देवाणघेवाण सुरू होईल."
-    },
-    "errors": {
-      "notAllowed": "परवानगी नाही.",
-      "messageTooLong": "संदेश खूप लांब आहे — तो {{limit}} अक्षरांपेक्षा कमी ठेवा.",
-      "titleTooLong": "शीर्षक खूप लांब आहे — ते {{limit}} अक्षरांपेक्षा कमी ठेवा.",
-      "messageEmpty": "संदेश रिकामा ठेवता येत नाही."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw इन्स्टन्स लोड करता आले नाहीत.",
-    "billing": {
-      "title": "बिलिंग",
-      "continueMonthToMonth": "मासिक योजनेवर सुरू ठेवा",
-      "plan": "योजना",
-      "finalTermEnds": "अंतिम कालावधीची समाप्ती",
-      "afterFinalTerm": "अंतिम कालावधीनंतर",
-      "lessThanOneDay": "1 दिवसापेक्षा कमी",
-      "ends": "समाप्ती",
-      "expires": "मुदत संपण्याची तारीख",
-      "noActivePlan": "कोणतीही सक्रिय योजना नाही",
-      "noActivePlanDescription": "तुमच्याकडे सक्रिय KiloClaw सदस्यत्व नाही.",
-      "managedByAdmin": "तुमच्या संस्थेचा प्रशासक बिलिंग व्यवस्थापित करतो.",
-      "couldNotLoad": "बिलिंगची माहिती लोड करता आली नाही.",
-      "manageOnWeb": "वेबवर बिलिंग व्यवस्थापित करा",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "तुमच्या Commit योजनेचा अंतिम कालावधी {{date}} रोजी संपेल. {{price}} दराने Standard योजनेवर सुरू ठेवा, अन्यथा होस्टिंग बंद होईल.",
-      "freeTrial": "मोफत चाचणी",
-      "hostingEnds": "होस्टिंग संपते",
-      "renews": "नूतनीकरण होते",
-      "standardMonthToMonth": "Standard मासिक योजना",
-      "standardStartsOn": "Standard योजना {{date}} रोजी {{price}} दराने सुरू होईल.",
-      "yourStandardMonthlyPrice": "तुमच्या Standard योजनेचा मासिक दर",
-      "perMonth": "/महिना",
-      "earlybirdAccessUntil": "Earlybird चा वापर {{date}} पर्यंत करता येईल.",
-      "earlybirdEnding": "Earlybird ची मुदत संपायला {{remaining}} बाकी आहे.",
-      "paymentPastDue": "पेमेंट थकले आहे. कृपया तुमची पेमेंट पद्धत अपडेट करा.",
-      "subscriptionCancels": "सदस्यत्व {{date}} रोजी रद्द होईल.",
-      "trialDaysRemaining": "चाचणीसाठी {{remaining}} बाकी आहे.",
-      "trialEndingSoon": "चाचणी लवकरच संपेल: {{remaining}} बाकी आहे.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "कमिट"
-    },
-    "changelog": {
-      "title": "नवीन बदल",
-      "couldNotLoad": "बदलांची नोंद लोड करता आली नाही.",
-      "noUpdates": "अद्याप कोणतेही अपडेट नाहीत",
-      "noUpdatesDescription": "बदलांच्या नोंदी येथे दिसतील.",
-      "recentUpdates": "अलीकडील अपडेट्स",
-      "manageVersion": "आवृत्ती व्यवस्थापित करा",
-      "redeployRequired": "पुन्हा डिप्लॉय करणे आवश्यक",
-      "redeploySuggested": "पुन्हा डिप्लॉय करण्याची शिफारस",
-      "upgradeRequired": "अपग्रेड आवश्यक"
-    },
-    "dashboard": {
-      "title": "डॅशबोर्ड",
-      "couldNotLoad": "डॅशबोर्ड लोड करता आला नाही.",
-      "renameInstance": "इन्स्टन्सचे नाव बदला",
-      "renamePlaceholder": "नवीन नाव (जास्तीत जास्त 50 अक्षरे)",
-      "someDetailsFailed": "काही ताजे तपशील लोड करता आले नाहीत.",
-      "destroy": "नष्ट करा",
-      "destroyMessage": "यामुळे तुमचा KiloClaw इन्स्टन्स आणि त्यातील सर्व डेटा कायमचा नष्ट होईल. ही कृती पूर्ववत करता येणार नाही.",
-      "destroyTitle": "इन्स्टन्स नष्ट करा",
-      "instance": "इन्स्टन्स",
-      "couldNotCheckStatus": "सेवेची स्थिती तपासता आली नाही.",
-      "dangerZone": "धोक्याचे क्षेत्र",
-      "destroying": "नष्ट होत आहे…",
-      "serviceDegraded": "सेवेत अडथळे आहेत — स्थिती पाहण्यासाठी टॅप करा",
-      "up": "सुरू"
-    },
-    "channels": {
-      "title": "चॅनेल",
-      "couldNotLoad": "चॅनेल्स लोड करता आले नाहीत.",
-      "noChannels": "कोणतेही चॅनेल उपलब्ध नाहीत",
-      "noChannelsDescription": "चॅनेल्सशी जोडणी करण्याचे पर्याय येथे दिसतील.",
-      "connected": "{{label}} कनेक्ट झाले",
-      "disconnectMessage": "{{label}} काढून टाकायचे? हा चॅनेल डिस्कनेक्ट होईल.",
-      "disconnectTitle": "चॅनेल डिस्कनेक्ट करा"
-    },
-    "devicePairing": {
-      "title": "उपकरणांची जोडणी",
-      "refreshRequests": "जोडणीच्या विनंत्या रीफ्रेश करा",
-      "couldNotLoad": "जोडणीच्या विनंत्या लोड करता आल्या नाहीत.",
-      "noPending": "कोणत्याही प्रलंबित विनंत्या नाहीत",
-      "noPendingDescription": "चॅनेल्स आणि डिव्हाइस जोडण्याच्या विनंत्या येथे दिसतील.",
-      "channelRequests": "चॅनेल जोडण्याच्या विनंत्या",
-      "deviceRequests": "डिव्हाइस जोडण्याच्या विनंत्या",
-      "approveDeviceMessage": "{{platform}} ला तुमच्या इन्स्टन्सशी कनेक्ट होण्याची परवानगी द्यायची?",
-      "approveDeviceTitle": "डिव्हाइसला परवानगी द्या",
-      "approveMessage": "{{label}} (कोड: {{code}}) याला तुमच्या इन्स्टन्सशी कनेक्ट होण्याची परवानगी द्यायची?",
-      "approveTitle": "जोडणीची विनंती मंजूर करा",
-      "unknownDevice": "अज्ञात डिव्हाइस"
-    },
-    "execPolicy": {
-      "title": "कमांड चालवण्याचे धोरण",
-      "couldNotLoad": "कमांड चालवण्याचे धोरण लोड करता आले नाही.",
-      "alwaysAsk": "नेहमी विचारा",
-      "alwaysAskDescription": "प्रत्येक कमांड चालवण्यापूर्वी पुष्टी घ्या. हा सर्वात सुरक्षित पर्याय आहे.",
-      "neverAsk": "कधीही विचारू नका",
-      "neverAskDescription": "पुष्टी न घेता कमांड चालवा. हा पर्याय वेगवान पण कमी सुरक्षित आहे."
-    },
-    "google": {
-      "title": "Google खाते",
-      "couldNotLoad": "Google खात्याची स्थिती लोड करता आली नाही.",
-      "disconnected": "Google खाते डिस्कनेक्ट झाले. बदल लागू करण्यासाठी तुमचा इन्स्टन्स पुन्हा डिप्लॉय करा.",
-      "setupCommand": "सेटअप कमांड",
-      "setupCommandHelp": "तुमचे Google खाते कनेक्ट करण्यासाठी तुमच्या स्वतःच्या संगणकावर Docker इन्स्टॉल करा आणि टर्मिनलमध्ये ही कमांड चालवा.",
-      "failedToLoadCommand": "सेटअप कमांड लोड करता आली नाही.",
-      "gmailNotifications": "Gmail च्या सूचना",
-      "disconnect": "Google खाते डिस्कनेक्ट करा",
-      "copied": "कॉपी केले",
-      "copyCommand": "कमांड कॉपी करा",
-      "disconnectConfirm": "डिस्कनेक्ट करा",
-      "disconnectMessage": "या इन्स्टन्समधून तुमचे Google खाते काढून टाकायचे? यामुळे Gmail च्या सूचना बंद होतील. बदल लागू करण्यासाठी डिस्कनेक्ट केल्यानंतर पुन्हा डिप्लॉय करा.",
-      "disconnectTitle": "Google डिस्कनेक्ट करा"
-    },
-    "modelList": {
-      "noMatches": "तुमच्या शोधाशी जुळणारी कोणतीही मॉडेल्स नाहीत",
-      "noModelsDescription": "उपलब्ध झाल्यावर मॉडेल्स येथे दिसतील.",
-      "noResultsFor": "\"{{query}}\" साठी कोणतेही निकाल सापडले नाहीत."
-    },
-    "secrets": {
-      "title": "गोपनीय मूल्ये",
-      "couldNotLoad": "सिक्रेट्स लोड करता आले नाहीत.",
-      "noSecrets": "कोणतेही सिक्रेट्स उपलब्ध नाहीत",
-      "noSecretsDescription": "सिक्रेट्स वापरून जोडणी करण्याचे पर्याय येथे दिसतील.",
-      "removeMessage": "{{label}} काढून टाकायचे? यानंतर या टूलला त्याची क्रेडेन्शियल्स वापरता येणार नाहीत.",
-      "removeTitle": "सिक्रेट काढा",
-      "saved": "{{label}} जतन झाले",
-      "hide": "{{label}} लपवा",
-      "show": "{{label}} दाखवा",
-      "allFieldsRequired": "{{label}} कनेक्ट करण्यासाठी सर्व रकाने भरणे आवश्यक आहे.",
-      "setupGuideFallback": "सेटअप मार्गदर्शिका",
-      "setupGuideA11y": "{{label}} च्या सेटअपचे मार्गदर्शन",
-      "setupGuide": "सेटअप मार्गदर्शिका",
-      "saving": "जतन होत आहे…",
-      "removing": "काढून टाकत आहे…",
-      "updateToken": "टोकन अपडेट करा"
-    },
-    "versionPin": {
-      "title": "आवृत्ती निश्चित करणे",
-      "couldNotLoad": "आवृत्तीची माहिती लोड करता आली नाही.",
-      "couldNotLoadMore": "आणखी आवृत्त्या लोड करता आल्या नाहीत.",
-      "loadMore": "आणखी आवृत्त्या लोड करा",
-      "showingLatest": "नवीनतम 100 आवृत्त्या दाखवल्या आहेत.",
-      "availableVersions": "उपलब्ध आवृत्त्या",
-      "noVersions": "कोणत्याही आवृत्त्या उपलब्ध नाहीत",
-      "noVersionsDescription": "उपलब्ध OpenClaw आवृत्त्या येथे दिसतील.",
-      "unpin": "अनपिन करा",
-      "unpinMessage": "पुन्हा नवीनतम उपलब्ध आवृत्ती वापरायची?",
-      "unpinTitle": "आवृत्ती अनपिन करा",
-      "confirmPin": "पिन करण्याची पुष्टी करा",
-      "followingLatest": "नेहमी नवीनतम आवृत्ती",
-      "latest": "नवीनतम",
-      "pin": "पिन करा",
-      "pinnedByAdmin": "प्रशासकाने आवृत्ती पिन केली आहे — ती बदलण्यासाठी तुमच्या प्रशासकाशी संपर्क साधा.",
-      "pinnedTo": "{{version}} ही आवृत्ती पिन केली",
-      "reasonOptional": "कारण (ऐच्छिक)",
-      "reasonPlaceholder": "तुम्ही ही आवृत्ती का पिन करत आहात?",
-      "replaceAdminPin": "प्रशासकाने पिन केलेली आवृत्ती बदला",
-      "replacesAdminPin": "यामुळे प्रशासकाने पिन केलेली आवृत्ती बदलेल (सध्या {{label}})."
-    },
-    "redeploy": "पुन्हा तैनात करा",
-    "redeployMessage": "हा इन्स्टन्स पुन्हा डिप्लॉय करायचा आहे याची खात्री आहे?",
-    "redeployTitle": "इन्स्टन्स पुन्हा डिप्लॉय करा",
-    "controls": {
-      "redeploying": "पुन्हा डिप्लॉय होत आहे…",
-      "restart": "पुन्हा सुरू करा",
-      "restartOpenClawMessage": "OpenClaw प्रक्रिया पुन्हा सुरू करायची आहे याची खात्री आहे?",
-      "restartOpenClawTitle": "OpenClaw पुन्हा सुरू करा",
-      "restarting": "पुन्हा सुरू होत आहे…",
-      "start": "सुरू करा",
-      "startMessage": "हा इन्स्टन्स सुरू करायचा आहे याची खात्री आहे?",
-      "startTitle": "इन्स्टन्स सुरू करा",
-      "stop": "थांबवा",
-      "stopMessage": "हा इन्स्टन्स थांबवायचा आहे याची खात्री आहे?",
-      "stopTitle": "इन्स्टन्स थांबवा",
-      "stopping": "थांबत आहे…"
-    },
-    "empty": {
-      "finishingSetup": "सेटअप पूर्ण होत आहे",
-      "finishingSetupDescription": "थोडे थांबा, आम्ही तुमचे खाते तयार करत आहोत. यासाठी सहसा फार वेळ लागत नाही.",
-      "getStarted": "सुरू करा",
-      "noInstancesDescription": "कोडिंग एजंट्स चालवण्यासाठी तुमचा पहिला इन्स्टन्स तयार करा."
-    },
-    "instance": {
-      "backToInstances": "इन्स्टन्सच्या यादीवर परत जा",
-      "couldNotLoad": "इन्स्टन्स लोड करता आला नाही.",
-      "notFound": "इन्स्टन्स सापडला नाही",
-      "notFoundDescription": "हा इन्स्टन्स नष्ट झाला असेल किंवा लिंक आता वैध नसेल."
-    },
-    "list": {
-      "createInstance": "इन्स्टन्स तयार करा",
-      "organizations": "संस्था",
-      "accessIssue": {
-        "trialExpired": "चाचणी संपली — हा इन्स्टन्स वापरत राहण्यासाठी सदस्यत्व घ्या",
-        "subscriptionCanceled": "सदस्यत्व सक्रिय नाही — हा इन्स्टन्स वापरत राहण्यासाठी पुन्हा सदस्यत्व घ्या",
-        "subscriptionPastDue": "पेमेंटमध्ये अडचण आहे — हा इन्स्टन्स वापरत राहण्यासाठी बिलिंगची माहिती अपडेट करा",
-        "quarantined": "इन्स्टन्स विलगीकरणात आहे — आमच्या टीमने तपासणे आवश्यक",
-        "multipleCurrentConflict": "खात्याची समीक्षा आवश्यक",
-        "nonCanonicalEarlybird": "जुन्या योजनेचे पुनरावलोकन आवश्यक"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}} सोबत गप्पा मारा",
-        "ready": "{{name}} तयार आहे",
-        "warmedUp": "सर्व काही तयार आहे. तुम्ही तयार असाल तेव्हा नमस्कार म्हणा."
-      },
-      "flow": {
-        "genericErrorBody": "आत्ता तुमच्या इन्स्टन्सचा सेटअप पूर्ण करता आला नाही.",
-        "manualReviewBody": "इन्स्टन्स तयार करण्यापूर्वी तुमच्या खात्याची स्थिती तपासणे आवश्यक आहे. पुढील प्रक्रिया kilo.ai वर पूर्ण करा.",
-        "manualReviewTitle": "सेटअपसाठी आमच्या टीमची तपासणी आवश्यक",
-        "openKiloAi": "Kilo.ai उघडा",
-        "provisioning": "इन्स्टन्सची निर्मिती",
-        "review": "समीक्षा",
-        "identityTitle": "तुमच्या बॉटला ओळख द्या",
-        "couldNotLoad": "प्रारंभिक सेटअपची स्थिती लोड करता आली नाही.",
-        "finishingSetup": "सेटअप पूर्ण होत आहे — तुमचे खाते तयार होईपर्यंत थोडे थांबा.",
-        "ready": "तयार",
-        "settingUp": "सेटअप होत आहे…"
-      },
-      "unavailableDescription": "इन्स्टन्स तयार करण्यासाठी सक्रिय KiloClaw सदस्यत्व आवश्यक आहे. विद्यमान इन्स्टन्स आणि सदस्यत्वे नेहमीप्रमाणे सुरू राहतील.",
-      "unavailableTitle": "नवीन KiloClaw इन्स्टन्स अनुपलब्ध आहेत",
-      "identity": {
-        "chooseAvatar": "अवतार निवडा",
-        "namePlaceholder": "तुमच्या बॉटचे नाव",
-        "selectAvatar": "{{name}} अवतार म्हणून निवडा",
-        "personality": "व्यक्तिमत्त्व",
-        "changePersonality": "व्यक्तिमत्त्व बदला",
-        "location": "स्थान",
-        "locationPlaceholder": "शहर किंवा प्रदेश (ऐच्छिक)",
-        "useCurrentLocation": "सध्याचे स्थान वापरा",
-        "locationDeniedTitle": "स्थान वापरण्याची परवानगी नाकारली",
-        "locationDeniedMessage": "तुमचे सध्याचे स्थान वापरण्यासाठी सेटिंग्जमध्ये स्थान वापरण्याची परवानगी द्या.",
-        "locationValidationFailed": "स्थान सत्यापित करता आले नाही.",
-        "locationResolveFailed": "तुमचे स्थान शोधता आले नाही. तुम्ही ते स्वतः बदलू शकता.",
-        "locationGetFailed": "तुमचे स्थान मिळवता आले नाही. ते स्वतः भरा.",
-        "nature": {
-          "aiAssistantLabel": "AI सहाय्यक",
-          "aiAssistantVibe": "मदतीला तत्पर, सक्षम, व्यावसायिक",
-          "digitalCreatureLabel": "डिजिटल प्राणी",
-          "digitalCreatureVibe": "हटके, जिवंतपणा असलेला, थोडा अनपेक्षित",
-          "virtualCompanionLabel": "व्हर्च्युअल साथीदार",
-          "virtualCompanionVibe": "आपुलकीने वागणारा, सोबत करणारा, मनापासून काळजी घेणारा",
-          "somethingWeirderLabel": "आणखी काहीतरी वेगळे…",
-          "somethingWeirderVibe": "स्वतः ठरवा"
-        }
-      },
-      "notifications": {
-        "mockMessage": "काम झाले! तुम्ही मागितलेला सारांश मी तयार केला आहे. तुम्हाला वेळ मिळेल तेव्हा पहा.",
-        "settingUp": "सूचनांचा सेटअप होत आहे…",
-        "stayInTheLoop": "वेळेवर सूचना",
-        "getNotified": "{{name}} ने काम पूर्ण केल्यावर सूचना मिळवा, म्हणजे कोणतेही उत्तर तुमच्या नजरेतून सुटणार नाही.",
-        "now": "आता",
-        "skipForNow": "आत्तासाठी वगळा",
-        "couldNotEnable": "सूचना चालू करता आल्या नाहीत."
-      },
-      "provisioning": {
-        "queryErrorTitle": "सेटअपची स्थिती तपासता आली नाही",
-        "queryErrorBody": "{{name}} च्या सेटअपची स्थिती तपासताना कनेक्शन तुटले. सेटअप अजूनही सुरू असेल. पुन्हा प्रयत्न करा किंवा थोड्या वेळाने पुन्हा तपासा.",
-        "stoppedTitle": "सेटअप थांबला",
-        "stoppedBody": "{{name}} चा इन्स्टन्स सेटअपदरम्यान अनपेक्षितपणे थांबला.",
-        "stalledTitle": "काहीतरी अडकले",
-        "stalledBody": "{{name}} चा सेटअप पूर्ण करता आला नाही. पुन्हा प्रयत्न करा किंवा असे वारंवार होत असल्यास {{supportEmail}} वर ईमेल करा.",
-        "timeoutTitle": "अपेक्षेपेक्षा जास्त वेळ लागत आहे",
-        "timeoutBody": "{{name}} च्या सेटअपला नेहमीपेक्षा जास्त वेळ लागत आहे ({{displayMinutes}} मिनिटांहून अधिक).",
-        "continueInBackground": "पार्श्वभूमीत सुरू ठेवा",
-        "settingUp": "{{name}} चा सेटअप होत आहे",
-        "connectingToAgent": "एजंटशी कनेक्ट होत आहे",
-        "startingSandbox": "सँडबॉक्स सुरू होत आहे",
-        "backgroundHint": "यासाठी सहसा एका मिनिटापेक्षा कमी वेळ लागतो. तुम्ही ही स्क्रीन बंद करू शकता — आम्ही पार्श्वभूमीत काम करत राहू."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "कोड {{code}}",
-      "gatewayProcess": "गेटवे प्रक्रिया",
-      "lastExit": "शेवटची प्रक्रिया समाप्ती",
-      "memory": "मेमरी",
-      "region": "प्रदेश",
-      "resources": "संसाधने",
-      "restarts": "पुन्हा सुरू झाल्याची संख्या",
-      "state": "स्थिती",
-      "uptime": "चालू असल्याचा कालावधी",
-      "crashed": "क्रॅश झाले",
-      "destroying": "नष्ट होत आहे",
-      "provisioned": "इन्स्टन्स तयार",
-      "restarting": "पुन्हा सुरू होत आहे",
-      "running": "चालू आहे",
-      "shuttingDown": "बंद होत आहे",
-      "starting": "सुरू होत आहे",
-      "stopped": "थांबले",
-      "stopping": "थांबत आहे",
-      "unknown": "अज्ञात",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "अत्याधुनिक",
-      "frontierDescription": "सर्वोच्च कार्यक्षमता. तर्कशक्ती असलेल्या अत्याधुनिक मॉडेल्सकडे विनंत्या पाठवते.",
-      "balancedDescription": "कमी खर्चात वेग आणि क्षमतेचा योग्य समतोल.",
-      "autoModelA11y": "{{label}} ऑटो मॉडेल",
-      "currentModel": "सध्याचे मॉडेल",
-      "browseAllModels": "किंवा 500+ मॉडेल्समधून निवडा",
-      "browseAllModelsA11y": "सर्व 500+ मॉडेल्स पहा"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw वापरत राहण्यासाठी तुमच्या ब्राउझरमधून kilo.ai/claw वर जा. अॅपमध्ये सदस्यत्व घेता येत नाही.",
-      "subscriptionCanceledTitle": "वेबवर सदस्यता घ्या",
-      "subscriptionCanceledBody": "KiloClaw वापरण्यासाठी तुमच्या ब्राउझरमधून kilo.ai/claw वर जा. अॅपमध्ये सदस्यत्व घेता येत नाही.",
-      "subscriptionCanceledCta": "Kilo.ai/claw उघडा",
-      "subscriptionPastDueTitle": "वेबवर पेमेंटची माहिती अपडेट करा",
-      "subscriptionPastDueBody": "तुमच्या सर्वात अलीकडील पेमेंटमध्ये अडचण आली. पेमेंटची माहिती अपडेट करण्यासाठी तुमच्या ब्राउझरमधून kilo.ai/claw वर जा. अॅपमध्ये बिलिंग व्यवस्थापित करता येत नाही.",
-      "quarantinedTitle": "इन्स्टन्स दुरुस्त करणे आवश्यक",
-      "quarantinedBody": "तुमचा KiloClaw इन्स्टन्स विलगीकरणात आहे आणि सध्या वापरता येत नाही. तो पुन्हा वापरण्यायोग्य करण्यासाठी आमच्या टीमची मदत आवश्यक आहे.",
-      "multipleCurrentConflictBody": "तुमच्या खात्यावर एकापेक्षा जास्त सक्रिय सदस्यत्वे आढळली. तुमच्याकडून दोनदा शुल्क आकारले जाऊ नये म्हणून आम्ही प्रक्रिया थांबवली आहे.",
-      "multipleCurrentConflictCta": "Kilo.ai वर सुरू ठेवा",
-      "nonCanonicalEarlybirdTitle": "जुनी योजना आढळली",
-      "nonCanonicalEarlybirdBody": "तुमची लवकर प्रवेश देणारी योजना मोबाइलवर वापरण्यापूर्वी आमच्या टीमने तपासणे आवश्यक आहे.",
-      "iosTitle": "IOS वर KiloClaw अनुपलब्ध",
-      "iosBody": "या खात्यासाठी KiloClaw वापरण्याची परवानगी iOS अॅपच्या बाहेर व्यवस्थापित केली जाते.",
-      "iosContact": "काही प्रश्न आहेत? {{supportEmail}} वर संपर्क साधा.",
-      "quarantinedCta": "आमच्या टीमला ईमेल करा",
-      "nonCanonicalEarlybirdCta": "तुमची योजना Kilo.ai वर तपासा"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} कडे लक्ष देणे आवश्यक आहे: {{label}}",
-      "openUnread_one": "{{name}} उघडा, {{displayCount}} न वाचलेला संदेश",
-      "openUnread": "{{name}} उघडा, {{displayCount}} न वाचलेले संदेश",
-      "openUnread_other": "{{name}} उघडा, {{displayCount}} न वाचलेले संदेश",
-      "openSettings": "{{name}} साठी सेटिंग्ज उघडा",
-      "fixOnKiloAi": "Kilo.ai वर दुरुस्त करा: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "डिव्हाइस जोडण्याच्या विनंत्या मंजूर करा",
-      "execPolicyDescription": "सुरक्षा सेटिंग्ज",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "AI मॉडेलची निवड",
-      "secretsDescription": "एन्क्रिप्टेड क्रेडेन्शियल्स",
-      "versionPinDescription": "विशिष्ट आवृत्तीवर पिन करा"
-    },
-    "avatar": {
-      "arcade": "आर्केड",
-      "brain": "मेंदू",
-      "creature": "प्राणी",
-      "crystal": "स्फटिक",
-      "custom": "सानुकूल अवतार",
-      "dragon": "ड्रॅगन",
-      "explorer": "शोधक",
-      "flame": "ज्वाला",
-      "lightning": "वीज",
-      "magicWand": "जादूची कांडी",
-      "moon": "चंद्र",
-      "operator": "संचालक",
-      "orbit": "कक्षा",
-      "oracle": "भविष्यवेत्ता",
-      "rainbow": "इंद्रधनुष्य",
-      "robot": "रोबोट",
-      "satellite": "उपग्रह",
-      "sparkles": "चकाकी",
-      "strongArm": "मजबूत हात",
-      "talisman": "ताईत"
-    },
-    "remoteSpawnFilesNotSupported": "या इन्स्टन्सवर फाइल्स स्वीकारता येत नाहीत.",
-    "instanceSwitcherTitle": "KiloClaw इन्स्टन्स"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}} डावीकडे हलवा",
       "moveRight": "{{filename}} उजवीकडे हलवा"
     },
-    "attachmentPasteHint": {
-      "accessibility": "क्लिपबोर्डवरून प्रतिमा पेस्ट करा",
-      "label": "प्रतिमा आढळली, पेस्ट करण्यासाठी टॅप करा"
-    },
     "attachmentPicker": {
       "camera": "कॅमेरा",
       "photoLibrary": "फोटो संग्रह",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "सत्र साइन आउट झाले.",
     "signOutThisDeviceTitle": "या डिव्हाइसवरून साइन आउट करायचे?",
     "signOutThisSessionTitle": "या सत्रातून साइन आउट करायचे?",
-    "signOutThisSessionMessage": "{{device}} वरून साइन आउट केले जाईल. मात्र, त्याचा API प्रवेश आणखी एक तासापर्यंत चालू राहू शकतो."
+    "signOutThisSessionMessage": "{{device}} वरून साइन आउट केले जाईल. मात्र, त्याचा API प्रवेश आणखी एक तासापर्यंत चालू राहू शकतो.",
+    "unknownDevice": "अज्ञात डिव्हाइस"
   },
   "forceUpdate": {
     "couldNotOpenStore": "अॅप स्टोअर उघडता आले नाही.",

@@ -4,49 +4,7 @@ import { pushDataSchema } from '@kilocode/notifications';
 import { notificationPathForData } from './notification-path';
 
 describe('pushDataSchema', () => {
-  it('rejects empty chat notification IDs', () => {
-    expect(
-      pushDataSchema.safeParse({
-        type: 'chat.message',
-        sandboxId: '',
-        conversationId: 'conversation-1',
-        messageId: 'message-1',
-      }).success
-    ).toBe(false);
-    expect(
-      pushDataSchema.safeParse({
-        type: 'chat.message',
-        sandboxId: 'sandbox-1',
-        conversationId: '',
-        messageId: 'message-1',
-      }).success
-    ).toBe(false);
-    expect(
-      pushDataSchema.safeParse({
-        type: 'chat.message',
-        sandboxId: 'sandbox-1',
-        conversationId: 'conversation-1',
-        messageId: '',
-      }).success
-    ).toBe(false);
-  });
-
-  it('accepts valid chat, lifecycle, and cloud agent notification data', () => {
-    expect(
-      pushDataSchema.safeParse({
-        type: 'chat.message',
-        sandboxId: 'sandbox-1',
-        conversationId: 'conversation-1',
-        messageId: 'message-1',
-      }).success
-    ).toBe(true);
-    expect(
-      pushDataSchema.safeParse({
-        type: 'instance-lifecycle',
-        event: 'ready',
-        sandboxId: 'sandbox-1',
-      }).success
-    ).toBe(true);
+  it('accepts valid cloud agent notification data', () => {
     expect(
       pushDataSchema.safeParse({
         type: 'cloud_agent_session',

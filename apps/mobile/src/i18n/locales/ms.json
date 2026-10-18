@@ -101,12 +101,9 @@
     "scheduled": "Dijadualkan",
     "keepEditing": "Teruskan menyunting",
     "keepRunning": "Teruskan proses",
-    "kiloclaw": "KiloClaw",
     "newSession": "Sesi baharu",
-    "noKiloclawInstances": "Tiada instans KiloClaw",
     "noModelsAvailable": "Tiada model tersedia",
     "notFound": "Tidak ditemui.",
-    "online": "Dalam talian",
     "open": "Buka {{name}}",
     "openPullRequest": "Buka PR",
     "pending": "Menunggu",
@@ -257,7 +254,8 @@
     "renamePasskey": "Namakan semula kunci laluan",
     "removePasskey": "Alih keluar kunci laluan",
     "removePasskeyTitle": "Alih keluar kunci laluan?",
-    "removePasskeyMessage": "Anda tidak lagi boleh log masuk dengan kunci laluan ini."
+    "removePasskeyMessage": "Anda tidak lagi boleh log masuk dengan kunci laluan ini.",
+    "changelog": "Yang baharu"
   },
   "preferences": {
     "general": "Umum",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Pemberitahuan hanya memaklumkan bahawa terdapat aktiviti baharu. Buka Kilo untuk membaca mesej.",
     "channel": {
       "agentProgress": "Kemajuan ejen",
-      "chat": "Mesej sembang",
-      "kiloclaw": "Aktiviti KiloClaw",
       "balance": "Amaran baki",
       "security": "Dapatan keselamatan",
       "spend": "Amaran perbelanjaan",
       "followedSessions": "Sesi diikuti"
     },
     "category": {
-      "chatMessagesSubtitle": "balasan dalam perbualan anda",
       "agentAttentionTitle": "Ejen memerlukan tindakan anda",
       "agentAttentionSubtitle": "soalan, permintaan kebenaran dan maklumat yang diperlukan",
       "agentUpdatesTitle": "Kemas kini ejen",
       "agentUpdatesSubtitle": "mesej daripada ejen semasa tugasan berjalan",
       "sessionStatusTitle": "Status sesi",
       "sessionStatusSubtitle": "selesai / gagal / sedia untuk dikawal",
-      "kiloclawActivitySubtitle": "instans sedia/gagal, tindakan berjadual",
-      "kiloclawActivityUnavailable": "Mulakan instans KiloClaw untuk mendapatkan aktiviti KiloClaw.",
       "balanceAlertsSubtitle": "amaran baki rendah untuk organisasi",
       "balanceAlertsUnavailable": "Sertai organisasi untuk mendapatkan amaran baki.",
       "securityFindingsSubtitle": "penemuan baharu dan peringatan SLA",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Utama",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, tab, {{position}} daripada {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Tukar instans",
-      "couldNotLoadInstances": "Tidak dapat memuatkan instans.",
-      "noInstancesDescription": "Sediakan instans untuk mula bersembang.",
-      "setUpKiloclaw": "Sediakan KiloClaw",
-      "currentInstance": "{{title}}, semasa"
-    },
     "conversation": {
-      "failedToLoad": "Gagal memuatkan perbualan.",
-      "notFound": "Perbualan tidak ditemui.",
       "untitled": "Tiada tajuk",
-      "leaveTitle": "Tinggalkan perbualan?",
-      "leaveMessage": "Ini mengeluarkannya daripada senarai anda.",
-      "openHint": "Membuka perbualan. Tekan lama untuk melihat pilihan menamakan semula atau meninggalkan perbualan.",
-      "unread": "Belum dibaca",
-      "optionsFor": "Pilihan perbualan untuk {{title}}",
-      "options": "Pilihan perbualan",
-      "renameTitle": "Namakan semula perbualan",
-      "renamePlaceholder": "Nama baharu",
-      "couldNotReachBot": "Tidak dapat menghubungi bot. Sila cuba lagi.",
-      "messageDeliveryFailed": "Mesej tidak dapat dihantar kepada bot.",
-      "couldNotSignIn": "Tidak dapat log masuk ke sembang.",
-      "couldNotRefreshMessages": "Tidak dapat memuat semula mesej.",
-      "couldNotLoadHistory": "Tidak dapat memuatkan sejarah perbualan.",
-      "leave": "Tinggalkan",
-      "untitledConversation": "Perbualan tanpa tajuk",
-      "createFailed": "Gagal mencipta perbualan.",
-      "leaveFailed": "Gagal meninggalkan perbualan."
-    },
-    "reactions": {
-      "common": "Biasa",
-      "reactWith": "Beri reaksi {{reaction}}",
-      "accessibility": "Reaksi {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Membalas kepada",
-      "cancelReply": "Batalkan balasan",
-      "openInstance": "Buka instans",
-      "attachFile": "Lampirkan fail",
-      "cancelEdit": "Batalkan suntingan"
+      "renamePlaceholder": "Nama baharu"
     },
     "conversationList": {
-      "couldNotLoad": "Tidak dapat memuatkan perbualan.",
-      "emptyTitle": "Belum ada perbualan",
-      "emptyDescription": "Cipta perbualan untuk mula bersembang dengan instans KiloClaw anda.",
-      "create": "Cipta perbualan",
-      "newConversation": "Perbualan baharu",
-      "openInstanceSettings": "Buka tetapan instans",
       "today": "Hari ini",
       "yesterday": "Semalam",
-      "thisWeek": "Minggu ini",
       "older": "Terdahulu"
     },
     "attachment": {
-      "open": "Buka {{filename}}",
-      "openFailed": "Tidak dapat membuka lampiran. Semak sambungan anda dan cuba lagi.",
-      "attachFailed": "Gagal melampirkan fail.",
-      "limit": "Anda boleh melampirkan sehingga {{displayCount}} fail.",
-      "sizeRejection": "{{filename}} melebihi had lampiran {{limit}}.",
-      "unreadable": "Tidak dapat membaca {{filename}}.",
-      "pastedImage": "imej yang ditampal",
-      "defaultName": "Lampiran",
       "classificationDenied": "Fail boleh laksana tidak boleh dilampirkan.",
       "classificationEmpty": "Fail ini kosong.",
       "classificationTooLarge": "Saiz fail mesti 20 MB atau kurang.",
@@ -943,426 +883,17 @@
       "networkError": "Ralat rangkaian berlaku.",
       "uploadFailed": "Muat naik gagal.",
       "nothingToPaste": "Tiada apa-apa untuk ditampal.",
-      "metadataStripFailed": "Metadata foto tidak dapat dibuang.",
-      "limit_one": "Anda boleh melampirkan sehingga {{displayCount}} fail.",
-      "limit_other": "Anda boleh melampirkan sehingga {{displayCount}} fail."
+      "metadataStripFailed": "Metadata foto tidak dapat dibuang."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Cuba muat naik {{filename}} semula",
-      "remove": "Alih keluar {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[mesej dipadam]",
-      "yourMessage": "Mesej anda",
-      "messageFrom": "Mesej daripada {{author}}",
-      "moreActions": "Tindakan lain",
-      "notDelivered": "Gagal dihantar",
-      "edited": "(disunting)",
-      "image": "Imej"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Disalin",
-      "copyFailed": "Gagal menyalin.",
-      "title": "Tindakan mesej",
-      "deleteTitle": "Padam mesej?",
-      "deleteMessage": "Ini akan mengeluarkan mesej daripada perbualan.",
-      "deleteFailed": "Gagal memadam mesej.",
-      "removeReactionFailed": "Gagal membuang reaksi.",
-      "addReactionFailed": "Gagal menambah reaksi.",
-      "retrySend": "Cuba hantar semula",
-      "moreReactions": "Lebih banyak reaksi",
-      "edit": "Sunting",
-      "sendFailed": "Gagal menghantar mesej.",
-      "retrySendFailed": "Gagal menghantar semula mesej.",
-      "editFailed": "Gagal menyunting mesej.",
-      "executeFailed": "Gagal melaksanakan tindakan."
+      "edit": "Sunting"
     },
     "attachmentPicker": {
-      "takePhoto": "Ambil foto",
-      "photoLibrary": "Galeri foto",
-      "files": "Fail",
       "cameraAccessMessage": "Benarkan akses kamera dalam tetapan untuk mengambil foto."
-    },
-    "typingIndicator": {
-      "someone": "Seseorang",
-      "typing_one": "{{name}} sedang menaip...",
-      "typing": "{{names}} sedang menaip...",
-      "typing_other": "{{names}} sedang menaip..."
-    },
-    "botStatus": {
-      "offline": "Luar talian",
-      "loadingUser": "Memuatkan pengguna...",
-      "waitingForStatus": "Menunggu status bot...",
-      "offlineMessage": "Bot berada di luar talian. Penghantaran mesej akan disambung semula apabila bot kembali dalam talian."
-    },
-    "errors": {
-      "notAllowed": "Tindakan ini tidak dibenarkan.",
-      "messageTooLong": "Mesej terlalu panjang. Gunakan kurang daripada {{limit}} aksara.",
-      "titleTooLong": "Tajuk terlalu panjang. Gunakan kurang daripada {{limit}} aksara.",
-      "messageEmpty": "Mesej tidak boleh kosong."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Tidak dapat memuatkan tika KiloClaw.",
-    "billing": {
-      "title": "Pengebilan",
-      "continueMonthToMonth": "Teruskan langganan bulanan",
-      "plan": "Pelan",
-      "finalTermEnds": "Tempoh akhir tamat",
-      "afterFinalTerm": "Selepas tempoh akhir",
-      "lessThanOneDay": "Kurang daripada 1 hari",
-      "ends": "Tamat",
-      "expires": "Luput",
-      "noActivePlan": "Tiada pelan aktif",
-      "noActivePlanDescription": "Anda tidak mempunyai langganan KiloClaw yang aktif.",
-      "managedByAdmin": "Pengebilan diuruskan oleh pentadbir organisasi anda.",
-      "couldNotLoad": "Tidak dapat memuatkan maklumat pengebilan.",
-      "manageOnWeb": "Urus pengebilan di web",
-      "earlybird": "Akses awal",
-      "finalCommitTermEndsOn": "Tempoh terakhir pelan Commit anda tamat pada {{date}}. Teruskan dengan pelan Standard pada harga {{price}}, atau pengehosan akan ditamatkan.",
-      "freeTrial": "Percubaan percuma",
-      "hostingEnds": "Pengehosan berakhir",
-      "renews": "Diperbaharui",
-      "standardMonthToMonth": "Standard bulanan",
-      "standardStartsOn": "Pelan Standard bermula pada {{date}} dengan harga {{price}}.",
-      "yourStandardMonthlyPrice": "harga bulanan pelan Standard anda",
-      "perMonth": "/bulan",
-      "earlybirdAccessUntil": "Akses awal tersedia sehingga {{date}}.",
-      "earlybirdEnding": "Akses awal akan tamat dalam {{remaining}}.",
-      "paymentPastDue": "Pembayaran tertunggak. Sila kemas kini kaedah pembayaran anda.",
-      "subscriptionCancels": "Langganan akan dibatalkan pada {{date}}.",
-      "trialDaysRemaining": "Baki tempoh percubaan: {{remaining}}.",
-      "trialEndingSoon": "Percubaan akan tamat tidak lama lagi: {{remaining}} lagi.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Komit"
-    },
-    "changelog": {
-      "title": "Yang baharu",
-      "couldNotLoad": "Tidak dapat memuatkan log perubahan.",
-      "noUpdates": "Belum ada kemas kini",
-      "noUpdatesDescription": "Entri log perubahan akan muncul di sini.",
-      "recentUpdates": "Kemas kini terkini",
-      "manageVersion": "Urus versi",
-      "redeployRequired": "Atur guna semula diperlukan",
-      "redeploySuggested": "Atur guna semula disyorkan",
-      "upgradeRequired": "Naik taraf diperlukan"
-    },
-    "dashboard": {
-      "title": "Papan pemuka",
-      "couldNotLoad": "Tidak dapat memuatkan papan pemuka.",
-      "renameInstance": "Namakan semula tika",
-      "renamePlaceholder": "Nama baharu (maksimum 50 aksara)",
-      "someDetailsFailed": "Beberapa butiran masa nyata gagal dimuatkan.",
-      "destroy": "Padam kekal",
-      "destroyMessage": "Tika KiloClaw anda dan semua datanya akan dipadam secara kekal. Tindakan ini tidak boleh dibatalkan.",
-      "destroyTitle": "Padam tika secara kekal",
-      "instance": "Tika",
-      "couldNotCheckStatus": "Tidak dapat menyemak status perkhidmatan.",
-      "dangerZone": "ZON BAHAYA",
-      "destroying": "Memadam secara kekal…",
-      "serviceDegraded": "Prestasi perkhidmatan merosot — ketik untuk melihat status",
-      "up": "AKTIF"
-    },
-    "channels": {
-      "title": "Saluran",
-      "couldNotLoad": "Tidak dapat memuatkan saluran.",
-      "noChannels": "Tiada saluran tersedia",
-      "noChannelsDescription": "Integrasi saluran akan muncul di sini.",
-      "connected": "{{label}} disambungkan",
-      "disconnectMessage": "Alih keluar {{label}}? Sambungan saluran ini akan diputuskan.",
-      "disconnectTitle": "Putuskan sambungan saluran"
-    },
-    "devicePairing": {
-      "title": "Penggandingan peranti",
-      "refreshRequests": "Muat semula permintaan berpasangan",
-      "couldNotLoad": "Tidak dapat memuatkan permintaan berpasangan.",
-      "noPending": "Tiada permintaan menunggu kelulusan",
-      "noPendingDescription": "Permintaan untuk memasangkan saluran dan peranti akan muncul di sini.",
-      "channelRequests": "Permintaan saluran",
-      "deviceRequests": "Permintaan peranti",
-      "approveDeviceMessage": "Benarkan {{platform}} menyambung ke tika anda?",
-      "approveDeviceTitle": "Luluskan peranti",
-      "approveMessage": "Benarkan {{label}} (kod: {{code}}) menyambung ke tika anda?",
-      "approveTitle": "Luluskan permintaan berpasangan",
-      "unknownDevice": "Peranti tidak diketahui"
-    },
-    "execPolicy": {
-      "title": "Dasar pelaksanaan",
-      "couldNotLoad": "Tidak dapat memuatkan dasar pelaksanaan.",
-      "alwaysAsk": "Sentiasa tanya",
-      "alwaysAskDescription": "Sahkan setiap arahan sebelum dijalankan. Pilihan paling selamat.",
-      "neverAsk": "Jangan tanya",
-      "neverAskDescription": "Laksanakan arahan tanpa pengesahan. Lebih pantas tetapi kurang selamat."
-    },
-    "google": {
-      "title": "Akaun Google",
-      "couldNotLoad": "Tidak dapat memuatkan status akaun Google.",
-      "disconnected": "Sambungan akaun Google telah diputuskan. Atur guna semula tika anda untuk menerapkan perubahan ini.",
-      "setupCommand": "Arahan persediaan",
-      "setupCommandHelp": "Untuk menyambungkan akaun Google anda, jalankan arahan ini dalam terminal pada komputer anda sendiri yang telah dipasang Docker.",
-      "failedToLoadCommand": "Gagal memuatkan arahan persediaan.",
-      "gmailNotifications": "Pemberitahuan Gmail",
-      "disconnect": "Putuskan sambungan akaun Google",
-      "copied": "Disalin",
-      "copyCommand": "Salin arahan",
-      "disconnectConfirm": "Putuskan sambungan",
-      "disconnectMessage": "Alih keluar akaun Google anda daripada tika ini? Pemberitahuan Gmail akan dinyahdayakan. Selepas memutuskan sambungan, atur guna semula tika untuk menerapkan perubahan.",
-      "disconnectTitle": "Putuskan sambungan Google"
-    },
-    "modelList": {
-      "noMatches": "Tiada model yang sepadan dengan carian anda",
-      "noModelsDescription": "Model akan muncul di sini apabila tersedia.",
-      "noResultsFor": "Tiada hasil untuk \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Rahsia",
-      "couldNotLoad": "Tidak dapat memuatkan rahsia.",
-      "noSecrets": "Tiada rahsia tersedia",
-      "noSecretsDescription": "Integrasi rahsia akan muncul di sini.",
-      "removeMessage": "Alih keluar {{label}}? Alat ini akan kehilangan akses kepada maklumat pengesahannya.",
-      "removeTitle": "Alih keluar rahsia",
-      "saved": "{{label}} disimpan",
-      "hide": "Sembunyikan {{label}}",
-      "show": "Paparkan {{label}}",
-      "allFieldsRequired": "Semua medan mesti diisi untuk menyambungkan {{label}}.",
-      "setupGuideFallback": "panduan persediaan",
-      "setupGuideA11y": "panduan persediaan {{label}}",
-      "setupGuide": "Panduan persediaan",
-      "saving": "Menyimpan…",
-      "removing": "Mengalih keluar…",
-      "updateToken": "Kemas kini token"
-    },
-    "versionPin": {
-      "title": "Penguncian versi",
-      "couldNotLoad": "Tidak dapat memuatkan maklumat versi.",
-      "couldNotLoadMore": "Tidak dapat memuatkan lebih banyak versi.",
-      "loadMore": "Muatkan lebih banyak versi",
-      "showingLatest": "100 Versi terkini dipaparkan.",
-      "availableVersions": "Versi tersedia",
-      "noVersions": "Tiada versi tersedia",
-      "noVersionsDescription": "Versi OpenClaw yang tersedia akan muncul di sini.",
-      "unpin": "Nyahsemat",
-      "unpinMessage": "Tukar kembali ke versi terkini yang tersedia?",
-      "unpinTitle": "Nyahsemat versi",
-      "confirmPin": "Sahkan penyematan",
-      "followingLatest": "Mengikuti versi terkini",
-      "latest": "terkini",
-      "pin": "Semat",
-      "pinnedByAdmin": "Versi ini disemat oleh pentadbir. Hubungi pentadbir anda untuk menukarnya.",
-      "pinnedTo": "Disemat pada {{version}}",
-      "reasonOptional": "Sebab (pilihan)",
-      "reasonPlaceholder": "Mengapa anda menyemat versi ini?",
-      "replaceAdminPin": "Ganti penyematan pentadbir",
-      "replacesAdminPin": "Penyematan pentadbir akan digantikan (versi semasa: {{label}})."
-    },
-    "redeploy": "Atur guna semula",
-    "redeployMessage": "Adakah anda pasti mahu mengatur guna semula tika ini?",
-    "redeployTitle": "Atur guna semula tika",
-    "controls": {
-      "redeploying": "Mengatur guna semula…",
-      "restart": "Mulakan semula",
-      "restartOpenClawMessage": "Adakah anda pasti mahu memulakan semula proses OpenClaw?",
-      "restartOpenClawTitle": "Mulakan semula OpenClaw",
-      "restarting": "Memulakan semula…",
-      "start": "Mula",
-      "startMessage": "Adakah anda pasti mahu memulakan tika ini?",
-      "startTitle": "Mulakan tika",
-      "stop": "Henti",
-      "stopMessage": "Adakah anda pasti mahu menghentikan tika ini?",
-      "stopTitle": "Hentikan tika",
-      "stopping": "Menghentikan…"
-    },
-    "empty": {
-      "finishingSetup": "Melengkapkan persediaan",
-      "finishingSetupDescription": "Tunggu sebentar, kami sedang menyiapkan akaun anda. Proses ini biasanya hanya mengambil masa yang singkat.",
-      "getStarted": "Mula",
-      "noInstancesDescription": "Cipta tika pertama anda untuk mula menjalankan ejen pengekodan."
-    },
-    "instance": {
-      "backToInstances": "Kembali ke senarai tika",
-      "couldNotLoad": "Tidak dapat memuatkan tika.",
-      "notFound": "Tika tidak ditemui",
-      "notFoundDescription": "Tika ini mungkin telah dipadam secara kekal, atau pautannya tidak lagi sah."
-    },
-    "list": {
-      "createInstance": "Cipta tika",
-      "organizations": "Organisasi",
-      "accessIssue": {
-        "trialExpired": "Percubaan telah tamat — langgan untuk terus menggunakan tika ini",
-        "subscriptionCanceled": "Langganan tidak aktif — langgan semula untuk terus menggunakan tika ini",
-        "subscriptionPastDue": "Masalah pembayaran — kemas kini maklumat pengebilan untuk terus menggunakan tika ini",
-        "quarantined": "Tika dikuarantin — semakan manual diperlukan",
-        "multipleCurrentConflict": "Akaun memerlukan semakan",
-        "nonCanonicalEarlybird": "Pelan lama memerlukan semakan"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Berbual dengan {{name}}",
-        "ready": "{{name}} sudah bersedia",
-        "warmedUp": "Semuanya sudah sedia. Mulakan perbualan apabila anda bersedia."
-      },
-      "flow": {
-        "genericErrorBody": "Kami tidak dapat menyiapkan tika anda sebentar tadi.",
-        "manualReviewBody": "Status akaun anda perlu disemak sebelum kami boleh mencipta tika. Teruskan di kilo.ai.",
-        "manualReviewTitle": "Persediaan memerlukan semakan manual",
-        "openKiloAi": "Buka kilo.ai",
-        "provisioning": "Menyediakan",
-        "review": "Semakan",
-        "identityTitle": "Berikan identiti kepada bot anda",
-        "couldNotLoad": "Tidak dapat memuatkan status persediaan.",
-        "finishingSetup": "Persediaan hampir selesai. Tunggu sebentar sementara kami menyiapkan akaun anda.",
-        "ready": "Bersedia",
-        "settingUp": "Menyediakan…"
-      },
-      "unavailableDescription": "Langganan KiloClaw yang aktif diperlukan untuk menyediakan tika. Tika dan langganan sedia ada terus berfungsi seperti biasa.",
-      "unavailableTitle": "Tika KiloClaw baharu tidak tersedia",
-      "identity": {
-        "chooseAvatar": "Pilih avatar",
-        "namePlaceholder": "Nama bot anda",
-        "selectAvatar": "Pilih {{name}} sebagai avatar",
-        "personality": "Personaliti",
-        "changePersonality": "Tukar personaliti",
-        "location": "Lokasi",
-        "locationPlaceholder": "Bandar atau wilayah (pilihan)",
-        "useCurrentLocation": "Gunakan lokasi semasa",
-        "locationDeniedTitle": "Akses lokasi dinafikan",
-        "locationDeniedMessage": "Dayakan akses lokasi dalam Tetapan untuk menggunakan lokasi semasa anda.",
-        "locationValidationFailed": "Lokasi tidak dapat disahkan.",
-        "locationResolveFailed": "Tidak dapat menentukan lokasi anda. Anda boleh menyuntingnya secara manual.",
-        "locationGetFailed": "Tidak dapat memperoleh lokasi anda. Masukkan lokasi secara manual.",
-        "nature": {
-          "aiAssistantLabel": "Pembantu AI",
-          "aiAssistantVibe": "Suka membantu, berkebolehan, profesional",
-          "digitalCreatureLabel": "Makhluk digital",
-          "digitalCreatureVibe": "Unik, lincah, agak sukar dijangka",
-          "virtualCompanionLabel": "Rakan maya",
-          "virtualCompanionVibe": "Mesra, sentiasa menemani, benar-benar mengambil berat",
-          "somethingWeirderLabel": "Sesuatu yang lebih pelik…",
-          "somethingWeirderVibe": "Takrifkan sendiri"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Sudah siap! Saya telah menyediakan ringkasan yang anda minta. Baca apabila anda bersedia.",
-        "settingUp": "Menyediakan pemberitahuan…",
-        "stayInTheLoop": "Ikuti perkembangan terkini",
-        "getNotified": "Terima pemberitahuan apabila {{name}} menyelesaikan tugasan supaya anda tidak terlepas sebarang balasan.",
-        "now": "sekarang",
-        "skipForNow": "Langkau buat masa ini",
-        "couldNotEnable": "Tidak dapat mendayakan pemberitahuan."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Tidak dapat menyemak status persediaan",
-        "queryErrorBody": "Sambungan terputus semasa kami menyemak persediaan {{name}}. Persediaan mungkin masih berjalan. Cuba lagi atau semak semula sebentar lagi.",
-        "stoppedTitle": "Persediaan dihentikan",
-        "stoppedBody": "Tika {{name}} terhenti secara tidak dijangka semasa persediaan.",
-        "stalledTitle": "Proses tergendala",
-        "stalledBody": "Kami tidak dapat menyiapkan {{name}}. Cuba lagi atau hantar e-mel ke {{supportEmail}} jika masalah ini berulang.",
-        "timeoutTitle": "Mengambil masa lebih lama daripada jangkaan",
-        "timeoutBody": "Persediaan untuk {{name}} mengambil masa lebih lama daripada biasa (lebih daripada {{displayMinutes}} minit).",
-        "continueInBackground": "Teruskan di latar belakang",
-        "settingUp": "Menyediakan {{name}}",
-        "connectingToAgent": "Menyambung ke ejen",
-        "startingSandbox": "Memulakan persekitaran terasing",
-        "backgroundHint": "Proses ini biasanya mengambil masa kurang daripada seminit. Anda boleh menutup skrin ini. Kami akan meneruskan persediaan di latar belakang."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kod {{code}}",
-      "gatewayProcess": "PROSES GET LALUAN",
-      "lastExit": "Penamatan terakhir",
-      "memory": "Memori",
-      "region": "Wilayah",
-      "resources": "SUMBER",
-      "restarts": "Bilangan mula semula",
-      "state": "Keadaan",
-      "uptime": "Masa aktif",
-      "crashed": "RANAP",
-      "destroying": "SEDANG DIPADAM",
-      "provisioned": "DISEDIAKAN",
-      "restarting": "DIMULAKAN SEMULA",
-      "running": "SEDANG BERJALAN",
-      "shuttingDown": "SEDANG DITUTUP",
-      "starting": "SEDANG DIMULAKAN",
-      "stopped": "DIHENTIKAN",
-      "stopping": "SEDANG DIHENTIKAN",
-      "unknown": "TIDAK DIKETAHUI",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Tercanggih",
-      "frontierDescription": "Prestasi tertinggi. Menghalakan permintaan kepada model tercanggih dengan keupayaan penaakulan.",
-      "balancedDescription": "Keseimbangan yang baik antara kelajuan dan keupayaan pada kos lebih rendah.",
-      "autoModelA11y": "model automatik {{label}}",
-      "currentModel": "Model semasa",
-      "browseAllModels": "atau pilih daripada 500+ model",
-      "browseAllModelsA11y": "Semak imbas semua 500+ model"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Untuk terus menggunakan KiloClaw, buka kilo.ai/claw dalam penyemak imbas anda. Langganan tidak boleh dibuat dalam apl.",
-      "subscriptionCanceledTitle": "Langgan melalui laman web",
-      "subscriptionCanceledBody": "Untuk menggunakan KiloClaw, buka kilo.ai/claw dalam penyemak imbas anda. Langganan tidak boleh dibuat dalam apl.",
-      "subscriptionCanceledCta": "Buka kilo.ai/claw",
-      "subscriptionPastDueTitle": "Kemas kini maklumat pembayaran di web",
-      "subscriptionPastDueBody": "Pembayaran terkini anda mengalami masalah. Buka kilo.ai/claw dalam penyemak imbas anda untuk mengemas kini maklumat pembayaran. Pengebilan tidak boleh diuruskan dalam apl.",
-      "quarantinedTitle": "Tika memerlukan pemulihan",
-      "quarantinedBody": "Tika KiloClaw anda dikuarantin dan tidak boleh digunakan buat masa ini. Pasukan kami perlu membantu memulihkannya.",
-      "multipleCurrentConflictBody": "Kami menemui lebih daripada satu langganan aktif pada akaun anda. Kami telah menjeda proses ini supaya anda tidak dicaj dua kali.",
-      "multipleCurrentConflictCta": "Teruskan di kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Pelan lama dikesan",
-      "nonCanonicalEarlybirdBody": "Pelan akses awal anda memerlukan semakan manual sebelum boleh digunakan pada peranti mudah alih.",
-      "iosTitle": "KiloClaw tidak tersedia dalam iOS",
-      "iosBody": "Akses KiloClaw diuruskan di luar apl iOS untuk akaun ini.",
-      "iosContact": "Ada soalan? Hubungi {{supportEmail}}.",
-      "quarantinedCta": "Hantar e-mel kepada pasukan kami",
-      "nonCanonicalEarlybirdCta": "Semak pelan anda di kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} memerlukan perhatian: {{label}}",
-      "openUnread_one": "Buka {{name}}, {{displayCount}} mesej belum dibaca",
-      "openUnread": "Buka {{name}}, {{displayCount}} mesej belum dibaca",
-      "openUnread_other": "Buka {{name}}, {{displayCount}} mesej belum dibaca",
-      "openSettings": "Buka tetapan untuk {{name}}",
-      "fixOnKiloAi": "Baiki di kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Luluskan permintaan peranti",
-      "execPolicyDescription": "Tetapan keselamatan",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Pemilihan model AI",
-      "secretsDescription": "Maklumat pengesahan yang disulitkan",
-      "versionPinDescription": "Semat pada versi tertentu"
-    },
-    "avatar": {
-      "arcade": "Arked",
-      "brain": "Otak",
-      "creature": "Makhluk",
-      "crystal": "Kristal",
-      "custom": "Avatar tersuai",
-      "dragon": "Naga",
-      "explorer": "Penjelajah",
-      "flame": "Api",
-      "lightning": "Petir",
-      "magicWand": "Tongkat ajaib",
-      "moon": "Bulan",
-      "operator": "Pengendali",
-      "orbit": "Laluan orbit",
-      "oracle": "Peramal",
-      "rainbow": "Pelangi",
-      "robot": "Robot maya",
-      "satellite": "Satelit",
-      "sparkles": "Kilauan",
-      "strongArm": "Lengan kuat",
-      "talisman": "Azimat"
-    },
-    "remoteSpawnFilesNotSupported": "Tika ini tidak boleh menerima fail.",
-    "instanceSwitcherTitle": "Tika KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Alihkan {{filename}} ke kiri",
       "moveRight": "Alihkan {{filename}} ke kanan"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Tampal imej daripada papan keratan",
-      "label": "Imej dikesan, ketik untuk menampal"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Galeri foto",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "Sesi dilog keluar.",
     "signOutThisDeviceTitle": "Log keluar daripada peranti ini?",
     "signOutThisSessionTitle": "Log keluar daripada sesi ini?",
-    "signOutThisSessionMessage": "{{device}} akan dilog keluar. Ia boleh mengekalkan akses API sehingga satu jam."
+    "signOutThisSessionMessage": "{{device}} akan dilog keluar. Ia boleh mengekalkan akses API sehingga satu jam.",
+    "unknownDevice": "Peranti tidak diketahui"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Tidak dapat membuka gedung apl.",

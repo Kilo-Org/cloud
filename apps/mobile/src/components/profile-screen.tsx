@@ -340,13 +340,13 @@ export function ProfileScreen() {
           />
           <ConfigureRow
             icon={Sparkles}
-            title={t('kiloclaw.changelog.title')}
+            title={t('profile.changelog')}
             hue="sage"
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
               void openExternalUrl(CHANGELOG_URL, {
-                label: t('kiloclaw.changelog.title'),
+                label: t('profile.changelog'),
               });
             }}
           />

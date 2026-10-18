@@ -577,7 +577,7 @@ describe('account-verification redirect logic', () => {
   // App-link-safe-redirect interstitial: claimed callback paths
   // ---------------------------------------------------------------
   describe('app-link-safe-redirect interstitial', () => {
-    it('routes callbackPath=/claw through the interstitial', async () => {
+    it('keeps the web-only Claw callback outside the mobile interstitial', async () => {
       const user = makeUser({ customer_source: null });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -585,7 +585,7 @@ describe('account-verification redirect logic', () => {
       await renderPage({ callbackPath: '/claw' });
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith('/users/continue?to=%2Fclaw');
+      expect(mockRedirect).toHaveBeenCalledWith('/claw');
     });
 
     it('routes callbackPath=/profile through the interstitial', async () => {

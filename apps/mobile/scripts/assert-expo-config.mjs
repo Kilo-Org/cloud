@@ -103,10 +103,8 @@ const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSPhotoLibraryUsageDescription',
   'NSLocalNetworkUsageDescription',
   'NSMicrophoneUsageDescription',
-  'NSMotionUsageDescription',
   'NSSpeechRecognitionUsageDescription',
   'NSFaceIDUsageDescription',
-  'NSLocationWhenInUseUsageDescription',
   'NSUserTrackingUsageDescription',
 ];
 
@@ -252,17 +250,6 @@ for (const tag of localizations) {
       `locales["${tag}"].ios["${key}"] must be a non-empty string`
     );
   }
-  // `.lproj/InfoPlist.strings` is compiled verbatim — Xcode expands
-  // `$(PRODUCT_NAME)` only in Info.plist — so the localized copy must name the
-  // app instead of keeping the variable, or the prompt shows it literally.
-  check(
-    locales[tag]?.ios?.NSLocationWhenInUseUsageDescription?.includes('$(PRODUCT_NAME)') === false,
-    `locales["${tag}"].ios.NSLocationWhenInUseUsageDescription must not keep $(PRODUCT_NAME)`
-  );
-  check(
-    locales[tag]?.ios?.NSLocationWhenInUseUsageDescription?.includes(APP_NAME) === true,
-    `locales["${tag}"].ios.NSLocationWhenInUseUsageDescription must name the app "${APP_NAME}"`
-  );
 }
 
 const pluginNames = (config.plugins ?? []).map(plugin =>

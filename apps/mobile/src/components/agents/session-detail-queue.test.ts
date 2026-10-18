@@ -371,7 +371,7 @@ vi.mock('@/components/agents/use-session-detail-rename', () => ({
     title: 'Test session',
   }),
 }));
-vi.mock('@/components/kilo-chat/hooks/use-cli-session-presence', () => ({
+vi.mock('@/lib/hooks/use-cli-session-presence', () => ({
   resolveLoadedCliSessionPresenceId: () => null,
   useCliSessionPresence: vi.fn(),
 }));

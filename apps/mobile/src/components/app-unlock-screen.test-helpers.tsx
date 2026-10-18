@@ -1,11 +1,11 @@
-/* eslint-disable max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
+/* eslint-disable max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the layouts reach. */
 import { createElement, type ElementType, type ReactElement, useState } from 'react';
 import { type AppStateStatus } from 'react-native';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { expect, vi } from 'vitest';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { AppRootProviders } from '@/components/app-root-providers';
-import KiloClawLayout from '@/app/(app)/(tabs)/(1_kiloclaw)/_layout';
+import OrganizationLayout from '@/app/(app)/(tabs)/(3_profile)/organization/_layout';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -17,7 +17,7 @@ export function unlockRoot() {
   }
   return view.renderer.root;
 }
-export async function mount(ui: ReactElement = <KiloClawLayout />, languageReady = true) {
+export async function mount(ui: ReactElement = <OrganizationLayout />, languageReady = true) {
   view = await renderWithProviders(
     <AppRootProviders languageReady={languageReady}>{ui}</AppRootProviders>
   );
@@ -292,11 +292,8 @@ vi.mock('@rn-primitives/slot', () => ({}));
 vi.mock('@/components/agents/user-web-connection-provider', () => ({
   UserWebConnectionProvider: 'UserWebConnectionProvider',
 }));
-vi.mock('@/components/kilo-chat/kilo-chat-provider', () => ({
-  KiloChatProvider: 'KiloChatProvider',
-}));
-vi.mock('@/components/kilo-chat/kilo-chat-presence-mount', () => ({
-  KiloChatPresenceMount: 'KiloChatPresenceMount',
+vi.mock('@/components/event-service-provider', () => ({
+  EventServiceProvider: 'EventServiceProvider',
 }));
 vi.mock('@/components/share/share-payload-navigator', () => ({
   SharePayloadNavigator: 'SharePayloadNavigator',

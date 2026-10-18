@@ -13,7 +13,6 @@ const URL_KEY_TO_SERVICE = new Map<string, { service: string; protocol: 'http' |
   ['WEB_BASE_URL', { service: 'nextjs', protocol: 'http' }],
   ['CLOUD_AGENT_WS_URL', { service: 'cloud-agent-next', protocol: 'ws' }],
   ['SESSION_INGEST_WS_URL', { service: 'cloudflare-session-ingest', protocol: 'ws' }],
-  ['KILO_CHAT_URL', { service: 'kilo-chat', protocol: 'http' }],
   ['EVENT_SERVICE_URL', { service: 'event-service', protocol: 'ws' }],
   ['NOTIFICATIONS_URL', { service: 'notifications', protocol: 'http' }],
   ['LATENCY_INGEST_URL', { service: 'latency-ingest', protocol: 'http' }],

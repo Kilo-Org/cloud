@@ -101,12 +101,9 @@
     "scheduled": "Đã lên lịch",
     "keepEditing": "Tiếp tục chỉnh sửa",
     "keepRunning": "Tiếp tục chạy",
-    "kiloclaw": "KiloClaw",
     "newSession": "Phiên mới",
-    "noKiloclawInstances": "Chưa có máy chủ KiloClaw",
     "noModelsAvailable": "Không có mô hình khả dụng",
     "notFound": "Không tìm thấy.",
-    "online": "Trực tuyến",
     "open": "Mở {{name}}",
     "openPullRequest": "Mở yêu cầu hợp nhất",
     "pending": "Đang chờ",
@@ -257,7 +254,8 @@
     "renamePasskey": "Đổi tên khóa truy cập",
     "removePasskey": "Xóa khóa truy cập",
     "removePasskeyTitle": "Xóa khóa truy cập?",
-    "removePasskeyMessage": "Bạn sẽ không thể đăng nhập bằng khóa truy cập này nữa."
+    "removePasskeyMessage": "Bạn sẽ không thể đăng nhập bằng khóa truy cập này nữa.",
+    "changelog": "Có gì mới"
   },
   "preferences": {
     "general": "Chung",
@@ -320,23 +318,18 @@
     "previewGenericDescription": "Thông báo chỉ cho biết có hoạt động mới. Mở Kilo để xem nội dung.",
     "channel": {
       "agentProgress": "Tiến độ tác nhân",
-      "chat": "Tin nhắn trò chuyện",
-      "kiloclaw": "Hoạt động KiloClaw",
       "balance": "Cảnh báo số dư",
       "security": "Vấn đề bảo mật",
       "spend": "Cảnh báo chi tiêu",
       "followedSessions": "Phiên đã theo dõi"
     },
     "category": {
-      "chatMessagesSubtitle": "câu trả lời trong các cuộc trò chuyện của bạn",
       "agentAttentionTitle": "Tác nhân cần bạn phản hồi",
       "agentAttentionSubtitle": "câu hỏi, yêu cầu cấp quyền hoặc cung cấp thông tin",
       "agentUpdatesTitle": "Cập nhật từ tác nhân",
       "agentUpdatesSubtitle": "tin nhắn từ tác nhân trong lúc thực hiện tác vụ",
       "sessionStatusTitle": "Trạng thái phiên",
       "sessionStatusSubtitle": "hoàn tất / thất bại / sẵn sàng điều khiển",
-      "kiloclawActivitySubtitle": "máy sẵn sàng hoặc gặp lỗi, thao tác đã lên lịch",
-      "kiloclawActivityUnavailable": "Khởi chạy một instance KiloClaw để nhận hoạt động KiloClaw.",
       "balanceAlertsSubtitle": "cảnh báo số dư tổ chức thấp",
       "balanceAlertsUnavailable": "Tham gia một tổ chức để nhận cảnh báo số dư.",
       "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA",
@@ -356,72 +349,19 @@
   },
   "tabs": {
     "home": "Trang chủ",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, thẻ {{position}} trên {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Chuyển máy chủ",
-      "couldNotLoadInstances": "Không thể tải danh sách máy chủ.",
-      "noInstancesDescription": "Thiết lập một máy chủ để bắt đầu trò chuyện.",
-      "setUpKiloclaw": "Thiết lập KiloClaw",
-      "currentInstance": "{{title}}, đang dùng"
-    },
     "conversation": {
-      "failedToLoad": "Không thể tải cuộc trò chuyện.",
-      "notFound": "Không tìm thấy cuộc trò chuyện.",
       "untitled": "Không có tiêu đề",
-      "leaveTitle": "Rời khỏi cuộc trò chuyện?",
-      "leaveMessage": "Cuộc trò chuyện này sẽ bị xóa khỏi danh sách của bạn.",
-      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để xem tùy chọn đổi tên hoặc rời khỏi.",
-      "unread": "Chưa đọc",
-      "optionsFor": "Tùy chọn cho cuộc trò chuyện {{title}}",
-      "options": "Tùy chọn cuộc trò chuyện",
-      "renameTitle": "Đổi tên cuộc trò chuyện",
-      "renamePlaceholder": "Tên mới",
-      "couldNotReachBot": "Không thể kết nối với bot. Vui lòng thử lại.",
-      "messageDeliveryFailed": "Không thể gửi tin nhắn đến bot.",
-      "couldNotSignIn": "Không thể đăng nhập để trò chuyện.",
-      "couldNotRefreshMessages": "Không thể làm mới tin nhắn.",
-      "couldNotLoadHistory": "Không thể tải lịch sử cuộc trò chuyện.",
-      "leave": "Rời khỏi",
-      "untitledConversation": "Cuộc trò chuyện không có tiêu đề",
-      "createFailed": "Không thể tạo cuộc trò chuyện.",
-      "leaveFailed": "Không thể rời khỏi cuộc trò chuyện."
-    },
-    "reactions": {
-      "common": "Phổ biến",
-      "reactWith": "Bày tỏ cảm xúc bằng {{reaction}}",
-      "accessibility": "Biểu cảm {{emoji}}, {{displayCount}} lượt"
-    },
-    "composer": {
-      "replyingTo": "Đang trả lời",
-      "cancelReply": "Hủy trả lời",
-      "openInstance": "Mở máy chủ",
-      "attachFile": "Đính kèm tệp",
-      "cancelEdit": "Hủy chỉnh sửa"
+      "renamePlaceholder": "Tên mới"
     },
     "conversationList": {
-      "couldNotLoad": "Không thể tải danh sách cuộc trò chuyện.",
-      "emptyTitle": "Chưa có cuộc trò chuyện nào",
-      "emptyDescription": "Tạo cuộc trò chuyện để bắt đầu trò chuyện với máy chủ KiloClaw của bạn.",
-      "create": "Tạo cuộc trò chuyện",
-      "newConversation": "Cuộc trò chuyện mới",
-      "openInstanceSettings": "Mở cài đặt máy chủ",
       "today": "Hôm nay",
       "yesterday": "Hôm qua",
-      "thisWeek": "Tuần này",
       "older": "Trước đó"
     },
     "attachment": {
-      "open": "Mở {{filename}}",
-      "openFailed": "Không thể mở tệp đính kèm. Kiểm tra kết nối và thử lại.",
-      "attachFailed": "Không thể đính kèm tệp.",
-      "limit": "Bạn có thể đính kèm tối đa {{displayCount}} tệp.",
-      "sizeRejection": "Tệp {{filename}} vượt quá giới hạn dung lượng đính kèm {{limit}}.",
-      "unreadable": "Không thể đọc {{filename}}.",
-      "pastedImage": "hình ảnh đã dán",
-      "defaultName": "Tệp đính kèm",
       "classificationDenied": "Không thể đính kèm tệp thực thi.",
       "classificationEmpty": "Tệp không có nội dung.",
       "classificationTooLarge": "Dung lượng tệp không được vượt quá 20 MB.",
@@ -431,426 +371,17 @@
       "networkError": "Đã xảy ra lỗi mạng.",
       "uploadFailed": "Không thể tải lên.",
       "nothingToPaste": "Không có nội dung để dán.",
-      "metadataStripFailed": "Không thể xóa siêu dữ liệu ảnh.",
-      "limit_one": "Bạn có thể đính kèm tối đa {{displayCount}} tệp.",
-      "limit_other": "Bạn có thể đính kèm tối đa {{displayCount}} tệp."
+      "metadataStripFailed": "Không thể xóa siêu dữ liệu ảnh."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Thử tải lại {{filename}}",
-      "remove": "Xóa {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[tin nhắn đã xóa]",
-      "yourMessage": "Tin nhắn của bạn",
-      "messageFrom": "Tin nhắn từ {{author}}",
-      "moreActions": "Thao tác khác",
-      "notDelivered": "Chưa chuyển đến người nhận",
-      "edited": "(đã chỉnh sửa)",
-      "image": "Hình ảnh"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Đã sao chép",
-      "copyFailed": "Không thể sao chép.",
-      "title": "Thao tác với tin nhắn",
-      "deleteTitle": "Xóa tin nhắn?",
-      "deleteMessage": "Thao tác này sẽ xóa tin nhắn khỏi cuộc trò chuyện.",
-      "deleteFailed": "Không thể xóa tin nhắn.",
-      "removeReactionFailed": "Không thể gỡ biểu cảm.",
-      "addReactionFailed": "Không thể thêm biểu cảm.",
-      "retrySend": "Gửi lại",
-      "moreReactions": "Biểu cảm khác",
-      "edit": "Chỉnh sửa",
-      "sendFailed": "Không thể gửi tin nhắn.",
-      "retrySendFailed": "Không thể gửi lại tin nhắn.",
-      "editFailed": "Không thể chỉnh sửa tin nhắn.",
-      "executeFailed": "Không thể thực hiện thao tác."
+      "edit": "Chỉnh sửa"
     },
     "attachmentPicker": {
-      "takePhoto": "Chụp ảnh",
-      "photoLibrary": "Thư viện ảnh",
-      "files": "Tệp",
       "cameraAccessMessage": "Cho phép truy cập máy ảnh trong phần cài đặt để chụp ảnh."
-    },
-    "typingIndicator": {
-      "someone": "Ai đó",
-      "typing_one": "{{name}} đang nhập...",
-      "typing": "{{names}} đang nhập...",
-      "typing_other": "{{names}} đang nhập..."
-    },
-    "botStatus": {
-      "offline": "Ngoại tuyến",
-      "loadingUser": "Đang tải thông tin người dùng...",
-      "waitingForStatus": "Đang chờ trạng thái bot...",
-      "offlineMessage": "Bot đang ngoại tuyến. Việc gửi và nhận tin nhắn sẽ tiếp tục khi bot kết nối lại."
-    },
-    "errors": {
-      "notAllowed": "Bạn không được phép thực hiện thao tác này.",
-      "messageTooLong": "Tin nhắn quá dài. Hãy rút ngắn xuống dưới {{limit}} ký tự.",
-      "titleTooLong": "Tiêu đề quá dài. Hãy rút ngắn xuống dưới {{limit}} ký tự.",
-      "messageEmpty": "Tin nhắn không được để trống."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Không thể tải các phiên chạy KiloClaw.",
-    "billing": {
-      "title": "Thanh toán",
-      "continueMonthToMonth": "Tiếp tục thanh toán theo tháng",
-      "plan": "Kế hoạch",
-      "finalTermEnds": "Ngày kết thúc kỳ cuối",
-      "afterFinalTerm": "Sau kỳ cuối",
-      "lessThanOneDay": "Dưới 1 ngày",
-      "ends": "Kết thúc",
-      "expires": "Hết hạn",
-      "noActivePlan": "Chưa có gói còn hiệu lực",
-      "noActivePlanDescription": "Bạn chưa có gói đăng ký KiloClaw còn hiệu lực.",
-      "managedByAdmin": "Việc thanh toán do quản trị viên tổ chức của bạn quản lý.",
-      "couldNotLoad": "Không thể tải thông tin thanh toán.",
-      "manageOnWeb": "Quản lý thanh toán trên web",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Kỳ cuối của gói Commit kết thúc vào {{date}}. Chuyển sang gói Standard với giá {{price}} để tiếp tục; nếu không, dịch vụ lưu trữ sẽ kết thúc.",
-      "freeTrial": "Dùng thử miễn phí",
-      "hostingEnds": "Dịch vụ lưu trữ kết thúc",
-      "renews": "Gia hạn",
-      "standardMonthToMonth": "Gói Standard theo tháng",
-      "standardStartsOn": "Gói Standard bắt đầu vào {{date}} với giá {{price}}.",
-      "yourStandardMonthlyPrice": "mức phí hằng tháng cho gói Standard của bạn",
-      "perMonth": "/tháng",
-      "earlybirdAccessUntil": "Bạn có quyền sử dụng gói Earlybird đến {{date}}.",
-      "earlybirdEnding": "Gói Earlybird còn {{remaining}} là kết thúc.",
-      "paymentPastDue": "Khoản thanh toán đã quá hạn. Vui lòng cập nhật phương thức thanh toán.",
-      "subscriptionCancels": "Gói đăng ký sẽ bị hủy vào {{date}}.",
-      "trialDaysRemaining": "Thời gian dùng thử còn {{remaining}}.",
-      "trialEndingSoon": "Thời gian dùng thử sắp kết thúc, còn {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Có gì mới",
-      "couldNotLoad": "Không thể tải nhật ký thay đổi.",
-      "noUpdates": "Chưa có bản cập nhật",
-      "noUpdatesDescription": "Thông tin về các thay đổi sẽ xuất hiện ở đây.",
-      "recentUpdates": "Cập nhật gần đây",
-      "manageVersion": "Quản lý phiên bản",
-      "redeployRequired": "Cần triển khai lại",
-      "redeploySuggested": "Nên triển khai lại",
-      "upgradeRequired": "Cần nâng cấp"
-    },
-    "dashboard": {
-      "title": "Bảng điều khiển",
-      "couldNotLoad": "Không thể tải bảng điều khiển.",
-      "renameInstance": "Đổi tên phiên chạy",
-      "renamePlaceholder": "Tên mới (tối đa 50 ký tự)",
-      "someDetailsFailed": "Không thể tải một số thông tin theo thời gian thực.",
-      "destroy": "Xóa vĩnh viễn",
-      "destroyMessage": "Thao tác này sẽ xóa vĩnh viễn phiên chạy KiloClaw của bạn cùng toàn bộ dữ liệu. Bạn không thể hoàn tác thao tác này.",
-      "destroyTitle": "Xóa vĩnh viễn phiên chạy",
-      "instance": "Phiên chạy",
-      "couldNotCheckStatus": "Không thể kiểm tra trạng thái dịch vụ.",
-      "dangerZone": "KHU VỰC NGUY HIỂM",
-      "destroying": "Đang xóa vĩnh viễn…",
-      "serviceDegraded": "Dịch vụ hoạt động không ổn định — chạm để xem trạng thái",
-      "up": "HOẠT ĐỘNG"
-    },
-    "channels": {
-      "title": "Kênh",
-      "couldNotLoad": "Không thể tải các kênh.",
-      "noChannels": "Không có kênh khả dụng",
-      "noChannelsDescription": "Các kênh tích hợp sẽ xuất hiện ở đây.",
-      "connected": "Đã kết nối {{label}}",
-      "disconnectMessage": "Xóa {{label}}? Kênh này sẽ bị ngắt kết nối.",
-      "disconnectTitle": "Ngắt kết nối kênh"
-    },
-    "devicePairing": {
-      "title": "Ghép nối thiết bị",
-      "refreshRequests": "Làm mới yêu cầu ghép nối",
-      "couldNotLoad": "Không thể tải các yêu cầu ghép nối.",
-      "noPending": "Không có yêu cầu chờ duyệt",
-      "noPendingDescription": "Các yêu cầu ghép nối kênh và thiết bị sẽ xuất hiện tại đây.",
-      "channelRequests": "Yêu cầu ghép nối kênh",
-      "deviceRequests": "Yêu cầu ghép nối thiết bị",
-      "approveDeviceMessage": "Cho phép {{platform}} kết nối với phiên chạy của bạn?",
-      "approveDeviceTitle": "Phê duyệt thiết bị",
-      "approveMessage": "Cho phép {{label}} (mã: {{code}}) kết nối với phiên chạy của bạn?",
-      "approveTitle": "Phê duyệt yêu cầu ghép nối",
-      "unknownDevice": "Thiết bị không xác định"
-    },
-    "execPolicy": {
-      "title": "Chính sách thực thi",
-      "couldNotLoad": "Không thể tải chính sách thực thi.",
-      "alwaysAsk": "Luôn hỏi xác nhận",
-      "alwaysAskDescription": "Yêu cầu xác nhận trước khi chạy từng lệnh. Đây là lựa chọn an toàn nhất.",
-      "neverAsk": "Không hỏi xác nhận",
-      "neverAskDescription": "Chạy lệnh mà không cần xác nhận. Nhanh hơn nhưng kém an toàn hơn."
-    },
-    "google": {
-      "title": "Tài khoản Google",
-      "couldNotLoad": "Không thể tải trạng thái tài khoản Google.",
-      "disconnected": "Đã ngắt kết nối tài khoản Google. Triển khai lại phiên chạy để áp dụng thay đổi.",
-      "setupCommand": "Lệnh thiết lập",
-      "setupCommandHelp": "Trên máy tính đã cài Docker của bạn, mở cửa sổ dòng lệnh và chạy lệnh này để kết nối tài khoản Google.",
-      "failedToLoadCommand": "Không thể tải lệnh thiết lập.",
-      "gmailNotifications": "Thông báo Gmail",
-      "disconnect": "Ngắt kết nối tài khoản Google",
-      "copied": "Đã sao chép",
-      "copyCommand": "Sao chép lệnh",
-      "disconnectConfirm": "Ngắt kết nối",
-      "disconnectMessage": "Xóa tài khoản Google của bạn khỏi phiên chạy này? Thao tác này sẽ tắt thông báo Gmail. Triển khai lại sau khi ngắt kết nối để áp dụng thay đổi.",
-      "disconnectTitle": "Ngắt kết nối Google"
-    },
-    "modelList": {
-      "noMatches": "Không có mô hình phù hợp với nội dung tìm kiếm",
-      "noModelsDescription": "Các mô hình sẽ xuất hiện ở đây khi có thể sử dụng.",
-      "noResultsFor": "Không tìm thấy kết quả cho \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Thông tin bí mật",
-      "couldNotLoad": "Không thể tải thông tin bảo mật.",
-      "noSecrets": "Chưa có thông tin bảo mật",
-      "noSecretsDescription": "Các tích hợp dùng thông tin bảo mật sẽ xuất hiện ở đây.",
-      "removeMessage": "Xóa {{label}}? Công cụ này sẽ mất quyền truy cập vào thông tin xác thực của nó.",
-      "removeTitle": "Xóa thông tin bảo mật",
-      "saved": "Đã lưu {{label}}",
-      "allFieldsRequired": "Điền tất cả các trường để kết nối {{label}}.",
-      "hide": "Ẩn {{label}}",
-      "removing": "Đang xóa…",
-      "saving": "Đang lưu…",
-      "setupGuide": "Hướng dẫn thiết lập",
-      "setupGuideA11y": "Hướng dẫn thiết lập {{label}}",
-      "setupGuideFallback": "hướng dẫn thiết lập",
-      "show": "Hiện {{label}}",
-      "updateToken": "Cập nhật mã truy cập"
-    },
-    "versionPin": {
-      "title": "Ghim phiên bản",
-      "couldNotLoad": "Không thể tải thông tin phiên bản.",
-      "couldNotLoadMore": "Không thể tải thêm phiên bản.",
-      "loadMore": "Tải thêm phiên bản",
-      "showingLatest": "Đang hiển thị 100 phiên bản mới nhất.",
-      "availableVersions": "Phiên bản khả dụng",
-      "noVersions": "Không có phiên bản khả dụng",
-      "noVersionsDescription": "Các phiên bản OpenClaw khả dụng sẽ xuất hiện tại đây.",
-      "unpin": "Bỏ ghim",
-      "unpinMessage": "Chuyển về phiên bản mới nhất hiện có?",
-      "unpinTitle": "Bỏ ghim phiên bản",
-      "confirmPin": "Xác nhận ghim",
-      "followingLatest": "Theo bản mới nhất",
-      "latest": "mới nhất",
-      "pin": "Ghim",
-      "pinnedByAdmin": "Quản trị viên đã ghim phiên bản này. Liên hệ quản trị viên để thay đổi.",
-      "pinnedTo": "Đã ghim phiên bản {{version}}",
-      "reasonOptional": "Lý do (tùy chọn)",
-      "reasonPlaceholder": "Lý do ghim phiên bản này",
-      "replaceAdminPin": "Thay phiên bản quản trị viên đã ghim",
-      "replacesAdminPin": "Thao tác này sẽ thay phiên bản do quản trị viên ghim (hiện là {{label}})."
-    },
-    "redeploy": "Triển khai lại",
-    "redeployMessage": "Bạn có chắc muốn triển khai lại phiên chạy này không?",
-    "redeployTitle": "Triển khai lại phiên chạy",
-    "accessRequired": {
-      "iosBody": "Quyền truy cập KiloClaw cho tài khoản này được quản lý bên ngoài ứng dụng iOS.",
-      "iosContact": "Nếu có thắc mắc, hãy liên hệ {{supportEmail}}.",
-      "iosTitle": "KiloClaw không khả dụng trên iOS",
-      "multipleCurrentConflictBody": "Tài khoản của bạn có nhiều gói đăng ký còn hiệu lực. Chúng tôi đã tạm dừng dịch vụ để tránh tính phí trùng lặp.",
-      "multipleCurrentConflictCta": "Tiếp tục trên kilo.ai",
-      "nonCanonicalEarlybirdBody": "Gói truy cập sớm của bạn cần được nhân viên kiểm tra trước khi sử dụng trên thiết bị di động.",
-      "nonCanonicalEarlybirdTitle": "Phát hiện gói cũ",
-      "quarantinedBody": "Phiên chạy KiloClaw của bạn đang bị cách ly nên hiện không thể sử dụng. Đội ngũ hỗ trợ cần giúp bạn khôi phục phiên chạy này.",
-      "quarantinedTitle": "Phiên chạy cần được khắc phục",
-      "subscriptionCanceledBody": "Để sử dụng KiloClaw, hãy truy cập kilo.ai/claw từ trình duyệt. Bạn không thể đăng ký trong ứng dụng.",
-      "subscriptionCanceledCta": "Mở kilo.ai/claw",
-      "subscriptionCanceledTitle": "Đăng ký gói trên trang web",
-      "subscriptionPastDueBody": "Đã xảy ra sự cố với khoản thanh toán gần nhất của bạn. Truy cập kilo.ai/claw bằng trình duyệt để cập nhật thông tin thanh toán. Bạn không thể quản lý thanh toán trong ứng dụng.",
-      "subscriptionPastDueTitle": "Cập nhật thông tin thanh toán trên web",
-      "trialExpiredBody": "Để tiếp tục sử dụng KiloClaw, hãy truy cập kilo.ai/claw từ trình duyệt. Bạn không thể đăng ký trong ứng dụng.",
-      "quarantinedCta": "Gửi email cho đội ngũ của chúng tôi",
-      "nonCanonicalEarlybirdCta": "Xem xét gói của bạn trên kilo.ai"
-    },
-    "controls": {
-      "redeploying": "Đang triển khai lại…",
-      "restart": "Khởi động lại",
-      "restartOpenClawMessage": "Bạn có chắc muốn khởi động lại tiến trình OpenClaw không?",
-      "restartOpenClawTitle": "Khởi động lại OpenClaw",
-      "restarting": "Đang khởi động lại…",
-      "start": "Khởi động",
-      "startMessage": "Bạn có chắc muốn khởi động phiên chạy này không?",
-      "startTitle": "Khởi động phiên chạy",
-      "stop": "Dừng",
-      "stopMessage": "Bạn có chắc muốn dừng phiên chạy này không?",
-      "stopTitle": "Dừng phiên chạy",
-      "stopping": "Đang dừng…"
-    },
-    "empty": {
-      "finishingSetup": "Đang hoàn tất thiết lập",
-      "finishingSetupDescription": "Vui lòng đợi trong khi chúng tôi hoàn tất thiết lập tài khoản của bạn. Quá trình này thường chỉ mất một lát.",
-      "getStarted": "Bắt đầu",
-      "noInstancesDescription": "Tạo phiên chạy đầu tiên để bắt đầu dùng các tác nhân lập trình."
-    },
-    "instance": {
-      "backToInstances": "Về danh sách phiên chạy",
-      "couldNotLoad": "Không thể tải phiên chạy.",
-      "notFound": "Không tìm thấy phiên chạy",
-      "notFoundDescription": "Phiên chạy này có thể đã bị xóa vĩnh viễn hoặc liên kết không còn hợp lệ."
-    },
-    "instanceCard": {
-      "fixOnKiloAi": "Khắc phục trên kilo.ai: {{label}}",
-      "needsAttention": "{{name}} cần được kiểm tra: {{label}}",
-      "openSettings": "Mở cài đặt cho {{name}}",
-      "openUnread": "Mở {{name}}, {{displayCount}} tin nhắn chưa đọc",
-      "openUnread_other": "Mở {{name}}, {{displayCount}} tin nhắn chưa đọc",
-      "openUnread_one": "Mở {{name}}, {{displayCount}} tin nhắn chưa đọc"
-    },
-    "list": {
-      "createInstance": "Tạo phiên chạy",
-      "organizations": "Tổ chức",
-      "accessIssue": {
-        "trialExpired": "Thời gian dùng thử đã hết — đăng ký để tiếp tục sử dụng phiên chạy này",
-        "subscriptionCanceled": "Gói đăng ký không còn hiệu lực — đăng ký lại để tiếp tục sử dụng phiên chạy này",
-        "subscriptionPastDue": "Có sự cố thanh toán — cập nhật thông tin thanh toán để tiếp tục sử dụng phiên chạy này",
-        "quarantined": "Phiên chạy bị cách ly — cần nhân viên kiểm tra",
-        "multipleCurrentConflict": "Tài khoản cần được rà soát",
-        "nonCanonicalEarlybird": "Gói cũ cần được xem xét"
-      }
-    },
-    "modelPicker": {
-      "autoModelA11y": "Mô hình tự động {{label}}",
-      "balancedDescription": "Cân bằng giữa tốc độ và khả năng xử lý với chi phí thấp hơn.",
-      "browseAllModels": "hoặc chọn từ hơn 500 mô hình",
-      "browseAllModelsA11y": "Xem toàn bộ danh sách hơn 500 mô hình",
-      "currentModel": "Mô hình hiện tại",
-      "frontierDescription": "Hiệu năng cao nhất. Chuyển yêu cầu đến các mô hình tiên tiến có khả năng suy luận.",
-      "frontierLabel": "Tiên tiến",
-      "kiloAuto": "Kilo Auto"
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Trò chuyện với {{name}}",
-        "ready": "{{name}} đã sẵn sàng",
-        "warmedUp": "Mọi thứ đã sẵn sàng. Hãy gửi lời chào khi bạn muốn bắt đầu."
-      },
-      "flow": {
-        "couldNotLoad": "Không thể tải trạng thái thiết lập ban đầu.",
-        "finishingSetup": "Đang hoàn tất thiết lập. Vui lòng đợi trong khi chúng tôi chuẩn bị tài khoản của bạn.",
-        "genericErrorBody": "Hiện chưa thể hoàn tất thiết lập phiên chạy của bạn.",
-        "identityTitle": "Tạo cá tính cho trợ lý của bạn",
-        "manualReviewBody": "Tài khoản của bạn cần được kiểm tra trước khi tạo phiên chạy. Tiếp tục trên kilo.ai.",
-        "manualReviewTitle": "Cần nhân viên kiểm tra việc thiết lập",
-        "openKiloAi": "Mở kilo.ai",
-        "provisioning": "Đang cấp phát",
-        "ready": "Sẵn sàng",
-        "review": "Rà soát",
-        "settingUp": "Đang thiết lập…"
-      },
-      "identity": {
-        "changePersonality": "Thay đổi tính cách",
-        "chooseAvatar": "Chọn hình đại diện",
-        "location": "Vị trí",
-        "locationDeniedMessage": "Bật quyền truy cập vị trí trong Cài đặt để sử dụng vị trí hiện tại của bạn.",
-        "locationDeniedTitle": "Chưa được cấp quyền truy cập vị trí",
-        "locationGetFailed": "Không thể lấy vị trí của bạn. Hãy nhập thủ công.",
-        "locationPlaceholder": "Thành phố hoặc khu vực (tùy chọn)",
-        "locationResolveFailed": "Không thể xác định vị trí của bạn. Bạn có thể chỉnh sửa thủ công.",
-        "locationValidationFailed": "Không thể xác thực vị trí.",
-        "namePlaceholder": "Tên trợ lý của bạn",
-        "nature": {
-          "aiAssistantLabel": "Trợ lý AI",
-          "aiAssistantVibe": "Nhiệt tình, giỏi việc, chuyên nghiệp",
-          "digitalCreatureLabel": "Sinh vật kỹ thuật số",
-          "digitalCreatureVibe": "Khác lạ, sống động, hơi khó đoán",
-          "somethingWeirderLabel": "Thứ gì đó kỳ lạ hơn…",
-          "somethingWeirderVibe": "Tự định nghĩa",
-          "virtualCompanionLabel": "Bạn đồng hành ảo",
-          "virtualCompanionVibe": "Ấm áp, luôn bên bạn, chân thành quan tâm"
-        },
-        "personality": "Tính cách",
-        "selectAvatar": "Chọn {{name}} làm hình đại diện",
-        "useCurrentLocation": "Dùng vị trí hiện tại"
-      },
-      "notifications": {
-        "couldNotEnable": "Không thể bật thông báo.",
-        "getNotified": "Nhận thông báo khi {{name}} hoàn thành tác vụ để không bỏ lỡ phản hồi.",
-        "mockMessage": "Xong rồi! Tôi đã soạn bản tóm tắt bạn yêu cầu. Bạn có thể xem bất cứ lúc nào.",
-        "now": "vừa xong",
-        "settingUp": "Đang thiết lập thông báo…",
-        "skipForNow": "Tạm bỏ qua",
-        "stayInTheLoop": "Nhận thông báo mới"
-      },
-      "provisioning": {
-        "backgroundHint": "Quá trình này thường mất chưa đến một phút. Bạn có thể đóng màn hình này — quá trình thiết lập vẫn tiếp tục chạy nền.",
-        "connectingToAgent": "Đang kết nối với tác nhân",
-        "continueInBackground": "Tiếp tục chạy nền",
-        "queryErrorBody": "Kết nối bị mất khi kiểm tra tiến độ thiết lập {{name}}. Quá trình thiết lập có thể vẫn đang chạy. Thử lại hoặc quay lại kiểm tra sau một lát.",
-        "queryErrorTitle": "Không thể kiểm tra tiến độ thiết lập",
-        "settingUp": "Đang thiết lập {{name}}",
-        "stalledBody": "Chúng tôi không thể hoàn tất thiết lập {{name}}. Hãy thử lại hoặc gửi email đến {{supportEmail}} nếu sự cố vẫn tiếp diễn.",
-        "stalledTitle": "Quá trình thiết lập bị gián đoạn",
-        "startingSandbox": "Đang khởi động môi trường cô lập",
-        "stoppedBody": "Phiên chạy của {{name}} đã dừng đột ngột trong quá trình thiết lập.",
-        "stoppedTitle": "Thiết lập đã dừng",
-        "timeoutBody": "Quá trình thiết lập {{name}} đang mất nhiều thời gian hơn bình thường (hơn {{displayMinutes}} phút).",
-        "timeoutTitle": "Mất nhiều thời gian hơn dự kiến"
-      },
-      "unavailableDescription": "Bạn cần có gói đăng ký KiloClaw còn hiệu lực để tạo phiên chạy. Các phiên chạy và gói đăng ký hiện có vẫn hoạt động bình thường.",
-      "unavailableTitle": "Không thể tạo phiên chạy KiloClaw mới"
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Mã thoát {{code}}",
-      "gatewayProcess": "TIẾN TRÌNH CỔNG KẾT NỐI",
-      "lastExit": "Lần thoát gần nhất",
-      "memory": "Bộ nhớ",
-      "region": "Khu vực",
-      "resources": "TÀI NGUYÊN",
-      "restarts": "Số lần khởi động lại",
-      "state": "Trạng thái",
-      "uptime": "Thời gian hoạt động",
-      "crashed": "BỊ LỖI",
-      "destroying": "ĐANG XÓA VĨNH VIỄN",
-      "provisioned": "ĐÃ CẤP PHÁT",
-      "restarting": "ĐANG KHỞI ĐỘNG LẠI",
-      "running": "ĐANG CHẠY",
-      "shuttingDown": "ĐANG TẮT",
-      "starting": "ĐANG KHỞI ĐỘNG",
-      "stopped": "ĐÃ DỪNG",
-      "stopping": "ĐANG DỪNG",
-      "unknown": "KHÔNG XÁC ĐỊNH",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Phê duyệt yêu cầu ghép nối thiết bị",
-      "execPolicyDescription": "Cài đặt bảo mật",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Chọn mô hình AI",
-      "secretsDescription": "Thông tin xác thực được mã hóa",
-      "versionPinDescription": "Ghim vào một phiên bản cụ thể"
-    },
-    "avatar": {
-      "arcade": "Máy chơi điện tử",
-      "brain": "Bộ não",
-      "creature": "Sinh vật",
-      "crystal": "Pha lê",
-      "custom": "Hình đại diện tùy chỉnh",
-      "dragon": "Rồng",
-      "explorer": "Nhà thám hiểm",
-      "flame": "Ngọn lửa",
-      "lightning": "Tia sét",
-      "magicWand": "Đũa phép",
-      "moon": "Mặt trăng",
-      "operator": "Người vận hành",
-      "orbit": "Quỹ đạo",
-      "oracle": "Nhà tiên tri",
-      "rainbow": "Cầu vồng",
-      "robot": "Rô-bốt",
-      "satellite": "Vệ tinh",
-      "sparkles": "Ánh sao lấp lánh",
-      "strongArm": "Cánh tay cơ bắp",
-      "talisman": "Bùa hộ mệnh"
-    },
-    "remoteSpawnFilesNotSupported": "Phiên chạy này không thể nhận tệp.",
-    "instanceSwitcherTitle": "Phiên chạy KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2030,10 +1561,6 @@
       "moveLeft": "Di chuyển {{filename}} sang trái",
       "moveRight": "Di chuyển {{filename}} sang phải"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Dán hình ảnh từ bảng nhớ tạm",
-      "label": "Đã phát hiện hình ảnh, chạm để dán"
-    },
     "attachmentPicker": {
       "camera": "Máy ảnh",
       "photoLibrary": "Thư viện ảnh",
@@ -2229,7 +1756,8 @@
     "sessionSignedOut": "Đã đăng xuất phiên.",
     "signOutThisDeviceTitle": "Đăng xuất khỏi thiết bị này?",
     "signOutThisSessionTitle": "Đăng xuất phiên này?",
-    "signOutThisSessionMessage": "{{device}} sẽ được đăng xuất. Thiết bị này vẫn có thể truy cập API trong tối đa một giờ."
+    "signOutThisSessionMessage": "{{device}} sẽ được đăng xuất. Thiết bị này vẫn có thể truy cập API trong tối đa một giờ.",
+    "unknownDevice": "Thiết bị không xác định"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Không thể mở cửa hàng ứng dụng.",

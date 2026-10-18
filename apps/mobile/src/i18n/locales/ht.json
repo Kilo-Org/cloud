@@ -101,12 +101,9 @@
     "scheduled": "Pwograme",
     "keepEditing": "Kontinye modifye",
     "keepRunning": "Kite l kontinye fonksyone",
-    "kiloclaw": "KiloClaw",
     "newSession": "Nouvo sesyon",
-    "noKiloclawInstances": "Pa gen enstans KiloClaw",
     "noModelsAvailable": "Pa gen modèl ki disponib",
     "notFound": "Nou pa jwenn li.",
-    "online": "Sou entènèt",
     "open": "Louvri {{name}}",
     "openPullRequest": "Louvri demann fizyon an",
     "pending": "An atant",
@@ -257,7 +254,8 @@
     "renamePasskey": "Chanje non kle aksè",
     "removePasskey": "Retire kle aksè",
     "removePasskeyTitle": "Retire kle aksè?",
-    "removePasskeyMessage": "Ou pap ka konekte ak kle aksè sa a ankò."
+    "removePasskeyMessage": "Ou pap ka konekte ak kle aksè sa a ankò.",
+    "changelog": "Sa ki nouvo"
   },
   "preferences": {
     "general": "Jeneral",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Notifikasyon yo fè ou konnen gen yon bagay ki rive. Louvri Kilo pou li mesaj la.",
     "channel": {
       "agentProgress": "Pwogrè ajan",
-      "chat": "Mesaj diskisyon",
-      "kiloclaw": "Aktivite KiloClaw",
       "balance": "Alèt balans",
       "security": "Pwoblèm sekirite detekte",
       "spend": "Alèt depans",
       "followedSessions": "Sesyon swiv"
     },
     "category": {
-      "chatMessagesSubtitle": "repons nan konvèsasyon ou yo",
       "agentAttentionTitle": "Ajan an bezwen ou",
       "agentAttentionSubtitle": "kesyon, pèmisyon ak enfòmasyon ki nesesè",
       "agentUpdatesTitle": "Mizajou ajan",
       "agentUpdatesSubtitle": "mesaj ajan an voye pandan travay la",
       "sessionStatusTitle": "Estati sesyon",
       "sessionStatusSubtitle": "fini / echwe / pare pou kontwole",
-      "kiloclawActivitySubtitle": "enstans pare/echwe, aksyon pwograme",
-      "kiloclawActivityUnavailable": "Kòmanse yon enstans KiloClaw pou jwenn aktivite KiloClaw.",
       "balanceAlertsSubtitle": "avètisman lè balans òganizasyon an ba",
       "balanceAlertsUnavailable": "Antre nan yon òganizasyon pou jwenn avètisman balans.",
       "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Akèy",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, onglet, {{position}} sou {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Chanjman enstans",
-      "couldNotLoadInstances": "Nou pa t ka chaje enstans yo.",
-      "noInstancesDescription": "Mete yon enstans an plas pou kòmanse pale.",
-      "setUpKiloclaw": "Mete KiloClaw an plas",
-      "currentInstance": "{{title}}, aktyèl"
-    },
     "conversation": {
-      "failedToLoad": "Nou pa t ka chaje konvèsasyon an.",
-      "notFound": "Nou pa jwenn konvèsasyon an.",
       "untitled": "San tit",
-      "leaveTitle": "Kite konvèsasyon an?",
-      "leaveMessage": "Sa retire konvèsasyon an nan lis ou a.",
-      "openHint": "Louvri konvèsasyon an. Peze epi kenbe pou wè opsyon pou chanje non li oswa kite li.",
-      "unread": "Poko li",
-      "optionsFor": "Opsyon konvèsasyon pou {{title}}",
-      "options": "Opsyon konvèsasyon",
-      "renameTitle": "Chanjman non konvèsasyon an",
-      "renamePlaceholder": "Nouvo non",
-      "couldNotReachBot": "Nou pa t ka kontakte wobo a. Tanpri eseye ankò.",
-      "messageDeliveryFailed": "Nou pa t ka fè mesaj la rive jwenn wobo a.",
-      "couldNotSignIn": "Nou pa t ka konekte ou nan espas konvèsasyon an.",
-      "couldNotRefreshMessages": "Nou pa t ka rafrechi mesaj yo.",
-      "couldNotLoadHistory": "Nou pa t ka chaje istwa konvèsasyon an.",
-      "leave": "Kite",
-      "untitledConversation": "Konvèsasyon san tit",
-      "createFailed": "Nou pa t ka kreye konvèsasyon an.",
-      "leaveFailed": "Nou pa t ka fè ou kite konvèsasyon an."
-    },
-    "reactions": {
-      "common": "Pi itilize",
-      "reactWith": "Reyaji ak {{reaction}}",
-      "accessibility": "Reyaksyon {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Ap reponn",
-      "cancelReply": "Anile repons lan",
-      "openInstance": "Louvri enstans lan",
-      "attachFile": "Atache yon fichye",
-      "cancelEdit": "Anile modifikasyon an"
+      "renamePlaceholder": "Nouvo non"
     },
     "conversationList": {
-      "couldNotLoad": "Nou pa t ka chaje konvèsasyon yo.",
-      "emptyTitle": "Poko gen konvèsasyon",
-      "emptyDescription": "Kreye yon konvèsasyon pou kòmanse pale ak enstans KiloClaw ou a.",
-      "create": "Kreye yon konvèsasyon",
-      "newConversation": "Nouvo konvèsasyon",
-      "openInstanceSettings": "Louvri paramèt enstans lan",
       "today": "Jodi a",
       "yesterday": "Yè",
-      "thisWeek": "Semèn sa a",
       "older": "Pi ansyen"
     },
     "attachment": {
-      "open": "Louvri {{filename}}",
-      "openFailed": "Nou pa t ka louvri fichye atache a. Verifye koneksyon ou epi eseye ankò.",
-      "attachFailed": "Nou pa t ka atache fichye a.",
-      "limit": "Ou ka atache jiska {{displayCount}} fichye.",
-      "sizeRejection": "{{filename}} depase limit {{limit}} pou gwosè fichye atache yo.",
-      "unreadable": "Nou pa t ka li {{filename}}.",
-      "pastedImage": "imaj ou kole a",
-      "defaultName": "Fichye tache",
       "classificationDenied": "Ou pa ka atache fichye egzekitab.",
       "classificationEmpty": "Fichye a vid.",
       "classificationTooLarge": "Gwosè chak fichye pa dwe depase 20 MB.",
@@ -943,426 +883,17 @@
       "networkError": "Gen yon erè nan rezo a.",
       "uploadFailed": "Nou pa t ka voye fichye a.",
       "nothingToPaste": "Pa gen anyen pou kole.",
-      "metadataStripFailed": "Nou pa t ka retire metadone foto a.",
-      "limit_one": "Ou ka atache jiska {{displayCount}} fichye.",
-      "limit_other": "Ou ka atache jiska {{displayCount}} fichye."
+      "metadataStripFailed": "Nou pa t ka retire metadone foto a."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Eseye voye {{filename}} ankò",
-      "remove": "Retire {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[mesaj efase]",
-      "yourMessage": "Mesaj ou a",
-      "messageFrom": "Mesaj {{author}} voye",
-      "moreActions": "Plis aksyon",
-      "notDelivered": "Pa rive jwenn destinatè a",
-      "edited": "(modifye)",
-      "image": "Imaj"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Kopye",
-      "copyFailed": "Nou pa t ka kopye mesaj la.",
-      "title": "Aksyon sou mesaj la",
-      "deleteTitle": "Efase mesaj la?",
-      "deleteMessage": "Sa ap retire mesaj la nan konvèsasyon an.",
-      "deleteFailed": "Nou pa t ka efase mesaj la.",
-      "removeReactionFailed": "Nou pa t ka retire reyaksyon an.",
-      "addReactionFailed": "Nou pa t ka ajoute reyaksyon an.",
-      "retrySend": "Eseye voye ankò",
-      "moreReactions": "Plis reyaksyon",
-      "edit": "Modifye",
-      "sendFailed": "Nou pa t ka voye mesaj la.",
-      "retrySendFailed": "Nou pa t ka voye mesaj la ankò.",
-      "editFailed": "Nou pa t ka modifye mesaj la.",
-      "executeFailed": "Nou pa t ka fè aksyon an."
+      "edit": "Modifye"
     },
     "attachmentPicker": {
-      "takePhoto": "Pran yon foto",
-      "photoLibrary": "Bibliyotèk foto",
-      "files": "Fichye",
       "cameraAccessMessage": "Pèmèt aksè nan kamera a nan paramèt yo pou pran yon foto."
-    },
-    "typingIndicator": {
-      "someone": "Yon moun",
-      "typing_one": "{{name}} ap tape...",
-      "typing": "{{names}} ap tape...",
-      "typing_other": "{{names}} ap tape..."
-    },
-    "botStatus": {
-      "offline": "Dekonekte",
-      "loadingUser": "Ap chaje itilizatè a...",
-      "waitingForStatus": "Ap tann estati wobo a...",
-      "offlineMessage": "Wobo a dekonekte. Echanj mesaj yo ap reprann lè li rekonekte."
-    },
-    "errors": {
-      "notAllowed": "Ou pa gen dwa fè sa.",
-      "messageTooLong": "Mesaj la twò long. Li dwe gen mwens pase {{limit}} karaktè.",
-      "titleTooLong": "Tit la twò long. Li dwe gen mwens pase {{limit}} karaktè.",
-      "messageEmpty": "Mesaj la pa ka vid."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Pa t ka chaje enstans KiloClaw yo.",
-    "billing": {
-      "title": "Faktirasyon",
-      "continueMonthToMonth": "Kontinye mwa pa mwa",
-      "plan": "Planifikasyon",
-      "finalTermEnds": "Fen dènye peryòd la",
-      "afterFinalTerm": "Apre dènye peryòd la",
-      "ends": "Fini",
-      "expires": "Ekspire",
-      "noActivePlan": "Pa gen plan aktif",
-      "noActivePlanDescription": "Ou pa gen yon abònman KiloClaw aktif.",
-      "managedByAdmin": "Administratè òganizasyon ou an jere faktirasyon an.",
-      "couldNotLoad": "Pa t ka chaje enfòmasyon sou faktirasyon an.",
-      "manageOnWeb": "Jere faktirasyon sou entènèt",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Dènye peryòd plan Commit ou a fini {{date}}. Kontinye ak plan Standard la pou {{price}}, sinon ebèjman an ap fini.",
-      "freeTrial": "Esè gratis",
-      "hostingEnds": "Ebèjman an fini",
-      "lessThanOneDay": "Mwens pase 1 jou",
-      "renews": "Renouvle",
-      "standardMonthToMonth": "Standard mwa pa mwa",
-      "standardStartsOn": "Plan Standard la kòmanse {{date}} pou {{price}}.",
-      "yourStandardMonthlyPrice": "pri plan Standard ou a pa mwa",
-      "perMonth": "/mwa",
-      "earlybirdAccessUntil": "Aksè Earlybird la valab jiska {{date}}.",
-      "earlybirdEnding": "Aksè Earlybird la ap fini: {{remaining}}.",
-      "paymentPastDue": "Peman an anreta. Tanpri mete metòd peman ou a ajou.",
-      "subscriptionCancels": "Abònman an ap anile {{date}}.",
-      "trialDaysRemaining": "Rete {{remaining}} nan peryòd esè a.",
-      "trialEndingSoon": "Peryòd esè a ap fini talè: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Komit"
-    },
-    "changelog": {
-      "title": "Sa ki nouvo",
-      "couldNotLoad": "Pa t ka chaje jounal chanjman an.",
-      "noUpdates": "Poko gen mizajou",
-      "noUpdatesDescription": "Detay chanjman yo ap parèt isit la.",
-      "recentUpdates": "Dènye mizajou",
-      "manageVersion": "Jere vèsyon an",
-      "redeployRequired": "Redepwayman obligatwa",
-      "redeploySuggested": "Redepwayman sijere",
-      "upgradeRequired": "Mizajou obligatwa"
-    },
-    "dashboard": {
-      "title": "Tablodbò",
-      "couldNotLoad": "Pa t ka chaje tablodbò a.",
-      "renameInstance": "Chanje non enstans lan",
-      "renamePlaceholder": "Nouvo non (50 karaktè maksimòm)",
-      "someDetailsFailed": "Pa t ka chaje kèk detay an tan reyèl.",
-      "destroy": "Detwi",
-      "destroyMessage": "Sa ap detwi enstans KiloClaw ou a ak tout done li yo pou toutan. Ou p ap ka anile aksyon sa a.",
-      "destroyTitle": "Detwi enstans lan",
-      "instance": "Enstans",
-      "couldNotCheckStatus": "Pa t ka tcheke estati sèvis la.",
-      "dangerZone": "ZON DANJE",
-      "destroying": "Ap detwi…",
-      "serviceDegraded": "Sèvis la gen pwoblèm — peze pou wè estati li",
-      "up": "AN MACHE"
-    },
-    "channels": {
-      "title": "Chanèl",
-      "couldNotLoad": "Pa t ka chaje chanèl yo.",
-      "noChannels": "Pa gen chanèl ki disponib",
-      "noChannelsDescription": "Entegrasyon pou chanèl yo ap parèt isit la.",
-      "connected": "{{label}} konekte",
-      "disconnectMessage": "Retire {{label}}? Chanèl sa a ap dekonekte.",
-      "disconnectTitle": "Dekonekte chanèl la"
-    },
-    "devicePairing": {
-      "title": "Asosyasyon aparèy",
-      "refreshRequests": "Rafrechi demann asosiyasyon yo",
-      "couldNotLoad": "Pa t ka chaje demann asosiyasyon yo.",
-      "noPending": "Pa gen demann k ap tann",
-      "noPendingDescription": "Demann asosiyasyon pou chanèl ak aparèy yo ap parèt isit la.",
-      "channelRequests": "Demann chanèl",
-      "deviceRequests": "Demann aparèy",
-      "approveDeviceMessage": "Pèmèt {{platform}} konekte ak enstans ou a?",
-      "approveDeviceTitle": "Apwouve aparèy la",
-      "approveMessage": "Pèmèt {{label}} (kòd: {{code}}) konekte ak enstans ou a?",
-      "approveTitle": "Apwouve demann asosiyasyon an",
-      "unknownDevice": "Aparèy enkoni"
-    },
-    "execPolicy": {
-      "title": "Règleman egzekisyon",
-      "couldNotLoad": "Pa t ka chaje règleman egzekisyon an.",
-      "alwaysAsk": "Toujou mande",
-      "alwaysAskDescription": "Konfime chak kòmand anvan li egzekite. Se opsyon ki pi an sekirite a.",
-      "neverAsk": "Pa janm mande",
-      "neverAskDescription": "Egzekite kòmand yo san konfimasyon. Se yon opsyon ki pi rapid men ki mwens an sekirite."
-    },
-    "google": {
-      "title": "Kont Google",
-      "couldNotLoad": "Pa t ka chaje estati kont Google la.",
-      "disconnected": "Kont Google la dekonekte. Redepwaye enstans ou a pou aplike chanjman an.",
-      "setupCommand": "Kòmand konfigirasyon",
-      "setupCommandHelp": "Pou konekte kont Google ou a, egzekite kòmand sa a nan yon tèminal sou pwòp òdinatè ou, kote Docker enstale.",
-      "failedToLoadCommand": "Pa t ka chaje kòmand konfigirasyon an.",
-      "gmailNotifications": "Notifikasyon Gmail",
-      "disconnect": "Dekonekte kont Google la",
-      "copied": "Kopye",
-      "copyCommand": "Kopye kòmand lan",
-      "disconnectConfirm": "Dekonekte",
-      "disconnectMessage": "Retire kont Google ou a nan enstans sa a? Sa ap dezaktive notifikasyon Gmail yo. Redepwaye enstans lan apre dekoneksyon an pou aplike chanjman yo.",
-      "disconnectTitle": "Dekonekte Google"
-    },
-    "modelList": {
-      "noMatches": "Pa gen modèl ki koresponn ak rechèch ou a",
-      "noModelsDescription": "Modèl yo ap parèt isit la lè yo disponib.",
-      "noResultsFor": "Pa gen rezilta pou \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Sekrè",
-      "couldNotLoad": "Pa t ka chaje sekrè yo.",
-      "noSecrets": "Pa gen sekrè ki disponib",
-      "noSecretsDescription": "Entegrasyon ki itilize sekrè yo ap parèt isit la.",
-      "removeMessage": "Retire {{label}}? Zouti sa a ap pèdi aksè ak enfòmasyon otantifikasyon li yo.",
-      "removeTitle": "Retire sekrè a",
-      "saved": "{{label}} anrejistre",
-      "hide": "Kache {{label}}",
-      "show": "Montre {{label}}",
-      "allFieldsRequired": "Tout chan yo obligatwa pou konekte {{label}}.",
-      "setupGuideFallback": "gid konfigirasyon",
-      "setupGuideA11y": "gid konfigirasyon {{label}}",
-      "setupGuide": "Gid konfigirasyon",
-      "saving": "Ap anrejistre…",
-      "removing": "Ap retire…",
-      "updateToken": "Mete jeton an ajou"
-    },
-    "versionPin": {
-      "title": "Vèsyon fiks",
-      "couldNotLoad": "Pa t ka chaje enfòmasyon sou vèsyon an.",
-      "couldNotLoadMore": "Pa t ka chaje plis vèsyon.",
-      "loadMore": "Chaje plis vèsyon",
-      "showingLatest": "Se 100 dènye vèsyon yo ki parèt.",
-      "availableVersions": "Vèsyon ki disponib",
-      "noVersions": "Pa gen vèsyon ki disponib",
-      "noVersionsDescription": "Vèsyon OpenClaw ki disponib yo ap parèt isit la.",
-      "unpin": "Retire fiksasyon an",
-      "unpinMessage": "Retounen nan dènye vèsyon ki disponib la?",
-      "unpinTitle": "Retire fiksasyon vèsyon an",
-      "confirmPin": "Konfime fiksasyon an",
-      "followingLatest": "Ap swiv dènye vèsyon an",
-      "latest": "dènye",
-      "pin": "Fikse",
-      "pinnedByAdmin": "Administratè a fikse vèsyon an. Kontakte administratè ou a pou chanje li.",
-      "pinnedTo": "Fikse sou {{version}}",
-      "reasonOptional": "Rezon (opsyonèl)",
-      "reasonPlaceholder": "Poukisa w ap fikse vèsyon sa a?",
-      "replaceAdminPin": "Ranplase fiksasyon administratè a",
-      "replacesAdminPin": "Sa ranplase fiksasyon administratè a te mete a (kounye a {{label}})."
-    },
-    "redeploy": "Deplwaye ankò",
-    "redeployMessage": "Èske w sèten ou vle redepwaye enstans sa a?",
-    "redeployTitle": "Redepwaye enstans lan",
-    "controls": {
-      "redeploying": "Ap redepwaye…",
-      "restart": "Redemare",
-      "restartOpenClawMessage": "Èske w sèten ou vle redemare pwosesis OpenClaw la?",
-      "restartOpenClawTitle": "Redemare OpenClaw",
-      "restarting": "Ap redemare…",
-      "start": "Demare",
-      "startMessage": "Èske ou sèten ou vle demare enstans sa a?",
-      "startTitle": "Demare enstans lan",
-      "stop": "Sispann",
-      "stopMessage": "Èske w sèten ou vle sispann enstans sa a?",
-      "stopTitle": "Sispann enstans lan",
-      "stopping": "Ap sispann…"
-    },
-    "empty": {
-      "finishingSetup": "Ap fini konfigirasyon an",
-      "finishingSetupDescription": "Tann yon ti moman pandan n ap fini prepare kont ou a. Anjeneral, sa pa pran anpil tan.",
-      "getStarted": "Kòmanse",
-      "noInstancesDescription": "Kreye premye enstans ou a pou kòmanse fè ajan pwogramasyon yo travay."
-    },
-    "instance": {
-      "backToInstances": "Retounen nan lis enstans yo",
-      "couldNotLoad": "Pa t ka chaje enstans lan.",
-      "notFound": "Pa jwenn enstans lan",
-      "notFoundDescription": "Petèt yo te detwi enstans sa a, oswa lyen an pa valab ankò."
-    },
-    "list": {
-      "createInstance": "Kreye yon enstans",
-      "organizations": "Òganizasyon",
-      "accessIssue": {
-        "trialExpired": "Peryòd esè a fini, abòne pou kontinye itilize enstans sa a",
-        "subscriptionCanceled": "Abònman an pa aktif, abòne ankò pou kontinye itilize enstans sa a",
-        "subscriptionPastDue": "Pwoblèm peman, mete enfòmasyon faktirasyon yo ajou pou kontinye itilize enstans sa a",
-        "quarantined": "Enstans lan an karantèn, yon moun dwe egzamine li",
-        "multipleCurrentConflict": "Kont lan bezwen revizyon",
-        "nonCanonicalEarlybird": "Ansyen plan an bezwen yon revizyon"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Pale ak {{name}}",
-        "ready": "{{name}} pare",
-        "warmedUp": "Tout bagay pare. Di bonjou lè ou pare."
-      },
-      "flow": {
-        "genericErrorBody": "Nou pa t ka fini prepare enstans ou a kounye a.",
-        "manualReviewBody": "Nou dwe verifye eta kont ou a anvan nou ka kreye yon enstans. Kontinye sou kilo.ai.",
-        "manualReviewTitle": "Preparasyon an mande yon revizyon pa yon moun",
-        "openKiloAi": "Louvri kilo.ai",
-        "provisioning": "Preparasyon resous",
-        "review": "Revizyon",
-        "identityTitle": "Idantite wobo ou a",
-        "couldNotLoad": "Pa t ka chaje eta preparasyon an.",
-        "finishingSetup": "N ap fini preparasyon an — tann yon ti moman pandan n ap fini prepare kont ou a.",
-        "ready": "Pare",
-        "settingUp": "Ap prepare…"
-      },
-      "unavailableDescription": "Ou dwe gen yon abònman KiloClaw aktif pou prepare yon enstans. Enstans ak abònman ki deja egziste yo kontinye fonksyone nòmalman.",
-      "unavailableTitle": "Nouvo enstans KiloClaw pa disponib",
-      "identity": {
-        "chooseAvatar": "Chwazi avatar",
-        "namePlaceholder": "Non wobo ou a",
-        "selectAvatar": "Chwazi {{name}} kòm avatar",
-        "personality": "Pèsonalite",
-        "changePersonality": "Chanje pèsonalite",
-        "location": "Kote",
-        "locationPlaceholder": "Vil oswa rejyon (opsyonèl)",
-        "useCurrentLocation": "Itilize kote ou ye kounye a",
-        "locationDeniedTitle": "Aksè ak pozisyon ou refize",
-        "locationDeniedMessage": "Nan paramèt yo, aktive aksè ak pozisyon ou pou itilize kote ou ye kounye a.",
-        "locationValidationFailed": "Pa t ka valide kote a.",
-        "locationResolveFailed": "Pa t ka idantifye kote ou ye a. Ou ka modifye li alamen.",
-        "locationGetFailed": "Pa t ka jwenn kote ou ye a. Antre li alamen.",
-        "nature": {
-          "aiAssistantLabel": "Asistan entèlijans atifisyèl",
-          "aiAssistantVibe": "Itil, konpetan, pwofesyonèl",
-          "digitalCreatureLabel": "Kreyati dijital",
-          "digitalCreatureVibe": "Etranj, vivan, yon ti jan enprevizib",
-          "virtualCompanionLabel": "Konpayon vityèl",
-          "virtualCompanionVibe": "Zanmitay, prezan, vrèman sousye de ou",
-          "somethingWeirderLabel": "Yon bagay ki pi etranj…",
-          "somethingWeirderVibe": "Defini li tèt ou"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Tout fini! Mwen prepare rezime ou te mande a. Mwen pare lè ou pare.",
-        "settingUp": "Ap konfigire notifikasyon yo…",
-        "stayInTheLoop": "Toujou okouran",
-        "getNotified": "Resevwa notifikasyon lè {{name}} fini yon travay pou ou pa janm manke yon repons.",
-        "now": "kounye a",
-        "skipForNow": "Pase etap sa a pou kounye a",
-        "couldNotEnable": "Pa t ka aktive notifikasyon yo."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Pa t ka tcheke preparasyon an",
-        "queryErrorBody": "Nou pèdi koneksyon an pandan n ap tcheke preparasyon {{name}}. Petèt preparasyon an toujou ap fèt. Eseye ankò oswa retounen tcheke talè.",
-        "stoppedTitle": "Preparasyon an sispann",
-        "stoppedBody": "Enstans {{name}} lan sispann sanzatann pandan preparasyon an.",
-        "stalledTitle": "Yon bagay bloke",
-        "stalledBody": "Nou pa t ka fini prepare {{name}}. Eseye ankò, oswa voye yon imèl bay {{supportEmail}} si sa kontinye rive.",
-        "timeoutTitle": "Ap pran plis tan pase sa nou te prevwa",
-        "timeoutBody": "Preparasyon {{name}} ap pran plis tan pase nòmal (plis pase {{displayMinutes}} minit).",
-        "continueInBackground": "Kontinye an aryèplan",
-        "settingUp": "Preparasyon {{name}}",
-        "connectingToAgent": "Ap konekte ak ajan an",
-        "startingSandbox": "Ap demare anviwònman izole a",
-        "backgroundHint": "Anjeneral, sa pran mwens pase yon minit. Ou ka fèmen ekran sa a — n ap kontinye travay an aryèplan."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kòd {{code}}",
-      "gatewayProcess": "PWOSESIS PASRÈL",
-      "lastExit": "Dènye sòti",
-      "memory": "Memwa",
-      "region": "Rejyon",
-      "resources": "RESOUS",
-      "restarts": "Redemaraj",
-      "state": "Eta",
-      "uptime": "Tan an mache",
-      "crashed": "PLANTE",
-      "destroying": "AP DETWI",
-      "provisioned": "RESOUS PARE",
-      "restarting": "AP REDEMARE",
-      "running": "AP FONKSYONE",
-      "shuttingDown": "AP FÈMEN",
-      "starting": "AP KÒMANSE",
-      "stopped": "SISPANN",
-      "stopping": "AP SISPANN",
-      "unknown": "ENKONI",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Pi avanse",
-      "frontierDescription": "Pi bon pèfòmans. Voye demann yo bay modèl ki pi avanse yo, avèk rezònman.",
-      "balancedDescription": "Bon ekilib ant vitès ak kapasite pou yon pri ki pi ba.",
-      "autoModelA11y": "modèl otomatik {{label}}",
-      "currentModel": "Modèl aktyèl",
-      "browseAllModels": "oswa chwazi pami plis pase 500 modèl",
-      "browseAllModelsA11y": "Gade tout modèl yo, plis pase 500"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Pou kontinye itilize KiloClaw, ale sou kilo.ai/claw nan navigatè ou a. Ou pa ka abòne nan aplikasyon an.",
-      "subscriptionCanceledTitle": "Abòne sou sit entènèt la",
-      "subscriptionCanceledBody": "Pou itilize KiloClaw, ale sou kilo.ai/claw nan navigatè ou a. Ou pa ka abòne nan aplikasyon an.",
-      "subscriptionCanceledCta": "Louvri kilo.ai/claw",
-      "subscriptionPastDueTitle": "Mizajou peman sou entènèt",
-      "subscriptionPastDueBody": "Nou te gen pwoblèm ak dènye peman ou a. Ale sou kilo.ai/claw nan navigatè ou a pou mete li ajou. Ou pa ka jere faktirasyon nan aplikasyon an.",
-      "quarantinedTitle": "Enstans lan bezwen reparasyon",
-      "quarantinedBody": "Enstans KiloClaw ou a an karantèn epi ou pa ka itilize li kounye a. Ekip nou an dwe ede retabli li.",
-      "multipleCurrentConflictBody": "Nou jwenn plis pase yon abònman aktif sou kont ou a. Nou mete sèvis la an poz pou evite faktire ou de fwa.",
-      "multipleCurrentConflictCta": "Kontinye sou kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Ansyen plan detekte",
-      "nonCanonicalEarlybirdBody": "Yon moun dwe revize plan aksè bonè ou a anvan ou ka itilize li sou mobil.",
-      "iosTitle": "KiloClaw pa disponib sou iOS",
-      "iosBody": "Pou kont sa a, jesyon aksè KiloClaw la fèt deyò aplikasyon iOS la.",
-      "iosContact": "Kesyon? Kontakte {{supportEmail}}.",
-      "quarantinedCta": "Voye imel pou ekip nou an",
-      "nonCanonicalEarlybirdCta": "Gade plan ou sou kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} bezwen atansyon: {{label}}",
-      "openUnread_one": "Louvri {{name}}, {{displayCount}} mesaj ki poko li",
-      "openUnread": "Louvri {{name}}, {{displayCount}} mesaj poko li",
-      "openUnread_other": "Louvri {{name}}, {{displayCount}} mesaj poko li",
-      "openSettings": "Louvri paramèt {{name}}",
-      "fixOnKiloAi": "Korije sou kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Apwouve demann aparèy",
-      "execPolicyDescription": "Paramèt sekirite",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Seleksyon modèl entèlijans atifisyèl",
-      "secretsDescription": "Enfòmasyon otantifikasyon chifre",
-      "versionPinDescription": "Fikse sou yon vèsyon presi"
-    },
-    "avatar": {
-      "arcade": "Jwèt akad",
-      "brain": "Sèvo",
-      "creature": "Kreyati",
-      "crystal": "Kristal",
-      "custom": "Avatar pèsonalize",
-      "dragon": "Dragon mitik",
-      "explorer": "Eksploratè",
-      "flame": "Flanm",
-      "lightning": "Zèklè",
-      "magicWand": "Baton majik",
-      "moon": "Lalin",
-      "operator": "Operatè",
-      "orbit": "Òbit",
-      "oracle": "Orak",
-      "rainbow": "Lakansyèl",
-      "robot": "Wobo",
-      "satellite": "Satelit",
-      "sparkles": "Etensèl",
-      "strongArm": "Bra fò",
-      "talisman": "Gad pwoteksyon"
-    },
-    "remoteSpawnFilesNotSupported": "Enstans sa a pa ka resevwa fichye.",
-    "instanceSwitcherTitle": "Enstans KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Deplase {{filename}} agoch",
       "moveRight": "Deplase {{filename}} adwat"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Kole imaj ki nan près-papye a",
-      "label": "Gen yon imaj, peze pou kole li"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Bibliyotèk foto",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Dekonekte aparèy sa a?",
     "signOutThisSessionTitle": "Dekonekte sesyon sa a?",
     "signOutThisSessionMessage": "{{device}} ap dekonekte. Li ka kenbe aksè nan API a pou jiska inèdtan.",
-    "webBrowser": "Navigatè entènèt"
+    "webBrowser": "Navigatè entènèt",
+    "unknownDevice": "Aparèy enkoni"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Pa t ka louvri magazen aplikasyon an.",

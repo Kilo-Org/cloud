@@ -101,12 +101,9 @@
     "scheduled": "Agendada",
     "keepEditing": "Continuar a editar",
     "keepRunning": "Continuar em execução",
-    "kiloclaw": "KiloClaw",
     "newSession": "Nova sessão",
-    "noKiloclawInstances": "Sem instâncias do KiloClaw",
     "noModelsAvailable": "Sem modelos disponíveis",
     "notFound": "Conteúdo não encontrado.",
-    "online": "Em linha",
     "open": "Abrir {{name}}",
     "openPullRequest": "Abrir PR",
     "pending": "Pendente",
@@ -257,7 +254,8 @@
     "renamePasskey": "Renomear a chave de acesso",
     "removePasskey": "Remover a chave de acesso",
     "removePasskeyTitle": "Remover a chave de acesso?",
-    "removePasskeyMessage": "Já não vais poder iniciar sessão com esta chave de acesso."
+    "removePasskeyMessage": "Já não vais poder iniciar sessão com esta chave de acesso.",
+    "changelog": "Novidades"
   },
   "preferences": {
     "general": "Geral",
@@ -848,23 +846,18 @@
     "previewGenericDescription": "As notificações indicam que há novidades. Abra o Kilo para ler a mensagem.",
     "channel": {
       "agentProgress": "Progresso do agente",
-      "chat": "Mensagens da conversa",
-      "kiloclaw": "Atividade do KiloClaw",
       "balance": "Alertas de saldo",
       "security": "Ocorrências de segurança",
       "spend": "Alertas de gastos",
       "followedSessions": "Sessões seguidas"
     },
     "category": {
-      "chatMessagesSubtitle": "respostas nas suas conversas",
       "agentAttentionTitle": "O agente precisa de si",
       "agentAttentionSubtitle": "perguntas, pedidos de permissão e de resposta",
       "agentUpdatesTitle": "Atualizações do agente",
       "agentUpdatesSubtitle": "mensagens do agente durante a tarefa",
       "sessionStatusTitle": "Estado da sessão",
       "sessionStatusSubtitle": "concluída / com erro / pronta para controlo",
-      "kiloclawActivitySubtitle": "instância pronta ou com erro, ações agendadas",
-      "kiloclawActivityUnavailable": "Inicie uma instância do KiloClaw para receber atividade do KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
       "balanceAlertsUnavailable": "Junte-se a uma organização para receber alertas de saldo.",
       "securityFindingsSubtitle": "novas ocorrências e lembretes de SLA",
@@ -884,72 +877,19 @@
   },
   "tabs": {
     "home": "Início",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, separador, {{position}} de {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Mudar de instância",
-      "couldNotLoadInstances": "Não foi possível carregar as instâncias.",
-      "noInstancesDescription": "Configura uma instância para começar a conversar.",
-      "setUpKiloclaw": "Configurar KiloClaw",
-      "currentInstance": "{{title}}, atual"
-    },
     "conversation": {
-      "failedToLoad": "Não foi possível carregar a conversa.",
-      "notFound": "Não foi possível encontrar a conversa.",
       "untitled": "Sem título",
-      "leaveTitle": "Sair da conversa?",
-      "leaveMessage": "A conversa será removida da tua lista.",
-      "openHint": "Abre a conversa. Mantém premido para ver as opções de mudar o nome e sair.",
-      "unread": "Por ler",
-      "optionsFor": "Opções da conversa {{title}}",
-      "options": "Opções da conversa",
-      "renameTitle": "Mudar nome da conversa",
-      "renamePlaceholder": "Novo nome",
-      "couldNotReachBot": "Não foi possível contactar o bot. Tenta novamente.",
-      "messageDeliveryFailed": "Não foi possível entregar a mensagem ao bot.",
-      "couldNotSignIn": "Não foi possível iniciar sessão na conversa.",
-      "couldNotRefreshMessages": "Não foi possível atualizar as mensagens.",
-      "couldNotLoadHistory": "Não foi possível carregar o histórico da conversa.",
-      "leave": "Sair",
-      "untitledConversation": "Conversa sem título",
-      "createFailed": "Não foi possível criar a conversa.",
-      "leaveFailed": "Não foi possível sair da conversa."
-    },
-    "reactions": {
-      "common": "Comuns",
-      "reactWith": "Reagir com {{reaction}}",
-      "accessibility": "Reação {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "A responder a",
-      "cancelReply": "Cancelar resposta",
-      "openInstance": "Abrir instância",
-      "attachFile": "Anexar ficheiro",
-      "cancelEdit": "Cancelar edição"
+      "renamePlaceholder": "Novo nome"
     },
     "conversationList": {
-      "couldNotLoad": "Não foi possível carregar as conversas.",
-      "emptyTitle": "Ainda sem conversas",
-      "emptyDescription": "Cria uma conversa para começar a falar com a tua instância do KiloClaw.",
-      "create": "Criar conversa",
-      "newConversation": "Nova conversa",
-      "openInstanceSettings": "Abrir definições da instância",
       "today": "Hoje",
       "yesterday": "Ontem",
-      "thisWeek": "Esta semana",
       "older": "Mais antigas"
     },
     "attachment": {
-      "open": "Abrir {{filename}}",
-      "openFailed": "Não foi possível abrir o anexo. Verifica a tua ligação e tenta novamente.",
-      "attachFailed": "Não foi possível anexar o ficheiro.",
-      "limit": "Podes anexar até {{displayCount}} ficheiros.",
-      "sizeRejection": "{{filename}} excede o limite de {{limit}} por anexo.",
-      "unreadable": "Não foi possível ler {{filename}}.",
-      "pastedImage": "a imagem colada",
-      "defaultName": "Anexo",
       "classificationDenied": "Não é possível anexar ficheiros executáveis.",
       "classificationEmpty": "O ficheiro está vazio.",
       "classificationTooLarge": "Os ficheiros têm de ter, no máximo, 20 MB.",
@@ -959,429 +899,17 @@
       "networkError": "Ocorreu um erro de rede.",
       "uploadFailed": "Não foi possível enviar o anexo.",
       "nothingToPaste": "Não há nada para colar.",
-      "metadataStripFailed": "Não foi possível remover os metadados da fotografia.",
-      "limit_one": "Podes anexar até {{displayCount}} ficheiro.",
-      "limit_other": "Podes anexar até {{displayCount}} ficheiros.",
-      "limit_many": "Podes anexar até {{displayCount}} ficheiros."
+      "metadataStripFailed": "Não foi possível remover os metadados da fotografia."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}: {{status}}",
-      "retryUploading": "Tentar enviar {{filename}} novamente",
-      "remove": "Remover {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[mensagem eliminada]",
-      "yourMessage": "A tua mensagem",
-      "messageFrom": "Mensagem de {{author}}",
-      "moreActions": "Mais ações",
-      "notDelivered": "Não entregue",
-      "edited": "(editada)",
-      "image": "Imagem"
+      "accessibility": "{{filename}}: {{status}}"
     },
     "messageActions": {
-      "copied": "Copiado",
-      "copyFailed": "Não foi possível copiar.",
-      "title": "Ações da mensagem",
-      "deleteTitle": "Eliminar mensagem?",
-      "deleteMessage": "A mensagem será removida da conversa.",
-      "deleteFailed": "Não foi possível eliminar a mensagem.",
-      "removeReactionFailed": "Não foi possível remover a reação.",
-      "addReactionFailed": "Não foi possível adicionar a reação.",
-      "retrySend": "Repetir envio",
-      "moreReactions": "Mais reações",
-      "edit": "Editar",
-      "sendFailed": "Não foi possível enviar a mensagem.",
-      "retrySendFailed": "Não foi possível repetir o envio.",
-      "editFailed": "Não foi possível editar a mensagem.",
-      "executeFailed": "Não foi possível executar a ação."
+      "edit": "Editar"
     },
     "attachmentPicker": {
-      "takePhoto": "Tirar fotografia",
-      "photoLibrary": "Biblioteca de fotografias",
-      "files": "Ficheiros",
       "cameraAccessMessage": "Permite o acesso à câmara nas definições para tirar uma fotografia."
-    },
-    "typingIndicator": {
-      "someone": "Alguém",
-      "typing_one": "{{name}} está a escrever...",
-      "typing": "{{names}} estão a escrever...",
-      "typing_other": "{{names}} estão a escrever...",
-      "typing_many": "{{names}} estão a escrever…"
-    },
-    "botStatus": {
-      "offline": "Sem ligação",
-      "loadingUser": "A carregar o utilizador...",
-      "waitingForStatus": "A aguardar o estado do bot...",
-      "offlineMessage": "O bot está sem ligação. A troca de mensagens será retomada quando voltar a ligar-se."
-    },
-    "errors": {
-      "notAllowed": "Esta ação não é permitida.",
-      "messageTooLong": "A mensagem é demasiado longa. Usa menos de {{limit}} caracteres.",
-      "titleTooLong": "O título é demasiado longo. Usa menos de {{limit}} caracteres.",
-      "messageEmpty": "A mensagem não pode estar vazia."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Não foi possível carregar as instâncias do KiloClaw.",
-    "billing": {
-      "title": "Faturação",
-      "continueMonthToMonth": "Continuar com um plano mensal",
-      "plan": "Plano",
-      "finalTermEnds": "Fim do último período",
-      "afterFinalTerm": "Após o último período",
-      "lessThanOneDay": "Menos de 1 dia",
-      "ends": "Termina",
-      "expires": "Expira",
-      "noActivePlan": "Sem plano ativo",
-      "noActivePlanDescription": "Não tens uma subscrição ativa do KiloClaw.",
-      "managedByAdmin": "O administrador da tua organização gere a faturação.",
-      "couldNotLoad": "Não foi possível carregar os dados de faturação.",
-      "manageOnWeb": "Gerir faturação no site",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "O teu último período do plano Commit termina em {{date}}. Continua com o plano Standard por {{price}}. Caso contrário, o alojamento termina.",
-      "freeTrial": "Período experimental gratuito",
-      "hostingEnds": "O alojamento termina",
-      "renews": "Renova em",
-      "standardMonthToMonth": "Standard mensal",
-      "standardStartsOn": "O plano Standard começa em {{date}} por {{price}}.",
-      "yourStandardMonthlyPrice": "o teu preço mensal do plano Standard",
-      "perMonth": "/mês",
-      "earlybirdAccessUntil": "O acesso Earlybird termina em {{date}}.",
-      "earlybirdEnding": "O acesso Earlybird termina dentro de {{remaining}}.",
-      "paymentPastDue": "O pagamento está em atraso. Atualiza o teu método de pagamento.",
-      "subscriptionCancels": "A subscrição será cancelada em {{date}}.",
-      "trialDaysRemaining": "O período experimental termina dentro de {{remaining}}.",
-      "trialEndingSoon": "O período experimental está quase a terminar: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Novidades",
-      "couldNotLoad": "Não foi possível carregar o registo de alterações.",
-      "noUpdates": "Ainda sem atualizações",
-      "noUpdatesDescription": "As entradas do registo de alterações aparecerão aqui.",
-      "recentUpdates": "Atualizações recentes",
-      "manageVersion": "Gerir versão",
-      "redeployRequired": "Nova publicação necessária",
-      "redeploySuggested": "Nova publicação recomendada",
-      "upgradeRequired": "Atualização necessária"
-    },
-    "dashboard": {
-      "title": "Painel",
-      "couldNotLoad": "Não foi possível carregar o painel.",
-      "renameInstance": "Renomear instância",
-      "renamePlaceholder": "Novo nome (máx. 50 caracteres)",
-      "someDetailsFailed": "Não foi possível carregar alguns dados em tempo real.",
-      "destroy": "Destruir",
-      "destroyMessage": "A tua instância do KiloClaw e todos os seus dados serão destruídos de forma permanente. Não é possível anular esta ação.",
-      "destroyTitle": "Destruir instância",
-      "instance": "Instância",
-      "couldNotCheckStatus": "Não foi possível verificar o estado do serviço.",
-      "dangerZone": "ZONA DE PERIGO",
-      "destroying": "A destruir…",
-      "serviceDegraded": "Serviço com problemas — toca para ver o estado",
-      "up": "ATIVO"
-    },
-    "channels": {
-      "title": "Canais",
-      "couldNotLoad": "Não foi possível carregar os canais.",
-      "noChannels": "Sem canais disponíveis",
-      "noChannelsDescription": "As integrações de canais aparecerão aqui.",
-      "connected": "{{label}} ligado",
-      "disconnectMessage": "Remover {{label}}? Este canal será desligado.",
-      "disconnectTitle": "Desligar canal"
-    },
-    "devicePairing": {
-      "title": "Emparelhamento de dispositivos",
-      "refreshRequests": "Atualizar pedidos de emparelhamento",
-      "couldNotLoad": "Não foi possível carregar os pedidos de emparelhamento.",
-      "noPending": "Sem pedidos pendentes",
-      "noPendingDescription": "Os pedidos de emparelhamento de canais e dispositivos aparecerão aqui.",
-      "channelRequests": "Pedidos de canais",
-      "deviceRequests": "Pedidos de dispositivos",
-      "approveDeviceMessage": "Permitir que {{platform}} se ligue à tua instância?",
-      "approveDeviceTitle": "Aprovar dispositivo",
-      "approveMessage": "Permitir que {{label}} (código: {{code}}) se ligue à tua instância?",
-      "approveTitle": "Aprovar pedido de emparelhamento",
-      "unknownDevice": "Dispositivo desconhecido"
-    },
-    "execPolicy": {
-      "title": "Política de execução",
-      "couldNotLoad": "Não foi possível carregar a política de execução.",
-      "alwaysAsk": "Perguntar sempre",
-      "alwaysAskDescription": "Pede confirmação antes de executar cada comando. É a opção mais segura.",
-      "neverAsk": "Nunca perguntar",
-      "neverAskDescription": "Executa os comandos sem pedir confirmação. É mais rápido, mas menos seguro."
-    },
-    "google": {
-      "title": "Conta Google",
-      "couldNotLoad": "Não foi possível carregar o estado da conta Google.",
-      "disconnected": "A conta Google foi desligada. Volta a publicar a tua instância para aplicar a alteração.",
-      "setupCommand": "Comando de configuração",
-      "setupCommandHelp": "No teu computador, com o Docker instalado, executa este comando num terminal para ligar a tua conta Google.",
-      "failedToLoadCommand": "Não foi possível carregar o comando de configuração.",
-      "gmailNotifications": "Notificações do Gmail",
-      "disconnect": "Desligar conta Google",
-      "copied": "Copiado",
-      "copyCommand": "Copiar comando",
-      "disconnectConfirm": "Desligar",
-      "disconnectMessage": "Remover a tua conta Google desta instância? As notificações do Gmail serão desativadas. Depois de desligar a conta, volta a publicar a instância para aplicar as alterações.",
-      "disconnectTitle": "Desligar Google"
-    },
-    "modelList": {
-      "noMatches": "Nenhum modelo corresponde à tua pesquisa",
-      "noModelsDescription": "Os modelos aparecerão aqui quando estiverem disponíveis.",
-      "noResultsFor": "Não há resultados para \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Segredos",
-      "couldNotLoad": "Não foi possível carregar os segredos.",
-      "noSecrets": "Sem segredos disponíveis",
-      "noSecretsDescription": "As integrações de segredos aparecerão aqui.",
-      "removeMessage": "Remover {{label}}? Esta ferramenta perderá o acesso às suas credenciais.",
-      "removeTitle": "Remover segredo",
-      "saved": "{{label}} guardado",
-      "hide": "Ocultar {{label}}",
-      "show": "Mostrar {{label}}",
-      "allFieldsRequired": "Todos os campos são obrigatórios para ligar {{label}}.",
-      "setupGuideFallback": "guia de configuração",
-      "setupGuideA11y": "guia de configuração de {{label}}",
-      "setupGuide": "Guia de configuração",
-      "saving": "A guardar…",
-      "removing": "A remover…",
-      "updateToken": "Atualizar token"
-    },
-    "versionPin": {
-      "title": "Fixação de versão",
-      "couldNotLoad": "Não foi possível carregar as informações da versão.",
-      "couldNotLoadMore": "Não foi possível carregar mais versões.",
-      "loadMore": "Carregar mais versões",
-      "showingLatest": "São apresentadas as 100 versões mais recentes.",
-      "availableVersions": "Versões disponíveis",
-      "noVersions": "Sem versões disponíveis",
-      "noVersionsDescription": "As versões disponíveis do OpenClaw aparecerão aqui.",
-      "unpin": "Desafixar",
-      "unpinMessage": "Voltar para a versão mais recente disponível?",
-      "unpinTitle": "Desafixar versão",
-      "confirmPin": "Confirmar fixação",
-      "followingLatest": "Segue a versão mais recente",
-      "latest": "mais recente",
-      "pin": "Fixar",
-      "pinnedByAdmin": "A versão foi fixada pelo administrador. Contacta-o para a alterar.",
-      "pinnedTo": "Fixada em {{version}}",
-      "reasonOptional": "Motivo (opcional)",
-      "reasonPlaceholder": "Motivo para fixar esta versão",
-      "replaceAdminPin": "Substituir fixação do administrador",
-      "replacesAdminPin": "Isto substitui a fixação definida pelo administrador (atualmente {{label}})."
-    },
-    "redeploy": "Voltar a implementar",
-    "redeployMessage": "Tens a certeza de que queres voltar a publicar esta instância?",
-    "redeployTitle": "Voltar a publicar a instância",
-    "controls": {
-      "redeploying": "A publicar novamente…",
-      "restart": "Reiniciar",
-      "restartOpenClawMessage": "Tens a certeza de que queres reiniciar o processo do OpenClaw?",
-      "restartOpenClawTitle": "Reiniciar OpenClaw",
-      "restarting": "A reiniciar…",
-      "start": "Iniciar",
-      "startMessage": "Tens a certeza de que queres iniciar esta instância?",
-      "startTitle": "Iniciar instância",
-      "stop": "Parar",
-      "stopMessage": "Tens a certeza de que queres parar esta instância?",
-      "stopTitle": "Parar instância",
-      "stopping": "A parar…"
-    },
-    "empty": {
-      "finishingSetup": "A concluir a configuração",
-      "finishingSetupDescription": "Estamos a concluir a configuração da tua conta. Normalmente demora apenas uns instantes.",
-      "getStarted": "Começar",
-      "noInstancesDescription": "Cria a tua primeira instância para começar a executar agentes de programação."
-    },
-    "instance": {
-      "backToInstances": "Voltar às instâncias",
-      "couldNotLoad": "Não foi possível carregar a instância.",
-      "notFound": "Instância não encontrada",
-      "notFoundDescription": "Esta instância pode ter sido destruída ou a ligação já não é válida."
-    },
-    "list": {
-      "createInstance": "Criar instância",
-      "organizations": "Organizações",
-      "accessIssue": {
-        "trialExpired": "O período experimental terminou — subscreve para continuar a usar esta instância",
-        "subscriptionCanceled": "Subscrição inativa — subscreve novamente para continuar a usar esta instância",
-        "subscriptionPastDue": "Problema de pagamento — atualiza os dados de faturação para continuar a usar esta instância",
-        "quarantined": "Instância em quarentena — é necessária uma revisão manual",
-        "multipleCurrentConflict": "Conta a precisar de revisão",
-        "nonCanonicalEarlybird": "O plano antigo precisa de revisão"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Conversar com {{name}}",
-        "ready": "{{name}} está pronto",
-        "warmedUp": "Está tudo pronto. Diz olá quando quiseres."
-      },
-      "flow": {
-        "genericErrorBody": "Não conseguimos concluir a configuração da tua instância neste momento.",
-        "manualReviewBody": "Precisamos de rever a tua conta antes de criar uma instância. Continua em kilo.ai.",
-        "manualReviewTitle": "É necessária uma revisão manual da configuração",
-        "openKiloAi": "Abrir kilo.ai",
-        "provisioning": "Preparação da instância",
-        "review": "Revisão",
-        "identityTitle": "Identidade do teu assistente",
-        "couldNotLoad": "Não foi possível carregar o estado da configuração inicial.",
-        "finishingSetup": "Estamos a concluir a configuração da tua conta. Aguarda uns instantes.",
-        "ready": "Pronto",
-        "settingUp": "A configurar…"
-      },
-      "unavailableDescription": "É necessária uma subscrição ativa do KiloClaw para preparar uma instância. As instâncias e subscrições existentes continuam a funcionar normalmente.",
-      "unavailableTitle": "Não é possível criar novas instâncias do KiloClaw",
-      "identity": {
-        "chooseAvatar": "Escolher avatar",
-        "namePlaceholder": "Nome do teu assistente",
-        "selectAvatar": "Selecionar {{name}} como avatar",
-        "personality": "Personalidade",
-        "changePersonality": "Alterar personalidade",
-        "location": "Localização",
-        "locationPlaceholder": "Cidade ou região (opcional)",
-        "useCurrentLocation": "Usar a localização atual",
-        "locationDeniedTitle": "Acesso à localização negado",
-        "locationDeniedMessage": "Ativa o acesso à localização nas definições para usar a tua localização atual.",
-        "locationValidationFailed": "Não foi possível validar a localização.",
-        "locationResolveFailed": "Não foi possível identificar a tua localização. Podes editá-la manualmente.",
-        "locationGetFailed": "Não foi possível obter a tua localização. Introduz a localização manualmente.",
-        "nature": {
-          "aiAssistantLabel": "Assistente de IA",
-          "aiAssistantVibe": "Prestável, capaz, profissional",
-          "digitalCreatureLabel": "Criatura digital",
-          "digitalCreatureVibe": "Peculiar, viva, um pouco imprevisível",
-          "virtualCompanionLabel": "Companheiro virtual",
-          "virtualCompanionVibe": "Afetuoso, presente, atento ao que sentes",
-          "somethingWeirderLabel": "Algo mais estranho…",
-          "somethingWeirderVibe": "Define à tua maneira"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Já está! Preparei o resumo que pediste. Podes vê-lo quando quiseres.",
-        "settingUp": "A configurar notificações…",
-        "stayInTheLoop": "A par de tudo",
-        "getNotified": "Recebe uma notificação quando {{name}} terminar uma tarefa, para não perderes nenhuma resposta.",
-        "now": "agora",
-        "skipForNow": "Adiar por agora",
-        "couldNotEnable": "Não foi possível ativar as notificações."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Não foi possível verificar a configuração",
-        "queryErrorBody": "Perdemos a ligação ao verificar a configuração de {{name}}. A configuração pode ainda estar em curso. Tenta novamente ou volta daqui a pouco.",
-        "stoppedTitle": "Configuração interrompida",
-        "stoppedBody": "A instância de {{name}} parou inesperadamente durante a configuração.",
-        "stalledTitle": "A configuração deixou de avançar",
-        "stalledBody": "Não conseguimos concluir a configuração de {{name}}. Tenta novamente. Se o problema persistir, envia um email para {{supportEmail}}.",
-        "timeoutTitle": "A demorar mais do que o esperado",
-        "timeoutBody": "A configuração de {{name}} está a demorar mais do que o habitual (mais de {{displayMinutes}} minutos).",
-        "continueInBackground": "Continuar em segundo plano",
-        "settingUp": "A configurar {{name}}",
-        "connectingToAgent": "A ligar ao agente",
-        "startingSandbox": "A iniciar o ambiente isolado",
-        "backgroundHint": "Normalmente demora menos de um minuto. Podes fechar este ecrã. Continuaremos a trabalhar em segundo plano."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Código {{code}}",
-      "gatewayProcess": "PROCESSO DO GATEWAY",
-      "lastExit": "Último encerramento",
-      "memory": "Memória",
-      "region": "Região",
-      "resources": "RECURSOS",
-      "restarts": "Reinícios",
-      "state": "Estado",
-      "uptime": "Tempo de atividade",
-      "crashed": "FALHOU",
-      "destroying": "A DESTRUIR",
-      "provisioned": "PREPARADO",
-      "restarting": "A REINICIAR",
-      "running": "EM EXECUÇÃO",
-      "shuttingDown": "A ENCERRAR",
-      "starting": "A INICIAR",
-      "stopped": "PARADO",
-      "stopping": "A PARAR",
-      "unknown": "DESCONHECIDO",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Avançado",
-      "frontierDescription": "Oferece o máximo desempenho. Encaminha os pedidos para os modelos mais avançados, com raciocínio.",
-      "balancedDescription": "Equilíbrio inteligente entre velocidade e capacidade a um custo menor.",
-      "autoModelA11y": "modelo automático {{label}}",
-      "currentModel": "Modelo atual",
-      "browseAllModels": "ou escolhe entre mais de 500 modelos",
-      "browseAllModelsA11y": "Ver os mais de 500 modelos"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Para continuar a usar o KiloClaw, abre kilo.ai/claw no teu navegador. Não é possível subscrever na aplicação.",
-      "subscriptionCanceledTitle": "Subscrever no site",
-      "subscriptionCanceledBody": "Para usar o KiloClaw, abre kilo.ai/claw no teu navegador. Não é possível subscrever na aplicação.",
-      "subscriptionCanceledCta": "Abrir kilo.ai/claw",
-      "subscriptionPastDueTitle": "Atualizar o pagamento no site",
-      "subscriptionPastDueBody": "Ocorreu um problema com o teu último pagamento. Abre kilo.ai/claw no teu navegador para atualizar os dados de pagamento. Não é possível gerir a faturação na aplicação.",
-      "quarantinedTitle": "É necessário recuperar a instância",
-      "quarantinedBody": "A tua instância do KiloClaw está em quarentena e não pode ser usada neste momento. É necessária a ajuda da nossa equipa para a recuperar.",
-      "multipleCurrentConflictBody": "Encontrámos mais de uma subscrição ativa na tua conta. Suspendemos o acesso para evitar cobranças duplicadas.",
-      "multipleCurrentConflictCta": "Continuar em kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Plano antigo detetado",
-      "nonCanonicalEarlybirdBody": "O teu plano de acesso antecipado precisa de uma revisão manual antes de o poderes usar no telemóvel.",
-      "iosTitle": "KiloClaw indisponível no iOS",
-      "iosBody": "O acesso ao KiloClaw é gerido fora da aplicação iOS para esta conta.",
-      "iosContact": "Tens dúvidas? Envia um email para {{supportEmail}}.",
-      "quarantinedCta": "Enviar um e-mail à nossa equipa",
-      "nonCanonicalEarlybirdCta": "Rever o teu plano em kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} necessita de atenção: {{label}}",
-      "openUnread_one": "Abrir {{name}}, {{displayCount}} mensagem não lida",
-      "openUnread": "Abrir {{name}}, {{displayCount}} mensagens não lidas",
-      "openUnread_other": "Abrir {{name}}, {{displayCount}} mensagens não lidas",
-      "openSettings": "Abrir as definições de {{name}}",
-      "fixOnKiloAi": "Corrigir em kilo.ai: {{label}}",
-      "openUnread_many": "Abrir {{name}}, {{displayCount}} mensagens não lidas"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Aprovar pedidos de dispositivos",
-      "execPolicyDescription": "Definições de segurança",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Seleção de modelo de IA",
-      "secretsDescription": "Credenciais encriptadas",
-      "versionPinDescription": "Fixar numa versão específica"
-    },
-    "avatar": {
-      "arcade": "Máquina de jogos",
-      "brain": "Cérebro",
-      "creature": "Criatura",
-      "crystal": "Cristal",
-      "custom": "Avatar personalizado",
-      "dragon": "Dragão",
-      "explorer": "Explorador",
-      "flame": "Chama",
-      "lightning": "Relâmpago",
-      "magicWand": "Varinha mágica",
-      "moon": "Lua",
-      "operator": "Operador",
-      "orbit": "Órbita",
-      "oracle": "Oráculo",
-      "rainbow": "Arco-íris",
-      "robot": "Robô",
-      "satellite": "Satélite",
-      "sparkles": "Brilhos",
-      "strongArm": "Braço forte",
-      "talisman": "Talismã"
-    },
-    "remoteSpawnFilesNotSupported": "Esta instância não pode receber ficheiros.",
-    "instanceSwitcherTitle": "Instância KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2575,10 +2103,6 @@
       "moveLeft": "Mover {{filename}} para a esquerda",
       "moveRight": "Mover {{filename}} para a direita"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Colar imagem da área de transferência",
-      "label": "Colar imagem detetada"
-    },
     "attachmentPicker": {
       "camera": "Câmara",
       "photoLibrary": "Biblioteca de fotografias",
@@ -2780,7 +2304,8 @@
     "signOutThisDeviceTitle": "Terminar sessão neste dispositivo?",
     "signOutThisSessionTitle": "Terminar esta sessão?",
     "signOutThisSessionMessage": "A sessão em {{device}} será terminada. O dispositivo pode manter o acesso à API durante até uma hora.",
-    "webBrowser": "Navegador web"
+    "webBrowser": "Navegador web",
+    "unknownDevice": "Dispositivo desconhecido"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Não foi possível abrir a loja de aplicações.",

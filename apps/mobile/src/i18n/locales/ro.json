@@ -101,12 +101,9 @@
     "scheduled": "Programată",
     "keepEditing": "Continuă editarea",
     "keepRunning": "Continuă rularea",
-    "kiloclaw": "KiloClaw",
     "newSession": "Sesiune nouă",
-    "noKiloclawInstances": "Nicio instanță KiloClaw",
     "noModelsAvailable": "Niciun model disponibil",
     "notFound": "Elementul nu a fost găsit.",
-    "online": "Conectat",
     "open": "Deschide {{name}}",
     "openPullRequest": "Deschidere PR",
     "pending": "În așteptare",
@@ -257,7 +254,8 @@
     "renamePasskey": "Redenumește cheia de acces",
     "removePasskey": "Elimină cheia de acces",
     "removePasskeyTitle": "Elimini cheia de acces?",
-    "removePasskeyMessage": "Nu te vei mai putea autentifica cu această cheie de acces."
+    "removePasskeyMessage": "Nu te vei mai putea autentifica cu această cheie de acces.",
+    "changelog": "Noutăți"
   },
   "preferences": {
     "general": "General",
@@ -848,23 +846,18 @@
     "previewGenericDescription": "Notificările semnalează activitatea fără a afișa textul mesajului. Deschide Kilo pentru a-l citi.",
     "channel": {
       "agentProgress": "Progresul agenților",
-      "chat": "Mesaje din conversații",
-      "kiloclaw": "Activitate KiloClaw",
       "balance": "Alerte privind soldul",
       "security": "Probleme de securitate detectate",
       "spend": "Alerte de cheltuieli",
       "followedSessions": "Sesiuni urmărite"
     },
     "category": {
-      "chatMessagesSubtitle": "răspunsuri în conversațiile tale",
       "agentAttentionTitle": "Agentul are nevoie de tine",
       "agentAttentionSubtitle": "întrebări, solicitări de permisiune sau de informații",
       "agentUpdatesTitle": "Noutăți de la agent",
       "agentUpdatesSubtitle": "mesaje de la agent în timpul executării sarcinii",
       "sessionStatusTitle": "Starea sesiunii",
       "sessionStatusSubtitle": "finalizată / eșuată / pregătită pentru control",
-      "kiloclawActivitySubtitle": "instanță pregătită sau eșuată, acțiuni programate",
-      "kiloclawActivityUnavailable": "Pornește o instanță KiloClaw pentru a primi activitate KiloClaw.",
       "balanceAlertsSubtitle": "avertismente de sold scăzut al organizației",
       "balanceAlertsUnavailable": "Alătură-te unei organizații pentru a primi alerte de sold.",
       "securityFindingsSubtitle": "constatări noi și mementouri SLA",
@@ -884,72 +877,19 @@
   },
   "tabs": {
     "home": "Acasă",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, filă, {{position}} din {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Schimbarea instanței",
-      "couldNotLoadInstances": "Nu s-au putut încărca instanțele.",
-      "noInstancesDescription": "Configurează o instanță pentru a începe conversația.",
-      "setUpKiloclaw": "Configurează KiloClaw",
-      "currentInstance": "{{title}}, instanța curentă"
-    },
     "conversation": {
-      "failedToLoad": "Nu s-a putut încărca conversația.",
-      "notFound": "Conversația nu a fost găsită.",
       "untitled": "Fără titlu",
-      "leaveTitle": "Părăsești conversația?",
-      "leaveMessage": "Conversația va fi eliminată din lista ta.",
-      "openHint": "Deschide conversația. Apasă lung pentru opțiunile de redenumire și părăsire.",
-      "unread": "Necitită",
-      "optionsFor": "Opțiuni pentru conversația {{title}}",
-      "options": "Opțiunile conversației",
-      "renameTitle": "Redenumirea conversației",
-      "renamePlaceholder": "Noul nume",
-      "couldNotReachBot": "Nu s-a putut stabili conexiunea cu botul. Încearcă din nou.",
-      "messageDeliveryFailed": "Mesajul nu a putut fi livrat botului.",
-      "couldNotSignIn": "Nu s-a putut efectua autentificarea în chat.",
-      "couldNotRefreshMessages": "Nu s-au putut actualiza mesajele.",
-      "couldNotLoadHistory": "Nu s-a putut încărca istoricul conversației.",
-      "leave": "Părăsește",
-      "untitledConversation": "Conversație fără titlu",
-      "createFailed": "Nu s-a putut crea conversația.",
-      "leaveFailed": "Nu s-a putut părăsi conversația."
-    },
-    "reactions": {
-      "common": "Frecvente",
-      "reactWith": "Reacționează cu {{reaction}}",
-      "accessibility": "Reacție {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Răspunzi la",
-      "cancelReply": "Anulează răspunsul",
-      "openInstance": "Deschide instanța",
-      "attachFile": "Atașează un fișier",
-      "cancelEdit": "Anulează editarea"
+      "renamePlaceholder": "Noul nume"
     },
     "conversationList": {
-      "couldNotLoad": "Nu s-au putut încărca conversațiile.",
-      "emptyTitle": "Încă nu există conversații",
-      "emptyDescription": "Creează o conversație pentru a discuta cu instanța ta KiloClaw.",
-      "create": "Creează o conversație",
-      "newConversation": "Conversație nouă",
-      "openInstanceSettings": "Deschide setările instanței",
       "today": "Astăzi",
       "yesterday": "Ieri",
-      "thisWeek": "Săptămâna aceasta",
       "older": "Mai vechi"
     },
     "attachment": {
-      "open": "Deschide {{filename}}",
-      "openFailed": "Nu s-a putut deschide atașamentul. Verifică conexiunea și încearcă din nou.",
-      "attachFailed": "Nu s-a putut atașa fișierul.",
-      "limit": "Poți atașa cel mult {{displayCount}} fișiere.",
-      "sizeRejection": "{{filename}} depășește dimensiunea maximă de {{limit}} pentru un atașament.",
-      "unreadable": "Nu s-a putut citi {{filename}}.",
-      "pastedImage": "imaginea lipită",
-      "defaultName": "Atașament",
       "classificationDenied": "Fișierele executabile nu pot fi atașate.",
       "classificationEmpty": "Fișierul este gol.",
       "classificationTooLarge": "Dimensiunea fișierelor nu poate depăși 20 MB.",
@@ -959,429 +899,17 @@
       "networkError": "A apărut o eroare de rețea.",
       "uploadFailed": "Încărcarea a eșuat.",
       "nothingToPaste": "Nu există nimic de lipit.",
-      "metadataStripFailed": "Nu s-au putut elimina metadatele fotografiei.",
-      "limit_one": "Poți atașa cel mult {{displayCount}} fișier.",
-      "limit_other": "Poți atașa cel mult {{displayCount}} fișiere.",
-      "limit_few": "Poți atașa cel mult {{displayCount}} fișiere."
+      "metadataStripFailed": "Nu s-au putut elimina metadatele fotografiei."
     },
     "attachmentPreview": {
-      "accessibility": "Fișier: {{filename}}, stare: {{status}}",
-      "retryUploading": "Reîncearcă încărcarea fișierului {{filename}}",
-      "remove": "Elimină {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[mesaj șters]",
-      "yourMessage": "Mesajul tău",
-      "messageFrom": "Mesaj de la {{author}}",
-      "moreActions": "Mai multe acțiuni",
-      "notDelivered": "Nelivrat",
-      "edited": "(editat)",
-      "image": "Imagine"
+      "accessibility": "Fișier: {{filename}}, stare: {{status}}"
     },
     "messageActions": {
-      "copied": "Copiat",
-      "copyFailed": "Copierea a eșuat.",
-      "title": "Acțiuni pentru mesaj",
-      "deleteTitle": "Ștergi mesajul?",
-      "deleteMessage": "Mesajul va fi eliminat din conversație.",
-      "deleteFailed": "Nu s-a putut șterge mesajul.",
-      "removeReactionFailed": "Nu s-a putut elimina reacția.",
-      "addReactionFailed": "Nu s-a putut adăuga reacția.",
-      "retrySend": "Reîncearcă trimiterea",
-      "moreReactions": "Mai multe reacții",
-      "edit": "Editează",
-      "sendFailed": "Nu s-a putut trimite mesajul.",
-      "retrySendFailed": "Nu s-a putut retrimite mesajul.",
-      "editFailed": "Nu s-a putut edita mesajul.",
-      "executeFailed": "Nu s-a putut executa acțiunea."
+      "edit": "Editează"
     },
     "attachmentPicker": {
-      "takePhoto": "Fă o fotografie",
-      "photoLibrary": "Galerie foto",
-      "files": "Fișiere",
       "cameraAccessMessage": "Permite accesul la cameră în Setări pentru a face o fotografie."
-    },
-    "typingIndicator": {
-      "someone": "Cineva",
-      "typing_one": "{{name}} scrie…",
-      "typing": "{{names}} scriu...",
-      "typing_other": "{{names}} scriu...",
-      "typing_few": "{{names}} scriu..."
-    },
-    "botStatus": {
-      "offline": "Deconectat",
-      "loadingUser": "Se încarcă utilizatorul…",
-      "waitingForStatus": "Se așteaptă starea botului…",
-      "offlineMessage": "Botul este deconectat. Schimbul de mesaje va fi reluat când se reconectează."
-    },
-    "errors": {
-      "notAllowed": "Acțiunea nu este permisă.",
-      "messageTooLong": "Mesajul este prea lung. Folosește mai puțin de {{limit}} caractere.",
-      "titleTooLong": "Titlul este prea lung. Folosește mai puțin de {{limit}} caractere.",
-      "messageEmpty": "Mesajul nu poate fi gol."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Nu s-au putut încărca instanțele KiloClaw.",
-    "billing": {
-      "title": "Facturare",
-      "continueMonthToMonth": "Continuă cu abonamentul lunar",
-      "plan": "Planul",
-      "finalTermEnds": "Ultima perioadă contractuală se încheie",
-      "afterFinalTerm": "După ultima perioadă contractuală",
-      "lessThanOneDay": "Mai puțin de 1 zi",
-      "ends": "Se încheie",
-      "expires": "Expiră",
-      "noActivePlan": "Fără plan activ",
-      "noActivePlanDescription": "Nu ai un abonament KiloClaw activ.",
-      "managedByAdmin": "Facturarea este gestionată de administratorul organizației tale.",
-      "couldNotLoad": "Nu s-au putut încărca informațiile de facturare.",
-      "manageOnWeb": "Gestionează facturarea în browser",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Ultima perioadă a planului Commit se încheie pe {{date}}. Continuă cu planul Standard la {{price}} sau găzduirea se va încheia.",
-      "freeTrial": "Perioadă de probă gratuită",
-      "hostingEnds": "Găzduirea se încheie",
-      "renews": "Se reînnoiește",
-      "standardMonthToMonth": "Standard cu plată lunară",
-      "standardStartsOn": "Planul Standard începe pe {{date}}, la prețul de {{price}}.",
-      "yourStandardMonthlyPrice": "prețul lunar al planului tău Standard",
-      "perMonth": "/lună",
-      "earlybirdAccessUntil": "Accesul Earlybird este valabil până pe {{date}}.",
-      "earlybirdEnding": "Accesul Earlybird se încheie în {{remaining}}.",
-      "paymentPastDue": "Plata este restantă. Actualizează metoda de plată.",
-      "subscriptionCancels": "Abonamentul se va anula pe {{date}}.",
-      "trialDaysRemaining": "Timp rămas din perioada de probă: {{remaining}}.",
-      "trialEndingSoon": "Perioada de probă se încheie curând. Timp rămas: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Noutăți",
-      "couldNotLoad": "Nu s-a putut încărca istoricul modificărilor.",
-      "noUpdates": "Încă nu există actualizări",
-      "noUpdatesDescription": "Aici vor apărea detaliile modificărilor.",
-      "recentUpdates": "Actualizări recente",
-      "manageVersion": "Gestionează versiunea",
-      "redeployRequired": "Reimplementare necesară",
-      "redeploySuggested": "Reimplementare recomandată",
-      "upgradeRequired": "Actualizare necesară"
-    },
-    "dashboard": {
-      "title": "Panou de control",
-      "couldNotLoad": "Nu s-a putut încărca panoul de control.",
-      "renameInstance": "Redenumește instanța",
-      "renamePlaceholder": "Nume nou (maximum 50 de caractere)",
-      "someDetailsFailed": "Unele date în timp real nu s-au putut încărca.",
-      "destroy": "Șterge definitiv",
-      "destroyMessage": "Instanța ta KiloClaw și toate datele ei vor fi șterse definitiv. Această acțiune nu poate fi anulată.",
-      "destroyTitle": "Ștergere definitivă a instanței",
-      "instance": "Instanță",
-      "couldNotCheckStatus": "Nu s-a putut verifica starea serviciului.",
-      "dangerZone": "ACȚIUNI IREVERSIBILE",
-      "destroying": "Se șterge definitiv…",
-      "serviceDegraded": "Serviciul funcționează cu probleme — atinge pentru a vedea starea",
-      "up": "ACTIV"
-    },
-    "channels": {
-      "title": "Canaluri",
-      "couldNotLoad": "Nu s-au putut încărca canalele.",
-      "noChannels": "Niciun canal disponibil",
-      "noChannelsDescription": "Aici vor apărea integrările cu canalele de comunicare.",
-      "connected": "{{label}} conectat",
-      "disconnectMessage": "Elimini {{label}}? Acest canal va fi deconectat.",
-      "disconnectTitle": "Deconectează canalul"
-    },
-    "devicePairing": {
-      "title": "Asocierea dispozitivelor",
-      "refreshRequests": "Actualizează cererile de asociere",
-      "couldNotLoad": "Nu s-au putut încărca cererile de asociere.",
-      "noPending": "Nicio cerere în așteptare",
-      "noPendingDescription": "Aici vor apărea cererile de asociere pentru canale și dispozitive.",
-      "channelRequests": "Cereri de asociere pentru canale",
-      "deviceRequests": "Cereri de asociere pentru dispozitive",
-      "approveDeviceMessage": "Permiți conectarea dispozitivului {{platform}} la instanța ta?",
-      "approveDeviceTitle": "Aprobă dispozitivul",
-      "approveMessage": "Permiți conectarea la instanța ta pentru {{label}} (cod: {{code}})?",
-      "approveTitle": "Aprobă cererea de asociere",
-      "unknownDevice": "Dispozitiv necunoscut"
-    },
-    "execPolicy": {
-      "title": "Politica de execuție",
-      "couldNotLoad": "Nu s-a putut încărca politica de execuție.",
-      "alwaysAsk": "Întreabă mereu",
-      "alwaysAskDescription": "Cere confirmarea înainte de a executa fiecare comandă. Aceasta este cea mai sigură opțiune.",
-      "neverAsk": "Nu întreba niciodată",
-      "neverAskDescription": "Execută comenzile fără confirmare. Această opțiune este mai rapidă, dar mai puțin sigură."
-    },
-    "google": {
-      "title": "Cont Google",
-      "couldNotLoad": "Nu s-a putut încărca starea contului Google.",
-      "disconnected": "Contul Google a fost deconectat. Reimplementează instanța pentru a aplica modificarea.",
-      "setupCommand": "Comandă de configurare",
-      "setupCommandHelp": "Pentru a-ți conecta contul Google, rulează această comandă într-un terminal pe computerul tău, pe care trebuie să fie instalat Docker.",
-      "failedToLoadCommand": "Nu s-a putut încărca comanda de configurare.",
-      "gmailNotifications": "Notificări Gmail",
-      "disconnect": "Deconectează contul Google",
-      "copied": "Copiat",
-      "copyCommand": "Copiază comanda",
-      "disconnectConfirm": "Deconectează",
-      "disconnectMessage": "Elimini contul Google din această instanță? Notificările Gmail vor fi dezactivate. După deconectare, reimplementează instanța pentru a aplica modificările.",
-      "disconnectTitle": "Deconectare de la Google"
-    },
-    "modelList": {
-      "noMatches": "Niciun model nu corespunde căutării tale",
-      "noModelsDescription": "Modelele vor apărea aici când vor fi disponibile.",
-      "noResultsFor": "Nu există rezultate pentru „{{query}}”."
-    },
-    "secrets": {
-      "title": "Secrete",
-      "couldNotLoad": "Nu s-au putut încărca secretele.",
-      "noSecrets": "Niciun secret disponibil",
-      "noSecretsDescription": "Aici vor apărea integrările care folosesc secrete.",
-      "removeMessage": "Elimini {{label}}? Acest instrument va pierde accesul la datele sale de autentificare.",
-      "removeTitle": "Elimină secretul",
-      "saved": "{{label}} salvat",
-      "hide": "Ascunde {{label}}",
-      "show": "Afișează {{label}}",
-      "allFieldsRequired": "Toate câmpurile sunt obligatorii pentru a conecta {{label}}.",
-      "setupGuideFallback": "ghid de configurare",
-      "setupGuideA11y": "ghid de configurare pentru {{label}}",
-      "setupGuide": "Ghid de configurare",
-      "saving": "Se salvează…",
-      "removing": "Se elimină…",
-      "updateToken": "Actualizează tokenul"
-    },
-    "versionPin": {
-      "title": "Fixarea versiunii",
-      "couldNotLoad": "Nu s-au putut încărca informațiile despre versiune.",
-      "couldNotLoadMore": "Nu s-au putut încărca mai multe versiuni.",
-      "loadMore": "Încarcă mai multe versiuni",
-      "showingLatest": "Se afișează cele mai recente 100 de versiuni.",
-      "availableVersions": "Versiuni disponibile",
-      "noVersions": "Nicio versiune disponibilă",
-      "noVersionsDescription": "Versiunile OpenClaw disponibile vor apărea aici.",
-      "unpin": "Anulează fixarea",
-      "unpinMessage": "Revii la cea mai recentă versiune disponibilă?",
-      "unpinTitle": "Anularea fixării versiunii",
-      "confirmPin": "Confirmă fixarea",
-      "followingLatest": "La zi automat",
-      "latest": "cea mai recentă",
-      "pin": "Fixează",
-      "pinnedByAdmin": "Administratorul a fixat versiunea. Contactează-l pentru a o schimba.",
-      "pinnedTo": "Fixată la versiunea {{version}}",
-      "reasonOptional": "Motiv (opțional)",
-      "reasonPlaceholder": "Motivul fixării acestei versiuni",
-      "replaceAdminPin": "Înlocuiește versiunea fixată de administrator",
-      "replacesAdminPin": "Această acțiune înlocuiește versiunea fixată de administrator (în prezent {{label}})."
-    },
-    "redeploy": "Implementează din nou",
-    "redeployMessage": "Sigur vrei să reimplementezi această instanță?",
-    "redeployTitle": "Reimplementarea instanței",
-    "controls": {
-      "redeploying": "Se reimplementează…",
-      "restart": "Repornește",
-      "restartOpenClawMessage": "Ești sigur că vrei să repornești procesul OpenClaw?",
-      "restartOpenClawTitle": "Repornire OpenClaw",
-      "restarting": "Se repornește…",
-      "start": "Pornește",
-      "startMessage": "Ești sigur că vrei să pornești această instanță?",
-      "startTitle": "Pornirea instanței",
-      "stop": "Oprește",
-      "stopMessage": "Ești sigur că vrei să oprești această instanță?",
-      "stopTitle": "Oprirea instanței",
-      "stopping": "Se oprește…"
-    },
-    "empty": {
-      "finishingSetup": "Se finalizează configurarea",
-      "finishingSetupDescription": "Așteaptă puțin, finalizăm configurarea contului tău. De obicei durează doar câteva clipe.",
-      "getStarted": "Începe",
-      "noInstancesDescription": "Creează prima ta instanță pentru a rula agenți de programare."
-    },
-    "instance": {
-      "backToInstances": "Înapoi la instanțe",
-      "couldNotLoad": "Nu s-a putut încărca instanța.",
-      "notFound": "Instanța nu a fost găsită",
-      "notFoundDescription": "Este posibil ca această instanță să fi fost ștearsă definitiv sau ca legătura să nu mai fie validă."
-    },
-    "list": {
-      "createInstance": "Creează o instanță",
-      "organizations": "Organizații",
-      "accessIssue": {
-        "trialExpired": "Perioada de probă s-a încheiat, abonează-te pentru a continua să folosești această instanță",
-        "subscriptionCanceled": "Abonament inactiv, reabonează-te pentru a continua să folosești această instanță",
-        "subscriptionPastDue": "Problemă la plată — actualizează datele de facturare pentru a continua să folosești această instanță",
-        "quarantined": "Instanță în carantină — necesită revizuire manuală",
-        "multipleCurrentConflict": "Contul trebuie verificat",
-        "nonCanonicalEarlybird": "Planul vechi necesită revizuire"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Discută cu {{name}}",
-        "ready": "{{name}} este gata",
-        "warmedUp": "Totul este pregătit. Trimite un salut când ești gata."
-      },
-      "flow": {
-        "genericErrorBody": "Nu am putut finaliza configurarea instanței tale acum.",
-        "manualReviewBody": "Contul tău necesită o verificare înainte de a putea crea o instanță. Continuă pe kilo.ai.",
-        "manualReviewTitle": "Configurarea necesită revizuire manuală",
-        "openKiloAi": "Deschide kilo.ai",
-        "provisioning": "Punere în funcțiune",
-        "review": "Revizuire",
-        "identityTitle": "Identitatea botului tău",
-        "couldNotLoad": "Nu s-a putut încărca starea configurării inițiale.",
-        "finishingSetup": "Așteaptă puțin, finalizăm configurarea contului tău.",
-        "ready": "Gata",
-        "settingUp": "Se configurează…"
-      },
-      "unavailableDescription": "Ai nevoie de un abonament KiloClaw activ pentru a pune în funcțiune o instanță. Instanțele și abonamentele existente funcționează în continuare ca de obicei.",
-      "unavailableTitle": "Instanțe KiloClaw noi indisponibile",
-      "identity": {
-        "chooseAvatar": "Alege avatarul",
-        "namePlaceholder": "Numele botului tău",
-        "selectAvatar": "Selectează {{name}} ca avatar",
-        "personality": "Personalitate",
-        "changePersonality": "Schimbă personalitatea",
-        "location": "Locație",
-        "locationPlaceholder": "Oraș sau regiune (opțional)",
-        "useCurrentLocation": "Folosește locația curentă",
-        "locationDeniedTitle": "Acces la locație refuzat",
-        "locationDeniedMessage": "Activează accesul la locație din setări pentru a folosi locația ta curentă.",
-        "locationValidationFailed": "Locația nu a putut fi validată.",
-        "locationResolveFailed": "Nu s-a putut identifica locația ta. O poți modifica manual.",
-        "locationGetFailed": "Locația ta nu a putut fi obținută. Introdu-o manual.",
-        "nature": {
-          "aiAssistantLabel": "Asistent AI",
-          "aiAssistantVibe": "Util, capabil, profesionist",
-          "digitalCreatureLabel": "Creatură digitală",
-          "digitalCreatureVibe": "Excentrică, plină de viață, puțin imprevizibilă",
-          "virtualCompanionLabel": "Companion virtual",
-          "virtualCompanionVibe": "Cald, prezent, îi pasă cu adevărat",
-          "somethingWeirderLabel": "Ceva mai ciudat…",
-          "somethingWeirderVibe": "Tu decizi ce este"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Gata! Am pregătit rezumatul pe care l-ai cerut. Îl poți citi când ai timp.",
-        "settingUp": "Se configurează notificările…",
-        "stayInTheLoop": "Rămâi la curent",
-        "getNotified": "Primește notificări când {{name}} termină o sarcină, ca să nu ratezi niciun răspuns.",
-        "now": "acum",
-        "skipForNow": "Omite deocamdată",
-        "couldNotEnable": "Notificările nu au putut fi activate."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Nu s-a putut verifica configurarea",
-        "queryErrorBody": "Am pierdut conexiunea în timp ce verificam configurarea pentru {{name}}. Este posibil ca aceasta să fie încă în curs. Încearcă din nou sau revino în câteva clipe.",
-        "stoppedTitle": "Configurare oprită",
-        "stoppedBody": "Instanța lui {{name}} s-a oprit neașteptat în timpul configurării.",
-        "stalledTitle": "Ceva s-a blocat",
-        "stalledBody": "Nu am putut finaliza configurarea lui {{name}}. Încearcă din nou sau trimite un e-mail la {{supportEmail}} dacă acest lucru se întâmplă în continuare.",
-        "timeoutTitle": "Durează mai mult decât era de așteptat",
-        "timeoutBody": "Configurarea pentru {{name}} durează mai mult decât de obicei (peste {{displayMinutes}} minute).",
-        "continueInBackground": "Continuă în fundal",
-        "settingUp": "Se configurează {{name}}",
-        "connectingToAgent": "Se conectează la agent",
-        "startingSandbox": "Se pornește mediul izolat",
-        "backgroundHint": "De obicei durează mai puțin de un minut. Poți închide acest ecran — vom continua configurarea în fundal."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Cod {{code}}",
-      "gatewayProcess": "PROCESUL PORȚII DE ACCES",
-      "lastExit": "Ultima terminare a procesului",
-      "memory": "Memorie",
-      "region": "Regiune",
-      "resources": "RESURSE",
-      "restarts": "Reporniri",
-      "state": "Stare",
-      "uptime": "Timp de funcționare",
-      "crashed": "OPRIT CU EROARE",
-      "destroying": "SE ȘTERGE DEFINITIV",
-      "provisioned": "PUS ÎN FUNCȚIUNE",
-      "restarting": "SE REPORNEȘTE",
-      "running": "RULEAZĂ",
-      "shuttingDown": "SE ÎNCHIDE",
-      "starting": "SE PORNEȘTE",
-      "stopped": "OPRIT",
-      "stopping": "SE OPREȘTE",
-      "unknown": "NECUNOSCUT",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "De vârf",
-      "frontierDescription": "Performanță maximă. Direcționează cererile către modele de vârf cu capacități de raționament.",
-      "balancedDescription": "Oferă un echilibru între viteză și performanță, la un cost mai mic.",
-      "autoModelA11y": "model automat {{label}}",
-      "currentModel": "Modelul curent",
-      "browseAllModels": "sau alege dintre peste 500 de modele",
-      "browseAllModelsA11y": "Explorează toate cele peste 500 de modele"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Pentru a continua să folosești KiloClaw, mergi la kilo.ai/claw din browserul tău. Nu te poți abona în aplicație.",
-      "subscriptionCanceledTitle": "Abonează-te pe site",
-      "subscriptionCanceledBody": "Pentru a folosi KiloClaw, mergi la kilo.ai/claw din browserul tău. Nu te poți abona în aplicație.",
-      "subscriptionCanceledCta": "Deschide kilo.ai/claw",
-      "subscriptionPastDueTitle": "Actualizarea datelor de plată în browser",
-      "subscriptionPastDueBody": "Am întâmpinat o problemă la ultima ta plată. Deschide kilo.ai/claw în browser pentru a actualiza datele de plată. Nu poți gestiona facturarea în aplicație.",
-      "quarantinedTitle": "Instanța necesită intervenție",
-      "quarantinedBody": "Instanța ta KiloClaw este în carantină și nu poate fi folosită momentan. Echipa noastră trebuie să intervină pentru a o readuce în funcțiune.",
-      "multipleCurrentConflictBody": "Am găsit mai multe abonamente active în contul tău, așa că am suspendat temporar accesul pentru a evita facturarea dublă.",
-      "multipleCurrentConflictCta": "Continuă pe kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Plan vechi detectat",
-      "nonCanonicalEarlybirdBody": "Planul tău de acces timpuriu necesită o revizuire manuală înainte de a putea fi folosit pe mobil.",
-      "iosTitle": "KiloClaw indisponibil pe iOS",
-      "iosBody": "Pentru acest cont, accesul la KiloClaw este gestionat în afara aplicației iOS.",
-      "iosContact": "Ai întrebări? Scrie-ne la {{supportEmail}}.",
-      "quarantinedCta": "Trimite un e-mail echipei noastre",
-      "nonCanonicalEarlybirdCta": "Verifică-ți planul pe kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} necesită atenție: {{label}}",
-      "openUnread_one": "Deschide {{name}}, {{displayCount}} mesaj necitit",
-      "openUnread": "Deschide {{name}}, {{displayCount}} de mesaje necitite",
-      "openUnread_other": "Deschide {{name}}, {{displayCount}} de mesaje necitite",
-      "openSettings": "Deschide setările pentru {{name}}",
-      "fixOnKiloAi": "Rezolvă pe kilo.ai: {{label}}",
-      "openUnread_few": "Deschide {{name}}, {{displayCount}} mesaje necitite"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Aprobă cererile de asociere pentru dispozitive",
-      "execPolicyDescription": "Setări de securitate",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Selectarea modelului AI",
-      "secretsDescription": "Date de autentificare criptate",
-      "versionPinDescription": "Fixează o anumită versiune"
-    },
-    "avatar": {
-      "arcade": "Joc de sală",
-      "brain": "Creier",
-      "creature": "Creatură",
-      "crystal": "Cristal",
-      "custom": "Avatar personalizat",
-      "dragon": "Balaur",
-      "explorer": "Explorator",
-      "flame": "Flacără",
-      "lightning": "Fulger",
-      "magicWand": "Baghetă magică",
-      "moon": "Lună",
-      "operator": "Operator tehnic",
-      "orbit": "Orbită",
-      "oracle": "Oracol",
-      "rainbow": "Curcubeu",
-      "robot": "Roboțel",
-      "satellite": "Satelit",
-      "sparkles": "Scântei",
-      "strongArm": "Braț puternic",
-      "talisman": "Amuletă"
-    },
-    "remoteSpawnFilesNotSupported": "Această instanță nu poate primi fișiere.",
-    "instanceSwitcherTitle": "Instanță KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2575,10 +2103,6 @@
       "moveLeft": "Mută {{filename}} la stânga",
       "moveRight": "Mută {{filename}} la dreapta"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Lipește imaginea din clipboard",
-      "label": "Imagine detectată, atinge pentru a lipi"
-    },
     "attachmentPicker": {
       "camera": "Cameră",
       "photoLibrary": "Galerie foto",
@@ -2780,7 +2304,8 @@
     "signOutThisDeviceTitle": "Deconectezi acest dispozitiv?",
     "signOutThisSessionTitle": "Deconectezi această sesiune?",
     "signOutThisSessionMessage": "{{device}} va fi deconectat. Accesul la API poate rămâne activ încă cel mult o oră.",
-    "webBrowser": "Browser web"
+    "webBrowser": "Browser web",
+    "unknownDevice": "Dispozitiv necunoscut"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Magazinul de aplicații nu a putut fi deschis.",

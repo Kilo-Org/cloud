@@ -101,12 +101,9 @@
     "scheduled": "Запланировано",
     "keepEditing": "Продолжить редактирование",
     "keepRunning": "Продолжить выполнение",
-    "kiloclaw": "KiloClaw",
     "newSession": "Новый сеанс",
-    "noKiloclawInstances": "Нет экземпляров KiloClaw",
     "noModelsAvailable": "Нет доступных моделей",
     "notFound": "Не найдено.",
-    "online": "В сети",
     "open": "Открыть {{name}}",
     "openPullRequest": "Открыть pull request",
     "pending": "Ожидание",
@@ -257,7 +254,8 @@
     "renamePasskey": "Переименовать ключ доступа",
     "removePasskey": "Удалить ключ доступа",
     "removePasskeyTitle": "Удалить ключ доступа?",
-    "removePasskeyMessage": "Вы больше не сможете войти с этим ключом доступа."
+    "removePasskeyMessage": "Вы больше не сможете войти с этим ключом доступа.",
+    "changelog": "Что нового"
   },
   "preferences": {
     "general": "Общие",
@@ -320,23 +318,18 @@
     "previewGenericDescription": "Уведомления сообщают о событиях без подробностей. Откройте Kilo, чтобы прочитать сообщение.",
     "channel": {
       "agentProgress": "Ход выполнения агента",
-      "chat": "Сообщения чата",
-      "kiloclaw": "Активность KiloClaw",
       "balance": "Оповещения о балансе",
       "security": "Замечания по безопасности",
       "spend": "Оповещения о расходах",
       "followedSessions": "Отслеживаемые сеансы"
     },
     "category": {
-      "chatMessagesSubtitle": "ответы в вашей переписке",
       "agentAttentionTitle": "Агенту нужна помощь",
       "agentAttentionSubtitle": "вопросы, запросы разрешений и данных",
       "agentUpdatesTitle": "Новости от агента",
       "agentUpdatesSubtitle": "сообщения агента в ходе выполнения задачи",
       "sessionStatusTitle": "Статус сеанса",
       "sessionStatusSubtitle": "завершён / ошибка / готов к управлению",
-      "kiloclawActivitySubtitle": "готовность и ошибки экземпляра, запланированные действия",
-      "kiloclawActivityUnavailable": "Запустите экземпляр KiloClaw, чтобы получать активность KiloClaw.",
       "balanceAlertsSubtitle": "предупреждения о низком балансе организации",
       "balanceAlertsUnavailable": "Присоединитесь к организации, чтобы получать оповещения о балансе.",
       "securityFindingsSubtitle": "новые уязвимости и напоминания о сроках SLA",
@@ -356,72 +349,19 @@
   },
   "tabs": {
     "home": "Главная",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, вкладка, {{position}} из {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Выбор экземпляра",
-      "couldNotLoadInstances": "Не удалось загрузить список экземпляров.",
-      "noInstancesDescription": "Настройте экземпляр, чтобы начать общение.",
-      "setUpKiloclaw": "Настроить KiloClaw",
-      "currentInstance": "{{title}}, текущий"
-    },
     "conversation": {
-      "failedToLoad": "Не удалось загрузить чат.",
-      "notFound": "Чат не найден.",
       "untitled": "Без названия",
-      "leaveTitle": "Выйти из чата?",
-      "leaveMessage": "Чат исчезнет из вашего списка.",
-      "openHint": "Открывает чат. Нажмите и удерживайте, чтобы переименовать чат или выйти из него.",
-      "unread": "Непрочитано",
-      "optionsFor": "Действия с чатом «{{title}}»",
-      "options": "Действия с чатом",
-      "renameTitle": "Название чата",
-      "renamePlaceholder": "Новое название",
-      "couldNotReachBot": "Не удалось связаться с ботом. Попробуйте снова.",
-      "messageDeliveryFailed": "Не удалось доставить сообщение боту.",
-      "couldNotSignIn": "Не удалось войти в чат.",
-      "couldNotRefreshMessages": "Не удалось обновить сообщения.",
-      "couldNotLoadHistory": "Не удалось загрузить историю чата.",
-      "leave": "Выйти",
-      "untitledConversation": "Чат без названия",
-      "createFailed": "Не удалось создать чат.",
-      "leaveFailed": "Не удалось выйти из чата."
-    },
-    "reactions": {
-      "common": "Популярные",
-      "reactWith": "Добавить реакцию {{reaction}}",
-      "accessibility": "Реакция {{emoji}}, количество: {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Ответ на",
-      "cancelReply": "Отменить ответ",
-      "openInstance": "Открыть экземпляр",
-      "attachFile": "Прикрепить файл",
-      "cancelEdit": "Отменить редактирование"
+      "renamePlaceholder": "Новое название"
     },
     "conversationList": {
-      "couldNotLoad": "Не удалось загрузить список чатов.",
-      "emptyTitle": "Чатов пока нет",
-      "emptyDescription": "Создайте чат, чтобы начать общение с вашим экземпляром KiloClaw.",
-      "create": "Создать чат",
-      "newConversation": "Новый чат",
-      "openInstanceSettings": "Открыть настройки экземпляра",
       "today": "Сегодня",
       "yesterday": "Вчера",
-      "thisWeek": "На этой неделе",
       "older": "Ранее"
     },
     "attachment": {
-      "open": "Открыть {{filename}}",
-      "openFailed": "Не удалось открыть вложение. Проверьте подключение и попробуйте ещё раз.",
-      "attachFailed": "Не удалось прикрепить файл.",
-      "limit": "Можно прикрепить до {{displayCount}} файлов.",
-      "sizeRejection": "Размер файла {{filename}} превышает допустимый размер вложения: {{limit}}.",
-      "unreadable": "Не удалось прочитать {{filename}}.",
-      "pastedImage": "вставленное изображение",
-      "defaultName": "Вложение",
       "classificationDenied": "Исполняемые файлы нельзя прикреплять.",
       "classificationEmpty": "Файл пуст.",
       "classificationTooLarge": "Размер файла не должен превышать 20 МБ.",
@@ -431,432 +371,17 @@
       "networkError": "Произошла ошибка сети.",
       "uploadFailed": "Не удалось загрузить файл.",
       "nothingToPaste": "Нечего вставить.",
-      "metadataStripFailed": "Не удалось удалить метаданные фотографии.",
-      "limit_one": "Можно прикрепить до {{displayCount}} файл.",
-      "limit_other": "Можно прикрепить до {{displayCount}} файлов.",
-      "limit_few": "Можно прикрепить до {{displayCount}} файла.",
-      "limit_many": "Можно прикрепить до {{displayCount}} файлов."
+      "metadataStripFailed": "Не удалось удалить метаданные фотографии."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, статус: {{status}}",
-      "retryUploading": "Повторить загрузку {{filename}}",
-      "remove": "Убрать {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[сообщение удалено]",
-      "yourMessage": "Ваше сообщение",
-      "messageFrom": "Сообщение от {{author}}",
-      "moreActions": "Другие действия",
-      "notDelivered": "Не доставлено",
-      "edited": "(изменено)",
-      "image": "Изображение"
+      "accessibility": "{{filename}}, статус: {{status}}"
     },
     "messageActions": {
-      "copied": "Скопировано",
-      "copyFailed": "Не удалось скопировать.",
-      "title": "Действия с сообщением",
-      "deleteTitle": "Удалить сообщение?",
-      "deleteMessage": "Сообщение будет удалено из чата.",
-      "deleteFailed": "Не удалось удалить сообщение.",
-      "removeReactionFailed": "Не удалось удалить реакцию.",
-      "addReactionFailed": "Не удалось добавить реакцию.",
-      "retrySend": "Отправить повторно",
-      "moreReactions": "Другие реакции",
-      "edit": "Редактировать",
-      "sendFailed": "Не удалось отправить сообщение.",
-      "retrySendFailed": "Не удалось отправить сообщение повторно.",
-      "editFailed": "Не удалось изменить сообщение.",
-      "executeFailed": "Не удалось выполнить действие."
+      "edit": "Редактировать"
     },
     "attachmentPicker": {
-      "takePhoto": "Сделать фото",
-      "photoLibrary": "Медиатека",
-      "files": "Файлы",
       "cameraAccessMessage": "Разрешите доступ к камере в настройках, чтобы сделать фото."
-    },
-    "typingIndicator": {
-      "someone": "Кто-то",
-      "typing_one": "{{name}} печатает...",
-      "typing": "{{names}} печатают...",
-      "typing_other": "{{names}} печатают...",
-      "typing_few": "{{names}} печатают…",
-      "typing_many": "{{names}} печатают…"
-    },
-    "botStatus": {
-      "offline": "Не в сети",
-      "loadingUser": "Загрузка данных пользователя…",
-      "waitingForStatus": "Ожидание статуса бота...",
-      "offlineMessage": "Бот не в сети. Обмен сообщениями возобновится после его подключения."
-    },
-    "errors": {
-      "notAllowed": "Действие запрещено.",
-      "messageTooLong": "Сообщение слишком длинное. Допустимо не более {{limit}} символов.",
-      "titleTooLong": "Название слишком длинное. Допустимо не более {{limit}} символов.",
-      "messageEmpty": "Сообщение не может быть пустым."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Не удалось загрузить экземпляры KiloClaw.",
-    "billing": {
-      "title": "Оплата",
-      "continueMonthToMonth": "Продолжить с помесячной оплатой",
-      "plan": "План",
-      "finalTermEnds": "Конец последнего периода",
-      "afterFinalTerm": "После последнего периода",
-      "lessThanOneDay": "Менее 1 дня",
-      "ends": "Дата окончания",
-      "expires": "Срок действия",
-      "noActivePlan": "Нет активного тарифа",
-      "noActivePlanDescription": "У вас нет активной подписки на KiloClaw.",
-      "managedByAdmin": "Оплатой управляет администратор вашей организации.",
-      "couldNotLoad": "Не удалось загрузить данные об оплате.",
-      "manageOnWeb": "Управлять оплатой на сайте",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Последний период тарифа Commit заканчивается {{date}}. Перейдите на тариф Standard за {{price}}, иначе хостинг будет отключён.",
-      "freeTrial": "Бесплатный пробный период",
-      "hostingEnds": "Хостинг будет отключён",
-      "renews": "Дата продления",
-      "standardMonthToMonth": "Standard с помесячной оплатой",
-      "standardStartsOn": "Тариф Standard начнёт действовать {{date}}. Стоимость: {{price}}.",
-      "yourStandardMonthlyPrice": "ваша ежемесячная плата по тарифу Standard",
-      "perMonth": "/мес.",
-      "earlybirdAccessUntil": "Доступ по тарифу Earlybird действует до {{date}}.",
-      "earlybirdEnding": "До окончания тарифа Earlybird осталось: {{remaining}}.",
-      "paymentPastDue": "Платёж просрочен. Обновите способ оплаты.",
-      "subscriptionCancels": "Подписка будет отменена {{date}}.",
-      "trialDaysRemaining": "До конца пробного периода осталось: {{remaining}}.",
-      "trialEndingSoon": "Пробный период скоро закончится. Осталось: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Что нового",
-      "couldNotLoad": "Не удалось загрузить журнал изменений.",
-      "noUpdates": "Обновлений пока нет",
-      "noUpdatesDescription": "Здесь появятся сведения об изменениях.",
-      "recentUpdates": "Недавние обновления",
-      "manageVersion": "Управлять версией",
-      "redeployRequired": "Нужно повторное развёртывание",
-      "redeploySuggested": "Желательно повторное развёртывание",
-      "upgradeRequired": "Требуется обновление"
-    },
-    "dashboard": {
-      "title": "Панель управления",
-      "couldNotLoad": "Не удалось загрузить панель управления.",
-      "renameInstance": "Переименовать экземпляр",
-      "renamePlaceholder": "Новое название (до 50 символов)",
-      "someDetailsFailed": "Не удалось загрузить часть актуальных данных.",
-      "destroy": "Удалить навсегда",
-      "destroyMessage": "Экземпляр KiloClaw и все его данные будут удалены навсегда. Это действие нельзя отменить.",
-      "destroyTitle": "Удалить экземпляр навсегда?",
-      "instance": "Экземпляр",
-      "couldNotCheckStatus": "Не удалось проверить статус сервиса.",
-      "dangerZone": "ОПАСНЫЕ ДЕЙСТВИЯ",
-      "destroying": "Удаление…",
-      "serviceDegraded": "Сервис работает с перебоями — нажмите, чтобы посмотреть статус",
-      "up": "РАБОТАЕТ"
-    },
-    "channels": {
-      "title": "Каналы",
-      "couldNotLoad": "Не удалось загрузить каналы.",
-      "noChannels": "Нет доступных каналов",
-      "noChannelsDescription": "Здесь появятся доступные подключения к каналам.",
-      "connected": "Канал {{label}} подключён",
-      "disconnectMessage": "Удалить {{label}}? Этот канал будет отключён.",
-      "disconnectTitle": "Отключить канал"
-    },
-    "devicePairing": {
-      "title": "Привязка устройств",
-      "refreshRequests": "Обновить запросы на сопряжение",
-      "couldNotLoad": "Не удалось загрузить запросы на сопряжение.",
-      "noPending": "Нет запросов на одобрение",
-      "noPendingDescription": "Запросы на сопряжение каналов и устройств появятся здесь.",
-      "channelRequests": "Запросы от каналов",
-      "deviceRequests": "Запросы от устройств",
-      "approveDeviceMessage": "Разрешить {{platform}} подключиться к вашему экземпляру?",
-      "approveDeviceTitle": "Разрешить подключение устройства",
-      "approveMessage": "Разрешить {{label}} (код: {{code}}) подключиться к вашему экземпляру?",
-      "approveTitle": "Одобрить запрос на сопряжение",
-      "unknownDevice": "Неизвестное устройство"
-    },
-    "execPolicy": {
-      "title": "Правила выполнения команд",
-      "couldNotLoad": "Не удалось загрузить правила выполнения команд.",
-      "alwaysAsk": "Всегда спрашивать",
-      "alwaysAskDescription": "Каждая команда требует подтверждения перед выполнением. Самый безопасный вариант.",
-      "neverAsk": "Никогда не спрашивать",
-      "neverAskDescription": "Команды выполняются без подтверждения. Быстрее, но менее безопасно."
-    },
-    "google": {
-      "title": "Аккаунт Google",
-      "couldNotLoad": "Не удалось загрузить статус аккаунта Google.",
-      "disconnected": "Аккаунт Google отключён. Повторно разверните экземпляр, чтобы применить изменение.",
-      "setupCommand": "Команда для настройки",
-      "setupCommandHelp": "Чтобы подключить аккаунт Google, выполните эту команду в терминале на своём компьютере. На компьютере должен быть установлен Docker.",
-      "failedToLoadCommand": "Не удалось загрузить команду для настройки.",
-      "gmailNotifications": "Уведомления Gmail",
-      "disconnect": "Отключить аккаунт Google",
-      "copied": "Скопировано",
-      "copyCommand": "Копировать команду",
-      "disconnectConfirm": "Отключить",
-      "disconnectMessage": "Удалить аккаунт Google из этого экземпляра? Уведомления Gmail будут отключены. Затем повторно разверните экземпляр, чтобы применить изменения.",
-      "disconnectTitle": "Отключить Google"
-    },
-    "modelList": {
-      "noMatches": "По запросу модели не найдены",
-      "noModelsDescription": "Модели появятся здесь, когда станут доступны.",
-      "noResultsFor": "По запросу «{{query}}» ничего не найдено."
-    },
-    "secrets": {
-      "title": "Секреты",
-      "couldNotLoad": "Не удалось загрузить секреты.",
-      "noSecrets": "Нет доступных секретов",
-      "noSecretsDescription": "Здесь появятся интеграции, для которых нужны секреты.",
-      "removeMessage": "Удалить {{label}}? Инструмент потеряет доступ к своим учётным данным.",
-      "removeTitle": "Удалить секрет",
-      "saved": "Секрет {{label}} сохранён",
-      "allFieldsRequired": "Для подключения {{label}} необходимо заполнить все поля.",
-      "hide": "Скрыть {{label}}",
-      "removing": "Удаление…",
-      "saving": "Сохранение…",
-      "setupGuide": "Руководство по настройке",
-      "setupGuideA11y": "Руководство по настройке {{label}}",
-      "setupGuideFallback": "руководство по настройке",
-      "show": "Показать {{label}}",
-      "updateToken": "Обновить токен"
-    },
-    "versionPin": {
-      "title": "Закрепление версии",
-      "couldNotLoad": "Не удалось загрузить сведения о версии.",
-      "couldNotLoadMore": "Не удалось загрузить остальные версии.",
-      "loadMore": "Загрузить ещё версии",
-      "showingLatest": "Показаны последние 100 версий.",
-      "availableVersions": "Доступные версии",
-      "noVersions": "Нет доступных версий",
-      "noVersionsDescription": "Доступные версии OpenClaw появятся здесь.",
-      "unpin": "Открепить",
-      "unpinMessage": "Вернуться к последней доступной версии?",
-      "unpinTitle": "Открепить версию",
-      "confirmPin": "Подтвердить закрепление",
-      "followingLatest": "Всегда последняя версия",
-      "latest": "последняя",
-      "pin": "Закрепить",
-      "pinnedByAdmin": "Версию закрепил администратор. Обратитесь к нему, чтобы её изменить.",
-      "pinnedTo": "Закреплена версия {{version}}",
-      "reasonOptional": "Причина (необязательно)",
-      "reasonPlaceholder": "Почему вы закрепляете эту версию?",
-      "replaceAdminPin": "Заменить версию администратора",
-      "replacesAdminPin": "Вы замените версию, закреплённую администратором (сейчас: {{label}})."
-    },
-    "redeploy": "Развернуть повторно",
-    "redeployMessage": "Повторно развернуть этот экземпляр?",
-    "redeployTitle": "Повторно развернуть экземпляр",
-    "accessRequired": {
-      "iosBody": "Для этого аккаунта управление доступом к KiloClaw доступно только вне приложения для iOS.",
-      "iosContact": "Вопросы? Напишите на {{supportEmail}}.",
-      "iosTitle": "KiloClaw недоступен на iOS",
-      "multipleCurrentConflictBody": "Мы обнаружили несколько активных подписок в вашем аккаунте и приостановили работу, чтобы избежать двойного списания.",
-      "multipleCurrentConflictCta": "Продолжить на kilo.ai",
-      "nonCanonicalEarlybirdBody": "Прежде чем использовать тариф раннего доступа в мобильном приложении, нужно дождаться проверки специалистом.",
-      "nonCanonicalEarlybirdTitle": "Обнаружен старый тариф",
-      "quarantinedBody": "Экземпляр KiloClaw находится на карантине и сейчас недоступен. Для восстановления нужна помощь нашей команды.",
-      "quarantinedTitle": "Экземпляр требует восстановления",
-      "subscriptionCanceledBody": "Чтобы пользоваться KiloClaw, откройте kilo.ai/claw в браузере. Оформить подписку в приложении нельзя.",
-      "subscriptionCanceledCta": "Открыть kilo.ai/claw",
-      "subscriptionCanceledTitle": "Подписка на сайте",
-      "subscriptionPastDueBody": "Возникла проблема с последним платежом. Откройте kilo.ai/claw в браузере, чтобы обновить платёжные данные. Управлять оплатой в приложении нельзя.",
-      "subscriptionPastDueTitle": "Обновление платёжных данных на сайте",
-      "trialExpiredBody": "Чтобы продолжить пользоваться KiloClaw, откройте kilo.ai/claw в браузере. Оформить подписку в приложении нельзя.",
-      "quarantinedCta": "Написать нашей команде",
-      "nonCanonicalEarlybirdCta": "Проверить свой тариф на kilo.ai"
-    },
-    "controls": {
-      "redeploying": "Повторное развёртывание…",
-      "restart": "Перезапустить",
-      "restartOpenClawMessage": "Перезапустить процесс OpenClaw?",
-      "restartOpenClawTitle": "Перезапустить OpenClaw",
-      "restarting": "Перезапуск…",
-      "start": "Запустить",
-      "startMessage": "Запустить этот экземпляр?",
-      "startTitle": "Запустить экземпляр",
-      "stop": "Остановить",
-      "stopMessage": "Остановить этот экземпляр?",
-      "stopTitle": "Остановить экземпляр",
-      "stopping": "Остановка…"
-    },
-    "empty": {
-      "finishingSetup": "Завершение настройки",
-      "finishingSetupDescription": "Подождите, мы завершаем настройку вашего аккаунта. Обычно это занимает немного времени.",
-      "getStarted": "Начать",
-      "noInstancesDescription": "Создайте первый экземпляр, чтобы запускать агентов для написания кода."
-    },
-    "instance": {
-      "backToInstances": "К списку экземпляров",
-      "couldNotLoad": "Не удалось загрузить экземпляр.",
-      "notFound": "Экземпляр не найден",
-      "notFoundDescription": "Возможно, этот экземпляр удалён или ссылка больше не действует."
-    },
-    "instanceCard": {
-      "fixOnKiloAi": "Исправить на kilo.ai: {{label}}",
-      "needsAttention": "{{name}} требует внимания: {{label}}",
-      "openSettings": "Открыть настройки для {{name}}",
-      "openUnread": "Открыть {{name}}, непрочитанных сообщений: {{displayCount}}",
-      "openUnread_other": "Открыть {{name}}, непрочитанных сообщений: {{displayCount}}",
-      "openUnread_one": "Открыть {{name}}, {{displayCount}} непрочитанное сообщение",
-      "openUnread_few": "Открыть {{name}}, {{displayCount}} непрочитанных сообщения",
-      "openUnread_many": "Открыть {{name}}, {{displayCount}} непрочитанных сообщений"
-    },
-    "list": {
-      "createInstance": "Создать экземпляр",
-      "organizations": "Организации",
-      "accessIssue": {
-        "trialExpired": "Пробный период закончился — оформите подписку, чтобы продолжить работу с экземпляром",
-        "subscriptionCanceled": "Подписка неактивна — оформите её снова, чтобы продолжить работу с экземпляром",
-        "subscriptionPastDue": "Проблема с оплатой — обновите платёжные данные, чтобы продолжить работу с экземпляром",
-        "quarantined": "Экземпляр на карантине — требуется проверка специалистом",
-        "multipleCurrentConflict": "Нужна проверка аккаунта",
-        "nonCanonicalEarlybird": "Старый тариф требует проверки"
-      }
-    },
-    "modelPicker": {
-      "autoModelA11y": "Автоматический выбор модели: {{label}}",
-      "balancedDescription": "Оптимальное сочетание скорости и возможностей по более низкой цене.",
-      "browseAllModels": "или выберите из 500+ моделей",
-      "browseAllModelsA11y": "Просмотреть все 500+ моделей",
-      "currentModel": "Текущая модель",
-      "frontierDescription": "Максимальные возможности. Запросы обрабатывают передовые модели с поддержкой рассуждений.",
-      "frontierLabel": "Передовые модели",
-      "kiloAuto": "Kilo Auto"
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Открыть чат с {{name}}",
-        "ready": "{{name}} — всё готово",
-        "warmedUp": "Всё готово. Напишите, когда захотите начать."
-      },
-      "flow": {
-        "couldNotLoad": "Не удалось загрузить сведения о ходе настройки.",
-        "finishingSetup": "Завершаем настройку аккаунта. Пожалуйста, подождите.",
-        "genericErrorBody": "Сейчас не удалось завершить настройку экземпляра.",
-        "identityTitle": "Имя и характер бота",
-        "manualReviewBody": "Прежде чем создать экземпляр, нужно проверить ваш аккаунт. Продолжите на kilo.ai.",
-        "manualReviewTitle": "Требуется проверка специалистом",
-        "openKiloAi": "Открыть kilo.ai",
-        "provisioning": "Подготовка",
-        "ready": "Готово",
-        "review": "Проверка",
-        "settingUp": "Настройка…"
-      },
-      "identity": {
-        "changePersonality": "Изменить характер",
-        "chooseAvatar": "Выбрать аватар",
-        "location": "Местоположение",
-        "locationDeniedMessage": "Разрешите доступ к геолокации в настройках, чтобы использовать текущее местоположение.",
-        "locationDeniedTitle": "Нет доступа к местоположению",
-        "locationGetFailed": "Не удалось получить данные о местоположении. Укажите его вручную.",
-        "locationPlaceholder": "Город или регион (необязательно)",
-        "locationResolveFailed": "Не удалось определить местоположение. Вы можете указать его вручную.",
-        "locationValidationFailed": "Не удалось проверить местоположение.",
-        "namePlaceholder": "Имя бота",
-        "nature": {
-          "aiAssistantLabel": "ИИ-ассистент",
-          "aiAssistantVibe": "Отзывчивый, умелый, профессиональный",
-          "digitalCreatureLabel": "Цифровое существо",
-          "digitalCreatureVibe": "Необычное, живое, немного непредсказуемое",
-          "somethingWeirderLabel": "Что-нибудь необычнее…",
-          "somethingWeirderVibe": "Придумайте сами",
-          "virtualCompanionLabel": "Виртуальный компаньон",
-          "virtualCompanionVibe": "Дружелюбный, внимательный, искренне заботливый"
-        },
-        "personality": "Характер",
-        "selectAvatar": "Выбрать аватар: {{name}}",
-        "useCurrentLocation": "Использовать текущее местоположение"
-      },
-      "notifications": {
-        "couldNotEnable": "Не удалось включить уведомления.",
-        "getNotified": "Получайте уведомления, когда {{name}} завершит задачу, чтобы не пропустить ответ.",
-        "mockMessage": "Готово! Сводка по вашему запросу уже ждёт вас. Можете прочитать её в любое время.",
-        "now": "сейчас",
-        "settingUp": "Настройка уведомлений…",
-        "skipForNow": "Пропустить",
-        "stayInTheLoop": "Будьте в курсе"
-      },
-      "provisioning": {
-        "backgroundHint": "Обычно настройка занимает меньше минуты. Можете закрыть этот экран — настройка продолжится в фоновом режиме.",
-        "connectingToAgent": "Подключение к агенту",
-        "continueInBackground": "Продолжить в фоновом режиме",
-        "queryErrorBody": "Связь прервалась при проверке хода настройки {{name}}. Возможно, настройка продолжается. Попробуйте снова или проверьте чуть позже.",
-        "queryErrorTitle": "Не удалось узнать статус настройки",
-        "settingUp": "Настройка {{name}}",
-        "stalledBody": "Не удалось завершить настройку {{name}}. Попробуйте снова. Если ошибка повторяется, напишите на {{supportEmail}}.",
-        "stalledTitle": "Настройка не продвигается",
-        "startingSandbox": "Запуск песочницы",
-        "stoppedBody": "Экземпляр {{name}} неожиданно остановился во время настройки.",
-        "stoppedTitle": "Настройка остановлена",
-        "timeoutBody": "Настройка {{name}} занимает больше времени, чем обычно (прошло более {{displayMinutes}} мин.).",
-        "timeoutTitle": "Настройка занимает больше времени, чем обычно"
-      },
-      "unavailableDescription": "Для создания экземпляра нужна активная подписка на KiloClaw. Существующие экземпляры и подписки продолжают работать как обычно.",
-      "unavailableTitle": "Создание экземпляров KiloClaw недоступно"
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Код {{code}}",
-      "gatewayProcess": "ПРОЦЕСС ШЛЮЗА",
-      "lastExit": "Последнее завершение",
-      "memory": "Память",
-      "region": "Регион",
-      "resources": "РЕСУРСЫ",
-      "restarts": "Перезапуски",
-      "state": "Состояние",
-      "uptime": "Время работы",
-      "crashed": "СБОЙ",
-      "destroying": "УДАЛЕНИЕ",
-      "provisioned": "ПОДГОТОВЛЕН",
-      "restarting": "ПЕРЕЗАПУСК",
-      "running": "В РАБОТЕ",
-      "shuttingDown": "ЗАВЕРШЕНИЕ РАБОТЫ",
-      "starting": "ЗАПУСК",
-      "stopped": "ОСТАНОВЛЕН",
-      "stopping": "ОСТАНОВКА",
-      "unknown": "НЕИЗВЕСТНО",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Одобрение запросов на подключение устройств",
-      "execPolicyDescription": "Настройки безопасности",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Выбор ИИ-модели",
-      "secretsDescription": "Зашифрованные учётные данные",
-      "versionPinDescription": "Закрепление конкретной версии"
-    },
-    "avatar": {
-      "arcade": "Аркада",
-      "brain": "Мозг",
-      "creature": "Существо",
-      "crystal": "Кристалл",
-      "custom": "Свой аватар",
-      "dragon": "Дракон",
-      "explorer": "Исследователь",
-      "flame": "Пламя",
-      "lightning": "Молния",
-      "magicWand": "Волшебная палочка",
-      "moon": "Луна",
-      "operator": "Оператор",
-      "orbit": "Орбита",
-      "oracle": "Оракул",
-      "rainbow": "Радуга",
-      "robot": "Робот",
-      "satellite": "Спутник",
-      "sparkles": "Искры",
-      "strongArm": "Сильная рука",
-      "talisman": "Талисман"
-    },
-    "remoteSpawnFilesNotSupported": "Этот экземпляр не может принимать файлы.",
-    "instanceSwitcherTitle": "Экземпляр KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2064,10 +1589,6 @@
       "moveLeft": "Переместить {{filename}} влево",
       "moveRight": "Переместить {{filename}} вправо"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Вставить изображение из буфера обмена",
-      "label": "Вставить изображение из буфера"
-    },
     "attachmentPicker": {
       "camera": "Камера",
       "photoLibrary": "Медиатека",
@@ -2275,7 +1796,8 @@
     "signOutThisDeviceTitle": "Выйти на этом устройстве?",
     "signOutThisSessionTitle": "Завершить этот сеанс?",
     "signOutThisSessionMessage": "На устройстве {{device}} будет выполнен выход из аккаунта. Доступ к API на нём может сохраняться ещё до часа.",
-    "webBrowser": "Веб-браузер"
+    "webBrowser": "Веб-браузер",
+    "unknownDevice": "Неизвестное устройство"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Не удалось открыть магазин приложений.",

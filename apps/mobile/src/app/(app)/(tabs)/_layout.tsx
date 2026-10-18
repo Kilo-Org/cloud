@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Tabs, usePathname, useRouter, useSegments } from 'expo-router';
-import { Bot, House, MessageCircle, MessageSquare, UserRound } from '@/components/ui/icons';
+import { Bot, House, MessageCircle, UserRound } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +15,6 @@ import { Text } from '@/components/ui/text';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
-import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import {
@@ -32,11 +31,10 @@ import {
   shouldHideTabBar,
   shouldShowTabLabel,
   TAB_LABEL_MINIMUM_FONT_SCALE,
-  TAB_LABEL_WRAP_FONT_SCALE,
   tabAccessibilityLabel,
   tabBarPosition,
   tabLabelLineCount,
-  visibleTabCount,
+  VISIBLE_TAB_COUNT,
 } from '@/lib/tab-bar-layout';
 
 const TAB_BAR_ICON_STYLE = {
@@ -111,9 +109,7 @@ export default function TabsLayout() {
   const tabLabelLines = tabLabelLineCount(fontScale);
   const allowLabelWrap = tabLabelLines > 1;
   const hideTabs = shouldHideTabBar(pathname, segments);
-  const showKiloClawTab = useKiloClawTabVisible();
-  const tabFlags = { showKiloClaw: showKiloClawTab };
-  const tabCount = visibleTabCount(showKiloClawTab);
+  const tabCount = VISIBLE_TAB_COUNT;
   // The label box is the tab item minus the bar's side safe areas and the
   // tab item's own padding (subtracted inside `tabLabelFits`). A window whose
   // width was never measured leaves the box unknown — the same missing
@@ -125,20 +121,12 @@ export default function TabsLayout() {
     : undefined;
   const { t } = useTranslation();
   const homeLabel = t('tabs.home');
-  const kiloclawLabel =
-    fontScale > TAB_LABEL_WRAP_FONT_SCALE ? t('tabs.kiloclawWrapped') : t('common.kiloclaw');
   const agentsLabel = t('common.agents');
   const chatLabel = t('common.chat');
   const profileLabel = t('common.profile');
   // The label set in render order, so the visible/dropped decision measures
   // exactly the strings each `TabBarLabel` renders.
-  const tabLabels = [
-    homeLabel,
-    ...(showKiloClawTab ? [kiloclawLabel] : []),
-    agentsLabel,
-    chatLabel,
-    profileLabel,
-  ];
+  const tabLabels = [homeLabel, agentsLabel, chatLabel, profileLabel];
   const showTabLabel = shouldShowTabLabel(fontScale, tabItemWidth, tabLabels);
   const tabBarHeight = getEffectiveTabBarHeight({
     bottomInset: bottom,
@@ -239,7 +227,7 @@ export default function TabsLayout() {
             title: t('tabs.home'),
             tabBarAccessibilityLabel: tabAccessibilityLabel(
               t('tabs.home'),
-              tabBarPosition('home', tabFlags) ?? 1,
+              tabBarPosition('home'),
               tabCount
             ),
             tabBarLabel: ({ focused }) => (
@@ -252,34 +240,6 @@ export default function TabsLayout() {
           listeners={TAB_PRESS_HAPTICS}
         />
         <Tabs.Screen
-          name="(1_kiloclaw)"
-          options={{
-            href: showKiloClawTab ? undefined : null,
-            title: t('common.kiloclaw'),
-            tabBarAccessibilityLabel: tabAccessibilityLabel(
-              t('common.kiloclaw'),
-              tabBarPosition('kiloclaw', tabFlags) ?? 2,
-              tabCount
-            ),
-            // The pre-wrapped copy is chosen once, from the same font scale the
-            // width decision measures, so `tabLabels` and the rendered label
-            // cannot disagree about which string is on the bar.
-            tabBarLabel: ({ focused }) => (
-              <TabLabel label={kiloclawLabel} focused={focused} allowWrap={allowLabelWrap} />
-            ),
-            tabBarIcon: ({ color, focused }) => (
-              <MessageSquare size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
-            ),
-          }}
-          listeners={{
-            tabPress: event => {
-              void Haptics.selectionAsync();
-              event.preventDefault();
-              router.navigate('/(app)/(tabs)/(1_kiloclaw)');
-            },
-          }}
-        />
-        <Tabs.Screen
           name="(2_agents)"
           options={{
             title: t('common.agents'),
@@ -288,7 +248,7 @@ export default function TabsLayout() {
               needsInputBadge
                 ? `${t('common.agents')}, ${needsInputBadge} ${t('agents.sessionRow.needsInput')}`
                 : t('common.agents'),
-              tabBarPosition('agents', tabFlags) ?? 2,
+              tabBarPosition('agents'),
               tabCount
             ),
             tabBarLabel: ({ focused }) => (
@@ -306,7 +266,7 @@ export default function TabsLayout() {
             title: t('common.chat'),
             tabBarAccessibilityLabel: tabAccessibilityLabel(
               t('common.chat'),
-              tabBarPosition('chat', tabFlags) ?? 3,
+              tabBarPosition('chat'),
               tabCount
             ),
             tabBarLabel: ({ focused }) => (

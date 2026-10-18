@@ -12,7 +12,6 @@ import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
 import { creditsRouter } from '@/routers/credits-router';
-import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { modelsRouter } from '@/routers/models-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
@@ -43,7 +42,6 @@ const mobileRouter = createTRPCRouter({
   securityAgent: securityAgentRouter,
   kiloPass: kiloPassRouter,
   credits: creditsRouter,
-  kiloclaw: kiloclawRouter,
   models: modelsRouter,
   activeSessions: activeSessionsRouter,
   modelPreferences: modelPreferencesRouter,

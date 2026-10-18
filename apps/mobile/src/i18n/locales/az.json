@@ -101,12 +101,9 @@
     "scheduled": "Planlaşdırılıb",
     "keepEditing": "Redaktəyə davam et",
     "keepRunning": "İcranı davam etdir",
-    "kiloclaw": "KiloClaw",
     "newSession": "Yeni sessiya",
-    "noKiloclawInstances": "KiloClaw nüsxəsi yoxdur",
     "noModelsAvailable": "Mövcud model yoxdur",
     "notFound": "Tapılmadı.",
-    "online": "Onlayn",
     "open": "{{name}} aç",
     "openPullRequest": "Açıq birləşdirmə sorğusu",
     "pending": "Gözləyir",
@@ -257,7 +254,8 @@
     "renamePasskey": "Giriş açarının adını dəyiş",
     "removePasskey": "Giriş açarını sil",
     "removePasskeyTitle": "Giriş açarı silinsin?",
-    "removePasskeyMessage": "Artıq bu giriş açarı ilə daxil ola bilməyəcəksiniz."
+    "removePasskeyMessage": "Artıq bu giriş açarı ilə daxil ola bilməyəcəksiniz.",
+    "changelog": "Yeniliklər"
   },
   "preferences": {
     "general": "Ümumi",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Bildirişlər yalnız hadisənin baş verdiyini göstərir. Mesajı oxumaq üçün Kilo-nu aç.",
     "channel": {
       "agentProgress": "Agent gedişatı",
-      "chat": "Söhbət mesajları",
-      "kiloclaw": "KiloClaw fəaliyyəti",
       "balance": "Balans bildirişləri",
       "security": "Təhlükəsizlik problemləri",
       "spend": "Xərc bildirişləri",
       "followedSessions": "İzlənilən sessiyalar"
     },
     "category": {
-      "chatMessagesSubtitle": "söhbətlərindəki cavablar",
       "agentAttentionTitle": "Agentin sənə ehtiyacı var",
       "agentAttentionSubtitle": "suallar, icazə və məlumat sorğuları",
       "agentUpdatesTitle": "Agent yeniləmələri",
       "agentUpdatesSubtitle": "tapşırıq zamanı agentdən gələn mesajlar",
       "sessionStatusTitle": "Sessiya statusu",
       "sessionStatusSubtitle": "tamamlanıb / uğursuz olub / idarəetməyə hazırdır",
-      "kiloclawActivitySubtitle": "nüsxə hazırdır/uğursuz olub, planlaşdırılmış əməliyyatlar",
-      "kiloclawActivityUnavailable": "KiloClaw fəaliyyəti üçün KiloClaw nüsxəsini işə salın.",
       "balanceAlertsSubtitle": "təşkilatın balansının azalması barədə xəbərdarlıqlar",
       "balanceAlertsUnavailable": "Balans xəbərdarlıqları üçün təşkilata qoşulun.",
       "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Əsas",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, vərəq, {{position}} / {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Nüsxə seçimi",
-      "couldNotLoadInstances": "Nüsxələri yükləmək mümkün olmadı.",
-      "noInstancesDescription": "Söhbətə başlamaq üçün bir nüsxə qur.",
-      "setUpKiloclaw": "KiloClaw-u qur",
-      "currentInstance": "{{title}}, cari"
-    },
     "conversation": {
-      "failedToLoad": "Söhbəti yükləmək mümkün olmadı.",
-      "notFound": "Söhbət tapılmadı.",
       "untitled": "Adsız",
-      "leaveTitle": "Söhbətdən çıxılsın?",
-      "leaveMessage": "Bu, söhbəti siyahından siləcək.",
-      "openHint": "Söhbəti açır. Ad dəyişmə və çıxış seçimləri üçün basıb saxla.",
-      "unread": "Oxunmamış",
-      "optionsFor": "{{title}} üçün söhbət seçimləri",
-      "options": "Söhbət seçimləri",
-      "renameTitle": "Söhbətin adının dəyişdirilməsi",
-      "renamePlaceholder": "Yeni ad",
-      "couldNotReachBot": "Botla əlaqə yaratmaq mümkün olmadı. Yenidən cəhd et.",
-      "messageDeliveryFailed": "Mesajı bota çatdırmaq mümkün olmadı.",
-      "couldNotSignIn": "Söhbətə daxil olmaq mümkün olmadı.",
-      "couldNotRefreshMessages": "Mesajları yeniləmək mümkün olmadı.",
-      "couldNotLoadHistory": "Söhbət tarixçəsini yükləmək mümkün olmadı.",
-      "leave": "Çıx",
-      "untitledConversation": "Adsız söhbət",
-      "createFailed": "Söhbət yaratmaq mümkün olmadı.",
-      "leaveFailed": "Söhbətdən çıxmaq mümkün olmadı."
-    },
-    "reactions": {
-      "common": "Tez-tez istifadə olunanlar",
-      "reactWith": "{{reaction}} ilə reaksiya ver",
-      "accessibility": "{{emoji}} reaksiyası, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Cavab verilən mesaj",
-      "cancelReply": "Cavabı ləğv et",
-      "openInstance": "Nüsxəni aç",
-      "attachFile": "Fayl əlavə et",
-      "cancelEdit": "Redaktəni ləğv et"
+      "renamePlaceholder": "Yeni ad"
     },
     "conversationList": {
-      "couldNotLoad": "Söhbətləri yükləmək mümkün olmadı.",
-      "emptyTitle": "Hələ söhbət yoxdur",
-      "emptyDescription": "KiloClaw nüsxənlə yazışmağa başlamaq üçün söhbət yarat.",
-      "create": "Söhbət yarat",
-      "newConversation": "Yeni söhbət",
-      "openInstanceSettings": "Nüsxənin parametrlərini aç",
       "today": "Bu gün",
       "yesterday": "Dünən",
-      "thisWeek": "Bu həftə",
       "older": "Daha əvvəl"
     },
     "attachment": {
-      "open": "{{filename}} faylını aç",
-      "openFailed": "Əlavə edilmiş faylı açmaq mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
-      "attachFailed": "Fayl əlavə etmək mümkün olmadı.",
-      "limit": "Ən çox {{displayCount}} fayl əlavə edə bilərsən.",
-      "sizeRejection": "{{filename}} faylının ölçüsü icazə verilən {{limit}} həddini aşır.",
-      "unreadable": "{{filename}} faylını oxumaq mümkün olmadı.",
-      "pastedImage": "yapışdırılmış şəkil",
-      "defaultName": "Qoşma",
       "classificationDenied": "İcra olunan faylları əlavə etmək olmaz.",
       "classificationEmpty": "Fayl boşdur.",
       "classificationTooLarge": "Faylların ölçüsü 20 MB-dan çox olmamalıdır.",
@@ -943,426 +883,17 @@
       "networkError": "Şəbəkə xətası baş verdi.",
       "uploadFailed": "Yükləmə uğursuz oldu.",
       "nothingToPaste": "Yapışdırılacaq heç nə yoxdur.",
-      "metadataStripFailed": "Şəklin metaməlumatlarını silmək mümkün olmadı.",
-      "limit_one": "Ən çox {{displayCount}} fayl əlavə edə bilərsən.",
-      "limit_other": "Ən çox {{displayCount}} fayl əlavə edə bilərsən."
+      "metadataStripFailed": "Şəklin metaməlumatlarını silmək mümkün olmadı."
     },
     "attachmentPreview": {
-      "accessibility": "Fayl: {{filename}}, {{status}}",
-      "retryUploading": "{{filename}} faylını yenidən yüklə",
-      "remove": "{{filename}} faylını sil"
-    },
-    "messageBubble": {
-      "deleted": "[silinmiş mesaj]",
-      "yourMessage": "Sənin mesajın",
-      "messageFrom": "Göndərən: {{author}}",
-      "moreActions": "Digər əməliyyatlar",
-      "notDelivered": "Çatdırılmayıb",
-      "edited": "(redaktə edilib)",
-      "image": "Şəkil"
+      "accessibility": "Fayl: {{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Kopyalandı",
-      "copyFailed": "Kopyalamaq mümkün olmadı.",
-      "title": "Mesaj əməliyyatları",
-      "deleteTitle": "Mesaj silinsin?",
-      "deleteMessage": "Bu, mesajı söhbətdən siləcək.",
-      "deleteFailed": "Mesajı silmək mümkün olmadı.",
-      "removeReactionFailed": "Reaksiyanı silmək mümkün olmadı.",
-      "addReactionFailed": "Reaksiya əlavə etmək mümkün olmadı.",
-      "retrySend": "Yenidən göndər",
-      "moreReactions": "Daha çox reaksiya",
-      "edit": "Redaktə et",
-      "sendFailed": "Mesajı göndərmək mümkün olmadı.",
-      "retrySendFailed": "Mesajı yenidən göndərmək mümkün olmadı.",
-      "editFailed": "Mesajı redaktə etmək mümkün olmadı.",
-      "executeFailed": "Əməliyyatı icra etmək mümkün olmadı."
+      "edit": "Redaktə et"
     },
     "attachmentPicker": {
-      "takePhoto": "Şəkil çək",
-      "photoLibrary": "Qalereya",
-      "files": "Fayl",
       "cameraAccessMessage": "Şəkil çəkmək üçün parametrlərdə kameraya girişə icazə ver."
-    },
-    "typingIndicator": {
-      "someone": "Kimsə",
-      "typing_one": "{{name}} yazır...",
-      "typing": "{{names}} yazırlar...",
-      "typing_other": "{{names}} yazırlar..."
-    },
-    "botStatus": {
-      "offline": "Oflayn",
-      "loadingUser": "İstifadəçi məlumatları yüklənir...",
-      "waitingForStatus": "Botun statusu gözlənilir...",
-      "offlineMessage": "Bot oflayndır. Yenidən qoşulduqda mesaj mübadiləsi davam edəcək."
-    },
-    "errors": {
-      "notAllowed": "İcazə verilmir.",
-      "messageTooLong": "Mesaj çox uzundur. Simvol sayı {{limit}} həddindən az olmalıdır.",
-      "titleTooLong": "Başlıq çox uzundur. Simvol sayı {{limit}} həddindən az olmalıdır.",
-      "messageEmpty": "Mesaj boş ola bilməz."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw instanslarını yükləmək mümkün olmadı.",
-    "billing": {
-      "title": "Ödənişlər",
-      "continueMonthToMonth": "Aylıq planla davam et",
-      "plan": "Planlaşdırma",
-      "finalTermEnds": "Son dövrün bitmə tarixi",
-      "afterFinalTerm": "Son dövrdən sonra",
-      "ends": "Bitmə tarixi",
-      "expires": "Etibarlılıq müddəti",
-      "noActivePlan": "Aktiv plan yoxdur",
-      "noActivePlanDescription": "Aktiv KiloClaw abunəliyin yoxdur.",
-      "managedByAdmin": "Ödənişləri təşkilatının inzibatçısı idarə edir.",
-      "couldNotLoad": "Ödəniş məlumatlarını yükləmək mümkün olmadı.",
-      "manageOnWeb": "Ödənişləri saytda idarə et",
-      "earlybird": "Erkən giriş",
-      "finalCommitTermEndsOn": "Commit planının son dövrü {{date}} tarixində bitir. {{price}} qiymətinə Standard planı ilə davam et, əks halda hostinq dayandırılacaq.",
-      "freeTrial": "Pulsuz sınaq",
-      "hostingEnds": "Hostinq bitir",
-      "renews": "Yenilənmə tarixi",
-      "standardMonthToMonth": "Standard aylıq planı",
-      "standardStartsOn": "Standard planı {{date}} tarixində {{price}} qiymətinə başlayır.",
-      "yourStandardMonthlyPrice": "standard planın üzrə aylıq ödənişin",
-      "perMonth": "/ay",
-      "earlybirdAccessUntil": "Erkən giriş {{date}} tarixinədək qüvvədədir.",
-      "earlybirdEnding": "Erkən girişin bitməsinə qalan vaxt: {{remaining}}",
-      "paymentPastDue": "Ödənişin vaxtı keçib. Ödəniş üsulunu yenilə.",
-      "subscriptionCancels": "Abunəlik {{date}} tarixində ləğv ediləcək.",
-      "trialDaysRemaining": "Sınaq müddətinin bitməsinə {{remaining}} qalıb.",
-      "trialEndingSoon": "Sınaq müddəti tezliklə bitir. Qalan vaxt: {{remaining}}",
-      "lessThanOneDay": "1 Gündən az",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Kommit"
-    },
-    "changelog": {
-      "title": "Yeniliklər",
-      "couldNotLoad": "Dəyişiklik jurnalını yükləmək mümkün olmadı.",
-      "noUpdates": "Hələ yeniləmə yoxdur",
-      "noUpdatesDescription": "Dəyişiklik jurnalı qeydləri burada görünəcək.",
-      "recentUpdates": "Son yeniləmələr",
-      "manageVersion": "Versiyanı idarə et",
-      "redeployRequired": "Yenidən yerləşdirmə tələb olunur",
-      "redeploySuggested": "Yenidən yerləşdirmə tövsiyə olunur",
-      "upgradeRequired": "Yeniləmə tələb olunur"
-    },
-    "dashboard": {
-      "title": "İdarə paneli",
-      "couldNotLoad": "İdarə panelini yükləmək mümkün olmadı.",
-      "renameInstance": "İnstansın adını dəyiş",
-      "renamePlaceholder": "Yeni ad (ən çox 50 simvol)",
-      "someDetailsFailed": "Bəzi cari məlumatları yükləmək mümkün olmadı.",
-      "destroy": "Həmişəlik sil",
-      "destroyMessage": "KiloClaw instansın və ondakı bütün məlumatlar həmişəlik silinəcək. Bu əməliyyatı geri qaytarmaq mümkün deyil.",
-      "destroyTitle": "İnstansın həmişəlik silinməsi",
-      "instance": "İnstans",
-      "couldNotCheckStatus": "Xidmətin statusunu yoxlamaq mümkün olmadı.",
-      "dangerZone": "TƏHLÜKƏLİ ƏMƏLİYYATLAR",
-      "destroying": "Həmişəlik silinir…",
-      "serviceDegraded": "Xidmətin işində problem var — statusa baxmaq üçün toxun",
-      "up": "İŞLƏYİR"
-    },
-    "channels": {
-      "title": "Kanallar",
-      "couldNotLoad": "Kanalları yükləmək mümkün olmadı.",
-      "noChannels": "Əlçatan kanal yoxdur",
-      "noChannelsDescription": "Kanal inteqrasiyaları burada görünəcək.",
-      "connected": "{{label}} qoşulub",
-      "disconnectMessage": "{{label}} silinsin? Bu kanalla bağlantı kəsiləcək.",
-      "disconnectTitle": "Kanal bağlantısının kəsilməsi"
-    },
-    "devicePairing": {
-      "title": "Cihazın cütləşdirilməsi",
-      "refreshRequests": "Cütləşdirmə sorğularını yenilə",
-      "couldNotLoad": "Cütləşdirmə sorğularını yükləmək mümkün olmadı.",
-      "noPending": "Gözləyən sorğu yoxdur",
-      "noPendingDescription": "Kanal və cihazların cütləşdirmə sorğuları burada görünəcək.",
-      "channelRequests": "Kanal sorğuları",
-      "deviceRequests": "Cihaz sorğuları",
-      "approveDeviceMessage": "{{platform}} platformasının instansına qoşulmasına icazə verilsin?",
-      "approveDeviceTitle": "Cihazın təsdiqi",
-      "approveMessage": "{{label}} (kod: {{code}}) üçün instansına qoşulmağa icazə verilsin?",
-      "approveTitle": "Cütləşdirmə sorğusunun təsdiqi",
-      "unknownDevice": "Naməlum cihaz"
-    },
-    "execPolicy": {
-      "title": "İcra siyasəti",
-      "couldNotLoad": "İcra qaydalarını yükləmək mümkün olmadı.",
-      "alwaysAsk": "Həmişə soruş",
-      "alwaysAskDescription": "Hər əmri icra etməzdən əvvəl təsdiqlə. Ən təhlükəsiz seçimdir.",
-      "neverAsk": "Heç vaxt soruşma",
-      "neverAskDescription": "Əmrləri təsdiq olmadan icra et. Daha sürətli, amma daha az təhlükəsizdir."
-    },
-    "google": {
-      "title": "Google hesabı",
-      "couldNotLoad": "Google hesabının statusunu yükləmək mümkün olmadı.",
-      "disconnected": "Google hesabının bağlantısı kəsildi. Dəyişikliyi tətbiq etmək üçün instansını yenidən yerləşdir.",
-      "setupCommand": "Quraşdırma əmri",
-      "setupCommandHelp": "Google hesabını qoşmaq üçün bu əmri Docker quraşdırılmış öz kompüterinin terminalında icra et.",
-      "failedToLoadCommand": "Quraşdırma əmrini yükləmək mümkün olmadı.",
-      "gmailNotifications": "Gmail bildirişləri",
-      "disconnect": "Google hesabının bağlantısını kəs",
-      "copied": "Kopyalandı",
-      "copyCommand": "Əmrin surətini çıxar",
-      "disconnectConfirm": "Bağlantını kəs",
-      "disconnectMessage": "Google hesabın bu instansdan silinsin? Gmail bildirişləri söndürüləcək. Dəyişiklikləri tətbiq etmək üçün bağlantını kəsdikdən sonra instansı yenidən yerləşdir.",
-      "disconnectTitle": "Google bağlantısının kəsilməsi"
-    },
-    "modelList": {
-      "noMatches": "Axtarışına uyğun model yoxdur",
-      "noModelsDescription": "Modellər mövcud olduqda burada görünəcək.",
-      "noResultsFor": "“{{query}}” sorğusu üçün nəticə yoxdur."
-    },
-    "secrets": {
-      "title": "Məxfi məlumatlar",
-      "couldNotLoad": "Məxfi məlumatları yükləmək mümkün olmadı.",
-      "noSecrets": "Məxfi məlumat yoxdur",
-      "noSecretsDescription": "Məxfi məlumatlarla qurulan inteqrasiyalar burada görünəcək.",
-      "removeMessage": "{{label}} silinsin? Bu alət artıq öz giriş məlumatlarından istifadə edə bilməyəcək.",
-      "removeTitle": "Məxfi məlumatın silinməsi",
-      "saved": "{{label}} yadda saxlanıldı",
-      "hide": "{{label}} gizlət",
-      "show": "{{label}} göstər",
-      "allFieldsRequired": "{{label}} xidmətini qoşmaq üçün bütün sahələri doldurmaq lazımdır.",
-      "setupGuideFallback": "quraşdırma təlimatı",
-      "setupGuideA11y": "{{label}} quraşdırma təlimatı",
-      "setupGuide": "Quraşdırma təlimatı",
-      "saving": "Yadda saxlanılır…",
-      "removing": "Silinir…",
-      "updateToken": "Tokeni yenilə"
-    },
-    "versionPin": {
-      "title": "Versiyanın sabitlənməsi",
-      "couldNotLoad": "Versiya məlumatlarını yükləmək mümkün olmadı.",
-      "couldNotLoadMore": "Əlavə versiyaları yükləmək mümkün olmadı.",
-      "loadMore": "Daha çox versiya yüklə",
-      "showingLatest": "Son 100 versiya göstərilir.",
-      "availableVersions": "Əlçatan versiyalar",
-      "noVersions": "Əlçatan versiya yoxdur",
-      "noVersionsDescription": "Əlçatan OpenClaw versiyaları burada görünəcək.",
-      "unpin": "Sabitləməni ləğv et",
-      "unpinMessage": "Ən son əlçatan versiyaya qayıdılsın?",
-      "unpinTitle": "Versiyanın sabitlənməsinin ləğvi",
-      "confirmPin": "Sabitləməni təsdiqlə",
-      "followingLatest": "Son versiyanı izləyir",
-      "latest": "ən son",
-      "pin": "Sabitlə",
-      "pinnedByAdmin": "İnzibatçı tərəfindən sabitlənib — dəyişmək üçün inzibatçınla əlaqə saxla.",
-      "pinnedTo": "{{version}} versiyasına sabitlənib",
-      "reasonOptional": "Səbəb (məcburi deyil)",
-      "reasonPlaceholder": "Bu versiyanı sabitləməyinin səbəbi",
-      "replaceAdminPin": "İnzibatçının sabitləməsini əvəz et",
-      "replacesAdminPin": "Bu, inzibatçının təyin etdiyi sabitləməni əvəz edəcək (hazırda {{label}})."
-    },
-    "redeploy": "Yenidən yerləşdir",
-    "redeployMessage": "Bu instansı yenidən yerləşdirmək istədiyinə əminsən?",
-    "redeployTitle": "İnstansın yenidən yerləşdirilməsi",
-    "controls": {
-      "redeploying": "Yenidən yerləşdirilir…",
-      "restart": "Yenidən başlat",
-      "restartOpenClawMessage": "OpenClaw prosesini yenidən başlatmaq istədiyinə əminsən?",
-      "restartOpenClawTitle": "OpenClaw prosesinin yenidən başladılması",
-      "restarting": "Yenidən başladılır…",
-      "start": "Başlat",
-      "startMessage": "Bu instansı başlatmaq istədiyinə əminsən?",
-      "startTitle": "İnstansın başladılması",
-      "stop": "Dayandır",
-      "stopMessage": "Bu instansı dayandırmaq istədiyinə əminsən?",
-      "stopTitle": "İnstansın dayandırılması",
-      "stopping": "Dayandırılır…"
-    },
-    "empty": {
-      "finishingSetup": "Quraşdırma tamamlanır",
-      "finishingSetupDescription": "Bir az gözlə, hesabını hazırlayırıq. Bu, adətən çox vaxt çəkmir.",
-      "getStarted": "Başla",
-      "noInstancesDescription": "Kodlaşdırma agentlərini işə salmaq üçün ilk instansını yarat."
-    },
-    "instance": {
-      "backToInstances": "İnstanslara qayıt",
-      "couldNotLoad": "İnstansı yükləmək mümkün olmadı.",
-      "notFound": "İnstans tapılmadı",
-      "notFoundDescription": "Bu instans həmişəlik silinmiş ola bilər və ya keçid artıq etibarlı deyil."
-    },
-    "list": {
-      "createInstance": "İnstans yarat",
-      "organizations": "Təşkilatlar",
-      "accessIssue": {
-        "trialExpired": "Sınaq müddəti bitib — bu instansdan istifadə etməyə davam etmək üçün abunə ol",
-        "subscriptionCanceled": "Abunəlik aktiv deyil — bu instansdan istifadə etməyə davam etmək üçün yenidən abunə ol",
-        "subscriptionPastDue": "Ödəniş problemi var — bu instansdan istifadə etməyə davam etmək üçün ödəniş məlumatlarını yenilə",
-        "quarantined": "İnstans karantinə alınıb — mütəxəssis tərəfindən yoxlanmalıdır",
-        "multipleCurrentConflict": "Hesab yoxlanmalıdır",
-        "nonCanonicalEarlybird": "Köhnə plan nəzərdən keçirilməlidir"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}} ilə söhbət et",
-        "ready": "{{name}} hazırdır",
-        "warmedUp": "Hər şey hazırdır. Hazır olanda salam yaz."
-      },
-      "flow": {
-        "genericErrorBody": "İnstansının quraşdırılmasını indi tamamlamaq mümkün olmadı.",
-        "manualReviewBody": "İnstans yaratmazdan əvvəl hesabının vəziyyəti yoxlanmalıdır. kilo.ai saytında davam et.",
-        "manualReviewTitle": "Quraşdırma mütəxəssis tərəfindən yoxlanmalıdır",
-        "openKiloAi": "Kilo.ai-ni aç",
-        "provisioning": "Hazırlıq",
-        "review": "Yoxlama",
-        "identityTitle": "Botunun kimliyi",
-        "couldNotLoad": "İlkin quraşdırmanın vəziyyətini yükləmək mümkün olmadı.",
-        "finishingSetup": "Quraşdırma tamamlanır — hesabın hazır olana qədər bir az gözlə.",
-        "ready": "Hazır",
-        "settingUp": "Quraşdırılır…"
-      },
-      "unavailableDescription": "İnstans hazırlamaq üçün aktiv KiloClaw abunəliyi lazımdır. Mövcud instanslar və abunəliklər əvvəlki kimi işləməyə davam edir.",
-      "unavailableTitle": "Yeni KiloClaw instansları əlçatan deyil",
-      "identity": {
-        "chooseAvatar": "Avatar seç",
-        "namePlaceholder": "Botun adı",
-        "selectAvatar": "Avatar kimi {{name}} seç",
-        "personality": "Xarakter",
-        "changePersonality": "Xarakteri dəyiş",
-        "location": "Məkan",
-        "locationPlaceholder": "Şəhər və ya bölgə (məcburi deyil)",
-        "useCurrentLocation": "Cari məkandan istifadə et",
-        "locationDeniedTitle": "Məkan məlumatlarına giriş rədd edildi",
-        "locationDeniedMessage": "Cari məkanından istifadə etmək üçün parametrlərdə məkan məlumatlarına girişə icazə ver.",
-        "locationValidationFailed": "Məkan təsdiqlənə bilmədi.",
-        "locationResolveFailed": "Məkanını müəyyən etmək mümkün olmadı. Onu əl ilə redaktə edə bilərsən.",
-        "locationGetFailed": "Məkan məlumatlarını almaq mümkün olmadı. Onları əl ilə daxil et.",
-        "nature": {
-          "aiAssistantLabel": "Süni intellekt köməkçisi",
-          "aiAssistantVibe": "Yardımsevər, bacarıqlı, peşəkar",
-          "digitalCreatureLabel": "Rəqəmsal varlıq",
-          "digitalCreatureVibe": "Özünəməxsus, canlı, bir az gözlənilməz",
-          "virtualCompanionLabel": "Virtual yoldaş",
-          "virtualCompanionVibe": "Səmimi, həmişə yanında, həqiqətən qayğıkeş",
-          "somethingWeirderLabel": "Daha qəribə bir şey…",
-          "somethingWeirderVibe": "Özün müəyyən et"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Hazırdır! İstədiyin xülasəni hazırladım. İstədiyin vaxt baxa bilərsən.",
-        "settingUp": "Bildirişlər quraşdırılır…",
-        "stayInTheLoop": "Yeniliklərdən xəbərdar ol",
-        "getNotified": "{{name}} tapşırığı bitirdikdə bildiriş al ki, heç bir cavabı nəzərdən qaçırmayasan.",
-        "now": "indi",
-        "skipForNow": "Hələlik keç",
-        "couldNotEnable": "Bildirişlər aktiv edilə bilmədi."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Quraşdırmanın vəziyyətini yoxlamaq mümkün olmadı",
-        "queryErrorBody": "{{name}} üçün quraşdırmanın vəziyyətini yoxlayarkən bağlantı kəsildi. Quraşdırma hələ davam edə bilər. Yenidən cəhd et və ya bir az sonra yoxla.",
-        "stoppedTitle": "Quraşdırma dayandı",
-        "stoppedBody": "{{name}} üçün instans quraşdırma zamanı gözlənilmədən dayandı.",
-        "stalledTitle": "Quraşdırma irəliləmir",
-        "stalledBody": "{{name}} üçün quraşdırmanı tamamlamaq mümkün olmadı. Yenidən cəhd et. Problem təkrarlanarsa, {{supportEmail}} ünvanına yaz.",
-        "timeoutTitle": "Gözləniləndən çox çəkir",
-        "timeoutBody": "{{name}} üçün quraşdırma həmişəkindən çox vaxt aparır ({{displayMinutes}} dəqiqədən çox).",
-        "continueInBackground": "Fonda davam et",
-        "settingUp": "{{name}} quraşdırılır",
-        "connectingToAgent": "Agentə qoşulma gedir",
-        "startingSandbox": "Təcrid olunmuş mühit başladılır",
-        "backgroundHint": "Bu, adətən bir dəqiqədən az vaxt aparır. Bu ekranı bağlaya bilərsən — quraşdırma arxa planda davam edəcək."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kod {{code}}",
-      "gatewayProcess": "ŞLÜZ PROSESİ",
-      "lastExit": "Son çıxış",
-      "memory": "Yaddaş",
-      "region": "Bölgə",
-      "resources": "RESURSLAR",
-      "restarts": "Yenidən başlatmalar",
-      "state": "Vəziyyət",
-      "uptime": "İşləmə müddəti",
-      "crashed": "ÇÖKÜB",
-      "destroying": "HƏMİŞƏLİK SİLİNİR",
-      "provisioned": "HAZIRLANIB",
-      "restarting": "YENİDƏN BAŞLADILIR",
-      "running": "İŞLƏYİR",
-      "shuttingDown": "SÖNDÜRÜLÜR",
-      "starting": "BAŞLADILIR",
-      "stopped": "DAYANDIRILIB",
-      "stopping": "DAYANDIRILIR",
-      "unknown": "NAMƏLUM",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Ən qabaqcıl",
-      "frontierDescription": "Ən yüksək məhsuldarlıq. Sorğuları məntiqi düşünmə qabiliyyətli ən qabaqcıl modellərə yönləndirir.",
-      "balancedDescription": "Daha aşağı qiymətə sürət və imkanlar arasında optimal tarazlıq yaradır.",
-      "autoModelA11y": "{{label}} avtomatik modeli",
-      "currentModel": "Cari model",
-      "browseAllModels": "və ya 500-dən çox model arasından seç",
-      "browseAllModelsA11y": "500-Dən çox modelin hamısına bax"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw-dan istifadə etməyə davam etmək üçün brauzerdə kilo.ai/claw ünvanını aç. Tətbiqdən abunə olmaq mümkün deyil.",
-      "subscriptionCanceledTitle": "Saytda abunə ol",
-      "subscriptionCanceledBody": "KiloClaw-dan istifadə etmək üçün brauzerdə kilo.ai/claw ünvanını aç. Tətbiqdən abunə olmaq mümkün deyil.",
-      "subscriptionCanceledCta": "Kilo.ai/claw ünvanını aç",
-      "subscriptionPastDueTitle": "Ödəniş məlumatlarını saytda yenilə",
-      "subscriptionPastDueBody": "Son ödənişində problem yarandı. Ödəniş məlumatlarını yeniləmək üçün brauzerdə kilo.ai/claw ünvanını aç. Ödənişləri tətbiqdən idarə etmək mümkün deyil.",
-      "quarantinedTitle": "İnstansın bərpası lazımdır",
-      "quarantinedBody": "KiloClaw instansın karantinə alınıb və hazırda ondan istifadə etmək mümkün deyil. Onun bərpası üçün komandamızın köməyi lazımdır.",
-      "multipleCurrentConflictBody": "Hesabında birdən çox aktiv abunəlik aşkar etdik. Səndən iki dəfə ödəniş tutulmasın deyə əməliyyatları müvəqqəti dayandırdıq.",
-      "multipleCurrentConflictCta": "Kilo.ai saytında davam et",
-      "nonCanonicalEarlybirdTitle": "Köhnə plan aşkarlandı",
-      "nonCanonicalEarlybirdBody": "Erkən giriş planından mobil cihazda istifadə etməzdən əvvəl plan mütəxəssis tərəfindən yoxlanmalıdır.",
-      "iosTitle": "KiloClaw iOS-da əlçatan deyil",
-      "iosBody": "Bu hesab üçün KiloClaw girişi iOS tətbiqindən kənarda idarə olunur.",
-      "iosContact": "Sualın var? {{supportEmail}} ünvanına yaz.",
-      "quarantinedCta": "Komandamıza e-poçt göndər",
-      "nonCanonicalEarlybirdCta": "Planını kilo.ai saytında nəzərdən keçir"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} diqqət tələb edir: {{label}}",
-      "openUnread_one": "{{name}} aç, {{displayCount}} oxunmamış mesaj var",
-      "openUnread": "{{name}} aç, {{displayCount}} oxunmamış mesaj",
-      "openUnread_other": "{{name}} aç, {{displayCount}} oxunmamış mesaj",
-      "openSettings": "{{name}} üçün parametrləri aç",
-      "fixOnKiloAi": "Kilo.ai saytında düzəlt: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Cihaz sorğularını təsdiqlə",
-      "execPolicyDescription": "Təhlükəsizlik parametrləri",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Süni intellekt modelinin seçimi",
-      "secretsDescription": "Şifrələnmiş giriş məlumatları",
-      "versionPinDescription": "Müəyyən bir versiyaya sabitlə"
-    },
-    "avatar": {
-      "arcade": "Oyun avtomatı",
-      "brain": "Beyin",
-      "creature": "Varlıq",
-      "crystal": "Kristal",
-      "custom": "Xüsusi avatar",
-      "dragon": "Əjdaha",
-      "explorer": "Kəşfiyyatçı",
-      "flame": "Alov",
-      "lightning": "İldırım",
-      "magicWand": "Sehrli çubuq",
-      "moon": "Ay",
-      "operator": "İdarəçi",
-      "orbit": "Orbita",
-      "oracle": "Kahin",
-      "rainbow": "Göy qurşağı",
-      "robot": "Robot avatarı",
-      "satellite": "Peyk",
-      "sparkles": "Parıltılar",
-      "strongArm": "Güclü qol",
-      "talisman": "Tilsim"
-    },
-    "remoteSpawnFilesNotSupported": "Bu instans fayl qəbul edə bilmir.",
-    "instanceSwitcherTitle": "KiloClaw instansı"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}} faylını sola keçir",
       "moveRight": "{{filename}} faylını sağa keçir"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Mübadilə buferindən şəkil yapışdır",
-      "label": "Şəkil tapıldı, yapışdırmaq üçün toxun"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Qalereya",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "Sessiyadan çıxıldı.",
     "signOutThisDeviceTitle": "Bu cihazdan çıxış edilsin?",
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",
-    "signOutThisSessionMessage": "{{device}} cihazındakı hesabdan çıxılacaq. Cihazın API-yə girişi bir saata qədər davam edə bilər."
+    "signOutThisSessionMessage": "{{device}} cihazındakı hesabdan çıxılacaq. Cihazın API-yə girişi bir saata qədər davam edə bilər.",
+    "unknownDevice": "Naməlum cihaz"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Tətbiq mağazası açıla bilmədi.",

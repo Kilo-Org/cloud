@@ -16,13 +16,13 @@ export type DeviceSession = inferRouterOutputs<MobileRouter>['user']['listDevice
 export function deviceSessionLabel(userAgent: string | null | undefined): string {
   const trimmed = userAgent?.trim() ?? '';
   if (!trimmed) {
-    return i18n.t('kiloclaw.devicePairing.unknownDevice');
+    return i18n.t('deviceSessions.unknownDevice');
   }
   if (trimmed.startsWith('Mozilla/')) {
     return i18n.t('deviceSessions.webBrowser');
   }
   // "Kilo-Code/1.2.3 (darwin; arm64)" → "Kilo-Code" (drop the version and the rest).
-  return trimmed.split(/[\s/]/)[0] ?? i18n.t('kiloclaw.devicePairing.unknownDevice');
+  return trimmed.split(/[\s/]/)[0] ?? i18n.t('deviceSessions.unknownDevice');
 }
 
 /**

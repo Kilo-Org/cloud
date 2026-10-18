@@ -26,7 +26,6 @@ test('builds LAN URLs for every mobile-facing local service', () => {
     values.get('SESSION_INGEST_WS_URL'),
     `ws://192.168.1.10:${getService('cloudflare-session-ingest').port}`
   );
-  assert.equal(values.get('KILO_CHAT_URL'), `http://192.168.1.10:${getService('kilo-chat').port}`);
   assert.equal(
     values.get('EVENT_SERVICE_URL'),
     `ws://192.168.1.10:${getService('event-service').port}`

@@ -101,12 +101,9 @@
     "scheduled": "Naka-iskedyul",
     "keepEditing": "Ituloy ang pag-edit",
     "keepRunning": "Hayaang tumakbo",
-    "kiloclaw": "KiloClaw",
     "newSession": "Bagong sesyon",
-    "noKiloclawInstances": "Walang instance ng KiloClaw",
     "noModelsAvailable": "Walang magagamit na modelo",
     "notFound": "Hindi mahanap.",
-    "online": "Nakakonekta",
     "open": "Buksan ang {{name}}",
     "openPullRequest": "Buksan ang PR",
     "pending": "Nakabinbin",
@@ -257,7 +254,8 @@
     "renamePasskey": "Palitan ang pangalan ng passkey",
     "removePasskey": "Alisin ang passkey",
     "removePasskeyTitle": "Alisin ang passkey?",
-    "removePasskeyMessage": "Hindi ka na makakapag-sign in gamit ang passkey na ito."
+    "removePasskeyMessage": "Hindi ka na makakapag-sign in gamit ang passkey na ito.",
+    "changelog": "Mga bago"
   },
   "preferences": {
     "general": "Pangkalahatan",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Ipinapaalam ng mga notipikasyon na may nangyari. Buksan ang Kilo para basahin ang mensahe.",
     "channel": {
       "agentProgress": "Pag-usad ng ahente",
-      "chat": "Mga mensahe sa usapan",
-      "kiloclaw": "Aktibidad ng KiloClaw",
       "balance": "Mga babala sa balanse",
       "security": "Mga natukoy na isyu sa seguridad",
       "spend": "Mga babala sa gastos",
       "followedSessions": "Mga sinusubaybayang sesyon"
     },
     "category": {
-      "chatMessagesSubtitle": "mga tugon sa iyong mga pag-uusap",
       "agentAttentionTitle": "Kailangan ka ng ahente",
       "agentAttentionSubtitle": "mga tanong, pahintulot, kailangang sagot",
       "agentUpdatesTitle": "Mga update ng ahente",
       "agentUpdatesSubtitle": "mga mensahe mula sa ahente habang isinasagawa ang gawain",
       "sessionStatusTitle": "Status ng sesyon",
       "sessionStatusSubtitle": "tapos / nabigo / handa nang kontrolin",
-      "kiloclawActivitySubtitle": "handa o nabigo ang instance, mga nakaiskedyul na aksyon",
-      "kiloclawActivityUnavailable": "Magsimula ng instance ng KiloClaw para makakuha ng aktibidad ng KiloClaw.",
       "balanceAlertsSubtitle": "mga babala sa mababang balanse ng organisasyon",
       "balanceAlertsUnavailable": "Sumali sa isang organisasyon para makakuha ng mga babala sa balanse.",
       "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Simula",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, tab, {{position}} sa {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Paglipat ng instance",
-      "couldNotLoadInstances": "Hindi ma-load ang mga instance.",
-      "noInstancesDescription": "Mag-set up ng instance para magsimula ng chat.",
-      "setUpKiloclaw": "I-set up ang KiloClaw",
-      "currentInstance": "{{title}}, kasalukuyan"
-    },
     "conversation": {
-      "failedToLoad": "Hindi ma-load ang pag-uusap.",
-      "notFound": "Hindi makita ang pag-uusap.",
       "untitled": "Walang pamagat",
-      "leaveTitle": "Umalis sa pag-uusap?",
-      "leaveMessage": "Mawawala ang pag-uusap sa listahan mo.",
-      "openHint": "Binubuksan ang pag-uusap. Pindutin nang matagal para makita ang mga opsyon sa pagpapalit ng pangalan at pag-alis.",
-      "unread": "Hindi pa nababasa",
-      "optionsFor": "Mga opsyon ng pag-uusap na {{title}}",
-      "options": "Mga opsyon ng pag-uusap",
-      "renameTitle": "Pagpapalit ng pangalan ng pag-uusap",
-      "renamePlaceholder": "Bagong pangalan",
-      "couldNotReachBot": "Hindi makakonekta sa bot. Pakisubukang muli.",
-      "messageDeliveryFailed": "Hindi naihatid ang mensahe sa bot.",
-      "couldNotSignIn": "Hindi makapag-sign in sa chat.",
-      "couldNotRefreshMessages": "Hindi ma-refresh ang mga mensahe.",
-      "couldNotLoadHistory": "Hindi ma-load ang kasaysayan ng pag-uusap.",
-      "leave": "Umalis",
-      "untitledConversation": "Pag-uusap na walang pamagat",
-      "createFailed": "Hindi nagawa ang pag-uusap.",
-      "leaveFailed": "Hindi nakaalis sa pag-uusap."
-    },
-    "reactions": {
-      "common": "Mga karaniwan",
-      "reactWith": "Magbigay ng reaksiyong {{reaction}}",
-      "accessibility": "Reaksiyong {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Sumasagot sa",
-      "cancelReply": "Kanselahin ang sagot",
-      "openInstance": "Buksan ang instance",
-      "attachFile": "Ilakip ang file",
-      "cancelEdit": "Kanselahin ang pag-edit"
+      "renamePlaceholder": "Bagong pangalan"
     },
     "conversationList": {
-      "couldNotLoad": "Hindi ma-load ang mga pag-uusap.",
-      "emptyTitle": "Wala pang pag-uusap",
-      "emptyDescription": "Gumawa ng pag-uusap para makipag-chat sa iyong instance ng KiloClaw.",
-      "create": "Gumawa ng pag-uusap",
-      "newConversation": "Bagong pag-uusap",
-      "openInstanceSettings": "Buksan ang mga setting ng instance",
       "today": "Ngayon",
       "yesterday": "Kahapon",
-      "thisWeek": "Ngayong linggo",
       "older": "Mas luma"
     },
     "attachment": {
-      "open": "Buksan ang {{filename}}",
-      "openFailed": "Hindi mabuksan ang kalakip. Suriin ang koneksyon mo at subukang muli.",
-      "attachFailed": "Hindi nailakip ang file.",
-      "limit": "Maaari kang maglakip ng hanggang {{displayCount}} file.",
-      "sizeRejection": "Lampas sa limitasyong {{limit}} para sa kalakip ang {{filename}}.",
-      "unreadable": "Hindi mabasa ang {{filename}}.",
-      "pastedImage": "ang na-paste na larawan",
-      "defaultName": "Kalakip",
       "classificationDenied": "Hindi maaaring ilakip ang mga executable file.",
       "classificationEmpty": "Walang laman ang file.",
       "classificationTooLarge": "Dapat 20 MB o mas maliit ang mga file.",
@@ -943,426 +883,17 @@
       "networkError": "Nagkaproblema sa network.",
       "uploadFailed": "Nabigo ang pag-upload.",
       "nothingToPaste": "Walang maipa-paste.",
-      "metadataStripFailed": "Hindi maalis ang metadata ng larawan.",
-      "limit_one": "Maaari kang maglakip ng hanggang {{displayCount}} file.",
-      "limit_other": "Maaari kang maglakip ng hanggang {{displayCount}} file."
+      "metadataStripFailed": "Hindi maalis ang metadata ng larawan."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Subukang i-upload muli ang {{filename}}",
-      "remove": "Alisin ang {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[na-delete na mensahe]",
-      "yourMessage": "Iyong mensahe",
-      "messageFrom": "Mensahe mula kay {{author}}",
-      "moreActions": "Iba pang aksiyon",
-      "notDelivered": "Hindi naihatid",
-      "edited": "(na-edit)",
-      "image": "Larawan"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Kinopya",
-      "copyFailed": "Hindi nakopya.",
-      "title": "Mga aksiyon sa mensahe",
-      "deleteTitle": "I-delete ang mensahe?",
-      "deleteMessage": "Aalisin nito ang mensahe sa pag-uusap.",
-      "deleteFailed": "Hindi na-delete ang mensahe.",
-      "removeReactionFailed": "Hindi naalis ang reaksiyon.",
-      "addReactionFailed": "Hindi naidagdag ang reaksiyon.",
-      "retrySend": "Ipadala muli",
-      "moreReactions": "Iba pang reaksiyon",
-      "edit": "I-edit",
-      "sendFailed": "Hindi naipadala ang mensahe.",
-      "retrySendFailed": "Hindi naipadala muli ang mensahe.",
-      "editFailed": "Hindi na-edit ang mensahe.",
-      "executeFailed": "Hindi naisagawa ang aksiyon."
+      "edit": "I-edit"
     },
     "attachmentPicker": {
-      "takePhoto": "Kumuha ng larawan",
-      "photoLibrary": "Mga larawan",
-      "files": "Mga payl",
       "cameraAccessMessage": "Payagan ang paggamit ng kamera sa mga setting para makakuha ng larawan."
-    },
-    "typingIndicator": {
-      "someone": "Isang tao",
-      "typing_one": "Nagta-type si {{name}}...",
-      "typing": "Nagta-type sina {{names}}...",
-      "typing_other": "Nagta-type sina {{names}}..."
-    },
-    "botStatus": {
-      "offline": "Hindi nakakonekta",
-      "loadingUser": "Nilo-load ang gumagamit...",
-      "waitingForStatus": "Naghihintay sa katayuan ng bot...",
-      "offlineMessage": "Hindi nakakonekta ang bot. Magpapatuloy ang pagpapadala ng mga mensahe kapag nakakonekta na itong muli."
-    },
-    "errors": {
-      "notAllowed": "Hindi ito pinapayagan.",
-      "messageTooLong": "Masyadong mahaba ang mensahe. Gumamit ng mas kaunti sa {{limit}} character.",
-      "titleTooLong": "Masyadong mahaba ang pamagat. Gumamit ng mas kaunti sa {{limit}} character.",
-      "messageEmpty": "Hindi maaaring walang laman ang mensahe."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Hindi ma-load ang mga instance ng KiloClaw.",
-    "billing": {
-      "title": "Pagsingil",
-      "continueMonthToMonth": "Magpatuloy nang buwan-buwan",
-      "plan": "Plano",
-      "finalTermEnds": "Magtatapos ang huling termino",
-      "afterFinalTerm": "Pagkatapos ng huling termino",
-      "lessThanOneDay": "Wala pang 1 araw",
-      "ends": "Magtatapos",
-      "expires": "Mawawalan ng bisa",
-      "noActivePlan": "Walang aktibong plano",
-      "noActivePlanDescription": "Wala kang aktibong subscription sa KiloClaw.",
-      "managedByAdmin": "Pinamamahalaan ng admin ng organisasyon mo ang pagsingil.",
-      "couldNotLoad": "Hindi ma-load ang impormasyon sa pagsingil.",
-      "manageOnWeb": "Pamahalaan ang pagsingil sa web",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Magtatapos ang huling termino mo sa Commit sa {{date}}. Lumipat sa Standard sa halagang {{price}} para magpatuloy, kung hindi ay matatapos ang hosting.",
-      "freeTrial": "Libreng pagsubok",
-      "hostingEnds": "Magtatapos ang hosting",
-      "renews": "Magre-renew",
-      "standardMonthToMonth": "Standard na buwanan",
-      "standardStartsOn": "Magsisimula ang Standard sa {{date}} sa halagang {{price}}.",
-      "yourStandardMonthlyPrice": "ang iyong buwanang presyo sa Standard",
-      "perMonth": "/buwan",
-      "earlybirdAccessUntil": "Magagamit ang Earlybird hanggang {{date}}.",
-      "earlybirdEnding": "Matatapos ang Earlybird sa loob ng {{remaining}}.",
-      "paymentPastDue": "Lampas na sa takdang petsa ang bayad. Pakipalitan ang paraan ng pagbabayad mo.",
-      "subscriptionCancels": "Kakanselahin ang subscription sa {{date}}.",
-      "trialDaysRemaining": "May {{remaining}} pang natitira sa pagsubok.",
-      "trialEndingSoon": "Malapit nang matapos ang pagsubok: {{remaining}} na lang.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Mga bago",
-      "couldNotLoad": "Hindi ma-load ang talaan ng mga pagbabago.",
-      "noUpdates": "Wala pang update",
-      "noUpdatesDescription": "Lalabas dito ang mga tala ng pagbabago.",
-      "recentUpdates": "Mga kamakailang update",
-      "manageVersion": "Pamahalaan ang bersyon",
-      "redeployRequired": "Kailangang mag-redeploy",
-      "redeploySuggested": "Iminumungkahing mag-redeploy",
-      "upgradeRequired": "Kailangang mag-upgrade"
-    },
-    "dashboard": {
-      "title": "Pangkalahatang-ideya",
-      "couldNotLoad": "Hindi ma-load ang pangkalahatang-ideya.",
-      "renameInstance": "Palitan ang pangalan ng instance",
-      "renamePlaceholder": "Bagong pangalan (hanggang 50 character)",
-      "someDetailsFailed": "Hindi ma-load ang ilang kasalukuyang detalye.",
-      "destroy": "Burahin nang permanente",
-      "destroyMessage": "Permanente nitong buburahin ang instance mo ng KiloClaw at lahat ng data nito. Hindi na ito maibabalik.",
-      "destroyTitle": "Burahin nang permanente ang instance",
-      "instance": "Instance ng server",
-      "couldNotCheckStatus": "Hindi masuri ang status ng serbisyo.",
-      "dangerZone": "MGA MAPANGANIB NA AKSIYON",
-      "destroying": "Binubura nang permanente…",
-      "serviceDegraded": "May problema ang serbisyo — i-tap para tingnan ang status",
-      "up": "GUMAGANA"
-    },
-    "channels": {
-      "title": "Mga channel",
-      "couldNotLoad": "Hindi ma-load ang mga channel.",
-      "noChannels": "Walang magagamit na channel",
-      "noChannelsDescription": "Lalabas dito ang mga integrasyon ng channel.",
-      "connected": "Nakakonekta na ang {{label}}",
-      "disconnectMessage": "Alisin ang {{label}}? Madidiskonekta ang channel na ito.",
-      "disconnectTitle": "Idiskonekta ang channel"
-    },
-    "devicePairing": {
-      "title": "Pagpapares ng aparato",
-      "refreshRequests": "I-refresh ang mga kahilingan sa pagpapares",
-      "couldNotLoad": "Hindi ma-load ang mga kahilingan sa pagpapares.",
-      "noPending": "Walang nakabinbing kahilingan",
-      "noPendingDescription": "Lalabas dito ang mga kahilingan sa pagpapares ng channel at device.",
-      "channelRequests": "Mga kahilingan sa channel",
-      "deviceRequests": "Mga kahilingan sa device",
-      "approveDeviceMessage": "Payagan ang {{platform}} na kumonekta sa iyong instance?",
-      "approveDeviceTitle": "Aprubahan ang device",
-      "approveMessage": "Payagan ang {{label}} (code: {{code}}) na kumonekta sa iyong instance?",
-      "approveTitle": "Aprubahan ang kahilingan sa pagpapares",
-      "unknownDevice": "Hindi kilalang device"
-    },
-    "execPolicy": {
-      "title": "Patakaran sa pagpapatakbo",
-      "couldNotLoad": "Hindi ma-load ang patakaran sa pagpapatakbo ng mga command.",
-      "alwaysAsk": "Palaging magtanong",
-      "alwaysAskDescription": "Kumpirmahin ang bawat command bago ito patakbuhin. Ito ang pinakaligtas.",
-      "neverAsk": "Huwag magtanong",
-      "neverAskDescription": "Patakbuhin ang mga command nang walang kumpirmasyon. Mas mabilis pero hindi gaanong ligtas."
-    },
-    "google": {
-      "title": "Account sa Google",
-      "couldNotLoad": "Hindi ma-load ang status ng Google account.",
-      "disconnected": "Nadiskonekta ang Google account. I-redeploy ang instance mo para mailapat ang pagbabago.",
-      "setupCommand": "Command sa pag-setup",
-      "setupCommandHelp": "Para ikonekta ang Google account mo, patakbuhin ang command na ito sa terminal ng sarili mong computer na may naka-install na Docker.",
-      "failedToLoadCommand": "Hindi ma-load ang command sa pag-setup.",
-      "gmailNotifications": "Mga notification sa Gmail",
-      "disconnect": "Idiskonekta ang Google account",
-      "copied": "Kinopya",
-      "copyCommand": "Kopyahin ang command",
-      "disconnectConfirm": "Idiskonekta",
-      "disconnectMessage": "Alisin ang Google account mo sa instance na ito? Ihihinto nito ang mga notification sa Gmail. Mag-redeploy pagkatapos magdiskonekta para mailapat ang mga pagbabago.",
-      "disconnectTitle": "Idiskonekta ang Google"
-    },
-    "modelList": {
-      "noMatches": "Walang modelong tumutugma sa iyong paghahanap",
-      "noModelsDescription": "Lalabas dito ang mga modelo kapag puwede nang gamitin.",
-      "noResultsFor": "Walang resulta para sa \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Mga sikreto",
-      "couldNotLoad": "Hindi ma-load ang mga secret.",
-      "noSecrets": "Walang magagamit na secret",
-      "noSecretsDescription": "Lalabas dito ang mga integrasyon ng secret.",
-      "removeMessage": "Alisin ang {{label}}? Mawawalan ng access ang tool na ito sa mga credential nito.",
-      "removeTitle": "Alisin ang secret",
-      "saved": "Nai-save ang {{label}}",
-      "hide": "Itago ang {{label}}",
-      "show": "Ipakita ang {{label}}",
-      "allFieldsRequired": "Punan ang lahat ng field para ikonekta ang {{label}}.",
-      "setupGuideFallback": "gabay sa pag-setup",
-      "setupGuideA11y": "gabay sa pag-setup ng {{label}}",
-      "setupGuide": "Gabay sa pag-setup",
-      "saving": "Sine-save…",
-      "removing": "Inaalis…",
-      "updateToken": "I-update ang token"
-    },
-    "versionPin": {
-      "title": "Pag-pin ng bersyon",
-      "couldNotLoad": "Hindi ma-load ang impormasyon ng bersyon.",
-      "couldNotLoadMore": "Hindi ma-load ang iba pang bersyon.",
-      "loadMore": "I-load ang iba pang bersyon",
-      "showingLatest": "Ipinapakita ang 100 pinakabagong bersyon.",
-      "availableVersions": "Mga magagamit na bersyon",
-      "noVersions": "Walang magagamit na bersyon",
-      "noVersionsDescription": "Lalabas dito ang mga bersyon ng OpenClaw na puwedeng gamitin.",
-      "unpin": "Alisin ang pagkaka-pin",
-      "unpinMessage": "Bumalik sa pinakabagong bersyong puwedeng gamitin?",
-      "unpinTitle": "Alisin ang pagkaka-pin ng bersyon",
-      "confirmPin": "Kumpirmahin ang pag-pin",
-      "followingLatest": "Gamit ang pinakabago",
-      "latest": "pinakabago",
-      "pin": "I-pin",
-      "pinnedByAdmin": "Naka-pin ayon sa admin — makipag-ugnayan sa admin mo para baguhin ito.",
-      "pinnedTo": "Naka-pin sa {{version}}",
-      "reasonOptional": "Dahilan (opsyonal)",
-      "reasonPlaceholder": "Dahilan ng pag-pin sa bersyong ito",
-      "replaceAdminPin": "Palitan ang naka-pin na bersyon ng admin",
-      "replacesAdminPin": "Papalitan nito ang bersyong naka-pin ayon sa admin (kasalukuyang {{label}})."
-    },
-    "redeploy": "I-deploy muli",
-    "redeployMessage": "Sigurado ka bang gusto mong i-redeploy ang instance na ito?",
-    "redeployTitle": "I-redeploy ang instance",
-    "controls": {
-      "redeploying": "Nire-redeploy…",
-      "restart": "I-restart",
-      "restartOpenClawMessage": "Sigurado ka bang gusto mong i-restart ang proseso ng OpenClaw?",
-      "restartOpenClawTitle": "I-restart ang OpenClaw",
-      "restarting": "Nire-restart…",
-      "start": "Simulan",
-      "startMessage": "Sigurado ka bang gusto mong simulan ang instance na ito?",
-      "startTitle": "Simulan ang instance",
-      "stop": "Ihinto",
-      "stopMessage": "Sigurado ka bang gusto mong ihinto ang instance na ito?",
-      "stopTitle": "Ihinto ang instance",
-      "stopping": "Hinihinto…"
-    },
-    "empty": {
-      "finishingSetup": "Tinatapos ang setup",
-      "finishingSetupDescription": "Sandali lang, tinatapos namin ang pag-setup ng account mo. Karaniwan, sandali lang ito.",
-      "getStarted": "Magsimula",
-      "noInstancesDescription": "Gumawa ng una mong instance para magpatakbo ng mga agent sa pag-code."
-    },
-    "instance": {
-      "backToInstances": "Bumalik sa mga instance",
-      "couldNotLoad": "Hindi ma-load ang instance.",
-      "notFound": "Hindi nahanap ang instance",
-      "notFoundDescription": "Maaaring permanenteng nabura na ang instance na ito, o wala nang bisa ang link."
-    },
-    "list": {
-      "createInstance": "Gumawa ng instance",
-      "organizations": "Mga organisasyon",
-      "accessIssue": {
-        "trialExpired": "Tapos na ang pagsubok — mag-subscribe para patuloy na magamit ang instance na ito",
-        "subscriptionCanceled": "Hindi aktibo ang subscription, mag-subscribe muli para magamit pa ang instance na ito",
-        "subscriptionPastDue": "May problema sa pagbabayad — i-update ang impormasyon sa pagsingil para patuloy na magamit ang instance na ito",
-        "quarantined": "Nakahiwalay ang instance — kailangang suriin ng tao",
-        "multipleCurrentConflict": "Kailangang suriin ang account",
-        "nonCanonicalEarlybird": "Kailangang suriin ang lumang plano"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Makipag-chat kay {{name}}",
-        "ready": "Handa na si {{name}}",
-        "warmedUp": "Handa na ang lahat. Bumati kapag handa ka na."
-      },
-      "flow": {
-        "genericErrorBody": "Hindi namin makumpleto ang pag-setup ng instance mo sa ngayon.",
-        "manualReviewBody": "Kailangang ayusin ang status ng account mo bago kami makagawa ng instance. Magpatuloy sa kilo.ai.",
-        "manualReviewTitle": "Kailangang suriin ng tao ang pag-setup",
-        "openKiloAi": "Buksan ang kilo.ai",
-        "provisioning": "Paghahanda ng instance",
-        "review": "Pagsusuri",
-        "identityTitle": "Pagkakakilanlan ng bot mo",
-        "couldNotLoad": "Hindi ma-load ang status ng paunang pag-setup.",
-        "finishingSetup": "Tinatapos ang pag-setup — maghintay sandali habang inaayos namin ang account mo.",
-        "ready": "Handa na",
-        "settingUp": "Sine-set up…"
-      },
-      "unavailableDescription": "Kailangan ng aktibong subscription sa KiloClaw para makapaghanda ng instance. Magpapatuloy gaya ng dati ang mga instance at subscription na mayroon ka na.",
-      "unavailableTitle": "Hindi makagawa ng bagong instance ng KiloClaw",
-      "identity": {
-        "chooseAvatar": "Pumili ng avatar",
-        "namePlaceholder": "Pangalan ng bot mo",
-        "selectAvatar": "Piliin ang {{name}} bilang avatar",
-        "personality": "Personalidad",
-        "changePersonality": "Palitan ang personalidad",
-        "location": "Lokasyon",
-        "locationPlaceholder": "Lungsod o rehiyon (opsyonal)",
-        "useCurrentLocation": "Gamitin ang kasalukuyang lokasyon",
-        "locationDeniedTitle": "Tinanggihan ang access sa lokasyon",
-        "locationDeniedMessage": "Payagan ang access sa lokasyon sa mga setting para magamit ang kasalukuyang lokasyon mo.",
-        "locationValidationFailed": "Hindi makumpirma kung wasto ang lokasyon.",
-        "locationResolveFailed": "Hindi matukoy ang iyong lokasyon. Maaari mo itong i-edit nang manu-mano.",
-        "locationGetFailed": "Hindi makuha ang iyong lokasyon. Ilagay ito nang manu-mano.",
-        "nature": {
-          "aiAssistantLabel": "Katulong na AI",
-          "aiAssistantVibe": "Matulungin, mahusay, propesyonal",
-          "digitalCreatureLabel": "Digital na nilalang",
-          "digitalCreatureVibe": "Kakaiba, masigla, medyo mahirap hulaan",
-          "virtualCompanionLabel": "Virtual na kasama",
-          "virtualCompanionVibe": "Magiliw, laging nandiyan, tunay na nagmamalasakit",
-          "somethingWeirderLabel": "Mas kakaiba pa…",
-          "somethingWeirderVibe": "Ikaw ang magtakda"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Tapos na! Inihanda ko na ang buod na hiniling mo. Handa na ako kapag handa ka na.",
-        "settingUp": "Sine-set up ang mga notification…",
-        "stayInTheLoop": "Mga abiso sa gawain",
-        "getNotified": "Tumanggap ng abiso kapag natapos ni {{name}} ang isang gawain para wala kang mapalampas na sagot.",
-        "now": "ngayon",
-        "skipForNow": "Laktawan muna",
-        "couldNotEnable": "Hindi mapagana ang mga notification."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Hindi masuri ang pag-setup",
-        "queryErrorBody": "Nawala ang koneksyon habang sinusuri ang pag-setup kay {{name}}. Baka nagpapatuloy pa ito. Subukan muli, o bumalik pagkalipas ng ilang sandali.",
-        "stoppedTitle": "Huminto ang pag-setup",
-        "stoppedBody": "Biglang huminto ang instance ni {{name}} habang sine-set up.",
-        "stalledTitle": "May hindi umuusad",
-        "stalledBody": "Hindi namin natapos ang pag-setup kay {{name}}. Subukan muli, o mag-email sa {{supportEmail}} kung paulit-ulit itong nangyayari.",
-        "timeoutTitle": "Mas tumatagal kaysa inaasahan",
-        "timeoutBody": "Mas matagal kaysa karaniwan ang pag-setup kay {{name}} (mahigit {{displayMinutes}} minuto na).",
-        "continueInBackground": "Magpatuloy sa background",
-        "settingUp": "Sine-set up si {{name}}",
-        "connectingToAgent": "Kumokonekta sa agent",
-        "startingSandbox": "Sinisimulan ang sandbox",
-        "backgroundHint": "Karaniwang wala pang isang minuto ang kailangan. Puwede mo itong isara — magpapatuloy kami sa background."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kodigo {{code}}",
-      "gatewayProcess": "PROSESO NG GATEWAY",
-      "lastExit": "Huling paghinto",
-      "memory": "Memorya",
-      "region": "Rehiyon",
-      "resources": "MGA MAPAGKUKUNAN",
-      "restarts": "Mga restart",
-      "state": "Estado",
-      "uptime": "Tagal ng pagtakbo",
-      "crashed": "NA-CRASH",
-      "destroying": "BINUBURA",
-      "provisioned": "NAIHANDA",
-      "restarting": "NIRE-RESTART",
-      "running": "TUMATAKBO",
-      "shuttingDown": "PINAPATAY",
-      "starting": "SINISIMULAN",
-      "stopped": "NAKAHINTO",
-      "stopping": "HINIHINTO",
-      "unknown": "HINDI ALAM",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Pinakamaunlad",
-      "frontierDescription": "Pinakamahusay na pagganap. Gumagamit ng mga pinakamaunlad na modelo na may kakayahang mangatwiran.",
-      "balancedDescription": "Balanseng bilis at kakayahan sa mas mababang gastos.",
-      "autoModelA11y": "awtomatikong modelo na {{label}}",
-      "currentModel": "Kasalukuyang modelo",
-      "browseAllModels": "o pumili mula sa 500+ na modelo",
-      "browseAllModelsA11y": "Tingnan ang lahat ng 500+ na modelo"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Para patuloy na magamit ang KiloClaw, pumunta sa kilo.ai/claw mula sa iyong browser. Hindi ka maaaring mag-subscribe sa app.",
-      "subscriptionCanceledTitle": "Mag-subscribe sa web",
-      "subscriptionCanceledBody": "Para magamit ang KiloClaw, pumunta sa kilo.ai/claw mula sa iyong browser. Hindi ka maaaring mag-subscribe sa app.",
-      "subscriptionCanceledCta": "Buksan ang kilo.ai/claw",
-      "subscriptionPastDueTitle": "Pag-update ng pagbabayad sa web",
-      "subscriptionPastDueBody": "Nagkaproblema sa pinakahuli mong bayad. Pumunta sa kilo.ai/claw gamit ang browser mo para i-update ito. Hindi mapapamahalaan ang pagsingil sa app.",
-      "quarantinedTitle": "Kailangang ayusin ang instance",
-      "quarantinedBody": "Nakahiwalay ang instance mo ng KiloClaw at hindi ito magagamit ngayon. Kailangan ng tulong ng team namin para maibalik ito.",
-      "multipleCurrentConflictBody": "May nakita kaming higit sa isang aktibong subscription sa account mo, kaya pansamantala naming inihinto ang proseso para hindi ka masingil nang doble.",
-      "multipleCurrentConflictCta": "Magpatuloy sa kilo.ai",
-      "nonCanonicalEarlybirdTitle": "May nakitang lumang plano",
-      "nonCanonicalEarlybirdBody": "Kailangang suriin ng tao ang plano mo para sa maagang pag-access bago ito magamit sa mobile.",
-      "iosTitle": "Hindi magagamit ang KiloClaw sa iOS",
-      "iosBody": "Pinamamahalaan ang access sa KiloClaw sa labas ng iOS app para sa account na ito.",
-      "iosContact": "May mga tanong? Makipag-ugnayan sa {{supportEmail}}.",
-      "quarantinedCta": "Mag-email sa aming team",
-      "nonCanonicalEarlybirdCta": "Suriin ang iyong plano sa kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "Kailangang asikasuhin ang {{name}}: {{label}}",
-      "openUnread_one": "Buksan ang {{name}}, {{displayCount}} na hindi pa nababasang mensahe",
-      "openUnread": "Buksan ang {{name}}, {{displayCount}} na hindi pa nababasang mensahe",
-      "openUnread_other": "Buksan ang {{name}}, {{displayCount}} na hindi pa nababasang mensahe",
-      "openSettings": "Buksan ang mga setting para kay {{name}}",
-      "fixOnKiloAi": "Ayusin sa kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Aprubahan ang mga kahilingan sa device",
-      "execPolicyDescription": "Mga setting ng seguridad",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Pagpili ng modelo ng AI",
-      "secretsDescription": "Naka-encrypt na mga credential",
-      "versionPinDescription": "I-pin sa isang partikular na bersyon"
-    },
-    "avatar": {
-      "arcade": "Larong arcade",
-      "brain": "Utak",
-      "creature": "Nilalang",
-      "crystal": "Kristal",
-      "custom": "Sariling avatar",
-      "dragon": "Dragon na avatar",
-      "explorer": "Manlalakbay",
-      "flame": "Apoy",
-      "lightning": "Kidlat",
-      "magicWand": "Mahiwagang wand",
-      "moon": "Buwan",
-      "operator": "Tagapagpatakbo",
-      "orbit": "Orbita",
-      "oracle": "Manghuhula",
-      "rainbow": "Bahaghari",
-      "robot": "Robot na avatar",
-      "satellite": "Satelite",
-      "sparkles": "Mga kislap",
-      "strongArm": "Malakas na braso",
-      "talisman": "Agimat"
-    },
-    "remoteSpawnFilesNotSupported": "Hindi makakatanggap ng mga file ang instance na ito.",
-    "instanceSwitcherTitle": "Instance ng KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Ilipat ang {{filename}} pakaliwa",
       "moveRight": "Ilipat ang {{filename}} pakanan"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Idikit ang larawan mula sa clipboard",
-      "label": "May nakitang larawan, i-tap para idikit"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Mga larawan",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "I-sign out ang device na ito?",
     "signOutThisSessionTitle": "I-sign out ang sesyong ito?",
     "signOutThisSessionMessage": "Masa-sign out ang {{device}}. Maaari pa rin nitong ma-access ang API nang hanggang isang oras.",
-    "webBrowser": "Browser sa web"
+    "webBrowser": "Browser sa web",
+    "unknownDevice": "Hindi kilalang device"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Hindi mabuksan ang app store.",

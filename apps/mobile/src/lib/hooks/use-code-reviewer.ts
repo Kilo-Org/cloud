@@ -53,7 +53,7 @@ export function toNumericRepositoryIds(ids: (number | string)[]): number[] {
 // types even when structurally identical, so we can't pick between them
 // with a ternary and spread the result — TypeScript treats the branches as
 // unrelated. Instead we always call both hooks (one disabled) and return
-// whichever is active, mirroring the pattern in use-kiloclaw-queries.ts.
+// whichever is active.
 
 export function useGitHubStatus(scope: string) {
   const trpc = useTRPC();

@@ -66,8 +66,6 @@ import {
   clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
 } from '@/lib/auth/session-scoped-state';
-import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
-import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
@@ -496,10 +494,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // synchronous; the persisted delete chains behind any in-flight persist.
       clearAccountBoundPendingDeepLink();
       try {
-        // Close ownership persistence before any await so a late list
-        // response cannot write the previous account's answer during
-        // teardown.
-        gateKiloClawOwned();
         // Record the branch that fired immediately before the logout event,
         // so exactly one row lands per actual sign-out — a deduped sign-out
         // returned above and writes nothing — and it is attributed to the
@@ -587,8 +581,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // and an unknown one takes every chat rather than leaving one
             // account's conversations for the next person to sign in.
             clearChatsForSignOut(readCachedUserId(queryClient)),
-            clearLastActiveInstance(),
-            clearKiloClawOwned(),
             clearRecentPrs(),
             clearViewedFiles(),
             clearSessionAttentionForSignOut(),

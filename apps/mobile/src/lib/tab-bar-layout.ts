@@ -49,7 +49,7 @@ type TabBarPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'web';
  * and shrink to fit it: a word wider than its tab would otherwise wrap into a
  * second line the bar has no room for, and be clipped at the bar's edge
  * ("PROFIL E", 480x1000 @ 480 = 160 dp, e1, 2026-09-21). Above the threshold the
- * bar grows the second line for the two-line `tabs.kiloclawWrapped` label.
+ * bar reserves a second line for labels with an explicit line break.
  */
 export function tabLabelLineCount(fontScale = 1): 1 | 2 {
   return fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 2 : 1;
@@ -175,8 +175,8 @@ function isFullWidthCharacter(character: string): boolean {
 
 /**
  * Estimated rendered width (dp) of the widest line of a tab label. A label is
- * one line (`tabLabelNumberOfLines`), except copy that carries its own break
- * (`Kilo\nClaw`), whose wider line is the one that has to fit. Only an explicit
+ * one line (`tabLabelNumberOfLines`), except copy that carries its own break,
+ * whose wider line is the one that has to fit. Only an explicit
  * break starts a new line: an ordinary space stays on the same one line and
  * counts toward its width (the renderer tail-ellipsizes, it does not wrap on a
  * space). The estimate is deliberately conservative: it only decides whether
@@ -208,7 +208,7 @@ export function tabLabelFits(label: string, tabWidth: number, fontScale = 1): bo
 
 /**
  * Line count for a bottom-tab label: one line, tail-truncated, unless the copy
- * carries its own break (`tabs.kiloclawWrapped` = "Kilo\nClaw"). A two-line
+ * carries its own break. A two-line
  * wrap of a single word wider than its tab breaks it mid-word and leaves the
  * bar unreadable (155c33b5), so no label is allowed to wrap on its own; the
  * explicit break is the only way to reach two lines.
@@ -228,61 +228,26 @@ const CHAT_CONVERSATION = '[id]';
 
 export function shouldHideTabBar(pathname: string, segments: readonly string[]): boolean {
   const parts = pathname.split('/').filter(Boolean);
-  const isKiloClawInstancePicker = parts[0] === 'chat' && parts.length === 3;
   const isSecurityFindingFilter =
     parts[0] === 'security-agent' && parts.length === 3 && parts[2] === 'filter';
   const isChatConversation =
     segments.includes(CHAT_TAB_GROUP) && segments.at(-1) === CHAT_CONVERSATION;
-  return isKiloClawInstancePicker || isSecurityFindingFilter || isChatConversation;
+  return isSecurityFindingFilter || isChatConversation;
 }
 
-/** One tab bar entry, in render order. */
-export type TabBarTab = 'home' | 'kiloclaw' | 'agents' | 'chat' | 'profile';
+export type TabBarTab = 'home' | 'agents' | 'chat' | 'profile';
 
-/** Flag state that changes which tabs render. */
-export type TabBarTabFlags = {
-  showKiloClaw: boolean;
-};
+export const VISIBLE_TAB_COUNT = 4;
 
-/** Number of rendered tabs: Home, Agents, Chat, Profile, and optional KiloClaw. */
-export function visibleTabCount(showKiloClaw: boolean): number {
-  return 4 + Number(showKiloClaw);
+const TAB_BAR_POSITIONS = { home: 1, agents: 2, chat: 3, profile: 4 } satisfies Record<
+  TabBarTab,
+  number
+>;
+
+export function tabBarPosition(tab: TabBarTab): number {
+  return TAB_BAR_POSITIONS[tab];
 }
 
-/**
- * One-based render position of a tab, or null when the tab is hidden. Home is
- * always 1; KiloClaw sits at 2 when shown; Agents follows KiloClaw; Chat
- * follows Agents; Profile is always last.
- */
-export function tabBarPosition(tab: TabBarTab, flags: TabBarTabFlags): number | null {
-  switch (tab) {
-    case 'home': {
-      return 1;
-    }
-    case 'kiloclaw': {
-      return flags.showKiloClaw ? 2 : null;
-    }
-    case 'agents': {
-      return 2 + Number(flags.showKiloClaw);
-    }
-    case 'chat': {
-      return 3 + Number(flags.showKiloClaw);
-    }
-    case 'profile': {
-      return visibleTabCount(flags.showKiloClaw);
-    }
-    default: {
-      // `TabBarTab` is a closed union; this branch is unreachable but keeps
-      // `consistent-return` satisfied for an exhaustive switch.
-      return null;
-    }
-  }
-}
-
-/**
- * Accessibility label for a tab bar entry. The position and the total must match
- * the rendered tab count, which changes when the KiloClaw tab is hidden.
- */
 export function tabAccessibilityLabel(name: string, position: number, total: number): string {
   return i18n.t('tabs.position', {
     name,

@@ -101,12 +101,9 @@
     "scheduled": "စီစဉ်ထားသည်",
     "keepEditing": "ဆက်လက်တည်းဖြတ်ပါ",
     "keepRunning": "ဆက်လက်လုပ်ဆောင်ပါ",
-    "kiloclaw": "KiloClaw",
     "newSession": "ဆက်ရှင်အသစ်",
-    "noKiloclawInstances": "KiloClaw အင်စတန့်များ မရှိပါ",
     "noModelsAvailable": "အသုံးပြုနိုင်သော မော်ဒယ် မရှိပါ",
     "notFound": "မတွေ့ရပါ။",
-    "online": "အွန်လိုင်း",
     "open": "{{name}} ကို ဖွင့်ပါ",
     "openPullRequest": "PR ဖွင့်",
     "pending": "စောင့်ဆိုင်းနေ",
@@ -257,7 +254,8 @@
     "renamePasskey": "ပက်စ်ကီး အမည်ပြောင်းရန်",
     "removePasskey": "ပက်စ်ကီး ဖယ်ရှားရန်",
     "removePasskeyTitle": "ပက်စ်ကီး ဖယ်ရှားမလား?",
-    "removePasskeyMessage": "ဤပက်စ်ကီးဖြင့် နောက်ထပ် အကောင့်ဝင်၍ မရတော့ပါ။"
+    "removePasskeyMessage": "ဤပက်စ်ကီးဖြင့် နောက်ထပ် အကောင့်ဝင်၍ မရတော့ပါ။",
+    "changelog": "အသစ်ပါဝင်လာသည့်အရာများ"
   },
   "preferences": {
     "general": "အထွေထွေ",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "အကြောင်းကြားချက်များတွင် ဖြစ်ရပ်တစ်ခုရှိကြောင်းသာ ပြပါသည်။ မက်ဆေ့ခ်ျကို ဖတ်ရန် Kilo ကို ဖွင့်ပါ။",
     "channel": {
       "agentProgress": "အေးဂျင့် လုပ်ဆောင်ပြီးစီးမှု",
-      "chat": "စကားဝိုင်း မက်ဆေ့ချ်များ",
-      "kiloclaw": "KiloClaw လုပ်ဆောင်ချက်များ",
       "balance": "လက်ကျန်သတိပေးချက်များ",
       "security": "လုံခြုံရေးတွေ့ရှိချက်များ",
       "spend": "အသုံးစရိတ် သတိပေးချက်များ",
       "followedSessions": "လိုက်နာထားသော ဆက်ရှင်များ"
     },
     "category": {
-      "chatMessagesSubtitle": "သင့်စကားဝိုင်းများရှိ တုံ့ပြန်ချက်များ",
       "agentAttentionTitle": "အေးဂျင့်က သင့်တုံ့ပြန်မှုကို လိုအပ်နေသည်",
       "agentAttentionSubtitle": "မေးခွန်းများ၊ ခွင့်ပြုချက်နှင့် အချက်အလက်တောင်းဆိုမှုများ",
       "agentUpdatesTitle": "အေးဂျင့်၏ နောက်ဆုံးအခြေအနေများ",
       "agentUpdatesSubtitle": "လုပ်ငန်းလုပ်နေစဉ် အေးဂျင့်က ပို့သည့်မက်ဆေ့ခ်ျများ",
       "sessionStatusTitle": "စက်ရှင်အခြေအနေ",
       "sessionStatusSubtitle": "ပြီးဆုံး / မအောင်မြင် / ထိန်းချုပ်ရန် အသင့်",
-      "kiloclawActivitySubtitle": "စနစ်အသင့်ဖြစ်မှု/မအောင်မြင်မှု၊ အချိန်သတ်မှတ်ထားသော လုပ်ဆောင်ချက်များ",
-      "kiloclawActivityUnavailable": "KiloClaw လုပ်ဆောင်ချက် ရရှိရန် KiloClaw စနစ်တစ်ခုကို စတင်ပါ။",
       "balanceAlertsSubtitle": "အဖွဲ့အစည်း၏ လက်ကျန်နည်းချိန် သတိပေးချက်များ",
       "balanceAlertsUnavailable": "လက်ကျန် သတိပေးချက်များ ရရှိရန် အဖွဲ့အစည်းတစ်ခုသို့ ပါဝင်ပါ။",
       "securityFindingsSubtitle": "တွေ့ရှိချက်အသစ်များနှင့် SLA သတိပေးချက်များ",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "ပင်မ",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}၊ တဘ်၊ {{total}} ခုအနက် {{position}} ခုမြောက်"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "အင်စတန့် ပြောင်းခြင်း",
-      "couldNotLoadInstances": "အင်စတန့်များကို ရယူ၍ မရပါ။",
-      "noInstancesDescription": "စကားစပြောရန် အင်စတန့်တစ်ခုကို ပြင်ဆင်သတ်မှတ်ပါ။",
-      "setUpKiloclaw": "KiloClaw ပြင်ဆင်သတ်မှတ်ရန်",
-      "currentInstance": "{{title}}၊ လက်ရှိအင်စတန့်"
-    },
     "conversation": {
-      "failedToLoad": "စကားဝိုင်းကို ရယူ၍ မရပါ။",
-      "notFound": "စကားဝိုင်းကို ရှာမတွေ့ပါ။",
       "untitled": "ခေါင်းစဉ်မဲ့",
-      "leaveTitle": "စကားဝိုင်းမှ ထွက်မလား",
-      "leaveMessage": "ဤစကားဝိုင်းကို သင့်စာရင်းမှ ဖယ်ရှားမည်။",
-      "openHint": "စကားဝိုင်းကို ဖွင့်ပါသည်။ အမည်ပြောင်းရန်နှင့် ထွက်ရန် ရွေးချယ်စရာများအတွက် ကြာကြာနှိပ်ပါ။",
-      "unread": "မဖတ်ရသေး",
-      "optionsFor": "{{title}} အတွက် စကားဝိုင်းရွေးချယ်စရာများ",
-      "options": "စကားဝိုင်းရွေးချယ်စရာများ",
-      "renameTitle": "စကားဝိုင်း အမည်ပြောင်းခြင်း",
-      "renamePlaceholder": "အမည်အသစ်",
-      "couldNotReachBot": "ဘော့တ်ကို ဆက်သွယ်၍ မရပါ။ ထပ်ကြိုးစားပါ။",
-      "messageDeliveryFailed": "မက်ဆေ့ချ်ကို ဘော့တ်ထံ ပို့၍ မရပါ။",
-      "couldNotSignIn": "စကားပြောရန် အကောင့်ဝင်၍ မရပါ။",
-      "couldNotRefreshMessages": "မက်ဆေ့ချ်အသစ်များကို ရယူ၍ မရပါ။",
-      "couldNotLoadHistory": "စကားဝိုင်းမှတ်တမ်းကို ရယူ၍ မရပါ။",
-      "leave": "ထွက်ရန်",
-      "untitledConversation": "ခေါင်းစဉ်မဲ့ စကားဝိုင်း",
-      "createFailed": "စကားဝိုင်းကို ဖန်တီး၍ မရပါ။",
-      "leaveFailed": "စကားဝိုင်းမှ ထွက်၍ မရပါ။"
-    },
-    "reactions": {
-      "common": "အသုံးများသော တုံ့ပြန်မှုများ",
-      "reactWith": "{{reaction}} ဖြင့် တုံ့ပြန်ပါ",
-      "accessibility": "{{emoji}} တုံ့ပြန်မှု၊ {{displayCount}} ခု"
-    },
-    "composer": {
-      "replyingTo": "အကြောင်းပြန်မည့်သူ",
-      "cancelReply": "အကြောင်းပြန်မှု ပယ်ဖျက်ပါ",
-      "openInstance": "အင်စတန့် ဖွင့်ရန်",
-      "attachFile": "ဖိုင်တွဲပါ",
-      "cancelEdit": "တည်းဖြတ်မှု ပယ်ဖျက်ပါ"
+      "renamePlaceholder": "အမည်အသစ်"
     },
     "conversationList": {
-      "couldNotLoad": "စကားဝိုင်းများကို ရယူ၍ မရပါ။",
-      "emptyTitle": "စကားဝိုင်းများ မရှိသေးပါ",
-      "emptyDescription": "သင့် KiloClaw အင်စတန့်နှင့် စကားစပြောရန် စကားဝိုင်းတစ်ခု ဖန်တီးပါ။",
-      "create": "စကားဝိုင်း ဖန်တီးရန်",
-      "newConversation": "စကားဝိုင်းအသစ်",
-      "openInstanceSettings": "အင်စတန့်ဆက်တင်များကို ဖွင့်ပါ",
       "today": "ယနေ့",
       "yesterday": "မနေ့က",
-      "thisWeek": "ဤအပတ်",
       "older": "အစောပိုင်း"
     },
     "attachment": {
-      "open": "{{filename}} ဖွင့်ပါ",
-      "openFailed": "တွဲထားသောဖိုင်ကို ဖွင့်၍ မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။",
-      "attachFailed": "ဖိုင်တွဲ၍ မရပါ။",
-      "limit": "ဖိုင် {{displayCount}} ခုအထိ တွဲနိုင်သည်။",
-      "sizeRejection": "{{filename}} ၏ အရွယ်အစားသည် တွဲနိုင်သော ဖိုင်အရွယ်အစားကန့်သတ်ချက် {{limit}} ထက် ကျော်နေသည်။",
-      "unreadable": "{{filename}} ကို ဖတ်မရပါ။",
-      "pastedImage": "ကူးထည့်ထားသော ပုံ",
-      "defaultName": "ပူးတွဲဖိုင်",
       "classificationDenied": "ပရိုဂရမ်အဖြစ် လုပ်ဆောင်နိုင်သော ဖိုင်များကို တွဲ၍ မရပါ။",
       "classificationEmpty": "ဖိုင်ထဲတွင် ဒေတာ မရှိပါ။",
       "classificationTooLarge": "ဖိုင်အရွယ်အစားသည် 20 MB ထက် မကျော်ရပါ။",
@@ -943,426 +883,17 @@
       "networkError": "ကွန်ရက်တွင် အမှားဖြစ်ပေါ်သည်။",
       "uploadFailed": "ဖိုင်တင်၍ မရပါ။",
       "nothingToPaste": "ကူးထည့်စရာ မရှိပါ။",
-      "metadataStripFailed": "ဓာတ်ပုံ၏ နောက်ခံအချက်အလက်များကို ဖယ်ရှား၍မရခဲ့ပါ။",
-      "limit_one": "ဖိုင် {{displayCount}} ခုအထိ တွဲနိုင်သည်။",
-      "limit_other": "ဖိုင် {{displayCount}} ခုအထိ တွဲနိုင်သည်။"
+      "metadataStripFailed": "ဓာတ်ပုံ၏ နောက်ခံအချက်အလက်များကို ဖယ်ရှား၍မရခဲ့ပါ။"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}၊ {{status}}",
-      "retryUploading": "{{filename}} ကို ထပ်တင်ကြည့်ပါ",
-      "remove": "{{filename}} ဖယ်ရှားပါ"
-    },
-    "messageBubble": {
-      "deleted": "[ဖျက်ထားသော မက်ဆေ့ချ်]",
-      "yourMessage": "သင့်မက်ဆေ့ချ်",
-      "messageFrom": "{{author}} ထံမှ မက်ဆေ့ချ်",
-      "moreActions": "နောက်ထပ်လုပ်ဆောင်ချက်များ",
-      "notDelivered": "မရောက်ရှိ",
-      "edited": "(တည်းဖြတ်ပြီး)",
-      "image": "ပုံ"
+      "accessibility": "{{filename}}၊ {{status}}"
     },
     "messageActions": {
-      "copied": "ကူးယူပြီး",
-      "copyFailed": "ကူးယူ၍ မရပါ။",
-      "title": "မက်ဆေ့ချ်လုပ်ဆောင်ချက်များ",
-      "deleteTitle": "မက်ဆေ့ချ်ကို ဖျက်မလား",
-      "deleteMessage": "ဤမက်ဆေ့ချ်ကို စကားဝိုင်းမှ ဖယ်ရှားမည်။",
-      "deleteFailed": "မက်ဆေ့ချ်ကို ဖျက်၍ မရပါ။",
-      "removeReactionFailed": "တုံ့ပြန်မှုကို ဖယ်ရှား၍ မရပါ။",
-      "addReactionFailed": "တုံ့ပြန်မှုကို ထည့်၍ မရပါ။",
-      "retrySend": "ထပ်ပို့ရန်",
-      "moreReactions": "နောက်ထပ် တုံ့ပြန်မှုများ",
-      "edit": "တည်းဖြတ်ပါ",
-      "sendFailed": "မက်ဆေ့ချ်ကို ပို့၍ မရပါ။",
-      "retrySendFailed": "မက်ဆေ့ချ်ကို ထပ်ပို့၍ မရပါ။",
-      "editFailed": "မက်ဆေ့ချ်ကို တည်းဖြတ်၍ မရပါ။",
-      "executeFailed": "လုပ်ဆောင်ချက်ကို လုပ်ဆောင်၍ မရပါ။"
+      "edit": "တည်းဖြတ်ပါ"
     },
     "attachmentPicker": {
-      "takePhoto": "ဓာတ်ပုံရိုက်ရန်",
-      "photoLibrary": "ဓာတ်ပုံစုစည်းမှု",
-      "files": "ဖိုင်",
       "cameraAccessMessage": "ဓာတ်ပုံရိုက်ရန် ဆက်တင်များတွင် ကင်မရာ အသုံးပြုခွင့် ပေးပါ။"
-    },
-    "typingIndicator": {
-      "someone": "တစ်စုံတစ်ယောက်",
-      "typing_one": "{{name}} စာရိုက်နေသည်...",
-      "typing": "{{names}} စာရိုက်နေသည်...",
-      "typing_other": "{{names}} စာရိုက်နေသည်..."
-    },
-    "botStatus": {
-      "offline": "အော့ဖ်လိုင်း",
-      "loadingUser": "အသုံးပြုသူအချက်အလက်ကို ရယူနေသည်…",
-      "waitingForStatus": "ဘော့တ် အခြေအနေ စောင့်နေသည်...",
-      "offlineMessage": "ဘော့တ်သည် အော့ဖ်လိုင်းဖြစ်နေသည်။ ပြန်ချိတ်ဆက်သောအခါ မက်ဆေ့ချ်ပို့ခြင်းနှင့် လက်ခံခြင်းကို ဆက်လုပ်မည်။"
-    },
-    "errors": {
-      "notAllowed": "ခွင့်မပြုပါ။",
-      "messageTooLong": "မက်ဆေ့ချ် ရှည်လွန်းနေသည်။ စာလုံးရေ {{limit}} ထက် နည်းအောင် ရေးပါ။",
-      "titleTooLong": "ခေါင်းစဉ် ရှည်လွန်းနေသည်။ စာလုံးရေ {{limit}} ထက် နည်းအောင် ရေးပါ။",
-      "messageEmpty": "မက်ဆေ့ချ်ကို အလွတ်ထား၍ မရပါ။"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw အင်စတန့်များကို ရယူ၍မရပါ။",
-    "billing": {
-      "title": "ငွေတောင်းခံမှု",
-      "continueMonthToMonth": "လစဉ်ပေးချေမှုဖြင့် ဆက်သုံးပါ",
-      "plan": "အစီအစဉ်",
-      "finalTermEnds": "နောက်ဆုံးသက်တမ်း ကုန်ဆုံးမည့်ရက်",
-      "afterFinalTerm": "နောက်ဆုံးသက်တမ်း ကုန်ဆုံးပြီးနောက်",
-      "lessThanOneDay": "တစ်ရက်အောက်",
-      "ends": "ကုန်ဆုံးမည့်ရက်",
-      "expires": "သက်တမ်းကုန်မည့်ရက်",
-      "noActivePlan": "အသုံးပြုဆဲ အစီအစဉ်မရှိပါ",
-      "noActivePlanDescription": "သင့်တွင် အသုံးပြုဆဲ KiloClaw စာရင်းသွင်းမှု မရှိပါ။",
-      "managedByAdmin": "ငွေတောင်းခံမှုကို သင့်အဖွဲ့အစည်း၏ စီမံခန့်ခွဲသူက စီမံပါသည်။",
-      "couldNotLoad": "ငွေတောင်းခံမှု အချက်အလက်များကို ရယူ၍မရပါ။",
-      "manageOnWeb": "ဝဘ်ပေါ်တွင် ငွေတောင်းခံမှုကို စီမံပါ",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "သင့်နောက်ဆုံး Commit သက်တမ်းသည် {{date}} တွင် ကုန်ဆုံးပါမည်။ {{price}} ဖြင့် Standard အဖြစ် ဆက်သုံးပါ။ မဟုတ်လျှင် ဆာဗာဝန်ဆောင်မှု ရပ်ဆိုင်းပါမည်။",
-      "freeTrial": "အခမဲ့စမ်းသုံးခွင့်",
-      "hostingEnds": "ဆာဗာဝန်ဆောင်မှု ရပ်ဆိုင်းမည်",
-      "renews": "သက်တမ်းတိုးမည့်ရက်",
-      "standardMonthToMonth": "လစဉ်ပေးချေသည့် Standard",
-      "standardStartsOn": "Standard သည် {{date}} တွင် {{price}} ဖြင့် စတင်ပါသည်။",
-      "yourStandardMonthlyPrice": "သင့် Standard လစဉ်ကြေး",
-      "perMonth": "/လ",
-      "earlybirdAccessUntil": "Earlybird ကို {{date}} အထိ အသုံးပြုနိုင်ပါသည်။",
-      "earlybirdEnding": "Earlybird သက်တမ်း ကုန်ဆုံးရန် {{remaining}} ကျန်ပါသည်။",
-      "paymentPastDue": "ငွေပေးချေရမည့်ရက် ကျော်နေပါပြီ။ သင့်ငွေပေးချေမှုနည်းလမ်းကို မွမ်းမံပါ။",
-      "subscriptionCancels": "စာရင်းသွင်းမှုကို {{date}} တွင် ပယ်ဖျက်ပါမည်။",
-      "trialDaysRemaining": "စမ်းသုံးခွင့် {{remaining}} ကျန်ပါသည်။",
-      "trialEndingSoon": "စမ်းသုံးခွင့် မကြာမီကုန်ဆုံးပါမည်။ {{remaining}} ကျန်ပါသည်။",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "ကွန်မစ်"
-    },
-    "changelog": {
-      "title": "အသစ်ပါဝင်လာသည့်အရာများ",
-      "couldNotLoad": "ပြောင်းလဲမှုမှတ်တမ်းကို ရယူ၍မရပါ။",
-      "noUpdates": "မွမ်းမံမှုများ မရှိသေးပါ",
-      "noUpdatesDescription": "ပြောင်းလဲမှုမှတ်တမ်း အကြောင်းအရာများ ဤနေရာတွင် ပေါ်လာပါမည်။",
-      "recentUpdates": "မကြာသေးမီက မွမ်းမံမှုများ",
-      "manageVersion": "ဗားရှင်းကို စီမံပါ",
-      "redeployRequired": "ပြန်တင်ရန် လိုအပ်",
-      "redeploySuggested": "ပြန်တင်ရန် အကြံပြု",
-      "upgradeRequired": "အဆင့်မြှင့်ရန် လိုအပ်"
-    },
-    "dashboard": {
-      "title": "ဒက်ရှ်ဘုတ်",
-      "couldNotLoad": "ဒက်ရှ်ဘုတ်ကို ရယူ၍မရပါ။",
-      "renameInstance": "အင်စတန့်ကို အမည်ပြောင်းပါ",
-      "renamePlaceholder": "အမည်အသစ် (စာလုံးရေ ၅၀ အထိ)",
-      "someDetailsFailed": "လက်ရှိအသေးစိတ် အချက်အလက်အချို့ကို ရယူ၍မရပါ။",
-      "destroy": "အပြီးတိုင်ဖျက်ပါ",
-      "destroyMessage": "သင့် KiloClaw အင်စတန့်နှင့် ၎င်း၏ဒေတာအားလုံးကို အပြီးတိုင်ဖျက်ပါမည်။ ဒီလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍မရပါ။",
-      "destroyTitle": "အင်စတန့်ကို အပြီးတိုင်ဖျက်ခြင်း",
-      "instance": "အင်စတန့်",
-      "couldNotCheckStatus": "ဝန်ဆောင်မှုအခြေအနေကို စစ်ဆေး၍မရပါ။",
-      "dangerZone": "သတိထားရန် လုပ်ဆောင်ချက်များ",
-      "destroying": "အပြီးတိုင်ဖျက်နေသည်…",
-      "serviceDegraded": "ဝန်ဆောင်မှု စွမ်းဆောင်ရည် ကျဆင်းနေသည် — အခြေအနေကြည့်ရန် နှိပ်ပါ",
-      "up": "လည်ပတ်နေ"
-    },
-    "channels": {
-      "title": "ချန်နယ်များ",
-      "couldNotLoad": "ချန်နယ်များကို ရယူ၍မရပါ။",
-      "noChannels": "ရနိုင်သော ချန်နယ် မရှိပါ",
-      "noChannelsDescription": "ချန်နယ်ချိတ်ဆက်မှုများ ဒီနေရာတွင် ပေါ်လာပါမည်။",
-      "connected": "{{label}} ချိတ်ဆက်ပြီး",
-      "disconnectMessage": "{{label}} ကို ဖယ်ရှားမလား။ ဤချန်နယ် ချိတ်ဆက်မှု ပြတ်သွားပါမည်။",
-      "disconnectTitle": "ချန်နယ်ချိတ်ဆက်မှု ဖြုတ်ခြင်း"
-    },
-    "devicePairing": {
-      "title": "စက်ပစ္စည်း တွဲချိတ်မှု",
-      "refreshRequests": "တွဲချိတ်ရန် တောင်းဆိုချက်များကို ပြန်ရယူပါ",
-      "couldNotLoad": "တွဲချိတ်ရန် တောင်းဆိုချက်များကို ရယူ၍မရပါ။",
-      "noPending": "စောင့်ဆိုင်းနေသော တောင်းဆိုချက်မရှိပါ",
-      "noPendingDescription": "ချန်နယ်နှင့် စက်ပစ္စည်း တွဲချိတ်မှု တောင်းဆိုချက်များ ဤနေရာတွင် ပေါ်လာပါမည်။",
-      "channelRequests": "ချန်နယ် တောင်းဆိုချက်များ",
-      "deviceRequests": "စက်ပစ္စည်း တောင်းဆိုချက်များ",
-      "approveDeviceMessage": "{{platform}} ကို သင့်အင်စတန့်နှင့် ချိတ်ဆက်ခွင့်ပြုမလား။",
-      "approveDeviceTitle": "စက်ပစ္စည်းကို ခွင့်ပြုခြင်း",
-      "approveMessage": "{{label}} (ကုဒ်: {{code}}) ကို သင့်အင်စတန့်နှင့် ချိတ်ဆက်ခွင့်ပြုမလား။",
-      "approveTitle": "တွဲချိတ်ရန် တောင်းဆိုချက်ကို ခွင့်ပြုခြင်း",
-      "unknownDevice": "အမည်မသိ စက်ပစ္စည်း"
-    },
-    "execPolicy": {
-      "title": "အမိန့်များ လုပ်ဆောင်ခွင့် မူဝါဒ",
-      "couldNotLoad": "ကွန်မန်းလုပ်ဆောင်မှု မူဝါဒကို ရယူ၍မရပါ။",
-      "alwaysAsk": "အမြဲမေးပါ",
-      "alwaysAskDescription": "ကွန်မန်းတစ်ခုစီကို မလုပ်ဆောင်မီ အတည်ပြုချက် တောင်းပါ။ ဒီနည်းက အလုံခြုံဆုံးဖြစ်ပါသည်။",
-      "neverAsk": "ဘယ်တော့မှ မမေးပါ",
-      "neverAskDescription": "အတည်ပြုချက် မတောင်းဘဲ ကွန်မန်းများကို လုပ်ဆောင်ပါ။ ပိုမြန်သော်လည်း လုံခြုံမှုနည်းပါသည်။"
-    },
-    "google": {
-      "title": "Google အကောင့်",
-      "couldNotLoad": "Google အကောင့်အခြေအနေကို ရယူ၍မရပါ။",
-      "disconnected": "Google အကောင့်ချိတ်ဆက်မှုကို ဖြုတ်ပြီးပါပြီ။ ပြောင်းလဲမှု သက်ရောက်စေရန် အင်စတန့်ကို ပြန်တင်ပါ။",
-      "setupCommand": "စတင်ပြင်ဆင်ရန် ကွန်မန်း",
-      "setupCommandHelp": "Google အကောင့်ကို ချိတ်ဆက်ရန် Docker ထည့်သွင်းထားသော သင့်ကွန်ပျူတာ၏ တာမီနယ်တွင် ဒီကွန်မန်းကို လုပ်ဆောင်ပါ။",
-      "failedToLoadCommand": "စတင်ပြင်ဆင်ရန် ကွန်မန်းကို ရယူ၍မရပါ။",
-      "gmailNotifications": "Gmail အသိပေးချက်များ",
-      "disconnect": "Google အကောင့်ချိတ်ဆက်မှုကို ဖြုတ်ပါ",
-      "copied": "ကူးယူပြီး",
-      "copyCommand": "ကွန်မန်းကို ကူးယူပါ",
-      "disconnectConfirm": "ချိတ်ဆက်မှုကို ဖြုတ်ပါ",
-      "disconnectMessage": "ဒီအင်စတန့်မှ သင့် Google အကောင့်ကို ဖယ်ရှားမလား။ Gmail အသိပေးချက်များကို ပိတ်ပါမည်။ ပြောင်းလဲမှုများ သက်ရောက်စေရန် ချိတ်ဆက်မှုဖြုတ်ပြီးနောက် အင်စတန့်ကို ပြန်တင်ပါ။",
-      "disconnectTitle": "Google ချိတ်ဆက်မှု ဖြုတ်ခြင်း"
-    },
-    "modelList": {
-      "noMatches": "သင့်ရှာဖွေမှုနှင့် ကိုက်ညီသော မော်ဒယ် မရှိပါ",
-      "noModelsDescription": "မော်ဒယ်များ ရနိုင်သည့်အခါ ဤနေရာတွင် ပေါ်လာပါမည်။",
-      "noResultsFor": "\"{{query}}\" အတွက် ရလဒ်မရှိပါ။"
-    },
-    "secrets": {
-      "title": "လျှို့ဝှက်အချက်အလက်များ",
-      "couldNotLoad": "လျှို့ဝှက်ဒေတာကို ရယူ၍မရပါ။",
-      "noSecrets": "လျှို့ဝှက်ဒေတာ မရှိပါ",
-      "noSecretsDescription": "လျှို့ဝှက်ဒေတာဖြင့် ချိတ်ဆက်မှုများ ဒီနေရာတွင် ပေါ်လာပါမည်။",
-      "removeMessage": "{{label}} ကို ဖယ်ရှားမလား။ ဒီကိရိယာသည် ၎င်း၏ ဝင်ရောက်ခွင့်အချက်အလက်များကို အသုံးပြု၍မရတော့ပါ။",
-      "removeTitle": "လျှို့ဝှက်ဒေတာ ဖယ်ရှားခြင်း",
-      "saved": "{{label}} သိမ်းပြီး",
-      "hide": "{{label}} ကို ဝှက်ပါ",
-      "show": "{{label}} ကို ပြပါ",
-      "allFieldsRequired": "{{label}} ကို ချိတ်ဆက်ရန် အကွက်အားလုံးကို ဖြည့်ရပါမည်။",
-      "setupGuideFallback": "စတင်ပြင်ဆင်မှု လမ်းညွှန်",
-      "setupGuideA11y": "{{label}} စတင်ပြင်ဆင်မှု လမ်းညွှန်",
-      "setupGuide": "စတင်ပြင်ဆင်မှု လမ်းညွှန်",
-      "saving": "သိမ်းနေသည်…",
-      "removing": "ဖယ်ရှားနေသည်…",
-      "updateToken": "တိုကင်ကို မွမ်းမံပါ"
-    },
-    "versionPin": {
-      "title": "ဗားရှင်း ပုံသေသတ်မှတ်ခြင်း",
-      "couldNotLoad": "ဗားရှင်းအချက်အလက်များကို ရယူ၍မရပါ။",
-      "couldNotLoadMore": "နောက်ထပ်ဗားရှင်းများကို ရယူ၍မရပါ။",
-      "loadMore": "နောက်ထပ်ဗားရှင်းများကို ရယူပါ",
-      "showingLatest": "နောက်ဆုံးဗားရှင်း ၁၀၀ ကို ပြသထားပါသည်။",
-      "availableVersions": "ရနိုင်သော ဗားရှင်းများ",
-      "noVersions": "ရနိုင်သော ဗားရှင်း မရှိပါ",
-      "noVersionsDescription": "ရနိုင်သော OpenClaw ဗားရှင်းများ ဤနေရာတွင် ပေါ်လာပါမည်။",
-      "unpin": "ပုံသေသတ်မှတ်မှုကို ဖြုတ်ပါ",
-      "unpinMessage": "ရနိုင်သော နောက်ဆုံးဗားရှင်းသို့ ပြန်ပြောင်းမလား။",
-      "unpinTitle": "ဗားရှင်းပုံသေသတ်မှတ်မှု ဖြုတ်ခြင်း",
-      "confirmPin": "ပုံသေသတ်မှတ်မှုကို အတည်ပြုပါ",
-      "followingLatest": "နောက်ဆုံးဗားရှင်းကို လိုက်သုံးနေ",
-      "latest": "နောက်ဆုံး",
-      "pin": "ပုံသေသတ်မှတ်ပါ",
-      "pinnedByAdmin": "စီမံခန့်ခွဲသူက ပုံသေသတ်မှတ်ထားပါသည်။ ပြောင်းရန် စီမံခန့်ခွဲသူကို ဆက်သွယ်ပါ။",
-      "pinnedTo": "{{version}} ကို ပုံသေသတ်မှတ်ထား",
-      "reasonOptional": "အကြောင်းရင်း (မထည့်လည်းရ)",
-      "reasonPlaceholder": "ဒီဗားရှင်းကို ပုံသေသတ်မှတ်လိုသည့် အကြောင်းရင်း",
-      "replaceAdminPin": "စီမံခန့်ခွဲသူ၏ ပုံသေသတ်မှတ်မှုကို အစားထိုးပါ",
-      "replacesAdminPin": "စီမံခန့်ခွဲသူ၏ ပုံသေသတ်မှတ်မှုကို အစားထိုးပါမည် (လက်ရှိ {{label}})။"
-    },
-    "redeploy": "ပြန်လည်ဖြန့်ချိပါ",
-    "redeployMessage": "ဒီအင်စတန့်ကို ပြန်တင်မလား။",
-    "redeployTitle": "အင်စတန့် ပြန်တင်ခြင်း",
-    "controls": {
-      "redeploying": "ပြန်တင်နေသည်…",
-      "restart": "ပြန်စတင်ပါ",
-      "restartOpenClawMessage": "OpenClaw လုပ်ငန်းစဉ်ကို ပြန်စတင်မလား။",
-      "restartOpenClawTitle": "OpenClaw ပြန်စတင်ခြင်း",
-      "restarting": "ပြန်စတင်နေသည်…",
-      "start": "စတင်ပါ",
-      "startMessage": "ဒီအင်စတန့်ကို စတင်မလား။",
-      "startTitle": "အင်စတန့် စတင်ခြင်း",
-      "stop": "ရပ်တန့်ပါ",
-      "stopMessage": "ဒီအင်စတန့်ကို ရပ်တန့်မလား။",
-      "stopTitle": "အင်စတန့် ရပ်တန့်ခြင်း",
-      "stopping": "ရပ်တန့်နေသည်…"
-    },
-    "empty": {
-      "finishingSetup": "စတင်ပြင်ဆင်မှုကို အပြီးသတ်နေသည်",
-      "finishingSetupDescription": "သင့်အကောင့်ကို အပြီးသတ် ပြင်ဆင်နေပါသည်။ ခဏစောင့်ပါ။ များသောအားဖြင့် ခဏသာ ကြာပါသည်။",
-      "getStarted": "စတင်ပါ",
-      "noInstancesDescription": "ကုဒ်ရေးသည့် အေးဂျင့်များကို စတင်အသုံးပြုရန် သင့်ပထမဆုံး အင်စတန့်ကို ဖန်တီးပါ။"
-    },
-    "instance": {
-      "backToInstances": "အင်စတန့်စာရင်းသို့ ပြန်သွားပါ",
-      "couldNotLoad": "အင်စတန့်ကို ရယူ၍မရပါ။",
-      "notFound": "အင်စတန့် မတွေ့ပါ",
-      "notFoundDescription": "ဒီအင်စတန့်ကို အပြီးတိုင်ဖျက်ထားခြင်း သို့မဟုတ် လင့်ခ်ကို အသုံးပြု၍မရတော့ခြင်း ဖြစ်နိုင်ပါသည်။"
-    },
-    "list": {
-      "createInstance": "အင်စတန့်ကို ဖန်တီးပါ",
-      "organizations": "အဖွဲ့အစည်းများ",
-      "accessIssue": {
-        "trialExpired": "စမ်းသုံးခွင့် ကုန်ဆုံးပါပြီ။ ဒီအင်စတန့်ကို ဆက်သုံးရန် စာရင်းသွင်းပါ",
-        "subscriptionCanceled": "စာရင်းသွင်းမှု ရပ်ဆိုင်းနေပါသည်။ ဒီအင်စတန့်ကို ဆက်သုံးရန် ပြန်စာရင်းသွင်းပါ",
-        "subscriptionPastDue": "ငွေပေးချေမှု ပြဿနာရှိပါသည်။ ဒီအင်စတန့်ကို ဆက်သုံးရန် ငွေတောင်းခံမှု အချက်အလက်များကို မွမ်းမံပါ",
-        "quarantined": "အင်စတန့်ကို သီးခြားခွဲထားသည်။ လူကိုယ်တိုင် စစ်ဆေးရန်လိုသည်",
-        "multipleCurrentConflict": "အကောင့်ကို စစ်ဆေးရန် လိုအပ်သည်",
-        "nonCanonicalEarlybird": "အစီအစဉ်အဟောင်းကို စစ်ဆေးရန်လိုသည်"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}} နှင့် စကားပြောပါ",
-        "ready": "{{name}} အသင့်ဖြစ်ပြီ",
-        "warmedUp": "အားလုံး အသင့်ဖြစ်ပါပြီ။ အဆင်သင့်ဖြစ်လျှင် စကားစပြောပါ။"
-      },
-      "flow": {
-        "genericErrorBody": "သင့်အင်စတန့်ကို အခု အပြီးသတ် ပြင်ဆင်၍မရပါ။",
-        "manualReviewBody": "အင်စတန့် မဖန်တီးမီ သင့်အကောင့်အခြေအနေကို စစ်ဆေးရန်လိုပါသည်။ kilo.ai တွင် ဆက်လုပ်ပါ။",
-        "manualReviewTitle": "စတင်ပြင်ဆင်မှုကို လူကိုယ်တိုင် စစ်ဆေးရန်လိုသည်",
-        "openKiloAi": "Kilo.ai ကို ဖွင့်ပါ",
-        "provisioning": "ပြင်ဆင်နေသည်",
-        "review": "စစ်ဆေးမှု",
-        "identityTitle": "သင့်ဘော့တ်၏ ကိုယ်ပိုင်ပုံစံ",
-        "couldNotLoad": "စတင်ပြင်ဆင်မှု အခြေအနေကို ရယူ၍မရပါ။",
-        "finishingSetup": "စတင်ပြင်ဆင်မှုကို အပြီးသတ်နေပါသည်။ သင့်အကောင့်ကို အပြီးသတ် ပြင်ဆင်နေစဉ် ခဏစောင့်ပါ။",
-        "ready": "အသင့်",
-        "settingUp": "ပြင်ဆင်နေသည်…"
-      },
-      "unavailableDescription": "အင်စတန့် ဖန်တီးရန် အသုံးပြုဆဲ KiloClaw စာရင်းသွင်းမှု လိုအပ်ပါသည်။ ရှိပြီးသား အင်စတန့်များနှင့် စာရင်းသွင်းမှုများက ပုံမှန်အတိုင်း ဆက်လက်လည်ပတ်ပါမည်။",
-      "unavailableTitle": "KiloClaw အင်စတန့်အသစ်များ မရနိုင်ပါ",
-      "identity": {
-        "chooseAvatar": "ကိုယ်စားပြုပုံကို ရွေးပါ",
-        "namePlaceholder": "သင့်ဘော့တ်၏ အမည်",
-        "selectAvatar": "{{name}} ကို ကိုယ်စားပြုပုံအဖြစ် ရွေးပါ",
-        "personality": "စရိုက်လက္ခဏာ",
-        "changePersonality": "စရိုက်လက္ခဏာကို ပြောင်းပါ",
-        "location": "တည်နေရာ",
-        "locationPlaceholder": "မြို့ သို့မဟုတ် ဒေသ (မထည့်လည်းရ)",
-        "useCurrentLocation": "လက်ရှိတည်နေရာကို သုံးပါ",
-        "locationDeniedTitle": "တည်နေရာ အသုံးပြုခွင့်မရှိပါ",
-        "locationDeniedMessage": "လက်ရှိတည်နေရာ သုံးရန် ဆက်တင်များတွင် တည်နေရာ အသုံးပြုခွင့် ဖွင့်ပါ။",
-        "locationValidationFailed": "တည်နေရာကို အတည်ပြု၍မရပါ။",
-        "locationResolveFailed": "သင့်တည်နေရာကို သတ်မှတ်၍မရပါ။ ကိုယ်တိုင် တည်းဖြတ်နိုင်ပါသည်။",
-        "locationGetFailed": "သင့်တည်နေရာကို ရယူ၍ မရပါ။ ကိုယ်တိုင် ထည့်ပါ။",
-        "nature": {
-          "aiAssistantLabel": "AI လက်ထောက်",
-          "aiAssistantVibe": "ကူညီတတ်၊ စွမ်းဆောင်ရည်ရှိ၊ အလုပ်ကျွမ်းကျင်",
-          "digitalCreatureLabel": "ဒစ်ဂျစ်တယ် သတ္တဝါ",
-          "digitalCreatureVibe": "တစ်မျိုးထူးခြား၊ အသက်ဝင်၊ အနည်းငယ် ခန့်မှန်းရခက်",
-          "virtualCompanionLabel": "အွန်လိုင်း အဖော်",
-          "virtualCompanionVibe": "နွေးထွေး၊ အမြဲအဖော်ပြု၊ စိတ်ရင်းဖြင့် ဂရုစိုက်",
-          "somethingWeirderLabel": "ပိုထူးဆန်းသော တစ်ခုခု…",
-          "somethingWeirderVibe": "ကိုယ်တိုင် သတ်မှတ်ပါ"
-        }
-      },
-      "notifications": {
-        "mockMessage": "ပြီးပါပြီ။ တောင်းထားတဲ့ အကျဉ်းချုပ်ကို ပြင်ဆင်ပြီးပါပြီ။ အဆင်ပြေတဲ့အချိန် ကြည့်နိုင်ပါပြီ။",
-        "settingUp": "အသိပေးချက်များ ပြင်ဆင်နေသည်…",
-        "stayInTheLoop": "နောက်ဆုံးအခြေအနေ အသိပေးချက်များ",
-        "getNotified": "တုံ့ပြန်ချက်များ မလွတ်သွားစေရန် {{name}} က အလုပ်တစ်ခု ပြီးသည့်အခါ အသိပေးချက် ရယူပါ။",
-        "now": "ယခု",
-        "skipForNow": "လောလောဆယ် ကျော်ပါ",
-        "couldNotEnable": "အသိပေးချက်များ ဖွင့်၍ မရပါ။"
-      },
-      "provisioning": {
-        "queryErrorTitle": "စတင်ပြင်ဆင်မှု အခြေအနေကို စစ်ဆေး၍မရပါ",
-        "queryErrorBody": "{{name}} ၏ စတင်ပြင်ဆင်မှုကို စစ်ဆေးနေစဉ် ချိတ်ဆက်မှု ပြတ်သွားပါသည်။ ပြင်ဆင်မှု ဆက်လုပ်နေဆဲ ဖြစ်နိုင်ပါသည်။ ထပ်စမ်းကြည့်ပါ သို့မဟုတ် ခဏကြာလျှင် ပြန်စစ်ဆေးပါ။",
-        "stoppedTitle": "ပြင်ဆင်မှု ရပ်တန့်သွားသည်",
-        "stoppedBody": "{{name}} ၏ အင်စတန့်သည် စတင်ပြင်ဆင်နေစဉ် မမျှော်လင့်ဘဲ ရပ်တန့်သွားပါသည်။",
-        "stalledTitle": "ပြင်ဆင်မှု ရှေ့မဆက်တော့ပါ",
-        "stalledBody": "{{name}} ကို အပြီးသတ် ပြင်ဆင်၍မရပါ။ ထပ်စမ်းကြည့်ပါ။ ဆက်ဖြစ်နေလျှင် {{supportEmail}} သို့ အီးမေးလ်ပို့ပါ။",
-        "timeoutTitle": "မျှော်လင့်ထားသည်ထက် ကြာနေသည်",
-        "timeoutBody": "{{name}} အတွက် ပြင်ဆင်မှုက ပုံမှန်ထက် ကြာနေသည် ({{displayMinutes}} မိနစ်ကျော်)။",
-        "continueInBackground": "နောက်ခံတွင် ဆက်လုပ်ပါ",
-        "settingUp": "{{name}} ကို ပြင်ဆင်နေသည်",
-        "connectingToAgent": "အေးဂျင့်နှင့် ချိတ်ဆက်နေသည်",
-        "startingSandbox": "သီးခြားလုပ်ဆောင်ရာ ပတ်ဝန်းကျင်ကို စတင်နေသည်",
-        "backgroundHint": "များသောအားဖြင့် တစ်မိနစ်အောက်သာ ကြာပါသည်။ ဒီမျက်နှာပြင်ကို ပိတ်နိုင်ပါသည်။ နောက်ခံတွင် ဆက်လုပ်နေပါမည်။"
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "ကုဒ် {{code}}",
-      "gatewayProcess": "ဂိတ်ဝေးလုပ်ငန်းစဉ်",
-      "lastExit": "နောက်ဆုံးရပ်တန့်မှု",
-      "memory": "မမ်မိုရီ",
-      "region": "ဒေသ",
-      "resources": "အရင်းအမြစ်များ",
-      "restarts": "ပြန်စတင်မှုများ",
-      "state": "အခြေအနေ",
-      "uptime": "လည်ပတ်ချိန်",
-      "crashed": "ချို့ယွင်းရပ်တန့်",
-      "destroying": "အပြီးတိုင်ဖျက်နေ",
-      "provisioned": "ပြင်ဆင်ပြီး",
-      "restarting": "ပြန်စတင်နေ",
-      "running": "လည်ပတ်နေ",
-      "shuttingDown": "ပိတ်နေသည်",
-      "starting": "စတင်နေ",
-      "stopped": "ရပ်တန့်ပြီး",
-      "stopping": "ရပ်တန့်နေ",
-      "unknown": "မသိရ",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "ထိပ်တန်း",
-      "frontierDescription": "စွမ်းဆောင်ရည် အမြင့်ဆုံးဖြစ်ပါသည်။ ကျိုးကြောင်းဆင်ခြင်နိုင်သော ထိပ်တန်းမော်ဒယ်များထံ ပို့ပေးပါသည်။",
-      "balancedDescription": "ကုန်ကျစရိတ် သက်သာပြီး မြန်နှုန်းနှင့် စွမ်းဆောင်ရည်ကို မျှတစေပါသည်။",
-      "autoModelA11y": "{{label}} အလိုအလျောက် ရွေးချယ်မော်ဒယ်",
-      "currentModel": "လက်ရှိ မော်ဒယ်",
-      "browseAllModels": "သို့မဟုတ် မော်ဒယ် ၅၀၀ ကျော်ထဲမှ ရွေးပါ",
-      "browseAllModelsA11y": "မော်ဒယ် ၅၀၀ ကျော်အားလုံးကို ကြည့်ပါ"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw ကို ဆက်သုံးရန် ဘရောက်ဆာမှ kilo.ai/claw သို့ သွားပါ။ အက်ပ်ထဲတွင် စာရင်းသွင်း၍မရပါ။",
-      "subscriptionCanceledTitle": "ဝက်ဘ်ဆိုက်တွင် အခပေးအစီအစဉ် ဝယ်ယူပါ",
-      "subscriptionCanceledBody": "KiloClaw ကို သုံးရန် ဘရောက်ဆာမှ kilo.ai/claw သို့ သွားပါ။ အက်ပ်ထဲတွင် စာရင်းသွင်း၍မရပါ။",
-      "subscriptionCanceledCta": "Kilo.ai/claw ကို ဖွင့်ပါ",
-      "subscriptionPastDueTitle": "ဝဘ်ပေါ်တွင် ငွေပေးချေမှု မွမ်းမံခြင်း",
-      "subscriptionPastDueBody": "သင့်နောက်ဆုံး ငွေပေးချေမှုတွင် ပြဿနာရှိခဲ့ပါသည်။ မွမ်းမံရန် ဘရောက်ဆာမှ kilo.ai/claw သို့ သွားပါ။ အက်ပ်ထဲတွင် ငွေတောင်းခံမှုကို စီမံ၍မရပါ။",
-      "quarantinedTitle": "အင်စတန့်ကို ပြန်ပြင်ရန်လိုသည်",
-      "quarantinedBody": "သင့် KiloClaw အင်စတန့်ကို သီးခြားခွဲထားသဖြင့် လောလောဆယ် အသုံးပြု၍မရပါ။ ပြန်သုံးနိုင်ရန် ကျွန်ုပ်တို့အဖွဲ့က ကူညီပြင်ဆင်ပေးရပါမည်။",
-      "multipleCurrentConflictBody": "သင့်အကောင့်တွင် အသုံးပြုဆဲ စာရင်းသွင်းမှု တစ်ခုထက်ပိုနေပါသည်။ ငွေထပ်တောင်းခံမှု မဖြစ်စေရန် ယာယီရပ်ဆိုင်းထားပါသည်။",
-      "multipleCurrentConflictCta": "Kilo.ai တွင် ဆက်လုပ်ပါ",
-      "nonCanonicalEarlybirdTitle": "အစီအစဉ်အဟောင်း တွေ့ရှိသည်",
-      "nonCanonicalEarlybirdBody": "သင့်ကြိုတင်အသုံးပြုခွင့် အစီအစဉ်ကို ဖုန်းပေါ်တွင် မသုံးမီ လူကိုယ်တိုင် စစ်ဆေးရန်လိုပါသည်။",
-      "iosTitle": "KiloClaw ကို iOS တွင် မရရှိနိုင်ပါ",
-      "iosBody": "ဤအကောင့်အတွက် KiloClaw အသုံးပြုခွင့်ကို iOS အက်ပ်ပြင်ပတွင် စီမံပါသည်။",
-      "iosContact": "မေးခွန်းများရှိလား။ {{supportEmail}} သို့ ဆက်သွယ်ပါ။",
-      "quarantinedCta": "ကျွန်ုပ်တို့အဖွဲ့ကို အီးမေးလ်ပို့ပါ",
-      "nonCanonicalEarlybirdCta": "သင့်အစီအစဉ်ကို Kilo.ai တွင် ပြန်လည်သုံးသပ်ပါ"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} ကို စစ်ဆေးရန်လိုသည်: {{label}}",
-      "openUnread_one": "{{name}} ကို ဖွင့်ပါ၊ မဖတ်ရသေးသော မက်ဆေ့ချ် {{displayCount}} စောင်",
-      "openUnread": "{{name}} ကို ဖွင့်ပါ၊ မဖတ်ရသေးသော မက်ဆေ့ချ် {{displayCount}} စောင်",
-      "openUnread_other": "{{name}} ကို ဖွင့်ပါ၊ မဖတ်ရသေးသော မက်ဆေ့ချ် {{displayCount}} စောင်",
-      "openSettings": "{{name}} ၏ ဆက်တင်များကို ဖွင့်ပါ",
-      "fixOnKiloAi": "Kilo.ai တွင် ဖြေရှင်းပါ: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "စက်ပစ္စည်း တောင်းဆိုချက်များကို ခွင့်ပြုပါ",
-      "execPolicyDescription": "လုံခြုံရေး ဆက်တင်များ",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "AI မော်ဒယ် ရွေးချယ်မှု",
-      "secretsDescription": "ကုဒ်ဝှက်ထားသော ဝင်ရောက်ခွင့်အချက်အလက်များ",
-      "versionPinDescription": "ဗားရှင်းတစ်ခုကို ပုံသေသတ်မှတ်ပါ"
-    },
-    "avatar": {
-      "arcade": "ဂိမ်းစက်",
-      "brain": "ဦးနှောက်",
-      "creature": "သတ္တဝါ",
-      "crystal": "သလင်း",
-      "custom": "စိတ်ကြိုက် ကိုယ်စားပြုပုံ",
-      "dragon": "နဂါး",
-      "explorer": "စူးစမ်းရှာဖွေသူ",
-      "flame": "မီးလျှံ",
-      "lightning": "လျှပ်စီး",
-      "magicWand": "မှော်တုတ်တံ",
-      "moon": "လ",
-      "operator": "စက်ကိုင်တွယ်သူ",
-      "orbit": "ပတ်လမ်း",
-      "oracle": "ဗျာဒိတ်ဆရာ",
-      "rainbow": "သက်တံ",
-      "robot": "စက်ရုပ်",
-      "satellite": "ဂြိုဟ်တု",
-      "sparkles": "အလင်းလက်များ",
-      "strongArm": "သန်မာသောလက်မောင်း",
-      "talisman": "အဆောင်လက်ဖွဲ့"
-    },
-    "remoteSpawnFilesNotSupported": "ဒီအင်စတန့်သည် ဖိုင်များကို လက်ခံ၍မရပါ။",
-    "instanceSwitcherTitle": "KiloClaw အင်စတန့်"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}} ကို ဘယ်ဘက်သို့ ရွှေ့ပါ",
       "moveRight": "{{filename}} ကို ညာဘက်သို့ ရွှေ့ပါ"
     },
-    "attachmentPasteHint": {
-      "accessibility": "ကူးယူထားသော ပုံကို ကူးထည့်ပါ",
-      "label": "ပုံတွေ့ရှိထားသည်၊ ကူးထည့်ရန် နှိပ်ပါ"
-    },
     "attachmentPicker": {
       "camera": "ကင်မရာ",
       "photoLibrary": "ဓာတ်ပုံစုစည်းမှု",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "စက်ရှင်မှ အကောင့်ထွက်ပြီးပါပြီ။",
     "signOutThisDeviceTitle": "ဤစက်မှ အကောင့်ထွက်မလား။",
     "signOutThisSessionTitle": "ဤစက်ရှင်မှ အကောင့်ထွက်မလား။",
-    "signOutThisSessionMessage": "{{device}} မှ အကောင့်ထွက်ပါမည်။ ထိုစက်တွင် API ဝင်ရောက်ခွင့် တစ်နာရီအထိ ဆက်ရှိနိုင်ပါသည်။"
+    "signOutThisSessionMessage": "{{device}} မှ အကောင့်ထွက်ပါမည်။ ထိုစက်တွင် API ဝင်ရောက်ခွင့် တစ်နာရီအထိ ဆက်ရှိနိုင်ပါသည်။",
+    "unknownDevice": "အမည်မသိ စက်ပစ္စည်း"
   },
   "forceUpdate": {
     "couldNotOpenStore": "အက်ပ် စတိုးကို မဖွင့်နိုင်ပါ။",

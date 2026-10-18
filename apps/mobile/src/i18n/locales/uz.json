@@ -101,12 +101,9 @@
     "scheduled": "Rejalashtirilgan",
     "keepEditing": "Tahrirlashni davom ettirish",
     "keepRunning": "To‘xtatmaslik",
-    "kiloclaw": "KiloClaw",
     "newSession": "Yangi seans",
-    "noKiloclawInstances": "KiloClaw nusxalari yo‘q",
     "noModelsAvailable": "Modellar mavjud emas",
     "notFound": "Topilmadi.",
-    "online": "Onlayn",
     "open": "{{name}}ni ochish",
     "openPullRequest": "Ochiq PR",
     "pending": "Kutilmoqda",
@@ -257,7 +254,8 @@
     "renamePasskey": "Kirish kaliti nomini oʻzgartirish",
     "removePasskey": "Kirish kalitini olib tashlash",
     "removePasskeyTitle": "Kirish kaliti olib tashlansinmi?",
-    "removePasskeyMessage": "Endi bu kirish kaliti bilan kira olmaysiz."
+    "removePasskeyMessage": "Endi bu kirish kaliti bilan kira olmaysiz.",
+    "changelog": "Yangiliklar"
   },
   "preferences": {
     "general": "Umumiy",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Bildirishnomalar faqat yangi hodisa haqida xabar beradi. Xabarni o'qish uchun Kilo ilovasini oching.",
     "channel": {
       "agentProgress": "Agent jarayoni",
-      "chat": "Suhbat xabarlari",
-      "kiloclaw": "KiloClaw faoliyati",
       "balance": "Balans haqida ogohlantirishlar",
       "security": "Aniqlangan xavfsizlik muammolari",
       "spend": "Xarajat bildirishnomalari",
       "followedSessions": "Kuzatilayotgan seanslar"
     },
     "category": {
-      "chatMessagesSubtitle": "suhbatlaringizdagi javoblar",
       "agentAttentionTitle": "Agentga yordamingiz kerak",
       "agentAttentionSubtitle": "savollar, ruxsat va ma'lumot so'rovlari",
       "agentUpdatesTitle": "Agentdan yangiliklar",
       "agentUpdatesSubtitle": "vazifa bajarilayotganda agent yuborgan xabarlar",
       "sessionStatusTitle": "Sessiya holati",
       "sessionStatusSubtitle": "tugadi / xatolik yuz berdi / boshqarishga tayyor",
-      "kiloclawActivitySubtitle": "nusxa tayyor yoki xatolik yuz berdi, rejalashtirilgan amallar",
-      "kiloclawActivityUnavailable": "KiloClaw faoliyatini olish uchun KiloClaw nusxasini ishga tushiring.",
       "balanceAlertsSubtitle": "tashkilot balansi kamaygani haqida ogohlantirishlar",
       "balanceAlertsUnavailable": "Balans ogohlantirishlarini olish uchun tashkilotga qo'shiling.",
       "securityFindingsSubtitle": "aniqlangan yangi zaifliklar va SLA eslatmalari",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Bosh sahifa",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, varaq, {{total}} tadan {{position}}-si"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Nusxani almashtirish",
-      "couldNotLoadInstances": "Nusxalarni yuklab bo'lmadi.",
-      "noInstancesDescription": "Suhbatlashishni boshlash uchun nusxani sozlang.",
-      "setUpKiloclaw": "KiloClawni sozlash",
-      "currentInstance": "{{title}}, joriy"
-    },
     "conversation": {
-      "failedToLoad": "Suhbatni yuklab bo'lmadi.",
-      "notFound": "Suhbat topilmadi.",
       "untitled": "Nomsiz",
-      "leaveTitle": "Suhbatdan chiqilsinmi?",
-      "leaveMessage": "Suhbat ro'yxatingizdan olib tashlanadi.",
-      "openHint": "Suhbatni ochadi. Nomini o'zgartirish va chiqish amallarini ko'rish uchun bosib turing.",
-      "unread": "O'qilmagan",
-      "optionsFor": "{{title}} suhbati uchun amallar",
-      "options": "Suhbat amallari",
-      "renameTitle": "Suhbatni qayta nomlash",
-      "renamePlaceholder": "Yangi nom",
-      "couldNotReachBot": "Bot bilan bog'lanib bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "messageDeliveryFailed": "Xabarni botga yetkazib bo'lmadi.",
-      "couldNotSignIn": "Suhbatga kirib bo'lmadi.",
-      "couldNotRefreshMessages": "Xabarlarni yangilab bo'lmadi.",
-      "couldNotLoadHistory": "Suhbat tarixini yuklab bo'lmadi.",
-      "leave": "Chiqish",
-      "untitledConversation": "Nomsiz suhbat",
-      "createFailed": "Suhbatni yaratib bo'lmadi.",
-      "leaveFailed": "Suhbatdan chiqib bo'lmadi."
-    },
-    "reactions": {
-      "common": "Ko'p ishlatiladigan",
-      "reactWith": "{{reaction}} bilan reaksiya qilish",
-      "accessibility": "{{emoji}} reaksiyasi, {{displayCount}} ta"
-    },
-    "composer": {
-      "replyingTo": "Javob oluvchi",
-      "cancelReply": "Javobni bekor qilish",
-      "openInstance": "Nusxani ochish",
-      "attachFile": "Faylni biriktirish",
-      "cancelEdit": "Tahrirlashni bekor qilish"
+      "renamePlaceholder": "Yangi nom"
     },
     "conversationList": {
-      "couldNotLoad": "Suhbatlarni yuklab bo'lmadi.",
-      "emptyTitle": "Hali suhbatlar yo'q",
-      "emptyDescription": "KiloClaw nusxangiz bilan suhbatlashish uchun yangi suhbat yarating.",
-      "create": "Suhbat yaratish",
-      "newConversation": "Yangi suhbat",
-      "openInstanceSettings": "Nusxa sozlamalarini ochish",
       "today": "Bugun",
       "yesterday": "Kecha",
-      "thisWeek": "Bu hafta",
       "older": "Avvalgi"
     },
     "attachment": {
-      "open": "{{filename}} faylini ochish",
-      "openFailed": "Biriktirmani ochib bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring.",
-      "attachFailed": "Faylni biriktirib bo'lmadi.",
-      "limit": "Siz {{displayCount}} tagacha fayl biriktira olasiz.",
-      "sizeRejection": "{{filename}} faylining hajmi biriktirma uchun belgilangan {{limit}} chegarasidan oshadi.",
-      "unreadable": "{{filename}} faylini o'qib bo'lmadi.",
-      "pastedImage": "joylashtirilgan rasm",
-      "defaultName": "Biriktirma",
       "classificationDenied": "Bajariladigan fayllarni biriktirib bo'lmaydi.",
       "classificationEmpty": "Fayl bo'sh.",
       "classificationTooLarge": "Fayl hajmi 20 MB dan oshmasligi kerak.",
@@ -943,426 +883,17 @@
       "networkError": "Tarmoqda xato yuz berdi.",
       "uploadFailed": "Yuklash amalga oshmadi.",
       "nothingToPaste": "Joylashtirish uchun hech narsa yo'q.",
-      "metadataStripFailed": "Surat metama'lumotlarini olib tashlab bo'lmadi.",
-      "limit_one": "Siz {{displayCount}} tagacha fayl biriktira olasiz.",
-      "limit_other": "Siz {{displayCount}} tagacha fayl biriktira olasiz."
+      "metadataStripFailed": "Surat metama'lumotlarini olib tashlab bo'lmadi."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "{{filename}} faylini qayta yuklashga urinish",
-      "remove": "{{filename}} faylini olib tashlash"
-    },
-    "messageBubble": {
-      "deleted": "[o'chirilgan xabar]",
-      "yourMessage": "Sizning xabaringiz",
-      "messageFrom": "{{author}} yuborgan xabar",
-      "moreActions": "Boshqa amallar",
-      "notDelivered": "Yetkazilmagan",
-      "edited": "(tahrirlangan)",
-      "image": "Rasm"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Nusxalandi",
-      "copyFailed": "Nusxalab bo'lmadi.",
-      "title": "Xabar amallari",
-      "deleteTitle": "Xabar o'chirilsinmi?",
-      "deleteMessage": "Xabar suhbatdan olib tashlanadi.",
-      "deleteFailed": "Xabarni o'chirib bo'lmadi.",
-      "removeReactionFailed": "Reaksiyani olib tashlab bo'lmadi.",
-      "addReactionFailed": "Reaksiya qo'shib bo'lmadi.",
-      "retrySend": "Qayta yuborish",
-      "moreReactions": "Boshqa reaksiyalar",
-      "edit": "Tahrirlash",
-      "sendFailed": "Xabarni yuborib bo'lmadi.",
-      "retrySendFailed": "Xabarni qayta yuborib bo'lmadi.",
-      "editFailed": "Xabarni tahrirlab bo'lmadi.",
-      "executeFailed": "Amalni bajarib bo'lmadi."
+      "edit": "Tahrirlash"
     },
     "attachmentPicker": {
-      "takePhoto": "Rasmga olish",
-      "photoLibrary": "Rasmlar kutubxonasi",
-      "files": "Fayl",
       "cameraAccessMessage": "Suratga olish uchun sozlamalarda kameradan foydalanishga ruxsat bering."
-    },
-    "typingIndicator": {
-      "someone": "Kimdir",
-      "typing_one": "{{name}} yozmoqda...",
-      "typing": "{{names}} yozmoqda...",
-      "typing_other": "{{names}} yozmoqda..."
-    },
-    "botStatus": {
-      "offline": "Oflayn",
-      "loadingUser": "Foydalanuvchi ma'lumotlari yuklanmoqda...",
-      "waitingForStatus": "Bot holati kutilmoqda...",
-      "offlineMessage": "Bot oflayn. U qayta ulangach, xabar almashish davom etadi."
-    },
-    "errors": {
-      "notAllowed": "Bunga ruxsat berilmagan.",
-      "messageTooLong": "Xabar juda uzun. Undagi belgilar soni {{limit}} tadan kam bo'lishi kerak.",
-      "titleTooLong": "Sarlavha juda uzun. Undagi belgilar soni {{limit}} tadan kam bo'lishi kerak.",
-      "messageEmpty": "Xabar bo'sh bo'lishi mumkin emas."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw nusxalarini yuklab bo'lmadi.",
-    "billing": {
-      "title": "To'lovlar",
-      "continueMonthToMonth": "Oylik to'lov bilan davom etish",
-      "plan": "Reja",
-      "finalTermEnds": "Oxirgi davr tugashi",
-      "afterFinalTerm": "Oxirgi davrdan keyin",
-      "lessThanOneDay": "1 Kundan kam",
-      "ends": "Tugaydi",
-      "expires": "Amal qilish muddati tugaydi",
-      "noActivePlan": "Faol tarif yo'q",
-      "noActivePlanDescription": "Sizda faol KiloClaw obunasi yo'q.",
-      "managedByAdmin": "To'lovlarni tashkilotingiz administratori boshqaradi.",
-      "couldNotLoad": "To'lov ma'lumotlarini yuklab bo'lmadi.",
-      "manageOnWeb": "Saytda to'lovlarni boshqarish",
-      "earlybird": "Erta foydalanish",
-      "finalCommitTermEndsOn": "Commit tarifingizning oxirgi davri {{date}} sanasida tugaydi. Standard tarifida {{price}} evaziga davom eting, aks holda xosting to'xtatiladi.",
-      "freeTrial": "Bepul sinov",
-      "hostingEnds": "Xosting tugaydi",
-      "renews": "Yangilanadi",
-      "standardMonthToMonth": "Standard, oylik to'lov",
-      "standardStartsOn": "Standard tarifi {{date}} sanasidan {{price}} narxda boshlanadi.",
-      "yourStandardMonthlyPrice": "standard tarifingizning oylik narxi",
-      "perMonth": "/oy",
-      "earlybirdAccessUntil": "Erta foydalanish muddati {{date}} sanasigacha amal qiladi.",
-      "earlybirdEnding": "Erta foydalanish muddati tugashiga {{remaining}} qoldi.",
-      "paymentPastDue": "To'lov muddati o'tgan. Iltimos, to'lov usulini yangilang.",
-      "subscriptionCancels": "Obuna {{date}} sanasida bekor qilinadi.",
-      "trialDaysRemaining": "Sinov muddati tugashiga {{remaining}} qoldi.",
-      "trialEndingSoon": "Sinov muddati tez orada tugaydi: {{remaining}} qoldi.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Kommit"
-    },
-    "changelog": {
-      "title": "Yangiliklar",
-      "couldNotLoad": "O'zgarishlar jurnalini yuklab bo'lmadi.",
-      "noUpdates": "Hali yangilanishlar yo'q",
-      "noUpdatesDescription": "O'zgarishlar haqidagi yozuvlar shu yerda ko'rinadi.",
-      "recentUpdates": "So'nggi yangilanishlar",
-      "manageVersion": "Versiyani boshqarish",
-      "redeployRequired": "Qayta joylashtirish kerak",
-      "redeploySuggested": "Qayta joylashtirish tavsiya qilinadi",
-      "upgradeRequired": "Yangilash kerak"
-    },
-    "dashboard": {
-      "title": "Boshqaruv paneli",
-      "couldNotLoad": "Boshqaruv panelini yuklab bo'lmadi.",
-      "renameInstance": "Nusxa nomini o'zgartirish",
-      "renamePlaceholder": "Yangi nom (ko'pi bilan 50 ta belgi)",
-      "someDetailsFailed": "Ayrim joriy ma'lumotlarni yuklab bo'lmadi.",
-      "destroy": "Yo'q qilish",
-      "destroyMessage": "KiloClaw nusxangiz va undagi barcha ma'lumotlar butunlay yo'q qilinadi. Bu amalni ortga qaytarib bo'lmaydi.",
-      "destroyTitle": "Nusxani yo'q qilish",
-      "instance": "Nusxa",
-      "couldNotCheckStatus": "Xizmat holatini tekshirib bo'lmadi.",
-      "dangerZone": "XAVFLI AMALLAR",
-      "destroying": "Yo'q qilinmoqda…",
-      "serviceDegraded": "Xizmatda nosozlik bor — holatni ko'rish uchun bosing",
-      "up": "ISHLAYAPTI"
-    },
-    "channels": {
-      "title": "Kanallar",
-      "couldNotLoad": "Kanallarni yuklab bo'lmadi.",
-      "noChannels": "Kanallar mavjud emas",
-      "noChannelsDescription": "Kanal integratsiyalari shu yerda ko'rinadi.",
-      "connected": "{{label}} ulandi",
-      "disconnectMessage": "{{label}} olib tashlansinmi? Bu kanal bilan ulanish uziladi.",
-      "disconnectTitle": "Kanal ulanishini uzish"
-    },
-    "devicePairing": {
-      "title": "Qurilmani ulash",
-      "refreshRequests": "Juftlash so'rovlarini yangilash",
-      "couldNotLoad": "Juftlash so'rovlarini yuklab bo'lmadi.",
-      "noPending": "Kutilayotgan so'rovlar yo'q",
-      "noPendingDescription": "Kanallar va qurilmalarni juftlash so'rovlari shu yerda ko'rinadi.",
-      "channelRequests": "Kanal so'rovlari",
-      "deviceRequests": "Qurilma so'rovlari",
-      "approveDeviceMessage": "{{platform}} platformasiga nusxangizga ulanishga ruxsat berilsinmi?",
-      "approveDeviceTitle": "Qurilmani tasdiqlash",
-      "approveMessage": "{{label}} (kod: {{code}}) uchun nusxangizga ulanishga ruxsat berilsinmi?",
-      "approveTitle": "Juftlash so'rovini tasdiqlash",
-      "unknownDevice": "Noma'lum qurilma"
-    },
-    "execPolicy": {
-      "title": "Buyruqlarni bajarish qoidalari",
-      "couldNotLoad": "Buyruqlarni bajarish qoidalarini yuklab bo'lmadi.",
-      "alwaysAsk": "Har doim so'rash",
-      "alwaysAskDescription": "Har bir buyruqni bajarishdan oldin tasdiqlang. Bu eng xavfsiz usul.",
-      "neverAsk": "Hech qachon so'ramaslik",
-      "neverAskDescription": "Buyruqlarni tasdiqsiz bajaring. Bu tezroq, lekin xavfsizligi pastroq."
-    },
-    "google": {
-      "title": "Google hisobi",
-      "couldNotLoad": "Google hisobi holatini yuklab bo'lmadi.",
-      "disconnected": "Google hisobi bilan ulanish uzildi. O'zgarishni qo'llash uchun nusxangizni qayta joylashtiring.",
-      "setupCommand": "Sozlash buyrug'i",
-      "setupCommandHelp": "Google hisobingizni ulash uchun Docker o'rnatilgan kompyuteringizdagi terminalda bu buyruqni bajaring.",
-      "failedToLoadCommand": "Sozlash buyrug'ini yuklab bo'lmadi.",
-      "gmailNotifications": "Gmail bildirishnomalari",
-      "disconnect": "Google hisobi bilan ulanishni uzish",
-      "copied": "Nusxalandi",
-      "copyCommand": "Buyruqni nusxalash",
-      "disconnectConfirm": "Uzish",
-      "disconnectMessage": "Google hisobingiz bu nusxadan olib tashlansinmi? Gmail bildirishnomalari o'chiriladi. O'zgarishlarni qo'llash uchun ulanishni uzgach, nusxani qayta joylashtiring.",
-      "disconnectTitle": "Google bilan ulanishni uzish"
-    },
-    "modelList": {
-      "noMatches": "Qidiruvingizga mos model topilmadi",
-      "noModelsDescription": "Modellar mavjud bo'lgach, shu yerda ko'rinadi.",
-      "noResultsFor": "\"{{query}}\" so'rovi bo'yicha natija topilmadi."
-    },
-    "secrets": {
-      "title": "Maxfiy ma’lumotlar",
-      "couldNotLoad": "Maxfiy ma'lumotlarni yuklab bo'lmadi.",
-      "noSecrets": "Maxfiy ma'lumotlar yo'q",
-      "noSecretsDescription": "Maxfiy ma'lumotlardan foydalanadigan integratsiyalar shu yerda ko'rinadi.",
-      "removeMessage": "{{label}} olib tashlansinmi? Bu vosita o'z kirish ma'lumotlaridan foydalana olmay qoladi.",
-      "removeTitle": "Maxfiy ma'lumotni o'chirish",
-      "saved": "{{label}} saqlandi",
-      "hide": "{{label}}ni yashirish",
-      "show": "{{label}}ni ko'rsatish",
-      "allFieldsRequired": "{{label}}ni ulash uchun barcha maydonlar to'ldirilishi shart.",
-      "setupGuideFallback": "sozlash qo‘llanmasi",
-      "setupGuideA11y": "{{label}}ni sozlash bo'yicha qo'llanma",
-      "setupGuide": "Sozlash qo‘llanmasi",
-      "saving": "Saqlanmoqda…",
-      "removing": "O'chirilmoqda…",
-      "updateToken": "Tokenni yangilash"
-    },
-    "versionPin": {
-      "title": "Versiyani belgilab qo‘yish",
-      "couldNotLoad": "Versiya ma'lumotlarini yuklab bo'lmadi.",
-      "couldNotLoadMore": "Qolgan versiyalarni yuklab bo'lmadi.",
-      "loadMore": "Yana versiya yuklash",
-      "showingLatest": "So'nggi 100 ta versiya ko'rsatilmoqda.",
-      "availableVersions": "Mavjud versiyalar",
-      "noVersions": "Versiyalar mavjud emas",
-      "noVersionsDescription": "Mavjud OpenClaw versiyalari shu yerda ko'rinadi.",
-      "unpin": "Biriktirishni bekor qilish",
-      "unpinMessage": "So'nggi mavjud versiyaga qaytilsinmi?",
-      "unpinTitle": "Versiyani biriktirishni bekor qilish",
-      "confirmPin": "Biriktirishni tasdiqlash",
-      "followingLatest": "Doim so'nggi versiya",
-      "latest": "so'nggi",
-      "pin": "Biriktirish",
-      "pinnedByAdmin": "Administrator tomonidan biriktirilgan — o'zgartirish uchun administratoringizga murojaat qiling.",
-      "pinnedTo": "{{version}} versiyasiga biriktirilgan",
-      "reasonOptional": "Sabab (ixtiyoriy)",
-      "reasonPlaceholder": "Nega bu versiyani biriktirayapsiz?",
-      "replaceAdminPin": "Administrator biriktirgan versiyani almashtirish",
-      "replacesAdminPin": "Bu administrator biriktirgan versiyani almashtiradi (hozirgi versiya: {{label}})."
-    },
-    "redeploy": "Qayta joylashtirish",
-    "redeployMessage": "Bu nusxani qayta joylashtirmoqchimisiz?",
-    "redeployTitle": "Nusxani qayta joylashtirish",
-    "controls": {
-      "redeploying": "Qayta joylashtirilmoqda…",
-      "restart": "Qayta ishga tushirish",
-      "restartOpenClawMessage": "OpenClaw jarayonini qayta ishga tushirmoqchimisiz?",
-      "restartOpenClawTitle": "OpenClawni qayta ishga tushirish",
-      "restarting": "Qayta ishga tushirilmoqda…",
-      "start": "Ishga tushirish",
-      "startMessage": "Bu nusxani ishga tushirmoqchimisiz?",
-      "startTitle": "Nusxani ishga tushirish",
-      "stop": "To'xtatish",
-      "stopMessage": "Bu nusxani to'xtatmoqchimisiz?",
-      "stopTitle": "Nusxani to'xtatish",
-      "stopping": "To'xtatilmoqda…"
-    },
-    "empty": {
-      "finishingSetup": "Sozlash yakunlanmoqda",
-      "finishingSetupDescription": "Biroz kuting, hisobingizni sozlashni yakunlayapmiz. Bu odatda ko'p vaqt olmaydi.",
-      "getStarted": "Boshlash",
-      "noInstancesDescription": "Kod yozuvchi agentlarni ishga tushirish uchun birinchi nusxangizni yarating."
-    },
-    "instance": {
-      "backToInstances": "Nusxalar ro'yxatiga qaytish",
-      "couldNotLoad": "Nusxani yuklab bo'lmadi.",
-      "notFound": "Nusxa topilmadi",
-      "notFoundDescription": "Bu nusxa yo'q qilingan yoki havola endi yaroqsiz bo'lishi mumkin."
-    },
-    "list": {
-      "createInstance": "Nusxa yaratish",
-      "organizations": "Tashkilotlar",
-      "accessIssue": {
-        "trialExpired": "Sinov muddati tugadi — bu nusxadan foydalanishni davom ettirish uchun obuna bo'ling",
-        "subscriptionCanceled": "Obuna faol emas — bu nusxadan foydalanishni davom ettirish uchun qayta obuna bo'ling",
-        "subscriptionPastDue": "To'lovda muammo bor — bu nusxadan foydalanishni davom ettirish uchun to'lov ma'lumotlarini yangilang",
-        "quarantined": "Nusxa karantinda — mutaxassis tekshiruvi kerak",
-        "multipleCurrentConflict": "Hisobni ko‘rib chiqish kerak",
-        "nonCanonicalEarlybird": "Eski tarifni ko'rib chiqish kerak"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}} bilan suhbatlashish",
-        "ready": "{{name}} tayyor",
-        "warmedUp": "Hammasi tayyor. Xohlaganingizda salom ayting."
-      },
-      "flow": {
-        "genericErrorBody": "Hozir nusxangizni sozlashni yakunlab bo'lmadi.",
-        "manualReviewBody": "Nusxa yaratishdan oldin hisobingiz holatini tekshirish kerak. kilo.ai saytida davom eting.",
-        "manualReviewTitle": "Sozlash uchun mutaxassis tekshiruvi kerak",
-        "openKiloAi": "Kilo.ai saytini ochish",
-        "provisioning": "Resurslarni tayyorlash",
-        "review": "Ko‘rib chiqish",
-        "identityTitle": "Bot qiyofasi va xarakteri",
-        "couldNotLoad": "Dastlabki sozlash holatini yuklab bo'lmadi.",
-        "finishingSetup": "Sozlash yakunlanmoqda — hisobingiz tayyor bo'lguncha biroz kuting.",
-        "ready": "Tayyor",
-        "settingUp": "Sozlanmoqda…"
-      },
-      "unavailableDescription": "Nusxa yaratish uchun faol KiloClaw obunasi kerak. Mavjud nusxalar va obunalar odatdagidek ishlashda davom etadi.",
-      "unavailableTitle": "Yangi KiloClaw nusxalarini yaratib bo'lmaydi",
-      "identity": {
-        "chooseAvatar": "Avatar tanlash",
-        "namePlaceholder": "Bot nomi",
-        "selectAvatar": "{{name}}ni avatar sifatida tanlash",
-        "personality": "Xarakter",
-        "changePersonality": "Xarakterni o'zgartirish",
-        "location": "Joylashuv",
-        "locationPlaceholder": "Shahar yoki hudud (ixtiyoriy)",
-        "useCurrentLocation": "Joriy joylashuvdan foydalanish",
-        "locationDeniedTitle": "Joylashuvni aniqlashga ruxsat berilmagan",
-        "locationDeniedMessage": "Joriy joylashuvingizdan foydalanish uchun sozlamalarda joylashuvni aniqlashga ruxsat bering.",
-        "locationValidationFailed": "Joylashuvni tasdiqlab bo'lmadi.",
-        "locationResolveFailed": "Joylashuvingizni aniqlab bo'lmadi. Uni qo'lda tahrirlashingiz mumkin.",
-        "locationGetFailed": "Joylashuvingizni aniqlab bo'lmadi. Uni qo'lda kiriting.",
-        "nature": {
-          "aiAssistantLabel": "Sun'iy intellekt yordamchisi",
-          "aiAssistantVibe": "Yordamga tayyor, uquvli, malakali",
-          "digitalCreatureLabel": "Raqamli jonzot",
-          "digitalCreatureVibe": "O'ziga xos, jonli, biroz kutilmagan ishlar qiladi",
-          "virtualCompanionLabel": "Virtual hamroh",
-          "virtualCompanionVibe": "Samimiy, doim yoningizda, chin dildan g'amxo'r",
-          "somethingWeirderLabel": "Yanada g'aroyibroq narsa…",
-          "somethingWeirderVibe": "O'zingiz ta'riflang"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Tayyor! So'ragan xulosangizni tayyorladim. Xohlagan paytingiz ko'rishingiz mumkin.",
-        "settingUp": "Bildirishnomalar sozlanmoqda…",
-        "stayInTheLoop": "Doim xabardor",
-        "getNotified": "Hech bir javobni o'tkazib yubormaslik uchun {{name}} vazifani tugatganda bildirishnoma oling.",
-        "now": "hozir",
-        "skipForNow": "Hozircha o'tkazib yuborish",
-        "couldNotEnable": "Bildirishnomalarni yoqib bo'lmadi."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Sozlash holatini tekshirib bo'lmadi",
-        "queryErrorBody": "{{name}} uchun sozlash holatini tekshirayotganda ulanish uzildi. Sozlash hali davom etayotgan bo'lishi mumkin. Qayta urinib ko'ring yoki birozdan keyin tekshiring.",
-        "stoppedTitle": "Sozlash to'xtatildi",
-        "stoppedBody": "{{name}} nusxasi sozlash paytida kutilmaganda to'xtadi.",
-        "stalledTitle": "Sozlash to'xtab qoldi",
-        "stalledBody": "{{name}}ni sozlashni yakunlay olmadik. Qayta urinib ko'ring yoki bu takrorlansa, {{supportEmail}} ga yozing.",
-        "timeoutTitle": "Kutilganidan uzoq davom etyapti",
-        "timeoutBody": "{{name}} uchun sozlash odatdagidan uzoqroq davom etmoqda ({{displayMinutes}} daqiqadan oshdi).",
-        "continueInBackground": "Fonda davom ettirish",
-        "settingUp": "{{name}} sozlanmoqda",
-        "connectingToAgent": "Agentga ulanish o'rnatilmoqda",
-        "startingSandbox": "Ajratilgan muhit ishga tushirilmoqda",
-        "backgroundHint": "Odatda bir daqiqadan kam vaqt ketadi. Bu oynani yopishingiz mumkin — sozlash fonda davom etadi."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Chiqish kodi: {{code}}",
-      "gatewayProcess": "SHLYUZ JARAYONI",
-      "lastExit": "Oxirgi to'xtash",
-      "memory": "Xotira",
-      "region": "Hudud",
-      "resources": "RESURSLAR",
-      "restarts": "Qayta ishga tushirishlar",
-      "state": "Holat",
-      "uptime": "Uzluksiz ishlash vaqti",
-      "crashed": "XATO BILAN TO'XTADI",
-      "destroying": "YO'Q QILINMOQDA",
-      "provisioned": "TAYYORLANGAN",
-      "restarting": "QAYTA ISHGA TUSHIRILMOQDA",
-      "running": "ISHLAMOQDA",
-      "shuttingDown": "O'CHIRILMOQDA",
-      "starting": "BOSHLANMOQDA",
-      "stopped": "TO'XTATILGAN",
-      "stopping": "TO'XTATILMOQDA",
-      "unknown": "NOMA’LUM",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Ilg'or",
-      "frontierDescription": "Eng yuqori imkoniyatlar. So'rovlarni mulohaza yurita oladigan ilg'or modellarga yo'naltiradi.",
-      "balancedDescription": "Tezlik va imkoniyatlarning arzonroq narxdagi qulay muvozanati.",
-      "autoModelA11y": "{{label}} avtomatik modeli",
-      "currentModel": "Joriy model",
-      "browseAllModels": "yoki 500 dan ortiq model orasidan tanlang",
-      "browseAllModelsA11y": "500 Dan ortiq modelning barchasini ko'rish"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClawdan foydalanishni davom ettirish uchun brauzerda kilo.ai/claw sahifasini oching. Ilovada obuna bo'lib bo'lmaydi.",
-      "subscriptionCanceledTitle": "Saytda obuna bo‘lish",
-      "subscriptionCanceledBody": "KiloClawdan foydalanish uchun brauzerda kilo.ai/claw sahifasini oching. Ilovada obuna bo'lib bo'lmaydi.",
-      "subscriptionCanceledCta": "Kilo.ai/claw sahifasini ochish",
-      "subscriptionPastDueTitle": "Saytda to'lov ma'lumotlarini yangilash",
-      "subscriptionPastDueBody": "Oxirgi to'lovingizda muammo yuz berdi. To'lov ma'lumotlarini yangilash uchun brauzerda kilo.ai/claw sahifasini oching. Ilovada to'lovlarni boshqarib bo'lmaydi.",
-      "quarantinedTitle": "Nusxani tiklash kerak",
-      "quarantinedBody": "KiloClaw nusxangiz karantinda va hozir undan foydalanib bo'lmaydi. Uni tiklash uchun jamoamizning yordami kerak.",
-      "multipleCurrentConflictBody": "Hisobingizda bir nechta faol obuna aniqlandi. Sizdan ikki marta to'lov olinmasligi uchun xizmatni vaqtincha to'xtatdik.",
-      "multipleCurrentConflictCta": "Kilo.ai saytida davom etish",
-      "nonCanonicalEarlybirdTitle": "Eski tarif aniqlandi",
-      "nonCanonicalEarlybirdBody": "Erta foydalanish tarifingizni mobil qurilmada ishlatishdan oldin mutaxassis tekshirishi kerak.",
-      "iosTitle": "KiloClaw iOSda mavjud emas",
-      "iosBody": "Bu hisobning KiloClawdan foydalanish huquqi iOS ilovasidan tashqarida boshqariladi.",
-      "iosContact": "Savollaringiz bormi? {{supportEmail}} ga murojaat qiling.",
-      "quarantinedCta": "Jamoamizga xat yuborish",
-      "nonCanonicalEarlybirdCta": "Tarifingizni kilo.ai'da ko'rib chiqish"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} e'tibor talab qiladi: {{label}}",
-      "openUnread_one": "{{name}}ni ochish, {{displayCount}} ta o'qilmagan xabar",
-      "openUnread": "{{name}}ni ochish, {{displayCount}} ta o‘qilmagan xabar",
-      "openUnread_other": "{{name}}ni ochish, {{displayCount}} ta o‘qilmagan xabar",
-      "openSettings": "{{name}} uchun sozlamalarni ochish",
-      "fixOnKiloAi": "Kilo.ai saytida tuzatish: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Qurilma so'rovlarini tasdiqlash",
-      "execPolicyDescription": "Xavfsizlik sozlamalari",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Sun'iy intellekt modelini tanlash",
-      "secretsDescription": "Shifrlangan kirish ma'lumotlari",
-      "versionPinDescription": "Muayyan versiyaga biriktirish"
-    },
-    "avatar": {
-      "arcade": "Arkada",
-      "brain": "Miya",
-      "creature": "Jonzot",
-      "crystal": "Kristall",
-      "custom": "Maxsus avatar",
-      "dragon": "Ajdaho",
-      "explorer": "Tadqiqotchi",
-      "flame": "Olov",
-      "lightning": "Chaqmoq",
-      "magicWand": "Sehrli tayoq",
-      "moon": "Oy",
-      "operator": "Boshqaruvchi",
-      "orbit": "Orbita",
-      "oracle": "Bashoratchi",
-      "rainbow": "Kamalak",
-      "robot": "Robot tasviri",
-      "satellite": "Sun'iy yo'ldosh",
-      "sparkles": "Yaltirashlar",
-      "strongArm": "Kuchli qo'l",
-      "talisman": "Tumor"
-    },
-    "remoteSpawnFilesNotSupported": "Bu nusxa fayllarni qabul qila olmaydi.",
-    "instanceSwitcherTitle": "KiloClaw nusxasi"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}} faylini chapga surish",
       "moveRight": "{{filename}} faylini o'ngga surish"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Almashinuv buferidan rasm qo'yish",
-      "label": "Rasm aniqlandi, qo'yish uchun bosing"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Rasmlar kutubxonasi",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "Sessiyadan chiqildi.",
     "signOutThisDeviceTitle": "Bu qurilmada tizimdan chiqilsinmi?",
     "signOutThisSessionTitle": "Bu sessiya tugatilsinmi?",
-    "signOutThisSessionMessage": "{{device}} qurilmasi tizimdan chiqariladi. Unda API orqali kirish huquqi yana bir soatgacha saqlanishi mumkin."
+    "signOutThisSessionMessage": "{{device}} qurilmasi tizimdan chiqariladi. Unda API orqali kirish huquqi yana bir soatgacha saqlanishi mumkin.",
+    "unknownDevice": "Noma'lum qurilma"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Ilova do'konini ochib bo'lmadi.",

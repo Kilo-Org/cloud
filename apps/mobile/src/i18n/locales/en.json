@@ -102,12 +102,9 @@
     "scheduled": "Scheduled",
     "keepEditing": "Keep editing",
     "keepRunning": "Keep running",
-    "kiloclaw": "KiloClaw",
     "newSession": "New session",
-    "noKiloclawInstances": "No KiloClaw instances",
     "noModelsAvailable": "No models available",
     "notFound": "Not found",
-    "online": "Online",
     "open": "Open {{name}}",
     "openPullRequest": "Open pull request",
     "pending": "Pending",
@@ -257,7 +254,8 @@
     "renamePasskey": "Rename passkey",
     "removePasskey": "Remove passkey",
     "removePasskeyTitle": "Remove passkey?",
-    "removePasskeyMessage": "You will no longer be able to sign in with this passkey."
+    "removePasskeyMessage": "You will no longer be able to sign in with this passkey.",
+    "changelog": "What's New"
   },
   "preferences": {
     "biometricUnlock": "Unlock with biometrics",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Notifications show that something happened. Open Kilo to read it.",
     "channel": {
       "agentProgress": "Agent progress",
-      "chat": "Chat messages",
-      "kiloclaw": "KiloClaw activity",
       "balance": "Balance alerts",
       "security": "Security findings",
       "spend": "Spend alerts",
       "followedSessions": "Followed sessions"
     },
     "category": {
-      "chatMessagesSubtitle": "replies in your conversations",
       "agentAttentionTitle": "Agent needs you",
       "agentAttentionSubtitle": "questions, permission, input needed",
       "agentUpdatesTitle": "Agent updates",
       "agentUpdatesSubtitle": "mid-task messages from the agent",
       "sessionStatusTitle": "Session status",
       "sessionStatusSubtitle": "finished / failed / ready to control",
-      "kiloclawActivitySubtitle": "instance ready/failed, scheduled actions",
-      "kiloclawActivityUnavailable": "Start a KiloClaw instance to get KiloClaw activity.",
       "balanceAlertsSubtitle": "low organization balance warnings",
       "balanceAlertsUnavailable": "Join an organization to get balance alerts.",
       "securityFindingsSubtitle": "new findings and SLA reminders",
@@ -868,74 +861,19 @@
   },
   "tabs": {
     "home": "Home",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, tab, {{position}} of {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Switch instance",
-      "couldNotLoadInstances": "Could not load instances",
-      "noInstancesDescription": "Set up an instance to start chatting.",
-      "setUpKiloclaw": "Set up KiloClaw",
-      "currentInstance": "{{title}}, current"
-    },
     "conversation": {
-      "failedToLoad": "Failed to load conversation",
-      "notFound": "Conversation not found",
       "untitled": "Untitled",
-      "leaveTitle": "Leave conversation?",
-      "leaveMessage": "This removes it from your list.",
-      "openHint": "Opens the conversation. Long press for rename and leave options.",
-      "unread": "Unread",
-      "optionsFor": "Conversation options for {{title}}",
-      "options": "Conversation options",
-      "renameTitle": "Rename conversation",
-      "renamePlaceholder": "Enter a new name",
-      "couldNotReachBot": "Couldn't reach the bot. Please try again.",
-      "messageDeliveryFailed": "Message could not be delivered to the bot",
-      "couldNotSignIn": "Couldn't sign in to chat",
-      "couldNotRefreshMessages": "Couldn't refresh messages",
-      "couldNotLoadHistory": "Could not load conversation history",
-      "leave": "Leave",
-      "untitledConversation": "Untitled conversation",
-      "createFailed": "Failed to create conversation",
-      "leaveFailed": "Failed to leave conversation"
-    },
-    "reactions": {
-      "common": "Common",
-      "reactWith": "React with {{reaction}}",
-      "accessibility": "{{emoji}} reaction, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Replying to",
-      "cancelReply": "Cancel reply",
-      "openInstance": "Open instance",
-      "attachFile": "Attach file",
-      "cancelEdit": "Cancel edit"
+      "renamePlaceholder": "Enter a new name"
     },
     "conversationList": {
-      "couldNotLoad": "Could not load conversations",
-      "emptyTitle": "No conversations yet",
-      "emptyDescription": "Create a conversation to start chatting with your KiloClaw instance.",
-      "create": "Create conversation",
-      "newConversation": "New conversation",
-      "openInstanceSettings": "Open instance settings",
       "today": "Today",
       "yesterday": "Yesterday",
-      "thisWeek": "This Week",
       "older": "Older"
     },
     "attachment": {
-      "open": "Open {{filename}}",
-      "openFailed": "Couldn't open attachment. Check your connection and try again.",
-      "attachFailed": "Failed to attach file",
-      "limit_one": "You can attach up to {{displayCount}} file.",
-      "limit": "You can attach up to {{displayCount}} files.",
-      "limit_other": "You can attach up to {{displayCount}} files.",
-      "sizeRejection": "{{filename}} exceeds the {{limit}} attachment limit.",
-      "unreadable": "Couldn't read {{filename}}.",
-      "pastedImage": "the pasted image",
-      "defaultName": "Attachment",
       "classificationDenied": "Executable files can't be attached",
       "classificationEmpty": "File is empty",
       "classificationTooLarge": "Files must be 20 MB or smaller",
@@ -948,421 +886,14 @@
       "nothingToPaste": "Nothing to paste"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Retry upload for {{filename}}",
-      "remove": "Remove {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[deleted message]",
-      "yourMessage": "Your message",
-      "messageFrom": "Message from {{author}}",
-      "moreActions": "More actions",
-      "notDelivered": "Not delivered",
-      "edited": "(edited)",
-      "image": "Image"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Copied",
-      "copyFailed": "Failed to copy",
-      "title": "Message actions",
-      "deleteTitle": "Delete message?",
-      "deleteMessage": "This will remove the message from the conversation.",
-      "deleteFailed": "Failed to delete message",
-      "removeReactionFailed": "Failed to remove reaction",
-      "addReactionFailed": "Failed to add reaction",
-      "retrySend": "Retry send",
-      "moreReactions": "More reactions",
-      "edit": "Edit",
-      "sendFailed": "Failed to send message",
-      "retrySendFailed": "Failed to retry send",
-      "editFailed": "Failed to edit message",
-      "executeFailed": "Failed to execute action"
+      "edit": "Edit"
     },
     "attachmentPicker": {
-      "takePhoto": "Take photo",
-      "photoLibrary": "Photo library",
-      "files": "Files",
       "cameraAccessMessage": "Allow camera access in Settings to take a photo."
-    },
-    "typingIndicator": {
-      "someone": "Someone",
-      "typing_one": "{{name}} is typing...",
-      "typing": "{{names}} are typing...",
-      "typing_other": "{{names}} are typing..."
-    },
-    "botStatus": {
-      "offline": "Offline",
-      "loadingUser": "Loading user...",
-      "waitingForStatus": "Waiting for bot status...",
-      "offlineMessage": "Bot is offline. Messages will resume when it reconnects."
-    },
-    "errors": {
-      "notAllowed": "Not allowed",
-      "messageTooLong": "Message is too long — keep it under {{limit}} characters",
-      "titleTooLong": "Title is too long — keep it under {{limit}} characters",
-      "messageEmpty": "Message can't be empty"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Could not load KiloClaw instances",
-    "billing": {
-      "title": "Billing",
-      "continueMonthToMonth": "Continue month-to-month",
-      "plan": "Plan",
-      "finalTermEnds": "Final term ends",
-      "afterFinalTerm": "After final term",
-      "lessThanOneDay": "Less than 1 day",
-      "ends": "Ends",
-      "expires": "Expires",
-      "noActivePlan": "No active plan",
-      "noActivePlanDescription": "You don't have an active KiloClaw subscription.",
-      "managedByAdmin": "Billing is managed by your organization admin.",
-      "couldNotLoad": "Could not load billing information",
-      "manageOnWeb": "Manage Billing on Web",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Your final Commit term ends on {{date}}. Continue as Standard at {{price}}, or hosting ends.",
-      "freeTrial": "Free Trial",
-      "hostingEnds": "Hosting ends",
-      "renews": "Renews",
-      "standardMonthToMonth": "Standard month-to-month",
-      "standardStartsOn": "Standard starts on {{date}} at {{price}}.",
-      "yourStandardMonthlyPrice": "your Standard monthly price",
-      "perMonth": "/month",
-      "earlybirdAccessUntil": "Earlybird access until {{date}}",
-      "earlybirdEnding": "Earlybird ending: {{remaining}}",
-      "paymentPastDue": "Payment past due. Please update your payment method.",
-      "subscriptionCancels": "Subscription cancels {{date}}",
-      "trialDaysRemaining": "Trial: {{remaining}} remaining",
-      "trialEndingSoon": "Trial ending soon: {{remaining}}",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "What's New",
-      "couldNotLoad": "Could not load changelog",
-      "noUpdates": "No updates yet",
-      "noUpdatesDescription": "Changelog entries will appear here.",
-      "recentUpdates": "Recent updates",
-      "manageVersion": "Manage version",
-      "redeployRequired": "Redeploy required",
-      "redeploySuggested": "Redeploy suggested",
-      "upgradeRequired": "Upgrade required"
-    },
-    "dashboard": {
-      "title": "Dashboard",
-      "couldNotLoad": "Could not load dashboard",
-      "renameInstance": "Rename instance",
-      "renamePlaceholder": "Enter a new name (max 50 characters)",
-      "someDetailsFailed": "Some live details failed to load",
-      "destroy": "Destroy",
-      "destroyMessage": "This will permanently destroy your KiloClaw instance and all its data. This action cannot be undone.",
-      "destroyTitle": "Destroy instance",
-      "instance": "Instance",
-      "couldNotCheckStatus": "Could not check service status",
-      "dangerZone": "DANGER ZONE",
-      "destroying": "Destroying…",
-      "serviceDegraded": "Service degraded — tap to view status",
-      "up": "UP"
-    },
-    "channels": {
-      "title": "Channels",
-      "couldNotLoad": "Could not load channels",
-      "noChannels": "No channels available",
-      "noChannelsDescription": "Channel integrations will appear here.",
-      "connected": "{{label}} connected",
-      "disconnectMessage": "Remove {{label}}? This channel will be disconnected.",
-      "disconnectTitle": "Disconnect channel"
-    },
-    "devicePairing": {
-      "title": "Device pairing",
-      "refreshRequests": "Refresh pairing requests",
-      "couldNotLoad": "Could not load pairing requests",
-      "noPending": "No pending requests",
-      "noPendingDescription": "Channel and device pairing requests will appear here.",
-      "channelRequests": "Channel requests",
-      "deviceRequests": "Device requests",
-      "approveDeviceMessage": "Allow {{platform}} to connect to your instance?",
-      "approveDeviceTitle": "Approve device",
-      "approveMessage": "Allow {{label}} (code: {{code}}) to connect to your instance?",
-      "approveTitle": "Approve pairing request",
-      "unknownDevice": "Unknown device"
-    },
-    "execPolicy": {
-      "title": "Execution policy",
-      "couldNotLoad": "Could not load execution policy",
-      "alwaysAsk": "Always ask",
-      "alwaysAskDescription": "Confirm every command before execution. Most secure.",
-      "neverAsk": "Never ask",
-      "neverAskDescription": "Execute commands without confirmation. Faster but less safe."
-    },
-    "google": {
-      "title": "Google Account",
-      "couldNotLoad": "Could not load Google account status",
-      "disconnected": "Google account disconnected. Redeploy your instance to apply the change.",
-      "setupCommand": "Setup command",
-      "setupCommandHelp": "Run this command in a terminal with Docker installed on your own computer to connect your Google account.",
-      "failedToLoadCommand": "Failed to load setup command",
-      "gmailNotifications": "Gmail notifications",
-      "disconnect": "Disconnect Google Account",
-      "copied": "Copied!",
-      "copyCommand": "Copy command",
-      "disconnectConfirm": "Disconnect",
-      "disconnectMessage": "Remove your Google account from this instance? This will disable Gmail notifications. Redeploy after disconnecting to apply changes.",
-      "disconnectTitle": "Disconnect Google"
-    },
-    "modelList": {
-      "noMatches": "No models match your search",
-      "noModelsDescription": "Models will appear here once available.",
-      "noResultsFor": "No results for \"{{query}}\""
-    },
-    "secrets": {
-      "title": "Secrets",
-      "couldNotLoad": "Could not load secrets",
-      "noSecrets": "No secrets available",
-      "noSecretsDescription": "Secret integrations will appear here.",
-      "removeMessage": "Remove {{label}}? This tool will lose access to its credentials.",
-      "removeTitle": "Remove secret",
-      "saved": "{{label}} saved",
-      "hide": "Hide {{label}}",
-      "show": "Show {{label}}",
-      "allFieldsRequired": "All fields are required to connect {{label}}.",
-      "setupGuideFallback": "setup guide",
-      "setupGuideA11y": "{{label}} setup guide",
-      "setupGuide": "Setup guide",
-      "saving": "Saving…",
-      "removing": "Removing…",
-      "updateToken": "Update Token"
-    },
-    "versionPin": {
-      "title": "Version pinning",
-      "couldNotLoad": "Could not load version information",
-      "couldNotLoadMore": "Could not load more versions",
-      "loadMore": "Load more versions",
-      "showingLatest": "Showing latest 100 versions",
-      "availableVersions": "Available versions",
-      "noVersions": "No versions available",
-      "noVersionsDescription": "Available OpenClaw versions will appear here.",
-      "unpin": "Unpin",
-      "unpinMessage": "Switch back to the latest available version?",
-      "unpinTitle": "Unpin version",
-      "confirmPin": "Confirm Pin",
-      "followingLatest": "Following latest",
-      "latest": "latest",
-      "pin": "Pin",
-      "pinnedByAdmin": "Pinned by admin — contact your admin to change.",
-      "pinnedTo": "Pinned to {{version}}",
-      "reasonOptional": "Reason (optional)",
-      "reasonPlaceholder": "Why are you pinning this version?",
-      "replaceAdminPin": "Replace Admin Pin",
-      "replacesAdminPin": "This replaces the admin-set pin (currently {{label}})."
-    },
-    "redeploy": "Redeploy",
-    "redeployMessage": "Are you sure you want to redeploy this instance?",
-    "redeployTitle": "Redeploy instance",
-    "controls": {
-      "redeploying": "Redeploying…",
-      "restart": "Restart",
-      "restartOpenClawMessage": "Are you sure you want to restart the OpenClaw process?",
-      "restartOpenClawTitle": "Restart OpenClaw",
-      "restarting": "Restarting…",
-      "start": "Start",
-      "startMessage": "Are you sure you want to start this instance?",
-      "startTitle": "Start instance",
-      "stop": "Stop",
-      "stopMessage": "Are you sure you want to stop this instance?",
-      "stopTitle": "Stop instance",
-      "stopping": "Stopping…"
-    },
-    "empty": {
-      "finishingSetup": "Finishing setup",
-      "finishingSetupDescription": "Hang tight, we're finalizing your account. This usually takes a moment.",
-      "getStarted": "Get started",
-      "noInstancesDescription": "Create your first instance to start running coding agents."
-    },
-    "instance": {
-      "backToInstances": "Back to instances",
-      "couldNotLoad": "Could not load instance",
-      "notFound": "Instance not found",
-      "notFoundDescription": "This instance may have been destroyed, or the link is no longer valid."
-    },
-    "list": {
-      "createInstance": "Create instance",
-      "organizations": "Organizations",
-      "accessIssue": {
-        "trialExpired": "Trial ended, subscribe to keep using this instance",
-        "subscriptionCanceled": "Subscription inactive, resubscribe to keep using this instance",
-        "subscriptionPastDue": "Payment issue, update billing to keep using this instance",
-        "quarantined": "Instance quarantined, needs manual review",
-        "multipleCurrentConflict": "Account needs review",
-        "nonCanonicalEarlybird": "Legacy plan needs review"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Chat with {{name}}",
-        "ready": "{{name}} is ready",
-        "warmedUp": "All warmed up. Say hi whenever you're ready."
-      },
-      "flow": {
-        "genericErrorBody": "We couldn't finish setting up your instance just now.",
-        "manualReviewBody": "Your account state needs attention before we can create an instance. Continue on kilo.ai",
-        "manualReviewTitle": "Setup needs manual review",
-        "openKiloAi": "Open kilo.ai",
-        "provisioning": "Provisioning",
-        "review": "Review",
-        "identityTitle": "Give your bot an identity",
-        "couldNotLoad": "Could not load onboarding state",
-        "finishingSetup": "Finishing setup — hang tight while we finalize your account.",
-        "ready": "Ready",
-        "settingUp": "Setting up…"
-      },
-      "unavailableDescription": "A current KiloClaw subscription is required to provision an instance. Existing instances and subscriptions continue as normal.",
-      "unavailableTitle": "New KiloClaw instances are unavailable",
-      "identity": {
-        "chooseAvatar": "Choose avatar",
-        "namePlaceholder": "Name your bot",
-        "selectAvatar": "Select {{name}} as avatar",
-        "personality": "Personality",
-        "changePersonality": "Change personality",
-        "location": "Location",
-        "locationPlaceholder": "City or region (optional)",
-        "useCurrentLocation": "Use current location",
-        "locationDeniedTitle": "Location access denied",
-        "locationDeniedMessage": "Enable location access in Settings to use your current location.",
-        "locationValidationFailed": "Location could not be validated.",
-        "locationResolveFailed": "Could not resolve your location. You can edit it manually.",
-        "locationGetFailed": "Could not get your location. Enter it manually.",
-        "nature": {
-          "aiAssistantLabel": "AI assistant",
-          "aiAssistantVibe": "Helpful, capable, professional",
-          "digitalCreatureLabel": "Digital creature",
-          "digitalCreatureVibe": "Quirky, alive, a bit unpredictable",
-          "virtualCompanionLabel": "Virtual companion",
-          "virtualCompanionVibe": "Warm, present, genuinely cares",
-          "somethingWeirderLabel": "Something weirder…",
-          "somethingWeirderVibe": "Define it yourself"
-        }
-      },
-      "notifications": {
-        "mockMessage": "All done! I put together that summary you asked for. Ready when you are.",
-        "settingUp": "Setting up notifications…",
-        "stayInTheLoop": "Stay in the loop",
-        "getNotified": "Get notified when {{name}} finishes a task so you never miss a response.",
-        "now": "now",
-        "skipForNow": "Skip for now",
-        "couldNotEnable": "Could not enable notifications."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Couldn't check on setup",
-        "queryErrorBody": "We lost the connection while checking on {{name}}'s setup. It may still be running. Try again, or check back shortly.",
-        "stoppedTitle": "Setup stopped",
-        "stoppedBody": "{{name}}'s instance stopped unexpectedly during setup.",
-        "stalledTitle": "Something stalled",
-        "stalledBody": "We couldn't finish setting up {{name}}. Try again, or email {{supportEmail}} if this keeps happening.",
-        "timeoutTitle": "Taking longer than expected",
-        "timeoutBody": "Setup for {{name}} is taking longer than usual (over {{displayMinutes}} minutes).",
-        "continueInBackground": "Continue in background",
-        "settingUp": "Setting up {{name}}",
-        "connectingToAgent": "Connecting to the agent",
-        "startingSandbox": "Starting the sandbox",
-        "backgroundHint": "Usually takes under a minute. You can close this — we'll keep working in the background."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Code {{code}}",
-      "gatewayProcess": "GATEWAY PROCESS",
-      "lastExit": "Last exit",
-      "memory": "Memory",
-      "region": "Region",
-      "resources": "RESOURCES",
-      "restarts": "Restarts",
-      "state": "State",
-      "uptime": "Uptime",
-      "crashed": "CRASHED",
-      "destroying": "DESTROYING",
-      "provisioned": "PROVISIONED",
-      "restarting": "RESTARTING",
-      "running": "RUNNING",
-      "shuttingDown": "SHUTTING DOWN",
-      "starting": "STARTING",
-      "stopped": "STOPPED",
-      "stopping": "STOPPING",
-      "unknown": "UNKNOWN",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Frontier",
-      "frontierDescription": "Highest performance. Routes to frontier models with reasoning.",
-      "balancedDescription": "Smart balance of speed and capability at lower cost.",
-      "autoModelA11y": "{{label}} auto model",
-      "currentModel": "Current model",
-      "browseAllModels": "or select from 500+ models",
-      "browseAllModelsA11y": "Browse all 500+ models"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "To keep using KiloClaw, go to kilo.ai/claw from your browser. You can't subscribe in the app.",
-      "subscriptionCanceledTitle": "Subscribe on the web",
-      "subscriptionCanceledBody": "To use KiloClaw, go to kilo.ai/claw from your browser. You can't subscribe in the app.",
-      "subscriptionCanceledCta": "Open kilo.ai/claw",
-      "subscriptionPastDueTitle": "Update payment on the web",
-      "subscriptionPastDueBody": "We had trouble with your most recent payment. Go to kilo.ai/claw from your browser to update it. You can't manage billing in the app.",
-      "quarantinedTitle": "Instance needs remediation",
-      "quarantinedBody": "Your KiloClaw instance is in a quarantined state and can't be used right now. Our team needs to help restore it.",
-      "multipleCurrentConflictBody": "We found more than one active subscription on your account, so we've paused things to avoid double-billing you.",
-      "multipleCurrentConflictCta": "Continue on kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Legacy plan detected",
-      "nonCanonicalEarlybirdBody": "Your early-access plan needs a manual review before it can be used on mobile.",
-      "iosTitle": "KiloClaw unavailable in iOS",
-      "iosBody": "KiloClaw access is managed outside the iOS app for this account.",
-      "iosContact": "Questions? Contact {{supportEmail}}.",
-      "quarantinedCta": "Email our team",
-      "nonCanonicalEarlybirdCta": "Review your plan on kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} needs attention: {{label}}",
-      "openUnread_one": "Open {{name}}, {{displayCount}} unread message",
-      "openUnread": "Open {{name}}, {{displayCount}} unread messages",
-      "openUnread_other": "Open {{name}}, {{displayCount}} unread messages",
-      "openSettings": "Open settings for {{name}}",
-      "fixOnKiloAi": "Fix on kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Approve device requests",
-      "execPolicyDescription": "Security settings",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "AI model selection",
-      "secretsDescription": "Encrypted credentials",
-      "versionPinDescription": "Pin to a specific version"
-    },
-    "avatar": {
-      "arcade": "Arcade",
-      "brain": "Brain",
-      "creature": "Creature",
-      "crystal": "Crystal",
-      "custom": "Custom avatar",
-      "dragon": "Dragon",
-      "explorer": "Explorer",
-      "flame": "Flame",
-      "lightning": "Lightning",
-      "magicWand": "Magic wand",
-      "moon": "Moon",
-      "operator": "Operator",
-      "orbit": "Orbit",
-      "oracle": "Oracle",
-      "rainbow": "Rainbow",
-      "robot": "Robot",
-      "satellite": "Satellite",
-      "sparkles": "Sparkles",
-      "strongArm": "Strong arm",
-      "talisman": "Talisman"
-    },
-    "remoteSpawnFilesNotSupported": "This instance cannot receive files.",
-    "instanceSwitcherTitle": "KiloClaw instance"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2561,10 +2092,6 @@
       "uploaded": "Uploaded",
       "uploadFailedRetry": "Upload failed. Tap to retry."
     },
-    "attachmentPasteHint": {
-      "accessibility": "Paste image from clipboard",
-      "label": "Image detected, tap to paste"
-    },
     "attachmentPicker": {
       "camera": "Camera",
       "photoLibrary": "Photo Library",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Sign out this device?",
     "signOutThisSessionTitle": "Sign out this session?",
     "signOutThisSessionMessage": "{{device}} will be signed out. It can keep API access for up to an hour.",
-    "webBrowser": "Web browser"
+    "webBrowser": "Web browser",
+    "unknownDevice": "Unknown device"
   },
   "trustedHosts": {
     "title": "Trusted hosts",

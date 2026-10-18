@@ -24,7 +24,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import fr from '@/i18n/locales/fr.json';
 import AppLayout from '@/app/(app)/_layout';
-import KiloClawLayout from '@/app/(app)/(tabs)/(1_kiloclaw)/_layout';
 import OrganizationLayout from '@/app/(app)/(tabs)/(3_profile)/organization/_layout';
 import SecurityAgentScopeLayout from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/_layout';
 import PrReviewNumberLayout from '@/app/(app)/pr-review/[owner]/[repo]/[number]/_layout';
@@ -34,7 +33,7 @@ beforeEach(resetUnlockMocks);
 afterEach(unmountUnlock);
 
 it.each([false, true])(
-  'waits for language across all five layouts and retains the draft on relock; catalog failure=%s',
+  'waits for language across all four layouts and retains the draft on relock; catalog failure=%s',
   async failed => {
     catalogs.fr.mockImplementation(() => {
       if (failed) {
@@ -45,13 +44,7 @@ it.each([false, true])(
     });
     const auth = Promise.withResolvers<unknown>();
     native.authenticateAsync.mockReturnValueOnce(auth.promise);
-    const layouts = [
-      AppLayout,
-      KiloClawLayout,
-      PrReviewNumberLayout,
-      OrganizationLayout,
-      SecurityAgentScopeLayout,
-    ];
+    const layouts = [AppLayout, PrReviewNumberLayout, OrganizationLayout, SecurityAgentScopeLayout];
     const ui = (
       <>
         {layouts.map(Layout => (
@@ -68,7 +61,7 @@ it.each([false, true])(
       expect(boundary.findAllByType('Scene' as ElementType)).toHaveLength(1);
     }
     const observer = root().findByType('SecurityAgentCommandObserver' as ElementType);
-    const scene = root().findByType(KiloClawLayout);
+    const scene = root().findByType(OrganizationLayout);
     const draft = scene.findByType('Draft' as ElementType);
     await flush(() => {
       (draft.props.onChange as (value: string) => void)('unsent work');
@@ -207,7 +200,7 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
       error: 'authentication_failed',
     });
     i18n.addResourceBundle('fr', 'translation', fr);
-    const ui = nestedUnlockScenes(<KiloClawLayout />);
+    const ui = nestedUnlockScenes(<OrganizationLayout />);
     await mount(ui, false);
     await act(async () => {
       await i18n.changeLanguage('fr');
@@ -234,7 +227,7 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
     } else {
       native.authenticateAsync.mockResolvedValueOnce({ success: false, error: code });
     }
-    await mount(nestedUnlockScenes(<KiloClawLayout />));
+    await mount(nestedUnlockScenes(<OrganizationLayout />));
     expectFeedback(root(), message, 3);
     expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message]] : []);
 

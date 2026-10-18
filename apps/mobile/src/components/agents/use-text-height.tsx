@@ -14,7 +14,7 @@ type UseTextHeightOptions = {
    * System Dynamic Type scale. When set, the caller pre-scales `fontSize` and
    * `lineHeight` here and native scaling is disabled on the measure node, so
    * the scale applies exactly once. When omitted, the base sizes are rendered
-   * and native scaling applies (the kilo-chat message input path).
+   * and native scaling applies.
    */
   fontScale?: number;
   initialText?: string;
@@ -87,8 +87,6 @@ export function useTextHeight({
   const acceptedLineCountRef = useRef<number | null>(null);
   const measuredText = text.length === 0 || text.endsWith('\n') ? `${text} ` : text;
   const measurementWidth = Math.max(textContentWidth, 0);
-  // Pre-scale only when the caller opted in (the agent composers). The
-  // kilo-chat message input omits `fontScale` and relies on native scaling.
   const scaledFontSize = fontScale == null ? fontSize : fontSize * fontScale;
   const scaledLineHeight = fontScale == null ? lineHeight : lineHeight * fontScale;
   // Disable native scaling only when the caller pre-scaled, so the scale is

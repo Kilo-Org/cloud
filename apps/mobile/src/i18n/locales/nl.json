@@ -101,12 +101,9 @@
     "scheduled": "Gepland",
     "keepEditing": "Verder bewerken",
     "keepRunning": "Laten doorgaan",
-    "kiloclaw": "KiloClaw",
     "newSession": "Nieuwe sessie",
-    "noKiloclawInstances": "Geen KiloClaw-instanties",
     "noModelsAvailable": "Geen modellen beschikbaar",
     "notFound": "Dit item is niet gevonden.",
-    "online": "Verbonden",
     "open": "{{name}} openen",
     "openPullRequest": "PR openen",
     "pending": "In afwachting",
@@ -257,7 +254,8 @@
     "renamePasskey": "Passkey hernoemen",
     "removePasskey": "Passkey verwijderen",
     "removePasskeyTitle": "Passkey verwijderen?",
-    "removePasskeyMessage": "Je kunt je met deze passkey niet meer aanmelden."
+    "removePasskeyMessage": "Je kunt je met deze passkey niet meer aanmelden.",
+    "changelog": "Nieuw in deze versie"
   },
   "preferences": {
     "general": "Algemeen",
@@ -293,23 +291,18 @@
   "notifications": {
     "channel": {
       "agentProgress": "Agentvoortgang",
-      "chat": "Chatberichten",
-      "kiloclaw": "KiloClaw-activiteit",
       "balance": "Saldowaarschuwingen",
       "security": "Beveiligingsbevindingen",
       "spend": "Bestedingswaarschuwingen",
       "followedSessions": "Gevolgde sessies"
     },
     "category": {
-      "chatMessagesSubtitle": "antwoorden in je gesprekken",
       "agentAttentionTitle": "De agent heeft je nodig",
       "agentAttentionSubtitle": "vragen en verzoeken om toestemming of invoer",
       "agentUpdatesTitle": "Updates van de agent",
       "agentUpdatesSubtitle": "tussentijdse berichten van de agent",
       "sessionStatusTitle": "Sessiestatus",
       "sessionStatusSubtitle": "voltooid / mislukt / klaar voor bediening",
-      "kiloclawActivitySubtitle": "instantie klaar of mislukt, geplande acties",
-      "kiloclawActivityUnavailable": "Start een KiloClaw-instantie om KiloClaw-activiteit te ontvangen.",
       "balanceAlertsSubtitle": "waarschuwingen voor laag organisatiesaldo",
       "balanceAlertsUnavailable": "Word lid van een organisatie om saldowaarschuwingen te ontvangen.",
       "securityFindingsSubtitle": "nieuwe bevindingen en SLA-herinneringen",
@@ -356,72 +349,19 @@
   },
   "tabs": {
     "home": "Startpagina",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, tabblad, {{position}} van {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Van instantie wisselen",
-      "couldNotLoadInstances": "De instanties konden niet worden geladen.",
-      "noInstancesDescription": "Stel een instantie in om te beginnen met chatten.",
-      "setUpKiloclaw": "KiloClaw instellen",
-      "currentInstance": "{{title}}, huidige instantie"
-    },
     "conversation": {
-      "failedToLoad": "Het gesprek kon niet worden geladen.",
-      "notFound": "Het gesprek is niet gevonden.",
       "untitled": "Naamloos",
-      "leaveTitle": "Gesprek verlaten?",
-      "leaveMessage": "Hiermee verwijder je het gesprek uit je lijst.",
-      "openHint": "Opent het gesprek. Houd ingedrukt om het gesprek te hernoemen of te verlaten.",
-      "unread": "Ongelezen",
-      "optionsFor": "Gespreksopties voor {{title}}",
-      "options": "Gespreksopties",
-      "renameTitle": "Gesprek hernoemen",
-      "renamePlaceholder": "Nieuwe naam",
-      "couldNotReachBot": "De bot kon niet worden bereikt. Probeer het opnieuw.",
-      "messageDeliveryFailed": "Het bericht kon niet bij de bot worden bezorgd.",
-      "couldNotSignIn": "Aanmelden bij de chat is mislukt.",
-      "couldNotRefreshMessages": "De berichten konden niet worden vernieuwd.",
-      "couldNotLoadHistory": "De gespreksgeschiedenis kon niet worden geladen.",
-      "leave": "Verlaten",
-      "untitledConversation": "Naamloos gesprek",
-      "createFailed": "Het gesprek kon niet worden aangemaakt.",
-      "leaveFailed": "Het gesprek kon niet worden verlaten."
-    },
-    "reactions": {
-      "common": "Veelgebruikt",
-      "reactWith": "Reageren met {{reaction}}",
-      "accessibility": "Reactie {{emoji}}, {{displayCount}} keer"
-    },
-    "composer": {
-      "replyingTo": "Antwoord op",
-      "cancelReply": "Antwoord annuleren",
-      "openInstance": "Instantie openen",
-      "attachFile": "Bestand bijvoegen",
-      "cancelEdit": "Bewerking annuleren"
+      "renamePlaceholder": "Nieuwe naam"
     },
     "conversationList": {
-      "couldNotLoad": "De gesprekken konden niet worden geladen.",
-      "emptyTitle": "Nog geen gesprekken",
-      "emptyDescription": "Maak een gesprek aan om met je KiloClaw-instantie te chatten.",
-      "create": "Gesprek aanmaken",
-      "newConversation": "Nieuw gesprek",
-      "openInstanceSettings": "Instantie-instellingen openen",
       "today": "Vandaag",
       "yesterday": "Gisteren",
-      "thisWeek": "Deze week",
       "older": "Ouder"
     },
     "attachment": {
-      "open": "{{filename}} openen",
-      "openFailed": "De bijlage kon niet worden geopend. Controleer je verbinding en probeer het opnieuw.",
-      "attachFailed": "Het bestand kon niet worden bijgevoegd.",
-      "limit": "Je kunt maximaal {{displayCount}} bestanden bijvoegen.",
-      "sizeRejection": "{{filename}} is groter dan de toegestane {{limit}} per bijlage.",
-      "unreadable": "{{filename}} kon niet worden gelezen.",
-      "pastedImage": "de geplakte afbeelding",
-      "defaultName": "Bijlage",
       "classificationDenied": "Je kunt geen uitvoerbare bestanden bijvoegen.",
       "classificationEmpty": "Het bestand is leeg.",
       "classificationTooLarge": "Bestanden mogen niet groter zijn dan 20 MB.",
@@ -431,426 +371,17 @@
       "networkError": "Er is een netwerkfout opgetreden.",
       "uploadFailed": "Het uploaden is mislukt.",
       "nothingToPaste": "Er is niets om te plakken.",
-      "metadataStripFailed": "De metagegevens van de foto konden niet worden verwijderd.",
-      "limit_one": "Je kunt maximaal {{displayCount}} bestand bijvoegen.",
-      "limit_other": "Je kunt maximaal {{displayCount}} bestanden bijvoegen."
+      "metadataStripFailed": "De metagegevens van de foto konden niet worden verwijderd."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}: {{status}}",
-      "retryUploading": "{{filename}} opnieuw uploaden",
-      "remove": "{{filename}} verwijderen"
-    },
-    "messageBubble": {
-      "deleted": "[verwijderd bericht]",
-      "yourMessage": "Je bericht",
-      "messageFrom": "Bericht van {{author}}",
-      "moreActions": "Meer acties",
-      "notDelivered": "Niet bezorgd",
-      "edited": "(bewerkt)",
-      "image": "Afbeelding"
+      "accessibility": "{{filename}}: {{status}}"
     },
     "messageActions": {
-      "copied": "Gekopieerd",
-      "copyFailed": "Het kopiëren is mislukt.",
-      "title": "Acties voor dit bericht",
-      "deleteTitle": "Bericht verwijderen?",
-      "deleteMessage": "Hiermee wordt het bericht uit het gesprek verwijderd.",
-      "deleteFailed": "Het bericht kon niet worden verwijderd.",
-      "removeReactionFailed": "De reactie kon niet worden verwijderd.",
-      "addReactionFailed": "De reactie kon niet worden toegevoegd.",
-      "retrySend": "Opnieuw verzenden",
-      "moreReactions": "Meer reacties",
-      "edit": "Bewerken",
-      "sendFailed": "Het bericht kon niet worden verzonden.",
-      "retrySendFailed": "Het opnieuw verzenden is mislukt.",
-      "editFailed": "Het bericht kon niet worden bewerkt.",
-      "executeFailed": "De actie kon niet worden uitgevoerd."
+      "edit": "Bewerken"
     },
     "attachmentPicker": {
-      "takePhoto": "Foto maken",
-      "photoLibrary": "Fotobibliotheek",
-      "files": "Bestanden",
       "cameraAccessMessage": "Geef in de instellingen toegang tot de camera om een foto te maken."
-    },
-    "typingIndicator": {
-      "someone": "Iemand",
-      "typing_one": "{{name}} typt...",
-      "typing": "{{names}} typen...",
-      "typing_other": "{{names}} typen..."
-    },
-    "botStatus": {
-      "offline": "Niet verbonden",
-      "loadingUser": "Gebruiker laden...",
-      "waitingForStatus": "Wachten op botstatus...",
-      "offlineMessage": "De bot heeft geen verbinding. Zodra de verbinding is hersteld, worden berichten weer verwerkt."
-    },
-    "errors": {
-      "notAllowed": "Dit is niet toegestaan.",
-      "messageTooLong": "Het bericht is te lang. Gebruik minder dan {{limit}} tekens.",
-      "titleTooLong": "De titel is te lang. Gebruik minder dan {{limit}} tekens.",
-      "messageEmpty": "Het bericht mag niet leeg zijn."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "De KiloClaw-instanties konden niet worden geladen.",
-    "billing": {
-      "title": "Facturering",
-      "continueMonthToMonth": "Doorgaan met een maandabonnement",
-      "plan": "Planning",
-      "finalTermEnds": "Einde laatste periode",
-      "afterFinalTerm": "Na de laatste periode",
-      "lessThanOneDay": "Minder dan 1 dag",
-      "ends": "Eindigt",
-      "expires": "Verloopt",
-      "noActivePlan": "Geen actief abonnement",
-      "noActivePlanDescription": "Je hebt geen actief KiloClaw-abonnement.",
-      "managedByAdmin": "Je organisatiebeheerder beheert de facturering.",
-      "couldNotLoad": "De factureringsgegevens konden niet worden geladen.",
-      "manageOnWeb": "Facturering via de website beheren",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Je laatste Commit-periode eindigt op {{date}}. Ga voor {{price}} verder met Standard, anders stopt de hosting.",
-      "freeTrial": "Gratis proefperiode",
-      "hostingEnds": "Hosting stopt",
-      "renews": "Verlenging",
-      "standardMonthToMonth": "Standard-maandabonnement",
-      "standardStartsOn": "Standard start op {{date}} voor {{price}}.",
-      "yourStandardMonthlyPrice": "je maandprijs voor Standard",
-      "perMonth": "/maand",
-      "earlybirdAccessUntil": "Je hebt toegang via Earlybird tot {{date}}.",
-      "earlybirdEnding": "Earlybird loopt af. Resterende tijd: {{remaining}}.",
-      "paymentPastDue": "Je hebt een betalingsachterstand. Werk je betaalmethode bij.",
-      "subscriptionCancels": "Je abonnement stopt op {{date}}.",
-      "trialDaysRemaining": "Je proefperiode loopt nog {{remaining}}.",
-      "trialEndingSoon": "Je proefperiode loopt binnenkort af. Resterende tijd: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Nieuw in deze versie",
-      "couldNotLoad": "Het wijzigingsoverzicht kon niet worden geladen.",
-      "noUpdates": "Nog geen updates",
-      "noUpdatesDescription": "Hier verschijnen de wijzigingen per versie.",
-      "recentUpdates": "Recente updates",
-      "manageVersion": "Versie beheren",
-      "redeployRequired": "Opnieuw uitrollen vereist",
-      "redeploySuggested": "Opnieuw uitrollen aanbevolen",
-      "upgradeRequired": "Upgrade vereist"
-    },
-    "dashboard": {
-      "title": "Overzicht",
-      "couldNotLoad": "Het overzicht kon niet worden geladen.",
-      "renameInstance": "Instantie hernoemen",
-      "renamePlaceholder": "Nieuwe naam (max. 50 tekens)",
-      "someDetailsFailed": "Sommige actuele gegevens konden niet worden geladen.",
-      "destroy": "Definitief verwijderen",
-      "destroyMessage": "Je KiloClaw-instantie en alle bijbehorende gegevens worden definitief verwijderd. Je kunt dit niet ongedaan maken.",
-      "destroyTitle": "Instantie definitief verwijderen",
-      "instance": "Instantie",
-      "couldNotCheckStatus": "De dienststatus kon niet worden gecontroleerd.",
-      "dangerZone": "GEVARENZONE",
-      "destroying": "Definitief verwijderen…",
-      "serviceDegraded": "De dienst werkt niet volledig — tik om de status te bekijken",
-      "up": "ACTIEF"
-    },
-    "channels": {
-      "title": "Kanalen",
-      "couldNotLoad": "De kanalen konden niet worden geladen.",
-      "noChannels": "Geen kanalen beschikbaar",
-      "noChannelsDescription": "Hier verschijnen de koppelingen met kanalen.",
-      "connected": "{{label}} verbonden",
-      "disconnectMessage": "{{label}} verwijderen? Dit kanaal wordt losgekoppeld.",
-      "disconnectTitle": "Kanaal loskoppelen"
-    },
-    "devicePairing": {
-      "title": "Apparaten koppelen",
-      "refreshRequests": "Koppelingsverzoeken vernieuwen",
-      "couldNotLoad": "De koppelingsverzoeken konden niet worden geladen.",
-      "noPending": "Geen openstaande verzoeken",
-      "noPendingDescription": "Hier verschijnen verzoeken om kanalen en apparaten te koppelen.",
-      "channelRequests": "Kanaalverzoeken",
-      "deviceRequests": "Apparaatverzoeken",
-      "approveDeviceMessage": "Mag {{platform}} verbinding maken met je instantie?",
-      "approveDeviceTitle": "Apparaat goedkeuren",
-      "approveMessage": "Mag {{label}} (code: {{code}}) verbinding maken met je instantie?",
-      "approveTitle": "Koppelingsverzoek goedkeuren",
-      "unknownDevice": "Onbekend apparaat"
-    },
-    "execPolicy": {
-      "title": "Uitvoeringsbeleid",
-      "couldNotLoad": "Het uitvoeringsbeleid kon niet worden geladen.",
-      "alwaysAsk": "Altijd vragen",
-      "alwaysAskDescription": "Bevestig elke opdracht voordat deze wordt uitgevoerd. Dit is de veiligste optie.",
-      "neverAsk": "Nooit vragen",
-      "neverAskDescription": "Voer opdrachten uit zonder bevestiging. Dit is sneller, maar minder veilig."
-    },
-    "google": {
-      "title": "Google-account",
-      "couldNotLoad": "De status van je Google-account kon niet worden geladen.",
-      "disconnected": "Je Google-account is losgekoppeld. Rol je instantie opnieuw uit om de wijziging toe te passen.",
-      "setupCommand": "Configuratieopdracht",
-      "setupCommandHelp": "Voer deze opdracht uit in een terminal op je eigen computer om je Google-account te koppelen. Docker moet op die computer zijn geïnstalleerd.",
-      "failedToLoadCommand": "De configuratieopdracht kon niet worden geladen.",
-      "gmailNotifications": "Gmail-meldingen",
-      "disconnect": "Google-account loskoppelen",
-      "copied": "Gekopieerd",
-      "copyCommand": "Opdracht kopiëren",
-      "disconnectConfirm": "Loskoppelen",
-      "disconnectMessage": "Wil je je Google-account van deze instantie verwijderen? Gmail-meldingen worden dan uitgeschakeld. Rol je instantie na het loskoppelen opnieuw uit om de wijzigingen toe te passen.",
-      "disconnectTitle": "Google loskoppelen"
-    },
-    "modelList": {
-      "noMatches": "Geen modellen gevonden",
-      "noModelsDescription": "Modellen verschijnen hier zodra ze beschikbaar zijn.",
-      "noResultsFor": "Er zijn geen resultaten voor \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Geheime gegevens",
-      "couldNotLoad": "De geheimen konden niet worden geladen.",
-      "noSecrets": "Geen geheimen beschikbaar",
-      "noSecretsDescription": "Hier verschijnen koppelingen waarvoor geheimen zijn ingesteld.",
-      "removeMessage": "Wil je {{label}} verwijderen? Deze tool heeft dan geen toegang meer tot de bijbehorende inloggegevens.",
-      "removeTitle": "Geheim verwijderen",
-      "saved": "{{label}} opgeslagen",
-      "allFieldsRequired": "Vul alle velden in om {{label}} te koppelen.",
-      "hide": "{{label}} verbergen",
-      "removing": "Verwijderen…",
-      "saving": "Opslaan…",
-      "setupGuide": "Installatiehandleiding",
-      "setupGuideA11y": "Configuratiehandleiding voor {{label}}",
-      "setupGuideFallback": "installatiehandleiding",
-      "show": "{{label}} tonen",
-      "updateToken": "Token bijwerken"
-    },
-    "versionPin": {
-      "title": "Versie vastzetten",
-      "couldNotLoad": "De versiegegevens konden niet worden geladen.",
-      "couldNotLoadMore": "Er konden geen extra versies worden geladen.",
-      "loadMore": "Meer versies laden",
-      "showingLatest": "Je ziet de 100 nieuwste versies.",
-      "availableVersions": "Beschikbare versies",
-      "noVersions": "Geen versies beschikbaar",
-      "noVersionsDescription": "Beschikbare OpenClaw-versies verschijnen hier.",
-      "unpin": "Vastgezette versie loslaten",
-      "unpinMessage": "Wil je weer de nieuwste beschikbare versie gebruiken?",
-      "unpinTitle": "Vastgezette versie loslaten",
-      "confirmPin": "Vastzetten bevestigen",
-      "followingLatest": "Altijd de nieuwste",
-      "latest": "nieuwste",
-      "pin": "Vastzetten",
-      "pinnedByAdmin": "De beheerder heeft de versie vastgezet. Neem contact op met je beheerder om dit te wijzigen.",
-      "pinnedTo": "Vastgezet op {{version}}",
-      "reasonOptional": "Reden (optioneel)",
-      "reasonPlaceholder": "Reden om deze versie vast te zetten",
-      "replaceAdminPin": "Versie van beheerder vervangen",
-      "replacesAdminPin": "Dit vervangt de versie die de beheerder heeft vastgezet (momenteel {{label}})."
-    },
-    "redeploy": "Opnieuw uitrollen",
-    "redeployMessage": "Weet je zeker dat je deze instantie opnieuw wilt uitrollen?",
-    "redeployTitle": "Instantie opnieuw uitrollen",
-    "accessRequired": {
-      "iosBody": "KiloClaw-toegang wordt voor dit account buiten de iOS-app beheerd.",
-      "iosContact": "Vragen? Neem contact op via {{supportEmail}}.",
-      "iosTitle": "KiloClaw niet beschikbaar op iOS",
-      "multipleCurrentConflictBody": "We hebben meerdere actieve abonnementen voor je account gevonden. Daarom hebben we alles gepauzeerd om te voorkomen dat je dubbel betaalt.",
-      "multipleCurrentConflictCta": "Doorgaan op kilo.ai",
-      "nonCanonicalEarlybirdBody": "Je abonnement voor vroege toegang moet handmatig worden beoordeeld voordat je het op je telefoon kunt gebruiken.",
-      "nonCanonicalEarlybirdTitle": "Oud abonnement gevonden",
-      "quarantinedBody": "Je KiloClaw-instantie staat in quarantaine en kan nu niet worden gebruikt. Ons team moet helpen om de instantie te herstellen.",
-      "quarantinedTitle": "Instantie moet worden hersteld",
-      "subscriptionCanceledBody": "Ga vanuit je browser naar kilo.ai/claw om KiloClaw te gebruiken. Je kunt je niet in de app abonneren.",
-      "subscriptionCanceledCta": "Kilo.ai/claw openen",
-      "subscriptionCanceledTitle": "Abonneren via de website",
-      "subscriptionPastDueBody": "Er was een probleem met je laatste betaling. Ga in je browser naar kilo.ai/claw om je betaalgegevens bij te werken. Je kunt de facturering niet in de app beheren.",
-      "subscriptionPastDueTitle": "Betaalgegevens via de website bijwerken",
-      "trialExpiredBody": "Ga vanuit je browser naar kilo.ai/claw om KiloClaw te blijven gebruiken. Je kunt je niet in de app abonneren.",
-      "quarantinedCta": "Ons team een e-mail sturen",
-      "nonCanonicalEarlybirdCta": "Je plan bekijken op kilo.ai"
-    },
-    "controls": {
-      "redeploying": "Opnieuw uitrollen…",
-      "restart": "Herstarten",
-      "restartOpenClawMessage": "Weet je zeker dat je het OpenClaw-proces wilt herstarten?",
-      "restartOpenClawTitle": "OpenClaw herstarten",
-      "restarting": "Herstarten…",
-      "start": "Starten",
-      "startMessage": "Weet je zeker dat je deze instantie wilt starten?",
-      "startTitle": "Instantie starten",
-      "stop": "Stoppen",
-      "stopMessage": "Weet je zeker dat je deze instantie wilt stoppen?",
-      "stopTitle": "Instantie stoppen",
-      "stopping": "Stoppen…"
-    },
-    "empty": {
-      "finishingSetup": "Installatie wordt afgerond",
-      "finishingSetupDescription": "Even geduld. We ronden het instellen van je account af. Dit duurt meestal maar even.",
-      "getStarted": "Aan de slag",
-      "noInstancesDescription": "Maak je eerste instantie om programmeeragents te gebruiken."
-    },
-    "instance": {
-      "backToInstances": "Terug naar instanties",
-      "couldNotLoad": "De instantie kon niet worden geladen.",
-      "notFound": "Instantie niet gevonden",
-      "notFoundDescription": "Mogelijk is deze instantie definitief verwijderd of is de koppeling niet meer geldig."
-    },
-    "instanceCard": {
-      "fixOnKiloAi": "Oplossen op kilo.ai: {{label}}",
-      "needsAttention": "{{name}} heeft aandacht nodig: {{label}}",
-      "openSettings": "Instellingen voor {{name}} openen",
-      "openUnread": "{{name}} openen, {{displayCount}} ongelezen berichten",
-      "openUnread_other": "{{name}} openen, {{displayCount}} ongelezen berichten",
-      "openUnread_one": "{{name}} openen, {{displayCount}} ongelezen bericht"
-    },
-    "list": {
-      "createInstance": "Instantie maken",
-      "organizations": "Organisaties",
-      "accessIssue": {
-        "trialExpired": "Proefperiode afgelopen — abonnement afsluiten om deze instantie te blijven gebruiken",
-        "subscriptionCanceled": "Abonnement inactief — opnieuw abonneren om deze instantie te blijven gebruiken",
-        "subscriptionPastDue": "Betalingsprobleem — betaalgegevens bijwerken om deze instantie te blijven gebruiken",
-        "quarantined": "Instantie in quarantaine — handmatige beoordeling nodig",
-        "multipleCurrentConflict": "Accountcontrole nodig",
-        "nonCanonicalEarlybird": "Oud abonnement moet worden beoordeeld"
-      }
-    },
-    "modelPicker": {
-      "autoModelA11y": "Automatische modelkeuze: {{label}}",
-      "balancedDescription": "Een slimme balans tussen snelheid en mogelijkheden tegen lagere kosten.",
-      "browseAllModels": "of kies uit 500+ modellen",
-      "browseAllModelsA11y": "Alle 500+ modellen bekijken",
-      "currentModel": "Huidig model",
-      "frontierDescription": "Maximale prestaties. Gebruikt de meest geavanceerde modellen met redeneervermogen.",
-      "frontierLabel": "Toonaangevend",
-      "kiloAuto": "Kilo Auto"
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Chatten met {{name}}",
-        "ready": "{{name}} staat klaar",
-        "warmedUp": "Alles staat klaar. Zeg hallo zodra je er klaar voor bent."
-      },
-      "flow": {
-        "couldNotLoad": "De voortgang van de installatie kon niet worden geladen.",
-        "finishingSetup": "We ronden de installatie af. Even geduld terwijl we je account gereedmaken.",
-        "genericErrorBody": "We konden je instantie zojuist niet volledig instellen.",
-        "identityTitle": "Een identiteit voor je bot",
-        "manualReviewBody": "Je account moet worden gecontroleerd voordat we een instantie kunnen maken. Ga verder op kilo.ai.",
-        "manualReviewTitle": "Handmatige beoordeling nodig voor de installatie",
-        "openKiloAi": "Kilo.ai openen",
-        "provisioning": "Inrichten",
-        "ready": "Klaar",
-        "review": "Beoordeling",
-        "settingUp": "Instellen…"
-      },
-      "identity": {
-        "changePersonality": "Persoonlijkheid wijzigen",
-        "chooseAvatar": "Avatar kiezen",
-        "location": "Locatie",
-        "locationDeniedMessage": "Geef in de instellingen toegang tot je locatie om je huidige locatie te gebruiken.",
-        "locationDeniedTitle": "Locatietoegang geweigerd",
-        "locationGetFailed": "Je locatie kon niet worden opgehaald. Voer deze handmatig in.",
-        "locationPlaceholder": "Stad of regio (optioneel)",
-        "locationResolveFailed": "Je locatie kon niet worden bepaald. Je kunt deze handmatig bewerken.",
-        "locationValidationFailed": "De locatie kon niet worden gecontroleerd.",
-        "namePlaceholder": "Naam van je bot",
-        "nature": {
-          "aiAssistantLabel": "AI-assistent",
-          "aiAssistantVibe": "Behulpzaam, bekwaam, professioneel",
-          "digitalCreatureLabel": "Digitaal wezen",
-          "digitalCreatureVibe": "Eigenzinnig, levendig, een beetje onvoorspelbaar",
-          "somethingWeirderLabel": "Iets vreemders…",
-          "somethingWeirderVibe": "Bepaal het zelf",
-          "virtualCompanionLabel": "Virtuele metgezel",
-          "virtualCompanionVibe": "Warm, betrokken, geeft echt om je"
-        },
-        "personality": "Persoonlijkheid",
-        "selectAvatar": "{{name}} als avatar selecteren",
-        "useCurrentLocation": "Huidige locatie gebruiken"
-      },
-      "notifications": {
-        "couldNotEnable": "Meldingen konden niet worden ingeschakeld.",
-        "getNotified": "Ontvang een melding wanneer {{name}} een taak afrondt, zodat je nooit een antwoord mist.",
-        "mockMessage": "Klaar! Ik heb de samenvatting gemaakt waar je om vroeg. Je kunt hem bekijken wanneer het je uitkomt.",
-        "now": "nu",
-        "settingUp": "Meldingen instellen…",
-        "skipForNow": "Nu overslaan",
-        "stayInTheLoop": "Blijf op de hoogte"
-      },
-      "provisioning": {
-        "backgroundHint": "Dit duurt meestal minder dan een minuut. Je kunt dit scherm sluiten. We werken op de achtergrond verder.",
-        "connectingToAgent": "Verbinden met de agent",
-        "continueInBackground": "Op de achtergrond doorgaan",
-        "queryErrorBody": "De verbinding viel weg terwijl we de installatie van {{name}} controleerden. De installatie loopt mogelijk nog. Probeer het opnieuw of kijk over een moment nog eens.",
-        "queryErrorTitle": "Installatiestatus niet beschikbaar",
-        "settingUp": "{{name}} instellen",
-        "stalledBody": "We konden {{name}} niet volledig instellen. Probeer het opnieuw of stuur een e-mail naar {{supportEmail}} als dit blijft gebeuren.",
-        "stalledTitle": "Iets is vastgelopen",
-        "startingSandbox": "Sandbox starten",
-        "stoppedBody": "De instantie van {{name}} is onverwacht gestopt tijdens de installatie.",
-        "stoppedTitle": "Installatie gestopt",
-        "timeoutBody": "De installatie van {{name}} duurt langer dan normaal (meer dan {{displayMinutes}} minuten).",
-        "timeoutTitle": "Duurt langer dan verwacht"
-      },
-      "unavailableDescription": "Een actief KiloClaw-abonnement is vereist om een instantie in te richten. Bestaande instanties en abonnementen blijven normaal werken.",
-      "unavailableTitle": "Nieuwe KiloClaw-instanties zijn niet beschikbaar"
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Afsluitcode {{code}}",
-      "gatewayProcess": "GATEWAYPROCES",
-      "lastExit": "Laatste afsluiting",
-      "memory": "Geheugen",
-      "region": "Regio",
-      "resources": "SYSTEEMBRONNEN",
-      "restarts": "Herstarts",
-      "state": "Status",
-      "uptime": "Bedrijfsduur",
-      "crashed": "GECRASHT",
-      "destroying": "VERWIJDEREN",
-      "provisioned": "INGERICHT",
-      "restarting": "HERSTARTEN",
-      "running": "ACTIEF",
-      "shuttingDown": "AFSLUITEN",
-      "starting": "OPSTARTEN",
-      "stopped": "GESTOPT",
-      "stopping": "STOPPEN",
-      "unknown": "ONBEKEND",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Apparaatverzoeken goedkeuren",
-      "execPolicyDescription": "Beveiligingsinstellingen",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Keuze van AI-model",
-      "secretsDescription": "Versleutelde inloggegevens",
-      "versionPinDescription": "Een specifieke versie vastzetten"
-    },
-    "avatar": {
-      "arcade": "Speelautomaat",
-      "brain": "Brein",
-      "creature": "Wezen",
-      "crystal": "Kristal",
-      "custom": "Eigen avatar",
-      "dragon": "Draak",
-      "explorer": "Ontdekkingsreiziger",
-      "flame": "Vlam",
-      "lightning": "Bliksem",
-      "magicWand": "Toverstaf",
-      "moon": "Maan",
-      "operator": "Bediener",
-      "orbit": "Omloopbaan",
-      "oracle": "Orakel",
-      "rainbow": "Regenboog",
-      "robot": "Robotfiguur",
-      "satellite": "Satelliet",
-      "sparkles": "Schitteringen",
-      "strongArm": "Sterke arm",
-      "talisman": "Geluksbrenger"
-    },
-    "remoteSpawnFilesNotSupported": "Deze instantie kan geen bestanden ontvangen.",
-    "instanceSwitcherTitle": "KiloClaw-instantie"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2030,10 +1561,6 @@
       "moveLeft": "{{filename}} naar links verplaatsen",
       "moveRight": "{{filename}} naar rechts verplaatsen"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Afbeelding van het klembord plakken",
-      "label": "Gevonden afbeelding plakken"
-    },
     "attachmentPicker": {
       "camera": "Foto maken",
       "photoLibrary": "Fotobibliotheek",
@@ -2229,7 +1756,8 @@
     "signOutThisDeviceTitle": "Dit apparaat afmelden?",
     "signOutThisSessionTitle": "Deze sessie afmelden?",
     "signOutThisSessionMessage": "{{device}} wordt afgemeld. Het apparaat kan daarna nog maximaal een uur toegang tot de API hebben.",
-    "webBrowser": "Webbrowser"
+    "webBrowser": "Webbrowser",
+    "unknownDevice": "Onbekend apparaat"
   },
   "forceUpdate": {
     "couldNotOpenStore": "De appwinkel kon niet worden geopend.",

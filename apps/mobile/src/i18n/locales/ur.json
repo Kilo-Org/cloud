@@ -101,12 +101,9 @@
     "scheduled": "شیڈول شدہ",
     "keepEditing": "ترمیم جاری رکھیں",
     "keepRunning": "جاری رہنے دیں",
-    "kiloclaw": "KiloClaw",
     "newSession": "نیا سیشن",
-    "noKiloclawInstances": "کوئی KiloClaw انسٹنس نہیں",
     "noModelsAvailable": "کوئی ماڈل دستیاب نہیں",
     "notFound": "نہیں ملا۔",
-    "online": "آن لائن",
     "open": "{{name}} کھولیں",
     "openPullRequest": "پل ریکویسٹ کھولیں",
     "pending": "زیر التوا",
@@ -257,7 +254,8 @@
     "renamePasskey": "رسائی کلید کا نام تبدیل کریں",
     "removePasskey": "رسائی کلید ہٹائیں",
     "removePasskeyTitle": "رسائی کلید ہٹائیں؟",
-    "removePasskeyMessage": "اب آپ اس رسائی کلید سے سائن ان نہیں کر سکیں گے۔"
+    "removePasskeyMessage": "اب آپ اس رسائی کلید سے سائن ان نہیں کر سکیں گے۔",
+    "changelog": "نیا کیا ہے"
   },
   "preferences": {
     "general": "عمومی",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "اطلاعات صرف کسی سرگرمی کی خبر دیتی ہیں۔ تفصیلات پڑھنے کے لیے Kilo کھولیں۔",
     "channel": {
       "agentProgress": "ایجنٹ کی پیش رفت",
-      "chat": "چیٹ کے پیغامات",
-      "kiloclaw": "KiloClaw کی سرگرمی",
       "balance": "بیلنس کی تنبیہات",
       "security": "شناخت شدہ سیکیورٹی مسائل",
       "spend": "اخراجات کی تنبیہات",
       "followedSessions": "فالو کیے گئے سیشنز"
     },
     "category": {
-      "chatMessagesSubtitle": "آپ کی گفتگو میں جوابات",
       "agentAttentionTitle": "ایجنٹ کو آپ کی ضرورت ہے",
       "agentAttentionSubtitle": "سوالات، اجازت یا آپ کے جواب کی ضرورت",
       "agentUpdatesTitle": "ایجنٹ کی اپ ڈیٹس",
       "agentUpdatesSubtitle": "کام کے دوران ایجنٹ کے پیغامات",
       "sessionStatusTitle": "سیشن کی حالت",
       "sessionStatusSubtitle": "مکمل / ناکام / کنٹرول کے لیے تیار",
-      "kiloclawActivitySubtitle": "انسٹینس تیار یا ناکام، مقررہ وقت کے کام",
-      "kiloclawActivityUnavailable": "KiloClaw کی سرگرمی حاصل کرنے کے لیے KiloClaw انسٹینس شروع کریں۔",
       "balanceAlertsSubtitle": "تنظیم کا بیلنس کم ہونے کے انتباہات",
       "balanceAlertsUnavailable": "بیلنس انتباہات حاصل کرنے کے لیے کسی تنظیم میں شامل ہوں۔",
       "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "ہوم",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}، ٹیب، {{total}} میں سے {{position}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "انسٹنس کا انتخاب",
-      "couldNotLoadInstances": "انسٹنسز لوڈ نہیں ہو سکے۔",
-      "noInstancesDescription": "بات چیت شروع کرنے کے لیے ایک انسٹنس کا سیٹ اپ کریں۔",
-      "setUpKiloclaw": "KiloClaw کا سیٹ اپ کریں",
-      "currentInstance": "{{title}}، موجودہ"
-    },
     "conversation": {
-      "failedToLoad": "گفتگو لوڈ نہیں ہو سکی۔",
-      "notFound": "گفتگو نہیں ملی۔",
       "untitled": "بغیر عنوان",
-      "leaveTitle": "گفتگو چھوڑیں؟",
-      "leaveMessage": "اس سے یہ گفتگو آپ کی فہرست سے ہٹ جائے گی۔",
-      "openHint": "گفتگو کھولتا ہے۔ نام بدلنے اور گفتگو چھوڑنے کے اختیارات دیکھنے کے لیے دبا کر رکھیں۔",
-      "unread": "بغیر پڑھے",
-      "optionsFor": "گفتگو {{title}} کے اختیارات",
-      "options": "گفتگو کے اختیارات",
-      "renameTitle": "گفتگو کا نیا نام",
-      "renamePlaceholder": "نیا نام",
-      "couldNotReachBot": "بوٹ سے رابطہ نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
-      "messageDeliveryFailed": "پیغام بوٹ تک نہیں پہنچایا جا سکا۔",
-      "couldNotSignIn": "چیٹ میں سائن ان نہیں ہو سکا۔",
-      "couldNotRefreshMessages": "پیغامات تازہ نہیں ہو سکے۔",
-      "couldNotLoadHistory": "گفتگو کی سرگزشت لوڈ نہیں ہو سکی۔",
-      "leave": "چھوڑیں",
-      "untitledConversation": "بغیر عنوان گفتگو",
-      "createFailed": "نئی گفتگو نہیں بن سکی۔",
-      "leaveFailed": "گفتگو چھوڑی نہیں جا سکی۔"
-    },
-    "reactions": {
-      "common": "عام",
-      "reactWith": "{{reaction}} سے ردعمل دیں",
-      "accessibility": "{{emoji}} ردعمل، {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "جواب برائے",
-      "cancelReply": "جواب منسوخ کریں",
-      "openInstance": "انسٹنس کھولیں",
-      "attachFile": "فائل منسلک کریں",
-      "cancelEdit": "ترمیم منسوخ کریں"
+      "renamePlaceholder": "نیا نام"
     },
     "conversationList": {
-      "couldNotLoad": "گفتگو کی فہرست لوڈ نہیں ہو سکی۔",
-      "emptyTitle": "ابھی کوئی گفتگو نہیں",
-      "emptyDescription": "اپنے KiloClaw انسٹنس سے بات چیت شروع کرنے کے لیے نئی گفتگو بنائیں۔",
-      "create": "گفتگو بنائیں",
-      "newConversation": "نئی گفتگو",
-      "openInstanceSettings": "انسٹنس کی ترتیبات کھولیں",
       "today": "آج",
       "yesterday": "کل",
-      "thisWeek": "اس ہفتے",
       "older": "پرانی گفتگو"
     },
     "attachment": {
-      "open": "{{filename}} کھولیں",
-      "openFailed": "منسلک فائل نہیں کھل سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
-      "attachFailed": "فائل منسلک نہیں ہو سکی۔",
-      "limit": "آپ زیادہ سے زیادہ {{displayCount}} فائلیں منسلک کر سکتے ہیں۔",
-      "sizeRejection": "{{filename}} کا حجم منسلک فائل کی {{limit}} کی حد سے زیادہ ہے۔",
-      "unreadable": "{{filename}} پڑھی نہیں جا سکی۔",
-      "pastedImage": "چسپاں کردہ تصویر",
-      "defaultName": "منسلک فائل",
       "classificationDenied": "قابلِ اجرا فائلیں منسلک نہیں کی جا سکتیں۔",
       "classificationEmpty": "فائل خالی ہے۔",
       "classificationTooLarge": "فائلوں کا حجم 20 MB یا اس سے کم ہونا ضروری ہے۔",
@@ -943,426 +883,17 @@
       "networkError": "نیٹ ورک میں خرابی ہے۔",
       "uploadFailed": "اپ لوڈ ناکام ہو گیا۔",
       "nothingToPaste": "چسپاں کرنے کے لیے کچھ نہیں ہے۔",
-      "metadataStripFailed": "تصویر کا میٹاڈیٹا نہیں ہٹایا جا سکا۔",
-      "limit_one": "آپ زیادہ سے زیادہ {{displayCount}} فائل منسلک کر سکتے ہیں۔",
-      "limit_other": "آپ زیادہ سے زیادہ {{displayCount}} فائلیں منسلک کر سکتے ہیں۔"
+      "metadataStripFailed": "تصویر کا میٹاڈیٹا نہیں ہٹایا جا سکا۔"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}، {{status}}",
-      "retryUploading": "{{filename}} دوبارہ اپ لوڈ کریں",
-      "remove": "{{filename}} ہٹائیں"
-    },
-    "messageBubble": {
-      "deleted": "[حذف شدہ پیغام]",
-      "yourMessage": "آپ کا پیغام",
-      "messageFrom": "{{author}} کا پیغام",
-      "moreActions": "مزید کارروائیاں",
-      "notDelivered": "نہیں پہنچا",
-      "edited": "(ترمیم شدہ)",
-      "image": "تصویر"
+      "accessibility": "{{filename}}، {{status}}"
     },
     "messageActions": {
-      "copied": "کاپی ہو گیا",
-      "copyFailed": "کاپی نہیں ہو سکی۔",
-      "title": "پیغام کی کارروائیاں",
-      "deleteTitle": "پیغام حذف کریں؟",
-      "deleteMessage": "اس سے پیغام گفتگو سے ہٹ جائے گا۔",
-      "deleteFailed": "پیغام حذف نہیں ہو سکا۔",
-      "removeReactionFailed": "ردعمل ہٹایا نہیں جا سکا۔",
-      "addReactionFailed": "ردعمل شامل نہیں ہو سکا۔",
-      "retrySend": "دوبارہ بھیجیں",
-      "moreReactions": "مزید ردعمل",
-      "edit": "ترمیم کریں",
-      "sendFailed": "پیغام بھیجا نہیں جا سکا۔",
-      "retrySendFailed": "پیغام دوبارہ بھیجا نہیں جا سکا۔",
-      "editFailed": "پیغام میں ترمیم نہیں ہو سکی۔",
-      "executeFailed": "کارروائی مکمل نہیں ہو سکی۔"
+      "edit": "ترمیم کریں"
     },
     "attachmentPicker": {
-      "takePhoto": "تصویر لیں",
-      "photoLibrary": "تصاویر کی لائبریری",
-      "files": "فائلیں",
       "cameraAccessMessage": "تصویر لینے کے لیے ترتیبات میں کیمرے تک رسائی کی اجازت دیں۔"
-    },
-    "typingIndicator": {
-      "someone": "کوئی",
-      "typing_one": "{{name}} ٹائپ کر رہا ہے...",
-      "typing": "{{names}} ٹائپ کر رہے ہیں...",
-      "typing_other": "{{names}} ٹائپ کر رہے ہیں..."
-    },
-    "botStatus": {
-      "offline": "آف لائن",
-      "loadingUser": "صارف کی معلومات لوڈ ہو رہی ہیں…",
-      "waitingForStatus": "بوٹ کی حالت کا انتظار...",
-      "offlineMessage": "بوٹ آف لائن ہے۔ دوبارہ منسلک ہونے پر پیغامات کی ترسیل بحال ہو جائے گی۔"
-    },
-    "errors": {
-      "notAllowed": "اجازت نہیں ہے۔",
-      "messageTooLong": "پیغام بہت طویل ہے — اسے {{limit}} حروف سے کم رکھیں۔",
-      "titleTooLong": "عنوان بہت طویل ہے — اسے {{limit}} حروف سے کم رکھیں۔",
-      "messageEmpty": "پیغام خالی نہیں ہو سکتا۔"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw انسٹنسز لوڈ نہیں ہو سکیں۔",
-    "billing": {
-      "title": "بلنگ",
-      "continueMonthToMonth": "ماہانہ پلان جاری رکھیں",
-      "plan": "منصوبہ",
-      "finalTermEnds": "آخری مدت کے اختتام کی تاریخ",
-      "afterFinalTerm": "آخری مدت کے بعد",
-      "lessThanOneDay": "1 دن سے کم",
-      "ends": "اختتام کی تاریخ",
-      "expires": "میعاد ختم ہونے کی تاریخ",
-      "noActivePlan": "کوئی فعال پلان نہیں",
-      "noActivePlanDescription": "آپ کے پاس کوئی فعال KiloClaw سبسکرپشن نہیں ہے۔",
-      "managedByAdmin": "آپ کی تنظیم کا منتظم بلنگ سنبھالتا ہے۔",
-      "couldNotLoad": "بلنگ کی معلومات لوڈ نہیں ہو سکیں۔",
-      "manageOnWeb": "ویب پر بلنگ کا انتظام کریں",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "آپ کے Commit پلان کی آخری مدت {{date}} کو ختم ہوگی۔ {{price}} میں Standard پلان جاری رکھیں، ورنہ ہوسٹنگ ختم ہو جائے گی۔",
-      "freeTrial": "مفت آزمائش",
-      "hostingEnds": "ہوسٹنگ ختم ہو جائے گی",
-      "renews": "تجدید کی تاریخ",
-      "standardMonthToMonth": "Standard ماہانہ پلان",
-      "standardStartsOn": "Standard پلان {{date}} سے {{price}} میں شروع ہوگا۔",
-      "yourStandardMonthlyPrice": "آپ کے Standard پلان کی ماہانہ قیمت",
-      "perMonth": "/ماہ",
-      "earlybirdAccessUntil": "Earlybird کی رسائی {{date}} تک ہے۔",
-      "earlybirdEnding": "Earlybird ختم ہونے میں باقی وقت: {{remaining}}۔",
-      "paymentPastDue": "ادائیگی کی مقررہ تاریخ گزر چکی ہے۔ براہ کرم ادائیگی کا طریقہ اپ ڈیٹ کریں۔",
-      "subscriptionCancels": "سبسکرپشن {{date}} کو منسوخ ہو جائے گی۔",
-      "trialDaysRemaining": "آزمائش ختم ہونے میں باقی وقت: {{remaining}}۔",
-      "trialEndingSoon": "آزمائش جلد ختم ہوگی: {{remaining}}۔",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "کمٹ"
-    },
-    "changelog": {
-      "title": "نیا کیا ہے",
-      "couldNotLoad": "تبدیلیوں کا ریکارڈ لوڈ نہیں ہو سکا۔",
-      "noUpdates": "ابھی کوئی اپ ڈیٹ نہیں",
-      "noUpdatesDescription": "تبدیلیوں کا ریکارڈ یہاں دکھائی دے گا۔",
-      "recentUpdates": "حالیہ اپ ڈیٹس",
-      "manageVersion": "ورژن کا انتظام کریں",
-      "redeployRequired": "دوبارہ تعیناتی ضروری",
-      "redeploySuggested": "دوبارہ تعیناتی بہتر ہے",
-      "upgradeRequired": "اپ گریڈ ضروری"
-    },
-    "dashboard": {
-      "title": "ڈیش بورڈ",
-      "couldNotLoad": "ڈیش بورڈ لوڈ نہیں ہو سکا۔",
-      "renameInstance": "انسٹنس کا نام تبدیل کریں",
-      "renamePlaceholder": "نیا نام (زیادہ سے زیادہ 50 حروف)",
-      "someDetailsFailed": "کچھ تازہ تفصیلات لوڈ نہیں ہو سکیں۔",
-      "destroy": "ختم کریں",
-      "destroyMessage": "اس سے آپ کی KiloClaw انسٹنس اور اس کا تمام ڈیٹا ہمیشہ کے لیے ختم ہو جائے گا۔ اس کارروائی کو واپس نہیں لیا جا سکتا۔",
-      "destroyTitle": "انسٹنس ختم کریں",
-      "instance": "انسٹنس",
-      "couldNotCheckStatus": "سروس کی حالت چیک نہیں ہو سکی۔",
-      "dangerZone": "حساس کارروائیاں",
-      "destroying": "ختم کیا جا رہا ہے…",
-      "serviceDegraded": "سروس کی کارکردگی متاثر ہے — حالت دیکھنے کے لیے ٹیپ کریں",
-      "up": "فعال"
-    },
-    "channels": {
-      "title": "چینلز",
-      "couldNotLoad": "چینلز لوڈ نہیں ہو سکے۔",
-      "noChannels": "کوئی چینل دستیاب نہیں",
-      "noChannelsDescription": "چینلز سے منسلک کرنے کے اختیارات یہاں دکھائی دیں گے۔",
-      "connected": "{{label}} منسلک ہو گیا",
-      "disconnectMessage": "{{label}} ہٹائیں؟ یہ چینل منقطع ہو جائے گا۔",
-      "disconnectTitle": "چینل منقطع کریں"
-    },
-    "devicePairing": {
-      "title": "ڈیوائس کی پیئرنگ",
-      "refreshRequests": "منسلک ہونے کی درخواستیں تازہ کریں",
-      "couldNotLoad": "منسلک ہونے کی درخواستیں لوڈ نہیں ہو سکیں۔",
-      "noPending": "کوئی زیر التوا درخواست نہیں",
-      "noPendingDescription": "چینلز اور ڈیوائسز کی منسلک ہونے کی درخواستیں یہاں دکھائی دیں گی۔",
-      "channelRequests": "چینل کی درخواستیں",
-      "deviceRequests": "ڈیوائس کی درخواستیں",
-      "approveDeviceMessage": "{{platform}} کو آپ کی انسٹنس سے جڑنے کی اجازت دیں؟",
-      "approveDeviceTitle": "ڈیوائس کی منظوری دیں",
-      "approveMessage": "{{label}} (کوڈ: {{code}}) کو آپ کی انسٹنس سے جڑنے کی اجازت دیں؟",
-      "approveTitle": "منسلک ہونے کی درخواست منظور کریں",
-      "unknownDevice": "نامعلوم ڈیوائس"
-    },
-    "execPolicy": {
-      "title": "عمل درآمد کی پالیسی",
-      "couldNotLoad": "کمانڈ چلانے کی پالیسی لوڈ نہیں ہو سکی۔",
-      "alwaysAsk": "ہمیشہ پوچھیں",
-      "alwaysAskDescription": "ہر کمانڈ چلانے سے پہلے تصدیق کریں۔ یہ سب سے محفوظ طریقہ ہے۔",
-      "neverAsk": "کبھی نہ پوچھیں",
-      "neverAskDescription": "تصدیق کے بغیر کمانڈز چلائیں۔ یہ طریقہ تیز ہے، لیکن کم محفوظ ہے۔"
-    },
-    "google": {
-      "title": "Google اکاؤنٹ",
-      "couldNotLoad": "Google اکاؤنٹ کی حالت لوڈ نہیں ہو سکی۔",
-      "disconnected": "Google اکاؤنٹ منقطع ہو گیا۔ تبدیلی لاگو کرنے کے لیے اپنی انسٹنس دوبارہ تعینات کریں۔",
-      "setupCommand": "سیٹ اپ کمانڈ",
-      "setupCommandHelp": "اپنا Google اکاؤنٹ منسلک کرنے کے لیے اپنے کمپیوٹر کے ٹرمینل میں یہ کمانڈ چلائیں۔ کمپیوٹر پر Docker انسٹال ہونا ضروری ہے۔",
-      "failedToLoadCommand": "سیٹ اپ کی کمانڈ لوڈ نہیں ہو سکی۔",
-      "gmailNotifications": "Gmail کی اطلاعات",
-      "disconnect": "Google اکاؤنٹ منقطع کریں",
-      "copied": "کاپی ہو گیا",
-      "copyCommand": "کمانڈ کاپی کریں",
-      "disconnectConfirm": "منقطع کریں",
-      "disconnectMessage": "اس انسٹنس سے اپنا Google اکاؤنٹ ہٹائیں؟ اس سے Gmail کی اطلاعات غیر فعال ہو جائیں گی۔ تبدیلیاں لاگو کرنے کے لیے اکاؤنٹ منقطع کرنے کے بعد انسٹنس دوبارہ تعینات کریں۔",
-      "disconnectTitle": "Google منقطع کریں"
-    },
-    "modelList": {
-      "noMatches": "تلاش سے ملتا ہوا کوئی ماڈل نہیں",
-      "noModelsDescription": "دستیاب ہونے پر ماڈلز یہاں ظاہر ہوں گے۔",
-      "noResultsFor": "\"{{query}}\" کے لیے کوئی نتیجہ نہیں ملا۔"
-    },
-    "secrets": {
-      "title": "خفیہ معلومات",
-      "couldNotLoad": "خفیہ معلومات لوڈ نہیں ہو سکیں۔",
-      "noSecrets": "کوئی خفیہ معلومات دستیاب نہیں",
-      "noSecretsDescription": "خفیہ معلومات کے ذریعے منسلک کرنے کے اختیارات یہاں دکھائی دیں گے۔",
-      "removeMessage": "{{label}} ہٹائیں؟ اس ٹول کو اپنی تصدیقی معلومات تک رسائی نہیں رہے گی۔",
-      "removeTitle": "خفیہ معلومات ہٹائیں",
-      "saved": "{{label}} محفوظ ہو گیا",
-      "hide": "{{label}} چھپائیں",
-      "show": "{{label}} دکھائیں",
-      "allFieldsRequired": "{{label}} کو منسلک کرنے کے لیے تمام خانے پُر کرنا ضروری ہے۔",
-      "setupGuideFallback": "سیٹ اپ کی رہنمائی",
-      "setupGuideA11y": "{{label}} کے سیٹ اپ کی رہنما ہدایات",
-      "setupGuide": "سیٹ اپ کی رہنمائی",
-      "saving": "محفوظ کیا جا رہا ہے…",
-      "removing": "ہٹایا جا رہا ہے…",
-      "updateToken": "ٹوکن اپ ڈیٹ کریں"
-    },
-    "versionPin": {
-      "title": "ورژن برقرار رکھنا",
-      "couldNotLoad": "ورژن کی معلومات لوڈ نہیں ہو سکیں۔",
-      "couldNotLoadMore": "مزید ورژن لوڈ نہیں ہو سکے۔",
-      "loadMore": "مزید ورژن لوڈ کریں",
-      "showingLatest": "تازہ ترین 100 ورژن دکھائے جا رہے ہیں۔",
-      "availableVersions": "دستیاب ورژن",
-      "noVersions": "کوئی ورژن دستیاب نہیں",
-      "noVersionsDescription": "OpenClaw کے دستیاب ورژن یہاں دکھائی دیں گے۔",
-      "unpin": "پن ہٹائیں",
-      "unpinMessage": "تازہ ترین دستیاب ورژن پر واپس جائیں؟",
-      "unpinTitle": "ورژن کا پن ہٹائیں",
-      "confirmPin": "پن کی تصدیق کریں",
-      "followingLatest": "تازہ ترین ورژن منتخب",
-      "latest": "تازہ ترین",
-      "pin": "پن کریں",
-      "pinnedByAdmin": "منتظم نے ورژن پن کیا ہے — اسے بدلنے کے لیے اپنے منتظم سے رابطہ کریں۔",
-      "pinnedTo": "{{version}} پر پن کیا گیا",
-      "reasonOptional": "وجہ (اختیاری)",
-      "reasonPlaceholder": "اس ورژن کو پن کرنے کی وجہ",
-      "replaceAdminPin": "منتظم کا پن بدلیں",
-      "replacesAdminPin": "اس سے منتظم کا مقرر کردہ پن بدل جائے گا (فی الحال {{label}})۔"
-    },
-    "redeploy": "دوبارہ تعینات کریں",
-    "redeployMessage": "کیا آپ واقعی اس انسٹنس کو دوبارہ تعینات کرنا چاہتے ہیں؟",
-    "redeployTitle": "انسٹنس دوبارہ تعینات کریں",
-    "controls": {
-      "redeploying": "دوبارہ تعینات کیا جا رہا ہے…",
-      "restart": "دوبارہ شروع کریں",
-      "restartOpenClawMessage": "کیا آپ واقعی OpenClaw کے پروسیس کو دوبارہ شروع کرنا چاہتے ہیں؟",
-      "restartOpenClawTitle": "OpenClaw دوبارہ شروع کریں",
-      "restarting": "دوبارہ شروع کیا جا رہا ہے…",
-      "start": "شروع کریں",
-      "startMessage": "کیا آپ واقعی اس انسٹنس کو شروع کرنا چاہتے ہیں؟",
-      "startTitle": "انسٹنس شروع کریں",
-      "stop": "روکیں",
-      "stopMessage": "کیا آپ واقعی اس انسٹنس کو روکنا چاہتے ہیں؟",
-      "stopTitle": "انسٹنس روکیں",
-      "stopping": "روکا جا رہا ہے…"
-    },
-    "empty": {
-      "finishingSetup": "سیٹ اپ مکمل کیا جا رہا ہے",
-      "finishingSetupDescription": "ذرا انتظار کریں، ہم آپ کے اکاؤنٹ کی تیاری مکمل کر رہے ہیں۔ اس میں عام طور پر تھوڑا سا وقت لگتا ہے۔",
-      "getStarted": "شروع کریں",
-      "noInstancesDescription": "کوڈنگ ایجنٹس چلانا شروع کرنے کے لیے اپنی پہلی انسٹنس بنائیں۔"
-    },
-    "instance": {
-      "backToInstances": "انسٹنسز کی فہرست پر واپس جائیں",
-      "couldNotLoad": "انسٹنس لوڈ نہیں ہو سکی۔",
-      "notFound": "انسٹنس نہیں ملی",
-      "notFoundDescription": "ممکن ہے یہ انسٹنس ختم کر دی گئی ہو یا لنک اب قابل استعمال نہ ہو۔"
-    },
-    "list": {
-      "createInstance": "انسٹنس بنائیں",
-      "organizations": "تنظیمیں",
-      "accessIssue": {
-        "trialExpired": "آزمائش ختم ہو گئی، اس انسٹنس کا استعمال جاری رکھنے کے لیے سبسکرائب کریں",
-        "subscriptionCanceled": "سبسکرپشن غیر فعال ہے، اس انسٹنس کا استعمال جاری رکھنے کے لیے دوبارہ سبسکرائب کریں",
-        "subscriptionPastDue": "ادائیگی میں مسئلہ ہے، اس انسٹنس کا استعمال جاری رکھنے کے لیے بلنگ کی معلومات اپ ڈیٹ کریں",
-        "quarantined": "انسٹنس الگ کر دی گئی ہے، انسانی جائزہ درکار ہے",
-        "multipleCurrentConflict": "اکاؤنٹ کا جائزہ درکار ہے",
-        "nonCanonicalEarlybird": "پرانے پلان کا جائزہ درکار ہے"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}} کے ساتھ چیٹ کریں",
-        "ready": "{{name}} تیار ہے",
-        "warmedUp": "سب تیار ہے۔ جب آپ تیار ہوں تو سلام کریں۔"
-      },
-      "flow": {
-        "genericErrorBody": "ہم ابھی آپ کی انسٹنس کا سیٹ اپ مکمل نہیں کر سکے۔",
-        "manualReviewBody": "انسٹنس بنانے سے پہلے آپ کے اکاؤنٹ کا مسئلہ حل کرنا ضروری ہے۔ kilo.ai پر جاری رکھیں۔",
-        "manualReviewTitle": "سیٹ اپ کے لیے انسانی جائزہ درکار",
-        "openKiloAi": "Kilo.ai کھولیں",
-        "provisioning": "تیاری جاری",
-        "review": "جائزہ",
-        "identityTitle": "آپ کے بوٹ کی شناخت",
-        "couldNotLoad": "ابتدائی سیٹ اپ کی حالت لوڈ نہیں ہو سکی۔",
-        "finishingSetup": "سیٹ اپ مکمل ہو رہا ہے — ذرا انتظار کریں، ہم آپ کے اکاؤنٹ کی تیاری مکمل کر رہے ہیں۔",
-        "ready": "تیار",
-        "settingUp": "سیٹ اپ ہو رہا ہے…"
-      },
-      "unavailableDescription": "انسٹنس بنانے کے لیے فعال KiloClaw سبسکرپشن ضروری ہے۔ موجودہ انسٹنسز اور سبسکرپشنز معمول کے مطابق جاری رہیں گی۔",
-      "unavailableTitle": "نئی KiloClaw انسٹنسز دستیاب نہیں ہیں",
-      "identity": {
-        "chooseAvatar": "پروفائل کی تصویر منتخب کریں",
-        "namePlaceholder": "آپ کے بوٹ کا نام",
-        "selectAvatar": "{{name}} کو پروفائل کی تصویر بنائیں",
-        "personality": "شخصیت",
-        "changePersonality": "شخصیت تبدیل کریں",
-        "location": "مقام",
-        "locationPlaceholder": "شہر یا علاقہ (اختیاری)",
-        "useCurrentLocation": "موجودہ مقام استعمال کریں",
-        "locationDeniedTitle": "مقام تک رسائی کی اجازت نہیں",
-        "locationDeniedMessage": "اپنا موجودہ مقام استعمال کرنے کے لیے ترتیبات میں مقام تک رسائی فعال کریں۔",
-        "locationValidationFailed": "مقام کی تصدیق نہیں ہو سکی۔",
-        "locationResolveFailed": "آپ کا مقام معلوم نہیں ہو سکا۔ آپ اسے خود تبدیل کر سکتے ہیں۔",
-        "locationGetFailed": "آپ کا مقام حاصل نہیں ہو سکا۔ اسے دستی طور پر درج کریں۔",
-        "nature": {
-          "aiAssistantLabel": "AI معاون",
-          "aiAssistantVibe": "مددگار، قابل، پیشہ ور",
-          "digitalCreatureLabel": "ڈیجیٹل مخلوق",
-          "digitalCreatureVibe": "انوکھی، جاندار، قدرے غیر متوقع",
-          "virtualCompanionLabel": "مجازی ساتھی",
-          "virtualCompanionVibe": "گرم جوش، ساتھ دینے والا، دل سے خیال رکھنے والا",
-          "somethingWeirderLabel": "کچھ اور بھی انوکھا…",
-          "somethingWeirderVibe": "خود اس کی وضاحت کریں"
-        }
-      },
-      "notifications": {
-        "mockMessage": "کام مکمل ہو گیا! آپ کا مانگا ہوا خلاصہ تیار ہے۔ جب چاہیں دیکھ لیں۔",
-        "settingUp": "اطلاعات ترتیب دی جا رہی ہیں…",
-        "stayInTheLoop": "باخبر رہیں",
-        "getNotified": "{{name}} کے کام مکمل کرنے پر اطلاع پائیں تاکہ کوئی جواب آپ کی نظر سے نہ چھوٹے۔",
-        "now": "ابھی",
-        "skipForNow": "فی الحال چھوڑ دیں",
-        "couldNotEnable": "اطلاعات فعال نہیں ہو سکیں۔"
-      },
-      "provisioning": {
-        "queryErrorTitle": "سیٹ اپ کی جانچ نہیں ہو سکی",
-        "queryErrorBody": "{{name}} کے سیٹ اپ کی حالت چیک کرتے وقت کنکشن ٹوٹ گیا۔ ممکن ہے سیٹ اپ ابھی جاری ہو۔ دوبارہ کوشش کریں یا کچھ دیر بعد دیکھیں۔",
-        "stoppedTitle": "سیٹ اپ رک گیا",
-        "stoppedBody": "سیٹ اپ کے دوران {{name}} کی انسٹنس غیر متوقع طور پر رک گئی۔",
-        "stalledTitle": "پیش رفت رک گئی",
-        "stalledBody": "ہم {{name}} کا سیٹ اپ مکمل نہیں کر سکے۔ دوبارہ کوشش کریں، یا اگر ایسا بار بار ہو تو {{supportEmail}} پر ای میل کریں۔",
-        "timeoutTitle": "توقع سے زیادہ وقت لگ رہا ہے",
-        "timeoutBody": "{{name}} کا سیٹ اپ معمول سے زیادہ وقت لے رہا ہے ({{displayMinutes}} منٹ سے زیادہ)۔",
-        "continueInBackground": "پس منظر میں جاری رکھیں",
-        "settingUp": "{{name}} کا سیٹ اپ جاری ہے",
-        "connectingToAgent": "ایجنٹ سے رابطہ ہو رہا ہے",
-        "startingSandbox": "سینڈ باکس شروع کیا جا رہا ہے",
-        "backgroundHint": "عام طور پر ایک منٹ سے کم وقت لگتا ہے۔ آپ اسے بند کر سکتے ہیں — ہم پس منظر میں کام جاری رکھیں گے۔"
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "کوڈ {{code}}",
-      "gatewayProcess": "گیٹ وے پروسیس",
-      "lastExit": "آخری بار بند ہونے کا وقت",
-      "memory": "میموری",
-      "region": "علاقہ",
-      "resources": "وسائل",
-      "restarts": "دوبارہ شروع ہونے کی تعداد",
-      "state": "حالت",
-      "uptime": "چلنے کا دورانیہ",
-      "crashed": "کریش ہو گیا",
-      "destroying": "ختم کیا جا رہا ہے",
-      "provisioned": "تیار",
-      "restarting": "دوبارہ شروع ہو رہا ہے",
-      "running": "چل رہا ہے",
-      "shuttingDown": "بند ہو رہا ہے",
-      "starting": "شروع ہو رہا ہے",
-      "stopped": "رکا ہوا",
-      "stopping": "روکا جا رہا ہے",
-      "unknown": "نامعلوم",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo آٹو",
-      "frontierLabel": "جدید ترین",
-      "frontierDescription": "بہترین کارکردگی۔ استدلال کی صلاحیت والے جدید ترین ماڈلز کو درخواست بھیجتا ہے۔",
-      "balancedDescription": "کم لاگت میں رفتار اور صلاحیت کا اچھا توازن۔",
-      "autoModelA11y": "{{label}} خودکار ماڈل",
-      "currentModel": "موجودہ ماڈل",
-      "browseAllModels": "یا 500+ ماڈلز میں سے منتخب کریں",
-      "browseAllModelsA11y": "تمام 500+ ماڈلز دیکھیں"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw استعمال کرتے رہنے کے لیے اپنے براؤزر سے kilo.ai/claw پر جائیں۔ آپ ایپ میں سبسکرائب نہیں کر سکتے۔",
-      "subscriptionCanceledTitle": "ویب پر سبسکرائب کریں",
-      "subscriptionCanceledBody": "KiloClaw استعمال کرنے کے لیے اپنے براؤزر سے kilo.ai/claw پر جائیں۔ آپ ایپ میں سبسکرائب نہیں کر سکتے۔",
-      "subscriptionCanceledCta": "Kilo.ai/claw کھولیں",
-      "subscriptionPastDueTitle": "ویب پر ادائیگی کی معلومات کی تازہ کاری",
-      "subscriptionPastDueBody": "آپ کی تازہ ترین ادائیگی میں مسئلہ پیش آیا۔ ادائیگی کی معلومات اپ ڈیٹ کرنے کے لیے اپنے براؤزر میں kilo.ai/claw کھولیں۔ آپ ایپ میں بلنگ کا انتظام نہیں کر سکتے۔",
-      "quarantinedTitle": "انسٹنس کو بحالی کی ضرورت ہے",
-      "quarantinedBody": "آپ کی KiloClaw انسٹنس الگ کر دی گئی ہے اور ابھی استعمال نہیں کی جا سکتی۔ اسے بحال کرنے کے لیے ہماری ٹیم کی مدد ضروری ہے۔",
-      "multipleCurrentConflictBody": "آپ کے اکاؤنٹ پر ایک سے زیادہ فعال سبسکرپشنز ملیں۔ آپ سے دو بار رقم وصول ہونے سے بچانے کے لیے ہم نے کارروائی عارضی طور پر روک دی ہے۔",
-      "multipleCurrentConflictCta": "Kilo.ai پر جاری رکھیں",
-      "nonCanonicalEarlybirdTitle": "پرانا پلان ملا",
-      "nonCanonicalEarlybirdBody": "موبائل پر استعمال سے پہلے آپ کے ابتدائی رسائی والے پلان کا انسانی جائزہ ضروری ہے۔",
-      "iosTitle": "IOS پر KiloClaw دستیاب نہیں",
-      "iosBody": "اس اکاؤنٹ کے لیے KiloClaw تک رسائی کا انتظام iOS ایپ سے باہر ہوتا ہے۔",
-      "iosContact": "کوئی سوال ہے؟ {{supportEmail}} پر رابطہ کریں۔",
-      "quarantinedCta": "ہماری ٹیم کو ای میل بھیجیں",
-      "nonCanonicalEarlybirdCta": "اپنا پلان Kilo.ai پر دیکھیں"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} کو توجہ درکار ہے: {{label}}",
-      "openUnread_one": "{{name}} کھولیں، {{displayCount}} اَن پڑھا پیغام",
-      "openUnread": "{{name}} کھولیں، {{displayCount}} ان پڑھے پیغامات",
-      "openUnread_other": "{{name}} کھولیں، {{displayCount}} ان پڑھے پیغامات",
-      "openSettings": "{{name}} کی ترتیبات کھولیں",
-      "fixOnKiloAi": "Kilo.ai پر درست کریں: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram، Discord، Slack",
-      "devicePairingDescription": "ڈیوائس کی درخواستوں کی منظوری دیں",
-      "execPolicyDescription": "حفاظتی ترتیبات",
-      "googleDescription": "Gmail، Calendar، Docs",
-      "modelDescription": "AI ماڈل کا انتخاب",
-      "secretsDescription": "رمز بند تصدیقی معلومات",
-      "versionPinDescription": "کسی مخصوص ورژن پر پن کریں"
-    },
-    "avatar": {
-      "arcade": "آرکیڈ",
-      "brain": "دماغ",
-      "creature": "مخلوق",
-      "crystal": "کرسٹل",
-      "custom": "اپنی منتخب کردہ پروفائل تصویر",
-      "dragon": "ڈریگن",
-      "explorer": "مہم جو",
-      "flame": "شعلہ",
-      "lightning": "بجلی",
-      "magicWand": "جادوئی چھڑی",
-      "moon": "چاند",
-      "operator": "آپریٹر",
-      "orbit": "مدار",
-      "oracle": "پیش گو",
-      "rainbow": "قوس قزح",
-      "robot": "روبوٹ",
-      "satellite": "سیٹلائٹ",
-      "sparkles": "چمک",
-      "strongArm": "مضبوط بازو",
-      "talisman": "تعویذ"
-    },
-    "remoteSpawnFilesNotSupported": "یہ انسٹنس فائلیں وصول نہیں کر سکتی۔",
-    "instanceSwitcherTitle": "KiloClaw انسٹنس"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}} کو بائیں منتقل کریں",
       "moveRight": "{{filename}} کو دائیں منتقل کریں"
     },
-    "attachmentPasteHint": {
-      "accessibility": "کلپ بورڈ سے تصویر چسپاں کریں",
-      "label": "تصویر ملی ہے، چسپاں کرنے کے لیے ٹیپ کریں"
-    },
     "attachmentPicker": {
       "camera": "کیمرہ",
       "photoLibrary": "تصاویر کی لائبریری",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "سیشن سائن آؤٹ ہو گیا۔",
     "signOutThisDeviceTitle": "اس ڈیوائس سے سائن آؤٹ کریں؟",
     "signOutThisSessionTitle": "اس سیشن سے سائن آؤٹ کریں؟",
-    "signOutThisSessionMessage": "{{device}} سے سائن آؤٹ ہو جائے گا۔ اس کی API تک رسائی مزید ایک گھنٹے تک برقرار رہ سکتی ہے۔"
+    "signOutThisSessionMessage": "{{device}} سے سائن آؤٹ ہو جائے گا۔ اس کی API تک رسائی مزید ایک گھنٹے تک برقرار رہ سکتی ہے۔",
+    "unknownDevice": "نامعلوم ڈیوائس"
   },
   "forceUpdate": {
     "couldNotOpenStore": "ایپ اسٹور نہیں کھل سکا۔",

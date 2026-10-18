@@ -731,7 +731,6 @@ export async function handleLlmProxyRequest(
     user,
     organizationId,
     botId,
-    taskId,
     getRoutingProviderConfig: async () =>
       withIgnoredProviders(
         (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,

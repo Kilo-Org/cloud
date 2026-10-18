@@ -28,7 +28,6 @@ import { app } from './index';
 
 const findCustomRouter = vi.hoisted(() => vi.fn());
 const findCustomRouterById = vi.hoisted(() => vi.fn());
-const findLegacyPoolRouter = vi.hoisted(() => vi.fn());
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const findOrganizationMemberRole = vi.hoisted(() => vi.fn());
 const findOrganizationMemberBalanceRow = vi.hoisted(() => vi.fn());
@@ -41,7 +40,6 @@ vi.mock('./custom-router-store', async importOriginal => ({
   ...(await importOriginal<typeof CustomRouterStoreModule>()),
   findCustomRouter,
   findCustomRouterById,
-  findLegacyPoolRouter,
 }));
 
 vi.mock('./model-classifier', async importOriginal => ({
@@ -349,7 +347,6 @@ beforeEach(() => {
   dbRows.organization = [{ total_microdollars_acquired: 3_000_000, microdollars_used: 0 }];
   findCustomRouter.mockReset().mockResolvedValue(customRouter());
   findCustomRouterById.mockReset().mockResolvedValue(customRouter());
-  findLegacyPoolRouter.mockReset().mockResolvedValue(null);
   findOrganizationMemberRole.mockReset().mockResolvedValue('member');
   findOrganizationMemberBalanceRow.mockReset().mockResolvedValue(memberBalanceRow());
   classifyNormalizedInput.mockReset().mockResolvedValue({
@@ -715,53 +712,25 @@ describe('internal custom router decide', () => {
     });
   });
 
-  it('routes old and new Efficient IDs through the same canonical table and cache scope', async () => {
-    const canonical = customRouter({
-      slug: 'efficient',
-      legacyPool: true,
-      entries: [sonnet],
-    });
-    findLegacyPoolRouter.mockResolvedValue(canonical);
-    findCustomRouter.mockResolvedValue(canonical);
-    const oldResponse = await internalDecide({ router: 'efficient' }, 'kilo-auto/efficient');
-    const newResponse = await internalDecide(
+  it('keeps the saved Efficient custom ID on its canonical table and cache scope', async () => {
+    findCustomRouter.mockResolvedValue(customRouter({ slug: 'efficient', entries: [sonnet] }));
+    const response = await internalDecide(
       { customRouter: { scope: 'user', slug: 'efficient' } },
       'kilo-auto/custom/efficient'
     );
-    expect(oldResponse.status).toBe(200);
-    expect(newResponse.status).toBe(200);
-    const oldBody = await oldResponse.json();
-    const newBody = await newResponse.json();
-    expect(oldBody).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
-    expect(newBody).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toHaveProperty(
+      'decision',
+      expect.objectContaining({ model: SONNET })
+    );
     expect(benchmarkFetch).toHaveBeenCalledTimes(1);
     expect(
       cacheIdFromName.mock.calls.every(([key]) => key.startsWith(`custom:${ROUTER_ID}:`))
     ).toBe(true);
     await drainBackgroundTasks();
     expect(recordUsage.mock.calls.map(([usage]) => usage.core.requested_model)).toContain(
-      'kilo-auto/efficient'
+      'kilo-auto/custom/efficient'
     );
-  });
-
-  it('never falls back outside a migrated legacy pool when policy denies its only gateway entry', async () => {
-    findLegacyPoolRouter.mockResolvedValue(
-      customRouter({ slug: 'efficient', legacyPool: true, entries: [sonnet] })
-    );
-    const response = await internalDecide(
-      { router: 'efficient', routingPolicy: { deniedModelIds: [SONNET] } },
-      'kilo-auto/efficient'
-    );
-    expect(response.status).toBe(422);
-    expect(await errorCode(response)).toBe('custom_router_unavailable');
-  });
-
-  it('does not consult a platform table after a canonical lookup fails', async () => {
-    findLegacyPoolRouter.mockRejectedValue(new Error('canonical storage unavailable'));
-    const response = await internalDecide({ router: 'efficient' }, 'kilo-auto/efficient');
-    expect(response.status).toBe(500);
-    expect(benchmarkFetch).not.toHaveBeenCalled();
-    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
   it('returns router_not_found for an organization router without an organization', async () => {

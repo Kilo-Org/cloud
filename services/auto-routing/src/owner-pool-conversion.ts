@@ -19,7 +19,7 @@ import { asc, gt } from 'drizzle-orm';
 import type { Handler } from 'hono';
 import * as z from 'zod';
 import type { HonoEnv } from './hono-env';
-import type { AutoRoutingOwnerSettings, StoredOwnerSettings } from './routing-mode';
+import type { StoredOwnerSettings } from './routing-mode';
 
 const READ_CONCURRENCY = 10;
 const OUTAGE_CONSECUTIVE_FAILURES = 5;
@@ -97,7 +97,7 @@ async function mapBounded<T, R>(
   return results;
 }
 
-export async function postOwnerPoolConversions(
+async function postOwnerPoolConversions(
   env: Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'>,
   chunk: readonly OwnerPoolConversion[]
 ): Promise<OwnerPoolConversionResult[] | null> {
@@ -123,32 +123,6 @@ export async function postOwnerPoolConversions(
   } catch {
     return null;
   }
-}
-
-export async function migrateOwnerPoolForSettings(
-  env: Env,
-  owner: { ownerType: CustomRouterScope; ownerId: string },
-  requested: AutoRoutingOwnerSettings
-): Promise<OwnerPoolConversionOutcome | null> {
-  const namespace = env.AUTO_ROUTING_MODE_CONFIG;
-  const stub = namespace.get(namespace.idFromName(`${owner.ownerType}:${owner.ownerId}`));
-  const settings: StoredOwnerSettings = await stub.beginConversion(requested);
-  if (settings.pool === null) return null;
-  const conversion: OwnerPoolConversion = {
-    owner: { type: owner.ownerType, id: owner.ownerId },
-    mode: settings.mode ?? DEFAULT_AUTO_ROUTING_MODE,
-    configuredMode: settings.mode,
-    models: settings.pool.map(entry => entry.model),
-  };
-  if (!CustomRouterEntriesSchema.safeParse(convertedOwnerPoolRouter(conversion).entries).success) {
-    return null;
-  }
-  const results = await postOwnerPoolConversions(env, [conversion]);
-  const outcome = results?.[0]?.outcome ?? null;
-  if (outcome === 'created' || outcome === 'exists') {
-    await stub.markConverted(new Date().toISOString(), true);
-  }
-  return outcome;
 }
 
 /**

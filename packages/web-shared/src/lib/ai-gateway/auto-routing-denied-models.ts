@@ -2,9 +2,7 @@ import {
   isVirtualAutoModelId,
   type AutoRoutingDeniedModelsRequest,
 } from '@kilocode/auto-routing-contracts';
-import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
-import { findEffectiveLegacyPoolRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -16,11 +14,6 @@ import {
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
-export type AutoRoutingOwner = {
-  userId: string;
-  organizationId: string | null;
-};
-
 export function policyNeedsCandidateEvaluation(policy: EffectiveOrganizationModelPolicy): boolean {
   return (
     policy.requireModelInCurrentSnapshot === true ||
@@ -29,16 +22,13 @@ export function policyNeedsCandidateEvaluation(policy: EffectiveOrganizationMode
   );
 }
 
-export function candidateModelIdsFromSources(
-  table: { routes: Record<string, ReadonlyArray<{ model: string }>> } | null,
-  poolModelIds: ReadonlyArray<string> | null
+export function candidateModelIdsFromTable(
+  table: { routes: Record<string, ReadonlyArray<{ model: string }>> } | null
 ): string[] {
-  const fromPoolOrTable =
-    poolModelIds ??
-    Object.values(table?.routes ?? {}).flatMap(candidates =>
-      candidates.map(candidate => candidate.model)
-    );
-  return [...new Set(fromPoolOrTable.filter(id => !isVirtualAutoModelId(id)))];
+  const fromTable = Object.values(table?.routes ?? {}).flatMap(candidates =>
+    candidates.map(candidate => candidate.model)
+  );
+  return [...new Set(fromTable.filter(id => !isVirtualAutoModelId(id)))];
 }
 
 export function deniedModelIdsForCandidates(
@@ -60,40 +50,14 @@ export function deniedModelIdsForCandidates(
   return [...denied];
 }
 
-export async function loadEffectivePoolModelIds(owner: AutoRoutingOwner): Promise<string[] | null> {
-  const migrated = await findEffectiveLegacyPoolRouter(owner);
-  if (migrated) {
-    return migrated.entries.flatMap(entry => (entry.kind === 'gateway' ? [entry.model] : []));
-  }
-  const owners = [
-    ...(owner.organizationId ? [{ ownerType: 'org' as const, ownerId: owner.organizationId }] : []),
-    { ownerType: 'user' as const, ownerId: owner.userId },
-  ];
-  const results = await Promise.all(owners.map(getAutoRoutingSettings));
-  for (const result of results) {
-    if (result.status !== 200 || !('configuredPool' in result.body)) continue;
-    const pool = result.body.configuredPool;
-    if (pool && pool.length > 0) {
-      return pool.map(entry => entry.model);
-    }
-  }
-  return null;
-}
-
-export async function loadAutoRoutingCandidateModelIds(owner: AutoRoutingOwner): Promise<string[]> {
-  const [table, poolModelIds] = await Promise.all([
-    getCachedRoutingTable(),
-    loadEffectivePoolModelIds(owner),
-  ]);
-  return candidateModelIdsFromSources(table, poolModelIds);
-}
-
 export async function collectDeniedAutoRoutingModelIds(
-  policy: EffectiveOrganizationModelPolicy,
-  owner: AutoRoutingOwner
+  policy: EffectiveOrganizationModelPolicy
 ): Promise<string[]> {
   if (!policyNeedsCandidateEvaluation(policy)) return [];
-  return deniedAutoRoutingCandidates(policy, await loadAutoRoutingCandidateModelIds(owner));
+  return deniedAutoRoutingCandidates(
+    policy,
+    candidateModelIdsFromTable(await getCachedRoutingTable())
+  );
 }
 
 export async function deniedAutoRoutingCandidates(
@@ -133,14 +97,15 @@ export async function dataCollectionRequiredAutoRoutingCandidates(
   return dataCollectionRequiredCandidates(candidateIds, await getDataCollectionRequiredModelIds());
 }
 
-export async function collectDataCollectionRequiredAutoRoutingModelIds(
-  owner: AutoRoutingOwner
-): Promise<string[]> {
-  const [candidateIds, dataCollectionRequiredModelIds] = await Promise.all([
-    loadAutoRoutingCandidateModelIds(owner),
+export async function collectDataCollectionRequiredAutoRoutingModelIds(): Promise<string[]> {
+  const [table, dataCollectionRequiredModelIds] = await Promise.all([
+    getCachedRoutingTable(),
     getDataCollectionRequiredModelIds(),
   ]);
-  return dataCollectionRequiredCandidates(candidateIds, dataCollectionRequiredModelIds);
+  return dataCollectionRequiredCandidates(
+    candidateModelIdsFromTable(table),
+    dataCollectionRequiredModelIds
+  );
 }
 
 // The gateway evaluation for named candidates, served to the auto-routing worker's CLI path.

@@ -38,8 +38,6 @@ export function toCustomRouterDefinition(row: AutoRoutingCustomRouter): CustomRo
     mode: row.mode,
     entries: row.entries,
     defaultEntryKey: row.default_entry_key,
-    legacyPool: row.legacy_pool,
-    legacyModeInherited: row.legacy_mode_inherited,
   });
   if (!parsed.success) {
     throw new Error(
@@ -93,7 +91,7 @@ export function findCustomRouter(
         eq(auto_routing_custom_routers.slug, slug)
       )
     );
-  return slug === 'efficient' ? load() : cached(`${owner.type}:${owner.id}:${slug}`, load);
+  return cached(`${owner.type}:${owner.id}:${slug}`, load);
 }
 
 export function findCustomRouterById(
@@ -102,20 +100,5 @@ export function findCustomRouterById(
 ): Promise<CustomRouterDefinition | null> {
   return cached(`id:${routerId}`, () =>
     queryRouter(env, eq(auto_routing_custom_routers.id, routerId))
-  );
-}
-
-export function findLegacyPoolRouter(
-  env: Pick<Env, 'HYPERDRIVE'>,
-  owner: CustomRouterOwner
-): Promise<CustomRouterDefinition | null> {
-  return queryRouter(
-    env,
-    and(
-      owner.type === 'org'
-        ? eq(auto_routing_custom_routers.owned_by_organization_id, owner.id)
-        : eq(auto_routing_custom_routers.owned_by_user_id, owner.id),
-      eq(auto_routing_custom_routers.legacy_pool, true)
-    )
   );
 }

@@ -20,8 +20,8 @@ import {
 export { ReasoningEffortSchema } from './reasoning';
 export type { ReasoningEffort } from './reasoning';
 
-// Matches AutoRoutingModeOwnerTypeSchema in index.ts. Declared here (not
-// imported) to avoid a circular package-root dependency.
+// Matches CustomRouterScopeSchema. Declared here (not imported) to avoid a circular
+// package-root dependency.
 const BenchmarkProfileOwnerTypeSchema = z.enum(['user', 'org']);
 
 export const BenchmarkKindSchema = z.enum(['classifier', 'decider']);
@@ -422,12 +422,6 @@ export type RegisterBenchmarkProfilesRequest = z.input<
   typeof RegisterBenchmarkProfilesRequestSchema
 >;
 
-export const BenchmarkProfileStatusesRequestSchema = z.object({
-  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-  entries: EfficientModelPoolSchema,
-});
-export type BenchmarkProfileStatusesRequest = z.input<typeof BenchmarkProfileStatusesRequestSchema>;
-
 export const BenchmarkProfileStatusesResponseSchema = z.object({
   statuses: z.array(BenchmarkProfileEntryStatusSchema),
 });
@@ -442,12 +436,6 @@ export const BenchmarkProfileQuotaErrorSchema = z.object({
   retryAt: z.string(),
 });
 export type BenchmarkProfileQuotaError = z.infer<typeof BenchmarkProfileQuotaErrorSchema>;
-
-export const CustomRoutingTableRequestSchema = z.object({
-  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-  entries: EfficientModelPoolSchema,
-});
-export type CustomRoutingTableRequest = z.input<typeof CustomRoutingTableRequestSchema>;
 
 export const CustomRoutingTableResponseSchema = z.object({
   table: CustomRoutingTableSchema.nullable(),

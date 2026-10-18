@@ -1,15 +1,13 @@
 import * as z from 'zod';
-import { BenchmarkProfileEntryStatusSchema } from './benchmark';
 import { NormalizedClassifierInputSchema } from './input';
 import { ReasoningEffortSchema } from './reasoning';
-import { EfficientModelPoolSchema, PoolEntrySchema, poolEntryKey } from './routing-table';
 import {
   CustomRouterClientEntryIdSchema,
   CustomRouterEntryRefSchema,
   CustomRouterReferenceSchema,
   customRouterCandidateModel,
 } from './custom-router';
-import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
+import { AutoRouterSchema } from './router';
 import {
   ClassifierSubtaskTypeSchema,
   ClassifierTaskTypeSchema,
@@ -212,71 +210,6 @@ export const AutoRoutingClassifierModelResponseSchema = z.object({
 export type AutoRoutingClassifierModelResponse = z.infer<
   typeof AutoRoutingClassifierModelResponseSchema
 >;
-
-export const AutoRoutingModeOwnerTypeSchema = z.enum(['user', 'org']);
-export type AutoRoutingModeOwnerType = z.infer<typeof AutoRoutingModeOwnerTypeSchema>;
-
-export const AutoRoutingModeOwnerQuerySchema = z.object({
-  ownerType: AutoRoutingModeOwnerTypeSchema,
-  ownerId: z.string().trim().min(1),
-});
-export type AutoRoutingModeOwnerQuery = z.infer<typeof AutoRoutingModeOwnerQuerySchema>;
-
-export const UpdateAutoRoutingModeRequestSchema = AutoRoutingModeOwnerQuerySchema.extend({
-  mode: AutoRoutingModeSchema.nullable(),
-});
-export type UpdateAutoRoutingModeRequest = z.infer<typeof UpdateAutoRoutingModeRequestSchema>;
-
-export const AutoRoutingModeResponseSchema = AutoRoutingModeOwnerQuerySchema.extend({
-  mode: AutoRoutingModeSchema,
-  configuredMode: AutoRoutingModeSchema.nullable(),
-  defaultMode: AutoRoutingModeSchema,
-});
-export type AutoRoutingModeResponse = z.infer<typeof AutoRoutingModeResponseSchema>;
-
-// Combined mode + Efficient model pool settings. Null on each field means
-// inherit independently (mode and pool do not imply each other).
-export const UpdateAutoRoutingSettingsRequestSchema = AutoRoutingModeOwnerQuerySchema.extend({
-  mode: AutoRoutingModeSchema.nullable(),
-  pool: EfficientModelPoolSchema.nullable(),
-  // Subset of `pool` the owner explicitly retries after a terminal failure.
-  // Forwarded to benchmark profile registration when present.
-  retryEntries: z.array(PoolEntrySchema).optional(),
-}).superRefine((request, ctx) => {
-  if (!request.retryEntries || request.retryEntries.length === 0) return;
-  if (request.pool === null) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['retryEntries'],
-      message: 'retryEntries require a non-null pool',
-    });
-    return;
-  }
-  const entryKeys = new Set(request.pool.map(poolEntryKey));
-  request.retryEntries.forEach((entry, index) => {
-    const key = poolEntryKey(entry);
-    if (!entryKeys.has(key)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['retryEntries', index],
-        message: `retryEntry must appear in pool: ${key}`,
-      });
-    }
-  });
-});
-export type UpdateAutoRoutingSettingsRequest = z.infer<
-  typeof UpdateAutoRoutingSettingsRequestSchema
->;
-
-export const AutoRoutingSettingsResponseSchema = AutoRoutingModeOwnerQuerySchema.extend({
-  mode: AutoRoutingModeSchema,
-  configuredMode: AutoRoutingModeSchema.nullable(),
-  defaultMode: AutoRoutingModeSchema,
-  configuredPool: EfficientModelPoolSchema.nullable(),
-  // Empty when configuredPool is null.
-  poolStatuses: z.array(BenchmarkProfileEntryStatusSchema),
-});
-export type AutoRoutingSettingsResponse = z.infer<typeof AutoRoutingSettingsResponseSchema>;
 
 export const AutoRoutingAnalyticsPeriodSchema = z.enum(['1h', '24h', '7d', '30d']);
 export type AutoRoutingAnalyticsPeriod = z.infer<typeof AutoRoutingAnalyticsPeriodSchema>;

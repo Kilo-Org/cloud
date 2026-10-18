@@ -45,7 +45,6 @@ import { findCustomRouter, findCustomRouterById } from './custom-router-store';
 import { runDecision } from './decide';
 import type { HonoEnv } from './hono-env';
 import { deniedOrganizationModelIds } from './organization-policy';
-import { inheritedLegacyPoolMode } from './legacy-pool-overlap';
 
 function publicHandler(handle: (c: Context<HonoEnv>) => Promise<Response>): Handler<HonoEnv> {
   return async c => {
@@ -103,7 +102,7 @@ export const publicDecideHandler = publicHandler(async c => {
     loadPayerBalanceUsd(caller),
   ]);
   if (!stored) throw new CustomRouterError('router_not_found', 'Custom router not found');
-  const router = await inheritedLegacyPoolMode(c.env, stored, caller);
+  const router = stored;
   requirePaidUsageBalance(balanceUsd);
   // The organization model policy filters gateway entries for any router used in that
   // organization's context, including a member's personal router.

@@ -58,15 +58,13 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
   const deleteMutation = useMutation({
     mutationFn: (router: CustomRouterSummary) => deleteCustomRouter(router, organizationId),
     onSuccess: (_result, router) => {
-      queryClient.setQueryData<CustomRouterListResponse | null>(queryKey, current =>
+      queryClient.setQueryData<CustomRouterListResponse>(queryKey, current =>
         current ? { routers: current.routers.filter(item => item.id !== router.id) } : current
       );
       toast.success(`Deleted ${router.name}`);
     },
     onError: error => toast.error(error.message),
   });
-
-  if (query.data === null) return null;
 
   const routers = (query.data?.routers ?? []).filter(router => router.scope === scope);
   const canCreate = !readonly && query.data?.canCreate !== false;
@@ -201,11 +199,6 @@ function CustomRouterItem({
             {baseLabel} base · {modeLabel}
             {defaultEntry ? ` · Default: ${entryLabel(defaultEntry.entry)}` : null}
           </p>
-          {router.legacyPool ? (
-            <p className="text-muted-foreground text-sm">
-              Shared with kilo-auto/efficient during the transition.
-            </p>
-          ) : null}
         </div>
         {router.canEdit ? (
           <div className="flex shrink-0 items-start gap-2">
@@ -213,14 +206,12 @@ function CustomRouterItem({
               <Pencil className="size-4" aria-hidden />
               Edit
             </Button>
-            {!router.legacyPool ? (
-              <InlineDeleteConfirmation
-                onDelete={onDelete}
-                isLoading={deleting}
-                confirmText="Delete router"
-                warningText={`Requests that use ${router.modelId} will fail.`}
-              />
-            ) : null}
+            <InlineDeleteConfirmation
+              onDelete={onDelete}
+              isLoading={deleting}
+              confirmText="Delete router"
+              warningText={`Requests that use ${router.modelId} will fail.`}
+            />
           </div>
         ) : null}
       </div>

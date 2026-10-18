@@ -91,7 +91,7 @@ export async function runOwnerPoolConversion(params: {
         } catch (cause) {
           const reason = cause instanceof Error ? cause.message : 'scan failed';
           throw new Error(
-            `${reason}; ${retryHint}. Owners on the interrupted page whose router already exists come back as \`exists\`; migration does not send notices. An interrupted apply can leave legacy edits locked until a successful apply retry.`
+            `${reason}; ${retryHint}. Owners on the interrupted page whose router already exists come back as \`exists\`; migration does not send notices.`
           );
         }
         const page = OwnerPoolConversionScanResponseSchema.safeParse(response.body);
@@ -107,7 +107,7 @@ export async function runOwnerPoolConversion(params: {
             ?.slice('failed '.length);
           const escape =
             page.data.abortReason === 'consecutive_failures' && lastFailed !== undefined
-              ? ` If these owners keep failing, --resume ${lastFailed} skips them and posts the page's notPosted owners next. Skipped owners can remain locked against legacy edits; retry them with a full --apply after resolving their errors.`
+              ? ` If these owners keep failing, --resume ${lastFailed} skips them and posts the page's notPosted owners next. Retry skipped owners with a full --apply after resolving their errors.`
               : ' The failed batch may already have applied; those owners come back as `exists` on the retry.';
           throw new Error(
             `the web endpoint looks unavailable (${page.data.abortReason ?? 'aborted'}); fix it, then ${retryHint}.${escape}`

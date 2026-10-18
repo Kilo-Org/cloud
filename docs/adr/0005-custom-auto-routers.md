@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted. Supersedes [ADR 0003: Efficient Model Pools](./0003-efficient-model-pools.md) at the
-cutover described below. Amends [ADR 0002](./0002-auto-routing-efficient.md) invariant 5 for
-custom routers only.
+Accepted and in effect. Supersedes [ADR 0003: Efficient Model Pools](./0003-efficient-model-pools.md)
+since the cutover described below. Amends [ADR 0002](./0002-auto-routing-efficient.md) invariant 5
+for custom routers only.
 
 ## Context
 

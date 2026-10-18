@@ -34,9 +34,7 @@ describe('assertContainerCapacity', () => {
     'returns the admitted user limit %i and rejects another start at the limit',
     async limit => {
       const readCapacity = vi.fn(async () => userCapacity(limit - 1, limit));
-      await expect(
-        assertContainerCapacity(env, request(), { readCapacity })
-      ).resolves.toBe(limit);
+      await expect(assertContainerCapacity(env, request(), { readCapacity })).resolves.toBe(limit);
       expect(readCapacity).toHaveBeenCalledWith(request());
 
       readCapacity.mockResolvedValue(userCapacity(limit, limit));
@@ -99,7 +97,7 @@ describe('assertContainerCapacity', () => {
     const readCapacity = vi.fn(async () => userCapacity(1_000));
     await expect(
       assertContainerCapacity(env, request(overrides), { readCapacity })
-    ).resolves.toBe(USER_CONTAINER_LIMIT);
+    ).resolves.toBeUndefined();
     expect(readCapacity).not.toHaveBeenCalled();
   });
 
@@ -127,9 +125,9 @@ describe('assertContainerCapacity', () => {
   it('retries a transient read failure before admitting a start', async () => {
     const readCapacity = vi.fn(async () => userCapacity(0));
     readCapacity.mockRejectedValueOnce(new Error('connection reset'));
-    await expect(
-      assertContainerCapacity(env, request(), { readCapacity })
-    ).resolves.toBeUndefined();
+    await expect(assertContainerCapacity(env, request(), { readCapacity })).resolves.toBe(
+      USER_CONTAINER_LIMIT
+    );
     expect(readCapacity).toHaveBeenCalledTimes(2);
   });
 

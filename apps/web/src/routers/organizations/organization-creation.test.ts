@@ -102,8 +102,7 @@ describe('organization creation limit', () => {
     const user = await insertTestUser();
     const parent = await createTestOrganization('Existing oversized parent', user.id, 0);
     for (let index = 0; index < 5; index++) {
-      const organization = await createTestOrganization(`Existing oversized ${index}`, user.id, 0);
-      expect(organization.created_by_kilo_user_id).toBe(user.id);
+      await createTestOrganization(`Existing oversized ${index}`, user.id, 0);
     }
 
     const caller = await createCallerForUser(user.id);

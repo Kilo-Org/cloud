@@ -1,7 +1,9 @@
 import { AppRegistry } from 'react-native';
+import { z } from 'zod';
 
 import { i18n } from '@/i18n';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
+import { approveFollowedSession, unfollowDismissedSession } from '@/lib/glanceable/session-follow';
 import { runGlanceableApprove } from '@/lib/glanceable/approve-ask';
 import { restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
@@ -12,6 +14,7 @@ import { dismissNeedsInputNotification } from '@/lib/needs-input-notification';
 import {
   androidSink,
   renderStoredSnapshotWithNotice,
+  setGlanceableActionApproving,
   setGlanceableActionNotice,
 } from './android-sink';
 
@@ -19,27 +22,55 @@ import {
  * The JS bodies the ongoing notification's Approve action runs headless.
  *
  * Two registrations share this module. `handleApproveTask` answers the ask the
- * app recorded, and the entry registers it under `APPROVE_HEADLESS_TASK_KEY`
- * via the Kotlin worker; `runApproveTask` runs the front-approval service and
- * is registered under `APPROVE_AGENT_TASK_KEY` by `registerApproveTask`, the
- * key the `ActiveAgentsApproveTaskService` chain starts. Only the strings cross
- * the native boundary, so they are asserted equal in `approve-task.test.ts`.
+ * app recorded, and the entry registers it under `KiloActiveAgentsApprove`,
+ * the Kotlin worker's `TASK_NAME`; `runApproveTask` runs the front-approval
+ * service and is registered under `APPROVE_AGENT_TASK_KEY` by
+ * `registerApproveTask`, the key the `ActiveAgentsApproveTaskService` chain
+ * starts. Only the strings cross the native boundary.
  *
  * The recorded waiting ask is the only thing `handleApproveTask` answers —
  * never the snapshot's counts — and it also names the ids the republish below
  * needs.
- */
-export const APPROVE_HEADLESS_TASK_KEY = 'KiloActiveAgentsApprove';
-
-/**
+ *
  * The key the `ActiveAgentsApproveTaskService` chain starts. One literal,
  * shared by the Kotlin service and this registration: a mismatch would leave
  * that notification action with no task.
  */
-export const APPROVE_AGENT_TASK_KEY = 'ActiveAgentsApprove';
+const APPROVE_AGENT_TASK_KEY = 'ActiveAgentsApprove';
 
 /** The approval the task runs. Injected so the flow is unit-testable. */
 export type ApproveRunner = () => Promise<void>;
+
+/**
+ * The session and request a session notification's Approve names, or null for
+ * the aggregate card's tap (which carries an action but no session). The Kotlin
+ * worker passes the extras as task data.
+ */
+const sessionApproveTargetSchema = z.object({
+  session_id: z.string().min(1),
+  approval_key: z.string().min(1),
+});
+
+/**
+ * The Kotlin receiver's dismissal action (`ActiveAgentsActionReceiver.ACTION_DISMISS`).
+ * One literal on both sides: a mismatch would leave a swiped card followed.
+ */
+export const SESSION_DISMISS_ACTION = 'com.kilocode.activeagentsliveupdate.action.DISMISS';
+
+const sessionDismissSchema = z.object({
+  action: z.literal(SESSION_DISMISS_ACTION),
+  session_id: z.string().min(1),
+});
+
+function readSessionApproveTarget(
+  input: unknown
+): { sessionId: string; approvalKey: string } | null {
+  const parsed = sessionApproveTargetSchema.safeParse(input);
+  if (!parsed.success) {
+    return null;
+  }
+  return { sessionId: parsed.data.session_id, approvalKey: parsed.data.approval_key };
+}
 
 // A headless approve run has no Activity and no app root, so nothing else has
 // loaded the Android sink by the time the republish below runs; without the
@@ -76,6 +107,22 @@ async function showApproveFailed(ask: WaitingAsk): Promise<void> {
 }
 
 /**
+ * Show the answer in flight: the card reads "Approving…" and drops Approve until
+ * the answer settles. Best-effort: the republish after the answer redraws it.
+ */
+async function showApproving(ask: WaitingAsk): Promise<void> {
+  setGlanceableActionApproving(true);
+  try {
+    await renderStoredSnapshotWithNotice({
+      userId: ask.userId,
+      organizationId: ask.organizationId,
+    });
+  } catch {
+    // The answer still runs; the republish below corrects the surface.
+  }
+}
+
+/**
  * Answer the recorded ask and update the notification in place. Never throws:
  * the worker completes from the headless task's finish, so a rejection would
  * only lose the failure state the user needs to see. A thrown error is a
@@ -89,7 +136,28 @@ async function showApproveFailed(ask: WaitingAsk): Promise<void> {
  * task resolves once the last render has reached the notification, so a headless
  * process cannot exit with the update still in flight.
  */
-export async function handleApproveTask(): Promise<void> {
+export async function handleApproveTask(input?: unknown): Promise<void> {
+  // A swiped session notification is an Unfollow (spec "Android: actions" 3):
+  // the receiver already cancelled the card; this stops following the session
+  // and deletes its server row. Never throws: the worker completes from the
+  // task's finish, and a rejection would leave the row behind with no retry.
+  const dismissed = sessionDismissSchema.safeParse(input);
+  if (dismissed.success) {
+    try {
+      await unfollowDismissedSession(dismissed.data.session_id);
+    } catch {
+      // A failed delete stays recorded for the scope teardown's cleanup.
+    }
+    return;
+  }
+  // A session notification's Approve names its own session and request: the
+  // same revalidating answer the aggregate card runs, for that exact session.
+  const sessionTarget = readSessionApproveTarget(input);
+  if (sessionTarget !== null) {
+    await applyLanguageBestEffort();
+    await approveFollowedSession(sessionTarget.sessionId, sessionTarget.approvalKey);
+    return;
+  }
   let ask: WaitingAsk | null = null;
   let failed = false;
   // Only an ask the answer ended leaves a stale tray row to skip. A retryable
@@ -111,6 +179,7 @@ export async function handleApproveTask(): Promise<void> {
       // Nothing is recorded, so there is no ask to answer and no action to drop.
       return;
     }
+    await showApproving(ask);
     const result = await runGlanceableApprove({ now: () => Date.now() });
     askEnded = result.kind === 'approved' || result.kind === 'gone';
     if (result.kind === 'gone') {
@@ -124,6 +193,8 @@ export async function handleApproveTask(): Promise<void> {
     // Keep the recorded ask and its Approve; only the failure line is needed.
     failed = ask !== null;
   }
+  // Settled either way: the next draw shows the answer, the failure, or Approve again.
+  setGlanceableActionApproving(false);
   if (ask === null) {
     return;
   }

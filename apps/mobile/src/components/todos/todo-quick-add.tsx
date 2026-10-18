@@ -1,0 +1,62 @@
+import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { type TextInput, View } from 'react-native';
+
+import { Button } from '@/components/ui/button';
+import { Plus } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Text } from '@/components/ui/text';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
+
+/**
+ * The add row at the top of a list. Submitting adds the to-do and clears the
+ * field while the keyboard stays up, so several to-dos go in one after another.
+ */
+export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => void }>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const inputRef = useRef<TextInput>(null);
+  const textRef = useRef('');
+  const [hasText, setHasText] = useState(false);
+
+  function submit() {
+    const title = textRef.current.trim();
+    if (title.length === 0) {
+      return;
+    }
+    onAdd(title);
+    textRef.current = '';
+    setHasText(false);
+    inputRef.current?.clear();
+  }
+
+  return (
+    <View className="mx-4 my-2 flex-row items-center gap-2 rounded-lg border border-border bg-secondary pr-1">
+      <Input
+        ref={inputRef}
+        placeholder={t('todos.list.addPlaceholder')}
+        accessibilityLabel={t('todos.list.addPlaceholder')}
+        onChangeText={text => {
+          textRef.current = text;
+          const next = text.trim().length > 0;
+          setHasText(current => (current === next ? current : next));
+        }}
+        onSubmitEditing={submit}
+        submitBehavior="submit"
+        returnKeyType="done"
+        maxLength={TODO_TITLE_MAX_LENGTH}
+        className="min-w-0 flex-1 text-base text-foreground"
+      />
+      <Button
+        size="sm"
+        disabled={!hasText}
+        onPress={submit}
+        accessibilityLabel={t('todos.list.add')}
+      >
+        <Plus size={16} color={colors.primaryForeground} />
+        <Text>{t('todos.list.add')}</Text>
+      </Button>
+    </View>
+  );
+}

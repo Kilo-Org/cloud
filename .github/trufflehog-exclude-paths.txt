@@ -1,0 +1,10 @@
+# Synthetic-credential fixtures. security.test.ts builds a credential URL from
+# the literal "user:private-key@provider.example"; a later commit replaced it
+# with a constructed value, but the commit that added it stays in branch history.
+# Exclude the fixture path so the historical commit does not fail the scan.
+packages/harness-sdk/src/plugins/remote-model/security\.test\.ts
+
+# Preview-link fixtures. preview-link.test.ts asserts that a preview URL with
+# embedded credentials ("user:secret@localhost") is rejected. Exclude the
+# fixture path so the synthetic credential URI does not fail the scan.
+apps/web/src/lib/cloud-agent/preview-link\.test\.ts

@@ -247,6 +247,20 @@ describe('signupDecide', () => {
     expect((await signupDecide(request))?.enforced).toBe(true);
   });
 
+  it('accepts a manual ban rejection', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({
+        enforced: true,
+        code: 'signup_rate_limited',
+        retryAfterMs: 30 * 24 * 60 * 60 * 1000,
+        flags: [
+          { name: 'signup:banned', decision: 'block', enforced: true, until: null, source: 'ja4' },
+        ],
+      })
+    );
+    expect((await signupDecide(request))?.enforced).toBe(true);
+  });
+
   it('preserves shadow flags without manufacturing enforcement', async () => {
     const verdict = { enforced: false, flags: [{ ...flag, enforced: false, decision: 'review' }] };
     mockFetch.mockResolvedValue(Response.json(verdict));
@@ -315,6 +329,74 @@ describe('signupDecide', () => {
       Response.json({ enforced: true, code: 'signup_rate_limited', retryAfterMs: 1, flags: [flag] })
     );
     expect((await signupDecide({ ...request, operationId: 'a'.repeat(128) }))?.enforced).toBe(true);
+  });
+
+  describe('step-up', () => {
+    const stepUp = {
+      enforced: true,
+      code: 'signup_step_up',
+      methods: ['apple'],
+      flags: [
+        { ...flag, name: 'signup:busy' },
+        { ...flag, name: 'signup:domain', source: 'domain' },
+      ],
+    };
+
+    it('accepts a step-up verdict with the busy and domain flags', async () => {
+      mockFetch.mockResolvedValue(Response.json(stepUp));
+      await expect(signupDecide(request)).resolves.toEqual(stepUp);
+    });
+
+    it('accepts eight flags and rejects nine', async () => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      const flags = (count: number) => Array.from({ length: count }, () => flag);
+      mockFetch.mockResolvedValueOnce(Response.json({ ...stepUp, flags: flags(8) }));
+      expect((await signupDecide(request))?.enforced).toBe(true);
+      mockFetch.mockResolvedValueOnce(Response.json({ ...stepUp, flags: flags(9) }));
+      await expect(signupDecide(request)).resolves.toBeNull();
+      mockFetch.mockResolvedValueOnce(
+        Response.json({ enforced: false, flags: flags(9).map(f => ({ ...f, enforced: false })) })
+      );
+      await expect(signupDecide(request)).resolves.toBeNull();
+    });
+
+    it.each([
+      ['missing methods', { ...stepUp, methods: undefined }],
+      ['empty methods', { ...stepUp, methods: [] }],
+      ['too many methods', { ...stepUp, methods: Array.from({ length: 9 }, () => 'apple') }],
+      ['uppercase method', { ...stepUp, methods: ['Apple'] }],
+      ['method with a space', { ...stepUp, methods: ['app le'] }],
+      ['over-long method', { ...stepUp, methods: ['a'.repeat(33)] }],
+      ['non-string method', { ...stepUp, methods: [1] }],
+      ['step-up deadline', { ...stepUp, retryAfterMs: 1 }],
+      ['rate-limit methods', { ...stepUp, code: 'signup_rate_limited', retryAfterMs: 1 }],
+      ['shadow step-up', { ...stepUp, enforced: false }],
+    ])('returns unavailable on %s', async (_name, verdict) => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      mockFetch.mockResolvedValue(Response.json(verdict));
+      await expect(signupDecide(request)).resolves.toBeNull();
+    });
+
+    it('sends the method and normalized email domain', async () => {
+      mockFetch.mockResolvedValue(Response.json({ enforced: false, flags: [] }));
+      await signupDecide({ ...request, method: 'email', emailDomain: ' Example.TEST ' });
+      expect(lastRequestBody()).toEqual({
+        ...request,
+        method: 'email',
+        emailDomain: 'example.test',
+      });
+    });
+
+    it.each([
+      { method: 'Email' },
+      { method: 'a'.repeat(33) },
+      { emailDomain: 'bücher.example.test' },
+      { emailDomain: '' },
+    ])('omits an invalid step-up field but still asks for admission: %j', async fields => {
+      mockFetch.mockResolvedValue(Response.json({ enforced: false, flags: [] }));
+      expect((await signupDecide({ ...request, ...fields }))?.enforced).toBe(false);
+      expect(lastRequestBody()).toEqual(request);
+    });
   });
 
   it('returns unavailable on transport failure', async () => {

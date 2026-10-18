@@ -5,13 +5,16 @@
  * 1. Drop harness-injected E2E faults (see lib/telemetry/e2e-fault). A fault the
  *    E2E harness opened deliberately is not a product defect, so no Sentry
  *    issue may be filed for it — the tag is what makes it separable and the
- *    drop keeps it out of the issue stream entirely.
+ *    drop keeps it out of the issue stream entirely. A keychain call skipped
+ *    on a locked device (`ProtectedDataUnavailableError`) is dropped too: the
+ *    lock is expected, not a defect.
  * 2. Scrub the surviving event (token redaction, query-string stripping).
  *
  * Kept SDK-free and total so it is unit-testable under node vitest, where the
  * React Native Sentry SDK does not parse.
  */
 
+import { ProtectedDataUnavailableError } from '@/lib/protected-data';
 import { isE2eInjectedFault } from '@/lib/telemetry/e2e-fault';
 import { scrubEvent } from '@/lib/telemetry/sentry-scrub';
 
@@ -19,13 +22,14 @@ import { scrubEvent } from '@/lib/telemetry/sentry-scrub';
 export type BeforeSendHint = { originalException?: unknown };
 
 /**
- * Returns `null` to drop the event (a harness fault), otherwise the scrubbed
- * event. Never throws: a malformed hint keeps the event rather than dropping a
- * real crash.
+ * Returns `null` to drop the event (a harness fault or a locked-device skip),
+ * otherwise the scrubbed event. Never throws: a malformed hint keeps the event
+ * rather than dropping a real crash.
  */
 export function beforeSendScrubbedEvent<T>(event: T, hint?: BeforeSendHint): T | null {
   try {
-    if (isE2eInjectedFault(hint?.originalException)) {
+    const original = hint?.originalException;
+    if (isE2eInjectedFault(original) || original instanceof ProtectedDataUnavailableError) {
       return null;
     }
   } catch {

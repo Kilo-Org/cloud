@@ -1,17 +1,61 @@
 import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { createElement, type ReactNode, useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { i18n } from '@/i18n';
 
-export function showDeleteConfirm(onDelete: () => void) {
-  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-  Alert.alert(i18n.t('agents.sessionRow.deleteTitle'), i18n.t('agents.sessionRow.deleteMessage'), [
-    { text: i18n.t('common.cancel'), style: 'cancel' },
-    { text: i18n.t('common.delete'), style: 'destructive', onPress: onDelete },
-  ]);
+type SessionDeleteConfirm = {
+  /** Warns haptically, then opens the confirm for `onDelete`. */
+  confirmDelete: (onDelete: () => void) => void;
+  /** The confirm node; render it in the host that owns the delete trigger. */
+  deleteDialog: ReactNode;
+};
+
+/**
+ * Delete-session confirm. The native `Alert.alert` cannot carry the
+ * destructive affordance on Android: its `AlertDialog` paints every button
+ * with the theme accent, so `style: 'destructive'` never reaches the screen
+ * there. This is the in-app `DestructiveConfirmDialog` on both platforms
+ * instead — one implementation, with the destructive red fill and a neutral
+ * outline.
+ *
+ * The hook holds the pending delete and returns the node the caller mounts;
+ * the node is null while the confirm is closed. A dismissal (Cancel, backdrop,
+ * Android back) drops the pending delete without running it.
+ */
+export function useSessionDeleteConfirm(): SessionDeleteConfirm {
+  const [pendingDelete, setPendingDelete] = useState<{ run: () => void } | null>(null);
+
+  const confirmDelete = useCallback((onDelete: () => void) => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setPendingDelete({ run: onDelete });
+  }, []);
+
+  const dismiss = useCallback(() => {
+    setPendingDelete(null);
+  }, []);
+
+  return {
+    confirmDelete,
+    deleteDialog:
+      pendingDelete === null
+        ? null
+        : createElement(DestructiveConfirmDialog, {
+            title: i18n.t('agents.sessionRow.deleteTitle'),
+            message: i18n.t('agents.sessionRow.deleteMessage'),
+            confirmLabel: i18n.t('common.delete'),
+            onConfirm: () => {
+              const pending = pendingDelete;
+              dismiss();
+              pending.run();
+            },
+            onCancel: dismiss,
+          }),
+  };
 }
 
 /** iOS-only — uses Alert.prompt which is unavailable on Android. */

@@ -10,7 +10,7 @@ import {
   containerCapacityForService,
   formatContainerCapacity,
 } from '@/lib/cloudflare/container-capacity';
-import type { FetchedSessionData, ResolvedSession } from '@kilocode/cloud-agent-sdk';
+import type { ResolvedSession } from '@kilocode/cloud-agent-sdk';
 
 export const SANDBOX_STATUS_FRESHNESS_MS = 15_000;
 export const SANDBOX_SLEEP_ESTIMATE_DELAY_MS = 120_000;
@@ -37,10 +37,11 @@ export function isSandboxStatusEligible({
   organizationId?: string;
   activeSessionType: ResolvedSession['type'] | null;
   isReadOnly: boolean;
-  fetchedSessionData: Pick<
-    FetchedSessionData,
-    'kiloSessionId' | 'cloudAgentSessionId' | 'organizationId'
-  > | null;
+  fetchedSessionData: {
+    kiloSessionId: string;
+    cloudAgentSessionId: string | null;
+    organizationId: string | null;
+  } | null;
 }): boolean {
   return Boolean(
     currentUserId &&

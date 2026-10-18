@@ -16,6 +16,7 @@ import { Download } from 'lucide-react';
 const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
 
 export default function ApiRequestLogPage() {
+  const [id, setId] = useState('');
   const [userId, setUserId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -30,6 +31,9 @@ export default function ApiRequestLogPage() {
 
   function handleDownload() {
     const params = new URLSearchParams();
+    if (id.trim()) {
+      params.set('id', id.trim());
+    }
     if (userId.trim()) {
       params.set('userId', userId.trim());
     }
@@ -88,10 +92,21 @@ export default function ApiRequestLogPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="userId">User ID (optional)</Label>
+              <Label htmlFor="id">Log ID (optional)</Label>
+              <Input
+                id="id"
+                inputMode="numeric"
+                placeholder="Enter numeric log ID"
+                value={id}
+                onChange={e => setId(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="userId">User ID or email (optional)</Label>
               <Input
                 id="userId"
-                placeholder="Enter user ID"
+                placeholder="Enter user ID or email"
                 value={userId}
                 onChange={e => setUserId(e.target.value)}
               />

@@ -182,9 +182,6 @@ async function sealedRuntimeAuthorization(
 function createProvider(): FakeProvider {
   const provider: FakeProvider = { adapter: null as unknown as ProviderAdapter, launchEnvs: [] };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent) {
       return { providerRef: `mem_${intent.intentId}` };
@@ -200,6 +197,7 @@ function createProvider(): FakeProvider {
       return 'terminal' as StopResult;
     },
     async ensureLeaseAtLeast() {},
+    async applyContainedCredentials() {},
     async logs() {
       return '';
     },
@@ -340,29 +338,24 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     if (second?.type !== 'session.prepare' || !second.credentials.proxy)
       throw new Error(`missing sibling proxy: frame=${second?.type}`);
     expect(first.spec.directory).toBe(second.spec.directory);
-    expect(first.credentials.proxy.handle === second.credentials.proxy.handle).toBe(false);
-    expect(
-      await creator.resolveRuntimeCredentialProxyGrant(first.credentials.proxy.handle)
-    ).not.toBeNull();
-    expect(
-      await sibling.resolveRuntimeCredentialProxyGrant(second.credentials.proxy.handle)
-    ).not.toBeNull();
-    await sandbox.release({ sessionId: creatorId });
-    expect(
-      await creator.resolveRuntimeCredentialProxyGrant(first.credentials.proxy.handle)
-    ).toBeNull();
-    expect(
-      await sibling.resolveRuntimeCredentialProxyGrant(second.credentials.proxy.handle)
-    ).not.toBeNull();
+    const sharedHandle = first.credentials.proxy.handle;
+    // Two sibling modern sessions in one worktree share one adopted handle.
+    expect(second.credentials.proxy.handle).toBe(sharedHandle);
+    expect(await creator.resolveRuntimeCredentialProxyGrant(sharedHandle)).not.toBeNull();
+    expect(await sibling.resolveRuntimeCredentialProxyGrant(sharedHandle)).not.toBeNull();
+    await creator.deleteSession();
+    // The adopted handle survives the creator's deletion: the survivor serves it.
+    const afterRelease = await creator.resolveRuntimeCredentialProxyGrant(sharedHandle);
+    expect(afterRelease).not.toBeNull();
+    expect(afterRelease?.runtimeAuthorization.resourceId).toBe(siblingId);
+    expect(await sibling.resolveRuntimeCredentialProxyGrant(sharedHandle)).not.toBeNull();
     expect((await sandbox.getAllocationState()).kind).toBe('connected');
     expect(provider.launchEnvs).toHaveLength(1);
     wrapper.send({ type: 'session.failed', sessionId: siblingId, reason: 'agent_unavailable' });
     await waitFor(async () =>
       expect((await sandbox.status({ sessionId: siblingId })).view.state).toBe('failed')
     );
-    expect(
-      await sibling.resolveRuntimeCredentialProxyGrant(second.credentials.proxy.handle)
-    ).toBeNull();
+    expect(await sibling.resolveRuntimeCredentialProxyGrant(sharedHandle)).toBeNull();
     await waitFor(async () =>
       expect(await sibling.getSession()).toMatchObject({ messages: [{ state: 'failed' }] })
     );
@@ -409,7 +402,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       if (!handle) throw new Error('missing runtime proxy handle');
       expect(JSON.stringify(frame).includes(token)).toBe(false);
       expect(broker.kiloIssued()).toBe(0);
-      expect(frame.spec.runtimeIsolation).toBe('per-session');
+      expect(frame.spec.runtimeIsolation).toBeUndefined();
       expect(
         await sandboxStub.resolveCredential({
           credential: frame.spec.kilo?.token ?? '',
@@ -522,10 +515,6 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
       await sessionStub.stop();
       wrapper.heartbeat(false);
-      await waitFor(async () =>
-        expect((await sandboxStub.getAllocationState()).lastFrameAt).toBe(Date.now())
-      );
-      await runInDurableObject(sandboxStub, instance => instance.alarm());
       await waitFor(async () =>
         expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
       );

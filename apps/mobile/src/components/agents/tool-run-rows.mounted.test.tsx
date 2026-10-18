@@ -220,7 +220,7 @@ describe('CondensedToolRunRow label', () => {
       makePart('t2', 'todoread'),
     ]);
 
-    expect(textWithContent(renderer.root, '2 items; Read todos')).toHaveLength(1);
+    expect(textWithContent(renderer.root, '2 items; Read plan')).toHaveLength(1);
     expect(requestMock).not.toHaveBeenCalled();
     renderer.unmount();
   });

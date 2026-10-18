@@ -4,6 +4,8 @@ FROM docker.io/cloudflare/sandbox:0.12.9
 ARG BUILD_DATE=""
 ARG VCS_REF=""
 ARG KILOCODE_CLI_VERSION="7.8.1"
+ARG PNPM_VERSION="11.1.2"
+ARG GLAB_VERSION="1.93.0"
 
 # Install latest stable git + git-lfs from the git-core PPA, GitHub CLI, and supporting tools.
 # The default Ubuntu git (2.34.1 on 22.04) is outdated; the git-core PPA ships the latest
@@ -42,8 +44,7 @@ RUN set -eux; \
 # Version 1.82.0+ is required so OAuth2 access tokens sent via GITLAB_TOKEN are
 # authenticated with `Authorization: Bearer` instead of `PRIVATE-TOKEN` (which
 # GitLab rejects for OAuth tokens). Enabled via `GLAB_IS_OAUTH2=true` at runtime.
-RUN GLAB_VERSION="1.93.0" \
-	&& wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
+RUN wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
 	&& dpkg -i /tmp/glab.deb \
 	&& rm /tmp/glab.deb
 
@@ -61,12 +62,12 @@ ENV LC_ALL=en_US.UTF-8
 ENV LANG=en_US.UTF-8
 
 # Install dependencies globally (accessible to all users)
-RUN npm install -g pnpm @kilocode/cli@${KILOCODE_CLI_VERSION}
+RUN npm install -g pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
 
 # === Build wrapper bundle inside container ===
 # This ensures the wrapper is built with the same Bun version that will run it,
 # avoiding any compatibility issues between build and runtime environments.
-# The wrapper imports from ../../src/shared/protocol.js, so we maintain that structure.
+# The build entrypoint list lives in src/shared/runtime-distribution.ts.
 COPY wrapper /tmp/wrapper-build/wrapper
 COPY src/shared /tmp/wrapper-build/src/shared
 
@@ -74,15 +75,7 @@ COPY src/shared /tmp/wrapper-build/src/shared
 RUN cd /tmp/wrapper-build/wrapper && \
     bun install --production && \
     ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules && \
-    bun build src/main.ts --outfile=/usr/local/bin/kilocode-wrapper.js --target=bun --minify && \
-    bun build src/restore-session.ts --outfile=/usr/local/bin/kilo-restore-session.js --target=bun --minify && \
-    bun build src/bitbucket-review-cli.ts --outfile=/usr/local/bin/bb --target=bun --minify && \
-    bun build src/github-review-publish-mcp.ts --outfile=/usr/local/bin/github-review-publish-mcp --target=bun --minify && \
-    bun build src/control-plane/main.ts --outfile=/usr/local/bin/kilocode-control-plane-wrapper.js --target=bun --minify && \
-    chmod +x /usr/local/bin/bb && \
-    chmod +x /usr/local/bin/github-review-publish-mcp && \
-    cp control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh && \
-    chmod +x /usr/local/bin/kilocode-control-plane-supervisor.sh && \
+    bun run build.ts --install-dir /usr/local/bin && \
     rm -rf /tmp/wrapper-build
 
 # DO NOT override USER, WORKDIR, or ENTRYPOINT from the base image

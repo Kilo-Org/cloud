@@ -39,6 +39,7 @@ import {
   deleteSubstackCredential,
   getSubstackCredentialMeta,
   replaceSubstackCredential,
+  SubstackCredentialInputError,
   testStoredSubstackCredential,
   testSubstackCredentialMaterial,
 } from '@/lib/user/deletion-queue/deletion-substack-credential';
@@ -135,6 +136,7 @@ const VerifyTaskInputSchema = z.object({
 
 const ReplaceCredentialInputSchema = z.object({
   material: z.string().min(1).max(16_000),
+  totpSecret: z.string().max(512).optional(),
 });
 
 const COMPLETED_WINDOW_DAYS = 7;
@@ -601,21 +603,35 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
   }),
 
   testSubstackCredential: adminProcedure
-    .input(z.object({ material: z.string().min(1).max(16_000).optional() }))
+    .input(
+      z.object({
+        material: z.string().min(1).max(16_000).optional(),
+        totpSecret: z.string().max(512).optional(),
+      })
+    )
     .mutation(async ({ input }) => {
       if (input.material) {
-        return testSubstackCredentialMaterial(input.material);
+        return testSubstackCredentialMaterial(input.material, input.totpSecret);
       }
-      return testStoredSubstackCredential();
+      const result = await testStoredSubstackCredential();
+      return { result, refreshedCookie: null };
     }),
 
   replaceSubstackCredential: adminProcedure
     .input(ReplaceCredentialInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await replaceSubstackCredential({
-        material: input.material,
-        actorKiloUserId: ctx.user.id,
-      });
+      try {
+        await replaceSubstackCredential({
+          material: input.material,
+          totpSecret: input.totpSecret,
+          actorKiloUserId: ctx.user.id,
+        });
+      } catch (error) {
+        if (error instanceof SubstackCredentialInputError) {
+          failClosed('BAD_REQUEST', error.message);
+        }
+        throw error;
+      }
       return { stored: true as const };
     }),
 

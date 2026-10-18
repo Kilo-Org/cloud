@@ -1,5 +1,6 @@
 import type { ControlPlaneSandboxPeer } from '../../../src/control-plane/session/session-do.js';
 import type { ControlRuntimeCredentialProxyFence } from '../../../src/control-plane/sandbox/sandbox-do.js';
+import type { PreviewTargetResult } from '../../../src/control-plane/sandbox/preview-target.js';
 import type { SandboxStatusSnapshot } from '../../../src/shared/sandbox-status.js';
 import type {
   ControlPlaneAnswerPayload,
@@ -91,8 +92,32 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
     return this.runtimeCredentialProxyFence;
   }
 
+  /** The synthetic peer never has an accepted scope handle. */
+  async resolveScopeHandle(): Promise<{ type: 'denied' }> {
+    return { type: 'denied' };
+  }
+
+  async getAcceptedHandleIssuerLocator(): Promise<null> {
+    return null;
+  }
+
   async getStatusSnapshot(): Promise<SandboxStatusSnapshot> {
     return this.statusSnapshot;
+  }
+
+  previewTargetResult: PreviewTargetResult = {
+    status: 'ok',
+    coordinates: {
+      provider: 'cloudflare',
+      allocationName: 'sbx',
+      containment: false,
+    },
+  };
+  readonly previewTargetCalls: string[] = [];
+
+  async previewTarget(sessionId: string): Promise<PreviewTargetResult> {
+    this.previewTargetCalls.push(sessionId);
+    return this.previewTargetResult;
   }
 }
 

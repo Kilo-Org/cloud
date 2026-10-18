@@ -1,15 +1,23 @@
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 
-type DestructiveConfirmDialogProps = {
+export type DestructiveConfirmDialogProps = {
   title: string;
   message: string;
   confirmLabel: string;
   /** The safe choice's label; defaults to the generic Cancel. */
   cancelLabel?: string;
+  /**
+   * A third, non-destructive choice rendered between Cancel and the confirm —
+   * for a confirmation that offers a way out other than "do it" or "don't",
+   * such as discarding unsaved changes also offering Save.
+   */
+  extraAction?: { label: string; onPress: () => void };
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -24,44 +32,90 @@ type DestructiveConfirmDialogProps = {
  * the confirm in-app on both platforms instead — one implementation, so the
  * destructive red fill and the neutral outline read the same everywhere.
  *
- * Mount it only while it should be open (e.g. `{confirming && <DestructiveConfirmDialog ... />}`),
- * the same lifecycle `RenameModal` uses.
+ * It is a native sheet, not an in-tree dialog: a confirm is reached from inside
+ * `formSheet` routes and from content already presented in
+ * `SessionPageSheet`, where a `@rn-primitives/portal` dialog would render
+ * behind the sheet. The sheet sizes to the card and carries no drag indicator,
+ * so the stacked buttons are the choices. Both native sheets already keep their
+ * content above the home indicator and the navigation bar, so the card adds no
+ * bottom inset of its own.
+ *
+ * Keep the request mounted until native dismissal finishes. The action runs
+ * afterward, so deleting its owner cannot empty the sheet during dismissal.
  */
 export function DestructiveConfirmDialog({
   title,
   message,
   confirmLabel,
   cancelLabel,
+  extraAction,
   onConfirm,
   onCancel,
 }: Readonly<DestructiveConfirmDialogProps>) {
   const { t } = useTranslation();
+  const [visible, setVisible] = useState(true);
+  const pendingAction = useRef<(() => void) | null>(null);
+
+  function dismiss(action: () => void) {
+    if (pendingAction.current !== null) {
+      return;
+    }
+    pendingAction.current = action;
+    setVisible(false);
+  }
+
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable accessible={false} className="flex-1 justify-center px-6" onPress={onCancel}>
-        <View className="absolute inset-0 bg-black opacity-50" />
-        <Pressable
-          accessible={false}
-          accessibilityViewIsModal
-          className="gap-4 rounded-xl bg-card p-5"
-          onPress={event => {
-            event.stopPropagation();
-          }}
-        >
-          <Text accessibilityRole="header" className="text-base font-semibold">
+    <Sheet
+      visible={visible}
+      onClose={() => {
+        dismiss(onCancel);
+      }}
+      onDismiss={() => {
+        const action = pendingAction.current ?? onCancel;
+        pendingAction.current = null;
+        action();
+      }}
+      showHandle={false}
+    >
+      <View className="gap-5 px-5 pt-6">
+        <View className="gap-2">
+          <Text accessibilityRole="header" className="text-lg font-semibold">
             {title}
           </Text>
           <Text className="text-sm text-muted-foreground">{message}</Text>
-          <View className="flex-row justify-end gap-3">
-            <Button variant="outline" onPress={onCancel}>
-              <Text>{cancelLabel ?? t('common.cancel')}</Text>
+        </View>
+        <View className="gap-2">
+          <Button
+            variant="destructive"
+            className="w-full"
+            onPress={() => {
+              dismiss(onConfirm);
+            }}
+          >
+            <Text>{confirmLabel}</Text>
+          </Button>
+          {extraAction ? (
+            <Button
+              variant="secondary"
+              className="w-full"
+              onPress={() => {
+                extraAction.onPress();
+              }}
+            >
+              <Text>{extraAction.label}</Text>
             </Button>
-            <Button variant="destructive" onPress={onConfirm}>
-              <Text>{confirmLabel}</Text>
-            </Button>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+          ) : null}
+          <Button
+            variant="outline"
+            className="w-full"
+            onPress={() => {
+              dismiss(onCancel);
+            }}
+          >
+            <Text>{cancelLabel ?? t('common.cancel')}</Text>
+          </Button>
+        </View>
+      </View>
+    </Sheet>
   );
 }

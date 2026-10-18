@@ -7,6 +7,7 @@ import {
   createSessionSupervisor,
   type ExecutionFailure,
   type ExecutionIdentity,
+  type ExecutionRetry,
 } from './session-supervisor.js';
 
 /** Reconciliation is independent of the five-second wrapper heartbeat. */
@@ -20,8 +21,13 @@ export type RuntimeActivityOptions = {
   client: WrapperKiloClient;
   timers: ControlPlaneTimers['wrapper'];
   now(): number;
-  onDeadline(identity: ExecutionIdentity, reason: ExecutionFailure): void;
-  onFault(reason: ActivityFault): void;
+  onDeadline(
+    identity: ExecutionIdentity,
+    reason: ExecutionFailure,
+    retry: ExecutionRetry | undefined
+  ): void;
+  /** False when the runtime holds the fault (memory pressure); it is raised again next check. */
+  onFault(reason: ActivityFault): boolean;
   onChange(): void;
   readSnapshot?: typeof readSessionSnapshot;
 };
@@ -40,7 +46,7 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
   function fault(reason: ActivityFault): void {
     if (lifetime.signal.aborted || faulted) return;
     faulted = true;
-    options.onFault(reason);
+    if (!options.onFault(reason)) faulted = false;
   }
 
   async function request<T>(work: (signal: AbortSignal) => Promise<T>, signal = lifetime.signal) {
@@ -139,6 +145,8 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
     needsCompute: () =>
       !lifetime.signal.aborted && (unhealthySince !== undefined || supervisor.needsCompute()),
     isReady: () => !lifetime.signal.aborted && !faulted && unhealthySince === undefined,
+    observationFailureSince: () => unhealthySince,
+    hasRecentProgress: supervisor.hasRecentProgress,
     refresh,
     lost,
     connected() {
@@ -167,10 +175,14 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
         options.now() - unhealthySince >= options.timers.sseReconnectWindowMs
       ) {
         fault('activity_observation');
-        return;
+        // A held fault keeps reading snapshots, so a recovered Kilo clears `unhealthySince`.
+        if (faulted) return;
       }
       if (options.now() >= nextSnapshotAt) void refresh();
       supervisor.tick();
+    },
+    holdMemory(held: boolean) {
+      supervisor.holdMemory(held);
     },
     dispose() {
       lifetime.abort();

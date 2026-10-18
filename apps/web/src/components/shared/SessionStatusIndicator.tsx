@@ -35,7 +35,7 @@ export function SessionStatusIndicator({
     case 'working':
       return (
         <StatusSpinner
-          className="h-4 w-4 shrink-0 text-gray-600"
+          className="text-muted-foreground h-4 w-4 shrink-0"
           title={status === 'retry' ? 'Retrying' : 'Busy'}
         />
       );

@@ -14,6 +14,7 @@ import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gatew
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { api_request_log } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -83,7 +84,11 @@ function hangingSseResponse(body: string): { response: Response; cancel: jest.Mo
   };
 }
 
-function failingResponse(contentType: string, errorName: string, initialBody?: string): Response {
+function failingResponse(
+  contentType: string,
+  failure: string | Error,
+  initialBody?: string
+): Response {
   const encoder = new TextEncoder();
   let pullCount = 0;
   const body = new ReadableStream<Uint8Array>({
@@ -93,8 +98,8 @@ function failingResponse(contentType: string, errorName: string, initialBody?: s
         return;
       }
 
-      const error = new Error(errorName);
-      error.name = errorName;
+      const error = typeof failure === 'string' ? new Error(failure) : failure;
+      if (typeof failure === 'string') error.name = failure;
       controller.error(error);
     },
   });
@@ -239,6 +244,32 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.'
     );
   });
+
+  test.each(['application/json', 'text/event-stream'])(
+    'reports the gateway duration limit for a %s body that outlives the upstream budget',
+    async contentType => {
+      const result = await rewrite({
+        response: failingResponse(contentType, new UpstreamTimeoutError(600_000, 5_000)),
+        removeCost: true,
+        capture: null,
+        vercelRequestId: 'iad1::iad1::request-id',
+        reasoningEffort: null,
+      });
+      const message =
+        "The response reached the gateway's 600-second duration limit and was stopped before it finished. (request id: iad1::iad1::request-id)";
+
+      if (contentType === 'application/json') {
+        expect(result.status).toBe(503);
+        expect(await result.json()).toEqual({ error: message, error_type: 'timeout', message });
+      } else {
+        const events = dataObjects(await readOutputStream(result)) as {
+          error: { message: string };
+        }[];
+        expect(events).toHaveLength(1);
+        expect(events[0].error.message).toBe(message);
+      }
+    }
+  );
 });
 
 const timeoutEffortRequests = [
@@ -495,6 +526,66 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(json.choices[0].message.reasoning_content).toBe('full thought');
       expect(json.choices[0].message.reasoning_details).toBeUndefined();
     });
+
+    test('drops null message tool_calls', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'It is cloudy in Paris.', tool_calls: null },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        content: 'It is cloudy in Paris.',
+      });
+    });
+
+    test('preserves message tool_calls arrays', async () => {
+      const toolCalls = [
+        {
+          id: 'call-1',
+          type: 'function',
+          function: { name: 'get_weather', arguments: '{"city":"Paris"}' },
+        },
+      ];
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: null, tool_calls: toolCalls },
+            finish_reason: 'tool_calls',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.tool_calls).toEqual(toolCalls);
+    });
   });
 
   describe('streaming responses', () => {
@@ -591,6 +682,27 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect('role' in chunk.choices[0].delta).toBe(false);
       expect(chunk.choices[0].delta.content).toBe('hi');
       expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
+    test('drops null delta tool_calls', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"hi","tool_calls":null}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({ content: 'hi' });
     });
 
     test('maps Gemini thought content and signatures to reasoning_details', async () => {

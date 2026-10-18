@@ -14,14 +14,7 @@
 // dismisses (cancel) or the mutation succeeds (auto-dismiss).
 
 import * as Haptics from 'expo-haptics';
-import {
-  Alert,
-  Keyboard,
-  ScrollView,
-  type TextInput,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Keyboard, ScrollView, type TextInput, useWindowDimensions, View } from 'react-native';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -35,6 +28,7 @@ import {
 import { PrFormSheetFooter, PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import { PrReviewCapabilityBanner } from '@/components/pr-review/pr-review-capability-banner';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import {
   type AllowedMergeMethod,
@@ -209,6 +203,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
   } = props;
 
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
 
   // Provider arms derive the method list from the platform, not the GitHub
   // repo settings: GitLab offers merge + squash, Bitbucket Cloud only the
@@ -491,24 +486,24 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
             t('prReview.merge.confirmMessage'),
           ]
         : [t('prReview.merge.confirmTitle'), t('prReview.merge.confirmMessage')];
-      Alert.alert(confirmTitle, confirmMessage, [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('prReview.merge.merge'), style: 'destructive', onPress: submit },
-      ]);
+      confirm({
+        title: confirmTitle,
+        message: confirmMessage,
+        confirmLabel: t('prReview.merge.merge'),
+        onConfirm: submit,
+      });
       return;
     }
-    Alert.alert(
-      t('prReview.merge.enableAutoMergeConfirmTitle'),
-      prRef
+    confirm({
+      title: t('prReview.merge.enableAutoMergeConfirmTitle'),
+      message: prRef
         ? t('prReview.merge.enableAutoMergeConfirmMessageTerm', {
             term: t(providerPrNounKey(prRef.platform)),
           })
         : t('prReview.merge.enableAutoMergeConfirmMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('prReview.merge.enableAutoMerge'), style: 'destructive', onPress: submit },
-      ]
-    );
+      confirmLabel: t('prReview.merge.enableAutoMerge'),
+      onConfirm: submit,
+    });
   }
 
   const submitLabel =
@@ -662,6 +657,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       >
         {draft.settled ? settledBody : null}
       </ScrollView>
+      {dialog}
     </>
   );
 }

@@ -20,6 +20,7 @@ import {
   type SessionsListData,
 } from '@/lib/session-list-cache';
 import { useTRPC } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 type SessionsListSnapshot = [QueryKey, SessionsListData | undefined][];
 
@@ -45,6 +46,20 @@ async function settleCurrentOperation<T>(epoch: number, operation: Promise<T>): 
     return result;
   } catch (error) {
     assertCurrentOperation(epoch);
+    throw error;
+  }
+}
+
+// NOT_FOUND means the session is already gone (deleted on another device, or
+// a stale row the user deleted twice). The delete reached its goal, so it
+// resolves with `deleted` and the row stays removed.
+async function treatMissingAsDeleted<T>(deletion: Promise<T>, deleted: T): Promise<T> {
+  try {
+    return await deletion;
+  } catch (error) {
+    if (readTrpcErrorField(error, 'code') === 'NOT_FOUND') {
+      return deleted;
+    }
     throw error;
   }
 }
@@ -137,7 +152,13 @@ export function useSessionMutations() {
       if (!deleteOptions.mutationFn) {
         throw new Error('No mutationFn found');
       }
-      const result = await settleCurrentOperation(epoch, deleteOptions.mutationFn(input, context));
+      const result = await settleCurrentOperation(
+        epoch,
+        treatMissingAsDeleted(deleteOptions.mutationFn(input, context), {
+          success: true,
+          session_id: input.session_id,
+        })
+      );
       return result;
     },
   });

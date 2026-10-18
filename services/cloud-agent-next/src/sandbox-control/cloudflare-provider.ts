@@ -125,10 +125,17 @@ export function createCloudflareProviderAdapter(deps: {
   };
 
   return {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     ensureBillingAdmission,
+    describeRuntime(ref) {
+      const parsed = decodeCloudflareProviderRef(ref);
+      if (parsed?.sandboxId !== deps.sandboxId) return undefined;
+      return {
+        provider: 'cloudflare',
+        sandboxId: parsed.sandboxId,
+        instanceId: parsed.instanceId,
+        startSource: 'image',
+      };
+    },
     async probeWrapperProcesses(ref) {
       const parsed = decodeOwnedProviderRef(ref);
       if (!parsed) return { outcome: 'invalid_reference' };

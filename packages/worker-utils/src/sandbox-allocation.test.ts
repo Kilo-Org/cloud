@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION,
   CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
+  CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   SELECTABLE_SANDBOX_ALLOCATIONS,
   getSandboxAllocationInstance,
   getSandboxAllocationProvider,
@@ -145,11 +146,15 @@ describe('sandbox allocation contract', () => {
   });
 
   it('derives the default container instance from the default allocation', () => {
-    expect(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION).toBe('cloudflare-containers-standard-4');
+    expect(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION).toBe('cloudflare-containers-standard-3');
     expect(getSandboxAllocationInstance(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION)).toBe(
       CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE
     );
-    expect(CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE).toBe('standard-4');
+    expect(CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE).toBe('standard-3');
+    expect(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION).toBe('cloudflare-containers-standard-3');
+    expect(getSandboxAllocationInstance(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION)).toBe(
+      'standard-3'
+    );
   });
 
   it('rejects arbitrary allocations and capability options', () => {

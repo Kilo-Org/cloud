@@ -349,6 +349,7 @@ describe('processAppStoreKiloPassNotification', () => {
       new Date('2026-01-01T00:00:00.000Z').getTime()
     );
   });
+
   it('reverses the whole store credit pack on a full refund and still records the event', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0 });
     const transactionId = `tx-${crypto.randomUUID()}`;
@@ -1023,6 +1024,7 @@ describe('processAppStoreKiloPassNotification', () => {
       expect(after?.total_microdollars_acquired).toBe(toMicrodollars(7));
     });
   });
+
   it('reports a production credit-pack refund for the pack owner', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0 });
     const transactionId = `tx-${crypto.randomUUID()}`;

@@ -8,7 +8,7 @@ import { projectAllocationInspection } from './allocation.js';
 const SANDBOX_ID = 'usr-000000000abc';
 
 function view(overrides: Partial<AllocationView>): AllocationView {
-  return { ...initialAllocationState(), provider: 'cloudflare', ...overrides };
+  return { ...initialAllocationState(), provider: 'cloudflare', configuration: null, ...overrides };
 }
 
 describe('projectAllocationInspection', () => {
@@ -16,6 +16,8 @@ describe('projectAllocationInspection', () => {
     expect(projectAllocationInspection(SANDBOX_ID, view({}))).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: null,
+      provider: 'cloudflare',
+      configuration: null,
       physicalState: null,
     });
   });
@@ -26,6 +28,8 @@ describe('projectAllocationInspection', () => {
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: null,
+      provider: 'cloudflare',
+      configuration: null,
       physicalState: 'stopped',
     });
   });
@@ -39,6 +43,8 @@ describe('projectAllocationInspection', () => {
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: 'provider-ref-9',
+      provider: 'cloudflare',
+      configuration: null,
       physicalState: 'unknown',
     });
   });
@@ -49,6 +55,8 @@ describe('projectAllocationInspection', () => {
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: null,
+      provider: 'cloudflare',
+      configuration: null,
       physicalState: 'creating',
     });
   });
@@ -62,6 +70,8 @@ describe('projectAllocationInspection', () => {
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: 'provider-ref-9',
+      provider: 'cloudflare',
+      configuration: null,
       physicalState: 'running',
     });
   });
@@ -75,7 +85,51 @@ describe('projectAllocationInspection', () => {
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: 'provider-ref-9',
+      provider: 'cloudflare',
+      configuration: null,
       physicalState: 'stopping',
     });
+  });
+
+  it.each(['vercel', 'cloudflare-containers'] as const)(
+    'reports the persisted %s provider next to the reference',
+    provider => {
+      expect(
+        projectAllocationInspection(
+          SANDBOX_ID,
+          view({
+            kind: 'connected',
+            allocationId: 'alloc-1',
+            providerRef: 'provider-ref-9',
+            provider,
+          })
+        )
+      ).toEqual({
+        logicalSandboxId: SANDBOX_ID,
+        physicalProviderRef: 'provider-ref-9',
+        provider,
+        configuration: null,
+        physicalState: 'running',
+      });
+    }
+  );
+
+  it.each([
+    { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
+    { provider: 'vercel', resources: { vcpus: 4, memory: 8192 } },
+    { provider: 'cloudflare-containers', instance: 'standard-3' },
+    { provider: 'cloudflare-containers', instance: 'standard-4' },
+  ] as const)('reports the persisted configuration $provider', configuration => {
+    expect(
+      projectAllocationInspection(
+        SANDBOX_ID,
+        view({
+          kind: 'connected',
+          providerRef: 'provider-ref-9',
+          provider: configuration.provider,
+          configuration,
+        })
+      )
+    ).toMatchObject({ configuration });
   });
 });

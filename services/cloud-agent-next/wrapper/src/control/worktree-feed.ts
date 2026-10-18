@@ -5,6 +5,7 @@ import {
 } from '../../../src/shared/control-diagnostics.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { logToFile } from '../utils.js';
+import { kiloClientConfig } from '../kilo-server-auth.js';
 import { unfilteredKiloEvents } from './feed.js';
 import {
   feedDirectoryName,
@@ -19,13 +20,21 @@ export type KiloFeedEvent = {
   properties: Record<string, unknown>;
   directory?: string;
   nativeRuntimeId: string;
+  /**
+   * Runtime key of the runtime that emitted the event: the route's session id
+   * under per-session isolation, or the directory under directory-shared
+   * isolation. Lets the turn manager attribute an event to the route that
+   * produced it instead of trusting a descendant's reported parent, which can
+   * point at another route in the same worktree.
+   */
+  runtimeKey?: string;
 };
 
 export type WorktreeFeedSource = Readonly<{
   scopeId: string;
   runtimeId: string;
   directory: string;
-  kiloClient: Pick<WrapperKiloClient, 'serverUrl'>;
+  kiloClient: Pick<WrapperKiloClient, 'server'>;
   signal: AbortSignal;
 }>;
 
@@ -104,8 +113,7 @@ export function createWorktreeFeed(options: {
       return observeKiloFeedResponse(response, composite, onActivity, onFrame);
     }, fetch);
     const eventClient = createKiloEventClient({
-      baseUrl: kiloClient.serverUrl,
-      directory,
+      ...kiloClientConfig(kiloClient.server, directory),
       fetch: feedFetch,
     });
     const sseOptions: Parameters<typeof eventClient.global.event>[0] & {

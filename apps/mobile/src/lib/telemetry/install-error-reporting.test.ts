@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const sentryMock = vi.hoisted(() => ({
+  addBreadcrumb: vi.fn(),
   captureException: vi.fn(),
   captureMessage: vi.fn(),
 }));
@@ -37,6 +38,7 @@ const baseFetch = vi.fn();
 const INSTALLED_FLAG = '__kiloErrorReportingInstalled__';
 
 beforeEach(() => {
+  sentryMock.addBreadcrumb.mockClear();
   sentryMock.captureException.mockClear();
   sentryMock.captureMessage.mockClear();
   configMock.latencyIngestUrl = 'https://latency.kiloapps.io';
@@ -81,7 +83,26 @@ describe('installErrorReporting', () => {
     expect(sentryMock.captureException).not.toHaveBeenCalled();
   });
 
-  it('wraps the global fetch and reports a failing non-tRPC http request', async () => {
+  it('routes a breadcrumb to addBreadcrumb and sends no event', async () => {
+    const install = await loadInstallErrorReporting();
+    install();
+    const { addTelemetryBreadcrumb } = await import('@/lib/telemetry/error-sink');
+
+    const breadcrumb = {
+      category: 'auth',
+      message: 'auth branch',
+      level: 'warning',
+      data: { 'auth.cause': 'user' },
+    } as const;
+    addTelemetryBreadcrumb(breadcrumb);
+
+    expect(sentryMock.addBreadcrumb).toHaveBeenCalledTimes(1);
+    expect(sentryMock.addBreadcrumb).toHaveBeenCalledWith(breadcrumb);
+    expect(sentryMock.captureMessage).not.toHaveBeenCalled();
+    expect(sentryMock.captureException).not.toHaveBeenCalled();
+  });
+
+  it('wraps the global fetch and leaves a breadcrumb, not an event, for a transport failure', async () => {
     const install = await loadInstallErrorReporting();
     install();
 
@@ -93,11 +114,21 @@ describe('installErrorReporting', () => {
 
     await expect(wrapped('https://api.example.com/health')).rejects.toBe(failure);
 
-    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
-    expect(sentryMock.captureException).toHaveBeenCalledWith(
-      failure,
-      expect.objectContaining({ level: 'warning' })
-    );
+    expect(sentryMock.captureException).not.toHaveBeenCalled();
+    expect(sentryMock.captureMessage).not.toHaveBeenCalled();
+    expect(sentryMock.addBreadcrumb).toHaveBeenCalledTimes(1);
+    expect(sentryMock.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'network',
+      level: 'warning',
+      message: 'GET /health failed',
+      data: {
+        source: 'fetch',
+        method: 'GET',
+        path: '/health',
+        outcome: 'failed',
+        durationMs: expect.any(Number),
+      },
+    });
   });
 
   it('reports a >=400 response from a non-tRPC http request', async () => {
@@ -110,6 +141,7 @@ describe('installErrorReporting', () => {
 
     expect(response.status).toBe(502);
     expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+    expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
   });
 
   it('skips /api/trpc URLs (the tRPC links own those)', async () => {
@@ -124,6 +156,7 @@ describe('installErrorReporting', () => {
     ).rejects.toBe(failure);
 
     expect(sentryMock.captureException).not.toHaveBeenCalled();
+    expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
   });
 
   it('skips non-http URLs', async () => {
@@ -136,6 +169,7 @@ describe('installErrorReporting', () => {
     await expect(globalThis.fetch('file:///tmp/data')).rejects.toBe(failure);
 
     expect(sentryMock.captureException).not.toHaveBeenCalled();
+    expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
   });
 
   it('skips telemetry hosts so the SDK never observes itself', async () => {
@@ -159,6 +193,7 @@ describe('installErrorReporting', () => {
     await expect(globalThis.fetch('https://u.expo.dev/manifest')).rejects.toBe(sdkFailure);
 
     expect(sentryMock.captureException).not.toHaveBeenCalled();
+    expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
   });
 
   // KILO-APP-293: the app's own fire-and-forget latency POST answered 504 and
@@ -249,7 +284,7 @@ describe('installErrorReporting', () => {
     baseFetch.mockRejectedValue(new Error('once'));
     await expect(first('https://api.example.com/health')).rejects.toThrow('once');
 
-    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+    expect(sentryMock.addBreadcrumb).toHaveBeenCalledTimes(1);
   });
 
   it('does not stack wrappers when a fresh module instance installs again', async () => {
@@ -267,6 +302,6 @@ describe('installErrorReporting', () => {
     baseFetch.mockRejectedValue(new Error('refreshed'));
     await expect(first('https://api.example.com/health')).rejects.toThrow('refreshed');
 
-    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+    expect(sentryMock.addBreadcrumb).toHaveBeenCalledTimes(1);
   });
 });

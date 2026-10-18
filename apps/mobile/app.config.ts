@@ -117,12 +117,7 @@ const googleSignInPlugins: NonNullable<ExpoConfig['plugins']> = googleIosUrlSche
 const permissionLocales = buildPermissionPromptLocales(PERMISSION_PROMPT_COPY);
 const focusFilterCatalog = buildFocusFilterStringsFiles(FOCUS_FILTER_COPY);
 const nativeLocales: ExpoConfig['locales'] = Object.fromEntries(
-  SUPPORTED_LANGUAGES.map(tag => {
-    const { NSLocalNetworkUsageDescription: _developmentPrompt, ...productionPrompts } =
-      permissionLocales[tag].ios;
-    // Keep dev-launcher's base description unchanged so its release strip still matches.
-    return [tag, { ios: isProductionBuild ? productionPrompts : permissionLocales[tag].ios }];
-  })
+  SUPPORTED_LANGUAGES.map(tag => [tag, { ios: permissionLocales[tag].ios }])
 );
 
 const config: ExpoConfig = {
@@ -208,9 +203,20 @@ const config: ExpoConfig = {
       // be enabled on the App ID (`com.kilocode.kiloapp`) in the Apple
       // Developer portal for a provisioning profile to include it.
       'com.apple.developer.usernotifications.time-sensitive': true,
+      // A GGUF context for on-device llama.rn inference needs the raised memory
+      // ceiling. These stay on for every build profile: EAS syncs App ID
+      // capabilities from the entitlements of whichever build or `eas
+      // credentials` run touches `com.kilocode.kiloapp`, so a run without them
+      // disables both capabilities and the App Store profile loses them.
+      'com.apple.developer.kernel.extended-virtual-addressing': true,
+      'com.apple.developer.kernel.increased-memory-limit': true,
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // Custom LAN backends require an app-level approval before each endpoint
+      // can use HTTP. ATS stays enabled for public HTTPS endpoints.
+      NSAppTransportSecurity: { NSAllowsLocalNetworking: true },
+      NSLocalNetworkUsageDescription: permissionLocales.en.ios.NSLocalNetworkUsageDescription,
       // iOS reads this list, not the JS catalog. Without it the system treats
       // the app as English-only, so OS-drawn text we cannot translate — the
       // native Sign in with Apple button above all — stays English on a
@@ -233,7 +239,7 @@ const config: ExpoConfig = {
     googleServicesFile: './google-services.json',
     package: 'com.kilocode.kiloapp',
     adaptiveIcon: {
-      backgroundColor: '#FAF74F',
+      backgroundColor: '#FFDD00',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-foreground.png',
@@ -284,7 +290,9 @@ const config: ExpoConfig = {
         android: {
           enableMinifyInReleaseBuilds: true,
           // Keep expo-task-manager's reflectively-loaded headless app loader.
-          extraProguardRules: ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES,
+          // R8 runs on release builds and llama.rn's JSI bindings are reached
+          // only through JNI, so every com.rnllama class has to be kept too.
+          extraProguardRules: `${ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES}\n-keep class com.rnllama.** { *; }`,
           // Old release AABs shipped without resource shrinking. Keep this on so
           // the unused zz_unused_shrink_sentinel raw resource is stripped and
           // the inspector contract can catch a shrink regression before it lands.
@@ -317,6 +325,20 @@ const config: ExpoConfig = {
         },
       },
     ],
+    // llama.cpp for on-device GGUF inference. Each option below turns off a
+    // plugin behavior that is on by default. The podspec already compiles
+    // itself as C++20, and the app offloads nothing to Android GPUs, so neither
+    // global Podfile flags nor Qualcomm native libraries belong in the
+    // manifest. The plugin adds the iOS memory entitlements only under the
+    // production profile, so ios.entitlements declares them for every profile.
+    [
+      'llama.rn',
+      {
+        enableEntitlements: false,
+        forceCxx20: false,
+        enableOpenCLAndHexagon: false,
+      },
+    ],
     [
       'expo-speech-recognition',
       {
@@ -327,6 +349,8 @@ const config: ExpoConfig = {
     ],
     'expo-router',
     'expo-image',
+    // Inline video file parts in the session transcript (file-part-renderer).
+    'expo-video',
     [
       'expo-image-picker',
       {
@@ -353,7 +377,7 @@ const config: ExpoConfig = {
       'expo-notifications',
       {
         icon: './assets/images/android-notification-icon.png',
-        color: '#FAF74F',
+        color: '#FFDD00',
         // Name the channel Firebase falls back to when a message omits
         // `channel_id`. Without it FirebaseMessaging logs "Missing Default
         // Notification Channel metadata in AndroidManifest" on every message.
@@ -364,6 +388,10 @@ const config: ExpoConfig = {
         enableBackgroundRemoteNotifications: true,
       },
     ],
+    // Registers the BGTaskScheduler identifier and the `processing` background
+    // mode for the periodic glanceable refresh, the fallback for a dropped push
+    // (src/lib/glanceable-refresh-task.ts).
+    'expo-background-task',
     'expo-web-browser',
     // Must stay before '@sentry/react-native/expo': it edits the RNSentrySDK.start() line that plugin writes.
     './plugins/withReactMountLogBreadcrumbs',
@@ -375,6 +403,10 @@ const config: ExpoConfig = {
         organization: 'anaconda-nq',
         useNativeInit: true,
         options: SENTRY_NATIVE_OPTIONS,
+        // Android release builds upload NDK debug symbols and the R8 mapping, so
+        // native tombstones (libhermes, libreactnative, Expo modules) and Java
+        // frames symbolicate. The default sentry.gradle.kts uploads only JS source maps.
+        experimental_android: { enableAndroidGradlePlugin: true },
       },
     ],
     // One native splash configuration and shared AnimatedSplashOverlay lifecycle
@@ -384,7 +416,7 @@ const config: ExpoConfig = {
       './plugins/withBrandedSplash',
       {
         image: './assets/images/logo-mark.png',
-        backgroundColor: '#FAF74F',
+        backgroundColor: '#FFDD00',
         imageWidth: 100,
       },
     ],
@@ -478,6 +510,8 @@ const config: ExpoConfig = {
     // Aggregate "Active Agents" glanceable surfaces: one Live Activity plus Home
     // Screen and Lock Screen widgets, rendered by src/glanceable-ios. The widget
     // target reuses the existing app group; no second group is created.
+    // Native Home refresh runs after expo-widgets' source generation (mods run in reverse).
+    './plugins/withHomeWidgetRefresh',
     [
       'expo-widgets',
       {

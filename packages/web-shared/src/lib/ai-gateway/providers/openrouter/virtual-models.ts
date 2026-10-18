@@ -3,7 +3,6 @@ import type {
   OpenRouterModel,
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 
@@ -73,8 +72,9 @@ export function injectVirtualModels(params: {
   providerModelData: ProviderModels;
   catalogModels: CatalogModel[];
   storedModels: Record<string, StoredModel>;
+  unavailableModelIds: ReadonlySet<string>;
 }): void {
-  const { providerModelData, catalogModels, storedModels } = params;
+  const { providerModelData, catalogModels, storedModels, unavailableModelIds } = params;
   const snapshotModelIds = new Set(
     providerModelData.flatMap(({ models }) => models.map(model => normalizeModelId(model.slug)))
   );
@@ -85,7 +85,7 @@ export function injectVirtualModels(params: {
     if (
       snapshotModelIds.has(modelId) ||
       catalogModel.id.endsWith(':batch') ||
-      isUnavailableModel(catalogModel.id)
+      unavailableModelIds.has(catalogModel.id)
     ) {
       continue;
     }

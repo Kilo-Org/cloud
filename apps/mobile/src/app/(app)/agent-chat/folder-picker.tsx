@@ -1,7 +1,8 @@
+import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, View, type ViewStyle } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,6 +18,12 @@ import { type DirectoryEntry, useListDirectories } from '@/lib/hooks/use-list-di
 import { folderPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 
 const SKELETON_ROW_COUNT = 5;
+
+// FlashList takes `style`/`contentContainerStyle` (never `className`), so the
+// list's `flex-1 bg-background` classes become the list style plus the themed
+// background. The picker sheet renders its own scroll container
+// (`scrollable={false}`), so the list fills the sheet's body.
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 /** One navigation step in the in-sheet drill/Back stack. */
 type NavFrame = { path: string; title: string };
@@ -169,8 +176,8 @@ export default function FolderPickerScreen() {
       {currentState !== null && currentState.phase !== 'skeleton' && data.length === 0 ? (
         empty
       ) : (
-        <FlatList
-          className="flex-1 bg-background"
+        <FlashList
+          style={[listStyle, { backgroundColor: colors.background }]}
           data={data}
           keyExtractor={entry => entry.path}
           contentContainerStyle={listContentStyle}

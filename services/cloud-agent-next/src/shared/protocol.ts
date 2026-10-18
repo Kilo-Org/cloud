@@ -43,6 +43,7 @@ export type StreamEventType =
   | 'cloud.message.completed' // Accepted user message completed execution
   | 'cloud.message.failed' // User message delivery failed or was canceled before completion
   | 'connected' // Sent on WebSocket connect with current service state
+  | 'bootstrap.complete'
   // Wrapper -> DO -> /stream clients (slash command catalog)
   | 'commands.available'; // Catalog of kilo slash commands available in this session
 
@@ -139,6 +140,7 @@ export type PreparingStep =
   | 'workspace_backup'
   | 'sandbox_provision'
   | 'sandbox_boot'
+  | 'snapshot_fallback'
   | 'kilo_server'
   | 'kilo_session'
   | 'restore_incomplete'
@@ -156,6 +158,7 @@ export type PreparationStepSnapshot = {
   label: string;
   status: PreparationStepStatus;
   startedAt: number;
+  startedRevision?: number;
   completedAt?: number;
   revision: number;
   latestDetail?: string;
@@ -163,6 +166,7 @@ export type PreparationStepSnapshot = {
   command?: string;
   commandIndex?: number;
   commandCount?: number;
+  parentStepId?: string;
   outputTail?: string;
   outputTruncated?: boolean;
   exitCode?: number;
@@ -200,6 +204,7 @@ export type PreparingEventDataV2 = PreparingEventDataV2Base &
         command?: string;
         commandIndex?: number;
         commandCount?: number;
+        parentStepId?: string;
       }
     | { action: 'step_progress'; stepId: string; detail: string }
     | { action: 'step_output'; stepId: string; output: string }
@@ -244,6 +249,7 @@ export type SessionStatus =
 
 /** Data included in 'connected' events. */
 export type ConnectedEventData = {
+  bootstrapPending?: boolean;
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
   activeMessageId?: string | null;

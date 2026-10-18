@@ -426,8 +426,12 @@ describe('sessionStatusErrorMessage', () => {
     ['Agent wrapper disconnected'],
     ['Assistant request failed: model not found'],
     ['Assistant request was rate limited'],
+    ['Your provider rejected the request. Check your provider account and settings.'],
+    ['[BYOK] Your provider rejected the request. Check your provider account and settings.'],
     ['Session metadata is unavailable'],
     ['Commit failed'],
+    ['Kilo was not responding and was restarted'],
+    ['The turn made no progress'],
     // A bounded workspace failure appends its own detail to the projection.
     ['Workspace setup failed: Devcontainer workspace preparation failed'],
   ] as const)('shows the safe projection copy for %s', raw => {
@@ -437,6 +441,14 @@ describe('sessionStatusErrorMessage', () => {
   it('never returns the raw provider text', () => {
     const raw = 'Service Unavailable: The service is temporarily unavailable.';
     expect(sessionStatusErrorMessage({ message: raw })).not.toContain('Service Unavailable');
+  });
+
+  it.each([
+    '[BYOK] Synthetic provider response poison-text',
+    'Your provider rejected the request. Check your provider account and settings.: poison-text',
+    '[BYOK] Your provider rejected the request. Check your provider account and settings.: poison-text',
+  ])('does not admit arbitrary provider text as safe BYOK copy: %s', message => {
+    expect(sessionStatusErrorMessage({ message })).toBe('The response failed.');
   });
 });
 
@@ -486,6 +498,18 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
         failure: assistantFailure(null),
       })
     ).toBe(true);
+  });
+
+  it.each([
+    'Your provider rejected the request. Check your provider account and settings.',
+    '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+  ])('keeps actionable BYOK guidance visible: %s', message => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message },
+        failure: assistantFailure(null),
+      })
+    ).toBe(false);
   });
 
   it('suppresses the delivery line the last row already states', () => {

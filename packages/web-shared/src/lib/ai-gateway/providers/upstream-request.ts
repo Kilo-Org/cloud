@@ -17,6 +17,7 @@ import type {
 import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
+import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -27,8 +28,53 @@ type UpstreamFetchFailureFamily =
   | 'abort'
   | 'unknown';
 
-// Leave 200s of the Vercel function budget for post-stream work.
-const TIMEOUT_MS = 10 * 60 * 1000;
+/**
+ * Hard cap on one upstream call, from the fetch through the last body byte; the
+ * abort stays armed while the response streams.
+ *
+ * The gateway route's `maxDuration` of 800s covers the whole invocation,
+ * including the `after()` work that starts once the stream ends. That work runs
+ * in sequence in `countAndStoreUsage`: the generation lookup (`fetchGeneration`,
+ * about 75s of backoff), then the usage-record call (`ATTEMPT_TIMEOUT_MS`, 90s),
+ * then its local fallback write. By design that can need ~165s plus the
+ * fallback, nearly all of the 200s this cap leaves. Production logs agree on the
+ * typical case (after() done within 80s of a stream that ran this full cap), but
+ * only the design bound covers a slow usage endpoint, so the cap is not raised:
+ * a function killed at maxDuration loses its usage record.
+ *
+ * There is no separate header timer here: Node's fetch (undici) already fails a
+ * header wait after 300s (`headersTimeout`, surfaced as UND_ERR_HEADERS_TIMEOUT
+ * and classified `headers_timeout`), and that limit stops once headers arrive.
+ */
+const UPSTREAM_DURATION_BUDGET_MS = 10 * 60 * 1000;
+
+function formatSeconds(ms: number): string {
+  return `${Number((ms / 1000).toFixed(1))}s`;
+}
+
+/**
+ * Abort reason when `UPSTREAM_DURATION_BUDGET_MS` stops an upstream call. Its
+ * name stays `TimeoutError`, so failure classification is unchanged. It records
+ * whether the response headers had arrived, so the logs and the client-visible
+ * error can tell a header wait from a stream that outlived the budget.
+ */
+export class UpstreamTimeoutError extends Error {
+  override readonly name = 'TimeoutError';
+  readonly limitMs: number;
+  /** Time from the upstream fetch to its response headers; null if they never arrived. */
+  readonly headersReceivedAfterMs: number | null;
+
+  constructor(limitMs: number, headersReceivedAfterMs: number | null) {
+    super(
+      headersReceivedAfterMs === null
+        ? `gateway timeout after ${limitMs}ms waiting for upstream response headers`
+        : `upstream stream exceeded the gateway duration budget after ${formatSeconds(limitMs)} (headers at ${formatSeconds(headersReceivedAfterMs)})`
+    );
+    this.limitMs = limitMs;
+    this.headersReceivedAfterMs = headersReceivedAfterMs;
+  }
+}
+
 // fetchWithBackoff reserves the next delay before retrying, so 75s yields about one minute.
 const GENERATION_FETCH_MAX_DELAY_MS = 75 * 1000;
 const CHAT_API_PATHS = {
@@ -233,7 +279,11 @@ export async function upstreamRequest({
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
     headers.set(key, value);
   }
-  if (provider.apiKeyHeader === 'x-api-key') {
+  if (provider.secureProxy) {
+    for (const [key, value] of Object.entries(provider.secureProxy.upstreamAuthHeaders)) {
+      headers.set(key, value);
+    }
+  } else if (provider.apiKeyHeader === 'x-api-key') {
     headers.set('x-api-key', provider.apiKey);
   } else {
     headers.set('Authorization', `Bearer ${provider.apiKey}`);
@@ -247,36 +297,57 @@ export async function upstreamRequest({
   const apiUrl = provider.apiUrlOverrides[chatApi] ?? provider.apiUrl;
   const path = provider.disableUrlSuffix ? '' : CHAT_API_PATHS[chatApi];
 
-  const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
-  const onTimeoutAbort = () => {
-    errorExceptInTest(
-      `[upstreamRequest] gateway timeout after ${TIMEOUT_MS}ms waiting for upstream response headers`,
-      { vercelRequestId: vercelRequestId ?? '<none>' }
-    );
+  const fetchStartedAt = performance.now();
+  let headersReceivedAfterMs: number | null = null;
+  // AbortSignal.timeout keeps its timer unref'd; re-aborting through our own
+  // controller lets the abort reason say which phase the budget ran out in.
+  const timeoutController = new AbortController();
+  const budgetSignal = AbortSignal.timeout(UPSTREAM_DURATION_BUDGET_MS);
+  const onBudgetExceeded = () => {
+    const reason = new UpstreamTimeoutError(UPSTREAM_DURATION_BUDGET_MS, headersReceivedAfterMs);
+    errorExceptInTest(`[upstreamRequest] ${reason.message}`, {
+      vercelRequestId: vercelRequestId ?? '<none>',
+      phase: headersReceivedAfterMs === null ? 'headers' : 'stream',
+    });
+    timeoutController.abort(reason);
   };
-  timeoutSignal.addEventListener('abort', onTimeoutAbort);
+  budgetSignal.addEventListener('abort', onBudgetExceeded);
   after(() => {
-    timeoutSignal.removeEventListener('abort', onTimeoutAbort);
+    budgetSignal.removeEventListener('abort', onBudgetExceeded);
   });
-  const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, timeoutController.signal])
+    : timeoutController.signal;
 
   try {
     const targetUrl = provider.disableUrlSuffix
       ? appendQueryString(apiUrl, search)
       : `${apiUrl}${path}${search}`;
 
-    return {
-      type: 'success',
-      response: await fetch(targetUrl, {
-        method,
-        headers,
-        body: JSON.stringify(body),
-        // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
-        duplex: 'half',
-        signal: combinedSignal,
-      }),
-    };
+    const outgoing = provider.secureProxy
+      ? buildSecureProxyRequest({
+          proxyUrl: provider.secureProxy.url,
+          secret: provider.apiKey,
+          upstreamUrl: targetUrl,
+          upstreamHeaders: headers,
+          body,
+        })
+      : { url: targetUrl, headers, body: JSON.stringify(body) };
+
+    const response = await fetch(outgoing.url, {
+      method,
+      headers: outgoing.headers,
+      body: outgoing.body,
+      // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
+      duplex: 'half',
+      signal: combinedSignal,
+    });
+    headersReceivedAfterMs = performance.now() - fetchStartedAt;
+    return { type: 'success', response };
   } catch (error) {
+    // No response body to bound; a later fallback attempt must not be blamed
+    // for this attempt's budget.
+    budgetSignal.removeEventListener('abort', onBudgetExceeded);
     // The caller passes the incoming request signal, so a client that goes away
     // aborts this fetch as well. Those aborts are client-side cancellations and
     // must not be reported (or alerted on) as upstream failures.
@@ -294,6 +365,9 @@ export async function upstreamRequest({
       const failureMetadata = {
         providerId: provider.id,
         targetHost: getProviderTargetHost(apiUrl),
+        ...(provider.secureProxy && {
+          secureProxyHost: getProviderTargetHost(provider.secureProxy.url),
+        }),
         path,
         failureFamily,
         errorName,

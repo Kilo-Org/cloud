@@ -17,7 +17,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000' }),
 }));
 vi.mock('react-native', () => ({
-  Modal: 'Modal',
   View: 'View',
   Platform: reactNativeMock.Platform,
 }));
@@ -70,10 +69,10 @@ function findByTestID(
   return root.findAll(node => node.props.testID === testID);
 }
 
-function modal(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-  const found = findByType(root, 'Modal');
+function sheet(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  const found = findByType(root, 'BottomSheet');
   if (!found[0]) {
-    throw new Error('Modal not found');
+    throw new Error('BottomSheet not found');
   }
   return found[0];
 }
@@ -92,33 +91,39 @@ beforeEach(() => {
 });
 
 describe('SessionPageSheet mounted', () => {
-  it('renders the native pageSheet Modal on iOS and preserves onDismiss', async () => {
+  it('renders the native full-window sheet on iOS and preserves onDismiss', async () => {
     const onClose = vi.fn<() => void>();
     const onDismiss = vi.fn<() => void>();
     const renderer = await mountSheet({ onClose, onDismiss });
 
-    const modalNode = modal(renderer.root);
-    expect(modalNode.props.animationType).toBe('slide');
-    expect(modalNode.props.presentationStyle).toBe('pageSheet');
-    expect(modalNode.props.transparent).toBeUndefined();
-    expect(modalNode.props.onRequestClose).toBe(onClose);
-    expect(modalNode.props.onDismiss).toBe(onDismiss);
+    const sheetNode = sheet(renderer.root);
+    // One detent, the whole window, and no drag indicator: the surface owns the
+    // top of its own window with the caller's SheetHeader.
+    expect(sheetNode.props.snapPoints).toEqual(['100%']);
+    expect(sheetNode.props.handleComponent).toBeNull();
+    expect(sheetNode.props.index).toBe(0);
+    expect(sheetNode.props.backgroundStyle).toEqual({ backgroundColor: '#000' });
+    act(() => {
+      (sheetNode.props.onClose as () => void)();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    expect(surface[0]?.props.style).toBeUndefined();
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
 
     renderer.unmount();
   });
 
-  it.each(['ios', 'android'])('uses a StateSurface as the %s Modal root', async platform => {
+  it.each(['ios', 'android'])('uses a StateSurface as the %s sheet root', async platform => {
     reactNativeMock.Platform.OS = platform;
     const renderer = await mountSheet({
       children: createElement('SheetHeader', { title: 'Details' }),
     });
     const surfaces = findByType(renderer.root, 'StateSurface');
     expect(surfaces).toHaveLength(1);
-    expect(surfaces[0]?.parent).toBe(modal(renderer.root));
+    expect(surfaces[0]?.parent).toBe(sheet(renderer.root));
     expect(surfaces[0]?.props.className).toBe('flex-1 bg-background');
     expect(findByType(renderer.root, 'SheetHeader')[0]?.parent).toBe(surfaces[0]);
     expect(findByType(renderer.root, 'View')).toHaveLength(0);
@@ -127,15 +132,17 @@ describe('SessionPageSheet mounted', () => {
     });
   });
 
-  it('renders an opaque full-window Modal on Android', async () => {
+  it('renders an opaque full-window sheet on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     const onClose = vi.fn<() => void>();
     const renderer = await mountSheet({ onClose });
 
-    const modalNode = modal(renderer.root);
-    expect(modalNode.props.transparent).toBeUndefined();
-    expect(modalNode.props.animationType).toBe('slide');
-    expect(modalNode.props.onRequestClose).toBe(onClose);
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.snapPoints).toEqual(['100%']);
+    act(() => {
+      (sheetNode.props.onClose as () => void)();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
@@ -157,14 +164,16 @@ describe('SessionPageSheet mounted', () => {
     renderer.unmount();
   });
 
-  it('closes when Android Back fires onRequestClose', async () => {
+  it('closes when the sheet dismisses', async () => {
     reactNativeMock.Platform.OS = 'android';
     const onClose = vi.fn<() => void>();
     const renderer = await mountSheet({ onClose });
 
+    // Android Back, a swipe down and a backdrop tap all route through the
+    // native sheet's one close path.
     await act(async () => {
       await Promise.resolve();
-      press(modal(renderer.root), 'onRequestClose');
+      press(sheet(renderer.root), 'onClose');
     });
     expect(onClose).toHaveBeenCalledTimes(1);
 

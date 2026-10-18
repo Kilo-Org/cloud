@@ -5,20 +5,21 @@
 // sibling under the tab body (see pr-review-discussion-tab.tsx): the body
 // keeps flex-1, the bar keeps its natural height.
 //
-// Keyboard: AppAwareKeyboardPaddingView lifts the bar above the keyboard
-// while it is open; while it is closed that padding is 0 and
-// useDetailScreenBottomPadding (applied to the inner view) clears the device
-// safe area. The two paddings are separate because the keyboard-padding view
-// owns its own paddingBottom style slot.
+// Keyboard: KeyboardAvoidingView lifts the bar above the keyboard while it is
+// open; while it is closed the lift is 0 and useDetailScreenBottomPadding
+// (applied to the inner view) clears the device safe area. The two are separate
+// because the lift view owns its own padding slot.
 
 import { MessageSquarePlus } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 type PrCommentCtaProps = Readonly<{
@@ -38,6 +39,7 @@ export function PrCommentCta({ onPress, keyboardLift }: PrCommentCtaProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const bottomPadding = useDetailScreenBottomPadding();
+  const { bottom } = useSafeAreaInsets();
   const bar = (
     <View className="px-4 pt-3" style={{ paddingBottom: bottomPadding }}>
       <Button
@@ -50,14 +52,15 @@ export function PrCommentCta({ onPress, keyboardLift }: PrCommentCtaProps) {
       </Button>
     </View>
   );
-  // Unmounted (not just un-padded) while unfocused: the padding view's own
-  // keyboard listener must not react to another surface's keyboard at all.
-  // The bar's inner padding already includes the platform's bottom inset
-  // (`useDetailScreenBottomPadding`), so `contentReservesBottomInset` keeps the
-  // lift from counting that inset a second time and floating the button a
-  // navigation-bar height above the keyboard.
+  // Unmounted (not just un-padded) while unfocused: the lift must not react to
+  // another surface's keyboard at all. The bar's inner padding already includes
+  // the platform's bottom inset (`useDetailScreenBottomPadding`), so the lift is
+  // reduced by that inset and the button never floats a navigation-bar height
+  // above the keyboard.
   return keyboardLift ? (
-    <AppAwareKeyboardPaddingView contentReservesBottomInset>{bar}</AppAwareKeyboardPaddingView>
+    <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={keyboardInsetOffset(bottom)}>
+      {bar}
+    </KeyboardAvoidingView>
   ) : (
     bar
   );

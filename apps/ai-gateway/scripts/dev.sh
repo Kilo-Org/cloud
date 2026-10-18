@@ -61,8 +61,9 @@ UPSTASH_REDIS_REST_URL="${UPSTASH_REDIS_REST_URL:-$(read_env_value UPSTASH_REDIS
 export UPSTASH_REDIS_REST_URL="${UPSTASH_REDIS_REST_URL:-http://localhost:8079}"
 export UPSTASH_REDIS_REST_TOKEN="${UPSTASH_REDIS_REST_TOKEN:-example_token}"
 # Links in responses, such as sign-in and billing URLs, must point at the web
-# app rather than at this app.
-WEB_PORT=$(cat "$REPO_ROOT/.dev-port" 2>/dev/null || echo $((3000 + OFFSET)))
+# app rather than at this app. dev:start passes AI_GATEWAY_WEB_PORT because it
+# starts this app before the web app writes .dev-port.
+WEB_PORT=${AI_GATEWAY_WEB_PORT:-$(cat "$REPO_ROOT/.dev-port" 2>/dev/null || echo $((3000 + OFFSET)))}
 APP_URL_OVERRIDE="${APP_URL_OVERRIDE:-$(read_env_value APP_URL_OVERRIDE)}"
 export APP_URL_OVERRIDE="${APP_URL_OVERRIDE:-http://localhost:$WEB_PORT}"
 NEXTAUTH_URL="${NEXTAUTH_URL:-$(read_env_value NEXTAUTH_URL)}"

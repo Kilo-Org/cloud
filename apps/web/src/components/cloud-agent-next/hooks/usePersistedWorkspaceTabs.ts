@@ -8,7 +8,6 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import { safeLocalStorage } from '@/lib/localStorage';
 import { createWorkspaceTabsState, type WorkspaceTabsState } from '../workspace-tabs';
 import {
   getWorkspaceTabsForScope,
@@ -20,6 +19,7 @@ type ScopedWorkspaceTabs = {
   storageKey: string | null;
   scope: string | null;
   tabs: WorkspaceTabsState;
+  storageUnavailable?: boolean;
 };
 
 export function usePersistedWorkspaceTabs(
@@ -33,38 +33,70 @@ export function usePersistedWorkspaceTabs(
   }));
   const entryRef = useRef(entry);
 
-  useEffect(() => {
-    const loaded: ScopedWorkspaceTabs = {
-      storageKey,
-      scope,
-      tabs: getWorkspaceTabsForScope(
-        parseWorkspaceTabsByScope(
-          storageKey === null ? null : safeLocalStorage.getItem(storageKey)
-        ),
-        scope
-      ),
-    };
-    entryRef.current = loaded;
-    setEntry(loaded);
+  const getScopedState = useCallback(() => {
+    const current = entryRef.current;
+    const fallback: ScopedWorkspaceTabs =
+      current.storageKey === storageKey && current.scope === scope
+        ? current
+        : {
+            storageKey,
+            scope,
+            tabs: createWorkspaceTabsState(),
+          };
+    if (storageKey === null || scope === null || fallback.storageUnavailable)
+      return { entry: fallback, tabsByScope: {} };
+    try {
+      const tabsByScope = parseWorkspaceTabsByScope(window.localStorage.getItem(storageKey));
+      return {
+        entry: { storageKey, scope, tabs: getWorkspaceTabsForScope(tabsByScope, scope) },
+        tabsByScope,
+      };
+    } catch {
+      return { entry: fallback, tabsByScope: {} };
+    }
   }, [storageKey, scope]);
 
-  const setWorkspaceTabs = useCallback<Dispatch<SetStateAction<WorkspaceTabsState>>>(action => {
-    const current = entryRef.current;
-    const tabs = action instanceof Function ? action(current.tabs) : action;
-    if (tabs === current.tabs) return;
+  useEffect(() => {
+    const sync = () => {
+      const { entry: loaded } = getScopedState();
+      entryRef.current = loaded;
+      setEntry(loaded);
+    };
+    sync();
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea && event.storageArea !== window.localStorage) return;
+      if (storageKey !== null && scope !== null && (event.key === storageKey || event.key === null))
+        sync();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [getScopedState, storageKey, scope]);
 
-    const next: ScopedWorkspaceTabs = { ...current, tabs };
-    entryRef.current = next;
-    setEntry(next);
+  const setWorkspaceTabs = useCallback<Dispatch<SetStateAction<WorkspaceTabsState>>>(
+    action => {
+      const { entry: current, tabsByScope } = getScopedState();
+      const tabs = action instanceof Function ? action(current.tabs) : action;
+      if (current === entryRef.current && tabs === current.tabs) return;
 
-    if (current.storageKey === null || current.scope === null) return;
+      const next: ScopedWorkspaceTabs = { ...current, tabs };
+      entryRef.current = next;
+      setEntry(next);
 
-    const tabsByScope = parseWorkspaceTabsByScope(safeLocalStorage.getItem(current.storageKey));
-    safeLocalStorage.setItem(
-      current.storageKey,
-      JSON.stringify({ tabsByScope: setWorkspaceTabsForScope(tabsByScope, current.scope, tabs) })
-    );
-  }, []);
+      if (current.storageKey === null || current.scope === null || tabs === current.tabs) return;
+
+      try {
+        window.localStorage.setItem(
+          current.storageKey,
+          JSON.stringify({
+            tabsByScope: setWorkspaceTabsForScope(tabsByScope, current.scope, tabs),
+          })
+        );
+      } catch {
+        next.storageUnavailable = true;
+      }
+    },
+    [getScopedState]
+  );
 
   const tabs =
     entry.storageKey === storageKey && entry.scope === scope

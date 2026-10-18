@@ -1,0 +1,239 @@
+# Explorer-only simulator Release builds; Xcode ad-hoc signs locally, never signs or publishes a store app.
+name: explorer-ios-release
+run-name: explorer-ios-release ${{ inputs.fingerprint }}
+on:
+  workflow_dispatch:
+    inputs:
+      cloud_ref:
+        description: Full Kilo-Org/cloud commit SHA to build
+        required: true
+        type: string
+      fingerprint:
+        description: Explorer commit/recipe/environment/CA build key
+        required: true
+        type: string
+      mobile_env:
+        description: Base64 inert explorer .env.local (no credentials)
+        required: true
+        type: string
+      ca:
+        description: Base64 PEM explorer proxy CA certificate (never a private key)
+        required: true
+        type: string
+concurrency:
+  group: explorer-ios-release-${{ inputs.fingerprint }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      CLOUD_REF: ${{ inputs.cloud_ref }}
+      FINGERPRINT: ${{ inputs.fingerprint }}
+      MOBILE_ENV: ${{ inputs.mobile_env }}
+      CA_PEM: ${{ inputs.ca }}
+      SENTRY_DISABLE_AUTO_UPLOAD: 'true'
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - name: Validate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CLOUD_REF" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::cloud_ref must be a full commit SHA'; exit 1; }
+          [[ "$FINGERPRINT" =~ ^explorer-[0-9a-f]{12}-[0-9a-f]{16}$ ]] || { echo '::error::Invalid explorer build key'; exit 1; }
+          [[ "$FINGERPRINT" == explorer-"${CLOUD_REF:0:12}"-* ]] || { echo '::error::Build key does not match cloud_ref'; exit 1; }
+          [[ "$MOBILE_ENV" =~ ^[A-Za-z0-9+/]+={0,2}$ && ${#MOBILE_ENV} -le 65536 ]] || { echo '::error::Invalid mobile_env'; exit 1; }
+          [[ "$CA_PEM" =~ ^[A-Za-z0-9+/]+={0,2}$ && ${#CA_PEM} -le 16384 ]] || { echo '::error::Invalid CA'; exit 1; }
+          printf '%s' "$MOBILE_ENV" | base64 --decode > "$RUNNER_TEMP/explorer.env"
+          printf '%s' "$CA_PEM" | base64 --decode > "$RUNNER_TEMP/ca.crt"
+          openssl x509 -in "$RUNNER_TEMP/ca.crt" -noout > /dev/null 2>&1 || { echo '::error::Invalid CA certificate'; exit 1; }
+          if grep -q 'PRIVATE KEY' "$RUNNER_TEMP/ca.crt"; then echo '::error::CA must not contain a private key'; exit 1; fi
+          node <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const env = fs.readFileSync(`${process.env.RUNNER_TEMP}/explorer.env`, 'utf8');
+          const ca = fs.readFileSync(`${process.env.RUNNER_TEMP}/ca.crt`, 'utf8');
+          const expected = {
+            APPSFLYER_DEV_KEY: 'explorer-inert',
+            POSTHOG_API_KEY: 'phc_explorer_inert',
+            EXPO_PUBLIC_SENTRY_ENVIRONMENT: 'explorer',
+          };
+          for (const [key, value] of Object.entries(expected)) {
+            const lines = env.split(/\r?\n/).filter(line => line.startsWith(`${key}=`));
+            if (lines.length !== 1 || lines[0] !== `${key}=${value}`) {
+              throw new Error('Explorer telemetry must use exactly one inert value per key');
+            }
+          }
+          // Keep this recipe salt identical to explorer-ios-app.ts in the explorer supervisor.
+          const recipe = 'explorer-ios-release-v3-xcode-simulator-entitlements';
+          const digest = crypto.createHash('sha256').update(recipe).update('\0').update(env).update(ca).digest('hex').slice(0, 16);
+          if (process.env.FINGERPRINT !== `explorer-${process.env.CLOUD_REF.slice(0, 12)}-${digest}`) {
+            throw new Error('Explorer build key does not match build recipe, supplied env and CA');
+          }
+          NODE
+          # The env is data consumed by Expo, never sourced as shell code.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.cloud_ref }}
+          lfs: true
+          persist-credentials: false
+      - name: Prepare explorer env
+        run: cp "$RUNNER_TEMP/explorer.env" apps/mobile/.env.local
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build trpc types
+        run: pnpm --filter @kilocode/trpc run build
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
+      - name: Expo prebuild
+        run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform ios
+      - name: Disable OTA in generated native configuration
+        run: |
+          set -euo pipefail
+          plist=apps/mobile/ios/Kilo/Supporting/Expo.plist
+          /usr/libexec/PlistBuddy -c 'Delete :EXUpdatesEnabled' "$plist" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c 'Add :EXUpdatesEnabled bool false' "$plist"
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesEnabled' "$plist")" == false ]]
+      - name: Build embedded Release bundle
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace apps/mobile/ios/Kilo.xcworkspace \
+            -scheme Kilo \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
+          test -s "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator/Kilo.app/main.jsbundle"
+      - name: Verify linked simulator keychain entitlements
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import os
+          import pathlib
+          import plistlib
+          import subprocess
+
+          temporary = pathlib.Path(os.environ['RUNNER_TEMP'])
+          app = temporary / 'DerivedData/Build/Products/Release-iphonesimulator/Kilo.app'
+          native = pathlib.Path('apps/mobile/ios')
+          bundles = sorted(app.rglob('*.appex')) + [app]
+          for bundle in bundles:
+              with (bundle / 'Info.plist').open('rb') as source:
+                  info = plistlib.load(source)
+              identifier = info['CFBundleIdentifier']
+              executable = bundle / info['CFBundleExecutable']
+              with (native / bundle.stem / f'{bundle.stem}.entitlements').open('rb') as source:
+                  generated = plistlib.load(source)
+              architectures = subprocess.check_output(
+                  ['xcrun', 'lipo', '-archs', str(executable)], text=True
+              ).split()
+              if not architectures:
+                  raise RuntimeError(f'No simulator architecture in {identifier}')
+              for architecture in architectures:
+                  binary = executable
+                  if len(architectures) > 1:
+                      binary = temporary / f'{bundle.stem}.{architecture}.simulator'
+                      subprocess.run([
+                          'xcrun', 'lipo', str(executable), '-thin', architecture, '-output', str(binary)
+                      ], check=True)
+                  commands = subprocess.check_output(
+                      ['xcrun', 'otool', '-l', str(binary)], text=True
+                  )
+                  embedded = None
+                  # Read the real linked section, not codesign's separate signature XML:
+                  # AMFI requires simulator entitlements in __TEXT,__entitlements.
+                  for section in commands.split('Section\n')[1:]:
+                      fields = dict(line.split(None, 1) for line in section.splitlines()[:5])
+                      if fields.get('sectname') == '__entitlements' and fields.get('segname') == '__TEXT':
+                          with binary.open('rb') as source:
+                              source.seek(int(fields['offset']))
+                              data = source.read(int(fields['size'], 16))
+                          embedded = plistlib.loads(data.rstrip(b'\0'))
+                          break
+                  if embedded is None:
+                      raise RuntimeError(f'Missing linked simulator entitlements: {identifier}/{architecture}')
+                  application_id = embedded.get('application-identifier', '')
+                  groups = embedded.get('keychain-access-groups', [])
+                  if not (application_id == identifier or application_id.endswith('.' + identifier)):
+                      raise RuntimeError(f'Invalid linked application identifier: {identifier}/{architecture}')
+                  if bundle == app and application_id not in groups:
+                      raise RuntimeError(f'Missing main-app keychain access group: {identifier}/{architecture}')
+                  prefix = application_id[:-len(identifier)]
+                  declared_groups = [
+                      value.replace('$(AppIdentifierPrefix)', prefix)
+                      for value in generated.get('keychain-access-groups', [])
+                  ]
+                  if not set(declared_groups).issubset(groups):
+                      raise RuntimeError(f'Generated keychain groups not preserved: {identifier}/{architecture}')
+                  app_groups = 'com.apple.security.application-groups'
+                  if set(embedded.get(app_groups, [])) != set(generated.get(app_groups, [])):
+                      raise RuntimeError(f'Generated app groups not preserved: {identifier}/{architecture}')
+                  print(f'Verified linked simulator keychain entitlements: {identifier}/{architecture}')
+          subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)], check=True)
+          PY
+      - name: Package
+        run: |
+          set -euo pipefail
+          products="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator"
+          cp "$RUNNER_TEMP/ca.crt" "$products/ca.crt"
+          tar -C "$products" -czf "$RUNNER_TEMP/explorer.app.tar.gz" Kilo.app ca.crt
+      # Upload runs in a separate trusted job: untrusted pinned app code never receives an OIDC credential.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: explorer-ios-release
+          path: ${{ runner.temp }}/explorer.app.tar.gz
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      FINGERPRINT: ${{ inputs.fingerprint }}
+      WIF_PROVIDER: ${{ vars.KWF_IOS_WORKLOAD_IDENTITY_PROVIDER }}
+      UPLOAD_ACCOUNT: ${{ vars.KWF_IOS_UPLOAD_SERVICE_ACCOUNT }}
+    steps:
+      - name: Require existing scoped upload identity
+        run: |
+          set -euo pipefail
+          [[ -n "$WIF_PROVIDER" && -n "$UPLOAD_ACCOUNT" ]] || { echo '::error::Configure the existing explorers-prefix-scoped WIF provider and upload identity'; exit 1; }
+          [[ "$FINGERPRINT" =~ ^explorer-[0-9a-f]{12}-[0-9a-f]{16}$ ]]
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: explorer-ios-release
+          path: ${{ runner.temp }}/explorer-artifact
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.KWF_IOS_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.KWF_IOS_UPLOAD_SERVICE_ACCOUNT }}
+          token_format: access_token
+        id: auth
+      - name: Upload immutable explorer artifact
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          set -euo pipefail
+          url="https://storage.googleapis.com/upload/storage/v1/b/kwf-planner-kilocode-us-central1/o?uploadType=media&ifGenerationMatch=0&name=explorers%2Fios%2F${FINGERPRINT}.app.tar.gz"
+          status=$(curl -sS --retry 3 --retry-connrefused -o "$RUNNER_TEMP/upload-response" -w '%{http_code}' \
+            -H "Authorization: Bearer $ACCESS_TOKEN" -H 'Content-Type: application/gzip' \
+            --data-binary "@$RUNNER_TEMP/explorer-artifact/explorer.app.tar.gz" "$url")
+          case "$status" in
+            200|201) echo '::notice::Explorer simulator artifact uploaded' ;;
+            412) echo '::notice::Immutable explorer artifact already exists' ;;
+            *) echo "::error::Artifact upload returned HTTP $status"; exit 1 ;;
+          esac

@@ -1,8 +1,9 @@
 import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
+import { FlashList } from '@shopify/flash-list';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Pressable, View } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/code-review';
@@ -19,6 +20,9 @@ import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { dedupeById } from '@/lib/query/dedupe-by-id';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
+
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = { paddingHorizontal: 24, paddingTop: 16 } satisfies ViewStyle;
 
 // Tone classes stay mobile-local; the label is the translated catalog key
 // for the same stable status code web reads, so it can't drift from web.
@@ -171,7 +175,8 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
     );
   } else {
     body = (
-      <FlatList
+      <FlashList
+        style={listStyle}
         data={reviews}
         keyExtractor={review => review.id}
         renderItem={({ item: review, index }) => {
@@ -204,7 +209,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
             </Pressable>
           );
         }}
-        contentContainerClassName="px-6 pt-4"
+        contentContainerStyle={listContentContainerStyle}
         onEndReached={() => {
           // Once the next page has failed, auto-loading re-fires on every
           // content-size change (the footer grows/shrinks as the fetch

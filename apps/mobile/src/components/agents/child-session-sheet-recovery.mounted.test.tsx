@@ -8,7 +8,6 @@ import {
   historyPage,
   host,
   makeAssistantMessage,
-  modal,
   readyState,
   renderSheet,
   retryButton,
@@ -188,11 +187,11 @@ describe('ChildSessionSheet recovery', () => {
       await Promise.resolve();
     });
     await sheet.sync();
-    expect(modal(renderer.root).props.visible).toBe(false);
+    expect(host(renderer.root, 'BottomSheet').props.index).toBe(-1);
     expect(host(renderer.root, 'FlashList')).toBe(list);
     expect(textValues(list)).toEqual(['child text']);
     await act(async () => {
-      (modal(renderer.root).props.onDismiss as () => void)();
+      (host(renderer.root, 'BottomSheet').props.onDismiss as () => void)();
       await Promise.resolve();
     });
     pending.resolve(historyPage([makeAssistantMessage('m0', 'Recovered while closed')]));

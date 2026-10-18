@@ -28,11 +28,17 @@ import {
   type ContainerInstanceSize,
   type ContainersObservation,
 } from './SandboxContainers.js';
+import {
+  PREVIEW_MARKER_ALLOCATION_HEADER,
+  PREVIEW_MARKER_PORT_HEADER,
+} from '../shared/preview-headers.js';
 import type { Env } from '../types.js';
+import type { ContainersOutboundProps } from './containers-outbound.js';
 
 // The fake proves coordinator ordering only. It does not prove that exec behaves as assumed, and it
 // fails any attempt to snapshot the container so a stop that snapshots cannot pass silently.
 const RECORD_KEY = 'containers:record:v1';
+const SNAPSHOT_SIZE = 1_234_567;
 const REF_A = 'ref-a';
 const REF_B = 'ref-b';
 
@@ -45,6 +51,8 @@ type StoredRecord = {
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: string;
+  repositoryStartFailures?: { snapshotId: string; attempts: number };
+  egressPolicy?: { allocationRef: string; allowlist: string[] };
 };
 
 const idleRecord: StoredRecord = {
@@ -165,10 +173,10 @@ class FakeContainer {
     if (this.snapshotBehavior.kind === 'reject')
       throw this.snapshotBehavior.error ?? new Error('snapshot failed');
     if (this.snapshotBehavior.kind === 'resolve')
-      return { id: this.snapshotBehavior.id } as ContainerSnapshot;
+      return { id: this.snapshotBehavior.id, size: SNAPSHOT_SIZE };
     return new Promise((resolve, reject) =>
       this.deferredSnapshots.push({
-        resolve: id => resolve({ id } as ContainerSnapshot),
+        resolve: id => resolve({ id, size: SNAPSHOT_SIZE }),
         reject,
       })
     );
@@ -201,6 +209,13 @@ class FakeContainer {
 
   async setInactivityTimeout(ms: number | bigint): Promise<void> {
     this.leaseCalls.push(Number(ms));
+  }
+
+  tcpPortCalls = 0;
+
+  getTcpPort(_port: number): { fetch: (url: string, request: Request) => Promise<Response> } {
+    this.tcpPortCalls += 1;
+    return { fetch: async () => new Response('preview', { status: 200 }) };
   }
 
   async monitor(): Promise<void> {
@@ -306,13 +321,31 @@ function launch(
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
-function attachOutbound(instance: SandboxContainers): void {
-  const outbound = vi.fn((options: { props: { containerId: string } }) => options.props);
+type LogLine = { level: string; fields: Record<string, unknown>; message: string };
+
+/** Record every structured log line; `diagnostics(event)` narrows to one control diagnostic. */
+function captureLogs() {
+  const lines: LogLine[] = [];
+  vi.spyOn(logger, 'withFields').mockImplementation(((fields: Record<string, unknown>) => ({
+    info: (message: string) => lines.push({ level: 'info', fields, message }),
+    warn: (message: string) => lines.push({ level: 'warn', fields, message }),
+    error: (message: string) => lines.push({ level: 'error', fields, message }),
+  })) as unknown as typeof logger.withFields);
+  return {
+    lines,
+    diagnostics: (event: string) => lines.filter(line => line.fields.diagnosticEvent === event),
+  };
+}
+
+function attachOutbound(instance: SandboxContainers) {
+  const outbound = vi.fn((options: { props: ContainersOutboundProps }) => options.props);
   (
     instance as unknown as { ctx: { exports: { ContainersOutbound: typeof outbound } } }
   ).ctx.exports = { ContainersOutbound: outbound };
+  return outbound;
 }
 
 const NATIVE_GATE_ENV = { CONTROL_PLANE_NATIVE_LOGS: '1' };
@@ -346,6 +379,268 @@ function sleepPreExec(record?: StoredRecord) {
   state.container.running = true;
   return state;
 }
+
+describe('SandboxContainers egress enforcement', () => {
+  it.each([{ egressAllowlist: [] }, { egressAllowlist: ['Example.COM.', 'example.com'] }])(
+    'restricts a native image start independently of credential containment: %j',
+    async ({ egressAllowlist }) => {
+      const { instance, container, readRecord } = setup();
+      const outbound = attachOutbound(instance);
+      await instance.launchWrapper({
+        allocationRef: REF_A,
+        env: { EGRESS_ALLOWLIST: '*' },
+        instance: 'lite',
+        egressAllowlist,
+      });
+
+      const expectedPolicy = egressAllowlist.length === 0 ? [] : ['example.com'];
+      expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:cat']);
+      expect(container.startCalls[0]).toMatchObject({
+        enableInternet: false,
+        env: {
+          SANDBOX_INTERCEPT_HTTPS: '1',
+          NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt',
+        },
+      });
+      expect(outbound).toHaveBeenCalledWith({
+        props: { containerId: 'do-id', egressAllowlist: expectedPolicy },
+      });
+      expect(readRecord().egressPolicy).toEqual({
+        allocationRef: REF_A,
+        allowlist: expectedPolicy,
+      });
+    }
+  );
+
+  it('retains unrestricted starts when no policy or containment is supplied', async () => {
+    const { instance, container } = setup();
+    await launch(instance, REF_A);
+    expect(container.calls).toEqual(['start', 'exec:cat']);
+    expect(container.startCalls[0]?.enableInternet).toBe(true);
+  });
+
+  it.each(['interceptOutboundHttps', 'interceptAllOutboundHttp'] as const)(
+    'never starts a restricted container when %s fails',
+    async method => {
+      const { instance, container } = setup();
+      attachOutbound(instance);
+      vi.spyOn(container, method).mockRejectedValue(new Error('interceptor unavailable'));
+      await expect(
+        instance.launchWrapper({
+          allocationRef: REF_A,
+          env: {},
+          instance: 'lite',
+          egressAllowlist: [],
+        })
+      ).rejects.toThrow('interceptor unavailable');
+      expect(container.startCalls).toHaveLength(0);
+    }
+  );
+
+  it('reinstalls trusted props on same-allocation retries after Durable Object reconstruction', async () => {
+    const initial = setup();
+    attachOutbound(initial.instance);
+    await initial.instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite',
+      egressAllowlist: ['example.com'],
+    });
+    const restored = setup({ record: initial.readRecord(), running: true });
+    const outbound = attachOutbound(restored.instance);
+    await restored.instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite',
+      egressAllowlist: ['EXAMPLE.COM.'],
+    });
+    expect(restored.container.calls).toEqual(['https-intercept', 'http-intercept']);
+    expect(outbound).toHaveBeenCalledWith({
+      props: { containerId: 'do-id', egressAllowlist: ['example.com'] },
+    });
+    expect(restored.readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
+  });
+
+  it.each(
+    [undefined, [], ['other.test'], ['example.com', 'other.test']].map(egressAllowlist => ({
+      egressAllowlist,
+    }))
+  )(
+    'rejects policy changes on a restricted running allocation: %j',
+    async ({ egressAllowlist }) => {
+      const { instance, container, readRecord } = setup({
+        record: {
+          ...idleRecord,
+          allocationRef: REF_A,
+          state: 'running',
+          egressPolicy: { allocationRef: REF_A, allowlist: ['example.com'] },
+        },
+        running: true,
+      });
+      await expect(
+        instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: 'lite', egressAllowlist })
+      ).rejects.toThrow('egress policy cannot change');
+      expect(container.calls).toEqual([]);
+      expect(readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
+    }
+  );
+
+  it('rejects attempts to retrofit runtime network isolation onto an unrestricted allocation', async () => {
+    const { instance, container } = setup({
+      record: { ...idleRecord, allocationRef: REF_A, state: 'running' },
+      running: true,
+    });
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        env: {},
+        instance: 'lite',
+        egressAllowlist: [],
+      })
+    ).rejects.toThrow('egress policy cannot change');
+    expect(container.calls).toEqual([]);
+  });
+
+  it('rejects restricted fresh launches when an unowned physical container is already running', async () => {
+    const { instance, container } = setup({ running: true });
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        env: {},
+        instance: 'lite',
+        egressAllowlist: [],
+      })
+    ).rejects.toThrow('unowned running container');
+    expect(container.calls).toEqual([]);
+  });
+
+  it.each(
+    [null, '*', ['*.example.com'], ['127.0.0.1']].map(egressAllowlist => ({ egressAllowlist }))
+  )('fails closed before start for invalid policy %j', async ({ egressAllowlist }) => {
+    const { instance, container } = setup();
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        env: {},
+        instance: 'lite',
+        egressAllowlist,
+      } as never)
+    ).rejects.toThrow();
+    expect(container.calls).toEqual([]);
+  });
+
+  it('fails closed for invalid persisted policy instead of re-registering unrestricted props', async () => {
+    const { instance, container } = setup({
+      record: {
+        ...idleRecord,
+        allocationRef: REF_A,
+        state: 'running',
+        egressPolicy: { allocationRef: REF_A, allowlist: ['*'] },
+      },
+      running: true,
+    });
+    await expect(launch(instance, REF_A)).rejects.toThrow();
+    expect(container.calls).toEqual([]);
+  });
+
+  it('retains policy after an ambiguous native start and rejects removal before adoption', async () => {
+    const { instance, container, readRecord } = setup();
+    attachOutbound(instance);
+    container.startBehavior = 'effect-then-reject';
+    const input = {
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite' as const,
+      egressAllowlist: ['example.com'],
+    };
+    await expect(instance.launchWrapper(input)).rejects.toThrow('start failed');
+    expect(readRecord()).toMatchObject({
+      egressPolicy: { allocationRef: REF_A, allowlist: ['example.com'] },
+      wrapperAttempt: 'exec_pending',
+    });
+    await expect(launch(instance, REF_A)).rejects.toThrow('egress policy cannot change');
+    await expect(instance.launchWrapper(input)).resolves.toMatchObject({ started: true });
+    expect(container.startCalls).toHaveLength(1);
+    expect(container.startCalls[0]?.enableInternet).toBe(false);
+  });
+
+  it('retains enforcement on stopped pre-exec resume', async () => {
+    const { instance, container } = setup({
+      record: {
+        ...idleRecord,
+        allocationRef: REF_A,
+        state: 'launching',
+        wrapperAttempt: 'not_started',
+        egressPolicy: { allocationRef: REF_A, allowlist: [] },
+      },
+    });
+    attachOutbound(instance);
+    await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite',
+      egressAllowlist: [],
+    });
+    expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:cat']);
+    expect(container.startCalls[0]?.enableInternet).toBe(false);
+  });
+
+  it('retains trust and props on a running pre-exec resume', async () => {
+    const { instance, container } = sleepPreExec({
+      ...idleRecord,
+      allocationRef: REF_A,
+      state: 'launching',
+      wrapperAttempt: 'not_started',
+      egressPolicy: { allocationRef: REF_A, allowlist: ['example.com'] },
+    });
+    const outbound = attachOutbound(instance);
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+    await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite',
+      egressAllowlist: ['example.com'],
+    });
+    expect(container.startCalls).toHaveLength(0);
+    expect(container.execCalls.at(-1)?.options?.env).toMatchObject({
+      SANDBOX_INTERCEPT_HTTPS: '1',
+    });
+    expect(outbound).toHaveBeenCalledWith({
+      props: { containerId: 'do-id', egressAllowlist: ['example.com'] },
+    });
+  });
+
+  it('allows policy replacement only after destroying the previous allocation', async () => {
+    const { instance, container, readRecord } = setup();
+    attachOutbound(instance);
+    await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite',
+      egressAllowlist: [],
+    });
+    await launch(instance, REF_B);
+    expect(container.destroyCalls).toBe(1);
+    expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, true]);
+    expect(readRecord().egressPolicy).toBeUndefined();
+  });
+
+  it('rejects policy removal after stop when retrying the same allocation reference', async () => {
+    const { instance, container, readRecord } = setup();
+    attachOutbound(instance);
+    const input = { allocationRef: REF_A, env: {}, instance: 'lite' as const, egressAllowlist: [] };
+    await instance.launchWrapper(input);
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    expect(readRecord()).toMatchObject({
+      state: 'idle',
+      allocationRef: null,
+      egressPolicy: { allocationRef: REF_A, allowlist: [] },
+    });
+    await expect(launch(instance, REF_A)).rejects.toThrow('egress policy cannot change');
+    await expect(instance.launchWrapper(input)).resolves.toMatchObject({ started: true });
+    expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, false]);
+  });
+});
 
 describe('SandboxContainers launch', () => {
   it('fresh idle+missing starts natively with the supervisor entrypoint, gate and CA, and never execs the supervisor', async () => {
@@ -1488,6 +1783,65 @@ describe('SandboxContainers native start confirmation', () => {
     });
   });
 
+  it('logs the time to ready and the number of checks once PID 1 is the supervisor', async () => {
+    vi.useFakeTimers();
+    const { diagnostics } = captureLogs();
+    const { instance, container } = setup();
+    container.identityAfterStart = 'sleep';
+
+    const pending = launch(instance, REF_A);
+    await vi.advanceTimersByTimeAsync(1_500);
+    container.mainProcess = 'supervisor';
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(pending).resolves.toEqual({ started: true, startSource: 'image' });
+
+    const lines = diagnostics('supervisor_confirm');
+    expect(lines.map(line => [line.level, line.fields])).toEqual([
+      [
+        'info',
+        expect.objectContaining({ result: 'ready', source: 'image', elapsedMs: 2_000, checks: 3 }),
+      ],
+    ]);
+    expect(lines[0]?.fields).not.toHaveProperty('lastSeen');
+  });
+
+  it('logs the last PID 1 reading that completed when confirmation times out', async () => {
+    vi.useFakeTimers();
+    const { diagnostics } = captureLogs();
+    const { instance, container } = setup();
+    container.identityAfterStart = 'sleep';
+    // The first read sees `sleep infinity`; every later read hangs, so the read in
+    // flight at the deadline is cut off and must not hide what was last seen.
+    const exec = container.exec.bind(container);
+    let reads = 0;
+    vi.spyOn(container, 'exec').mockImplementation((cmd, options) => {
+      if (cmd[0] === 'cat' && (reads += 1) > 1) return new Promise<ExecProcess>(() => {});
+      return exec(cmd, options);
+    });
+
+    const failed = expect(launch(instance, REF_A)).rejects.toThrow('wrapper exec timed out');
+    await vi.advanceTimersByTimeAsync(90_000);
+    await failed;
+
+    const lines = diagnostics('supervisor_confirm');
+    expect(lines.map(line => [line.level, line.fields])).toEqual([
+      [
+        'warn',
+        expect.objectContaining({
+          result: 'timeout',
+          source: 'image',
+          elapsedMs: 90_000,
+          checks: 2,
+          finalCutOff: true,
+          lastSeen: 'cmdline',
+          lastIdentity: 'sleep',
+          lastCmdline: 'sleep_infinity',
+          lastCmdlineBytes: 14,
+        }),
+      ],
+    ]);
+  });
+
   it('fences a failed running-record write after native startup and never starts or execs on retry', async () => {
     const { instance, container, readRecord, setPutGate } = setup();
     setPutGate(value => {
@@ -1973,7 +2327,45 @@ function launchFromRepo(instance: SandboxContainers, ref: string, extra = {}) {
   });
 }
 
+async function launchWithImageFallback(instance: SandboxContainers, ref: string) {
+  const result = await launchFromRepo(instance, ref);
+  if (!result.snapshotFailed) return result;
+  expect(result).toEqual({ started: false, startSource: 'repository', snapshotFailed: true });
+  await expect(instance.stop(ref)).resolves.toBe('terminal');
+  return launchFromRepo(instance, ref, { skipRepository: true });
+}
+
 describe('SandboxContainers repository snapshots', () => {
+  it('restricts repository restore and subsequent image fallback with the same policy', async () => {
+    vi.useFakeTimers();
+    const key = await indexKeyFor();
+    const { kv } = fakeKv({ [key]: { snapshotId: 'snap-repo' } });
+    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: kv } });
+    const outbound = attachOutbound(instance);
+    container.identityAfterStart = 'ambiguous';
+    const policy = { egressAllowlist: ['example.com'] };
+    const pending = launchFromRepo(instance, REF_A, policy);
+    await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+    await vi.advanceTimersByTimeAsync(300_000);
+    const first = await pending;
+    expect(first.snapshotFailed).toBe(true);
+    expect(readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    container.identityAfterStart = 'supervisor';
+    await launchFromRepo(instance, REF_A, { ...policy, skipRepository: true });
+
+    expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, false]);
+    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-repo' } });
+    expect(container.startCalls[1]).toMatchObject({ image: IMAGE });
+    expect(
+      container.startCalls.every(options => options.env?.SANDBOX_INTERCEPT_HTTPS === '1')
+    ).toBe(true);
+    expect(outbound.mock.calls.map(call => call[0].props.egressAllowlist)).toEqual([
+      ['example.com'],
+      ['example.com'],
+    ]);
+  });
+
   it('starts from the repository snapshot stored for the repo key and the current image', async () => {
     const key = await indexKeyFor();
     const { kv } = fakeKv({ [key]: { snapshotId: 'snap-repo', commit: 'abc123' } });
@@ -2039,51 +2431,373 @@ describe('SandboxContainers repository snapshots', () => {
     });
   });
 
-  it('forgets the snapshot when its start fails, so the next start is from the image', async () => {
+  it('logs the age and size of the snapshot it starts from, and no age for an older entry', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000_000);
+    const { diagnostics } = captureLogs();
     const key = await indexKeyFor();
-    const store = fakeKv({ [key]: { snapshotId: 'snap-missing' } });
-    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-    container.startBehavior = 'reject';
+    const captured = fakeKv({
+      [key]: { snapshotId: 'snap-repo', capturedAt: 10_000_000 - 90_000, size: SNAPSHOT_SIZE },
+    });
+    const first = setup({ env: { REPO_SNAPSHOTS: captured.kv } });
+    await expect(launchFromRepo(first.instance, REF_A)).resolves.toMatchObject({
+      startSource: 'repository',
+    });
+    const older = fakeKv({ [key]: { snapshotId: 'snap-repo' } });
+    const second = setup({ env: { REPO_SNAPSHOTS: older.kv } });
+    await expect(launchFromRepo(second.instance, REF_A)).resolves.toMatchObject({
+      startSource: 'repository',
+    });
 
-    await expect(launchFromRepo(instance, REF_A)).rejects.toThrow('container start failed');
-    expect(store.data.has(key)).toBe(false);
-    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-missing' } });
+    const lookups = diagnostics('snapshot_lookup').map(line => line.fields);
+    expect(lookups).toEqual([
+      expect.objectContaining({
+        source: 'repository',
+        reason: 'index_hit',
+        ageMs: 90_000,
+        size: SNAPSHOT_SIZE,
+      }),
+      expect.objectContaining({ source: 'repository', reason: 'index_hit' }),
+    ]);
+    expect(lookups[1]).not.toHaveProperty('ageMs');
+    expect(lookups[1]).not.toHaveProperty('size');
+    expect(diagnostics('supervisor_confirm').map(line => line.fields.source)).toEqual([
+      'repository',
+      'repository',
+    ]);
   });
 
-  it('forgets the snapshot when the wrapper cannot start from it', async () => {
+  it.each(['reject', 'effect-then-reject'] as const)(
+    'falls back after a %s snapshot failure and retries the snapshot on ten separate starts',
+    async startBehavior => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10_000_000);
+      const key = await indexKeyFor();
+      const entry = {
+        snapshotId: 'snap-missing',
+        commit: 'abc123',
+        capturedAt: 9_000_000,
+        size: SNAPSHOT_SIZE,
+      };
+      const store = fakeKv({ [key]: entry });
+      const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+      const start = container.start.bind(container);
+      vi.spyOn(container, 'start').mockImplementation(options => {
+        container.startBehavior = options?.containerSnapshot === undefined ? 'ok' : startBehavior;
+        start(options);
+      });
+
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await expect(launchWithImageFallback(instance, `ref-${attempt}`)).resolves.toEqual({
+          started: true,
+          startSource: 'image',
+        });
+        expect(container.startCalls[attempt * 2]).toMatchObject({
+          containerSnapshot: { id: 'snap-missing' },
+        });
+        expect(container.startCalls[attempt * 2 + 1]).toEqual(nativeStartOptions('standard-2'));
+        expect(readRecord().repositoryStartFailures).toEqual({
+          snapshotId: 'snap-missing',
+          attempts: attempt + 1,
+        });
+      }
+      expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual(entry);
+      expect(store.calls.filter(call => call.op === 'put' || call.op === 'delete')).toEqual([]);
+
+      await expect(launchFromRepo(instance, REF_B)).resolves.toEqual({
+        started: true,
+        startSource: 'image',
+      });
+      expect(container.startCalls).toHaveLength(21);
+      expect(container.startCalls[20]).toEqual(nativeStartOptions('standard-2'));
+      expect(readRecord()).toMatchObject({
+        allocationRef: REF_B,
+        state: 'running',
+        startSource: 'image',
+      });
+      expect(store.data.has(key)).toBe(true);
+    }
+  );
+
+  it('falls back when the snapshot supervisor cannot start and retries the snapshot on the next start', async () => {
     vi.useFakeTimers();
     const key = await indexKeyFor();
     const store = fakeKv({ [key]: { snapshotId: 'snap-broken' } });
-    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-    container.identityAfterStart = 'ambiguous';
-    const failed = expect(launchFromRepo(instance, REF_A)).rejects.toThrow(
-      'wrapper exec timed out'
-    );
+    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    const start = container.start.bind(container);
+    const startSpy = vi.spyOn(container, 'start').mockImplementation(options => {
+      container.identityAfterStart =
+        options?.containerSnapshot === undefined ? 'supervisor' : 'ambiguous';
+      start(options);
+    });
+    const launched = expect(launchWithImageFallback(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
     await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
-    await vi.advanceTimersByTimeAsync(90_000);
-    await failed;
-    expect(store.data.has(key)).toBe(false);
+    await vi.advanceTimersByTimeAsync(300_000);
+    await launched;
+    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-broken' });
+    expect(readRecord().repositoryStartFailures).toEqual({
+      snapshotId: 'snap-broken',
+      attempts: 1,
+    });
+    expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
+
+    startSpy.mockRestore();
+    container.identityAfterStart = 'supervisor';
+    await expect(launchFromRepo(instance, REF_B)).resolves.toEqual({
+      started: true,
+      startSource: 'repository',
+    });
+    expect(container.startCalls[1]).toEqual(nativeStartOptions('standard-2'));
+    expect(container.startCalls[2]).toMatchObject({ containerSnapshot: { id: 'snap-broken' } });
+    expect(readRecord().repositoryStartFailures).toEqual({
+      snapshotId: 'snap-broken',
+      attempts: 1,
+    });
   });
 
-  it('forgets nothing when an image start fails', async () => {
+  it('marks nothing when an image start fails', async () => {
     const store = fakeKv();
     const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
     container.startBehavior = 'reject';
 
-    await expect(launchFromRepo(instance, REF_A)).rejects.toThrow('container start failed');
+    await expect(launchWithImageFallback(instance, REF_A)).rejects.toThrow(
+      'container start failed'
+    );
     expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
+    expect(store.calls.filter(call => call.op === 'put')).toEqual([]);
   });
 
-  it('discards the stored snapshot and starts from the image when asked', async () => {
+  it('propagates an image fallback failure without retrying either start', async () => {
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
+    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    container.startBehavior = 'reject';
+
+    await expect(launchWithImageFallback(instance, REF_A)).rejects.toThrow(
+      'container start failed'
+    );
+    expect(container.startCalls).toHaveLength(2);
+    expect(container.startCalls[1]).toEqual(nativeStartOptions('standard-2'));
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      startSource: 'image',
+      repositoryStartFailures: { snapshotId: 'snap-bad', attempts: 1 },
+    });
+    expect(store.calls.filter(call => call.op === 'put' || call.op === 'delete')).toEqual([]);
+  });
+
+  it('returns snapshot failure without destroying a container or issuing the image start', async () => {
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
+    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    container.startBehavior = 'effect-then-reject';
+
+    await expect(launchFromRepo(instance, REF_A)).resolves.toEqual({
+      started: false,
+      startSource: 'repository',
+      snapshotFailed: true,
+    });
+    expect(container.startCalls).toHaveLength(1);
+    expect(container.destroyCalls).toBe(0);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+    expect(store.data.has(key)).toBe(true);
+  });
+
+  it.each([undefined, 310_000])(
+    'allows a cold snapshot to become ready after four minutes with deadline %s',
+    async deadlineAt => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10_000);
+      const key = await indexKeyFor();
+      const store = fakeKv({ [key]: { snapshotId: 'snap-cold' } });
+      const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+      container.identityAfterStart = 'ambiguous';
+
+      const launched = expect(launchFromRepo(instance, REF_A, { deadlineAt })).resolves.toEqual({
+        started: true,
+        startSource: 'repository',
+      });
+      await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+      await vi.advanceTimersByTimeAsync(240_000);
+      container.mainProcess = 'supervisor';
+      await vi.advanceTimersByTimeAsync(1_000);
+      await launched;
+      expect(container.startCalls).toHaveLength(1);
+      expect(readRecord().repositoryStartFailures).toBeUndefined();
+    }
+  );
+
+  it.each(['repository', 'image'] as const)(
+    'bounds %s confirmation by its start-source timeout',
+    async source => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10_000);
+      const { diagnostics } = captureLogs();
+      const key = await indexKeyFor();
+      const store = fakeKv(source === 'repository' ? { [key]: { snapshotId: 'snap-cold' } } : {});
+      const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+      container.identityAfterStart = 'ambiguous';
+      const launch = launchFromRepo(instance, REF_A);
+      const failed =
+        source === 'repository'
+          ? expect(launch).resolves.toMatchObject({ snapshotFailed: true })
+          : expect(launch).rejects.toThrow('wrapper exec timed out');
+      await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+      const budget = source === 'repository' ? 300_000 : 90_000;
+      await vi.advanceTimersByTimeAsync(budget - 1_000);
+      expect(container.startCalls).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await failed;
+      expect(diagnostics('supervisor_confirm')[0].fields.elapsedMs).toBe(budget);
+    }
+  );
+
+  it('bounds snapshot confirmation by the supplied creation deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const { diagnostics } = captureLogs();
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
+    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    container.identityAfterStart = 'ambiguous';
+
+    const failed = expect(
+      launchFromRepo(instance, REF_A, { deadlineAt: 15_000 })
+    ).resolves.toMatchObject({ snapshotFailed: true });
+    await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+    await vi.advanceTimersByTimeAsync(5_000);
+    await failed;
+    expect(diagnostics('supervisor_confirm')[0].fields.elapsedMs).toBeGreaterThan(4_000);
+    expect(diagnostics('supervisor_confirm')[0].fields.elapsedMs).toBeLessThanOrEqual(5_000);
+    expect(container.destroyCalls).toBe(0);
+  });
+
+  it('does not issue an image start after its supplied deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const { instance, container } = setup();
+
+    await expect(
+      launchFromRepo(instance, REF_A, { deadlineAt: 10_000, skipRepository: true })
+    ).rejects.toThrow('wrapper exec timed out');
+    expect(container.startCalls).toEqual([]);
+  });
+
+  it.each(['index_miss', 'retries_exhausted'] as const)(
+    'keeps the full image readiness budget after %s',
+    async reason => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10_000);
+      const key = await indexKeyFor();
+      const store = fakeKv(reason === 'index_miss' ? {} : { [key]: { snapshotId: 'snap-bad' } });
+      const { instance, container } = setup({
+        env: { REPO_SNAPSHOTS: store.kv },
+        record: {
+          ...idleRecord,
+          repositoryStartFailures: { snapshotId: 'snap-bad', attempts: 10 },
+        },
+      });
+      container.identityAfterStart = 'ambiguous';
+
+      const launched = expect(
+        launchFromRepo(instance, REF_A, { deadlineAt: 130_000 })
+      ).resolves.toEqual({ started: true, startSource: 'image' });
+      await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+      await vi.advanceTimersByTimeAsync(65_000);
+      container.mainProcess = 'supervisor';
+      await vi.advanceTimersByTimeAsync(1_000);
+      await launched;
+    }
+  );
+
+  it('does not count a snapshot failure when its deadline expires before native issuance', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-good' } });
+    const { instance, container, readRecord, setPutGate, releaseHeldPut } = setup({
+      env: { REPO_SNAPSHOTS: store.kv },
+    });
+    let held = false;
+    setPutGate(value => {
+      if ((value as StoredRecord).state !== 'launching') return 'pass';
+      held = true;
+      return 'hold';
+    });
+
+    const failed = expect(launchFromRepo(instance, REF_A, { deadlineAt: 15_000 })).rejects.toThrow(
+      'wrapper exec timed out'
+    );
+    await vi.waitFor(() => expect(held).toBe(true));
+    await vi.advanceTimersByTimeAsync(6_000);
+    releaseHeldPut();
+    await failed;
+    expect(container.startCalls).toEqual([]);
+    expect(readRecord().repositoryStartFailures).toBeUndefined();
+  });
+
+  it('retains the stored snapshot and starts from the image when asked to skip it', async () => {
     const key = await indexKeyFor();
     const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
     const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
 
-    const result = await launchFromRepo(instance, REF_A, { discardRepository: true });
+    const result = await launchFromRepo(instance, REF_A, { skipRepository: true });
 
     expect(result).toEqual({ started: true, startSource: 'image' });
-    expect(store.data.has(key)).toBe(false);
+    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-bad' });
+    expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
     expect(container.startCalls[0]).toMatchObject({ image: IMAGE });
+  });
+
+  it('starts from the image without writing to KV when asked to skip a snapshot', async () => {
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
+    store.failing.put = true;
+    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+
+    await expect(launchFromRepo(instance, REF_A, { skipRepository: true })).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(container.startCalls[0]).toEqual(nativeStartOptions('standard-2'));
+    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-bad' });
+    expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
+    expect(store.calls.filter(call => call.op === 'put')).toEqual([]);
+  });
+
+  it('retains a failed entry across starts until a successful capture replaces it', async () => {
+    const { diagnostics } = captureLogs();
+    const key = await indexKeyFor();
+    const entry = { snapshotId: 'snap-bad' };
+    const store = fakeKv({ [key]: entry });
+    const { instance, container } = setup({
+      env: { REPO_SNAPSHOTS: store.kv },
+      record: { ...idleRecord, repositoryStartFailures: { snapshotId: 'snap-bad', attempts: 10 } },
+    });
+
+    await expect(launchFromRepo(instance, REF_A)).resolves.toMatchObject({ startSource: 'image' });
+    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual(entry);
+    expect(store.calls.filter(call => call.op === 'put' || call.op === 'delete')).toEqual([]);
+    expect(diagnostics('snapshot_lookup')[0].fields).toMatchObject({
+      source: 'image',
+      reason: 'retries_exhausted',
+      attempts: 10,
+    });
+
+    await expect(instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(true);
+    expect(JSON.parse(store.data.get(key) ?? 'null')).toMatchObject({ snapshotId: 'snap-1' });
+    await expect(launchFromRepo(instance, REF_B)).resolves.toMatchObject({
+      startSource: 'repository',
+    });
+    expect(container.startCalls[1]).toMatchObject({ containerSnapshot: { id: 'snap-1' } });
   });
 
   it('uses the recorded source when it resumes a launch that never started the wrapper', async () => {
@@ -2157,17 +2871,23 @@ describe('SandboxContainers repository capture', () => {
     return { ...harness, store };
   }
 
-  it('publishes the snapshot under the repo key and image with a 10 day ttl', async () => {
+  it('publishes the snapshot with its capture time and size under the repo key and image with a 10 day ttl', async () => {
     const { instance, container, store } = await runningWithIndex();
     container.snapshotBehavior = { kind: 'resolve', id: 'snap-captured' };
+    const before = Date.now();
 
     await expect(instance.captureRepository(REF_A, REPO_KEY, 'deadbeef')).resolves.toBe(true);
 
     const key = await indexKeyFor();
-    expect(JSON.parse(store.data.get(key) as string)).toEqual({
+    const entry = JSON.parse(store.data.get(key) as string);
+    expect(entry).toEqual({
       snapshotId: 'snap-captured',
+      capturedAt: expect.any(Number),
+      size: SNAPSHOT_SIZE,
       commit: 'deadbeef',
     });
+    expect(entry.capturedAt).toBeGreaterThanOrEqual(before);
+    expect(entry.capturedAt).toBeLessThanOrEqual(Date.now());
     expect(store.calls.find(call => call.op === 'put')).toEqual({
       op: 'put',
       key,
@@ -2176,12 +2896,8 @@ describe('SandboxContainers repository capture', () => {
     expect(container.snapshotCalls).toBe(1);
   });
 
-  it('logs one line per capture with its outcome and duration, and no key or id', async () => {
-    const lines: Array<{ level: string; fields: Record<string, unknown>; message: string }> = [];
-    vi.spyOn(logger, 'withFields').mockImplementation(((fields: Record<string, unknown>) => ({
-      info: (message: string) => lines.push({ level: 'info', fields, message }),
-      warn: (message: string) => lines.push({ level: 'warn', fields, message }),
-    })) as unknown as typeof logger.withFields);
+  it('logs one line per capture with its outcome, duration and size, and no key or id', async () => {
+    const { lines } = captureLogs();
 
     const stored = await runningWithIndex();
     await stored.instance.captureRepository(REF_A, REPO_KEY, 'abc123');
@@ -2199,9 +2915,14 @@ describe('SandboxContainers repository capture', () => {
       ['warn', 'index_unavailable', 'Repository snapshot not saved'],
     ]);
     for (const line of captures) expect(line.fields.durationMs).toEqual(expect.any(Number));
+    expect(captures.map(line => line.fields.size)).toEqual([
+      SNAPSHOT_SIZE,
+      undefined,
+      SNAPSHOT_SIZE,
+    ]);
     expect(JSON.stringify(lines)).not.toContain(REPO_KEY);
     expect(JSON.stringify(lines)).not.toContain('abc123');
-    vi.restoreAllMocks();
+    expect(JSON.stringify(lines)).not.toContain('snap-1');
   });
 
   it('does nothing without a KV binding, a running container or the running allocation', async () => {
@@ -2281,5 +3002,86 @@ describe('containment trust ownership', () => {
   it('keeps the container entrypoint to PID 1 only', () => {
     expect(dockerfileSource).not.toContain('update-ca-certificates');
     expect(dockerfileSource).toContain('exec sleep infinity');
+  });
+});
+
+describe('SandboxContainers preview fetch boundary', () => {
+  const runningRecord = (): StoredRecord => ({
+    ...idleRecord,
+    state: 'running',
+    allocationRef: REF_A,
+  });
+
+  function markedRequest(headers: Record<string, string>): Request {
+    return new Request('http://localhost:5173/page', { headers });
+  }
+
+  it('answers 404 for an unmarked request without touching the container', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const response = await instance.fetch(new Request('http://localhost:5173/page'));
+    expect(response.status).toBe(404);
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses a missing allocation header with a fixed 503 before getTcpPort', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const response = await instance.fetch(markedRequest({ [PREVIEW_MARKER_PORT_HEADER]: '5173' }));
+    expect(response.status).toBe(503);
+    expect(await response.text()).toBe('The sandbox is not running');
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses a replacement allocation ref with 503 before getTcpPort', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_B,
+      })
+    );
+    expect(response.status).toBe(503);
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses a stopping record with 503 before getTcpPort', async () => {
+    const { instance, container } = setup({
+      record: { ...runningRecord(), state: 'stopping' },
+      running: true,
+    });
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_A,
+      })
+    );
+    expect(response.status).toBe(503);
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses with 503 when ctx.container is absent', async () => {
+    const { instance } = setup({ record: runningRecord(), attachContainer: false });
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_A,
+      })
+    );
+    expect(response.status).toBe(503);
+  });
+
+  it('serves a running allocation and never calls the DO lease or container activity timer', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const lease = vi.spyOn(instance, 'ensureLeaseAtLeast');
+    const leaseCallsBeforeFetch = container.leaseCalls.length;
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_A,
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(container.tcpPortCalls).toBe(1);
+    expect(container.leaseCalls).toHaveLength(leaseCallsBeforeFetch);
+    expect(lease).not.toHaveBeenCalled();
   });
 });

@@ -71,7 +71,6 @@ vi.mock('@/lib/analytics/posthog', () => ({
 }));
 vi.mock('./conversation-row', () => ({ ConversationRow: 'ConversationRow' }));
 vi.mock('./conversation-header', () => ({ ConversationHeader: 'ConversationHeader' }));
-vi.mock('./app-aware-keyboard-padding', () => ({ AppAwareKeyboardPaddingView: 'KeyboardPadding' }));
 vi.mock('./hooks/use-kilo-chat-client', () => ({ useKiloChatClient: vi.fn() }));
 vi.mock('./hooks/use-instance-presence', () => ({ useInstancePresence: vi.fn() }));
 vi.mock('./hooks/use-app-active-and-focused', () => ({ useAppActiveAndFocused: () => true }));

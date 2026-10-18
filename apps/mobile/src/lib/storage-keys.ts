@@ -71,6 +71,14 @@ export const TRUSTED_IMAGE_HOSTS_KEY = 'trusted-image-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
 /** Group consecutive tool calls on the session page into one condensed row. */
 export const CONDENSE_TOOL_CALLS_KEY = 'condense-tool-calls';
+/** Master switch for the agent-callable settings tools (the profile settings a Quick Chat agent may change). */
+export const SETTINGS_TOOLS_ENABLED_KEY = 'settings-tools-enabled';
+/** Persisted remote MCP servers: a JSON array of `StoredRemoteMcpServer`. */
+export const REMOTE_MCP_SERVERS_KEY = 'remote-mcp-servers';
+/** OAuth tokens, client registrations and PKCE verifiers of remote MCP servers, by server id. */
+export const REMOTE_MCP_OAUTH_KEY = 'remote-mcp-oauth';
+/** Account-scoped remote Quick Chat profiles, including provider credentials. */
+export const CHAT_BACKENDS_KEY = 'chat-backends';
 /** Provider platforms whose new-session "Connect <provider>" CTA the user collapsed. */
 export const COLLAPSED_CONNECT_CTAS_KEY = 'collapsed-connect-ctas';
 /** Master switch for the glanceable Active Agents surfaces (widgets, Live Activity,

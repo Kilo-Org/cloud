@@ -13,6 +13,14 @@ import {
 } from './part-types';
 import { htmlSanitizesToEmpty } from './markdown-html-sanitization';
 
+// Parts are immutable: the session storage replaces a part object on every
+// change and keeps the object of an unchanged part. The transcript builders ask
+// this predicate for every part on every streamed frame, and for text it scans
+// the whole text (and runs the HTML sanitizer when the text holds a `<`), so a
+// cache per part object turns that per-frame scan of the whole transcript into
+// one scan per part version.
+const rendersContentByPart = new WeakMap<Part, boolean>();
+
 /**
  * Whether `PartRenderer` renders visible content for this part.
  *
@@ -21,6 +29,15 @@ import { htmlSanitizesToEmpty } from './markdown-html-sanitization';
  * builder drops a message that has no content and never puts a time marker above it.
  */
 export function partRendersContent(part: Part): boolean {
+  let rendersContent = rendersContentByPart.get(part);
+  if (rendersContent === undefined) {
+    rendersContent = computePartRendersContent(part);
+    rendersContentByPart.set(part, rendersContent);
+  }
+  return rendersContent;
+}
+
+function computePartRendersContent(part: Part): boolean {
   if (isTextPart(part)) {
     // Snapshot-init progress shows only in the fixed WorkingIndicator row, and
     // TextPartRenderer renders nothing for blank text. Whitespace-only text is

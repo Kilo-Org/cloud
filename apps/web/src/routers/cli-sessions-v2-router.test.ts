@@ -23,7 +23,10 @@ import {
   parseGitHubPrUrl,
   projectAssociatedPr,
 } from '@/routers/cli-sessions-v2-router';
-import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
+import type {
+  fetchSessionDiff as FetchSessionDiffType,
+  fetchSessionMessagesPage as FetchSessionMessagesPageType,
+} from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
 
@@ -36,7 +39,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
     getSession: mockGetSession,
     deleteSession: mockDeleteCloudAgentSession,
   })),
-  rethrowAsPaymentRequired: jest.fn(),
+  rethrowCloudAgentError: jest.fn(),
   InsufficientCreditsError: class InsufficientCreditsError extends Error {
     constructor(message = 'Insufficient credits') {
       super(message);
@@ -114,6 +117,7 @@ jest.mock('@/lib/session-ingest-client', () => {
   return {
     ...actual,
     fetchSessionMessagesPage: jest.fn(),
+    fetchSessionDiff: jest.fn(),
   };
 });
 
@@ -1312,6 +1316,71 @@ describe('cli-sessions-v2-router', () => {
         resolveGetSession({ latestEventId: 7 });
         await new Promise(r => setTimeout(r, 0));
       });
+    });
+  });
+
+  describe('getSessionDiff', () => {
+    const sessionId = 'ses_session_diff_test_1234';
+    let fetchSessionDiff: jest.MockedFunction<typeof FetchSessionDiffType>;
+
+    beforeEach(async () => {
+      ({ fetchSessionDiff } = jest.requireMock('@/lib/session-ingest-client') as {
+        fetchSessionDiff: jest.MockedFunction<typeof FetchSessionDiffType>;
+      });
+      fetchSessionDiff.mockReset();
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('does not read the diff of a session owned by another user', async () => {
+      const caller = await createCallerForUser(otherUser.id);
+
+      await expect(caller.cliSessionsV2.getSessionDiff({ session_id: sessionId })).rejects.toThrow(
+        'Session not found'
+      );
+      expect(fetchSessionDiff).not.toHaveBeenCalled();
+    });
+
+    it('maps stored files and the oversized outcome to typed results', async () => {
+      const files = [
+        {
+          file: 'src/a.ts',
+          patch: 'diff --git a/src/a.ts b/src/a.ts\n',
+          additions: 1,
+          deletions: 0,
+        },
+      ];
+      fetchSessionDiff
+        .mockResolvedValueOnce({ kind: 'value', files })
+        .mockResolvedValueOnce({ kind: 'too_large', maximumBytes: 1 });
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.getSessionDiff({ session_id: sessionId })).resolves.toEqual(
+        { kind: 'files', files }
+      );
+      await expect(caller.cliSessionsV2.getSessionDiff({ session_id: sessionId })).resolves.toEqual(
+        { kind: 'too_large' }
+      );
+    });
+
+    it('surfaces unreadable stored diffs as a retryable server error', async () => {
+      fetchSessionDiff
+        .mockResolvedValueOnce({ kind: 'retryable_failure' })
+        .mockResolvedValueOnce({ kind: 'invalid_data' });
+      const caller = await createCallerForUser(regularUser.id);
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await expect(
+          caller.cliSessionsV2.getSessionDiff({ session_id: sessionId })
+        ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+      }
     });
   });
 

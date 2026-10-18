@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { Platform } from 'react-native';
 
 import { NativeStateSurface } from '@/components/centered-state-surface';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
@@ -8,7 +9,11 @@ export const unstable_settings = {
 };
 
 export default function AuthLayout() {
-  const sheetOptions = useFormSheetScreenOptions();
+  const options = useFormSheetScreenOptions();
+  const sheetOptions =
+    Platform.OS === 'android'
+      ? { ...options, sheetAllowedDetents: [options.sheetAllowedDetents[1]] }
+      : options;
 
   return (
     <Stack

@@ -1,9 +1,3 @@
-/**
- * Queue-handler retry contract. DLQ messages must propagate processDeadLetter
- * errors (no ack) so the queue retries them: a lane death recorded without a
- * completed finalization has to be re-attempted, or the run wedges until the
- * stale sweep fails it wholesale.
- */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as RunModule from './run';
 
@@ -13,16 +7,37 @@ vi.mock('./run', async importOriginal => {
     ...actual,
     processDeadLetter: vi.fn(),
     processJob: vi.fn(),
+    sweepStaleRunsAndDrain: vi.fn(),
+    sweepStaleRuns: vi.fn(),
+    syncPlatformRegistry: vi.fn(),
+    drainQueues: vi.fn(),
+    publishPlatformRoutingTable: vi.fn(),
   };
 });
 
-import { processDeadLetter, processJob, type BenchmarkJobMessage } from './run';
+import {
+  processDeadLetter,
+  processJob,
+  sweepStaleRunsAndDrain,
+  sweepStaleRuns,
+  syncPlatformRegistry,
+  drainQueues,
+  publishPlatformRoutingTable,
+  type BenchmarkJobMessage,
+} from './run';
 import worker from './index';
 
-const env = {} as unknown as Env;
+const send = vi.fn();
+const env = { BENCH_QUEUE: { send } } as unknown as Env;
 
 function fakeBatch(queue: string, bodies: unknown[]) {
-  const messages = bodies.map(body => ({ id: 'm', timestamp: 0, body, ack: vi.fn() }));
+  const messages = bodies.map(body => ({
+    id: 'm',
+    timestamp: 0,
+    body,
+    ack: vi.fn(),
+    retry: vi.fn(),
+  }));
   return {
     batch: { queue, messages } as unknown as MessageBatch<BenchmarkJobMessage>,
     messages,
@@ -33,6 +48,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(processDeadLetter).mockResolvedValue(undefined);
   vi.mocked(processJob).mockResolvedValue(undefined);
+  send.mockReset().mockResolvedValue(undefined);
 });
 
 describe('queue handler — DLQ branch', () => {
@@ -45,35 +61,114 @@ describe('queue handler — DLQ branch', () => {
     expect(messages[0].ack).toHaveBeenCalled();
   });
 
-  it('propagates processDeadLetter errors without ack so the queue retries', async () => {
+  it('retries failed scheduler reconciliation without acknowledging the dead letter', async () => {
     vi.mocked(processDeadLetter).mockRejectedValueOnce(new Error('D1 transient'));
     const { batch, messages } = fakeBatch('auto-routing-benchmark-dlq', [{ runId: 'r1' }]);
-
-    await expect(worker.queue(batch, env)).rejects.toThrow('D1 transient');
-
+    await worker.queue(batch, env);
     expect(messages[0].ack).not.toHaveBeenCalled();
+    expect(messages[0].retry).toHaveBeenCalledOnce();
   });
 });
 
 describe('queue handler — jobs branch', () => {
-  it('acks jobs after processJob succeeds and propagates failures without ack', async () => {
-    const { batch, messages } = fakeBatch('auto-routing-benchmark-jobs', [
-      { runId: 'r1', kind: 'decider', model: 'm/x' },
-    ]);
-
-    await worker.queue(batch, env);
-
-    expect(processJob).toHaveBeenCalledWith(env, {
+  it('acknowledges a token-owned claim after scheduler execution settles', async () => {
+    const body = {
       runId: 'r1',
       kind: 'decider',
       model: 'm/x',
-    });
-    expect(messages[0].ack).toHaveBeenCalled();
+      claimId: 'chunk-1',
+      claimToken: 'token-1',
+    };
+    const { batch, messages } = fakeBatch('auto-routing-benchmark-jobs', [body]);
+    await worker.queue(batch, env);
+    expect(processJob).toHaveBeenCalledWith(env, body);
+    expect(messages[0].ack).toHaveBeenCalledOnce();
+    expect(messages[0].retry).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  });
 
-    vi.mocked(processJob).mockRejectedValueOnce(new Error('container capacity'));
-    const retry = fakeBatch('auto-routing-benchmark-jobs', [{ runId: 'r1' }]);
+  it('acknowledges scheduler wakeups without applying queue-level capacity redelivery', async () => {
+    const body = { runId: 'r1', kind: 'decider', model: 'm/x', schedulerWake: true };
+    const { batch, messages } = fakeBatch('auto-routing-benchmark-jobs', [body]);
+    await worker.queue(batch, env);
+    expect(processJob).toHaveBeenCalledWith(env, body);
+    expect(messages[0].ack).toHaveBeenCalledOnce();
+    expect(messages[0].retry).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  });
 
-    await expect(worker.queue(retry.batch, env)).rejects.toThrow('container capacity');
-    expect(retry.messages[0].ack).not.toHaveBeenCalled();
+  it('retains queue-level capacity compatibility for uncaught infrastructure waits', async () => {
+    const body = { runId: 'r1', kind: 'decider', model: 'm/x' };
+    vi.mocked(processJob).mockRejectedValueOnce(
+      new Error('container /warmup failed: HTTP 503 capacity')
+    );
+    const { batch, messages } = fakeBatch('auto-routing-benchmark-jobs', [body]);
+    await worker.queue(batch, env);
+    expect(send).toHaveBeenCalledWith(body, { delaySeconds: 30 });
+    expect(messages[0].ack).toHaveBeenCalledOnce();
+    expect(messages[0].retry).not.toHaveBeenCalled();
+  });
+
+  it('retries the original job if capacity redispatch fails', async () => {
+    vi.mocked(processJob).mockRejectedValueOnce(
+      new Error('container /run failed: HTTP 503 capacity')
+    );
+    send.mockRejectedValueOnce(new Error('Queue unavailable'));
+    const { batch, messages } = fakeBatch('auto-routing-benchmark-jobs', [{ runId: 'r1' }]);
+    await worker.queue(batch, env);
+    expect(messages[0].ack).not.toHaveBeenCalled();
+    expect(messages[0].retry).toHaveBeenCalledOnce();
+  });
+
+  it('retries an infrastructure failure and processes the remaining jobs', async () => {
+    vi.mocked(processJob).mockRejectedValueOnce(new Error('D1 transient'));
+    const { batch, messages } = fakeBatch('auto-routing-benchmark-jobs', [
+      { runId: 'r1' },
+      { runId: 'r2' },
+    ]);
+    await worker.queue(batch, env);
+    expect(messages[0].retry).toHaveBeenCalledOnce();
+    expect(messages[0].ack).not.toHaveBeenCalled();
+    expect(messages[1].ack).toHaveBeenCalledOnce();
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe('scheduled router queues', () => {
+  it('drains both routers on frequent ticks', async () => {
+    vi.mocked(sweepStaleRunsAndDrain).mockResolvedValue({ staleRunIds: [], drained: [] });
+    await worker.scheduled({ cron: '*/5 * * * *' } as ScheduledController, env);
+    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'efficient');
+    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'frontier');
+  });
+
+  it('reconciles, drains, and republishes both routers at the platform cadence', async () => {
+    vi.mocked(sweepStaleRuns).mockResolvedValue([]);
+    vi.mocked(syncPlatformRegistry).mockResolvedValue({ desiredEntries: 0 });
+    vi.mocked(drainQueues).mockResolvedValue([]);
+    vi.mocked(publishPlatformRoutingTable).mockResolvedValue(null);
+    await worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env);
+    expect(sweepStaleRuns).toHaveBeenCalledTimes(2);
+    for (const router of ['efficient', 'frontier'] as const) {
+      expect(syncPlatformRegistry).toHaveBeenCalledWith(env, fetch, router);
+      expect(drainQueues).toHaveBeenCalledWith(
+        env,
+        router === 'frontier' ? 'platform' : 'both',
+        undefined,
+        router
+      );
+      expect(publishPlatformRoutingTable).toHaveBeenCalledWith(env, fetch, router);
+    }
+    expect(sweepStaleRunsAndDrain).not.toHaveBeenCalled();
+  });
+
+  it('still drains frontier when the efficient drain fails and reports the failure', async () => {
+    vi.mocked(sweepStaleRunsAndDrain)
+      .mockRejectedValueOnce(new Error('efficient queue failed'))
+      .mockResolvedValueOnce({ staleRunIds: [], drained: [] });
+    await expect(
+      worker.scheduled({ cron: '*/5 * * * *' } as ScheduledController, env)
+    ).rejects.toThrow('Benchmark scheduled routers failed');
+    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'frontier');
   });
 });

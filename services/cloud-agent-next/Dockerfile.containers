@@ -5,13 +5,17 @@ ARG BUILD_DATE=""
 ARG VCS_REF=""
 ARG KILOCODE_CLI_VERSION="7.8.1"
 ARG NODE_VERSION="24.9.0"
-ARG BUN_VERSION="1.2.21"
+ARG BUN_VERSION="1.3.14"
+ARG PNPM_VERSION="11.1.2"
+ARG GLAB_VERSION="1.93.0"
+ARG GH_VERSION="2.82.1"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Debian's own git (2.47) and git-lfs (3.6) are current, so the git-core PPA is
-# not needed. gh, jq, libatomic1, openssh-client, ripgrep and locales also come
-# from Debian's repositories, so no third-party apt source or keyring is used.
+# not needed. jq, libatomic1, openssh-client, ripgrep and locales come from
+# Debian's repositories, so no third-party apt source or keyring is used. gh is
+# installed below from the pinned release tarball to match Vercel exactly.
 RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
@@ -19,7 +23,6 @@ RUN set -eux; \
 		curl \
 		git \
 		git-lfs \
-		gh \
 		jq \
 		libatomic1 \
 		locales \
@@ -40,10 +43,16 @@ ENV LANG=en_US.UTF-8
 # Install GitLab CLI (glab) from the official .deb release.
 # Version 1.82.0+ is required for OAuth2 access token support (GLAB_IS_OAUTH2),
 # which is newer than the packaged Debian release.
-RUN GLAB_VERSION="1.93.0" \
-	&& wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
+RUN wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
 	&& dpkg -i /tmp/glab.deb \
 	&& rm /tmp/glab.deb
+
+# Install GitHub CLI from the pinned release tarball so the version matches
+# Vercel and Dockerfile.dind exactly.
+RUN wget -nv -O /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+	&& tar -xzf /tmp/gh.tar.gz -C /tmp \
+	&& install -m 0755 "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh \
+	&& rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64"
 
 # Install pinned Node.js from the official dist tarball into /usr/local so that
 # node/npm/npx are on PATH.
@@ -79,12 +88,12 @@ RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
 	&& ln -sf /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential
 
 # Install dependencies globally (accessible to all users)
-RUN npm install -g pnpm @kilocode/cli@${KILOCODE_CLI_VERSION}
+RUN npm install -g pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
 
 # === Build wrapper bundle inside container ===
 # This ensures the wrapper is built with the same Bun version that will run it,
 # avoiding any compatibility issues between build and runtime environments.
-# The wrapper imports from ../../src/shared/protocol.js, so we maintain that structure.
+# The build entrypoint list lives in src/shared/runtime-distribution.ts.
 COPY wrapper /tmp/wrapper-build/wrapper
 COPY src/shared /tmp/wrapper-build/src/shared
 
@@ -92,15 +101,7 @@ COPY src/shared /tmp/wrapper-build/src/shared
 RUN cd /tmp/wrapper-build/wrapper && \
     bun install --production && \
     ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules && \
-    bun build src/main.ts --outfile=/usr/local/bin/kilocode-wrapper.js --target=bun --minify && \
-    bun build src/restore-session.ts --outfile=/usr/local/bin/kilo-restore-session.js --target=bun --minify && \
-    bun build src/bitbucket-review-cli.ts --outfile=/usr/local/bin/bb --target=bun --minify && \
-    bun build src/github-review-publish-mcp.ts --outfile=/usr/local/bin/github-review-publish-mcp --target=bun --minify && \
-    bun build src/control-plane/main.ts --outfile=/usr/local/bin/kilocode-control-plane-wrapper.js --target=bun --minify && \
-    chmod +x /usr/local/bin/bb && \
-    chmod +x /usr/local/bin/github-review-publish-mcp && \
-    cp control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh && \
-    chmod +x /usr/local/bin/kilocode-control-plane-supervisor.sh && \
+    bun run build.ts --install-dir /usr/local/bin && \
     rm -rf /tmp/wrapper-build
 
 # Keep PID 1 alive so the Durable Object's `exec` always has a running container to attach to.

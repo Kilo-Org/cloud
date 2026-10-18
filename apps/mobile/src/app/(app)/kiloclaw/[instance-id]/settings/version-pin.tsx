@@ -1,6 +1,7 @@
 import { PackageSearch } from '@/components/ui/icons';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useRef, useState } from 'react';
-import { Alert, FlatList, View } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
@@ -12,6 +13,7 @@ import { VersionPinStatusCard } from '@/components/kiloclaw/version-pin-status-c
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
@@ -22,10 +24,25 @@ import {
   useKiloClawMyPin,
 } from '@/lib/hooks/use-kiloclaw-queries';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const PAGE_SIZE = 25;
 // Server caps `limit` at 100 (kiloclaw-router.ts listAvailableVersions) — never send more.
 const MAX_LIMIT = 100;
+
+// FlashList takes `contentContainerStyle` (no `className`) and has no `gap`
+// handling, so the FlatList's container `gap-4` is rebuilt explicitly: the 16px
+// inter-row gap rides on the item separator, and the header/footer boundaries on
+// the component style props.
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = { paddingHorizontal: 16, paddingTop: 16 } satisfies ViewStyle;
+const listHeaderStyle = { paddingBottom: 16 } satisfies ViewStyle;
+const listFooterStyle = { paddingTop: 16 } satisfies ViewStyle;
+
+/** The list frame plus the rounded, secondary-filled card the FlatList drew. */
+function versionListStyle(colors: ThemeColors): ViewStyle[] {
+  return [listStyle, { borderRadius: 10, backgroundColor: colors.secondary }];
+}
 
 export default function VersionPinScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
@@ -37,10 +54,12 @@ export default function VersionPinScreen() {
   const availableVersionsQuery = useKiloClawAvailableVersions(organizationId, 0, limit);
   const mutations = useKiloClawMutations(organizationId);
   const paddingBottom = useDetailScreenBottomPadding();
+  const colors = useThemeColors();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const pendingReasonRef = useRef('');
   const [pendingItem, setPendingItem] = useState<VersionItem>();
-  const flatListRef = useRef<FlatList<VersionItem>>(null);
+  const listRef = useRef<FlashListRef<VersionItem>>(null);
 
   const isLoading = myPinQuery.isPending || latestVersionQuery.isPending;
   // Only one pin/unpin mutation should ever be in flight at a time — while
@@ -49,7 +68,10 @@ export default function VersionPinScreen() {
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
     return (
-      <InstanceContextBoundary title={t('kiloclaw.versionPin.title')} context={instanceContext} />
+      <>
+        <InstanceContextBoundary title={t('kiloclaw.versionPin.title')} context={instanceContext} />
+        {dialog}
+      </>
     );
   }
 
@@ -65,6 +87,7 @@ export default function VersionPinScreen() {
             <Skeleton className="h-12 w-full rounded-lg" />
           </Animated.View>
         </Animated.View>
+        {dialog}
       </View>
     );
   }
@@ -89,6 +112,7 @@ export default function VersionPinScreen() {
             void availableVersionsQuery.refetch();
           }}
         />
+        {dialog}
       </View>
     );
   }
@@ -106,16 +130,14 @@ export default function VersionPinScreen() {
   const isPinnedByAdmin = myPin != null && !myPin.pinnedBySelf;
 
   function handleUnpin() {
-    Alert.alert(t('kiloclaw.versionPin.unpinTitle'), t('kiloclaw.versionPin.unpinMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('kiloclaw.versionPin.unpin'),
-        style: 'destructive',
-        onPress: () => {
-          mutations.removeMyPin.mutate(undefined);
-        },
+    confirm({
+      title: t('kiloclaw.versionPin.unpinTitle'),
+      message: t('kiloclaw.versionPin.unpinMessage'),
+      confirmLabel: t('kiloclaw.versionPin.unpin'),
+      onConfirm: () => {
+        mutations.removeMyPin.mutate(undefined);
       },
-    ]);
+    });
   }
 
   function handlePin(item: VersionItem) {
@@ -130,7 +152,7 @@ export default function VersionPinScreen() {
     const index = versions.findIndex(v => v.image_tag === pendingItem.image_tag);
     if (index !== -1) {
       setTimeout(() => {
-        flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 });
+        void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 });
       }, 300);
     }
   }
@@ -239,12 +261,15 @@ export default function VersionPinScreen() {
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
       <ScreenHeader title={t('kiloclaw.versionPin.title')} />
-      <FlatList
-        ref={flatListRef}
+      <FlashList
+        ref={listRef}
+        style={versionListStyle(colors)}
         data={versions}
         keyExtractor={item => item.image_tag}
         renderItem={renderVersionItem}
-        contentContainerClassName="px-4 pt-4 gap-4"
+        contentContainerStyle={listContentContainerStyle}
+        ListHeaderComponentStyle={listHeaderStyle}
+        ListFooterComponentStyle={listFooterStyle}
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
@@ -267,7 +292,13 @@ export default function VersionPinScreen() {
             )}
           </Animated.View>
         }
-        ItemSeparatorComponent={() => <View className="h-px bg-border" />}
+        // The container `gap-4` the FlatList applied between rows now rides on
+        // the separator: the 1px rule plus the 16px below it.
+        ItemSeparatorComponent={() => (
+          <View className="pb-4">
+            <View className="h-px bg-border" />
+          </View>
+        )}
         ListEmptyComponent={
           availableVersionsQuery.isPending ? (
             <Skeleton className="h-12 w-full rounded-lg" />
@@ -287,8 +318,9 @@ export default function VersionPinScreen() {
             <View style={{ height: paddingBottom }} pointerEvents="none" />
           </>
         }
-        className="rounded-lg bg-secondary"
       />
+
+      {dialog}
     </Animated.View>
   );
 }

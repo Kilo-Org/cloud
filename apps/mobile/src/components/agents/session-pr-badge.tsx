@@ -14,7 +14,6 @@ import { useTranslation } from 'react-i18next';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { openExternalUrl } from '@/lib/external-link';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
@@ -83,7 +82,6 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
 
   if (loading) {
     return <Skeleton className="h-5 w-[52px] rounded-full" />;
@@ -104,11 +102,6 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
   function handlePress() {
     if (props.onPress) {
       props.onPress();
-      return;
-    }
-    // Flag off: GitHub taps fall back to the browser (same as chat links).
-    if (!prReviewEnabled) {
-      void openExternalUrl(pr.url, { label: t('common.pullRequest') });
       return;
     }
     const target = resolveSessionPrTapTarget({

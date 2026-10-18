@@ -22,10 +22,12 @@ import {
   resolveCloudAgentGitHubAuthForRepo,
   resolveManagedGitLabToken,
   resolveManagedBitbucketToken,
+  installationBotIdentityFromEnv,
 } from '../services/git-token-service-client.js';
 import { readProfileBundle } from '../session-profile.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
+import type { GitHubReviewTarget } from '../shared/github-review-target.js';
 import type {
   ControlPlaneCredentialRepository,
   ControlPlaneCredentialSource,
@@ -148,6 +150,7 @@ const scmSchema = z
     alias: tokenSchema.optional(),
     gitUrl: z.string().url(),
     author: gitAuthorSchema.optional(),
+    githubAppType: z.enum(['standard', 'lite']).optional(),
     capability: capabilitySchema.optional(),
     nativeToken: realTokenSchema.optional(),
     gitlab: z
@@ -364,6 +367,7 @@ type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
 
 type PreparedSessionAttachPayload = SessionAttachPayload & {
   kilo: NonNullable<SessionAttachPayload['kilo']>;
+  githubReviewTarget?: GitHubReviewTarget;
 };
 
 function invalidCredentials(): never {
@@ -614,7 +618,11 @@ async function refreshScmCapability(
     });
     if (!authorized.success) throw new Error('GitHub credential is unavailable');
   }
-  if (!refresh && isCapabilityCurrent(grant.scm?.capability, outboundContainerId, now))
+  if (
+    !refresh &&
+    isCapabilityCurrent(grant.scm?.capability, outboundContainerId, now) &&
+    (repository.type !== 'github' || grant.scm?.githubAppType !== undefined)
+  )
     return grant;
   const common = {
     userId: grant.userId,
@@ -641,6 +649,7 @@ async function refreshScmCapability(
       alias,
       gitUrl: `https://github.com/${repository.repo}.git`,
       author: issued.value.gitAuthor,
+      githubAppType: issued.value.appType,
       capability: cachedCapability(issued.value.capability, 'kgh2.', outboundContainerId, now),
     };
   } else if (repository.type === 'gitlab') {
@@ -767,6 +776,8 @@ function preparedPayload(input: {
   nativeKiloToken: string;
   nativeRepositoryToken: string | undefined;
   profileEnv: Record<string, string> | undefined;
+  source: ControlPlaneCredentialSource;
+  env: CredentialEnv;
 }): PreparedSessionAttachPayload {
   const { payload, grant, existing } = input;
   // Never let a `git` from the input payload pass through: it may carry a raw
@@ -778,6 +789,23 @@ function preparedPayload(input: {
       ? (grant.kilo.alias ?? invalidCredentials())
       : grant.kilo.token;
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
+  let githubReviewTarget: GitHubReviewTarget | undefined;
+  const reviewRepository = input.source.repository;
+  if (
+    input.source.createdOnPlatform === 'code-review' &&
+    reviewRepository?.type === 'github' &&
+    reviewRepository.pullRequestNumber !== undefined &&
+    grant.scm?.githubAppType
+  ) {
+    const bot = installationBotIdentityFromEnv(input.env, grant.scm.githubAppType);
+    if (bot)
+      githubReviewTarget = {
+        repo: reviewRepository.repo,
+        pullRequestNumber: reviewRepository.pullRequestNumber,
+        appType: grant.scm.githubAppType,
+        botUserId: bot.userId,
+      };
+  }
   const replacements: Array<[string, string]> = [[grant.kilo.token, kiloToken]];
   replacements.push([input.nativeKiloToken, kiloToken]);
   if (existing) replacements.push([existing.kilo.token, kiloToken]);
@@ -814,8 +842,12 @@ function preparedPayload(input: {
     if (grant.orgId) env.KILOCODE_ORGANIZATION_ID = grant.orgId;
   }
   if (grant.scm?.purpose === 'github' && scmToken) {
-    if (env.GITHUB_TOKEN && env.GH_TOKEN === undefined) env.GH_TOKEN = env.GITHUB_TOKEN;
-    env.GH_TOKEN ??= scmToken;
+    if (input.source.createdOnPlatform === 'code-review') {
+      env.GH_TOKEN = scmToken;
+    } else {
+      if (env.GITHUB_TOKEN && env.GH_TOKEN === undefined) env.GH_TOKEN = env.GITHUB_TOKEN;
+      env.GH_TOKEN ??= scmToken;
+    }
   } else if (grant.scm?.purpose === 'gitlab' && scmToken) {
     const gitlab = grant.scm.gitlab;
     if (!gitlab) invalidCredentials();
@@ -837,6 +869,7 @@ function preparedPayload(input: {
   }
   return {
     ...payloadWithoutGit,
+    ...(githubReviewTarget ? { githubReviewTarget } : {}),
     directory: grant.directory,
     env,
     ...(grant.scm
@@ -878,6 +911,7 @@ async function resolveDirectScmCredentials(
   if (repository.type === 'github') {
     let nativeToken = repositoryToken;
     let author: { name: string; email: string } | undefined;
+    let githubAppType: 'standard' | 'lite' | undefined;
     if (repository.authentication === 'managed') {
       const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
         ...common,
@@ -891,6 +925,7 @@ async function resolveDirectScmCredentials(
       if (!resolved.success) throw new Error('GitHub credential is unavailable');
       nativeToken = resolved.value.githubToken;
       author = resolved.value.gitAuthor;
+      githubAppType = resolved.value.appType;
     }
     if (!nativeToken) invalidCredentials();
     return {
@@ -900,6 +935,7 @@ async function resolveDirectScmCredentials(
         gitUrl: `https://github.com/${repository.repo}.git`,
         nativeToken,
         ...(author ? { author } : {}),
+        ...(githubAppType ? { githubAppType } : {}),
       },
     };
   }
@@ -1151,6 +1187,7 @@ export async function prepareCredentialGrant(
   } else if (repository?.type === 'github') {
     let nativeToken = repositoryToken;
     let author: { name: string; email: string } | undefined;
+    let githubAppType: 'standard' | 'lite' | undefined;
     if (repository.authentication === 'managed') {
       const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
         githubRepo: repository.repo,
@@ -1165,6 +1202,7 @@ export async function prepareCredentialGrant(
       if (!resolved.success) throw new Error('GitHub credential is unavailable');
       nativeToken = resolved.value.githubToken;
       author = resolved.value.gitAuthor;
+      githubAppType = resolved.value.appType;
     }
     if (!nativeToken) invalidCredentials();
     grant = {
@@ -1175,6 +1213,7 @@ export async function prepareCredentialGrant(
         gitUrl: `https://github.com/${repository.repo}.git`,
         nativeToken,
         ...(author ? { author } : {}),
+        ...(githubAppType ? { githubAppType } : {}),
       },
     };
   }
@@ -1189,6 +1228,8 @@ export async function prepareCredentialGrant(
         nativeKiloToken: source.kiloToken,
         nativeRepositoryToken: repositoryToken,
         profileEnv: input.profileEnv,
+        source,
+        env,
       }),
     };
   }
@@ -1214,6 +1255,8 @@ export async function prepareCredentialGrant(
       nativeKiloToken: source.kiloToken,
       nativeRepositoryToken: repositoryToken,
       profileEnv: input.profileEnv,
+      source,
+      env,
     }),
   };
 }
@@ -1234,6 +1277,9 @@ function credentialRepositoryFromMetadata(
       return {
         type: 'github',
         repo: repository.repo,
+        ...(repository.pullRequestNumber === undefined
+          ? {}
+          : { pullRequestNumber: repository.pullRequestNumber }),
         ...(repository.token ? { token: repository.token } : {}),
         ...(repository.githubIntegrationId
           ? { githubIntegrationId: repository.githubIntegrationId }
@@ -1362,9 +1408,10 @@ export function sessionCredentialsPayloadFromGrant(
       ? (grant.kilo.alias ?? invalidCredentials())
       : grant.kilo.token;
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
-  // The runtime credential proxy facade and the per-session handle (minted by
-  // the Session DO and bound to the route grant) are projected here, never into
-  // the route spec.
+  // The runtime credential proxy facade and the route's handle (the scope's
+  // shared canonical handle for an adopted worktree scope, or a per-session one
+  // otherwise, minted by the Session DO and bound to the route grant) are
+  // projected here, never into the route spec.
   const proxyMember = grant.kilo.runtimeProxy?.members.find(
     member => member.sessionId === sessionId
   );
@@ -1419,7 +1466,8 @@ export function removeSessionCredentialMembership(
 }
 
 export function buildControlNetworkPolicy(
-  grants: readonly SessionCredentialGrant[]
+  grants: readonly SessionCredentialGrant[],
+  acceptedHandlesByScopeId?: ReadonlyMap<string, readonly string[]>
 ): VercelSandboxNetworkPolicy {
   const policies = grants.map(value => {
     const grant = validateGrant(value);
@@ -1437,7 +1485,14 @@ export function buildControlNetworkPolicy(
         targets: grant.kilo.targets,
         rootSessionIds: grant.members.map(member => member.kiloSessionId),
         organizationId: grant.orgId,
-        ...(grant.kilo.runtimeProxy ? { runtimeProxy: grant.kilo.runtimeProxy } : {}),
+        ...(grant.kilo.runtimeProxy
+          ? {
+              runtimeProxy: {
+                ...grant.kilo.runtimeProxy,
+                handles: acceptedHandlesByScopeId?.get(grant.scopeId) ?? [],
+              },
+            }
+          : {}),
       },
       ...(grant.repository?.type === 'github' && grant.scm?.nativeToken
         ? {

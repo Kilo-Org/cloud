@@ -248,6 +248,44 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
     expect(result.model).toBe('anthropic/claude-opus-4.8');
   });
 
+  test('records generation_time from the serving Vercel provider attempt', async () => {
+    const stream = streamFromText(
+      'event: message_start\n' +
+        'data: {"type":"message_start","message":{"id":"generation-id","type":"message","role":"assistant","content":[],"model":"anthropic/claude-sonnet-5.5","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}}\n\n' +
+        'event: message_delta\n' +
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":2,"output_tokens":4757},"provider_metadata":{"gateway":{"routing":{"finalProvider":"bedrock","modelAttempts":[{"canonicalSlug":"anthropic/claude-sonnet-5.5","success":true,"providerAttempts":[{"provider":"vertexAnthropic","credentialType":"byok","success":false,"startTime":1791906880000,"endTime":1791906882400},{"provider":"bedrock","credentialType":"byok","success":true,"startTime":1791906882421,"endTime":1791906921724}]}]},"cost":"0","marketCost":"0.1164532"}}}\n\n' +
+        'event: message_stop\n' +
+        'data: {"type":"message_stop"}\n\n'
+    );
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'vercel',
+      200
+    );
+
+    expect(result.generation_time).toBe(39303);
+  });
+
+  test('leaves generation_time null when the Vercel attempt interval is invalid', async () => {
+    const stream = streamFromText(
+      'event: message_delta\n' +
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":1,"output_tokens":1},"provider_metadata":{"gateway":{"routing":{"finalProvider":"bedrock","modelAttempts":[{"success":true,"providerAttempts":[{"provider":"bedrock","success":true,"startTime":1791906921724,"endTime":1791906882421}]}]},"marketCost":"0.001"}}}\n\n'
+    );
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'vercel',
+      200
+    );
+
+    expect(result.generation_time).toBeNull();
+  });
+
   test('records stream error events as errored timeout usage', async () => {
     const stream = streamFromText(
       'event: error\n' +

@@ -23,8 +23,15 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
-import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
-import { buildDirectProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
+import {
+  CustomLlmCredentialsSchema,
+  CustomLlmDefinitionSchema,
+  type CustomLlmCredentials,
+} from '@kilocode/db/schema-types';
+import {
+  buildDirectProvider,
+  type DirectUpstreamAuth,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
@@ -79,7 +86,7 @@ async function checkDirectBYOK(
       apiKey: userByok[0].decryptedAPIKey,
       apiKeyHeader: null,
       supportedChatApis: directByok.supported_chat_apis,
-      responseTransforms: null,
+      responseTransforms: directByok.reasoning_details_transform,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
         delete context.request.body.provider;
@@ -89,6 +96,25 @@ async function checkDirectBYOK(
     userByok,
     bypassAccessCheck: true,
   };
+}
+
+async function resolveCustomLlmAuth(
+  credentials: CustomLlmCredentials
+): Promise<DirectUpstreamAuth> {
+  switch (credentials.type) {
+    case 'api_key':
+      return { type: 'api_key', apiKey: credentials.api_key, apiKeyHeader: null };
+    case 'x-api-key':
+      return { type: 'api_key', apiKey: credentials.api_key, apiKeyHeader: 'x-api-key' };
+    case 'service_account':
+      return {
+        type: 'api_key',
+        apiKey: await getGoogleServiceAccountAccessToken(credentials),
+        apiKeyHeader: null,
+      };
+    case 'secure_proxy':
+      return { type: 'secure_proxy', credentials };
+  }
 }
 
 async function checkCustomLlm(
@@ -125,19 +151,6 @@ async function checkCustomLlm(
     return null;
   }
 
-  let apiKey: string;
-  let apiKeyHeader: 'x-api-key' | null = null;
-  if (parsedCredentials.data.type === 'api_key' || parsedCredentials.data.type === 'x-api-key') {
-    apiKey = parsedCredentials.data.api_key;
-    apiKeyHeader = parsedCredentials.data.type === 'x-api-key' ? 'x-api-key' : null;
-  } else {
-    apiKey = await getGoogleServiceAccountAccessToken(parsedCredentials.data);
-  }
-
-  const resolvedCustomLlm = {
-    ...customLlm,
-    api_key: apiKey,
-  };
   return {
     kind: 'provider',
     provider: buildDirectProvider(
@@ -149,8 +162,8 @@ async function checkCustomLlm(
             ? 'responses'
             : 'chat_completions',
       ],
-      resolvedCustomLlm,
-      apiKeyHeader
+      customLlm,
+      await resolveCustomLlmAuth(parsedCredentials.data)
     ),
     userByok: null,
     bypassAccessCheck: true,

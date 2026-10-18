@@ -129,4 +129,4 @@ Each definition either carries its own `defaultTimeoutMs` (1–30 minutes) or
 relies on the scenario function's own default timeout; `run.ts` accepts
 `--timeout-ms` for exactly the registry names, and the deployed smoke budget is
 derived from the effective per-scenario defaults. All long scenarios require the
-unified API, `kilo/fake-deterministic`, and control-plane + worktree enrollment.
+unified API and `kilo/fake-deterministic`.

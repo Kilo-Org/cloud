@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one mounted case per panel state: the controlled selector, both manual editors, the save flow, and the retryable failure */
+/* eslint-disable max-lines -- one mounted case per panel state: both manual editors, the save flow, and the retryable save failure */
 import { createElement, type ReactNode, useState } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,8 +9,6 @@ import { type ProfileSelectorProfile } from './profile-selector-model';
 import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 
-const push = vi.fn<(href: string) => void>();
-vi.mock('expo-router', () => ({ useRouter: () => ({ push }) }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast }));
 
@@ -120,9 +118,8 @@ function listState(overrides: Partial<ListState> = {}): ListState {
 }
 
 /**
- * The panel's profile pick is controlled by the session, so the harness mirrors
- * the real parent: it owns `selectedProfileId` and reports each pick both to
- * the spy and to its own state, the way the new-session body does.
+ * The session owns the profile selected after saving manual configuration.
+ * The harness mirrors that ownership and records save selections.
  */
 function ControlledPanel({
   organizationId,
@@ -194,14 +191,6 @@ function byLabel(renderer: TestRenderer.ReactTestRenderer, label: string) {
     .find(node => typeof node.props.onPress === 'function');
 }
 
-function radios(renderer: TestRenderer.ReactTestRenderer) {
-  return renderer.root.findAll(node => node.props.accessibilityRole === 'radio');
-}
-
-function radio(renderer: TestRenderer.ReactTestRenderer, label: string) {
-  return radios(renderer).find(node => node.props.accessibilityLabel === label);
-}
-
 function containsText(node: TestRenderer.ReactTestInstance, text: string): boolean {
   if (node.children.some(child => typeof child === 'string' && child === text)) {
     return true;
@@ -249,7 +238,6 @@ function addVariable(renderer: TestRenderer.ReactTestRenderer, key: string, valu
 }
 
 beforeEach(() => {
-  push.mockReset();
   toast.success.mockReset();
   toast.error.mockReset();
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -266,11 +254,10 @@ describe('AdvancedConfigPanel', () => {
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
   });
 
-  it('expands to the selector, both manual editors and the summary', () => {
+  it('expands to both manual editors and the summary', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));
 
-    expect(byLabel(renderer, 'Pick a profile')).toBeDefined();
     expect(texts(renderer)).toContain('Environment variables');
     expect(texts(renderer)).toContain('Setup commands');
     // No manual config yet, so no Save as Profile.
@@ -331,78 +318,25 @@ describe('AdvancedConfigPanel', () => {
     expect(field(renderer, 'Value').props.maxLength).toBe(256);
   });
 
-  it('keeps No profile and manual config working with no profiles at all', () => {
+  it('keeps manual config working with no profiles at all', () => {
     const renderer = mount({ list: { personalProfiles: [] } });
     press(byLabel(renderer, 'Advanced Configuration'));
 
-    expect(texts(renderer)).toContain('No profile');
     addVariable(renderer, 'API_KEY', 'abc');
     expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
   });
 
-  it('shows the retryable failure and refetches', () => {
-    const refetch = vi.fn();
-    const renderer = mount({ list: { isError: true, refetch } });
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    expect(texts(renderer)).toContain('Failed to load profiles');
-    press(byLabel(renderer, 'Retry'));
-    expect(refetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders the session-owned selectedProfileId in the closed row', () => {
+  it('includes the session-owned selected profile in resource counts', () => {
     const renderer = mount({ selectedProfileId: 'backend' });
     press(byLabel(renderer, 'Advanced Configuration'));
 
-    expect(texts(renderer)).toContain('Backend');
     expect(texts(renderer)).toContain('3 environment variables · 1 setup commands');
   });
 
-  it('names the effective default in the no-override row when one applies', () => {
-    const renderer = mount({ list: { personalProfiles: [{ ...BACKEND, isDefault: true }] } });
-    press(byLabel(renderer, 'Advanced Configuration'));
-
-    // Clearing the pick keeps the default, so neither the closed row nor the
-    // sheet's no-override row may claim there is no profile.
-    expect(texts(renderer)).toContain('Default profile');
-    press(byLabel(renderer, 'Pick a profile'));
-    expect(radio(renderer, 'Default profile')?.props.accessibilityState).toMatchObject({
-      checked: true,
-    });
-    expect(radio(renderer, 'No profile')).toBeUndefined();
-  });
-
-  it('reports a pick from the sheet through onSelectProfile and shows it', () => {
-    const onSelectProfile = vi.fn<(id: string | null) => void>();
-    const renderer = mount({ onSelectProfile });
-    press(byLabel(renderer, 'Advanced Configuration'));
-    press(byLabel(renderer, 'Pick a profile'));
-
-    expect(radio(renderer, 'No profile')?.props.accessibilityState).toMatchObject({
-      checked: true,
-    });
-    press(radio(renderer, 'Backend'));
-
-    expect(onSelectProfile).toHaveBeenCalledWith('backend');
-    expect(texts(renderer)).toContain('Backend');
-    expect(texts(renderer)).toContain('3 environment variables · 1 setup commands');
-  });
-
-  it('reports No profile through onSelectProfile(null) and clears the row', () => {
-    const onSelectProfile = vi.fn<(id: string | null) => void>();
-    const renderer = mount({ selectedProfileId: 'backend', onSelectProfile });
-    press(byLabel(renderer, 'Advanced Configuration'));
-    press(byLabel(renderer, 'Pick a profile'));
-
-    press(radio(renderer, 'No profile'));
-
-    expect(onSelectProfile).toHaveBeenCalledWith(null);
-    expect(texts(renderer)).toContain('No profile');
-  });
-
-  it('saves the manual config in the web order and shows the new profile', async () => {
+  it('saves the manual config in the web order and selects the new profile', async () => {
     const mocks = mutations();
-    const renderer = mount({ mocks });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, onSelectProfile });
     press(byLabel(renderer, 'Advanced Configuration'));
     addVariable(renderer, 'API_KEY', 'abc');
     // A setup command.
@@ -444,8 +378,7 @@ describe('AdvancedConfigPanel', () => {
     });
     expect(mocks.setAsDefault.mutateAsync).toHaveBeenCalledWith({ profileId: 'new-1' });
     expect(toast.success).toHaveBeenCalledTimes(1);
-    // The saved profile appears in the selector immediately.
-    expect(texts(renderer)).toContain('My Setup');
+    expect(onSelectProfile).toHaveBeenCalledWith('new-1');
     // The profile carries the draft now, and the server appends a profile's
     // setup commands to the inline ones, so a kept draft would run them twice.
     expect(texts(renderer)).not.toContain('API_KEY');

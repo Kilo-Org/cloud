@@ -65,6 +65,124 @@
     ],
     "searchBlob": "activeSessions.listInstances List the currently active/connected agent instances or devices from the session ingest worker. activesessions listinstances"
   },
+  "activeSessions.widgetSnapshot": {
+    "path": "activeSessions.widgetSnapshot",
+    "kind": "query",
+    "summary": "Get the home widget snapshot of active agents and sessions for the current user, optionally scoped to an organization, for rendering a glanceable dashboard widget. Use this to fetch the widget's data payload.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "activesessions",
+      "widgetsnapshot",
+      "organizationid"
+    ],
+    "searchBlob": "activeSessions.widgetSnapshot Get the home widget snapshot of active agents and sessions for the current user, optionally scoped to an organization, for rendering a glanceable dashboard widget. Use this to fetch the widget's data payload. activesessions widgetsnapshot organizationid organizationId"
+  },
+  "agentProfiles.applyConfigImport": {
+    "path": "agentProfiles.applyConfigImport",
+    "kind": "mutation",
+    "summary": "Import an agent configuration archive into a profile, creating its instructions. Fails if the archive has unresolved issues; use preview first.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "archive": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selection": {
+          "type": "object",
+          "properties": {
+            "agents": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "commands": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "skills": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "instructions": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
+          },
+          "required": [
+            "agents",
+            "commands",
+            "skills",
+            "instructions"
+          ]
+        }
+      },
+      "required": [
+        "profileId",
+        "archive",
+        "selection"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "applyconfigimport",
+      "profileid",
+      "organizationid",
+      "archive",
+      "selection"
+    ],
+    "searchBlob": "agentProfiles.applyConfigImport Import an agent configuration archive into a profile, creating its instructions. Fails if the archive has unresolved issues; use preview first. agentprofiles applyconfigimport profileid organizationid archive selection profileId organizationId archive selection"
+  },
   "agentProfiles.bindToRepo": {
     "path": "agentProfiles.bindToRepo",
     "kind": "mutation",
@@ -959,6 +1077,52 @@
     ],
     "searchBlob": "agentProfiles.createCustomSkill Add a custom skill to an agent profile by supplying its name, description, markdown instructions, and files. agentprofiles createcustomskill profileid organizationid name description rawmarkdown files enabled profileId organizationId name description rawMarkdown files enabled"
   },
+  "agentProfiles.createInstruction": {
+    "path": "agentProfiles.createInstruction",
+    "kind": "mutation",
+    "summary": "Add a new custom instruction or rule to an agent profile so the agent follows it. Creates an instruction with a name and content under a profile.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100000
+        }
+      },
+      "required": [
+        "profileId",
+        "name",
+        "content"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "createinstruction",
+      "profileid",
+      "organizationid",
+      "name",
+      "content"
+    ],
+    "searchBlob": "agentProfiles.createInstruction Add a new custom instruction or rule to an agent profile so the agent follows it. Creates an instruction with a name and content under a profile. agentprofiles createinstruction profileid organizationid name content profileId organizationId name content"
+  },
   "agentProfiles.createKiloCommand": {
     "path": "agentProfiles.createKiloCommand",
     "kind": "mutation",
@@ -1236,6 +1400,44 @@
     ],
     "searchBlob": "agentProfiles.deleteAgent Delete a subagent from an agent profile. agentprofiles deleteagent profileid organizationid agentid profileId organizationId agentId"
   },
+  "agentProfiles.deleteInstruction": {
+    "path": "agentProfiles.deleteInstruction",
+    "kind": "mutation",
+    "summary": "Remove an instruction from an agent profile permanently. Deletes a custom rule or guideline from a profile.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "instructionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId",
+        "instructionId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "deleteinstruction",
+      "profileid",
+      "organizationid",
+      "instructionid"
+    ],
+    "searchBlob": "agentProfiles.deleteInstruction Remove an instruction from an agent profile permanently. Deletes a custom rule or guideline from a profile. agentprofiles deleteinstruction profileid organizationid instructionid profileId organizationId instructionId"
+  },
   "agentProfiles.deleteKiloCommand": {
     "path": "agentProfiles.deleteKiloCommand",
     "kind": "mutation",
@@ -1488,6 +1690,43 @@
     ],
     "searchBlob": "agentProfiles.listRepoBindings List repository bindings that associate repos with agent profiles for the current user or an organization. agentprofiles listrepobindings organizationid organizationId"
   },
+  "agentProfiles.previewConfigImport": {
+    "path": "agentProfiles.previewConfigImport",
+    "kind": "mutation",
+    "summary": "Preview what an agent config archive would import into a profile before committing it. Shows parsed instructions and any issues without applying changes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "archive": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "profileId",
+        "archive"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "previewconfigimport",
+      "profileid",
+      "organizationid",
+      "archive"
+    ],
+    "searchBlob": "agentProfiles.previewConfigImport Preview what an agent config archive would import into a profile before committing it. Shows parsed instructions and any issues without applying changes. agentprofiles previewconfigimport profileid organizationid archive profileId organizationId archive"
+  },
   "agentProfiles.reorderKiloCommands": {
     "path": "agentProfiles.reorderKiloCommands",
     "kind": "mutation",
@@ -1600,6 +1839,49 @@
       "commands"
     ],
     "searchBlob": "agentProfiles.setCommands Set the commands of an agent profile, replacing all existing commands. agentprofiles setcommands profileid organizationid commands profileId organizationId commands"
+  },
+  "agentProfiles.setInstructionEnabled": {
+    "path": "agentProfiles.setInstructionEnabled",
+    "kind": "mutation",
+    "summary": "Turn a profile instruction on or off without deleting it. Enable or disable a custom rule so it is included or ignored.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "instructionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "profileId",
+        "instructionId",
+        "enabled"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "setinstructionenabled",
+      "profileid",
+      "organizationid",
+      "instructionid",
+      "enabled"
+    ],
+    "searchBlob": "agentProfiles.setInstructionEnabled Turn a profile instruction on or off without deleting it. Enable or disable a custom rule so it is included or ignored. agentprofiles setinstructionenabled profileid organizationid instructionid enabled profileId organizationId instructionId enabled"
   },
   "agentProfiles.setKiloCommandEnabled": {
     "path": "agentProfiles.setKiloCommandEnabled",
@@ -2579,6 +2861,57 @@
       "config"
     ],
     "searchBlob": "agentProfiles.updateAgent Edit an existing subagent in an agent profile, such as its name, slug, or configuration. agentprofiles updateagent profileid organizationid agentid slug name config profileId organizationId agentId slug name config"
+  },
+  "agentProfiles.updateInstruction": {
+    "path": "agentProfiles.updateInstruction",
+    "kind": "mutation",
+    "summary": "Edit the name or content of an existing instruction on an agent profile. Updates a custom rule's text in place.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "instructionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100000
+        }
+      },
+      "required": [
+        "profileId",
+        "instructionId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "updateinstruction",
+      "profileid",
+      "organizationid",
+      "instructionid",
+      "name",
+      "content"
+    ],
+    "searchBlob": "agentProfiles.updateInstruction Edit the name or content of an existing instruction on an agent profile. Updates a custom rule's text in place. agentprofiles updateinstruction profileid organizationid instructionid name content profileId organizationId instructionId name content"
   },
   "agentProfiles.updateKiloCommand": {
     "path": "agentProfiles.updateKiloCommand",
@@ -5349,6 +5682,30 @@
     ],
     "searchBlob": "cliSessionsV2.getByCloudAgentSessionId Look up a user's CLI session record by the underlying cloud agent session ID. clisessionsv2 getbycloudagentsessionid cloud_agent_session_id cloud_agent_session_id"
   },
+  "cliSessionsV2.getSessionDiff": {
+    "path": "cliSessionsV2.getSessionDiff",
+    "kind": "query",
+    "summary": "Get the file changes (diff) produced by a CLI coding session, listing the modified files or indicating the diff is too large to return. Use to see what code a session changed.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "session_id"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getsessiondiff",
+      "session_id"
+    ],
+    "searchBlob": "cliSessionsV2.getSessionDiff Get the file changes (diff) produced by a CLI coding session, listing the modified files or indicating the diff is too large to return. Use to see what code a session changed. clisessionsv2 getsessiondiff session_id session_id"
+  },
   "cliSessionsV2.getSessionMessages": {
     "path": "cliSessionsV2.getSessionMessages",
     "kind": "query",
@@ -6076,6 +6433,43 @@
     ],
     "searchBlob": "cloudAgentNext.closeTerminal Close a terminal session running in a cloud agent session. cloudagentnext closeterminal cloudagentsessionid ptyid cloudAgentSessionId ptyId"
   },
+  "cloudAgentNext.createPreview": {
+    "path": "cloudAgentNext.createPreview",
+    "kind": "mutation",
+    "summary": "Generate a temporary, expiring preview link to open a port or path of an app running in a Cloud Agent session, for sharing or viewing it in a browser.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^\\/.*"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId",
+        "port"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "createpreview",
+      "cloudagentsessionid",
+      "port",
+      "path"
+    ],
+    "searchBlob": "cloudAgentNext.createPreview Generate a temporary, expiring preview link to open a port or path of an app running in a Cloud Agent session, for sharing or viewing it in a browser. cloudagentnext createpreview cloudagentsessionid port path cloudAgentSessionId port path"
+  },
   "cloudAgentNext.createTerminal": {
     "path": "cloudAgentNext.createTerminal",
     "kind": "mutation",
@@ -6358,6 +6752,36 @@
     ],
     "searchBlob": "cloudAgentNext.getPendingInteractions Fetch the pending interactions for a cloud agent session that are still waiting on a response, such as approvals or questions requiring user input. Use this to check whether a running agent session is blocked and needs the user to act. cloudagentnext getpendinginteractions cloudagentsessionid cloudAgentSessionId"
   },
+  "cloudAgentNext.getPreviewOptions": {
+    "path": "cloudAgentNext.getPreviewOptions",
+    "kind": "query",
+    "summary": "Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getpreviewoptions",
+      "cloudagentsessionid",
+      "organizationid"
+    ],
+    "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. cloudagentnext getpreviewoptions cloudagentsessionid organizationid cloudAgentSessionId organizationId"
+  },
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
     "kind": "query",
@@ -6368,15 +6792,31 @@
       "properties": {
         "devcontainer": {
           "type": "boolean"
+        },
+        "repositoryType": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab",
+            "bitbucket",
+            "git"
+          ]
+        },
+        "repositoryFullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
         }
       }
     },
     "tags": [
       "cloudagentnext",
       "getsandboxselectionoptions",
-      "devcontainer"
+      "devcontainer",
+      "repositorytype",
+      "repositoryfullname"
     ],
-    "searchBlob": "cloudAgentNext.getSandboxSelectionOptions List the sandbox selection options and capabilities available for a cloud agent, optionally filtered for devcontainer support. Use this to find which sandbox types a user can choose when starting an agent. cloudagentnext getsandboxselectionoptions devcontainer devcontainer"
+    "searchBlob": "cloudAgentNext.getSandboxSelectionOptions List the sandbox selection options and capabilities available for a cloud agent, optionally filtered for devcontainer support. Use this to find which sandbox types a user can choose when starting an agent. cloudagentnext getsandboxselectionoptions devcontainer repositorytype repositoryfullname devcontainer repositoryType repositoryFullName"
   },
   "cloudAgentNext.getSandboxStatus": {
     "path": "cloudAgentNext.getSandboxStatus",
@@ -6757,6 +7197,7 @@
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
                 "cloneFromKiloSessionId": {},
+                "cloneUpToMessageId": {},
                 "githubRepo": {
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -7179,8 +7620,7 @@
                       "maxItems": 5,
                       "type": "array",
                       "items": {
-                        "type": "string",
-                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                        "type": "string"
                       }
                     }
                   },
@@ -7233,6 +7673,10 @@
                   "minLength": 30,
                   "maxLength": 30,
                   "pattern": "^ses_.*"
+                },
+                "cloneUpToMessageId": {
+                  "type": "string",
+                  "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
                 },
                 "autoInitiate": {
                   "type": "boolean",
@@ -7665,8 +8109,7 @@
                       "maxItems": 5,
                       "type": "array",
                       "items": {
-                        "type": "string",
-                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                        "type": "string"
                       }
                     }
                   },
@@ -7711,6 +8154,29 @@
               ]
             }
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "egressMode": {
+              "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
+              "type": "string",
+              "enum": [
+                "unrestricted",
+                "allowlist"
+              ]
+            },
+            "egressAllowlist": {
+              "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 254,
+                "pattern": "^[A-Za-z0-9.-]+$"
+              }
+            }
+          }
         },
         {
           "type": "object",
@@ -7849,9 +8315,11 @@
     "tags": [
       "cloudagentnext",
       "preparesession",
+      "egressmode",
+      "egressallowlist",
       "sandboxallocation"
     ],
-    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession sandboxallocation sandboxAllocation"
+    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist sandboxallocation egressMode egressAllowlist sandboxAllocation"
   },
   "cloudAgentNext.refreshTerminalTicket": {
     "path": "cloudAgentNext.refreshTerminalTicket",
@@ -8114,8 +8582,7 @@
               "maxItems": 5,
               "type": "array",
               "items": {
-                "type": "string",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                "type": "string"
               }
             }
           },
@@ -8261,6 +8728,206 @@
       "recent_messages"
     ],
     "searchBlob": "cloudAgentNextFeedback.create Submit user feedback about a Cloud Agent session, including the rating text, model, repository, and recent messages. Use this to report a problem or share an opinion about a cloud agent run. cloudagentnextfeedback create cloud_agent_session_id kilo_session_id session_type organization_id feedback_text model repository is_streaming message_count recent_messages cloud_agent_session_id kilo_session_id session_type organization_id feedback_text model repository is_streaming message_count recent_messages"
+  },
+  "cloudAgentSettings.canManage": {
+    "path": "cloudAgentSettings.canManage",
+    "kind": "query",
+    "summary": "Check whether the current user has permission to manage Cloud Agent sandbox and repository settings, optionally within a specific organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "cloudagentsettings",
+      "canmanage",
+      "organizationid"
+    ],
+    "searchBlob": "cloudAgentSettings.canManage Check whether the current user has permission to manage Cloud Agent sandbox and repository settings, optionally within a specific organization. cloudagentsettings canmanage organizationid organizationId"
+  },
+  "cloudAgentSettings.get": {
+    "path": "cloudAgentSettings.get",
+    "kind": "query",
+    "summary": "Get the Cloud Agent settings for the user or organization, including the context sandbox allocation, per-repository profile allocations, and which sandbox options are available.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "cloudagentsettings",
+      "get",
+      "organizationid"
+    ],
+    "searchBlob": "cloudAgentSettings.get Get the Cloud Agent settings for the user or organization, including the context sandbox allocation, per-repository profile allocations, and which sandbox options are available. cloudagentsettings get organizationid organizationId"
+  },
+  "cloudAgentSettings.removeRepositorySettings": {
+    "path": "cloudAgentSettings.removeRepositorySettings",
+    "kind": "mutation",
+    "summary": "Delete the saved Cloud Agent settings for a specific repository.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repoFullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab"
+          ]
+        }
+      },
+      "required": [
+        "repoFullName",
+        "platform"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "removerepositorysettings",
+      "organizationid",
+      "repofullname",
+      "platform"
+    ],
+    "searchBlob": "cloudAgentSettings.removeRepositorySettings Delete the saved Cloud Agent settings for a specific repository. cloudagentsettings removerepositorysettings organizationid repofullname platform organizationId repoFullName platform"
+  },
+  "cloudAgentSettings.setContextAllocation": {
+    "path": "cloudAgentSettings.setContextAllocation",
+    "kind": "mutation",
+    "summary": "Set or clear the default sandbox allocation used for Cloud Agent context, for the current user or their organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "allocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "allocation"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setcontextallocation",
+      "organizationid",
+      "allocation"
+    ],
+    "searchBlob": "cloudAgentSettings.setContextAllocation Set or clear the default sandbox allocation used for Cloud Agent context, for the current user or their organization. cloudagentsettings setcontextallocation organizationid allocation organizationId allocation"
+  },
+  "cloudAgentSettings.setRepositorySettings": {
+    "path": "cloudAgentSettings.setRepositorySettings",
+    "kind": "mutation",
+    "summary": "Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repoFullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab"
+          ]
+        },
+        "profileId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "allocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "repoFullName",
+        "platform"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setrepositorysettings",
+      "organizationid",
+      "repofullname",
+      "platform",
+      "profileid",
+      "allocation"
+    ],
+    "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid allocation organizationId repoFullName platform profileId allocation"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",
@@ -17237,6 +17904,26 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
+            }
+          ]
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
             }
           ]
         }
@@ -17250,9 +17937,10 @@
       "autotopup",
       "changepaymentmethod",
       "organizationid",
-      "amountcents"
+      "amountcents",
+      "thresholdcents"
     ],
-    "searchBlob": "organizations.autoTopUp.changePaymentMethod Start the flow to set a new payment method for an organization's automatic top-up. Use to replace the card on file. organizations autotopup changepaymentmethod organizationid amountcents organizationId amountCents"
+    "searchBlob": "organizations.autoTopUp.changePaymentMethod Start the flow to set a new payment method for an organization's automatic top-up. Use to replace the card on file. organizations autotopup changepaymentmethod organizationid amountcents thresholdcents organizationId amountCents thresholdCents"
   },
   "organizations.autoTopUp.getConfig": {
     "path": "organizations.autoTopUp.getConfig",
@@ -17335,6 +18023,26 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
+            }
+          ]
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
             }
           ]
         }
@@ -17350,9 +18058,10 @@
       "toggle",
       "organizationid",
       "currentenabled",
-      "amountcents"
+      "amountcents",
+      "thresholdcents"
     ],
-    "searchBlob": "organizations.autoTopUp.toggle Turn automatic balance top-up on or off for an organization, or start payment-method setup. Use to enable or disable auto top-up. organizations autotopup toggle organizationid currentenabled amountcents organizationId currentEnabled amountCents"
+    "searchBlob": "organizations.autoTopUp.toggle Turn automatic balance top-up on or off for an organization, or start payment-method setup. Use to enable or disable auto top-up. organizations autotopup toggle organizationid currentenabled amountcents thresholdcents organizationId currentEnabled amountCents thresholdCents"
   },
   "organizations.autoTopUp.updateAmount": {
     "path": "organizations.autoTopUp.updateAmount",
@@ -17380,6 +18089,10 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
             }
           ]
         }
@@ -17397,6 +18110,50 @@
       "amountcents"
     ],
     "searchBlob": "organizations.autoTopUp.updateAmount Set the amount an organization automatically tops up when its balance is low. Use to change the auto top-up amount. organizations autotopup updateamount organizationid amountcents organizationId amountCents"
+  },
+  "organizations.autoTopUp.updateThreshold": {
+    "path": "organizations.autoTopUp.updateThreshold",
+    "kind": "mutation",
+    "summary": "Set the balance threshold that triggers automatic top-up for an organization, so credit is refilled when it falls below the configured amount. Use to change when auto-recharge kicks in for a team or organization account.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "thresholdCents"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "autotopup",
+      "updatethreshold",
+      "organizationid",
+      "thresholdcents"
+    ],
+    "searchBlob": "organizations.autoTopUp.updateThreshold Set the balance threshold that triggers automatic top-up for an organization, so credit is refilled when it falls below the configured amount. Use to change when auto-recharge kicks in for a team or organization account. organizations autotopup updatethreshold organizationid thresholdcents organizationId thresholdCents"
   },
   "organizations.autoTriage.getAutoTriageConfig": {
     "path": "organizations.autoTriage.getAutoTriageConfig",
@@ -18284,6 +19041,51 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.closeTerminal Close an open terminal in a cloud agent session. Use to end a terminal session. organizations cloudagentnext closeterminal organizationid cloudagentsessionid ptyid organizationId cloudAgentSessionId ptyId"
   },
+  "organizations.cloudAgentNext.createPreview": {
+    "path": "organizations.cloudAgentNext.createPreview",
+    "kind": "mutation",
+    "summary": "Generate a shareable, expiring URL for opening a preview of an app running on a specific port in an organization's cloud agent session, so you can view or share the running preview.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^\\/.*"
+        }
+      },
+      "required": [
+        "organizationId",
+        "cloudAgentSessionId",
+        "port"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "createpreview",
+      "organizationid",
+      "cloudagentsessionid",
+      "port",
+      "path"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.createPreview Generate a shareable, expiring URL for opening a preview of an app running on a specific port in an organization's cloud agent session, so you can view or share the running preview. organizations cloudagentnext createpreview organizationid cloudagentsessionid port path organizationId cloudAgentSessionId port path"
+  },
   "organizations.cloudAgentNext.createTerminal": {
     "path": "organizations.cloudAgentNext.createTerminal",
     "kind": "mutation",
@@ -18624,6 +19426,20 @@
         },
         "devcontainer": {
           "type": "boolean"
+        },
+        "repositoryType": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab",
+            "bitbucket",
+            "git"
+          ]
+        },
+        "repositoryFullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
         }
       },
       "required": [
@@ -18635,9 +19451,11 @@
       "cloudagentnext",
       "getsandboxselectionoptions",
       "organizationid",
-      "devcontainer"
+      "devcontainer",
+      "repositorytype",
+      "repositoryfullname"
     ],
-    "searchBlob": "organizations.cloudAgentNext.getSandboxSelectionOptions List the sandbox options available for a cloud agent, such as selectable environments and container capabilities. Use this to find which sandbox choices an agent can pick for an organization. organizations cloudagentnext getsandboxselectionoptions organizationid devcontainer organizationId devcontainer"
+    "searchBlob": "organizations.cloudAgentNext.getSandboxSelectionOptions List the sandbox options available for a cloud agent, such as selectable environments and container capabilities. Use this to find which sandbox choices an agent can pick for an organization. organizations cloudagentnext getsandboxselectionoptions organizationid devcontainer repositorytype repositoryfullname organizationId devcontainer repositoryType repositoryFullName"
   },
   "organizations.cloudAgentNext.getSandboxStatus": {
     "path": "organizations.cloudAgentNext.getSandboxStatus",
@@ -19216,6 +20034,7 @@
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
                     "cloneFromKiloSessionId": {},
+                    "cloneUpToMessageId": {},
                     "githubRepo": {
                       "type": "string",
                       "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -19638,8 +20457,7 @@
                           "maxItems": 5,
                           "type": "array",
                           "items": {
-                            "type": "string",
-                            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                            "type": "string"
                           }
                         }
                       },
@@ -19692,6 +20510,10 @@
                       "minLength": 30,
                       "maxLength": 30,
                       "pattern": "^ses_.*"
+                    },
+                    "cloneUpToMessageId": {
+                      "type": "string",
+                      "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
                     },
                     "autoInitiate": {
                       "type": "boolean",
@@ -20124,8 +20946,7 @@
                           "maxItems": 5,
                           "type": "array",
                           "items": {
-                            "type": "string",
-                            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                            "type": "string"
                           }
                         }
                       },
@@ -20170,6 +20991,29 @@
                   ]
                 }
               ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "egressMode": {
+                  "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
+                  "type": "string",
+                  "enum": [
+                    "unrestricted",
+                    "allowlist"
+                  ]
+                },
+                "egressAllowlist": {
+                  "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "pattern": "^[A-Za-z0-9.-]+$"
+                  }
+                }
+              }
             },
             {
               "type": "object",
@@ -20320,9 +21164,11 @@
       "cloudagentnext",
       "preparesession",
       "organizationid",
+      "egressmode",
+      "egressallowlist",
       "sandboxallocation"
     ],
-    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid sandboxallocation organizationId sandboxAllocation"
+    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist sandboxallocation organizationId egressMode egressAllowlist sandboxAllocation"
   },
   "organizations.cloudAgentNext.refreshTerminalTicket": {
     "path": "organizations.cloudAgentNext.refreshTerminalTicket",
@@ -20647,8 +21493,7 @@
               "maxItems": 5,
               "type": "array",
               "items": {
-                "type": "string",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                "type": "string"
               }
             }
           },
@@ -33420,144 +34265,6 @@
     ],
     "searchBlob": "providerReview.unresolveThread Reopen a previously resolved review comment thread on a pull request or merge request. providerreview unresolvethread"
   },
-  "quickChat.appendMessages": {
-    "path": "quickChat.appendMessages",
-    "kind": "mutation",
-    "summary": "Add one or more chat messages to an organization's quick chat thread in a specific order.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "messages": {
-          "minItems": 1,
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "role": {
-                "type": "string",
-                "enum": [
-                  "user",
-                  "assistant"
-                ]
-              },
-              "content": {
-                "type": "string",
-                "minLength": 1
-              },
-              "clientId": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "required": [
-              "role",
-              "content"
-            ]
-          }
-        }
-      },
-      "required": [
-        "organizationId",
-        "messages"
-      ]
-    },
-    "tags": [
-      "quickchat",
-      "appendmessages",
-      "organizationid",
-      "messages"
-    ],
-    "searchBlob": "quickChat.appendMessages Add one or more chat messages to an organization's quick chat thread in a specific order. quickchat appendmessages organizationid messages organizationId messages"
-  },
-  "quickChat.getOrCreateThread": {
-    "path": "quickChat.getOrCreateThread",
-    "kind": "mutation",
-    "summary": "Fetch the quick chat conversation thread for an organization, creating it if none exists yet.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "quickchat",
-      "getorcreatethread",
-      "organizationid"
-    ],
-    "searchBlob": "quickChat.getOrCreateThread Fetch the quick chat conversation thread for an organization, creating it if none exists yet. quickchat getorcreatethread organizationid organizationId"
-  },
-  "quickChat.listMessages": {
-    "path": "quickChat.listMessages",
-    "kind": "query",
-    "summary": "Paginated fetch of a user's quick chat message history within an organization/thread scope, returning messages newest-first with cursor-based pagination.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "cursor": {
-          "type": "string",
-          "minLength": 1
-        },
-        "limit": {
-          "default": 50,
-          "type": "number",
-          "minimum": 1,
-          "maximum": 50
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "quickchat",
-      "listmessages",
-      "organizationid",
-      "cursor",
-      "limit"
-    ],
-    "searchBlob": "quickChat.listMessages Paginated fetch of a user's quick chat message history within an organization/thread scope, returning messages newest-first with cursor-based pagination. quickchat listmessages organizationid cursor limit organizationId cursor limit"
-  },
   "reviewMemory.approveAndOpenChangeRequest": {
     "path": "reviewMemory.approveAndOpenChangeRequest",
     "kind": "mutation",
@@ -35165,6 +35872,720 @@
     ],
     "searchBlob": "spendAlerts.save Update spend alert settings and rules for your personal account or an organization, controlling when and how you get notified about spending thresholds. spendalerts save organizationid enabled rules organizationId enabled rules"
   },
+  "todos.items.candidatesForSession": {
+    "path": "todos.items.candidatesForSession",
+    "kind": "query",
+    "summary": "List open to-do items that could be linked to a session, prioritizing ones in the same repository.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "candidatesforsession",
+      "sessionid",
+      "organizationid"
+    ],
+    "searchBlob": "todos.items.candidatesForSession List open to-do items that could be linked to a session, prioritizing ones in the same repository. todos items candidatesforsession sessionid organizationid sessionId organizationId"
+  },
+  "todos.items.create": {
+    "path": "todos.items.create",
+    "kind": "mutation",
+    "summary": "Add a new to-do item with a title and optional notes to a list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "listId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 10000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "listId",
+        "title"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "create",
+      "listid",
+      "title",
+      "notes"
+    ],
+    "searchBlob": "todos.items.create Add a new to-do item with a title and optional notes to a list. todos items create listid title notes listId title notes"
+  },
+  "todos.items.delete": {
+    "path": "todos.items.delete",
+    "kind": "mutation",
+    "summary": "Delete a to-do item.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "delete",
+      "id"
+    ],
+    "searchBlob": "todos.items.delete Delete a to-do item. todos items delete id id"
+  },
+  "todos.items.forSession": {
+    "path": "todos.items.forSession",
+    "kind": "query",
+    "summary": "Look up which to-do item and list an agent session is linked to.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "forsession",
+      "sessionid"
+    ],
+    "searchBlob": "todos.items.forSession Look up which to-do item and list an agent session is linked to. todos items forsession sessionid sessionId"
+  },
+  "todos.items.get": {
+    "path": "todos.items.get",
+    "kind": "query",
+    "summary": "Fetch a single to-do item by id, including its list and any linked sessions.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "get",
+      "id"
+    ],
+    "searchBlob": "todos.items.get Fetch a single to-do item by id, including its list and any linked sessions. todos items get id id"
+  },
+  "todos.items.linkSession": {
+    "path": "todos.items.linkSession",
+    "kind": "mutation",
+    "summary": "Link an existing agent session to a to-do item, optionally linking a session that was started from it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "origin": {
+          "type": "string",
+          "enum": [
+            "started",
+            "linked"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "sessionId",
+        "origin"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "linksession",
+      "id",
+      "sessionid",
+      "origin"
+    ],
+    "searchBlob": "todos.items.linkSession Link an existing agent session to a to-do item, optionally linking a session that was started from it. todos items linksession id sessionid origin id sessionId origin"
+  },
+  "todos.items.list": {
+    "path": "todos.items.list",
+    "kind": "query",
+    "summary": "List the to-do items in a specific list, both open and completed.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "listId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "listId"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "list",
+      "listid"
+    ],
+    "searchBlob": "todos.items.list List the to-do items in a specific list, both open and completed. todos items list listid listId"
+  },
+  "todos.items.move": {
+    "path": "todos.items.move",
+    "kind": "mutation",
+    "summary": "Reorder a to-do item within its list by placing it before or after another item.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "beforeId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "afterId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "move",
+      "id",
+      "beforeid",
+      "afterid"
+    ],
+    "searchBlob": "todos.items.move Reorder a to-do item within its list by placing it before or after another item. todos items move id beforeid afterid id beforeId afterId"
+  },
+  "todos.items.unlinkSession": {
+    "path": "todos.items.unlinkSession",
+    "kind": "mutation",
+    "summary": "Remove the link between an agent session and a to-do item.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "id",
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "unlinksession",
+      "id",
+      "sessionid"
+    ],
+    "searchBlob": "todos.items.unlinkSession Remove the link between an agent session and a to-do item. todos items unlinksession id sessionid id sessionId"
+  },
+  "todos.items.upNext": {
+    "path": "todos.items.upNext",
+    "kind": "query",
+    "summary": "Get the next open to-do items to work on across lists, with their list names.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      }
+    },
+    "tags": [
+      "todos",
+      "items",
+      "upnext",
+      "organizationid",
+      "limit"
+    ],
+    "searchBlob": "todos.items.upNext Get the next open to-do items to work on across lists, with their list names. todos items upnext organizationid limit organizationId limit"
+  },
+  "todos.items.update": {
+    "path": "todos.items.update",
+    "kind": "mutation",
+    "summary": "Edit a to-do item's title or notes, or mark it done or not done.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 10000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "done": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "update",
+      "id",
+      "title",
+      "notes",
+      "done"
+    ],
+    "searchBlob": "todos.items.update Edit a to-do item's title or notes, or mark it done or not done. todos items update id title notes done id title notes done"
+  },
+  "todos.lists.create": {
+    "path": "todos.lists.create",
+    "kind": "mutation",
+    "summary": "Create a new to-do list with a name, optional emoji, repository, and default session settings.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "emoji": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 16
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gitUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "variant": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "tags": [
+      "todos",
+      "lists",
+      "create",
+      "organizationid",
+      "name",
+      "emoji",
+      "giturl",
+      "mode",
+      "model",
+      "variant"
+    ],
+    "searchBlob": "todos.lists.create Create a new to-do list with a name, optional emoji, repository, and default session settings. todos lists create organizationid name emoji giturl mode model variant organizationId name emoji gitUrl mode model variant"
+  },
+  "todos.lists.delete": {
+    "path": "todos.lists.delete",
+    "kind": "mutation",
+    "summary": "Delete a to-do list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "lists",
+      "delete",
+      "id"
+    ],
+    "searchBlob": "todos.lists.delete Delete a to-do list. todos lists delete id id"
+  },
+  "todos.lists.list": {
+    "path": "todos.lists.list",
+    "kind": "query",
+    "summary": "List all of the user's to-do lists, optionally including archived ones and scoped to an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "includeArchived": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "todos",
+      "lists",
+      "list",
+      "organizationid",
+      "includearchived"
+    ],
+    "searchBlob": "todos.lists.list List all of the user's to-do lists, optionally including archived ones and scoped to an organization. todos lists list organizationid includearchived organizationId includeArchived"
+  },
+  "todos.lists.move": {
+    "path": "todos.lists.move",
+    "kind": "mutation",
+    "summary": "Reorder a to-do list by placing it before or after another list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "beforeId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "afterId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "lists",
+      "move",
+      "id",
+      "beforeid",
+      "afterid"
+    ],
+    "searchBlob": "todos.lists.move Reorder a to-do list by placing it before or after another list. todos lists move id beforeid afterid id beforeId afterId"
+  },
+  "todos.lists.update": {
+    "path": "todos.lists.update",
+    "kind": "mutation",
+    "summary": "Edit a to-do list's name, emoji, repo, or defaults, or archive/unarchive it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "emoji": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 16
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gitUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "variant": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "archived": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "lists",
+      "update",
+      "id",
+      "name",
+      "emoji",
+      "giturl",
+      "mode",
+      "model",
+      "variant",
+      "archived"
+    ],
+    "searchBlob": "todos.lists.update Edit a to-do list's name, emoji, repo, or defaults, or archive/unarchive it. todos lists update id name emoji giturl mode model variant archived id name emoji gitUrl mode model variant archived"
+  },
   "unifiedSessions.list": {
     "path": "unifiedSessions.list",
     "kind": "query",
@@ -36605,7 +38026,9 @@
           "enum": [
             "ios_push_to_start",
             "ios_activity",
-            "android_ongoing"
+            "ios_session_activity",
+            "android_ongoing",
+            "android_session_ongoing"
           ]
         },
         "platform": {
@@ -36625,6 +38048,10 @@
               "type": "null"
             }
           ]
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -36640,9 +38067,10 @@
       "token",
       "kind",
       "platform",
-      "organizationid"
+      "organizationid",
+      "sessionid"
     ],
-    "searchBlob": "user.registerActivityToken Register an iOS Live Activity or Android ongoing notification token for the user. user registeractivitytoken token kind platform organizationid token kind platform organizationId"
+    "searchBlob": "user.registerActivityToken Register an iOS Live Activity or Android ongoing notification token for the user. user registeractivitytoken token kind platform organizationid sessionid token kind platform organizationId sessionId"
   },
   "user.registerPushToken": {
     "path": "user.registerPushToken",
@@ -37015,6 +38443,10 @@
         "token": {
           "type": "string",
           "minLength": 1
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -37024,9 +38456,10 @@
     "tags": [
       "user",
       "unregisteractivitytoken",
-      "token"
+      "token",
+      "sessionid"
     ],
-    "searchBlob": "user.unregisterActivityToken Remove an activity token used for Live Activities or ongoing notifications. user unregisteractivitytoken token token"
+    "searchBlob": "user.unregisterActivityToken Remove an activity token used for Live Activities or ongoing notifications. user unregisteractivitytoken token sessionid token sessionId"
   },
   "user.unregisterPushToken": {
     "path": "user.unregisterPushToken",

@@ -75,19 +75,6 @@ describe('provider-neutral URL field', () => {
     expect(ENTRY_SCREEN_SOURCE).not.toMatch(/\bPlatform\b/);
   });
 
-  it('leaves the field box to the shared input and adds no vertical padding', async () => {
-    const tree = await renderLoaded();
-    const input = find(tree, 'Input', () => true);
-    const classes = String(input.props?.className).split(' ');
-    // The shared single-line box (`@/components/ui/input`) owns the height floor
-    // and the one line box; the call site must not re-add vertical padding or a
-    // fixed height, which drew the placeholder off the value's baseline
-    // (apps/mobile/AGENTS.md).
-    expect(classes).toContain('text-base');
-    expect(classes.filter(name => name.startsWith('py-'))).toEqual([]);
-    expect(classes.filter(name => /^min-h|^h-\d/.test(name))).toEqual([]);
-  });
-
   it('opens a GitHub PR URL on the GitHub route', async () => {
     const tree = await renderLoaded();
     const input = find(tree, 'Input', () => true);

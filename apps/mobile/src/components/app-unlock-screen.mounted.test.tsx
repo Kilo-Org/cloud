@@ -252,13 +252,15 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
 
   it.each([false, true])('announces setting feedback once with locked=%s', async locked => {
     await mount(nestedUnlockScenes(<GeneralSettingsScreen />));
-    const preference = root().findByProps({ accessibilityLabel: 'Unlock with biometrics' });
+    const preference = root().findByProps({
+      accessibilityLabel: 'Unlock with biometrics',
+    });
     const save = Promise.withResolvers<undefined>();
     storage.setItemAsync.mockReturnValueOnce(save.promise);
     await flush(() => {
-      (preference.props.onValueChange as (enabled: boolean) => void)(false);
+      (preference.props.onPress as () => void)();
     });
-    expect(preference.props).toMatchObject({ value: true, accessibilityState: { busy: true } });
+    expect(preference.props).toMatchObject({ accessibilityState: { busy: true, checked: true } });
     expect(announcements).not.toHaveBeenCalled();
     if (locked) {
       const now = vi.spyOn(Date, 'now').mockReturnValue(0);
@@ -275,7 +277,10 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
     const message = 'Could not save setting';
     expectFeedback(root(), message, locked ? 3 : 1);
     expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message]] : []);
-    expect(preference.props).toMatchObject({ value: true, disabled: locked });
+    expect(preference.props).toMatchObject({
+      disabled: locked,
+      accessibilityState: { checked: true },
+    });
     if (locked) {
       expect(retry()?.props).toMatchObject({ disabled: false, accessibilityLabel: 'Retry' });
       await flush(retry()?.props.onPress as () => void);

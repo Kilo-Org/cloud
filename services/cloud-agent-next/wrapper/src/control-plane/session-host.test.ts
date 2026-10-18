@@ -16,9 +16,13 @@ async function hostFixture() {
   let preparing = false;
   let terminalInput = false;
   let abortReply: () => Promise<boolean> = async () => true;
+  let summaryReply: () => Promise<boolean> = async () => true;
   const frames: ControlPlaneWrapperFrame[] = [];
   const aborts: Array<{ path: string; scope: unknown }> = [];
   const prompts: string[] = [];
+  const summaries: string[] = [];
+  const summaryRequested = Promise.withResolvers<void>();
+  const promptRequested = Promise.withResolvers<void>();
   const feeds: Array<{ source: KiloEventFeedSource; callbacks: KiloFeedCallbacks }> = [];
   const intervals = new Map<symbol, () => void>();
   const stopped: number[] = [];
@@ -33,7 +37,13 @@ async function hostFixture() {
       }
       if (url.pathname.endsWith('/prompt_async')) {
         prompts.push(url.pathname);
+        promptRequested.resolve();
         return new Response(null, { status: 204 });
+      }
+      if (url.pathname.endsWith('/summarize')) {
+        summaries.push(url.pathname);
+        summaryRequested.resolve();
+        return Response.json(await summaryReply());
       }
       if (url.pathname === '/command') return Response.json([]);
       return new Response(null, { status: 404 });
@@ -64,6 +74,7 @@ async function hostFixture() {
         return {
           pid: id,
           url: server.url.toString(),
+          authorization: 'Basic test',
           exited: new Promise<void>(() => undefined),
           stop: async () => {
             stopped.push(id);
@@ -96,6 +107,9 @@ async function hostFixture() {
     feeds,
     aborts,
     prompts,
+    summaries,
+    summaryRequested: summaryRequested.promise,
+    promptRequested: promptRequested.promise,
     stopped,
     async runtime(key: string) {
       await host.runtimes.ensure({ key, directory: '/workspace', env: {} });
@@ -121,6 +135,9 @@ async function hostFixture() {
     setAbort(reply: typeof abortReply) {
       abortReply = reply;
     },
+    setSummary(reply: typeof summaryReply) {
+      summaryReply = reply;
+    },
     setSnapshot(observations: SessionObservation[]) {
       snapshot = observations;
     },
@@ -140,6 +157,170 @@ async function hostFixture() {
 }
 
 describe('production session host composition', () => {
+  it.each([
+    ['response-first', 0, 'after-open'],
+    ['response-first', 1, 'after-open'],
+    ['close-first', 0, 'after-open'],
+    ['close-first', 1, 'after-open'],
+    ['response-first', 1, 'before-open'],
+    ['close-first', 1, 'before-open'],
+    ['response-first', 1, 'after-response'],
+    ['response-first', 1, 'snapshot-before-close'],
+    ['response-first', 1, 'idle-dropped'],
+  ])(
+    'does not complete a compact follow-up before it runs with %s delivery, %i ms elapsed and %s receipt',
+    async (order, elapsed, receipt) => {
+      const f = await hostFixture();
+      const summary = Promise.withResolvers<boolean>();
+      try {
+        const feed = await f.runtime('/workspace');
+        f.host.turns.registerRoute({
+          sessionId: 'workspace_chat',
+          kiloSessionId: 'ses_root',
+          directory: '/workspace',
+          attemptId: 'a',
+        });
+        f.setSummary(() => summary.promise);
+        f.host.turns.submit('workspace_chat', {
+          messageId: 'c1',
+          turn: { type: 'command', command: 'compact', arguments: '' },
+          agent: { mode: 'code', model: 'test/model' },
+        });
+        await f.summaryRequested;
+        expect(f.summaries).toEqual(['/session/ses_root/summarize']);
+        const submitFollowup = () =>
+          f.host.turns.submit('workspace_chat', {
+            messageId: 'm1',
+            turn: { type: 'prompt', prompt: 'follow-up' },
+            agent: { mode: 'code', model: 'test/model' },
+          });
+        if (receipt === 'before-open') {
+          submitFollowup();
+          await f.advance(elapsed);
+        }
+        if (receipt !== 'after-response') {
+          f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+          if (receipt !== 'idle-dropped')
+            f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+        }
+        if (receipt !== 'before-open') {
+          await f.advance(elapsed);
+          submitFollowup();
+        }
+        await settle();
+        expect(f.prompts).toEqual([]);
+
+        if (order === 'response-first') {
+          summary.resolve(true);
+          await settle();
+          expect(f.prompts).toEqual([]);
+        }
+        if (receipt === 'after-response') {
+          f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+          f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+        }
+        if (receipt === 'snapshot-before-close') {
+          f.setSnapshot([
+            {
+              id: 'ses_root',
+              directory: '/workspace',
+              status: 'idle',
+              messages: [],
+              interactions: [],
+            },
+          ]);
+          await f.host.runtimes.get('/workspace')?.refreshActivity();
+          await settle();
+          expect(f.prompts).toEqual([]);
+        }
+        f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+        await settle();
+        expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+        expect(f.host.getHeartbeat().active).toBe(true);
+        if (receipt === 'idle-dropped') {
+          expect(f.prompts).toEqual([]);
+          f.setSnapshot([
+            {
+              id: 'ses_root',
+              directory: '/workspace',
+              status: 'idle',
+              messages: [],
+              interactions: [],
+            },
+          ]);
+          await f.host.runtimes.get('/workspace')?.refreshActivity();
+        }
+        summary.resolve(true);
+        await f.promptRequested;
+        await settle();
+        expect(f.prompts).toEqual(['/session/ses_root/prompt_async']);
+
+        f.event(feed, 'message.updated', {
+          info: { id: 'm1', sessionID: 'ses_root', role: 'user' },
+        });
+        f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+        f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+        f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+        await settle();
+        expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+          { status: 'completed', lastMessageId: 'm1' },
+        ]);
+        expect(f.host.getHeartbeat().active).toBe(false);
+      } finally {
+        summary.resolve(true);
+        await f.dispose();
+      }
+    }
+  );
+
+  it('bounds a follow-up waiting for a missing compact close', async () => {
+    const f = await hostFixture();
+    try {
+      const feed = await f.runtime('/workspace');
+      f.host.turns.registerRoute({
+        sessionId: 'workspace_chat',
+        kiloSessionId: 'ses_root',
+        directory: '/workspace',
+        attemptId: 'a',
+      });
+      f.host.turns.submit('workspace_chat', {
+        messageId: 'c1',
+        turn: { type: 'command', command: 'compact', arguments: '' },
+        agent: { mode: 'code', model: 'test/model' },
+      });
+      await f.summaryRequested;
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.host.turns.submit('workspace_chat', {
+        messageId: 'm1',
+        turn: { type: 'prompt', prompt: 'follow-up' },
+        agent: { mode: 'code', model: 'test/model' },
+      });
+      await settle();
+      expect(f.prompts).toEqual([]);
+      f.setSnapshot([
+        { id: 'ses_root', directory: '/workspace', status: 'idle', messages: [], interactions: [] },
+      ]);
+      await f.host.runtimes.get('/workspace')?.refreshActivity();
+      await f.advance(120_000 - 1);
+      f.host.turns.tick();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      expect(f.host.getHeartbeat().active).toBe(true);
+
+      await f.advance(1);
+      f.host.turns.tick();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+      ]);
+      expect(f.host.getHeartbeat().active).toBe(false);
+      f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await settle();
+      expect(f.prompts).toEqual([]);
+    } finally {
+      await f.dispose();
+    }
+  });
+
   it('recovers an unconfirmed abort through the runtime owner and reports interrupted autonomous siblings', async () => {
     const f = await hostFixture();
     try {
@@ -172,7 +353,7 @@ describe('production session host composition', () => {
       );
       expect(errors).toEqual([
         { sessionId: 'workspace_a', reason: 'no_progress' },
-        { sessionId: 'workspace_b', reason: 'agent_restarted' },
+        { sessionId: 'workspace_b', reason: 'agent_unresponsive' },
       ]);
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
       expect(f.host.getHeartbeat().active).toBe(false);

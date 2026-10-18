@@ -8,6 +8,8 @@ import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
 import { type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
+import { type LiveUpdateCard } from './live-update';
+
 const mocks = vi.hoisted(() => ({
   native: {
     isPromotionCapable: vi.fn(() => true),
@@ -94,148 +96,44 @@ describe('notification Open destination', () => {
   });
 });
 
+const CARD: LiveUpdateCard = {
+  title: '2 Needs input',
+  text: '3 Working · 1 Scheduled',
+  textIsError: false,
+  subText: 'Checked 4:32 PM',
+  compactText: '2',
+  openLabel: 'Open',
+  openUrl: 'kiloapp:///cloud/sessions/ses_1',
+  approveLabel: 'Approve',
+  newAgentLabel: null,
+  newAgentUrl: 'kiloapp:///cloud/sessions/new',
+};
+
 describe('live-update bridge argument shape', () => {
-  it('forwards the Open and Approve fields in the native argument order on start', () => {
-    start(
-      'Active agents',
-      '2 Needs input',
-      'Open',
-      'kiloapp:///cloud/sessions/ses_1',
-      'Approve',
-      '2',
-      'needs-input',
-      true
-    );
+  it('forwards the card record, channel, alert and promotion gate on start', () => {
+    start(CARD, 'needs-input', true);
 
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
-    expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      '2 Needs input',
-      { label: 'Open', url: 'kiloapp:///cloud/sessions/ses_1' },
-      'Approve',
-      '2',
-      'needs-input',
-      true,
-      true
-    );
-  });
-
-  it('passes a null Approve label so the native side omits the action', () => {
-    start(
-      'Active agents',
-      '3 Working',
-      'Open',
-      'kiloapp:///cloud/sessions',
-      null,
-      '3',
-      'agent-progress',
-      false
-    );
-
-    expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      '3 Working',
-      { label: 'Open', url: 'kiloapp:///cloud/sessions' },
-      null,
-      '3',
-      'agent-progress',
-      false,
-      true
-    );
+    expect(mocks.native.start).toHaveBeenCalledWith(CARD, 'needs-input', true, true);
   });
 
   it('defaults the update timeout to zero and forwards an explicit one', () => {
-    update(
-      'Active agents',
-      'No work in progress',
-      'Open',
-      'kiloapp:///cloud/sessions',
-      null,
-      null,
-      'agent-progress',
-      false
-    );
+    update(CARD, 'agent-progress', false);
+    expect(mocks.native.update).toHaveBeenLastCalledWith(CARD, 'agent-progress', false, 0);
 
-    expect(mocks.native.update).toHaveBeenLastCalledWith(
-      'Active agents',
-      'No work in progress',
-      { label: 'Open', url: 'kiloapp:///cloud/sessions' },
-      null,
-      null,
-      'agent-progress',
-      false,
-      0
-    );
-
-    update(
-      'Active agents',
-      '4 Working',
-      'Open',
-      'kiloapp:///cloud/sessions/ses_2',
-      'Approve',
-      '4',
-      'needs-input',
-      true,
-      8000
-    );
-
-    expect(mocks.native.update).toHaveBeenLastCalledWith(
-      'Active agents',
-      '4 Working',
-      { label: 'Open', url: 'kiloapp:///cloud/sessions/ses_2' },
-      'Approve',
-      '4',
-      'needs-input',
-      true,
-      8000
-    );
+    update(CARD, 'needs-input', true, 8000);
+    expect(mocks.native.update).toHaveBeenLastCalledWith(CARD, 'needs-input', true, 8000);
   });
 
   it('mirrors the native promotion gate on start and leaves it to the native update', () => {
     mocks.native.isPromotionCapable.mockReturnValue(false);
-    start(
-      'Active agents',
-      '1 Working',
-      'Open',
-      'kiloapp:///cloud/sessions',
-      null,
-      '1',
-      'agent-progress',
-      false
-    );
-    update(
-      'Active agents',
-      '1 Working',
-      'Open',
-      'kiloapp:///cloud/sessions',
-      null,
-      '1',
-      'agent-progress',
-      false
-    );
+    start(CARD, 'agent-progress', false);
+    update(CARD, 'agent-progress', false);
 
-    expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      '1 Working',
-      { label: 'Open', url: 'kiloapp:///cloud/sessions' },
-      null,
-      '1',
-      'agent-progress',
-      false,
-      false
-    );
-    // The native `update` spends its eighth bridge slot on the terminal timeout
-    // and reads the promotion gate from its own `isPromotionCapable()`.
-    expect(mocks.native.update).toHaveBeenCalledWith(
-      'Active agents',
-      '1 Working',
-      { label: 'Open', url: 'kiloapp:///cloud/sessions' },
-      null,
-      '1',
-      'agent-progress',
-      false,
-      0
-    );
+    expect(mocks.native.start).toHaveBeenCalledWith(CARD, 'agent-progress', false, false);
+    // The native `update` carries the terminal timeout and reads the promotion
+    // gate from its own `isPromotionCapable()`.
+    expect(mocks.native.update).toHaveBeenCalledWith(CARD, 'agent-progress', false, 0);
   });
 
   it('ends the notification through the native module', () => {

@@ -276,14 +276,35 @@ const byokErrorMessages: Record<number, string> = {
   429: '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
 };
 
-function byokErrorMessage(
-  status: number,
+const byokUpstreamErrorSchema = z.object({
+  error: z.object({ message: z.string() }).optional().catch(undefined),
+  message: z.string().optional().catch(undefined),
+});
+
+async function byokErrorMessage(
+  response: Response,
   userByokProviderIds: UserByokProviderId[]
-): string | undefined {
-  if (status === 403 && userByokProviderIds.includes('opencode-go')) {
+): Promise<string | undefined> {
+  if (response.status === 403 && userByokProviderIds.includes('opencode-go')) {
     return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
   }
-  return byokErrorMessages[status];
+  const specificMessage = byokErrorMessages[response.status];
+  if (specificMessage) return specificMessage;
+  if (response.status < 400 || response.status >= 500) return undefined;
+
+  const body: unknown = await response
+    .clone()
+    .json()
+    .catch(() => null);
+  const parsed = byokUpstreamErrorSchema.safeParse(body);
+  const providerMessage = parsed.success ? (parsed.data.error?.message ?? parsed.data.message) : '';
+  const message = providerMessage
+    ?.replace(/\p{Cc}/gu, ' ')
+    .trim()
+    .slice(0, 300);
+  return message
+    ? `[BYOK] ${message}`
+    : '[BYOK] Your provider rejected the request. Check your provider account and settings.';
 }
 
 function vertexByokModelNotFoundResponse(
@@ -370,10 +391,22 @@ export async function makeErrorReadable({
   const vertexByokResponse = vertexByokModelNotFoundResponse(response, userByokProviderIds);
   if (vertexByokResponse) return vertexByokResponse;
 
+  const hasSpecificByokMessage =
+    userByokProviderIds !== null && byokErrorMessages[response.status] !== undefined;
+  if (!hasSpecificByokMessage) {
+    const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
+    if (providerErrorResponse) return providerErrorResponse;
+
+    const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
+    if (overflowResponse) return overflowResponse;
+  }
+
   if (userByokProviderIds !== null) {
-    const byokMessage = byokErrorMessage(response.status, userByokProviderIds);
+    const byokMessage = await byokErrorMessage(response, userByokProviderIds);
     if (byokMessage) {
-      warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
+      if (hasSpecificByokMessage) {
+        warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
+      }
       return NextResponse.json(
         {
           error: byokMessage,
@@ -384,12 +417,6 @@ export async function makeErrorReadable({
       );
     }
   }
-
-  const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
-  if (providerErrorResponse) return providerErrorResponse;
-
-  const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
-  if (overflowResponse) return overflowResponse;
 
   if (shouldRedactErrorResponse(providerId, requestedModel)) {
     return await redactedErrorResponse(response);
@@ -531,6 +558,30 @@ export function accountForMicrodollarUsage(
   after(countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan));
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Field names, never values, of the request as sent upstream, so rejections
+ * such as "unknown field" can be attributed from logs alone.
+ */
+function describeRequestFields(request: unknown): Record<string, string> {
+  if (!isObjectRecord(request)) {
+    return {};
+  }
+  const fields: Record<string, string> = {
+    requestFields: Object.keys(request).sort().join(','),
+  };
+  if (Array.isArray(request.messages)) {
+    const messageFields = new Set(
+      request.messages.filter(isObjectRecord).flatMap(message => Object.keys(message))
+    );
+    fields.messageFields = [...messageFields].sort().join(',');
+  }
+  return fields;
+}
+
 export async function captureProxyError(params: {
   errorMessage: string;
   user: { id: string };
@@ -538,18 +589,35 @@ export async function captureProxyError(params: {
   response: Response;
   organizationId: string | undefined;
   model: string;
+  gatewayModel?: string;
+  byokProviderIds?: ReadonlyArray<string> | null;
   trackInSentry: boolean;
 }) {
-  const { errorMessage, user, response, organizationId, model, trackInSentry } = params;
+  const {
+    errorMessage,
+    user,
+    request,
+    response,
+    organizationId,
+    model,
+    gatewayModel,
+    byokProviderIds,
+    trackInSentry,
+  } = params;
   after(
     (async () => {
       const extraErrorData: Record<string, string | number> = {
         kiloUserId: user.id,
         model,
+        ...(gatewayModel && gatewayModel !== model ? { gatewayModel } : {}),
+        ...(byokProviderIds && byokProviderIds.length > 0
+          ? { byokProviderIds: byokProviderIds.join(',') }
+          : {}),
         status: response.status,
         statusText: response.statusText,
         responseContentType: response.headers.get('content-type') || '',
         ...(organizationId && { organizationId }),
+        ...describeRequestFields(request),
       };
 
       const clonedReponse = response.clone();

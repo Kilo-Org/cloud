@@ -41,6 +41,45 @@ type WorktreeDb = Pick<WorkerDb, 'select' | 'insert' | 'update' | 'delete' | 'ex
 export const WORKTREE_ACCESS_DENIED = 'worktree_access_denied';
 export const WORKTREE_DELETING = 'worktree_deleting';
 
+async function deletionDiagnostic<T>(
+  operation: 'begin' | 'record_cleanup' | 'complete',
+  params: CloudAgentWorktreeDeletionParams,
+  run: (timing: { setStage: (stage: string) => void; sessionCount?: number }) => Promise<T>
+): Promise<T> {
+  const startedAt = Date.now();
+  let stage = 'initialization';
+  let stageStartedAt = startedAt;
+  let ok = false;
+  const durations: Record<string, number> = {};
+  const timing: { sessionCount?: number; setStage: (next: string) => void } = {
+    setStage(next: string) {
+      const now = Date.now();
+      durations[`${stage}Ms`] = (durations[`${stage}Ms`] ?? 0) + Math.max(0, now - stageStartedAt);
+      stageStartedAt = now;
+      stage = next;
+    },
+  };
+  try {
+    const result = await run(timing);
+    ok = true;
+    return result;
+  } finally {
+    timing.setStage(stage);
+    const fields = {
+      event: 'worktree_deletion',
+      operation,
+      worktreeId: params.worktreeId,
+      stage,
+      ok,
+      sessionCount: timing.sessionCount,
+      durationMs: Math.max(0, Date.now() - startedAt),
+      ...durations,
+    };
+    if (ok) console.log(fields);
+    else console.warn(fields);
+  }
+}
+
 function locations(row: CloudAgentWorktree): CloudAgentWorktreeLocation[] {
   return z.array(cloudAgentWorktreeLocationSchema).parse(row.runtime_locations);
 }
@@ -312,8 +351,13 @@ async function beginWorktreeDeletionOn(
 }
 
 export async function beginWorktreeDeletion(env: Env, params: CloudAgentWorktreeDeletionParams) {
-  const db = getWorkerDb(env.HYPERDRIVE.connectionString);
-  return db.transaction(tx => beginWorktreeDeletionOn(tx, params));
+  return deletionDiagnostic('begin', params, async timing => {
+    const db = getWorkerDb(env.HYPERDRIVE.connectionString);
+    timing.setStage('sqlTransaction');
+    const state = await db.transaction(tx => beginWorktreeDeletionOn(tx, params));
+    timing.sessionCount = state.manifest.sessions.length;
+    return state;
+  });
 }
 
 /**
@@ -633,108 +677,116 @@ export async function recordWorktreeCleanup(
   env: Env,
   params: RecordCloudAgentWorktreeCleanupParams
 ) {
-  const db = getWorkerDb(env.HYPERDRIVE.connectionString);
-  const inferred = await inferChildSessionLineage(env, db, params);
-  const childSessions = [...(params.childSessions ?? []), ...inferred];
-  return db.transaction(async tx => {
-    const row = await lockWorktree(tx, params);
-    if (row.deletion_started_at === null) throw new Error('worktree_deletion_not_started');
-    const state = deletionState(row);
-    if (state.completed) return state;
-    await lockRoots(tx, params);
-    const sessions = new Map(state.manifest.sessions.map(session => [session.sessionId, session]));
-    await recoverChildSessionLineage(
-      tx,
-      { ...params, childSessions },
-      sessions,
-      new Set(inferred.map(child => child.sessionId))
-    );
-    const discovered = await discoverMembers(tx, params);
-    if (discovered.length > 0) {
-      const ids = discovered.map(session => session.sessionId);
-      const rootScopes = new Set<string>(
-        [...sessions.values()].flatMap(session =>
-          session.cloudAgentSessionId ? [session.cloudAgentSessionId] : []
-        )
+  return deletionDiagnostic('record_cleanup', params, async timing => {
+    const db = getWorkerDb(env.HYPERDRIVE.connectionString);
+    timing.setStage('lineageInference');
+    const inferred = await inferChildSessionLineage(env, db, params);
+    const childSessions = [...(params.childSessions ?? []), ...inferred];
+    timing.setStage('sqlTransaction');
+    const result = await db.transaction(async tx => {
+      const row = await lockWorktree(tx, params);
+      if (row.deletion_started_at === null) throw new Error('worktree_deletion_not_started');
+      const state = deletionState(row);
+      if (state.completed) return state;
+      await lockRoots(tx, params);
+      const sessions = new Map(
+        state.manifest.sessions.map(session => [session.sessionId, session])
       );
-      await tx
-        .update(cli_sessions_v2)
-        .set({ cloud_agent_worktree_id: params.worktreeId })
-        .where(
-          and(
-            eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-            inArray(cli_sessions_v2.session_id, ids),
-            isNull(cli_sessions_v2.cloud_agent_worktree_id),
-            params.organizationId
-              ? eq(cli_sessions_v2.organization_id, params.organizationId)
-              : isNull(cli_sessions_v2.organization_id),
-            or(
-              isNull(cli_sessions_v2.cloud_agent_session_scope_id),
-              inArray(cli_sessions_v2.cloud_agent_session_scope_id, [...rootScopes])
+      await recoverChildSessionLineage(
+        tx,
+        { ...params, childSessions },
+        sessions,
+        new Set(inferred.map(child => child.sessionId))
+      );
+      const discovered = await discoverMembers(tx, params);
+      if (discovered.length > 0) {
+        const ids = discovered.map(session => session.sessionId);
+        const rootScopes = new Set<string>(
+          [...sessions.values()].flatMap(session =>
+            session.cloudAgentSessionId ? [session.cloudAgentSessionId] : []
+          )
+        );
+        await tx
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_worktree_id: params.worktreeId })
+          .where(
+            and(
+              eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
+              inArray(cli_sessions_v2.session_id, ids),
+              isNull(cli_sessions_v2.cloud_agent_worktree_id),
+              params.organizationId
+                ? eq(cli_sessions_v2.organization_id, params.organizationId)
+                : isNull(cli_sessions_v2.organization_id),
+              or(
+                isNull(cli_sessions_v2.cloud_agent_session_scope_id),
+                inArray(cli_sessions_v2.cloud_agent_session_scope_id, [...rootScopes])
+              )
+            )
+          );
+        const fenced = await tx
+          .select({
+            organizationId: cli_sessions_v2.organization_id,
+            worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+            cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
+          })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
+              inArray(cli_sessions_v2.session_id, ids)
             )
           )
-        );
-      const fenced = await tx
-        .select({
-          organizationId: cli_sessions_v2.organization_id,
-          worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
-          cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
-        })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-            inArray(cli_sessions_v2.session_id, ids)
+          .orderBy(cli_sessions_v2.session_id)
+          .for('update');
+        if (
+          fenced.some(
+            session =>
+              session.organizationId !== (params.organizationId ?? null) ||
+              session.worktreeId !== params.worktreeId ||
+              (session.cloudAgentSessionScopeId != null &&
+                !rootScopes.has(session.cloudAgentSessionScopeId))
           )
         )
-        .orderBy(cli_sessions_v2.session_id)
-        .for('update');
-      if (
-        fenced.some(
-          session =>
-            session.organizationId !== (params.organizationId ?? null) ||
-            session.worktreeId !== params.worktreeId ||
-            (session.cloudAgentSessionScopeId != null &&
-              !rootScopes.has(session.cloudAgentSessionScopeId))
-        )
-      )
-        throw new Error('worktree_child_lineage_conflict');
-      for (const session of discovered) sessions.set(session.sessionId, session);
-    }
-    const extraIds = [...new Set(params.sessionIds ?? [])].filter(id => !sessions.has(id));
-    if (extraIds.length > 0) {
-      const existing = await tx
-        .select({ sessionId: cli_sessions_v2.session_id })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-            inArray(cli_sessions_v2.session_id, extraIds)
-          )
-        );
-      if (existing.length > 0) throw new Error('worktree_cleanup_session_conflict');
-      for (const sessionId of extraIds)
-        sessions.set(sessionId, { sessionId, cloudAgentSessionId: null });
-    }
-    const runtimeLocations = state.runtimeLocations;
-    for (const location of params.runtimeLocations ?? []) {
-      if (
-        !runtimeLocations.some(
-          item => item.sandboxId === location.sandboxId && item.provider === location.provider
-        )
-      ) {
-        runtimeLocations.push(location);
+          throw new Error('worktree_child_lineage_conflict');
+        for (const session of discovered) sessions.set(session.sessionId, session);
       }
-    }
-    const manifest = {
-      version: 1,
-      sessions: [...sessions.values()],
-    } satisfies typeof state.manifest;
-    await tx
-      .update(cloud_agent_worktrees)
-      .set({ runtime_locations: runtimeLocations, deletion_manifest: manifest })
-      .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId));
-    return { completed: false, manifest, runtimeLocations };
+      const extraIds = [...new Set(params.sessionIds ?? [])].filter(id => !sessions.has(id));
+      if (extraIds.length > 0) {
+        const existing = await tx
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
+              inArray(cli_sessions_v2.session_id, extraIds)
+            )
+          );
+        if (existing.length > 0) throw new Error('worktree_cleanup_session_conflict');
+        for (const sessionId of extraIds)
+          sessions.set(sessionId, { sessionId, cloudAgentSessionId: null });
+      }
+      const runtimeLocations = state.runtimeLocations;
+      for (const location of params.runtimeLocations ?? []) {
+        if (
+          !runtimeLocations.some(
+            item => item.sandboxId === location.sandboxId && item.provider === location.provider
+          )
+        ) {
+          runtimeLocations.push(location);
+        }
+      }
+      const manifest = {
+        version: 1,
+        sessions: [...sessions.values()],
+      } satisfies typeof state.manifest;
+      await tx
+        .update(cloud_agent_worktrees)
+        .set({ runtime_locations: runtimeLocations, deletion_manifest: manifest })
+        .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId));
+      return { completed: false, manifest, runtimeLocations };
+    });
+    timing.sessionCount = result.manifest.sessions.length;
+    return result;
   });
 }
 
@@ -868,84 +920,93 @@ export async function completeWorktreeDeletion(
   params: CloudAgentWorktreeDeletionParams,
   executionContext?: ExecutionContext
 ): Promise<{ success: true; deletedSessionIds: string[] }> {
-  const db = getWorkerDb(env.HYPERDRIVE.connectionString);
-  const [row] = await db
-    .select()
-    .from(cloud_agent_worktrees)
-    .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId));
-  const worktree = await authorize(db, row, params);
-  if (worktree.deletion_started_at === null) throw new Error('worktree_deletion_not_started');
-  const state = deletionState(worktree);
-  const sessionIds = state.manifest.sessions.map(session => session.sessionId);
-  if (state.completed) return { success: true, deletedSessionIds: sessionIds };
-  for (const sessionId of sessionIds) {
-    await withDORetry(
-      () => getSessionIngestDO(env, { kiloUserId: params.kiloUserId, sessionId }),
-      stub => stub.clearForWorktree(params.kiloUserId, sessionId),
-      'SessionIngestDO.clearForWorktree'
-    );
-    await withDORetry(
-      () => getSessionAccessCacheDO(env, { kiloUserId: params.kiloUserId }),
-      stub => stub.deleteSession(sessionId),
-      'SessionAccessCacheDO.deleteSession'
-    );
-    await withDORetry(
-      () => getUserConnectionDO(env, { kiloUserId: params.kiloUserId }),
-      stub => stub.clearSession(sessionId),
-      'UserConnectionDO.clearSession'
-    );
-  }
-  const { deletedSessionIds, deletedSessions } = await db.transaction(async tx => {
-    const current = await lockWorktree(tx, params);
-    if (current.deletion_completed_at !== null)
-      return { deletedSessionIds: current.deleted_session_ids, deletedSessions: [] };
-    const currentIds = deletionState(current).manifest.sessions.map(session => session.sessionId);
-    const cleaned = new Set(sessionIds);
-    if (currentIds.some(id => !cleaned.has(id)))
-      throw new Error('worktree_cleanup_manifest_changed');
-    await lockRoots(tx, params);
-    if ((await discoverMembers(tx, params)).some(session => !cleaned.has(session.sessionId))) {
-      throw new Error('worktree_cleanup_manifest_changed');
-    }
-    const deletedSessions =
-      sessionIds.length > 0
-        ? await tx
-            .delete(cli_sessions_v2)
-            .where(
-              and(
-                eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-                inArray(cli_sessions_v2.session_id, sessionIds)
-              )
-            )
-            .returning({
-              sessionId: cli_sessions_v2.session_id,
-              parentSessionId: cli_sessions_v2.parent_session_id,
-              organizationId: cli_sessions_v2.organization_id,
-              gitUrl: cli_sessions_v2.git_url,
-              gitBranch: cli_sessions_v2.git_branch,
-              createdOnPlatform: cli_sessions_v2.created_on_platform,
-            })
-        : [];
-    await tx
-      .update(cloud_agent_worktrees)
-      .set({
-        name: null,
-        runtime_locations: [],
-        deletion_manifest: null,
-        deletion_completed_at: new Date().toISOString(),
-        deleted_session_ids: sessionIds,
-      })
+  return deletionDiagnostic('complete', params, async timing => {
+    const db = getWorkerDb(env.HYPERDRIVE.connectionString);
+    timing.setStage('readState');
+    const [row] = await db
+      .select()
+      .from(cloud_agent_worktrees)
       .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId));
-    return { deletedSessionIds: sessionIds, deletedSessions };
+    const worktree = await authorize(db, row, params);
+    if (worktree.deletion_started_at === null) throw new Error('worktree_deletion_not_started');
+    const state = deletionState(worktree);
+    const sessionIds = state.manifest.sessions.map(session => session.sessionId);
+    timing.sessionCount = sessionIds.length;
+    if (state.completed) return { success: true, deletedSessionIds: sessionIds };
+    for (const sessionId of sessionIds) {
+      timing.setStage('ingestCleanup');
+      await withDORetry(
+        () => getSessionIngestDO(env, { kiloUserId: params.kiloUserId, sessionId }),
+        stub => stub.clearForWorktree(params.kiloUserId, sessionId),
+        'SessionIngestDO.clearForWorktree'
+      );
+      timing.setStage('accessCacheCleanup');
+      await withDORetry(
+        () => getSessionAccessCacheDO(env, { kiloUserId: params.kiloUserId }),
+        stub => stub.deleteSession(sessionId),
+        'SessionAccessCacheDO.deleteSession'
+      );
+      timing.setStage('connectionCleanup');
+      await withDORetry(
+        () => getUserConnectionDO(env, { kiloUserId: params.kiloUserId }),
+        stub => stub.clearSession(sessionId),
+        'UserConnectionDO.clearSession'
+      );
+    }
+    timing.setStage('sqlTransaction');
+    const { deletedSessionIds, deletedSessions } = await db.transaction(async tx => {
+      const current = await lockWorktree(tx, params);
+      if (current.deletion_completed_at !== null)
+        return { deletedSessionIds: current.deleted_session_ids, deletedSessions: [] };
+      const currentIds = deletionState(current).manifest.sessions.map(session => session.sessionId);
+      const cleaned = new Set(sessionIds);
+      if (currentIds.some(id => !cleaned.has(id)))
+        throw new Error('worktree_cleanup_manifest_changed');
+      await lockRoots(tx, params);
+      if ((await discoverMembers(tx, params)).some(session => !cleaned.has(session.sessionId))) {
+        throw new Error('worktree_cleanup_manifest_changed');
+      }
+      const deletedSessions =
+        sessionIds.length > 0
+          ? await tx
+              .delete(cli_sessions_v2)
+              .where(
+                and(
+                  eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
+                  inArray(cli_sessions_v2.session_id, sessionIds)
+                )
+              )
+              .returning({
+                sessionId: cli_sessions_v2.session_id,
+                parentSessionId: cli_sessions_v2.parent_session_id,
+                organizationId: cli_sessions_v2.organization_id,
+                gitUrl: cli_sessions_v2.git_url,
+                gitBranch: cli_sessions_v2.git_branch,
+                createdOnPlatform: cli_sessions_v2.created_on_platform,
+              })
+          : [];
+      await tx
+        .update(cloud_agent_worktrees)
+        .set({
+          name: null,
+          runtime_locations: [],
+          deletion_manifest: null,
+          deletion_completed_at: new Date().toISOString(),
+          deleted_session_ids: sessionIds,
+        })
+        .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId));
+      return { deletedSessionIds: sessionIds, deletedSessions };
+    });
+    timing.setStage('notifications');
+    const deletedAt = new Date().toISOString();
+    for (const session of deletedSessions) {
+      notifyUserSessionEvent(
+        env,
+        params.kiloUserId,
+        { type: 'session.deleted', data: { source: 'v2', ...session, deletedAt } },
+        executionContext
+      );
+    }
+    return { success: true, deletedSessionIds };
   });
-  const deletedAt = new Date().toISOString();
-  for (const session of deletedSessions) {
-    notifyUserSessionEvent(
-      env,
-      params.kiloUserId,
-      { type: 'session.deleted', data: { source: 'v2', ...session, deletedAt } },
-      executionContext
-    );
-  }
-  return { success: true, deletedSessionIds };
 }

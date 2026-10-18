@@ -67,9 +67,13 @@ vi.mock('@/components/agents/session-platform-icon', () => ({
 }));
 vi.mock('@/components/agents/session-row-actions', () => ({
   buildSessionActionMenuItems: vi.fn(),
+  useSessionDeleteConfirm: () => ({ confirmDelete: vi.fn(), deleteDialog: null }),
 }));
 vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn(),
+  useRemoteSessionExitConfirmation: () => ({
+    confirmExit: vi.fn().mockResolvedValue(true),
+    exitDialog: null,
+  }),
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn(), success: vi.fn() },

@@ -2,13 +2,14 @@ import { useBotStatus, useEventServiceClient } from '@kilocode/kilo-chat-hooks';
 import { CONVERSATION_TITLE_MAX_CHARS, type ConversationDetailResponse } from '@kilocode/kilo-chat';
 import { useCallback } from 'react';
 import { View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 
 import { RenameModal } from '@/components/rename-modal';
 
-import { AppAwareKeyboardPaddingView } from './app-aware-keyboard-padding';
 import { ConversationHeader } from './conversation-header';
 import {
   ConversationHistoryErrorView,
@@ -40,6 +41,7 @@ import { useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { kiloclawConversationEyebrow } from '@/lib/kiloclaw-display';
 import { chatInstancePickerPath } from '@/lib/kilo-chat-routes';
 import { setActiveChatLocation } from '@/lib/notifications';
+import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 
 type Props = {
   sandboxId: string;
@@ -60,6 +62,7 @@ export function ConversationScreen({
   const eventClient = useEventServiceClient();
   const activeAndFocused = useAppActiveAndFocused();
   const { t } = useTranslation();
+  const { bottom } = useSafeAreaInsets();
   const router = useRouter();
   const currentUserId = useCurrentUserId();
   const tokenError = useKiloChatTokenError();
@@ -91,12 +94,13 @@ export function ConversationScreen({
     }
   }, [messagesQuery]);
 
-  const { openOptions, renaming, closeRename, saveRename } = useConversationOptionsSheet({
-    client,
-    conversationId,
-    sandboxId,
-    conversationTitle,
-  });
+  const { openOptions, renaming, closeRename, saveRename, leaveDialog } =
+    useConversationOptionsSheet({
+      client,
+      conversationId,
+      sandboxId,
+      conversationTitle,
+    });
   const { typingMembers, clearTypingForMember } = useMobileTypingState({
     client,
     currentUserId,
@@ -159,18 +163,28 @@ export function ConversationScreen({
   );
 
   if (messageHistoryState === 'loading') {
-    return <ConversationHistoryLoadingView title={conversationTitle} subtitle={instanceLabel} />;
+    return (
+      <>
+        <ConversationHistoryLoadingView title={conversationTitle} subtitle={instanceLabel} />
+        {leaveDialog}
+        {messageController.deleteDialog}
+      </>
+    );
   }
 
   if (messageHistoryState === 'error') {
     return (
-      <ConversationHistoryErrorView
-        title={conversationTitle}
-        subtitle={instanceLabel}
-        onRetry={() => {
-          void messagesQuery.refetch();
-        }}
-      />
+      <>
+        <ConversationHistoryErrorView
+          title={conversationTitle}
+          subtitle={instanceLabel}
+          onRetry={() => {
+            void messagesQuery.refetch();
+          }}
+        />
+        {leaveDialog}
+        {messageController.deleteDialog}
+      </>
     );
   }
 
@@ -199,10 +213,14 @@ export function ConversationScreen({
           }}
         />
       ) : null}
-      {/* The composer below already pads the platform's bottom inset inside
-          this view (message-input-layout), so the keyboard lift must not add it
-          a second time and float the composer above the keyboard. */}
-      <AppAwareKeyboardPaddingView className="flex-1" contentReservesBottomInset>
+      {/* Android keeps its bottom inset in the composer and reduces the lift by
+          the same inset. iOS uses the keyboard frame without a correction and
+          releases the composer's home-indicator padding while it is covered. */}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior="padding"
+        keyboardVerticalOffset={keyboardInsetOffset(bottom)}
+      >
         <MessageList
           client={client}
           conversationId={conversationId}
@@ -253,7 +271,7 @@ export function ConversationScreen({
               : undefined
           }
         />
-      </AppAwareKeyboardPaddingView>
+      </KeyboardAvoidingView>
       <MessageReactionPickerSheet
         visible={messageController.reactionPickerMessage !== null}
         recentReactions={messageController.recentReactions}
@@ -278,6 +296,8 @@ export function ConversationScreen({
           onClose={closeRename}
         />
       )}
+      {leaveDialog}
+      {messageController.deleteDialog}
     </View>
   );
 }

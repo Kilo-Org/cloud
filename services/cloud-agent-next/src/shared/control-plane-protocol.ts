@@ -9,6 +9,7 @@ import type {
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
+import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { gitAuthorSchema, sessionAttachMcpServersSchema } from './sandbox-control-protocol.js';
 import {
   sessionTerminalClosePayloadSchema,
@@ -16,7 +17,7 @@ import {
   sessionTerminalCreatePayloadSchema,
   sessionTerminalResizePayloadSchema,
 } from './sandbox-control-protocol.js';
-import { sessionGitSummaryPayloadSchema } from './worktree-changes-wire.js';
+import { sessionGitSummaryPayloadSchema, worktreeRecoverySchema } from './worktree-changes-wire.js';
 
 export const CONTROL_PLANE_PROTOCOL_VERSION = 3;
 
@@ -30,13 +31,16 @@ export const CONTROL_PLANE_GIT_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as 
 export type ControlPlaneGitPlatform = (typeof CONTROL_PLANE_GIT_PLATFORMS)[number];
 
 /**
- * Route preparation steps. `sandbox_create` and `sandbox_start` come from the
- * Sandbox DO's allocation (provider create, then waiting for the wrapper's
- * `hello`); the rest come from the wrapper's `session.progress`.
+ * Route preparation steps. `sandbox_create`, `sandbox_start` and
+ * `snapshot_fallback` come from the Sandbox DO's allocation (provider create,
+ * then waiting for the wrapper's `hello`, and starting from the image when a
+ * repository snapshot start failed); the rest come from the wrapper's
+ * `session.progress`.
  */
 export const CONTROL_PLANE_PREPARATION_STEPS = [
   'sandbox_create',
   'sandbox_start',
+  'snapshot_fallback',
   'clone',
   'restore',
   'checkout',
@@ -107,6 +111,8 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'connection_lost',
   'sandbox_lost',
   'agent_restarted',
+  'sandbox_out_of_memory',
+  'agent_unresponsive',
   'no_progress',
   'no_outcome',
   'prompt_failed',
@@ -193,6 +199,40 @@ export const controlPlaneWorkspaceFailureSubtypeSchema = z.enum(
   CONTROL_PLANE_WORKSPACE_FAILURE_SUBTYPES
 );
 
+// Bounded run-container facts are duplicated locally (type-only import above)
+// so the standalone wrapper bundle never contains worker-utils. The drift
+// guards below and control-plane-run-container.test.ts contain the drift risk.
+export const CONTROL_PLANE_RUN_CONTAINER_PROVIDERS = [
+  'cloudflare',
+  'vercel',
+  'cloudflare-containers',
+] as const satisfies readonly CloudAgentRunContainer['provider'][];
+
+const controlPlaneRunContainerIdentifierSchema = z.string().min(1).max(128);
+
+export const controlPlaneRunContainerSchema = z
+  .object({
+    provider: z.enum(CONTROL_PLANE_RUN_CONTAINER_PROVIDERS),
+    sandboxId: controlPlaneRunContainerIdentifierSchema,
+    allocationId: controlPlaneRunContainerIdentifierSchema.optional(),
+    instanceId: controlPlaneRunContainerIdentifierSchema.optional(),
+    instanceType: controlPlaneRunContainerIdentifierSchema.optional(),
+    region: controlPlaneRunContainerIdentifierSchema.optional(),
+    imageRef: z.string().min(1).max(1024).optional(),
+    snapshotId: controlPlaneRunContainerIdentifierSchema.optional(),
+    runtimeBuildId: controlPlaneRunContainerIdentifierSchema.optional(),
+    startSource: z.enum(['image', 'snapshot']).optional(),
+  })
+  .strict();
+export type ControlPlaneRunContainer = z.infer<typeof controlPlaneRunContainerSchema>;
+
+type _RunContainerMissingFactDriftGuard = AssertNever<
+  Exclude<CloudAgentRunContainer, ControlPlaneRunContainer>
+>;
+type _RunContainerExtraFactDriftGuard = AssertNever<
+  Exclude<ControlPlaneRunContainer, CloudAgentRunContainer>
+>;
+
 // Kilo final-error reasons are free text from the wrapper; the closed set above
 // covers only control-plane reasons.
 export const controlPlaneOutcomeReasonSchema = z.string().min(1).max(4096);
@@ -241,8 +281,27 @@ export const controlPlaneRouteSpecSchema = z
     kiloSessionId: z.string().min(1),
     directory: z.string().min(1).max(1024),
     createdOnPlatform: z.string().max(256).optional(),
+    githubReviewTarget: z
+      .object({
+        repo: z.string().min(1).max(256),
+        pullRequestNumber: z.number().int().positive(),
+        appType: z.enum(['standard', 'lite']),
+        botUserId: z.string().min(1).max(256),
+      })
+      .strict()
+      .optional(),
+    permission: z
+      .record(
+        z.string().min(1).max(256),
+        z.union([
+          z.enum(['allow', 'deny', 'ask']),
+          z.record(z.string().min(1).max(1024), z.enum(['allow', 'deny', 'ask'])),
+        ])
+      )
+      .optional(),
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
+    worktreeRecovery: worktreeRecoverySchema.optional(),
     git: controlPlaneRouteGitSchema.optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
     env: z.record(z.string().max(256), z.string().max(10000)).optional(),
@@ -257,6 +316,10 @@ export const controlPlaneRouteSpecSchema = z
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
+    /**
+     * Preserves the runtime key and HOME of existing allocations. The Sandbox
+     * omits it only after negotiating worktree sharing for a new allocation.
+     */
     runtimeIsolation: z.enum(['per-session']).optional(),
     attemptId: z.string().min(1).max(128),
     /**
@@ -273,19 +336,7 @@ export const controlPlaneRouteSpecSchema = z
      */
     secretEnvKeys: z.array(z.string().min(1).max(128)).max(50).optional(),
   })
-  .strict()
-  .superRefine((spec, context) => {
-    if (
-      (spec.runtimeSkills?.length || spec.runtimeAgents?.length || spec.kiloCommands?.length) &&
-      spec.runtimeIsolation !== 'per-session'
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['runtimeIsolation'],
-        message: 'Runtime profiles require per-session isolation',
-      });
-    }
-  });
+  .strict();
 
 /**
  * Route spec accepted at the registration boundary. `secretEnvKeys` is
@@ -308,7 +359,7 @@ export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSche
  * DO-only credential source (plan "Clarification (2026-09-27, B3 credentials)").
  * The Session DO has the session metadata; the Sandbox DO does not. `prepare`
  * carries this minimal issue-time snapshot privately so the Sandbox DO can mint
- * and re-issue the per-session Git and Kilo credential grant. It must never be
+ * and re-issue the route's Git and Kilo credential grant. It must never be
  * serialized into a wrapper frame.
  */
 export const controlPlaneCredentialRepositorySchema = z.discriminatedUnion('type', [
@@ -316,6 +367,7 @@ export const controlPlaneCredentialRepositorySchema = z.discriminatedUnion('type
     .object({
       type: z.literal('github'),
       repo: z.string().min(1),
+      pullRequestNumber: z.number().int().positive().optional(),
       token: z.string().min(1).optional(),
       githubIntegrationId: z.string().uuid().optional(),
       githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
@@ -521,13 +573,22 @@ const controlPlaneRoutePreparingSchema = z
     attemptId: z.string().min(1).max(128),
     step: controlPlanePreparationStepSchema.optional(),
     detail: controlPlanePreparationDetailSchema.optional(),
+    container: controlPlaneRunContainerSchema.optional(),
   })
   .strict();
 const controlPlaneRouteReadySchema = z
-  .object({ state: z.literal('ready'), attemptId: z.string().min(1).max(128) })
+  .object({
+    state: z.literal('ready'),
+    attemptId: z.string().min(1).max(128),
+    container: controlPlaneRunContainerSchema.optional(),
+  })
   .strict();
 const controlPlaneRouteReconnectingSchema = z
-  .object({ state: z.literal('reconnecting'), attemptId: z.string().min(1).max(128) })
+  .object({
+    state: z.literal('reconnecting'),
+    attemptId: z.string().min(1).max(128),
+    container: controlPlaneRunContainerSchema.optional(),
+  })
   .strict();
 const controlPlaneRouteFailedSchema = z
   .object({
@@ -535,6 +596,7 @@ const controlPlaneRouteFailedSchema = z
     attemptId: z.string().min(1).max(128),
     reason: controlPlaneFailureReasonSchema,
     subtype: controlPlaneWorkspaceFailureSubtypeSchema.optional().catch(undefined),
+    container: controlPlaneRunContainerSchema.optional(),
   })
   .strict();
 const controlPlaneRouteLostSchema = z
@@ -542,6 +604,7 @@ const controlPlaneRouteLostSchema = z
     state: z.literal('lost'),
     attemptId: z.string().min(1).max(128),
     reason: controlPlaneFailureReasonSchema,
+    container: controlPlaneRunContainerSchema.optional(),
   })
   .strict();
 
@@ -581,14 +644,24 @@ export const controlPlaneOutcomeSchema = z
     reason: controlPlaneOutcomeReasonSchema.optional(),
     assistantReason: controlPlaneAssistantFailureReasonSchema.optional(),
     providerOwnership: controlPlaneProviderOwnershipSchema.optional(),
+    gateResult: z.enum(['pass', 'fail']).optional(),
     lastMessageId: z.string().min(1).max(128),
   })
-  .strict();
+  .strict()
+  .superRefine((outcome, context) => {
+    if (outcome.status !== 'completed' && outcome.gateResult !== undefined)
+      context.addIssue({
+        code: 'custom',
+        path: ['gateResult'],
+        message: 'Only completed results can include gateResult',
+      });
+  });
 
 export const controlPlaneDeliverPayloadSchema = z
   .object({
     sessionId: z.string().min(1),
     messages: z.array(controlPlanePromptPayloadSchema).min(1),
+    allocationId: z.string().min(1).max(128).optional(),
   })
   .strict();
 
@@ -800,7 +873,7 @@ const controlPlaneSessionEventsFrameSchema = z
   })
   .strict();
 
-const controlPlaneSessionOutcomeFrameSchema = controlPlaneOutcomeSchema.extend({
+const controlPlaneSessionOutcomeFrameSchema = controlPlaneOutcomeSchema.safeExtend({
   type: z.literal('session.outcome'),
 });
 
@@ -926,8 +999,6 @@ const controlPlaneWorktreeDeleteFrameSchema = z
     payload: controlPlaneWorktreeDeletionPayloadSchema,
   })
   .strict();
-
-// --- terminals (B10) --------------------------------------------------------
 
 /**
  * Session DO -> Sandbox DO terminal request (spec §10). The Sandbox DO forwards

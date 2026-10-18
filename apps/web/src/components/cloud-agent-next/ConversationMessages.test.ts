@@ -298,6 +298,22 @@ describe('ConversationMessages', () => {
     }
   );
 
+  it('reflows hard-wrapped commit bodies while preserving paragraph breaks', () => {
+    const wrappedCommit = {
+      ...commit,
+      commitMessage:
+        'feat: add thing\n\nAdd `repoSnapshotLogIdentity` to generate a bounded, sanitized, and\nlog-safe identity for repository snapshots.\n\nSecond paragraph line one\nline two.',
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(CommitDetails, { commit: wrappedCommit })
+    );
+    expect(html).toContain(
+      'Add `repoSnapshotLogIdentity` to generate a bounded, sanitized, and log-safe identity for repository snapshots.'
+    );
+    expect(html).not.toContain('sanitized, and\nlog-safe');
+    expect(html).toContain('snapshots.\n\nSecond paragraph line one line two.');
+  });
+
   it('keeps long commit messages as plain text in details without embedding them in the trigger name', () => {
     const longCommit = {
       ...commit,

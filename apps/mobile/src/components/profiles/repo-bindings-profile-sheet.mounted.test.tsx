@@ -37,6 +37,7 @@ describe('binding profile picker', () => {
         skillCount: 0,
         agentCount: 0,
         kiloCommandCount: 0,
+        instructionCount: 0,
       };
       const { renderer, unmount } = await renderWithProviders(
         createElement(ProfilePickerSheet, {

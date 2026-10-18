@@ -33,6 +33,12 @@ KILO_OPENROUTER_BASE=http://localhost:3000/api
 # @url cloud-agent-next
 WORKER_URL=http://host.docker.internal:8794
 
+# Preview subdomain suffix; unset turns preview off (the web app reads it from the Worker).
+# Local dev serves previews from `p<port>-<workspace-uuid-hex>.localhost`.
+PREVIEW_HOST_SUFFIX=localhost
+# Comma-separated user or org IDs shown the preview UI, or `*` for all
+PREVIEW_ENABLED_IDS=*
+
 # Timeout overrides (optional)
 CLI_TIMEOUT_SECONDS=900
 REAPER_INTERVAL_MS=300000
@@ -41,15 +47,9 @@ REAPER_INTERVAL_MS=300000
 # Comma-separated list of org IDs that use per-session Cloudflare sandboxes, or `*` for all orgs
 PER_SESSION_SANDBOX_ORG_IDS=
 
-# Control-plane and worktree enrollment (optional)
+# Code Reviewer sessions run on the control plane for these owners.
 # Comma-separated user or org IDs, or `*` for all including personal accounts.
-# Local wrangler `dev` also defaults these to `*` in wrangler.jsonc.
-CONTROL_PLANE_IDS=*
-WORKTREE_CREATION_ENABLED_IDS=*
-# Code Reviewer sessions for these owners run on the control plane instead of
-# the legacy plane. Comma-separated user or org IDs. Off by default; set the
-# enrolled org in the Cloudflare dashboard.
-# CODE_REVIEW_CONTROL_PLANE_IDS=
+CODE_REVIEW_CONTROL_PLANE_IDS=*
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 

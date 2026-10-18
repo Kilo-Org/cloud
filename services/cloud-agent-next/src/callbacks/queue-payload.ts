@@ -233,9 +233,33 @@ export function fitCallbackJobToQueueLimit(job: CallbackJob): CallbackJobQueueFi
     return { status: 'ready', job: candidateJob, serializedByteLength };
   }
 
+  if (job.payload.recentActivity !== undefined) {
+    const payload = { ...job.payload };
+    delete payload.recentActivity;
+    const withoutActivity = { ...job, payload };
+    const withoutActivityByteLength = serializedCallbackJobByteLength(withoutActivity);
+    if (withoutActivityByteLength <= CALLBACK_QUEUE_MAX_SERIALIZED_BYTES) {
+      return {
+        status: 'ready',
+        job: withoutActivity,
+        serializedByteLength: withoutActivityByteLength,
+      };
+    }
+  }
+
   const assistantText = candidateJob.payload.lastAssistantMessageText;
   if (assistantText !== undefined) {
     candidateJob = omittedAssistantTextJob(candidateJob, utf8ByteLength(assistantText));
+    serializedByteLength = serializedCallbackJobByteLength(candidateJob);
+    if (serializedByteLength <= CALLBACK_QUEUE_MAX_SERIALIZED_BYTES) {
+      return { status: 'ready', job: candidateJob, serializedByteLength };
+    }
+  }
+
+  if (candidateJob.payload.recentActivity !== undefined) {
+    const payload = { ...candidateJob.payload };
+    delete payload.recentActivity;
+    candidateJob = { ...candidateJob, payload };
     serializedByteLength = serializedCallbackJobByteLength(candidateJob);
     if (serializedByteLength <= CALLBACK_QUEUE_MAX_SERIALIZED_BYTES) {
       return { status: 'ready', job: candidateJob, serializedByteLength };

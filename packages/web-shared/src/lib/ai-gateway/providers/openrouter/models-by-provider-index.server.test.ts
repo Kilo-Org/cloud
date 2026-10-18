@@ -9,9 +9,9 @@ import {
   buildModelIdToProviderSlugsIndex,
   createModelsByProviderIndexLoader,
   getEndpointProviderSlugs,
-  getSnapshotModelVariantId,
   narrowProviderSlugsToVariant,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 const MODEL = 'nvidia/nemotron-3.5-lightning';
 const FREE_MODEL = `${MODEL}:free`;
@@ -228,6 +228,35 @@ describe('createModelsByProviderIndexLoader', () => {
 
     await expect(getProviderSlugsForModel('unknown/model')).resolves.toEqual(new Set());
     await expect(getProviderSlugsForModel('unknown/model:free')).resolves.toEqual(new Set());
+  });
+
+  it('resolves a whole catalog with one metadata read per source', async () => {
+    let openRouterReads = 0;
+    let vercelReads = 0;
+    const { getProviderSlugsForModels } = createModelsByProviderIndexLoader({
+      fetchSnapshot: async () => makeSnapshot(),
+      fetchOpenRouterModels: async () => {
+        openRouterReads += 1;
+        return storedModels;
+      },
+      fetchVercelModels: async () => {
+        vercelReads += 1;
+        return {};
+      },
+      ttlMs: 60_000,
+      nowMs: () => 0,
+    });
+
+    await expect(
+      getProviderSlugsForModels([MODEL, FREE_MODEL, 'unknown/model', MODEL])
+    ).resolves.toEqual(
+      new Map([
+        [MODEL, new Set(['deepinfra', 'coreweave'])],
+        [FREE_MODEL, new Set(['nvidia'])],
+        ['unknown/model', new Set()],
+      ])
+    );
+    expect({ openRouterReads, vercelReads }).toEqual({ openRouterReads: 1, vercelReads: 1 });
   });
 
   it.each(['provider_name', 'tag'] as const)(

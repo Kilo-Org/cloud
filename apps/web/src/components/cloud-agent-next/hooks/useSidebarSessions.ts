@@ -196,7 +196,7 @@ type WorktreeDetailsQueryData = inferRouterOutputs<RootRouter>['cliSessionsV2'][
 
 type SidebarSessionActivity = Pick<
   StoredSession,
-  'sessionId' | 'sessionStatus' | 'sessionStatusUpdatedAt'
+  'sessionId' | 'sessionStatus' | 'sessionStatusUpdatedAt' | 'updatedAt'
 >;
 
 export type SidebarForegroundSessionStatus = {
@@ -396,15 +396,18 @@ export function getSidebarWorktreeActivity(
   sessions: readonly SidebarSessionActivity[],
   activeSessionStatuses: ReadonlyMap<string, string>,
   authoritativeSessions: readonly SidebarSessionActivity[] = sessions,
-  foregroundSession?: SidebarForegroundSessionStatus | null
+  foregroundSession?: SidebarForegroundSessionStatus | null,
+  now = Date.now()
 ): SidebarWorktreeActivity {
   const sessionsById = new Map(authoritativeSessions.map(session => [session.sessionId, session]));
   for (const session of sessions) {
     const existing = sessionsById.get(session.sessionId);
     if (
       !existing ||
-      new Date(session.sessionStatusUpdatedAt ?? 0).getTime() >=
-        new Date(existing.sessionStatusUpdatedAt ?? 0).getTime()
+      new Date(session.sessionStatusUpdatedAt ?? 0).getTime() >
+        new Date(existing.sessionStatusUpdatedAt ?? 0).getTime() ||
+      (session.sessionStatusUpdatedAt === existing.sessionStatusUpdatedAt &&
+        new Date(session.updatedAt).getTime() >= new Date(existing.updatedAt).getTime())
     ) {
       sessionsById.set(session.sessionId, session);
     }
@@ -420,12 +423,17 @@ export function getSidebarWorktreeActivity(
     if (activeStatus !== undefined) isLive = true;
     const foregroundStatus =
       foregroundSession?.sessionId === session.sessionId ? foregroundSession.status : undefined;
+    const storedStatus =
+      (session.sessionStatus === 'busy' || session.sessionStatus === 'retry') &&
+      now - new Date(session.updatedAt).getTime() >= 20 * 60_000
+        ? null
+        : (session.sessionStatus ?? null);
     const statuses =
       foregroundStatus !== undefined
         ? [foregroundStatus]
         : activeStatus === 'idle'
           ? [activeStatus]
-          : [session.sessionStatus ?? null, activeStatus ?? null];
+          : [storedStatus, activeStatus ?? null];
     for (const status of statuses) {
       const priority =
         status === 'question' || status === 'permission'
@@ -448,7 +456,7 @@ export function getSidebarWorktreeActivity(
 
 export function patchSidebarWorktreeSessionStatus(
   data: WorktreeDetailsQueryData,
-  update: SidebarSessionActivity
+  update: Omit<SidebarSessionActivity, 'updatedAt'> & { updatedAt?: string }
 ): WorktreeDetailsQueryData {
   const worktrees = { ...data.worktrees };
   let changed = false;
@@ -459,7 +467,8 @@ export function patchSidebarWorktreeSessionStatus(
       new Date(update.sessionStatusUpdatedAt ?? 0).getTime() <
         new Date(existing.sessionStatusUpdatedAt ?? 0).getTime() ||
       (existing.sessionStatus === update.sessionStatus &&
-        existing.sessionStatusUpdatedAt === update.sessionStatusUpdatedAt)
+        existing.sessionStatusUpdatedAt === update.sessionStatusUpdatedAt &&
+        (update.updatedAt === undefined || existing.updatedAt === update.updatedAt))
     ) {
       continue;
     }
@@ -472,6 +481,7 @@ export function patchSidebarWorktreeSessionStatus(
               ...session,
               sessionStatus: update.sessionStatus ?? null,
               sessionStatusUpdatedAt: update.sessionStatusUpdatedAt ?? null,
+              updatedAt: update.updatedAt ?? session.updatedAt,
             }
           : session
       ),
@@ -945,7 +955,9 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     if (!sharedConnection) return;
 
     const filters = { organizationId, createdOnPlatform, gitUrl } satisfies SidebarSessionFilters;
-    const patchWorktreeStatus = (update: SidebarSessionActivity) => {
+    const patchWorktreeStatus = (
+      update: Parameters<typeof patchSidebarWorktreeSessionStatus>[1]
+    ) => {
       const queries = queryClient.getQueriesData<WorktreeDetailsQueryData>(
         trpc.cliSessionsV2.worktreeDetails.pathFilter()
       );
@@ -1038,6 +1050,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         sessionId: payload.session.sessionId,
         sessionStatus: payload.session.status,
         sessionStatusUpdatedAt: payload.session.statusUpdatedAt,
+        updatedAt: payload.session.updatedAt,
       });
       const next = eventRowToDbSession(payload.session);
       const filterResult = eventRowMatchesSidebarFilters(payload.session, filters);
@@ -1070,6 +1083,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
           sessionId: payload.sessionId,
           sessionStatus: payload.status,
           sessionStatusUpdatedAt: payload.statusUpdatedAt,
+          updatedAt: payload.updatedAt ?? undefined,
         });
         setDbSessions(prev =>
           sortSidebarDbSessions(

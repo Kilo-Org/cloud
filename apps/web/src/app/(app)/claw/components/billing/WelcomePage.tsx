@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc/utils';
-import { getMonthlyWelcomePromoMonth } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { formatPercent, getMonthlyBonusPreview } from '@/components/profile/kilo-pass/utils';
 import {
   createKiloClawSignupDisplay,
   formatMicrodollars,
@@ -34,6 +35,12 @@ const TIER_DATA: Record<
 };
 
 const TIERS: Tier[] = ['19', '49', '199'];
+
+const KILO_PASS_TIERS: Record<Tier, KiloPassTier> = {
+  '19': KiloPassTier.Tier19,
+  '49': KiloPassTier.Tier49,
+  '199': KiloPassTier.Tier199,
+};
 
 function isCommitAvailable(tier: Tier | null, cadence: Cadence): boolean {
   if (!tier) return false;
@@ -103,7 +110,11 @@ function TierCard({
   const creditsLabel = isYearly
     ? `$${data.yearlyPrice}/year paid credits`
     : `$${data.monthlyPrice}/month paid credits`;
-  const promoMonth = getMonthlyWelcomePromoMonth(subscriptionStartedAtIso);
+  const { firstMonthPercent, secondMonthPercent } = getMonthlyBonusPreview({
+    tier: KILO_PASS_TIERS[tier],
+    isFirstTimeSubscriberEver: showFirstMonthPromo,
+    subscriptionStartedAtIso,
+  });
 
   return (
     <button
@@ -137,11 +148,7 @@ function TierCard({
         <div className="text-xs leading-relaxed text-emerald-300">
           {isYearly
             ? '+50% free bonus credits every month'
-            : !showFirstMonthPromo
-              ? 'Month 1: +5%; month 2: +10% free bonus credits'
-              : promoMonth === 1
-                ? 'Month 1: +50%; month 2: +10% free bonus credits'
-                : 'Month 1: +5%; month 2: +50% free bonus credits'}
+            : `Month 1: +${formatPercent(firstMonthPercent)}; month 2: +${formatPercent(secondMonthPercent)} free bonus credits`}
         </div>
       </div>
 
@@ -306,7 +313,11 @@ function CreditsHowItWorks({
   subscriptionStartedAtIso: string;
 }) {
   const [open, setOpen] = useState(false);
-  const promoMonth = getMonthlyWelcomePromoMonth(subscriptionStartedAtIso);
+  const { welcomeDescription } = getMonthlyBonusPreview({
+    tier: KiloPassTier.Tier19,
+    isFirstTimeSubscriberEver: showFirstMonthPromo,
+    subscriptionStartedAtIso,
+  });
   return (
     <div className="border-border/50 mb-3.5 overflow-hidden rounded-lg border">
       <button
@@ -323,7 +334,7 @@ function CreditsHowItWorks({
         <div className="space-y-1 px-3.5 pb-3">
           <div className="text-muted-foreground flex items-start gap-2 py-0.5 text-xs">
             <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
-            <span>Your payment converts 1:1 into paid credits that never expire</span>
+            <span>Your payment converts 1:1 into paid credits</span>
           </div>
           <div className="text-muted-foreground flex items-start gap-2 py-0.5 text-xs">
             <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
@@ -342,18 +353,8 @@ function CreditsHowItWorks({
                   Monthly subscribers start with 5% free bonus credits, increasing by 5 percentage
                   points each consecutive month up to 40%.
                 </>
-              ) : promoMonth === 1 ? (
-                <>
-                  First-time monthly subscribers receive{' '}
-                  <span className="text-emerald-300">50%</span> free bonus credits for the first
-                  month, then the regular 10% bonus in the second month.
-                </>
               ) : (
-                <>
-                  First-time monthly subscribers receive{' '}
-                  <span className="text-emerald-300">50%</span> free bonus credits for the second
-                  month, with the regular 5% bonus in the first month.
-                </>
+                welcomeDescription
               )}
             </span>
           </div>

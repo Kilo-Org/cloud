@@ -8,6 +8,27 @@
       "when": 1786968532800,
       "tag": "0000_material_toad",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788574828397,
+      "tag": "0001_safe_hellfire_club",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791853110512,
+      "tag": "0002_majestic_old_lace",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791914277576,
+      "tag": "0003_quick_chat_titles",
+      "breakpoints": true
     }
   ]
 }

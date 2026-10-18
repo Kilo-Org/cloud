@@ -105,27 +105,27 @@ describe('listDirectoriesOnConnection', () => {
     });
   });
 
-  it('classifies invalid list_directories path as transport', async () => {
+  it('classifies invalid list_directories path as transport with its cause', async () => {
     const connection = makeFakeConnection();
-    connection.sendCommandToConnection.mockRejectedValue(
-      new CommandDeliveredError('invalid list_directories path')
-    );
+    const failure = new CommandDeliveredError('invalid list_directories path');
+    connection.sendCommandToConnection.mockRejectedValue(failure);
 
     await expect(listDirectoriesOnConnection(connection, 'cli-owner-1')).resolves.toEqual({
       ok: false,
       reason: 'transport',
+      cause: failure,
     });
   });
 
-  it('classifies failed to list directories as transport', async () => {
+  it('classifies failed to list directories as transport with its cause', async () => {
     const connection = makeFakeConnection();
-    connection.sendCommandToConnection.mockRejectedValue(
-      new CommandDeliveredError('failed to list directories')
-    );
+    const failure = new CommandDeliveredError('failed to list directories');
+    connection.sendCommandToConnection.mockRejectedValue(failure);
 
     await expect(listDirectoriesOnConnection(connection, 'cli-owner-1')).resolves.toEqual({
       ok: false,
       reason: 'transport',
+      cause: failure,
     });
   });
 
@@ -151,37 +151,41 @@ describe('listDirectoriesOnConnection', () => {
 
     for (const code of retryableCodes) {
       const connection = makeFakeConnection();
-      connection.sendCommandToConnection.mockRejectedValue(
-        new UserWebCommandError({ code, message: 'try again' })
-      );
+      const failure = new UserWebCommandError({ code, message: 'try again' });
+      connection.sendCommandToConnection.mockRejectedValue(failure);
 
       await expect(listDirectoriesOnConnection(connection, 'cli-owner-1')).resolves.toEqual({
         ok: false,
         reason: 'transport',
+        cause: failure,
       });
     }
   });
 
-  it('classifies a plain transport-level rejection as transport', async () => {
+  it('classifies a plain transport-level rejection as transport with its cause', async () => {
     const connection = makeFakeConnection();
-    connection.sendCommandToConnection.mockRejectedValue(new Error('Command timed out'));
+    const failure = new Error('Command timed out');
+    connection.sendCommandToConnection.mockRejectedValue(failure);
 
     await expect(listDirectoriesOnConnection(connection, 'cli-owner-1')).resolves.toEqual({
       ok: false,
       reason: 'transport',
+      cause: failure,
     });
   });
 
   it('classifies an unexpected strict-parse throw as transport and never rejects', async () => {
     const connection = makeFakeConnection();
     connection.sendCommandToConnection.mockResolvedValue({ any: 'payload' });
+    const failure = new Error('strict parse exploded');
     const parseSpy = jest.spyOn(listDirectoriesV1Schema, 'safeParse').mockImplementation(() => {
-      throw new Error('strict parse exploded');
+      throw failure;
     });
     try {
       await expect(listDirectoriesOnConnection(connection, 'cli-owner-1')).resolves.toEqual({
         ok: false,
         reason: 'transport',
+        cause: failure,
       });
     } finally {
       parseSpy.mockRestore();

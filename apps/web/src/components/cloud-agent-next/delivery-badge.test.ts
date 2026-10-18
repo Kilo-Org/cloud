@@ -5,6 +5,27 @@ describe('getDeliveryBadge', () => {
     expect(getDeliveryBadge(undefined)).toBeNull();
   });
 
+  it('returns a Sending spinner while the send request is pending', () => {
+    expect(getDeliveryBadge(undefined, { sending: true })).toEqual({
+      label: 'Sending',
+      tone: 'info',
+      spinner: true,
+    });
+  });
+
+  it('prefers an authoritative delivery state over the request-pending cue', () => {
+    expect(getDeliveryBadge({ status: 'queued' }, { sending: true })).toEqual({
+      label: 'Queued',
+      tone: 'info',
+    });
+    expect(
+      getDeliveryBadge(
+        { status: 'failed', error: 'flush failed', reason: 'exhausted' },
+        { sending: true }
+      )
+    ).toEqual({ label: 'Failed to deliver', tone: 'error', title: 'flush failed' });
+  });
+
   it('returns a Queued badge for queued messages', () => {
     expect(getDeliveryBadge({ status: 'queued' })).toEqual({ label: 'Queued', tone: 'info' });
   });

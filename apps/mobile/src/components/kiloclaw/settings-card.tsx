@@ -11,13 +11,14 @@ import {
 } from '@/components/ui/icons';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
 import { CATALOG_ICONS } from '@/components/icons';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { openExternalUrl } from '@/lib/external-link';
@@ -183,6 +184,7 @@ export function SettingsCard({
   const fieldValuesRef = useRef<Record<string, string>>({});
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const ItemIcon = CATALOG_ICONS[item.id];
 
   const updateCanSave = useCallback(() => {
@@ -227,28 +229,26 @@ export function SettingsCard({
   }
 
   function handleRemove() {
-    Alert.alert(removeAlertTitle, removeAlertMessage, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.remove'),
-        style: 'destructive',
-        onPress: () => {
-          setIsRemoving(true);
-          const secrets: Record<string, null> = {};
-          for (const f of item.fields) {
-            secrets[f.key] = null;
+    confirm({
+      title: removeAlertTitle,
+      message: removeAlertMessage,
+      confirmLabel: t('common.remove'),
+      onConfirm: () => {
+        setIsRemoving(true);
+        const secrets: Record<string, null> = {};
+        for (const f of item.fields) {
+          secrets[f.key] = null;
+        }
+        mutations.patchSecrets.mutate(
+          { secrets },
+          {
+            onSettled: () => {
+              setIsRemoving(false);
+            },
           }
-          mutations.patchSecrets.mutate(
-            { secrets },
-            {
-              onSettled: () => {
-                setIsRemoving(false);
-              },
-            }
-          );
-        },
+        );
       },
-    ]);
+    });
   }
 
   const toggleExpanded = useCallback(() => {
@@ -327,6 +327,8 @@ export function SettingsCard({
           onSave={handleSave}
         />
       )}
+
+      {dialog}
     </View>
   );
 }

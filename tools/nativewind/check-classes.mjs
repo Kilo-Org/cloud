@@ -124,13 +124,12 @@ const RAW_TEXT_EXEMPT = new Set([
   // component's base font classes, or the measurement stops matching the
   // input it mirrors.
   'apps/mobile/src/components/agents/use-text-height.tsx',
-  // These three build the agent's markdown surface with their own computed
+  // These two build the agent's markdown HTML surface with their own computed
   // styles, and a `mobile-pure` test reaches them — importing the shared
   // component would pull @rn-primitives/slot's untransformed JSX into a node
-  // environment. All apply `withRtlWritingDirection` from the same source.
-  'apps/mobile/src/components/agents/markdown-renderer.ts',
-  'apps/mobile/src/components/agents/markdown-table.tsx',
+  // environment. Both apply `withRtlWritingDirection` from the same source.
   'apps/mobile/src/components/agents/markdown-html.tsx',
+  'apps/mobile/src/components/agents/markdown-html-details.tsx',
 ]);
 
 function checkRawText(relative, text) {
@@ -157,9 +156,20 @@ function checkRawText(relative, text) {
  */
 const DIRECT_INTL = /new Intl\.\w+|\.toLocale(?:Date|Time|)String\s*\(/g;
 const DIRECT_INTL_DIR = join(ROOT, 'apps/mobile/src');
+// These layouts are stringified and run in the iOS widget extension, which
+// cannot import @/lib/intl-cache; they normalise the locale tag themselves.
+const WIDGET_PROCESS_LAYOUTS = new Set([
+  'apps/mobile/src/glanceable-ios/active-agents-widget.tsx',
+  'apps/mobile/src/glanceable-ios/active-agents-live-activity.tsx',
+  'apps/mobile/src/glanceable-ios/session-live-activity.tsx',
+]);
 
 function checkDirectIntl(relative, absolute, text) {
-  if (!absolute.startsWith(DIRECT_INTL_DIR) || relative.endsWith('lib/intl-cache.ts')) {
+  if (
+    !absolute.startsWith(DIRECT_INTL_DIR) ||
+    relative.endsWith('lib/intl-cache.ts') ||
+    WIDGET_PROCESS_LAYOUTS.has(relative.replace(/^\//, ''))
+  ) {
     return;
   }
   for (const [index, line] of text.split('\n').entries()) {

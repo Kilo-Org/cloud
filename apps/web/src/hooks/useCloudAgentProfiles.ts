@@ -4,6 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AgentConfig } from '@kilocode/db/schema-types';
 import { useTRPC } from '@/lib/trpc/utils';
+import { useInvalidateCloudAgentSettings } from './useCloudAgentSettings';
 
 // Owner type for profiles
 export type ProfileOwnerType = 'organization' | 'user';
@@ -22,6 +23,7 @@ export type ProfileSummary = {
   skillCount: number;
   agentCount: number;
   kiloCommandCount: number;
+  instructionCount: number;
 };
 
 // Profile summary with owner type for combined listings
@@ -93,6 +95,15 @@ export type ProfileKiloCommand = {
   updatedAt: string;
 };
 
+export type ProfileInstruction = {
+  id: string;
+  name: string;
+  content: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProfileDetails = {
   id: string;
   name: string;
@@ -106,6 +117,7 @@ export type ProfileDetails = {
   skills: ProfileSkill[];
   agents: ProfileAgent[];
   kiloCommands: ProfileKiloCommand[];
+  instructions: ProfileInstruction[];
 };
 
 // Combined profiles result for org context
@@ -172,6 +184,7 @@ type UseProfileMutationsOptions = {
  */
 export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
   const { organizationId } = options;
+  const invalidateSettings = useInvalidateCloudAgentSettings(organizationId);
   const queryClient = useQueryClient();
   const trpc = useTRPC();
 
@@ -200,6 +213,7 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     trpc.agentProfiles.update.mutationOptions({
       onSuccess: async (_data, variables) => {
         await invalidateProfile(variables.profileId);
+        await invalidateSettings();
       },
     })
   );
@@ -208,6 +222,7 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     trpc.agentProfiles.delete.mutationOptions({
       onSuccess: async (_data, variables) => {
         await invalidateProfile(variables.profileId);
+        await invalidateSettings();
       },
     })
   );
@@ -376,6 +391,18 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     })
   );
 
+  const previewConfigImport = useMutation(
+    trpc.agentProfiles.previewConfigImport.mutationOptions({})
+  );
+
+  const applyConfigImport = useMutation(
+    trpc.agentProfiles.applyConfigImport.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+
   return {
     createProfile,
     updateProfile,
@@ -401,6 +428,8 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     deleteKiloCommand,
     setKiloCommandEnabled,
     reorderKiloCommands,
+    previewConfigImport,
+    applyConfigImport,
     /** Manually invalidate profiles list */
     invalidateProfiles,
     /** Manually invalidate specific profile */
@@ -461,6 +490,8 @@ type UseCombinedProfileMutationsOptions = {
  */
 export function useCombinedProfileMutations(options: UseCombinedProfileMutationsOptions) {
   const { organizationId } = options;
+  const invalidateOrgSettings = useInvalidateCloudAgentSettings(organizationId);
+  const invalidatePersonalSettings = useInvalidateCloudAgentSettings();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
 
@@ -496,6 +527,7 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     trpc.agentProfiles.update.mutationOptions({
       onSuccess: async (_data, variables) => {
         await invalidateProfile(variables.profileId, variables.organizationId);
+        await (variables.organizationId ? invalidateOrgSettings() : invalidatePersonalSettings());
       },
     })
   );
@@ -504,6 +536,7 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     trpc.agentProfiles.delete.mutationOptions({
       onSuccess: async (_data, variables) => {
         await invalidateProfile(variables.profileId, variables.organizationId);
+        await (variables.organizationId ? invalidateOrgSettings() : invalidatePersonalSettings());
       },
     })
   );
@@ -672,6 +705,18 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     })
   );
 
+  const previewConfigImport = useMutation(
+    trpc.agentProfiles.previewConfigImport.mutationOptions({})
+  );
+
+  const applyConfigImport = useMutation(
+    trpc.agentProfiles.applyConfigImport.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+
   return {
     createProfile,
     updateProfile,
@@ -697,6 +742,8 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     deleteKiloCommand,
     setKiloCommandEnabled,
     reorderKiloCommands,
+    previewConfigImport,
+    applyConfigImport,
     /** Manually invalidate combined profiles */
     invalidateCombinedProfiles,
     /** Manually invalidate specific profile */
@@ -744,15 +791,14 @@ export function useRepoBindings(options: UseRepoBindingsOptions = {}) {
  * Invalidates listRepoBindings and profile caches on success.
  */
 export function useBindRepoMutation(organizationId?: string) {
+  const invalidateSettings = useInvalidateCloudAgentSettings(organizationId);
   const queryClient = useQueryClient();
   const trpc = useTRPC();
 
   return useMutation(
     trpc.agentProfiles.bindToRepo.mutationOptions({
       onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey: trpc.agentProfiles.listRepoBindings.queryKey({ organizationId }),
-        });
+        await invalidateSettings();
         // Also invalidate profile queries to ensure UI consistency
         await queryClient.invalidateQueries({
           queryKey: trpc.agentProfiles.list.queryKey({ organizationId }),
@@ -772,15 +818,14 @@ export function useBindRepoMutation(organizationId?: string) {
  * Invalidates listRepoBindings and profile caches on success.
  */
 export function useUnbindRepoMutation(organizationId?: string) {
+  const invalidateSettings = useInvalidateCloudAgentSettings(organizationId);
   const queryClient = useQueryClient();
   const trpc = useTRPC();
 
   return useMutation(
     trpc.agentProfiles.unbindRepo.mutationOptions({
       onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey: trpc.agentProfiles.listRepoBindings.queryKey({ organizationId }),
-        });
+        await invalidateSettings();
         // Also invalidate profile queries to ensure UI consistency
         await queryClient.invalidateQueries({
           queryKey: trpc.agentProfiles.list.queryKey({ organizationId }),

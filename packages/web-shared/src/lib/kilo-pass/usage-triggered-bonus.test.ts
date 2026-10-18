@@ -186,7 +186,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
   });
 
   test.each([
-    [1, '2026-10-01', 950_000],
+    [1, '2026-10-01', 1_900_000],
     [2, '2026-11-01', 9_500_000],
   ])(
     'new monthly subscription issues the month %s bonus after usage',

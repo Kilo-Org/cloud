@@ -97,6 +97,7 @@ describe('injectVirtualModels', () => {
       providerModelData,
       catalogModels: [catalogModel(SONNET_LATEST, 'Anthropic: Claude Sonnet Latest')],
       storedModels: { [SONNET_LATEST]: storedModel(SONNET_LATEST, SONNET) },
+      unavailableModelIds: new Set(),
     });
 
     const index = buildModelIdToProviderSlugsIndex({
@@ -127,6 +128,7 @@ describe('injectVirtualModels', () => {
         catalogModel('openrouter/free', 'Free Models Router', { prompt: '0', completion: '0' }),
       ],
       storedModels: {},
+      unavailableModelIds: new Set(),
     });
 
     const virtual = providerModelData.find(
@@ -170,6 +172,7 @@ describe('injectVirtualModels', () => {
       providerModelData,
       catalogModels: [catalogModel(SONNET_LATEST, 'Anthropic: Claude Sonnet Latest')],
       storedModels: { [SONNET_LATEST]: storedModel(SONNET_LATEST, SONNET) },
+      unavailableModelIds: new Set(),
     });
 
     expect(providerModelData.map(({ provider }) => provider.slug)).toEqual([
@@ -189,6 +192,7 @@ describe('injectVirtualModels', () => {
       providerModelData,
       catalogModels: [catalogModel(router, 'Sonnet Router')],
       storedModels: { [router]: storedModel(router, SONNET) },
+      unavailableModelIds: new Set(),
     });
 
     expect(providerModelData[0]?.models.map(model => model.slug)).toEqual([SONNET]);
@@ -196,6 +200,21 @@ describe('injectVirtualModels', () => {
       provider: VIRTUAL_PROVIDER,
       models: [expect.objectContaining({ slug: router })],
     });
+  });
+
+  test('skips unavailable models', () => {
+    const providerModelData = [{ provider: provider('typesafe'), models: [snapshotModel(SONNET)] }];
+
+    injectVirtualModels({
+      providerModelData,
+      catalogModels: [catalogModel('typesafe/jev-router', 'TypeSafe: Jev Router')],
+      storedModels: {},
+      unavailableModelIds: new Set(['typesafe/jev-router']),
+    });
+
+    expect(providerModelData).toEqual([
+      { provider: provider('typesafe'), models: [snapshotModel(SONNET)] },
+    ]);
   });
 
   test('keeps models that providers already list and skips batch variants', () => {
@@ -211,6 +230,7 @@ describe('injectVirtualModels', () => {
         catalogModel('openai/gpt-6-sol:batch', 'OpenAI: GPT-6 Sol (batch)'),
       ],
       storedModels: {},
+      unavailableModelIds: new Set(),
     });
 
     expect(providerModelData).toEqual([

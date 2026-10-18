@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       worker:
-        description: 'Worker folder to deploy (e.g. services/app-builder)'
+        description: 'Worker folder to deploy (e.g. services/session-ingest)'
         required: true
         type: string
       target_environment:
@@ -99,7 +99,7 @@ jobs:
         id: set-matrix
         run: |
           # Auto-discover all deployable workers (folders containing wrangler.jsonc)
-          # and exclude workers that have their own deploy pipelines.
+          # and exclude workers outside the automatic deployment pipeline.
           #
           # Diff from the last complete deployment so failed runs do not lose
           # Worker changes. Staging requires an explicitly configured environment.
@@ -163,8 +163,11 @@ jobs:
           NODE
           }
 
-          # Workers excluded from this workflow (they have custom deploy pipelines):
+          # Workers excluded from automatic deployment:
           EXCLUDED=(
+            services/app-builder
+            services/deploy-infra/builder
+            services/deploy-infra/dispatcher
             services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
             services/gastown   # Deployed separately
             services/wasteland # Deployed separately
@@ -176,7 +179,7 @@ jobs:
           while IFS= read -r cfg; do
             dir=$(dirname "$cfg")
             WORKERS+=("$dir")
-          done < <(find services -name "wrangler.jsonc" -not -path "*/node_modules/*" | sort)
+          done < <(find services -name "wrangler.jsonc" -not -path "*/node_modules/*" -not -path "*/test/fixtures/*" | sort)
 
           # Filter out excluded workers
           DEPLOYABLE=()

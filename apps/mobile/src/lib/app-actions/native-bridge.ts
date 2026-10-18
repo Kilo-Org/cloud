@@ -33,10 +33,11 @@ export type NativeAppActionRegistration = {
 type KiloAppActionsModule = InstanceType<typeof NativeModule> & {
   /**
    * Stores the JS handler and returns the payloads that arrived before it was
-   * registered, verbatim.
+   * registered, verbatim. Synchronous on both platforms: the native side has
+   * to take the handler on the JS thread.
    */
   // oxlint-disable-next-line anti-slop/no-unknown-returns -- raw native buffer, normalized on the next line of this module
-  registerAppActionDispatcher: (handler: NativeAppActionHandler) => Promise<unknown>;
+  registerAppActionDispatcher: (handler: NativeAppActionHandler) => unknown;
   /**
    * Reports one payload's settled result to the native entry point waiting for
    * it. Absent where the entry points read the handler's promise directly

@@ -19,6 +19,7 @@ export type SessionSection = {
 export const PLATFORM_FILTERS = [
   'cloud-agent',
   'extension',
+  'desktop',
   'cli',
   'slack',
   'github',

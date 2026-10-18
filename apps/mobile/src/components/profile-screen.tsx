@@ -18,10 +18,10 @@ import {
   Sparkles,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, type LayoutChangeEvent, type ScrollView, View } from 'react-native';
+import { type LayoutChangeEvent, type ScrollView, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
-import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -34,9 +34,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
-import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { openExternalUrl } from '@/lib/external-link';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
@@ -92,14 +90,10 @@ export function ProfileScreen() {
   // automated UI session holds one open) must not hide the Linked accounts row,
   // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
-  // One destructive confirm for both platforms: the in-app dialog carries the
-  // destructive (red) affordance on iOS and Android alike, so the sign-out
-  // path never branches on the platform. The confirmation itself, and its
-  // rationale, live in `useSignOutConfirmation`.
-  const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
-    () => void signOut()
-  );
+  // Both destructive confirms on this screen go through the app's dialog: it
+  // carries the destructive (red) affordance on iOS and Android alike, because
+  // Android's native `AlertDialog` paints every button with the theme accent.
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const {
     data,
     isLoading,
@@ -133,10 +127,22 @@ export function ProfileScreen() {
 
   const { t } = useTranslation();
 
+  const requestSignOut = () => {
+    confirm({
+      title: t('profile.signOutTitle'),
+      message: t('profile.signOutMessage'),
+      confirmLabel: t('common.signOut'),
+      onConfirm: () => {
+        void signOut();
+      },
+    });
+  };
+
   const {
     phase: deletePhase,
     isPending: deletePending,
     devCode,
+    canSubmitCode,
     beginDelete,
     submitCode,
     setCode,
@@ -172,15 +178,18 @@ export function ProfileScreen() {
     setDeleteScrollFrameHeight(current => (current === height ? current : height));
   }, []);
 
+  // The confirmation is the app's own dialog, not the native alert: Android's
+  // `AlertDialog` paints every button with the theme accent, so
+  // `style: 'destructive'` never reaches the screen there. The Profile screen
+  // is a tab, so nothing can be presented over it and the portal dialog is
+  // always visible.
   const confirmDeleteAccount = () => {
-    Alert.alert(t('profile.deleteAccountTitle'), t('profile.deleteAccountMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('profile.deleteAccountConfirm'),
-        style: 'destructive',
-        onPress: beginDelete,
-      },
-    ]);
+    confirm({
+      title: t('profile.deleteAccountTitle'),
+      message: t('profile.deleteAccountMessage'),
+      confirmLabel: t('profile.deleteAccountConfirm'),
+      onConfirm: beginDelete,
+    });
   };
 
   const showPrivacyChoices = () => {
@@ -249,24 +258,22 @@ export function ProfileScreen() {
         </View>
 
         {/* PR Review */}
-        {prReviewEnabled && (
-          <View className="mt-6 gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('profile.reviews')}
-            </Text>
-            <ConfigureRow
-              icon={GitMerge}
-              title={t('common.prReview')}
-              subtitle={t('profile.prReviewSubtitle')}
-              hue="gold"
-              className="rounded-lg bg-secondary px-3"
-              last
-              onPress={() => {
-                router.push(getPrReviewEntryPath());
-              }}
-            />
-          </View>
-        )}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('profile.reviews')}
+          </Text>
+          <ConfigureRow
+            icon={GitMerge}
+            title={t('common.prReview')}
+            subtitle={t('profile.prReviewSubtitle')}
+            hue="gold"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push(getPrReviewEntryPath());
+            }}
+          />
+        </View>
 
         {/* Organization */}
         {organizationId != null && (
@@ -463,7 +470,7 @@ export function ProfileScreen() {
               <Button
                 variant="destructive"
                 loading={deletePhase === 'executing'}
-                disabled={deletePhase === 'executing'}
+                disabled={deletePhase === 'executing' || !canSubmitCode}
                 onPress={submitCode}
               >
                 <Text>{t('profile.confirmDeletion')}</Text>
@@ -477,15 +484,7 @@ export function ProfileScreen() {
         </View>
       </TabScreenScrollView>
 
-      {confirmVisible && (
-        <DestructiveConfirmDialog
-          title={t('profile.signOutTitle')}
-          message={t('profile.signOutMessage')}
-          confirmLabel={t('common.signOut')}
-          onCancel={dismissConfirm}
-          onConfirm={confirmSignOut}
-        />
-      )}
+      {confirmDialog}
 
       {feedbackPrompt.promptDialog}
     </View>

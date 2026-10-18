@@ -1,7 +1,7 @@
 import {
-  alertSpy,
   buttonByLabel,
   confirmRemoval,
+  confirmSpy,
   hasButtonLabel,
   list,
   MACBOOK,
@@ -60,7 +60,7 @@ describe('PasskeysScreen inline failures', () => {
     await waitFor(() => texts(view).includes('MacBook'));
 
     await press(rowAction(view, 'Remove'));
-    await confirmRemoval(alertSpy);
+    await confirmRemoval();
     await waitFor(() => texts(view).includes('Could not remove that passkey. Try again.'));
 
     // A second passkey's removal is running. The retry in the notice names the
@@ -71,7 +71,7 @@ describe('PasskeysScreen inline failures', () => {
         releaseOtherDelete = resolve;
       });
     });
-    alertSpy.mockClear();
+    confirmSpy.mockClear();
     const removeControls = nodes(view, 'Pressable').filter(
       node => node.props.accessibilityLabel === 'Remove'
     );
@@ -80,7 +80,7 @@ describe('PasskeysScreen inline failures', () => {
       throw new Error('second row Remove not found');
     }
     await press(otherRemove);
-    await confirmRemoval(alertSpy);
+    await confirmRemoval();
 
     await waitFor(() => list.deleteFn.mock.calls.length === 2);
     expect(buttonByLabel(view, 'Retry').props.loading).toBe(false);

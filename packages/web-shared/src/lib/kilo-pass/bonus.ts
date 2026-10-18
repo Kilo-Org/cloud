@@ -1,6 +1,7 @@
 import { KiloPassCadence, type KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
+  KILO_PASS_MONTHLY_FIRST_MONTH_BONUS_PERCENT,
   KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF,
   KILO_PASS_TIER_CONFIG,
   KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
@@ -44,12 +45,14 @@ export const computeMonthlyCadenceBonusPercent = (params: {
     throw new Error('streakMonths must be >= 1');
   }
 
-  if (
-    isFirstTimeSubscriberEver &&
-    streakMonths <= 2 &&
-    streakMonths === getMonthlyWelcomePromoMonth(subscriptionStartedAtIso)
-  ) {
-    return KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
+  if (isFirstTimeSubscriberEver && streakMonths <= 2) {
+    const promoMonth = getMonthlyWelcomePromoMonth(subscriptionStartedAtIso);
+    if (streakMonths === promoMonth) {
+      return KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
+    }
+    if (streakMonths === 1 && promoMonth === 2) {
+      return KILO_PASS_MONTHLY_FIRST_MONTH_BONUS_PERCENT;
+    }
   }
 
   const config = KILO_PASS_TIER_CONFIG[tier];

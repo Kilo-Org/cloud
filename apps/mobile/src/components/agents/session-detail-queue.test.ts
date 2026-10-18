@@ -7,7 +7,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { Modal, Pressable } from 'react-native';
+import { Pressable } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,6 +16,7 @@ import type * as ReactI18next from 'react-i18next';
 
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import type * as SessionListHelpers from '@/components/agents/session-list-helpers';
+import type * as SessionDetailContentHelpers from './session-detail-content-helpers';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { MessageBubble } from '@/components/agents/message-bubble';
@@ -67,6 +68,8 @@ vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'whenUnlockedThisDeviceOnly',
 }));
+// The Follow control reads ActivityKit and the token graph; this suite renders none.
+vi.mock('@/components/agents/session-follow-button', () => ({ SessionFollowButton: () => null }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
@@ -159,7 +162,6 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
-  Modal: 'Modal',
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -182,6 +184,13 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn() },
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+// The to-do chip's link sheet pulls the bottom-sheet and organization
+// providers, which reach native modules the pure node project cannot load.
+// The chip's own behavior is covered in session-detail-content.test.ts.
+vi.mock('@/components/todos/session-todo-link', () => ({
+  SessionTodoChip: () => null,
+  SessionTodoLinkRow: () => null,
+}));
 vi.mock('@/components/agents/message-text-select-sheet', () => ({
   MessageTextSelectSheet: 'MessageTextSelectSheet',
 }));
@@ -198,7 +207,7 @@ vi.mock('expo-router', () => ({
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({ replace: vi.fn() }),
 }));
-vi.mock('expo-keep-awake', () => ({
+vi.mock('@/lib/keep-awake', () => ({
   useKeepAwake: vi.fn(),
 }));
 vi.mock('expo-haptics', () => ({
@@ -384,9 +393,6 @@ vi.mock('@/components/agents/mode-normalize', () => ({
 vi.mock('@/components/agents/queued-badge-hold', () => ({
   nextHeldQueuedIds: (held: unknown) => held,
 }));
-vi.mock('@/components/agents/session-keyboard-container-state', () => ({
-  getSessionKeyboardContainerKind: () => 'app-aware-padding',
-}));
 vi.mock('@/components/agents/context-usage-display', () => ({
   getContextSheetMountState: () => ({ mounted: false, visible: false }),
 }));
@@ -433,12 +439,16 @@ vi.mock('@/components/agents/child-session-sheet-state', () => ({
 vi.mock('@/components/agents/use-message-copy', () => ({
   performCopy: vi.fn(),
 }));
-vi.mock('@/components/agents/session-detail-content-helpers', () => ({
-  countInFlightMessages: () => 0,
-  lastVisibleMessageFailure: () => null,
-  resolveRetryPrompt: () => null,
-  retryFailedMessage: vi.fn(),
-}));
+vi.mock('@/components/agents/session-detail-content-helpers', async importOriginal => {
+  const actual = await importOriginal<typeof SessionDetailContentHelpers>();
+  return {
+    ...actual,
+    countInFlightMessages: () => 0,
+    lastVisibleMessageFailure: () => null,
+    resolveRetryPrompt: () => null,
+    retryFailedMessage: vi.fn(),
+  };
+});
 vi.mock('@/components/agents/create-and-navigate-agent-session', () => ({
   createAndNavigateAgentSession: vi.fn(),
 }));
@@ -528,9 +538,6 @@ vi.mock('@/components/agents/part-renderer', () => ({
 }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
-}));
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
 vi.mock('@/components/query-error', () => ({
   QueryError: 'QueryError',
@@ -743,9 +750,20 @@ function openDetails(renderer: TestRenderer.ReactTestRenderer, message: StoredMe
 }
 
 function closeDetails(renderer: TestRenderer.ReactTestRenderer): void {
-  const close = findByType(renderer, Modal)[0]?.props.onRequestClose as () => void;
+  const detailSheet = renderer.root.findAll(node => (node.type as string) === 'BottomSheet')[0];
+  if (!detailSheet) {
+    // Already dismissed: the pair below unmounts the sheet, so a second close
+    // has nothing left to dismiss.
+    return;
+  }
+  // The native sheet reports a dismissal as one event pair: `onClose` then
+  // `onDismiss` (see the library's `fireCloseCallbacks`). Firing only the first
+  // left the wrapper waiting for a report that never came.
+  const close = detailSheet.props.onClose as () => void;
+  const dismiss = detailSheet.props.onDismiss as () => void;
   act(() => {
     close();
+    dismiss();
   });
 }
 

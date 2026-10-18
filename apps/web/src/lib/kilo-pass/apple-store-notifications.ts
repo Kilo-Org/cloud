@@ -64,6 +64,7 @@ type SendConsumptionInformation = (
   transactionId: string,
   request: ConsumptionRequest
 ) => Promise<void>;
+
 type StoreEventClaimStatus = 'claimed' | 'already_processed' | 'in_flight';
 export type AppStoreKiloPassNotificationProcessingResult =
   | { processed: true }

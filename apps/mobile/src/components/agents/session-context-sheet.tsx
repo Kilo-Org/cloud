@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- The context sheet composes the usage ring, token totals, and per-model cost rows. */
 import { useQuery } from '@tanstack/react-query';
+import { type Href } from 'expo-router';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,6 +45,7 @@ import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
 import { copySessionId, copySessionLink } from './session-row-actions';
 import { type SessionConnectionDisplay } from './session-connection-indicator-state';
+import { SessionTodoLinkRow } from '@/components/todos/session-todo-link';
 
 type SessionContextSheetProps = {
   visible: boolean;
@@ -337,6 +339,8 @@ export function SessionContextSheet({
             </Text>
           </Row>
 
+          <SessionTodoLinkRow sessionId={sessionId} />
+
           {/* The pill is independent of goal and PR status: the sheet shows the
               associated PR in every state (open/draft/merged/closed) whenever
               the session has one, unlike the session page which gates on an
@@ -346,6 +350,8 @@ export function SessionContextSheet({
               <LazySessionContextPrRow manager={manager} sessionId={sessionId} onClose={onClose} />
             </Suspense>
           ) : null}
+
+          <SessionChangesRow sessionId={sessionId} onClose={onClose} />
 
           <CopyRow
             testID="session-context-sheet-copy-id"
@@ -527,6 +533,39 @@ function CopyRow({
       <Text variant="mono" className="text-xs text-foreground">
         {value}
       </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * Opens the session's file changes. Like the PR row, the sheet dismisses
+ * before the push so the route does not render behind it. The router is
+ * imported at press time because the mounted sheet test cannot load
+ * expo-router.
+ */
+function SessionChangesRow({
+  sessionId,
+  onClose,
+}: Readonly<{ sessionId: string; onClose: () => void }>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const label = t('agentChat.sessionChanges.viewChanges');
+  return (
+    <Pressable
+      onPress={() => {
+        onClose();
+        void (async () => {
+          const { router } = await import('expo-router');
+          router.push(`/(app)/session-changes/${sessionId}` as Href);
+        })();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className="min-h-[44px] flex-row items-center justify-between gap-3 active:opacity-70"
+      testID="session-context-sheet-view-changes"
+    >
+      <Text className="text-base font-medium text-foreground">{label}</Text>
+      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
     </Pressable>
   );
 }

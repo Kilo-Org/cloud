@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- one cohesive publisher state-machine suite sharing the fake-sink harness */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
@@ -11,6 +11,12 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { getTerminalBlankEpoch, writeSignedOutSnapshotAndEnd } from './cleanup';
+import { setFollowedSessionsSource } from './followed-sessions';
+import {
+  _resetHomeWidgetDataForTests,
+  getHomeWidgetDataForSnapshot,
+  rememberHomeWidgetData,
+} from './home-widget-data';
 import {
   GLANCEABLE_RENEW_MARGIN_MS,
   GLANCEABLE_RENEW_RETRY_MAX_MS,
@@ -933,6 +939,32 @@ describe('GlanceablePublisher waiting ask', () => {
     publisher.dispose();
   });
 
+  it('never records a followed session as the aggregate ask', () => {
+    setFollowedSessionsSource({
+      ids: () => ['followed'],
+      counts: () => ({ running: 0, needsInput: 1, needsApproval: 1, idle: 0, scheduled: 0 }),
+    });
+    const { publisher, asks } = makePublisher();
+    publisher.handleSessions(
+      [
+        {
+          id: 'followed',
+          status: 'permission',
+          statusUpdatedAt: new Date(NOW - 60_000).toISOString(),
+        },
+        { id: 'other', status: 'permission', statusUpdatedAt: new Date(NOW - 1000).toISOString() },
+      ],
+      PUB_CTX
+    );
+    // The followed session has its own card and Approve.
+    expect(asks.at(-1)).toMatchObject({ kiloSessionId: 'other' });
+
+    publisher.handleSessions([{ id: 'followed', status: 'permission' }], PUB_CTX);
+    expect(asks.at(-1)).toBeNull();
+    publisher.dispose();
+    setFollowedSessionsSource(null);
+  });
+
   it('clears the ask on a fetch error', () => {
     const { publisher, asks } = makePublisher();
     publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
@@ -960,6 +992,106 @@ describe('GlanceablePublisher waiting ask', () => {
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
     publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
     expect(count(calls, 'startOrUpdate')).toBe(1);
+    publisher.dispose();
+  });
+});
+
+describe('Home widget approval key retention', () => {
+  const KEY = 'b'.repeat(64);
+
+  beforeEach(() => {
+    _resetHomeWidgetDataForTests();
+  });
+
+  it('keeps a server-minted approval key while the visible ask is unchanged', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions([{ status: 'permission', title: 'Migrate billing' }], PUB_CTX);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBe(KEY);
+    publisher.dispose();
+  });
+
+  it('drops the key when a different ask becomes the visible one', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions([{ status: 'permission', title: 'Rotate the signing key' }], PUB_CTX);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBeNull();
+    publisher.dispose();
+  });
+
+  it('keeps the key when only the session behind the same visible ask changes', () => {
+    // The client sees titles and kinds, not session ids, so two waiting sessions
+    // with the same title are indistinguishable here. Keeping the key is
+    // deliberate: the press re-checks the digest, so a key that no longer matches
+    // the visible request answers nothing and reports the stale outcome.
+    const { sink, calls } = makeSink();
+    let now = NOW;
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions(
+      [{ id: 'ses_first', status: 'permission', title: 'Migrate billing' }],
+      PUB_CTX
+    );
+    const first = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(first).details.approvalKey).toBe(KEY);
+    // A different session with the same visible title replaces the first one.
+    // The visible content is unchanged, so only a due renewal writes a frame:
+    // step past the margin so the second call really reaches the sink.
+    now += GLANCEABLE_RENEW_MARGIN_MS;
+    publisher.handleSessions(
+      [{ id: 'ses_second', status: 'permission', title: 'Migrate billing' }],
+      PUB_CTX
+    );
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(published.revision).toBeGreaterThan(first.revision);
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBe(KEY);
+    publisher.dispose();
+  });
+
+  it('drops the key once no permission is waiting', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions([{ status: 'busy', title: 'Migrate billing' }], PUB_CTX);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBeNull();
     publisher.dispose();
   });
 });

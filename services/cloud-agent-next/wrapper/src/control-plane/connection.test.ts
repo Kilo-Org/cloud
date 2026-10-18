@@ -1,3 +1,7 @@
+import {
+  WORKTREE_RUNTIME_HEADER,
+  WORKTREE_RUNTIME_VERSION,
+} from '../../../src/shared/control-plane-runtime-contract.js';
 import { describe, expect, it } from 'bun:test';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -13,6 +17,7 @@ import {
   controlPlaneReconnectDelayMs,
   createControlPlaneConnection,
   type ControlPlaneConnection,
+  type ControlPlaneConnectionOptions,
 } from './connection.js';
 
 type WrapperTimerOverrides = Partial<ControlPlaneTimers['wrapper']>;
@@ -27,11 +32,18 @@ class TestSocket {
   onclose?: () => void;
   onerror?: () => void;
   frames: ControlPlaneWrapperFrame[] = [];
+  sendCalls = 0;
+  failSendAt?: number;
   closes = 0;
-  constructor() {
+  constructor(
+    _url: string,
+    readonly options?: { headers?: Record<string, string> }
+  ) {
     TestSocket.instances.push(this);
   }
   send(text: string): void {
+    this.sendCalls += 1;
+    if (this.sendCalls === this.failSendAt) throw new Error('test send failure');
     this.frames.push(JSON.parse(text));
   }
   close(): void {
@@ -39,6 +51,62 @@ class TestSocket {
   }
   receive(frame: unknown): void {
     this.onmessage?.({ data: JSON.stringify(frame) });
+  }
+}
+
+type TestTimeout = { run(): void; ms: number; cleared: boolean };
+
+function withControlledConnection(
+  run: (test: {
+    connection: ControlPlaneConnection;
+    timeouts: TestTimeout[];
+    connected: () => number;
+    disconnected: string[];
+    shutdowns: Array<string | undefined>;
+    logs: string[];
+  }) => void,
+  overrides: Partial<ControlPlaneConnectionOptions> = {}
+): void {
+  const original = {
+    WebSocket: globalThis.WebSocket,
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
+  };
+  const timeouts: TestTimeout[] = [];
+  Object.assign(globalThis, {
+    WebSocket: TestSocket,
+    setTimeout: (run: () => void, ms: number) => {
+      const timeout = { run, ms, cleared: false };
+      timeouts.push(timeout);
+      return timeout;
+    },
+    clearTimeout: (timeout: TestTimeout | undefined) => {
+      if (timeout) timeout.cleared = true;
+    },
+  });
+  TestSocket.instances = [];
+  let connected = 0;
+  const disconnected: string[] = [];
+  const shutdowns: Array<string | undefined> = [];
+  const logs: string[] = [];
+  const connection = createControlPlaneConnection({
+    url: 'ws://test',
+    credential: 'test',
+    allocationId: 'alloc-1',
+    timers: timerOverrides({ reconnectBackoffMinMs: 10, reconnectBackoffMaxMs: 20 }),
+    random: () => 0,
+    onConnected: () => (connected += 1),
+    onDisconnected: reason => disconnected.push(reason),
+    onShutdown: reason => shutdowns.push(reason),
+    log: message => logs.push(message),
+    ...overrides,
+  });
+  try {
+    connection.start();
+    run({ connection, timeouts, connected: () => connected, disconnected, shutdowns, logs });
+  } finally {
+    connection.close();
+    Object.assign(globalThis, original);
   }
 }
 
@@ -77,6 +145,23 @@ async function withTestSocket(
     Object.assign(globalThis, { WebSocket: original });
   }
 }
+
+it('advertises worktree support without changing the strict legacy hello', () => {
+  withControlledConnection(({ connection }) => {
+    connection.start();
+    const socket = TestSocket.instances[0];
+    expect(socket.options?.headers?.[WORKTREE_RUNTIME_HEADER]).toBe(WORKTREE_RUNTIME_VERSION);
+    socket.onopen?.();
+    expect(socket.frames[0]).toEqual({
+      type: 'hello',
+      wrapperId: connection.wrapperId,
+      allocationId: 'alloc-1',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      heartbeatAck: true,
+      redactsNamedSecrets: true,
+    });
+  });
+});
 
 describe('acknowledged heartbeat', () => {
   it.each(['connected', 'awaiting_welcome', 'connecting'] as const)(
@@ -192,6 +277,369 @@ describe('acknowledged heartbeat', () => {
       await Bun.sleep(120);
       expect(TestSocket.instances).toHaveLength(1);
       expect(disconnected).toEqual([]);
+    });
+  });
+});
+
+describe('control-plane handshake recovery', () => {
+  it.each(['connecting', 'awaiting_welcome'] as const)(
+    'bounds a hung %s attempt and fences late callbacks without shutdown',
+    phase => {
+      withControlledConnection(({ connection, timeouts, connected, disconnected, shutdowns }) => {
+        const socket = TestSocket.instances[0];
+        socket.readyState = TestSocket.CONNECTING;
+        const deadline = timeouts[0];
+        expect(deadline.ms).toBe(CONTROL_PLANE_TIMERS.wrapper.handshakeMs);
+        expect(deadline.ms).toBe(30_000);
+        if (phase === 'awaiting_welcome') {
+          socket.readyState = TestSocket.OPEN;
+          socket.onopen?.();
+          socket.receive({ type: 'welcome', protocolVersion: -1 });
+        }
+        expect(connection.snapshot().phase).toBe(phase);
+        expect(deadline.cleared).toBe(false);
+        deadline.run();
+        expect(deadline.cleared).toBe(true);
+        expect(socket.closes).toBe(1);
+        expect(connection.snapshot()).toMatchObject({ phase: 'idle', attempt: 1 });
+        expect(connected()).toBe(0);
+        expect(disconnected).toEqual([]);
+        expect(shutdowns).toEqual([]);
+        connection.start();
+        expect(TestSocket.instances).toHaveLength(1);
+
+        const retry = timeouts[timeouts.length - 1];
+        expect(retry.ms).toBe(10);
+        retry.run();
+        const replacement = TestSocket.instances[1];
+        socket.onopen?.();
+        socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        socket.receive({ type: 'shutdown', reason: 'stale' });
+        socket.onerror?.();
+        socket.onclose?.();
+        deadline.run();
+        expect(connection.snapshot().phase).toBe('connecting');
+        replacement.onopen?.();
+        replacement.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        expect(connection.snapshot()).toMatchObject({ phase: 'connected', attempt: 0 });
+        expect(connected()).toBe(1);
+        expect(shutdowns).toEqual([]);
+      });
+    }
+  );
+
+  it.each(['welcome', 'socket close', 'socket error', 'recycle', 'shutdown', 'close'] as const)(
+    'clears handshake and negotiation timers on %s, including already queued callbacks',
+    end => {
+      withControlledConnection(({ connection, timeouts, disconnected, shutdowns }) => {
+        const socket = TestSocket.instances[0];
+        socket.onopen?.();
+        const [deadline, negotiation] = timeouts;
+        if (end === 'welcome')
+          socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        if (end === 'socket close') socket.onclose?.();
+        if (end === 'socket error') socket.onerror?.();
+        if (end === 'recycle') connection.recycle();
+        if (end === 'shutdown') socket.receive({ type: 'shutdown', reason: 'stopped' });
+        if (end === 'close') connection.close();
+        expect(deadline.cleared).toBe(true);
+        expect(negotiation.cleared).toBe(true);
+        const snapshot = connection.snapshot();
+        const scheduled = timeouts.length;
+        deadline.run();
+        negotiation.run();
+        expect(connection.snapshot()).toEqual(snapshot);
+        expect(timeouts).toHaveLength(scheduled);
+        expect(socket.frames).toHaveLength(1);
+        expect(disconnected).toEqual([]);
+        expect(shutdowns).toEqual(end === 'shutdown' ? ['stopped'] : []);
+      });
+    }
+  );
+
+  it('backs off across repeated hung handshakes', () => {
+    withControlledConnection(({ connection, timeouts, shutdowns }) => {
+      for (const delay of [10, 20, 20]) {
+        const deadline = timeouts[timeouts.length - 1];
+        deadline.run();
+        const retry = timeouts[timeouts.length - 1];
+        expect(retry.ms).toBe(delay);
+        retry.run();
+      }
+      expect(TestSocket.instances).toHaveLength(4);
+      expect(connection.snapshot()).toMatchObject({ phase: 'connecting', attempt: 3 });
+      expect(shutdowns).toEqual([]);
+    });
+  });
+
+  it.each(['hello', 'fallback'] as const)('reconnects after a throwing %s write', failure => {
+    withControlledConnection(({ connection, timeouts, connected, shutdowns }) => {
+      const socket = TestSocket.instances[0];
+      if (failure === 'hello') socket.failSendAt = 1;
+      socket.onopen?.();
+      if (failure === 'fallback') {
+        socket.failSendAt = 2;
+        timeouts[1].run();
+      }
+      expect(connection.snapshot()).toMatchObject({ phase: 'idle', attempt: 1 });
+      expect(timeouts[0].cleared).toBe(true);
+      expect(socket.closes).toBe(1);
+      expect(connected()).toBe(0);
+      expect(shutdowns).toEqual([]);
+      expect(timeouts[timeouts.length - 1].ms).toBe(10);
+    });
+  });
+});
+
+describe('control-plane failed writes', () => {
+  const events: ControlPlaneWrapperFrame[] = [
+    {
+      type: 'session.events',
+      sessionId: 'session-1',
+      events: [{ type: 'event.1', properties: { text: '\u00e9' } }],
+    },
+    {
+      type: 'session.events',
+      sessionId: 'session-1',
+      events: [{ type: 'event.2', properties: {} }],
+    },
+    {
+      type: 'session.events',
+      sessionId: 'session-1',
+      events: [{ type: 'event.3', properties: {} }],
+    },
+  ];
+  const outcome: ControlPlaneWrapperFrame = {
+    type: 'session.outcome',
+    sessionId: 'session-1',
+    status: 'completed',
+    lastMessageId: 'message-1',
+  };
+  const bytesOf = (frames: ControlPlaneWrapperFrame[]): number =>
+    frames.reduce((bytes, frame) => bytes + Buffer.byteLength(JSON.stringify(frame)), 0);
+
+  it.each([0, 1])('retains the unsent suffix when flush write %s throws', failedIndex => {
+    withControlledConnection(({ connection, timeouts, connected, disconnected, shutdowns }) => {
+      const pending = [events[0], events[1], outcome];
+      for (const frame of pending) connection.send(frame);
+      expect(connection.snapshot().outboxBytes).toBe(bytesOf(pending));
+      const socket = TestSocket.instances[0];
+      socket.onopen?.();
+      socket.failSendAt = socket.sendCalls + failedIndex + 1;
+      socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      const suffix = pending.slice(failedIndex);
+      expect(socket.frames.slice(1)).toEqual(pending.slice(0, failedIndex));
+      expect(connection.snapshot()).toMatchObject({
+        phase: 'idle',
+        attempt: 1,
+        outboxBytes: bytesOf(suffix),
+      });
+      expect(socket.closes).toBe(1);
+      expect(connected()).toBe(0);
+      expect(disconnected).toEqual([]);
+      expect(shutdowns).toEqual([]);
+
+      timeouts[timeouts.length - 1].run();
+      const replacement = TestSocket.instances[1];
+      replacement.onopen?.();
+      replacement.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      expect(replacement.frames.slice(1)).toEqual(suffix);
+      expect(connection.snapshot()).toMatchObject({ phase: 'connected', outboxBytes: 0 });
+      expect(connected()).toBe(1);
+    });
+  });
+
+  it.each(['marker', 'frame'] as const)(
+    'retains a failed drop marker but never replays a successfully written marker after %s failure',
+    failure => {
+      withControlledConnection(
+        ({ connection, timeouts, connected, disconnected }) => {
+          for (const frame of [...events, outcome]) connection.send(frame);
+          const retained = [events[2], outcome];
+          const marker = { type: 'events_dropped', dropped: 2 } satisfies ControlPlaneWrapperFrame;
+          const socket = TestSocket.instances[0];
+          socket.onopen?.();
+          socket.failSendAt = socket.sendCalls + (failure === 'marker' ? 1 : 2);
+          socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+          expect(socket.frames.slice(1)).toEqual(failure === 'marker' ? [] : [marker]);
+          expect(connection.snapshot()).toMatchObject({
+            phase: 'idle',
+            outboxBytes: bytesOf(retained),
+          });
+          expect(socket.closes).toBe(1);
+          expect(connected()).toBe(0);
+          expect(disconnected).toEqual([]);
+          timeouts[timeouts.length - 1].run();
+          const replacement = TestSocket.instances[1];
+          replacement.onopen?.();
+          replacement.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+          expect(replacement.frames.slice(1)).toEqual([
+            ...(failure === 'marker' ? [marker] : []),
+            ...retained,
+          ]);
+          expect(connection.snapshot().outboxBytes).toBe(0);
+          expect(connected()).toBe(1);
+        },
+        { outboxMaxFrames: 2 }
+      );
+    }
+  );
+
+  it.each(['throw', 'not open'] as const)(
+    'retains a direct write and reconnects immediately when the socket is %s',
+    failure => {
+      withControlledConnection(({ connection, timeouts, connected, disconnected, shutdowns }) => {
+        const socket = TestSocket.instances[0];
+        socket.onopen?.();
+        socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        if (failure === 'throw') socket.failSendAt = socket.sendCalls + 1;
+        else socket.readyState = TestSocket.CONNECTING;
+        connection.send(outcome);
+        expect(connection.snapshot()).toMatchObject({
+          phase: 'idle',
+          attempt: 1,
+          outboxBytes: bytesOf([outcome]),
+        });
+        expect(disconnected).toEqual([failure === 'throw' ? 'send failed' : 'socket not open']);
+        expect(socket.closes).toBe(1);
+        socket.receive({ type: 'shutdown', reason: 'stale' });
+        socket.onerror?.();
+        socket.onclose?.();
+        timeouts[timeouts.length - 1].run();
+        const replacement = TestSocket.instances[1];
+        replacement.onopen?.();
+        replacement.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        expect(replacement.frames.slice(1)).toEqual([outcome]);
+        expect(connected()).toBe(2);
+        expect(connection.snapshot().outboxBytes).toBe(0);
+        expect(shutdowns).toEqual([]);
+      });
+    }
+  );
+
+  it.each(['frames', 'bytes'] as const)(
+    'rejects newest under critical-only %s pressure without evicting retained outcomes',
+    limit => {
+      const retained = [outcome, { ...outcome, lastMessageId: 'message-2' }];
+      withControlledConnection(
+        ({ connection, logs }) => {
+          for (const frame of retained) connection.send(frame);
+          connection.send({ ...outcome, lastMessageId: 'message-3' });
+          connection.send({ type: 'session.progress', sessionId: 'session-1', step: 'clone' });
+          connection.send(events[0]);
+          expect(connection.snapshot().outboxBytes).toBe(bytesOf(retained));
+          expect(logs.filter(line => line.includes('newest'))).toHaveLength(3);
+          const socket = TestSocket.instances[0];
+          socket.onopen?.();
+          socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+          expect(socket.frames.slice(1)).toEqual([
+            { type: 'events_dropped', dropped: 1 },
+            ...retained,
+          ]);
+          expect(connection.snapshot().outboxBytes).toBe(0);
+        },
+        limit === 'frames' ? { outboxMaxFrames: 2 } : { outboxMaxBytes: bytesOf(retained) }
+      );
+    }
+  );
+
+  const progress: Extract<ControlPlaneWrapperFrame, { type: 'session.progress' }> = {
+    type: 'session.progress',
+    sessionId: 'session-1',
+    step: 'clone',
+  };
+  const ready: ControlPlaneWrapperFrame = { type: 'session.ready', sessionId: 'session-1' };
+
+  it.each([
+    ['outcome', outcome],
+    ['ready', ready],
+  ] as const)(
+    'evicts display-only progress before rejecting a newer %s transition',
+    (_name, critical) => {
+      withControlledConnection(
+        ({ connection, logs }) => {
+          const queued: ControlPlaneWrapperFrame[] = [
+            progress,
+            { ...progress, step: 'setup' },
+            events[0],
+          ];
+          for (const frame of queued) connection.send(frame);
+          const later = { ...outcome, lastMessageId: 'message-2' };
+          connection.send(critical);
+          connection.send(later);
+          expect(logs.filter(line => line.includes('rejected'))).toEqual([
+            'control-plane outbox rejected the newest session.events frame at capacity',
+          ]);
+          const socket = TestSocket.instances[0];
+          socket.onopen?.();
+          socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+          expect(socket.frames.slice(1)).toEqual([
+            { type: 'events_dropped', dropped: 1 },
+            critical,
+            later,
+          ]);
+        },
+        { outboxMaxFrames: 2 }
+      );
+    }
+  );
+
+  it('never lets an event evict progress', () => {
+    withControlledConnection(
+      ({ connection }) => {
+        connection.send(progress);
+        connection.send(events[0]);
+        expect(connection.snapshot().outboxBytes).toBe(bytesOf([progress]));
+        const socket = TestSocket.instances[0];
+        socket.onopen?.();
+        socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        expect(socket.frames.slice(1)).toEqual([{ type: 'events_dropped', dropped: 1 }, progress]);
+      },
+      { outboxMaxFrames: 1 }
+    );
+  });
+
+  it('does not evict events for a critical frame that cannot fit even after eviction', () => {
+    withControlledConnection(
+      ({ connection, logs }) => {
+        connection.send(outcome);
+        connection.send(events[1]);
+        const before = connection.snapshot().outboxBytes;
+        connection.send({ ...outcome, lastMessageId: `message-${'x'.repeat(100)}` });
+        expect(connection.snapshot().outboxBytes).toBe(before);
+        expect(logs).toContain(
+          'control-plane outbox rejected the newest session.outcome frame at capacity'
+        );
+        const socket = TestSocket.instances[0];
+        socket.onopen?.();
+        socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        expect(socket.frames.slice(1)).toEqual([outcome, events[1]]);
+      },
+      { outboxMaxBytes: bytesOf([outcome, events[1]]) }
+    );
+  });
+
+  it('treats a welcome on a socket that is no longer open as a failed connect attempt', () => {
+    withControlledConnection(({ connection, timeouts, connected, disconnected }) => {
+      connection.send(outcome);
+      const socket = TestSocket.instances[0];
+      socket.onopen?.();
+      socket.readyState = 2;
+      socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      expect(socket.frames).toHaveLength(1);
+      expect(connection.snapshot()).toMatchObject({
+        phase: 'idle',
+        attempt: 1,
+        outboxBytes: bytesOf([outcome]),
+      });
+      expect(connected()).toBe(0);
+      expect(disconnected).toEqual([]);
+      timeouts[timeouts.length - 1].run();
+      const replacement = TestSocket.instances[1];
+      replacement.onopen?.();
+      replacement.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      expect(replacement.frames.slice(1)).toEqual([outcome]);
+      expect(connected()).toBe(1);
     });
   });
 });

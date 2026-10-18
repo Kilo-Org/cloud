@@ -12,6 +12,7 @@ import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason as CloudAgentTerminalReason,
 } from '@kilocode/db/schema-types';
+import type { EgressMode } from './egress-allowlist.js';
 
 // ---------------------------------------------------------------------------
 // Types — aligned with cloud-agent-next tRPC router contracts
@@ -66,6 +67,8 @@ export type CloudAgentPrepareSessionInput = {
   createdOnPlatform?: string;
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   sandboxAllocation?: 'isolated-standard';
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
   runtimeSkills?: Array<{
     name: string;
     rawMarkdown: string;

@@ -101,6 +101,16 @@ export type RuntimeKiloCommand = {
   subtask?: boolean;
 };
 
+/**
+ * Instruction file injected from the web app's merged profile stack. Each entry
+ * is materialized to `${SESSION_HOME}/.kilocode/rules/<name>.md` at session
+ * preparation time, alongside the Cloud-Agent-owned `cloud-agent.md`.
+ */
+export type RuntimeInstruction = {
+  name: string;
+  content: string;
+};
+
 export type CloudAgentSessionState = SessionMetadata;
 
 /**
@@ -131,8 +141,6 @@ export type PersistenceEnv = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
-  /** Comma-separated user or org IDs admitted to the call-home control plane for interactive web creates. `*` includes personal. */
-  CONTROL_PLANE_IDS?: string;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Shared secret for JWT token validation */
@@ -177,6 +185,8 @@ export type PersistenceEnv = {
   R2_ATTACHMENTS_BUCKET?: string;
   /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
+  CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   VERCEL_TOKEN?: string;
   VERCEL_TEAM_ID?: string;
   VERCEL_PROJECT_ID?: string;

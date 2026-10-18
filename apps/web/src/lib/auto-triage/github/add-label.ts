@@ -9,7 +9,7 @@ import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
-const LABEL_COLOR = 'faf74f'; // Kilo label color (hex without #)
+const LABEL_COLOR = 'ffdd00'; // Kilo label color (hex without #)
 
 export type AddIssueLabelParams = {
   repoFullName: string;

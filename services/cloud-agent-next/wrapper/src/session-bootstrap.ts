@@ -12,7 +12,7 @@ import {
   type WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap.js';
 import type { PreparationStepKind } from '../../src/shared/protocol.js';
-import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
+import { writeCloudAgentRulesFile } from './cloud-agent-rules-file.js';
 import {
   createSafeProcessDiagnostic,
   git,
@@ -682,12 +682,31 @@ async function writeSessionAuthFile(request: WrapperSessionReadyRequest): Promis
 }
 
 async function writeCloudAgentRules(request: WrapperSessionReadyRequest): Promise<void> {
+  await writeCloudAgentRulesFile(request.workspace.sessionHome, {
+    bashDefaultTimeoutMs: process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
+  });
+}
+
+function isSafeInstructionName(name: string): boolean {
+  // The profile validator owns the reserved-name decision; this guard keeps a
+  // bypassing caller from overwriting the Cloud-Agent-owned rules file.
+  return name !== 'cloud-agent' && /^[a-z0-9][a-z0-9-]*$/.test(name);
+}
+
+async function writeRuntimeInstructions(request: WrapperSessionReadyRequest): Promise<void> {
+  const instructions = request.materialized.runtimeInstructions;
+  if (!instructions?.length) return;
+
   const rulesDir = path.join(request.workspace.sessionHome, '.kilocode/rules');
   await fs.mkdir(rulesDir, { recursive: true });
-  await fs.writeFile(
-    path.join(rulesDir, 'cloud-agent.md'),
-    buildCloudAgentRules(process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS)
-  );
+
+  for (const instruction of instructions) {
+    if (!isSafeInstructionName(instruction.name)) {
+      logToFile(`bootstrap rejected unsafe instruction name=${JSON.stringify(instruction.name)}`);
+      continue;
+    }
+    await fs.writeFile(path.join(rulesDir, `${instruction.name}.md`), instruction.content);
+  }
 }
 
 async function bootstrapEmptyKiloSession(
@@ -1239,6 +1258,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     }
 
     await writeCloudAgentRules(request);
+    await writeRuntimeInstructions(request);
 
     if (workspaceWasWarm) {
       logToFile(

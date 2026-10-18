@@ -26,7 +26,6 @@ import {
   organization_invitations,
   organization_recommendation_dismissals,
   security_audit_log,
-  free_model_usage,
   organizations,
   user_feedback,
   cloud_agent_feedback,
@@ -76,6 +75,7 @@ import {
   agent_environment_profiles,
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
+  cloud_agent_sandbox_allocation_settings,
   deleted_user_email_tombstones,
   impact_attribution_touches,
   impact_advocate_participants,
@@ -132,13 +132,13 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
-  quick_chat_threads,
-  quick_chat_messages,
   user_deletion_requests,
   user_deletion_steps,
   cloud_agent_pending_uploads,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  todo_items,
+  todo_lists,
   passkey_credentials,
   passkey_challenges,
   passkey_sign_in_tickets,
@@ -243,6 +243,7 @@ describe('User', () => {
   afterEach(async () => {
     await db.delete(cloud_agent_worktrees);
     await db.delete(cloud_agent_workspace_folders);
+    await db.delete(todo_lists);
     await db.delete(user_deletion_steps);
     await db.delete(user_deletion_requests);
     await db.delete(deployments_ephemeral);
@@ -302,7 +303,6 @@ describe('User', () => {
     await db.delete(organization_user_usage);
     await db.delete(organization_user_limits);
     await db.delete(organization_memberships);
-    await db.delete(free_model_usage);
     await db.delete(microdollar_usage_metadata);
     await db.delete(microdollar_usage);
     await db.delete(user_feedback);
@@ -345,8 +345,6 @@ describe('User', () => {
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
     await db.delete(github_app_installations);
-    await db.delete(quick_chat_messages);
-    await db.delete(quick_chat_threads);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -978,7 +976,7 @@ describe('User', () => {
     });
     it.each([
       'unknown response',
-      'invalid six-flag rejection',
+      'invalid nine-flag rejection',
       'transport failure',
       'HTTP failure',
       'invalid JSON',
@@ -992,13 +990,13 @@ describe('User', () => {
         case 'unknown response':
           fetchMock.mockResolvedValue(Response.json(null));
           break;
-        case 'invalid six-flag rejection':
+        case 'invalid nine-flag rejection':
           fetchMock.mockResolvedValue(
             Response.json({
               enforced: true,
               code: 'signup_rate_limited',
               retryAfterMs: 1_000,
-              flags: Array.from({ length: 6 }, () => ({
+              flags: Array.from({ length: 9 }, () => ({
                 name: 'signup:ja4',
                 source: 'ja4',
                 decision: 'throttle',
@@ -1110,6 +1108,92 @@ describe('User', () => {
         ).toBeUndefined();
       }
     );
+
+    it.each(['email', 'github', 'google'] as const)(
+      'returns SIGNUP-STEP-UP for a %s signup without Stripe or user rows',
+      async provider => {
+        const email = `bouncer-step-up-${provider}@example.test`;
+        const providerAccountId = `${provider}-bouncer-step-up`;
+        mockSignupDecide.mockImplementation(actualSignupDecide);
+        const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+          Response.json({
+            enforced: true,
+            code: 'signup_step_up',
+            methods: ['apple', 'passkey', 'google'],
+            flags: [
+              {
+                name: 'signup:domain',
+                source: 'domain',
+                decision: 'throttle',
+                enforced: true,
+                until: null,
+              },
+            ],
+          })
+        );
+        const result = await createOrUpdateUser(
+          {
+            google_user_email: email,
+            google_user_name: 'Step Up',
+            google_user_image_url: '',
+            hosted_domain: null,
+            provider,
+            provider_account_id: providerAccountId,
+          },
+          undefined,
+          false,
+          new Headers({ 'x-forwarded-for': '203.0.113.64' })
+        );
+
+        expect(result).toEqual({
+          success: false,
+          error: 'SIGNUP-STEP-UP',
+          methods: ['google', 'apple'],
+        });
+        expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+          operationId: expect.stringMatching(/^signup:[a-f0-9]{64}$/),
+          ip: '203.0.113.64',
+          method: provider,
+          emailDomain: 'example.test',
+        });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(deleteStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, email),
+          })
+        ).toBeUndefined();
+        expect(
+          await db.query.user_auth_provider.findFirst({
+            where: eq(user_auth_provider.provider_account_id, providerAccountId),
+          })
+        ).toBeUndefined();
+      }
+    );
+
+    it.each([
+      ['mail.team.example.test', 'example.test'],
+      ['x.my.id', 'x.my.id'],
+    ])('sends the registrable domain of %s as %s', async (host, emailDomain) => {
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: `bouncer-domain@${host}`,
+          google_user_name: 'Bouncer Domain',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: `bouncer-domain@${host}`,
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.65' })
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockSignupDecide).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'email', emailDomain })
+      );
+    });
 
     it('propagates a Stripe failure without creating a user', async () => {
       const email = 'bouncer-stripe-failure@example.com';
@@ -1896,6 +1980,49 @@ describe('User', () => {
       expect(rows[0].kilo_user_id).toBeNull();
       expect(rows[0].created_by).toBe(connector.id);
     });
+
+    it('removes personal sandbox allocation settings while keeping the organization rows', async () => {
+      const user = await insertTestUser({
+        google_user_email: `sandbox-settings-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `Sandbox settings cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      await db.insert(cloud_agent_sandbox_allocation_settings).values([
+        { owned_by_user_id: user.id, allocation: 'cloudflare-single' },
+        {
+          owned_by_user_id: user.id,
+          repository_full_name: 'acme/web',
+          repository_platform: 'github',
+          allocation: 'vercel-small',
+        },
+        {
+          owned_by_organization_id: organization.id,
+          repository_full_name: 'acme/web',
+          repository_platform: 'github',
+          allocation: 'vercel-small',
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_sandbox_allocation_settings)
+          .where(eq(cloud_agent_sandbox_allocation_settings.owned_by_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_sandbox_allocation_settings)
+          .where(
+            eq(cloud_agent_sandbox_allocation_settings.owned_by_organization_id, organization.id)
+          )
+      ).toHaveLength(1);
+    });
   });
 
   describe('softDeleteUser', () => {
@@ -2023,6 +2150,61 @@ describe('User', () => {
         .where(eq(cloud_agent_worktrees.worktree_id, otherWorktreeId));
       expect(otherWorktreeAfter).toEqual(otherWorktreeBefore);
       expect(await findUserById(user.id)).toMatchObject({ google_user_name: 'Deleted User' });
+    });
+
+    it('deletes to-do lists and their to-dos in every scope without touching another owner', async () => {
+      const user = await insertTestUser({ id: `oauth/github|todo-privacy-${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization(
+        'To-do privacy organization',
+        otherUser.id,
+        0
+      );
+      const [personalList, organizationList, otherList] = await db
+        .insert(todo_lists)
+        .values([
+          { kilo_user_id: user.id, name: 'Private plans', position: 'i' },
+          {
+            kilo_user_id: user.id,
+            organization_id: organization.id,
+            name: 'Private organization plans',
+            position: 'i',
+          },
+          {
+            kilo_user_id: otherUser.id,
+            organization_id: organization.id,
+            name: 'Keep these plans',
+            position: 'i',
+          },
+        ])
+        .returning();
+      if (!personalList || !organizationList || !otherList) {
+        throw new Error('To-do list fixtures were not inserted');
+      }
+      const [, , otherItem] = await db
+        .insert(todo_items)
+        .values([
+          {
+            list_id: personalList.id,
+            kilo_user_id: user.id,
+            title: 'Private to-do',
+            notes: 'Private notes',
+            position: 'i',
+          },
+          {
+            list_id: organizationList.id,
+            kilo_user_id: user.id,
+            title: 'Private organization to-do',
+            position: 'i',
+          },
+          { list_id: otherList.id, kilo_user_id: otherUser.id, title: 'Keep me', position: 'i' },
+        ])
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      expect(await db.select().from(todo_lists)).toEqual([otherList]);
+      expect(await db.select().from(todo_items)).toEqual([otherItem]);
     });
 
     it('deletes operation ledger rows by user id and analytics outbox rows by either identity', async () => {
@@ -2199,55 +2381,6 @@ describe('User', () => {
           .select()
           .from(cloud_agent_pending_uploads)
           .where(eq(cloud_agent_pending_uploads.id, otherPending.id))
-      ).toHaveLength(1);
-    });
-
-    it('deletes quick chat threads and messages for the user and leaves other users intact', async () => {
-      const user = await insertTestUser({ google_user_email: 'quick-chat-user@example.com' });
-      const otherUser = await insertTestUser();
-
-      const [thread] = await db
-        .insert(quick_chat_threads)
-        .values({ user_id: user.id, organization_id: null })
-        .returning();
-      const [otherThread] = await db
-        .insert(quick_chat_threads)
-        .values({ user_id: otherUser.id, organization_id: null })
-        .returning();
-      if (!thread || !otherThread) throw new Error('Failed to seed quick chat threads');
-
-      const [message] = await db
-        .insert(quick_chat_messages)
-        .values({ thread_id: thread.id, role: 'user', content: 'hello' })
-        .returning();
-      const [otherMessage] = await db
-        .insert(quick_chat_messages)
-        .values({ thread_id: otherThread.id, role: 'user', content: 'keep me' })
-        .returning();
-      if (!message || !otherMessage) throw new Error('Failed to seed quick chat messages');
-
-      await softDeleteUser(user.id);
-
-      expect(
-        await db
-          .select()
-          .from(quick_chat_messages)
-          .where(eq(quick_chat_messages.thread_id, thread.id))
-      ).toHaveLength(0);
-      expect(
-        await db.select().from(quick_chat_threads).where(eq(quick_chat_threads.user_id, user.id))
-      ).toHaveLength(0);
-      expect(
-        await db
-          .select()
-          .from(quick_chat_threads)
-          .where(eq(quick_chat_threads.user_id, otherUser.id))
-      ).toHaveLength(1);
-      expect(
-        await db
-          .select()
-          .from(quick_chat_messages)
-          .where(eq(quick_chat_messages.thread_id, otherThread.id))
       ).toHaveLength(1);
     });
 
@@ -5719,22 +5852,6 @@ describe('User', () => {
       await softDeleteUser(user.id);
       const retained = await db.select().from(github_app_installations);
       expect(retained.map(row => row.id)).toEqual([canonicals[1]?.id]);
-    });
-
-    it('should nullify free_model_usage FK', async () => {
-      const user = await insertTestUser();
-
-      await db.insert(free_model_usage).values([
-        { ip_address: '1.2.3.4', model: 'test-model', kilo_user_id: user.id },
-        { ip_address: '1.2.3.4', model: 'test-model', kilo_user_id: null },
-      ]);
-
-      await softDeleteUser(user.id);
-
-      // User's free model usage should have kilo_user_id nulled, anonymous record untouched
-      const usages = await db.select().from(free_model_usage);
-      expect(usages).toHaveLength(2);
-      expect(usages.every(u => u.kilo_user_id === null)).toBe(true);
     });
 
     it('should anonymize security_advisor_scans and null public_ip', async () => {

@@ -12,7 +12,7 @@ import {
   sessionIdSchema as kiloSessionIdSchema,
   type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
-import { normalizeGitUrl } from '@kilocode/worker-utils';
+import { normalizeGitUrl, sha256Hex } from '@kilocode/worker-utils';
 import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
@@ -39,7 +39,6 @@ import {
 import type { SandboxId, TRPCContext } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
-import { sha256Hex } from '../../utils/sha256.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
@@ -276,6 +275,12 @@ async function worktreeIntentFingerprint(
       ...(source.workspace.sandboxAllocation
         ? { sandboxAllocation: source.workspace.sandboxAllocation }
         : {}),
+      ...(source.workspace.egressMode === 'allowlist'
+        ? {
+            egressMode: source.workspace.egressMode,
+            egressAllowlist: source.workspace.egressAllowlist ?? [],
+          }
+        : {}),
     })
   );
 }
@@ -464,8 +469,12 @@ function assertRegisteredMetadata(
     workspace.sandboxId !== source.workspace.sandboxId ||
     workspace.sandboxProvider !== source.workspace.sandboxProvider ||
     workspace.sandboxAllocation !== source.workspace.sandboxAllocation ||
+    (workspace.egressMode ?? 'unrestricted') !== (source.workspace.egressMode ?? 'unrestricted') ||
+    JSON.stringify(workspace.egressAllowlist ?? []) !==
+      JSON.stringify(source.workspace.egressAllowlist ?? []) ||
     workspace.branchName !== sourceWorktreeBranchName(source) ||
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
+    workspace.sandboxKind !== source.workspace.sandboxKind ||
     !metadata.repository ||
     canonicalRepositoryUrl(metadata.repository) !== canonicalRepositoryUrl(source.repository) ||
     (source.repository.type === 'github' &&

@@ -4,7 +4,7 @@ import { desc } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,

@@ -1,5 +1,5 @@
 import { createElement, type ReactNode } from 'react';
-import { type Mock, vi } from 'vitest';
+import { vi } from 'vitest';
 
 import '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -54,10 +54,23 @@ const list = vi.hoisted(() => ({
 const store = vi.hoisted(() => ({ rows: [] as unknown[] }));
 const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
-const alertSpy = vi.hoisted(() => vi.fn());
+const confirmSpy = vi.hoisted(() => vi.fn());
 // `vi.hoisted` results cannot be exported at their declaration (vitest hoists
 // them above the export), so they are exported after the declaration instead.
-export { alertSpy, list, store, toastError, toastSuccess };
+export { confirmSpy, list, store, toastError, toastSuccess };
+
+/**
+ * The confirmation the stubbed `useConfirmDialog` captured; mirrors the
+ * `ConfirmDialogRequest` the screen passes.
+ */
+export type CapturedConfirm = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  presentation?: 'screen' | 'sheet';
+  onConfirm: () => void;
+};
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -82,7 +95,6 @@ vi.mock('@/lib/auth/passkey-client', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: toastSuccess, error: toastError } }));
 vi.mock('react-native', () => ({
-  Alert: { alert: alertSpy },
   I18nManager: { isRTL: false },
   Modal: 'Modal',
   Platform: { OS: 'ios' },
@@ -109,6 +121,12 @@ vi.mock('@/components/empty-state', () => ({
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+// The removal confirmation is the app's in-app dialog. The screen's own
+// behaviour is the subject here, so the hook is stubbed: `confirm` captures the
+// request and the node it returns is irrelevant to these suites.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: confirmSpy, dialog: 'ConfirmDialog' }),
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -142,15 +160,13 @@ export async function retry(control: ReactTestInstance): Promise<void> {
 
 /**
  * Answer the removal confirmation the screen raised, choosing the destructive
- * action. The action names the passkey it removes, so it is picked by its role,
- * not by a label a copy change would move.
+ * action. The request carries the `onConfirm` that removes the passkey, so the
+ * confirmation is driven from the captured request, not a native alert.
  */
-export async function confirmRemoval(spy: Mock): Promise<void> {
-  const buttons = (
-    spy.mock.calls[0] as [string, string, { text: string; style?: string; onPress?: () => void }[]]
-  )[2];
+export async function confirmRemoval(): Promise<void> {
+  const request = confirmSpy.mock.calls[0]?.[0] as CapturedConfirm | undefined;
   await act(() => {
-    buttons.find(button => button.style === 'destructive')?.onPress?.();
+    request?.onConfirm();
   });
 }
 

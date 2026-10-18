@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
@@ -11,6 +11,7 @@ import { LogOut, Smartphone } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -83,6 +84,7 @@ export function DeviceSessionsScreen() {
   const { signOut, token } = useAuth();
   const trpc = useTRPC();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
 
   const { data, isPending, isError, isFetching, refetch } = useQuery({
     ...trpc.user.listDeviceSessions.queryOptions(),
@@ -115,34 +117,26 @@ export function DeviceSessionsScreen() {
     if (session.isCurrent) {
       // The current device signs out through the normal signOut() flow so the
       // full local teardown (tokens, metadata, cache) stays truthful.
-      Alert.alert(t('deviceSessions.signOutThisDeviceTitle'), t('profile.signOutMessage'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.signOut'),
-          style: 'destructive',
-          onPress: () => {
-            void signOut();
-          },
+      confirm({
+        title: t('deviceSessions.signOutThisDeviceTitle'),
+        message: t('profile.signOutMessage'),
+        confirmLabel: t('common.signOut'),
+        onConfirm: () => {
+          void signOut();
         },
-      ]);
+      });
       return;
     }
-    Alert.alert(
-      t('deviceSessions.signOutThisSessionTitle'),
-      t('deviceSessions.signOutThisSessionMessage', {
+    confirm({
+      title: t('deviceSessions.signOutThisSessionTitle'),
+      message: t('deviceSessions.signOutThisSessionMessage', {
         device: deviceSessionLabel(session.user_agent),
       }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.signOut'),
-          style: 'destructive',
-          onPress: () => {
-            revokeSession.mutate({ sessionId: session.id });
-          },
-        },
-      ]
-    );
+      confirmLabel: t('common.signOut'),
+      onConfirm: () => {
+        revokeSession.mutate({ sessionId: session.id });
+      },
+    });
   };
 
   let body: ReactNode = null;
@@ -227,6 +221,7 @@ export function DeviceSessionsScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.deviceSessions')} />
       {body}
+      {dialog}
     </View>
   );
 }

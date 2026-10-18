@@ -32,6 +32,10 @@ const alreadyOwnedPurchaseErrorSchema = z.object({
   code: z.literal(ErrorCode.AlreadyOwned),
 });
 
+const notReadyStoreErrorSchema = z.object({
+  code: z.literal(ErrorCode.NotPrepared),
+});
+
 // A store purchase the store has accepted but not finished: Play reports
 // `pending` for a payment awaiting approval, and StoreKit reports an
 // ask-to-buy/deferred payment with the same code. Nothing is wrong with the
@@ -284,6 +288,16 @@ function missingTokenKey(purchase: Purchase): string {
  */
 export function isStoreAlreadyOwnedError(error: unknown): boolean {
   return alreadyOwnedPurchaseErrorSchema.safeParse(error).success;
+}
+
+/**
+ * The store has no live billing connection: Play dropped its billing client
+ * (a service disconnect, or another owner's `endConnection`) after this owner
+ * connected, so `useIAP().connected` still reads true. Nothing reached the
+ * store, so the call is safe to repeat after `reconnect()`.
+ */
+export function isStoreNotReadyError(error: unknown): boolean {
+  return notReadyStoreErrorSchema.safeParse(error).success;
 }
 
 /**

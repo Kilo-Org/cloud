@@ -488,6 +488,104 @@ describe('handleKiloPassSubscriptionEvent', () => {
     expect(pauseEvents[0]!.resumed_at).toBeNull();
   });
 
+  test('canceled subscription with pause_collection still set closes the open pause event', async () => {
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
+
+    const user = await insertTestUser();
+    const stripeSubId = `sub_canceled_paused_${Math.random()}`;
+    const [subRow] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        started_at: '2026-01-01T00:00:00.000Z',
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    await db.insert(kilo_pass_pause_events).values({
+      kilo_pass_subscription_id: subRow!.id,
+      paused_at: '2026-02-01T00:00:00.000Z',
+      resumes_at: null,
+    });
+
+    mockStripeSubscriptionsRetrieve.mockResolvedValue({
+      status: 'canceled',
+      ended_at: 1_772_323_200,
+      pause_collection: { behavior: 'void', resumes_at: null },
+    });
+
+    const deletedEvent = {
+      eventId: `evt_${Math.random()}`,
+      eventType: 'customer.subscription.deleted',
+      subscription: makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_767_225_600,
+        status: 'canceled',
+        metadata: kiloPassMetadata({
+          kiloUserId: user.id,
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Monthly,
+        }),
+      }),
+    };
+    await handleKiloPassSubscriptionEvent(deletedEvent);
+    await handleKiloPassSubscriptionEvent(deletedEvent);
+
+    const row = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, subRow!.id),
+    });
+    expect(row?.status).toBe('canceled');
+
+    const pauseEvents = await db
+      .select()
+      .from(kilo_pass_pause_events)
+      .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, subRow!.id));
+    expect(pauseEvents).toHaveLength(1);
+    expect(pauseEvents[0]!.resumed_at).not.toBeNull();
+  });
+
+  test('canceled subscription with pause_collection set does not create a pause event', async () => {
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
+
+    const user = await insertTestUser();
+    const stripeSubId = `sub_canceled_unpaused_${Math.random()}`;
+    mockStripeSubscriptionsRetrieve.mockResolvedValue({
+      status: 'canceled',
+      ended_at: 1_772_323_200,
+      pause_collection: { behavior: 'void', resumes_at: null },
+    });
+
+    await handleKiloPassSubscriptionEvent({
+      eventId: `evt_${Math.random()}`,
+      eventType: 'customer.subscription.deleted',
+      subscription: makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_767_225_600,
+        status: 'canceled',
+        metadata: kiloPassMetadata({
+          kiloUserId: user.id,
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Monthly,
+        }),
+      }),
+    });
+
+    const row = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
+    });
+    expect(row?.status).toBe('canceled');
+    const pauseEvents = await db
+      .select({ id: kilo_pass_pause_events.id })
+      .from(kilo_pass_pause_events)
+      .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, row!.id));
+    expect(pauseEvents).toHaveLength(0);
+  });
+
   test('stale active delivery persists current canceled Stripe state', async () => {
     const { handleKiloPassSubscriptionEvent } =
       await import('@/lib/kilo-pass/stripe-handlers-subscription-events');

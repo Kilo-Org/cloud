@@ -2,8 +2,9 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatMoney } from '@/lib/format';
@@ -44,6 +45,7 @@ export function MemberRow({
 }: Readonly<MemberRowProps>) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const { showActionSheetWithOptions } = useActionSheet();
   const themedSheet = useThemedActionSheetOptions();
   const mutations = useOrganizationMutations(organizationId);
@@ -75,27 +77,21 @@ export function MemberRow({
   }
 
   function confirmRemove() {
-    Alert.alert(
-      t('organization.members.removeMember'),
-      t('organization.members.removeMemberMessage', { name: displayName }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.remove'),
-          style: 'destructive',
-          onPress: () => {
-            mutations.removeMember.mutate(
-              { memberId: member.id },
-              {
-                onSuccess: () => {
-                  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                },
-              }
-            );
-          },
-        },
-      ]
-    );
+    confirm({
+      title: t('organization.members.removeMember'),
+      message: t('organization.members.removeMemberMessage', { name: displayName }),
+      confirmLabel: t('common.remove'),
+      onConfirm: () => {
+        mutations.removeMember.mutate(
+          { memberId: member.id },
+          {
+            onSuccess: () => {
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            },
+          }
+        );
+      },
+    });
   }
 
   function openActions() {
@@ -163,7 +159,12 @@ export function MemberRow({
   );
 
   if (!canManage) {
-    return <View className="px-3">{inner}</View>;
+    return (
+      <View className="px-3">
+        {inner}
+        {dialog}
+      </View>
+    );
   }
 
   return (
@@ -174,6 +175,7 @@ export function MemberRow({
       className="px-3 active:opacity-70"
     >
       {inner}
+      {dialog}
     </Pressable>
   );
 }

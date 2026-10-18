@@ -55,10 +55,12 @@ vi.mock('expo-secure-store', () => ({
 }));
 
 // Mock dependencies of use-native-auth.ts so we can import production helpers.
+const appleMock = vi.hoisted(() => ({ isAvailableAsync: vi.fn() }));
 vi.mock('expo-apple-authentication', () => ({
   AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
   formatFullName: vi.fn(),
   signInAsync: vi.fn(),
+  isAvailableAsync: appleMock.isAvailableAsync,
 }));
 
 vi.mock('@react-native-google-signin/google-signin', () => ({
@@ -126,6 +128,7 @@ const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
 const { GOOGLE_WEB_CLIENT_ID } = await import('@/lib/config');
 const { toast } = await import('sonner-native');
 const { announcingToast } = await import('@/lib/a11y/announcing-toast');
+const { i18n } = await import('@/i18n');
 
 const mockGetAdmission = vi.mocked(getAdmission);
 
@@ -415,12 +418,25 @@ describe('useNativeAuth email validation feedback', () => {
       const resultRef = await mountNativeAuth();
 
       await act(async () => {
-        await resultRef.current?.requestEmailCode('http://localhost:3000/device-auth?code=test');
+        await resultRef.current?.requestEmailCode('user@example.com');
       });
 
       expect(toast.error).not.toHaveBeenCalled();
       expect(resultRef.current?.emailError).toBe(mapError(errorCode));
       expect(resultRef.current?.busy).toBeUndefined();
+    }
+  );
+
+  it.each(['http://localhost:3000/device-auth?code=test', 'user@example', 'user'])(
+    'keeps malformed address %s inline as INVALID_REQUEST without sending a request',
+    async address => {
+      const resultRef = await mountNativeAuth();
+      await act(async () => {
+        expect(await resultRef.current?.requestEmailCode(address)).toBe(false);
+      });
+      expect(resultRef.current?.emailError).toBe(mapError('INVALID_REQUEST'));
+      expect(mockPostAuth).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
     }
   );
 
@@ -596,6 +612,47 @@ describe('useNativeAuth created-account announcement', () => {
 
     expect(announcingToast.success).not.toHaveBeenCalled();
   });
+});
+
+// ── Signup step-up ──────────────────────────────────────────────────────
+
+describe('useNativeAuth signup step-up', () => {
+  beforeEach(() => {
+    mockGetAdmission.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // This harness runs as iOS with Google configured; Apple shows when Apple says it is available.
+  it.each([
+    [['google', 'apple'], true, 'authErrors.signupStepUpApple'],
+    [['google', 'apple'], false, 'authErrors.signupStepUpGoogle'],
+    [['apple'], false, 'authErrors.signupStepUp'],
+    [['apple', 'passkey'], true, 'authErrors.signupStepUpApple'],
+    [undefined, true, 'authErrors.signupStepUp'],
+  ] as const)(
+    'names only an allowed button on this screen: methods %j, Apple shown %s',
+    async (signupMethods, appleShown, key) => {
+      appleMock.isAvailableAsync.mockResolvedValue(appleShown);
+      mockPostAuth.mockResolvedValue({
+        ok: false,
+        errorCode: 'SIGNUP-STEP-UP',
+        ssoOrganizationId: undefined,
+        signupMethods: signupMethods && [...signupMethods],
+        httpStatus: 403,
+      });
+      const resultRef = await mountNativeAuth();
+
+      await act(async () => {
+        expect(await resultRef.current?.verifyEmailCode('user@example.com', '123456')).toBe(false);
+      });
+
+      expect(toast.error).toHaveBeenCalledWith(i18n.t(key));
+      expect(authMock.signIn).not.toHaveBeenCalled();
+    }
+  );
 });
 
 // ── Passkey sign-in (hook wiring) ───────────────────────────────────────

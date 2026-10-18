@@ -196,7 +196,7 @@ describe('SessionGoalSection disclosure', () => {
     // The carat is its own pressable under the row, a sibling of the action
     // pressable rather than nested inside it: a nested pressable disappears
     // from assistive technology inside an accessible parent.
-    expect(hostAncestor(disclosure(renderer))).toBe(rowContainer(renderer));
+    expect(rowAction(renderer).findAll(node => node === disclosure(renderer))).toHaveLength(0);
     expect(hostAncestor(rowAction(renderer))).toBe(rowContainer(renderer));
   });
 
@@ -216,7 +216,6 @@ describe('SessionGoalSection disclosure', () => {
     const slot = hostAncestor(renderer.root.findByProps({ accessibilityLabel: TRAILING_LABEL }));
     expect(String(slot?.props.className)).toContain('shrink-0');
     expect(String(slot?.props.className)).toContain('self-start');
-    expect(String(slot?.props.className)).toContain('pt-0.5');
     // `ml-auto` keeps the PR link at the row's trailing edge, and the chevron
     // that follows it is the only box left of that edge.
     expect(String(slot?.props.className)).toContain('ml-auto');

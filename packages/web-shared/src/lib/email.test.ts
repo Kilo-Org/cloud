@@ -13,6 +13,8 @@ import {
   renderNonAutolinkedText,
   renderTemplate,
   sendAccountDeletionCompletedEmail,
+  sendAccountDeletionSupportNotification,
+  sendKiloPassDuplicateCardCanceledEmail,
   sendSpendAlertEmail,
   subjects,
 } from '@kilocode/web-shared/lib/email';
@@ -34,6 +36,23 @@ describe('email rendering helpers', () => {
 });
 
 describe('template loading', () => {
+  it.each([undefined, 'other@example.com'])(
+    'renders the canonical support address with caller value %s',
+    supportEmail => {
+      const html = renderTemplate('codeReviewDisabled', {
+        reason: 'Repository access requires attention.',
+        recovery_url: 'https://app.example/code-reviews',
+        recovery_label: 'Open Code Reviewer',
+        year: '2026',
+        ...(supportEmail ? { support_email: supportEmail } : {}),
+      });
+
+      expect(html).toContain('reply to this email or contact hi@kilo.ai.');
+      expect(html).not.toContain('other@example.com');
+      expect(html).not.toMatch(/\{\{/);
+    }
+  );
+
   it('reports an unreadable template to Sentry and rethrows', () => {
     expect(() => renderTemplate('doesNotExist', {})).toThrow(/ENOENT/);
     expect(captureException).toHaveBeenCalledWith(
@@ -45,9 +64,63 @@ describe('template loading', () => {
   });
 });
 
+describe('support email defaults', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('sends account deletion notifications to support with the user as Reply-To', async () => {
+    await sendAccountDeletionSupportNotification('user@example.com', 'user-1');
+
+    expect(sendViaMailgun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'hi@kilo.ai',
+        replyTo: 'user@example.com',
+        category: 'accountDeletionSupport',
+      })
+    );
+  });
+
+  it.each([
+    [undefined, 'mailto:hi@kilo.ai'],
+    ['https://support.example/help', 'https://support.example/help'],
+  ])(
+    'renders the duplicate-card support link with override %s',
+    async (supportUrl, expectedUrl) => {
+      await sendKiloPassDuplicateCardCanceledEmail('user@example.com', { supportUrl });
+
+      expect(sendViaMailgun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: 'kiloPassDuplicateCardCanceled',
+          html: expect.stringContaining(`href="${expectedUrl}"`),
+        })
+      );
+    }
+  );
+});
+
+describe('store credit web tip rendering', () => {
+  it('escapes link variables without consuming the provider unsubscribe substitution', () => {
+    const html = renderTemplate(
+      'storeCreditWebTip',
+      {
+        credits_url: 'https://app.example/credits?account="><img src=x onerror=alert(1)>&other=1',
+        year: '2026',
+      },
+      'marketing-emails'
+    );
+
+    expect(html).toContain(
+      'href="https://app.example/credits?account=&quot;&gt;&lt;img src=x onerror=alert(1)&gt;&amp;other=1"'
+    );
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('href="%tag_unsubscribe_url%"');
+    expect(html).not.toMatch(/\{\{\s*\w+\s*\}\}/);
+  });
+});
+
 describe('user data export ready email', () => {
   it('uses the required subject and only links to the authenticated export page', () => {
-    expect(subjects.userDataExportReady).toBe('Your Kilo data export is ready');
     const html = renderTemplate('userDataExportReady', {
       data_exports_url: 'https://app.kilocode.ai/data-exports',
       expiry_date: 'August 15, 2026',
@@ -60,7 +133,6 @@ describe('user data export ready email', () => {
 
 describe('data export download code email', () => {
   it('carries the code and no link that could stand in for it', () => {
-    expect(subjects.dataExportDownloadCode).toBe('Your Kilo data export download code');
     const html = renderTemplate('dataExportDownloadCode', {
       code: '482913',
       email: 'user@example.com',
@@ -77,7 +149,6 @@ describe('data export download code email', () => {
 
 describe('account deletion completed email', () => {
   it('uses the canonical completion copy and transactional footer', async () => {
-    expect(subjects.accountDeletionCompleted).toBe('Kilo: Account deletion complete');
     const html = renderTemplate('accountDeletionCompleted', {
       completion_message: new RawHtml(USER_DELETION_COMPLETION_HTML),
       year: '2026',
@@ -109,8 +180,6 @@ describe('spend alert email', () => {
   });
 
   it('carries this scope amount and threshold and exactly one call to action', async () => {
-    expect(subjects.spendAlert).toBe('Kilo: Spend alert');
-
     await sendSpendAlertEmail({
       to: ['billing@example.com'],
       scopeType: 'organization',

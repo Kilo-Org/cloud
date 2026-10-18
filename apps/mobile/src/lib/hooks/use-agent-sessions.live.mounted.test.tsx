@@ -92,6 +92,8 @@ vi.mock('expo-router', () => ({
   useSegments: () => state.segments,
 }));
 vi.mock('expo-notifications', () => ({
+  PermissionStatus: { GRANTED: 'granted' },
+  getPermissionsAsync: vi.fn().mockResolvedValue({ status: 'granted' }),
   scheduleNotificationAsync: state.scheduleNotificationAsync,
   dismissNotificationAsync: state.dismissNotificationAsync,
 }));

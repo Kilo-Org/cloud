@@ -2,8 +2,9 @@ import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import { logger } from '../../src/logger.js';
 import migrations from '../../src/control-plane/sandbox/drizzle/migrations.js';
 import {
   routes as routesTable,
@@ -12,6 +13,7 @@ import {
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { readScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
 import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential.js';
+import { buildControlNetworkPolicy } from '../../src/sandbox-control/session-credentials.js';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
 import type {
   ProviderAdapter,
@@ -62,7 +64,7 @@ type FakeProvider = {
   /** Wrapper frames received at the moment each policy update was applied. */
   policyFrameCounts: number[];
   framesSeen: () => number;
-  /** When set, `updateNetworkPolicy` blocks on this until the test resolves it. */
+  /** When set, `applyContainedCredentials` blocks on this until the test resolves it. */
   policyGate: { promise: Promise<void>; resolve: () => void } | null;
   policyBlocked: boolean;
   failPolicy: boolean;
@@ -90,9 +92,6 @@ function createFakeProvider(): FakeProvider {
     failPolicy: false,
   };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       provider.intents.push(intent);
@@ -115,14 +114,16 @@ function createFakeProvider(): FakeProvider {
       return 'terminal';
     },
     async ensureLeaseAtLeast() {},
-    async updateNetworkPolicy(_ref, policy) {
+    async applyContainedCredentials(_ref, grants) {
       if (provider.failPolicy) throw new Error('network policy update failed');
       if (provider.policyGate) {
         provider.policyBlocked = true;
         await provider.policyGate.promise;
         provider.policyBlocked = false;
       }
-      provider.policyCalls.push(policy);
+      // The real adapter builds the policy, so validation of the grant set
+      // (shared-scope alias/sandbox mismatch) must run here too.
+      provider.policyCalls.push(buildControlNetworkPolicy(grants));
       provider.policyFrameCounts.push(provider.framesSeen());
     },
     async logs() {
@@ -236,9 +237,10 @@ function setGrantExpiry(
 async function setup(
   provider: FakeProvider,
   broker: FakeCredentialBroker = createFakeCredentialBroker(),
-  extraEnv: Record<string, unknown> = {}
+  extraEnv: Record<string, unknown> = {},
+  sandboxId: string = SANDBOX_ID
 ): Promise<DurableObjectStub<SandboxControlV2>> {
-  const stub = sandboxNamespace.getByName(SANDBOX_ID);
+  const stub = sandboxNamespace.getByName(sandboxId);
   // R1: a Vercel route with a runtime proxy now mints a handle on the first
   // connected `session.prepare`; the fake Session peer mints a verifiable one.
   const sessionPeer = createRuntimeProxyMintingPeer(env, sessionId => ({
@@ -269,7 +271,8 @@ async function setup(
 async function prepareWarmRoute(
   stub: DurableObjectStub<SandboxControlV2>,
   provider: FakeProvider,
-  input: ControlPlanePrepareInput = prepareInput(SESSION)
+  input: ControlPlanePrepareInput = prepareInput(SESSION),
+  runtimeContract: 'legacy' | 'worktree' = 'worktree'
 ): Promise<{
   wrapper: FakeWrapper;
   prepareFrame: ControlPlaneWrapperFrame | null;
@@ -284,7 +287,7 @@ async function prepareWarmRoute(
   const credential = launchEnv.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = launchEnv.CONTROL_PLANE_ALLOCATION_ID;
   if (!credential || !allocationId) throw new Error('launch environment is missing identity');
-  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential, runtimeContract });
   expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
     type: 'welcome',
     protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
@@ -399,6 +402,7 @@ async function reconstructPreB(
         },
         onEvents: async () => {},
         onOutcome: async () => {},
+        getRuntimeProxyDelegationExpiresAt: async () => Date.now() + 24 * 60 * 60_000,
         issueRuntimeCredentialProxyGrant: async () => null,
       }),
     });
@@ -687,57 +691,98 @@ describe('SandboxControlV2 credentials (B3)', () => {
     }
   );
 
-  it('keeps modern and legacy backing authorities separate for repository-only mixed scopes', async () => {
-    const provider = createFakeProvider();
-    const broker = createFakeCredentialBroker();
-    const stub = await setupVercel(provider, broker);
-    const input = (sessionId: string, modern: boolean) =>
-      prepareInput(
-        sessionId,
-        {
-          ...credentialsSource(sessionId, {
-            repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
-          }),
-          scopeId: 'mixed',
-          ...(modern ? { kiloToken: runtimeAuthorizedKiloToken() } : {}),
-        },
-        {
-          ...routeSpec(sessionId),
-          directory: '/workspace/mixed',
-          ...(modern ? { runtimeIsolation: 'per-session' as const } : {}),
-        }
+  it.each([false, true])(
+    'preserves mixed repository credentials on an older allocation (modern-first=%s)',
+    async modernFirst => {
+      const provider = createFakeProvider();
+      const stub = await setupVercel(provider, createFakeCredentialBroker());
+      const input = (sessionId: string, modern: boolean) =>
+        prepareInput(
+          sessionId,
+          {
+            ...credentialsSource(sessionId, {
+              repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+              ...(modern ? { kiloToken: runtimeAuthorizedKiloToken() } : {}),
+            }),
+            scopeId: 'mixed_class',
+          },
+          {
+            ...routeSpec(sessionId),
+            directory: '/workspace/mixed_class',
+            ...(modern ? { runtimeIsolation: 'per-session' as const } : {}),
+          }
+        );
+      const { wrapper, prepareFrame } = await prepareWarmRoute(
+        stub,
+        provider,
+        input(SESSION, modernFirst),
+        'legacy'
       );
-    const { wrapper, prepareFrame } = await prepareWarmRoute(stub, provider, input(SESSION, false));
-    await stub.prepare(input(SESSION_NEXT, true));
-    const modern = await wrapper.next();
-    if (
-      prepareFrame?.type !== 'session.prepare' ||
-      modern?.type !== 'session.prepare' ||
-      !modern.credentials.proxy
-    )
-      throw new Error('missing mixed preparation');
-    await runInDurableObject(stub, (_instance, state) => {
-      const db = drizzle(state.storage);
-      expect(db.select().from(scopeGrants).all()).toHaveLength(2);
-      expect(readScopeGrant(db, 'mixed:legacy')?.kilo.runtimeProxy).toBeUndefined();
+      if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare');
+      expect(prepareFrame.spec.runtimeIsolation).toBe(modernFirst ? 'per-session' : undefined);
+      expect((await stub.prepare(input(SESSION_NEXT, !modernFirst))).state).toBe('preparing');
+      const sibling = await wrapper.next();
+      if (sibling?.type !== 'session.prepare') throw new Error('missing sibling prepare');
+      expect(sibling.spec.runtimeIsolation).toBe(modernFirst ? undefined : 'per-session');
+      wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready')
+      );
+      await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
       expect(
-        readScopeGrant(db, 'mixed:runtime')?.kilo.runtimeProxy?.members.map(
-          member => member.sessionId
-        )
-      ).toEqual([SESSION_NEXT]);
-      expect(Object.keys(readScopeGrant(db, 'mixed:runtime')?.kilo.capabilities ?? {})).toEqual([]);
-    });
-    expect(broker.kiloIssued()).toBe(0);
-    await stub.release({ sessionId: SESSION_NEXT });
-    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
-    expect((await stub.getAllocationState()).kind).toBe('connected');
-    expect(
-      JSON.stringify(provider.policyCalls.at(-1)).includes(prepareFrame.credentials.kilo.token)
-    ).toBe(true);
-    expect(
-      JSON.stringify(provider.policyCalls.at(-1)).includes(modern.credentials.proxy.handle)
-    ).toBe(false);
-  });
+        await stub.deliver({ sessionId: SESSION, messages: [promptPayload('refresh_legacy')] })
+      ).toBe('sent');
+      expect((await wrapper.next())?.type).toBe('session.credentials');
+      expect((await wrapper.next())?.type).toBe('session.prompt');
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+      expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready');
+      expect(provider.launchEnvs).toHaveLength(1);
+    }
+  );
+
+  it.each([false, true])(
+    'rejects the other credential class for a directory sharing one checkout (modern-first=%s)',
+    async modernFirst => {
+      const provider = createFakeProvider();
+      const broker = createFakeCredentialBroker();
+      const stub = await setupVercel(provider, broker);
+      const directory = '/workspace/mixed_class';
+      const input = (sessionId: string, modern: boolean) =>
+        prepareInput(
+          sessionId,
+          {
+            ...credentialsSource(sessionId, {
+              repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+              ...(modern ? { kiloToken: runtimeAuthorizedKiloToken() } : {}),
+            }),
+            scopeId: 'mixed_class',
+          },
+          {
+            ...routeSpec(sessionId),
+            directory,
+            // Negotiated sharing removes compatibility isolation at the wire boundary.
+            ...(modern ? { runtimeIsolation: 'per-session' as const } : {}),
+          }
+        );
+      const { wrapper } = await prepareWarmRoute(stub, provider, input(SESSION, modernFirst));
+      const before = (await readRouteRow(stub, SESSION))?.grant;
+      const diagnostics: Record<string, unknown>[] = [];
+      const spy = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+        const bounded = fields as unknown as Record<string, unknown>;
+        if (bounded.diagnosticEvent === 'route_failed') diagnostics.push(bounded);
+        return logger;
+      });
+      expect((await stub.prepare(input(SESSION_NEXT, !modernFirst))).state).toBe('failed');
+      spy.mockRestore();
+      expect(diagnostics.some(diagnostic => diagnostic.stage === 'mixed_credential_class')).toBe(
+        true
+      );
+      expect((await readRouteRow(stub, SESSION))?.grant === before).toBe(true);
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+      // The joiner fails at admission, before any prepare frame reaches the wrapper.
+      expect(await wrapper.next(100)).toBeNull();
+    }
+  );
 
   it('does not publish a runtime handle whose Vercel policy update failed', async () => {
     const provider = createFakeProvider();
@@ -1268,11 +1313,12 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker);
 
-    const { prepareFrame } = await prepareWarmRoute(
-      stub,
-      provider,
-      prepareInput(SESSION, { ...credentialsSource(SESSION), createdOnPlatform: 'code-review' })
-    );
+    const input = prepareInput(SESSION, {
+      ...credentialsSource(SESSION),
+      createdOnPlatform: 'code-review',
+    });
+    input.spec.env = { GH_TOKEN: 'profile-token', GITHUB_TOKEN: 'profile-github-token' };
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, input);
 
     expect(prepareFrame?.type).toBe('session.prepare');
     const serialized = JSON.stringify(prepareFrame);
@@ -1290,6 +1336,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(prepareFrame.spec.kilo?.token).toBe(prepareFrame.credentials?.kilo.token);
     expect(prepareFrame.spec.env?.KILOCODE_TOKEN).toMatch(/^kcp1\./);
     expect(prepareFrame.spec.env?.GH_TOKEN).toMatch(/^kcp1\./);
+    expect(prepareFrame.spec.env?.GH_TOKEN).toBe(prepareFrame.credentials?.git?.token);
     expect(prepareFrame.credentials?.sessionId).toBe(SESSION);
 
     const row = await readRouteRow(stub, SESSION);
@@ -1302,6 +1349,63 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(broker.kiloIssued()).toBe(1);
     expect(broker.githubIssued()).toBe(1);
   });
+
+  it.each([
+    { appType: 'standard', runtimeContract: 'legacy' },
+    { appType: 'lite', runtimeContract: 'legacy' },
+    { appType: 'standard', runtimeContract: 'worktree' },
+    { appType: 'lite', runtimeContract: 'worktree' },
+  ] as const)(
+    'derives the $appType publisher for $runtimeContract allocations from the issued app and preserves review permissions through projection and refresh',
+    async ({ appType, runtimeContract }) => {
+      const provider = createFakeProvider();
+      const broker = createFakeCredentialBroker(appType);
+      const stub = await setup(provider, broker);
+      await runInDurableObject(stub, instance => {
+        instance.env.GITHUB_APP_SLUG = 'review';
+        instance.env.GITHUB_APP_BOT_USER_ID = '123';
+        instance.env.GITHUB_LITE_APP_SLUG = 'review-lite';
+        instance.env.GITHUB_LITE_APP_BOT_USER_ID = '456';
+      });
+      const input = prepareInput(SESSION, {
+        ...credentialsSource(SESSION, {
+          repository: { type: 'github', repo: 'acme/widgets', pullRequestNumber: 42 },
+        }),
+        createdOnPlatform: 'code-review',
+      });
+      input.spec.permission = { question: 'deny', edit: 'deny', bash: { 'git push': 'deny' } };
+      input.spec.runtimeIsolation = 'per-session';
+      const { prepareFrame, wrapper } = await prepareWarmRoute(
+        stub,
+        provider,
+        input,
+        runtimeContract
+      );
+      if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+      const expectedTarget = {
+        repo: 'acme/widgets',
+        pullRequestNumber: 42,
+        appType,
+        botUserId: appType === 'standard' ? '123' : '456',
+      };
+      expect(prepareFrame.spec.githubReviewTarget).toEqual(expectedTarget);
+      expect(prepareFrame.spec.permission).toEqual(input.spec.permission);
+      expect(prepareFrame.spec.runtimeIsolation).toBe(
+        runtimeContract === 'legacy' ? 'per-session' : undefined
+      );
+      await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+      expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+        'sent'
+      );
+      expect(broker.kiloIssued()).toBe(2);
+      expect(broker.githubIssued()).toBe(2);
+      expect((await wrapper.next())?.type).toBe('session.credentials');
+      expect((await wrapper.next())?.type).toBe('session.prompt');
+      const refreshed = JSON.parse((await readRouteRow(stub, SESSION))?.spec ?? '{}');
+      expect(refreshed.githubReviewTarget).toEqual(expectedTarget);
+      expect(refreshed.permission).toEqual(input.spec.permission);
+    }
+  );
 
   it('re-issues below one hour with fresh tokens and sends session.credentials before prompts', async () => {
     const provider = createFakeProvider();
@@ -1336,6 +1440,72 @@ describe('SandboxControlV2 credentials (B3)', () => {
     if (credentialsFrame?.type !== 'session.credentials') throw new Error('missing frame');
     expect(credentialsFrame.kilo.token).toBe(refreshed.kilo.alias);
     expect(credentialsFrame.sessionId).toBe(SESSION);
+  });
+
+  it('preserves the resolved GitHub app for managed Vercel review credentials', async () => {
+    const provider = createFakeProvider();
+    const broker = Object.assign(createFakeCredentialBroker('lite'), {
+      getCloudAgentAuthForRepo: async () => ({
+        success: true,
+        githubToken: 'native-github-review-test-token',
+        installationId: 1,
+        appType: 'lite',
+        accountLogin: 'acme',
+        source: 'installation',
+        gitAuthor: {
+          name: 'review-lite[bot]',
+          email: '456+review-lite[bot]@users.noreply.github.com',
+        },
+      }),
+    });
+    const stub = await setupVercel(provider, broker);
+    await runInDurableObject(stub, instance => {
+      instance.env.GITHUB_LITE_APP_SLUG = 'review-lite';
+      instance.env.GITHUB_LITE_APP_BOT_USER_ID = '456';
+    });
+    const source = {
+      ...vercelSource(SESSION),
+      createdOnPlatform: 'code-review',
+      repository: { type: 'github' as const, repo: 'acme/widgets', pullRequestNumber: 42 },
+    };
+    const spec = {
+      ...routeSpec(SESSION),
+      runtimeIsolation: 'per-session' as const,
+      permission: { question: 'deny' as const, edit: 'deny' as const },
+    };
+    const { prepareFrame } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, source, spec)
+    );
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec.githubReviewTarget).toEqual({
+      repo: 'acme/widgets',
+      pullRequestNumber: 42,
+      appType: 'lite',
+      botUserId: '456',
+    });
+    expect(prepareFrame.spec.permission).toEqual(spec.permission);
+  });
+
+  it('keeps reviews usable when the selected app bot identity is not configured', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider, createFakeCredentialBroker('lite'), {
+      GITHUB_LITE_APP_SLUG: '',
+      GITHUB_LITE_APP_BOT_USER_ID: '',
+    });
+    const input = prepareInput(SESSION, {
+      ...credentialsSource(SESSION, {
+        repository: { type: 'github', repo: 'acme/widgets', pullRequestNumber: 42 },
+      }),
+      createdOnPlatform: 'code-review',
+    });
+    input.spec.runtimeIsolation = 'per-session';
+    input.spec.permission = { question: 'deny', edit: 'deny' };
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, input);
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec.githubReviewTarget).toBeUndefined();
+    expect(prepareFrame.spec.permission).toEqual(input.spec.permission);
   });
 
   it('resolves contained outbound credentials for a routed session and rejects unknown/expired/mutated', async () => {
@@ -1627,6 +1797,27 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(await readRouteRow(stub, SESSION)).toBeNull();
   });
 
+  it('stops a live Vercel sandbox when the provider adapter lacks the policy hook', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
+    );
+
+    // A live Vercel adapter without `applyContainedCredentials` cannot remove the
+    // released alias, so the reachable interface fails closed exactly like a
+    // throwing hook instead of reporting a false success.
+    provider.adapter.applyContainedCredentials = undefined;
+    await stub.release({ sessionId: SESSION });
+
+    const state = await stub.getAllocationState();
+    expect(state.kind === 'stopping' || state.kind === 'stopped').toBe(true);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
   it('rejects prepare without a credential source and never emits raw material', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
@@ -1768,13 +1959,13 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     // The provider credential policy refresh fails once, then succeeds.
     provider.failPolicy = true;
-    const update = provider.adapter.updateNetworkPolicy!.bind(provider.adapter);
-    provider.adapter.updateNetworkPolicy = async (ref, policy) => {
+    const update = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+    provider.adapter.applyContainedCredentials = async (ref, grants) => {
       if (provider.failPolicy) {
         provider.failPolicy = false;
         throw new Error('network policy update failed');
       }
-      return update(ref, policy);
+      return update(ref, grants);
     };
 
     const { prepareFrame } = await prepareWarmRoute(
@@ -1798,7 +1989,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     // A persistent policy failure is retried once, then fails the route. Each
     // attempt is one policy update, so two attempts means exactly two updates.
     let policyUpdates = 0;
-    provider.adapter.updateNetworkPolicy = async () => {
+    provider.adapter.applyContainedCredentials = async () => {
       policyUpdates += 1;
       throw new Error('network policy update failed');
     };
@@ -1913,5 +2104,118 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(next?.type).toBe('session.prepare');
     if (next?.type !== 'session.prepare') throw new Error('expected session.prepare');
     expect(next.spec.sessionId).toBe(SESSION_NEXT);
+  });
+});
+
+describe('SandboxControlV2 placed sandbox keys', () => {
+  const PLACED_ID = `sbx-${'d'.repeat(48)}`;
+  const smallPool = { idFromName: (name: string) => ({ toString: () => `small_${name}` }) };
+  const codeReviewPool = { idFromName: (name: string) => ({ toString: () => `review_${name}` }) };
+
+  function setupPlaced(provider: FakeProvider) {
+    return setup(
+      provider,
+      createFakeCredentialBroker(),
+      { SandboxSmallContainment: smallPool, SandboxCodeReviewContainment: codeReviewPool },
+      PLACED_ID
+    );
+  }
+
+  function readPin(stub: DurableObjectStub<SandboxControlV2>) {
+    return runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const rows = await db
+        .select({ pin: allocationTable.provider_pin })
+        .from(allocationTable)
+        .where(eq(allocationTable.id, 'current'));
+      return JSON.parse(rows[0]?.pin ?? 'null') as { sandboxKind?: unknown } | null;
+    });
+  }
+
+  it('pins the kind and names the outbound container in its pool', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupPlaced(provider);
+
+    await stub.prepare({
+      ...prepareInput(SESSION),
+      sandboxSelection: {
+        provider: 'cloudflare',
+        sandboxKind: 'isolated',
+        containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+      },
+    });
+
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      outboundContainerId?: string;
+    };
+    // A placed key never reaches the prefix table, which would have chosen SandboxContainment.
+    expect(grant.outboundContainerId).toBe(`small_${PLACED_ID}`);
+    expect((await readPin(stub))?.sandboxKind).toBe('isolated');
+  });
+
+  it('keeps the pinned kind when a later prepare names another', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupPlaced(provider);
+    await stub.prepare({
+      ...prepareInput(SESSION),
+      sandboxSelection: {
+        provider: 'cloudflare',
+        sandboxKind: 'isolated',
+        containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+      },
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+
+    await stub.prepare({
+      ...prepareInput(SESSION_NEXT),
+      sandboxSelection: {
+        provider: 'cloudflare',
+        sandboxKind: 'code-review',
+        containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+      },
+    });
+
+    const grant = JSON.parse((await readRouteRow(stub, SESSION_NEXT))?.grant ?? '{}') as {
+      outboundContainerId?: string;
+    };
+    expect(grant.outboundContainerId).toBe(`small_${PLACED_ID}`);
+    expect((await readPin(stub))?.sandboxKind).toBe('isolated');
+  });
+
+  it('rejects a placed key selection without its kind', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupPlaced(provider);
+
+    // In-DO call: the rejection is asserted without crossing the RPC boundary.
+    await runInDurableObject(stub, instance =>
+      expect(
+        instance.prepare({
+          ...prepareInput(SESSION),
+          sandboxSelection: {
+            provider: 'cloudflare',
+            containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+          },
+        })
+      ).rejects.toThrow('Sandbox selection kind does not match the sandbox key')
+    );
+    expect(provider.intents).toHaveLength(0);
+  });
+
+  it('rejects a kind for a legacy prefixed key', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+
+    await runInDurableObject(stub, instance =>
+      expect(
+        instance.prepare({
+          ...prepareInput(SESSION),
+          sandboxSelection: {
+            provider: 'cloudflare',
+            sandboxKind: 'isolated',
+            containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+          },
+        })
+      ).rejects.toThrow('Sandbox selection kind does not match the sandbox key')
+    );
   });
 });

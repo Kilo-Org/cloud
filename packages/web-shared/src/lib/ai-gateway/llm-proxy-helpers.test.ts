@@ -26,7 +26,14 @@ jest.mock('./processUsage', () => ({
   ) => mockedLogMicrodollarUsage(stats, ctx),
 }));
 
+const mockedErrorExceptInTest = jest.fn();
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
+  errorExceptInTest: (...args: unknown[]) => mockedErrorExceptInTest(...args),
+}));
+
 import {
+  captureProxyError,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
   extractEditPromptInfo,
@@ -740,6 +747,80 @@ describe('parseTranscriptionUsageFromResponse', () => {
   });
 });
 
+describe('captureProxyError', () => {
+  beforeEach(() => {
+    mockedErrorExceptInTest.mockClear();
+  });
+
+  async function capturedErrorData() {
+    for (
+      let attempt = 0;
+      attempt < 20 && mockedErrorExceptInTest.mock.calls.length === 0;
+      attempt++
+    ) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    expect(mockedErrorExceptInTest).toHaveBeenCalledTimes(1);
+    return mockedErrorExceptInTest.mock.calls[0][1] as Record<string, unknown>;
+  }
+
+  it('logs the gateway model, BYOK providers, and request field names', async () => {
+    await captureProxyError({
+      errorMessage: 'direct-byok returned error 400',
+      user: { id: 'user-1' },
+      request: {
+        model: 'glm-5.3-flash',
+        reasoning: { effort: 'high' },
+        messages: [
+          { role: 'user', content: 'secret prompt' },
+          { role: 'assistant', content: 'hi', reasoning: 'secret thoughts' },
+        ],
+      },
+      response: new Response('{"error":"unknown field"}', {
+        status: 400,
+        statusText: 'Bad Request',
+        headers: { 'content-type': 'application/json' },
+      }),
+      organizationId: undefined,
+      model: 'glm-5.3-flash',
+      gatewayModel: 'opencode-go/glm-5.3-flash',
+      byokProviderIds: ['opencode-go'],
+      trackInSentry: false,
+    });
+
+    const data = await capturedErrorData();
+    expect(data).toMatchObject({
+      model: 'glm-5.3-flash',
+      gatewayModel: 'opencode-go/glm-5.3-flash',
+      byokProviderIds: 'opencode-go',
+      requestFields: 'messages,model,reasoning',
+      messageFields: 'content,reasoning,role',
+      first4kOfResponse: '{"error":"unknown field"}',
+    });
+    expect(JSON.stringify(data)).not.toContain('secret');
+  });
+
+  it('omits optional fields that add no information', async () => {
+    await captureProxyError({
+      errorMessage: 'openrouter returned error 400',
+      user: { id: 'user-1' },
+      request: null,
+      response: new Response('', { status: 400 }),
+      organizationId: undefined,
+      model: 'vendor/model',
+      gatewayModel: 'vendor/model',
+      byokProviderIds: null,
+      trackInSentry: false,
+    });
+
+    const data = await capturedErrorData();
+    expect(data).not.toHaveProperty('gatewayModel');
+    expect(data).not.toHaveProperty('byokProviderIds');
+    expect(data).not.toHaveProperty('requestFields');
+    expect(data).not.toHaveProperty('messageFields');
+  });
+});
+
 describe('makeErrorReadable', () => {
   const request = {
     kind: 'chat_completions',
@@ -782,16 +863,207 @@ describe('makeErrorReadable', () => {
   it('does not label other user BYOK 404 responses as Vertex errors', async () => {
     const response = Response.json({ error: { message: 'Model not found' } }, { status: 404 });
 
-    await expect(
-      makeErrorReadable({
-        providerId: 'vercel',
-        requestedModel: 'anthropic/claude-sonnet-5',
-        request,
-        response,
-        userByokProviderIds: ['anthropic'],
-      })
-    ).resolves.toBeUndefined();
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-5',
+      request,
+      response,
+      userByokProviderIds: ['anthropic'],
+    });
+
+    expect(result?.status).toBe(404);
+    await expect(result?.json()).resolves.toEqual({
+      error: '[BYOK] Model not found',
+      error_type: 'byok_error',
+      message: '[BYOK] Model not found',
+    });
   });
+
+  it.each([
+    {
+      providerId: 'direct-byok',
+      userByokProviderIds: ['opencode-go'],
+      body: {
+        error: { type: 'server_error', message: 'A synthetic region setting blocks this model.' },
+      },
+      expectedMessage: 'A synthetic region setting blocks this model.',
+    },
+    {
+      providerId: 'vercel',
+      userByokProviderIds: ['anthropic'],
+      body: {
+        error: {
+          message: 'Synthetic provider account configuration needs attention.',
+          metadata: { routing: { credentialType: 'byok' } },
+        },
+        isRetryable: false,
+      },
+      expectedMessage: 'Synthetic provider account configuration needs attention.',
+    },
+    {
+      providerId: 'vercel',
+      userByokProviderIds: [],
+      body: { message: 'Synthetic request option is unsupported.' },
+      expectedMessage: 'Synthetic request option is unsupported.',
+    },
+  ] as const)(
+    'marks a $providerId BYOK 400 without forwarding upstream metadata',
+    async fixture => {
+      const result = await makeErrorReadable({
+        providerId: fixture.providerId,
+        requestedModel: 'synthetic-model',
+        request,
+        response: Response.json(fixture.body, { status: 400 }),
+        userByokProviderIds: [...fixture.userByokProviderIds],
+      });
+
+      expect(result?.status).toBe(400);
+      await expect(result?.json()).resolves.toEqual({
+        error: `[BYOK] ${fixture.expectedMessage}`,
+        error_type: 'byok_error',
+        message: `[BYOK] ${fixture.expectedMessage}`,
+      });
+    }
+  );
+
+  it.each([400, 404, 405, 408, 409, 422, 499])(
+    'preserves the upstream status for a generic BYOK %i',
+    async status => {
+      const result = await makeErrorReadable({
+        providerId: 'vercel',
+        requestedModel: 'synthetic-model',
+        request,
+        response: Response.json({}, { status }),
+        userByokProviderIds: [],
+      });
+
+      expect(result?.status).toBe(status);
+      await expect(result?.json()).resolves.toEqual({
+        error:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+        error_type: 'byok_error',
+        message:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+      });
+    }
+  );
+
+  it('keeps context overflow ahead of generic BYOK rejection', async () => {
+    const body = {
+      error: { message: 'The maximum context length is 1024 tokens. Requested 2048 tokens.' },
+    };
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(body, { status: 400 }),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    expect(result?.status).toBe(400);
+    await expect(result?.json()).resolves.toEqual({
+      ...body,
+      error_type: 'context_length_exceeded',
+    });
+  });
+
+  it.each([
+    [401, []],
+    [402, ['anthropic']],
+    [403, ['anthropic']],
+    [403, ['opencode-go']],
+    [429, []],
+    [404, ['vertex']],
+  ] as const)(
+    'keeps the specific BYOK %i mapping ahead of an upstream overflow body for %j',
+    async (status, providerIds) => {
+      const options = {
+        providerId: 'vercel',
+        requestedModel: 'synthetic-model',
+        request,
+        userByokProviderIds: [...providerIds],
+      } satisfies Omit<Parameters<typeof makeErrorReadable>[0], 'response'>;
+      const baseline = await makeErrorReadable({
+        ...options,
+        response: Response.json({}, { status }),
+      });
+      const result = await makeErrorReadable({
+        ...options,
+        response: Response.json(
+          {
+            error: { message: 'The maximum context length is 1024 tokens. Requested 2048 tokens.' },
+          },
+          { status }
+        ),
+      });
+
+      expect(result?.status).toBe(status);
+      const body = await result?.json();
+      expect(body).toMatchObject({ error_type: 'byok_error' });
+      expect(body).toEqual(await baseline?.json());
+    }
+  );
+
+  it.each([400, 500, 502, 503])(
+    'leaves non-BYOK errors and BYOK outages unchanged for status %i',
+    async status => {
+      for (const userByokProviderIds of status === 400 ? [null] : [null, ['anthropic'] as const]) {
+        await expect(
+          makeErrorReadable({
+            providerId: 'vercel',
+            requestedModel: 'synthetic-model',
+            request,
+            response: Response.json(
+              { error: { message: 'Synthetic provider failure.' } },
+              { status }
+            ),
+            userByokProviderIds: userByokProviderIds === null ? null : [...userByokProviderIds],
+          })
+        ).resolves.toBeUndefined();
+      }
+    }
+  );
+
+  it('removes control characters and bounds generic BYOK provider text', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(
+        { error: { message: `  Synthetic\u0000\n\u007f\u0085${'x'.repeat(400)}  ` } },
+        { status: 400 }
+      ),
+      userByokProviderIds: ['anthropic'],
+    });
+
+    const expected = `[BYOK] ${`Synthetic    ${'x'.repeat(400)}`.slice(0, 300)}`;
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it.each(['not json', '{}', '{"error":{"message":42}}', '{"message":"\\u0000\\n"}'])(
+    'falls back to fixed BYOK text for an unusable provider body: %s',
+    async body => {
+      const result = await makeErrorReadable({
+        providerId: 'vercel',
+        requestedModel: 'synthetic-model',
+        request,
+        response: new Response(body, { status: 400 }),
+        userByokProviderIds: ['anthropic'],
+      });
+
+      await expect(result?.json()).resolves.toEqual({
+        error:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+        error_type: 'byok_error',
+        message:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+      });
+    }
+  );
 
   it.each([
     [401, []],
@@ -860,35 +1132,38 @@ describe('makeErrorReadable', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('returns an actionable error when no allowed provider serves the model', async () => {
-    const response = Response.json(
-      {
-        message: 'No allowed providers are available for the selected model.',
-        code: 404,
-        metadata: {
-          available_providers: ['alibaba'],
-          requested_providers: ['anthropic', 'openai'],
+  it.each([null, ['anthropic']] as const)(
+    'keeps provider routing errors ahead of generic BYOK rejection with provider set %j',
+    async providerIds => {
+      const response = Response.json(
+        {
+          message: 'No allowed providers are available for the selected model.',
+          code: 404,
+          metadata: {
+            available_providers: ['alibaba'],
+            requested_providers: ['anthropic', 'openai'],
+          },
         },
-      },
-      { status: 404 }
-    );
+        { status: 404 }
+      );
 
-    const result = await makeErrorReadable({
-      providerId: 'openrouter',
-      requestedModel: 'qwen/qwen3.7-plus',
-      request,
-      response,
-      userByokProviderIds: null,
-    });
+      const result = await makeErrorReadable({
+        providerId: 'openrouter',
+        requestedModel: 'qwen/qwen3.7-plus',
+        request,
+        response,
+        userByokProviderIds: providerIds === null ? null : [...providerIds],
+      });
 
-    expect(result?.status).toBe(404);
-    await expect(result?.json()).resolves.toEqual({
-      error: 'No eligible provider can serve the selected model.',
-      error_type: 'provider_not_allowed',
-      message:
-        'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
-    });
-  });
+      expect(result?.status).toBe(404);
+      await expect(result?.json()).resolves.toEqual({
+        error: 'No eligible provider can serve the selected model.',
+        error_type: 'provider_not_allowed',
+        message:
+          'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
+      });
+    }
+  );
 
   it('recognizes the wrapped OpenRouter error response', async () => {
     const response = Response.json(

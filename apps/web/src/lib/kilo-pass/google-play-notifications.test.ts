@@ -70,6 +70,7 @@ function pubsubMessage(
     messageId: params.messageId,
   };
 }
+
 async function insertGooglePlayUser(): Promise<{
   user: User;
   obfsAccountId: string;

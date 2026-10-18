@@ -9,9 +9,9 @@ import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router'
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useKeepAwake } from 'expo-keep-awake';
 import * as Haptics from 'expo-haptics';
-import { Alert, KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
+import { Platform, type Text as RNText, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -44,7 +44,6 @@ import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-sel
 import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
-import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import {
   type ContextSheetIdentity,
   getContextSheetMountState,
@@ -66,12 +65,14 @@ import {
   selectVisibleGoal,
 } from '@/components/agents/session-goal-actions';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
+import { SessionTodoChip } from '@/components/todos/session-todo-link';
 import {
   toggleSessionGoalCollapsed,
   useSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { SessionFollowButton } from '@/components/agents/session-follow-button';
 import {
   canAutoApprovePermissions,
   canAutoApproveReply,
@@ -80,6 +81,8 @@ import {
   useSessionAutoApproveEnabled,
 } from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
+import { SessionTasksChip, SessionTasksRow } from '@/components/agents/session-tasks-indicator';
+import { selectSessionTodoSummary } from '@/components/agents/session-todo-summary';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
@@ -104,6 +107,7 @@ import {
   countInFlightMessages,
   lastVisibleMessageFailure,
   resolveRetryPrompt,
+  restoreCanceledQueuedMessages,
   retryFailedMessage,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
@@ -111,7 +115,6 @@ import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch'
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import {
   resolveLoadedCliSessionPresenceId,
   useCliSessionPresence,
@@ -173,6 +176,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import {
   type AnalyticsSurface,
@@ -186,11 +190,13 @@ import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
+import { useCliAgents } from '@/lib/hooks/use-cli-agents';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
+import { useKeepAwake } from '@/lib/keep-awake';
 import { useHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { useCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
@@ -204,6 +210,7 @@ import {
   buildContinueHref,
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
+import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -269,6 +276,7 @@ export function SessionDetailContent({
   const manager = useSessionManager();
   const { t } = useTranslation();
   const router = useRouter();
+  const { confirm, dialog } = useConfirmDialog();
   // Session-route navigation only: `replace` in one native-stack commit crashes
   // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
   const sessionRouter = useStackSafeReplace();
@@ -653,12 +661,18 @@ export function SessionDetailContent({
 
   // Custom modes: a remote session merges the session profile's visible custom
   // agents (loaded for the session's own recorded/bound profile, not the
-  // context's effective default) with the session's runtime-reported agents, so
-  // the user's roles show even when the CLI has not reported them. Cloud-agent
-  // and read-only sessions use only `runtimeAgents`. The selected slug is
-  // appended once when it is neither a built-in nor already listed, so an
-  // inherited custom slug stays visible in the picker.
+  // context's effective default) with the agents its CLI reports for the
+  // session's directory, so both the user's profile roles and the project's
+  // `.kilo/agents` show. Cloud-agent and read-only sessions use only
+  // `runtimeAgents`. The selected slug is appended once when it is neither a
+  // built-in nor already listed, so an inherited custom slug stays visible in
+  // the picker.
   const runtimeAgents = sessionConfig?.runtimeAgents;
+  const { agents: cliAgents } = useCliAgents(
+    activeSessionType === 'remote' && remoteModelState.ownerConnectionId !== null
+      ? { sessionId, ownerConnectionId: remoteModelState.ownerConnectionId }
+      : null
+  );
   const { profileAgents: effectiveProfileAgents } = useEffectiveProfileCustomModes(
     organizationId,
     activeSessionProfileId
@@ -667,11 +681,12 @@ export function SessionDetailContent({
     () =>
       resolveSessionRoleView({
         sessionType: activeSessionType,
-        runtimeAgents,
+        runtimeAgents:
+          activeSessionType === 'remote' && cliAgents.length > 0 ? cliAgents : runtimeAgents,
         profileAgents: effectiveProfileAgents,
         selectedMode: currentMode,
       }),
-    [activeSessionType, runtimeAgents, effectiveProfileAgents, currentMode]
+    [activeSessionType, cliAgents, runtimeAgents, effectiveProfileAgents, currentMode]
   );
   const customOptions = roleView.customOptions;
   // A custom agent can pin a model (+ optional variant). The pin always comes
@@ -1031,24 +1046,7 @@ export function SessionDetailContent({
     if (canceledQueuedMessages.size === 0) {
       return base;
     }
-    // Re-insert the canceled-but-kept rows the SDK already removed, in their
-    // original id-sorted position (the SDK orders messages by id).
-    const kept = [...canceledQueuedMessages.values()].filter(
-      m => !base.some(b => b.info.id === m.info.id)
-    );
-    if (kept.length === 0) {
-      return base;
-    }
-    // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; the spread already copies so nothing shared is mutated
-    return [...base, ...kept].sort((a, b) => {
-      if (a.info.id < b.info.id) {
-        return -1;
-      }
-      if (a.info.id > b.info.id) {
-        return 1;
-      }
-      return 0;
-    });
+    return restoreCanceledQueuedMessages(base, canceledQueuedMessages);
   }, [messages, droppedQueuedIds, supersededMessageIds, canceledQueuedMessages]);
 
   // Visibility-only strip for the "Hide thinking details" option. Applied once
@@ -1089,6 +1087,18 @@ export function SessionDetailContent({
   );
   const isCancelingSelected =
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
+  const detailsForkCut = useMemo(
+    () =>
+      detailsMessageId === null
+        ? null
+        : resolveForkCut({
+            messages: displayedMessages,
+            messageId: detailsMessageId,
+            pendingMessages,
+            isSessionStreaming: isStreaming,
+          }),
+    [displayedMessages, detailsMessageId, pendingMessages, isStreaming]
+  );
 
   const baseTranscript = useMemo(() => {
     // A superseded submission's preparation goes with its row: dropping only
@@ -1826,6 +1836,7 @@ export function SessionDetailContent({
   const handleRenameClose = rename.closeModal;
   const headerRight = (
     <View className="min-w-0 shrink flex-row items-center gap-2">
+      <SessionFollowButton sessionId={sessionId} />
       <SessionContextMetrics
         info={contextInfo}
         totalCostMicrodollars={totalMicrodollars}
@@ -1847,7 +1858,17 @@ export function SessionDetailContent({
     </View>
   );
   const associatedPr = fetchedData?.associatedPr ?? null;
-  const prBadge = associatedPr ? <SessionPrBadge pr={associatedPr} loading={false} /> : undefined;
+  const prBadge = associatedPr ? <SessionPrBadge pr={associatedPr} loading={false} /> : null;
+  // The model's latest todo list. With a goal it is a chip under the PR pill;
+  // without one it is a one-line row under the header.
+  const todoSummary = useMemo(() => selectSessionTodoSummary(messages), [messages]);
+  const goalTrailing =
+    prBadge || todoSummary ? (
+      <>
+        {prBadge}
+        {todoSummary ? <SessionTasksChip summary={todoSummary} /> : null}
+      </>
+    ) : undefined;
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   // A pending permission ask that the auto-reply is already answering is
   // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
@@ -1918,7 +1939,6 @@ export function SessionDetailContent({
     }
     return t('common.message');
   }, [cloudStatus, t]);
-  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSendCommand = useCallback(
     async (command: string, argumentsText: string) => {
@@ -2036,26 +2056,20 @@ export function SessionDetailContent({
           return;
         }
         if (action === 'remove') {
-          Alert.alert(
-            t('agentChat.goal.removeConfirmTitle'),
-            t('agentChat.goal.removeConfirmMessage'),
-            [
-              { text: t('common.cancel'), style: 'cancel' },
-              {
-                text: t('agentChat.goal.remove'),
-                style: 'destructive',
-                onPress: () => {
-                  void runGoalAction('remove');
-                },
-              },
-            ]
-          );
+          confirm({
+            title: t('agentChat.goal.removeConfirmTitle'),
+            message: t('agentChat.goal.removeConfirmMessage'),
+            confirmLabel: t('agentChat.goal.remove'),
+            onConfirm: () => {
+              void runGoalAction('remove');
+            },
+          });
           return;
         }
         void runGoalAction(action);
       }
     );
-  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction]);
+  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction, confirm]);
 
   const handleGoalEditSave = useCallback(
     async (objective: string) => {
@@ -2148,30 +2162,49 @@ export function SessionDetailContent({
     })();
   }, [exitFailure]);
 
+  const pushContinue = useCallback(
+    (cut: ForkCut | null) => {
+      router.push(
+        buildContinueHref({
+          organizationId,
+          cloneFromKiloSessionId: sessionId,
+          cloneSourceTitle: rename.title,
+          cloneUpToMessageId: cut?.cloneUpToMessageId,
+          forkPrefillText: cut?.forkPrefillText,
+          forkSourceIsCloudAgent: Boolean(fetchedData?.cloudAgentSessionId),
+          prefill: buildContinuePrefillParams({
+            gitUrl: fetchedData?.gitUrl,
+            mode: currentMode,
+            model: currentModel,
+            variant: currentVariant,
+          }),
+        }) as Href
+      );
+    },
+    [
+      router,
+      organizationId,
+      sessionId,
+      rename.title,
+      fetchedData?.gitUrl,
+      fetchedData?.cloudAgentSessionId,
+      currentMode,
+      currentModel,
+      currentVariant,
+    ]
+  );
+
   const handleContinueInNewSession = useCallback(() => {
-    router.push(
-      buildContinueHref({
-        organizationId,
-        cloneFromKiloSessionId: sessionId,
-        cloneSourceTitle: rename.title,
-        prefill: buildContinuePrefillParams({
-          gitUrl: fetchedData?.gitUrl,
-          mode: currentMode,
-          model: currentModel,
-          variant: currentVariant,
-        }),
-      }) as Href
-    );
-  }, [
-    router,
-    organizationId,
-    sessionId,
-    rename.title,
-    fetchedData?.gitUrl,
-    currentMode,
-    currentModel,
-    currentVariant,
-  ]);
+    pushContinue(null);
+  }, [pushContinue]);
+
+  const handleForkFromHere = useCallback(() => {
+    if (detailsForkCut === null) {
+      return;
+    }
+    handleCloseDetails();
+    pushContinue(detailsForkCut);
+  }, [detailsForkCut, handleCloseDetails, pushContinue]);
 
   const isFocused = useIsFocused();
   const keepScreenAwake = shouldKeepSessionAwake({
@@ -2257,7 +2290,7 @@ export function SessionDetailContent({
               <SessionGoalSection
                 goal={sessionGoal}
                 collapsed={goalCollapsed}
-                trailing={prBadge}
+                trailing={goalTrailing}
                 onToggleCollapsed={() => {
                   toggleSessionGoalCollapsed(sessionId);
                 }}
@@ -2265,19 +2298,25 @@ export function SessionDetailContent({
               />
             </Animated.View>
           ) : null}
+          <SessionTodoChip sessionId={sessionId} />
+          {sessionGoal === null && todoSummary ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
+            >
+              <SessionTasksRow summary={todoSummary} />
+            </Animated.View>
+          ) : null}
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
-          {keyboardContainerKind === 'app-aware-padding' ? (
-            // The trailing bottom-chrome spacer below reserves the navigation-
-            // bar inset outside this view, so the view must not add it again.
-            <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
-              {renderKeyboardBody()}
-            </AppAwareKeyboardPaddingView>
-          ) : (
-            <KeyboardAvoidingView className="flex-1" behavior="padding">
-              {renderKeyboardBody()}
-            </KeyboardAvoidingView>
-          )}
+          {/* The trailing bottom-chrome spacer below reserves the navigation-bar
+              inset outside this view. The native lift measures the keyboard
+              against this view's own bottom edge, so that inset is never
+              counted twice — the correction the app-aware padding needed. */}
+          <KeyboardAvoidingView className="flex-1" behavior="padding">
+            {renderKeyboardBody()}
+          </KeyboardAvoidingView>
 
           {isComposerVisible ? (
             <BlurBar className="border-t-0">
@@ -2341,6 +2380,7 @@ export function SessionDetailContent({
                 ? t('agentChat.session.cancelQueuedUpgradeRequired')
                 : null
             }
+            onForkFromHere={detailsForkCut ? handleForkFromHere : undefined}
           />
 
           {childSessionSheet.sheet ? (
@@ -2408,6 +2448,7 @@ export function SessionDetailContent({
           ) : null}
         </View>
       </ToolRunSheetHost>
+      {dialog}
     </PartDetailSheetHost>
   );
 
@@ -2562,12 +2603,14 @@ export function SessionDetailContent({
                 sendDisabledReason={sendDisabledReason}
                 isStreaming={isStreaming}
                 placeholder={composerPlaceholder}
-                mode={currentMode}
-                onModeChange={handleModeChange}
+                modeControl={{
+                  mode: currentMode,
+                  onModeChange: handleModeChange,
+                  customOptions,
+                }}
                 model={displayModel}
                 variant={displayVariant}
                 modelOptions={modelOptionsForToolbar}
-                customOptions={customOptions}
                 modelLocked={modelLocked}
                 modelLockLabel={pinned.agentName}
                 onModelSelect={handleModelSelect}
@@ -2722,7 +2765,7 @@ export function SessionDetailContent({
         <EmptyState
           icon={MessageSquare}
           title={t('agentChat.session.emptyTitle')}
-          description={t('agentChat.session.emptyDescription')}
+          description={isReadOnly ? undefined : t('agentChat.session.emptyDescription')}
         />
       );
     }

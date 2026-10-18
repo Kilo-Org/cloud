@@ -45,33 +45,38 @@ vi.mock('@kilocode/db/client', () => ({
 }));
 
 type TicketStore = {
-  tickets: Map<string, { userId: string; expiresAt: number }>;
+  tickets: Map<string, { userId: string; expiresAt: number; secret: string }>;
   mint: (userId: string, expiresAt: number) => string;
   namespace: {
-    idFromName: (name: string) => string;
-    get: (id: string) => { consume: () => Promise<{ userId: string } | null> };
+    idFromString: (id: string) => string;
+    get: (id: string) => { consume: (secret: string) => Promise<{ userId: string } | null> };
   };
 };
 
+const OBJECT_ID_PATTERN = /^[0-9a-f]{64}$/;
+
 function makeTicketStore(): TicketStore {
-  const tickets = new Map<string, { userId: string; expiresAt: number }>();
+  const tickets = new Map<string, { userId: string; expiresAt: number; secret: string }>();
   return {
     tickets,
     mint(userId: string, expiresAt: number): string {
-      const ticket = crypto.randomUUID();
-      tickets.set(ticket, { userId, expiresAt });
-      return ticket;
+      const objectId = crypto.randomUUID().replaceAll('-', '').repeat(2);
+      const secret = crypto.randomUUID();
+      tickets.set(objectId, { userId, expiresAt, secret });
+      return `${objectId}.${secret}`;
     },
     namespace: {
-      idFromName: (name: string) => name,
+      idFromString: (id: string) => {
+        if (!OBJECT_ID_PATTERN.test(id)) throw new TypeError('Invalid Durable Object ID');
+        return id;
+      },
       get: (id: string) => ({
-        consume: async () => {
+        consume: async (secret: string) => {
           const entry = tickets.get(id);
-          if (!entry || entry.expiresAt <= Date.now()) {
-            tickets.delete(id);
+          tickets.delete(id);
+          if (!entry || entry.expiresAt <= Date.now() || entry.secret !== secret) {
             return null;
           }
-          tickets.delete(id);
           return { userId: entry.userId };
         },
       }),
@@ -502,6 +507,46 @@ describe('kiloJwtAuthMiddleware', () => {
         headers: { Upgrade: 'websocket' },
       }),
       makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'Invalid or expired ticket',
+    });
+  });
+
+  it('rejects a ticket with the wrong secret and burns it on /api/user/web', async () => {
+    const ticketStore = makeTicketStore();
+    const ticket = ticketStore.mint('usr_123', Date.now() + 60_000);
+    const [objectId] = ticket.split('.');
+
+    const forged = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${objectId}.${crypto.randomUUID()}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+    const original = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${ticket}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+
+    expect(forged.status).toBe(401);
+    expect(original.status).toBe(401);
+  });
+
+  // Guard coverage for the ticket format lives in connection-ticket.test.ts.
+  // This case only checks that a legacy UUID ticket from a pre-deploy mint
+  // still gets the middleware's 401.
+  it('rejects a legacy UUID ticket on /api/user/web', async () => {
+    const res = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${crypto.randomUUID()}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET)
     );
 
     expect(res.status).toBe(401);

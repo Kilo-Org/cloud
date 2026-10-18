@@ -1,4 +1,5 @@
 import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type {
   AgentSelection,
@@ -48,6 +49,8 @@ export type SessionRepositoryRequest =
 
 export type SessionRuntimeIntent = {
   sandboxAllocation?: SandboxAllocation;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 export type SessionCreateRequest = {
@@ -56,8 +59,16 @@ export type SessionCreateRequest = {
   agent: AgentSelection;
   repository: SessionRepositoryRequest;
   runtime?: SessionRuntimeIntent;
+  /**
+   * The allocation that the owner's saved settings resolved for this create,
+   * set only by the Worker and never by a client. `null` means the settings were
+   * read and none applied, so a retry does not read them again.
+   */
+  savedSandboxAllocation?: SandboxAllocation | null;
   clone?: {
     cloneFromKiloSessionId: string;
+    /** Inclusive cut: copy source messages up to and including this ID. */
+    cloneUpToMessageId?: string;
   };
   profile?: {
     id?: string;

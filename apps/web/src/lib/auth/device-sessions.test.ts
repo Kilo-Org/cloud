@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
-import { eq, getTableName, sql } from 'drizzle-orm';
+import { and, eq, getTableName, isNotNull, isNull, sql } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
 import {
   createDeviceSession,
   issueSessionCredentials,
@@ -127,28 +128,224 @@ describe('device-sessions', () => {
       expect(session!.revoked_at).toBeNull();
     });
 
-    test('reused refresh token revokes the session', async () => {
-      const sessionId = await createDeviceSession({ userId: testUserId });
-      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
-
-      // First rotation succeeds
-      const first = await rotateRefreshToken(refreshToken);
-      expect(first.ok).toBe(true);
-
-      // Second use of the SAME refresh token must fail and revoke
-      const second = await rotateRefreshToken(refreshToken);
-      expect(second.ok).toBe(false);
-      if (!second.ok) {
-        expect(second.error).toBe('INVALID_REFRESH_TOKEN');
-      }
-
-      // Session must be revoked with the right reason
+    async function readSession(sessionId: string) {
       const [session] = await db
         .select()
         .from(device_sessions)
         .where(eq(device_sessions.id, sessionId));
-      expect(session!.revoked_at).not.toBeNull();
-      expect(session!.revoked_reason).toBe('refresh_reuse_detected');
+      return session!;
+    }
+
+    // Wait until `count` rotations are blocked on the session row lock. The
+    // wait is a Postgres lock, not a timer, so fake timers cannot drive it:
+    // poll pg_stat_activity until the waiters are visible.
+    async function waitForSessionLockWaiters(count: number) {
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const {
+          rows: [{ blocked }],
+        } = await db.execute<{ blocked: number }>(sql`
+          SELECT count(*)::int AS blocked
+          FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND pid <> pg_backend_pid()
+            AND state = 'active'
+            AND wait_event_type = 'Lock'
+            AND query ILIKE '%device_sessions%'
+        `);
+        if (blocked >= count) {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      throw new Error(`expected ${count} rotations to wait on the session row lock`);
+    }
+
+    // Hold the session row lock in a separate transaction. `inLock` runs
+    // under the lock after `release` is called, then the transaction commits.
+    async function holdSessionLock(
+      sessionId: string,
+      inLock: (tx: DrizzleTransaction) => Promise<void> = async () => {}
+    ) {
+      const gate = Promise.withResolvers<void>();
+      const held = Promise.withResolvers<void>();
+      const done = db.transaction(async tx => {
+        await tx
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId))
+          .for('update');
+        held.resolve();
+        await gate.promise;
+        await inLock(tx);
+      });
+      await held.promise;
+      return { release: () => gate.resolve(), done };
+    }
+
+    test('replay after the session chain advanced revokes the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      // The client rotates twice, so the chain has moved past the first token.
+      const first = await rotateRefreshToken(refreshToken);
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      const second = await rotateRefreshToken(first.refreshToken);
+      expect(second.ok).toBe(true);
+
+      // A use of the first token now is a replay: refuse and revoke.
+      const replay = await rotateRefreshToken(refreshToken);
+      expect(replay).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
+
+      const session = await readSession(sessionId);
+      expect(session.revoked_at).not.toBeNull();
+      expect(session.revoked_reason).toBe('refresh_reuse_detected');
+    });
+
+    test('a lost rotation response is retried with the consumed token without revocation', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      // The server commits the rotation, but the client never stores the
+      // response (suspended mid-request, dropped connection, keychain write
+      // failure) and retries with the token it still holds.
+      const lost = await rotateRefreshToken(refreshToken);
+      expect(lost.ok).toBe(true);
+      if (!lost.ok) return;
+
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+      if (!retry.ok) return;
+      expect(retry.refreshToken).not.toBe(lost.refreshToken);
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
+
+      // The session keeps one live refresh token: the one the client stored.
+      const live = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(
+          and(
+            eq(device_refresh_tokens.device_session_id, sessionId),
+            isNull(device_refresh_tokens.consumed_at)
+          )
+        );
+      expect(live).toHaveLength(1);
+
+      // The retried pair keeps rotating.
+      const next = await rotateRefreshToken(retry.refreshToken);
+      expect(next.ok).toBe(true);
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
+    });
+
+    test('a use of the retired pair from a lost rotation revokes the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      const lost = await rotateRefreshToken(refreshToken);
+      expect(lost.ok).toBe(true);
+      if (!lost.ok) return;
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+
+      // Two holders of the session diverged: refuse and revoke.
+      const replay = await rotateRefreshToken(lost.refreshToken);
+      expect(replay).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
+      expect((await readSession(sessionId)).revoked_reason).toBe('refresh_reuse_detected');
+    });
+
+    test('a stale request that read the token before the winning consume retires nothing', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+      const deliveredToken = `delivered-${Date.now()}`;
+
+      // The client times out and retries. The retry wins the session lock,
+      // consumes the token, and delivers a new pair. The aborted request read
+      // the token first but reaches the lock after the retry commits.
+      const lock = await holdSessionLock(sessionId, async tx => {
+        await tx
+          .update(device_refresh_tokens)
+          .set({ consumed_at: sql`clock_timestamp()` })
+          .where(
+            eq(
+              device_refresh_tokens.token_hash,
+              createHash('sha256').update(refreshToken).digest('hex')
+            )
+          );
+        await tx.insert(device_refresh_tokens).values({
+          token_hash: createHash('sha256').update(deliveredToken).digest('hex'),
+          device_session_id: sessionId,
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+      });
+      const staleRequest = rotateRefreshToken(refreshToken);
+      try {
+        await waitForSessionLockWaiters(1);
+      } finally {
+        lock.release();
+        await lock.done;
+      }
+
+      expect(await staleRequest).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
+
+      // The delivered pair stays live and keeps rotating.
+      const next = await rotateRefreshToken(deliveredToken);
+      expect(next.ok).toBe(true);
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
+    });
+
+    test('a retry that gets the session lock after the lost rotation still recovers', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      // The first request waits on the lock, the client times out and
+      // retries, and the retry waits behind it. The first request consumes
+      // the token, but its response is lost.
+      const lock = await holdSessionLock(sessionId);
+      const first = rotateRefreshToken(refreshToken);
+      let retryRequest = first;
+      try {
+        await waitForSessionLockWaiters(1);
+        retryRequest = rotateRefreshToken(refreshToken);
+        await waitForSessionLockWaiters(2);
+      } finally {
+        lock.release();
+        await lock.done;
+      }
+
+      expect((await first).ok).toBe(true);
+      const retry = await retryRequest;
+      expect(retry.ok).toBe(true);
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
+      if (!retry.ok) return;
+
+      // The pair the client stored keeps rotating.
+      const next = await rotateRefreshToken(retry.refreshToken);
+      expect(next.ok).toBe(true);
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
+    });
+
+    test('a consumed token outside the lost-rotation grace revokes the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      const lost = await rotateRefreshToken(refreshToken);
+      expect(lost.ok).toBe(true);
+
+      // Move the consume outside the 24-hour grace.
+      await db
+        .update(device_refresh_tokens)
+        .set({ consumed_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })
+        .where(
+          and(
+            eq(device_refresh_tokens.device_session_id, sessionId),
+            isNotNull(device_refresh_tokens.consumed_at)
+          )
+        );
+
+      const replay = await rotateRefreshToken(refreshToken);
+      expect(replay).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
+      expect((await readSession(sessionId)).revoked_reason).toBe('refresh_reuse_detected');
     });
 
     test('refresh for a revoked session returns SESSION_REVOKED', async () => {
@@ -204,27 +401,9 @@ describe('device-sessions', () => {
         const rotatePromise = rotateRefreshToken(refreshToken);
 
         // Deterministic barrier: the rotation cannot pass its `FOR UPDATE`
-        // recheck until the revoke commits, so poll until the rotation is
+        // recheck until the revoke commits, so wait until the rotation is
         // observed waiting on the session row lock inside its transaction.
-        let rotationBlocked = false;
-        for (let attempt = 0; attempt < 200 && !rotationBlocked; attempt++) {
-          const {
-            rows: [{ blocked }],
-          } = await db.execute<{ blocked: number }>(sql`
-            SELECT count(*)::int AS blocked
-            FROM pg_stat_activity
-            WHERE datname = current_database()
-              AND pid <> pg_backend_pid()
-              AND state = 'active'
-              AND wait_event_type = 'Lock'
-              AND query ILIKE '%device_sessions%'
-          `);
-          rotationBlocked = blocked > 0;
-          if (!rotationBlocked) {
-            await new Promise(resolve => setTimeout(resolve, 10));
-          }
-        }
-        expect(rotationBlocked).toBe(true);
+        await waitForSessionLockWaiters(1);
 
         // Commit the revoke; the rotation's locked recheck then refuses.
         releaseRevoke();

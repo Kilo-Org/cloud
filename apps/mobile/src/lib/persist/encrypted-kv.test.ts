@@ -188,6 +188,7 @@ vi.mock('@sentry/react-native', () => ({
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
 import { PERSIST_DB_KEY } from '@/lib/storage-keys';
+import { ProtectedDataUnavailableError, setProtectedDataAvailable } from '@/lib/protected-data';
 import {
   clearScope,
   clearScopePrefix,
@@ -219,6 +220,7 @@ beforeEach(() => {
   hasSQLCipher = true;
   cipherProbedAtSqlCount = -1;
   closeCallCount = 0;
+  setProtectedDataAvailable(true);
   resetEncryptedKvOpenForTests();
 });
 
@@ -384,6 +386,63 @@ describe('transient keychain read', () => {
     // The retry read the stored key and the store opened on it.
     expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
     expect(sqlLog).toContain(`PRAGMA key = "x'${storedKey}'"`);
+  });
+});
+
+describe('locked device', () => {
+  it('waits for unlock before it reads the key or opens the database', async () => {
+    store.set(PERSIST_DB_KEY, 'a'.repeat(64));
+    setProtectedDataAvailable(false);
+
+    const read = getItem('s', 'k');
+    await Promise.resolve();
+    expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+    expect(SQLite.openDatabaseSync).not.toHaveBeenCalled();
+
+    setProtectedDataAvailable(true);
+    await expect(read).resolves.toBeNull();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('never resets the database when the device locks during the open, and opens again after unlock', async () => {
+    const storedKey = 'a'.repeat(64);
+    store.set(PERSIST_DB_KEY, storedKey);
+    failNextProbe = true;
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(async () => {
+      setProtectedDataAvailable(false);
+      return storedKey;
+    });
+
+    await expect(getItem('s', 'k')).rejects.toBeInstanceOf(ProtectedDataUnavailableError);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    expect(closeCallCount).toBe(1);
+
+    setProtectedDataAvailable(true);
+    await expect(getItem('s', 'k')).resolves.toBeNull();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('opens again after unlock when the key read rejects because the device locked', async () => {
+    const storedKey = 'a'.repeat(64);
+    store.set(PERSIST_DB_KEY, storedKey);
+    const refusal = new Error('keychain refused: device locked');
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(async () => {
+      setProtectedDataAvailable(false);
+      throw refusal;
+    });
+
+    await expect(getItem('s', 'k')).rejects.toBe(refusal);
+    expect(SQLite.openDatabaseSync).not.toHaveBeenCalled();
+
+    // The raw native refusal must not keep the open memo rejected until relaunch.
+    setProtectedDataAvailable(true);
+    await expect(getItem('s', 'k')).resolves.toBeNull();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
   });
 });
 

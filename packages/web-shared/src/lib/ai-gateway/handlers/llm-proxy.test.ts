@@ -3,6 +3,7 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   JWT_TOKEN_VERSION,
@@ -31,23 +32,23 @@ import {
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
+import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
+import {
+  FRONTIER_CODE_MODEL,
+  FRONTIER_MODE_TO_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
 import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
+import type * as AutoModelResolution from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import {
-  checkFreeModelRateLimit,
-  checkFreeModelRateLimitByUser,
-  checkPromotionLimit,
-  logFreeModelRequest,
-} from '@kilocode/web-shared/lib/free-model-rate-limiter';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { stepfun_5_preview_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -56,7 +57,7 @@ import {
   releaseDecideLease,
   type DecideResponse,
 } from '@kilocode/web-shared/lib/bouncer/client';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { handleLlmProxyRequest } from './llm-proxy';
 
 jest.mock('next/server', () => {
@@ -86,7 +87,20 @@ jest.mock('@kilocode/web-shared/lib/creditTransactions', () => ({
   })),
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
-jest.mock('@kilocode/web-shared/lib/free-model-rate-limiter');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/unavailable-models') as Record<
+    string,
+    unknown
+  >),
+  isUnavailableModel: jest.fn(async (modelId: string) =>
+    [
+      'google/gemma-4-26b-a4b-it:free',
+      'google/gemma-4-31b-it:free',
+      'thinkingmachines/inkling:free',
+    ].includes(modelId)
+  ),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit');
 jest.mock(
   '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',
   () => ({
@@ -134,6 +148,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
   };
 });
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-decision');
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
+  isReleaseToggleEnabled: jest.fn(async () => false),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models', () => ({
   collectDeniedAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
   collectDataCollectionRequiredAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
@@ -171,6 +188,7 @@ const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
+const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
 const mockedCollectDataCollectionRequiredAutoRoutingModelIds = jest.mocked(
   collectDataCollectionRequiredAutoRoutingModelIds
@@ -179,10 +197,7 @@ const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
 const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
-const mockedCheckFreeModelRateLimit = jest.mocked(checkFreeModelRateLimit);
-const mockedCheckFreeModelRateLimitByUser = jest.mocked(checkFreeModelRateLimitByUser);
-const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
-const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
+const mockedIsFreeModelRateLimited = jest.mocked(isFreeModelRateLimited);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
 const mockedIsNonTrialEnterpriseOrganization = jest.mocked(isNonTrialEnterpriseOrganization);
@@ -330,7 +345,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_5_preview_free_model.public_id), {
+      makeRequest(makeBody('test/free-model:free'), {
         // A Kilo client sets `apiKey: "anonymous"` when nobody is signed in.
         // This is the free tier's normal path, so it must stay anonymous.
         authorization: 'Bearer anonymous',
@@ -364,7 +379,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_5_preview_free_model.public_id), {
+      makeRequest(makeBody('test/free-model:free'), {
         authorization: `Bearer ${signedToken(KILO_API_AUDIENCE)}`,
       }) as never
     );
@@ -476,7 +491,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_5_preview_free_model.public_id), {
+      makeRequest(makeBody('test/free-model:free'), {
         // Even a free model must not be served anonymously to a caller that
         // sent a credential: the caller believes it is authenticated.
         authorization: 'Bearer not-a-jwt',
@@ -505,7 +520,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_5_preview_free_model.public_id), {
+      makeRequest(makeBody('test/free-model:free'), {
         authorization: `Bearer ${token}`,
       }) as never
     );
@@ -728,7 +743,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_5_preview_free_model.public_id)) as never
+      makeRequest(makeBody('test/free-model:free')) as never
     );
 
     expect(response.status).toBe(200);
@@ -1208,7 +1223,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     'google/gemma-4-31b-it:free',
     'thinkingmachines/inkling:free',
   ])('rejects the unavailable or disabled model %s before upstream', async modelId => {
-    mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });
+    mockedIsFreeModelRateLimited.mockResolvedValue(false);
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(makeRequest(makeBody(modelId)) as never);
@@ -1220,8 +1235,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('applies free-model rate limiting to flagged Kilo-exclusive models', async () => {
-    mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: false, requestCount: 200 });
+  it('applies free-model rate limiting per IP to flagged Kilo-exclusive models', async () => {
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
@@ -1233,9 +1248,45 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       error_type: 'rate_limit_exceeded',
       message: 'Model usage limit reached. Please try again later.',
     });
-    expect(mockedCheckFreeModelRateLimit).toHaveBeenCalledWith('127.0.0.1');
-    expect(mockedCheckFreeModelRateLimitByUser).not.toHaveBeenCalled();
-    expect(mockedLogFreeModelRequest).not.toHaveBeenCalled();
+    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), 'ip:127.0.0.1');
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('applies free-model rate limiting per user to server-side products on Cloudflare IPs', async () => {
+    setUserAuth();
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id), {
+        'x-forwarded-for': '104.16.0.1',
+        'x-kilocode-feature': 'cloud-agent',
+      }) as never
+    );
+
+    expect(response.status).toBe(429);
+    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), 'user:user-123');
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('requires authentication for server-side products on Cloudflare IPs', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id), {
+        'x-forwarded-for': '104.16.0.1',
+        'x-kilocode-feature': 'cloud-agent',
+      }) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error_type: 'authentication_required' });
+    expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
@@ -1248,14 +1299,11 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_5_preview_free_model.public_id)) as never
+      makeRequest(makeBody('test/free-model:free')) as never
     );
 
     expect(response.status).toBe(200);
-    expect(mockedCheckFreeModelRateLimit).not.toHaveBeenCalled();
-    expect(mockedCheckFreeModelRateLimitByUser).not.toHaveBeenCalled();
-    expect(mockedCheckPromotionLimit).not.toHaveBeenCalled();
-    expect(mockedLogFreeModelRequest).not.toHaveBeenCalled();
+    expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
@@ -1459,9 +1507,10 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([]);
     mockedCollectDataCollectionRequiredAutoRoutingModelIds.mockResolvedValue([]);
-    // Mock applyResolvedAutoModel to resolve the virtual model and invoke the efficientDecision thunk
+    mockedIsReleaseToggleEnabled.mockResolvedValue(false);
     mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
       if (opts.efficientDecision) await opts.efficientDecision();
+      if (opts.frontierDecision) await opts.frontierDecision();
       request.body.model = 'anthropic/claude-haiku-4';
       return { kind: 'ok', resolved: { model: 'anthropic/claude-haiku-4' } };
     });
@@ -1470,6 +1519,135 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedAfter.mockImplementation((_arg: unknown) => {
       // no-op: the promise has already been started when passed to after()
     });
+  });
+
+  it.each([
+    { name: 'disabled flag', enabled: false, decision: false },
+    { name: 'enabled flag with frontier decision', enabled: true, decision: true },
+    { name: 'enabled flag with missing frontier table', enabled: true, decision: false },
+  ])('routes frontier with $name', async ({ enabled, decision }) => {
+    mockedIsReleaseToggleEnabled.mockResolvedValue(enabled);
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: decision
+        ? {
+            model: 'anthropic/claude-haiku-4',
+            taskType: 'implementation',
+            subtaskType: 'feature_development',
+            source: 'benchmark',
+            tableVersion: 'frontier-v1',
+            sticky: false,
+          }
+        : null,
+      costUsd: 0,
+    });
+    const actualResolution = jest.requireActual<typeof AutoModelResolution>(
+      '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution'
+    );
+    mockedApplyResolvedAutoModel.mockImplementation(actualResolution.applyResolvedAutoModel);
+    const request = makeRequest(makeBody('kilo-auto/frontier'));
+    request.headers.set('x-kilocode-mode', 'architect');
+
+    const response = await handleLlmProxyRequest(request);
+
+    expect(response.status).toBe(200);
+    expect(mockedIsReleaseToggleEnabled).toHaveBeenCalledWith(
+      'kilo-auto-frontier-routing',
+      'user-123'
+    );
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(
+      decision ? 'anthropic/claude-haiku-4' : FRONTIER_MODE_TO_MODEL.architect.model
+    );
+    if (enabled) {
+      expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+        expect.objectContaining({ requestedModel: 'kilo-auto/frontier', router: 'frontier' })
+      );
+    } else {
+      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+    }
+    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+  });
+
+  it('preserves the frontier code fallback when the worker request fails', async () => {
+    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
+    mockedFetchEfficientAutoDecision.mockResolvedValue(null);
+    const actualResolution = jest.requireActual<typeof AutoModelResolution>(
+      '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution'
+    );
+    mockedApplyResolvedAutoModel.mockImplementation(actualResolution.applyResolvedAutoModel);
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(FRONTIER_CODE_MODEL.model);
+  });
+
+  it('forwards effective privacy and policy denials to frontier routing', async () => {
+    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'deny' },
+      plan: 'enterprise',
+    });
+    mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue(['openai/gpt-4o']);
+    mockedCollectDataCollectionRequiredAutoRoutingModelIds.mockResolvedValue([
+      'meta/muse-spark-1.3-contributor',
+    ]);
+    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({
+        ...makeBody('kilo-auto/frontier'),
+        provider: { data_collection: 'allow', zdr: true },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        router: 'frontier',
+        organizationId: 'org-123',
+        providerHints: {
+          provider: { data_collection: 'deny', zdr: true },
+          providerOptions: null,
+        },
+        deniedModelIds: expect.arrayContaining([
+          'openai/gpt-4o',
+          'meta/muse-spark-1.3-contributor',
+        ]),
+      })
+    );
+  });
+
+  it('does not classify frontier requests without an authenticated user', async () => {
+    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+      credentialsRejected: false,
+    });
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
+
+    expect(response.status).toBe(401);
+    expect(mockedIsReleaseToggleEnabled).not.toHaveBeenCalled();
+    expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+  });
+
+  it('keeps efficient routing on the default worker router without a flag check', async () => {
+    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
+
+    expect(response.status).toBe(200);
+    expect(mockedIsReleaseToggleEnabled).not.toHaveBeenCalled();
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledTimes(1);
+    expect(mockedFetchEfficientAutoDecision.mock.calls[0]?.[0]).not.toHaveProperty('router');
   });
 
   it('normalizes privacy before Auto resolution and decision hints', async () => {
@@ -1582,7 +1760,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedApplyResolvedAutoModel.mockImplementation(async params => {
       const isCandidateAllowed = params.isAutoFreeCandidateAllowed;
       expect(isCandidateAllowed).toBeDefined();
-      expect(await isCandidateAllowed?.('stepfun/step-5-preview-free')).toBe(false);
+      expect(await isCandidateAllowed?.('vendor/model:free')).toBe(false);
       return { kind: 'no_free_models_available' };
     });
 
@@ -1592,47 +1770,45 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(response.status).toBe(503);
     expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
       expect.anything(),
-      'stepfun/step-5-preview-free'
+      'vendor/model:free'
     );
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('bills classifier cost when cost > 0 and user is non-BYOK', async () => {
-    mockedFetchEfficientAutoDecision.mockResolvedValue({
-      decision: {
-        model: 'anthropic/claude-haiku-4',
-        taskType: 'implementation',
-        subtaskType: 'feature_development',
-        source: 'benchmark',
-        tableVersion: 'v1',
-        sticky: false,
-      },
-      costUsd: 0.002,
-    });
+  it.each(['kilo-auto/efficient', 'kilo-auto/frontier'])(
+    'bills classifier cost for %s when cost > 0 and user is non-BYOK',
+    async model => {
+      mockedIsReleaseToggleEnabled.mockResolvedValue(true);
+      mockedFetchEfficientAutoDecision.mockResolvedValue({
+        decision: {
+          model: 'anthropic/claude-haiku-4',
+          taskType: 'implementation',
+          subtaskType: 'feature_development',
+          source: 'benchmark',
+          tableVersion: 'v1',
+          sticky: false,
+        },
+        costUsd: 0.002,
+      });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/efficient')) as never
-    );
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(model)));
 
-    expect(response.status).toBe(200);
-    // Wait for after() callback to settle
-    await Promise.resolve();
-    await Promise.resolve();
+      expect(response.status).toBe(200);
+      await Promise.resolve();
+      await Promise.resolve();
 
-    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
-    const [stats, ctx] = mockedLogMicrodollarUsage.mock.calls[0];
-    expect(stats.cost_mUsd).toBe(2000); // toMicrodollars(0.002)
-    expect(stats.model).toBe('auto-routing/classifier');
-    expect(stats.inputTokens).toBe(0);
-    expect(stats.outputTokens).toBe(0);
-    expect(ctx.requested_model).toBe('kilo-auto/efficient');
-    expect(ctx.user_byok).toBe(false);
-    // The internal classifier-overhead row must not carry a posthog distinct id,
-    // so it can't emit generic first_usage lifecycle events or be mistaken for
-    // the user's first model usage.
-    expect(ctx.posthog_distinct_id).toBeUndefined();
-  });
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+      const [stats, ctx] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats.cost_mUsd).toBe(2000);
+      expect(stats.model).toBe('auto-routing/classifier');
+      expect(stats.inputTokens).toBe(0);
+      expect(stats.outputTokens).toBe(0);
+      expect(ctx.requested_model).toBe(model);
+      expect(ctx.user_byok).toBe(false);
+      // Classifier overhead must not emit first_usage lifecycle events.
+      expect(ctx.posthog_distinct_id).toBeUndefined();
+    }
+  );
 
   it('bills classifier cost for the balanced alias using its requested model id', async () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
@@ -1664,27 +1840,32 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(ctx.requested_model).toBe('kilo-auto/balanced');
   });
 
-  it('does not bill when classifier cost is 0 (cache hit)', async () => {
-    mockedFetchEfficientAutoDecision.mockResolvedValue({
-      decision: {
-        model: 'anthropic/claude-haiku-4',
-        taskType: 'implementation',
-        subtaskType: 'feature_development',
-        source: 'benchmark' as const,
-        tableVersion: 'v1',
-        sticky: false,
-      },
-      costUsd: 0,
-    });
+  it.each([false, true])(
+    'does not bill worker-owned classifier usage (null decision: %s)',
+    async nullDecision => {
+      mockedFetchEfficientAutoDecision.mockResolvedValue({
+        decision: nullDecision
+          ? null
+          : {
+              model: 'anthropic/claude-haiku-4',
+              taskType: 'implementation',
+              subtaskType: 'feature_development',
+              source: 'benchmark' as const,
+              tableVersion: 'v1',
+              sticky: false,
+            },
+        costUsd: 0,
+      });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')) as never);
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
-    await Promise.resolve();
-    await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
 
-    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
-  });
+      expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    }
+  );
 
   it('bills classifier cost even when the final inference is BYOK', async () => {
     // The classifier runs on Kilo's OpenRouter credential regardless of the

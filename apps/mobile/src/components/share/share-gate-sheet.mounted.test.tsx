@@ -85,10 +85,6 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('sonner-native', () => ({
   toast: { error: toastError },
 }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'pr_review',
-  useFeatureFlag: () => true,
-}));
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));

@@ -68,8 +68,7 @@ function findRowHolding(node: Node, typeNames: string[]): Record<string, unknown
 
 function defaultProps() {
   return {
-    mode: 'code' as AgentMode,
-    onModeChange: vi.fn(),
+    modeControl: { mode: 'code' as AgentMode, onModeChange: vi.fn() },
     model: 'anthropic/claude-sonnet-4',
     variant: 'medium',
     modelOptions: [] as never[],
@@ -216,4 +215,26 @@ describe('ChatToolbar', () => {
     const modeProps = modeSelectorProps ?? {};
     expect(modeProps.disabled).toBe(false);
   });
+
+  it.each(['mode-first', 'model-first'] as const)(
+    'renders no mode chip without modeControl and starts the row with the model chip (%s)',
+    order => {
+      const onPaste = vi.fn(() => undefined);
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = ChatToolbar({
+        ...defaultProps(),
+        modeControl: undefined,
+        onPaste,
+        order,
+      }) as Node;
+
+      expect(findElementByType(element, 'ModeSelector')).toBeNull();
+      // The row holds only the model chip's line, which keeps the paste button
+      // at its trailing edge.
+      expect(childTypesOf(element).filter(type => type !== undefined)).toEqual(['View']);
+      expect(findRowHolding(element, ['ModelSelector', 'ComposerPasteButton'])).not.toBeNull();
+      const pasteButtonProps = findElementByType(element, 'ComposerPasteButton') ?? {};
+      expect(pasteButtonProps.className).toContain('ml-auto');
+    }
+  );
 });

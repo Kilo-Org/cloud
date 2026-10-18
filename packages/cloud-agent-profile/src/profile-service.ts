@@ -1,4 +1,5 @@
 import type { WorkerDb } from '@kilocode/db';
+import { TRPCError } from '@trpc/server';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
@@ -7,15 +8,23 @@ import {
   agent_environment_profile_skills,
   agent_environment_profile_agents,
   agent_environment_profile_kilo_commands,
+  agent_environment_profile_instructions,
   type AgentEnvironmentProfile,
 } from '@kilocode/db/schema';
 import { eq, and, sql, count, inArray } from 'drizzle-orm';
-import type { ProfileOwner, ProfileSummary, ProfileResponse } from './types';
-import { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils';
+import type { ProfileDatabase, ProfileOwner, ProfileSummary, ProfileResponse } from './types';
+import {
+  buildOwnershipCondition,
+  lockProfileOwnership,
+  verifyProfileOwnership,
+} from './profile-utils';
+import { withProfileTransaction } from './database';
+import { countBindingsForProfile } from './repo-binding-db';
 import { listMcpServersForProfile } from './profile-mcp-service';
 import { listSkillsForProfile } from './profile-skills-service';
 import { listAgentsForProfile } from './profile-agents-service';
 import { listKiloCommandsForProfile } from './profile-kilo-commands-service';
+import { listInstructionsForProfile } from './profile-instructions-service';
 
 /**
  * Create a new environment profile.
@@ -75,16 +84,30 @@ export async function updateProfile(
 }
 
 /**
- * Delete a profile and cascade to vars and commands.
+ * Delete a profile and cascade to vars and commands. For an organization-owned
+ * profile that is bound to a repository, only an organization manager may
+ * delete it: the repo-binding FK cascade would otherwise let a member strip
+ * protected bindings.
  */
 export async function deleteProfile(
-  db: WorkerDb,
+  db: ProfileDatabase,
   profileId: string,
-  owner: ProfileOwner
+  owner: ProfileOwner,
+  canManageOrganizationProfiles: boolean
 ): Promise<void> {
-  await verifyProfileOwnership(db, profileId, owner);
-
-  await db.delete(agent_environment_profiles).where(eq(agent_environment_profiles.id, profileId));
+  await withProfileTransaction(db, async tx => {
+    await lockProfileOwnership(tx, profileId, owner);
+    if (owner.type === 'organization' && !canManageOrganizationProfiles) {
+      const boundCount = await countBindingsForProfile(tx, profileId);
+      if (boundCount > 0) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only organization owners and admins can delete a profile bound to a repository',
+        });
+      }
+    }
+    await tx.delete(agent_environment_profiles).where(eq(agent_environment_profiles.id, profileId));
+  });
 }
 
 /**
@@ -111,57 +134,72 @@ export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<P
     return [];
   }
 
-  const [varCounts, commandCounts, mcpServerCounts, skillCounts, agentCounts, kiloCommandCounts] =
-    await Promise.all([
-      db
-        .select({
-          profileId: agent_environment_profile_vars.profile_id,
-          count: count(),
-        })
-        .from(agent_environment_profile_vars)
-        .where(inArray(agent_environment_profile_vars.profile_id, profileIds))
-        .groupBy(agent_environment_profile_vars.profile_id),
-      db
-        .select({
-          profileId: agent_environment_profile_commands.profile_id,
-          count: count(),
-        })
-        .from(agent_environment_profile_commands)
-        .where(inArray(agent_environment_profile_commands.profile_id, profileIds))
-        .groupBy(agent_environment_profile_commands.profile_id),
-      db
-        .select({
-          profileId: agent_environment_profile_mcp_servers.profile_id,
-          count: count(),
-        })
-        .from(agent_environment_profile_mcp_servers)
-        .where(inArray(agent_environment_profile_mcp_servers.profile_id, profileIds))
-        .groupBy(agent_environment_profile_mcp_servers.profile_id),
-      db
-        .select({
-          profileId: agent_environment_profile_skills.profile_id,
-          count: count(),
-        })
-        .from(agent_environment_profile_skills)
-        .where(inArray(agent_environment_profile_skills.profile_id, profileIds))
-        .groupBy(agent_environment_profile_skills.profile_id),
-      db
-        .select({
-          profileId: agent_environment_profile_agents.profile_id,
-          count: count(),
-        })
-        .from(agent_environment_profile_agents)
-        .where(inArray(agent_environment_profile_agents.profile_id, profileIds))
-        .groupBy(agent_environment_profile_agents.profile_id),
-      db
-        .select({
-          profileId: agent_environment_profile_kilo_commands.profile_id,
-          count: count(),
-        })
-        .from(agent_environment_profile_kilo_commands)
-        .where(inArray(agent_environment_profile_kilo_commands.profile_id, profileIds))
-        .groupBy(agent_environment_profile_kilo_commands.profile_id),
-    ]);
+  const [
+    varCounts,
+    commandCounts,
+    mcpServerCounts,
+    skillCounts,
+    agentCounts,
+    kiloCommandCounts,
+    instructionCounts,
+  ] = await Promise.all([
+    db
+      .select({
+        profileId: agent_environment_profile_vars.profile_id,
+        count: count(),
+      })
+      .from(agent_environment_profile_vars)
+      .where(inArray(agent_environment_profile_vars.profile_id, profileIds))
+      .groupBy(agent_environment_profile_vars.profile_id),
+    db
+      .select({
+        profileId: agent_environment_profile_commands.profile_id,
+        count: count(),
+      })
+      .from(agent_environment_profile_commands)
+      .where(inArray(agent_environment_profile_commands.profile_id, profileIds))
+      .groupBy(agent_environment_profile_commands.profile_id),
+    db
+      .select({
+        profileId: agent_environment_profile_mcp_servers.profile_id,
+        count: count(),
+      })
+      .from(agent_environment_profile_mcp_servers)
+      .where(inArray(agent_environment_profile_mcp_servers.profile_id, profileIds))
+      .groupBy(agent_environment_profile_mcp_servers.profile_id),
+    db
+      .select({
+        profileId: agent_environment_profile_skills.profile_id,
+        count: count(),
+      })
+      .from(agent_environment_profile_skills)
+      .where(inArray(agent_environment_profile_skills.profile_id, profileIds))
+      .groupBy(agent_environment_profile_skills.profile_id),
+    db
+      .select({
+        profileId: agent_environment_profile_agents.profile_id,
+        count: count(),
+      })
+      .from(agent_environment_profile_agents)
+      .where(inArray(agent_environment_profile_agents.profile_id, profileIds))
+      .groupBy(agent_environment_profile_agents.profile_id),
+    db
+      .select({
+        profileId: agent_environment_profile_kilo_commands.profile_id,
+        count: count(),
+      })
+      .from(agent_environment_profile_kilo_commands)
+      .where(inArray(agent_environment_profile_kilo_commands.profile_id, profileIds))
+      .groupBy(agent_environment_profile_kilo_commands.profile_id),
+    db
+      .select({
+        profileId: agent_environment_profile_instructions.profile_id,
+        count: count(),
+      })
+      .from(agent_environment_profile_instructions)
+      .where(inArray(agent_environment_profile_instructions.profile_id, profileIds))
+      .groupBy(agent_environment_profile_instructions.profile_id),
+  ]);
 
   const varCountMap = new Map(varCounts.map(v => [v.profileId, Number(v.count)]));
   const commandCountMap = new Map(commandCounts.map(c => [c.profileId, Number(c.count)]));
@@ -169,6 +207,7 @@ export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<P
   const skillCountMap = new Map(skillCounts.map(s => [s.profileId, Number(s.count)]));
   const agentCountMap = new Map(agentCounts.map(a => [a.profileId, Number(a.count)]));
   const kiloCommandCountMap = new Map(kiloCommandCounts.map(k => [k.profileId, Number(k.count)]));
+  const instructionCountMap = new Map(instructionCounts.map(i => [i.profileId, Number(i.count)]));
 
   return profiles.map(p => ({
     id: p.id,
@@ -183,6 +222,7 @@ export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<P
     skillCount: skillCountMap.get(p.id) ?? 0,
     agentCount: agentCountMap.get(p.id) ?? 0,
     kiloCommandCount: kiloCommandCountMap.get(p.id) ?? 0,
+    instructionCount: instructionCountMap.get(p.id) ?? 0,
   }));
 }
 
@@ -197,37 +237,39 @@ export async function getProfile(
 ): Promise<ProfileResponse> {
   const profile = await verifyProfileOwnership(db, profileId, owner);
 
-  const [vars, commands, mcpServers, skills, agents, kiloCommands] = await Promise.all([
-    db
-      .select({
-        key: agent_environment_profile_vars.key,
-        value: sql<string>`
+  const [vars, commands, mcpServers, skills, agents, kiloCommands, instructions] =
+    await Promise.all([
+      db
+        .select({
+          key: agent_environment_profile_vars.key,
+          value: sql<string>`
           CASE
             WHEN ${agent_environment_profile_vars.is_secret} = true
             THEN '***'
             ELSE ${agent_environment_profile_vars.value}
           END
         `.as('value'),
-        isSecret: agent_environment_profile_vars.is_secret,
-        createdAt: agent_environment_profile_vars.created_at,
-        updatedAt: agent_environment_profile_vars.updated_at,
-      })
-      .from(agent_environment_profile_vars)
-      .where(eq(agent_environment_profile_vars.profile_id, profileId))
-      .orderBy(agent_environment_profile_vars.key),
-    db
-      .select({
-        sequence: agent_environment_profile_commands.sequence,
-        command: agent_environment_profile_commands.command,
-      })
-      .from(agent_environment_profile_commands)
-      .where(eq(agent_environment_profile_commands.profile_id, profileId))
-      .orderBy(agent_environment_profile_commands.sequence),
-    listMcpServersForProfile(db, profileId),
-    listSkillsForProfile(db, profileId),
-    listAgentsForProfile(db, profileId),
-    listKiloCommandsForProfile(db, profileId),
-  ]);
+          isSecret: agent_environment_profile_vars.is_secret,
+          createdAt: agent_environment_profile_vars.created_at,
+          updatedAt: agent_environment_profile_vars.updated_at,
+        })
+        .from(agent_environment_profile_vars)
+        .where(eq(agent_environment_profile_vars.profile_id, profileId))
+        .orderBy(agent_environment_profile_vars.key),
+      db
+        .select({
+          sequence: agent_environment_profile_commands.sequence,
+          command: agent_environment_profile_commands.command,
+        })
+        .from(agent_environment_profile_commands)
+        .where(eq(agent_environment_profile_commands.profile_id, profileId))
+        .orderBy(agent_environment_profile_commands.sequence),
+      listMcpServersForProfile(db, profileId),
+      listSkillsForProfile(db, profileId),
+      listAgentsForProfile(db, profileId),
+      listKiloCommandsForProfile(db, profileId),
+      listInstructionsForProfile(db, profileId),
+    ]);
 
   return {
     id: profile.id,
@@ -242,6 +284,7 @@ export async function getProfile(
     skills,
     agents,
     kiloCommands,
+    instructions,
   };
 }
 

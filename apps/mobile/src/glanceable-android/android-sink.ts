@@ -12,15 +12,23 @@ import {
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
+import {
+  getHomeWidgetDataForSnapshot,
+  getLastHomeWidgetData,
+} from '@/lib/glanceable/home-widget-data';
 import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
 import {
   getGlanceableDelivery,
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
-import { getWaitingAsk } from '@/lib/glanceable/waiting-ask';
 
-import { getActionNotice, pruneActionNotice, setGlanceableActionNotice } from './action-notice';
+import {
+  getActionNotice,
+  pruneActionNotice,
+  setGlanceableActionApproving,
+  setGlanceableActionNotice,
+} from './action-notice';
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
 import {
   formatGlanceableAgo,
@@ -30,7 +38,6 @@ import {
 } from './count-format';
 import { ensureAndroidNotificationChannels } from './ensure-notification-channels';
 import {
-  buildNotificationActions,
   end as endLiveUpdate,
   getPostedNotificationChannel,
   getStoredWidgetSnapshot,
@@ -38,25 +45,19 @@ import {
   start as startLiveUpdate,
   update as updateLiveUpdate,
 } from './live-update';
+import { cardAction, cardFor } from './notification-card';
 import { isNotificationPermissionGranted } from './permission';
-import {
-  type AndroidWidgetProps,
-  buildCompactNotificationText,
-  buildCurrentWidgetProps,
-  buildOngoingNotificationText,
-} from './widget-props';
+import { type AndroidWidgetProps, buildCurrentWidgetProps } from './widget-props';
 
-// Re-exported because the approve task and the widget suite import it from the
-// sink; the notice state itself now lives in `./action-notice`.
-export { setGlanceableActionNotice };
+// Re-exported because the approve task and the widget suite import them from the
+// sink; the notice state itself lives in `./action-notice`.
+export { setGlanceableActionApproving, setGlanceableActionNotice };
 
 /**
  * Android owns the widget expiry and notification timeout. The sink supplies
  * translated copy, persists the latest snapshot, and fences pending starts.
  * Ending the ongoing notification never cancels a still-eligible widget expiry.
  */
-const NOTIFICATION_TITLE_KEY = 'glanceable.channelName';
-
 function translate(key: string): string {
   return i18n.t(key);
 }
@@ -88,18 +89,15 @@ let terminalExpiresAt: number | null = null;
  * task for an OS retry.
  */
 let inflightStart: Promise<void> | null = null;
+/**
+ * The approve state the posted card draws ("Approving…", a failure line, or
+ * neither), so a change in it — from either Approve — redraws the card.
+ */
+const NO_ACTION = JSON.stringify({ approving: false, failure: null });
+let postedAction = NO_ACTION;
 
-/** The ongoing notification line, carrying the pending notice when one waits. */
-function notificationText(snapshot: GlanceableAgentsSnapshot): string {
-  pruneActionNotice(snapshot);
-  return buildOngoingNotificationText(
-    snapshot,
-    {},
-    translate,
-    formatGlanceableCount,
-    getActionNotice(),
-    formatGlanceableAgo
-  );
+function actionKey(snapshot: GlanceableAgentsSnapshot): string {
+  return JSON.stringify(cardAction(snapshot));
 }
 
 /**
@@ -117,33 +115,21 @@ function postNotification(
   method: 'start' | 'update',
   terminalText?: string
 ): void {
-  const actions = buildNotificationActions(getWaitingAsk(), translate);
   const kind = agentNotificationKindForGlanceableSnapshot(snapshot);
-  const args = [
-    translate(NOTIFICATION_TITLE_KEY),
-    terminalText ?? notificationText(snapshot),
-    actions.openLabel,
-    actions.openUrl,
-    // A terminal card has nothing to answer, even if a background delivery left
-    // an ask recorded. Open remains the route back; Approve must disappear.
-    terminalText === undefined ? actions.approveLabel : null,
-    terminalText === undefined
-      ? buildCompactNotificationText(snapshot, {}, formatGlanceableCount)
-      : null,
-    androidChannelIdForAgentKind(kind),
-    shouldAlert(kind),
-  ] as const;
+  const card = cardFor(snapshot, terminalText);
+  const channelId = androidChannelIdForAgentKind(kind);
   if (method === 'start') {
-    startLiveUpdate(...args);
+    startLiveUpdate(card, channelId, shouldAlert(kind));
   } else {
     const timeoutMs =
       terminalText === undefined || terminalExpiresAt === null
         ? 0
         : Math.max(1, terminalExpiresAt - Date.now());
-    updateLiveUpdate(...args, timeoutMs);
+    updateLiveUpdate(card, channelId, shouldAlert(kind), timeoutMs);
   }
   notificationKind = kind;
   revision = snapshot.revision;
+  postedAction = terminalText === undefined ? actionKey(snapshot) : NO_ACTION;
 }
 
 /** The widget props for `snapshot`, with the deadline and staleness checks every redraw runs. */
@@ -153,13 +139,15 @@ function widgetPropsFor(snapshot: GlanceableAgentsSnapshot): AndroidWidgetProps 
     translate,
     formatGlanceableCount,
     formatGlanceableAgo,
-    formatGlanceableClock
+    formatGlanceableClock,
+    getHomeWidgetDataForSnapshot(snapshot)
   );
 }
 
 /** A delayed render must check the current snapshot and its deadline, not cached props. */
 export function getCurrentWidgetProps(): AndroidWidgetProps | null {
-  return lastWidgetSnapshot === null ? null : widgetPropsFor(lastWidgetSnapshot);
+  const snapshot = lastWidgetSnapshot ?? getLastHomeWidgetData()?.snapshot ?? null;
+  return snapshot === null ? null : widgetPropsFor(snapshot);
 }
 
 function renderWidgetNow(props: AndroidWidgetProps): void {
@@ -193,6 +181,7 @@ function endNotification(): void {
   pending = null;
   startEpoch += 1;
   terminalExpiresAt = null;
+  postedAction = NO_ACTION;
 }
 
 /**
@@ -221,7 +210,12 @@ async function tryStartOrUpdate(
   // A pending notice must reach the surface even when the counts did not
   // change: it is the only carrier of the retryable failure, and the republish
   // that carries it can arrive with the same counts (or not arrive at all).
-  if (notificationActive && snapshot.revision <= revision && getActionNotice() === null) {
+  if (
+    notificationActive &&
+    snapshot.revision <= revision &&
+    getActionNotice() === null &&
+    postedAction === actionKey(snapshot)
+  ) {
     return;
   }
   if (notificationActive) {
@@ -283,6 +277,20 @@ export async function renderStoredSnapshotWithNotice(ctx: GlanceableSinkContext)
     return;
   }
   await tryStartOrUpdate(snapshot, ctx, { carryNotice: true });
+}
+
+/**
+ * Redraw a posted card whose approve state changed outside a publish. The Home
+ * widget's in-place Approve settles by changing the shared surface extras, which
+ * no snapshot carries, so without this the card would keep "Approving…" and hide
+ * Approve until an unrelated snapshot arrived. Never starts a card.
+ */
+export function refreshPostedCardAction(): void {
+  const snapshot = lastWidgetSnapshot ?? getStoredWidgetSnapshot();
+  const changed = snapshot !== null && postedAction !== actionKey(snapshot);
+  if (notificationActive && changed && hasCurrentWork(snapshot)) {
+    postNotification(snapshot, 'update');
+  }
 }
 
 /** Retry a pending start after permission turns granted. Caller owns the check. */
@@ -375,7 +383,10 @@ export const androidSink: GlanceableSink = {
         return;
       }
     }
-    if (notificationActive && snapshot.revision > revision) {
+    if (
+      notificationActive &&
+      (snapshot.revision > revision || postedAction !== actionKey(snapshot))
+    ) {
       postNotification(
         snapshot,
         'update',
@@ -409,5 +420,7 @@ export function _resetAndroidSinkForTests(): void {
   startEpoch += 1;
   terminalExpiresAt = null;
   inflightStart = null;
+  postedAction = NO_ACTION;
   setGlanceableActionNotice(null);
+  setGlanceableActionApproving(false);
 }

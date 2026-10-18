@@ -399,6 +399,18 @@ function commandFailureDescription(command: SecurityAgentCommand): string {
   return getSecurityCommandFailureMessage(command);
 }
 
+export function getSecurityAgentCommandGitHubError(
+  command: SecurityAgentCommand
+): string | undefined {
+  if (
+    command.resultCode !== 'GITHUB_AUTH_INVALID' &&
+    command.resultCode !== 'GITHUB_TOKEN_UNAVAILABLE'
+  ) {
+    return undefined;
+  }
+  return commandFailureDescription(command);
+}
+
 type SecurityAgentProviderProps = {
   organizationId?: string;
   children: React.ReactNode;
@@ -734,9 +746,7 @@ function useSecurityAgentProviderValue(
       commandSuccessCallbacksRef.current?.delete(command.id);
       if (command.status === 'failed') {
         const title = getSecurityAgentCommandFailureTitle(command.commandType);
-        if (command.resultCode === 'GITHUB_AUTH_INVALID') {
-          terminalGitHubError = commandFailureDescription(command);
-        }
+        terminalGitHubError = getSecurityAgentCommandGitHubError(command) ?? terminalGitHubError;
         toast.error(title, { description: commandFailureDescription(command), duration: 8000 });
       } else if (shouldRunSecurityAgentCommandSuccessCallback(command)) {
         successCallback?.();

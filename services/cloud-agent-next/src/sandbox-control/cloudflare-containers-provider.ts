@@ -50,6 +50,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
   logicalSandboxId: string;
   allocationName: string;
   instance?: ContainerInstanceSize;
+  egressAllowlist?: string[];
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
 }): ProviderAdapter {
   const instance = deps.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
@@ -115,10 +116,17 @@ export function createCloudflareContainersProviderAdapter(deps: {
   };
 
   return {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     ensureBillingAdmission,
+    describeRuntime(ref) {
+      const parsed = decodeOwnedProviderRef(ref);
+      if (parsed === null) return undefined;
+      return {
+        provider: 'cloudflare-containers',
+        sandboxId: deps.logicalSandboxId,
+        instanceId: parsed.instanceId,
+        instanceType: instance,
+      };
+    },
     async create(intent: ProviderCreateIntent) {
       const providerRef = encodeIntentProviderRef(intent);
       await ensureBillingAdmission(providerRef, intent.billing);
@@ -133,12 +141,14 @@ export function createCloudflareContainersProviderAdapter(deps: {
       const workloadLimitMb =
         env['CONTROL_WORKLOAD_LIMIT_MB'] ??
         String(containersBillingIdentity(instance).capacity.memoryMiB);
-      const { startSource } = await container.launchWrapper({
+      const { startSource, snapshotFailed } = await container.launchWrapper({
         allocationRef: ref,
         instance,
         containment: owned.containment,
+        ...(deps.egressAllowlist === undefined ? {} : { egressAllowlist: deps.egressAllowlist }),
         ...(options?.repoKey === undefined ? {} : { repoKey: options.repoKey }),
-        ...(options?.discardRepository === true ? { discardRepository: true as const } : {}),
+        ...(options?.skipRepository === true ? { skipRepository: true as const } : {}),
+        ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
         env: {
           ...env,
           CONTROL_WORKLOAD_LIMIT_MB: workloadLimitMb,
@@ -146,10 +156,21 @@ export function createCloudflareContainersProviderAdapter(deps: {
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
         },
       });
+      if (snapshotFailed) return { startSource, snapshotFailed };
       // Lease renewal only starts once the wrapper reports ready, which the
       // recovery admission gate can delay. Establish the initial lease here so
       // the container is not reaped by its inactivity timeout before then.
-      await container.ensureLeaseAtLeast(ref, leaseAtLeastMs());
+      await container.ensureLeaseAtLeast(ref, leaseAtLeastMs()).catch(() => {
+        logControlDiagnostic(
+          'lease_renewal_failed',
+          {
+            allocationName: deps.allocationName,
+            provider: 'cloudflare-containers',
+            stage: 'launch',
+          },
+          'warn'
+        );
+      });
       return { startSource };
     },
     async captureRepository(ref, repoKey, commit) {

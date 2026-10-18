@@ -948,6 +948,41 @@ describe('CloudflareAgentSandbox', () => {
     expect(destroy).not.toHaveBeenCalled();
   });
 
+  it('treats a missing exec session in a replaced container as deleted', async () => {
+    const deleteSession = vi
+      .fn()
+      .mockRejectedValue(new Error("Session 'agent_cloudflare' not found"));
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          getSession: vi.fn().mockResolvedValue({
+            exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+          }),
+          deleteSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await expect(sandbox.delete('explicit')).resolves.toBeUndefined();
+    expect(deleteSession).toHaveBeenCalledWith('agent_cloudflare');
+  });
+
+  it.each([
+    ['another session', "Session 'agent_other' not found"],
+    ['another error', 'container unavailable'],
+  ])('rethrows session deletion failures for %s', async (_case, message) => {
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          getSession: vi.fn().mockResolvedValue({
+            exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+          }),
+          deleteSession: vi.fn().mockRejectedValue(new Error(message)),
+        }) as unknown as SandboxInstance,
+    });
+
+    await expect(sandbox.delete('explicit')).rejects.toThrow(message);
+  });
+
   it('maps infrastructure recovery to destructive Cloudflare sandbox replacement', async () => {
     const destroy = vi.fn().mockResolvedValue(undefined);
     const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {

@@ -33,6 +33,7 @@ import {
   type SessionRuntimeLocator,
 } from '../sandbox-control/worktree-ownership.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
+import { renderRecentActivity } from '../callbacks/recent-activity.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
 import { projectTerminalClientError } from '../session/terminal-error-projector.js';
 import { sql } from 'drizzle-orm';
@@ -424,6 +425,23 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const lastAssistantMessageText =
       status === 'completed' ? await this.getLatestAssistantMessageText() : undefined;
 
+    let recentActivity: string | undefined;
+    if (status === 'completed' && messageId && metadata.auth.kiloSessionId) {
+      try {
+        recentActivity = renderRecentActivity(
+          this.eventQueries.getRecentAssistantMessagesForUserMessage(
+            sessionId,
+            metadata.auth.kiloSessionId,
+            messageId
+          )
+        );
+      } catch {
+        logger
+          .withFields({ sessionId, messageId })
+          .warn('Unable to include recent activity in the callback snapshot');
+      }
+    }
+
     const payload: CallbackJob['payload'] = {
       sessionId,
       cloudAgentSessionId: sessionId,
@@ -437,6 +455,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       kiloSessionId: metadata.auth.kiloSessionId,
       gateResult,
       lastAssistantMessageText,
+      recentActivity,
     };
 
     if (messageId) {
@@ -486,8 +505,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   constructor(ctx: DurableObjectState, env: WorkerEnv) {
     super(ctx, env);
 
-    // Extract sessionId from DO name pattern: "userId:sessionId"
-    // The DO name is set by the worker when creating the stub.
     // Split on the *last* colon because userId may contain colons
     // (e.g. "oauth/google:12345:agent_abc" → sessionId = "agent_abc").
     const doName = ctx.id.name;
@@ -590,6 +607,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           return resolvedSessionId ?? metadata?.identity.sessionId ?? '';
         },
         getCallbackQueue: () => this.env.CALLBACK_QUEUE,
+        getRecentAssistantMessagesForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
+          this.eventQueries.getRecentAssistantMessagesForUserMessage(
+            sessionId,
+            kiloSessionId,
+            parentMessageId
+          ),
         sendPushNotification: params =>
           this.env.NOTIFICATIONS.sendCloudAgentSessionNotification(params),
         hasConnectedStreamClients: () => getConnectedStreamClientCount(this.ctx) > 0,
@@ -1253,7 +1276,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return response;
     }
 
-    // Route ingest WebSocket (internal only - from queue consumer)
     if (url.pathname === '/ingest') {
       if (await this.hasDeletionIntent()) {
         return new Response('Session not found', { status: 404 });
@@ -1278,9 +1300,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       await ingestHandler.handleIngestMessage(ws, message);
       return;
     }
-
-    // Stream connections are server-push only, ignore client messages
-    // Future: could handle client commands like subscribe/unsubscribe
   }
 
   /**
@@ -2006,6 +2025,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (existingMetadata) {
       if (existingMetadata.clone?.reportingCreatedAt !== newMetadata.clone?.reportingCreatedAt) {
         throw new Error('Clone reporting creation time cannot be changed');
+      }
+      if (existingMetadata.clone?.cloneUpToMessageId !== newMetadata.clone?.cloneUpToMessageId) {
+        throw new Error('Clone cut cannot be changed');
       }
       if (existingMetadata.clone?.reportingCreatedAt && existingMetadata.initialMessage?.id) {
         newMetadata.initialMessage = existingMetadata.initialMessage;

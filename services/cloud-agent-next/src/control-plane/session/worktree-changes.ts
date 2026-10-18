@@ -112,6 +112,9 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
   });
 
   return {
+    recovery() {
+      return manager.recovery();
+    },
     get(): Promise<GetWorktreeChangesOutput> {
       return manager.get();
     },

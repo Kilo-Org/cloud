@@ -25,7 +25,10 @@ type SessionGoalSectionProps = {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onPress: () => void;
-  /** The associated PR pill sits between the goal action and the chevron. */
+  /**
+   * The PR pill and the task chip, stacked in one right-aligned column between
+   * the goal action and the chevron.
+   */
   trailing?: ReactNode;
 };
 
@@ -59,8 +62,11 @@ export function SessionGoalSection({
   const colors = useThemeColors();
   const { t } = useTranslation();
 
+  // Two stacked pills are taller than the collapsed row's content box, so the
+  // column reaches 4px into the row's bottom padding (`-mb-[4px]`) instead of
+  // growing the row. One pill or none leaves the row height as it was.
   const trailingSlot = trailing ? (
-    <View className="ml-auto shrink-0 self-start pt-0.5">{trailing}</View>
+    <View className="-mb-[4px] ml-auto shrink-0 items-end gap-[1px] self-start">{trailing}</View>
   ) : null;
 
   const isActive = goal.status === 'active';
@@ -101,11 +107,15 @@ export function SessionGoalSection({
           </View>
         </Pressable>
         {trailingSlot}
-        <DisclosureChevron
-          expanded={!collapsed}
-          label={collapsed ? t('agentChat.goal.expand') : t('agentChat.goal.collapse')}
-          onPress={onToggleCollapsed}
-        />
+        {/* Centered on the whole row, so the carat stays put as the pills
+            beside it stack or the goal text wraps. */}
+        <View className="self-center">
+          <DisclosureChevron
+            expanded={!collapsed}
+            label={collapsed ? t('agentChat.goal.expand') : t('agentChat.goal.collapse')}
+            onPress={onToggleCollapsed}
+          />
+        </View>
       </View>
     </DisclosureLayout>
   );

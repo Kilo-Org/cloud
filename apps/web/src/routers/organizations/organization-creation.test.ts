@@ -6,6 +6,7 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, isNull, or } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   addUserToOrganization,
   createOrganization,
@@ -95,6 +96,38 @@ describe('organization creation limit', () => {
     });
     expect(memberships).toHaveLength(1);
     expect(getOrCreateStripeCustomerIdForOrganization).toHaveBeenCalledTimes(4);
+  });
+
+  test('blocks further self-service creation for an existing account above the limit', async () => {
+    const user = await insertTestUser();
+    const parent = await createTestOrganization('Existing oversized parent', user.id, 0);
+    for (let index = 0; index < 5; index++) {
+      const organization = await createTestOrganization(`Existing oversized ${index}`, user.id, 0);
+      expect(organization.created_by_kilo_user_id).toBe(user.id);
+    }
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.create({ name: 'Over existing limit' })
+    ).rejects.toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+    });
+    await expect(
+      caller.organizations.createChild({
+        organizationId: parent.id,
+        name: 'Over existing child limit',
+      })
+    ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+
+    const persisted = await db.query.organizations.findMany({
+      where: eq(organizations.created_by_kilo_user_id, user.id),
+    });
+    const memberships = await db.query.organization_memberships.findMany({
+      where: eq(organization_memberships.kilo_user_id, user.id),
+    });
+    expect(persisted).toHaveLength(6);
+    expect(memberships).toHaveLength(6);
+    expect(getOrCreateStripeCustomerIdForOrganization).not.toHaveBeenCalled();
   });
 
   test('counts existing children inherited by a parent admin who did not create them', async () => {

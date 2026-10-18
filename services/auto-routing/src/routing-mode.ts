@@ -115,8 +115,12 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
       const owner = { ownerType, ownerId };
       const previous = await this.getSettings();
       if (JSON.stringify(pool) === JSON.stringify(previous.pool) && !retryEntries?.length) {
+        const statuses =
+          pool === null
+            ? []
+            : (await fetchBenchmarkProfileStatuses(this.env, { ...owner, entries: pool })).statuses;
         await this.setSettings({ mode, pool });
-        return { statuses: [] };
+        return { statuses };
       }
       if (previous.pool !== null) {
         await syncBenchmarkSubscriptions(this.env, { ...owner, entries: previous.pool });

@@ -222,15 +222,39 @@ describe('owner benchmark subscriptions', () => {
     expect(requests).toEqual([]);
   });
 
-  it('does not synchronize or re-register an unchanged pool on a mode-only save', async () => {
-    const { modeDO, handle, requests } = createSubscriptionDO();
-    await modeDO.setSettings({ mode: null, pool: aliases });
-    handle.mockRejectedValue(new Error('benchmark unavailable'));
+  it('preserves ready statuses without changing subscriptions on a mode-only save', async () => {
+    const { modeDO, state, requests } = createSubscriptionDO();
+    await modeDO.saveSettings({ ...owner, mode: null, pool: aliases });
+    requests.length = 0;
+
     await expect(
       modeDO.saveSettings({ ...owner, mode: 'best_accuracy', pool: aliases })
-    ).resolves.toEqual({ statuses: [] });
+    ).resolves.toEqual({
+      statuses: [{ entry: { model: '~vendor/model-latest', variant: null }, status: 'ready' }],
+    });
     expect(await modeDO.getSettings()).toEqual({ mode: 'best_accuracy', pool: aliases });
-    expect(requests).toEqual([]);
+    expect(state.subscriptions).toEqual(aliases);
+    expect(requests).toEqual([
+      {
+        path: '/admin/profiles/status',
+        body: { router: 'efficient', ...owner, entries: aliases },
+      },
+    ]);
+  });
+
+  it('preserves settings and subscriptions when a mode-only status read fails', async () => {
+    const { modeDO, state, handle, requests } = createSubscriptionDO();
+    await modeDO.saveSettings({ ...owner, mode: 'cost_per_accuracy', pool: aliases });
+    requests.length = 0;
+    handle.mockRejectedValue(new Error('benchmark unavailable'));
+
+    await expect(
+      modeDO.saveSettings({ ...owner, mode: 'best_accuracy', pool: aliases })
+    ).rejects.toThrow('benchmark unavailable');
+
+    expect(await modeDO.getSettings()).toEqual({ mode: 'cost_per_accuracy', pool: aliases });
+    expect(state.subscriptions).toEqual(aliases);
+    expect(requests.map(request => request.path)).toEqual(['/admin/profiles/status']);
   });
 
   it('bootstraps historical aliases on every settings read without rewriting the saved pool', async () => {

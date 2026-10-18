@@ -166,6 +166,67 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     return { claims: sent, killed, ms };
   }
 
+  it('fails an identity-less run and releases its profiles without blocking a sibling', async () => {
+    insertRun('invalid', 'platform', 1, 1);
+    insertRun('healthy', 'user', 1, 1);
+    sqlite.prepare("UPDATE benchmark_runs SET benchmark_user_id = NULL WHERE id = 'invalid'").run();
+    sqlite
+      .prepare(`INSERT INTO benchmark_profiles (
+      router, model, variant, engine_identity, repetitions, status, run_id, requested_at, updated_at
+    ) VALUES ('efficient', 'invalid/model-0', '', 'scheduler-init-test', 1, 'running', 'invalid', ?, ?)`)
+      .run(new Date(NOW).toISOString(), new Date(NOW).toISOString());
+
+    const result = await tick();
+
+    expect(sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'invalid'").get()).toEqual({
+      status: 'failed',
+    });
+    expect(
+      sqlite.prepare("SELECT status FROM benchmark_profiles WHERE run_id = 'invalid'").get()
+    ).toEqual({ status: 'failed' });
+    expect(chunkCount('invalid')).toBe(0);
+    expect(initialized('healthy')).toBe(true);
+    expect(result.claims.some(claim => claim.runId === 'healthy')).toBe(true);
+  });
+
+  it('contains a temporary catalog failure while initializing and dispatching a sibling', async () => {
+    insertRun('retryable', 'platform', 1, 1);
+    insertRun('healthy', 'user', 1, 1);
+    sqlite
+      .prepare("UPDATE benchmark_runs SET benchmark_user_id = 'retry-user' WHERE id = 'retryable'")
+      .run();
+    const fetcher = vi.mocked(globalThis.fetch);
+    const base = fetcher.getMockImplementation();
+    if (!base) throw new Error('Catalog fixture was not installed.');
+    fetcher.mockImplementation(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      if (
+        url.pathname === '/api/internal/auto-routing-benchmark/token' &&
+        typeof init?.body === 'string'
+      ) {
+        const body: unknown = JSON.parse(init.body);
+        if (
+          typeof body === 'object' &&
+          body !== null &&
+          'userId' in body &&
+          body.userId === 'retry-user'
+        ) {
+          return new Response(null, { status: 503 });
+        }
+      }
+      return base(input, init);
+    });
+
+    const result = await tick();
+
+    expect(
+      sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'retryable'").get()
+    ).toEqual({ status: 'running' });
+    expect(initialized('retryable')).toBe(false);
+    expect(initialized('healthy')).toBe(true);
+    expect(result.claims.some(claim => claim.runId === 'healthy')).toBe(true);
+  });
+
   it('initializes a 100k-chunk run over bounded ticks while another run is claimed every tick', async () => {
     const entries = 58;
     const repetitions = 3;

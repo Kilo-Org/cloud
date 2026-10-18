@@ -56,6 +56,7 @@ import type { ModelCapabilitiesMap } from './model-capabilities';
 import { recordClassifierUsage, type ClassifierCallKind } from './classifier-usage';
 
 const CUSTOM_ROUTING_TABLE_CACHE_TTL_MS = 60_000;
+export const CUSTOM_ROUTING_TABLE_CACHE_MAX_ENTRIES = 64;
 
 export function orderedPoolCacheKey(pool: EfficientModelPool): string {
   return [...pool]
@@ -84,6 +85,12 @@ async function loadCustomRoutingTable(
   const key = JSON.stringify([owner.ownerType, owner.ownerId, orderedPoolCacheKey(pool)]);
   let cache = customTableLoaders.get(key);
   if (!cache) {
+    if (customTableLoaders.size >= CUSTOM_ROUTING_TABLE_CACHE_MAX_ENTRIES) {
+      const oldestKey = customTableLoaders.keys().next().value;
+      if (oldestKey !== undefined) {
+        customTableLoaders.delete(oldestKey);
+      }
+    }
     cache = ttlCached(CUSTOM_ROUTING_TABLE_CACHE_TTL_MS, (e: Env) =>
       getOwnerCustomRoutingTable(e, owner)
     );

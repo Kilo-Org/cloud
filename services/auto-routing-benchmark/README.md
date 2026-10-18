@@ -72,10 +72,9 @@ falls back to the system value. Publishing reads effective values only.
   measurement-effort knobs have no measured basis for a daily recomputation. The Policy tab
   shows their value and the reason they are read-only.
 
-Frontier initially has no saved configuration or published table. No default model pool or
-efficient table is fabricated for it. Before enabling frontier serving, administrators must
-save a frontier configuration with its own decider models, benchmark those entries, and
-publish a complete frontier table.
+An omitted Frontier pool uses its router-specific alias preset.
+The worker benchmarks that pool before it publishes a complete Frontier table.
+It does not fabricate measurements or reuse the Efficient table.
 
 Decider execution uses a global pool of reusable container slots, not run reservations.
 An atomic D1 claim selects an eligible unfinished chunk from any running run whenever a
@@ -152,6 +151,10 @@ exists, and only marked runs are dispatched. Dispatch claims for initialized run
 materializes, and a second lease row keeps concurrent dispatchers from initializing at the
 same time; a pass that completes a run's initialization claims again so its chunks start at
 once.
+
+Initialization failures stay isolated to their run, so healthy runs can still dispatch.
+A run without its saved execution identity fails and releases its claimed profiles.
+Transient catalog failures leave the run eligible for another initialization attempt.
 
 Run completion accounting reads every case result of the run, so it does not run per
 completed chunk. A completion first asks whether the run still has scheduled work — an
@@ -244,6 +247,12 @@ Send `entries: null` to remove its subscriptions.
 Use `restorePrevious: true` only to compensate a failed settings save.
 Ordinary removal and re-addition resolve a new subscription instead of restoring its previous target.
 Apply the additive D1 migration and deploy both routing workers before resuming paused benchmark queues.
+
+The serving worker bounds its owner-table cache and retains its existing expiry and single-flight loading.
+A mode-only save returns current pool statuses without changing the alias subscription.
+If that status lookup fails, the save leaves the previous mode unchanged.
+A save without an owner pool does not require the benchmark service.
+
 
 ### Unavailable models and targeted refresh
 

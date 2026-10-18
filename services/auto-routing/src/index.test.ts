@@ -8,7 +8,7 @@ import * as classifierConfig from './classifier-config';
 import { clearRoutingTableCache } from './routing-table';
 import { clearModelCapabilitiesCache } from './model-capabilities';
 import type * as ModelCapabilitiesModule from './model-capabilities';
-import { clearCustomRoutingTableCache } from './decide';
+import { clearCustomRoutingTableCache, CUSTOM_ROUTING_TABLE_CACHE_MAX_ENTRIES } from './decide';
 import { AutoRoutingDecisionCacheDO, clearClassificationHotCache } from './decision-cache';
 import {
   AutoRoutingModeConfigDO,
@@ -1324,6 +1324,93 @@ describe('auto routing worker', () => {
       );
     });
 
+    it('PUT mode-only returns ready pool statuses without registering or changing subscriptions', async () => {
+      const store = ownerSettingsStore({ mode: 'cost_per_accuracy', pool });
+      benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/profiles/status')) {
+          return Response.json({ statuses });
+        }
+        throw new Error(`unexpected benchmark call ${url}`);
+      });
+
+      const response = await request('/admin/routing-settings', {
+        method: 'PUT',
+        headers: {
+          authorization: 'Bearer classifier-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          ownerType: 'user',
+          ownerId: 'user-1',
+          mode: 'best_accuracy',
+          pool,
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        configuredMode: 'best_accuracy',
+        configuredPool: pool,
+        poolStatuses: statuses,
+      });
+      expect(store.mode).toBe('best_accuracy');
+      expect(store.pool).toEqual(pool);
+      expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('PUT mode-only reports a failed status lookup without saving settings', async () => {
+      const store = ownerSettingsStore({ mode: 'cost_per_accuracy', pool });
+      benchmarkFetch.mockRejectedValue(new Error('benchmark unavailable'));
+
+      const response = await request('/admin/routing-settings', {
+        method: 'PUT',
+        headers: {
+          authorization: 'Bearer classifier-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          ownerType: 'user',
+          ownerId: 'user-1',
+          mode: 'best_accuracy',
+          pool,
+        }),
+      });
+
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toEqual({ error: 'Failed to save routing settings' });
+      expect(store.mode).toBe('cost_per_accuracy');
+      expect(store.pool).toEqual(pool);
+      expect(store.setSettings).not.toHaveBeenCalled();
+    });
+
+    it('PUT mode-only without a pool succeeds while the benchmark backend is down', async () => {
+      const store = ownerSettingsStore({ mode: 'cost_per_accuracy', pool: null });
+      benchmarkFetch.mockRejectedValue(new Error('benchmark unavailable'));
+
+      const response = await request('/admin/routing-settings', {
+        method: 'PUT',
+        headers: {
+          authorization: 'Bearer classifier-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          ownerType: 'user',
+          ownerId: 'user-1',
+          mode: 'best_accuracy',
+          pool: null,
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        configuredMode: 'best_accuracy',
+        configuredPool: null,
+        poolStatuses: [],
+      });
+      expect(store.mode).toBe('best_accuracy');
+      expect(benchmarkFetch).not.toHaveBeenCalled();
+    });
+
     it('PUT maps register 429 to 429 with retryAt and persists nothing', async () => {
       const store = ownerSettingsStore({ mode: 'cost_per_accuracy', pool: null });
       const retryAt = '2026-07-29T00:00:00.000Z';
@@ -1765,6 +1852,57 @@ describe('auto routing worker', () => {
           String(url).includes('/admin/custom-routing-table')
         )
       ).toHaveLength(2);
+    });
+
+    it('evicts the oldest owner table after churn while retaining recent owner tables', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now());
+      setOwnerPool(pool);
+      cacheReadConversationState.mockResolvedValue(conversationState(mockClassification));
+      dbWhereCaps.mockResolvedValue([
+        {
+          openrouterId: 'pool/chat',
+          inputModalities: [],
+          contextLength: 1_000_000,
+          isActive: true,
+        },
+      ]);
+      const ownerLookups = new Map<string, number>();
+      benchmarkFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (String(url).includes('/admin/custom-routing-table')) {
+          if (typeof init?.body !== 'string')
+            throw new Error('Expected a JSON custom-table request.');
+          const { ownerId } = JSON.parse(init.body) as { ownerId: string };
+          const loads = (ownerLookups.get(ownerId) ?? 0) + 1;
+          ownerLookups.set(ownerId, loads);
+          return Response.json({
+            table: { ...customTable, version: `${ownerId}-${loads}` },
+          });
+        }
+        return Response.json({ winner: null });
+      });
+
+      async function expectOwnerTable(ownerId: string, loads: number) {
+        const response = await decideRequest(
+          mirrorPayload({ userId: ownerId, sessionId: ownerId })
+        );
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({
+          decision: { model: 'pool/chat', tableVersion: `${ownerId}-${loads}` },
+        });
+      }
+
+      await Promise.all([expectOwnerTable('oldest-owner', 1), expectOwnerTable('oldest-owner', 1)]);
+      expect(ownerLookups.get('oldest-owner')).toBe(1);
+      for (let index = 0; index < CUSTOM_ROUTING_TABLE_CACHE_MAX_ENTRIES; index++) {
+        await expectOwnerTable(`churn-owner-${index}`, 1);
+      }
+      const recentOwner = `churn-owner-${CUSTOM_ROUTING_TABLE_CACHE_MAX_ENTRIES - 1}`;
+      await expectOwnerTable(recentOwner, 1);
+      expect(ownerLookups.get(recentOwner)).toBe(1);
+      await expectOwnerTable('oldest-owner', 2);
+      expect(ownerLookups.get('oldest-owner')).toBe(2);
+      expect(classifyNormalizedInput).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
     });
 
     it('keeps the active target through cache refreshes while an alias replacement is pending', async () => {

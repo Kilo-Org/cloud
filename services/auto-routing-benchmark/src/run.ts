@@ -1055,7 +1055,10 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
   const { run, models } = (await getRunWithModels(env.BENCH_DB, runId)) ?? {};
   if (!run || !models || run.status !== 'running') return false;
   if (!run.benchmark_user_id) {
-    throw new BenchmarkRunConfigError('Benchmark run is missing its execution identity.');
+    const reason = 'Benchmark run is missing its execution identity.';
+    await markProfilesFailedForRun(env.BENCH_DB, runId, reason);
+    await markRunFailed(env.BENCH_DB, runId, reason);
+    return false;
   }
   const catalog = await fetchExecutableBenchmarkModelCatalog(env, {
     benchmarkUserId: run.benchmark_user_id,
@@ -1091,7 +1094,17 @@ async function initializeScheduledRuns(env: Env): Promise<boolean> {
   try {
     let initialized = false;
     for (const run of uninitialized.results) {
-      if (await initializeScheduledRun(env, run.id)) initialized = true;
+      try {
+        if (await initializeScheduledRun(env, run.id)) initialized = true;
+      } catch (error) {
+        console.warn(
+          JSON.stringify({
+            event: 'benchmark_scheduler_initialization_failed',
+            runId: run.id,
+            ...formatError(error),
+          })
+        );
+      }
     }
     return initialized;
   } finally {

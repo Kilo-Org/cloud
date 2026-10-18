@@ -10,6 +10,7 @@ import {
   type AutoRoutingSettingsResponse,
   type EfficientModelPool,
   type PoolEntry,
+  type FrontierFallbackEntry,
 } from '@kilocode/auto-routing-contracts';
 import {
   AUTO_ROUTING_WORKER_URL,
@@ -172,6 +173,7 @@ export function updateAutoRoutingSettings(params: {
   ownerId: string;
   mode: AutoRoutingMode | null;
   pool: EfficientModelPool | null;
+  frontierFallback?: FrontierFallbackEntry | null;
   retryEntries?: PoolEntry[];
 }): Promise<AutoRoutingSettingsWorkerResult> {
   const { retryEntries, ...rest } = params;
@@ -182,5 +184,27 @@ export function updateAutoRoutingSettings(params: {
       ...rest,
       ...(retryEntries !== undefined ? { retryEntries } : {}),
     }),
+  });
+}
+
+export function initializeFrontierFallback(params: {
+  ownerType: AutoRoutingModeOwnerType;
+  ownerId: string;
+  frontierFallback: FrontierFallbackEntry | null;
+}): Promise<AutoRoutingSettingsWorkerResult> {
+  return fetchAutoRoutingSettingsAdmin('/admin/frontier-fallback', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+}
+
+export function getFrontierFallback(owner: {
+  ownerType: AutoRoutingModeOwnerType;
+  ownerId: string;
+}): Promise<AutoRoutingSettingsWorkerResult> {
+  const searchParams = new URLSearchParams(owner);
+  return fetchAutoRoutingSettingsAdmin(`/admin/frontier-fallback?${searchParams}`, {
+    method: 'GET',
   });
 }

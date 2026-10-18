@@ -4,18 +4,17 @@ import { TRPCError } from '@trpc/server';
 import type { AutoRoutingSettingsResponse } from '@kilocode/auto-routing-contracts';
 import type * as KiloExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { NextRequest } from 'next/server';
-import {
-  getAutoRoutingMode,
-  getAutoRoutingSettings,
-  updateAutoRoutingSettings,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
-import { poolValidationMessage } from '@/lib/auto-routing-pool-validation';
-import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
-import { GET, PUT } from './route';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/frontier-fallback', () => ({
+  getOwnerFrontierFallback: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+  resolveOrganizationDefaultModelPolicy: jest.fn(async () => ({
+    requireModelInCurrentSnapshot: false,
+  })),
+  getEffectiveModelDecision: jest.fn(async () => ({ allowed: true })),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/trial-middleware');
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/routers/organizations/utils');
@@ -38,6 +37,17 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => ({
     { public_id: 'kilo/public-model', status: 'public' },
   ],
 }));
+import {
+  getAutoRoutingMode,
+  getAutoRoutingSettings,
+  updateAutoRoutingSettings,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
+import { poolValidationMessage } from '@/lib/auto-routing-pool-validation';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { GET, PUT } from './route';
+import { getOwnerFrontierFallback } from '@kilocode/web-shared/lib/ai-gateway/auto-model/frontier-fallback';
 
 const { getEnhancedOpenRouterModels } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
@@ -126,6 +136,14 @@ function settingsBody(
 describe('/api/auto-routing/settings', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(getOwnerFrontierFallback).mockResolvedValue(null);
+    const baselineAccess = jest.requireMock(
+      '@kilocode/web-shared/lib/organizations/effective-model-access.server'
+    );
+    baselineAccess.resolveOrganizationDefaultModelPolicy.mockResolvedValue({
+      requireModelInCurrentSnapshot: false,
+    });
+    baselineAccess.getEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: USER_ID, is_admin: false },
       authFailedResponse: null,
@@ -134,11 +152,131 @@ describe('/api/auto-routing/settings', () => {
     mockedGetByokOrg.mockResolvedValue([]);
     mockedGetEnhanced.mockResolvedValue({
       data: [
-        model('anthropic/claude-sonnet-4', { high: {}, low: {} }),
+        model('anthropic/claude-sonnet-4', {
+          high: { reasoning: { enabled: true, effort: 'high' } },
+          low: { reasoning: { enabled: true, effort: 'low' } },
+        }),
         model('google/gemini-2.5-flash'),
         model('kilo/public-model'),
       ],
     });
+  });
+
+  test('GET resolves the organization fallback without inheriting a personal fallback', async () => {
+    mockedGetAutoRoutingSettings.mockResolvedValue({
+      status: 200,
+      body: settingsBody({ ownerType: 'org', ownerId: ORGANIZATION_ID }),
+    });
+    const fallback = { model: 'anthropic/claude-sonnet-4', variant: 'high' };
+    jest.mocked(getOwnerFrontierFallback).mockResolvedValue(fallback);
+    const response = await GET(
+      makeRequest(`/api/auto-routing/settings?organizationId=${ORGANIZATION_ID}`)
+    );
+    expect(await response.json()).toEqual(
+      expect.objectContaining({
+        ownerType: 'org',
+        ownerId: ORGANIZATION_ID,
+        frontierFallback: fallback,
+      })
+    );
+  });
+
+  test('GET keeps Efficient settings available when fallback initialization is unavailable', async () => {
+    mockedGetAutoRoutingSettings.mockResolvedValue({
+      status: 200,
+      body: settingsBody({ configuredMode: 'best_accuracy', mode: 'best_accuracy' }),
+    });
+    jest.mocked(getOwnerFrontierFallback).mockRejectedValue(new Error('Unavailable'));
+    const response = await GET(makeRequest('/api/auto-routing/settings'));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual(
+      expect.objectContaining({
+        configuredMode: 'best_accuracy',
+        mode: 'best_accuracy',
+        poolSupported: true,
+        frontierFallbackSupported: false,
+      })
+    );
+    expect(body).not.toHaveProperty('frontierFallback');
+  });
+
+  test('PUT returns a successful Efficient save when fallback catalog is unavailable', async () => {
+    mockedUpdateAutoRoutingSettings.mockResolvedValue({
+      status: 200,
+      body: settingsBody({ configuredMode: 'best_accuracy', mode: 'best_accuracy' }),
+    });
+    mockedGetEnhanced.mockRejectedValue(new Error('Unavailable'));
+    const response = await PUT(
+      makeRequest('/api/auto-routing/settings', {
+        mode: 'best_accuracy',
+        pool: null,
+      })
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual(
+      expect.objectContaining({
+        configuredMode: 'best_accuracy',
+        frontierFallbackSupported: false,
+        poolSupported: true,
+      })
+    );
+    expect(body).not.toHaveProperty('frontierFallback');
+    expect(mockedUpdateAutoRoutingSettings).toHaveBeenCalledWith({
+      ownerType: 'user',
+      ownerId: USER_ID,
+      mode: 'best_accuracy',
+      pool: null,
+    });
+  });
+
+  test('PUT saves a concrete fallback effort while preserving mode and pool', async () => {
+    const frontierFallback = { model: 'anthropic/claude-sonnet-4', variant: 'high' };
+    mockedUpdateAutoRoutingSettings.mockResolvedValue({ status: 200, body: settingsBody() });
+    const response = await PUT(
+      makeRequest('/api/auto-routing/settings', {
+        mode: 'best_accuracy',
+        pool: [{ model: 'google/gemini-2.5-flash' }],
+        frontierFallback,
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(mockedUpdateAutoRoutingSettings).toHaveBeenCalledWith({
+      ownerType: 'user',
+      ownerId: USER_ID,
+      mode: 'best_accuracy',
+      pool: [{ model: 'google/gemini-2.5-flash' }],
+      frontierFallback,
+    });
+  });
+
+  test('PUT rejects unsupported fallback efforts before writing settings', async () => {
+    const response = await PUT(
+      makeRequest('/api/auto-routing/settings', {
+        mode: null,
+        pool: null,
+        frontierFallback: { model: 'anthropic/claude-sonnet-4', variant: 'unsupported' },
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual(expect.objectContaining({ reason: 'invalid_variant' }));
+    expect(mockedUpdateAutoRoutingSettings).not.toHaveBeenCalled();
+  });
+
+  test('PUT explicitly disables the fallback with null', async () => {
+    mockedUpdateAutoRoutingSettings.mockResolvedValue({ status: 200, body: settingsBody() });
+    const response = await PUT(
+      makeRequest('/api/auto-routing/settings', {
+        mode: null,
+        pool: null,
+        frontierFallback: null,
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(mockedUpdateAutoRoutingSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ frontierFallback: null })
+    );
   });
 
   test('returns 401 when unauthenticated', async () => {
@@ -211,6 +349,7 @@ describe('/api/auto-routing/settings', () => {
       configuredPool: null,
       poolStatuses: [],
       poolSupported: false,
+      frontierFallback: null,
     });
     expect(mockedGetAutoRoutingMode).toHaveBeenCalledWith({
       ownerType: 'user',

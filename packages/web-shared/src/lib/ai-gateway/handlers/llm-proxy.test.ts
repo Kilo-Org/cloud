@@ -33,10 +33,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
 import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
+import { FRONTIER_MODE_TO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
-  FRONTIER_CODE_MODEL,
-  FRONTIER_MODE_TO_MODEL,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+  getOwnerFrontierFallback,
+  resolveEligibleFrontierFallback,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/frontier-fallback';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
@@ -154,6 +155,10 @@ jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models', () => ({
   collectDeniedAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
   collectDataCollectionRequiredAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/frontier-fallback', () => ({
+  getOwnerFrontierFallback: jest.fn(),
+  resolveEligibleFrontierFallback: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/processUsage');
@@ -1508,6 +1513,15 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([]);
     mockedCollectDataCollectionRequiredAutoRoutingModelIds.mockResolvedValue([]);
     mockedIsReleaseToggleEnabled.mockResolvedValue(false);
+    jest.mocked(getOwnerFrontierFallback).mockResolvedValue({
+      model: 'anthropic/claude-opus-5.5',
+      variant: 'medium',
+    });
+    jest.mocked(resolveEligibleFrontierFallback).mockResolvedValue({
+      model: 'anthropic/claude-opus-5.5',
+      reasoning: { enabled: true, effort: 'medium' },
+      verbosity: 'medium',
+    });
     mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
       if (opts.efficientDecision) await opts.efficientDecision();
       if (opts.frontierDecision) await opts.frontierDecision();
@@ -1555,7 +1569,11 @@ describe('kilo-auto/efficient classifier billing', () => {
       'user-123'
     );
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(
-      decision ? 'anthropic/claude-haiku-4' : FRONTIER_MODE_TO_MODEL.architect.model
+      decision
+        ? 'anthropic/claude-haiku-4'
+        : enabled
+          ? 'anthropic/claude-opus-5.5'
+          : FRONTIER_MODE_TO_MODEL.architect.model
     );
     if (enabled) {
       expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
@@ -1567,9 +1585,10 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
   });
 
-  it('preserves the frontier code fallback when the worker request fails', async () => {
+  it('returns a specific no-eligible response when the worker fails and fallback is disabled', async () => {
     mockedIsReleaseToggleEnabled.mockResolvedValue(true);
     mockedFetchEfficientAutoDecision.mockResolvedValue(null);
+    jest.mocked(getOwnerFrontierFallback).mockResolvedValue(null);
     const actualResolution = jest.requireActual<typeof AutoModelResolution>(
       '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution'
     );
@@ -1577,8 +1596,11 @@ describe('kilo-auto/efficient classifier billing', () => {
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
 
-    expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(FRONTIER_CODE_MODEL.model);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({ error_type: 'no_frontier_models_available' })
+    );
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('forwards effective privacy and policy denials to frontier routing', async () => {
@@ -1621,6 +1643,48 @@ describe('kilo-auto/efficient classifier billing', () => {
         ]),
       })
     );
+    expect(mockedCollectDeniedAutoRoutingModelIds).toHaveBeenCalledWith(
+      expect.anything(),
+      { userId: 'user-123', organizationId: 'org-123' },
+      'frontier'
+    );
+    expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).toHaveBeenCalledWith(
+      { userId: 'user-123', organizationId: 'org-123' },
+      'frontier'
+    );
+  });
+
+  it('rejects an organization fallback for a disjoint member policy before dispatch', async () => {
+    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: false });
+    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+    jest
+      .mocked(resolveEligibleFrontierFallback)
+      .mockImplementation(async (entry, context) =>
+        (await context.isModelAllowed(entry.model)) ? { model: entry.model } : null
+      );
+    const actualResolution = jest.requireActual<typeof AutoModelResolution>(
+      '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution'
+    );
+    mockedApplyResolvedAutoModel.mockImplementation(actualResolution.applyResolvedAutoModel);
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
+
+    expect(response.status).toBe(503);
+    expect(getOwnerFrontierFallback).toHaveBeenCalledWith({
+      userId: 'user-123',
+      organizationId: 'org-123',
+    });
+    expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+      expect.anything(),
+      'anthropic/claude-opus-5.5'
+    );
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('does not classify frontier requests without an authenticated user', async () => {
@@ -2075,10 +2139,6 @@ describe('kilo-auto/efficient classifier billing', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).toHaveBeenCalledWith({
-        userId: 'user-123',
-        organizationId: 'org-123',
-      });
       expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
         expect.objectContaining({ deniedModelIds: ['meta/muse-spark-1.3-contributor'] })
       );

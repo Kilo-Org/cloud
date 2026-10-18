@@ -1,16 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRequire } from 'node:module';
-import { act, createElement } from 'react';
+import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { BenchmarkProfileEntryStatus, PoolEntry } from '@kilocode/auto-routing-contracts';
+import type * as AutoRoutingModeCardModule from './AutoRoutingModeCard';
 
 jest.mock('@/lib/hooks/use-openrouter-models', () => ({
   useModelSelectorList: () => ({
     data: { data: [] },
     isLoading: false,
   }),
+}));
+jest.mock('@/components/shared/usePreferredModels', () => ({
+  usePreferredModels: () => [],
 }));
 
 jest.mock('sonner', () => ({
@@ -20,7 +24,7 @@ jest.mock('sonner', () => ({
   },
 }));
 
-import {
+const {
   applyRetryMutationSuccess,
   applySaveMutationError,
   applySaveMutationSuccess,
@@ -54,9 +58,12 @@ import {
   tryAddPoolEntry,
   UNAVAILABLE_ENTRY_EXPLANATION,
   variantLabel,
-  type AutoRoutingSettingsApiResponse,
-  type DraftPool,
-  type PoolEntryWithAvailability,
+} = jest.requireActual<typeof AutoRoutingModeCardModule>('./AutoRoutingModeCard');
+
+import type {
+  AutoRoutingSettingsApiResponse,
+  DraftPool,
+  PoolEntryWithAvailability,
 } from './AutoRoutingModeCard';
 
 type LinkedomParseHtml = (html: string) => {
@@ -238,6 +245,63 @@ function mountCardDom(data: AutoRoutingSettingsApiResponse, organizationId?: str
     },
   };
 }
+
+describe('Frontier fallback editor', () => {
+  const testGlobals = globalThis as typeof globalThis & { React?: typeof React };
+  let previousReact: typeof React | undefined;
+
+  beforeEach(() => {
+    previousReact = testGlobals.React;
+    testGlobals.React = React;
+  });
+
+  afterEach(() => {
+    if (previousReact === undefined) {
+      delete testGlobals.React;
+    } else {
+      testGlobals.React = previousReact;
+    }
+  });
+
+  it('shows an explicit None choice independently of the Efficient pool', () => {
+    const html = mountCardHtml(settings({ frontierFallback: null }));
+    expect(html).toContain('Frontier fallback');
+    expect(html).toContain('Fallback model');
+    expect(html).toContain('None');
+    expect(html).toContain('No custom pool.');
+  });
+
+  it('hides unavailable fallback editing without hiding Efficient settings', () => {
+    const html = mountCardHtml(settings({ frontierFallbackSupported: false }));
+    expect(html).not.toContain('Fallback model');
+    expect(html).not.toContain('Fallback reasoning effort');
+    expect(html).toContain('Efficient model pool');
+    expect(html).toContain('Save auto routing');
+  });
+
+  it('keeps organization fallback controls read-only for members', () => {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(
+      settingsQueryKey('org-1'),
+      settings({
+        ownerType: 'org',
+        ownerId: 'org-1',
+        frontierFallback: { model: entryReady.model, variant: 'high' },
+      })
+    );
+    const html = renderToStaticMarkup(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(AutoRoutingModeCard, { organizationId: 'org-1', readonly: true })
+      )
+    );
+    expect(html).toContain('does not inherit personal settings');
+    expect(html).toContain('Fallback reasoning effort');
+    expect(html).not.toContain('Save auto routing');
+    expect(html).not.toContain('Reset changes');
+  });
+});
 
 function findSaveButton(container: HTMLElement): HTMLButtonElement {
   const buttons = Array.from(container.querySelectorAll('button'));
@@ -831,6 +895,86 @@ describe('toEligibleModelOptions', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildSaveBody / buildRetryBody / buildModeSaveBody', () => {
+  it('saves Frontier fallback independently, including explicit None', () => {
+    const frontierFallback = { model: entryReady.model, variant: 'high' };
+    expect(
+      buildSaveBody({
+        mode: 'best_accuracy',
+        pool: [entryFailed],
+        frontierFallback,
+      })
+    ).toEqual({
+      mode: 'best_accuracy',
+      pool: [entryFailed],
+      frontierFallback,
+    });
+    expect(
+      buildSaveBody({
+        mode: 'inherit',
+        pool: null,
+        frontierFallback: null,
+      })
+    ).toEqual({ mode: null, pool: null, frontierFallback: null });
+    expect(
+      buildRetryBody({
+        mode: 'inherit',
+        savedPool: [entryReady],
+        retryEntry: entryReady,
+      })
+    ).not.toHaveProperty('frontierFallback');
+  });
+
+  it('omits unchanged fallback on unrelated mode or pool saves', () => {
+    const frontierFallback = { model: entryReady.model, variant: 'high' };
+    expect(
+      buildSaveBody({
+        mode: 'best_accuracy',
+        pool: [entryFailed],
+        frontierFallback,
+        savedFrontierFallback: { ...frontierFallback },
+      })
+    ).toEqual({ mode: 'best_accuracy', pool: [entryFailed] });
+    expect(
+      buildSaveBody({
+        mode: 'inherit',
+        pool: null,
+        frontierFallback: null,
+        savedFrontierFallback: null,
+      })
+    ).toEqual({ mode: null, pool: null });
+    expect(
+      buildSaveBody({
+        mode: 'inherit',
+        pool: null,
+        frontierFallback: null,
+        savedFrontierFallback: frontierFallback,
+      })
+    ).toEqual({ mode: null, pool: null, frontierFallback: null });
+  });
+
+  it('tracks fallback-only and reasoning-only edits as dirty', () => {
+    const base = {
+      selectedMode: 'inherit' as const,
+      savedMode: 'inherit' as const,
+      draftPool: null,
+      savedPool: null,
+      savedFrontierFallback: { model: entryReady.model, variant: 'high' },
+    };
+    expect(
+      isDraftDirty({
+        ...base,
+        frontierFallback: { model: entryReady.model, variant: 'low' },
+      })
+    ).toBe(true);
+    expect(isDraftDirty({ ...base, frontierFallback: null })).toBe(true);
+    expect(
+      isDraftDirty({
+        ...base,
+        frontierFallback: { model: entryReady.model, variant: 'high' },
+      })
+    ).toBe(false);
+  });
+
   it('PUTs { mode, pool } with nulls for inherit (happy save payload)', () => {
     expect(buildSaveBody({ mode: 'inherit', pool: null })).toEqual({
       mode: null,

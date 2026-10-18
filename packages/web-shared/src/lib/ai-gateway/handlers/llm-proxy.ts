@@ -58,6 +58,7 @@ import {
   efficientPoolBlockedResponse,
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
+  noFrontierModelsAvailableResponse,
   organizationAutoConfigurationResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
@@ -128,6 +129,7 @@ import {
   getEffectiveModelDecision,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
@@ -393,17 +395,22 @@ export async function handleLlmProxyRequest(
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
     isAutoEfficientRequest = isAutoEfficientId;
+    let frontierRoutingEnabledPromise: Promise<boolean> | undefined;
+    const frontierRoutingEnabled = () =>
+      (frontierRoutingEnabledPromise ??= authPromise.then(async auth => {
+        if (!auth.user || auth.authFailedResponse) return false;
+        try {
+          return (await isReleaseToggleEnabled(FRONTIER_ROUTING_FLAG, auth.user.id)) === true;
+        } catch {
+          return false;
+        }
+      }));
     const decisionForRouter = async (router: AutoRouter) => {
       const { user, authFailedResponse, organizationId } = await authPromise;
       // The classifier uses Kilo's paid credential. Unauthenticated callers
       // must never spend classification without a user to attribute it to.
       if (!user || authFailedResponse) return null;
-      if (
-        router === 'frontier' &&
-        !(await isReleaseToggleEnabled(FRONTIER_ROUTING_FLAG, user.id))
-      ) {
-        return null;
-      }
+      if (router === 'frontier' && !(await frontierRoutingEnabled())) return null;
       const { settings, plan } = await balanceAndSettingsPromise;
       const groupPolicy = await organizationGroupPolicyPromise;
       const deniedFromSettings =
@@ -412,9 +419,9 @@ export async function handleLlmProxyRequest(
           : [];
       const owner = { userId: user.id, organizationId: organizationId ?? null };
       const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
-        groupPolicy ? collectDeniedAutoRoutingModelIds(groupPolicy, owner) : [],
+        groupPolicy ? collectDeniedAutoRoutingModelIds(groupPolicy, owner, router) : [],
         isDataCollectionExplicitlyDisallowed(effectivePrivacy)
-          ? collectDataCollectionRequiredAutoRoutingModelIds(owner)
+          ? collectDataCollectionRequiredAutoRoutingModelIds(owner, router)
           : [],
       ]);
       const deniedModelIds = [
@@ -455,6 +462,22 @@ export async function handleLlmProxyRequest(
         clientIp: ipAddress ?? null,
         efficientDecision,
         frontierDecision,
+        frontierRoutingEnabled,
+        requestBody: requestBodyParsed.body,
+        isFrontierFallbackAllowed: async modelId => {
+          const policy = await organizationGroupPolicyPromise;
+          if (policy && !(await getEffectiveModelDecision(policy, modelId)).allowed) return false;
+          if (isDataCollectionExplicitlyDisallowed(effectivePrivacy)) {
+            const requiredModels = await getDataCollectionRequiredModelIds();
+            if (
+              hasBestEffortGuessDataCollectionRequirement(modelId) ||
+              requiredModels.has(modelId)
+            ) {
+              return false;
+            }
+          }
+          return true;
+        },
         organizationContext: organizationContextPromise,
         isAutoFreeCandidateAllowed: async modelId => {
           const policy = await organizationGroupPolicyPromise;
@@ -467,6 +490,9 @@ export async function handleLlmProxyRequest(
     );
     if (autoResult.kind === 'no_free_models_available') {
       return noFreeModelsAvailableResponse();
+    }
+    if (autoResult.kind === 'no_frontier_models_available') {
+      return noFrontierModelsAvailableResponse();
     }
     if (autoResult.kind === 'organization_auto_configuration_error') {
       return organizationAutoConfigurationResponse(autoResult.message);

@@ -16,6 +16,9 @@ export const BenchmarkPairSchema = PoolEntrySchema.extend({
 });
 export type BenchmarkPair = z.infer<typeof BenchmarkPairSchema>;
 
+export const FrontierFallbackEntrySchema = BenchmarkPairSchema;
+export type FrontierFallbackEntry = z.infer<typeof FrontierFallbackEntrySchema>;
+
 export function poolEntryKey(entry: PoolEntry): string {
   return JSON.stringify([entry.model]);
 }

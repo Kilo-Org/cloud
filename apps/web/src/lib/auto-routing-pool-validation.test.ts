@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import {
-  annotatePoolAvailability,
-  poolValidationMessage,
-  toApiSettingsResponse,
-  toLegacyModeApiSettingsResponse,
-  validatePoolEntries,
-  type EligibleCatalog,
-} from './auto-routing-pool-validation';
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+  resolveOrganizationDefaultModelPolicy: jest.fn(),
+  getEffectiveModelDecision: jest.fn(),
+}));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
@@ -30,6 +26,15 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => ({
     },
   ],
 }));
+import {
+  annotatePoolAvailability,
+  poolValidationMessage,
+  toApiSettingsResponse,
+  toLegacyModeApiSettingsResponse,
+  validatePoolEntries,
+  validateFrontierFallback,
+  type EligibleCatalog,
+} from './auto-routing-pool-validation';
 
 const { getEnhancedOpenRouterModels } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
@@ -46,7 +51,10 @@ const mockedGetByokUser = jest.mocked(getDirectByokModelsForUser);
 const mockedGetByokOrg = jest.mocked(getDirectByokModelsForOrganization);
 const mockedGetOrgModels = jest.mocked(getAvailableModelsForOrganization);
 
-function model(id: string, variants?: Record<string, { reasoning?: { enabled: boolean } }>) {
+function model(
+  id: string,
+  variants?: Record<string, { reasoning?: { enabled: boolean; effort?: string } }>
+) {
   return {
     id,
     name: id,
@@ -72,6 +80,123 @@ describe('auto-routing-pool-validation', () => {
     jest.resetAllMocks();
     mockedGetByokUser.mockResolvedValue([]);
     mockedGetByokOrg.mockResolvedValue([]);
+  });
+
+  describe('validateFrontierFallback', () => {
+    test('preserves the exact concrete catalog reasoning variant', async () => {
+      mockedGetEnhanced.mockResolvedValue({
+        data: [
+          model('anthropic/claude-sonnet-4', {
+            medium: { reasoning: { enabled: true, effort: 'medium' } },
+            high: { reasoning: { enabled: true, effort: 'high' } },
+          }),
+        ],
+      });
+      expect(
+        await validateFrontierFallback({
+          user: { id: 'user-1' },
+          organizationId: null,
+          entry: { model: 'anthropic/claude-sonnet-4', variant: 'medium' },
+        })
+      ).toEqual({
+        ok: true,
+        entry: { model: 'anthropic/claude-sonnet-4', variant: 'medium' },
+      });
+    });
+
+    test('requires an exact effort when the model has reasoning variants', async () => {
+      mockedGetEnhanced.mockResolvedValue({
+        data: [
+          model('anthropic/claude-sonnet-4', {
+            medium: { reasoning: { enabled: true, effort: 'medium' } },
+          }),
+        ],
+      });
+      expect(
+        await validateFrontierFallback({
+          user: { id: 'user-1' },
+          organizationId: null,
+          entry: { model: 'anthropic/claude-sonnet-4', variant: null },
+        })
+      ).toEqual({
+        ok: false,
+        error: expect.objectContaining({ reason: 'invalid_variant' }),
+      });
+    });
+
+    test('rejects a model disallowed by the organization policy', async () => {
+      mockedGetEnhanced.mockResolvedValue({
+        data: [
+          model('anthropic/claude-sonnet-4', {
+            medium: { reasoning: { enabled: true, effort: 'medium' } },
+          }),
+        ],
+      });
+      const baselineAccess = jest.requireMock(
+        '@kilocode/web-shared/lib/organizations/effective-model-access.server'
+      );
+      baselineAccess.resolveOrganizationDefaultModelPolicy.mockResolvedValue({
+        requireModelInCurrentSnapshot: true,
+      });
+      baselineAccess.getEffectiveModelDecision.mockResolvedValue({ allowed: false });
+      expect(
+        await validateFrontierFallback({
+          user: { id: 'user-1' },
+          organizationId: 'org-1',
+          entry: { model: 'anthropic/claude-sonnet-4', variant: 'medium' },
+        })
+      ).toEqual({
+        ok: false,
+        error: expect.objectContaining({ reason: 'organization_denied_model' }),
+      });
+      expect(baselineAccess.getEffectiveModelDecision).toHaveBeenCalledWith(
+        expect.objectContaining({ memberGrant: { mode: 'organization_baseline' } }),
+        'anthropic/claude-sonnet-4'
+      );
+    });
+
+    test('allows organization baseline models without inheriting default-member grants', async () => {
+      mockedGetEnhanced.mockResolvedValue({
+        data: [
+          model('anthropic/claude-sonnet-4', {
+            medium: { reasoning: { enabled: true, effort: 'medium' } },
+          }),
+        ],
+      });
+      const baselineAccess = jest.requireMock(
+        '@kilocode/web-shared/lib/organizations/effective-model-access.server'
+      );
+      baselineAccess.resolveOrganizationDefaultModelPolicy.mockResolvedValue({
+        requireModelInCurrentSnapshot: true,
+        memberGrant: { mode: 'restricted', modelIds: [] },
+      });
+      baselineAccess.getEffectiveModelDecision.mockResolvedValue({ allowed: true });
+      expect(
+        await validateFrontierFallback({
+          user: { id: 'user-1' },
+          organizationId: 'org-1',
+          entry: { model: 'anthropic/claude-sonnet-4', variant: 'medium' },
+        })
+      ).toEqual({
+        ok: true,
+        entry: { model: 'anthropic/claude-sonnet-4', variant: 'medium' },
+      });
+      expect(mockedGetOrgModels).not.toHaveBeenCalled();
+    });
+
+    test('rejects unsupported reasoning variants for non-reasoning models', async () => {
+      mockedGetEnhanced.mockResolvedValue({ data: [model('google/gemini-2.5-flash')] });
+      expect(
+        await validateFrontierFallback({
+          user: { id: 'user-1' },
+          organizationId: null,
+          entry: { model: 'google/gemini-2.5-flash', variant: 'medium' },
+        })
+      ).toEqual({
+        ok: false,
+        error: expect.objectContaining({ reason: 'invalid_variant' }),
+      });
+    });
   });
 
   describe('validatePoolEntries', () => {

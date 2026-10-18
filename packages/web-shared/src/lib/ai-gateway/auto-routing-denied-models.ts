@@ -1,6 +1,9 @@
-import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
+import { isVirtualAutoModelId, type AutoRouter } from '@kilocode/auto-routing-contracts';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
-import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import {
+  getCachedRoutingTable,
+  getCachedFrontierRoutingTable,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -69,7 +72,13 @@ export async function loadEffectivePoolModelIds(owner: AutoRoutingOwner): Promis
   return null;
 }
 
-export async function loadAutoRoutingCandidateModelIds(owner: AutoRoutingOwner): Promise<string[]> {
+export async function loadAutoRoutingCandidateModelIds(
+  owner: AutoRoutingOwner,
+  router: AutoRouter = 'efficient'
+): Promise<string[]> {
+  if (router === 'frontier') {
+    return candidateModelIdsFromSources(await getCachedFrontierRoutingTable(), null);
+  }
   const [table, poolModelIds] = await Promise.all([
     getCachedRoutingTable(),
     loadEffectivePoolModelIds(owner),
@@ -79,13 +88,14 @@ export async function loadAutoRoutingCandidateModelIds(owner: AutoRoutingOwner):
 
 export async function collectDeniedAutoRoutingModelIds(
   policy: EffectiveOrganizationModelPolicy,
-  owner: AutoRoutingOwner
+  owner: AutoRoutingOwner,
+  router: AutoRouter = 'efficient'
 ): Promise<string[]> {
   if (!policyNeedsCandidateEvaluation(policy) && policy.organizationModelDenyList.length === 0) {
     return [];
   }
 
-  const candidateIds = await loadAutoRoutingCandidateModelIds(owner);
+  const candidateIds = await loadAutoRoutingCandidateModelIds(owner, router);
   if (!policyNeedsCandidateEvaluation(policy)) {
     return deniedModelIdsForCandidates(policy, candidateIds, () => true);
   }
@@ -103,10 +113,11 @@ export async function collectDeniedAutoRoutingModelIds(
 }
 
 export async function collectDataCollectionRequiredAutoRoutingModelIds(
-  owner: AutoRoutingOwner
+  owner: AutoRoutingOwner,
+  router: AutoRouter = 'efficient'
 ): Promise<string[]> {
   const [candidateIds, dataCollectionRequiredModelIds] = await Promise.all([
-    loadAutoRoutingCandidateModelIds(owner),
+    loadAutoRoutingCandidateModelIds(owner, router),
     getDataCollectionRequiredModelIds(),
   ]);
   return candidateIds.filter(

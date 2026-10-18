@@ -2,9 +2,11 @@ import {
   AutoRoutingModeSchema,
   DEFAULT_AUTO_ROUTING_MODE,
   PersistedEfficientModelPoolSchema,
+  FrontierFallbackEntrySchema,
   type AutoRoutingMode,
   type AutoRoutingModeOwnerType,
   type EfficientModelPool,
+  type FrontierFallbackEntry,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
@@ -13,10 +15,12 @@ type AutoRoutingModeEnv = Pick<Env, 'AUTO_ROUTING_MODE_CONFIG'>;
 
 const MODE_STORAGE_KEY = 'mode';
 const POOL_STORAGE_KEY = 'pool';
+const FRONTIER_FALLBACK_STORAGE_KEY = 'frontierFallback';
 
 export type AutoRoutingOwnerSettings = {
   mode: AutoRoutingMode | null;
   pool: EfficientModelPool | null;
+  frontierFallback?: FrontierFallbackEntry | null;
 };
 
 const AUTO_ROUTING_SETTINGS_TTL_MS = 30_000;
@@ -80,13 +84,31 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
   }
 
   async getSettings(): Promise<AutoRoutingOwnerSettings> {
-    const [mode, pool] = await Promise.all([this.getMode(), this.getPool()]);
-    return { mode, pool };
+    const [mode, pool, rawFallback] = await Promise.all([
+      this.getMode(),
+      this.getPool(),
+      this.ctx.storage.get(FRONTIER_FALLBACK_STORAGE_KEY),
+    ]);
+    const frontierFallback =
+      rawFallback === undefined
+        ? undefined
+        : FrontierFallbackEntrySchema.nullable().parse(rawFallback);
+    return { mode, pool, ...(frontierFallback !== undefined ? { frontierFallback } : {}) };
+  }
+
+  async initializeFrontierFallback(
+    frontierFallback: FrontierFallbackEntry | null
+  ): Promise<AutoRoutingOwnerSettings> {
+    await this.ctx.storage.transaction(async txn => {
+      if ((await txn.get(FRONTIER_FALLBACK_STORAGE_KEY)) === undefined) {
+        await txn.put(FRONTIER_FALLBACK_STORAGE_KEY, frontierFallback);
+      }
+    });
+    return this.getSettings();
   }
 
   async setSettings(settings: AutoRoutingOwnerSettings): Promise<void> {
-    // Mode and pool commit or fail together in one storage transaction.
-    // setMode/setPool stay single-key for individual callers.
+    // All supplied settings commit or fail together; omitted fallback preserves its value.
     const toPut: Record<string, unknown> = {};
     const toDelete: string[] = [];
     if (settings.mode === null) {
@@ -98,6 +120,9 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
       toDelete.push(POOL_STORAGE_KEY);
     } else {
       toPut[POOL_STORAGE_KEY] = settings.pool;
+    }
+    if (settings.frontierFallback !== undefined) {
+      toPut[FRONTIER_FALLBACK_STORAGE_KEY] = settings.frontierFallback;
     }
     if (Object.keys(toPut).length === 0 && toDelete.length === 0) {
       return;
@@ -238,4 +263,16 @@ export async function setAutoRoutingSettings(
   settings: AutoRoutingOwnerSettings
 ): Promise<void> {
   await modeStub(env, owner.ownerType, owner.ownerId).setSettings(settings);
+}
+
+export async function initializeFrontierFallback(
+  env: AutoRoutingModeEnv,
+  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string },
+  frontierFallback: FrontierFallbackEntry | null
+): Promise<AutoRoutingOwnerSettings> {
+  const settings = await modeStub(env, owner.ownerType, owner.ownerId).initializeFrontierFallback(
+    frontierFallback
+  );
+  clearAutoRoutingSettingsCache();
+  return settings;
 }

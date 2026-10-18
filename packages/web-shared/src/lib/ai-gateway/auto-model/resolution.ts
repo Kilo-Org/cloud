@@ -45,6 +45,10 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import { getModelVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
+import {
+  getOwnerFrontierFallback,
+  resolveEligibleFrontierFallback,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/frontier-fallback';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -57,6 +61,9 @@ type ResolveAutoModelParams = {
   // Decisions are lazy so only the selected router captures the request body.
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
   frontierDecision?: () => Promise<AutoRoutingDecision | null>;
+  frontierRoutingEnabled?: () => Promise<boolean>;
+  isFrontierFallbackAllowed?: (modelId: string) => Promise<boolean>;
+  requestBody?: unknown;
   organizationContext?: Promise<{
     organizationId?: string;
     settings?: OrganizationSettings;
@@ -143,6 +150,7 @@ function resolveOrganizationAutoRouteTarget(
 export type ResolveAutoModelResult =
   | { kind: 'ok'; resolved: ResolvedAutoModel; routingTarget?: string }
   | { kind: 'no_free_models_available' }
+  | { kind: 'no_frontier_models_available' }
   | { kind: 'organization_auto_configuration_error'; message: string };
 
 async function resolveOrganizationAutoModel(
@@ -339,13 +347,37 @@ export async function resolveAutoModel(
     // Static fallback when the worker is slow or unavailable.
     return { kind: 'ok', resolved: fallbackModel };
   }
-  if (model === KILO_AUTO_FRONTIER_MODEL.id && params.frontierDecision) {
-    const decision = await params.frontierDecision();
-    if (decision && !isVirtualAutoModelId(decision.model)) {
-      const resolvedFromDecision = await resolveAutoRoutingDecisionModel(decision);
-      if (resolvedFromDecision) {
-        return { kind: 'ok', resolved: resolvedFromDecision };
+  if (model === KILO_AUTO_FRONTIER_MODEL.id && (await params.frontierRoutingEnabled?.()) === true) {
+    try {
+      const decision = await params.frontierDecision?.();
+      if (decision && !isVirtualAutoModelId(decision.model)) {
+        const resolvedFromDecision = await resolveAutoRoutingDecisionModel(decision);
+        if (resolvedFromDecision) {
+          return { kind: 'ok', resolved: resolvedFromDecision };
+        }
       }
+    } catch {
+      // Worker and catalog failures use the same policy-checked owner fallback.
+    }
+    try {
+      const user = await userPromise;
+      if (!user) return { kind: 'no_frontier_models_available' };
+      const organization = await params.organizationContext;
+      const fallback = await getOwnerFrontierFallback({
+        userId: user.id,
+        organizationId: organization?.organizationId ?? null,
+      });
+      if (!fallback || !params.isFrontierFallbackAllowed) {
+        return { kind: 'no_frontier_models_available' };
+      }
+      const resolved = await resolveEligibleFrontierFallback(fallback, {
+        apiKind,
+        body: params.requestBody,
+        isModelAllowed: params.isFrontierFallbackAllowed,
+      });
+      return resolved ? { kind: 'ok', resolved } : { kind: 'no_frontier_models_available' };
+    } catch {
+      return { kind: 'no_frontier_models_available' };
     }
   }
   const mode = resolveMode(modeHeader, featureHeader);

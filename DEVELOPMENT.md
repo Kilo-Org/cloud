@@ -388,6 +388,21 @@ The application consists of the Next.js app plus several Cloudflare Worker servi
 
 AI inference works locally without any extra services. The Next.js app includes an OpenRouter proxy route (`/api/openrouter/[...path]`) that calls real AI providers using API keys from `.env.local`. There are no mocks or local stubs — all inference hits real APIs (OpenRouter, OpenAI, Anthropic, Mistral, etc.).
 
+### Frontier fallback
+
+The routing settings include an independent Frontier fallback model and an exact reasoning variant.
+Personal requests use personal settings. Organization requests use only organization settings, without personal inheritance.
+The fallback applies only when dynamic Frontier routing is enabled and cannot select a usable model.
+When dynamic routing is disabled, the existing mode-based model selection remains unchanged.
+
+Missing settings initialize lazily to an allowed Sonnet model with medium reasoning, then an allowed Opus model, otherwise no fallback.
+Explicit selections and **None** survive initialization. Current model policies, privacy settings, and request requirements still apply.
+If neither routing nor the configured fallback can serve the request, the gateway returns `no_frontier_models_available`.
+
+Owner settings reside in `AutoRoutingModeConfigDO`. Omitting `frontierFallback` from a settings update preserves its value; `null` disables it.
+The authenticated `GET /admin/frontier-fallback` reads settings without benchmark status dependencies.
+The corresponding `POST` initializes only an absent fallback atomically, without changing the mode or Efficient pool.
+
 ### Running workers locally
 
 Each worker in the workspace can be started individually with `wrangler dev` (or `pnpm dev`) from its directory. Workers communicate with Next.js over HTTP using env vars like `CLOUD_AGENT_NEXT_API_URL`, `CODE_REVIEW_WORKER_URL`, etc. Dev ports are defined in each worker's `wrangler.jsonc`.

@@ -2,6 +2,8 @@ import {
   getAutoRoutingClassifierAnalytics,
   getAutoRoutingClassifierModel,
   getAutoRoutingSettings,
+  initializeFrontierFallback,
+  getFrontierFallback,
   updateAutoRoutingClassifierModel,
   updateAutoRoutingSettings,
 } from './auto-routing-admin-client';
@@ -202,6 +204,69 @@ describe('auto routing admin client', () => {
           retryEntries: [{ model: 'google/gemini-2.5-flash' }],
         }),
       }
+    );
+  });
+
+  it.each([{ model: 'anthropic/claude-sonnet-4.6', variant: 'medium' }, null])(
+    'initializes fallback through its dedicated endpoint (%j)',
+    async frontierFallback => {
+      const body = { ...settingsResponse, frontierFallback };
+      mockFetch.mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve(body),
+      });
+      const params = { ownerType: 'user' as const, ownerId: 'user-1', frontierFallback };
+      await expect(initializeFrontierFallback(params)).resolves.toEqual({ status: 200, body });
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://auto-routing.example.com/admin/frontier-fallback',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({ 'content-type': 'application/json' }),
+          body: JSON.stringify(params),
+        })
+      );
+    }
+  );
+
+  it('forwards explicit fallback disablement with settings updates', async () => {
+    mockFetch.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({ ...settingsResponse, frontierFallback: null }),
+    });
+    const params = {
+      ownerType: 'org' as const,
+      ownerId: 'org-1',
+      mode: null,
+      pool: null,
+      frontierFallback: null,
+    };
+    await updateAutoRoutingSettings(params);
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://auto-routing.example.com/admin/routing-settings',
+      expect.objectContaining({ body: JSON.stringify(params) })
+    );
+  });
+
+  it('reads fallback settings through the profile-independent endpoint', async () => {
+    const body = {
+      ...settingsResponse,
+      frontierFallback: { model: 'provider/model', variant: 'medium' },
+      poolStatuses: [],
+    };
+    mockFetch.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(body),
+    });
+    await expect(getFrontierFallback({ ownerType: 'org', ownerId: 'org-1' })).resolves.toEqual({
+      status: 200,
+      body,
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://auto-routing.example.com/admin/frontier-fallback?ownerType=org&ownerId=org-1',
+      expect.objectContaining({ method: 'GET' })
     );
   });
 

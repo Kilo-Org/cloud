@@ -22,3 +22,15 @@ export const getCachedRoutingTable = createCachedFetch(
   ROUTING_TABLE_TTL_MS,
   null
 );
+
+export const getCachedFrontierRoutingTable = createCachedFetch(
+  async () => {
+    const result = await getBenchmarkRoutingTable('frontier');
+    if (result.status === 200 && 'table' in result.body) {
+      return result.body.table;
+    }
+    throw new Error(`Frontier routing table unavailable (status ${result.status})`);
+  },
+  ROUTING_TABLE_TTL_MS,
+  null
+);

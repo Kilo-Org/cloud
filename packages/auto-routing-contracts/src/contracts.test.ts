@@ -6,6 +6,7 @@ import {
   AutoRoutingDecisionSchema,
   AutoRoutingSettingsResponseSchema,
   MirrorPayloadSchema,
+  InitializeFrontierFallbackRequestSchema,
   RoutingConstraintsSchema,
   UpdateAutoRoutingSettingsRequestSchema,
   UpdateClassifierModelRequestSchema,
@@ -560,6 +561,67 @@ describe('AutoRoutingDecisionSchema variant compatibility', () => {
 });
 
 describe('owner pool settings wire contracts', () => {
+  it.each([
+    { model: 'anthropic/claude-sonnet-4.6', variant: 'medium' },
+    { model: 'provider/model', variant: null },
+    null,
+  ])(
+    'round-trips a Frontier fallback without changing the Efficient pool (%j)',
+    frontierFallback => {
+      const owner = { ownerType: 'user', ownerId: 'user-1' };
+      const parsed = UpdateAutoRoutingSettingsRequestSchema.parse({
+        ...owner,
+        mode: null,
+        pool: [{ model: 'a/b', variant: 'legacy' }],
+        frontierFallback,
+      });
+      expect(parsed.frontierFallback).toEqual(frontierFallback);
+      expect(parsed.pool).toEqual([{ model: 'a/b' }]);
+      expect(
+        InitializeFrontierFallbackRequestSchema.parse({
+          ...owner,
+          frontierFallback,
+        }).frontierFallback
+      ).toEqual(frontierFallback);
+      expect(
+        AutoRoutingSettingsResponseSchema.parse({
+          ...owner,
+          mode: 'cost_per_accuracy',
+          configuredMode: null,
+          defaultMode: 'cost_per_accuracy',
+          configuredPool: null,
+          poolStatuses: [],
+          frontierFallback,
+        }).frontierFallback
+      ).toEqual(frontierFallback);
+    }
+  );
+
+  it('distinguishes an unmigrated fallback from explicit disablement', () => {
+    const settings = {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      mode: null,
+      pool: null,
+    };
+    expect(UpdateAutoRoutingSettingsRequestSchema.parse(settings)).not.toHaveProperty(
+      'frontierFallback'
+    );
+    expect(
+      UpdateAutoRoutingSettingsRequestSchema.parse({
+        ...settings,
+        frontierFallback: null,
+      })
+    ).toHaveProperty('frontierFallback', null);
+    expect(InitializeFrontierFallbackRequestSchema.safeParse(settings).success).toBe(false);
+    expect(
+      InitializeFrontierFallbackRequestSchema.safeParse({
+        ...settings,
+        frontierFallback: { model: 'provider/model' },
+      }).success
+    ).toBe(false);
+  });
+
   it('accepts null pool (inherit) on update', () => {
     const parsed = UpdateAutoRoutingSettingsRequestSchema.parse({
       ownerType: 'user',

@@ -2,10 +2,12 @@ import 'server-only';
 
 import {
   isVirtualAutoModelId,
+  getReasoningVariantKeys,
   MAX_POOL_ENTRIES,
   poolEntryKey,
   type AutoRoutingSettingsResponse,
   type PoolEntry,
+  type FrontierFallbackEntry,
 } from '@kilocode/auto-routing-contracts';
 import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -14,6 +16,10 @@ import {
   getDirectByokModelsForUser,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import {
+  getEffectiveModelDecision,
+  resolveOrganizationDefaultModelPolicy,
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 
@@ -25,6 +31,7 @@ export type PoolValidationReason =
   | 'organization_denied_model'
   | 'duplicate_model'
   | 'too_many_entries'
+  | 'invalid_variant'
   | 'empty_pool';
 
 export type PoolValidationError = {
@@ -41,6 +48,8 @@ export type PoolEntryWithAvailability = PoolEntry & {
 /** Web API response: worker settings plus per-entry availability for the UI. */
 export type AutoRoutingSettingsApiResponse = Omit<AutoRoutingSettingsResponse, 'configuredPool'> & {
   configuredPool: PoolEntryWithAvailability[] | null;
+  frontierFallbackModels?: { id: string; name: string; variants: string[] }[];
+  frontierFallbackSupported?: boolean;
   /**
    * False when the worker only supports legacy mode endpoints (deploy-order
    * window or worker rollback). UI must hide pool editing and never send pool mutations.
@@ -50,6 +59,8 @@ export type AutoRoutingSettingsApiResponse = Omit<AutoRoutingSettingsResponse, '
 
 export type EligibleModelInfo = {
   id: string;
+  name?: string;
+  variants?: string[];
 };
 
 export type EligibleCatalog = {
@@ -71,6 +82,7 @@ const REJECTION_MESSAGES: Record<PoolValidationReason, string> = {
   duplicate_model: 'Duplicate model in the pool.',
   too_many_entries: `An Efficient pool can include at most ${MAX_POOL_ENTRIES} models.`,
   empty_pool: 'An Efficient pool must include at least one model.',
+  invalid_variant: 'Choose a supported reasoning effort for this model.',
 };
 
 export function poolValidationMessage(reason: PoolValidationReason): string {
@@ -93,6 +105,7 @@ function isCustomLlmId(modelId: string): boolean {
 export async function buildEligibleCatalog(params: {
   userId: string;
   organizationId: string | null;
+  frontierFallback?: boolean;
 }): Promise<EligibleCatalog> {
   const { userId, organizationId } = params;
 
@@ -108,7 +121,22 @@ export async function buildEligibleCatalog(params: {
   const byokOnlyIds = new Set(byokModels.map(model => model.id));
 
   let ownerModels: OpenRouterModel[];
-  if (organizationId) {
+  if (organizationId && params.frontierFallback) {
+    const policy = await resolveOrganizationDefaultModelPolicy({ organizationId });
+    const baselinePolicy = {
+      ...policy,
+      memberGrant: policy.requireModelInCurrentSnapshot
+        ? { mode: 'organization_baseline' as const }
+        : { mode: 'unrestricted' as const },
+    };
+    const decisions = await Promise.all(
+      managedModels.map(async model => ({
+        model,
+        allowed: (await getEffectiveModelDecision(baselinePolicy, model.id)).allowed,
+      }))
+    );
+    ownerModels = decisions.filter(decision => decision.allowed).map(decision => decision.model);
+  } else if (organizationId) {
     // Pool membership is organization-level configuration, so it resolves against
     // the organization's own policy rather than the configuring owner's group
     // grants. A member subject would also require direct membership, which a
@@ -126,6 +154,7 @@ export async function buildEligibleCatalog(params: {
 
   for (const model of ownerModels) {
     const id = model.id;
+    if (params.frontierFallback && !model.architecture.output_modalities.includes('text')) continue;
     if (isVirtualAutoModelId(id)) continue;
     if (byokOnlyIds.has(id)) continue;
     if (isCustomLlmId(id)) continue;
@@ -133,6 +162,8 @@ export async function buildEligibleCatalog(params: {
 
     byId.set(id, {
       id,
+      name: model.name,
+      variants: getReasoningVariantKeys(model.opencode?.variants),
     });
   }
 
@@ -261,6 +292,35 @@ export async function validatePoolEntries(params: {
   }
 
   return { ok: true, entries: canonical };
+}
+
+export async function validateFrontierFallback(params: {
+  user: { id: string };
+  organizationId: string | null;
+  entry: FrontierFallbackEntry;
+}): Promise<
+  { ok: true; entry: FrontierFallbackEntry } | { ok: false; error: PoolValidationError }
+> {
+  const catalog = await buildEligibleCatalog({
+    userId: params.user.id,
+    organizationId: params.organizationId,
+    frontierFallback: true,
+  });
+  const result = validateSingleEntry(params.entry, 0, catalog);
+  if (!result.ok) return result;
+  const variant = params.entry.variant ?? null;
+  const variants = catalog.byId.get(result.entry.model)?.variants ?? [];
+  if (variant === null ? variants.length > 0 : !variants.includes(variant)) {
+    return {
+      ok: false,
+      error: {
+        reason: 'invalid_variant',
+        message: poolValidationMessage('invalid_variant'),
+        entry: params.entry,
+      },
+    };
+  }
+  return { ok: true, entry: { model: result.entry.model, variant } };
 }
 
 /**

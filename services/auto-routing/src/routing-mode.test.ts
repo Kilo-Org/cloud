@@ -8,6 +8,7 @@ import {
   getEffectiveAutoRoutingSettings,
   setAutoRoutingMode,
   setAutoRoutingSettings,
+  initializeFrontierFallback,
 } from './routing-mode';
 import type { AutoRoutingMode, EfficientModelPool } from '@kilocode/auto-routing-contracts';
 import type { AutoRoutingOwnerSettings } from './routing-mode';
@@ -184,6 +185,86 @@ describe('AutoRoutingModeConfigDO', () => {
     await expect(modeDO.getSettings()).resolves.toEqual({ mode: null, pool: null });
   });
 
+  it('preserves an omitted fallback and stores explicit null without deleting it', async () => {
+    const { modeDO, storage } = createModeDO();
+    const frontierFallback = { model: 'anthropic/claude-sonnet-4.6', variant: 'medium' };
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: SAMPLE_POOL, frontierFallback });
+    await modeDO.setSettings({ mode: 'cost_per_accuracy', pool: null });
+    await expect(modeDO.getSettings()).resolves.toEqual({
+      mode: 'cost_per_accuracy',
+      pool: null,
+      frontierFallback,
+    });
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: SAMPLE_POOL, frontierFallback: null });
+    expect(storage.entries.has('frontierFallback')).toBe(true);
+    expect(storage.entries.get('frontierFallback')).toBeNull();
+    await modeDO.setMode(null);
+    await modeDO.setPool(null);
+    await expect(modeDO.getSettings()).resolves.toEqual({
+      mode: null,
+      pool: null,
+      frontierFallback: null,
+    });
+  });
+
+  it.each([{ model: 'anthropic/claude-sonnet-4.6', variant: 'medium' }, null])(
+    'initializes only an absent fallback and preserves mode and pool (%j)',
+    async frontierFallback => {
+      const { modeDO, storage } = createModeDO();
+      await modeDO.setSettings({ mode: 'best_accuracy', pool: SAMPLE_POOL });
+      const transaction = vi.spyOn(storage, 'transaction');
+      await expect(modeDO.initializeFrontierFallback(frontierFallback)).resolves.toEqual({
+        mode: 'best_accuracy',
+        pool: SAMPLE_POOL,
+        frontierFallback,
+      });
+      expect(transaction).toHaveBeenCalled();
+      await expect(
+        modeDO.initializeFrontierFallback({ model: 'anthropic/claude-opus-4.6', variant: 'medium' })
+      ).resolves.toEqual({ mode: 'best_accuracy', pool: SAMPLE_POOL, frontierFallback });
+      expect(storage.entries.get('frontierFallback')).toEqual(frontierFallback);
+    }
+  );
+
+  it('isolates fallback initialization by owner type and id', async () => {
+    const user = createModeDO();
+    const org = createModeDO();
+    const otherUser = createModeDO();
+    const objects: Record<string, AutoRoutingModeConfigDO> = {
+      'user:owner-1': user.modeDO,
+      'org:owner-1': org.modeDO,
+      'user:owner-2': otherUser.modeDO,
+    };
+    const env = {
+      AUTO_ROUTING_MODE_CONFIG: {
+        idFromName: (name: string) => name,
+        get: (id: string) => {
+          const object = objects[id];
+          if (!object) throw new Error('Unexpected owner');
+          return object;
+        },
+      },
+    } as unknown as Pick<Env, 'AUTO_ROUTING_MODE_CONFIG'>;
+    const frontierFallback = { model: 'provider/model', variant: 'medium' };
+    await initializeFrontierFallback(
+      env,
+      { ownerType: 'user', ownerId: 'owner-1' },
+      frontierFallback
+    );
+    await initializeFrontierFallback(env, { ownerType: 'org', ownerId: 'owner-1' }, null);
+    await expect(user.modeDO.getSettings()).resolves.toEqual({
+      mode: null,
+      pool: null,
+      frontierFallback,
+    });
+    await expect(org.modeDO.getSettings()).resolves.toEqual({
+      mode: null,
+      pool: null,
+      frontierFallback: null,
+    });
+    await expect(otherUser.modeDO.getSettings()).resolves.toEqual({ mode: null, pool: null });
+  });
+
   it('commits mode and pool via one multi-key put and paired multi-key delete', async () => {
     const { modeDO, storage } = createModeDO();
     const putCalls: unknown[] = [];
@@ -227,9 +308,10 @@ describe('AutoRoutingModeConfigDO', () => {
     expect(deleteCalls).toEqual([['pool']]);
   });
 
-  it('rolls back mode and pool when a transactional delete fails', async () => {
+  it('rolls back mode, pool, and fallback when a transactional delete fails', async () => {
     const { modeDO, storage } = createModeDO();
-    await modeDO.setSettings({ mode: 'best_accuracy', pool: SAMPLE_POOL });
+    const frontierFallback = { model: 'provider/model', variant: 'medium' };
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: SAMPLE_POOL, frontierFallback });
 
     const originalTransaction = storage.transaction.bind(storage);
     vi.spyOn(storage, 'transaction').mockImplementation(async callback =>
@@ -241,14 +323,15 @@ describe('AutoRoutingModeConfigDO', () => {
       })
     );
 
-    await expect(modeDO.setSettings({ mode: 'cost_per_accuracy', pool: null })).rejects.toThrow(
-      'delete failed'
-    );
+    await expect(
+      modeDO.setSettings({ mode: 'cost_per_accuracy', pool: null, frontierFallback: null })
+    ).rejects.toThrow('delete failed');
     expect(storage.entries.get('mode')).toBe('best_accuracy');
     expect(storage.entries.get('pool')).toEqual(SAMPLE_POOL);
     await expect(modeDO.getSettings()).resolves.toEqual({
       mode: 'best_accuracy',
       pool: SAMPLE_POOL,
+      frontierFallback,
     });
   });
 

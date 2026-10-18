@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
+import type * as FrontierFallback from '@kilocode/web-shared/lib/ai-gateway/auto-model/frontier-fallback';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   ...jest.requireActual<typeof GatewayModelsCache>(
@@ -16,6 +17,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () 
   getConfiguredAutoFreeModels: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/frontier-fallback', () => ({
+  getOwnerFrontierFallback: jest.fn(),
+  resolveEligibleFrontierFallback: jest.fn(),
+}));
+
+import type { User } from '@kilocode/db';
 import type * as AutoModelResolution from './resolution';
 import {
   FRONTIER_CODE_MODEL,
@@ -30,6 +37,9 @@ import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/provide
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 
+const { getOwnerFrontierFallback, resolveEligibleFrontierFallback } = jest.requireMock<
+  jest.Mocked<typeof FrontierFallback>
+>('@kilocode/web-shared/lib/ai-gateway/auto-model/frontier-fallback');
 const { resolveAutoModel, applyResolvedAutoModel } =
   jest.requireActual<typeof AutoModelResolution>('./resolution');
 
@@ -466,6 +476,7 @@ describe('resolveAutoModel — kilo-auto/frontier branch', () => {
         ...baseParams,
         model: KILO_AUTO_FRONTIER_MODEL.id,
         apiKind: 'chat_completions',
+        frontierRoutingEnabled: async () => true,
         frontierDecision,
         efficientDecision,
       },
@@ -489,20 +500,21 @@ describe('resolveAutoModel — kilo-auto/frontier branch', () => {
     ['missing frontier table', null],
     ['virtual model', { ...sampleDecision, model: KILO_AUTO_EFFICIENT_MODEL.id }],
     ['missing catalog variant', { ...sampleDecision, variant: 'missing-variant' }],
-  ] as const)('uses the unchanged mode mapping for %s', async (_, decision) => {
+  ] as const)('fails closed for %s without an eligible owner fallback', async (_, decision) => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
         model: KILO_AUTO_FRONTIER_MODEL.id,
         modeHeader: 'architect',
         apiKind: 'chat_completions',
+        frontierRoutingEnabled: async () => true,
         frontierDecision: async () => decision,
       },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: FRONTIER_MODE_TO_MODEL.architect });
+    expect(result).toEqual({ kind: 'no_frontier_models_available' });
   });
 
   it('keeps efficient routing independent of a supplied frontier decision', async () => {
@@ -515,6 +527,89 @@ describe('resolveAutoModel — kilo-auto/frontier branch', () => {
 
     expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
     expect(frontierDecision).not.toHaveBeenCalled();
+  });
+
+  it('does not consult decisions or saved fallback when the flag is off', async () => {
+    const frontierDecision = jest.fn(async () => sampleDecision);
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_FRONTIER_MODEL.id,
+        apiKind: 'messages',
+        frontierRoutingEnabled: async () => false,
+        frontierDecision,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+    expect(result).toEqual({ kind: 'ok', resolved: FRONTIER_CODE_MODEL });
+    expect(frontierDecision).not.toHaveBeenCalled();
+  });
+
+  it.each([null, { model: 'anthropic/claude-sonnet-5.5', variant: 'medium' }])(
+    'uses only the selected organization fallback %j after worker failure',
+    async fallback => {
+      jest.mocked(getOwnerFrontierFallback).mockResolvedValue(fallback);
+      jest
+        .mocked(resolveEligibleFrontierFallback)
+        .mockResolvedValue(
+          fallback
+            ? { model: fallback.model, reasoning: { enabled: true, effort: 'medium' } }
+            : null
+        );
+      const result = await resolveAutoModel(
+        {
+          ...baseParams,
+          model: KILO_AUTO_FRONTIER_MODEL.id,
+          apiKind: 'messages',
+          frontierRoutingEnabled: async () => true,
+          frontierDecision: async () => {
+            throw new Error('worker unavailable');
+          },
+          organizationContext: Promise.resolve({ organizationId: 'organization-1' }),
+          isFrontierFallbackAllowed: async () => true,
+        },
+        Promise.resolve({ id: 'member-1' } as User),
+        zeroBalancePromise
+      );
+      expect(getOwnerFrontierFallback).toHaveBeenCalledWith({
+        userId: 'member-1',
+        organizationId: 'organization-1',
+      });
+      expect(result).toEqual(
+        fallback
+          ? {
+              kind: 'ok',
+              resolved: {
+                model: fallback.model,
+                reasoning: { enabled: true, effort: 'medium' },
+              },
+            }
+          : { kind: 'no_frontier_models_available' }
+      );
+    }
+  );
+
+  it('never replaces a denied saved fallback with the static Frontier model', async () => {
+    jest.mocked(getOwnerFrontierFallback).mockResolvedValue({
+      model: 'provider/denied',
+      variant: null,
+    });
+    jest.mocked(resolveEligibleFrontierFallback).mockResolvedValue(null);
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_FRONTIER_MODEL.id,
+        modeHeader: 'architect',
+        apiKind: 'chat_completions',
+        frontierRoutingEnabled: async () => true,
+        frontierDecision: async () => null,
+        isFrontierFallbackAllowed: async () => false,
+      },
+      Promise.resolve({ id: 'member-1' } as User),
+      zeroBalancePromise
+    );
+    expect(result).toEqual({ kind: 'no_frontier_models_available' });
   });
 });
 

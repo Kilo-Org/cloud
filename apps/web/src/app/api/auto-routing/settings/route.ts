@@ -13,12 +13,15 @@ import {
   getAutoRoutingSettings,
   updateAutoRoutingSettings,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
+import { getOwnerFrontierFallback } from '@kilocode/web-shared/lib/ai-gateway/auto-model/frontier-fallback';
 import {
   annotateConfiguredPool,
+  buildEligibleCatalog,
   poolValidationMessage,
   toApiSettingsResponse,
   toLegacyModeApiSettingsResponse,
   validatePoolEntries,
+  validateFrontierFallback,
   type AutoRoutingSettingsApiResponse,
 } from '@/lib/auto-routing-pool-validation';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -96,7 +99,26 @@ async function annotateWorkerSuccess(
     organizationId: owner.organizationId,
     configuredPool: body.configuredPool,
   });
-  const apiBody: AutoRoutingSettingsApiResponse = toApiSettingsResponse(body, configuredPool);
+  const apiBody = toApiSettingsResponse(body, configuredPool);
+  try {
+    const frontierFallback = await getOwnerFrontierFallback(owner);
+    const fallbackCatalog = await buildEligibleCatalog({ ...owner, frontierFallback: true });
+    return NextResponse.json(
+      {
+        ...apiBody,
+        frontierFallbackSupported: true,
+        frontierFallback,
+        frontierFallbackModels: [...fallbackCatalog.byId.values()].map(model => ({
+          id: model.id,
+          name: model.name ?? model.id,
+          variants: model.variants ?? [],
+        })),
+      } satisfies AutoRoutingSettingsApiResponse,
+      { status }
+    );
+  } catch {
+    apiBody.frontierFallbackSupported = false;
+  }
   return NextResponse.json(apiBody, { status });
 }
 
@@ -134,8 +156,13 @@ function legacyModeSuccessResponse(result: { status: number; body: unknown }): N
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid worker mode response' }, { status: 502 });
   }
-  // No annotateConfiguredPool — pool is null; no catalog fetch.
-  return NextResponse.json(toLegacyModeApiSettingsResponse(parsed.data), { status: 200 });
+  return NextResponse.json(
+    {
+      ...toLegacyModeApiSettingsResponse(parsed.data),
+      frontierFallback: null,
+    },
+    { status: 200 }
+  );
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -246,12 +273,29 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     pool = validation.entries;
   }
 
+  let frontierFallback = parsed.data.frontierFallback;
+  if (frontierFallback !== undefined && frontierFallback !== null) {
+    const validation = await validateFrontierFallback({
+      user: { id: owner.userId },
+      organizationId: owner.organizationId,
+      entry: frontierFallback,
+    });
+    if (!validation.ok) {
+      return NextResponse.json(
+        { error: validation.error.message, reason: validation.error.reason },
+        { status: 400 }
+      );
+    }
+    frontierFallback = validation.entry;
+  }
+
   const result = await updateAutoRoutingSettings({
     ownerType: owner.ownerType,
     ownerId: owner.ownerId,
     mode: parsed.data.mode,
     pool,
     ...(parsed.data.retryEntries !== undefined ? { retryEntries: parsed.data.retryEntries } : {}),
+    ...(frontierFallback !== undefined ? { frontierFallback } : {}),
   });
 
   // Settings PUT callers always intend pool-aware writes. An old worker that

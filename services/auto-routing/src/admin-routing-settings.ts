@@ -4,11 +4,13 @@ import {
   BenchmarkProfileQuotaErrorSchema,
   DEFAULT_AUTO_ROUTING_MODE,
   UpdateAutoRoutingSettingsRequestSchema,
+  InitializeFrontierFallbackRequestSchema,
   type AutoRoutingMode,
   type AutoRoutingModeOwnerType,
   type AutoRoutingSettingsResponse,
   type BenchmarkProfileEntryStatus,
   type EfficientModelPool,
+  type FrontierFallbackEntry,
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
 import {
@@ -21,6 +23,7 @@ import {
   clearAutoRoutingSettingsCache,
   getConfiguredAutoRoutingSettings,
   setAutoRoutingSettings,
+  initializeFrontierFallback,
 } from './routing-mode';
 
 function settingsResponse(params: {
@@ -28,6 +31,7 @@ function settingsResponse(params: {
   ownerId: string;
   configuredMode: AutoRoutingMode | null;
   configuredPool: EfficientModelPool | null;
+  frontierFallback?: FrontierFallbackEntry | null;
   poolStatuses: BenchmarkProfileEntryStatus[];
 }): AutoRoutingSettingsResponse {
   return AutoRoutingSettingsResponseSchema.parse({
@@ -37,6 +41,7 @@ function settingsResponse(params: {
     configuredMode: params.configuredMode,
     defaultMode: DEFAULT_AUTO_ROUTING_MODE,
     configuredPool: params.configuredPool,
+    ...(params.frontierFallback !== undefined ? { frontierFallback: params.frontierFallback } : {}),
     poolStatuses: params.poolStatuses,
   });
 }
@@ -57,6 +62,9 @@ export const getRoutingSettingsHandler: Handler<HonoEnv> = async c => {
         ...parsed.data,
         configuredMode: configured.mode,
         configuredPool: null,
+        ...(configured.frontierFallback !== undefined
+          ? { frontierFallback: configured.frontierFallback }
+          : {}),
         poolStatuses: [],
       })
     );
@@ -69,6 +77,9 @@ export const getRoutingSettingsHandler: Handler<HonoEnv> = async c => {
         ...parsed.data,
         configuredMode: configured.mode,
         configuredPool: configured.pool,
+        ...(configured.frontierFallback !== undefined
+          ? { frontierFallback: configured.frontierFallback }
+          : {}),
         poolStatuses: statuses.statuses,
       })
     );
@@ -90,7 +101,7 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
     return c.json({ error: 'Invalid routing settings' }, 400);
   }
 
-  const { ownerType, ownerId, mode, pool, retryEntries } = parsed.data;
+  const { ownerType, ownerId, mode, pool, retryEntries, frontierFallback } = parsed.data;
 
   let poolStatuses: BenchmarkProfileEntryStatus[] = [];
   if (pool !== null) {
@@ -117,8 +128,17 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
   }
 
   // Persist only after successful admission (or when clearing the pool).
-  await setAutoRoutingSettings(c.env, { ownerType, ownerId }, { mode, pool });
+  await setAutoRoutingSettings(
+    c.env,
+    { ownerType, ownerId },
+    {
+      mode,
+      pool,
+      ...(frontierFallback !== undefined ? { frontierFallback } : {}),
+    }
+  );
   clearAutoRoutingSettingsCache();
+  const configured = await getConfiguredAutoRoutingSettings(c.env, { ownerType, ownerId });
 
   return c.json(
     settingsResponse({
@@ -127,6 +147,58 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
       configuredMode: mode,
       configuredPool: pool,
       poolStatuses,
+      ...(configured.frontierFallback !== undefined
+        ? { frontierFallback: configured.frontierFallback }
+        : {}),
+    })
+  );
+};
+
+export const getFrontierFallbackHandler: Handler<HonoEnv> = async c => {
+  const parsed = AutoRoutingModeOwnerQuerySchema.safeParse({
+    ownerType: c.req.query('ownerType'),
+    ownerId: c.req.query('ownerId'),
+  });
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid routing settings owner' }, 400);
+  }
+  const configured = await getConfiguredAutoRoutingSettings(c.env, parsed.data);
+  return c.json(
+    settingsResponse({
+      ...parsed.data,
+      configuredMode: configured.mode,
+      configuredPool: configured.pool,
+      frontierFallback: configured.frontierFallback,
+      poolStatuses: [],
+    })
+  );
+};
+
+export const initializeFrontierFallbackHandler: Handler<HonoEnv> = async c => {
+  let rawBody: unknown;
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsed = InitializeFrontierFallbackRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid Frontier fallback' }, 400);
+  }
+  const { ownerType, ownerId, frontierFallback } = parsed.data;
+  const configured = await initializeFrontierFallback(
+    c.env,
+    { ownerType, ownerId },
+    frontierFallback
+  );
+  return c.json(
+    settingsResponse({
+      ownerType,
+      ownerId,
+      configuredMode: configured.mode,
+      configuredPool: configured.pool,
+      frontierFallback: configured.frontierFallback,
+      poolStatuses: [],
     })
   );
 };

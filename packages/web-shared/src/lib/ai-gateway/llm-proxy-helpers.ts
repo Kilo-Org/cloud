@@ -508,6 +508,15 @@ export function noFreeModelsAvailableResponse() {
   );
 }
 
+export function noFrontierModelsAvailableResponse() {
+  const error =
+    'No eligible models are currently available for Auto Frontier. Choose an allowed fallback in Auto settings, or select another model.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.no_frontier_models_available, message: error },
+    { status: 503 }
+  );
+}
+
 export function organizationAutoConfigurationResponse(message: string) {
   return NextResponse.json(
     {

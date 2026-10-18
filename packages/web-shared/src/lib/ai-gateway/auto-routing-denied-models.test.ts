@@ -1,8 +1,12 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
-import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import {
+  getCachedRoutingTable,
+  getCachedFrontierRoutingTable,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   candidateModelIdsFromSources,
   collectDataCollectionRequiredAutoRoutingModelIds,
@@ -16,6 +20,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client', () =>
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
+  getCachedFrontierRoutingTable: jest.fn(),
 }));
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
@@ -23,6 +28,13 @@ jest.mock(
     getDataCollectionRequiredModelIds: jest.fn(),
   })
 );
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+  getEffectiveModelDecision: jest.fn(),
+}));
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 function policy(
   overrides: Partial<EffectiveOrganizationModelPolicy> = {}
@@ -83,6 +95,36 @@ describe('collectDeniedAutoRoutingModelIds', () => {
   it('returns no denials without loading when the policy cannot deny anything', async () => {
     await expect(collectDeniedAutoRoutingModelIds(policy(), owner)).resolves.toEqual([]);
   });
+
+  it('evaluates the Frontier platform candidates instead of an Efficient custom pool', async () => {
+    jest.mocked(getCachedFrontierRoutingTable).mockResolvedValue({
+      routes: {
+        'implementation/code_generation': [
+          { model: 'frontier/allowed' },
+          { model: 'frontier/disjoint' },
+        ],
+      },
+    } as never);
+    jest.mocked(getEffectiveModelDecision).mockImplementation(async (_, modelId) => ({
+      allowed: modelId === 'frontier/allowed',
+    }));
+    await expect(
+      collectDeniedAutoRoutingModelIds(
+        policy({
+          memberGrant: {
+            mode: 'selected',
+            includeOrganizationBaseline: false,
+            modelAllowList: ['frontier/allowed'],
+            providerAllowList: [],
+          },
+        }),
+        owner,
+        'frontier'
+      )
+    ).resolves.toEqual(['frontier/disjoint']);
+    expect(getAutoRoutingSettings).not.toHaveBeenCalled();
+    expect(getCachedRoutingTable).not.toHaveBeenCalled();
+  });
 });
 
 describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
@@ -106,6 +148,25 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
       'meta/muse-spark-1.3-contributor',
       'provider/free-model:free',
     ]);
+  });
+
+  it('checks privacy against Frontier candidates rather than the Efficient pool', async () => {
+    jest.mocked(getCachedFrontierRoutingTable).mockResolvedValue({
+      routes: {
+        'implementation/code_generation': [
+          { model: 'frontier/private' },
+          { model: 'frontier/contributor' },
+        ],
+      },
+    } as never);
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValue(new Set(['frontier/contributor', 'efficient/contributor']));
+    await expect(
+      collectDataCollectionRequiredAutoRoutingModelIds(owner, 'frontier')
+    ).resolves.toEqual(['frontier/contributor']);
+    expect(getAutoRoutingSettings).not.toHaveBeenCalled();
+    expect(getCachedRoutingTable).not.toHaveBeenCalled();
   });
 });
 

@@ -2,7 +2,12 @@ import * as z from 'zod';
 import { BenchmarkProfileEntryStatusSchema } from './benchmark';
 import { NormalizedClassifierInputSchema } from './input';
 import { ReasoningEffortSchema } from './reasoning';
-import { EfficientModelPoolSchema, PoolEntrySchema, poolEntryKey } from './routing-table';
+import {
+  EfficientModelPoolSchema,
+  FrontierFallbackEntrySchema,
+  PoolEntrySchema,
+  poolEntryKey,
+} from './routing-table';
 import { AutoRouterSchema } from './router';
 import {
   ClassifierSubtaskTypeSchema,
@@ -199,11 +204,17 @@ export const AutoRoutingModeResponseSchema = AutoRoutingModeOwnerQuerySchema.ext
 });
 export type AutoRoutingModeResponse = z.infer<typeof AutoRoutingModeResponseSchema>;
 
-// Combined mode + Efficient model pool settings. Null on each field means
-// inherit independently (mode and pool do not imply each other).
+export const InitializeFrontierFallbackRequestSchema = AutoRoutingModeOwnerQuerySchema.extend({
+  frontierFallback: FrontierFallbackEntrySchema.nullable(),
+});
+export type InitializeFrontierFallbackRequest = z.infer<
+  typeof InitializeFrontierFallbackRequestSchema
+>;
+
 export const UpdateAutoRoutingSettingsRequestSchema = AutoRoutingModeOwnerQuerySchema.extend({
   mode: AutoRoutingModeSchema.nullable(),
   pool: EfficientModelPoolSchema.nullable(),
+  frontierFallback: FrontierFallbackEntrySchema.nullable().optional(),
   // Subset of `pool` the owner explicitly retries after a terminal failure.
   // Forwarded to benchmark profile registration when present.
   retryEntries: z.array(PoolEntrySchema).optional(),
@@ -238,6 +249,7 @@ export const AutoRoutingSettingsResponseSchema = AutoRoutingModeOwnerQuerySchema
   configuredMode: AutoRoutingModeSchema.nullable(),
   defaultMode: AutoRoutingModeSchema,
   configuredPool: EfficientModelPoolSchema.nullable(),
+  frontierFallback: FrontierFallbackEntrySchema.nullable().optional(),
   // Empty when configuredPool is null.
   poolStatuses: z.array(BenchmarkProfileEntryStatusSchema),
 });

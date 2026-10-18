@@ -19,6 +19,7 @@ import type {
   AutoRoutingMode,
   ClassifierOutput,
   EfficientModelPool,
+  FrontierFallbackEntry,
   MirrorPayload,
   NormalizedClassifierInput,
   RoutingTable,
@@ -1151,13 +1152,20 @@ describe('auto routing worker', () => {
     function ownerSettingsStore(initial?: {
       mode?: AutoRoutingMode | null;
       pool?: EfficientModelPool | null;
+      frontierFallback?: FrontierFallbackEntry | null;
     }) {
       let mode: AutoRoutingMode | null = initial?.mode ?? null;
       let poolValue: EfficientModelPool | null = initial?.pool ?? null;
+      let frontierFallback = initial?.frontierFallback;
       const setSettings = vi.fn(
-        async (settings: { mode: AutoRoutingMode | null; pool: EfficientModelPool | null }) => {
+        async (settings: {
+          mode: AutoRoutingMode | null;
+          pool: EfficientModelPool | null;
+          frontierFallback?: FrontierFallbackEntry | null;
+        }) => {
           mode = settings.mode;
           poolValue = settings.pool;
+          if (settings.frontierFallback !== undefined) frontierFallback = settings.frontierFallback;
         }
       );
       modeConfigGet.mockImplementation(() => ({
@@ -1169,7 +1177,15 @@ describe('auto routing worker', () => {
         setPool: vi.fn(async (next: EfficientModelPool | null) => {
           poolValue = next;
         }),
-        getSettings: vi.fn(async () => ({ mode, pool: poolValue })),
+        getSettings: vi.fn(async () => ({
+          mode,
+          pool: poolValue,
+          ...(frontierFallback !== undefined ? { frontierFallback } : {}),
+        })),
+        initializeFrontierFallback: vi.fn(async (value: FrontierFallbackEntry | null) => {
+          if (frontierFallback === undefined) frontierFallback = value;
+          return { mode, pool: poolValue, frontierFallback };
+        }),
         setSettings,
       }));
       return {
@@ -1416,6 +1432,100 @@ describe('auto routing worker', () => {
       expect(store.setSettings).toHaveBeenCalledTimes(1);
       expect(store.setSettings).toHaveBeenCalledWith({ mode: 'best_accuracy', pool });
       expect(store.pool).toEqual(pool);
+    });
+
+    it('GET fallback skips benchmark profiles even with a configured Efficient pool', async () => {
+      const frontierFallback = { model: 'anthropic/claude-sonnet-4.6', variant: 'medium' };
+      ownerSettingsStore({ mode: 'best_accuracy', pool, frontierFallback });
+      benchmarkFetch.mockRejectedValue(new Error('profiles unavailable'));
+      const response = await request('/admin/frontier-fallback?ownerType=user&ownerId=user-1', {
+        headers: { authorization: 'Bearer classifier-token' },
+      });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        configuredMode: 'best_accuracy',
+        configuredPool: pool,
+        frontierFallback,
+        poolStatuses: [],
+      });
+      expect(modeConfigIdFromName).toHaveBeenCalledWith('user:user-1');
+      expect(benchmarkFetch).not.toHaveBeenCalled();
+    });
+
+    it.each([{ model: 'anthropic/claude-sonnet-4.6', variant: 'medium' }, null])(
+      'POST initializes fallback once without registering profiles (%j)',
+      async frontierFallback => {
+        const store = ownerSettingsStore({ mode: 'best_accuracy', pool });
+        const initialize = (value: FrontierFallbackEntry | null) =>
+          request('/admin/frontier-fallback', {
+            method: 'POST',
+            headers: {
+              authorization: 'Bearer classifier-token',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ ownerType: 'org', ownerId: 'org-1', frontierFallback: value }),
+          });
+        const first = await initialize(frontierFallback);
+        expect(first.status).toBe(200);
+        await expect(first.json()).resolves.toMatchObject({
+          ownerType: 'org',
+          ownerId: 'org-1',
+          configuredMode: 'best_accuracy',
+          configuredPool: pool,
+          frontierFallback,
+        });
+        const repeated = await initialize({
+          model: 'anthropic/claude-opus-4.6',
+          variant: 'medium',
+        });
+        await expect(repeated.json()).resolves.toMatchObject({ frontierFallback });
+        expect(modeConfigIdFromName).toHaveBeenCalledWith('org:org-1');
+        expect(store.setSettings).not.toHaveBeenCalled();
+        expect(benchmarkFetch).not.toHaveBeenCalled();
+      }
+    );
+
+    it('PUT omission preserves fallback and explicit null disables it', async () => {
+      const frontierFallback = { model: 'anthropic/claude-sonnet-4.6', variant: 'medium' };
+      ownerSettingsStore({ frontierFallback });
+      const update = (extra: { frontierFallback?: FrontierFallbackEntry | null }) =>
+        request('/admin/routing-settings', {
+          method: 'PUT',
+          headers: {
+            authorization: 'Bearer classifier-token',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            ownerType: 'user',
+            ownerId: 'user-1',
+            mode: 'best_accuracy',
+            pool: null,
+            ...extra,
+          }),
+        });
+      await expect((await update({})).json()).resolves.toMatchObject({ frontierFallback });
+      await expect((await update({ frontierFallback: null })).json()).resolves.toMatchObject({
+        frontierFallback: null,
+      });
+      expect(benchmarkFetch).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { ownerType: 'team', ownerId: 'org-1', frontierFallback: null },
+      { ownerType: 'user', ownerId: '', frontierFallback: null },
+      { ownerType: 'user', ownerId: 'user-1' },
+      { ownerType: 'user', ownerId: 'user-1', frontierFallback: { model: 'model' } },
+    ])('POST rejects invalid initialization input (%j)', async body => {
+      const response = await request('/admin/frontier-fallback', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer classifier-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      expect(response.status).toBe(400);
+      expect(modeConfigGet).not.toHaveBeenCalled();
     });
   });
 

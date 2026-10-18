@@ -10,6 +10,7 @@ import {
   type BenchmarkProfileEntryStatus,
   type BenchmarkProfileQuotaError,
   type PoolEntry,
+  type FrontierFallbackEntry,
 } from '@kilocode/auto-routing-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Route, Trash2, X } from 'lucide-react';
@@ -54,6 +55,9 @@ export type AutoRoutingSettingsApiResponse = {
   configuredMode: AutoRoutingMode | null;
   defaultMode: AutoRoutingMode;
   configuredPool: PoolEntryWithAvailability[] | null;
+  frontierFallback?: FrontierFallbackEntry | null;
+  frontierFallbackModels?: { id: string; name: string; variants: string[] }[];
+  frontierFallbackSupported?: boolean;
   poolStatuses: BenchmarkProfileEntryStatus[];
   /**
    * False when the BFF fell back to legacy mode-only workers (deploy window /
@@ -196,10 +200,14 @@ export function isDraftDirty(params: {
   selectedMode: ModeSelection;
   draftPool: DraftPool;
   savedMode: ModeSelection;
+  frontierFallback?: FrontierFallbackEntry | null;
+  savedFrontierFallback?: FrontierFallbackEntry | null;
   savedPool: DraftPool;
 }): boolean {
   return (
-    params.selectedMode !== params.savedMode || !draftsEqual(params.draftPool, params.savedPool)
+    params.selectedMode !== params.savedMode ||
+    !draftsEqual(params.draftPool, params.savedPool) ||
+    !fallbacksEqual(params.frontierFallback ?? null, params.savedFrontierFallback ?? null)
   );
 }
 
@@ -302,13 +310,28 @@ export function draftsEqual(a: DraftPool, b: DraftPool): boolean {
   });
 }
 
-export function buildSaveBody(params: { mode: ModeSelection; pool: DraftPool }): {
+function fallbacksEqual(a: FrontierFallbackEntry | null, b: FrontierFallbackEntry | null): boolean {
+  return a?.model === b?.model && (a?.variant ?? null) === (b?.variant ?? null);
+}
+
+export function buildSaveBody(params: {
+  mode: ModeSelection;
+  pool: DraftPool;
+  frontierFallback?: FrontierFallbackEntry | null;
+  savedFrontierFallback?: FrontierFallbackEntry | null;
+}): {
   mode: AutoRoutingMode | null;
   pool: PoolEntry[] | null;
+  frontierFallback?: FrontierFallbackEntry | null;
 } {
   return {
     mode: params.mode === 'inherit' ? null : params.mode,
     pool: params.pool,
+    ...(params.frontierFallback !== undefined &&
+    (params.savedFrontierFallback === undefined ||
+      !fallbacksEqual(params.frontierFallback, params.savedFrontierFallback))
+      ? { frontierFallback: params.frontierFallback }
+      : {}),
   };
 }
 
@@ -603,6 +626,7 @@ async function putSettings(
     mode: AutoRoutingMode | null;
     pool: PoolEntry[] | null;
     retryEntries?: PoolEntry[];
+    frontierFallback?: FrontierFallbackEntry | null;
   }
 ): Promise<AutoRoutingSettingsApiResponse> {
   const response = await fetch(settingsEndpoint(organizationId), {
@@ -676,6 +700,9 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
   // Polls/refetches update statuses via query.data without touching these.
   const [modeOverride, setModeOverride] = useState<ModeSelection | undefined>(undefined);
   const [poolOverride, setPoolOverride] = useState<DraftPool | undefined>(undefined);
+  const [fallbackOverride, setFallbackOverride] = useState<
+    FrontierFallbackEntry | null | undefined
+  >(undefined);
   const [addModelId, setAddModelId] = useState<string | undefined>(undefined);
   const [addError, setAddError] = useState<string | null>(null);
   const [showAddFlow, setShowAddFlow] = useState(false);
@@ -695,6 +722,11 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     [query.data?.configuredPool]
   );
   const poolStatuses = query.data?.poolStatuses ?? [];
+  const savedFallback = query.data?.frontierFallback ?? null;
+  const draftFallback = fallbackOverride !== undefined ? fallbackOverride : savedFallback;
+  const fallbackModels = query.data?.frontierFallbackModels ?? [];
+  const fallbackVariants =
+    fallbackModels.find(model => model.id === draftFallback?.model)?.variants ?? [];
 
   const { selectedMode, draftPool } = resolveEffectiveDraft({
     savedMode,
@@ -712,12 +744,15 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     const nextSavedPool = savedPoolSnapshot(query.data.configuredPool);
     const stillDirty =
       (modeOverride !== undefined && modeOverride !== nextSavedMode) ||
-      (poolOverride !== undefined && !draftsEqual(poolOverride, nextSavedPool));
+      (poolOverride !== undefined && !draftsEqual(poolOverride, nextSavedPool)) ||
+      (fallbackOverride !== undefined &&
+        !fallbacksEqual(fallbackOverride, query.data.frontierFallback ?? null));
     if (stillDirty) return;
     clearOverridesAfterSaveRef.current = false;
     setModeOverride(undefined);
     setPoolOverride(undefined);
-  }, [query.data, modeOverride, poolOverride]);
+    setFallbackOverride(undefined);
+  }, [query.data, modeOverride, poolOverride, fallbackOverride]);
 
   const saveMutation = useMutation({
     mutationFn: async (payload: {
@@ -726,6 +761,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
       mode: AutoRoutingMode | null;
       pool: PoolEntry[] | null;
       retryEntries?: PoolEntry[];
+      frontierFallback?: FrontierFallbackEntry | null;
     }): Promise<AutoRoutingSettingsApiResponse | 'legacy-mode-saved'> => {
       if (payload.useLegacyModeEndpoint) {
         await putMode(organizationId, { mode: payload.mode });
@@ -734,6 +770,9 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
       return putSettings(organizationId, {
         mode: payload.mode,
         pool: payload.pool,
+        ...(payload.frontierFallback !== undefined
+          ? { frontierFallback: payload.frontierFallback }
+          : {}),
         ...(payload.retryEntries !== undefined ? { retryEntries: payload.retryEntries } : {}),
       });
     },
@@ -747,6 +786,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
         toast.success('Auto routing settings saved');
         return;
       }
+      setFallbackOverride(data.frontierFallback ?? null);
       // Align overrides with the saved response immediately so the UI shows
       // the committed pool; the effect above clears them once query.data matches.
       applySaveMutationSuccess({
@@ -827,6 +867,9 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     draftPool,
     savedMode,
     savedPool,
+    frontierFallback:
+      query.data?.frontierFallbackSupported === false ? savedFallback : draftFallback,
+    savedFrontierFallback: savedFallback,
   });
   const hasConfiguredPool = savedPool !== null && savedPool.length > 0;
   const draftHasEntries = draftPool !== null && draftPool.length > 0;
@@ -885,11 +928,17 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
       });
       return;
     }
-    const body = buildSaveBody({ mode: selectedMode, pool: draftPool });
+    const body = buildSaveBody({
+      mode: selectedMode,
+      pool: draftPool,
+      frontierFallback: query.data?.frontierFallbackSupported === false ? undefined : draftFallback,
+      savedFrontierFallback: savedFallback,
+    });
     saveMutation.mutate({
       useLegacyModeEndpoint: false,
       mode: body.mode,
       pool: body.pool,
+      frontierFallback: body.frontierFallback,
     });
   };
 
@@ -917,8 +966,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
             Auto routing
           </CardTitle>
           <CardDescription>
-            Choose how Kilo ranks models for kilo-auto/efficient and which models belong in the
-            Efficient pool.
+            Configure Efficient model ranking and pools, and choose a Frontier fallback.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4" aria-busy="true">
@@ -941,8 +989,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
             Auto routing
           </CardTitle>
           <CardDescription>
-            Choose how Kilo ranks models for kilo-auto/efficient and which models belong in the
-            Efficient pool.
+            Configure Efficient model ranking and pools, and choose a Frontier fallback.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -966,8 +1013,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
           Auto routing
         </CardTitle>
         <CardDescription>
-          Choose how Kilo ranks models for kilo-auto/efficient and which models belong in the
-          Efficient pool.
+          Configure Efficient model ranking and pools, and choose a Frontier fallback.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -1227,6 +1273,77 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
           ) : null}
         </div>
 
+        {poolSupported && query.data?.frontierFallbackSupported !== false ? (
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-medium">Frontier fallback</h3>
+              <p className="text-muted-foreground text-sm" id={`${idPrefix}-fallback-help`}>
+                Used when Frontier cannot select a model. None disables this fallback.
+                {organizationId
+                  ? ' This organization setting does not inherit personal settings.'
+                  : ''}
+              </p>
+            </div>
+            <ModelCombobox
+              id={`${idPrefix}-fallback-model`}
+              label="Fallback model"
+              models={fallbackModels}
+              pinnedModel={{ id: '__none__', name: 'None', showGatewayMetadata: false }}
+              value={draftFallback?.model ?? '__none__'}
+              onValueChange={model => {
+                const variants = fallbackModels.find(option => option.id === model)?.variants ?? [];
+                setFallbackOverride(
+                  model === '__none__'
+                    ? null
+                    : {
+                        model,
+                        variant: variants.includes('medium') ? 'medium' : (variants[0] ?? null),
+                      }
+                );
+              }}
+              helperText={
+                draftFallback && !fallbackModels.some(model => model.id === draftFallback.model)
+                  ? `Saved model: ${draftFallback.model}. This model is unavailable in your catalog.`
+                  : undefined
+              }
+              isLoading={query.isLoading}
+              disabled={controlsDisabled}
+            />
+            {draftFallback ? (
+              <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}-fallback-effort`}>Fallback reasoning effort</Label>
+                <Select
+                  value={draftFallback.variant ?? '__default__'}
+                  disabled={controlsDisabled}
+                  onValueChange={variant =>
+                    setFallbackOverride({
+                      model: draftFallback.model,
+                      variant: variant === '__default__' ? null : variant,
+                    })
+                  }
+                >
+                  <SelectTrigger
+                    id={`${idPrefix}-fallback-effort`}
+                    aria-describedby={`${idPrefix}-fallback-help`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {fallbackVariants.length === 0 ? (
+                      <SelectItem value="__default__">Default</SelectItem>
+                    ) : null}
+                    {fallbackVariants.map(variant => (
+                      <SelectItem key={variant} value={variant}>
+                        {variantLabel(variant)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {retryError ? (
           <Alert variant="destructive" id={retryErrorId}>
             <AlertTitle>Could not retry benchmark</AlertTitle>
@@ -1268,14 +1385,29 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
         ) : null}
 
         {editableChrome.showSave && (
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={controlsDisabled || !hasChanges}
-            aria-describedby={saveError ? saveErrorId : undefined}
-          >
-            {saveMutation.isPending ? 'Saving…' : 'Save auto routing'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={controlsDisabled || !hasChanges}
+              aria-describedby={saveError ? saveErrorId : undefined}
+            >
+              {saveMutation.isPending ? 'Saving…' : 'Save auto routing'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={controlsDisabled || !hasChanges}
+              onClick={() => {
+                setModeOverride(undefined);
+                setPoolOverride(undefined);
+                setFallbackOverride(undefined);
+                setSaveError(null);
+              }}
+            >
+              Reset changes
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>

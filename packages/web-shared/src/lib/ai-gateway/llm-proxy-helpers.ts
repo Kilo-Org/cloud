@@ -46,7 +46,12 @@ import type {
   GatewayChatApiKind,
   ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import {
+  computeOpenRouterCostFields,
+  drainSseStream,
+  hasReportedCost,
+  hasValidTokenCounts,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getInferenceProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -833,6 +838,13 @@ export type FimUsage = {
   total_tokens: number;
 };
 
+function hasCompleteFimTokenUsage(usage: FimUsage | null | undefined): boolean {
+  return (
+    hasValidTokenCounts(usage?.prompt_tokens, usage?.completion_tokens, usage?.total_tokens) &&
+    usage?.total_tokens === (usage?.prompt_tokens ?? 0) + (usage?.completion_tokens ?? 0)
+  );
+}
+
 export type MistralFimCompletion = {
   id: string;
   object: 'fim.completion';
@@ -883,19 +895,22 @@ function parseMistralFimUsageFromString(
   statusCode: number
 ): MicrodollarUsageStats {
   const json: MistralFimCompletion = JSON.parse(response);
-  const cost_mUsd = computeFimMicrodollarCost(json.usage, provider);
+  const cost_mUsd = json.usage ? computeFimMicrodollarCost(json.usage, provider) : 0;
+  const hasFinalTokenUsage = typeof json.model === 'string' && hasCompleteFimTokenUsage(json.usage);
 
   return {
     messageId: json.id,
     model: json.model,
-    responseContent: json.choices[0]?.text || '',
+    responseContent: json.choices?.[0]?.text || '',
     hasError: !json.model || statusCode >= 400,
     inference_provider: provider,
-    inputTokens: json.usage.prompt_tokens,
-    outputTokens: json.usage.completion_tokens,
+    inputTokens: json.usage?.prompt_tokens ?? 0,
+    outputTokens: json.usage?.completion_tokens ?? 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
     cost_mUsd,
+    hasFinalTokenUsage,
+    hasFinalCost: hasFinalTokenUsage && (provider === 'mistral' || provider === 'inception'),
     is_byok: null,
     upstream_id: null,
     finish_reason: null,
@@ -932,8 +947,8 @@ async function parseMistralFimUsageFromStream(
   let firstTokenReceived = false;
   let usage: FimUsage | undefined;
 
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
+  let sawDone = false;
+  let sawFinalUsage = false;
 
   const sseStreamParser = createParser({
     onEvent(event: EventSourceMessage) {
@@ -943,7 +958,10 @@ async function parseMistralFimUsageFromStream(
         timeToFirstTokenSpan.end();
       }
 
-      if (event.data === '[DONE]') return;
+      if (event.data === '[DONE]') {
+        sawDone = true;
+        return;
+      }
 
       try {
         const json: MistralFimStreamChunk = JSON.parse(event.data);
@@ -951,6 +969,11 @@ async function parseMistralFimUsageFromStream(
         model = json.model ?? model;
         messageId = json.id ?? messageId;
         usage = json.usage ?? usage; // Usage comes in final chunk
+        if (json.usage) {
+          sawFinalUsage =
+            Array.isArray(json.choices) &&
+            json.choices.every(choice => choice.finish_reason != null);
+        }
 
         const contentDelta = json.choices?.[0]?.delta?.content;
         if (contentDelta) {
@@ -966,16 +989,11 @@ async function parseMistralFimUsageFromStream(
     },
   });
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      sseStreamParser.feed(decoder.decode(value, { stream: true }));
-    }
-  } finally {
-    reader.releaseLock();
-    streamProcessingSpan.end();
-  }
+  const wasAborted = await drainSseStream(
+    stream,
+    chunk => sseStreamParser.feed(chunk),
+    streamProcessingSpan
+  );
 
   if (!usage) {
     captureMessage('SUSPICIOUS: No usage info in FIM stream', {
@@ -985,17 +1003,21 @@ async function parseMistralFimUsageFromStream(
     });
   }
 
+  const hasFinalTokenUsage =
+    sawDone && sawFinalUsage && !wasAborted && !reportedError && hasCompleteFimTokenUsage(usage);
   return {
     messageId,
     model,
     responseContent,
-    hasError: reportedError,
+    hasError: reportedError || wasAborted,
     inference_provider: provider,
     inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: usage?.completion_tokens ?? 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
     cost_mUsd: usage ? computeFimMicrodollarCost(usage, provider) : 0,
+    hasFinalTokenUsage,
+    hasFinalCost: hasFinalTokenUsage && (provider === 'mistral' || provider === 'inception'),
     is_byok: null,
     upstream_id: null,
     finish_reason: null,
@@ -1030,11 +1052,13 @@ export function countAndStoreFimUsage(
           .text()
           .then(content =>
             parseMistralFimUsageFromString(content, usageContext.provider, statusCode)
-          );
+          )
+          .catch(() => null);
 
   after(
     usageStatsPromise.then(usageStats => {
       if (!usageStats) {
+        if (usageContext.prepaidReservationId) return processTokenData(null, usageContext);
         captureMessage('SUSPICIOUS: No FIM usage information', {
           level: 'error',
           tags: { source: 'fim_usage_processing' },
@@ -1122,6 +1146,11 @@ export function parseEditUsageFromResponse(
   const json: MercuryEditCompletionResponse = JSON.parse(response);
   const usage = json.usage;
   const cacheHitTokens = usage ? getEditCacheHitTokens(usage) : 0;
+  const hasFinalTokenUsage =
+    typeof json.model === 'string' &&
+    hasCompleteFimTokenUsage(usage) &&
+    hasValidTokenCounts(usage?.cached_input_tokens ?? 0) &&
+    (usage?.cached_input_tokens ?? 0) <= (usage?.prompt_tokens ?? 0);
   return {
     messageId: json.id ?? null,
     model: json.model ?? null,
@@ -1133,6 +1162,8 @@ export function parseEditUsageFromResponse(
     cacheHitTokens,
     cacheWriteTokens: 0,
     cost_mUsd: usage ? computeEditMicrodollarCost(usage, provider) : 0,
+    hasFinalTokenUsage,
+    hasFinalCost: hasFinalTokenUsage && provider === 'inception',
     cacheDiscount_mUsd:
       usage && provider === 'inception' ? Math.round(cacheHitTokens * (0.25 - 0.025)) : undefined,
     is_byok: null,
@@ -1172,6 +1203,7 @@ export function countAndStoreEditUsage(
     usageStatsPromise.then(usageStats => {
       requestSpan?.end();
       if (!usageStats) {
+        if (usageContext.prepaidReservationId) return processTokenData(null, usageContext);
         captureMessage('SUSPICIOUS: No edit usage information', {
           level: 'error',
           tags: { source: 'edit_usage_processing' },
@@ -1246,6 +1278,10 @@ export function parseEmbeddingUsageFromResponse(
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
     cost_mUsd,
+    hasFinalTokenUsage:
+      json.object === 'list' &&
+      hasValidTokenCounts(json.usage?.prompt_tokens, json.usage?.total_tokens),
+    hasFinalCost: json.object === 'list' && hasReportedCost(json.usage),
     is_byok: null,
     upstream_id: null,
     finish_reason: null,
@@ -1292,6 +1328,10 @@ export function parseTranscriptionUsageFromResponse(
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
     cost_mUsd: cost.cost_mUsd,
+    hasFinalTokenUsage:
+      typeof json.text === 'string' &&
+      hasValidTokenCounts(json.usage?.input_tokens, json.usage?.output_tokens),
+    hasFinalCost: typeof json.text === 'string' && hasReportedCost(json.usage),
     is_byok: cost.is_byok,
   };
 }
@@ -1331,6 +1371,7 @@ export function countAndStoreEmbeddingUsage(
     usageStatsPromise.then(usageStats => {
       requestSpan?.end();
       if (!usageStats) {
+        if (usageContext.prepaidReservationId) return processTokenData(null, usageContext);
         captureMessage('SUSPICIOUS: No embedding usage information', {
           level: 'error',
           tags: { source: 'embedding_usage_processing' },
@@ -1372,6 +1413,7 @@ export function countAndStoreTranscriptionUsage(
     usageStatsPromise.then(usageStats => {
       requestSpan?.end();
       if (!usageStats) {
+        if (usageContext.prepaidReservationId) return processTokenData(null, usageContext);
         captureMessage('SUSPICIOUS: No transcription usage information', {
           level: 'error',
           tags: { source: 'transcription_usage_processing' },

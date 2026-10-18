@@ -49,8 +49,6 @@ type RenewalRow = {
   total_microdollars_acquired: number;
   microdollars_used: number;
   auto_top_up_enabled: boolean;
-  next_credit_expiration_at: string | null;
-  user_updated_at: string;
 };
 
 type RenewalResult = 'renewed' | 'duplicate' | 'past_due_started' | 'waiting' | 'terminated';
@@ -214,8 +212,6 @@ async function sweepRenewals(
       total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
       microdollars_used: kilocode_users.microdollars_used,
       auto_top_up_enabled: kilocode_users.auto_top_up_enabled,
-      next_credit_expiration_at: kilocode_users.next_credit_expiration_at,
-      user_updated_at: kilocode_users.updated_at,
     })
     .from(coding_plan_subscriptions)
     .innerJoin(kilocode_users, eq(coding_plan_subscriptions.user_id, kilocode_users.id))
@@ -259,8 +255,6 @@ async function sweepRenewals(
             total_microdollars_acquired: row.total_microdollars_acquired,
             microdollars_used: row.microdollars_used,
             auto_top_up_enabled: row.auto_top_up_enabled,
-            next_credit_expiration_at: row.next_credit_expiration_at,
-            updated_at: row.user_updated_at,
           });
         } catch (error) {
           logError('Auto top-up attempt failed during coding plan recovery', {
@@ -350,7 +344,7 @@ export async function processCodingPlanRenewal(
       UPDATE kilocode_users
       SET microdollars_used = microdollars_used + ${row.cost_microdollars}
       WHERE id = ${row.user_id}
-        AND total_microdollars_acquired - microdollars_used >= ${row.cost_microdollars}
+        AND total_microdollars_acquired - microdollars_used - inference_microdollars_held >= ${row.cost_microdollars}
       RETURNING id
     `);
     if (chargedUsers.length > 0) {

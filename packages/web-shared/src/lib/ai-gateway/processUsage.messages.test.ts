@@ -220,7 +220,11 @@ describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
       'vercel',
       200
     );
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -330,8 +334,91 @@ describe('parseMessagesMicrodollarUsageFromString approval tests', () => {
     const inputFile = join(sampleDir, vercelMessagesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
     const result = parseMessagesMicrodollarUsageFromString(jsonString, 200);
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
+});
+
+describe('authoritative Messages usage evidence', () => {
+  const start =
+    'data: {"type":"message_start","message":{"id":"message","model":"model","usage":{"input_tokens":20,"cache_read_input_tokens":5,"output_tokens":0}}}\n\n';
+  const delta =
+    'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":10}}\n\n';
+  const stop = 'data: {"type":"message_stop"}\n\n';
+
+  test('combines initial input and final cumulative output before accepting terminal tokens', async () => {
+    const stats = await parseMessagesMicrodollarUsageFromStream(
+      streamFromText(start + delta + stop),
+      'user',
+      undefined,
+      'martian',
+      200
+    );
+    expect(stats).toMatchObject({
+      inputTokens: 25,
+      outputTokens: 10,
+      cacheHitTokens: 5,
+      hasFinalTokenUsage: true,
+      hasFinalCost: false,
+    });
+  });
+
+  test('keeps a stream without message_stop provisional even with a usage delta', async () => {
+    const stats = await parseMessagesMicrodollarUsageFromStream(
+      streamFromText(start + delta),
+      'user',
+      undefined,
+      'martian',
+      200
+    );
+    expect(stats).toMatchObject({ hasFinalTokenUsage: false, hasFinalCost: false });
+  });
+
+  test('does not finalize initial zero output without a final usage delta', async () => {
+    const stats = await parseMessagesMicrodollarUsageFromStream(
+      streamFromText(start + stop),
+      'user',
+      undefined,
+      'martian',
+      200
+    );
+    expect(stats).toMatchObject({ hasFinalTokenUsage: false, hasFinalCost: false });
+  });
+
+  test('distinguishes missing nonstream usage from an authoritative final zero', () => {
+    const payload = { id: 'message', model: 'model', content: [], stop_reason: 'end_turn' };
+    expect(parseMessagesMicrodollarUsageFromString(JSON.stringify(payload), 200)).toMatchObject({
+      hasFinalTokenUsage: false,
+      hasFinalCost: false,
+    });
+    expect(
+      parseMessagesMicrodollarUsageFromString(
+        JSON.stringify({
+          ...payload,
+          usage: { input_tokens: 0, output_tokens: 0, cost: 0 },
+        }),
+        200
+      )
+    ).toMatchObject({ hasFinalTokenUsage: true, hasFinalCost: true });
+  });
+});
+
+test('does not reuse an initial Messages zero-cost estimate as the final charge', async () => {
+  const text =
+    'data: {"type":"message_start","message":{"id":"message","model":"model","usage":{"input_tokens":20,"output_tokens":0,"cost":0}}}\n\n' +
+    'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":10}}\n\n' +
+    'data: {"type":"message_stop"}\n\n';
+  const stats = await parseMessagesMicrodollarUsageFromStream(
+    streamFromText(text),
+    'user',
+    undefined,
+    'martian',
+    200
+  );
+  expect(stats).toMatchObject({ hasFinalTokenUsage: true, hasFinalCost: false });
 });

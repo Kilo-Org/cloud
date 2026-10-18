@@ -452,6 +452,7 @@ export const kilocode_users = pgTable(
     microdollars_used: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),
+    inference_microdollars_held: bigint({ mode: 'number' }).default(0).notNull(),
     /**
      * If set, bonus credits are issued on usage once `microdollars_used` crosses this threshold.
      * For Kilo Pass we currently treat it as "earned" slightly early (threshold - $1) when checking.
@@ -3274,6 +3275,7 @@ export const organizations = pgTable(
     microdollars_used: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),
+    inference_microdollars_held: bigint({ mode: 'number' }).default(0).notNull(),
     // Deprecated: balance is now computed as total_microdollars_acquired - microdollars_used.
     // Kept in sync for rollback safety; will be removed in a future migration.
     microdollars_balance: bigint({ mode: 'number' })
@@ -3318,6 +3320,52 @@ export const organizations = pgTable(
 );
 
 export type Organization = typeof organizations.$inferSelect;
+
+export const inference_reservations = pgTable(
+  'inference_reservations',
+  {
+    request_id: text().primaryKey().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'restrict' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
+    amount_microdollars: bigint({ mode: 'number' }).notNull(),
+    actual_cost_microdollars: bigint({ mode: 'number' }),
+    status: text().$type<'reserved' | 'settled' | 'released'>().notNull().default('reserved'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    finalized_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    check(
+      'inference_reservations_amount_check',
+      sql`${table.amount_microdollars} BETWEEN 0 AND 9007199254740991`
+    ),
+    check(
+      'inference_reservations_actual_cost_check',
+      sql`${table.actual_cost_microdollars} BETWEEN 0 AND 9007199254740991`
+    ),
+    check(
+      'inference_reservations_state_check',
+      sql`(
+        ${table.status} = 'reserved'
+        AND ${table.actual_cost_microdollars} IS NULL
+        AND ${table.finalized_at} IS NULL
+      ) OR (
+        ${table.status} = 'settled'
+        AND ${table.actual_cost_microdollars} IS NOT NULL
+        AND ${table.finalized_at} IS NOT NULL
+      ) OR (
+        ${table.status} = 'released'
+        AND ${table.actual_cost_microdollars} IS NULL
+        AND ${table.finalized_at} IS NOT NULL
+      )`
+    ),
+    index('IDX_inference_reservations_user').on(table.kilo_user_id),
+    index('IDX_inference_reservations_active_org_user')
+      .on(table.organization_id, table.kilo_user_id)
+      .where(sql`${table.status} = 'reserved' AND ${table.organization_id} IS NOT NULL`),
+  ]
+);
 
 export const kilo_pass_org_term_versions = pgTable(
   'kilo_pass_org_term_versions',

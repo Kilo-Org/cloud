@@ -67,6 +67,7 @@ function toUserForBalance(user: User): UserForBalance {
     id: user.id,
     total_microdollars_acquired: user.total_microdollars_acquired,
     microdollars_used: user.microdollars_used,
+    inference_microdollars_held: user.inference_microdollars_held,
     next_credit_expiration_at: user.next_credit_expiration_at,
     updated_at: user.updated_at,
     auto_top_up_enabled: user.auto_top_up_enabled,

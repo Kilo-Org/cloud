@@ -1,4 +1,4 @@
-import { after, type NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 
 import {
   getToolsAvailable,
@@ -23,6 +23,11 @@ import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/pr
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import {
+  admitPrepaidInference,
+  cancelPrepaidInference,
+} from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 
 type SendUpstreamAttemptInput = {
@@ -39,6 +44,11 @@ type SendUpstreamAttemptInput = {
   method: string;
   signal?: AbortSignal;
   vercelRequestId?: string | null;
+  prepaid: {
+    requestId: string;
+    usageContext: Pick<MicrodollarUsageContext, 'requested_model' | 'prepaidReservationId'>;
+    zeroCost: boolean;
+  };
 };
 
 type SendUpstreamAttemptResult =
@@ -66,6 +76,7 @@ export async function sendUpstreamAttempt({
   method,
   signal,
   vercelRequestId,
+  prepaid,
 }: SendUpstreamAttemptInput): Promise<SendUpstreamAttemptResult> {
   const extraHeaders: Record<string, string> = {};
   await applyProviderSpecificLogic(
@@ -87,6 +98,30 @@ export async function sendUpstreamAttempt({
     if (!transformedModel || !(await isValidOpenRouterModelId(transformedModel))) {
       return { type: 'invalid-openrouter-model' };
     }
+  }
+
+  const admission = await admitPrepaidInference({
+    requestId: prepaid.requestId,
+    userId,
+    organizationId: organizationId ?? undefined,
+    apiKind: request.kind,
+    model: prepaid.usageContext.requested_model,
+    providerId: providerContext.provider.id,
+    body: request.body,
+    zeroCost: prepaid.zeroCost,
+    signal,
+  });
+  if (admission.kind === 'rejected') return { type: 'error', response: admission.response };
+  prepaid.usageContext.prepaidReservationId = admission.reservationId;
+  if (signal?.aborted) {
+    if (admission.reservationId) {
+      await cancelPrepaidInference({
+        requestId: admission.reservationId,
+        userId,
+        organizationId: organizationId ?? undefined,
+      });
+    }
+    return { type: 'error', response: new NextResponse(null, { status: 499 }) };
   }
 
   const result = await upstreamRequest({

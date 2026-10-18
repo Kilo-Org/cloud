@@ -10,6 +10,7 @@ import type { ClassifierApiKind, MirrorPayload } from '@kilocode/auto-routing-co
 import {
   AUTO_ROUTING_WORKER_URL,
   INTERNAL_API_SECRET,
+  isPrepaidInferenceReservationsEnabled,
 } from '@kilocode/web-shared/lib/config.server';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
@@ -106,6 +107,9 @@ export async function fetchEfficientAutoDecision(
       headers: new Headers({
         authorization: `Bearer ${authToken}`,
         'content-type': 'application/json',
+        ...(isPrepaidInferenceReservationsEnabled() && {
+          'x-kilo-prepaid-admission': 'required',
+        }),
       }),
       body: JSON.stringify(payload),
       signal,

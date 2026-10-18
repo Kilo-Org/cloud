@@ -28,6 +28,7 @@ import {
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -920,6 +921,14 @@ export async function handleLlmProxyRequest(
     ...upstreamAttemptOptions,
     providerContext: effectiveProviderContext,
     request: requestBodyParsed,
+    prepaid: {
+      requestId: bouncerRequestId,
+      usageContext,
+      zeroCost:
+        isFreeModel(effectiveModelIdLowerCased) ||
+        !!effectiveProviderContext.userByok ||
+        effectiveProviderContext.provider.id === OPENAI_CHATGPT_PROVIDER_ID,
+    },
   });
   if (attempt.type === 'invalid-openrouter-model') {
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);

@@ -1,5 +1,6 @@
 import { classifyWithSystemOne } from '@kilocode/auto-routing-contracts/classifier';
 import type { ClassifierRunResult } from '@kilocode/auto-routing-contracts/classifier';
+import type { SystemOneClient } from '@kilocode/auto-routing-contracts/classifier';
 import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
 import { createSystemOneClient } from './openrouter';
 
@@ -11,8 +12,13 @@ type ClassifierEnv = Pick<Env, 'OPENROUTER_API_KEY'>;
 export async function classifyNormalizedInput(
   env: ClassifierEnv,
   input: NormalizedClassifierInput,
-  classifierModel: string
+  classifierModel: string,
+  admission?: Pick<SystemOneClient, 'beforeRequest' | 'retryTransientFailures'>
 ): Promise<ClassifierRunResult> {
   const client = await createSystemOneClient(env);
-  return classifyWithSystemOne(client, input, classifierModel);
+  return classifyWithSystemOne(
+    admission ? { ...client, ...admission } : client,
+    input,
+    classifierModel
+  );
 }

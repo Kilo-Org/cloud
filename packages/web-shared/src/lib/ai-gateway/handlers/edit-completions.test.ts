@@ -11,6 +11,12 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { NextResponse } from 'next/server';
+import {
+  admitPrepaidInference,
+  cancelPrepaidInference,
+} from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
+import { handleEditCompletionsRequest } from './edit-completions';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
@@ -21,6 +27,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/prepaid-inference', () => ({
+  admitPrepaidInference: jest.fn(),
+  cancelPrepaidInference: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
     decision: { allowed: true },
@@ -164,6 +174,7 @@ async function flushAfter() {
 describe('POST /api/edit/completions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(admitPrepaidInference).mockResolvedValue({ kind: 'admitted' });
     mockedResolveOrganizationMemberModelDecision.mockResolvedValue({
       policy: {} as never,
       decision: { allowed: true },
@@ -174,6 +185,39 @@ describe('POST /api/edit/completions', () => {
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it.each([undefined, 'edit-reservation'])(
+    'cancels only reserved aborted work: %s',
+    async reservationId => {
+      setOrganizationAuth();
+      const controller = new AbortController();
+      const request = new Request(makeRequest(makeValidRequestBody()), {
+        signal: controller.signal,
+      });
+      jest.mocked(admitPrepaidInference).mockImplementation(async ({ signal }) => {
+        expect(signal).toBe(request.signal);
+        controller.abort();
+        return { kind: 'admitted', reservationId };
+      });
+      const response = await handleEditCompletionsRequest(request as never);
+      expect(response.status).toBe(499);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(cancelPrepaidInference).toHaveBeenCalledTimes(reservationId ? 1 : 0);
+    }
+  );
+
+  it('does not dispatch when prepaid admission rejects', async () => {
+    setOrganizationAuth();
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'rejected',
+      response: NextResponse.json({ error: 'Insufficient credits' }, { status: 402 }),
+    });
+    const response = await handleEditCompletionsRequest(
+      makeRequest(makeValidRequestBody()) as never
+    );
+    expect(response.status).toBe(402);
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('rejects unsupported edit models with the dedicated error type', async () => {
@@ -316,6 +360,10 @@ describe('POST /api/edit/completions', () => {
 
   it('bills non-BYOK requests and records the cache discount', async () => {
     setOrganizationAuth();
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'admitted',
+      reservationId: 'edit-reservation',
+    });
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
     const { handleEditCompletionsRequest } = await import('./edit-completions');
@@ -330,6 +378,14 @@ describe('POST /api/edit/completions', () => {
     const [stats, ctx] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(ctx.api_kind).toBe('edit_completions');
     expect(ctx.user_byok).toBe(false);
+    expect(ctx.prepaidReservationId).toBe('edit-reservation');
+    expect(admitPrepaidInference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'inception/mercury-edit-2',
+        body: expect.objectContaining({ model: 'mercury-edit-2' }),
+        zeroCost: false,
+      })
+    );
     expect(stats.cost_mUsd).toBe(4_750);
     expect(stats.cacheDiscount_mUsd).toBe(20_250);
     expect(stats.market_cost).toBe(4_750);

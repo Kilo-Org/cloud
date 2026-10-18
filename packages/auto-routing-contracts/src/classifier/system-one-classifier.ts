@@ -12,10 +12,14 @@ import classifierTaxonomy from './taxonomy.json';
 export const DEFAULT_CLASSIFIER_MODEL = 'typesafe/jev-1.13';
 export const OPENROUTER_SYSTEM_ONE_URL = 'https://openrouter.ai/api/v1/systemone';
 
+type SystemOneBeforeRequest = (request: unknown, model: string) => Promise<unknown>;
+
 export type SystemOneClient = {
   apiKey: string;
   // OpenRouter app attribution (HTTP-Referer, X-Title).
   attributionHeaders: Record<string, string>;
+  beforeRequest?: SystemOneBeforeRequest;
+  retryTransientFailures?: boolean;
 };
 
 export type ClassifierRunResult = {
@@ -297,13 +301,13 @@ export async function requestSystemOne(
   model: string,
   options: { timeoutMs?: number } = {}
 ): Promise<Response> {
-  const body = JSON.stringify(request);
+  const admittedRequest = client.beforeRequest
+    ? await client.beforeRequest(request, model)
+    : request;
+  const body = JSON.stringify(admittedRequest);
   const timeoutMs = options.timeoutMs ?? ATTEMPT_TIMEOUT_MS;
   let response = await postSystemOne(client, body, model, timeoutMs);
-  // One quick retry absorbs a rate-limit or provider blip; the gateway waits on
-  // this decision, so the retry stays single and short. Failed HTTP calls are
-  // not billed, so no cost is carried over.
-  if (isTransientFailure(response)) {
+  if (client.retryTransientFailures !== false && isTransientFailure(response)) {
     if (response instanceof Response) await response.body?.cancel();
     const { promise, resolve } = Promise.withResolvers<void>();
     setTimeout(resolve, TRANSIENT_RETRY_DELAY_MS);

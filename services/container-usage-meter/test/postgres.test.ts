@@ -1263,6 +1263,179 @@ describe('container usage PostgreSQL application', () => {
       .delete(container_usage_interval)
       .where(eq(container_usage_interval.id, targetId));
   });
+
+  it.each(['user', 'org'] as const)(
+    'excludes inference holds from %s admission and budgets while posting incurred compute charges',
+    async subjectType => {
+      const subject =
+        subjectType === 'user'
+          ? { type: 'user' as const, id: userId }
+          : { type: 'org' as const, id: organizationId };
+      const payerTable = subject.type === 'user' ? kilocode_users : organizations;
+      await client.db
+        .update(payerTable)
+        .set({
+          total_microdollars_acquired: 20_000_000,
+          microdollars_used: 0,
+          inference_microdollars_held: 15_000_000,
+        })
+        .where(eq(payerTable.id, subject.id));
+      if (subject.type === 'org') {
+        await client.db
+          .update(organizations)
+          .set({ microdollars_balance: 20_000_000 })
+          .where(eq(organizations.id, subject.id));
+      }
+      const heldContext = {
+        ...context,
+        instanceId: `held-${subjectType}-${suffix}`,
+        sku: paidSkuId,
+        subject,
+      };
+      const heldFingerprint = await usageContextFingerprint(heldContext);
+      const startEpochMs = Date.now();
+      const heldIntervalId = `cloud-agent-next:${heldContext.instanceId}:${startEpochMs}`;
+      const start = {
+        ...heldContext,
+        startEpochMs,
+        idempotencyKey: startIdempotencyKey(
+          heldContext.service,
+          heldContext.instanceId,
+          startEpochMs
+        ),
+      };
+
+      try {
+        expect(
+          await applyStartWithDb(
+            client.db,
+            start,
+            heldIntervalId,
+            heldFingerprint,
+            startEpochMs,
+            paidBillingConfig
+          )
+        ).toMatchObject({
+          kind: 'rejected',
+          code: 'insufficient_credits',
+          remainingMicrodollars: 5_000_000,
+        });
+        expect(
+          await client.db
+            .select()
+            .from(container_usage_interval)
+            .where(eq(container_usage_interval.id, heldIntervalId))
+        ).toEqual([]);
+
+        await client.db
+          .update(payerTable)
+          .set({ inference_microdollars_held: 10_000_000 })
+          .where(eq(payerTable.id, subject.id));
+        expect(
+          await applyStartWithDb(
+            client.db,
+            start,
+            heldIntervalId,
+            heldFingerprint,
+            startEpochMs,
+            paidBillingConfig
+          )
+        ).toMatchObject({
+          kind: 'applied',
+          billingMode: 'paid',
+          remainingMicrodollars: 10_000_000,
+        });
+        const firstHeartbeat = {
+          service: heldContext.service,
+          instanceId: heldContext.instanceId,
+          startEpochMs,
+          idempotencyKey: heartbeatIdempotencyKey(
+            heldContext.service,
+            heldContext.instanceId,
+            startEpochMs,
+            1
+          ),
+          seq: 1,
+          usageSinceLast: 10,
+          context: heldContext,
+        };
+        expect(
+          await applyHeartbeatWithDb(
+            client.db,
+            firstHeartbeat,
+            heldIntervalId,
+            heldFingerprint,
+            startEpochMs + 10_000,
+            paidBillingConfig
+          )
+        ).toMatchObject({
+          dedup: false,
+          budget: { verdict: 'warn', remainingMicrodollars: 9_900_000 },
+        });
+
+        await client.db
+          .update(payerTable)
+          .set({ inference_microdollars_held: 19_800_000 })
+          .where(eq(payerTable.id, subject.id));
+        expect(
+          await applyHeartbeatWithDb(
+            client.db,
+            firstHeartbeat,
+            heldIntervalId,
+            heldFingerprint,
+            startEpochMs + 10_000,
+            paidBillingConfig
+          )
+        ).toMatchObject({
+          dedup: true,
+          budget: { verdict: 'stop', remainingMicrodollars: 100_000 },
+        });
+        const secondHeartbeat = {
+          ...firstHeartbeat,
+          idempotencyKey: heartbeatIdempotencyKey(
+            heldContext.service,
+            heldContext.instanceId,
+            startEpochMs,
+            2
+          ),
+          seq: 2,
+          usageSinceLast: 20,
+        };
+        expect(
+          await applyHeartbeatWithDb(
+            client.db,
+            secondHeartbeat,
+            heldIntervalId,
+            heldFingerprint,
+            startEpochMs + 30_000,
+            paidBillingConfig
+          )
+        ).toMatchObject({
+          dedup: false,
+          budget: { verdict: 'stop', remainingMicrodollars: -100_000 },
+        });
+        const [payer] = await client.db
+          .select({
+            used: payerTable.microdollars_used,
+            held: payerTable.inference_microdollars_held,
+          })
+          .from(payerTable)
+          .where(eq(payerTable.id, subject.id));
+        expect(payer).toEqual({ used: 300_000, held: 19_800_000 });
+        const charges = await client.db
+          .select()
+          .from(compute_usage_charge)
+          .where(eq(compute_usage_charge.usage_source_id, secondHeartbeat.idempotencyKey));
+        expect(charges).toHaveLength(1);
+        expect(charges[0]?.amount_microdollars).toBe(200_000);
+      } finally {
+        await client.db
+          .update(payerTable)
+          .set({ inference_microdollars_held: 0 })
+          .where(eq(payerTable.id, subject.id));
+      }
+    }
+  );
 });
 
 function timestamp(milliseconds: number): string {

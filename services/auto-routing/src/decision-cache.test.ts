@@ -16,7 +16,8 @@ const writerEnv = {
   INTERNAL_API_SECRET_PROD: { get: async () => 'test-secret' },
 };
 
-async function classifierUsage() {
+function classifierUsage() {
+  const usageId = crypto.randomUUID();
   return buildClassifierUsage(
     MirrorPayloadSchema.parse({
       userId: 'user-1',
@@ -41,10 +42,8 @@ async function classifierUsage() {
     }),
     {
       conversationKey: 'conversation-1',
-      classifierModel: 'test/classifier',
-      contentHash: 'hash',
-      kind: 'sync',
-      requestStart: 'request-start',
+      usageId,
+      prepaidReservationId: usageId,
     },
     0.000013,
     new Date().toISOString()
@@ -236,7 +235,8 @@ describe('AutoRoutingDecisionCacheDO', () => {
 describe('classifier usage retries', () => {
   it('persists before delivery and retries failures with the same event until recorded', async () => {
     const { cacheDO, storage } = createCacheDO();
-    const usage = await classifierUsage();
+    const usage = classifierUsage();
+    expect(usage.metadata.prepaid_reservation_id).toBe(usage.core.id);
     const key = `usage:${usage.core.id}`;
     fetchMock.mockRejectedValueOnce(new Error('connection lost'));
     await cacheDO.recordClassifierUsage(usage);
@@ -279,7 +279,7 @@ describe('classifier usage retries', () => {
 
   it('accepts duplicate acknowledgement after a lost recorded response and stops retries', async () => {
     const { cacheDO, storage } = createCacheDO();
-    const usage = await classifierUsage();
+    const usage = classifierUsage();
     fetchMock.mockRejectedValueOnce(new Error('response lost after commit'));
     await cacheDO.recordClassifierUsage(usage);
     fetchMock.mockResolvedValueOnce(
@@ -307,7 +307,7 @@ describe('classifier usage retries', () => {
     const { cacheDO, storage } = createCacheDO();
     await cacheDO.putEntry('model:hash', classification);
     const sweepAt = Date.now() + 30 * 60 * 1000;
-    const usage = await classifierUsage();
+    const usage = classifierUsage();
     fetchMock.mockResolvedValue(Response.json({ status: 'not_recorded', result: null }));
     await cacheDO.recordClassifierUsage(usage);
     await expect(storage.getAlarm()).resolves.toBe(Date.now() + 1000);
@@ -340,7 +340,7 @@ describe('classifier usage retries', () => {
     const { cacheDO, storage } = createCacheDO();
     await cacheDO.putEntry('model:hash', classification);
     const sweepAt = Date.now() + 30 * 60 * 1000;
-    const usage = await classifierUsage();
+    const usage = classifierUsage();
     fetchMock.mockImplementation(async () =>
       Response.json({ status: 'not_recorded', result: null })
     );
@@ -378,7 +378,7 @@ describe('classifier usage retries', () => {
 
   it('logs and removes writes still unavailable at the retry horizon', async () => {
     const { cacheDO, storage } = createCacheDO();
-    const usage = await classifierUsage();
+    const usage = classifierUsage();
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     fetchMock.mockResolvedValue(Response.json({ status: 'not_recorded', result: null }));
     await cacheDO.recordClassifierUsage(usage);

@@ -3,6 +3,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   exa_monthly_usage,
   exa_usage_log,
+  inference_reservations,
   kilocode_users,
   organization_user_usage,
   organizations,
@@ -12,6 +13,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } from './exa-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { reserveInferenceCredits } from '@kilocode/db/inference-reservations';
 
 // Mock next/server's after function which requires request context
 jest.mock('next/server', () => ({
@@ -82,6 +84,40 @@ describe('Exa Usage Tracking', () => {
   });
 
   describe('recordExaUsage', () => {
+    test('settles an explicit zero charge without consuming held credit', async () => {
+      const user = await insertTestUser({ total_microdollars_acquired: 100 });
+      const requestId = crypto.randomUUID();
+      try {
+        await reserveInferenceCredits(db, { requestId, userId: user.id, amountMicrodollars: 60 });
+        await recordExaUsage({
+          userId: user.id,
+          organizationId: undefined,
+          path: '/search',
+          costMicrodollars: 0,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 0,
+          prepaidReservationId: requestId,
+        });
+        const [updated] = await db
+          .select()
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, user.id));
+        const [reservation] = await db
+          .select()
+          .from(inference_reservations)
+          .where(eq(inference_reservations.request_id, requestId));
+        expect(updated).toMatchObject({ microdollars_used: 0, inference_microdollars_held: 0 });
+        expect(reservation).toMatchObject({ status: 'settled', actual_cost_microdollars: 0 });
+      } finally {
+        await db.delete(exa_monthly_usage).where(eq(exa_monthly_usage.kilo_user_id, user.id));
+        await db.delete(exa_usage_log).where(eq(exa_usage_log.kilo_user_id, user.id));
+        await db
+          .delete(inference_reservations)
+          .where(eq(inference_reservations.kilo_user_id, user.id));
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
+      }
+    });
+
     test('creates a counter row on first request with free allowance', async () => {
       const user = await insertTestUser();
 

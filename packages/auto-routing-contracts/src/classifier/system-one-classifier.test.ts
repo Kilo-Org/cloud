@@ -48,6 +48,62 @@ afterEach(() => {
 });
 
 describe('classifyWithSystemOne', () => {
+  it('waits for credit admission before dispatching the provider request', async () => {
+    const fetchMock = mockFetch(
+      Response.json({
+        answers: answers({ 'debugging/test_repair': 1 }),
+        usage: { cost: 0.0001 },
+      })
+    );
+    const admission = Promise.withResolvers<unknown>();
+    const beforeRequest = async () => admission.promise;
+    const pending = classifyWithSystemOne(
+      { ...client, beforeRequest, retryTransientFailures: false },
+      input,
+      'typesafe/jev-1.13'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    admission.resolve(buildClassifierRequest(input, 'typesafe/jev-1.13'));
+    await expect(pending).resolves.toMatchObject({
+      classification: { taskType: 'debugging', subtaskType: 'test_repair' },
+    });
+  });
+
+  it('does not dispatch after admission rejects', async () => {
+    const fetchMock = mockFetch(new Response(null, { status: 200 }));
+    await expect(
+      classifyWithSystemOne(
+        {
+          ...client,
+          beforeRequest: async () => {
+            throw new Error('Insufficient credits');
+          },
+        },
+        input,
+        'typesafe/jev-1.13'
+      )
+    ).rejects.toThrow('Insufficient credits');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['transport', 'http'] as const)(
+    'does not retry an admitted provider attempt after %s failure',
+    async failure => {
+      const fetchMock = vi.fn<typeof fetch>();
+      if (failure === 'transport') fetchMock.mockRejectedValue(new Error('response lost'));
+      else fetchMock.mockResolvedValue(new Response(null, { status: 503 }));
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(
+        classifyWithSystemOne(
+          { ...client, beforeRequest: async body => body, retryTransientFailures: false },
+          input,
+          'typesafe/jev-1.13'
+        )
+      ).rejects.toBeInstanceOf(ClassifierRunError);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('sends the classifier questions to OpenRouter System One and decodes the answers', async () => {
     const fetchMock = mockFetch(
       Response.json({

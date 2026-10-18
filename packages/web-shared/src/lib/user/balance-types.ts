@@ -5,6 +5,7 @@ export type UserForBalance = Pick<
   | 'id'
   | 'total_microdollars_acquired'
   | 'microdollars_used'
+  | 'inference_microdollars_held'
   | 'next_credit_expiration_at'
   | 'updated_at'
   | 'auto_top_up_enabled'

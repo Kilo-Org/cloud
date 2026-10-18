@@ -18,6 +18,8 @@ import {
   extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
+  hasReportedCost,
+  hasValidTokenCounts,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -50,6 +52,15 @@ type MessagesApiUsage = Anthropic.Messages.MessageDeltaUsage & {
   is_byok?: boolean | null;
   cost_details?: { upstream_inference_cost: number };
 };
+
+function hasCompleteMessagesTokenUsage(usage: MessagesApiUsage | null | undefined): boolean {
+  return hasValidTokenCounts(
+    usage?.input_tokens,
+    usage?.output_tokens,
+    usage?.cache_read_input_tokens ?? 0,
+    usage?.cache_creation_input_tokens ?? 0
+  );
+}
 
 function getVercelResolvedModel(
   providerMetadata: VercelProviderMetaData | null | undefined
@@ -133,6 +144,9 @@ export async function parseMessagesMicrodollarUsageFromStream(
   let finish_reason: string | null = null;
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
+  let sawMessageStop = false;
+  let sawFinalUsage = false;
+  let finalCostReported = false;
 
   const sseStreamParser = createParser({
     onEvent(event: EventSourceMessage) {
@@ -176,6 +190,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
       if (json.type === 'message_start') {
         messageId = json.message.id;
         model = json.message.model;
+        usage = { ...usage, ...json.message.usage };
         const openRouterProvider = (json.message as MaybeHasOpenRouterProvider).provider;
         if (openRouterProvider) {
           inference_provider = openRouterProvider;
@@ -192,14 +207,26 @@ export async function parseMessagesMicrodollarUsageFromStream(
 
       if (json.type === 'message_delta') {
         finish_reason = json.delta.stop_reason;
-        usage = json.usage ?? usage;
+        usage = {
+          ...usage,
+          ...json.usage,
+          input_tokens: json.usage?.input_tokens ?? usage?.input_tokens ?? null,
+          cache_read_input_tokens:
+            json.usage?.cache_read_input_tokens ?? usage?.cache_read_input_tokens ?? null,
+          cache_creation_input_tokens:
+            json.usage?.cache_creation_input_tokens ?? usage?.cache_creation_input_tokens ?? null,
+        };
+        sawFinalUsage =
+          json.delta.stop_reason != null && hasValidTokenCounts(json.usage?.output_tokens);
         const meta = (json as MaybeHasVercelProviderMetadata).provider_metadata;
+        finalCostReported = sawFinalUsage && hasReportedCost(json.usage, meta);
         if (meta) {
           providerMetadata = meta;
           model = getVercelResolvedModel(meta) ?? model;
           inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
         }
       }
+      if (json.type === 'message_stop') sawMessageStop = true;
     },
   });
 
@@ -234,7 +261,9 @@ export async function parseMessagesMicrodollarUsageFromStream(
   } satisfies NotYetCostedUsageStats;
 
   const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
-  return { ...coreProps, ...costs };
+  const final = sawMessageStop && sawFinalUsage && !wasAborted && !reportedError;
+  const hasFinalTokenUsage = final && hasCompleteMessagesTokenUsage(usage);
+  return { ...coreProps, ...costs, hasFinalTokenUsage, hasFinalCost: final && finalCostReported };
 }
 
 export function parseMessagesMicrodollarUsageFromString(
@@ -273,7 +302,14 @@ export function parseMessagesMicrodollarUsageFromString(
   } satisfies NotYetCostedUsageStats;
 
   const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
-  return { ...coreProps, ...costs };
+  const final = typeof finish_reason === 'string' && finish_reason.length > 0;
+  const hasFinalTokenUsage = final && hasCompleteMessagesTokenUsage(usage);
+  return {
+    ...coreProps,
+    ...costs,
+    hasFinalTokenUsage,
+    hasFinalCost: final && hasReportedCost(usage, providerMetadata),
+  };
 }
 
 export function extractMessagesPromptInfo(body: GatewayMessagesRequest): PromptInfo {

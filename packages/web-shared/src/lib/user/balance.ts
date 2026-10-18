@@ -32,6 +32,8 @@ export async function getBalanceForUser(
   }
 
   after(() => maybePerformAutoTopUp(user));
-  const balance = (user.total_microdollars_acquired - user.microdollars_used) / 1_000_000;
+  const balance =
+    (user.total_microdollars_acquired - user.microdollars_used - user.inference_microdollars_held) /
+    1_000_000;
   return { balance };
 }

@@ -105,6 +105,10 @@ export type NotYetCostedUsageStats = {
 };
 
 export type JustTheCostsUsageStats = {
+  /** Complete cumulative token counters from a terminal provider response, never inferred defaults. */
+  hasFinalTokenUsage?: boolean;
+  /** Authoritative final upstream charge, or a fixed billing calculation over final token counters. */
+  hasFinalCost?: boolean;
   cost_mUsd: number;
   cacheDiscount_mUsd?: number;
   /** The real cost before any free/BYOK/promo zeroing. Set by processTokenData. */
@@ -166,6 +170,7 @@ export type MicrodollarUsageContext = {
    * do not need to know about it.
    */
   clientRequestId?: string | null;
+  prepaidReservationId?: string;
   /**
    * Report-only bouncer telemetry. Set on every gateway inference request that
    * reports a usage event; absent only on the internal classifier overhead row.
@@ -239,6 +244,8 @@ export type UsageRecordWriteOutcome = UsageRecordInsertResult & { wasRedelivery:
 
 export type UsageMetaData = {
   id: string;
+  prepaid_reservation_id?: string | null;
+  prepaid_usage_final?: boolean;
   message_id: string;
   created_at: string;
   http_x_forwarded_for: string | null;

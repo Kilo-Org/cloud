@@ -142,14 +142,14 @@ async function balanceForSubject(
     subject.type === 'user'
       ? tx
           .select({
-            remaining: sql<number>`${kilocode_users.total_microdollars_acquired} - ${kilocode_users.microdollars_used}`,
+            remaining: sql<number>`${kilocode_users.total_microdollars_acquired} - ${kilocode_users.microdollars_used} - ${kilocode_users.inference_microdollars_held}`,
           })
           .from(kilocode_users)
           .where(eq(kilocode_users.id, subject.id))
           .limit(1)
       : tx
           .select({
-            remaining: sql<number>`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`,
+            remaining: sql<number>`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used} - ${organizations.inference_microdollars_held}`,
           })
           .from(organizations)
           .where(eq(organizations.id, subject.id))
@@ -246,7 +246,7 @@ async function settleSegment(
         })
         .where(eq(kilocode_users.id, interval.subject_id))
         .returning({
-          remaining: sql<number>`${kilocode_users.total_microdollars_acquired} - ${kilocode_users.microdollars_used}`,
+          remaining: sql<number>`${kilocode_users.total_microdollars_acquired} - ${kilocode_users.microdollars_used} - ${kilocode_users.inference_microdollars_held}`,
         });
       if (!payer) throw new UsageMutationConflictError('Billing subject not found');
       remainingMicrodollars = Number(payer.remaining);
@@ -260,7 +260,7 @@ async function settleSegment(
         })
         .where(eq(organizations.id, interval.subject_id))
         .returning({
-          remaining: sql<number>`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`,
+          remaining: sql<number>`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used} - ${organizations.inference_microdollars_held}`,
         });
       if (!payer) throw new UsageMutationConflictError('Billing subject not found');
       remainingMicrodollars = Number(payer.remaining);

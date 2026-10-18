@@ -8,12 +8,11 @@ import {
   kilo_pass_issuance_items,
   kilo_pass_issuances,
 } from '@kilocode/db/schema';
-import type { Organization } from '@kilocode/db/schema';
+import type { Organization, User } from '@kilocode/db/schema';
 import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest, sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { failureResult, successResult, type Result } from '@kilocode/web-shared/lib/maybe-result';
-import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   getOrganizationById,
@@ -60,6 +59,11 @@ function createAutoTopUpFeeDeps(): ServiceFeeCheckoutDependencies {
 
 type AutoTopUpResult = Result<{ stripe_id: string }, string>;
 
+type AutoTopUpUser = Pick<
+  User,
+  'id' | 'auto_top_up_enabled' | 'total_microdollars_acquired' | 'microdollars_used'
+>;
+
 type AutoTopUpOrganization = Pick<
   Organization,
   'id' | 'auto_top_up_enabled' | 'total_microdollars_acquired' | 'microdollars_used'
@@ -71,7 +75,7 @@ type AutoTopUpOrganization = Pick<
  * Only minimal fields needed - fresh data is fetched inside performAutoTopUpForEntity.
  */
 export type AutoTopUpEntity =
-  | { type: 'user'; user: UserForBalance }
+  | { type: 'user'; user: AutoTopUpUser }
   | { type: 'organization'; organization: AutoTopUpOrganization };
 
 function orgThresholdDollars(thresholdCents: number | null | undefined): number {
@@ -127,7 +131,7 @@ async function shouldWaitForKiloPassBonusCredits(kiloUserId: string): Promise<bo
  *
  * Credit application is handled by the `invoice.paid` Stripe webhook.
  */
-export async function maybePerformAutoTopUp(user: UserForBalance): Promise<void> {
+export async function maybePerformAutoTopUp(user: AutoTopUpUser): Promise<void> {
   return await maybePerformAutoTopUpForEntity({ type: 'user', user });
 }
 

@@ -21,6 +21,11 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import {
+  admitPrepaidInference,
+  cancelPrepaidInference,
+} from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
@@ -173,6 +178,75 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
 
+  const usageContext: MicrodollarUsageContext = {
+    api_kind: 'systemone',
+    kiloUserId: user.id,
+    provider: 'openrouter',
+    requested_model: requestedModel,
+    promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
+    max_tokens: null,
+    has_middle_out_transform: null,
+    reasoning_setting: null,
+    fraudHeaders,
+    isStreaming: false,
+    organizationId,
+    prior_microdollar_usage: user.microdollars_used,
+    posthog_distinct_id: user.google_user_email,
+    project_id: projectId,
+    status_code: null,
+    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
+    user_byok: false,
+    has_tools: false,
+    botId,
+    tokenSource,
+    feature,
+    session_id: extractHeaderAndLimitLength(request, 'X-KiloCode-TaskId'),
+    mode: extractHeaderAndLimitLength(request, 'x-kilocode-mode'),
+    auto_model: null,
+    ttfb_ms: null,
+    bouncer: {
+      requestId: bouncerRequestId,
+      occurredAt: new Date(startedAtMs),
+      accountId: bouncerAccountId(user.id, organizationId),
+      clientIp: payerSharingIp(bouncerIp, feature),
+      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      requestedLogprobs: false,
+      samples: null,
+      promptSimHash: null,
+      spendWatch: bouncerVerdict?.spendWatch === true,
+    },
+  };
+
+  const upstreamBody = {
+    ...parsed.data,
+    provider: providerPolicy,
+    user: generateProviderSpecificHash(user.id, OPENROUTER),
+  };
+  const admission = await admitPrepaidInference({
+    requestId: bouncerRequestId,
+    userId: user.id,
+    organizationId,
+    apiKind: 'systemone',
+    model: requestedModel,
+    providerId: OPENROUTER.id,
+    body: upstreamBody,
+    zeroCost: false,
+    signal: request.signal,
+  });
+  if (admission.kind === 'rejected') return admission.response;
+  usageContext.prepaidReservationId = admission.reservationId;
+  if (request.signal.aborted) {
+    if (admission.reservationId) {
+      await cancelPrepaidInference({
+        requestId: admission.reservationId,
+        userId: user.id,
+        organizationId,
+      });
+    }
+    return new NextResponse(null, { status: 499 });
+  }
+
   let response: Response;
   let responseBody: unknown;
   let ttfbMs: number;
@@ -184,11 +258,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         Authorization: `Bearer ${OPENROUTER.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        ...parsed.data,
-        provider: providerPolicy,
-        user: generateProviderSpecificHash(user.id, OPENROUTER),
-      }),
+      body: JSON.stringify(upstreamBody),
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(10 * 60 * 1000)]),
     });
     ttfbMs = Math.max(0, Math.round(performance.now() - startedAt));
@@ -217,6 +287,8 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   const { id, model, provider, usage } = result.data;
   const cost = toMicrodollars(usage.cost);
+  usageContext.status_code = response.status;
+  usageContext.ttfb_ms = ttfbMs;
   after(async () => {
     await logMicrodollarUsageAndReportToBouncer(
       {
@@ -234,6 +306,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         cancelled: false,
         status_code: response.status,
         cost_mUsd: cost,
+        hasFinalCost: Number.isSafeInteger(cost) && cost >= 0,
         market_cost: cost,
         inputTokens: usage.input_tokens,
         outputTokens: usage.output_tokens,
@@ -241,47 +314,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         cacheHitTokens: 0,
         is_byok: false,
       },
-      {
-        api_kind: 'systemone',
-        kiloUserId: user.id,
-        provider: 'openrouter',
-        requested_model: requestedModel,
-        promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
-        max_tokens: null,
-        has_middle_out_transform: null,
-        reasoning_setting: null,
-        fraudHeaders,
-        isStreaming: false,
-        organizationId,
-        prior_microdollar_usage: user.microdollars_used,
-        posthog_distinct_id: user.google_user_email,
-        project_id: projectId,
-        status_code: response.status,
-        editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-        machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
-        user_byok: false,
-        has_tools: false,
-        botId,
-        tokenSource,
-        feature,
-        session_id: extractHeaderAndLimitLength(request, 'X-KiloCode-TaskId'),
-        mode: extractHeaderAndLimitLength(request, 'x-kilocode-mode'),
-        auto_model: null,
-        ttfb_ms: ttfbMs,
-        bouncer: {
-          requestId: bouncerRequestId,
-          occurredAt: new Date(startedAtMs),
-          accountId: bouncerAccountId(user.id, organizationId),
-          clientIp: payerSharingIp(bouncerIp, feature),
-          clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
-          requestedLogprobs: false,
-          samples: null,
-          // System One input is a typed classification payload, not a conversation,
-          // so there is no prompt text to hash (and no raw state leaves the gateway).
-          promptSimHash: null,
-          spendWatch: bouncerVerdict?.spendWatch === true,
-        },
-      }
+      usageContext
     );
   });
   return NextResponse.json(responseBody);

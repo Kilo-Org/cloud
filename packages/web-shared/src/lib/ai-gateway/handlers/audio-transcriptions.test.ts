@@ -7,6 +7,13 @@ import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight'
 import type { User } from '@kilocode/db/schema';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { NextResponse } from 'next/server';
+import {
+  admitPrepaidInference,
+  cancelPrepaidInference,
+} from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
+import { handleAudioTranscriptionsRequest } from './audio-transcriptions';
+import { countAndStoreTranscriptionUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 
 jest.mock('next/server', () => {
   return {
@@ -27,6 +34,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   isFreeModel: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/prepaid-inference', () => ({
+  admitPrepaidInference: jest.fn(),
+  cancelPrepaidInference: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers');
@@ -100,6 +111,7 @@ function makeUpstreamResponse(body: unknown, status = 200) {
 describe('POST /api/gateway/v1/audio/transcriptions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(admitPrepaidInference).mockResolvedValue({ kind: 'admitted' });
     globalThis.fetch = mockedFetch;
     mockedIsAutoTopUpInFlight.mockResolvedValue(false);
   });
@@ -108,8 +120,52 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     globalThis.fetch = originalFetch;
   });
 
+  it.each([undefined, 'transcription-reservation'])(
+    'cancels only reserved aborted work: %s',
+    async reservationId => {
+      setUserAuth();
+      const controller = new AbortController();
+      const request = new Request(
+        makeRequest({
+          model: 'openai/gpt-4o-mini-transcribe',
+          input_audio: { data: 'UklGRiQA', format: 'wav' },
+        }),
+        { signal: controller.signal }
+      );
+      jest.mocked(admitPrepaidInference).mockImplementation(async ({ signal }) => {
+        expect(signal).toBe(request.signal);
+        controller.abort();
+        return { kind: 'admitted', reservationId };
+      });
+      const response = await handleAudioTranscriptionsRequest(request as never);
+      expect(response.status).toBe(499);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(cancelPrepaidInference).toHaveBeenCalledTimes(reservationId ? 1 : 0);
+    }
+  );
+
+  it('does not dispatch when prepaid admission rejects', async () => {
+    setUserAuth();
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'rejected',
+      response: NextResponse.json({ error: 'Insufficient credits' }, { status: 402 }),
+    });
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+    expect(response.status).toBe(402);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
   it('proxies transcription requests to OpenRouter', async () => {
     setUserAuth();
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'admitted',
+      reservationId: 'transcription-reservation',
+    });
     mockedFetch.mockResolvedValue(
       makeUpstreamResponse({
         text: 'hello world',
@@ -147,6 +203,12 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(upstream.input_audio).toEqual({ data: 'UklGRiQA', format: 'wav' });
     expect(upstream.safety_identifier).toBeTruthy();
     expect(upstream.user).toBe(upstream.safety_identifier);
+    expect(admitPrepaidInference).toHaveBeenCalledWith(
+      expect.objectContaining({ body: upstream, zeroCost: false })
+    );
+    expect(jest.mocked(countAndStoreTranscriptionUsage).mock.calls[0]?.[1]).toMatchObject({
+      prepaidReservationId: 'transcription-reservation',
+    });
     expect(mockedEmitApiMetricsForResponse.mock.calls[0]?.[0]).not.toMatchObject({
       feature: 'vscode-extension',
     });

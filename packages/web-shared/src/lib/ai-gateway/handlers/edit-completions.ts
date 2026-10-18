@@ -5,6 +5,10 @@ import { NextResponse } from 'next/server';
 import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import {
+  admitPrepaidInference,
+  cancelPrepaidInference,
+} from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
@@ -306,6 +310,29 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   });
 
   const bodyForUpstream = { ...requestBody, model: upstreamModel };
+  const admission = await admitPrepaidInference({
+    requestId: bouncerRequestId,
+    userId: user.id,
+    organizationId,
+    apiKind: usageContext.api_kind,
+    model: usageContext.requested_model,
+    providerId: editProvider,
+    body: bodyForUpstream,
+    zeroCost: isFreeModel(requestBody.model) || !!userByokEntry,
+    signal: request.signal,
+  });
+  if (admission.kind === 'rejected') return admission.response;
+  usageContext.prepaidReservationId = admission.reservationId;
+  if (request.signal.aborted) {
+    if (admission.reservationId) {
+      await cancelPrepaidInference({
+        requestId: admission.reservationId,
+        userId: user.id,
+        organizationId,
+      });
+    }
+    return new NextResponse(null, { status: 499 });
+  }
 
   const proxyRes = await fetch(INCEPTION_EDIT_URL, {
     method: 'POST',
@@ -314,6 +341,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(bodyForUpstream),
+    signal: request.signal,
   });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;

@@ -3,6 +3,10 @@ import { NextResponse, type NextResponse as NextResponseType } from 'next/server
 import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import {
+  admitPrepaidInference,
+  cancelPrepaidInference,
+} from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
@@ -385,6 +389,30 @@ export async function handleEmbeddingsRequest(
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
+
+  const admission = await admitPrepaidInference({
+    requestId: bouncerRequestId,
+    userId: user.id,
+    organizationId,
+    apiKind: usageContext.api_kind,
+    model: usageContext.requested_model,
+    providerId: effectiveProvider.id,
+    body: upstreamBody,
+    zeroCost: isFreeModel(requestedModelLowerCased) || !!userByok,
+    signal: request.signal,
+  });
+  if (admission.kind === 'rejected') return admission.response;
+  usageContext.prepaidReservationId = admission.reservationId;
+  if (request.signal.aborted) {
+    if (admission.reservationId) {
+      await cancelPrepaidInference({
+        requestId: admission.reservationId,
+        userId: user.id,
+        organizationId,
+      });
+    }
+    return new NextResponse(null, { status: 499 });
+  }
 
   const response = await embeddingProxyRequest({
     body: upstreamBody,

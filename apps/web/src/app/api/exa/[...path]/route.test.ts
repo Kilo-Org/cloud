@@ -12,6 +12,7 @@ import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/con
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { captureException } from '@sentry/nextjs';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { admitPrepaidInference } from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
 
 // Capture promises scheduled via next/server `after` so tests can await them.
 let afterCallbacks: (() => Promise<void>)[] = [];
@@ -34,6 +35,10 @@ async function flushAfterCallbacks() {
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   EXA_API_KEY: 'test-exa-key',
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/prepaid-inference', () => ({
+  admitPrepaidInference: jest.fn(),
+  cancelPrepaidInference: jest.fn(async () => undefined),
 }));
 
 jest.mock('@kilocode/web-shared/lib/user/server');
@@ -80,12 +85,31 @@ function makeUpstreamResponse(body: unknown, headers?: Record<string, string>, s
 describe('POST /api/exa/[...path]', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(admitPrepaidInference).mockResolvedValue({ kind: 'admitted' });
     afterCallbacks = [];
     globalThis.fetch = mockedFetch;
     // Default: user is within free tier, no existing row
     mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
     mockedGetExaFreeAllowanceMicrodollars.mockReturnValue(EXA_MONTHLY_ALLOWANCE_MICRODOLLARS);
     mockedRecordExaUsage.mockResolvedValue();
+  });
+
+  it('does not dispatch paid search when credit admission rejects it', async () => {
+    setUserAuth();
+    mockedGetExaMonthlyUsage.mockResolvedValue({
+      usage: EXA_MONTHLY_ALLOWANCE_MICRODOLLARS,
+      freeAllowance: EXA_MONTHLY_ALLOWANCE_MICRODOLLARS,
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 1 });
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'rejected',
+      response: NextResponse.json({ error: 'Credit authorization unavailable' }, { status: 503 }),
+    });
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest('/search') as never);
+    expect(response.status).toBe(503);
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(mockedRecordExaUsage).not.toHaveBeenCalled();
   });
 
   afterAll(() => {

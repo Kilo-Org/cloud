@@ -5,6 +5,7 @@ const mockedWarnExceptInTest = jest.fn();
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   AUTO_ROUTING_WORKER_URL: '',
   INTERNAL_API_SECRET: '',
+  isPrepaidInferenceReservationsEnabled: jest.fn(() => false),
 }));
 
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
@@ -17,6 +18,7 @@ import {
   detectRequiredInputModalities,
   estimateRoutingTokens,
 } from '@kilocode/auto-routing-contracts';
+import { isPrepaidInferenceReservationsEnabled } from '@kilocode/web-shared/lib/config.server';
 
 const originalFetch = globalThis.fetch;
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
@@ -68,12 +70,27 @@ const validResponse = {
 describe('fetchEfficientAutoDecision', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(isPrepaidInferenceReservationsEnabled).mockReturnValue(false);
     globalThis.fetch = mockedFetch;
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
   });
+
+  it.each([false, true])(
+    'marks required classifier admission only when enabled=%s',
+    async enabled => {
+      jest.mocked(isPrepaidInferenceReservationsEnabled).mockReturnValue(enabled);
+      mockedFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(validResponse), { status: 200 })
+      );
+      await fetchEfficientAutoDecision(makeParams(), options);
+      const headers = new Headers(mockedFetch.mock.calls[0]?.[1]?.headers);
+      expect(headers.get('x-kilo-prepaid-admission')).toBe(enabled ? 'required' : null);
+      expect(headers.get('authorization')).toBe('Bearer classifier-token');
+    }
+  );
 
   it('returns the decision on a 200 response with valid body', async () => {
     mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));

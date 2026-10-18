@@ -34,7 +34,12 @@ import {
   coding_plan_terms,
   credit_transactions,
   kilocode_users,
+  inference_reservations,
 } from '@kilocode/db/schema';
+import {
+  releaseInferenceCredits,
+  reserveInferenceCredits,
+} from '@kilocode/db/inference-reservations';
 
 const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
@@ -81,6 +86,7 @@ async function createUserWithBalance(microdollars: number) {
 }
 
 afterEach(async () => {
+  await db.delete(inference_reservations);
   await db.delete(coding_plan_availability_intents);
   await db.delete(coding_plan_terms);
   await db.delete(coding_plan_subscriptions);
@@ -299,6 +305,25 @@ describe('coding plans', () => {
     expect(managedKey.management_source).toBe('coding_plan');
     expect(inventoryKey.status).toBe('assigned');
     expect(inventoryKey.assigned_to_user_id).toBe(user.id);
+  });
+
+  it('cannot purchase a coding plan using credit held for inference', async () => {
+    const user = await createUserWithBalance(COST_MICRODOLLARS);
+    await seedInventoryKey('held-credit-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);
+    const reservation = { requestId: crypto.randomUUID(), userId: user.id, amountMicrodollars: 1 };
+    expect(await reserveInferenceCredits(db, reservation)).toMatchObject({ kind: 'reserved' });
+
+    await expect(
+      subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'held-credit-purchase')
+    ).rejects.toThrow('Insufficient credit balance');
+    const [heldUser] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, user.id));
+    expect(heldUser).toMatchObject({ microdollars_used: 0, inference_microdollars_held: 1 });
+    expect(await db.select().from(coding_plan_terms)).toHaveLength(0);
+    await db.transaction(tx => releaseInferenceCredits(tx, reservation));
+
+    await expect(
+      subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'held-credit-purchase')
+    ).resolves.toMatchObject({ subscriptionId: expect.any(String) });
   });
 
   it('returns prior outcome when an activation request is retried', async () => {

@@ -13,6 +13,7 @@ import { AutoRoutingDecisionCacheDO, clearClassificationHotCache } from './decis
 import { clearAutoRoutingSettingsCache } from './routing-mode';
 import { app } from './index';
 import { ClassifierRunError, type ClassifierRunResult } from './model-classifier';
+import { buildClassifierRequest } from '@kilocode/auto-routing-contracts/classifier';
 import type * as DbModule from '@kilocode/db';
 import type * as ModelClassifierModule from './model-classifier';
 import type {
@@ -26,11 +27,7 @@ import type {
 import { CLASSIFIER_WINNER_KV_KEY } from '@kilocode/auto-routing-contracts';
 import { computeContentHashes } from './conversation-identity';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
-import {
-  buildClassifierUsage,
-  writeClassifierUsage,
-  type ClassifierCallKind,
-} from './classifier-usage';
+import { buildClassifierUsage, writeClassifierUsage } from './classifier-usage';
 
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const getWorkerDb = vi.hoisted(() => vi.fn());
@@ -80,6 +77,7 @@ const env = {
     get: async () => 'classifier-token',
   },
   KILO_WEB_API_BASE_URL: 'https://web.example.test',
+  GATEWAY_PREPAID_RESERVATIONS_ENABLED: 'false',
   AUTO_ROUTING_CONFIG: {
     get: configGet,
     delete: configDelete,
@@ -264,12 +262,13 @@ function localRequest(path: string, init: RequestInit = {}) {
   return app.request(`http://localhost:8810${path}`, init, env, executionCtx);
 }
 
-function decideRequest(payload: unknown) {
+function decideRequest(payload: unknown, headers: Record<string, string> = {}) {
   return request('/decide', {
     method: 'POST',
     headers: {
       authorization: 'Bearer classifier-token',
       'content-type': 'application/json',
+      ...headers,
     },
     body: JSON.stringify(payload),
   });
@@ -277,6 +276,7 @@ function decideRequest(payload: unknown) {
 
 describe('auto routing worker', () => {
   beforeEach(async () => {
+    env.GATEWAY_PREPAID_RESERVATIONS_ENABLED = 'false';
     clearClassifierConfigCache();
     clearRoutingTableCache();
     clearModelCapabilitiesCache();
@@ -374,6 +374,187 @@ describe('auto routing worker', () => {
     });
     globalThis.fetch = mockedFetch;
     clearCustomRoutingTableCache();
+  });
+
+  describe.each(['worker', 'gateway'] as const)('%s prepaid classifier enforcement', source => {
+    it.each(['sync', 'speculative', 'background'] as const)(
+      'reserves and settles the same usage identity for %s calls',
+      async kind => {
+        if (kind === 'background') {
+          mockStoredConversation();
+          await decideRequest(mirrorPayload());
+          await drainBackgroundTasks();
+          cacheRecordClassifierUsage.mockClear();
+        }
+        env.GATEWAY_PREPAID_RESERVATIONS_ENABLED = source === 'worker' ? 'true' : 'false';
+        let reservedId: string | undefined;
+        mockedFetch.mockImplementation(async (_url, init) => {
+          const body = JSON.parse(typeof init?.body === 'string' ? init.body : '');
+          if (body.action === 'admit') {
+            reservedId = body.requestId;
+            return Response.json({
+              kind: 'admitted',
+              reservationId: body.requestId,
+              body: { ...body.body, max_tokens: 64 },
+            });
+          }
+          const usage = UsageRecordRequestSchema.parse(body);
+          return Response.json({
+            status: 'recorded',
+            result: {
+              usageId: usage.core.id,
+              createdAt: usage.core.created_at,
+              newMicrodollarsUsed: usage.core.cost,
+            },
+          });
+        });
+        const dispatch = vi.fn();
+        classifyNormalizedInput.mockImplementation(
+          async (...args: Parameters<typeof ModelClassifierModule.classifyNormalizedInput>) => {
+            const [, input, model, admission] = args;
+            if (!admission?.beforeRequest) throw new Error('Missing prepaid admission');
+            expect(admission.retryTransientFailures).toBe(false);
+            const body = await admission.beforeRequest(buildClassifierRequest(input, model), model);
+            dispatch(body);
+            return { ...mockClassifierResult, classifierModel: model };
+          }
+        );
+        await decideRequest(
+          mirrorPayload({
+            input: {
+              ...normalizedInput,
+              userPromptPrefix: `Admission ${kind}`,
+              messageCount: kind === 'speculative' ? 1 : 4,
+            },
+          }),
+          source === 'gateway' ? { 'x-kilo-prepaid-admission': 'required' } : {}
+        );
+        await drainBackgroundTasks();
+        expect(dispatch).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ max_tokens: 64 })
+        );
+        expect(reservedId).toBeDefined();
+        expect(cacheRecordClassifierUsage).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({
+            core: expect.objectContaining({ id: reservedId }),
+            metadata: expect.objectContaining({ prepaid_reservation_id: reservedId }),
+          })
+        );
+      }
+    );
+
+    it.each([402, 200])(
+      'does not dispatch or bill without reserved admission (status=%s)',
+      async status => {
+        env.GATEWAY_PREPAID_RESERVATIONS_ENABLED = source === 'worker' ? 'true' : 'false';
+        mockedFetch.mockImplementation(async (_url, init) => {
+          const command = JSON.parse(typeof init?.body === 'string' ? init.body : '');
+          return status === 402
+            ? new Response(null, { status })
+            : Response.json({ kind: 'admitted', body: command.body });
+        });
+        const dispatch = vi.fn();
+        classifyNormalizedInput.mockImplementation(
+          async (...args: Parameters<typeof ModelClassifierModule.classifyNormalizedInput>) => {
+            const [, input, model, admission] = args;
+            if (!admission?.beforeRequest) throw new Error('Missing prepaid admission');
+            await admission.beforeRequest(buildClassifierRequest(input, model), model);
+            dispatch();
+            return mockClassifierResult;
+          }
+        );
+        await decideRequest(
+          mirrorPayload(),
+          source === 'gateway' ? { 'x-kilo-prepaid-admission': 'required' } : {}
+        );
+        await drainBackgroundTasks();
+        expect(dispatch).not.toHaveBeenCalled();
+        expect(cacheRecordClassifierUsage).not.toHaveBeenCalled();
+      }
+    );
+
+    it('does not dispatch or bill when a primary admission acknowledgement is lost', async () => {
+      env.GATEWAY_PREPAID_RESERVATIONS_ENABLED = source === 'worker' ? 'true' : 'false';
+      mockedFetch.mockImplementation(async (_url, init) => {
+        const command = JSON.parse(typeof init?.body === 'string' ? init.body : '');
+        if (command.action === 'admit') throw new Error('Primary acknowledgement lost');
+        return Response.json({ kind: 'released' });
+      });
+      const dispatch = vi.fn();
+      classifyNormalizedInput.mockImplementation(
+        async (...args: Parameters<typeof ModelClassifierModule.classifyNormalizedInput>) => {
+          const [, input, model, admission] = args;
+          if (!admission?.beforeRequest) throw new Error('Missing prepaid admission');
+          await admission.beforeRequest(buildClassifierRequest(input, model), model);
+          dispatch();
+          return mockClassifierResult;
+        }
+      );
+      await decideRequest(
+        mirrorPayload(),
+        source === 'gateway' ? { 'x-kilo-prepaid-admission': 'required' } : {}
+      );
+      await drainBackgroundTasks();
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(cacheRecordClassifierUsage).not.toHaveBeenCalled();
+    });
+
+    it('assigns distinct paid operation IDs to parallel identical calls with frozen clocks', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(1_780_000_000_000);
+      vi.spyOn(performance, 'now').mockReturnValue(10);
+      env.GATEWAY_PREPAID_RESERVATIONS_ENABLED = source === 'worker' ? 'true' : 'false';
+      const admittedIds: string[] = [];
+      mockedFetch.mockImplementation(async (_url, init) => {
+        const body = JSON.parse(typeof init?.body === 'string' ? init.body : '');
+        if (body.action === 'admit') {
+          admittedIds.push(body.requestId);
+          return Response.json({
+            kind: 'admitted',
+            reservationId: body.requestId,
+            body: body.body,
+          });
+        }
+        const usage = UsageRecordRequestSchema.parse(body);
+        return Response.json({
+          status: 'recorded',
+          result: {
+            usageId: usage.core.id,
+            createdAt: usage.core.created_at,
+            newMicrodollarsUsed: usage.core.cost,
+          },
+        });
+      });
+      const bothAdmitted = Promise.withResolvers<void>();
+      let providerCalls = 0;
+      classifyNormalizedInput.mockImplementation(
+        async (...args: Parameters<typeof ModelClassifierModule.classifyNormalizedInput>) => {
+          const [, input, model, admission] = args;
+          if (!admission?.beforeRequest) throw new Error('Missing prepaid admission');
+          await admission.beforeRequest(buildClassifierRequest(input, model), model);
+          providerCalls++;
+          if (providerCalls === 2) bothAdmitted.resolve();
+          await bothAdmitted.promise;
+          return { ...mockClassifierResult, classifierModel: model };
+        }
+      );
+      const payload = mirrorPayload({ input: { ...normalizedInput, messageCount: 1 } });
+      const headers: Record<string, string> =
+        source === 'gateway' ? { 'x-kilo-prepaid-admission': 'required' } : {};
+      await Promise.all([decideRequest(payload, headers), decideRequest(payload, headers)]);
+      await drainBackgroundTasks();
+      expect(providerCalls).toBe(2);
+      expect(admittedIds).toHaveLength(2);
+      expect(new Set(admittedIds).size).toBe(2);
+      const bills = cacheRecordClassifierUsage.mock.calls.map(([usage]) =>
+        UsageRecordRequestSchema.parse(usage)
+      );
+      expect(bills).toHaveLength(2);
+      expect(new Set(bills.map(usage => usage.core.id))).toEqual(new Set(admittedIds));
+      for (const usage of bills) {
+        expect(usage.metadata.prepaid_reservation_id).toBe(usage.core.id);
+        expect(usage.metadata.prepaid_usage_final).toBe(true);
+      }
+    });
   });
 
   afterEach(async () => {
@@ -1768,21 +1949,14 @@ describe('auto routing worker', () => {
       vi.spyOn(performance, 'now').mockReturnValue(10);
     });
 
-    async function expectClassifierUsage(
-      input: NormalizedClassifierInput,
-      kind: ClassifierCallKind,
-      cost: number
-    ) {
+    async function expectClassifierUsage(input: NormalizedClassifierInput, cost: number) {
       await drainBackgroundTasks();
-      const hashes = await computeContentHashes(input);
-      const expected = await buildClassifierUsage(
+      const usage = UsageRecordRequestSchema.parse(cacheRecordClassifierUsage.mock.calls[0]?.[0]);
+      const expected = buildClassifierUsage(
         mirrorPayload({ input }),
         {
           conversationKey: 'user:user-1:task:task-123',
-          classifierModel,
-          contentHash: hashes.exact,
-          kind,
-          requestStart: `${generation}:10`,
+          usageId: usage.core.id,
         },
         cost,
         new Date(generation).toISOString()
@@ -1858,7 +2032,6 @@ describe('auto routing worker', () => {
           }
           await expectClassifierUsage(
             { ...normalizedInput, messageCount } as NormalizedClassifierInput,
-            'speculative',
             classifierResult.cost ?? 0
           );
         }
@@ -1946,7 +2119,6 @@ describe('auto routing worker', () => {
           );
           await expectClassifierUsage(
             input as NormalizedClassifierInput,
-            'speculative',
             classifierResult.cost ?? 0
           );
           await expect(
@@ -1963,7 +2135,6 @@ describe('auto routing worker', () => {
           expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
           await expectClassifierUsage(
             input as NormalizedClassifierInput,
-            'speculative',
             classifierResult.cost ?? 0
           );
         }
@@ -1985,7 +2156,6 @@ describe('auto routing worker', () => {
       expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
       await expectClassifierUsage(
         normalizedInput as NormalizedClassifierInput,
-        'sync',
         mockClassifierResult.cost
       );
     });
@@ -2057,11 +2227,7 @@ describe('auto routing worker', () => {
           await pending;
           await drainBackgroundTasks();
         }
-        await expectClassifierUsage(
-          input as NormalizedClassifierInput,
-          'speculative',
-          classifierResult.cost ?? 0
-        );
+        await expectClassifierUsage(input as NormalizedClassifierInput, classifierResult.cost ?? 0);
         const decisionLogs = [...logSpy.mock.calls, ...warnSpy.mock.calls]
           .map(([message]) => JSON.parse(String(message)))
           .filter(entry => entry.event === 'auto_routing_decision');
@@ -2086,11 +2252,7 @@ describe('auto routing worker', () => {
             cost: 0,
           }
         );
-        await expectClassifierUsage(
-          input as NormalizedClassifierInput,
-          'speculative',
-          classifierResult.cost ?? 0
-        );
+        await expectClassifierUsage(input as NormalizedClassifierInput, classifierResult.cost ?? 0);
         expect(classifyNormalizedInput).toHaveBeenCalledTimes(result === 'success' ? 1 : 3);
       }
     );
@@ -2126,7 +2288,6 @@ describe('auto routing worker', () => {
       );
       await expectClassifierUsage(
         { ...normalizedInput, messageCount: 2 } as NormalizedClassifierInput,
-        'speculative',
         classifierResult.cost ?? 0
       );
       expect(cachePutEntry).not.toHaveBeenCalled();
@@ -2138,7 +2299,6 @@ describe('auto routing worker', () => {
       ).resolves.toMatchObject({ cost: 0 });
       await expectClassifierUsage(
         { ...normalizedInput, messageCount: 2 } as NormalizedClassifierInput,
-        'speculative',
         classifierResult.cost ?? 0
       );
     });

@@ -31,6 +31,10 @@ import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gatewa
 import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
+  admitPrepaidInference,
+  cancelPrepaidInference,
+} from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
+import {
   systemOneRequestSchema,
   TYPESAFE_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/typesafe/schemas';
@@ -97,6 +101,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitGatewayApiMetrics: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/prepaid-inference', () => ({
+  admitPrepaidInference: jest.fn(),
+  cancelPrepaidInference: jest.fn(),
 }));
 
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
@@ -196,6 +204,7 @@ function mockVerdict(verdict: DecideResponse | null) {
 describe('handleSystemOneRequest', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(admitPrepaidInference).mockResolvedValue({ kind: 'admitted' });
     globalThis.fetch = mockedFetch;
     setAuth();
     mockVerdict(null);
@@ -236,6 +245,62 @@ describe('handleSystemOneRequest', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it.each([undefined, 'systemone-reservation'])(
+    'cancels only reserved aborted work: %s',
+    async reservationId => {
+      const controller = new AbortController();
+      const request = new NextRequest(makeRequest({ ...requestBody, model: TYPESAFE_MODEL }), {
+        signal: controller.signal,
+      });
+      jest.mocked(admitPrepaidInference).mockImplementation(async ({ signal }) => {
+        expect(signal).toBe(request.signal);
+        controller.abort();
+        return { kind: 'admitted', reservationId };
+      });
+      const response = await handleSystemOneRequest(request);
+      expect(response.status).toBe(499);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(cancelPrepaidInference).toHaveBeenCalledTimes(reservationId ? 1 : 0);
+    }
+  );
+
+  it('does not dispatch when prepaid admission rejects', async () => {
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'rejected',
+      response: NextResponse.json({ error: 'Insufficient credits' }, { status: 402 }),
+    });
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: TYPESAFE_MODEL })
+    );
+    expect(response.status).toBe(402);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('quotes the final request and carries its reservation into usage', async () => {
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'admitted',
+      reservationId: 'systemone-reservation',
+    });
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: TYPESAFE_MODEL })
+    );
+    expect(response.status).toBe(200);
+    expect(admitPrepaidInference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKind: 'systemone',
+        model: TYPESAFE_MODEL,
+        providerId: 'openrouter',
+        body: upstreamRequest().body,
+        zeroCost: false,
+      })
+    );
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ prepaidReservationId: 'systemone-reservation' })
+    );
   });
 
   it('supports the TypeSafe SDK contract through a custom fetch transport', async () => {

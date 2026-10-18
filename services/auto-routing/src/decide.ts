@@ -50,7 +50,8 @@ import { getEffectiveAutoRoutingSettings } from './routing-mode';
 import type { HonoEnv } from './hono-env';
 import { getModelCapabilities } from './model-capabilities';
 import type { ModelCapabilitiesMap } from './model-capabilities';
-import { recordClassifierUsage, type ClassifierCallKind } from './classifier-usage';
+import { recordClassifierUsage, type ClassifierUsageIdentity } from './classifier-usage';
+import { admitClassifierInference } from './prepaid-inference';
 
 const CUSTOM_ROUTING_TABLE_CACHE_TTL_MS = 60_000;
 
@@ -379,7 +380,6 @@ function recordDecision(
 
 export const decideHandler: Handler<HonoEnv> = async c => {
   const generation = Date.now();
-  const requestStart = `${generation}:${performance.now()}`;
   const usageCreatedAt = new Date(generation).toISOString();
   let rawBody: unknown;
   try {
@@ -458,18 +458,38 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   })();
   const classifyAndBill = async (
     ctx: DecisionContext,
-    classifierModel: string,
-    kind: ClassifierCallKind
+    classifierModel: string
   ): Promise<ClassifierRunResult> => {
-    const identity = {
+    const identity: ClassifierUsageIdentity = {
       conversationKey: ctx.conversationKey,
-      classifierModel,
-      contentHash: ctx.hashes.exact,
-      kind,
-      requestStart,
+      usageId: crypto.randomUUID(),
     };
     try {
-      const classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel);
+      let classifier: ClassifierRunResult;
+      if (
+        c.req.header('x-kilo-prepaid-admission') === 'required' ||
+        ('GATEWAY_PREPAID_RESERVATIONS_ENABLED' in c.env &&
+          String(c.env.GATEWAY_PREPAID_RESERVATIONS_ENABLED) === 'true')
+      ) {
+        const userId = payload.userId;
+        if (!userId) throw new Error('Classifier prepaid admission requires a payer');
+        classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel, {
+          retryTransientFailures: false,
+          beforeRequest: async (body, model) => {
+            const admission = await admitClassifierInference(c.env, {
+              requestId: identity.usageId,
+              userId,
+              organizationId: payload.organizationId ?? null,
+              model,
+              body,
+            });
+            identity.prepaidReservationId = admission.reservationId;
+            return admission.body;
+          },
+        });
+      } else {
+        classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel);
+      }
       c.executionCtx.waitUntil(
         recordClassifierUsage(c.env, payload, identity, classifier.cost, usageCreatedAt)
       );
@@ -514,10 +534,10 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       successSampleRate,
       timings,
     };
-    const runClassifier = async (kind: ClassifierCallKind): Promise<ClassifierOutcome> => {
+    const runClassifier = async (): Promise<ClassifierOutcome> => {
       const classifierStartedAt = performance.now();
       try {
-        const classifier = await classifyAndBill(ctx, classifierModel, kind);
+        const classifier = await classifyAndBill(ctx, classifierModel);
         return { kind: 'model', classifier };
       } catch (error) {
         return { kind: 'error', error };
@@ -528,7 +548,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     const speculative: ClassificationRun | null =
       (payload.input.messageCount === null || payload.input.messageCount <= 2) &&
       !getHotCachedClassification(hashes.exact, classifierModel, router)
-        ? { promise: runClassifier('speculative'), outcome: null }
+        ? { promise: runClassifier(), outcome: null }
         : null;
     if (speculative) {
       speculative.promise = speculative.promise.then(outcome => {
@@ -587,7 +607,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       }
     }
 
-    const outcome = await (speculative?.promise ?? runClassifier('sync'));
+    const outcome = await (speculative?.promise ?? runClassifier());
     return { ctx, sticky, speculative, outcome };
   })();
   // Keep an in-flight paid call alive if the gateway disconnects before its response.
@@ -620,7 +640,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           const classifier =
             speculativeOutcome?.kind === 'model'
               ? speculativeOutcome.classifier
-              : await classifyAndBill(ctx, outcome.classifierModel, 'background');
+              : await classifyAndBill(ctx, outcome.classifierModel);
           backgroundCtx.timings.classifierMs = speculative
             ? timings.classifierMs
             : performance.now() - classifierStartedAt;

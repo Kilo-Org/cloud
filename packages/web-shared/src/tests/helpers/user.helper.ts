@@ -18,6 +18,7 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     created_at: now,
     updated_at: now,
     microdollars_used: 0,
+    inference_microdollars_held: 0,
     kilo_pass_threshold: null,
     total_microdollars_acquired: 0,
     is_admin: false,

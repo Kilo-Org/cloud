@@ -31,10 +31,7 @@ const payload: MirrorPayload = {
 };
 const identity: ClassifierUsageIdentity = {
   conversationKey: 'conversation-1',
-  classifierModel: 'test/classifier',
-  contentHash: 'exact-content-hash',
-  kind: 'sync',
-  requestStart: 'request-start-1',
+  usageId: '00000000-0000-4000-8000-000000000001',
 };
 const createdAt = '2026-01-01T00:00:00.000Z';
 const costUsd = 0.000013;
@@ -52,58 +49,42 @@ afterEach(() => {
 });
 
 describe('classifier usage identity', () => {
-  it('produces a stable UUID per call independently of delivery time', async () => {
-    const first = await buildClassifierUsage(payload, identity, costUsd, createdAt);
-    const retry = await buildClassifierUsage(
+  it('uses the pre-dispatch identity for reservation settlement metadata', () => {
+    const usage = buildClassifierUsage(
       payload,
-      identity,
+      { ...identity, prepaidReservationId: identity.usageId },
       costUsd,
-      '2026-01-02T00:00:00.000Z'
+      createdAt
     );
-    expect(first.core.id).toBe(retry.core.id);
+    expect(usage.core.id).toBe(identity.usageId);
+    expect(usage.metadata.prepaid_reservation_id).toBe(identity.usageId);
+    const unreservedUsage = buildClassifierUsage(payload, identity, costUsd, createdAt);
+    expect(unreservedUsage.metadata.prepaid_reservation_id).toBeUndefined();
+  });
+
+  it('preserves the supplied UUID independently of delivery time', () => {
+    const first = buildClassifierUsage(payload, identity, costUsd, createdAt);
+    const retry = buildClassifierUsage(payload, identity, costUsd, '2026-01-02T00:00:00.000Z');
+    expect(first.core.id).toBe(identity.usageId);
+    expect(retry.core.id).toBe(identity.usageId);
     expect(first.metadata.id).toBe(first.core.id);
     expect(UsageRecordRequestSchema.safeParse(first).success).toBe(true);
   });
 
-  it.each([
-    { conversationKey: 'conversation-2' },
-    { classifierModel: 'other/classifier' },
-    { contentHash: 'other-exact-hash' },
-    { kind: 'background' as const },
-    { kind: 'speculative' as const },
-    { requestStart: 'request-start-2' },
-  ])('separates calls when identity changes: %j', async change => {
-    const first = await buildClassifierUsage(payload, identity, costUsd, createdAt);
-    const other = await buildClassifierUsage(
+  it('keeps distinct operation IDs for otherwise identical usage', () => {
+    const first = buildClassifierUsage(payload, identity, costUsd, createdAt);
+    const other = buildClassifierUsage(
       payload,
-      { ...identity, ...change },
+      { ...identity, usageId: '00000000-0000-4000-8000-000000000002' },
       costUsd,
       createdAt
     );
     expect(first.core.id).not.toBe(other.core.id);
+    expect(other.metadata.id).toBe(other.core.id);
   });
 
-  it('namespaces usage IDs by router and defaults omitted routers to efficient', async () => {
-    const defaultUsage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
-    const efficientUsage = await buildClassifierUsage(
-      { ...payload, router: 'efficient' },
-      identity,
-      costUsd,
-      createdAt
-    );
-    const frontierUsage = await buildClassifierUsage(
-      { ...payload, router: 'frontier' },
-      identity,
-      costUsd,
-      createdAt
-    );
-    expect(defaultUsage.core.id).toBe(efficientUsage.core.id);
-    expect(frontierUsage.core.id).not.toBe(efficientUsage.core.id);
-    expect(frontierUsage.metadata.id).toBe(frontierUsage.core.id);
-  });
-
-  it('matches classifier billing fields without persisting prompt text or lifecycle identity', async () => {
-    const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+  it('matches classifier billing fields without persisting prompt text or lifecycle identity', () => {
+    const usage = buildClassifierUsage(payload, identity, costUsd, createdAt);
     expect(usage.core).toMatchObject({
       kilo_user_id: payload.userId,
       model: 'auto-routing/classifier',
@@ -131,21 +112,21 @@ describe('classifier usage identity', () => {
     expect(JSON.stringify(usage)).not.toContain('private');
   });
 
-  it('maps an omitted organization to the same personal payer as the parsed payload', async () => {
+  it('maps an omitted organization to the same personal payer as the parsed payload', () => {
     const legacyPayload = { ...payload };
     Reflect.deleteProperty(legacyPayload, 'organizationId');
     const parsedPayload = MirrorPayloadSchema.parse(legacyPayload);
     expect(parsedPayload.organizationId).toBeNull();
-    const legacyUsage = await buildClassifierUsage(legacyPayload, identity, costUsd, createdAt);
-    const parsedUsage = await buildClassifierUsage(parsedPayload, identity, costUsd, createdAt);
+    const legacyUsage = buildClassifierUsage(legacyPayload, identity, costUsd, createdAt);
+    const parsedUsage = buildClassifierUsage(parsedPayload, identity, costUsd, createdAt);
     expect(legacyUsage.core.organization_id).toBeNull();
     expect(legacyUsage).toEqual(parsedUsage);
     expect(legacyUsage.core.cost).toBe(13);
   });
 
-  it('preserves the org payer and strips NUL bytes from client metadata', async () => {
+  it('preserves the org payer and strips NUL bytes from client metadata', () => {
     const organizationId = '00000000-0000-4000-8000-000000000001';
-    const usage = await buildClassifierUsage(
+    const usage = buildClassifierUsage(
       {
         ...payload,
         organizationId,
@@ -169,28 +150,20 @@ describe('classifier usage identity', () => {
 });
 
 describe('classifier usage delivery', () => {
-  it.each(['sync', 'background', 'speculative'] as const)(
-    'hands off one durable event for a %s call with no dependency on a decide response',
-    async kind => {
-      const record = vi.fn(async () => {});
-      const idFromName = vi.fn((name: string) => name);
-      const env = {
-        AUTO_ROUTING_DECISION_CACHE: {
-          idFromName,
-          get: vi.fn(() => ({ recordClassifierUsage: record })),
-        },
-      } as unknown as Env;
-      await recordClassifierUsage(env, payload, { ...identity, kind }, costUsd, createdAt);
-      const expected = await buildClassifierUsage(
-        payload,
-        { ...identity, kind },
-        costUsd,
-        createdAt
-      );
-      expect(record).toHaveBeenCalledExactlyOnceWith(expected);
-      expect(idFromName).toHaveBeenCalledExactlyOnceWith(`efficient:${identity.conversationKey}`);
-    }
-  );
+  it('hands off one durable event with no dependency on a decide response', async () => {
+    const record = vi.fn(async () => {});
+    const idFromName = vi.fn((name: string) => name);
+    const env = {
+      AUTO_ROUTING_DECISION_CACHE: {
+        idFromName,
+        get: vi.fn(() => ({ recordClassifierUsage: record })),
+      },
+    } as unknown as Env;
+    await recordClassifierUsage(env, payload, identity, costUsd, createdAt);
+    const expected = buildClassifierUsage(payload, identity, costUsd, createdAt);
+    expect(record).toHaveBeenCalledExactlyOnceWith(expected);
+    expect(idFromName).toHaveBeenCalledExactlyOnceWith(`efficient:${identity.conversationKey}`);
+  });
 
   it('delivers frontier usage through its router-scoped conversation object', async () => {
     const record = vi.fn(async () => {});
@@ -241,7 +214,7 @@ describe('classifier usage delivery', () => {
   });
 
   it('posts the usage contract to the existing web writer using the internal secret', async () => {
-    const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    const usage = buildClassifierUsage(payload, identity, costUsd, createdAt);
     fetchMock.mockResolvedValueOnce(
       Response.json({
         status: 'recorded',
@@ -270,7 +243,7 @@ describe('classifier usage delivery', () => {
   });
 
   it('returns unavailable when the secret cannot be read so the DO retains the event', async () => {
-    const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    const usage = buildClassifierUsage(payload, identity, costUsd, createdAt);
     await expect(
       writeClassifierUsage(
         {

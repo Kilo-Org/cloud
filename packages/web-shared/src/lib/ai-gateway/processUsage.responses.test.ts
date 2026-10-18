@@ -222,7 +222,11 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'openrouter',
       200
     );
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -239,7 +243,11 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'vercel',
       200
     );
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -283,7 +291,11 @@ describe('parseMicrodollarUsageFromString approval tests', () => {
     const inputFile = join(sampleDir, openrouterResponsesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
     const result = parseResponsesMicrodollarUsageFromString(jsonString, 200);
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -293,8 +305,120 @@ describe('parseMicrodollarUsageFromString approval tests', () => {
     const inputFile = join(sampleDir, vercelResponsesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
     const result = parseResponsesMicrodollarUsageFromString(jsonString, 200);
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
+});
+
+describe('authoritative Responses usage evidence', () => {
+  function stream(type: string, usage?: object): ReadableStream<Uint8Array> {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            'data: ' +
+              JSON.stringify({
+                type,
+                response: {
+                  id: 'response',
+                  model: 'model',
+                  status: type.slice('response.'.length),
+                  usage,
+                },
+              }) +
+              '\n\n'
+          )
+        );
+        controller.close();
+      },
+    });
+  }
+
+  test('does not promote in-progress counters or positive costs into a final charge', async () => {
+    const stats = await parseResponsesMicrodollarUsageFromStream(
+      stream('response.in_progress', {
+        input_tokens: 10,
+        output_tokens: 5,
+        cost: 0.01,
+      }),
+      'user',
+      undefined,
+      'martian',
+      200
+    );
+    expect(stats).toMatchObject({
+      cost_mUsd: 10000,
+      hasFinalTokenUsage: false,
+      hasFinalCost: false,
+    });
+  });
+
+  test.each(['response.completed', 'response.incomplete', 'response.failed'])(
+    'accepts authoritative terminal usage from %s',
+    async type => {
+      const stats = await parseResponsesMicrodollarUsageFromStream(
+        stream(type, {
+          input_tokens: 0,
+          output_tokens: 0,
+          cost: 0,
+        }),
+        'user',
+        undefined,
+        'openrouter',
+        200
+      );
+      expect(stats).toMatchObject({ hasFinalTokenUsage: true, hasFinalCost: true });
+    }
+  );
+
+  test('does not synthesize a final zero for a terminal event missing usage', async () => {
+    const stats = await parseResponsesMicrodollarUsageFromStream(
+      stream('response.completed'),
+      'user',
+      undefined,
+      'martian',
+      200
+    );
+    expect(stats).toMatchObject({ hasFinalTokenUsage: false, hasFinalCost: false });
+  });
+
+  test('requires usage on the complete nonstream response, not HTTP success alone', () => {
+    const stats = parseResponsesMicrodollarUsageFromString(
+      JSON.stringify({
+        id: 'response',
+        model: 'model',
+        status: 'completed',
+        output: [],
+      }),
+      200
+    );
+    expect(stats).toMatchObject({ hasFinalTokenUsage: false, hasFinalCost: false });
+  });
+});
+
+test('does not reuse early Responses gateway cost metadata as a final charge', async () => {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(
+        new TextEncoder().encode(
+          'data: {"type":"response.in_progress","response":{"id":"response","model":"model","status":"in_progress","usage":{"input_tokens":10,"output_tokens":0},"provider_metadata":{"gateway":{"marketCost":"0"}}}}\n\n' +
+            'data: {"type":"response.completed","response":{"id":"response","model":"model","status":"completed","usage":{"input_tokens":10,"output_tokens":5}}}\n\n'
+        )
+      );
+      controller.close();
+    },
+  });
+  const stats = await parseResponsesMicrodollarUsageFromStream(
+    stream,
+    'user',
+    undefined,
+    'vercel',
+    200
+  );
+  expect(stats).toMatchObject({ hasFinalTokenUsage: true, hasFinalCost: false });
 });

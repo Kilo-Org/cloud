@@ -20,7 +20,12 @@ import {
   coding_plan_terms,
   credit_transactions,
   kilocode_users,
+  inference_reservations,
 } from '@kilocode/db/schema';
+import {
+  releaseInferenceCredits,
+  reserveInferenceCredits,
+} from '@kilocode/db/inference-reservations';
 
 jest.mock('@kilocode/web-shared/lib/autoTopUp', () => ({
   maybePerformAutoTopUp: jest.fn(async () => undefined),
@@ -116,6 +121,7 @@ async function createGrandfatheredMiniMaxSubscription(planId: CodingPlanId, cost
 
 afterEach(async () => {
   jest.mocked(maybePerformAutoTopUp).mockClear();
+  await db.delete(inference_reservations);
   await db.delete(coding_plan_terms);
   await db.delete(coding_plan_subscriptions);
   await db.delete(byok_api_keys);
@@ -409,6 +415,38 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.status).toBe('past_due');
     expect(subscription.payment_grace_expires_at).not.toBeNull();
     expect(maybePerformAutoTopUp).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not renew using held inference credit and recovers after confirmed release', async () => {
+    const { user, subscriptionId } = await createSubscription(COST_MICRODOLLARS * 2, true);
+    const reservation = { requestId: crypto.randomUUID(), userId: user.id, amountMicrodollars: 1 };
+    expect(await reserveInferenceCredits(db, reservation)).toMatchObject({ kind: 'reserved' });
+
+    const blocked = await runCodingPlanBillingLifecycleCron(db);
+    expect(blocked.renewals).toBe(0);
+    expect(blocked.past_due_started).toBe(1);
+    const [heldUser] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, user.id));
+    expect(heldUser).toMatchObject({
+      microdollars_used: COST_MICRODOLLARS,
+      inference_microdollars_held: 1,
+    });
+    await db.transaction(tx => releaseInferenceCredits(tx, reservation));
+
+    const recovered = await runCodingPlanBillingLifecycleCron(db);
+    expect(recovered.renewals).toBe(1);
+    const [subscription] = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, subscriptionId));
+    expect(subscription.status).toBe('active');
+    const [chargedUser] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(chargedUser).toMatchObject({
+      microdollars_used: COST_MICRODOLLARS * 2,
+      inference_microdollars_held: 0,
+    });
   });
 
   it('restores active status when credits arrive during grace', async () => {

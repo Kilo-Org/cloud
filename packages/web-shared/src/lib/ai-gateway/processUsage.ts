@@ -89,12 +89,15 @@ import {
   extractVercelIsByok,
   extractVercelUpstreamId,
   isResponseInterruptedError,
+  hasReportedCost,
+  hasValidTokenCounts,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import {
   calculateCost_mUsd,
   type KiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
@@ -106,6 +109,10 @@ import {
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
 import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
+import {
+  lockInferenceReservationForSettlement,
+  settleInferenceCredits,
+} from '@kilocode/db/inference-reservations';
 
 const posthogClient = PostHogClient();
 
@@ -155,6 +162,9 @@ export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
     kilo_user_id: usageContext.kiloUserId,
+    ...(usageContext.prepaidReservationId
+      ? { prepaid_reservation_id: usageContext.prepaidReservationId }
+      : {}),
     organization_id: usageContext.organizationId ?? null,
     ...usageContext.fraudHeaders,
     provider: usageContext.provider,
@@ -214,7 +224,7 @@ export async function toInsertableDbUsageRecord(
   usageStats: MicrodollarUsageStats,
   usageContextInfo: UsageContextInfo
 ): Promise<CoreUsageWithMetaData> {
-  const id = randomUUID();
+  const id = usageContextInfo.prepaid_reservation_id ?? randomUUID();
   const created_at = new Date().toISOString();
 
   const { kilo_user_id, organization_id, project_id, provider, ttfb_ms, ...metadataFromContext } =
@@ -242,6 +252,9 @@ export async function toInsertableDbUsageRecord(
 
   const metadata: UsageMetaData = {
     ...metadataFromContext,
+    ...(usageContextInfo.prepaid_reservation_id
+      ? { prepaid_usage_final: usageStats.hasFinalCost === true }
+      : {}),
     id,
     created_at,
     message_id: usageStats.messageId ?? '<missing>',
@@ -326,6 +339,14 @@ export async function logMicrodollarUsage(
   usageContext: MicrodollarUsageContext,
   bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
 ): Promise<{ usageId: string; createdAt: string } | null> {
+  if (usageContext.prepaidReservationId && usageStats.hasFinalCost !== true) {
+    console.warn('prepaid inference settlement pending authoritative usage', {
+      requestId: usageContext.prepaidReservationId,
+      provider: usageContext.provider,
+      upstreamId: usageStats.upstream_id ?? usageStats.messageId,
+    });
+    return null;
+  }
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
   const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
@@ -570,6 +591,21 @@ async function insertUsageTransaction(
 ): Promise<UsageTransactionResult> {
   return db.transaction(async tx => {
     await setUsageTransactionIdleTimeout(tx);
+    const settlement =
+      metadataFields.prepaid_reservation_id && metadataFields.prepaid_usage_final === true
+        ? {
+            requestId: metadataFields.prepaid_reservation_id,
+            userId: coreUsageFields.kilo_user_id,
+            organizationId: coreUsageFields.organization_id ?? undefined,
+            actualCostMicrodollars: coreUsageFields.cost,
+          }
+        : undefined;
+    if (settlement) {
+      if (settlement.requestId !== coreUsageFields.id) {
+        throw new Error('Reservation and usage identities differ');
+      }
+      await lockInferenceReservationForSettlement(tx, settlement);
+    }
     const inserted = await insertUsageAndMetadataWithBalanceUpdate(
       tx,
       coreUsageFields,
@@ -590,6 +626,7 @@ async function insertUsageTransaction(
         inserted.organizationUsage = await mutateOrganizationUsage(tx, coreUsageFields);
       }
     }
+    if (settlement) await settleInferenceCredits(tx, settlement);
     if (coreUsageFields.cost !== 0) {
       await enqueueDailyUsageRollupRepair(tx, {
         usageId: coreUsageFields.id,
@@ -744,6 +781,14 @@ export async function insertUsageRecord(
   metadataFields: UsageMetaData,
   bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
 ): Promise<UsageRecordWriteOutcome | null> {
+  if (metadataFields.prepaid_reservation_id && metadataFields.prepaid_usage_final !== true) {
+    console.warn('prepaid inference settlement pending authoritative usage', {
+      requestId: metadataFields.prepaid_reservation_id,
+      provider: coreUsageFields.provider,
+      upstreamId: metadataFields.upstream_id ?? metadataFields.message_id,
+    });
+    return null;
+  }
   try {
     const result = await startSpan(
       {
@@ -1020,7 +1065,7 @@ export function countAndStoreUsage(
     try {
       return parse(await clonedReponse.text());
     } catch (error) {
-      if (isResponseInterruptedError(error)) return null;
+      if (usageContext.prepaidReservationId || isResponseInterruptedError(error)) return null;
       throw error;
     }
   };
@@ -1095,6 +1140,17 @@ export function processOpenRouterUsage(
   };
 }
 
+function hasCompleteChatTokenUsage(usage: OpenRouterUsage | null | undefined): boolean {
+  return hasValidTokenCounts(
+    usage?.prompt_tokens,
+    usage?.completion_tokens,
+    usage?.prompt_tokens_details?.cached_tokens ?? 0,
+    usage?.prompt_tokens_details?.cache_write_tokens ??
+      usage?.prompt_tokens_details?.cache_creation_input_tokens ??
+      0
+  );
+}
+
 export async function parseMicrodollarUsageFromStream(
   stream: ReadableStream,
   kiloUserId: string,
@@ -1124,6 +1180,8 @@ export async function parseMicrodollarUsageFromStream(
   let inference_provider: string | null = null;
   let finish_reason: string | null = null;
   let vercelProviderMetadata: VercelProviderMetaData | null = null;
+  let sawDone = false;
+  let sawFinalUsage = false;
 
   const sseStreamParser = createParser({
     onEvent(event: EventSourceMessage) {
@@ -1137,6 +1195,7 @@ export async function parseMicrodollarUsageFromStream(
       }
 
       if (event.data === '[DONE]') {
+        sawDone = true;
         return;
       }
 
@@ -1174,6 +1233,10 @@ export async function parseMicrodollarUsageFromStream(
       model = json.model ?? model;
       messageId = json.id ?? messageId;
       usage = json.usage ?? usage;
+      if (json.usage) {
+        sawFinalUsage =
+          Array.isArray(json.choices) && json.choices.every(choice => choice.finish_reason != null);
+      }
       const choice = json.choices?.[0];
       const chunkProviderMetadata = choice?.delta?.provider_metadata;
       if (chunkProviderMetadata) {
@@ -1225,7 +1288,14 @@ export async function parseMicrodollarUsageFromStream(
 
   const costs = processOpenRouterUsage(usage, coreProps, vercelProviderMetadata);
 
-  return { ...coreProps, ...costs };
+  const final = sawDone && sawFinalUsage && !wasAborted && !reportedError;
+  const hasFinalTokenUsage = final && hasCompleteChatTokenUsage(usage);
+  return {
+    ...coreProps,
+    ...costs,
+    hasFinalTokenUsage,
+    hasFinalCost: final && hasReportedCost(usage),
+  };
 }
 
 export function parseMicrodollarUsageFromString(
@@ -1268,7 +1338,18 @@ export function parseMicrodollarUsageFromString(
 
   const costs = processOpenRouterUsage(responseJson?.usage, coreProps, vercelProviderMetadata);
 
-  return { ...coreProps, ...costs };
+  const terminal =
+    Boolean(responseJson?.choices?.length) &&
+    responseJson?.choices.every(
+      choice => typeof choice.finish_reason === 'string' && choice.finish_reason.length > 0
+    ) === true;
+  const hasFinalTokenUsage = terminal && hasCompleteChatTokenUsage(responseJson?.usage);
+  return {
+    ...coreProps,
+    ...costs,
+    hasFinalTokenUsage,
+    hasFinalCost: terminal && hasReportedCost(responseJson?.usage),
+  };
 }
 
 export function calculateKiloExclusiveCost_mUsd(
@@ -1308,6 +1389,14 @@ export async function processTokenData(
   usageContext: MicrodollarUsageContext
 ): Promise<{ usageId: string; createdAt: string } | null> {
   if (!usageStats) {
+    if (usageContext.prepaidReservationId) {
+      console.warn('prepaid inference settlement pending authoritative usage', {
+        requestId: usageContext.prepaidReservationId,
+        provider: usageContext.provider,
+        upstreamId: null,
+      });
+      return null;
+    }
     captureMessage('SUSPICIOUS: No usage information', {
       level: 'error',
       tags: { source: 'usage_processing' },
@@ -1341,6 +1430,7 @@ export async function processTokenData(
       genStats.outputTokens = usageStats.outputTokens;
       genStats.cacheHitTokens = usageStats.cacheHitTokens;
       genStats.cacheWriteTokens = usageStats.cacheWriteTokens;
+      genStats.hasFinalTokenUsage = usageStats.hasFinalTokenUsage === true;
     }
 
     genStats.model = usageStats.model; // openrouter bug?
@@ -1382,6 +1472,9 @@ export async function processTokenData(
     if (exclusiveCost_mUsd !== undefined) {
       usageStats.market_cost = usageStats.cost_mUsd;
       usageStats.cost_mUsd = exclusiveCost_mUsd;
+      usageStats.hasFinalCost =
+        usageStats.hasFinalTokenUsage === true &&
+        (!kiloExclusiveModel.pricing.fallbackOnly || usageStats.hasFinalCost === true);
     }
   }
 
@@ -1390,6 +1483,12 @@ export async function processTokenData(
   // Preserve the real cost before zeroing for free/BYOK
   usageStats.market_cost ??= usageStats.cost_mUsd;
   usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
+  if (customCost_mUsd !== undefined) {
+    usageStats.hasFinalCost =
+      usageStats.hasFinalTokenUsage === true &&
+      (!getCustomPricing(usageContext.requested_model)?.fallbackOnly ||
+        usageStats.hasFinalCost === true);
+  }
 
   if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
@@ -1415,6 +1514,9 @@ export async function logMicrodollarUsageAndReportToBouncer(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
 ): Promise<{ usageId: string; createdAt: string } | null> {
+  if (usageContext.prepaidReservationId && usageStats.hasFinalCost !== true) {
+    return logMicrodollarUsage(usageStats, usageContext);
+  }
   const event = bouncerUsageEvent(usageStats, usageContext);
   if (!event || usageContext.bouncer?.spendWatch !== true) {
     const record = await logMicrodollarUsage(usageStats, usageContext);
@@ -1481,6 +1583,7 @@ async function getGenerationLookupProvider(
   if (!provider || !isSuccessStatusCode) {
     return undefined;
   }
+  if (usageContext.prepaidReservationId && usageStats?.hasFinalCost !== true) return provider;
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
     isFreeModel(usageContext.requested_model) ||
@@ -1524,6 +1627,25 @@ export const mapToUsageStats = (
   }
 
   return {
+    hasFinalTokenUsage:
+      (Boolean(data.finish_reason) || data.cancelled === true) &&
+      hasValidTokenCounts(
+        data.native_tokens_prompt,
+        data.native_tokens_completion,
+        data.native_tokens_cached ?? 0,
+        data.native_tokens_cache_creation ?? 0,
+        data.native_tokens_reasoning ?? 0
+      ),
+    hasFinalCost:
+      (Boolean(data.finish_reason) || data.cancelled === true) &&
+      hasReportedCost({
+        cost: data.total_cost,
+        is_byok: data.is_byok,
+        cost_details:
+          data.upstream_inference_cost === undefined
+            ? undefined
+            : { upstream_inference_cost: data.upstream_inference_cost },
+      }),
     messageId: data.id,
     hasError: false,
     model: data.model,

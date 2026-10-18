@@ -36,6 +36,7 @@ const mockUser: User = {
   updated_at: '2024-01-01T00:00:00Z',
   hosted_domain: null,
   microdollars_used: 0,
+  inference_microdollars_held: 0,
   kilo_pass_threshold: null,
   stripe_customer_id: 'cus_test123',
   app_store_account_token: '550e8400-e29b-41d4-a716-446655440000',

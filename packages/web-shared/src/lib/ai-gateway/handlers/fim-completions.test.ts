@@ -10,6 +10,12 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { NextResponse } from 'next/server';
+import {
+  admitPrepaidInference,
+  cancelPrepaidInference,
+} from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
+import { handleFimCompletionsRequest } from './fim-completions';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
@@ -21,6 +27,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/prepaid-inference', () => ({
+  admitPrepaidInference: jest.fn(),
+  cancelPrepaidInference: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
     decision: { allowed: true },
@@ -128,6 +138,7 @@ async function flushAfter() {
 describe('POST /api/fim/completions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(admitPrepaidInference).mockResolvedValue({ kind: 'admitted' });
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
     mockedResolveOrganizationMemberModelDecision.mockResolvedValue({
@@ -140,9 +151,42 @@ describe('POST /api/fim/completions', () => {
     globalThis.fetch = originalFetch;
   });
 
+  it.each([undefined, 'fim-reservation'])(
+    'cancels only reserved aborted work: %s',
+    async reservationId => {
+      setOrganizationAuth(1000);
+      const controller = new AbortController();
+      const request = new Request(makeRequest(), { signal: controller.signal });
+      jest.mocked(admitPrepaidInference).mockImplementation(async ({ signal }) => {
+        expect(signal).toBe(request.signal);
+        controller.abort();
+        return { kind: 'admitted', reservationId };
+      });
+      const response = await handleFimCompletionsRequest(request as never);
+      expect(response.status).toBe(499);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(cancelPrepaidInference).toHaveBeenCalledTimes(reservationId ? 1 : 0);
+    }
+  );
+
+  it('does not dispatch when prepaid admission rejects', async () => {
+    setOrganizationAuth(1000);
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'rejected',
+      response: NextResponse.json({ error: 'Insufficient credits' }, { status: 402 }),
+    });
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
+    expect(response.status).toBe(402);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
   it('bills the Inception model when using the system key', async () => {
     setOrganizationAuth(1000);
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'admitted',
+      reservationId: 'fim-reservation',
+    });
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
     const response = await handleFimCompletionsRequest(makeRequest() as never);
@@ -158,6 +202,17 @@ describe('POST /api/fim/completions', () => {
 
     await flushAfter();
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(mockedLogMicrodollarUsage.mock.calls[0]?.[1].prepaidReservationId).toBe(
+      'fim-reservation'
+    );
+    expect(admitPrepaidInference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'inception/mercury-edit-2',
+        providerId: 'inception',
+        body: expect.objectContaining({ model: 'mercury-edit-2' }),
+        zeroCost: false,
+      })
+    );
     expect(stats.cost_mUsd).toBe(325);
     expect(stats.market_cost).toBe(325);
 

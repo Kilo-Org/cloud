@@ -101,6 +101,8 @@ const UsageMetadataSchema = z.object({
   is_free: z.boolean().nullable(),
   abuse_delay: z.number().nullable(),
   abuse_downgraded_from: z.string().nullable(),
+  prepaid_reservation_id: z.string().uuid().nullable().optional(),
+  prepaid_usage_final: z.boolean().optional(),
 });
 
 /**
@@ -115,15 +117,28 @@ export const BouncerUsageEventEnqueueSchema = z.object({
 
 export type BouncerUsageEventEnqueue = z.infer<typeof BouncerUsageEventEnqueueSchema>;
 
-export const UsageRecordRequestSchema = z.object({
-  core: CoreUsageSchema,
-  metadata: UsageMetadataSchema,
-  prior_microdollar_usage: z.number(),
-  posthog_distinct_id: z.string().nullable(),
-  // Optional, unlike the fields above: a sender from before this field existed omits it, and that
-  // must still record the billing row. Null or absent means no outbox row.
-  bouncer_usage_event: BouncerUsageEventEnqueueSchema.nullable().optional(),
-});
+export const UsageRecordRequestSchema = z
+  .object({
+    core: CoreUsageSchema,
+    metadata: UsageMetadataSchema,
+    prior_microdollar_usage: z.number(),
+    posthog_distinct_id: z.string().nullable(),
+    // Optional, unlike the fields above: a sender from before this field existed omits it, and that
+    // must still record the billing row. Null or absent means no outbox row.
+    bouncer_usage_event: BouncerUsageEventEnqueueSchema.nullable().optional(),
+  })
+  .superRefine((record, context) => {
+    if (
+      record.metadata.prepaid_reservation_id &&
+      record.metadata.prepaid_reservation_id !== record.core.id
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['metadata', 'prepaid_reservation_id'],
+        message: 'Reservation and usage identities must match',
+      });
+    }
+  });
 
 export type UsageRecordRequest = z.infer<typeof UsageRecordRequestSchema>;
 
@@ -147,3 +162,45 @@ export const UsageRecordResponseSchema = z.object({
 });
 
 export type UsageRecordResponse = z.infer<typeof UsageRecordResponseSchema>;
+
+export const InferenceReservationIdentitySchema = z.object({
+  requestId: z.string().uuid(),
+  userId: z.string().min(1),
+  organizationId: z.string().uuid().optional(),
+});
+
+export const InferenceReservationCommandSchema = z.discriminatedUnion('action', [
+  InferenceReservationIdentitySchema.extend({
+    action: z.literal('reserve'),
+    amountMicrodollars: z.number().int().safe().positive(),
+  }),
+  InferenceReservationIdentitySchema.extend({ action: z.literal('release') }),
+  InferenceReservationIdentitySchema.extend({
+    action: z.literal('admit'),
+    apiKind: z.string().min(1),
+    model: z.string().min(1),
+    providerId: z.string().min(1),
+    body: z.unknown(),
+  }),
+]);
+
+export const InferenceReservationResultSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('reserved'),
+    requestId: z.string().uuid(),
+    amountMicrodollars: z.number().int().safe().positive(),
+  }),
+  z.object({ kind: z.literal('insufficient') }),
+  z.object({ kind: z.literal('released') }),
+  z.object({
+    kind: z.literal('admitted'),
+    reservationId: z.string().uuid().optional(),
+    body: z.unknown(),
+  }),
+]);
+
+export type InferenceReservationCommand = z.infer<typeof InferenceReservationCommandSchema>;
+export type InferenceReservationIdentity = z.infer<typeof InferenceReservationIdentitySchema>;
+export type InferenceReservationResult = z.infer<typeof InferenceReservationResultSchema>;
+
+export const INFERENCE_RESERVATION_STATE_HEADER = 'x-kilo-reservation-state';

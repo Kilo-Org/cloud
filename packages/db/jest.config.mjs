@@ -1,6 +1,5 @@
 /**
- * The database-backed suites in this package — `schema.test.ts` and the
- * commit-switch repository test — connect to `POSTGRES_URL` and need a migrated
+ * The database-backed suites below connect to `POSTGRES_URL` and need a migrated
  * database to run against. The `workspace-tests` matrix that runs this package's
  * `test` script provides no database, so `test` covers the suites that need
  * none, including the migration-journal guard (which reads generated files
@@ -12,6 +11,7 @@
 const databaseBackedSuites = [
   '<rootDir>/src/schema.test.ts',
   '<rootDir>/src/kiloclaw-commit-switch-qualification-repository.test.ts',
+  '<rootDir>/src/inference-reservations.test.ts',
 ];
 
 /** @type {import('jest').Config} */

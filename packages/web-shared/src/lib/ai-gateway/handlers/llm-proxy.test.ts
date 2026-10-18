@@ -19,6 +19,10 @@ import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight'
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
+  admitPrepaidInference,
+  cancelPrepaidInference,
+} from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
+import {
   getOpenRouterModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -119,6 +123,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/prepaid-inference', () => ({
+  admitPrepaidInference: jest.fn(),
+  cancelPrepaidInference: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
@@ -307,6 +315,10 @@ function setSignedTokenAuth(token: string, authenticatedResult: AuthResult) {
     return authenticatedResult;
   });
 }
+
+beforeEach(() => {
+  jest.mocked(admitPrepaidInference).mockResolvedValue({ kind: 'admitted' });
+});
 
 describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
   beforeEach(() => {
@@ -632,6 +644,106 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
   });
+
+  it.each([undefined, 'chat-reservation'])(
+    'cancels only reserved aborted work: %s',
+    async reservationId => {
+      const controller = new AbortController();
+      const request = new NextRequest(makeRequest(makeBody()), { signal: controller.signal });
+      jest.mocked(admitPrepaidInference).mockImplementation(async ({ signal }) => {
+        expect(signal).toBe(request.signal);
+        controller.abort();
+        return { kind: 'admitted', reservationId };
+      });
+      const response = await handleLlmProxyRequest(request);
+      expect(response.status).toBe(499);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(cancelPrepaidInference).toHaveBeenCalledTimes(reservationId ? 1 : 0);
+    }
+  );
+
+  it('keeps a reservation after an uncertain provider error', async () => {
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'admitted',
+      reservationId: 'chat-reservation',
+    });
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'error',
+      response: new NextResponse(null, { status: 502 }),
+    });
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+    expect(response.status).toBe(502);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(cancelPrepaidInference).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch when prepaid admission rejects', async () => {
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'rejected',
+      response: NextResponse.json({ error: 'Insufficient credits' }, { status: 402 }),
+    });
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+    expect(response.status).toBe(402);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('quotes the transformed provider request and preserves its reservation in usage', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: {
+        ...provider,
+        async transformRequest({ request }) {
+          request.body.model = 'transformed-model';
+        },
+      },
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    jest.mocked(admitPrepaidInference).mockImplementation(async ({ body }) => {
+      expect(body).toMatchObject({ model: 'transformed-model' });
+      return { kind: 'admitted', reservationId: 'chat-reservation' };
+    });
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+    expect(response.status).toBe(200);
+    expect(admitPrepaidInference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: expect.any(String),
+        userId: 'user-123',
+        apiKind: 'chat_completions',
+        providerId: 'openrouter',
+        model: 'openai/gpt-4o',
+        body: mockedUpstreamRequest.mock.calls[0]?.[0].body,
+        zeroCost: false,
+      })
+    );
+    expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ prepaidReservationId: 'chat-reservation' }),
+      expect.anything()
+    );
+  });
+
+  it.each([
+    { providerId: 'custom', byok: false, zeroCost: false },
+    { providerId: 'direct-byok', byok: true, zeroCost: true },
+    { providerId: 'openai-chatgpt', byok: false, zeroCost: true },
+  ] as const)(
+    'uses actual billing for $providerId admission',
+    async ({ providerId, byok, zeroCost }) => {
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        provider: { ...provider, id: providerId },
+        userByok: byok ? [{ providerId: 'openai', decryptedAPIKey: 'test-user-key' }] : null,
+        bypassAccessCheck: providerId !== 'openai-chatgpt',
+        skipBalanceCheck: providerId === 'openai-chatgpt',
+      });
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+      expect(response.status).toBe(200);
+      expect(admitPrepaidInference).toHaveBeenCalledWith(
+        expect.objectContaining({ providerId, zeroCost })
+      );
+    }
+  );
 
   it('rejects providerOptions and directs clients to provider', async () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');

@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  admitPrepaidInference,
+  cancelPrepaidInference,
+} from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
+import { handleEmbeddingsRequest } from './embeddings';
+import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import type { User } from '@kilocode/db/schema';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -21,6 +27,10 @@ jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server'
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider', () => ({
   getEmbeddingProvider: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/prepaid-inference', () => ({
+  admitPrepaidInference: jest.fn(),
+  cancelPrepaidInference: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   isFreeModel: jest.fn(),
@@ -87,6 +97,7 @@ function getUpstreamBody(): Record<string, unknown> {
 describe('POST /api/gateway/embeddings provider privacy', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(admitPrepaidInference).mockResolvedValue({ kind: 'admitted' });
     globalThis.fetch = mockedFetch;
     setUserAuth();
     mockedResolveModelDecision.mockResolvedValue(allowedModelDecision);
@@ -104,13 +115,50 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     globalThis.fetch = originalFetch;
   });
 
+  it.each([undefined, 'embedding-reservation'])(
+    'cancels only reserved aborted work: %s',
+    async reservationId => {
+      const controller = new AbortController();
+      const request = new NextRequest(makeRequest(), { signal: controller.signal });
+      jest.mocked(admitPrepaidInference).mockImplementation(async ({ signal }) => {
+        expect(signal).toBe(request.signal);
+        controller.abort();
+        return { kind: 'admitted', reservationId };
+      });
+      const response = await handleEmbeddingsRequest(request);
+      expect(response.status).toBe(499);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(cancelPrepaidInference).toHaveBeenCalledTimes(reservationId ? 1 : 0);
+    }
+  );
+
+  it('does not dispatch when prepaid admission rejects', async () => {
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'rejected',
+      response: NextResponse.json({ error: 'Insufficient credits' }, { status: 402 }),
+    });
+    const response = await handleEmbeddingsRequest(makeRequest());
+    expect(response.status).toBe(402);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
   it('forwards personal request privacy with other provider fields', async () => {
     const provider = { data_collection: 'deny', zdr: true, only: ['openai'], sort: 'latency' };
+    jest.mocked(admitPrepaidInference).mockResolvedValue({
+      kind: 'admitted',
+      reservationId: 'embedding-reservation',
+    });
     const { handleEmbeddingsRequest } = await import('./embeddings');
     const response = await handleEmbeddingsRequest(makeRequest({ provider }));
 
     expect(response.status).toBe(200);
     expect(getUpstreamBody().provider).toEqual(provider);
+    expect(admitPrepaidInference).toHaveBeenCalledWith(
+      expect.objectContaining({ body: getUpstreamBody(), zeroCost: false })
+    );
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
+      prepaidReservationId: 'embedding-reservation',
+    });
   });
 
   it.each([undefined, { only: ['openai'] }])(
@@ -213,5 +261,8 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
         ...testCase.translated,
       },
     });
+    expect(admitPrepaidInference).toHaveBeenCalledWith(
+      expect.objectContaining({ body: getUpstreamBody(), zeroCost: true })
+    );
   });
 });

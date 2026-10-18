@@ -1360,6 +1360,7 @@ export async function enrollWithCredits(params: {
       .select({
         total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
         microdollars_used: kilocode_users.microdollars_used,
+        inference_microdollars_held: kilocode_users.inference_microdollars_held,
         kilo_pass_threshold: kilocode_users.kilo_pass_threshold,
       })
       .from(kilocode_users)
@@ -1472,7 +1473,8 @@ export async function enrollWithCredits(params: {
       effectiveThreshold !== null && projectedUsage >= effectiveThreshold
         ? await getKiloPassStateForUser(tx, userId, { forUpdate: true })
         : null;
-    const balance = user.total_microdollars_acquired - user.microdollars_used;
+    const balance =
+      user.total_microdollars_acquired - user.microdollars_used - user.inference_microdollars_held;
     const { effectiveBalanceMicrodollars: effectiveBalance } =
       await getEffectiveCreditBalancePreview({
         userId,

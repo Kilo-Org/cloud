@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from '@kilocode/db';
+import { getKiloClawPlanCostMicrodollars } from '@kilocode/db';
 
 const {
   mockFindLatestPreCutoffUserCommitSwitchQualification,
@@ -332,6 +333,7 @@ function creditRenewalRow(overrides: Partial<Record<string, unknown>> = {}) {
     auto_top_up_triggered_for_period: null,
     total_microdollars_acquired: 20_000_000,
     microdollars_used: 0,
+    inference_microdollars_held: 0,
     auto_top_up_enabled: false,
     kilo_pass_threshold: 1_000_000_000,
     next_credit_expiration_at: null,
@@ -1570,6 +1572,43 @@ describe('credit renewal fanout queue processing', () => {
     expect(updates).toHaveLength(0);
     expect(selectBuilders[0]?.limit).toHaveBeenCalledTimes(1);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('does not fund finite credit renewal from an outstanding inference hold', async () => {
+    const cost = getKiloClawPlanCostMicrodollars({
+      priceVersion: '2026-03-19',
+      plan: 'standard',
+    });
+    const row = creditRenewalRow({
+      total_microdollars_acquired: cost,
+      inference_microdollars_held: 1,
+      kilo_pass_threshold: null,
+    });
+    const { db, txInserts, txUpdates, updates } = createMockDb([[row], [row]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ sent: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    const summary = await processCreditRenewalItem(
+      createEnvWithQueueMocks(vi.fn()).env,
+      creditRenewalItemMessage({
+        subscriptionId: row.id,
+        userId: row.user_id,
+        renewalBoundary: row.credit_renewal_at,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.credit_renewals_past_due).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(txInserts).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+    expect(updates).toContainEqual(expect.objectContaining({ status: 'past_due' }));
   });
 
   it('resolves a terminal failure when an operator retry finalizes an expected past-due outcome', async () => {
@@ -4376,6 +4415,7 @@ describe('credit renewal Kilo Pass bonus projection', () => {
           auto_top_up_triggered_for_period: null,
           total_microdollars_acquired: 10_000_000,
           microdollars_used: 0,
+          inference_microdollars_held: 0,
           auto_top_up_enabled: false,
           kilo_pass_threshold: null,
           next_credit_expiration_at: null,
@@ -4458,6 +4498,7 @@ describe('credit renewal Kilo Pass bonus projection', () => {
           auto_top_up_triggered_for_period: null,
           total_microdollars_acquired: 7_000_000,
           microdollars_used: 0,
+          inference_microdollars_held: 0,
           auto_top_up_enabled: false,
           kilo_pass_threshold: 8_000_000,
           next_credit_expiration_at: null,
@@ -4487,6 +4528,7 @@ describe('credit renewal Kilo Pass bonus projection', () => {
           auto_top_up_triggered_for_period: null,
           total_microdollars_acquired: 7_000_000,
           microdollars_used: 0,
+          inference_microdollars_held: 0,
           auto_top_up_enabled: false,
           kilo_pass_threshold: 8_000_000,
           next_credit_expiration_at: null,
@@ -4566,6 +4608,7 @@ describe('credit renewal Kilo Pass bonus projection', () => {
           auto_top_up_triggered_for_period: null,
           total_microdollars_acquired: 7_000_000,
           microdollars_used: 0,
+          inference_microdollars_held: 0,
           auto_top_up_enabled: false,
           kilo_pass_threshold: 20_000_000,
           next_credit_expiration_at: null,
@@ -4641,6 +4684,7 @@ describe('credit renewal Kilo Pass bonus projection', () => {
       auto_top_up_triggered_for_period: null,
       total_microdollars_acquired: 17_000_000,
       microdollars_used: 10_000_000,
+      inference_microdollars_held: 0,
       auto_top_up_enabled: false,
       kilo_pass_threshold: 20_000_000,
       next_credit_expiration_at: null,
@@ -4741,6 +4785,7 @@ describe('credit renewal Kilo Pass bonus projection', () => {
           auto_top_up_triggered_for_period: null,
           total_microdollars_acquired: 7_000_000,
           microdollars_used: 0,
+          inference_microdollars_held: 0,
           auto_top_up_enabled: false,
           kilo_pass_threshold: null,
           next_credit_expiration_at: null,
@@ -4829,6 +4874,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 100_000_000,
             microdollars_used: 0,
+            inference_microdollars_held: 0,
             auto_top_up_enabled: false,
             kilo_pass_threshold: null,
             next_credit_expiration_at: null,
@@ -4856,6 +4902,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 100_000_000,
             microdollars_used: 0,
+            inference_microdollars_held: 0,
             auto_top_up_enabled: false,
             kilo_pass_threshold: null,
             next_credit_expiration_at: null,
@@ -4885,6 +4932,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 400_000_000,
             microdollars_used: 0,
+            inference_microdollars_held: 0,
             auto_top_up_enabled: false,
             kilo_pass_threshold: null,
             next_credit_expiration_at: null,
@@ -5004,6 +5052,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 100_000_000,
             microdollars_used: 0,
+            inference_microdollars_held: 0,
             auto_top_up_enabled: false,
             kilo_pass_threshold: null,
             next_credit_expiration_at: null,
@@ -5063,6 +5112,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 400_000_000,
             microdollars_used: 0,
+            inference_microdollars_held: 0,
             auto_top_up_enabled: false,
             kilo_pass_threshold: null,
             next_credit_expiration_at: null,
@@ -5091,6 +5141,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 100_000_000,
             microdollars_used: 0,
+            inference_microdollars_held: 0,
             auto_top_up_enabled: false,
             kilo_pass_threshold: null,
             next_credit_expiration_at: null,
@@ -5217,6 +5268,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 100_000_000,
             microdollars_used: 0,
+            inference_microdollars_held: 0,
             auto_top_up_enabled: false,
             kilo_pass_threshold: null,
             next_credit_expiration_at: null,
@@ -5305,6 +5357,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 100_000_000,
             microdollars_used: 0,
+            inference_microdollars_held: 0,
             auto_top_up_enabled: false,
             kilo_pass_threshold: 55_000_000,
             next_credit_expiration_at: null,
@@ -5471,6 +5524,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 1_000_000,
             microdollars_used: 0,
+            inference_microdollars_held: 0,
             auto_top_up_enabled: false,
             kilo_pass_threshold: null,
             next_credit_expiration_at: null,
@@ -5585,6 +5639,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 100_000_000,
             microdollars_used: 0,
+            inference_microdollars_held: 0,
             auto_top_up_enabled: false,
             kilo_pass_threshold: null,
             next_credit_expiration_at: null,
@@ -5821,6 +5876,7 @@ describe('credit renewal sweep affiliate tracking', () => {
           auto_top_up_triggered_for_period: null,
           total_microdollars_acquired: 50_000_000,
           microdollars_used: 0,
+          inference_microdollars_held: 0,
           auto_top_up_enabled: false,
           kilo_pass_threshold: null,
           next_credit_expiration_at: null,
@@ -5950,6 +6006,7 @@ describe('credit renewal sweep affiliate tracking', () => {
           auto_top_up_triggered_for_period: null,
           total_microdollars_acquired: 50_000_000,
           microdollars_used: 0,
+          inference_microdollars_held: 0,
           auto_top_up_enabled: false,
           kilo_pass_threshold: null,
           next_credit_expiration_at: null,
@@ -6032,6 +6089,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 50_000_000,
             microdollars_used: 0,
+            inference_microdollars_held: 0,
             auto_top_up_enabled: false,
             kilo_pass_threshold: null,
             next_credit_expiration_at: null,
@@ -6157,6 +6215,7 @@ describe('credit renewal sweep affiliate tracking', () => {
       auto_top_up_triggered_for_period: null,
       total_microdollars_acquired: 1_000_000,
       microdollars_used: 900_000,
+      inference_microdollars_held: 0,
       auto_top_up_enabled: true,
       kilo_pass_threshold: null,
       next_credit_expiration_at: null,
@@ -6337,6 +6396,7 @@ describe('credit renewal sweep affiliate tracking', () => {
       auto_top_up_triggered_for_period: null,
       total_microdollars_acquired: 1_000_000,
       microdollars_used: 900_000,
+      inference_microdollars_held: 0,
       auto_top_up_enabled: true,
       kilo_pass_threshold: null,
       next_credit_expiration_at: null,
@@ -6655,6 +6715,7 @@ describe('credit renewal sweep affiliate tracking', () => {
           auto_top_up_triggered_for_period: null,
           total_microdollars_acquired: 50_000_000,
           microdollars_used: 0,
+          inference_microdollars_held: 0,
           auto_top_up_enabled: false,
           kilo_pass_threshold: null,
           next_credit_expiration_at: null,

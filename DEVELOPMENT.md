@@ -388,6 +388,68 @@ The application consists of the Next.js app plus several Cloudflare Worker servi
 
 AI inference works locally without any extra services. The Next.js app includes an OpenRouter proxy route (`/api/openrouter/[...path]`) that calls real AI providers using API keys from `.env.local`. There are no mocks or local stubs — all inference hits real APIs (OpenRouter, OpenAI, Anthropic, Mistral, etc.).
 
+### Prepaid inference admission
+
+Prepaid admission uses PostgreSQL reservations, not Bouncer balances.
+The paying user or organization holds credit before a supported paid operation.
+The usage transaction records the authoritative charge and releases the hold together.
+Inference holds no database transaction or connection.
+
+- Keep `GATEWAY_PREPAID_RESERVATIONS_ENABLED` disabled until the readiness checks pass.
+- Apply the generated reservation migration before deploying the new schema readers.
+- Deploy compatible app, gateway, classifier worker, and other balance consumers before activation.
+- Use the shared web environment workflow for deployment configuration.
+- The gateway marks classifier calls that require admission, regardless of the worker's local flag.
+- A worker that requires admission rejects responses without a reservation.
+- Rollback disables new admission; existing holds still require settlement or confirmed cancellation.
+
+#### Charge ceilings
+
+The quote uses fixed billing rates and enforced output limits where those contracts exist.
+Fixed-model input holds conservatively cover the configured input context.
+These holds can reject ordinary requests with small balances.
+They are not validated request-specific token estimates.
+
+Generic market-priced routes, fixed custom models without output ceilings, media, embeddings, transcription, System One, and paid Exa remain unsupported.
+When admission is enabled, unsupported paid operations reject before provider dispatch.
+Do not activate production enforcement until each required route has a verified, practical charge ceiling.
+Display pricing, average costs, and character-based token estimates do not establish that ceiling.
+
+#### Uncertain usage and recovery
+
+- A closed response, interrupted stream, missing usage, or elapsed time does not authorize a refund.
+- Unknown or partial final charges retain the whole hold without inserting an authoritative usage row.
+- Use the pending-settlement diagnostic to correlate the reservation and upstream request.
+- Obtain authoritative final usage before settling through the existing usage writer.
+- Preserve the reservation request identity as the usage identity when replaying that final record.
+- Cancel only confirmed no-dispatch work through the transactional cancellation helper.
+- Do not delete reservation rows to restore credit.
+- Automatic vendor reconciliation is not implemented.
+- Cancelled quoted-provider streams can retain the whole hold indefinitely when no final receipt is available.
+- The documented Martian endpoints provide no final-usage retrieval API; dashboard history alone is not automatic recovery.
+- Keep enforcement disabled until cancellation, provider errors, and missing receipts have a verified settlement or no-charge contract.
+
+Other spendable-balance checks exclude holds.
+Already-incurred compute charges still post, and running compute can retain unbilled exposure until metering stops it.
+This mechanism does not establish global zero overdraft across every service or credit revocation.
+Temporary holds alone do not trigger additional automatic top-up payments.
+
+#### Isolated capacity verification
+
+Run the reservation tests and `pnpm drizzle:verify-bootstrap` against disposable local PostgreSQL.
+Use a separate migrated database for `scripts/benchmark-inference-reservations.ts`.
+The benchmark requires explicit loopback addressing, a benchmark database name, and exclusively synthetic accounts.
+It compares baseline and reservation workloads for distributed and concentrated payers, then removes its own fixtures.
+
+```bash
+BENCHMARK_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/inference_reservation_bench_local \
+  pnpm exec tsx scripts/benchmark-inference-reservations.ts
+```
+
+The output reports component throughput, latency, errors, connection waiting, and sampled lock waits.
+It does not measure production capacity, the complete billing pipeline, or actual cross-region admission latency.
+Validate those separately before enabling production admission.
+
 ### Running workers locally
 
 Each worker in the workspace can be started individually with `wrangler dev` (or `pnpm dev`) from its directory. Workers communicate with Next.js over HTTP using env vars like `CLOUD_AGENT_NEXT_API_URL`, `CODE_REVIEW_WORKER_URL`, etc. Dev ports are defined in each worker's `wrangler.jsonc`.

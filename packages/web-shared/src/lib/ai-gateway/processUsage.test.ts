@@ -147,7 +147,11 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'openrouter',
       200
     );
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -164,7 +168,11 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'openrouter',
       200
     );
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -181,7 +189,11 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'openrouter',
       200
     );
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -191,7 +203,11 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     const inputFile = join(sampleDir, nonStreaming);
     const jsonString = await readFile(inputFile, 'utf-8');
     const result = parseMicrodollarUsageFromString(jsonString, 'fake-user-id', 200);
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -533,7 +549,11 @@ describe('extractPromptInfo approval tests', () => {
     const inputFile = join(sampleReqDir, anthropicFile);
     const prompt = await readFile(inputFile, 'utf-8');
     const result = extractPromptInfo(JSON.parse(prompt));
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.extractPromptInfo.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -543,7 +563,11 @@ describe('extractPromptInfo approval tests', () => {
     const inputFile = join(sampleReqDir, geminiFile);
     const prompt = await readFile(inputFile, 'utf-8');
     const result = extractPromptInfo(JSON.parse(prompt));
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.extractPromptInfo.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -553,7 +577,11 @@ describe('extractPromptInfo approval tests', () => {
     const inputFile = join(sampleReqDir, openAiGptFile);
     const prompt = await readFile(inputFile, 'utf-8');
     const result = extractPromptInfo(JSON.parse(prompt));
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.extractPromptInfo.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -565,7 +593,11 @@ describe('mapToUsageStats approval tests', () => {
     const inputFile = join(sampleDir, claudeSonnetGeneration);
     const generationData = JSON.parse(await readFile(inputFile, 'utf-8')) as OpenRouterGeneration;
     const result = mapToUsageStats(generationData, 'nonsense', 'fake-user-id', 'openrouter');
-    const resultString = JSON.stringify(result, null, 2);
+    const resultString = JSON.stringify(
+      result,
+      (key, value) => (key === 'hasFinalTokenUsage' || key === 'hasFinalCost' ? undefined : value),
+      2
+    );
     const approvalFilePath = inputFile + '.mapToUsageStats.approved.json';
     await verifyApproval(resultString, approvalFilePath);
   });
@@ -1703,5 +1735,107 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     );
 
     expect(metadata.api_kind).toBe('audio_transcriptions');
+  });
+
+  test.each([true, false, undefined])(
+    'carries explicit final-cost evidence %s into reserved metadata',
+    async hasFinalCost => {
+      const requestId = '867510af-934b-41eb-8e78-a883a1b57c25';
+      const { core, metadata } = await toInsertableDbUsageRecord(
+        { ...baseUsageStats, hasFinalCost },
+        extractUsageContextInfo(makeUsageContext({ prepaidReservationId: requestId }))
+      );
+      expect(core.id).toBe(requestId);
+      expect(metadata.prepaid_reservation_id).toBe(requestId);
+      expect(metadata.prepaid_usage_final).toBe(hasFinalCost === true);
+    }
+  );
+});
+
+describe('authoritative chat usage evidence', () => {
+  function stream(text: string): ReadableStream<Uint8Array> {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(text));
+        controller.close();
+      },
+    });
+  }
+
+  test('does not treat missing usage on a completed nonstream response as a final zero charge', () => {
+    const stats = parseMicrodollarUsageFromString(
+      JSON.stringify({
+        id: 'missing-usage',
+        model: 'model',
+        choices: [{ finish_reason: 'stop', message: { content: 'done' } }],
+      }),
+      'user',
+      200
+    );
+    expect(stats).toMatchObject({ cost_mUsd: 0, hasFinalTokenUsage: false, hasFinalCost: false });
+  });
+
+  test('recognizes an explicitly reported final zero rather than inferring it from defaults', () => {
+    const stats = parseMicrodollarUsageFromString(
+      JSON.stringify({
+        id: 'zero-usage',
+        model: 'model',
+        choices: [{ finish_reason: 'stop', message: { content: '' } }],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost: 0 },
+      }),
+      'user',
+      200
+    );
+    expect(stats).toMatchObject({ cost_mUsd: 0, hasFinalTokenUsage: true, hasFinalCost: true });
+  });
+
+  test('requires a terminal usage chunk and DONE, not a positive interim charge', async () => {
+    const stats = await parseMicrodollarUsageFromStream(
+      stream(
+        'data: {"id":"partial","model":"model","choices":[{"delta":{"content":"partial"},"finish_reason":null}],"usage":{"prompt_tokens":5,"completion_tokens":2,"cost":0.01}}\n\n' +
+          'data: {"id":"partial","model":"model","choices":[{"delta":{},"finish_reason":"stop"}]}\n\n' +
+          'data: [DONE]\n\n'
+      ),
+      'user',
+      undefined,
+      'martian',
+      200
+    );
+    expect(stats.cost_mUsd).toBe(10000);
+    expect(stats.hasFinalTokenUsage).toBe(false);
+    expect(stats.hasFinalCost).toBe(false);
+  });
+
+  test('retains final native token evidence without inventing an upstream market charge', async () => {
+    const stats = await parseMicrodollarUsageFromStream(
+      stream(
+        'data: {"id":"final","model":"model","choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}\n\n' +
+          'data: [DONE]\n\n'
+      ),
+      'user',
+      undefined,
+      'martian',
+      200
+    );
+    expect(stats).toMatchObject({
+      inputTokens: 5,
+      outputTokens: 2,
+      hasFinalTokenUsage: true,
+      hasFinalCost: false,
+    });
+  });
+
+  test('accepts an explicit final zero usage chunk', async () => {
+    const stats = await parseMicrodollarUsageFromStream(
+      stream(
+        'data: {"id":"final","model":"model","choices":[],"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0,"cost":0}}\n\n' +
+          'data: [DONE]\n\n'
+      ),
+      'user',
+      undefined,
+      'openrouter',
+      200
+    );
+    expect(stats).toMatchObject({ hasFinalTokenUsage: true, hasFinalCost: true });
   });
 });

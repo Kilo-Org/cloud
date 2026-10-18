@@ -14,6 +14,7 @@ import {
   sharedCliSessions,
   cloud_agent_code_reviews,
   kilocode_users,
+  inference_reservations,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -98,6 +99,20 @@ export async function getBalanceForOrganizationUser(
       microdollar_usage: organization_user_usage.microdollar_usage,
       total_microdollars_acquired: organizations.total_microdollars_acquired,
       microdollars_used: organizations.microdollars_used,
+      inference_microdollars_held: organizations.inference_microdollars_held,
+      member_inference_microdollars_held: sql`
+        CASE
+          WHEN NOT ${organizations.require_seats} AND ${organization_user_limits.microdollar_limit} IS NOT NULL
+          THEN (
+            SELECT COALESCE(SUM(${inference_reservations.amount_microdollars}), 0)
+            FROM ${inference_reservations}
+            WHERE ${inference_reservations.organization_id} = ${organizations.id}
+              AND ${inference_reservations.kilo_user_id} = ${userId}
+              AND ${inference_reservations.status} = 'reserved'
+          )
+          ELSE 0
+        END
+      `.mapWith(Number),
       settings: organizations.settings,
       require_seats: organizations.require_seats,
       plan: organizations.plan,
@@ -124,7 +139,7 @@ export async function getBalanceForOrganizationUser(
         eq(organization_user_usage.organization_id, organizations.id),
         eq(organization_user_usage.kilo_user_id, userId),
         eq(organization_user_usage.limit_type, limitType),
-        eq(organization_user_usage.usage_date, sql`CURRENT_DATE`)
+        eq(organization_user_usage.usage_date, sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`)
       )
     )
     .where(
@@ -151,6 +166,8 @@ export async function getBalanceForOrganizationUser(
     microdollar_usage,
     total_microdollars_acquired: initial_total_microdollars_acquired,
     microdollars_used,
+    inference_microdollars_held,
+    member_inference_microdollars_held,
     settings,
     require_seats,
     plan,
@@ -160,7 +177,8 @@ export async function getBalanceForOrganizationUser(
   } = result[0];
 
   let total_microdollars_acquired = initial_total_microdollars_acquired;
-  let organization_balance = total_microdollars_acquired - microdollars_used;
+  let organization_balance =
+    total_microdollars_acquired - microdollars_used - inference_microdollars_held;
 
   // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
   const expireBefore = subHours(new Date(), Math.random());
@@ -179,7 +197,8 @@ export async function getBalanceForOrganizationUser(
     );
     if (expiryResult) {
       total_microdollars_acquired = expiryResult.total_microdollars_acquired;
-      organization_balance = total_microdollars_acquired - microdollars_used;
+      organization_balance =
+        total_microdollars_acquired - microdollars_used - inference_microdollars_held;
     }
   }
 
@@ -233,7 +252,7 @@ export async function getBalanceForOrganizationUser(
   }
 
   const usageAmount = microdollar_usage || 0;
-  const remainingAllowance = microdollar_limit - usageAmount;
+  const remainingAllowance = microdollar_limit - usageAmount - member_inference_microdollars_held;
 
   // Cap the remaining allowance at the organization's actual balance
   // This ensures a user's balance cannot exceed what the organization has available

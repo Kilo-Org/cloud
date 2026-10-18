@@ -75,6 +75,11 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
       isNonTrialEnterprise: false,
       search: '',
       method: 'POST',
+      prepaid: {
+        requestId: randomUUID(),
+        usageContext: { requested_model: 'openai/gpt-6.1-sol' },
+        zeroCost: true,
+      },
     });
   }
 

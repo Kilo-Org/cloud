@@ -7,6 +7,7 @@ import {
   organizations,
   organization_memberships,
   organization_user_usage,
+  inference_reservations,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -20,6 +21,10 @@ import {
   updateOrganizationUserLimit,
 } from './organization-usage';
 import { createOrganizationUsage } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
+import {
+  releaseInferenceCredits,
+  reserveInferenceCredits,
+} from '@kilocode/db/inference-reservations';
 
 jest.mock('@kilocode/web-shared/lib/email', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/email'),
@@ -56,6 +61,7 @@ async function drainAfterCallbacks(): Promise<void> {
 describe('Organization Usage Functions', () => {
   afterEach(async () => {
     jest.clearAllMocks();
+    await db.delete(inference_reservations).where(sql`TRUE`);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
   });
@@ -512,6 +518,101 @@ describe('Organization Usage Functions', () => {
   });
 
   describe('ensureUserHasAvailableUsage', () => {
+    test('subtracts active member holds from allowance and restores it only after confirmed release', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Held allowance',
+        user.id,
+        100_000,
+        {},
+        false
+      );
+      await updateOrganizationUserLimit(organization.id, user.id, 0.05);
+      await db.insert(organization_user_usage).values({
+        organization_id: organization.id,
+        kilo_user_id: user.id,
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`,
+        limit_type: 'daily',
+        microdollar_usage: 10_000,
+      });
+      const reservation = {
+        requestId: crypto.randomUUID(),
+        userId: user.id,
+        organizationId: organization.id,
+        amountMicrodollars: 40_000,
+      };
+      expect(await reserveInferenceCredits(db, reservation)).toMatchObject({ kind: 'reserved' });
+      await db
+        .update(inference_reservations)
+        .set({ created_at: '2000-01-01T00:00:00.000Z' })
+        .where(eq(inference_reservations.request_id, reservation.requestId));
+
+      expect(await getBalanceForOrganizationUser(organization.id, user.id)).toMatchObject({
+        balance: 0,
+        balanceLimitedByUserAllowance: true,
+      });
+      await db.transaction(tx => releaseInferenceCredits(tx, reservation));
+      expect(await getBalanceForOrganizationUser(organization.id, user.id)).toMatchObject({
+        balance: 0.04,
+        balanceLimitedByUserAllowance: false,
+      });
+    });
+
+    test('caps allowance by payer credit held for another member without consuming this member allowance', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Shared held credit',
+        owner.id,
+        100_000,
+        {},
+        false
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+      await updateOrganizationUserLimit(organization.id, owner.id, 0.05);
+      expect(
+        await reserveInferenceCredits(db, {
+          requestId: crypto.randomUUID(),
+          userId: member.id,
+          organizationId: organization.id,
+          amountMicrodollars: 70_000,
+        })
+      ).toMatchObject({ kind: 'reserved' });
+
+      expect(await getBalanceForOrganizationUser(organization.id, owner.id)).toMatchObject({
+        balance: 0.03,
+        balanceLimitedByUserAllowance: false,
+      });
+    });
+
+    test.each([true, false])(
+      'subtracts payer holds without applying an absent allowance when require_seats is %s',
+      async requireSeats => {
+        const user = await insertTestUser();
+        const organization = await createTestOrganization(
+          'Held payer credit',
+          user.id,
+          100_000,
+          {},
+          requireSeats
+        );
+        if (requireSeats) await updateOrganizationUserLimit(organization.id, user.id, 0);
+        expect(
+          await reserveInferenceCredits(db, {
+            requestId: crypto.randomUUID(),
+            userId: user.id,
+            organizationId: organization.id,
+            amountMicrodollars: 20_000,
+          })
+        ).toMatchObject({ kind: 'reserved' });
+
+        expect(await getBalanceForOrganizationUser(organization.id, user.id)).toMatchObject({
+          balance: 0.08,
+          balanceLimitedByUserAllowance: false,
+        });
+      }
+    );
+
     test('should return organization balance when no limit is set', async () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 100000);

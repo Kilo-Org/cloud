@@ -1,3 +1,4 @@
+import { setImmediate as nextTurn } from 'node:timers/promises';
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
@@ -327,6 +328,8 @@ describe('parseEditUsageFromResponse', () => {
     expect(result.cacheHitTokens).toBe(0);
     expect(result.cost_mUsd).toBe(0);
     expect(result.cacheDiscount_mUsd).toBeUndefined();
+    expect(result.hasFinalTokenUsage).toBe(false);
+    expect(result.hasFinalCost).toBe(false);
   });
 
   it('flags an error and zero cost on upstream 4xx responses', () => {
@@ -362,6 +365,19 @@ describe('parseEditUsageFromResponse', () => {
     // negative cost. The clamp pins cacheHitTokens at prompt_tokens.
     expect(result.cacheHitTokens).toBe(1_000);
     expect(result.cost_mUsd).toBe(25);
+  });
+  it('recognizes explicit final zero token usage without inferring it from defaults', () => {
+    const result = parseEditUsageFromResponse(
+      JSON.stringify({
+        id: 'edit-zero',
+        model: 'mercury-edit-2',
+        choices: [],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      }),
+      'inception',
+      200
+    );
+    expect(result).toMatchObject({ cost_mUsd: 0, hasFinalTokenUsage: true, hasFinalCost: true });
   });
 });
 
@@ -431,6 +447,8 @@ describe('countAndStoreFimUsage', () => {
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(stats.cost_mUsd).toBe(325);
     expect(stats.market_cost).toBe(325);
+    expect(stats.hasFinalTokenUsage).toBe(true);
+    expect(stats.hasFinalCost).toBe(true);
   });
 
   it('bills other FIM models', async () => {
@@ -459,6 +477,65 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.cost_mUsd).toBe(0);
     expect(stats.cacheDiscount_mUsd).toBe(0);
     expect(stats.market_cost).toBe(325);
+  });
+  it('retains partial FIM counters without claiming final usage after a stream interruption', async () => {
+    let reads = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (reads++ === 0)
+          controller.enqueue(
+            new TextEncoder().encode(
+              'data: {"id":"fim-partial","model":"mercury-edit-2","choices":[{"delta":{"content":"partial"},"finish_reason":null}],"usage":{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12}}\n\n'
+            )
+          );
+        else controller.error(new Error('disconnected'));
+      },
+    });
+    countAndStoreFimUsage(new Response(body), makeUsageContext({ isStreaming: true }), undefined);
+    await nextTurn();
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats).toMatchObject({
+      inputTokens: 10,
+      outputTokens: 2,
+      hasError: true,
+      hasFinalTokenUsage: false,
+      hasFinalCost: false,
+    });
+  });
+
+  it('does not call an absent nonstream FIM usage object an authoritative zero', async () => {
+    countAndStoreFimUsage(
+      new Response(
+        JSON.stringify({
+          id: 'fim-missing',
+          model: 'mercury-edit-2',
+          choices: [],
+        })
+      ),
+      makeUsageContext(),
+      undefined
+    );
+    await nextTurn();
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats).toMatchObject({ cost_mUsd: 0, hasFinalTokenUsage: false, hasFinalCost: false });
+  });
+
+  it('accepts an explicitly final zero FIM usage chunk', async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            'data: {"id":"fim-zero","model":"mercury-edit-2","choices":[],"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}}\n\n' +
+              'data: [DONE]\n\n'
+          )
+        );
+        controller.close();
+      },
+    });
+    countAndStoreFimUsage(new Response(body), makeUsageContext({ isStreaming: true }), undefined);
+    await nextTurn();
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats).toMatchObject({ cost_mUsd: 0, hasFinalTokenUsage: true, hasFinalCost: true });
   });
 });
 
@@ -568,6 +645,22 @@ describe('countAndStoreEditUsage', () => {
 
     await new Promise(resolve => setImmediate(resolve));
 
+    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+  });
+  it('retains a reservation after an interrupted edit response instead of writing a final zero', async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new Error('interrupted edit body'));
+      },
+    });
+    countAndStoreEditUsage(
+      new Response(body),
+      makeUsageContext({
+        prepaidReservationId: 'ba16aef2-5c71-4b8f-bacb-1818b0c00c13',
+      }),
+      undefined
+    );
+    await nextTurn();
     expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
   });
 });

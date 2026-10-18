@@ -200,6 +200,7 @@ type CreditRenewalRow = {
   scheduled_by: KiloClawSubscription['scheduled_by'];
   total_microdollars_acquired: number;
   microdollars_used: number;
+  inference_microdollars_held: number;
   auto_top_up_enabled: boolean;
   kilo_pass_threshold: number | null;
   next_credit_expiration_at: string | null;
@@ -1975,7 +1976,10 @@ async function processCreditRenewalRow(
       plan: effectivePlan,
     });
     const periodMonths = effectivePlan === 'commit' ? 6 : 1;
-    const rawBalance = current.total_microdollars_acquired - current.microdollars_used;
+    const rawBalance =
+      current.total_microdollars_acquired -
+      current.microdollars_used -
+      current.inference_microdollars_held;
     const projectedBonus = await projectPendingKiloPassBonusMicrodollars(tx, {
       userId,
       microdollarsUsed: current.microdollars_used + costMicrodollars,
@@ -2389,6 +2393,7 @@ export async function runCreditRenewalSweep(
       auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
       total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
       microdollars_used: kilocode_users.microdollars_used,
+      inference_microdollars_held: kilocode_users.inference_microdollars_held,
       auto_top_up_enabled: kilocode_users.auto_top_up_enabled,
       kilo_pass_threshold: kilocode_users.kilo_pass_threshold,
       next_credit_expiration_at: kilocode_users.next_credit_expiration_at,
@@ -2487,6 +2492,7 @@ function selectCreditRenewalRowFields() {
     auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
     total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
     microdollars_used: kilocode_users.microdollars_used,
+    inference_microdollars_held: kilocode_users.inference_microdollars_held,
     auto_top_up_enabled: kilocode_users.auto_top_up_enabled,
     kilo_pass_threshold: kilocode_users.kilo_pass_threshold,
     next_credit_expiration_at: kilocode_users.next_credit_expiration_at,

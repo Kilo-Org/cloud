@@ -16,6 +16,10 @@ import { captureException } from '@sentry/nextjs';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { EXA_ALLOWED_PATHS, isExaAllowedPath } from '@/lib/exa-paths';
 import { z } from 'zod';
+import {
+  admitPrepaidInference,
+  cancelPrepaidInference,
+} from '@kilocode/web-shared/lib/ai-gateway/prepaid-inference';
 
 const EXA_BASE_URL = 'https://api.exa.ai';
 const MICRODOLLARS_PER_DOLLAR = 1_000_000;
@@ -36,7 +40,8 @@ function extractExaPath(url: URL): string | null {
 
 function extractCostMicrodollars(responseBody: unknown): number | undefined {
   const costDollars = ExaCostResponseSchema.parse(responseBody).costDollars?.total;
-  if (costDollars === undefined || costDollars === 0) return undefined;
+  if (costDollars === undefined) return undefined;
+  if (costDollars === 0) return 0;
   if (costDollars < 0) {
     throw new Error('Exa response costDollars.total must be positive.');
   }
@@ -99,9 +104,32 @@ export async function POST(request: NextRequest) {
   // Strip `stream` to guarantee JSON responses with costDollars for billing
   const requestBody: Record<string, unknown> = await request.json();
   delete requestBody.stream;
+  const admission = await admitPrepaidInference({
+    requestId: crypto.randomUUID(),
+    userId: user.id,
+    organizationId,
+    apiKind: 'exa',
+    model: exaPath,
+    providerId: 'exa',
+    body: requestBody,
+    zeroCost: !isPaidRequest,
+    signal: request.signal,
+  });
+  if (admission.kind === 'rejected') return admission.response;
 
   const featureId = validateFeatureHeader(request.headers.get(FEATURE_HEADER)) ?? undefined;
   const type = typeof requestBody.type === 'string' ? requestBody.type : undefined;
+
+  if (request.signal.aborted) {
+    if (admission.reservationId) {
+      await cancelPrepaidInference({
+        requestId: admission.reservationId,
+        userId: user.id,
+        organizationId,
+      });
+    }
+    return new NextResponse(null, { status: 499 });
+  }
 
   const response = await fetch(`${EXA_BASE_URL}${exaPath}`, {
     method: 'POST',
@@ -129,7 +157,8 @@ export async function POST(request: NextRequest) {
     try {
       const body: unknown = await cloned.json();
       const costMicrodollars = extractCostMicrodollars(body);
-      if (costMicrodollars === undefined) return;
+      if (costMicrodollars === undefined || (costMicrodollars === 0 && !admission.reservationId))
+        return;
 
       await recordExaUsage({
         userId: user.id,
@@ -140,6 +169,7 @@ export async function POST(request: NextRequest) {
         freeAllowanceMicrodollars: allowance,
         featureId,
         type,
+        ...(admission.reservationId ? { prepaidReservationId: admission.reservationId } : {}),
       });
     } catch (error) {
       captureException(error, {

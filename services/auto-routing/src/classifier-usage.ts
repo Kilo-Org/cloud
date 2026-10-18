@@ -1,18 +1,13 @@
 import { DEFAULT_AUTO_ROUTER, type MirrorPayload } from '@kilocode/auto-routing-contracts';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
-import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { recordUsage, type UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
 import { ZodError } from 'zod';
 
-export type ClassifierCallKind = 'sync' | 'background' | 'speculative';
-
 export type ClassifierUsageIdentity = {
   conversationKey: string;
-  classifierModel: string;
-  contentHash: string;
-  kind: ClassifierCallKind;
-  requestStart: string;
+  usageId: string;
+  prepaidReservationId?: string;
 };
 
 type ClassifierUsageEnv = Pick<
@@ -24,23 +19,13 @@ function clean(value: string | null): string | null {
   return value?.replaceAll('\u0000', '') ?? null;
 }
 
-export async function buildClassifierUsage(
+export function buildClassifierUsage(
   payload: MirrorPayload,
   identity: ClassifierUsageIdentity,
   costUsd: number,
   createdAt: string
-): Promise<UsageRecordRequest> {
-  const hash = await sha256Hex(
-    JSON.stringify([
-      payload.router ?? DEFAULT_AUTO_ROUTER,
-      identity.conversationKey,
-      identity.classifierModel,
-      identity.contentHash,
-      identity.kind,
-      identity.requestStart,
-    ])
-  );
-  const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-${((parseInt(hash[16] ?? '0', 16) & 3) | 8).toString(16)}${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+): UsageRecordRequest {
+  const id = identity.usageId;
   return UsageRecordRequestSchema.parse({
     core: {
       id,
@@ -63,6 +48,10 @@ export async function buildClassifierUsage(
     },
     metadata: {
       id,
+      ...(identity.prepaidReservationId && {
+        prepaid_reservation_id: identity.prepaidReservationId,
+        prepaid_usage_final: Number.isFinite(costUsd) && costUsd >= 0,
+      }),
       message_id: '<missing>',
       created_at: createdAt,
       http_x_forwarded_for: null,
@@ -130,7 +119,7 @@ export async function recordClassifierUsage(
   if (costUsd == null) return;
   let usage: UsageRecordRequest;
   try {
-    usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    usage = buildClassifierUsage(payload, identity, costUsd, createdAt);
   } catch (error) {
     if (!(error instanceof ZodError)) throw error;
     for (const issue of error.issues) {

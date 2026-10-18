@@ -33,6 +33,7 @@ function context(
       created_at: '',
       updated_at: '',
       microdollars_used: 0,
+      inference_microdollars_held: 0,
       microdollars_balance: 0,
       total_microdollars_acquired: 0,
       next_credit_expiration_at: null,

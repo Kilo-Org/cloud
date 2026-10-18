@@ -19,6 +19,8 @@ import {
   extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
+  hasReportedCost,
+  hasValidTokenCounts,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 
@@ -29,6 +31,15 @@ type ResponsesApiUsage = OpenAI.Responses.ResponseUsage & {
   is_byok?: boolean | null;
   cost_details?: { upstream_inference_cost: number };
 };
+
+function hasCompleteResponsesTokenUsage(usage: ResponsesApiUsage | null | undefined): boolean {
+  return hasValidTokenCounts(
+    usage?.input_tokens,
+    usage?.output_tokens,
+    usage?.input_tokens_details?.cached_tokens ?? 0,
+    usage?.input_tokens_details?.cache_write_tokens ?? 0
+  );
+}
 
 type MaybeHasVercelProviderMetadata = {
   provider_metadata?: VercelProviderMetaData;
@@ -132,6 +143,8 @@ export async function parseResponsesMicrodollarUsageFromStream(
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
   let finish_reason: string | null = null;
+  let sawTerminalUsage = false;
+  let finalCostReported = false;
 
   const sseStreamParser = createParser({
     onEvent(event: EventSourceMessage) {
@@ -178,6 +191,12 @@ export async function parseResponsesMicrodollarUsageFromStream(
         model = response.model ?? model;
         if (response.usage) {
           usage = response.usage as ResponsesApiUsage;
+          sawTerminalUsage =
+            json.type === 'response.completed' ||
+            json.type === 'response.failed' ||
+            json.type === 'response.incomplete';
+          finalCostReported =
+            sawTerminalUsage && hasReportedCost(response.usage, response.provider_metadata);
         }
         const meta = response.provider_metadata;
         if (meta) {
@@ -224,7 +243,9 @@ export async function parseResponsesMicrodollarUsageFromStream(
   } satisfies NotYetCostedUsageStats;
 
   const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);
-  return { ...coreProps, ...costs };
+  const final = sawTerminalUsage && !wasAborted;
+  const hasFinalTokenUsage = final && hasCompleteResponsesTokenUsage(usage);
+  return { ...coreProps, ...costs, hasFinalTokenUsage, hasFinalCost: final && finalCostReported };
 }
 
 export function parseResponsesMicrodollarUsageFromString(
@@ -255,7 +276,17 @@ export function parseResponsesMicrodollarUsageFromString(
   } satisfies NotYetCostedUsageStats;
 
   const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);
-  return { ...coreProps, ...costs };
+  const final =
+    responseJson?.status === 'completed' ||
+    responseJson?.status === 'failed' ||
+    responseJson?.status === 'incomplete';
+  const hasFinalTokenUsage = final && hasCompleteResponsesTokenUsage(usage);
+  return {
+    ...coreProps,
+    ...costs,
+    hasFinalTokenUsage,
+    hasFinalCost: final && hasReportedCost(usage, providerMetadata),
+  };
 }
 
 export function extractInputItemTextContent(

@@ -7,6 +7,7 @@ import {
   user_affiliate_events,
   user_auth_provider,
   credit_transactions,
+  inference_reservations,
   kilo_pass_store_events,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
@@ -143,6 +144,7 @@ import {
   passkey_challenges,
   passkey_sign_in_tickets,
 } from '@kilocode/db/schema';
+import { reserveInferenceCredits } from '@kilocode/db/inference-reservations';
 
 import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -241,6 +243,7 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
+    await db.delete(inference_reservations);
     await db.delete(cloud_agent_worktrees);
     await db.delete(cloud_agent_workspace_folders);
     await db.delete(todo_lists);
@@ -5912,6 +5915,60 @@ describe('User', () => {
       expect(softDeletedCreator?.google_user_name).toBe('Deleted User');
       expect(softDeletedCreator?.is_admin).toBe(false);
       expect(softDeletedCreator?.can_manage_credits).toBe(false);
+    });
+
+    it('preserves uncertain personal and organization inference holds through account anonymization', async () => {
+      const user = await insertTestUser({
+        total_microdollars_acquired: 1_000_000,
+        microdollars_used: 100_000,
+      });
+      const organization = await createTestOrganization(
+        'Retained inference credit',
+        user.id,
+        1_000_000
+      );
+      const personalRequest = {
+        requestId: crypto.randomUUID(),
+        userId: user.id,
+        amountMicrodollars: 200_000,
+      };
+      const organizationRequest = {
+        requestId: crypto.randomUUID(),
+        userId: user.id,
+        organizationId: organization.id,
+        amountMicrodollars: 300_000,
+      };
+      expect(await reserveInferenceCredits(db, personalRequest)).toMatchObject({
+        kind: 'reserved',
+      });
+      expect(await reserveInferenceCredits(db, organizationRequest)).toMatchObject({
+        kind: 'reserved',
+      });
+
+      await softDeleteUser(user.id);
+
+      const retainedUser = await findUserById(user.id);
+      expect(retainedUser).toMatchObject({
+        id: user.id,
+        google_user_name: 'Deleted User',
+        total_microdollars_acquired: 1_000_000,
+        microdollars_used: 100_000,
+        inference_microdollars_held: 200_000,
+      });
+      const [retainedOrganization] = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+      expect(retainedOrganization.inference_microdollars_held).toBe(300_000);
+      const retainedReservations = await db
+        .select()
+        .from(inference_reservations)
+        .where(eq(inference_reservations.kilo_user_id, user.id));
+      expect(retainedReservations).toHaveLength(2);
+      expect(retainedReservations.every(row => row.status === 'reserved')).toBe(true);
+      expect(
+        retainedReservations.map(row => row.amount_microdollars).sort((a, b) => a - b)
+      ).toEqual([200_000, 300_000]);
     });
 
     it('should preserve Kilo Pass subscriptions and issuance chain', async () => {

@@ -6,6 +6,10 @@ import { scheduleOrganizationLowBalanceAlert } from '@kilocode/web-shared/lib/or
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
+import {
+  lockInferenceReservationForSettlement,
+  settleInferenceCredits,
+} from '@kilocode/db/inference-reservations';
 
 export type ExaMonthlyUsageResult = {
   /** Total spend in microdollars for the current month. */
@@ -69,6 +73,7 @@ export async function recordExaUsage(params: {
   freeAllowanceMicrodollars: number;
   featureId?: string;
   type?: string;
+  prepaidReservationId?: string;
 }): Promise<void> {
   const {
     userId,
@@ -81,10 +86,19 @@ export async function recordExaUsage(params: {
     type,
   } = params;
   const chargedAmount = chargedToBalance ? costMicrodollars : 0;
-  const sourceId = randomUUID();
+  const sourceId = params.prepaidReservationId ?? randomUUID();
   const occurredAt = new Date().toISOString();
+  const settlement = params.prepaidReservationId
+    ? {
+        requestId: params.prepaidReservationId,
+        userId,
+        organizationId,
+        actualCostMicrodollars: chargedAmount,
+      }
+    : undefined;
 
   const organizationUsage = await db.transaction(async tx => {
+    if (settlement) await lockInferenceReservationForSettlement(tx, settlement);
     await tx.insert(exa_usage_log).values({
       id: sourceId,
       kilo_user_id: userId,
@@ -106,15 +120,17 @@ export async function recordExaUsage(params: {
       freeAllowanceMicrodollars,
     });
 
-    if (!chargedToBalance || costMicrodollars <= 0) return null;
-
-    const result = await deductFromBalance(tx, {
-      userId,
-      organizationId,
-      occurredAt,
-      costMicrodollars,
-      sourceId,
-    });
+    const result =
+      chargedToBalance && costMicrodollars > 0
+        ? await deductFromBalance(tx, {
+            userId,
+            organizationId,
+            occurredAt,
+            costMicrodollars,
+            sourceId,
+          })
+        : null;
+    if (settlement) await settleInferenceCredits(tx, settlement);
 
     return result;
   });

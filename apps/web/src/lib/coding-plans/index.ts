@@ -271,7 +271,7 @@ export async function subscribeToCodingPlan(
       UPDATE kilocode_users
       SET microdollars_used = microdollars_used + ${plan.costMicrodollars}
       WHERE id = ${userId}
-        AND total_microdollars_acquired - microdollars_used >= ${plan.costMicrodollars}
+        AND total_microdollars_acquired - microdollars_used - inference_microdollars_held >= ${plan.costMicrodollars}
       RETURNING microdollars_used
     `);
     if (chargedUsers.length === 0) {

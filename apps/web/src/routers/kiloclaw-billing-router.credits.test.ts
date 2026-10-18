@@ -20,6 +20,7 @@ import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   user_affiliate_events,
+  inference_reservations,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { sandboxIdFromUserId } from '@kilocode/worker-utils/sandbox-id';
@@ -31,6 +32,11 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { differenceInCalendarMonths } from 'date-fns';
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+import { enrollWithCredits } from '@/lib/kiloclaw/credit-billing';
+import {
+  releaseInferenceCredits,
+  reserveInferenceCredits,
+} from '@kilocode/db/inference-reservations';
 
 // ── Credit Enrollment ──────────────────────────────────────────────────────
 
@@ -401,6 +407,55 @@ describe('enrollWithCredits', () => {
     await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
       'Insufficient credit balance'
     );
+  });
+
+  it('rejects direct credit enrollment when inference holds reserve the required funds', async () => {
+    const instance = await createCreditEnrollmentAnchor(user.id);
+    await giveUserCredits(user.id, 55_000_000);
+    await db
+      .update(kiloclaw_subscriptions)
+      .set({ kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION })
+      .where(eq(kiloclaw_subscriptions.instance_id, instance.id));
+    const reservation = {
+      requestId: crypto.randomUUID(),
+      userId: user.id,
+      amountMicrodollars: 1,
+    };
+
+    try {
+      expect(await reserveInferenceCredits(db, reservation)).toMatchObject({ kind: 'reserved' });
+      await expect(
+        enrollWithCredits({
+          userId: user.id,
+          instanceId: instance.id,
+          plan: 'standard',
+          hadPaidSubscription: false,
+          expectedPriceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+        })
+      ).rejects.toMatchObject({ reason: 'insufficient_credits' });
+
+      const [savedUser] = await db
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, user.id));
+      expect(savedUser).toMatchObject({ microdollars_used: 0, inference_microdollars_held: 1 });
+      const [subscription] = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.instance_id, instance.id));
+      expect(subscription.status).toBe('trialing');
+      expect(
+        await db
+          .select()
+          .from(credit_transactions)
+          .where(eq(credit_transactions.kilo_user_id, user.id))
+      ).toHaveLength(0);
+    } finally {
+      await db.transaction(tx => releaseInferenceCredits(tx, reservation));
+      await db
+        .delete(inference_reservations)
+        .where(eq(inference_reservations.request_id, reservation.requestId));
+    }
   });
 
   it('charges legacy recurring standard for live legacy trial with prior paid history', async () => {

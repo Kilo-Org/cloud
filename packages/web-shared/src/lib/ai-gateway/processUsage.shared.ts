@@ -15,6 +15,41 @@ type OpenRouterCostFields = {
   cost_details?: { upstream_inference_cost: number };
 };
 
+export function hasValidTokenCounts(...counts: unknown[]): boolean {
+  return (
+    counts.length > 0 &&
+    counts.every(value => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0)
+  );
+}
+
+export function hasReportedCost(
+  usage: unknown,
+  providerMetadata?: VercelProviderMetaData | null
+): boolean {
+  if (usage !== null && typeof usage === 'object') {
+    const cost = 'cost' in usage ? usage.cost : undefined;
+    const byok = 'is_byok' in usage ? usage.is_byok : undefined;
+    if (cost != null || byok != null) {
+      if (byok != null && typeof byok !== 'boolean') return false;
+      const details = 'cost_details' in usage ? usage.cost_details : undefined;
+      const billed =
+        byok === true
+          ? details !== null && typeof details === 'object' && 'upstream_inference_cost' in details
+            ? details.upstream_inference_cost
+            : undefined
+          : cost;
+      return typeof billed === 'number' && Number.isFinite(billed) && billed >= 0;
+    }
+  }
+  const value = providerMetadata?.gateway?.marketCost ?? providerMetadata?.gateway?.cost;
+  return (
+    typeof value === 'string' &&
+    value.trim() !== '' &&
+    Number.isFinite(Number(value)) &&
+    Number(value) >= 0
+  );
+}
+
 /**
  * Computes cost_mUsd and is_byok from OpenRouter usage cost fields, and emits a
  * Sentry warning when the accounting looks suspicious.

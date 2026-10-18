@@ -162,18 +162,16 @@ describe('unmaterialized credit lot repair', () => {
           created_at: '2026-01-02',
         },
       ]);
-      await db
-        .insert(microdollar_usage)
-        .values({
-          kilo_user_id: user.id,
-          organization_id: organization?.id ?? null,
-          cost: 80 + drift,
-          input_tokens: 1,
-          output_tokens: 1,
-          cache_write_tokens: 0,
-          cache_hit_tokens: 0,
-          created_at: '2026-01-01',
-        });
+      await db.insert(microdollar_usage).values({
+        kilo_user_id: user.id,
+        organization_id: organization?.id ?? null,
+        cost: 80 + drift,
+        input_tokens: 1,
+        output_tokens: 1,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        created_at: '2026-01-01',
+      });
       for (let replay = 0; replay < 2; replay++) {
         const result = organization
           ? await recomputeOrganizationBalances({ organizationId: id })

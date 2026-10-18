@@ -257,7 +257,7 @@ describe('Frontier fallback editor', () => {
 
   afterEach(() => {
     if (previousReact === undefined) {
-      delete testGlobals.React;
+      Reflect.deleteProperty(testGlobals, 'React');
     } else {
       testGlobals.React = previousReact;
     }

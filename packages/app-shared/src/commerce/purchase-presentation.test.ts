@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  isNativeIapMutationAllowed,
-  mapKiloPassStatusToClass,
-  resolvePurchasePresentation,
-} from './purchase-presentation';
+import { mapKiloPassStatusToClass, resolvePurchasePresentation } from './purchase-presentation';
 
 describe('resolvePurchasePresentation', () => {
   it('marks iOS credits unavailable with no CTA', () => {
@@ -154,46 +150,5 @@ describe('mapKiloPassStatusToClass', () => {
 
   it('maps no subscription to inactive regardless of status', () => {
     expect(mapKiloPassStatusToClass('active', { hasSubscription: false })).toBe('inactive');
-  });
-});
-
-describe('isNativeIapMutationAllowed', () => {
-  it('is true for iOS App Store and Android Play Kilo Pass', () => {
-    expect(
-      isNativeIapMutationAllowed({ platform: 'ios', storefront: 'app_store', product: 'kilo_pass' })
-    ).toBe(true);
-    expect(
-      isNativeIapMutationAllowed({ platform: 'android', storefront: 'play', product: 'kilo_pass' })
-    ).toBe(true);
-  });
-
-  it('is false for iOS credits', () => {
-    expect(
-      isNativeIapMutationAllowed({ platform: 'ios', storefront: 'app_store', product: 'credits' })
-    ).toBe(false);
-  });
-
-  it('is false for Android credits', () => {
-    expect(
-      isNativeIapMutationAllowed({ platform: 'android', storefront: 'play', product: 'credits' })
-    ).toBe(false);
-  });
-
-  it('is false for Android Kilo Pass on a non-Play storefront', () => {
-    expect(
-      isNativeIapMutationAllowed({ platform: 'android', storefront: 'web', product: 'kilo_pass' })
-    ).toBe(false);
-  });
-
-  it('is false for a non-App Store storefront', () => {
-    expect(
-      isNativeIapMutationAllowed({ platform: 'ios', storefront: 'web', product: 'kilo_pass' })
-    ).toBe(false);
-  });
-
-  it('is false for a missing platform', () => {
-    expect(
-      isNativeIapMutationAllowed({ platform: null, storefront: 'app_store', product: 'kilo_pass' })
-    ).toBe(false);
   });
 });

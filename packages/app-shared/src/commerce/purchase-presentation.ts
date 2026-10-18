@@ -153,19 +153,3 @@ export function mapKiloPassStatusToClass(
       return 'inactive';
   }
 }
-
-/**
- * True for iOS App Store Kilo Pass and for Android Play Kilo Pass.
- */
-export function isNativeIapMutationAllowed(input: {
-  platform: PurchasePlatform | null | undefined;
-  storefront: PurchaseStorefront | null | undefined;
-  product: PurchaseProduct;
-}): boolean {
-  return (
-    (input.platform === 'ios' &&
-      input.storefront === 'app_store' &&
-      input.product === 'kilo_pass') ||
-    (input.platform === 'android' && input.storefront === 'play' && input.product === 'kilo_pass')
-  );
-}

@@ -137,6 +137,9 @@ describe.each(['personal', 'org-example'])('security notification history (%s)',
     expect(path).toBe(
       `/(app)/(tabs)/(3_profile)/security-agent/${scope}/findings/finding-123?via=push`
     );
+    if (path === null) {
+      throw new Error('Security notifications must keep their navigation destination');
+    }
     const url = new URL(path, 'https://example.test');
     const segments = url.pathname.split('/');
     const action = {

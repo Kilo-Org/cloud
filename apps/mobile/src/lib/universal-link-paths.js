@@ -8,7 +8,6 @@ export const UNIVERSAL_LINK_PATH_PATTERNS = [
   '/home',
   '/profile',
   '/profile/preferences',
-  '/claw',
   '/cloud/sessions',
   '/cloud/sessions/.*',
   '/security-agent',

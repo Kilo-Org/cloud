@@ -101,12 +101,9 @@
     "scheduled": "예약됨",
     "keepEditing": "계속 편집",
     "keepRunning": "계속 실행",
-    "kiloclaw": "KiloClaw",
     "newSession": "새 세션",
-    "noKiloclawInstances": "KiloClaw 인스턴스 없음",
     "noModelsAvailable": "사용 가능한 모델 없음",
     "notFound": "항목을 찾을 수 없습니다.",
-    "online": "온라인",
     "open": "{{name}} 열기",
     "openPullRequest": "풀 리퀘스트 오픈",
     "pending": "대기 중",
@@ -257,7 +254,8 @@
     "renamePasskey": "패스키 이름 변경",
     "removePasskey": "패스키 제거",
     "removePasskeyTitle": "패스키를 제거할까요?",
-    "removePasskeyMessage": "이 패스키로는 더 이상 로그인할 수 없습니다."
+    "removePasskeyMessage": "이 패스키로는 더 이상 로그인할 수 없습니다.",
+    "changelog": "새로운 기능"
   },
   "preferences": {
     "general": "일반",
@@ -320,23 +318,18 @@
     "previewGenericDescription": "알림에는 새 소식이 있다는 사실만 표시됩니다. 내용을 읽으려면 Kilo를 여세요.",
     "channel": {
       "agentProgress": "에이전트 진행 상황",
-      "chat": "채팅 메시지",
-      "kiloclaw": "KiloClaw 활동",
       "balance": "잔액 알림",
       "security": "보안 진단 결과",
       "spend": "지출 알림",
       "followedSessions": "팔로우한 세션"
     },
     "category": {
-      "chatMessagesSubtitle": "대화에 달린 답장",
       "agentAttentionTitle": "에이전트 응답 요청",
       "agentAttentionSubtitle": "질문, 권한 승인, 입력 요청",
       "agentUpdatesTitle": "에이전트 진행 소식",
       "agentUpdatesSubtitle": "작업 중 에이전트가 보내는 메시지",
       "sessionStatusTitle": "세션 상태",
       "sessionStatusSubtitle": "완료 / 실패 / 제어 준비 완료",
-      "kiloclawActivitySubtitle": "인스턴스 준비 완료 및 실패, 예약된 작업",
-      "kiloclawActivityUnavailable": "KiloClaw 활동을 받으려면 KiloClaw 인스턴스를 시작하세요.",
       "balanceAlertsSubtitle": "조직 잔액 부족 경고",
       "balanceAlertsUnavailable": "잔액 경고를 받으려면 조직에 가입하세요.",
       "securityFindingsSubtitle": "새 보안 문제 및 SLA 알림",
@@ -356,72 +349,19 @@
   },
   "tabs": {
     "home": "홈",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, 탭, {{total}}개 중 {{position}}번째"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "인스턴스 전환",
-      "couldNotLoadInstances": "인스턴스를 불러올 수 없습니다.",
-      "noInstancesDescription": "채팅을 시작하려면 인스턴스를 설정하세요.",
-      "setUpKiloclaw": "KiloClaw 설정",
-      "currentInstance": "{{title}}, 현재 선택된 인스턴스"
-    },
     "conversation": {
-      "failedToLoad": "대화를 불러오지 못했습니다.",
-      "notFound": "대화를 찾을 수 없습니다.",
       "untitled": "제목 없음",
-      "leaveTitle": "대화에서 나갈까요?",
-      "leaveMessage": "이 대화가 내 목록에서 삭제됩니다.",
-      "openHint": "대화를 엽니다. 길게 누르면 이름 변경과 나가기 옵션이 표시됩니다.",
-      "unread": "읽지 않음",
-      "optionsFor": "{{title}} 대화 옵션",
-      "options": "대화 옵션",
-      "renameTitle": "대화 이름 변경",
-      "renamePlaceholder": "새 이름 입력",
-      "couldNotReachBot": "봇에 연결할 수 없습니다. 다시 시도하세요.",
-      "messageDeliveryFailed": "봇에 메시지를 전달하지 못했습니다.",
-      "couldNotSignIn": "채팅에 로그인할 수 없습니다.",
-      "couldNotRefreshMessages": "메시지를 새로고침할 수 없습니다.",
-      "couldNotLoadHistory": "대화 기록을 불러올 수 없습니다.",
-      "leave": "나가기",
-      "untitledConversation": "제목 없는 대화",
-      "createFailed": "대화를 만들지 못했습니다.",
-      "leaveFailed": "대화에서 나가지 못했습니다."
-    },
-    "reactions": {
-      "common": "자주 쓰는 반응",
-      "reactWith": "{{reaction}} 반응 추가",
-      "accessibility": "{{emoji}} 반응, {{displayCount}}개"
-    },
-    "composer": {
-      "replyingTo": "답장 대상",
-      "cancelReply": "답장 취소",
-      "openInstance": "인스턴스 열기",
-      "attachFile": "파일 첨부",
-      "cancelEdit": "편집 취소"
+      "renamePlaceholder": "새 이름 입력"
     },
     "conversationList": {
-      "couldNotLoad": "대화를 불러올 수 없습니다.",
-      "emptyTitle": "아직 대화 없음",
-      "emptyDescription": "KiloClaw 인스턴스와 채팅을 시작하려면 대화를 만드세요.",
-      "create": "대화 만들기",
-      "newConversation": "새 대화",
-      "openInstanceSettings": "인스턴스 설정 열기",
       "today": "오늘",
       "yesterday": "어제",
-      "thisWeek": "이번 주",
       "older": "이전"
     },
     "attachment": {
-      "open": "{{filename}} 열기",
-      "openFailed": "첨부 파일을 열 수 없습니다. 연결을 확인하고 다시 시도하세요.",
-      "attachFailed": "파일을 첨부하지 못했습니다.",
-      "limit": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
-      "sizeRejection": "{{filename}}의 크기가 첨부 한도({{limit}})를 초과합니다.",
-      "unreadable": "파일을 읽을 수 없습니다: {{filename}}",
-      "pastedImage": "붙여넣은 이미지",
-      "defaultName": "첨부 파일",
       "classificationDenied": "실행 파일은 첨부할 수 없습니다.",
       "classificationEmpty": "파일이 비어 있습니다.",
       "classificationTooLarge": "파일 크기는 20 MB 이하여야 합니다.",
@@ -431,426 +371,17 @@
       "networkError": "네트워크 오류가 발생했습니다.",
       "uploadFailed": "업로드하지 못했습니다.",
       "nothingToPaste": "붙여넣을 내용이 없습니다.",
-      "metadataStripFailed": "사진 메타데이터를 제거하지 못했습니다.",
-      "limit_one": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
-      "limit_other": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다."
+      "metadataStripFailed": "사진 메타데이터를 제거하지 못했습니다."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, 상태: {{status}}",
-      "retryUploading": "{{filename}} 업로드 다시 시도",
-      "remove": "{{filename}} 제거"
-    },
-    "messageBubble": {
-      "deleted": "[삭제된 메시지입니다.]",
-      "yourMessage": "내 메시지",
-      "messageFrom": "{{author}}님의 메시지",
-      "moreActions": "추가 작업",
-      "notDelivered": "전송 안 됨",
-      "edited": "(수정됨)",
-      "image": "이미지"
+      "accessibility": "{{filename}}, 상태: {{status}}"
     },
     "messageActions": {
-      "copied": "복사 완료",
-      "copyFailed": "복사하지 못했습니다.",
-      "title": "메시지 작업",
-      "deleteTitle": "메시지를 삭제할까요?",
-      "deleteMessage": "대화에서 이 메시지가 삭제됩니다.",
-      "deleteFailed": "메시지를 삭제하지 못했습니다.",
-      "removeReactionFailed": "반응을 제거하지 못했습니다.",
-      "addReactionFailed": "반응을 추가하지 못했습니다.",
-      "retrySend": "다시 보내기",
-      "moreReactions": "다른 반응 보기",
-      "edit": "편집",
-      "sendFailed": "메시지를 보내지 못했습니다.",
-      "retrySendFailed": "메시지를 다시 보내지 못했습니다.",
-      "editFailed": "메시지를 수정하지 못했습니다.",
-      "executeFailed": "작업을 실행하지 못했습니다."
+      "edit": "편집"
     },
     "attachmentPicker": {
-      "takePhoto": "사진 찍기",
-      "photoLibrary": "사진 보관함",
-      "files": "파일",
       "cameraAccessMessage": "사진을 찍으려면 설정에서 카메라 접근을 허용하세요."
-    },
-    "typingIndicator": {
-      "someone": "누군가",
-      "typing_one": "{{name}} 입력 중...",
-      "typing": "{{names}}님이 입력 중...",
-      "typing_other": "{{names}}님이 입력 중..."
-    },
-    "botStatus": {
-      "offline": "오프라인",
-      "loadingUser": "사용자 정보 불러오는 중...",
-      "waitingForStatus": "봇 상태 확인 대기 중...",
-      "offlineMessage": "봇이 오프라인입니다. 다시 연결되면 메시지 송수신이 재개됩니다."
-    },
-    "errors": {
-      "notAllowed": "허용되지 않는 작업입니다.",
-      "messageTooLong": "메시지가 너무 깁니다. {{limit}}자 미만으로 입력하세요.",
-      "titleTooLong": "제목이 너무 깁니다. {{limit}}자 미만으로 입력하세요.",
-      "messageEmpty": "메시지를 입력하세요."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw 인스턴스를 불러오지 못했습니다.",
-    "billing": {
-      "title": "결제",
-      "continueMonthToMonth": "월간 구독으로 계속 이용",
-      "plan": "플랜",
-      "finalTermEnds": "마지막 약정 종료일",
-      "afterFinalTerm": "마지막 약정 종료 후",
-      "lessThanOneDay": "1일 미만",
-      "ends": "종료일",
-      "expires": "만료일",
-      "noActivePlan": "이용 중인 요금제 없음",
-      "noActivePlanDescription": "현재 이용 중인 KiloClaw 구독이 없습니다.",
-      "managedByAdmin": "조직 관리자가 결제를 관리합니다.",
-      "couldNotLoad": "결제 정보를 불러오지 못했습니다.",
-      "manageOnWeb": "웹에서 결제 관리",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "마지막 Commit 약정 기간이 {{date}}에 종료됩니다. {{price}}에 Standard 요금제로 계속 이용하지 않으면 호스팅이 종료됩니다.",
-      "freeTrial": "무료 체험",
-      "hostingEnds": "호스팅 종료",
-      "renews": "갱신일",
-      "standardMonthToMonth": "Standard 월간 구독",
-      "standardStartsOn": "{{date}}부터 {{price}}에 Standard 요금제를 이용하게 됩니다.",
-      "yourStandardMonthlyPrice": "standard 월 이용 요금",
-      "perMonth": "/월",
-      "earlybirdAccessUntil": "Earlybird 이용 기간은 {{date}}까지입니다.",
-      "earlybirdEnding": "Earlybird 이용 종료까지 {{remaining}} 남았습니다.",
-      "paymentPastDue": "결제가 연체되었습니다. 결제 수단을 업데이트하세요.",
-      "subscriptionCancels": "구독이 {{date}}에 취소됩니다.",
-      "trialDaysRemaining": "무료 체험 기간이 {{remaining}} 남았습니다.",
-      "trialEndingSoon": "무료 체험이 곧 종료됩니다. {{remaining}} 남았습니다.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "커밋"
-    },
-    "changelog": {
-      "title": "새로운 기능",
-      "couldNotLoad": "변경 내역을 불러오지 못했습니다.",
-      "noUpdates": "아직 업데이트 없음",
-      "noUpdatesDescription": "업데이트 내역이 여기에 표시됩니다.",
-      "recentUpdates": "최근 업데이트",
-      "manageVersion": "버전 관리",
-      "redeployRequired": "재배포 필요",
-      "redeploySuggested": "재배포 권장",
-      "upgradeRequired": "업그레이드 필요"
-    },
-    "dashboard": {
-      "title": "대시보드",
-      "couldNotLoad": "대시보드를 불러오지 못했습니다.",
-      "renameInstance": "인스턴스 이름 변경",
-      "renamePlaceholder": "새 이름(최대 50자)",
-      "someDetailsFailed": "일부 실시간 정보를 불러오지 못했습니다.",
-      "destroy": "영구 삭제",
-      "destroyMessage": "KiloClaw 인스턴스와 모든 데이터가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
-      "destroyTitle": "인스턴스 영구 삭제",
-      "instance": "인스턴스",
-      "couldNotCheckStatus": "서비스 상태를 확인하지 못했습니다.",
-      "dangerZone": "주의가 필요한 작업",
-      "destroying": "삭제 중…",
-      "serviceDegraded": "서비스 성능 저하 · 탭하여 상태 보기",
-      "up": "실행 중"
-    },
-    "channels": {
-      "title": "채널",
-      "couldNotLoad": "채널을 불러오지 못했습니다.",
-      "noChannels": "사용 가능한 채널 없음",
-      "noChannelsDescription": "채널 연동 정보가 여기에 표시됩니다.",
-      "connected": "{{label}} 연결됨",
-      "disconnectMessage": "{{label}} 연결을 해제할까요? 이 채널과의 연결이 끊어집니다.",
-      "disconnectTitle": "채널 연결 해제"
-    },
-    "devicePairing": {
-      "title": "기기 페어링",
-      "refreshRequests": "페어링 요청 새로고침",
-      "couldNotLoad": "페어링 요청을 불러오지 못했습니다.",
-      "noPending": "대기 중인 요청 없음",
-      "noPendingDescription": "채널 및 기기 페어링 요청이 여기에 표시됩니다.",
-      "channelRequests": "채널 요청",
-      "deviceRequests": "기기 요청",
-      "approveDeviceMessage": "{{platform}} 기기가 인스턴스에 연결하도록 허용할까요?",
-      "approveDeviceTitle": "기기 승인",
-      "approveMessage": "{{label}}의 인스턴스 연결을 허용할까요? 코드: {{code}}",
-      "approveTitle": "페어링 요청 승인",
-      "unknownDevice": "알 수 없는 기기"
-    },
-    "execPolicy": {
-      "title": "실행 정책",
-      "couldNotLoad": "실행 정책을 불러오지 못했습니다.",
-      "alwaysAsk": "항상 확인",
-      "alwaysAskDescription": "실행 전에 모든 명령을 확인합니다. 가장 안전합니다.",
-      "neverAsk": "확인 안 함",
-      "neverAskDescription": "확인 없이 명령을 실행합니다. 빠르지만 덜 안전합니다."
-    },
-    "google": {
-      "title": "Google 계정",
-      "couldNotLoad": "Google 계정 상태를 불러오지 못했습니다.",
-      "disconnected": "Google 계정 연결이 해제되었습니다. 변경 사항을 적용하려면 인스턴스를 다시 배포하세요.",
-      "setupCommand": "설정 명령",
-      "setupCommandHelp": "Google 계정을 연결하려면 Docker가 설치된 본인 컴퓨터의 터미널에서 이 명령을 실행하세요.",
-      "failedToLoadCommand": "설정 명령을 불러오지 못했습니다.",
-      "gmailNotifications": "Gmail 알림",
-      "disconnect": "Google 계정 연결 해제",
-      "copied": "복사 완료",
-      "copyCommand": "명령 복사",
-      "disconnectConfirm": "연결 해제",
-      "disconnectMessage": "이 인스턴스에서 Google 계정을 제거할까요? Gmail 알림이 꺼집니다. 변경 사항을 적용하려면 연결 해제 후 다시 배포하세요.",
-      "disconnectTitle": "Google 연결 해제"
-    },
-    "modelList": {
-      "noMatches": "검색 결과에 해당하는 모델 없음",
-      "noModelsDescription": "사용 가능한 모델이 여기에 표시됩니다.",
-      "noResultsFor": "\"{{query}}\" 검색 결과가 없습니다."
-    },
-    "secrets": {
-      "title": "시크릿",
-      "couldNotLoad": "시크릿을 불러오지 못했습니다.",
-      "noSecrets": "사용 가능한 시크릿 없음",
-      "noSecretsDescription": "시크릿 연동 정보가 여기에 표시됩니다.",
-      "removeMessage": "{{label}} 시크릿을 제거할까요? 이 도구는 더 이상 인증 정보에 접근할 수 없습니다.",
-      "removeTitle": "시크릿 제거",
-      "saved": "{{label}} 저장됨",
-      "allFieldsRequired": "{{label}} 연결에 필요한 모든 항목을 입력하세요.",
-      "hide": "{{label}} 숨기기",
-      "removing": "제거 중…",
-      "saving": "저장 중…",
-      "setupGuide": "설정 가이드",
-      "setupGuideA11y": "{{label}} 설정 가이드",
-      "setupGuideFallback": "설정 가이드",
-      "show": "{{label}} 표시",
-      "updateToken": "토큰 업데이트"
-    },
-    "versionPin": {
-      "title": "버전 고정",
-      "couldNotLoad": "버전 정보를 불러오지 못했습니다.",
-      "couldNotLoadMore": "버전을 더 불러오지 못했습니다.",
-      "loadMore": "버전 더 불러오기",
-      "showingLatest": "최신 버전 100개를 표시합니다.",
-      "availableVersions": "사용 가능한 버전",
-      "noVersions": "사용 가능한 버전 없음",
-      "noVersionsDescription": "사용 가능한 OpenClaw 버전이 여기에 표시됩니다.",
-      "unpin": "고정 해제",
-      "unpinMessage": "사용 가능한 최신 버전으로 돌아갈까요?",
-      "unpinTitle": "버전 고정 해제",
-      "confirmPin": "버전 고정",
-      "followingLatest": "최신 버전 사용",
-      "latest": "최신",
-      "pin": "고정",
-      "pinnedByAdmin": "관리자가 버전을 고정했습니다. 변경하려면 관리자에게 문의하세요.",
-      "pinnedTo": "{{version}} 버전으로 고정됨",
-      "reasonOptional": "사유(선택 사항)",
-      "reasonPlaceholder": "버전 고정 사유",
-      "replaceAdminPin": "관리자가 고정한 버전 변경",
-      "replacesAdminPin": "관리자가 고정한 버전(현재 {{label}})을 변경합니다."
-    },
-    "redeploy": "다시 배포",
-    "redeployMessage": "이 인스턴스를 다시 배포할까요?",
-    "redeployTitle": "인스턴스 다시 배포",
-    "accessRequired": {
-      "iosBody": "이 계정의 KiloClaw 이용 권한은 iOS 앱 외부에서 관리됩니다.",
-      "iosContact": "질문이 있으신가요? {{supportEmail}}로 문의하세요.",
-      "iosTitle": "IOS에서 KiloClaw를 사용할 수 없음",
-      "multipleCurrentConflictBody": "계정에서 이용 중인 구독이 두 개 이상 확인되었습니다. 중복 청구를 방지하기 위해 이용을 일시 중지했습니다.",
-      "multipleCurrentConflictCta": "Kilo.ai에서 계속하기",
-      "nonCanonicalEarlybirdBody": "사전 이용 요금제를 모바일에서 사용하려면 담당자의 검토가 필요합니다.",
-      "nonCanonicalEarlybirdTitle": "이전 요금제 확인됨",
-      "quarantinedBody": "KiloClaw 인스턴스가 격리되어 지금은 사용할 수 없습니다. 복구하려면 지원팀의 도움이 필요합니다.",
-      "quarantinedTitle": "인스턴스 복구 필요",
-      "subscriptionCanceledBody": "KiloClaw를 사용하려면 브라우저에서 kilo.ai/claw로 이동하세요. 앱에서는 구독할 수 없습니다.",
-      "subscriptionCanceledCta": "Kilo.ai/claw 열기",
-      "subscriptionCanceledTitle": "웹에서 구독",
-      "subscriptionPastDueBody": "최근 결제에 문제가 발생했습니다. 브라우저에서 kilo.ai/claw로 이동해 결제 정보를 업데이트하세요. 앱에서는 결제를 관리할 수 없습니다.",
-      "subscriptionPastDueTitle": "웹에서 결제 정보 업데이트",
-      "trialExpiredBody": "KiloClaw를 계속 사용하려면 브라우저에서 kilo.ai/claw로 이동하세요. 앱에서는 구독할 수 없습니다.",
-      "quarantinedCta": "지원팀에게 이메일 보내기",
-      "nonCanonicalEarlybirdCta": "요금제를 Kilo.ai에서 검토하기"
-    },
-    "controls": {
-      "redeploying": "다시 배포 중…",
-      "restart": "재시작",
-      "restartOpenClawMessage": "OpenClaw 프로세스를 재시작할까요?",
-      "restartOpenClawTitle": "OpenClaw 재시작",
-      "restarting": "재시작 중…",
-      "start": "시작",
-      "startMessage": "이 인스턴스를 시작할까요?",
-      "startTitle": "인스턴스 시작",
-      "stop": "중지",
-      "stopMessage": "이 인스턴스를 중지할까요?",
-      "stopTitle": "인스턴스 중지",
-      "stopping": "중지 중…"
-    },
-    "empty": {
-      "finishingSetup": "설정 마무리 중",
-      "finishingSetupDescription": "계정 설정을 마무리하고 있습니다. 보통 금방 끝나니 잠시만 기다려 주세요.",
-      "getStarted": "시작하기",
-      "noInstancesDescription": "코딩 에이전트를 실행하려면 첫 인스턴스를 만드세요."
-    },
-    "instance": {
-      "backToInstances": "인스턴스 목록으로 돌아가기",
-      "couldNotLoad": "인스턴스를 불러오지 못했습니다.",
-      "notFound": "인스턴스를 찾을 수 없음",
-      "notFoundDescription": "이 인스턴스가 삭제되었거나 링크가 더 이상 유효하지 않을 수 있습니다."
-    },
-    "instanceCard": {
-      "fixOnKiloAi": "Kilo.ai에서 문제 해결: {{label}}",
-      "needsAttention": "{{name}} 확인 필요: {{label}}",
-      "openSettings": "{{name}} 설정 열기",
-      "openUnread": "{{name}} 열기, 읽지 않은 메시지 {{displayCount}}개",
-      "openUnread_other": "{{name}} 열기, 읽지 않은 메시지 {{displayCount}}개",
-      "openUnread_one": "{{name}} 열기, 읽지 않은 메시지 {{displayCount}}개"
-    },
-    "list": {
-      "createInstance": "인스턴스 만들기",
-      "organizations": "조직",
-      "accessIssue": {
-        "trialExpired": "무료 체험 종료 · 계속 이용하려면 구독",
-        "subscriptionCanceled": "구독 중단 · 계속 이용하려면 다시 구독",
-        "subscriptionPastDue": "결제 문제 · 계속 이용하려면 결제 정보 업데이트",
-        "quarantined": "인스턴스 격리됨 · 담당자 검토 필요",
-        "multipleCurrentConflict": "계정 검토 필요",
-        "nonCanonicalEarlybird": "이전 요금제 검토 필요"
-      }
-    },
-    "modelPicker": {
-      "autoModelA11y": "{{label}} 자동 모델",
-      "balancedDescription": "합리적인 비용으로 속도와 성능을 균형 있게 제공합니다.",
-      "browseAllModels": "또는 500개 이상의 모델 중에서 선택",
-      "browseAllModelsA11y": "500개 이상의 모든 모델 둘러보기",
-      "currentModel": "현재 모델",
-      "frontierDescription": "추론 기능을 갖춘 최상위 모델을 선택해 최고의 성능을 제공합니다.",
-      "frontierLabel": "프런티어",
-      "kiloAuto": "Kilo Auto"
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}}과(와) 채팅하기",
-        "ready": "{{name}} 준비 완료",
-        "warmedUp": "준비가 모두 끝났습니다. 언제든 인사를 건네세요."
-      },
-      "flow": {
-        "couldNotLoad": "초기 설정 상태를 불러오지 못했습니다.",
-        "finishingSetup": "계정 설정을 마무리하고 있습니다. 잠시만 기다려 주세요.",
-        "genericErrorBody": "인스턴스 설정을 완료하지 못했습니다.",
-        "identityTitle": "봇 개성 설정",
-        "manualReviewBody": "인스턴스를 만들려면 계정 상태를 확인해야 합니다. kilo.ai에서 계속 진행하세요.",
-        "manualReviewTitle": "설정에 담당자 검토 필요",
-        "openKiloAi": "Kilo.ai 열기",
-        "provisioning": "프로비저닝",
-        "ready": "준비됨",
-        "review": "리뷰",
-        "settingUp": "설정 중…"
-      },
-      "identity": {
-        "changePersonality": "성격 변경",
-        "chooseAvatar": "아바타 선택",
-        "location": "위치",
-        "locationDeniedMessage": "현재 위치를 사용하려면 설정에서 위치 접근을 허용하세요.",
-        "locationDeniedTitle": "위치 접근 권한 없음",
-        "locationGetFailed": "위치를 가져올 수 없습니다. 직접 입력하세요.",
-        "locationPlaceholder": "도시 또는 지역(선택 사항)",
-        "locationResolveFailed": "위치를 확인할 수 없습니다. 직접 수정할 수 있습니다.",
-        "locationValidationFailed": "위치를 확인할 수 없습니다.",
-        "namePlaceholder": "봇 이름",
-        "nature": {
-          "aiAssistantLabel": "AI 어시스턴트",
-          "aiAssistantVibe": "친절하고 유능하며 전문적",
-          "digitalCreatureLabel": "디지털 생명체",
-          "digitalCreatureVibe": "엉뚱하고 생동감 넘치며 조금은 예측 불가",
-          "somethingWeirderLabel": "좀 더 독특한 존재…",
-          "somethingWeirderVibe": "직접 설정",
-          "virtualCompanionLabel": "가상 동반자",
-          "virtualCompanionVibe": "늘 곁에서 진심으로 챙겨 주는 따뜻한 성격"
-        },
-        "personality": "성격",
-        "selectAvatar": "{{name}} 아바타 선택",
-        "useCurrentLocation": "현재 위치 사용"
-      },
-      "notifications": {
-        "couldNotEnable": "알림을 켜지 못했습니다.",
-        "getNotified": "{{name}}의 작업 완료 알림을 받아 응답을 놓치지 마세요.",
-        "mockMessage": "다 끝났습니다! 요청하신 내용을 요약해 두었습니다. 편할 때 확인하세요.",
-        "now": "지금",
-        "settingUp": "알림 설정 중…",
-        "skipForNow": "지금은 건너뛰기",
-        "stayInTheLoop": "작업 알림 설정"
-      },
-      "provisioning": {
-        "backgroundHint": "보통 1분 안에 완료됩니다. 이 화면을 닫아도 백그라운드에서 계속 진행됩니다.",
-        "connectingToAgent": "에이전트에 연결 중",
-        "continueInBackground": "백그라운드에서 계속 진행",
-        "queryErrorBody": "{{name}}의 설정 진행 상황을 확인하다가 연결이 끊겼습니다. 설정은 계속 진행 중일 수 있습니다. 다시 시도하거나 잠시 후 확인하세요.",
-        "queryErrorTitle": "설정 진행 상황 확인 불가",
-        "settingUp": "{{name}} 설정 중",
-        "stalledBody": "{{name}} 설정을 완료하지 못했습니다. 다시 시도하세요. 문제가 계속되면 {{supportEmail}}로 이메일을 보내세요.",
-        "stalledTitle": "설정 진행이 멈춤",
-        "startingSandbox": "샌드박스 시작 중",
-        "stoppedBody": "설정 중 {{name}}의 인스턴스가 예기치 않게 중지되었습니다.",
-        "stoppedTitle": "설정 중지됨",
-        "timeoutBody": "{{name}} 설정이 평소보다 오래 걸리고 있습니다({{displayMinutes}}분 초과).",
-        "timeoutTitle": "예상보다 오래 걸림"
-      },
-      "unavailableDescription": "인스턴스를 만들려면 이용 중인 KiloClaw 구독이 있어야 합니다. 기존 인스턴스와 구독은 정상적으로 유지됩니다.",
-      "unavailableTitle": "새 KiloClaw 인스턴스 생성 불가"
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "종료 코드 {{code}}",
-      "gatewayProcess": "게이트웨이 프로세스",
-      "lastExit": "마지막 종료",
-      "memory": "메모리",
-      "region": "지역",
-      "resources": "리소스",
-      "restarts": "재시작 횟수",
-      "state": "상태",
-      "uptime": "가동 시간",
-      "crashed": "비정상 종료",
-      "destroying": "삭제 중",
-      "provisioned": "프로비저닝 완료",
-      "restarting": "재시작 중",
-      "running": "실행 중",
-      "shuttingDown": "종료 중",
-      "starting": "시작 중",
-      "stopped": "중지됨",
-      "stopping": "중지 중",
-      "unknown": "알 수 없음",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "기기 요청 승인",
-      "execPolicyDescription": "보안 설정",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "AI 모델 선택",
-      "secretsDescription": "암호화된 인증 정보",
-      "versionPinDescription": "특정 버전에 고정"
-    },
-    "avatar": {
-      "arcade": "아케이드",
-      "brain": "두뇌",
-      "creature": "생명체",
-      "crystal": "크리스탈",
-      "custom": "사용자 지정 아바타",
-      "dragon": "용",
-      "explorer": "탐험가",
-      "flame": "불꽃",
-      "lightning": "번개",
-      "magicWand": "마법 지팡이",
-      "moon": "달",
-      "operator": "운영자",
-      "orbit": "궤도",
-      "oracle": "예언자",
-      "rainbow": "무지개",
-      "robot": "로봇",
-      "satellite": "위성",
-      "sparkles": "반짝임",
-      "strongArm": "근육질 팔",
-      "talisman": "부적"
-    },
-    "remoteSpawnFilesNotSupported": "이 인스턴스는 파일을 받을 수 없습니다.",
-    "instanceSwitcherTitle": "KiloClaw 인스턴스"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2030,10 +1561,6 @@
       "moveLeft": "{{filename}} 왼쪽으로 이동",
       "moveRight": "{{filename}} 오른쪽으로 이동"
     },
-    "attachmentPasteHint": {
-      "accessibility": "클립보드에서 이미지 붙여넣기",
-      "label": "감지된 이미지 붙여넣기"
-    },
     "attachmentPicker": {
       "camera": "카메라",
       "photoLibrary": "사진 보관함",
@@ -2229,7 +1756,8 @@
     "signOutThisDeviceTitle": "이 기기에서 로그아웃할까요?",
     "signOutThisSessionTitle": "이 세션에서 로그아웃할까요?",
     "signOutThisSessionMessage": "{{device}} 기기에서 로그아웃됩니다. 로그아웃 후에도 최대 1시간 동안 API에 접근할 수 있습니다.",
-    "webBrowser": "웹 브라우저"
+    "webBrowser": "웹 브라우저",
+    "unknownDevice": "알 수 없는 기기"
   },
   "forceUpdate": {
     "couldNotOpenStore": "앱 스토어를 열 수 없습니다.",

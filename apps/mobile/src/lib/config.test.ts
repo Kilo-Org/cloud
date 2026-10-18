@@ -22,7 +22,6 @@ const REQUIRED_EXTRA = {
   sessionIngestWsUrl: 'wss://ingest.kilosessions.ai',
   appsFlyerDevKey: 'apps-flyer-dev-key',
   appsFlyerAppId: 'apps-flyer-app-id',
-  kiloChatUrl: 'https://chat.kiloapps.io',
   eventServiceUrl: 'https://events.kiloapps.io',
   notificationsUrl: 'https://notifications.kiloapps.io',
   posthogApiKey: 'posthog-key',

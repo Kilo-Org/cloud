@@ -803,13 +803,18 @@ describe('handleNeedsInputNotificationResponse — default action', () => {
     expect(mocks.runNeedsInputInteraction).not.toHaveBeenCalled();
   });
 
-  it('leaves the pending destination alone for malformed tap data', async () => {
+  it.each([
+    { type: 'security_finding', scope: 'personal' },
+    { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+    { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
+    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
+  ])('leaves the pending destination alone for unsupported tap data $type', async data => {
     setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
 
     const handled = await handleNeedsInputNotificationResponse(
       raiseResponse({
         actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
-        data: { type: 'security_finding', scope: 'personal' },
+        data,
       }),
       { runInteraction: mocks.runNeedsInputInteraction }
     );

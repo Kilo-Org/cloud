@@ -7,19 +7,17 @@
 // code block consistent.
 //
 // The palette is keyed by the SURFACE the code is painted on, not by the app
-// color scheme: a dark-theme user bubble is bright yellow (#FFDD00) while a
-// light-theme kilo-chat user bubble is dark olive (#4F5A10), so the app scheme
-// is the wrong signal for either one. `tokenSchemeForSurface` classifies the
+// color scheme: user bubbles remain bright in the dark theme.
+// `tokenSchemeForSurface` classifies the
 // real code-card background — the bubble tinted by the palette's 10% ink
 // (`compositeOver`) — and the matching pair is used: `light` holds dark ink for
 // bright cards, `dark` holds light ink for dim cards.
 //
 // Every `light` value clears 4.5:1 on the light code cards (assistant muted
-// #F0EEE6, card #FFFFFF, and the yellow user/kilo-chat surfaces including the
+// #F0EEE6, card #FFFFFF, and the yellow user surfaces including the
 // 10%-ink code tint), and every `dark` value clears 4.5:1 on the dark code
-// cards (assistant muted #1F1F24, card #17171A, and the light-theme kilo-chat
-// code card, where the 10% white ink tint lifts the olive primary #4F5A10 to
-// #616B28). Hue is preserved within a token family so the token types stay
+// cards (assistant muted #1F1F24 and card #17171A).
+// Hue is preserved within a token family so the token types stay
 // distinguishable. `syntax-colors.test.ts` asserts this, and the light values
 // must also keep clearing the tinted diff tiles asserted by
 // `src/lib/hooks/use-theme-colors.contrast.test.ts`.
@@ -54,10 +52,7 @@ export type TokenScheme = 'onLight' | 'onDark';
 
 /**
  * Relative luminance above which a code-card surface is treated as bright.
- * WCAG's own light/dark boundary (0.179) sits lower, but no code card lands
- * between the two supported surfaces (the brightest dim card is the
- * light-theme kilo-chat primary at ~0.09; the dimmest bright card is the
- * yellow at ~0.73), so 0.5 keeps the classifier unambiguous.
+ * No code-card surface lies near 0.5, keeping the classifier unambiguous.
  */
 const LIGHT_SURFACE_LUMINANCE = 0.5;
 
@@ -151,7 +146,7 @@ function parseColor(color: string): ParsedColor | null {
 /**
  * Classifies a code-card surface color into the token scheme that stays
  * legible on it. The markdown palettes pass the real card background
- * (assistant `codeBackground`, the composite of the kilo-chat/user bubble
+ * (assistant `codeBackground`, the composite of the user bubble
  * tint), so a bright bubble never gets light ink and a dark bubble never gets
  * dark ink.
  */

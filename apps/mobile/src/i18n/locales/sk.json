@@ -101,12 +101,9 @@
     "scheduled": "Naplánované",
     "keepEditing": "Pokračovať v úpravách",
     "keepRunning": "Nechať bežať",
-    "kiloclaw": "KiloClaw",
     "newSession": "Nová relácia",
-    "noKiloclawInstances": "Žiadne inštancie KiloClaw",
     "noModelsAvailable": "Žiadne dostupné modely",
     "notFound": "Nenájdené",
-    "online": "Pripojené",
     "open": "Otvoriť {{name}}",
     "openPullRequest": "Otvoriť PR",
     "pending": "Čaká sa",
@@ -257,7 +254,8 @@
     "renamePasskey": "Premenovať prístupový kľúč",
     "removePasskey": "Odstrániť prístupový kľúč",
     "removePasskeyTitle": "Odstrániť prístupový kľúč?",
-    "removePasskeyMessage": "Týmto prístupovým kľúčom sa už nebudete môcť prihlásiť."
+    "removePasskeyMessage": "Týmto prístupovým kľúčom sa už nebudete môcť prihlásiť.",
+    "changelog": "Čo je nové"
   },
   "preferences": {
     "general": "Všeobecné",
@@ -864,23 +862,18 @@
     "previewGenericDescription": "Upozornenia oznámia novú udalosť bez zobrazenia obsahu. Správu si prečítaš v aplikácii Kilo.",
     "channel": {
       "agentProgress": "Priebeh agenta",
-      "chat": "Správy v čete",
-      "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornenia na zostatok",
       "security": "Bezpečnostné zistenia",
       "spend": "Upozornenia na výdavky",
       "followedSessions": "Sledované relácie"
     },
     "category": {
-      "chatMessagesSubtitle": "odpovede v tvojich konverzáciách",
       "agentAttentionTitle": "Agent ťa potrebuje",
       "agentAttentionSubtitle": "otázky, žiadosti o povolenie a potrebné odpovede",
       "agentUpdatesTitle": "Novinky od agenta",
       "agentUpdatesSubtitle": "správy agenta počas úlohy",
       "sessionStatusTitle": "Stav relácie",
       "sessionStatusSubtitle": "dokončená / zlyhala / pripravená na ovládanie",
-      "kiloclawActivitySubtitle": "pripravená inštancia, zlyhanie inštancie, naplánované akcie",
-      "kiloclawActivityUnavailable": "Spustite inštanciu KiloClaw, aby ste získali aktivitu KiloClaw.",
       "balanceAlertsSubtitle": "upozornenia na nízky zostatok organizácie",
       "balanceAlertsUnavailable": "Pripojte sa k organizácii, aby ste získali upozornenia na zostatok.",
       "securityFindingsSubtitle": "nové zistenia a pripomienky SLA",
@@ -900,72 +893,19 @@
   },
   "tabs": {
     "home": "Domov",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, karta, {{position}} z {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Výber inštancie",
-      "couldNotLoadInstances": "Inštancie sa nepodarilo načítať.",
-      "noInstancesDescription": "Nastavte inštanciu a začnite chatovať.",
-      "setUpKiloclaw": "Nastaviť KiloClaw",
-      "currentInstance": "{{title}}, aktuálna"
-    },
     "conversation": {
-      "failedToLoad": "Konverzáciu sa nepodarilo načítať.",
-      "notFound": "Konverzácia sa nenašla.",
       "untitled": "Bez názvu",
-      "leaveTitle": "Opustiť konverzáciu?",
-      "leaveMessage": "Konverzácia sa odstráni z vášho zoznamu.",
-      "openHint": "Otvorí konverzáciu. Dlhým stlačením zobrazíte možnosti premenovania a opustenia konverzácie.",
-      "unread": "Neprečítané",
-      "optionsFor": "Možnosti konverzácie {{title}}",
-      "options": "Možnosti konverzácie",
-      "renameTitle": "Premenovanie konverzácie",
-      "renamePlaceholder": "Nový názov",
-      "couldNotReachBot": "S botom sa nepodarilo spojiť. Skúste to znova.",
-      "messageDeliveryFailed": "Správu sa nepodarilo doručiť botovi.",
-      "couldNotSignIn": "Do chatu sa nepodarilo prihlásiť.",
-      "couldNotRefreshMessages": "Správy sa nepodarilo obnoviť.",
-      "couldNotLoadHistory": "Históriu konverzácie sa nepodarilo načítať.",
-      "leave": "Opustiť",
-      "untitledConversation": "Konverzácia bez názvu",
-      "createFailed": "Konverzáciu sa nepodarilo vytvoriť.",
-      "leaveFailed": "Konverzáciu sa nepodarilo opustiť."
-    },
-    "reactions": {
-      "common": "Bežné",
-      "reactWith": "Pridať reakciu {{reaction}}",
-      "accessibility": "Reakcia {{emoji}}, počet: {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Odpovedáte na",
-      "cancelReply": "Zrušiť odpoveď",
-      "openInstance": "Otvoriť inštanciu",
-      "attachFile": "Priložiť súbor",
-      "cancelEdit": "Zrušiť úpravu"
+      "renamePlaceholder": "Nový názov"
     },
     "conversationList": {
-      "couldNotLoad": "Konverzácie sa nepodarilo načítať.",
-      "emptyTitle": "Zatiaľ žiadne konverzácie",
-      "emptyDescription": "Vytvorte konverzáciu a začnite chatovať so svojou inštanciou KiloClaw.",
-      "create": "Vytvoriť konverzáciu",
-      "newConversation": "Nová konverzácia",
-      "openInstanceSettings": "Otvoriť nastavenia inštancie",
       "today": "Dnes",
       "yesterday": "Včera",
-      "thisWeek": "Tento týždeň",
       "older": "Staršie"
     },
     "attachment": {
-      "open": "Otvoriť {{filename}}",
-      "openFailed": "Prílohu sa nepodarilo otvoriť. Skontrolujte pripojenie a skúste to znova.",
-      "attachFailed": "Súbor sa nepodarilo priložiť.",
-      "limit": "Maximálny počet príloh je {{displayCount}}.",
-      "sizeRejection": "Súbor {{filename}} prekračuje maximálnu veľkosť prílohy {{limit}}.",
-      "unreadable": "{{filename}} sa nepodarilo prečítať.",
-      "pastedImage": "vložený obrázok",
-      "defaultName": "Príloha",
       "classificationDenied": "Spustiteľné súbory nemožno priložiť.",
       "classificationEmpty": "Súbor je prázdny.",
       "classificationTooLarge": "Súbory môžu mať najviac 20 MB.",
@@ -975,432 +915,17 @@
       "networkError": "Vyskytla sa chyba siete.",
       "uploadFailed": "Nahrávanie zlyhalo.",
       "nothingToPaste": "Nie je čo vložiť.",
-      "metadataStripFailed": "Metaúdaje fotografie sa nepodarilo odstrániť.",
-      "limit_one": "Maximálny počet príloha je {{displayCount}}.",
-      "limit_other": "Maximálny počet príloh je {{displayCount}}.",
-      "limit_few": "Maximálny počet prílohy je {{displayCount}}.",
-      "limit_many": "Maximálny počet príloh je {{displayCount}}."
+      "metadataStripFailed": "Metaúdaje fotografie sa nepodarilo odstrániť."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Skúsiť znova nahrať {{filename}}",
-      "remove": "Odstrániť {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[vymazaná správa]",
-      "yourMessage": "Vaša správa",
-      "messageFrom": "Správa od {{author}}",
-      "moreActions": "Ďalšie akcie",
-      "notDelivered": "Nedoručené",
-      "edited": "(upravené)",
-      "image": "Obrázok"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Skopírované",
-      "copyFailed": "Kopírovanie zlyhalo.",
-      "title": "Akcie so správou",
-      "deleteTitle": "Vymazať správu?",
-      "deleteMessage": "Správa sa vymaže z konverzácie.",
-      "deleteFailed": "Správu sa nepodarilo vymazať.",
-      "removeReactionFailed": "Reakciu sa nepodarilo odstrániť.",
-      "addReactionFailed": "Reakciu sa nepodarilo pridať.",
-      "retrySend": "Odoslať znova",
-      "moreReactions": "Ďalšie reakcie",
-      "edit": "Upraviť",
-      "sendFailed": "Správu sa nepodarilo odoslať.",
-      "retrySendFailed": "Správu sa nepodarilo znova odoslať.",
-      "editFailed": "Správu sa nepodarilo upraviť.",
-      "executeFailed": "Akciu sa nepodarilo vykonať."
+      "edit": "Upraviť"
     },
     "attachmentPicker": {
-      "takePhoto": "Odfotiť",
-      "photoLibrary": "Knižnica fotiek",
-      "files": "Súborov",
       "cameraAccessMessage": "Ak chceš fotiť, povoľ v nastaveniach prístup k fotoaparátu."
-    },
-    "typingIndicator": {
-      "someone": "Niekto",
-      "typing_one": "{{name}} píše…",
-      "typing": "{{names}} píšu…",
-      "typing_other": "{{names}} píšu…",
-      "typing_few": "{{names}} píšu…",
-      "typing_many": "{{names}} píšu…"
-    },
-    "botStatus": {
-      "offline": "Odpojený",
-      "loadingUser": "Načítava sa používateľ…",
-      "waitingForStatus": "Čaká sa na stav bota…",
-      "offlineMessage": "Bot je odpojený. Prenos správ sa obnoví, keď sa znova pripojí."
-    },
-    "errors": {
-      "notAllowed": "Táto akcia nie je povolená.",
-      "messageTooLong": "Správa je príliš dlhá. Skráťte ju na menej ako {{limit}} znakov.",
-      "titleTooLong": "Názov je príliš dlhý. Skráťte ho na menej ako {{limit}} znakov.",
-      "messageEmpty": "Správa nemôže byť prázdna."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Inštancie KiloClaw sa nepodarilo načítať.",
-    "billing": {
-      "title": "Fakturácia",
-      "continueMonthToMonth": "Pokračovať s mesačným predplatným",
-      "plan": "Plán",
-      "finalTermEnds": "Koniec posledného obdobia",
-      "afterFinalTerm": "Po poslednom období",
-      "lessThanOneDay": "Menej ako 1 deň",
-      "ends": "Končí",
-      "expires": "Platnosť končí",
-      "noActivePlan": "Žiadny aktívny program",
-      "noActivePlanDescription": "Nemáš aktívne predplatné KiloClaw.",
-      "managedByAdmin": "Fakturáciu spravuje správca tvojej organizácie.",
-      "couldNotLoad": "Informácie o fakturácii sa nepodarilo načítať.",
-      "manageOnWeb": "Spravovať fakturáciu na webe",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Tvoje posledné obdobie programu Commit sa končí {{date}}. Pokračuj s programom Standard za {{price}}, inak sa hosting ukončí.",
-      "freeTrial": "Skúšobné obdobie zadarmo",
-      "hostingEnds": "Hosting končí",
-      "renews": "Dátum obnovenia",
-      "standardMonthToMonth": "Standard s mesačným predplatným",
-      "standardStartsOn": "Program Standard sa začne {{date}} za {{price}}.",
-      "yourStandardMonthlyPrice": "tvoja mesačná cena programu Standard",
-      "perMonth": "/mesiac",
-      "earlybirdAccessUntil": "Prístup v programe Earlybird platí do {{date}}.",
-      "earlybirdEnding": "Prístup v programe Earlybird sa končí: {{remaining}}.",
-      "paymentPastDue": "Platba je po splatnosti. Aktualizuj svoj spôsob platby.",
-      "subscriptionCancels": "Predplatné sa zruší {{date}}.",
-      "trialDaysRemaining": "Do konca skúšobného obdobia zostáva {{remaining}}.",
-      "trialEndingSoon": "Skúšobné obdobie sa čoskoro končí: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Revízia"
-    },
-    "changelog": {
-      "title": "Čo je nové",
-      "couldNotLoad": "Prehľad zmien sa nepodarilo načítať.",
-      "noUpdates": "Zatiaľ žiadne aktualizácie",
-      "noUpdatesDescription": "Tu sa zobrazia záznamy o zmenách.",
-      "recentUpdates": "Nedávne aktualizácie",
-      "manageVersion": "Spravovať verziu",
-      "redeployRequired": "Vyžaduje sa opätovné nasadenie",
-      "redeploySuggested": "Odporúča sa opätovné nasadenie",
-      "upgradeRequired": "Vyžaduje sa aktualizácia"
-    },
-    "dashboard": {
-      "title": "Prehľad",
-      "couldNotLoad": "Prehľad sa nepodarilo načítať.",
-      "renameInstance": "Premenovať inštanciu",
-      "renamePlaceholder": "Nový názov (najviac 50 znakov)",
-      "someDetailsFailed": "Niektoré aktuálne údaje sa nepodarilo načítať.",
-      "destroy": "Natrvalo odstrániť",
-      "destroyMessage": "Týmto natrvalo odstrániš svoju inštanciu KiloClaw aj všetky jej údaje. Túto akciu nemožno vrátiť späť.",
-      "destroyTitle": "Natrvalo odstrániť inštanciu",
-      "instance": "Inštancia",
-      "couldNotCheckStatus": "Stav služby sa nepodarilo skontrolovať.",
-      "dangerZone": "RIZIKOVÉ AKCIE",
-      "destroying": "Natrvalo sa odstraňuje…",
-      "serviceDegraded": "Služba má obmedzenia — klepnutím zobrazíš stav",
-      "up": "V PREVÁDZKE"
-    },
-    "channels": {
-      "title": "Kanály",
-      "couldNotLoad": "Kanály sa nepodarilo načítať.",
-      "noChannels": "Žiadne dostupné kanály",
-      "noChannelsDescription": "Tu sa zobrazia integrácie kanálov.",
-      "connected": "Pripojené: {{label}}",
-      "disconnectMessage": "Odstrániť {{label}}? Tento kanál sa odpojí.",
-      "disconnectTitle": "Odpojiť kanál"
-    },
-    "devicePairing": {
-      "title": "Párovanie zariadení",
-      "refreshRequests": "Obnoviť požiadavky na párovanie",
-      "couldNotLoad": "Požiadavky na párovanie sa nepodarilo načítať.",
-      "noPending": "Žiadne čakajúce požiadavky",
-      "noPendingDescription": "Tu sa zobrazia požiadavky na párovanie kanálov a zariadení.",
-      "channelRequests": "Požiadavky kanálov",
-      "deviceRequests": "Požiadavky zariadení",
-      "approveDeviceMessage": "Povoliť zariadeniu {{platform}} pripojenie k tvojej inštancii?",
-      "approveDeviceTitle": "Schváliť zariadenie",
-      "approveMessage": "Povoliť pripojenie k tvojej inštancii pre {{label}} (kód: {{code}})?",
-      "approveTitle": "Schváliť požiadavku na párovanie",
-      "unknownDevice": "Neznáme zariadenie"
-    },
-    "execPolicy": {
-      "title": "Pravidlá spúšťania",
-      "couldNotLoad": "Pravidlá spúšťania príkazov sa nepodarilo načítať.",
-      "alwaysAsk": "Vždy žiadať potvrdenie",
-      "alwaysAskDescription": "Pred spustením každého príkazu sa vyžaduje potvrdenie. Najbezpečnejšia možnosť.",
-      "neverAsk": "Nikdy nežiadať potvrdenie",
-      "neverAskDescription": "Príkazy sa spúšťajú bez potvrdenia. Rýchlejšia, ale menej bezpečná možnosť."
-    },
-    "google": {
-      "title": "Účet Google",
-      "couldNotLoad": "Stav účtu Google sa nepodarilo načítať.",
-      "disconnected": "Účet Google bol odpojený. Znova nasaď inštanciu, aby sa zmena prejavila.",
-      "setupCommand": "Príkaz na nastavenie",
-      "setupCommandHelp": "Na pripojenie účtu Google spusti tento príkaz v termináli na svojom počítači. Na počítači musí byť nainštalovaný Docker.",
-      "failedToLoadCommand": "Príkaz na nastavenie sa nepodarilo načítať.",
-      "gmailNotifications": "Upozornenia zo služby Gmail",
-      "disconnect": "Odpojiť účet Google",
-      "copied": "Skopírované",
-      "copyCommand": "Kopírovať príkaz",
-      "disconnectConfirm": "Odpojiť",
-      "disconnectMessage": "Odstrániť tvoj účet Google z tejto inštancie? Upozornenia zo služby Gmail sa vypnú. Po odpojení znova nasaď inštanciu, aby sa zmeny prejavili.",
-      "disconnectTitle": "Odpojiť Google"
-    },
-    "modelList": {
-      "noMatches": "Žiadne modely nezodpovedajú tvojmu vyhľadávaniu",
-      "noModelsDescription": "Keď budú modely dostupné, zobrazia sa tu.",
-      "noResultsFor": "Pre výraz „{{query}}“ sa nenašli žiadne výsledky."
-    },
-    "secrets": {
-      "title": "Tajné údaje",
-      "couldNotLoad": "Tajné údaje sa nepodarilo načítať.",
-      "noSecrets": "Žiadne dostupné tajné údaje",
-      "noSecretsDescription": "Tu sa zobrazia integrácie, ktoré používajú tajné údaje.",
-      "removeMessage": "Odstrániť {{label}}? Tento nástroj stratí prístup k svojim prihlasovacím údajom.",
-      "removeTitle": "Odstrániť tajný údaj",
-      "saved": "Uložené: {{label}}",
-      "hide": "Skryť {{label}}",
-      "show": "Zobraziť {{label}}",
-      "allFieldsRequired": "Na pripojenie služby {{label}} musíš vyplniť všetky polia.",
-      "setupGuideFallback": "návod na nastavenie",
-      "setupGuideA11y": "návod na nastavenie {{label}}",
-      "setupGuide": "Návod na nastavenie",
-      "saving": "Ukladá sa…",
-      "removing": "Odstraňuje sa…",
-      "updateToken": "Aktualizovať token"
-    },
-    "versionPin": {
-      "title": "Pripnutie verzie",
-      "couldNotLoad": "Informácie o verzii sa nepodarilo načítať.",
-      "couldNotLoadMore": "Ďalšie verzie sa nepodarilo načítať.",
-      "loadMore": "Načítať ďalšie verzie",
-      "showingLatest": "Zobrazuje sa 100 najnovších verzií.",
-      "availableVersions": "Dostupné verzie",
-      "noVersions": "Žiadne dostupné verzie",
-      "noVersionsDescription": "Tu sa zobrazia dostupné verzie OpenClaw.",
-      "unpin": "Odopnúť",
-      "unpinMessage": "Prepnúť späť na najnovšiu dostupnú verziu?",
-      "unpinTitle": "Odopnúť verziu",
-      "confirmPin": "Potvrdiť pripnutie",
-      "followingLatest": "Vždy najnovšia",
-      "latest": "najnovšia",
-      "pin": "Pripnúť",
-      "pinnedByAdmin": "Verziu pripol správca. Ak ju chceš zmeniť, obráť sa naňho.",
-      "pinnedTo": "Pripnuté na {{version}}",
-      "reasonOptional": "Dôvod (voliteľný)",
-      "reasonPlaceholder": "Dôvod pripnutia tejto verzie",
-      "replaceAdminPin": "Nahradiť pripnutie správcu",
-      "replacesAdminPin": "Toto nahradí pripnutie nastavené správcom (aktuálne {{label}})."
-    },
-    "redeploy": "Znova nasadiť",
-    "redeployMessage": "Naozaj chceš znova nasadiť túto inštanciu?",
-    "redeployTitle": "Opätovne nasadiť inštanciu",
-    "controls": {
-      "redeploying": "Opätovne sa nasadzuje…",
-      "restart": "Reštartovať",
-      "restartOpenClawMessage": "Naozaj chceš reštartovať proces OpenClaw?",
-      "restartOpenClawTitle": "Reštartovať OpenClaw",
-      "restarting": "Reštartuje sa…",
-      "start": "Spustiť",
-      "startMessage": "Naozaj chceš spustiť túto inštanciu?",
-      "startTitle": "Spustiť inštanciu",
-      "stop": "Zastaviť",
-      "stopMessage": "Naozaj chceš zastaviť túto inštanciu?",
-      "stopTitle": "Zastaviť inštanciu",
-      "stopping": "Zastavuje sa…"
-    },
-    "empty": {
-      "finishingSetup": "Dokončuje sa nastavenie",
-      "finishingSetupDescription": "Chvíľu počkaj, dokončujeme nastavenie tvojho účtu. Zvyčajne to trvá len chvíľu.",
-      "getStarted": "Začať",
-      "noInstancesDescription": "Vytvor si prvú inštanciu a začni používať programovacie agenty."
-    },
-    "instance": {
-      "backToInstances": "Späť na inštancie",
-      "couldNotLoad": "Inštanciu sa nepodarilo načítať.",
-      "notFound": "Inštancia sa nenašla",
-      "notFoundDescription": "Táto inštancia bola možno natrvalo odstránená alebo odkaz už neplatí."
-    },
-    "list": {
-      "createInstance": "Vytvoriť inštanciu",
-      "organizations": "Organizácie",
-      "accessIssue": {
-        "trialExpired": "Skúšobné obdobie sa skončilo — aktivuj si predplatné a používaj inštanciu ďalej",
-        "subscriptionCanceled": "Predplatné nie je aktívne — obnov si ho a používaj inštanciu ďalej",
-        "subscriptionPastDue": "Problém s platbou — aktualizuj fakturačné údaje a používaj inštanciu ďalej",
-        "quarantined": "Inštancia je v karanténe — vyžaduje ručnú kontrolu",
-        "multipleCurrentConflict": "Účet vyžaduje kontrolu",
-        "nonCanonicalEarlybird": "Starší program vyžaduje kontrolu"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Chatovať s {{name}}",
-        "ready": "Všetko je pripravené pre {{name}}",
-        "warmedUp": "Všetko je pripravené. Pozdrav, keď budeš chcieť."
-      },
-      "flow": {
-        "genericErrorBody": "Nastavenie tvojej inštancie sa teraz nepodarilo dokončiť.",
-        "manualReviewBody": "Pred vytvorením inštancie musíme preveriť stav tvojho účtu. Pokračuj na kilo.ai.",
-        "manualReviewTitle": "Nastavenie vyžaduje ručnú kontrolu",
-        "openKiloAi": "Otvoriť kilo.ai",
-        "provisioning": "Zriaďovanie",
-        "review": "Kontrola",
-        "identityTitle": "Identita tvojho bota",
-        "couldNotLoad": "Stav úvodného nastavenia sa nepodarilo načítať.",
-        "finishingSetup": "Dokončujeme nastavenie tvojho účtu. Chvíľu počkaj.",
-        "ready": "Pripravené",
-        "settingUp": "Nastavuje sa…"
-      },
-      "unavailableDescription": "Na zriadenie inštancie potrebuješ aktívne predplatné KiloClaw. Existujúce inštancie a predplatné fungujú ďalej bez zmeny.",
-      "unavailableTitle": "Nové inštancie KiloClaw nie sú dostupné",
-      "identity": {
-        "chooseAvatar": "Vybrať avatar",
-        "namePlaceholder": "Meno bota",
-        "selectAvatar": "Použiť {{name}} ako avatar",
-        "personality": "Osobnosť",
-        "changePersonality": "Zmeniť osobnosť",
-        "location": "Poloha",
-        "locationPlaceholder": "Mesto alebo región (voliteľné)",
-        "useCurrentLocation": "Použiť aktuálnu polohu",
-        "locationDeniedTitle": "Prístup k polohe zamietnutý",
-        "locationDeniedMessage": "Ak chceš použiť svoju aktuálnu polohu, povoľ prístup k polohe v nastaveniach.",
-        "locationValidationFailed": "Polohu sa nepodarilo overiť.",
-        "locationResolveFailed": "Tvoju polohu sa nepodarilo zistiť. Môžeš ju upraviť ručne.",
-        "locationGetFailed": "Tvoju polohu sa nepodarilo získať. Zadaj ju ručne.",
-        "nature": {
-          "aiAssistantLabel": "Asistent s AI",
-          "aiAssistantVibe": "Užitočný, schopný, profesionálny",
-          "digitalCreatureLabel": "Digitálny tvor",
-          "digitalCreatureVibe": "Svojrázny, živý, trochu nepredvídateľný",
-          "virtualCompanionLabel": "Virtuálny spoločník",
-          "virtualCompanionVibe": "Srdečný, pozorný, úprimne sa zaujíma",
-          "somethingWeirderLabel": "Niečo divnejšie…",
-          "somethingWeirderVibe": "Urči si to po svojom"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Hotovo! Zhrnutie je pripravené podľa tvojej požiadavky. Môžeš si ho pozrieť, keď budeš mať čas.",
-        "settingUp": "Nastavujú sa upozornenia…",
-        "stayInTheLoop": "Všetko pod kontrolou",
-        "getNotified": "Zapni si upozornenia na dokončenie úloh od {{name}}, aby ti neušla žiadna odpoveď.",
-        "now": "teraz",
-        "skipForNow": "Zatiaľ preskočiť",
-        "couldNotEnable": "Upozornenia sa nepodarilo povoliť."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Stav nastavovania sa nepodarilo overiť",
-        "queryErrorBody": "Pri overovaní priebehu nastavenia pre {{name}} sa prerušilo spojenie. Nastavovanie možno stále prebieha. Skús to znova alebo sa vráť o chvíľu.",
-        "stoppedTitle": "Nastavovanie sa zastavilo",
-        "stoppedBody": "Inštancia {{name}} sa neočakávane zastavila počas nastavovania.",
-        "stalledTitle": "Nastavovanie sa zaseklo",
-        "stalledBody": "Nepodarilo sa dokončiť nastavenie pre {{name}}. Skús to znova. Ak sa problém opakuje, napíš na {{supportEmail}}.",
-        "timeoutTitle": "Trvá to dlhšie, než sa očakávalo",
-        "timeoutBody": "Nastavovanie pre {{name}} trvá dlhšie než zvyčajne (viac než {{displayMinutes}} minút).",
-        "continueInBackground": "Pokračovať na pozadí",
-        "settingUp": "Nastavovanie pre {{name}}",
-        "connectingToAgent": "Pripája sa k agentovi",
-        "startingSandbox": "Spúšťa sa izolované prostredie",
-        "backgroundHint": "Zvyčajne to trvá menej než minútu. Túto obrazovku môžeš zavrieť — budeme pokračovať na pozadí."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kód {{code}}",
-      "gatewayProcess": "PROCES BRÁNY",
-      "lastExit": "Posledné ukončenie",
-      "memory": "Pamäť",
-      "region": "Región",
-      "resources": "ZDROJE",
-      "restarts": "Reštarty",
-      "state": "Stav",
-      "uptime": "Čas prevádzky",
-      "crashed": "ZLYHANIE",
-      "destroying": "ODSTRAŇUJE SA",
-      "provisioned": "ZRIADENÉ",
-      "restarting": "REŠTARTUJE SA",
-      "running": "PREBIEHA",
-      "shuttingDown": "VYPÍNA SA",
-      "starting": "SPÚŠŤA SA",
-      "stopped": "ZASTAVENÉ",
-      "stopping": "ZASTAVUJE SA",
-      "unknown": "NEZNÁME",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Špičkové",
-      "frontierDescription": "Najvyšší výkon. Požiadavky smerujú na špičkové modely s uvažovaním.",
-      "balancedDescription": "Vyvážený pomer rýchlosti a schopností za nižšiu cenu.",
-      "autoModelA11y": "automatický model: {{label}}",
-      "currentModel": "Aktuálny model",
-      "browseAllModels": "alebo si vyber z viac než 500 modelov",
-      "browseAllModelsA11y": "Prehliadať viac než 500 dostupných modelov"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Ak chceš ďalej používať KiloClaw, otvor v prehliadači kilo.ai/claw. V aplikácii si predplatné aktivovať nemôžeš.",
-      "subscriptionCanceledTitle": "Predplatiť si na webe",
-      "subscriptionCanceledBody": "Ak chceš používať KiloClaw, otvor v prehliadači kilo.ai/claw. V aplikácii si predplatné aktivovať nemôžeš.",
-      "subscriptionCanceledCta": "Otvoriť kilo.ai/claw",
-      "subscriptionPastDueTitle": "Aktualizácia platby na webe",
-      "subscriptionPastDueBody": "Pri tvojej poslednej platbe nastal problém. Otvor v prehliadači kilo.ai/claw a aktualizuj platobné údaje. Fakturáciu nemožno spravovať v aplikácii.",
-      "quarantinedTitle": "Inštancia vyžaduje nápravu",
-      "quarantinedBody": "Tvoja inštancia KiloClaw je v karanténe a teraz sa nedá používať. Jej obnovenie vyžaduje pomoc nášho tímu.",
-      "multipleCurrentConflictBody": "Na tvojom účte sme našli viac než jedno aktívne predplatné. Používanie služby sme preto pozastavili, aby sme ti neúčtovali poplatky dvakrát.",
-      "multipleCurrentConflictCta": "Pokračovať na kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Zistený starší program",
-      "nonCanonicalEarlybirdBody": "Pred používaním v mobile musí tvoj program prednostného prístupu prejsť ručnou kontrolou.",
-      "iosTitle": "KiloClaw nie je dostupný v systéme iOS",
-      "iosBody": "Prístup k službe KiloClaw sa pre tento účet spravuje mimo aplikácie pre iOS.",
-      "iosContact": "Máš otázky? Napíš na {{supportEmail}}.",
-      "quarantinedCta": "Napísať nášmu tímu",
-      "nonCanonicalEarlybirdCta": "Skontrolovať svoj program na kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} si vyžaduje pozornosť: {{label}}",
-      "openUnread_one": "Otvoriť {{name}}, {{displayCount}} neprečítaná správa",
-      "openUnread": "Otvoriť {{name}}, {{displayCount}} neprečítaných správ",
-      "openUnread_other": "Otvoriť {{name}}, {{displayCount}} neprečítaných správ",
-      "openSettings": "Otvoriť nastavenia pre {{name}}",
-      "fixOnKiloAi": "Opraviť na kilo.ai: {{label}}",
-      "openUnread_few": "Otvoriť {{name}}, {{displayCount}} neprečítané správy",
-      "openUnread_many": "Otvoriť {{name}}, {{displayCount}} neprečítanej správy"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Schváliť požiadavky zariadení",
-      "execPolicyDescription": "Nastavenia zabezpečenia",
-      "googleDescription": "Gmail, Kalendár, Dokumenty",
-      "modelDescription": "Výber modelu AI",
-      "secretsDescription": "Šifrované prihlasovacie údaje",
-      "versionPinDescription": "Pripnúť na konkrétnu verziu"
-    },
-    "avatar": {
-      "arcade": "Herný automat",
-      "brain": "Mozog",
-      "creature": "Tvor",
-      "crystal": "Kryštál",
-      "custom": "Vlastný avatar",
-      "dragon": "Drak",
-      "explorer": "Prieskumník",
-      "flame": "Plameň",
-      "lightning": "Blesk",
-      "magicWand": "Čarovná palička",
-      "moon": "Mesiac",
-      "operator": "Operátor",
-      "orbit": "Obežná dráha",
-      "oracle": "Veštec",
-      "rainbow": "Dúha",
-      "robot": "Robotický avatar",
-      "satellite": "Družica",
-      "sparkles": "Iskry",
-      "strongArm": "Silná ruka",
-      "talisman": "Talizman"
-    },
-    "remoteSpawnFilesNotSupported": "Táto inštancia nemôže prijímať súbory.",
-    "instanceSwitcherTitle": "Inštancia KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2608,10 +2133,6 @@
       "moveLeft": "Presunúť {{filename}} doľava",
       "moveRight": "Presunúť {{filename}} doprava"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Vložiť obrázok zo schránky",
-      "label": "Vložiť obrázok zo schránky"
-    },
     "attachmentPicker": {
       "camera": "Fotoaparát",
       "photoLibrary": "Knižnica fotiek",
@@ -2819,7 +2340,8 @@
     "signOutThisDeviceTitle": "Odhlásiť toto zariadenie?",
     "signOutThisSessionTitle": "Odhlásiť túto reláciu?",
     "signOutThisSessionMessage": "Zariadenie {{device}} sa odhlási. Prístup k API mu môže zostať ešte hodinu.",
-    "webBrowser": "Webový prehliadač"
+    "webBrowser": "Webový prehliadač",
+    "unknownDevice": "Neznáme zariadenie"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Obchod s aplikáciami sa nepodarilo otvoriť.",

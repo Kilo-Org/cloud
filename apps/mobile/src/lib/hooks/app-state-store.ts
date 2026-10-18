@@ -16,9 +16,8 @@ export type AppStateStore = {
  * first listener subscribes, and again on the last unsubscribe.
  * `use-app-lifecycle` keeps the default `true`: a screen that mounts while the
  * app is backgrounded has never observed a background -> active edge, and
- * must not start observing one now. The kilo-chat store seeds from the live
- * `AppState.currentState` instead, so a mount reads the live value, like
- * today's `useState(AppState.currentState === 'active')` did.
+ * must not start observing one now. The presence store seeds from the live
+ * `AppState.currentState` instead, so a mount reads the live value.
  *
  * The source listener is added with the first subscriber and removed with the
  * last. The first subscribe re-reads the seed before registering the source

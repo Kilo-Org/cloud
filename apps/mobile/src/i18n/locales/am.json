@@ -101,12 +101,9 @@
     "scheduled": "የተያዘ",
     "keepEditing": "ማርትዕህን ቀጥል",
     "keepRunning": "እንዲሠራ ተወው",
-    "kiloclaw": "KiloClaw",
     "newSession": "አዲስ ክፍለ ጊዜ",
-    "noKiloclawInstances": "ምንም የKiloClaw ኢንስታንሶች የሉም",
     "noModelsAvailable": "ምንም ሞዴሎች የሉም",
     "notFound": "አልተገኘም።",
-    "online": "በመስመር ላይ",
     "open": "{{name}}ን ክፈት",
     "openPullRequest": "ክፍት የማዋሃድ ጥያቄ",
     "pending": "በመጠበቅ ላይ",
@@ -257,7 +254,8 @@
     "renamePasskey": "ፓስኪ ስም ይቀይሩ",
     "removePasskey": "ፓስኪ ያስወግዱ",
     "removePasskeyTitle": "ፓስኪ ይወገድ?",
-    "removePasskeyMessage": "በዚህ ፓስኪ ከእንግዲህ መግባት አይችሉም።"
+    "removePasskeyMessage": "በዚህ ፓስኪ ከእንግዲህ መግባት አይችሉም።",
+    "changelog": "አዲስ ነገር"
   },
   "preferences": {
     "general": "አጠቃላይ",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "ማሳወቂያዎች አንድ ነገር እንደተከሰተ ያሳያሉ። መልእክቱን ለማንበብ Kiloን ይክፈቱ።",
     "channel": {
       "agentProgress": "የወኪል እድገት",
-      "chat": "የውይይት መልእክቶች",
-      "kiloclaw": "የKiloClaw እንቅስቃሴ",
       "balance": "የቀሪ ሂሳብ ማስጠንቀቂያዎች",
       "security": "የደህንነት ግኝቶች",
       "spend": "የወጪ ማስጠንቀቂያዎች",
       "followedSessions": "የተከታተሉ ክፍለ ጊዜዎች"
     },
     "category": {
-      "chatMessagesSubtitle": "በውይይቶችዎ ውስጥ የሚሰጡ ምላሾች",
       "agentAttentionTitle": "ወኪሉ የእርስዎን እርዳታ ይፈልጋል",
       "agentAttentionSubtitle": "ጥያቄዎች፣ የፈቃድና የመረጃ ጥያቄዎች",
       "agentUpdatesTitle": "ከወኪሉ የሚመጡ ዝማኔዎች",
       "agentUpdatesSubtitle": "ወኪሉ ተግባሩን እየሠራ እያለ የሚልካቸው መልእክቶች",
       "sessionStatusTitle": "የክፍለ ጊዜ ሁኔታ",
       "sessionStatusSubtitle": "የተጠናቀቀ / ያልተሳካ / ለመቆጣጠር ዝግጁ",
-      "kiloclawActivitySubtitle": "ዝግጁ የሆነ/ያልተሳካ ሂደት፣ መርሐግብር የተያዘላቸው ተግባሮች",
-      "kiloclawActivityUnavailable": "የKiloClaw እንቅስቃሴ ለማግኘት የKiloClaw ሂደት ይጀምሩ።",
       "balanceAlertsSubtitle": "ዝቅተኛ የድርጅት ቀሪ ሂሳብ ማስጠንቀቂያዎች",
       "balanceAlertsUnavailable": "የቀሪ ሂሳብ ማስጠንቀቂያዎችን ለማግኘት ድርጅት ይቀላቀሉ።",
       "securityFindingsSubtitle": "አዳዲስ ግኝቶችና የSLA ማስታወሻዎች",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "መነሻ",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}፣ ትር፣ ከ{{total}} ውስጥ {{position}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "አገልጋይ መቀየር",
-      "couldNotLoadInstances": "አገልጋዮችን መጫን አልተቻለም።",
-      "noInstancesDescription": "መወያየት ለመጀመር አገልጋይ ያዋቅሩ።",
-      "setUpKiloclaw": "KiloClawን ያዋቅሩ",
-      "currentInstance": "{{title}}፣ አሁን የተመረጠው"
-    },
     "conversation": {
-      "failedToLoad": "ውይይቱን መጫን አልተሳካም።",
-      "notFound": "ውይይቱ አልተገኘም።",
       "untitled": "ርዕስ የሌለው",
-      "leaveTitle": "ከውይይቱ ይውጡ?",
-      "leaveMessage": "ይህ ከዝርዝርዎ ያስወግደዋል።",
-      "openHint": "ውይይቱን ይከፍታል። ስሙን የመቀየር እና ከውይይቱ የመውጣት አማራጮችን ለማየት ተጭነው ይቆዩ።",
-      "unread": "ያልተነበበ",
-      "optionsFor": "ለ{{title}} የውይይት አማራጮች",
-      "options": "የውይይት አማራጮች",
-      "renameTitle": "የውይይት ስም መቀየር",
-      "renamePlaceholder": "አዲስ ስም",
-      "couldNotReachBot": "ቦቱን ማግኘት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
-      "messageDeliveryFailed": "መልዕክቱን ወደ ቦቱ ማድረስ አልተቻለም።",
-      "couldNotSignIn": "ወደ ውይይት መግባት አልተቻለም።",
-      "couldNotRefreshMessages": "መልዕክቶችን ማደስ አልተቻለም።",
-      "couldNotLoadHistory": "የውይይት ታሪክን መጫን አልተቻለም።",
-      "leave": "ይውጡ",
-      "untitledConversation": "ርዕስ የሌለው ውይይት",
-      "createFailed": "ውይይት መፍጠር አልተሳካም።",
-      "leaveFailed": "ከውይይቱ መውጣት አልተሳካም።"
-    },
-    "reactions": {
-      "common": "የተለመዱ",
-      "reactWith": "በ{{reaction}} ምላሽ ይስጡ",
-      "accessibility": "{{emoji}} ምላሽ፣ {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "ምላሽ የሚሰጥለት",
-      "cancelReply": "ምላሹን ይሰርዙ",
-      "openInstance": "አገልጋዩን ይክፈቱ",
-      "attachFile": "ፋይል ያያይዙ",
-      "cancelEdit": "አርትዖቱን ይሰርዙ"
+      "renamePlaceholder": "አዲስ ስም"
     },
     "conversationList": {
-      "couldNotLoad": "ውይይቶችን መጫን አልተቻለም።",
-      "emptyTitle": "እስካሁን ምንም ውይይቶች የሉም",
-      "emptyDescription": "ከKiloClaw አገልጋይዎ ጋር መወያየት ለመጀመር ውይይት ይፍጠሩ።",
-      "create": "ውይይት ይፍጠሩ",
-      "newConversation": "አዲስ ውይይት",
-      "openInstanceSettings": "የአገልጋዩን ቅንብሮች ይክፈቱ",
       "today": "ዛሬ",
       "yesterday": "ትናንት",
-      "thisWeek": "ይህ ሳምንት",
       "older": "ከዚያ በፊት"
     },
     "attachment": {
-      "open": "{{filename}}ን ይክፈቱ",
-      "openFailed": "ዓባሪውን መክፈት አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
-      "attachFailed": "ፋይል ማያያዝ አልተሳካም።",
-      "limit": "እስከ {{displayCount}} ፋይሎች ማያያዝ ይችላሉ።",
-      "sizeRejection": "የ{{filename}} መጠን ከ{{limit}} የዓባሪ መጠን ገደብ በላይ ነው።",
-      "unreadable": "{{filename}}ን ማንበብ አልተቻለም።",
-      "pastedImage": "የተለጠፈው ምስል",
-      "defaultName": "አባሪ",
       "classificationDenied": "ፕሮግራም የሚያስኬዱ ፋይሎችን ማያያዝ አይቻልም።",
       "classificationEmpty": "ፋይሉ ባዶ ነው።",
       "classificationTooLarge": "የፋይሎች መጠን 20 MB ወይም ከዚያ በታች መሆን አለበት።",
@@ -943,426 +883,17 @@
       "networkError": "የአውታረ መረብ ስህተት ተከስቷል።",
       "uploadFailed": "ፋይሉን መስቀል አልተሳካም።",
       "nothingToPaste": "የሚለጠፍ ነገር የለም።",
-      "metadataStripFailed": "የፎቶውን ተጨማሪ መረጃ ማስወገድ አልተቻለም።",
-      "limit_one": "እስከ {{displayCount}} ፋይል ማያያዝ ይችላሉ።",
-      "limit_other": "እስከ {{displayCount}} ፋይሎች ማያያዝ ይችላሉ።"
+      "metadataStripFailed": "የፎቶውን ተጨማሪ መረጃ ማስወገድ አልተቻለም።"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}፣ {{status}}",
-      "retryUploading": "{{filename}}ን መስቀል እንደገና ይሞክሩ",
-      "remove": "{{filename}}ን ያስወግዱ"
-    },
-    "messageBubble": {
-      "deleted": "[የተሰረዘ መልዕክት]",
-      "yourMessage": "መልዕክትዎ",
-      "messageFrom": "ከ{{author}} የመጣ መልዕክት",
-      "moreActions": "ተጨማሪ ተግባራት",
-      "notDelivered": "አልደረሰም",
-      "edited": "(ታርሟል)",
-      "image": "ምስል"
+      "accessibility": "{{filename}}፣ {{status}}"
     },
     "messageActions": {
-      "copied": "ተቀድቷል",
-      "copyFailed": "መቅዳት አልተሳካም።",
-      "title": "የመልዕክት ተግባራት",
-      "deleteTitle": "መልዕክቱ ይሰረዝ?",
-      "deleteMessage": "ይህ መልዕክቱን ከውይይቱ ያስወግዳል።",
-      "deleteFailed": "መልዕክቱን መሰረዝ አልተሳካም።",
-      "removeReactionFailed": "ምላሹን ማስወገድ አልተሳካም።",
-      "addReactionFailed": "ምላሽ ማከል አልተሳካም።",
-      "retrySend": "እንደገና ለመላክ ይሞክሩ",
-      "moreReactions": "ተጨማሪ ምላሾች",
-      "edit": "አርትዕ",
-      "sendFailed": "መልዕክቱን መላክ አልተሳካም።",
-      "retrySendFailed": "መልዕክቱን እንደገና ለመላክ የተደረገው ሙከራ አልተሳካም።",
-      "editFailed": "መልዕክቱን ማረም አልተሳካም።",
-      "executeFailed": "ተግባሩን መፈጸም አልተሳካም።"
+      "edit": "አርትዕ"
     },
     "attachmentPicker": {
-      "takePhoto": "ፎቶ ያንሱ",
-      "photoLibrary": "የፎቶ ስብስብ",
-      "files": "ፋይሎች",
       "cameraAccessMessage": "ፎቶ ለማንሳት በቅንብሮች ውስጥ ካሜራውን የመጠቀም ፈቃድ ስጥ።"
-    },
-    "typingIndicator": {
-      "someone": "አንድ ሰው",
-      "typing_one": "{{name}} እየጻፈ ነው…",
-      "typing": "{{names}} እየጻፉ ነው...",
-      "typing_other": "{{names}} እየጻፉ ነው..."
-    },
-    "botStatus": {
-      "offline": "ከመስመር ውጭ",
-      "loadingUser": "የተጠቃሚ መረጃ በመጫን ላይ…",
-      "waitingForStatus": "የቦት ሁኔታ በመጠበቅ ላይ...",
-      "offlineMessage": "ቦቱ ከመስመር ውጭ ነው። እንደገና ሲገናኝ የመልዕክት ልውውጡ ይቀጥላል።"
-    },
-    "errors": {
-      "notAllowed": "ይህ አይፈቀድም።",
-      "messageTooLong": "መልዕክቱ በጣም ረጅም ነው። የቁምፊዎቹ ብዛት ከ{{limit}} በታች እንዲሆን ያሳጥሩት።",
-      "titleTooLong": "ርዕሱ በጣም ረጅም ነው። የቁምፊዎቹ ብዛት ከ{{limit}} በታች እንዲሆን ያሳጥሩት።",
-      "messageEmpty": "መልዕክቱ ባዶ መሆን አይችልም።"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "የKiloClaw ኢንስታንሶችን መጫን አልተቻለም።",
-    "billing": {
-      "title": "ክፍያ",
-      "continueMonthToMonth": "በወርሃዊ ክፍያ ቀጥል",
-      "plan": "ዕቅድ",
-      "finalTermEnds": "የመጨረሻው የውል ጊዜ የሚያበቃበት",
-      "afterFinalTerm": "ከመጨረሻው የውል ጊዜ በኋላ",
-      "ends": "ያበቃል",
-      "expires": "ጊዜው የሚያልፍበት",
-      "noActivePlan": "ንቁ የአገልግሎት ዕቅድ የለም",
-      "noActivePlanDescription": "ንቁ የKiloClaw ደንበኝነት የለህም።",
-      "managedByAdmin": "የድርጅትህ አስተዳዳሪ ክፍያውን ያስተዳድራል።",
-      "couldNotLoad": "የክፍያ መረጃውን መጫን አልተቻለም።",
-      "manageOnWeb": "ክፍያን በድረ ገጹ አስተዳድር",
-      "earlybird": "የቅድሚያ ተመዝጋቢዎች ዕቅድ",
-      "finalCommitTermEndsOn": "የመጨረሻው የCommit ውልህ በ{{date}} ያበቃል። በመደበኛው ዕቅድ በ{{price}} ቀጥል፤ ካልሆነ ማስተናገዱ ያበቃል።",
-      "freeTrial": "ነፃ ሙከራ",
-      "hostingEnds": "ማስተናገዱ ያበቃል",
-      "renews": "ይታደሳል",
-      "standardMonthToMonth": "መደበኛ ዕቅድ፣ ወርሃዊ ክፍያ",
-      "standardStartsOn": "መደበኛው ዕቅድ በ{{date}} በ{{price}} ይጀምራል።",
-      "yourStandardMonthlyPrice": "የመደበኛ ዕቅድህ ወርሃዊ ዋጋ",
-      "perMonth": "/ወር",
-      "earlybirdAccessUntil": "የቅድሚያ ተመዝጋቢዎች ዕቅድ እስከ {{date}} ያገለግላል።",
-      "earlybirdEnding": "የቅድሚያ ተመዝጋቢዎች ዕቅድ እስኪያበቃ የቀረው፦ {{remaining}}።",
-      "paymentPastDue": "የክፍያው ጊዜ አልፏል። የመክፈያ ዘዴህን አዘምን።",
-      "subscriptionCancels": "ደንበኝነቱ በ{{date}} ይሰረዛል።",
-      "trialDaysRemaining": "ከሙከራው ጊዜ የቀረው፦ {{remaining}}።",
-      "trialEndingSoon": "ሙከራው በቅርቡ ያበቃል፤ የቀረው፦ {{remaining}}።",
-      "lessThanOneDay": "ከ1 ቀን በታች",
-      "planName": {
-        "standard": "መደበኛ"
-      },
-      "commit": "ኮሚት"
-    },
-    "changelog": {
-      "title": "አዲስ ነገር",
-      "couldNotLoad": "የለውጥ መዝገቡን መጫን አልተቻለም።",
-      "noUpdates": "እስካሁን ምንም ዝመና የለም",
-      "noUpdatesDescription": "የለውጥ መዝገቡ ዝርዝሮች እዚህ ይታያሉ።",
-      "recentUpdates": "የቅርብ ጊዜ ዝመናዎች",
-      "manageVersion": "ስሪቱን አስተዳድር",
-      "redeployRequired": "እንደገና ማሰማራት ያስፈልጋል",
-      "redeploySuggested": "እንደገና ማሰማራት ይመከራል",
-      "upgradeRequired": "ማሻሻል ያስፈልጋል"
-    },
-    "dashboard": {
-      "title": "ዳሽቦርድ",
-      "couldNotLoad": "ዳሽቦርዱን መጫን አልተቻለም።",
-      "renameInstance": "የኢንስታንሱን ስም ቀይር",
-      "renamePlaceholder": "አዲስ ስም (እስከ 50 ቁምፊዎች)",
-      "someDetailsFailed": "አንዳንድ የአሁኑ ሁኔታ ዝርዝሮችን መጫን አልተቻለም።",
-      "destroy": "አጥፋ",
-      "destroyMessage": "ይህ የKiloClaw ኢንስታንስህን እና ሁሉንም ውሂቡን እስከመጨረሻው ያጠፋል። ይህን እርምጃ መቀልበስ አይቻልም።",
-      "destroyTitle": "ኢንስታንሱን ማጥፋት",
-      "instance": "ኢንስታንስ",
-      "couldNotCheckStatus": "የአገልግሎቱን ሁኔታ መፈተሽ አልተቻለም።",
-      "dangerZone": "አደገኛ እርምጃዎች",
-      "destroying": "በማጥፋት ላይ…",
-      "serviceDegraded": "የአገልግሎቱ አፈጻጸም ቀንሷል — ሁኔታውን ለማየት ንካ",
-      "up": "እየሰራ ነው"
-    },
-    "channels": {
-      "title": "ሰርጦች",
-      "couldNotLoad": "ሰርጦችን መጫን አልተቻለም።",
-      "noChannels": "ምንም ሰርጦች የሉም",
-      "noChannelsDescription": "የሰርጥ ግንኙነቶች እዚህ ይታያሉ።",
-      "connected": "{{label}} ተገናኝቷል",
-      "disconnectMessage": "{{label}} ይወገድ? የዚህ ሰርጥ ግንኙነት ይቋረጣል።",
-      "disconnectTitle": "የሰርጥ ግንኙነትን ማቋረጥ"
-    },
-    "devicePairing": {
-      "title": "መሣሪያ ማጣመር",
-      "refreshRequests": "የማጣመር ጥያቄዎችን አድስ",
-      "couldNotLoad": "የማጣመር ጥያቄዎችን መጫን አልተቻለም።",
-      "noPending": "መልስ የሚጠብቁ ጥያቄዎች የሉም",
-      "noPendingDescription": "የሰርጥ እና የመሣሪያ ማጣመር ጥያቄዎች እዚህ ይታያሉ።",
-      "channelRequests": "የሰርጥ ጥያቄዎች",
-      "deviceRequests": "የመሣሪያ ጥያቄዎች",
-      "approveDeviceMessage": "{{platform}} ከኢንስታንስህ ጋር እንዲገናኝ ይፈቀድ?",
-      "approveDeviceTitle": "ለመሣሪያ ፈቃድ መስጠት",
-      "approveMessage": "{{label}} (ኮድ፦ {{code}}) ከኢንስታንስህ ጋር እንዲገናኝ ይፈቀድ?",
-      "approveTitle": "የማጣመር ጥያቄን ማጽደቅ",
-      "unknownDevice": "ያልታወቀ መሣሪያ"
-    },
-    "execPolicy": {
-      "title": "የትዕዛዝ ማስኬድ ፖሊሲ",
-      "couldNotLoad": "የማስፈጸሚያ ፖሊሲውን መጫን አልተቻለም።",
-      "alwaysAsk": "ሁልጊዜ ጠይቅ",
-      "alwaysAskDescription": "እያንዳንዱ ትእዛዝ ከመፈጸሙ በፊት አረጋግጥ። ከሁሉ የበለጠ ደህንነት ያለው አማራጭ ነው።",
-      "neverAsk": "ፈጽሞ አትጠይቅ",
-      "neverAskDescription": "ትእዛዞችን ያለ ማረጋገጫ አስፈጽም። ፈጣን ነው፣ ግን ደህንነቱ ያነሰ ነው።"
-    },
-    "google": {
-      "title": "የGoogle መለያ",
-      "couldNotLoad": "የGoogle መለያውን ሁኔታ መጫን አልተቻለም።",
-      "disconnected": "የGoogle መለያው ግንኙነት ተቋርጧል። ለውጡን ለመተግበር ኢንስታንስህን እንደገና አሰማራ።",
-      "setupCommand": "የማዋቀር ትእዛዝ",
-      "setupCommandHelp": "የGoogle መለያህን ለማገናኘት፣ Docker በተጫነበት የራስህ ኮምፒውተር ላይ ተርሚናል ክፈትና ይህን ትእዛዝ አስኪድ።",
-      "failedToLoadCommand": "የማዋቀር ትእዛዙን መጫን አልተቻለም።",
-      "gmailNotifications": "የGmail ማሳወቂያዎች",
-      "disconnect": "የGoogle መለያውን ግንኙነት አቋርጥ",
-      "copied": "ተቀድቷል",
-      "copyCommand": "ትእዛዙን ቅዳ",
-      "disconnectConfirm": "አቋርጥ",
-      "disconnectMessage": "የGoogle መለያህ ከዚህ ኢንስታንስ ይወገድ? ይህ የGmail ማሳወቂያዎችን ያሰናክላል። ግንኙነቱን ካቋረጥክ በኋላ ለውጦቹን ለመተግበር እንደገና አሰማራ።",
-      "disconnectTitle": "የGoogle ግንኙነትን ማቋረጥ"
-    },
-    "modelList": {
-      "noMatches": "ከፍለጋህ ጋር የሚዛመዱ ሞዴሎች የሉም",
-      "noModelsDescription": "ሞዴሎች ሲገኙ እዚህ ይታያሉ።",
-      "noResultsFor": "ለ«{{query}}» ምንም ውጤት የለም።"
-    },
-    "secrets": {
-      "title": "ሚስጥራዊ መረጃ",
-      "couldNotLoad": "ሚስጥሮችን መጫን አልተቻለም።",
-      "noSecrets": "ምንም ሚስጥሮች የሉም",
-      "noSecretsDescription": "ሚስጥሮችን የሚጠቀሙ ግንኙነቶች እዚህ ይታያሉ።",
-      "removeMessage": "{{label}} ይወገድ? ይህ መሣሪያ የመግቢያ መረጃውን መጠቀም አይችልም።",
-      "removeTitle": "ሚስጥር ማስወገድ",
-      "saved": "{{label}} ተቀምጧል",
-      "hide": "{{label}}ን ደብቅ",
-      "show": "{{label}}ን አሳይ",
-      "allFieldsRequired": "{{label}}ን ለማገናኘት ሁሉም መስኮች መሞላት አለባቸው።",
-      "setupGuideFallback": "የማዋቀር መመሪያ",
-      "setupGuideA11y": "የ{{label}} ማዋቀር መመሪያ",
-      "setupGuide": "የማዋቀር መመሪያ",
-      "saving": "በማስቀመጥ ላይ…",
-      "removing": "በማስወገድ ላይ…",
-      "updateToken": "ቶከኑን አዘምን"
-    },
-    "versionPin": {
-      "title": "ስሪት መወሰን",
-      "couldNotLoad": "የስሪት መረጃውን መጫን አልተቻለም።",
-      "couldNotLoadMore": "ተጨማሪ ስሪቶችን መጫን አልተቻለም።",
-      "loadMore": "ተጨማሪ ስሪቶችን ጫን",
-      "showingLatest": "የቅርብ ጊዜዎቹ 100 ስሪቶች እየታዩ ነው።",
-      "availableVersions": "የሚገኙ ስሪቶች",
-      "noVersions": "ምንም ስሪቶች የሉም",
-      "noVersionsDescription": "የሚገኙ የOpenClaw ስሪቶች እዚህ ይታያሉ።",
-      "unpin": "ማስቀጠያውን አስወግድ",
-      "unpinMessage": "ወደ ሚገኘው የቅርብ ጊዜ ስሪት ይመለስ?",
-      "unpinTitle": "የስሪት ማስቀጠያን ማስወገድ",
-      "confirmPin": "በዚህ ስሪት መቀጠልን አረጋግጥ",
-      "followingLatest": "የቅርብ ጊዜውን ይከተላል",
-      "latest": "የቅርብ ጊዜ",
-      "pin": "በዚህ ስሪት አስቀጥል",
-      "pinnedByAdmin": "አስተዳዳሪው በዚህ ስሪት እንዲቀጥል ወስኗል። ለመቀየር አስተዳዳሪህን አነጋግር።",
-      "pinnedTo": "በ{{version}} እንዲቀጥል ተወስኗል",
-      "reasonOptional": "ምክንያት (አማራጭ)",
-      "reasonPlaceholder": "በዚህ ስሪት የመቀጠል ምክንያት",
-      "replaceAdminPin": "የአስተዳዳሪውን የስሪት ምርጫ ተካ",
-      "replacesAdminPin": "ይህ አስተዳዳሪው እንዲቀጥል የወሰነውን ስሪት (በአሁኑ ጊዜ {{label}}) ይተካል።"
-    },
-    "redeploy": "እንደገና አሰማራ",
-    "redeployMessage": "ይህን ኢንስታንስ እንደገና ለማሰማራት እርግጠኛ ነህ?",
-    "redeployTitle": "ኢንስታንሱን እንደገና ማሰማራት",
-    "controls": {
-      "redeploying": "እንደገና በማሰማራት ላይ…",
-      "restart": "እንደገና አስጀምር",
-      "restartOpenClawMessage": "የOpenClaw ሂደቱን እንደገና ለማስጀመር እርግጠኛ ነህ?",
-      "restartOpenClawTitle": "OpenClawን እንደገና ማስጀመር",
-      "restarting": "እንደገና በማስጀመር ላይ…",
-      "start": "ጀምር",
-      "startMessage": "ይህን ኢንስታንስ ለማስጀመር እርግጠኛ ነህ?",
-      "startTitle": "ኢንስታንሱን ማስጀመር",
-      "stop": "አቁም",
-      "stopMessage": "ይህን ኢንስታንስ ለማቆም እርግጠኛ ነህ?",
-      "stopTitle": "ኢንስታንሱን ማቆም",
-      "stopping": "በማቆም ላይ…"
-    },
-    "empty": {
-      "finishingSetup": "ማዋቀርን በማጠናቀቅ ላይ",
-      "finishingSetupDescription": "መለያህን ማዋቀር እያጠናቀቅን ነው። ትንሽ ጠብቅ፤ ብዙውን ጊዜ በአጭር ጊዜ ያልቃል።",
-      "getStarted": "ጀምር",
-      "noInstancesDescription": "ኮድ የሚጽፉ ወኪሎችን ማስኬድ ለመጀመር የመጀመሪያ ኢንስታንስህን ፍጠር።"
-    },
-    "instance": {
-      "backToInstances": "ወደ ኢንስታንሶች ተመለስ",
-      "couldNotLoad": "ኢንስታንሱን መጫን አልተቻለም።",
-      "notFound": "ኢንስታንሱ አልተገኘም",
-      "notFoundDescription": "ይህ ኢንስታንስ ጠፍቶ ሊሆን ይችላል፣ ወይም አገናኙ ከእንግዲህ አይሠራም።"
-    },
-    "list": {
-      "createInstance": "ኢንስታንስ ፍጠር",
-      "organizations": "ድርጅቶች",
-      "accessIssue": {
-        "trialExpired": "ሙከራው አብቅቷል፤ ይህን ኢንስታንስ መጠቀም ለመቀጠል ደንበኛ ሁን",
-        "subscriptionCanceled": "ደንበኝነቱ ንቁ አይደለም፤ ይህን ኢንስታንስ መጠቀም ለመቀጠል እንደገና ደንበኛ ሁን",
-        "subscriptionPastDue": "የክፍያ ችግር አለ፤ ይህን ኢንስታንስ መጠቀም ለመቀጠል የክፍያ መረጃህን አዘምን",
-        "quarantined": "ኢንስታንሱ ለይቶ ተገድቧል፤ በሰው መገምገም ያስፈልገዋል",
-        "multipleCurrentConflict": "መለያው ግምገማ ይፈልጋል",
-        "nonCanonicalEarlybird": "የቀድሞው የአገልግሎት ዕቅድ ግምገማ ያስፈልገዋል"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "ከ{{name}} ጋር ተወያይ",
-        "ready": "{{name}} ዝግጁ ነው",
-        "warmedUp": "ሁሉም ዝግጁ ነው። ስትዘጋጅ ሰላም በል።"
-      },
-      "flow": {
-        "genericErrorBody": "አሁን ኢንስታንስህን ማዋቀር ማጠናቀቅ አልቻልንም።",
-        "manualReviewBody": "ኢንስታንስ ከመፍጠራችን በፊት የመለያህ ሁኔታ መፈተሽ አለበት። በkilo.ai ላይ ቀጥል።",
-        "manualReviewTitle": "ማዋቀሩ በሰው መገምገም ያስፈልገዋል",
-        "openKiloAi": "Kilo.aiን ክፈት",
-        "provisioning": "የኢንስታንስ ዝግጅት",
-        "review": "ግምገማ",
-        "identityTitle": "የቦትህ ማንነት",
-        "couldNotLoad": "የመጀመሪያ ማዋቀሩን ሁኔታ መጫን አልተቻለም።",
-        "finishingSetup": "ማዋቀሩን እያጠናቀቅን ነው። መለያህን እስክናዘጋጅ ድረስ ትንሽ ጠብቅ።",
-        "ready": "ዝግጁ",
-        "settingUp": "በማዋቀር ላይ…"
-      },
-      "unavailableDescription": "ኢንስታንስ ለማዘጋጀት ንቁ የKiloClaw ደንበኝነት ያስፈልጋል። ያሉት ኢንስታንሶች እና ደንበኝነቶች እንደተለመደው ይቀጥላሉ።",
-      "unavailableTitle": "አዲስ የKiloClaw ኢንስታንሶችን መፍጠር አይቻልም",
-      "identity": {
-        "chooseAvatar": "አምሳያ ምረጥ",
-        "namePlaceholder": "የቦትህ ስም",
-        "selectAvatar": "{{name}}ን እንደ አምሳያ ምረጥ",
-        "personality": "ስብዕና",
-        "changePersonality": "ስብዕናውን ቀይር",
-        "location": "ቦታ",
-        "locationPlaceholder": "ከተማ ወይም ክልል (አማራጭ)",
-        "useCurrentLocation": "ያለህበትን ቦታ ተጠቀም",
-        "locationDeniedTitle": "የቦታ መረጃ ፈቃድ ተከልክሏል",
-        "locationDeniedMessage": "ያለህበትን ቦታ ለመጠቀም በቅንብሮች ውስጥ የቦታ መረጃ ፈቃድን አንቃ።",
-        "locationValidationFailed": "ቦታውን ማረጋገጥ አልተቻለም።",
-        "locationResolveFailed": "ያለህበትን ቦታ መለየት አልተቻለም። ራስህ ማርትዕ ትችላለህ።",
-        "locationGetFailed": "ያለህበትን ቦታ ማግኘት አልተቻለም። ራስህ አስገባው።",
-        "nature": {
-          "aiAssistantLabel": "የAI ረዳት",
-          "aiAssistantVibe": "አጋዥ፣ ብቁ፣ ሙያዊ",
-          "digitalCreatureLabel": "ዲጂታል ፍጡር",
-          "digitalCreatureVibe": "ለየት ያለ፣ ሕያው፣ ባህሪው ትንሽ የማይገመት",
-          "virtualCompanionLabel": "ምናባዊ ጓደኛ",
-          "virtualCompanionVibe": "ወዳጃዊ፣ ሁሌም አብሮህ ያለ፣ ከልብ የሚያስብልህ",
-          "somethingWeirderLabel": "የበለጠ እንግዳ ነገር…",
-          "somethingWeirderVibe": "ራስህ ግለጸው"
-        }
-      },
-      "notifications": {
-        "mockMessage": "ጨርሻለሁ! የጠየቅኸውን ማጠቃለያ አዘጋጅቻለሁ። ስትዘጋጅ እየጠበቅሁህ ነው።",
-        "settingUp": "ማሳወቂያዎችን በማዋቀር ላይ…",
-        "stayInTheLoop": "ወቅታዊ መረጃ",
-        "getNotified": "ምንም ምላሽ እንዳያመልጥህ፣ {{name}} ሥራ ሲጨርስ ማሳወቂያ ተቀበል።",
-        "now": "አሁን",
-        "skipForNow": "ለአሁኑ ዝለል",
-        "couldNotEnable": "ማሳወቂያዎችን ማንቃት አልተቻለም።"
-      },
-      "provisioning": {
-        "queryErrorTitle": "የማዋቀሩን ሁኔታ መፈተሽ አልተቻለም",
-        "queryErrorBody": "የ{{name}} ማዋቀር ሁኔታን ስንፈትሽ ግንኙነቱ ተቋርጧል። ማዋቀሩ አሁንም እየቀጠለ ሊሆን ይችላል። እንደገና ሞክር ወይም ከጥቂት ጊዜ በኋላ ተመልሰህ ፈትሽ።",
-        "stoppedTitle": "ማዋቀር ቆሟል",
-        "stoppedBody": "የ{{name}} ኢንስታንስ በማዋቀር ወቅት ባልተጠበቀ ሁኔታ ቆሟል።",
-        "stalledTitle": "ማዋቀሩ ተቋርጧል",
-        "stalledBody": "{{name}}ን ማዋቀር ማጠናቀቅ አልቻልንም። እንደገና ሞክር፤ ችግሩ ከቀጠለ ወደ {{supportEmail}} ኢሜይል ላክ።",
-        "timeoutTitle": "ከተጠበቀው በላይ ጊዜ እየወሰደ ነው",
-        "timeoutBody": "የ{{name}} ማዋቀር ከወትሮው በላይ ጊዜ እየወሰደ ነው (ከ{{displayMinutes}} ደቂቃዎች በላይ)።",
-        "continueInBackground": "ከበስተጀርባ ቀጥል",
-        "settingUp": "{{name}}ን በማዋቀር ላይ",
-        "connectingToAgent": "ከወኪሉ ጋር በመገናኘት ላይ",
-        "startingSandbox": "የተለየውን የማስኬጃ አካባቢ በማስጀመር ላይ",
-        "backgroundHint": "ብዙውን ጊዜ ከአንድ ደቂቃ በታች ይወስዳል። ይህን መዝጋት ትችላለህ — ከበስተጀርባ ማዋቀሩን እንቀጥላለን።"
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "ኮድ {{code}}",
-      "gatewayProcess": "የመተላለፊያ ሂደት",
-      "lastExit": "ሂደቱ ለመጨረሻ ጊዜ ያበቃበት",
-      "memory": "ማህደረ ትውስታ",
-      "region": "ክልል",
-      "resources": "ሀብቶች",
-      "restarts": "የዳግም መጀመር ብዛት",
-      "state": "ሁኔታ",
-      "uptime": "ያለማቋረጥ የሠራበት ጊዜ",
-      "crashed": "በስህተት ቆሟል",
-      "destroying": "በማጥፋት ላይ",
-      "provisioned": "ተዘጋጅቷል",
-      "restarting": "እንደገና በማስጀመር ላይ",
-      "running": "በሥራ ላይ",
-      "shuttingDown": "በመዝጋት ላይ",
-      "starting": "በመጀመር ላይ",
-      "stopped": "ቆሟል",
-      "stopping": "በማቆም ላይ",
-      "unknown": "ያልታወቀ",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "ግንባር ቀደም",
-      "frontierDescription": "ከፍተኛውን አፈጻጸም ይሰጣል። ጥያቄዎችን የማመዛዘን ችሎታ ወዳላቸው ግንባር ቀደም ሞዴሎች ይልካል።",
-      "balancedDescription": "በዝቅተኛ ወጪ ፍጥነትን እና ችሎታን በሚዛን ያቀርባል።",
-      "autoModelA11y": "የ{{label}} ራስ-ሰር ሞዴል",
-      "currentModel": "የአሁኑ ሞዴል",
-      "browseAllModels": "ወይም ከ500 በላይ ሞዴሎች ምረጥ",
-      "browseAllModelsA11y": "ከ500 በላይ የሆኑትን ሞዴሎች በሙሉ አስስ"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClawን መጠቀም ለመቀጠል በአሳሽህ ወደ kilo.ai/claw ሂድ። በመተግበሪያው ውስጥ ደንበኛ መሆን አትችልም።",
-      "subscriptionCanceledTitle": "በድረ ገጹ ላይ ደንበኛ ሁን",
-      "subscriptionCanceledBody": "KiloClawን ለመጠቀም በአሳሽህ ወደ kilo.ai/claw ሂድ። በመተግበሪያው ውስጥ ደንበኛ መሆን አትችልም።",
-      "subscriptionCanceledCta": "Kilo.ai/clawን ክፈት",
-      "subscriptionPastDueTitle": "የክፍያ መረጃን በድረ ገጹ ማዘመን",
-      "subscriptionPastDueBody": "የቅርብ ጊዜ ክፍያህን ለመቀበል ችግር አጋጥሞናል። የክፍያ መረጃህን ለማዘመን በአሳሽህ ወደ kilo.ai/claw ሂድ። በመተግበሪያው ውስጥ ክፍያን ማስተዳደር አትችልም።",
-      "quarantinedTitle": "ኢንስታንሱ ማስተካከያ ያስፈልገዋል",
-      "quarantinedBody": "የKiloClaw ኢንስታንስህ ለይቶ ተገድቧል፤ አሁን መጠቀም አትችልም። ወደ ሥራ ለመመለስ የቡድናችን እርዳታ ያስፈልጋል።",
-      "multipleCurrentConflictBody": "በመለያህ ላይ ከአንድ በላይ ንቁ ደንበኝነት አግኝተናል። ሁለት ጊዜ እንዳትከፍል አገልግሎቱን ለጊዜው አቁመናል።",
-      "multipleCurrentConflictCta": "በkilo.ai ላይ ቀጥል",
-      "nonCanonicalEarlybirdTitle": "የቀድሞ የአገልግሎት ዕቅድ ተገኝቷል",
-      "nonCanonicalEarlybirdBody": "የቅድሚያ መዳረሻ ዕቅድህን በሞባይል ላይ ከመጠቀምህ በፊት በሰው መገምገም ያስፈልጋል።",
-      "iosTitle": "KiloClaw በiOS አይገኝም",
-      "iosBody": "ለዚህ መለያ የKiloClaw መዳረሻ ከiOS መተግበሪያ ውጭ ነው የሚተዳደረው።",
-      "iosContact": "ጥያቄ አለህ? ወደ {{supportEmail}} ጻፍ።",
-      "quarantinedCta": "ለቡድናችን ኢሜይል ላክ",
-      "nonCanonicalEarlybirdCta": "ዕቅድህን በkilo.ai ላይ ገምግም"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} ትኩረት ይፈልጋል፡ {{label}}",
-      "openUnread_one": "{{name}}ን ክፈት፣ {{displayCount}} ያልተነበበ መልእክት",
-      "openUnread": "{{name}}ን ክፈት፣ {{displayCount}} ያልተነበቡ መልእክቶች",
-      "openUnread_other": "{{name}}ን ክፈት፣ {{displayCount}} ያልተነበቡ መልእክቶች",
-      "openSettings": "የ{{name}} ቅንብሮችን ክፈት",
-      "fixOnKiloAi": "በkilo.ai ላይ አስተካክል፦ {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "የመሣሪያ ጥያቄዎችን አጽድቅ",
-      "execPolicyDescription": "የደህንነት ቅንብሮች",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "የAI ሞዴል ምርጫ",
-      "secretsDescription": "የተመሰጠረ የመግቢያ መረጃ",
-      "versionPinDescription": "በተወሰነ ስሪት አስቀጥል"
-    },
-    "avatar": {
-      "arcade": "አርኬድ",
-      "brain": "አንጎል",
-      "creature": "ፍጡር",
-      "crystal": "ክሪስታል",
-      "custom": "ብጁ አምሳያ",
-      "dragon": "ዘንዶ",
-      "explorer": "አሳሽ",
-      "flame": "ነበልባል",
-      "lightning": "መብረቅ",
-      "magicWand": "አስማታዊ ዘንግ",
-      "moon": "ጨረቃ",
-      "operator": "ኦፕሬተር",
-      "orbit": "ምህዋር",
-      "oracle": "ትንቢት ተናጋሪ",
-      "rainbow": "ቀስተ ደመና",
-      "robot": "ሮቦት",
-      "satellite": "ሳተላይት",
-      "sparkles": "ብልጭታዎች",
-      "strongArm": "ጠንካራ ክንድ",
-      "talisman": "ክታብ"
-    },
-    "remoteSpawnFilesNotSupported": "ይህ ኢንስታንስ ፋይሎችን መቀበል አይችልም።",
-    "instanceSwitcherTitle": "የKiloClaw ኢንስታንስ"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}}ን ወደ ግራ ያንቀሳቅሱ",
       "moveRight": "{{filename}}ን ወደ ቀኝ ያንቀሳቅሱ"
     },
-    "attachmentPasteHint": {
-      "accessibility": "ከቅንጥብ ሰሌዳው ምስል ይለጥፉ",
-      "label": "ምስል ተገኝቷል፣ ለመለጠፍ ይንኩ"
-    },
     "attachmentPicker": {
       "camera": "ካሜራ",
       "photoLibrary": "የፎቶ ስብስብ",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "ከክፍለ ጊዜው ወጥተዋል።",
     "signOutThisDeviceTitle": "ከዚህ መሣሪያ መውጣት ይፈልጋሉ?",
     "signOutThisSessionTitle": "ከዚህ ክፍለ ጊዜ መውጣት ይፈልጋሉ?",
-    "signOutThisSessionMessage": "{{device}} ከመለያዎ ይወጣል። እስከ አንድ ሰዓት ድረስ APIን መጠቀም ሊቀጥል ይችላል።"
+    "signOutThisSessionMessage": "{{device}} ከመለያዎ ይወጣል። እስከ አንድ ሰዓት ድረስ APIን መጠቀም ሊቀጥል ይችላል።",
+    "unknownDevice": "ያልታወቀ መሣሪያ"
   },
   "forceUpdate": {
     "couldNotOpenStore": "የመተግበሪያ መደብር መክፈት አልተቻለም።",

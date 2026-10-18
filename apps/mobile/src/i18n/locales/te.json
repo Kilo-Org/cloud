@@ -101,12 +101,9 @@
     "scheduled": "షెడ్యూల్ చేయబడింది",
     "keepEditing": "సవరించడం కొనసాగించండి",
     "keepRunning": "అమలు కొనసాగించండి",
-    "kiloclaw": "KiloClaw",
     "newSession": "కొత్త సెషన్",
-    "noKiloclawInstances": "KiloClaw ఇన్‌స్టాన్స్‌లు లేవు",
     "noModelsAvailable": "మోడళ్లు అందుబాటులో లేవు",
     "notFound": "దొరకలేదు.",
-    "online": "ఆన్‌లైన్",
     "open": "{{name}}ను తెరవండి",
     "openPullRequest": "ఓపెన్ పుల్ రిక్వెస్ట్",
     "pending": "వేచి ఉంది",
@@ -257,7 +254,8 @@
     "renamePasskey": "పాస్‌కీ పేరు మార్చండి",
     "removePasskey": "పాస్‌కీ తీసివేయండి",
     "removePasskeyTitle": "పాస్‌కీ తీసివేయాలా?",
-    "removePasskeyMessage": "ఇప్పుడు మీరు ఈ పాస్‌కీతో సైన్ ఇన్ చేయలేరు."
+    "removePasskeyMessage": "ఇప్పుడు మీరు ఈ పాస్‌కీతో సైన్ ఇన్ చేయలేరు.",
+    "changelog": "కొత్త విశేషాలు"
   },
   "preferences": {
     "general": "సాధారణం",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "నోటిఫికేషన్‌లు ఏదైనా జరిగిందని మాత్రమే తెలియజేస్తాయి. సందేశాన్ని చదవడానికి Kilo తెరవండి.",
     "channel": {
       "agentProgress": "ఏజెంట్ పురోగతి",
-      "chat": "చాట్ సందేశాలు",
-      "kiloclaw": "KiloClaw కార్యకలాపాలు",
       "balance": "బ్యాలెన్స్ హెచ్చరికలు",
       "security": "గుర్తించిన భద్రతా సమస్యలు",
       "spend": "ఖర్చు హెచ్చరికలు",
       "followedSessions": "ఫాలో చేసిన సెషన్లు"
     },
     "category": {
-      "chatMessagesSubtitle": "మీ సంభాషణలలో ప్రత్యుత్తరాలు",
       "agentAttentionTitle": "ఏజెంట్‌కు మీ స్పందన అవసరం",
       "agentAttentionSubtitle": "ప్రశ్నలు, అనుమతి లేదా మీ సమాధానం అవసరమైనప్పుడు",
       "agentUpdatesTitle": "ఏజెంట్ అప్‌డేట్‌లు",
       "agentUpdatesSubtitle": "పని జరుగుతుండగా ఏజెంట్ పంపే సందేశాలు",
       "sessionStatusTitle": "సెషన్ స్థితి",
       "sessionStatusSubtitle": "పూర్తయింది / విఫలమైంది / నియంత్రించడానికి సిద్ధం",
-      "kiloclawActivitySubtitle": "ఇన్‌స్టాన్స్ సిద్ధం/విఫలం, నిర్ణీత సమయాల్లో జరిగే చర్యలు",
-      "kiloclawActivityUnavailable": "KiloClaw కార్యకలాపాన్ని పొందడానికి KiloClaw ఇన్‌స్టాన్స్‌ను ప్రారంభించండి.",
       "balanceAlertsSubtitle": "సంస్థ బ్యాలెన్స్ తగ్గినప్పుడు హెచ్చరికలు",
       "balanceAlertsUnavailable": "బ్యాలెన్స్ హెచ్చరికలను పొందడానికి సంస్థలో చేరండి.",
       "securityFindingsSubtitle": "కొత్త భద్రతా సమస్యలు, SLA రిమైండర్లు",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "హోమ్",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, ట్యాబ్, మొత్తం {{total}}లో {{position}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "ఇన్‌స్టాన్స్ ఎంపిక",
-      "couldNotLoadInstances": "ఇన్‌స్టాన్స్‌లను లోడ్ చేయలేకపోయాము.",
-      "noInstancesDescription": "చాట్ ప్రారంభించడానికి ఒక ఇన్‌స్టాన్స్‌ను సెటప్ చేయండి.",
-      "setUpKiloclaw": "KiloClawను సెటప్ చేయండి",
-      "currentInstance": "{{title}}, ప్రస్తుత ఇన్‌స్టాన్స్"
-    },
     "conversation": {
-      "failedToLoad": "సంభాషణను లోడ్ చేయలేకపోయాము.",
-      "notFound": "సంభాషణ కనుగొనబడలేదు.",
       "untitled": "శీర్షిక లేదు",
-      "leaveTitle": "సంభాషణను వదిలివేయాలా?",
-      "leaveMessage": "దీంతో సంభాషణ మీ జాబితా నుంచి తొలగిపోతుంది.",
-      "openHint": "సంభాషణను తెరుస్తుంది. పేరు మార్చే లేదా సంభాషణను వదిలివేసే ఎంపికల కోసం ఎక్కువసేపు నొక్కండి.",
-      "unread": "చదవనిది",
-      "optionsFor": "{{title}} సంభాషణ ఎంపికలు",
-      "options": "సంభాషణ ఎంపికలు",
-      "renameTitle": "సంభాషణ పేరు మార్పు",
-      "renamePlaceholder": "కొత్త పేరు",
-      "couldNotReachBot": "బాట్‌ను సంప్రదించలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి.",
-      "messageDeliveryFailed": "బాట్‌కు సందేశాన్ని అందించలేకపోయాము.",
-      "couldNotSignIn": "చాట్‌లో సైన్ ఇన్ చేయలేకపోయాము.",
-      "couldNotRefreshMessages": "సందేశాలను రిఫ్రెష్ చేయలేకపోయాము.",
-      "couldNotLoadHistory": "సంభాషణ చరిత్రను లోడ్ చేయలేకపోయాము.",
-      "leave": "వదిలివేయండి",
-      "untitledConversation": "శీర్షిక లేని సంభాషణ",
-      "createFailed": "సంభాషణను సృష్టించలేకపోయాము.",
-      "leaveFailed": "సంభాషణను వదిలివేయలేకపోయాము."
-    },
-    "reactions": {
-      "common": "తరచుగా వాడేవి",
-      "reactWith": "{{reaction}}తో ప్రతిస్పందించండి",
-      "accessibility": "{{emoji}} ప్రతిస్పందన, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "వీరికి ప్రత్యుత్తరం",
-      "cancelReply": "ప్రత్యుత్తరాన్ని రద్దు చేయండి",
-      "openInstance": "ఇన్‌స్టాన్స్‌ను తెరవండి",
-      "attachFile": "ఫైల్‌ను జత చేయండి",
-      "cancelEdit": "సవరణను రద్దు చేయండి"
+      "renamePlaceholder": "కొత్త పేరు"
     },
     "conversationList": {
-      "couldNotLoad": "సంభాషణలను లోడ్ చేయలేకపోయాము.",
-      "emptyTitle": "ఇంకా సంభాషణలు లేవు",
-      "emptyDescription": "మీ KiloClaw ఇన్‌స్టాన్స్‌తో చాట్ ప్రారంభించడానికి సంభాషణను సృష్టించండి.",
-      "create": "సంభాషణను సృష్టించండి",
-      "newConversation": "కొత్త సంభాషణ",
-      "openInstanceSettings": "ఇన్‌స్టాన్స్ సెట్టింగ్‌లను తెరవండి",
       "today": "ఈరోజు",
       "yesterday": "నిన్న",
-      "thisWeek": "ఈ వారం",
       "older": "పాతవి"
     },
     "attachment": {
-      "open": "{{filename}} తెరవండి",
-      "openFailed": "జత చేసిన ఫైల్‌ను తెరవలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి, మళ్లీ ప్రయత్నించండి.",
-      "attachFailed": "ఫైల్‌ను జత చేయలేకపోయాము.",
-      "limit": "మీరు గరిష్టంగా {{displayCount}} ఫైళ్లను జత చేయవచ్చు.",
-      "sizeRejection": "{{filename}} పరిమాణం జత చేసే ఫైళ్లకు ఉన్న {{limit}} పరిమితిని మించింది.",
-      "unreadable": "{{filename}}ను చదవలేకపోయాము.",
-      "pastedImage": "అతికించిన చిత్రం",
-      "defaultName": "జోడించిన ఫైల్",
       "classificationDenied": "అమలు చేయగల ఫైళ్లను జత చేయలేరు.",
       "classificationEmpty": "ఫైల్ ఖాళీగా ఉంది.",
       "classificationTooLarge": "ఫైళ్ల పరిమాణం 20 MB లేదా అంతకంటే తక్కువగా ఉండాలి.",
@@ -943,426 +883,17 @@
       "networkError": "నెట్‌వర్క్‌లో లోపం ఏర్పడింది.",
       "uploadFailed": "అప్‌లోడ్ విఫలమైంది.",
       "nothingToPaste": "అతికించడానికి ఏమీ లేదు.",
-      "metadataStripFailed": "ఫోటో మెటాడేటాను తొలగించలేకపోయాము.",
-      "limit_one": "మీరు గరిష్టంగా {{displayCount}} ఫైల్ జత చేయవచ్చు.",
-      "limit_other": "మీరు గరిష్టంగా {{displayCount}} ఫైళ్లను జత చేయవచ్చు."
+      "metadataStripFailed": "ఫోటో మెటాడేటాను తొలగించలేకపోయాము."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "{{filename}}ను మళ్లీ అప్‌లోడ్ చేయండి",
-      "remove": "{{filename}}ను తీసివేయండి"
-    },
-    "messageBubble": {
-      "deleted": "[తొలగించబడిన సందేశం]",
-      "yourMessage": "మీ సందేశం",
-      "messageFrom": "{{author}} నుండి సందేశం",
-      "moreActions": "మరిన్ని చర్యలు",
-      "notDelivered": "అందలేదు",
-      "edited": "(సవరించబడింది)",
-      "image": "చిత్రం"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "కాపీ అయింది",
-      "copyFailed": "కాపీ చేయలేకపోయాము.",
-      "title": "సందేశ చర్యలు",
-      "deleteTitle": "సందేశాన్ని తొలగించాలా?",
-      "deleteMessage": "ఇది సంభాషణ నుండి సందేశాన్ని తీసివేస్తుంది.",
-      "deleteFailed": "సందేశాన్ని తొలగించలేకపోయాము.",
-      "removeReactionFailed": "ప్రతిస్పందనను తీసివేయలేకపోయాము.",
-      "addReactionFailed": "ప్రతిస్పందనను జోడించలేకపోయాము.",
-      "retrySend": "మళ్లీ పంపండి",
-      "moreReactions": "మరిన్ని ప్రతిస్పందనలు",
-      "edit": "సవరించండి",
-      "sendFailed": "సందేశాన్ని పంపలేకపోయాము.",
-      "retrySendFailed": "మళ్లీ పంపలేకపోయాము.",
-      "editFailed": "సందేశాన్ని సవరించలేకపోయాము.",
-      "executeFailed": "చర్యను అమలు చేయలేకపోయాము."
+      "edit": "సవరించండి"
     },
     "attachmentPicker": {
-      "takePhoto": "ఫోటో తీయండి",
-      "photoLibrary": "ఫోటో లైబ్రరీ",
-      "files": "ఫైళ్లు",
       "cameraAccessMessage": "ఫోటో తీయడానికి సెట్టింగ్‌లలో కెమెరా వాడేందుకు అనుమతి ఇవ్వండి."
-    },
-    "typingIndicator": {
-      "someone": "ఎవరో",
-      "typing_one": "{{name}} టైప్ చేస్తున్నారు...",
-      "typing": "{{names}} టైప్ చేస్తున్నారు...",
-      "typing_other": "{{names}} టైప్ చేస్తున్నారు..."
-    },
-    "botStatus": {
-      "offline": "ఆఫ్‌లైన్",
-      "loadingUser": "వినియోగదారు వివరాలను లోడ్ చేస్తోంది...",
-      "waitingForStatus": "బాట్ స్థితి కోసం వేచి ఉంది...",
-      "offlineMessage": "బాట్ ఆఫ్‌లైన్‌లో ఉంది. మళ్లీ కనెక్ట్ అయ్యాక సందేశాల మార్పిడి కొనసాగుతుంది."
-    },
-    "errors": {
-      "notAllowed": "అనుమతి లేదు.",
-      "messageTooLong": "సందేశం చాలా పొడవుగా ఉంది — {{limit}} అక్షరాల కంటే తక్కువగా రాయండి.",
-      "titleTooLong": "శీర్షిక చాలా పొడవుగా ఉంది — {{limit}} అక్షరాల కంటే తక్కువగా రాయండి.",
-      "messageEmpty": "సందేశం ఖాళీగా ఉండకూడదు."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw ఇన్‌స్టాన్స్‌లను లోడ్ చేయలేకపోయాము.",
-    "billing": {
-      "title": "బిల్లింగ్",
-      "continueMonthToMonth": "నెలవారీగా కొనసాగించండి",
-      "plan": "ప్లాన్",
-      "finalTermEnds": "చివరి చందా వ్యవధి ముగింపు",
-      "afterFinalTerm": "చివరి చందా వ్యవధి తర్వాత",
-      "lessThanOneDay": "1 రోజు కంటే తక్కువ",
-      "ends": "ముగింపు",
-      "expires": "గడువు ముగింపు",
-      "noActivePlan": "అమలులో ఉన్న ప్లాన్ లేదు",
-      "noActivePlanDescription": "మీకు అమలులో ఉన్న KiloClaw చందా లేదు.",
-      "managedByAdmin": "మీ సంస్థ నిర్వాహకుడు బిల్లింగ్‌ను నిర్వహిస్తారు.",
-      "couldNotLoad": "బిల్లింగ్ సమాచారాన్ని లోడ్ చేయలేకపోయాము.",
-      "manageOnWeb": "వెబ్‌లో బిల్లింగ్‌ను నిర్వహించండి",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "మీ చివరి Commit చందా వ్యవధి {{date}}న ముగుస్తుంది. {{price}} ధరతో Standard ప్లాన్‌లో కొనసాగించండి. లేకపోతే హోస్టింగ్ ముగుస్తుంది.",
-      "freeTrial": "ఉచిత ట్రయల్",
-      "hostingEnds": "హోస్టింగ్ ముగుస్తుంది",
-      "renews": "పునరుద్ధరణ",
-      "standardMonthToMonth": "Standard నెలవారీ ప్లాన్",
-      "standardStartsOn": "Standard ప్లాన్ {{date}}న {{price}} ధరతో ప్రారంభమవుతుంది.",
-      "yourStandardMonthlyPrice": "మీ Standard ప్లాన్ నెలవారీ ధర",
-      "perMonth": "/నెల",
-      "earlybirdAccessUntil": "Earlybirdను {{date}} వరకు ఉపయోగించవచ్చు.",
-      "earlybirdEnding": "Earlybird ముగియడానికి మిగిలిన సమయం: {{remaining}}.",
-      "paymentPastDue": "చెల్లింపు గడువు దాటింది. మీ చెల్లింపు పద్ధతిని నవీకరించండి.",
-      "subscriptionCancels": "చందా {{date}}న రద్దవుతుంది.",
-      "trialDaysRemaining": "ట్రయల్‌కు మిగిలిన సమయం: {{remaining}}.",
-      "trialEndingSoon": "ట్రయల్ త్వరలో ముగుస్తుంది: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "కమిట్"
-    },
-    "changelog": {
-      "title": "కొత్త విశేషాలు",
-      "couldNotLoad": "మార్పుల చరిత్రను లోడ్ చేయలేకపోయాము.",
-      "noUpdates": "ఇంకా నవీకరణలు లేవు",
-      "noUpdatesDescription": "మార్పుల వివరాలు ఇక్కడ కనిపిస్తాయి.",
-      "recentUpdates": "ఇటీవలి నవీకరణలు",
-      "manageVersion": "వెర్షన్‌ను నిర్వహించండి",
-      "redeployRequired": "మళ్లీ డిప్లాయ్ చేయాలి",
-      "redeploySuggested": "మళ్లీ డిప్లాయ్ చేయడం మంచిది",
-      "upgradeRequired": "అప్‌గ్రేడ్ అవసరం"
-    },
-    "dashboard": {
-      "title": "డాష్‌బోర్డ్",
-      "couldNotLoad": "డాష్‌బోర్డ్‌ను లోడ్ చేయలేకపోయాము.",
-      "renameInstance": "ఇన్‌స్టాన్స్ పేరు మార్చండి",
-      "renamePlaceholder": "కొత్త పేరు (గరిష్టంగా 50 అక్షరాలు)",
-      "someDetailsFailed": "కొన్ని తాజా వివరాలను లోడ్ చేయలేకపోయాము.",
-      "destroy": "శాశ్వతంగా తొలగించండి",
-      "destroyMessage": "దీనితో మీ KiloClaw ఇన్‌స్టాన్స్‌ను, అందులోని డేటా మొత్తాన్ని శాశ్వతంగా తొలగిస్తాము. తొలగించిన వాటిని తిరిగి పొందలేరు.",
-      "destroyTitle": "ఇన్‌స్టాన్స్‌ను శాశ్వతంగా తొలగించాలా?",
-      "instance": "ఇన్‌స్టాన్స్",
-      "couldNotCheckStatus": "సేవ స్థితిని తనిఖీ చేయలేకపోయాము.",
-      "dangerZone": "ప్రమాదకర చర్యలు",
-      "destroying": "శాశ్వతంగా తొలగిస్తోంది…",
-      "serviceDegraded": "సేవ సరిగా పనిచేయడం లేదు — స్థితిని చూడటానికి నొక్కండి",
-      "up": "పనిచేస్తోంది"
-    },
-    "channels": {
-      "title": "ఛానళ్లు",
-      "couldNotLoad": "ఛానళ్లను లోడ్ చేయలేకపోయాము.",
-      "noChannels": "ఛానళ్లు అందుబాటులో లేవు",
-      "noChannelsDescription": "ఛానల్ అనుసంధానాలు ఇక్కడ కనిపిస్తాయి.",
-      "connected": "{{label}} కనెక్ట్ అయింది",
-      "disconnectMessage": "{{label}}ను తీసివేయాలా? ఈ ఛానల్ డిస్కనెక్ట్ అవుతుంది.",
-      "disconnectTitle": "ఛానల్‌ను డిస్కనెక్ట్ చేయాలా?"
-    },
-    "devicePairing": {
-      "title": "పరికరాల జత",
-      "refreshRequests": "జత చేసే అభ్యర్థనలను రిఫ్రెష్ చేయండి",
-      "couldNotLoad": "జత చేసే అభ్యర్థనలను లోడ్ చేయలేకపోయాము.",
-      "noPending": "వేచి ఉన్న అభ్యర్థనలు లేవు",
-      "noPendingDescription": "ఛానళ్లను, పరికరాలను జత చేసే అభ్యర్థనలు ఇక్కడ కనిపిస్తాయి.",
-      "channelRequests": "ఛానల్ అభ్యర్థనలు",
-      "deviceRequests": "పరికర అభ్యర్థనలు",
-      "approveDeviceMessage": "మీ ఇన్‌స్టాన్స్‌కు కనెక్ట్ కావడానికి {{platform}}ను అనుమతించాలా?",
-      "approveDeviceTitle": "పరికరాన్ని ఆమోదించాలా?",
-      "approveMessage": "మీ ఇన్‌స్టాన్స్‌కు కనెక్ట్ కావడానికి {{label}} (కోడ్: {{code}})ను అనుమతించాలా?",
-      "approveTitle": "జత చేసే అభ్యర్థనను ఆమోదించాలా?",
-      "unknownDevice": "తెలియని పరికరం"
-    },
-    "execPolicy": {
-      "title": "అమలు విధానం",
-      "couldNotLoad": "అమలు విధానాన్ని లోడ్ చేయలేకపోయాము.",
-      "alwaysAsk": "ఎల్లప్పుడూ అడగాలి",
-      "alwaysAskDescription": "ప్రతి ఆదేశాన్ని అమలు చేసే ముందు నిర్ధారణ కోరుతుంది. ఇది అత్యంత సురక్షితమైన ఎంపిక.",
-      "neverAsk": "ఎప్పుడూ అడగకూడదు",
-      "neverAskDescription": "నిర్ధారణ లేకుండానే ఆదేశాలను అమలు చేస్తుంది. ఇది వేగంగా ఉంటుంది, కానీ భద్రత తక్కువ."
-    },
-    "google": {
-      "title": "Google ఖాతా",
-      "couldNotLoad": "Google ఖాతా స్థితిని లోడ్ చేయలేకపోయాము.",
-      "disconnected": "Google ఖాతా డిస్కనెక్ట్ అయింది. మార్పును వర్తింపజేయడానికి మీ ఇన్‌స్టాన్స్‌ను మళ్లీ డిప్లాయ్ చేయండి.",
-      "setupCommand": "సెటప్ ఆదేశం",
-      "setupCommandHelp": "మీ Google ఖాతాను కనెక్ట్ చేయడానికి, Docker ఇన్‌స్టాల్ చేసిన మీ సొంత కంప్యూటర్‌లో టెర్మినల్ తెరిచి ఈ ఆదేశాన్ని అమలు చేయండి.",
-      "failedToLoadCommand": "సెటప్ ఆదేశాన్ని లోడ్ చేయలేకపోయాము.",
-      "gmailNotifications": "Gmail నోటిఫికేషన్లు",
-      "disconnect": "Google ఖాతాను డిస్కనెక్ట్ చేయండి",
-      "copied": "కాపీ అయింది",
-      "copyCommand": "ఆదేశాన్ని కాపీ చేయండి",
-      "disconnectConfirm": "డిస్కనెక్ట్ చేయండి",
-      "disconnectMessage": "ఈ ఇన్‌స్టాన్స్ నుంచి మీ Google ఖాతాను తీసివేయాలా? దీనితో Gmail నోటిఫికేషన్లు ఆగిపోతాయి. మార్పులను వర్తింపజేయడానికి డిస్కనెక్ట్ చేసిన తర్వాత మళ్లీ డిప్లాయ్ చేయండి.",
-      "disconnectTitle": "Googleను డిస్కనెక్ట్ చేయాలా?"
-    },
-    "modelList": {
-      "noMatches": "మీ శోధనకు సరిపోలే మోడళ్లు లేవు",
-      "noModelsDescription": "అందుబాటులోకి వచ్చిన తర్వాత మోడళ్లు ఇక్కడ కనిపిస్తాయి.",
-      "noResultsFor": "\"{{query}}\"కు ఫలితాలు లేవు."
-    },
-    "secrets": {
-      "title": "రహస్య విలువలు",
-      "couldNotLoad": "సీక్రెట్‌లను లోడ్ చేయలేకపోయాము.",
-      "noSecrets": "సీక్రెట్‌లు అందుబాటులో లేవు",
-      "noSecretsDescription": "సీక్రెట్ అనుసంధానాలు ఇక్కడ కనిపిస్తాయి.",
-      "removeMessage": "{{label}}ను తీసివేయాలా? ఈ సాధనం తన ప్రామాణీకరణ వివరాలను ఇక ఉపయోగించుకోలేదు.",
-      "removeTitle": "సీక్రెట్‌ను తీసివేయాలా?",
-      "saved": "{{label}} సేవ్ అయింది",
-      "hide": "{{label}}ను దాచండి",
-      "show": "{{label}}ను చూపండి",
-      "allFieldsRequired": "{{label}}ను కనెక్ట్ చేయడానికి అన్ని ఫీల్డ్‌లను పూరించాలి.",
-      "setupGuideFallback": "సెటప్ సూచనలు",
-      "setupGuideA11y": "{{label}} సెటప్ సూచనలు",
-      "setupGuide": "సెటప్ సూచనలు",
-      "saving": "సేవ్ చేస్తోంది…",
-      "removing": "తీసివేస్తోంది…",
-      "updateToken": "టోకెన్‌ను నవీకరించండి"
-    },
-    "versionPin": {
-      "title": "వెర్షన్‌ను స్థిరపరచడం",
-      "couldNotLoad": "వెర్షన్ సమాచారాన్ని లోడ్ చేయలేకపోయాము.",
-      "couldNotLoadMore": "మరిన్ని వెర్షన్‌లను లోడ్ చేయలేకపోయాము.",
-      "loadMore": "మరిన్ని వెర్షన్‌లను లోడ్ చేయండి",
-      "showingLatest": "తాజా 100 వెర్షన్‌లను చూపిస్తున్నాము.",
-      "availableVersions": "అందుబాటులో ఉన్న వెర్షన్‌లు",
-      "noVersions": "వెర్షన్‌లు అందుబాటులో లేవు",
-      "noVersionsDescription": "అందుబాటులో ఉన్న OpenClaw వెర్షన్‌లు ఇక్కడ కనిపిస్తాయి.",
-      "unpin": "పిన్‌ను తీసివేయండి",
-      "unpinMessage": "అందుబాటులో ఉన్న తాజా వెర్షన్‌కు తిరిగి మారాలా?",
-      "unpinTitle": "వెర్షన్ పిన్‌ను తీసివేయాలా?",
-      "confirmPin": "పిన్ చేయడాన్ని నిర్ధారించండి",
-      "followingLatest": "తాజా వెర్షన్‌ను అనుసరిస్తోంది",
-      "latest": "తాజా",
-      "pin": "పిన్ చేయండి",
-      "pinnedByAdmin": "నిర్వాహకుడు పిన్ చేశారు — మార్చడానికి మీ నిర్వాహకుడిని సంప్రదించండి.",
-      "pinnedTo": "{{version}}కు పిన్ చేయబడింది",
-      "reasonOptional": "కారణం (ఐచ్ఛికం)",
-      "reasonPlaceholder": "ఈ వెర్షన్‌ను పిన్ చేయడానికి కారణం",
-      "replaceAdminPin": "నిర్వాహకుడి పిన్‌ను భర్తీ చేయండి",
-      "replacesAdminPin": "దీనితో నిర్వాహకుడు పెట్టిన పిన్‌ను (ప్రస్తుతం {{label}}) భర్తీ చేస్తాము."
-    },
-    "redeploy": "మళ్లీ డిప్లాయ్ చేయండి",
-    "redeployMessage": "ఈ ఇన్‌స్టాన్స్‌ను ఖచ్చితంగా మళ్లీ డిప్లాయ్ చేయాలనుకుంటున్నారా?",
-    "redeployTitle": "ఇన్‌స్టాన్స్‌ను మళ్లీ డిప్లాయ్ చేయాలా?",
-    "controls": {
-      "redeploying": "మళ్లీ డిప్లాయ్ చేస్తోంది…",
-      "restart": "పునఃప్రారంభించండి",
-      "restartOpenClawMessage": "OpenClaw ప్రాసెస్‌ను ఖచ్చితంగా పునఃప్రారంభించాలనుకుంటున్నారా?",
-      "restartOpenClawTitle": "OpenClawను పునఃప్రారంభించాలా?",
-      "restarting": "పునఃప్రారంభిస్తోంది…",
-      "start": "ప్రారంభించండి",
-      "startMessage": "ఈ ఇన్‌స్టాన్స్‌ను ఖచ్చితంగా ప్రారంభించాలనుకుంటున్నారా?",
-      "startTitle": "ఇన్‌స్టాన్స్‌ను ప్రారంభించాలా?",
-      "stop": "ఆపండి",
-      "stopMessage": "ఈ ఇన్‌స్టాన్స్‌ను ఖచ్చితంగా ఆపాలనుకుంటున్నారా?",
-      "stopTitle": "ఇన్‌స్టాన్స్‌ను ఆపాలా?",
-      "stopping": "ఆపుతోంది…"
-    },
-    "empty": {
-      "finishingSetup": "సెటప్ పూర్తవుతోంది",
-      "finishingSetupDescription": "మీ ఖాతా ఏర్పాటును పూర్తి చేస్తున్నాము. కాసేపు వేచి ఉండండి. సాధారణంగా దీనికి ఎక్కువ సమయం పట్టదు.",
-      "getStarted": "ప్రారంభించండి",
-      "noInstancesDescription": "కోడింగ్ ఏజెంట్లను నడపడానికి మీ మొదటి ఇన్‌స్టాన్స్‌ను సృష్టించండి."
-    },
-    "instance": {
-      "backToInstances": "ఇన్‌స్టాన్స్‌లకు తిరిగి వెళ్లండి",
-      "couldNotLoad": "ఇన్‌స్టాన్స్‌ను లోడ్ చేయలేకపోయాము.",
-      "notFound": "ఇన్‌స్టాన్స్ కనిపించలేదు",
-      "notFoundDescription": "ఈ ఇన్‌స్టాన్స్‌ను శాశ్వతంగా తొలగించి ఉండవచ్చు లేదా లింక్ ఇక చెల్లకపోవచ్చు."
-    },
-    "list": {
-      "createInstance": "ఇన్‌స్టాన్స్‌ను సృష్టించండి",
-      "organizations": "సంస్థలు",
-      "accessIssue": {
-        "trialExpired": "ట్రయల్ ముగిసింది — ఈ ఇన్‌స్టాన్స్‌ను వాడటం కొనసాగించడానికి చందా తీసుకోండి",
-        "subscriptionCanceled": "చందా అమలులో లేదు — ఈ ఇన్‌స్టాన్స్‌ను వాడటం కొనసాగించడానికి మళ్లీ చందా తీసుకోండి",
-        "subscriptionPastDue": "చెల్లింపులో సమస్య ఉంది — ఈ ఇన్‌స్టాన్స్‌ను వాడటం కొనసాగించడానికి బిల్లింగ్ వివరాలను నవీకరించండి",
-        "quarantined": "ఇన్‌స్టాన్స్‌ను విడిగా నిలిపివేశాము — సిబ్బంది సమీక్ష అవసరం",
-        "multipleCurrentConflict": "ఖాతాను సమీక్షించాలి",
-        "nonCanonicalEarlybird": "పాత ప్లాన్‌ను సమీక్షించాలి"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}}తో చాట్ చేయండి",
-        "ready": "{{name}} సిద్ధంగా ఉంది",
-        "warmedUp": "అంతా సిద్ధంగా ఉంది. మీకు వీలైనప్పుడు పలకరించండి."
-      },
-      "flow": {
-        "genericErrorBody": "ప్రస్తుతం మీ ఇన్‌స్టాన్స్ సెటప్‌ను పూర్తి చేయలేకపోయాము.",
-        "manualReviewBody": "ఇన్‌స్టాన్స్‌ను సృష్టించే ముందు మీ ఖాతా స్థితిని సరిచూడాలి. kilo.aiలో కొనసాగించండి.",
-        "manualReviewTitle": "సెటప్‌కు సిబ్బంది సమీక్ష అవసరం",
-        "openKiloAi": "Kilo.ai తెరవండి",
-        "provisioning": "వనరుల కేటాయింపు",
-        "review": "సమీక్ష",
-        "identityTitle": "మీ బాట్ గుర్తింపు",
-        "couldNotLoad": "ప్రారంభ సెటప్ స్థితిని లోడ్ చేయలేకపోయాము.",
-        "finishingSetup": "సెటప్‌ను పూర్తి చేస్తున్నాము — మీ ఖాతా ఏర్పాటు పూర్తయ్యే వరకు కాసేపు వేచి ఉండండి.",
-        "ready": "సిద్ధం",
-        "settingUp": "సెటప్ చేస్తోంది…"
-      },
-      "unavailableDescription": "ఇన్‌స్టాన్స్‌ను సిద్ధం చేయడానికి అమలులో ఉన్న KiloClaw చందా అవసరం. ఇప్పటికే ఉన్న ఇన్‌స్టాన్స్‌లు, చందాలు యథావిధిగా కొనసాగుతాయి.",
-      "unavailableTitle": "కొత్త KiloClaw ఇన్‌స్టాన్స్‌లు అందుబాటులో లేవు",
-      "identity": {
-        "chooseAvatar": "అవతార్‌ను ఎంచుకోండి",
-        "namePlaceholder": "మీ బాట్ పేరు",
-        "selectAvatar": "{{name}}ను అవతార్‌గా ఎంచుకోండి",
-        "personality": "వ్యక్తిత్వం",
-        "changePersonality": "వ్యక్తిత్వాన్ని మార్చండి",
-        "location": "స్థానం",
-        "locationPlaceholder": "నగరం లేదా ప్రాంతం (ఐచ్ఛికం)",
-        "useCurrentLocation": "ప్రస్తుత స్థానాన్ని ఉపయోగించండి",
-        "locationDeniedTitle": "స్థానాన్ని తెలుసుకోవడానికి అనుమతి లేదు",
-        "locationDeniedMessage": "మీ ప్రస్తుత స్థానాన్ని ఉపయోగించడానికి సెట్టింగ్‌లలో స్థానాన్ని తెలుసుకునే అనుమతిని ఇవ్వండి.",
-        "locationValidationFailed": "స్థానాన్ని ధృవీకరించలేకపోయాము.",
-        "locationResolveFailed": "మీ స్థానాన్ని గుర్తించలేకపోయాము. దాన్ని మీరే సవరించవచ్చు.",
-        "locationGetFailed": "మీ స్థానాన్ని పొందలేకపోయాము. దాన్ని మీరే నమోదు చేయండి.",
-        "nature": {
-          "aiAssistantLabel": "AI సహాయకుడు",
-          "aiAssistantVibe": "సాయపడే, సమర్థత గల, వృత్తిపరమైన తీరుతో ఉండే",
-          "digitalCreatureLabel": "డిజిటల్ జీవి",
-          "digitalCreatureVibe": "వింతగా, జీవం ఉట్టిపడుతూ, కాస్త ఊహకు అందకుండా ఉండే",
-          "virtualCompanionLabel": "వర్చువల్ సహచరుడు",
-          "virtualCompanionVibe": "ఆప్యాయంగా, తోడుగా, నిజమైన శ్రద్ధ చూపుతూ ఉండే",
-          "somethingWeirderLabel": "ఇంకా విచిత్రమైనది…",
-          "somethingWeirderVibe": "మీరే నిర్వచించుకోండి"
-        }
-      },
-      "notifications": {
-        "mockMessage": "పూర్తయింది! మీరు అడిగిన సారాంశాన్ని సిద్ధం చేశాను. మీకు వీలైనప్పుడు చూడండి.",
-        "settingUp": "నోటిఫికేషన్లను సెటప్ చేస్తోంది…",
-        "stayInTheLoop": "తాజా సమాచారం మీకు చేరుతుంది",
-        "getNotified": "{{name}} పని పూర్తి చేసినప్పుడు నోటిఫికేషన్ పొందండి. ఏ సమాధానమూ మీ దృష్టి నుంచి తప్పిపోదు.",
-        "now": "ఇప్పుడు",
-        "skipForNow": "ప్రస్తుతానికి దాటవేయండి",
-        "couldNotEnable": "నోటిఫికేషన్లను ప్రారంభించలేకపోయాము."
-      },
-      "provisioning": {
-        "queryErrorTitle": "సెటప్ స్థితిని తనిఖీ చేయలేకపోయాము",
-        "queryErrorBody": "{{name}} సెటప్ స్థితిని తనిఖీ చేస్తుండగా కనెక్షన్ తెగిపోయింది. సెటప్ ఇంకా కొనసాగుతూ ఉండవచ్చు. మళ్లీ ప్రయత్నించండి లేదా కాసేపటి తర్వాత చూడండి.",
-        "stoppedTitle": "సెటప్ ఆగిపోయింది",
-        "stoppedBody": "సెటప్ సమయంలో {{name}} ఇన్‌స్టాన్స్ అనుకోకుండా ఆగిపోయింది.",
-        "stalledTitle": "సెటప్ ముందుకు సాగడం లేదు",
-        "stalledBody": "{{name}} సెటప్‌ను పూర్తి చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి. సమస్య కొనసాగితే {{supportEmail}}కు ఇమెయిల్ చేయండి.",
-        "timeoutTitle": "అంచనా కంటే ఎక్కువ సమయం తీసుకుంటోంది",
-        "timeoutBody": "{{name}} సెటప్‌కు సాధారణం కంటే ఎక్కువ సమయం పడుతోంది ({{displayMinutes}} నిమిషాలకు పైగా).",
-        "continueInBackground": "నేపథ్యంలో కొనసాగించండి",
-        "settingUp": "{{name}} సెటప్ జరుగుతోంది",
-        "connectingToAgent": "ఏజెంట్‌కు కనెక్ట్ అవుతోంది",
-        "startingSandbox": "శాండ్‌బాక్స్‌ను ప్రారంభిస్తోంది",
-        "backgroundHint": "సాధారణంగా ఒక నిమిషం కంటే తక్కువ పడుతుంది. మీరు దీన్ని మూసివేయవచ్చు — మేము నేపథ్యంలో పని చేస్తూనే ఉంటాము."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "కోడ్ {{code}}",
-      "gatewayProcess": "గేట్‌వే ప్రాసెస్",
-      "lastExit": "చివరి నిష్క్రమణ",
-      "memory": "మెమరీ",
-      "region": "ప్రాంతం",
-      "resources": "వనరులు",
-      "restarts": "పునఃప్రారంభాలు",
-      "state": "స్థితి",
-      "uptime": "పనిచేస్తున్న వ్యవధి",
-      "crashed": "క్రాష్ అయింది",
-      "destroying": "తొలగిస్తోంది",
-      "provisioned": "వనరులు కేటాయించాము",
-      "restarting": "పునఃప్రారంభిస్తోంది",
-      "running": "నడుస్తోంది",
-      "shuttingDown": "మూసివేస్తోంది",
-      "starting": "ప్రారంభమవుతోంది",
-      "stopped": "ఆగింది",
-      "stopping": "ఆపుతోంది",
-      "unknown": "తెలియదు",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "అత్యాధునికం",
-      "frontierDescription": "అత్యుత్తమ పనితీరును అందిస్తుంది. తార్కికంగా ఆలోచించగల అత్యాధునిక మోడళ్లకు అభ్యర్థనలను పంపుతుంది.",
-      "balancedDescription": "తక్కువ ఖర్చుతో వేగం, సామర్థ్యం మధ్య సమతుల్యతను అందిస్తుంది.",
-      "autoModelA11y": "{{label}} ఆటో మోడల్",
-      "currentModel": "ప్రస్తుత మోడల్",
-      "browseAllModels": "లేదా 500+ మోడళ్ల నుండి ఎంచుకోండి",
-      "browseAllModelsA11y": "మొత్తం 500కు పైగా మోడళ్లను చూడండి"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClawను వాడటం కొనసాగించడానికి మీ బ్రౌజర్‌లో kilo.ai/clawకు వెళ్లండి. యాప్‌లో చందా తీసుకోలేరు.",
-      "subscriptionCanceledTitle": "వెబ్‌సైట్‌లో చందా తీసుకోండి",
-      "subscriptionCanceledBody": "KiloClawను వాడటానికి మీ బ్రౌజర్‌లో kilo.ai/clawకు వెళ్లండి. యాప్‌లో చందా తీసుకోలేరు.",
-      "subscriptionCanceledCta": "Kilo.ai/claw తెరవండి",
-      "subscriptionPastDueTitle": "వెబ్‌లో చెల్లింపు వివరాల నవీకరణ",
-      "subscriptionPastDueBody": "మీ తాజా చెల్లింపులో సమస్య వచ్చింది. చెల్లింపు వివరాలను నవీకరించడానికి మీ బ్రౌజర్‌లో kilo.ai/clawకు వెళ్లండి. యాప్‌లో బిల్లింగ్‌ను నిర్వహించలేరు.",
-      "quarantinedTitle": "ఇన్‌స్టాన్స్‌లో సమస్యను పరిష్కరించాలి",
-      "quarantinedBody": "మీ KiloClaw ఇన్‌స్టాన్స్‌ను విడిగా నిలిపివేశాము. ప్రస్తుతం దాన్ని వాడలేరు. దాన్ని పునరుద్ధరించడానికి మా బృందం సహాయం అవసరం.",
-      "multipleCurrentConflictBody": "మీ ఖాతాలో ఒకటి కంటే ఎక్కువ చందాలు అమలులో ఉన్నాయి. మీకు రెండుసార్లు బిల్లు రాకుండా సేవలను తాత్కాలికంగా నిలిపివేశాము.",
-      "multipleCurrentConflictCta": "Kilo.aiలో కొనసాగించండి",
-      "nonCanonicalEarlybirdTitle": "పాత ప్లాన్‌ను గుర్తించాము",
-      "nonCanonicalEarlybirdBody": "మీ ముందస్తు వినియోగ ప్లాన్‌ను మొబైల్‌లో వాడే ముందు సిబ్బంది సమీక్షించాలి.",
-      "iosTitle": "IOSలో KiloClaw అందుబాటులో లేదు",
-      "iosBody": "ఈ ఖాతా KiloClaw వినియోగ అనుమతులను iOS యాప్ వెలుపల నిర్వహిస్తాము.",
-      "iosContact": "ప్రశ్నలు ఉన్నాయా? {{supportEmail}}కు ఇమెయిల్ చేయండి.",
-      "quarantinedCta": "మా బృందానికి ఇమెయిల్ పంపండి",
-      "nonCanonicalEarlybirdCta": "మీ ప్లాన్‌ను Kilo.aiలో సమీక్షించండి"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}}ను సరిచూడాలి: {{label}}",
-      "openUnread_one": "{{name}}ను తెరవండి, {{displayCount}} చదవని సందేశం",
-      "openUnread": "{{name}}ను తెరవండి, చదవని సందేశాలు {{displayCount}}",
-      "openUnread_other": "{{name}}ను తెరవండి, చదవని సందేశాలు {{displayCount}}",
-      "openSettings": "{{name}} సెట్టింగ్‌లను తెరవండి",
-      "fixOnKiloAi": "Kilo.aiలో పరిష్కరించండి: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "పరికర అభ్యర్థనలను ఆమోదించండి",
-      "execPolicyDescription": "భద్రతా సెట్టింగ్‌లు",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "AI మోడల్ ఎంపిక",
-      "secretsDescription": "ఎన్‌క్రిప్ట్ చేసిన ప్రామాణీకరణ వివరాలు",
-      "versionPinDescription": "నిర్దిష్ట వెర్షన్‌కు పిన్ చేయండి"
-    },
-    "avatar": {
-      "arcade": "ఆర్కేడ్",
-      "brain": "మెదడు",
-      "creature": "జీవి",
-      "crystal": "స్ఫటికం",
-      "custom": "కస్టమ్ అవతార్",
-      "dragon": "డ్రాగన్",
-      "explorer": "అన్వేషకుడు",
-      "flame": "మంట",
-      "lightning": "మెరుపు",
-      "magicWand": "మంత్రదండం",
-      "moon": "చంద్రుడు",
-      "operator": "ఆపరేటర్",
-      "orbit": "కక్ష్య",
-      "oracle": "భవిష్యవాణి చెప్పేవారు",
-      "rainbow": "ఇంద్రధనుస్సు",
-      "robot": "రోబోట్",
-      "satellite": "ఉపగ్రహం",
-      "sparkles": "మెరుపులు",
-      "strongArm": "బలమైన చేయి",
-      "talisman": "తాయెత్తు"
-    },
-    "remoteSpawnFilesNotSupported": "ఈ ఇన్‌స్టాన్స్ ఫైళ్లను స్వీకరించలేదు.",
-    "instanceSwitcherTitle": "KiloClaw ఇన్‌స్టాన్స్"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}}ను ఎడమకు తరలించండి",
       "moveRight": "{{filename}}ను కుడికి తరలించండి"
     },
-    "attachmentPasteHint": {
-      "accessibility": "క్లిప్‌బోర్డ్ నుండి చిత్రాన్ని అతికించండి",
-      "label": "చిత్రం ఉంది, అతికించడానికి నొక్కండి"
-    },
     "attachmentPicker": {
       "camera": "కెమెరా",
       "photoLibrary": "ఫోటో లైబ్రరీ",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "ఈ పరికరం నుండి సైన్ అవుట్ చేయాలా?",
     "signOutThisSessionTitle": "ఈ సెషన్ నుండి సైన్ అవుట్ చేయాలా?",
     "signOutThisSessionMessage": "{{device}} నుండి సైన్ అవుట్ చేస్తాము. అయినా మరో గంట వరకు దానికి API యాక్సెస్ ఉండవచ్చు.",
-    "webBrowser": "వెబ్ బ్రౌజర్"
+    "webBrowser": "వెబ్ బ్రౌజర్",
+    "unknownDevice": "తెలియని పరికరం"
   },
   "forceUpdate": {
     "couldNotOpenStore": "యాప్ స్టోర్‌ను తెరవలేకపోయాము.",

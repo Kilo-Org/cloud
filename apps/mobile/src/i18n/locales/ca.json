@@ -101,12 +101,9 @@
     "scheduled": "Programada",
     "keepEditing": "Continua editant",
     "keepRunning": "Mantén l'execució en curs",
-    "kiloclaw": "KiloClaw",
     "newSession": "Nova sessió",
-    "noKiloclawInstances": "Cap instància de KiloClaw",
     "noModelsAvailable": "Cap model disponible",
     "notFound": "No s'ha trobat l'element.",
-    "online": "En línia",
     "open": "Obre {{name}}",
     "openPullRequest": "PR oberta",
     "pending": "Pendent",
@@ -257,7 +254,8 @@
     "renamePasskey": "Canvia el nom de la clau d'accés",
     "removePasskey": "Elimina la clau d'accés",
     "removePasskeyTitle": "Eliminar la clau d'accés?",
-    "removePasskeyMessage": "Ja no podràs iniciar la sessió amb aquesta clau d'accés."
+    "removePasskeyMessage": "Ja no podràs iniciar la sessió amb aquesta clau d'accés.",
+    "changelog": "Novetats"
   },
   "preferences": {
     "general": "General",
@@ -848,23 +846,18 @@
     "previewGenericDescription": "Les notificacions mostren que ha passat alguna cosa. Obre Kilo per llegir-ho.",
     "channel": {
       "agentProgress": "Progrés de l'agent",
-      "chat": "Missatges de xat",
-      "kiloclaw": "Activitat de KiloClaw",
       "balance": "Alertes de saldo",
       "security": "Problemes de seguretat",
       "spend": "Alertes de despesa",
       "followedSessions": "Sessions seguides"
     },
     "category": {
-      "chatMessagesSubtitle": "respostes a les teves converses",
       "agentAttentionTitle": "L'agent et necessita",
       "agentAttentionSubtitle": "preguntes, permisos i sol·licituds d'informació",
       "agentUpdatesTitle": "Actualitzacions de l'agent",
       "agentUpdatesSubtitle": "missatges de l'agent durant la tasca",
       "sessionStatusTitle": "Estat de la sessió",
       "sessionStatusSubtitle": "finalitzada / fallida / a punt per controlar",
-      "kiloclawActivitySubtitle": "instància a punt/fallida, accions programades",
-      "kiloclawActivityUnavailable": "Inicia una instància de KiloClaw per rebre activitat de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baix de l'organització",
       "balanceAlertsUnavailable": "Uneix-te a una organització per rebre avisos de saldo.",
       "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA",
@@ -884,72 +877,19 @@
   },
   "tabs": {
     "home": "Inici",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, pestanya, {{position}} de {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Canvi d'instància",
-      "couldNotLoadInstances": "No s'han pogut carregar les instàncies.",
-      "noInstancesDescription": "Configura una instància per començar a xatejar.",
-      "setUpKiloclaw": "Configura KiloClaw",
-      "currentInstance": "{{title}}, actual"
-    },
     "conversation": {
-      "failedToLoad": "No s'ha pogut carregar la conversa.",
-      "notFound": "No s'ha trobat la conversa.",
       "untitled": "Sense títol",
-      "leaveTitle": "Vols sortir de la conversa?",
-      "leaveMessage": "Això la treu de la teva llista.",
-      "openHint": "Obre la conversa. Mantén-la premuda per veure les opcions de canviar-ne el nom i sortir-ne.",
-      "unread": "Sense llegir",
-      "optionsFor": "Opcions de la conversa {{title}}",
-      "options": "Opcions de la conversa",
-      "renameTitle": "Canvi de nom de la conversa",
-      "renamePlaceholder": "Nom nou",
-      "couldNotReachBot": "No s'ha pogut contactar amb el bot. Torna-ho a provar.",
-      "messageDeliveryFailed": "No s'ha pogut lliurar el missatge al bot.",
-      "couldNotSignIn": "No s'ha pogut iniciar la sessió al xat.",
-      "couldNotRefreshMessages": "No s'han pogut actualitzar els missatges.",
-      "couldNotLoadHistory": "No s'ha pogut carregar l'historial de la conversa.",
-      "leave": "Surt",
-      "untitledConversation": "Conversa sense títol",
-      "createFailed": "No s'ha pogut crear la conversa.",
-      "leaveFailed": "No s'ha pogut sortir de la conversa."
-    },
-    "reactions": {
-      "common": "Habituals",
-      "reactWith": "Reacciona amb {{reaction}}",
-      "accessibility": "Reacció {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "En resposta a",
-      "cancelReply": "Cancel·la la resposta",
-      "openInstance": "Obre la instància",
-      "attachFile": "Adjunta un fitxer",
-      "cancelEdit": "Cancel·la l'edició"
+      "renamePlaceholder": "Nom nou"
     },
     "conversationList": {
-      "couldNotLoad": "No s'han pogut carregar les converses.",
-      "emptyTitle": "Encara no hi ha converses",
-      "emptyDescription": "Crea una conversa per començar a xatejar amb la teva instància de KiloClaw.",
-      "create": "Crea una conversa",
-      "newConversation": "Conversa nova",
-      "openInstanceSettings": "Obre la configuració de la instància",
       "today": "Avui",
       "yesterday": "Ahir",
-      "thisWeek": "Aquesta setmana",
       "older": "Més antigues"
     },
     "attachment": {
-      "open": "Obre {{filename}}",
-      "openFailed": "No s'ha pogut obrir l'adjunt. Comprova la connexió i torna-ho a provar.",
-      "attachFailed": "No s'ha pogut adjuntar el fitxer.",
-      "limit": "Pots adjuntar fins a {{displayCount}} fitxers.",
-      "sizeRejection": "{{filename}} supera la mida màxima permesa per als adjunts, que és de {{limit}}.",
-      "unreadable": "No s'ha pogut llegir {{filename}}.",
-      "pastedImage": "la imatge enganxada",
-      "defaultName": "Fitxer adjunt",
       "classificationDenied": "No es poden adjuntar fitxers executables.",
       "classificationEmpty": "El fitxer és buit.",
       "classificationTooLarge": "Els fitxers no poden superar els 20 MB.",
@@ -959,429 +899,17 @@
       "networkError": "S'ha produït un error de xarxa.",
       "uploadFailed": "No s'ha pogut penjar l'adjunt.",
       "nothingToPaste": "No hi ha res per enganxar.",
-      "metadataStripFailed": "No s'han pogut eliminar les metadades de la foto.",
-      "limit_one": "Pots adjuntar fins a {{displayCount}} fitxer.",
-      "limit_other": "Pots adjuntar fins a {{displayCount}} fitxers.",
-      "limit_many": "Pots adjuntar fins a {{displayCount}} fitxers."
+      "metadataStripFailed": "No s'han pogut eliminar les metadades de la foto."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Torna a penjar {{filename}}",
-      "remove": "Elimina {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[missatge eliminat]",
-      "yourMessage": "El teu missatge",
-      "messageFrom": "Missatge de {{author}}",
-      "moreActions": "Més accions",
-      "notDelivered": "No lliurat",
-      "edited": "(editat)",
-      "image": "Imatge"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Copiat",
-      "copyFailed": "No s'ha pogut copiar.",
-      "title": "Accions del missatge",
-      "deleteTitle": "Vols eliminar el missatge?",
-      "deleteMessage": "Això eliminarà el missatge de la conversa.",
-      "deleteFailed": "No s'ha pogut eliminar el missatge.",
-      "removeReactionFailed": "No s'ha pogut eliminar la reacció.",
-      "addReactionFailed": "No s'ha pogut afegir la reacció.",
-      "retrySend": "Torna a enviar",
-      "moreReactions": "Més reaccions",
-      "edit": "Edita",
-      "sendFailed": "No s'ha pogut enviar el missatge.",
-      "retrySendFailed": "No s'ha pogut tornar a enviar el missatge.",
-      "editFailed": "No s'ha pogut editar el missatge.",
-      "executeFailed": "No s'ha pogut executar l'acció."
+      "edit": "Edita"
     },
     "attachmentPicker": {
-      "takePhoto": "Fes una foto",
-      "photoLibrary": "Fototeca",
-      "files": "Fitxers",
       "cameraAccessMessage": "Permet l'accés a la càmera a la configuració per fer una foto."
-    },
-    "typingIndicator": {
-      "someone": "Algú",
-      "typing_one": "{{name}} està escrivint…",
-      "typing": "{{names}} estan escrivint...",
-      "typing_other": "{{names}} estan escrivint...",
-      "typing_many": "{{names}} estan escrivint…"
-    },
-    "botStatus": {
-      "offline": "Desconnectat",
-      "loadingUser": "S'està carregant l'usuari…",
-      "waitingForStatus": "S'està esperant l'estat del bot…",
-      "offlineMessage": "El bot està desconnectat. L'intercanvi de missatges es reprendrà quan es torni a connectar."
-    },
-    "errors": {
-      "notAllowed": "Aquesta acció no està permesa.",
-      "messageTooLong": "El missatge és massa llarg. Ha de tenir menys de {{limit}} caràcters.",
-      "titleTooLong": "El títol és massa llarg. Ha de tenir menys de {{limit}} caràcters.",
-      "messageEmpty": "El missatge no pot estar buit."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "No s'han pogut carregar les instàncies de KiloClaw.",
-    "billing": {
-      "title": "Facturació",
-      "continueMonthToMonth": "Continua amb el pla mensual",
-      "plan": "Pla",
-      "finalTermEnds": "Fi de l'últim període",
-      "afterFinalTerm": "Després de l'últim període",
-      "ends": "Acaba",
-      "expires": "Caduca",
-      "noActivePlan": "Cap pla actiu",
-      "noActivePlanDescription": "No tens cap subscripció activa de KiloClaw.",
-      "managedByAdmin": "La facturació la gestiona l'administrador de la teva organització.",
-      "couldNotLoad": "No s'ha pogut carregar la informació de facturació.",
-      "manageOnWeb": "Gestiona la facturació al web",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "L'últim període del teu pla Commit acaba el {{date}}. Continua amb el pla Standard per {{price}}; si no, l'allotjament finalitzarà.",
-      "freeTrial": "Prova gratuïta",
-      "hostingEnds": "Fi de l'allotjament",
-      "renews": "Es renova",
-      "standardMonthToMonth": "Pla Standard mensual",
-      "standardStartsOn": "El pla Standard comença el {{date}} per {{price}}.",
-      "yourStandardMonthlyPrice": "el preu mensual del teu pla Standard",
-      "perMonth": "/mes",
-      "earlybirdAccessUntil": "Tens accés amb Earlybird fins al {{date}}.",
-      "earlybirdEnding": "L'accés amb Earlybird s'acaba d'aquí a {{remaining}}.",
-      "paymentPastDue": "Tens un pagament endarrerit. Actualitza el mètode de pagament.",
-      "subscriptionCancels": "La subscripció es cancel·larà el {{date}}.",
-      "trialDaysRemaining": "Temps restant de prova: {{remaining}}.",
-      "trialEndingSoon": "La prova s'acaba aviat: {{remaining}}.",
-      "lessThanOneDay": "Menys d'1 dia",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Canvi"
-    },
-    "changelog": {
-      "title": "Novetats",
-      "couldNotLoad": "No s'ha pogut carregar el registre de canvis.",
-      "noUpdates": "Encara no hi ha actualitzacions",
-      "noUpdatesDescription": "Les entrades del registre de canvis apareixeran aquí.",
-      "recentUpdates": "Actualitzacions recents",
-      "manageVersion": "Gestiona la versió",
-      "redeployRequired": "Cal tornar a desplegar",
-      "redeploySuggested": "Redesplegament recomanat",
-      "upgradeRequired": "Cal actualitzar"
-    },
-    "dashboard": {
-      "title": "Tauler",
-      "couldNotLoad": "No s'ha pogut carregar el tauler.",
-      "renameInstance": "Reanomena la instància",
-      "renamePlaceholder": "Nom nou (màxim 50 caràcters)",
-      "someDetailsFailed": "No s'han pogut carregar algunes dades en temps real.",
-      "destroy": "Destrueix",
-      "destroyMessage": "Aquesta acció destruirà definitivament la teva instància de KiloClaw i totes les dades que conté. No es pot desfer.",
-      "destroyTitle": "Destrucció de la instància",
-      "instance": "Instància",
-      "couldNotCheckStatus": "No s'ha pogut comprovar l'estat del servei.",
-      "dangerZone": "ZONA DE PERILL",
-      "destroying": "S'està destruint…",
-      "serviceDegraded": "El servei té incidències. Toca per veure'n l'estat",
-      "up": "ACTIU"
-    },
-    "channels": {
-      "title": "Canals",
-      "couldNotLoad": "No s'han pogut carregar els canals.",
-      "noChannels": "Cap canal disponible",
-      "noChannelsDescription": "Les integracions de canals apareixeran aquí.",
-      "connected": "{{label}} connectat",
-      "disconnectMessage": "Vols eliminar {{label}}? Aquest canal es desconnectarà.",
-      "disconnectTitle": "Desconnexió del canal"
-    },
-    "devicePairing": {
-      "title": "Aparellament de dispositius",
-      "refreshRequests": "Actualitza les sol·licituds d'aparellament",
-      "couldNotLoad": "No s'han pogut carregar les sol·licituds d'aparellament.",
-      "noPending": "Cap sol·licitud pendent",
-      "noPendingDescription": "Les sol·licituds d'aparellament de canals i dispositius apareixeran aquí.",
-      "channelRequests": "Sol·licituds de canals",
-      "deviceRequests": "Sol·licituds de dispositius",
-      "approveDeviceMessage": "Vols permetre que {{platform}} es connecti a la teva instància?",
-      "approveDeviceTitle": "Autorització del dispositiu",
-      "approveMessage": "Vols permetre que {{label}} (codi: {{code}}) es connecti a la teva instància?",
-      "approveTitle": "Aprovació de l'aparellament",
-      "unknownDevice": "Dispositiu desconegut"
-    },
-    "execPolicy": {
-      "title": "Política d'execució",
-      "couldNotLoad": "No s'ha pogut carregar la política d'execució.",
-      "alwaysAsk": "Pregunta sempre",
-      "alwaysAskDescription": "Confirma cada ordre abans d'executar-la. És l'opció més segura.",
-      "neverAsk": "No preguntis mai",
-      "neverAskDescription": "Executa les ordres sense confirmació. És més ràpid, però menys segur."
-    },
-    "google": {
-      "title": "Compte de Google",
-      "couldNotLoad": "No s'ha pogut carregar l'estat del compte de Google.",
-      "disconnected": "S'ha desconnectat el compte de Google. Torna a desplegar la instància per aplicar el canvi.",
-      "setupCommand": "Ordre de configuració",
-      "setupCommandHelp": "Per connectar el teu compte de Google, executa aquesta ordre al terminal del teu ordinador. Cal tenir-hi Docker instal·lat.",
-      "failedToLoadCommand": "No s'ha pogut carregar l'ordre de configuració.",
-      "gmailNotifications": "Notificacions de Gmail",
-      "disconnect": "Desconnecta el compte de Google",
-      "copied": "Copiat",
-      "copyCommand": "Copia l'ordre",
-      "disconnectConfirm": "Desconnecta",
-      "disconnectMessage": "Vols eliminar el teu compte de Google d'aquesta instància? Es desactivaran les notificacions de Gmail. Després de desconnectar-lo, torna a desplegar la instància per aplicar els canvis.",
-      "disconnectTitle": "Desconnexió de Google"
-    },
-    "modelList": {
-      "noMatches": "Cap model coincideix amb la teva cerca",
-      "noModelsDescription": "Els models apareixeran aquí quan estiguin disponibles.",
-      "noResultsFor": "No hi ha cap resultat per a «{{query}}»."
-    },
-    "secrets": {
-      "title": "Dades secretes",
-      "couldNotLoad": "No s'han pogut carregar els secrets.",
-      "noSecrets": "Cap secret disponible",
-      "noSecretsDescription": "Les integracions de secrets apareixeran aquí.",
-      "removeMessage": "Vols eliminar {{label}}? Aquesta eina perdrà l'accés a les seves credencials.",
-      "removeTitle": "Eliminació del secret",
-      "saved": "{{label}} desat",
-      "hide": "Amaga {{label}}",
-      "show": "Mostra {{label}}",
-      "allFieldsRequired": "Tots els camps són obligatoris per connectar {{label}}.",
-      "setupGuideFallback": "guia de configuració",
-      "setupGuideA11y": "Guia de configuració de {{label}}",
-      "setupGuide": "Guia de configuració",
-      "saving": "S'està desant…",
-      "removing": "S'està eliminant…",
-      "updateToken": "Actualitza el testimoni"
-    },
-    "versionPin": {
-      "title": "Fixació de la versió",
-      "couldNotLoad": "No s'ha pogut carregar la informació de la versió.",
-      "couldNotLoadMore": "No s'han pogut carregar més versions.",
-      "loadMore": "Carrega més versions",
-      "showingLatest": "Es mostren les 100 versions més recents.",
-      "availableVersions": "Versions disponibles",
-      "noVersions": "Cap versió disponible",
-      "noVersionsDescription": "Les versions disponibles d'OpenClaw apareixeran aquí.",
-      "unpin": "Deixa de fixar",
-      "unpinMessage": "Vols tornar a la versió més recent disponible?",
-      "unpinTitle": "Vols deixar de fixar la versió?",
-      "confirmPin": "Confirma la fixació",
-      "followingLatest": "Sempre la més recent",
-      "latest": "més recent",
-      "pin": "Fixa",
-      "pinnedByAdmin": "L'administrador ha fixat la versió. Contacta-hi per canviar-la.",
-      "pinnedTo": "Versió fixada: {{version}}",
-      "reasonOptional": "Motiu (opcional)",
-      "reasonPlaceholder": "Motiu per fixar aquesta versió",
-      "replaceAdminPin": "Substitueix la fixació de l'administrador",
-      "replacesAdminPin": "Això substitueix la fixació establerta per l'administrador (actualment {{label}})."
-    },
-    "redeploy": "Torna a desplegar",
-    "redeployMessage": "Segur que vols tornar a desplegar aquesta instància?",
-    "redeployTitle": "Redesplegament de la instància",
-    "controls": {
-      "redeploying": "S'està tornant a desplegar…",
-      "restart": "Reinicia",
-      "restartOpenClawMessage": "Segur que vols reiniciar el procés d'OpenClaw?",
-      "restartOpenClawTitle": "Reinici d'OpenClaw",
-      "restarting": "S'està reiniciant…",
-      "start": "Inicia",
-      "startMessage": "Segur que vols iniciar aquesta instància?",
-      "startTitle": "Inici de la instància",
-      "stop": "Atura",
-      "stopMessage": "Segur que vols aturar aquesta instància?",
-      "stopTitle": "Aturada de la instància",
-      "stopping": "S'està aturant…"
-    },
-    "empty": {
-      "finishingSetup": "S'està acabant la configuració",
-      "finishingSetupDescription": "Espera un moment mentre acabem de preparar el teu compte. Normalment es fa de seguida.",
-      "getStarted": "Comença",
-      "noInstancesDescription": "Crea la teva primera instància per començar a executar agents de programació."
-    },
-    "instance": {
-      "backToInstances": "Torna a les instàncies",
-      "couldNotLoad": "No s'ha pogut carregar la instància.",
-      "notFound": "No s'ha trobat la instància",
-      "notFoundDescription": "Pot ser que aquesta instància s'hagi destruït o que l'enllaç ja no sigui vàlid."
-    },
-    "list": {
-      "createInstance": "Crea una instància",
-      "organizations": "Organitzacions",
-      "accessIssue": {
-        "trialExpired": "La prova s'ha acabat. Subscriu-te per continuar utilitzant aquesta instància",
-        "subscriptionCanceled": "La subscripció està inactiva. Torna a subscriure't per continuar utilitzant aquesta instància",
-        "subscriptionPastDue": "Hi ha un problema amb el pagament. Actualitza les dades de facturació per continuar utilitzant aquesta instància",
-        "quarantined": "Instància en quarantena, requereix revisió manual",
-        "multipleCurrentConflict": "Compte pendent de revisió",
-        "nonCanonicalEarlybird": "El pla antic requereix revisió"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Xateja amb {{name}}",
-        "ready": "{{name}} ja està a punt",
-        "warmedUp": "Tot a punt. Saluda quan vulguis."
-      },
-      "flow": {
-        "genericErrorBody": "No hem pogut acabar de configurar la teva instància ara mateix.",
-        "manualReviewBody": "Cal revisar l'estat del teu compte abans de poder crear una instància. Continua a kilo.ai.",
-        "manualReviewTitle": "La configuració requereix revisió manual",
-        "openKiloAi": "Obre kilo.ai",
-        "provisioning": "Aprovisionament",
-        "review": "Revisió",
-        "identityTitle": "Identitat del bot",
-        "couldNotLoad": "No s'ha pogut carregar l'estat de la configuració inicial.",
-        "finishingSetup": "Estem acabant la configuració. Espera un moment mentre preparem el teu compte.",
-        "ready": "A punt",
-        "settingUp": "S'està configurant…"
-      },
-      "unavailableDescription": "Cal una subscripció vigent de KiloClaw per aprovisionar una instància. Les instàncies i les subscripcions existents continuen funcionant amb normalitat.",
-      "unavailableTitle": "No es poden crear instàncies de KiloClaw",
-      "identity": {
-        "chooseAvatar": "Tria un avatar",
-        "namePlaceholder": "Nom del bot",
-        "selectAvatar": "Selecciona {{name}} com a avatar",
-        "personality": "Personalitat",
-        "changePersonality": "Canvia la personalitat",
-        "location": "Ubicació",
-        "locationPlaceholder": "Ciutat o regió (opcional)",
-        "useCurrentLocation": "Utilitza la ubicació actual",
-        "locationDeniedTitle": "Accés a la ubicació denegat",
-        "locationDeniedMessage": "Activa l'accés a la ubicació a la configuració del dispositiu per utilitzar la teva ubicació actual.",
-        "locationValidationFailed": "No s'ha pogut validar la ubicació.",
-        "locationResolveFailed": "No s'ha pogut determinar la teva ubicació. Pots editar-la manualment.",
-        "locationGetFailed": "No s'ha pogut obtenir la teva ubicació. Introdueix-la manualment.",
-        "nature": {
-          "aiAssistantLabel": "Assistent d'IA",
-          "aiAssistantVibe": "Útil, competent, professional",
-          "digitalCreatureLabel": "Criatura digital",
-          "digitalCreatureVibe": "Excèntrica, viva, una mica imprevisible",
-          "virtualCompanionLabel": "Company virtual",
-          "virtualCompanionVibe": "Afectuós, atent, s'interessa de debò per tu",
-          "somethingWeirderLabel": "Una cosa més estranya…",
-          "somethingWeirderVibe": "Defineix-ho a la teva manera"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Ja està! He preparat el resum que m'has demanat. El tens a punt per quan vulguis.",
-        "settingUp": "S'estan configurant les notificacions…",
-        "stayInTheLoop": "Al dia de tot",
-        "getNotified": "Rep notificacions quan {{name}} acabi una tasca per no perdre't mai cap resposta.",
-        "now": "ara",
-        "skipForNow": "Omet-ho de moment",
-        "couldNotEnable": "No s'han pogut activar les notificacions."
-      },
-      "provisioning": {
-        "queryErrorTitle": "No s'ha pogut comprovar el progrés de la configuració",
-        "queryErrorBody": "Hem perdut la connexió mentre comprovàvem el progrés de la configuració de {{name}}. Pot ser que encara estigui en curs. Torna-ho a provar o consulta-ho d'aquí a una estona.",
-        "stoppedTitle": "Configuració aturada",
-        "stoppedBody": "La instància de {{name}} s'ha aturat inesperadament durant la configuració.",
-        "stalledTitle": "Alguna cosa s'ha encallat",
-        "stalledBody": "No hem pogut acabar de configurar {{name}}. Torna-ho a provar o escriu a {{supportEmail}} si el problema persisteix.",
-        "timeoutTitle": "Tarda més del previst",
-        "timeoutBody": "La configuració de {{name}} tarda més del normal (més de {{displayMinutes}} minuts).",
-        "continueInBackground": "Continua en segon pla",
-        "settingUp": "Configuració de {{name}}",
-        "connectingToAgent": "S'està connectant amb l'agent",
-        "startingSandbox": "S'està iniciant l'entorn aïllat",
-        "backgroundHint": "Normalment triga menys d'un minut. Pots tancar aquesta pantalla. Continuarem treballant en segon pla."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Codi {{code}}",
-      "gatewayProcess": "PROCÉS DE LA PASSAREL·LA",
-      "lastExit": "Última finalització",
-      "memory": "Memòria",
-      "region": "Regió",
-      "resources": "RECURSOS",
-      "restarts": "Reinicis",
-      "state": "Estat",
-      "uptime": "Temps d'activitat",
-      "crashed": "HA FALLAT",
-      "destroying": "DESTRUINT",
-      "provisioned": "APROVISIONAT",
-      "restarting": "REINICIANT",
-      "running": "EN EXECUCIÓ",
-      "shuttingDown": "APAGANT",
-      "starting": "S'ESTÀ INICIANT",
-      "stopped": "ATURAT",
-      "stopping": "ATURANT",
-      "unknown": "DESCONEGUT",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Avantguarda",
-      "frontierDescription": "Rendiment màxim. Dirigeix les peticions a models d'avantguarda amb raonament.",
-      "balancedDescription": "Equilibri intel·ligent entre velocitat i capacitat a un cost més baix.",
-      "autoModelA11y": "model automàtic {{label}}",
-      "currentModel": "Model actual",
-      "browseAllModels": "o tria entre més de 500 models",
-      "browseAllModelsA11y": "Explora els més de 500 models"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Per continuar utilitzant KiloClaw, vés a kilo.ai/claw des del navegador. No pots subscriure't des de l'aplicació.",
-      "subscriptionCanceledTitle": "Subscriu-te des del web",
-      "subscriptionCanceledBody": "Per utilitzar KiloClaw, vés a kilo.ai/claw des del navegador. No pots subscriure't des de l'aplicació.",
-      "subscriptionCanceledCta": "Obre kilo.ai/claw",
-      "subscriptionPastDueTitle": "Actualització del pagament al web",
-      "subscriptionPastDueBody": "Hem tingut problemes amb el teu últim pagament. Vés a kilo.ai/claw des del navegador per actualitzar les dades de pagament. No pots gestionar la facturació des de l'aplicació.",
-      "quarantinedTitle": "Cal reparar la instància",
-      "quarantinedBody": "La teva instància de KiloClaw està en quarantena i no es pot utilitzar ara mateix. El nostre equip ha d'ajudar a restaurar-la.",
-      "multipleCurrentConflictBody": "Hem trobat més d'una subscripció activa al teu compte. Hem aturat el procés per evitar cobrar-te dues vegades.",
-      "multipleCurrentConflictCta": "Continua a kilo.ai",
-      "nonCanonicalEarlybirdTitle": "S'ha detectat un pla antic",
-      "nonCanonicalEarlybirdBody": "El teu pla d'accés anticipat requereix una revisió manual abans de poder-se utilitzar al mòbil.",
-      "iosTitle": "KiloClaw no està disponible a iOS",
-      "iosBody": "L'accés d'aquest compte a KiloClaw es gestiona fora de l'aplicació per a iOS.",
-      "iosContact": "Tens preguntes? Contacta amb {{supportEmail}}.",
-      "quarantinedCta": "Escriu al nostre equip",
-      "nonCanonicalEarlybirdCta": "Revisa el teu pla a kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} requereix atenció: {{label}}",
-      "openUnread_one": "Obre {{name}}, {{displayCount}} missatge no llegit",
-      "openUnread": "Obre {{name}}, {{displayCount}} missatges no llegits",
-      "openUnread_other": "Obre {{name}}, {{displayCount}} missatges no llegits",
-      "openSettings": "Obre la configuració de {{name}}",
-      "fixOnKiloAi": "Resol-ho a kilo.ai: {{label}}",
-      "openUnread_many": "Obre {{name}}, {{displayCount}} missatges no llegits"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Aprova les sol·licituds de dispositius",
-      "execPolicyDescription": "Configuració de seguretat",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Selecció del model d'IA",
-      "secretsDescription": "Credencials xifrades",
-      "versionPinDescription": "Fixa una versió específica"
-    },
-    "avatar": {
-      "arcade": "Màquina recreativa",
-      "brain": "Cervell",
-      "creature": "Criatura",
-      "crystal": "Cristall",
-      "custom": "Avatar personalitzat",
-      "dragon": "Drac",
-      "explorer": "Explorador",
-      "flame": "Flama",
-      "lightning": "Llamp",
-      "magicWand": "Vareta màgica",
-      "moon": "Lluna",
-      "operator": "Operador",
-      "orbit": "Òrbita",
-      "oracle": "Endeví",
-      "rainbow": "Arc de Sant Martí",
-      "robot": "Autòmat",
-      "satellite": "Satèl·lit",
-      "sparkles": "Espurnes",
-      "strongArm": "Braç fort",
-      "talisman": "Talismà"
-    },
-    "remoteSpawnFilesNotSupported": "Aquesta instància no pot rebre fitxers.",
-    "instanceSwitcherTitle": "Instància de KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2575,10 +2103,6 @@
       "moveLeft": "Mou {{filename}} a l'esquerra",
       "moveRight": "Mou {{filename}} a la dreta"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Enganxa la imatge del portapapers",
-      "label": "Imatge detectada, toca per enganxar-la"
-    },
     "attachmentPicker": {
       "camera": "Càmera",
       "photoLibrary": "Fototeca",
@@ -2780,7 +2304,8 @@
     "sessionSignedOut": "Sessió tancada.",
     "signOutThisDeviceTitle": "Vols tancar la sessió d'aquest dispositiu?",
     "signOutThisSessionTitle": "Vols tancar aquesta sessió?",
-    "signOutThisSessionMessage": "Es tancarà la sessió de {{device}}. Pot mantenir l'accés a l'API fins a una hora."
+    "signOutThisSessionMessage": "Es tancarà la sessió de {{device}}. Pot mantenir l'accés a l'API fins a una hora.",
+    "unknownDevice": "Dispositiu desconegut"
   },
   "forceUpdate": {
     "couldNotOpenStore": "No s'ha pogut obrir la botiga d'aplicacions.",

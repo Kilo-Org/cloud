@@ -4,8 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
-import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
-import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
+import { EventServiceProvider } from '@/components/event-service-provider';
 import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { TourAutoOpen } from '@/components/tour/tour-auto-open';
@@ -85,20 +84,13 @@ function ForegroundReconciliationMount() {
 }
 
 /**
- * Refreshes app-wide freshness on foreground regain: the signed-in user,
- * their organizations, and kilo-chat conversations. The root `(app)` layout
+ * Refreshes app-wide freshness on foreground regain: the signed-in user and
+ * their organizations. The root `(app)` layout
  * is always focused, so the hook's focus gate never blocks this mount.
  */
 function AppWideFreshnessMount() {
   const trpc = useTRPC();
-  useRouteForegroundRefresh([
-    trpc.user.getMe.queryKey(),
-    trpc.organizations.list.queryKey(),
-    // Kilo-chat keys are FLAT (['kilo-chat', 'conversations', …]), so the
-    // partial key is the flat ['kilo-chat']; the nested tRPC form
-    // [['kilo-chat']] does not prefix-match flat keys.
-    ['kilo-chat'],
-  ]);
+  useRouteForegroundRefresh([trpc.user.getMe.queryKey(), trpc.organizations.list.queryKey()]);
   return null;
 }
 
@@ -128,94 +120,79 @@ export default function AppLayout() {
       <AppWideFreshnessMount />
       <SharePayloadNavigator />
       <TourAutoOpen />
-      <KiloChatProvider>
-        <KiloChatPresenceMount>
-          <Stack
-            screenLayout={appUnlockScreenLayout}
-            screenOptions={{
-              contentStyle: { backgroundColor: colors.background },
+      <EventServiceProvider>
+        <Stack
+          screenLayout={appUnlockScreenLayout}
+          screenOptions={{
+            contentStyle: { backgroundColor: colors.background },
+            headerShown: false,
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.foreground,
+          }}
+        >
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="pr-review/index" options={{ headerShown: false }} />
+          <Stack.Screen name="pr-review/[owner]/[repo]/[number]" options={{ headerShown: false }} />
+          <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
+          <Stack.Screen name="agent-chat/[session-id]" />
+          <Stack.Screen name="session-changes/[session-id]" options={{ headerShown: false }} />
+          <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />
+          <Stack.Screen name="agent-chat/repo-picker" options={searchSheetOptions} />
+          <Stack.Screen name="agent-chat/branch-picker" options={sheetOptions} />
+          <Stack.Screen
+            name="agent-chat/mode-picker"
+            options={{ ...sheetOptions, sheetAllowedDetents: [0.5] }}
+          />
+          <Stack.Screen name="agent-chat/instance-picker" options={sheetOptions} />
+          <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
+          <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
+          <Stack.Screen name="todos/[list-id]" />
+          <Stack.Screen name="todos/item/[item-id]" />
+          <Stack.Screen name="todos/list-settings" options={sheetOptions} />
+          <Stack.Screen name="share-gate" options={sheetOptions} />
+          <Stack.Screen name="language-picker" options={searchSheetOptions} />
+          <Stack.Screen name="transcription-model-picker" options={sheetOptions} />
+          <Stack.Screen name="voice-language-picker" options={searchSheetOptions} />
+          <Stack.Screen
+            name="kilo-pass"
+            options={{
+              presentation: 'modal',
               headerShown: false,
-              headerStyle: { backgroundColor: colors.background },
-              headerTintColor: colors.foreground,
             }}
-          >
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="pr-review/index" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="pr-review/[owner]/[repo]/[number]"
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
-            <Stack.Screen name="agent-chat/[session-id]" />
-            <Stack.Screen name="session-changes/[session-id]" options={{ headerShown: false }} />
-            <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />
-            <Stack.Screen name="agent-chat/repo-picker" options={searchSheetOptions} />
-            <Stack.Screen name="agent-chat/branch-picker" options={sheetOptions} />
-            <Stack.Screen
-              name="agent-chat/mode-picker"
-              options={{ ...sheetOptions, sheetAllowedDetents: [0.5] }}
-            />
-            <Stack.Screen name="agent-chat/instance-picker" options={sheetOptions} />
-            <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
-            <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
-            <Stack.Screen name="todos/[list-id]" />
-            <Stack.Screen name="todos/item/[item-id]" />
-            <Stack.Screen name="todos/list-settings" options={sheetOptions} />
-            <Stack.Screen name="share-gate" options={sheetOptions} />
-            <Stack.Screen name="language-picker" options={searchSheetOptions} />
-            <Stack.Screen name="transcription-model-picker" options={sheetOptions} />
-            <Stack.Screen name="voice-language-picker" options={searchSheetOptions} />
-            <Stack.Screen
-              name="kilo-pass"
-              options={{
-                presentation: 'modal',
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="credits"
-              options={{
-                presentation: 'modal',
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="onboarding"
-              options={{
-                presentation: 'modal',
-                headerShown: false,
-                gestureEnabled: false,
-              }}
-            />
-            <Stack.Screen
-              name="tour"
-              options={{
-                presentation: 'modal',
-                headerShown: false,
-                // A swipe-down dismissal would bypass the tour's own dismissal
-                // (which records the per-account decision). Match `onboarding`
-                // and `consent`: the only exits are the tour's own controls and
-                // Android hardware Back, both of which record first.
-                gestureEnabled: false,
-              }}
-            />
-            <Stack.Screen
-              name="consent"
-              options={{
-                presentation: 'modal',
-                headerShown: false,
-                gestureEnabled: false,
-              }}
-            />
-            <Stack.Screen
-              name="consent-details"
-              options={{
-                headerShown: false,
-              }}
-            />
-          </Stack>
-        </KiloChatPresenceMount>
-      </KiloChatProvider>
+          />
+          <Stack.Screen
+            name="credits"
+            options={{
+              presentation: 'modal',
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="tour"
+            options={{
+              presentation: 'modal',
+              headerShown: false,
+              // A swipe-down dismissal would bypass the tour's per-account
+              // decision, so only its controls and Android Back may dismiss.
+              gestureEnabled: false,
+            }}
+          />
+          <Stack.Screen
+            name="consent"
+            options={{
+              presentation: 'modal',
+              headerShown: false,
+              gestureEnabled: false,
+            }}
+          />
+          <Stack.Screen
+            name="consent-details"
+            options={{
+              headerShown: false,
+            }}
+          />
+        </Stack>
+      </EventServiceProvider>
     </UserWebConnectionProvider>
   );
 }

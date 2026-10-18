@@ -101,12 +101,9 @@
     "scheduled": "Programatuta",
     "keepEditing": "Jarraitu editatzen",
     "keepRunning": "Jarraitu exekutatzen",
-    "kiloclaw": "KiloClaw",
     "newSession": "Saio berria",
-    "noKiloclawInstances": "Ez dago KiloClaw instantziarik",
     "noModelsAvailable": "Ez dago eredurik eskuragarri",
     "notFound": "Ez da aurkitu.",
-    "online": "Konektatuta",
     "open": "Ireki {{name}}",
     "openPullRequest": "Ireki bateratze-eskaera",
     "pending": "Zain",
@@ -257,7 +254,8 @@
     "renamePasskey": "Aldatu sarbide-gakoaren izena",
     "removePasskey": "Kendu sarbide-gakoa",
     "removePasskeyTitle": "Sarbide-gakoa kendu?",
-    "removePasskeyMessage": "Ezingo duzu gehiago sarbide-gako honekin saioa hasi."
+    "removePasskeyMessage": "Ezingo duzu gehiago sarbide-gako honekin saioa hasi.",
+    "changelog": "Berritasunak"
   },
   "preferences": {
     "general": "Orokorra",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Jakinarazpenek zerbait gertatu dela adierazten dute. Ireki Kilo irakurtzeko.",
     "channel": {
       "agentProgress": "Agentearen aurrerapena",
-      "chat": "Txat-mezuak",
-      "kiloclaw": "KiloClaw-en jarduera",
       "balance": "Saldoari buruzko alertak",
       "security": "Antzemandako segurtasun-arazoak",
       "spend": "Gastu-alertak",
       "followedSessions": "Jarraitutako saioak"
     },
     "category": {
-      "chatMessagesSubtitle": "zure elkarrizketetako erantzunak",
       "agentAttentionTitle": "Agenteak zure beharra du",
       "agentAttentionSubtitle": "galderak, baimen-eskaerak eta zure erantzunaren beharra",
       "agentUpdatesTitle": "Agentearen eguneratzeak",
       "agentUpdatesSubtitle": "agenteak zeregin batean ari dela bidalitako mezuak",
       "sessionStatusTitle": "Saioaren egoera",
       "sessionStatusSubtitle": "amaituta / huts eginda / kontrolatzeko prest",
-      "kiloclawActivitySubtitle": "instantzia prest edo huts eginda, programatutako ekintzak",
-      "kiloclawActivityUnavailable": "Abiarazi KiloClaw instantzia bat KiloClaw jarduera jasotzeko.",
       "balanceAlertsSubtitle": "erakundearen saldo baxuaren abisuak",
       "balanceAlertsUnavailable": "Egin bat erakunde batekin saldo-abisuak jasotzeko.",
       "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Hasiera",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, fitxa, {{total}} fitxatatik {{position}}.a"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Instantziaren hautaketa",
-      "couldNotLoadInstances": "Ezin izan dira instantziak kargatu.",
-      "noInstancesDescription": "Konfiguratu instantzia bat txateatzen hasteko.",
-      "setUpKiloclaw": "Konfiguratu KiloClaw",
-      "currentInstance": "{{title}}, oraingoa"
-    },
     "conversation": {
-      "failedToLoad": "Ezin izan da elkarrizketa kargatu.",
-      "notFound": "Ez da elkarrizketa aurkitu.",
       "untitled": "Izenik gabe",
-      "leaveTitle": "Elkarrizketatik irten?",
-      "leaveMessage": "Elkarrizketa zure zerrendatik kenduko da.",
-      "openHint": "Elkarrizketa irekitzen du. Luze sakatu izena aldatzeko eta elkarrizketatik irteteko aukerak ikusteko.",
-      "unread": "Irakurri gabea",
-      "optionsFor": "{{title}} elkarrizketaren aukerak",
-      "options": "Elkarrizketaren aukerak",
-      "renameTitle": "Elkarrizketaren izen-aldaketa",
-      "renamePlaceholder": "Izen berria",
-      "couldNotReachBot": "Ezin izan da botarekin konektatu. Saiatu berriro.",
-      "messageDeliveryFailed": "Ezin izan zaio mezua botari helarazi.",
-      "couldNotSignIn": "Ezin izan da txatean saioa hasi.",
-      "couldNotRefreshMessages": "Ezin izan dira mezuak eguneratu.",
-      "couldNotLoadHistory": "Ezin izan da elkarrizketaren historiala kargatu.",
-      "leave": "Irten",
-      "untitledConversation": "Izenik gabeko elkarrizketa",
-      "createFailed": "Ezin izan da elkarrizketa sortu.",
-      "leaveFailed": "Ezin izan da elkarrizketatik irten."
-    },
-    "reactions": {
-      "common": "Ohikoak",
-      "reactWith": "Gehitu {{reaction}} erreakzioa",
-      "accessibility": "{{emoji}} erreakzioa, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Honi erantzuten:",
-      "cancelReply": "Utzi erantzuna bertan behera",
-      "openInstance": "Ireki instantzia",
-      "attachFile": "Erantsi fitxategia",
-      "cancelEdit": "Utzi edizioa bertan behera"
+      "renamePlaceholder": "Izen berria"
     },
     "conversationList": {
-      "couldNotLoad": "Ezin izan dira elkarrizketak kargatu.",
-      "emptyTitle": "Ez dago elkarrizketarik oraindik",
-      "emptyDescription": "Sortu elkarrizketa bat zure KiloClaw instantziarekin txateatzen hasteko.",
-      "create": "Sortu elkarrizketa",
-      "newConversation": "Elkarrizketa berria",
-      "openInstanceSettings": "Ireki instantziaren ezarpenak",
       "today": "Gaur",
       "yesterday": "Atzo",
-      "thisWeek": "Aste honetan",
       "older": "Zaharragoak"
     },
     "attachment": {
-      "open": "Ireki {{filename}}",
-      "openFailed": "Ezin izan da eranskina ireki. Egiaztatu konexioa eta saiatu berriro.",
-      "attachFailed": "Ezin izan da fitxategia erantsi.",
-      "limit": "Gehienez {{displayCount}} fitxategi erants ditzakezu.",
-      "sizeRejection": "{{filename}} fitxategiak eranskinetarako {{limit}} muga gainditzen du.",
-      "unreadable": "Ezin izan da {{filename}} irakurri.",
-      "pastedImage": "itsatsitako irudia",
-      "defaultName": "Eranskina",
       "classificationDenied": "Ezin dira fitxategi exekutagarriak erantsi.",
       "classificationEmpty": "Fitxategia hutsik dago.",
       "classificationTooLarge": "Fitxategien tamainak gehienez 20 MB izan behar du.",
@@ -943,426 +883,17 @@
       "networkError": "Errore bat gertatu da sarean.",
       "uploadFailed": "Igoerak huts egin du.",
       "nothingToPaste": "Ez dago ezer itsasteko.",
-      "metadataStripFailed": "Ezin izan dira argazkiaren metadatuak kendu.",
-      "limit_one": "Gehienez {{displayCount}} fitxategi erants ditzakezu.",
-      "limit_other": "Gehienez {{displayCount}} fitxategi erants ditzakezu."
+      "metadataStripFailed": "Ezin izan dira argazkiaren metadatuak kendu."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Saiatu berriro {{filename}} igotzen",
-      "remove": "Kendu {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[ezabatutako mezua]",
-      "yourMessage": "Zure mezua",
-      "messageFrom": "{{author}} erabiltzailearen mezua",
-      "moreActions": "Ekintza gehiago",
-      "notDelivered": "Ez da helarazi",
-      "edited": "(editatuta)",
-      "image": "Irudia"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Kopiatuta",
-      "copyFailed": "Ezin izan da kopiatu.",
-      "title": "Mezuaren ekintzak",
-      "deleteTitle": "Mezua ezabatu?",
-      "deleteMessage": "Mezua elkarrizketatik kenduko da.",
-      "deleteFailed": "Ezin izan da mezua ezabatu.",
-      "removeReactionFailed": "Ezin izan da erreakzioa kendu.",
-      "addReactionFailed": "Ezin izan da erreakzioa gehitu.",
-      "retrySend": "Bidali berriro",
-      "moreReactions": "Erreakzio gehiago",
-      "edit": "Editatu",
-      "sendFailed": "Ezin izan da mezua bidali.",
-      "retrySendFailed": "Ezin izan da mezua berriro bidali.",
-      "editFailed": "Ezin izan da mezua editatu.",
-      "executeFailed": "Ezin izan da ekintza exekutatu."
+      "edit": "Editatu"
     },
     "attachmentPicker": {
-      "takePhoto": "Atera argazkia",
-      "photoLibrary": "Argazki-bilduma",
-      "files": "Fitxategi",
       "cameraAccessMessage": "Eman kamera erabiltzeko baimena ezarpenetan, argazki bat ateratzeko."
-    },
-    "typingIndicator": {
-      "someone": "Norbait",
-      "typing_one": "{{name}} idazten ari da...",
-      "typing": "{{names}} idazten ari dira…",
-      "typing_other": "{{names}} idazten ari dira…"
-    },
-    "botStatus": {
-      "offline": "Deskonektatuta",
-      "loadingUser": "Erabiltzailea kargatzen...",
-      "waitingForStatus": "Botaren egoeraren zain...",
-      "offlineMessage": "Bota deskonektatuta dago. Berriro konektatzen denean berrekingo zaio mezuak bidaltzeari."
-    },
-    "errors": {
-      "notAllowed": "Ez dago baimenduta.",
-      "messageTooLong": "Mezua luzeegia da. Erabili {{limit}} karaktere baino gutxiago.",
-      "titleTooLong": "Izenburua luzeegia da. Erabili {{limit}} karaktere baino gutxiago.",
-      "messageEmpty": "Mezua ezin da hutsik egon."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Ezin izan dira KiloClaw instantziak kargatu.",
-    "billing": {
-      "title": "Fakturazioa",
-      "continueMonthToMonth": "Jarraitu hilabetez hilabete",
-      "plan": "Plana",
-      "finalTermEnds": "Azken epearen amaiera",
-      "afterFinalTerm": "Azken epearen ondoren",
-      "lessThanOneDay": "Egun bat baino gutxiago",
-      "ends": "Amaiera",
-      "expires": "Iraungitze-data",
-      "noActivePlan": "Ez dago plan aktiborik",
-      "noActivePlanDescription": "Ez duzu KiloClaw harpidetza aktiborik.",
-      "managedByAdmin": "Fakturazioa zure erakundeko administratzaileak kudeatzen du.",
-      "couldNotLoad": "Ezin izan da fakturazio-informazioa kargatu.",
-      "manageOnWeb": "Kudeatu fakturazioa webgunean",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Zure Commit planaren azken epea {{date}} egunean amaituko da. Jarraitu Standard planarekin {{price}} ordainduta; bestela, ostatatzea amaituko da.",
-      "freeTrial": "Doako proba",
-      "hostingEnds": "Ostatatzea amaituko da",
-      "renews": "Berritze-data",
-      "standardMonthToMonth": "Standard plana, hilez hil",
-      "standardStartsOn": "Standard plana {{date}} egunean hasiko da, {{price}} ordainduta.",
-      "yourStandardMonthlyPrice": "zure Standard planaren hileko prezioa",
-      "perMonth": "/hilabete",
-      "earlybirdAccessUntil": "Earlybird sarbidea {{date}} egunera arte dago erabilgarri.",
-      "earlybirdEnding": "Earlybird sarbidea amaitzeko {{remaining}} falta da.",
-      "paymentPastDue": "Ordainketa atzeratuta dago. Eguneratu zure ordainketa-metodoa.",
-      "subscriptionCancels": "Harpidetza {{date}} egunean bertan behera utziko da.",
-      "trialDaysRemaining": "Proba amaitzeko {{remaining}} falta da.",
-      "trialEndingSoon": "Proba laster amaituko da: {{remaining}} falta da.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Egikaritze"
-    },
-    "changelog": {
-      "title": "Berritasunak",
-      "couldNotLoad": "Ezin izan da aldaketen erregistroa kargatu.",
-      "noUpdates": "Ez dago eguneratzerik oraindik",
-      "noUpdatesDescription": "Aldaketen erregistroko sarrerak hemen agertuko dira.",
-      "recentUpdates": "Azken eguneratzeak",
-      "manageVersion": "Kudeatu bertsioa",
-      "redeployRequired": "Berriro hedatu behar da",
-      "redeploySuggested": "Berriro hedatzea gomendatuta",
-      "upgradeRequired": "Eguneratzea beharrezkoa"
-    },
-    "dashboard": {
-      "title": "Panela",
-      "couldNotLoad": "Ezin izan da panela kargatu.",
-      "renameInstance": "Aldatu instantziaren izena",
-      "renamePlaceholder": "Izen berria (gehienez 50 karaktere)",
-      "someDetailsFailed": "Ezin izan dira denbora errealeko xehetasun batzuk kargatu.",
-      "destroy": "Suntsitu",
-      "destroyMessage": "Zure KiloClaw instantzia eta haren datu guztiak betiko suntsituko dira. Ekintza hau ezin da desegin.",
-      "destroyTitle": "Suntsitu instantzia",
-      "instance": "Instantzia",
-      "couldNotCheckStatus": "Ezin izan da zerbitzuaren egoera egiaztatu.",
-      "dangerZone": "ARRISKU-EREMUA",
-      "destroying": "Suntsitzen…",
-      "serviceDegraded": "Zerbitzuak arazoak ditu — sakatu egoera ikusteko",
-      "up": "MARTXAN"
-    },
-    "channels": {
-      "title": "Kanalak",
-      "couldNotLoad": "Ezin izan dira kanalak kargatu.",
-      "noChannels": "Ez dago kanal erabilgarririk",
-      "noChannelsDescription": "Kanal-integrazioak hemen agertuko dira.",
-      "connected": "{{label}} konektatuta",
-      "disconnectMessage": "Kendu {{label}}? Kanal hau deskonektatuko da.",
-      "disconnectTitle": "Deskonektatu kanala"
-    },
-    "devicePairing": {
-      "title": "Gailuen parekatzea",
-      "refreshRequests": "Freskatu parekatze-eskaerak",
-      "couldNotLoad": "Ezin izan dira parekatze-eskaerak kargatu.",
-      "noPending": "Ez dago onartzeko eskaerarik",
-      "noPendingDescription": "Kanalak eta gailuak parekatzeko eskaerak hemen agertuko dira.",
-      "channelRequests": "Kanal-eskaerak",
-      "deviceRequests": "Gailu-eskaerak",
-      "approveDeviceMessage": "{{platform}} zure instantziara konektatzea baimendu?",
-      "approveDeviceTitle": "Onartu gailua",
-      "approveMessage": "{{label}} (kodea: {{code}}) zure instantziara konektatzea baimendu?",
-      "approveTitle": "Onartu parekatze-eskaera",
-      "unknownDevice": "Gailu ezezaguna"
-    },
-    "execPolicy": {
-      "title": "Exekuzio-politika",
-      "couldNotLoad": "Ezin izan da exekuzio-politika kargatu.",
-      "alwaysAsk": "Beti galdetu",
-      "alwaysAskDescription": "Berretsi komando bakoitza exekutatu aurretik. Aukerarik seguruena da.",
-      "neverAsk": "Ez galdetu inoiz",
-      "neverAskDescription": "Exekutatu komandoak berrespenik gabe. Azkarragoa da, baina ez hain segurua."
-    },
-    "google": {
-      "title": "Google-ko kontua",
-      "couldNotLoad": "Ezin izan da Google kontuaren egoera kargatu.",
-      "disconnected": "Google kontua deskonektatu da. Hedatu berriro zure instantzia aldaketa aplikatzeko.",
-      "setupCommand": "Konfigurazio-komandoa",
-      "setupCommandHelp": "Zure Google kontua konektatzeko, exekutatu komando hau zure ordenagailuko terminal batean. Ordenagailuan Docker instalatuta eduki behar duzu.",
-      "failedToLoadCommand": "Ezin izan da konfigurazio-komandoa kargatu.",
-      "gmailNotifications": "Gmail-eko jakinarazpenak",
-      "disconnect": "Deskonektatu Google kontua",
-      "copied": "Kopiatuta",
-      "copyCommand": "Kopiatu komandoa",
-      "disconnectConfirm": "Deskonektatu",
-      "disconnectMessage": "Zure Google kontua instantzia honetatik kendu? Gmail-eko jakinarazpenak desgaituko dira. Deskonektatu ondoren, hedatu berriro instantzia aldaketak aplikatzeko.",
-      "disconnectTitle": "Deskonektatu Google"
-    },
-    "modelList": {
-      "noMatches": "Ez dago zure bilaketarekin bat datorren eredurik",
-      "noModelsDescription": "Ereduak hemen agertuko dira eskuragarri daudenean.",
-      "noResultsFor": "Ez dago emaitzarik «{{query}}» bilaketarako."
-    },
-    "secrets": {
-      "title": "Sekretuak",
-      "couldNotLoad": "Ezin izan dira sekretuak kargatu.",
-      "noSecrets": "Ez dago sekretu erabilgarririk",
-      "noSecretsDescription": "Sekretu-integrazioak hemen agertuko dira.",
-      "removeMessage": "Kendu {{label}}? Tresna honek bere kredentzialetarako sarbidea galduko du.",
-      "removeTitle": "Kendu sekretua",
-      "saved": "{{label}} gordeta",
-      "hide": "Ezkutatu {{label}}",
-      "show": "Erakutsi {{label}}",
-      "allFieldsRequired": "Eremu guztiak beharrezkoak dira {{label}} konektatzeko.",
-      "setupGuideFallback": "konfigurazio-gida",
-      "setupGuideA11y": "{{label}} konfiguratzeko gida",
-      "setupGuide": "Konfigurazio-gida",
-      "saving": "Gordetzen…",
-      "removing": "Kentzen…",
-      "updateToken": "Eguneratu tokena"
-    },
-    "versionPin": {
-      "title": "Bertsioaren finkapena",
-      "couldNotLoad": "Ezin izan da bertsioaren informazioa kargatu.",
-      "couldNotLoadMore": "Ezin izan dira bertsio gehiago kargatu.",
-      "loadMore": "Kargatu bertsio gehiago",
-      "showingLatest": "Azken 100 bertsioak erakusten dira.",
-      "availableVersions": "Bertsio erabilgarriak",
-      "noVersions": "Ez dago bertsio erabilgarririk",
-      "noVersionsDescription": "OpenClaw bertsio erabilgarriak hemen agertuko dira.",
-      "unpin": "Kendu finkapena",
-      "unpinMessage": "Itzuli eskuragarri dagoen azken bertsiora?",
-      "unpinTitle": "Kendu bertsioaren finkapena",
-      "confirmPin": "Berretsi finkapena",
-      "followingLatest": "Azkenari jarraitzen",
-      "latest": "azkena",
-      "pin": "Finkatu",
-      "pinnedByAdmin": "Administratzaileak finkatuta — jarri harremanetan zure administratzailearekin aldatzeko.",
-      "pinnedTo": "{{version}} bertsioan finkatuta",
-      "reasonOptional": "Arrazoia (aukerakoa)",
-      "reasonPlaceholder": "Bertsio hau finkatzeko arrazoia",
-      "replaceAdminPin": "Ordezkatu administratzailearen finkapena",
-      "replacesAdminPin": "Honek administratzaileak ezarritako finkapena ordezkatuko du (une honetan: {{label}})."
-    },
-    "redeploy": "Hedatu berriro",
-    "redeployMessage": "Ziur zaude instantzia hau berriro hedatu nahi duzula?",
-    "redeployTitle": "Hedatu berriro instantzia",
-    "controls": {
-      "redeploying": "Berriro hedatzen…",
-      "restart": "Berrabiarazi",
-      "restartOpenClawMessage": "Ziur zaude OpenClaw prozesua berrabiarazi nahi duzula?",
-      "restartOpenClawTitle": "Berrabiarazi OpenClaw",
-      "restarting": "Berrabiarazten…",
-      "start": "Abiarazi",
-      "startMessage": "Ziur zaude instantzia hau abiarazi nahi duzula?",
-      "startTitle": "Abiarazi instantzia",
-      "stop": "Gelditu",
-      "stopMessage": "Ziur zaude instantzia hau gelditu nahi duzula?",
-      "stopTitle": "Gelditu instantzia",
-      "stopping": "Gelditzen…"
-    },
-    "empty": {
-      "finishingSetup": "Konfigurazioa amaitzen",
-      "finishingSetupDescription": "Itxaron pixka bat, zure kontua prestatzen amaitzen ari gara. Normalean denbora gutxi behar da.",
-      "getStarted": "Hasi",
-      "noInstancesDescription": "Sortu zure lehen instantzia programazio-agenteak exekutatzen hasteko."
-    },
-    "instance": {
-      "backToInstances": "Itzuli instantzietara",
-      "couldNotLoad": "Ezin izan da instantzia kargatu.",
-      "notFound": "Ez da instantzia aurkitu",
-      "notFoundDescription": "Baliteke instantzia hau suntsitu izana edo esteka jada baliozkoa ez izatea."
-    },
-    "list": {
-      "createInstance": "Sortu instantzia",
-      "organizations": "Erakundeak",
-      "accessIssue": {
-        "trialExpired": "Proba amaitu da, harpidetu instantzia hau erabiltzen jarraitzeko",
-        "subscriptionCanceled": "Harpidetza ez dago aktibo; harpidetu berriro instantzia hau erabiltzen jarraitzeko",
-        "subscriptionPastDue": "Ordainketa-arazoa, eguneratu fakturazioa instantzia hau erabiltzen jarraitzeko",
-        "quarantined": "Instantzia berrogeialdian dago; eskuz berrikusi behar da",
-        "multipleCurrentConflict": "Kontua berrikusi behar da",
-        "nonCanonicalEarlybird": "Plan zaharra berrikusi behar da"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Hasi txata: {{name}}",
-        "ready": "{{name}} prest dago",
-        "warmedUp": "Guztiz prest. Esan kaixo prest zaudenean."
-      },
-      "flow": {
-        "genericErrorBody": "Oraingoan ezin izan dugu zure instantzia konfiguratzen amaitu.",
-        "manualReviewBody": "Zure kontuaren egoera berrikusi behar dugu instantzia bat sortu aurretik. Jarraitu kilo.ai-n.",
-        "manualReviewTitle": "Konfigurazioa eskuz berrikusi behar da",
-        "openKiloAi": "Ireki kilo.ai",
-        "provisioning": "Hornitzen",
-        "review": "Berrikuspena",
-        "identityTitle": "Zure botaren nortasuna",
-        "couldNotLoad": "Ezin izan da hasierako konfigurazioaren egoera kargatu.",
-        "finishingSetup": "Konfigurazioa amaitzen ari gara. Itxaron pixka bat zure kontua prestatzen amaitu arte.",
-        "ready": "Prest",
-        "settingUp": "Konfiguratzen…"
-      },
-      "unavailableDescription": "KiloClaw harpidetza aktibo bat behar duzu instantzia bat hornitzeko. Lehendik dauden instantziek eta harpidetzek ohi bezala jarraituko dute.",
-      "unavailableTitle": "KiloClaw instantzia berriak ez daude eskuragarri",
-      "identity": {
-        "chooseAvatar": "Aukeratu avatarra",
-        "namePlaceholder": "Zure botaren izena",
-        "selectAvatar": "Hautatu {{name}} avatar gisa",
-        "personality": "Nortasuna",
-        "changePersonality": "Aldatu nortasuna",
-        "location": "Kokalekua",
-        "locationPlaceholder": "Hiria edo eskualdea (aukerakoa)",
-        "useCurrentLocation": "Erabili uneko kokalekua",
-        "locationDeniedTitle": "Kokalekua atzitzeko baimena ukatuta",
-        "locationDeniedMessage": "Zure uneko kokalekua erabiltzeko, eman kokalekua atzitzeko baimena ezarpenetan.",
-        "locationValidationFailed": "Kokalekua ezin izan da balioztatu.",
-        "locationResolveFailed": "Ezin izan da zure kokalekua zehaztu. Eskuz edita dezakezu.",
-        "locationGetFailed": "Zure kokalekua ezin izan da lortu. Idatzi eskuz.",
-        "nature": {
-          "aiAssistantLabel": "Adimen artifizialeko laguntzailea",
-          "aiAssistantVibe": "Laguntzeko prest, trebea, profesionala",
-          "digitalCreatureLabel": "Izaki digitala",
-          "digitalCreatureVibe": "Bitxia, bizia, apur bat aurreikusezina",
-          "virtualCompanionLabel": "Lagun birtuala",
-          "virtualCompanionVibe": "Goxoa, beti hor, zutaz benetan arduratzen da",
-          "somethingWeirderLabel": "Zerbait arraroagoa…",
-          "somethingWeirderVibe": "Definitu ezazu zeuk"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Dena eginda! Eskatu zenidan laburpena osatu dut. Prest nago, zu prest zaudenerako.",
-        "settingUp": "Jakinarazpenak konfiguratzen…",
-        "stayInTheLoop": "Izan guztiaren berri",
-        "getNotified": "Jaso jakinarazpena {{name}} agenteak zeregin bat amaitzen duenean, erantzunik galdu ez dezazun.",
-        "now": "orain",
-        "skipForNow": "Saltatu oraingoz",
-        "couldNotEnable": "Jakinarazpenak ezin izan dira gaitu."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Ezin izan da konfigurazioaren egoera egiaztatu",
-        "queryErrorBody": "Konexioa galdu dugu {{name}} konfiguratzeko prozesua egiaztatzean. Baliteke prozesuak martxan jarraitzea. Saiatu berriro edo begiratu hemendik gutxira.",
-        "stoppedTitle": "Konfigurazioa gelditu da",
-        "stoppedBody": "{{name}} izeneko instantzia ustekabean gelditu da konfiguratzean.",
-        "stalledTitle": "Prozesua trabatu da",
-        "stalledBody": "Ezin izan dugu {{name}} konfiguratzen amaitu. Saiatu berriro. Arazoak jarraitzen badu, idatzi {{supportEmail}} helbidera.",
-        "timeoutTitle": "Uste baino denbora gehiago hartzen ari da",
-        "timeoutBody": "{{name}} konfiguratzeko prozesuak ohi baino denbora gehiago behar du ({{displayMinutes}} minutu baino gehiago).",
-        "continueInBackground": "Jarraitu atzealdean",
-        "settingUp": "{{name}} konfiguratzen",
-        "connectingToAgent": "Agentearekin konektatzen",
-        "startingSandbox": "Ingurune isolatua abiarazten",
-        "backgroundHint": "Normalean minutu bat baino gutxiago behar da. Itxi dezakezu — atzealdean lanean jarraituko dugu."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kodea: {{code}}",
-      "gatewayProcess": "ATEBIDEAREN PROZESUA",
-      "lastExit": "Azken irteera",
-      "memory": "Memoria",
-      "region": "Eskualdea",
-      "resources": "BALIABIDEAK",
-      "restarts": "Berrabiarazpenak",
-      "state": "Egoera",
-      "uptime": "Martxan emandako denbora",
-      "crashed": "HUTS EGINDA",
-      "destroying": "SUNTSITZEN",
-      "provisioned": "HORNITUTA",
-      "restarting": "BERRABIARAZTEN",
-      "running": "MARTXAN",
-      "shuttingDown": "ITZALTZEN",
-      "starting": "ABIARAZTEN",
-      "stopped": "GELDITUTA",
-      "stopping": "GELDITZEN",
-      "unknown": "EZEZAGUNA",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Puntakoa",
-      "frontierDescription": "Errendimendu handiena. Arrazoitzeko gai diren puntako ereduetara bideratzen du.",
-      "balancedDescription": "Abiaduraren eta gaitasunaren oreka adimentsua kostu txikiagoan.",
-      "autoModelA11y": "{{label}} eredu automatikoa",
-      "currentModel": "Uneko eredua",
-      "browseAllModels": "edo aukeratu 500 eredu baino gehiagoren artean",
-      "browseAllModelsA11y": "Arakatu erabilgarri dauden 500 eredu baino gehiago"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw erabiltzen jarraitzeko, joan kilo.ai/claw-ra zure nabigatzailetik. Ezin zara aplikazioan harpidetu.",
-      "subscriptionCanceledTitle": "Harpidetu webgunean",
-      "subscriptionCanceledBody": "KiloClaw erabiltzeko, joan kilo.ai/claw-ra zure nabigatzailetik. Ezin zara aplikazioan harpidetu.",
-      "subscriptionCanceledCta": "Ireki kilo.ai/claw",
-      "subscriptionPastDueTitle": "Eguneratu ordainketa webgunean",
-      "subscriptionPastDueBody": "Arazoak izan ditugu zure azken ordainketarekin. Joan kilo.ai/claw helbidera nabigatzailetik, ordainketa-datuak eguneratzeko. Ezin duzu fakturazioa aplikazioan kudeatu.",
-      "quarantinedTitle": "Instantziak konponketa behar du",
-      "quarantinedBody": "Zure KiloClaw instantzia berrogeialdian dago eta ezin da une honetan erabili. Gure taldearen laguntza behar duzu lehengoratzeko.",
-      "multipleCurrentConflictBody": "Harpidetza aktibo bat baino gehiago aurkitu dugu zure kontuan. Horregatik, prozesua eten dugu, bi aldiz kobratzea saihesteko.",
-      "multipleCurrentConflictCta": "Jarraitu kilo.ai-n",
-      "nonCanonicalEarlybirdTitle": "Plan zaharra hauteman da",
-      "nonCanonicalEarlybirdBody": "Zure sarbide aurreratuko plana eskuz berrikusi behar da mugikorrean erabili ahal izateko.",
-      "iosTitle": "KiloClaw ez dago eskuragarri iOS-en",
-      "iosBody": "KiloClaw sarbidea iOS aplikaziotik kanpo kudeatzen da kontu honetarako.",
-      "iosContact": "Galderarik? Jarri harremanetan {{supportEmail}}-rekin.",
-      "quarantinedCta": "Idatzi gure taldeari",
-      "nonCanonicalEarlybirdCta": "Berrikusi zure plana kilo.ai-n"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} izeneko instantziak arreta behar du: {{label}}",
-      "openUnread_one": "Ireki {{name}}, irakurri gabeko {{displayCount}} mezu",
-      "openUnread": "Ireki {{name}}, {{displayCount}} mezu irakurri gabe",
-      "openUnread_other": "Ireki {{name}}, {{displayCount}} mezu irakurri gabe",
-      "openSettings": "Ireki {{name}} izeneko instantziaren ezarpenak",
-      "fixOnKiloAi": "Konpondu kilo.ai-n: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Onartu gailu-eskaerak",
-      "execPolicyDescription": "Segurtasun-ezarpenak",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Adimen artifizialeko eredua hautatzea",
-      "secretsDescription": "Enkriptatutako kredentzialak",
-      "versionPinDescription": "Finkatu bertsio jakin batean"
-    },
-    "avatar": {
-      "arcade": "Joko-makina",
-      "brain": "Garuna",
-      "creature": "Izakia",
-      "crystal": "Kristala",
-      "custom": "Avatar pertsonalizatua",
-      "dragon": "Dragoia",
-      "explorer": "Esploratzailea",
-      "flame": "Garra",
-      "lightning": "Tximista",
-      "magicWand": "Makila magikoa",
-      "moon": "Ilargia",
-      "operator": "Operadorea",
-      "orbit": "Orbita",
-      "oracle": "Orakulua",
-      "rainbow": "Ostadarra",
-      "robot": "Robota",
-      "satellite": "Satelitea",
-      "sparkles": "Distirak",
-      "strongArm": "Beso indartsua",
-      "talisman": "Talismana"
-    },
-    "remoteSpawnFilesNotSupported": "Instantzia honek ezin du fitxategirik jaso.",
-    "instanceSwitcherTitle": "KiloClaw instantzia"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Mugitu {{filename}} ezkerrera",
       "moveRight": "Mugitu {{filename}} eskuinera"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Itsatsi irudia arbeletik",
-      "label": "Irudia hauteman da, sakatu itsasteko"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Argazki-bilduma",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Itxi saioa gailu honetan?",
     "signOutThisSessionTitle": "Itxi saio hau?",
     "signOutThisSessionMessage": "Gailu honetako saioa itxiko da: {{device}}. Gailuak APIrako sarbidea mantendu dezake, gehienez ordubetez.",
-    "webBrowser": "Web-nabigatzailea"
+    "webBrowser": "Web-nabigatzailea",
+    "unknownDevice": "Gailu ezezaguna"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Ezin izan da aplikazio-denda ireki.",

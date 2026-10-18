@@ -78,6 +78,18 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
       expect(getPendingDeepLink()).toBeNull();
     });
+
+    it.each([
+      '/(app)/(tabs)/(1_kiloclaw)',
+      '/(app)/(tabs)/(1_kiloclaw)/chat/instance-picker',
+      '/(app)/kiloclaw/settings',
+      '/(app)/onboarding',
+      '/chat/sandbox-1/conversation-1',
+    ])('does not queue a removed destination %s', href => {
+      setPendingDeepLink(href, 'notification');
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
+    });
   });
 
   describe('source precedence (order-independent)', () => {
@@ -466,6 +478,30 @@ describe('deep-link-launch', () => {
   });
 
   describe('restorePersistedPendingDeepLink', () => {
+    it.each([
+      '/(app)/(tabs)/(1_kiloclaw)',
+      '/(app)/(tabs)/(1_kiloclaw)/chat/sandbox-1/conversation-1',
+      '/(app)/kiloclaw/settings',
+      '/(app)/onboarding',
+    ])('discards a removed destination persisted by an older app: %s', async href => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href,
+          source: 'universal-link',
+          storedAt: Date.now(),
+          userId: null,
+        })
+      );
+
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+      });
+    });
+
     it('restores a destination persisted before process death', async () => {
       store.set(
         PENDING_DEEP_LINK_KEY,
@@ -701,6 +737,19 @@ describe('deep-link-launch', () => {
   });
 
   describe('captureLaunchDeepLink', () => {
+    it.each([
+      'https://app.kilo.ai/claw',
+      'kiloapp://claw',
+      'kiloapp:///claw',
+      'kiloapp:///chat/sandbox-1/conversation-1',
+      'kiloapp:///(app)/(tabs)/(1_kiloclaw)',
+    ])('does not capture a removed launch destination %s', url => {
+      _setGetLinkingURLForTests(() => url);
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
+    });
+
     it('stashes a mapped launch URL synchronously', () => {
       _setGetLinkingURLForTests(() => 'https://app.kilo.ai/security-agent/findings');
       captureLaunchDeepLink();
@@ -729,7 +778,7 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
 
       // Second call must not write again even if getLinkingURL returns a new URL.
-      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/claw');
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/home');
       setPendingDeepLink('/pre-existing', 'notification');
       captureLaunchDeepLink();
       expect(getPendingDeepLink()).toBe('/pre-existing');

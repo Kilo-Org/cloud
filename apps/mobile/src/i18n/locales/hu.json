@@ -101,12 +101,9 @@
     "scheduled": "Ütemezve",
     "keepEditing": "Szerkesztés folytatása",
     "keepRunning": "Futtatás folytatása",
-    "kiloclaw": "KiloClaw",
     "newSession": "Új munkamenet",
-    "noKiloclawInstances": "Nincsenek KiloClaw-példányok",
     "noModelsAvailable": "Nem érhetők el modellek",
     "notFound": "Nem található.",
-    "online": "Elérhető",
     "open": "{{name}} megnyitása",
     "openPullRequest": "PR megnyitása",
     "pending": "Függőben",
@@ -257,7 +254,8 @@
     "renamePasskey": "Jelkulcs átnevezése",
     "removePasskey": "Jelkulcs eltávolítása",
     "removePasskeyTitle": "Eltávolítod a jelkulcsot?",
-    "removePasskeyMessage": "Ezzel a jelkulccsal már nem tudsz bejelentkezni."
+    "removePasskeyMessage": "Ezzel a jelkulccsal már nem tudsz bejelentkezni.",
+    "changelog": "Újdonságok"
   },
   "preferences": {
     "general": "Általános",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Az értesítések csak azt jelzik, hogy valami történt. A részletek elolvasásához nyisd meg a Kilo alkalmazást.",
     "channel": {
       "agentProgress": "Ügynök előrehaladása",
-      "chat": "Csevegőüzenetek",
-      "kiloclaw": "KiloClaw-tevékenység",
       "balance": "Egyenlegértesítések",
       "security": "Biztonsági találatok",
       "spend": "Költésfigyelmeztetések",
       "followedSessions": "Követett munkamenetek"
     },
     "category": {
-      "chatMessagesSubtitle": "válaszok a beszélgetéseidben",
       "agentAttentionTitle": "Az ügynök rád vár",
       "agentAttentionSubtitle": "kérdések, engedélykérések, válaszra váró kérések",
       "agentUpdatesTitle": "Hírek az ügynöktől",
       "agentUpdatesSubtitle": "az ügynök üzenetei a feladat végrehajtása közben",
       "sessionStatusTitle": "Munkamenet állapota",
       "sessionStatusSubtitle": "befejezett / sikertelen / vezérelhető",
-      "kiloclawActivitySubtitle": "elkészült vagy meghibásodott példányok, ütemezett műveletek",
-      "kiloclawActivityUnavailable": "Indíts el egy KiloClaw-példányt, hogy KiloClaw-tevékenységet kapj.",
       "balanceAlertsSubtitle": "figyelmeztetések a szervezet alacsony egyenlegére",
       "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy egyenleg-figyelmeztetéseket kapj.",
       "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Kezdőlap",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, lap, {{position}}. a {{total}} közül"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Példányváltás",
-      "couldNotLoadInstances": "Nem sikerült betölteni a példányokat.",
-      "noInstancesDescription": "A csevegés indításához állíts be egy példányt.",
-      "setUpKiloclaw": "KiloClaw beállítása",
-      "currentInstance": "{{title}}, aktuális"
-    },
     "conversation": {
-      "failedToLoad": "Nem sikerült betölteni a beszélgetést.",
-      "notFound": "A beszélgetés nem található.",
       "untitled": "Cím nélküli",
-      "leaveTitle": "Kilépsz a beszélgetésből?",
-      "leaveMessage": "Ezzel eltávolítod a beszélgetést a listádról.",
-      "openHint": "Megnyitja a beszélgetést. Az átnevezéshez és a kilépéshez tartsd hosszan lenyomva.",
-      "unread": "Olvasatlan",
-      "optionsFor": "Beszélgetés műveletei: {{title}}",
-      "options": "Beszélgetés műveletei",
-      "renameTitle": "Beszélgetés átnevezése",
-      "renamePlaceholder": "Új név",
-      "couldNotReachBot": "Nem sikerült elérni a botot. Próbáld újra.",
-      "messageDeliveryFailed": "Nem sikerült kézbesíteni az üzenetet a botnak.",
-      "couldNotSignIn": "Nem sikerült bejelentkezni a csevegésbe.",
-      "couldNotRefreshMessages": "Nem sikerült frissíteni az üzeneteket.",
-      "couldNotLoadHistory": "Nem sikerült betölteni a beszélgetés előzményeit.",
-      "leave": "Kilépés",
-      "untitledConversation": "Cím nélküli beszélgetés",
-      "createFailed": "Nem sikerült létrehozni a beszélgetést.",
-      "leaveFailed": "Nem sikerült kilépni a beszélgetésből."
-    },
-    "reactions": {
-      "common": "Gyakori",
-      "reactWith": "Reagálás: {{reaction}}",
-      "accessibility": "{{emoji}} reakció, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Válasz erre:",
-      "cancelReply": "Válasz elvetése",
-      "openInstance": "Példány megnyitása",
-      "attachFile": "Fájl csatolása",
-      "cancelEdit": "Szerkesztés elvetése"
+      "renamePlaceholder": "Új név"
     },
     "conversationList": {
-      "couldNotLoad": "Nem sikerült betölteni a beszélgetéseket.",
-      "emptyTitle": "Még nincs beszélgetés",
-      "emptyDescription": "Hozz létre egy beszélgetést, hogy cseveghess a KiloClaw-példányoddal.",
-      "create": "Beszélgetés létrehozása",
-      "newConversation": "Új beszélgetés",
-      "openInstanceSettings": "Példánybeállítások megnyitása",
       "today": "Ma",
       "yesterday": "Tegnap",
-      "thisWeek": "Ezen a héten",
       "older": "Régebbiek"
     },
     "attachment": {
-      "open": "{{filename}} megnyitása",
-      "openFailed": "Nem sikerült megnyitni a csatolmányt. Ellenőrizd a kapcsolatot, és próbáld újra.",
-      "attachFailed": "Nem sikerült csatolni a fájlt.",
-      "limit": "Legfeljebb {{displayCount}} fájlt csatolhatsz.",
-      "sizeRejection": "{{filename}}: a csatolmány mérete meghaladja a megengedett korlátot ({{limit}}).",
-      "unreadable": "Nem sikerült beolvasni ezt a fájlt: {{filename}}.",
-      "pastedImage": "a beillesztett kép",
-      "defaultName": "Csatolmány",
       "classificationDenied": "Futtatható fájlok nem csatolhatók.",
       "classificationEmpty": "A fájl üres.",
       "classificationTooLarge": "A fájlok mérete legfeljebb 20 MB lehet.",
@@ -943,426 +883,17 @@
       "networkError": "Hálózati hiba történt.",
       "uploadFailed": "A feltöltés nem sikerült.",
       "nothingToPaste": "Nincs mit beilleszteni.",
-      "metadataStripFailed": "Nem sikerült eltávolítani a fotó metaadatait.",
-      "limit_one": "Legfeljebb {{displayCount}} fájlt csatolhatsz.",
-      "limit_other": "Legfeljebb {{displayCount}} fájlt csatolhatsz."
+      "metadataStripFailed": "Nem sikerült eltávolítani a fotó metaadatait."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, állapot: {{status}}",
-      "retryUploading": "{{filename}} feltöltésének újrapróbálása",
-      "remove": "{{filename}} eltávolítása"
-    },
-    "messageBubble": {
-      "deleted": "[törölt üzenet]",
-      "yourMessage": "Saját üzenet",
-      "messageFrom": "{{author}} üzenete",
-      "moreActions": "További műveletek",
-      "notDelivered": "Kézbesítetlen",
-      "edited": "(szerkesztve)",
-      "image": "Kép"
+      "accessibility": "{{filename}}, állapot: {{status}}"
     },
     "messageActions": {
-      "copied": "Másolva",
-      "copyFailed": "Nem sikerült a másolás.",
-      "title": "Üzenet műveletei",
-      "deleteTitle": "Törlöd az üzenetet?",
-      "deleteMessage": "Ez eltávolítja az üzenetet a beszélgetésből.",
-      "deleteFailed": "Nem sikerült törölni az üzenetet.",
-      "removeReactionFailed": "Nem sikerült eltávolítani a reakciót.",
-      "addReactionFailed": "Nem sikerült hozzáadni a reakciót.",
-      "retrySend": "Újraküldés",
-      "moreReactions": "További reakciók",
-      "edit": "Szerkesztés",
-      "sendFailed": "Nem sikerült elküldeni az üzenetet.",
-      "retrySendFailed": "Nem sikerült újraküldeni az üzenetet.",
-      "editFailed": "Nem sikerült szerkeszteni az üzenetet.",
-      "executeFailed": "Nem sikerült végrehajtani a műveletet."
+      "edit": "Szerkesztés"
     },
     "attachmentPicker": {
-      "takePhoto": "Fotó készítése",
-      "photoLibrary": "Fotótár",
-      "files": "Fájl",
       "cameraAccessMessage": "Fénykép készítéséhez engedélyezd a kamera használatát a Beállításokban."
-    },
-    "typingIndicator": {
-      "someone": "Valaki",
-      "typing_one": "{{name}} gépel…",
-      "typing": "{{names}} gépelnek…",
-      "typing_other": "{{names}} gépelnek…"
-    },
-    "botStatus": {
-      "offline": "Nincs kapcsolat",
-      "loadingUser": "Felhasználó betöltése…",
-      "waitingForStatus": "Várakozás a bot állapotára…",
-      "offlineMessage": "A bot nem kapcsolódik a hálózathoz. Az üzenetváltás az újracsatlakozás után folytatódik."
-    },
-    "errors": {
-      "notAllowed": "Ez a művelet nem engedélyezett.",
-      "messageTooLong": "Az üzenet túl hosszú. Írj {{limit}} karakternél rövidebb üzenetet.",
-      "titleTooLong": "A cím túl hosszú. Adj meg {{limit}} karakternél rövidebb címet.",
-      "messageEmpty": "Az üzenet nem lehet üres."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Nem sikerült betölteni a KiloClaw-példányokat.",
-    "billing": {
-      "title": "Számlázás",
-      "continueMonthToMonth": "Folytatás havidíjjal",
-      "plan": "Terv",
-      "finalTermEnds": "Utolsó időszak vége",
-      "afterFinalTerm": "Az utolsó időszak után",
-      "ends": "Vége",
-      "expires": "Lejár",
-      "noActivePlan": "Nincs aktív csomag",
-      "noActivePlanDescription": "Nincs aktív KiloClaw-előfizetésed.",
-      "managedByAdmin": "A számlázást a szervezeted adminisztrátora kezeli.",
-      "couldNotLoad": "Nem sikerült betölteni a számlázási adatokat.",
-      "manageOnWeb": "Számlázás kezelése a weben",
-      "earlybird": "Korai hozzáférés",
-      "finalCommitTermEndsOn": "Az utolsó Commit-időszakod vége: {{date}}. Folytasd a Standard csomaggal {{price}} áron, különben megszűnik a példány üzemeltetése.",
-      "freeTrial": "Ingyenes próbaidőszak",
-      "hostingEnds": "A példány üzemeltetése megszűnik",
-      "lessThanOneDay": "Kevesebb mint 1 nap",
-      "renews": "Megújul",
-      "standardMonthToMonth": "Standard havi előfizetés",
-      "standardStartsOn": "A Standard csomag kezdete: {{date}}, díja: {{price}}.",
-      "yourStandardMonthlyPrice": "a Standard csomagod havidíja",
-      "perMonth": "/hó",
-      "earlybirdAccessUntil": "A korai hozzáférés vége: {{date}}.",
-      "earlybirdEnding": "A korai hozzáférésből hátralévő idő: {{remaining}}.",
-      "paymentPastDue": "Fizetési hátralékod van. Frissítsd a fizetési módodat.",
-      "subscriptionCancels": "Az előfizetés megszűnésének dátuma: {{date}}.",
-      "trialDaysRemaining": "A próbaidőszakból még {{remaining}} van hátra.",
-      "trialEndingSoon": "A próbaidőszak hamarosan véget ér. Hátralévő idő: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Újdonságok",
-      "couldNotLoad": "Nem sikerült betölteni a változásnaplót.",
-      "noUpdates": "Még nincsenek frissítések",
-      "noUpdatesDescription": "A változásnapló bejegyzései itt jelennek meg.",
-      "recentUpdates": "Legutóbbi frissítések",
-      "manageVersion": "Verzió kezelése",
-      "redeployRequired": "Újratelepítés szükséges",
-      "redeploySuggested": "Újratelepítés javasolt",
-      "upgradeRequired": "Frissítés szükséges"
-    },
-    "dashboard": {
-      "title": "Irányítópult",
-      "couldNotLoad": "Nem sikerült betölteni az irányítópultot.",
-      "renameInstance": "Példány átnevezése",
-      "renamePlaceholder": "Új név (legfeljebb 50 karakter)",
-      "someDetailsFailed": "Egyes valós idejű adatokat nem sikerült betölteni.",
-      "destroy": "Végleges törlés",
-      "destroyMessage": "Ezzel végleg törlöd a KiloClaw-példányodat és az összes adatát. A művelet nem vonható vissza.",
-      "destroyTitle": "Példány végleges törlése",
-      "instance": "Példány",
-      "couldNotCheckStatus": "Nem sikerült ellenőrizni a szolgáltatás állapotát.",
-      "dangerZone": "VESZÉLYES MŰVELETEK",
-      "destroying": "Végleges törlés…",
-      "serviceDegraded": "A szolgáltatás nem működik megfelelően – koppints az állapot megtekintéséhez",
-      "up": "ÜZEMEL"
-    },
-    "channels": {
-      "title": "Csatornák",
-      "couldNotLoad": "Nem sikerült betölteni a csatornákat.",
-      "noChannels": "Nem érhetők el csatornák",
-      "noChannelsDescription": "A csatornaintegrációk itt jelennek meg.",
-      "connected": "{{label}} csatlakoztatva",
-      "disconnectMessage": "Eltávolítod ezt a csatornát: {{label}}? Ezzel megszünteted a kapcsolatát.",
-      "disconnectTitle": "Csatorna leválasztása"
-    },
-    "devicePairing": {
-      "title": "Eszközpárosítás",
-      "refreshRequests": "Párosítási kérelmek frissítése",
-      "couldNotLoad": "Nem sikerült betölteni a párosítási kérelmeket.",
-      "noPending": "Nincs függőben lévő kérelem",
-      "noPendingDescription": "Itt jelennek meg a csatornák és eszközök párosítási kérelmei.",
-      "channelRequests": "Csatornák párosítási kérelmei",
-      "deviceRequests": "Eszközök párosítási kérelmei",
-      "approveDeviceMessage": "Engedélyezed, hogy a következő eszköz csatlakozzon a példányodhoz: {{platform}}?",
-      "approveDeviceTitle": "Eszköz jóváhagyása",
-      "approveMessage": "Engedélyezed a csatlakozást a példányodhoz a következőnek: {{label}} (kód: {{code}})?",
-      "approveTitle": "Párosítási kérelem jóváhagyása",
-      "unknownDevice": "Ismeretlen eszköz"
-    },
-    "execPolicy": {
-      "title": "Végrehajtási szabályzat",
-      "couldNotLoad": "Nem sikerült betölteni a végrehajtási szabályzatot.",
-      "alwaysAsk": "Megerősítés mindig",
-      "alwaysAskDescription": "Minden parancs végrehajtása előtt megerősítést kér. Ez a legbiztonságosabb beállítás.",
-      "neverAsk": "Megerősítés nélkül",
-      "neverAskDescription": "Megerősítés nélkül hajtja végre a parancsokat. Ez gyorsabb, de kevésbé biztonságos."
-    },
-    "google": {
-      "title": "Google-fiók",
-      "couldNotLoad": "Nem sikerült betölteni a Google-fiók állapotát.",
-      "disconnected": "A Google-fiók le van választva. Telepítsd újra a példányt a változtatás érvényesítéséhez.",
-      "setupCommand": "Beállítási parancs",
-      "setupCommandHelp": "A Google-fiókod csatlakoztatásához futtasd ezt a parancsot a saját számítógéped termináljában. Ehhez telepített Docker szükséges.",
-      "failedToLoadCommand": "Nem sikerült betölteni a beállítási parancsot.",
-      "gmailNotifications": "Gmail-értesítések",
-      "disconnect": "Google-fiók leválasztása",
-      "copied": "Másolva",
-      "copyCommand": "Parancs másolása",
-      "disconnectConfirm": "Leválasztás",
-      "disconnectMessage": "Eltávolítod a Google-fiókodat erről a példányról? Ezzel letiltod a Gmail-értesítéseket. A változtatások érvényesítéséhez a leválasztás után telepítsd újra a példányt.",
-      "disconnectTitle": "Google leválasztása"
-    },
-    "modelList": {
-      "noMatches": "Nincs a keresésnek megfelelő modell",
-      "noModelsDescription": "A modellek itt jelennek meg, ha elérhetők lesznek.",
-      "noResultsFor": "Nincs találat erre: „{{query}}”."
-    },
-    "secrets": {
-      "title": "Titkos adatok",
-      "couldNotLoad": "Nem sikerült betölteni a titkos adatokat.",
-      "noSecrets": "Nincs elérhető titkos adat",
-      "noSecretsDescription": "Itt jelennek meg a titkos adatokat használó integrációk.",
-      "removeMessage": "Eltávolítod a következő eszköz titkos adatait: {{label}}? Az eszköz többé nem fér hozzá a hitelesítő adataihoz.",
-      "removeTitle": "Titkos adat eltávolítása",
-      "saved": "{{label}} mentve",
-      "hide": "{{label}} elrejtése",
-      "show": "{{label}} megjelenítése",
-      "allFieldsRequired": "A csatlakoztatáshoz minden mezőt ki kell töltened: {{label}}.",
-      "setupGuideFallback": "beállítási útmutató",
-      "setupGuideA11y": "beállítási útmutató: {{label}}",
-      "setupGuide": "Beállítási útmutató",
-      "saving": "Mentés…",
-      "removing": "Eltávolítás…",
-      "updateToken": "Token frissítése"
-    },
-    "versionPin": {
-      "title": "Verziórögzítés",
-      "couldNotLoad": "Nem sikerült betölteni a verzióadatokat.",
-      "couldNotLoadMore": "Nem sikerült betölteni a további verziókat.",
-      "loadMore": "További verziók betöltése",
-      "showingLatest": "A legújabb 100 verzió látható.",
-      "availableVersions": "Elérhető verziók",
-      "noVersions": "Nem érhetők el verziók",
-      "noVersionsDescription": "Az elérhető OpenClaw-verziók itt jelennek meg.",
-      "unpin": "Rögzítés feloldása",
-      "unpinMessage": "Visszaváltasz a legújabb elérhető verzióra?",
-      "unpinTitle": "Verzió rögzítésének feloldása",
-      "confirmPin": "Rögzítés megerősítése",
-      "followingLatest": "Legújabb követése",
-      "latest": "legújabb",
-      "pin": "Rögzítés",
-      "pinnedByAdmin": "Az adminisztrátor rögzítette — fordulj az adminisztrátorodhoz a módosításhoz.",
-      "pinnedTo": "Rögzítve: {{version}}",
-      "reasonOptional": "Indok (nem kötelező)",
-      "reasonPlaceholder": "Miért rögzíted ezt a verziót?",
-      "replaceAdminPin": "Adminisztrátori rögzítés felülírása",
-      "replacesAdminPin": "Ezzel felülírod az adminisztrátor által rögzített verziót (jelenleg: {{label}})."
-    },
-    "redeploy": "Újratelepítés",
-    "redeployMessage": "Biztosan újratelepíted ezt a példányt?",
-    "redeployTitle": "Példány újratelepítése",
-    "controls": {
-      "redeploying": "Újratelepítés…",
-      "restart": "Újraindítás",
-      "restartOpenClawMessage": "Biztosan újraindítod az OpenClaw-folyamatot?",
-      "restartOpenClawTitle": "OpenClaw újraindítása",
-      "restarting": "Újraindítás…",
-      "start": "Indítás",
-      "startMessage": "Biztosan elindítod ezt a példányt?",
-      "startTitle": "Példány indítása",
-      "stop": "Leállítás",
-      "stopMessage": "Biztosan leállítod ezt a példányt?",
-      "stopTitle": "Példány leállítása",
-      "stopping": "Leállítás…"
-    },
-    "empty": {
-      "finishingSetup": "Beállítás véglegesítése",
-      "finishingSetupDescription": "Még egy kis türelmet, befejezzük a fiókod beállítását. Ez általában csak néhány pillanat.",
-      "getStarted": "Kezdés",
-      "noInstancesDescription": "Hozd létre az első példányodat, és indíts el programozó ügynököket."
-    },
-    "instance": {
-      "backToInstances": "Vissza a példányokhoz",
-      "couldNotLoad": "Nem sikerült betölteni a példányt.",
-      "notFound": "A példány nem található",
-      "notFoundDescription": "Lehet, hogy ezt a példányt végleg törölték, vagy a hivatkozás már nem érvényes."
-    },
-    "list": {
-      "createInstance": "Példány létrehozása",
-      "organizations": "Szervezetek",
-      "accessIssue": {
-        "trialExpired": "A próbaidőszak lejárt, fizess elő a példány további használatához",
-        "subscriptionCanceled": "Az előfizetés inaktív, fizess elő újra a példány további használatához",
-        "subscriptionPastDue": "Fizetési probléma – frissítsd a számlázási adatokat a példány további használatához",
-        "quarantined": "A példány karanténban van, kézi felülvizsgálat szükséges",
-        "multipleCurrentConflict": "A fiók ellenőrzést igényel",
-        "nonCanonicalEarlybird": "A régi csomag felülvizsgálatra szorul"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Beszélgetés vele: {{name}}",
-        "ready": "{{name}} készen áll",
-        "warmedUp": "Minden készen áll. Köszönj, amikor szeretnéd elkezdeni."
-      },
-      "flow": {
-        "genericErrorBody": "Most nem sikerült befejeznünk a példányod beállítását.",
-        "manualReviewBody": "A példány létrehozása előtt rendezned kell a fiókod állapotát. Folytasd a kilo.ai oldalon.",
-        "manualReviewTitle": "A beállítás kézi felülvizsgálatot igényel",
-        "openKiloAi": "Kilo.ai megnyitása",
-        "provisioning": "Létrehozás",
-        "review": "Ellenőrzés",
-        "identityTitle": "A bot személyisége",
-        "couldNotLoad": "Nem sikerült betölteni a beállítás állapotát.",
-        "finishingSetup": "Még egy kis türelmet, befejezzük a fiókod beállítását.",
-        "ready": "Kész",
-        "settingUp": "Beállítás…"
-      },
-      "unavailableDescription": "A példány létrehozásához aktív KiloClaw-előfizetés szükséges. A meglévő példányok és előfizetések változatlanul működnek tovább.",
-      "unavailableTitle": "Most nem hozható létre új KiloClaw-példány",
-      "identity": {
-        "chooseAvatar": "Avatár kiválasztása",
-        "namePlaceholder": "A bot neve",
-        "selectAvatar": "{{name}} kiválasztása avatárként",
-        "personality": "Személyiség",
-        "changePersonality": "Személyiség módosítása",
-        "location": "Helyszín",
-        "locationPlaceholder": "Város vagy régió (nem kötelező)",
-        "useCurrentLocation": "Jelenlegi helyszín használata",
-        "locationDeniedTitle": "A helyadatokhoz való hozzáférés megtagadva",
-        "locationDeniedMessage": "A jelenlegi helyszín használatához engedélyezd a helyadatokhoz való hozzáférést a Beállításokban.",
-        "locationValidationFailed": "Nem sikerült ellenőrizni a helyszínt.",
-        "locationResolveFailed": "Nem sikerült meghatározni a helyszínedet. Kézzel is módosíthatod.",
-        "locationGetFailed": "Nem sikerült lekérni a helyszínedet. Add meg kézzel.",
-        "nature": {
-          "aiAssistantLabel": "AI-asszisztens",
-          "aiAssistantVibe": "Segítőkész, rátermett, profi",
-          "digitalCreatureLabel": "Digitális lény",
-          "digitalCreatureVibe": "Különc, eleven, kissé kiszámíthatatlan",
-          "virtualCompanionLabel": "Virtuális társ",
-          "virtualCompanionVibe": "Kedves, figyelmes, őszintén törődik veled",
-          "somethingWeirderLabel": "Valami furcsább…",
-          "somethingWeirderVibe": "Te határozod meg"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Elkészült! Összeállítottam a kért összefoglalót. Bármikor megnézheted.",
-        "settingUp": "Értesítések beállítása…",
-        "stayInTheLoop": "Maradj naprakész",
-        "getNotified": "Kérj értesítést, amikor {{name}} befejez egy feladatot, hogy egyetlen válaszról se maradj le.",
-        "now": "most",
-        "skipForNow": "Most kihagyom",
-        "couldNotEnable": "Nem sikerült engedélyezni az értesítéseket."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Nem sikerült ellenőrizni a beállítást",
-        "queryErrorBody": "A kapcsolat megszakadt, miközben ellenőriztük, hol tart {{name}} beállítása. A beállítás ettől még folytatódhat. Próbáld újra, vagy térj vissza hamarosan.",
-        "stoppedTitle": "A beállítás leállt",
-        "stoppedBody": "{{name}} példánya váratlanul leállt a beállítás során.",
-        "stalledTitle": "Valami elakadt",
-        "stalledBody": "Nem sikerült befejeznünk {{name}} beállítását. Próbáld újra. Ha a hiba ismétlődik, írj a {{supportEmail}} címre.",
-        "timeoutTitle": "Tovább tart a vártnál",
-        "timeoutBody": "{{name}} beállítása a szokásosnál tovább tart (már több mint {{displayMinutes}} perce).",
-        "continueInBackground": "Folytatás a háttérben",
-        "settingUp": "{{name}} beállítása",
-        "connectingToAgent": "Csatlakozás az ügynökhöz",
-        "startingSandbox": "Elkülönített környezet indítása",
-        "backgroundHint": "Általában kevesebb mint egy percet vesz igénybe. Bezárhatod — a háttérben folytatjuk a munkát."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kilépési kód: {{code}}",
-      "gatewayProcess": "AZ ÁTJÁRÓ FOLYAMATA",
-      "lastExit": "Utolsó kilépés",
-      "memory": "Memória",
-      "region": "Régió",
-      "resources": "ERŐFORRÁSOK",
-      "restarts": "Újraindítások",
-      "state": "Állapot",
-      "uptime": "Üzemidő",
-      "crashed": "ÖSSZEOMLOTT",
-      "destroying": "VÉGLEGES TÖRLÉS",
-      "provisioned": "LÉTREHOZVA",
-      "restarting": "ÚJRAINDÍTÁS",
-      "running": "FUT",
-      "shuttingDown": "LEÁLLÍTÁS",
-      "starting": "INDÍTÁS",
-      "stopped": "LEÁLLÍTVA",
-      "stopping": "LEÁLLÍTÁS",
-      "unknown": "ISMERETLEN",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Csúcsteljesítmény",
-      "frontierDescription": "A legnagyobb teljesítmény. Következtetésre képes csúcsmodellekhez irányítja a kéréseket.",
-      "balancedDescription": "Jó egyensúly a sebesség és a képességek között, kedvezőbb áron.",
-      "autoModelA11y": "{{label}} – automatikus modellválasztás",
-      "currentModel": "Jelenlegi modell",
-      "browseAllModels": "vagy válassz több mint 500 modell közül",
-      "browseAllModelsA11y": "Több mint 500 modell böngészése"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "A KiloClaw további használatához lépj a kilo.ai/claw oldalra a böngésződből. Az alkalmazásban nem tudsz előfizetni.",
-      "subscriptionCanceledTitle": "Előfizetés a weboldalon",
-      "subscriptionCanceledBody": "A KiloClaw használatához lépj a kilo.ai/claw oldalra a böngésződből. Az alkalmazásban nem tudsz előfizetni.",
-      "subscriptionCanceledCta": "Kilo.ai/claw megnyitása",
-      "subscriptionPastDueTitle": "Fizetési adatok frissítése a weben",
-      "subscriptionPastDueBody": "Probléma merült fel a legutóbbi fizetéseddel. A fizetési adatok frissítéséhez nyisd meg a kilo.ai/claw oldalt a böngésződben. Az alkalmazásban nem kezelhető a számlázás.",
-      "quarantinedTitle": "A példány helyreállítást igényel",
-      "quarantinedBody": "A KiloClaw-példányod karanténban van, ezért jelenleg nem használható. A helyreállításhoz a csapatunk segítsége szükséges.",
-      "multipleCurrentConflictBody": "Több aktív előfizetést találtunk a fiókodban, ezért szüneteltetjük a szolgáltatást, hogy ne számlázzunk kétszer.",
-      "multipleCurrentConflictCta": "Folytatás a kilo.ai oldalon",
-      "nonCanonicalEarlybirdTitle": "Régebbi csomag észlelve",
-      "nonCanonicalEarlybirdBody": "A korai hozzáférést biztosító csomagodat előbb kézzel felül kell vizsgálnunk, hogy mobilon is használhasd.",
-      "iosTitle": "A KiloClaw nem érhető el iOS-en",
-      "iosBody": "Ennél a fióknál a KiloClaw-hozzáférést az iOS-alkalmazáson kívül lehet kezelni.",
-      "iosContact": "Kérdésed van? Írj a {{supportEmail}} címre.",
-      "quarantinedCta": "E-mail küldése a csapatunknak",
-      "nonCanonicalEarlybirdCta": "Csomag áttekintése a kilo.ai oldalon"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} beavatkozást igényel: {{label}}",
-      "openUnread_one": "{{name}} megnyitása, {{displayCount}} olvasatlan üzenet",
-      "openUnread": "{{name}} megnyitása, {{displayCount}} olvasatlan üzenet",
-      "openUnread_other": "{{name}} megnyitása, {{displayCount}} olvasatlan üzenet",
-      "openSettings": "{{name}} beállításainak megnyitása",
-      "fixOnKiloAi": "Javítás a kilo.ai oldalon: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Eszközök párosítási kérelmeinek jóváhagyása",
-      "execPolicyDescription": "Biztonsági beállítások",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "AI-modell kiválasztása",
-      "secretsDescription": "Titkosított hitelesítő adatok",
-      "versionPinDescription": "Rögzítés egy adott verzióhoz"
-    },
-    "avatar": {
-      "arcade": "Játékgép",
-      "brain": "Agy",
-      "creature": "Lény",
-      "crystal": "Kristály",
-      "custom": "Egyéni avatár",
-      "dragon": "Sárkány",
-      "explorer": "Felfedező",
-      "flame": "Láng",
-      "lightning": "Villám",
-      "magicWand": "Varázspálca",
-      "moon": "Hold",
-      "operator": "Kezelő",
-      "orbit": "Keringési pálya",
-      "oracle": "Jós",
-      "rainbow": "Szivárvány",
-      "robot": "Robotfigura",
-      "satellite": "Műhold",
-      "sparkles": "Szikrák",
-      "strongArm": "Erős kar",
-      "talisman": "Talizmán"
-    },
-    "remoteSpawnFilesNotSupported": "Ez a példány nem fogadhat fájlokat.",
-    "instanceSwitcherTitle": "KiloClaw-példány"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}} mozgatása balra",
       "moveRight": "{{filename}} mozgatása jobbra"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Kép beillesztése a vágólapról",
-      "label": "Kép észlelve, koppints a beillesztéshez"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Fotótár",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Kijelentkezel erről az eszközről?",
     "signOutThisSessionTitle": "Kijelentkezel ebből a munkamenetből?",
     "signOutThisSessionMessage": "Kijelentkeztetjük ezt az eszközt: {{device}}. Az API-hozzáférése még legfeljebb egy óráig megmaradhat.",
-    "webBrowser": "Webböngésző"
+    "webBrowser": "Webböngésző",
+    "unknownDevice": "Ismeretlen eszköz"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Nem sikerült megnyitni az alkalmazásboltot.",

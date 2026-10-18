@@ -46,10 +46,4 @@ describe('markdown palette', () => {
 
     expect(palette.textColor).toBe(colors.accentSoftForeground);
   });
-
-  it('uses primary-foreground for kilo-chat user bubbles (bg-primary)', () => {
-    const palette = getPalette('kilo-chat-user', colors);
-
-    expect(palette.textColor).toBe(colors.primaryForeground);
-  });
 });

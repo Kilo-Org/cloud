@@ -101,12 +101,9 @@
     "scheduled": "Ti ṣètò",
     "keepEditing": "Tẹ̀síwájú pẹ̀lú àtúnṣe",
     "keepRunning": "Jẹ́ kí ó máa ṣiṣẹ́ nìṣó",
-    "kiloclaw": "KiloClaw",
     "newSession": "Ìgbà iṣẹ́ tuntun",
-    "noKiloclawInstances": "Kò sí ẹ̀rọ KiloClaw kankan",
     "noModelsAvailable": "Kò sí àwòṣe kankan",
     "notFound": "A kò rí i.",
-    "online": "Lórí ayélujára",
     "open": "Ṣí {{name}}",
     "openPullRequest": "Ṣí ìbéèrè àkópọ̀",
     "pending": "Ń dúró",
@@ -257,7 +254,8 @@
     "renamePasskey": "Pààrọ̀ orúkọ passkey",
     "removePasskey": "Yọ passkey kúrò",
     "removePasskeyTitle": "Yọ passkey kúrò?",
-    "removePasskeyMessage": "Ìwọ kò ní lè wọlé pẹ̀lú passkey yìí mọ́."
+    "removePasskeyMessage": "Ìwọ kò ní lè wọlé pẹ̀lú passkey yìí mọ́.",
+    "changelog": "Àwọn ohun tuntun"
   },
   "preferences": {
     "general": "Gbogbogbo",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Àwọn ìfitónilétí máa ń fi hàn pé ohun kan ṣẹlẹ̀. Ṣí Kilo láti kà á.",
     "channel": {
       "agentProgress": "Ìlọsíwájú aṣojú",
-      "chat": "Àwọn ìfiránṣẹ́ ìfọ̀rọ̀wérọ̀",
-      "kiloclaw": "Àwọn ìgbòkègbodò KiloClaw",
       "balance": "Àwọn ìkìlọ̀ nípa owó tó kù",
       "security": "Àwọn àwárí ààbò",
       "spend": "Àwọn ìkìlọ̀ ìnáwó",
       "followedSessions": "Àwọn sẹ́ṣàn tí a tẹ̀lé"
     },
     "category": {
-      "chatMessagesSubtitle": "àwọn ìdáhùn nínú ìjíròrò rẹ",
       "agentAttentionTitle": "Aṣojú nílò rẹ",
       "agentAttentionSubtitle": "àwọn ìbéèrè, ìyọ̀ǹda àti ìdáhùn tí a nílò",
       "agentUpdatesTitle": "Àwọn ìmúdójúìwọ̀n aṣojú",
       "agentUpdatesSubtitle": "àwọn ìfiránṣẹ́ láti ọ̀dọ̀ aṣojú nígbà tí iṣẹ́ ṣì ń lọ",
       "sessionStatusTitle": "Ipò ìgbà iṣẹ́",
       "sessionStatusSubtitle": "ó parí / ó kùnà / ó ti ṣe tán fún ìṣàkóso",
-      "kiloclawActivitySubtitle": "ẹ̀rọ iṣẹ́ ti ṣe tán/ó kùnà, àwọn ìṣe tí a ṣètò àkókò wọn",
-      "kiloclawActivityUnavailable": "Bẹ̀rẹ̀ ẹ̀rọ iṣẹ́ KiloClaw kan láti gba ìṣe KiloClaw.",
       "balanceAlertsSubtitle": "àwọn ìkìlọ̀ pé owó àjọ tó kù ti dín kù",
       "balanceAlertsUnavailable": "Darapọ̀ mọ́ àjọ kan láti gba àwọn ìkìlọ̀ owó tó kù.",
       "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Ilé",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, táàbù, {{position}} nínú {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Yí ẹ̀rọ iṣẹ́ padà",
-      "couldNotLoadInstances": "A kò lè gbé àwọn ẹ̀rọ iṣẹ́ wọlé.",
-      "noInstancesDescription": "Ṣètò ẹ̀rọ iṣẹ́ kan láti bẹ̀rẹ̀ ìjíròrò.",
-      "setUpKiloclaw": "Ṣètò KiloClaw",
-      "currentInstance": "{{title}}, tí a ń lò lọ́wọ́"
-    },
     "conversation": {
-      "failedToLoad": "A kò lè gbé ìjíròrò wọlé.",
-      "notFound": "A kò rí ìjíròrò náà.",
       "untitled": "Láìsí àkọlé",
-      "leaveTitle": "Ṣé kí o kúrò nínú ìjíròrò?",
-      "leaveMessage": "Èyí yóò yọ ọ́ kúrò nínú àkójọ rẹ.",
-      "openHint": "Ó ń ṣí ìjíròrò náà. Tẹ̀ ẹ́ mọ́lẹ̀ láti rí àwọn àṣàyàn fún yíyí orúkọ padà àti kíkúrò.",
-      "unread": "A kò tíì kà á",
-      "optionsFor": "Àwọn àṣàyàn ìjíròrò fún {{title}}",
-      "options": "Àwọn àṣàyàn ìjíròrò",
-      "renameTitle": "Yí orúkọ ìjíròrò padà",
-      "renamePlaceholder": "Orúkọ tuntun",
-      "couldNotReachBot": "A kò lè so pọ̀ mọ́ bọ́tì náà. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "messageDeliveryFailed": "A kò lè fi ìfiránṣẹ́ ránṣẹ́ sí bọ́tì náà.",
-      "couldNotSignIn": "A kò lè wọlé sí ìjíròrò.",
-      "couldNotRefreshMessages": "A kò lè sọ àwọn ìfiránṣẹ́ di tuntun.",
-      "couldNotLoadHistory": "A kò lè gbé ìtàn ìjíròrò wọlé.",
-      "leave": "Kúrò",
-      "untitledConversation": "Ìjíròrò láìsí àkọlé",
-      "createFailed": "A kò lè ṣẹ̀dá ìjíròrò.",
-      "leaveFailed": "A kò lè kúrò nínú ìjíròrò."
-    },
-    "reactions": {
-      "common": "Tó wọ́pọ̀",
-      "reactWith": "Fi {{reaction}} dáhùn",
-      "accessibility": "ìfèsì {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Ń dáhùn sí",
-      "cancelReply": "Fagilé ìdáhùn",
-      "openInstance": "Ṣí ẹ̀rọ iṣẹ́",
-      "attachFile": "So fáìlì mọ́ ọn",
-      "cancelEdit": "Fagilé àtúnkọ"
+      "renamePlaceholder": "Orúkọ tuntun"
     },
     "conversationList": {
-      "couldNotLoad": "A kò lè gbé àwọn ìjíròrò wọlé.",
-      "emptyTitle": "Kò sí ìjíròrò síbẹ̀",
-      "emptyDescription": "Ṣẹ̀dá ìjíròrò láti bẹ̀rẹ̀ sí í bá ẹ̀rọ iṣẹ́ KiloClaw rẹ sọ̀rọ̀.",
-      "create": "Ṣẹ̀dá ìjíròrò",
-      "newConversation": "Ìjíròrò tuntun",
-      "openInstanceSettings": "Ṣí àwọn ètò ẹ̀rọ iṣẹ́",
       "today": "Lónìí",
       "yesterday": "Àná",
-      "thisWeek": "Ọ̀sẹ̀ yìí",
       "older": "Tó ti pẹ́ sí i"
     },
     "attachment": {
-      "open": "Ṣí {{filename}}",
-      "openFailed": "A kò lè ṣí àsomọ́. Ṣàyẹ̀wò ìsopọ̀ rẹ, kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
-      "attachFailed": "A kò lè so fáìlì mọ́ ọn.",
-      "limit": "O lè so fáìlì tó pọ̀ jù {{displayCount}} mọ́ ọn.",
-      "sizeRejection": "{{filename}} tóbi ju ààlà àsomọ́ {{limit}} lọ.",
-      "unreadable": "A kò lè ka {{filename}}.",
-      "pastedImage": "àwòrán tí a lẹ̀ mọ́ ọn",
-      "defaultName": "Àsòmọ́",
       "classificationDenied": "A kò lè so àwọn fáìlì tó ń ṣiṣẹ́ gẹ́gẹ́ bí ètò mọ́ ọn.",
       "classificationEmpty": "Fáìlì náà ṣófo.",
       "classificationTooLarge": "Ìwọ̀n fáìlì gbọdọ̀ jẹ́ 20 MB tàbí kéré sí i.",
@@ -943,426 +883,17 @@
       "networkError": "Àṣìṣe kan wà nínú nẹ́tíwọ́ọ̀kì.",
       "uploadFailed": "Gbígbé sókè kùnà.",
       "nothingToPaste": "Kò sí ohun tí a lè lẹ̀ mọ́ ọn.",
-      "metadataStripFailed": "A kò lè yọ dátà àpèjúwe fọ́tò kúrò.",
-      "limit_one": "O lè so fáìlì tó pọ̀ jù {{displayCount}} mọ́ ọn.",
-      "limit_other": "O lè so fáìlì tó pọ̀ jù {{displayCount}} mọ́ ọn."
+      "metadataStripFailed": "A kò lè yọ dátà àpèjúwe fọ́tò kúrò."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Tún gbìyànjú láti gbé {{filename}} sókè",
-      "remove": "Yọ {{filename}} kúrò"
-    },
-    "messageBubble": {
-      "deleted": "[ìfiránṣẹ́ tí a parẹ́]",
-      "yourMessage": "Ìfiránṣẹ́ rẹ",
-      "messageFrom": "Ìfiránṣẹ́ láti ọ̀dọ̀ {{author}}",
-      "moreActions": "Àwọn ìgbésẹ̀ sí i",
-      "notDelivered": "Kò dé ọ̀dọ̀ olùgbà",
-      "edited": "(a ti ṣàtúnkọ)",
-      "image": "Àwòrán"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "A ti ṣe ẹ̀dà",
-      "copyFailed": "A kò lè dà á kọ.",
-      "title": "Àwọn ìgbésẹ̀ ìfiránṣẹ́",
-      "deleteTitle": "Ṣé kí a pa ìfiránṣẹ́ rẹ́?",
-      "deleteMessage": "Èyí yóò yọ ìfiránṣẹ́ náà kúrò nínú ìjíròrò.",
-      "deleteFailed": "A kò lè pa ìfiránṣẹ́ rẹ́.",
-      "removeReactionFailed": "A kò lè yọ ìfèsì kúrò.",
-      "addReactionFailed": "A kò lè fi ìfèsì kún un.",
-      "retrySend": "Tún gbìyànjú láti firánṣẹ́",
-      "moreReactions": "Àwọn ìfèsì sí i",
-      "edit": "Ṣàtúnṣe",
-      "sendFailed": "A kò lè fi ìfiránṣẹ́ ránṣẹ́.",
-      "retrySendFailed": "A kò lè tún gbìyànjú láti firánṣẹ́.",
-      "editFailed": "A kò lè ṣàtúnkọ ìfiránṣẹ́.",
-      "executeFailed": "A kò lè ṣe ìgbésẹ̀ náà."
+      "edit": "Ṣàtúnṣe"
     },
     "attachmentPicker": {
-      "takePhoto": "Ya fọ́tò",
-      "photoLibrary": "Àkójọpọ̀ fọ́tò",
-      "files": "Fáìlì",
       "cameraAccessMessage": "Gba lílo kámẹ́rà láyè nínú àwọn ètò kí o lè ya fọ́tò."
-    },
-    "typingIndicator": {
-      "someone": "Ẹnìkan",
-      "typing_one": "{{name}} ń tẹ ọ̀rọ̀...",
-      "typing": "{{names}} ń tẹ̀wé...",
-      "typing_other": "{{names}} ń tẹ̀wé..."
-    },
-    "botStatus": {
-      "offline": "Kò sí lórí ayélujára",
-      "loadingUser": "A ń gbé àlàyé olùlò wọlé...",
-      "waitingForStatus": "A ń dúró de ipò bọ́tì...",
-      "offlineMessage": "Bọ́tì kò sí lórí ayélujára. Àwọn ìfiránṣẹ́ yóò tún bẹ̀rẹ̀ sí í wọlé nígbà tí ó bá tún so pọ̀."
-    },
-    "errors": {
-      "notAllowed": "A kò yọ̀ǹda èyí.",
-      "messageTooLong": "Ìfiránṣẹ́ gùn jù — iye àmì inú rẹ̀ gbọdọ̀ kéré ju {{limit}} lọ.",
-      "titleTooLong": "Àkọlé gùn jù — iye àmì inú rẹ̀ gbọdọ̀ kéré ju {{limit}} lọ.",
-      "messageEmpty": "Ìfiránṣẹ́ kò gbọdọ̀ ṣófo."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "A kò lè ṣàkójọ àwọn ẹ̀rọ KiloClaw.",
-    "billing": {
-      "title": "Ìsanwó",
-      "continueMonthToMonth": "Tẹ̀síwájú pẹ̀lú ìsanwó lóṣooṣù",
-      "plan": "Ètò",
-      "finalTermEnds": "Òpin àkókò ìkẹyìn",
-      "afterFinalTerm": "Lẹ́yìn àkókò ìkẹyìn",
-      "lessThanOneDay": "Ó kéré ju ọjọ́ 1 lọ",
-      "ends": "Òpin",
-      "expires": "Ọjọ́ ìparí",
-      "noActivePlan": "Kò sí ètò tí ó ń ṣiṣẹ́",
-      "noActivePlanDescription": "O kò ní ìforúkọsílẹ̀ ìsanwó KiloClaw tó ń ṣiṣẹ́.",
-      "managedByAdmin": "Alábòójútó àjọ rẹ ló ń ṣàkóso ìsanwó.",
-      "couldNotLoad": "A kò lè ṣàkójọ àlàyé ìsanwó.",
-      "manageOnWeb": "Ṣàkóso ìsanwó lórí wẹ́ẹ̀bù",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Àkókò Commit ìkẹyìn rẹ parí ní {{date}}. Tẹ̀síwájú pẹ̀lú Standard ní {{price}}, bí bẹ́ẹ̀ kọ́, ìgbàlejò yóò parí.",
-      "freeTrial": "Ìdánwò ọ̀fẹ́",
-      "hostingEnds": "Ìgbàlejò yóò parí",
-      "renews": "Ọjọ́ ìsọdọtun",
-      "standardMonthToMonth": "Standard lóṣooṣù",
-      "standardStartsOn": "Standard bẹ̀rẹ̀ ní {{date}} ní {{price}}.",
-      "yourStandardMonthlyPrice": "owó Standard rẹ lóṣooṣù",
-      "perMonth": "/oṣù",
-      "earlybirdAccessUntil": "O lè lo Earlybird títí di {{date}}.",
-      "earlybirdEnding": "Earlybird ń parí: {{remaining}}.",
-      "paymentPastDue": "Ọjọ́ ìsanwó ti kọjá. Jọ̀wọ́ ṣe ìmúdójúìwọ̀n ọ̀nà ìsanwó rẹ.",
-      "subscriptionCancels": "Ìforúkọsílẹ̀ ìsanwó yóò parí ní {{date}}.",
-      "trialDaysRemaining": "Ìdánwò: {{remaining}} ló kù.",
-      "trialEndingSoon": "Ìdánwò ń parí láìpẹ́: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Ìfipamọ́ àyípadà"
-    },
-    "changelog": {
-      "title": "Àwọn ohun tuntun",
-      "couldNotLoad": "A kò lè ṣàkójọ àkọsílẹ̀ ìyípadà.",
-      "noUpdates": "Kò sí ìmúdójúìwọ̀n síbẹ̀",
-      "noUpdatesDescription": "Àwọn àlàyé ìyípadà yóò hàn níbí.",
-      "recentUpdates": "Àwọn ìmúdójúìwọ̀n àìpẹ́",
-      "manageVersion": "Ṣàkóso ẹ̀dà",
-      "redeployRequired": "Àtúngbékalẹ̀ pọn dandan",
-      "redeploySuggested": "A dámọ̀ràn àtúngbékalẹ̀",
-      "upgradeRequired": "Ìgbésókè pọn dandan"
-    },
-    "dashboard": {
-      "title": "Dáṣíbọ́ọ̀dù",
-      "couldNotLoad": "A kò lè ṣàkójọ dáṣíbọ́ọ̀dù.",
-      "renameInstance": "Sọ ẹ̀rọ lórúkọ tuntun",
-      "renamePlaceholder": "Orúkọ tuntun (kò ju àmì 50 lọ)",
-      "someDetailsFailed": "A kò lè ṣàkójọ àwọn àlàyé ìsinsìnyí kan.",
-      "destroy": "Pa run",
-      "destroyMessage": "Èyí yóò pa ẹ̀rọ KiloClaw rẹ àti gbogbo dátà rẹ̀ run pátápátá. A kò lè mú ìgbésẹ̀ yìí padà sẹ́yìn.",
-      "destroyTitle": "Pa ẹ̀rọ run",
-      "instance": "Ẹ̀rọ",
-      "couldNotCheckStatus": "A kò lè ṣàyẹ̀wò ipò iṣẹ́.",
-      "dangerZone": "ÀGBÈGBÈ EWU",
-      "destroying": "Ń parun…",
-      "serviceDegraded": "Iṣẹ́ kò lọ dáadáa — tẹ̀ láti wo ipò",
-      "up": "Ń ṢIṢẸ́"
-    },
-    "channels": {
-      "title": "Àwọn ìkànnì",
-      "couldNotLoad": "A kò lè ṣàkójọ àwọn ìkànnì.",
-      "noChannels": "Kò sí ìkànnì tó wà",
-      "noChannelsDescription": "Àwọn àsopọ̀ ìkànnì yóò hàn níbí.",
-      "connected": "{{label}} ti sopọ̀",
-      "disconnectMessage": "Yọ {{label}} kúrò? A ó gé àsopọ̀ ìkànnì yìí.",
-      "disconnectTitle": "Gé àsopọ̀ ìkànnì"
-    },
-    "devicePairing": {
-      "title": "Ìsopọ̀ ẹ̀rọ",
-      "refreshRequests": "Sọ àwọn ìbéèrè ìsopọ̀ di tuntun",
-      "couldNotLoad": "A kò lè ṣàkójọ àwọn ìbéèrè ìsopọ̀.",
-      "noPending": "Kò sí ìbéèrè tó ń dúró",
-      "noPendingDescription": "Àwọn ìbéèrè ìsopọ̀ ìkànnì àti ẹ̀rọ yóò hàn níbí.",
-      "channelRequests": "Àwọn ìbéèrè ìkànnì",
-      "deviceRequests": "Àwọn ìbéèrè ẹ̀rọ",
-      "approveDeviceMessage": "Gba {{platform}} láàyè láti sopọ̀ mọ́ ẹ̀rọ rẹ?",
-      "approveDeviceTitle": "Fọwọ́ sí ẹ̀rọ",
-      "approveMessage": "Gba {{label}} (kóòdù: {{code}}) láàyè láti sopọ̀ mọ́ ẹ̀rọ rẹ?",
-      "approveTitle": "Fọwọ́ sí ìbéèrè ìsopọ̀",
-      "unknownDevice": "Ẹ̀rọ àìmọ̀"
-    },
-    "execPolicy": {
-      "title": "Ìlànà ṣíṣe àwọn àṣẹ",
-      "couldNotLoad": "A kò lè ṣàkójọ ìlànà ìṣiṣẹ́.",
-      "alwaysAsk": "Béèrè nígbà gbogbo",
-      "alwaysAskDescription": "Jẹ́rìí sí gbogbo àṣẹ kí a tó ṣe é. Èyí ló ní ààbò jù lọ.",
-      "neverAsk": "Má ṣe béèrè",
-      "neverAskDescription": "Ṣe àwọn àṣẹ láìbéèrè fún ìmúdájú. Ó yára sí i, ṣùgbọ́n ààbò rẹ̀ kéré sí i."
-    },
-    "google": {
-      "title": "Àpamọ́ Google",
-      "couldNotLoad": "A kò lè ṣàkójọ ipò àkọọ́lẹ̀ Google.",
-      "disconnected": "A ti gé àsopọ̀ àkọọ́lẹ̀ Google. Tún gbé ẹ̀rọ rẹ kalẹ̀ láti mú ìyípadà náà ṣiṣẹ́.",
-      "setupCommand": "Àṣẹ ìṣètò",
-      "setupCommandHelp": "Lórí kọ̀ǹpútà tìrẹ tí Docker wà, ṣe àṣẹ yìí nínú tẹ́mínà láti so àkọọ́lẹ̀ Google rẹ pọ̀.",
-      "failedToLoadCommand": "A kò lè ṣàkójọ àṣẹ ìṣètò.",
-      "gmailNotifications": "Àwọn ìfitónilétí Gmail",
-      "disconnect": "Gé àsopọ̀ àkọọ́lẹ̀ Google",
-      "copied": "A ti ṣe ẹ̀dà",
-      "copyCommand": "Dákọ àṣẹ",
-      "disconnectConfirm": "Gé àsopọ̀",
-      "disconnectMessage": "Yọ àkọọ́lẹ̀ Google rẹ kúrò lórí ẹ̀rọ yìí? Èyí yóò pa àwọn ìfitónilétí Gmail. Tún gbé ẹ̀rọ náà kalẹ̀ lẹ́yìn tí o bá gé àsopọ̀ láti mú àwọn ìyípadà ṣiṣẹ́.",
-      "disconnectTitle": "Gé àsopọ̀ Google"
-    },
-    "modelList": {
-      "noMatches": "Kò sí àwòṣe tó bá ohun tí o wá mu",
-      "noModelsDescription": "Àwọn àwòṣe yóò hàn níbí nígbà tí wọ́n bá wà.",
-      "noResultsFor": "Kò sí èsì fún \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Àwọn àṣírí",
-      "couldNotLoad": "A kò lè ṣàkójọ àwọn àṣírí.",
-      "noSecrets": "Kò sí àṣírí tó wà",
-      "noSecretsDescription": "Àwọn àsopọ̀ àṣírí yóò hàn níbí.",
-      "removeMessage": "Yọ {{label}} kúrò? Ohun èlò yìí kò ní lè lo àwọn ẹ̀rí ìwọlé rẹ̀ mọ́.",
-      "removeTitle": "Yọ àṣírí kúrò",
-      "saved": "a ti fi {{label}} pamọ́",
-      "hide": "Fi {{label}} pamọ́",
-      "show": "Fi {{label}} hàn",
-      "allFieldsRequired": "O gbọ́dọ̀ kún gbogbo àyè láti so {{label}} pọ̀.",
-      "setupGuideFallback": "ìtọ́sọ́nà ìṣètò",
-      "setupGuideA11y": "ìtọ́sọ́nà ìṣètò {{label}}",
-      "setupGuide": "Ìtọ́sọ́nà ìṣètò",
-      "saving": "Ń fipamọ́…",
-      "removing": "Ń yọ kúrò…",
-      "updateToken": "Ṣe ìmúdójúìwọ̀n tókínì"
-    },
-    "versionPin": {
-      "title": "Dídúró lórí ẹ̀yà kan",
-      "couldNotLoad": "A kò lè ṣàkójọ àlàyé ẹ̀dà.",
-      "couldNotLoadMore": "A kò lè ṣàkójọ àwọn ẹ̀dà sí i.",
-      "loadMore": "Ṣàkójọ àwọn ẹ̀dà sí i",
-      "showingLatest": "À ń fi ẹ̀dà 100 tuntun jù lọ hàn.",
-      "availableVersions": "Àwọn ẹ̀dà tó wà",
-      "noVersions": "Kò sí ẹ̀dà tó wà",
-      "noVersionsDescription": "Àwọn ẹ̀dà OpenClaw tó wà yóò hàn níbí.",
-      "unpin": "Yọ ìdímú kúrò",
-      "unpinMessage": "Padà sí ẹ̀dà tuntun jù lọ tó wà?",
-      "unpinTitle": "Yọ ìdímú ẹ̀dà kúrò",
-      "confirmPin": "Jẹ́rìí sí ìdímú",
-      "followingLatest": "Ń tẹ̀lé ẹ̀dà tuntun",
-      "latest": "tuntun jù lọ",
-      "pin": "Dì mú",
-      "pinnedByAdmin": "Alábòójútó ti dì í mú — kàn sí alábòójútó rẹ láti yí i padà.",
-      "pinnedTo": "A dì mọ́ {{version}}",
-      "reasonOptional": "Ìdí (kò pọn dandan)",
-      "reasonPlaceholder": "Kí nìdí tí o fi fẹ́ di ẹ̀dà yìí mú?",
-      "replaceAdminPin": "Rọ́pò ìdímú alábòójútó",
-      "replacesAdminPin": "Èyí yóò rọ́pò ìdímú tí alábòójútó ṣètò ({{label}} ni báyìí)."
-    },
-    "redeploy": "Tún gbé kalẹ̀",
-    "redeployMessage": "Ṣé ó dá ọ lójú pé o fẹ́ tún gbé ẹ̀rọ yìí kalẹ̀?",
-    "redeployTitle": "Tún gbé ẹ̀rọ kalẹ̀",
-    "controls": {
-      "redeploying": "Ń tún gbé kalẹ̀…",
-      "restart": "Tún bẹ̀rẹ̀",
-      "restartOpenClawMessage": "Ṣé ó dá ọ lójú pé o fẹ́ tún ìṣiṣẹ́ OpenClaw bẹ̀rẹ̀?",
-      "restartOpenClawTitle": "Tún OpenClaw bẹ̀rẹ̀",
-      "restarting": "Ń tún bẹ̀rẹ̀…",
-      "start": "Bẹ̀rẹ̀",
-      "startMessage": "Ṣé ó dá ọ lójú pé o fẹ́ mú ẹ̀rọ yìí ṣiṣẹ́?",
-      "startTitle": "Mú ẹ̀rọ ṣiṣẹ́",
-      "stop": "Dá dúró",
-      "stopMessage": "Ṣé ó dá ọ lójú pé o fẹ́ dá ẹ̀rọ yìí dúró?",
-      "stopTitle": "Dá ẹ̀rọ dúró",
-      "stopping": "Ń dá dúró…"
-    },
-    "empty": {
-      "finishingSetup": "Ń parí ìṣètò",
-      "finishingSetupDescription": "Dúró díẹ̀, à ń parí ìṣètò àkọọ́lẹ̀ rẹ. Èyí máa ń gba àkókò díẹ̀.",
-      "getStarted": "Bẹ̀rẹ̀",
-      "noInstancesDescription": "Ṣẹ̀dá ẹ̀rọ àkọ́kọ́ rẹ láti bẹ̀rẹ̀ sí í lo àwọn aṣojú ìkọ̀wé kóòdù."
-    },
-    "instance": {
-      "backToInstances": "Padà sí àwọn ẹ̀rọ",
-      "couldNotLoad": "A kò lè ṣàkójọ ẹ̀rọ náà.",
-      "notFound": "A kò rí ẹ̀rọ náà",
-      "notFoundDescription": "Ó lè jẹ́ pé a ti pa ẹ̀rọ yìí run, tàbí ọ̀nà àsopọ̀ náà kò wúlò mọ́."
-    },
-    "list": {
-      "createInstance": "Ṣẹ̀dá ẹ̀rọ",
-      "organizations": "Àwọn àjọ",
-      "accessIssue": {
-        "trialExpired": "Ìdánwò ti parí, forúkọ sí ètò ìsanwó láti máa lo ẹ̀rọ yìí",
-        "subscriptionCanceled": "Ìforúkọsílẹ̀ ìsanwó kò ṣiṣẹ́, tún forúkọ sí i láti máa lo ẹ̀rọ yìí",
-        "subscriptionPastDue": "Ìṣòro ìsanwó wà, ṣe ìmúdójúìwọ̀n àlàyé ìsanwó láti máa lo ẹ̀rọ yìí",
-        "quarantined": "A ti ya ẹ̀rọ sọ́tọ̀, ènìyàn gbọ́dọ̀ ṣe àtúnyẹ̀wò rẹ̀",
-        "multipleCurrentConflict": "Àpamọ́ nílò àtúnyẹ̀wò",
-        "nonCanonicalEarlybird": "Ètò àtijọ́ nílò àtúnyẹ̀wò"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Bá {{name}} sọ̀rọ̀",
-        "ready": "{{name}} ti ṣe tán",
-        "warmedUp": "Gbogbo rẹ̀ ti ṣe tán. Kí i nígbà tí o bá ṣe tán."
-      },
-      "flow": {
-        "genericErrorBody": "A kò lè parí ìṣètò ẹ̀rọ rẹ báyìí.",
-        "manualReviewBody": "A gbọ́dọ̀ ṣàyẹ̀wò ipò àkọọ́lẹ̀ rẹ kí a tó lè ṣẹ̀dá ẹ̀rọ. Tẹ̀síwájú lórí kilo.ai.",
-        "manualReviewTitle": "Ìṣètò nílò àtúnyẹ̀wò ènìyàn",
-        "openKiloAi": "Ṣí kilo.ai",
-        "provisioning": "Ìpèsè ẹ̀rọ",
-        "review": "Àtúnyẹ̀wò",
-        "identityTitle": "Ìdánimọ̀ bọ́ọ̀tì rẹ",
-        "couldNotLoad": "A kò lè ṣàkójọ ipò ìṣètò àkọ́kọ́.",
-        "finishingSetup": "À ń parí ìṣètò — dúró díẹ̀ kí a parí ìṣètò àkọọ́lẹ̀ rẹ.",
-        "ready": "Ti ṣe tán",
-        "settingUp": "Ń ṣètò…"
-      },
-      "unavailableDescription": "O nílò ìforúkọsílẹ̀ ìsanwó KiloClaw tó ń ṣiṣẹ́ láti pèsè ẹ̀rọ. Àwọn ẹ̀rọ àti ìforúkọsílẹ̀ ìsanwó tó wà yóò tẹ̀síwájú bí tẹ́lẹ̀.",
-      "unavailableTitle": "Àwọn ẹ̀rọ KiloClaw tuntun kò sí",
-      "identity": {
-        "chooseAvatar": "Yan àwòrán ìdánimọ̀",
-        "namePlaceholder": "Orúkọ bọ́ọ̀tì rẹ",
-        "selectAvatar": "Yan {{name}} gẹ́gẹ́ bí àwòrán ìdánimọ̀",
-        "personality": "Ìwà",
-        "changePersonality": "Yí ìwà padà",
-        "location": "Ibi",
-        "locationPlaceholder": "Ìlú tàbí ẹkùn (kò pọn dandan)",
-        "useCurrentLocation": "Lo ibi tí o wà báyìí",
-        "locationDeniedTitle": "A kò gba àyè sí ibi tí o wà",
-        "locationDeniedMessage": "Gba àyè sí ibi tí o wà nínú àwọn ètò láti lo ibi tí o wà báyìí.",
-        "locationValidationFailed": "A kò lè jẹ́rìí sí ibi náà.",
-        "locationResolveFailed": "A kò lè mọ ibi tí o wà. O lè ṣàtúnṣe rẹ̀ fúnra rẹ.",
-        "locationGetFailed": "A kò lè rí ibi tí o wà. Tẹ̀ ẹ́ sí i fúnra rẹ.",
-        "nature": {
-          "aiAssistantLabel": "Olùrànlọ́wọ́ AI",
-          "aiAssistantVibe": "Tó ń ṣèrànwọ́, tó lágbára, tó mọ iṣẹ́",
-          "digitalCreatureLabel": "Ẹ̀dá orí kọ̀ǹpútà",
-          "digitalCreatureVibe": "Tó yàtọ̀, tó láàyè, tí a kò lè mọ ohun tó máa ṣe nígbà gbogbo",
-          "virtualCompanionLabel": "Alábàákẹ́gbẹ́ orí kọ̀ǹpútà",
-          "virtualCompanionVibe": "Onínúure, tó wà fún ọ, tó bìkítà lóòótọ́",
-          "somethingWeirderLabel": "Nǹkan tó jẹ́ àjèjì jù…",
-          "somethingWeirderVibe": "Ṣàlàyé rẹ̀ fúnra rẹ"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Mo ti parí! Mo ti kọ àkótán tí o béèrè fún. Ó ti ṣe tán nígbà tí o bá fẹ́ lò ó.",
-        "settingUp": "Ń ṣètò àwọn ìfitónilétí…",
-        "stayInTheLoop": "Ìròyìn ní gbogbo ìgbà",
-        "getNotified": "Gba ìfitónilétí nígbà tí {{name}} bá parí iṣẹ́ kan kí o má pàdánù ìdáhùn kankan.",
-        "now": "báyìí",
-        "skipForNow": "Fo kọjá fún báyìí",
-        "couldNotEnable": "A kò lè tan àwọn ìfitónilétí."
-      },
-      "provisioning": {
-        "queryErrorTitle": "A kò lè ṣàyẹ̀wò ìṣètò",
-        "queryErrorBody": "Àsopọ̀ já nígbà tí à ń ṣàyẹ̀wò ìṣètò {{name}}. Ìṣètò náà lè ṣì máa lọ. Tún gbìyànjú, tàbí padà wò ó láìpẹ́.",
-        "stoppedTitle": "Ìṣètò ti dúró",
-        "stoppedBody": "Ẹ̀rọ {{name}} dúró láìròtẹ́lẹ̀ nígbà ìṣètò.",
-        "stalledTitle": "Ohun kan kò tẹ̀síwájú",
-        "stalledBody": "A kò lè parí ìṣètò {{name}}. Tún gbìyànjú, tàbí fi iméèlì ránṣẹ́ sí {{supportEmail}} bí èyí bá ń ṣẹlẹ̀ léraléra.",
-        "timeoutTitle": "Ó ń pẹ́ ju bí a ti retí lọ",
-        "timeoutBody": "Ìṣètò {{name}} ń pẹ́ ju bí ó ti sábà máa ń rí lọ (ó ti lé ní ìṣẹ́jú {{displayMinutes}}).",
-        "continueInBackground": "Tẹ̀síwájú láìsí lójú ìwé",
-        "settingUp": "Ìṣètò {{name}}",
-        "connectingToAgent": "Ń sopọ̀ mọ́ aṣojú",
-        "startingSandbox": "Ń bẹ̀rẹ̀ àyíká iṣẹ́ àdádó",
-        "backgroundHint": "Ó sábà máa ń gba àkókò tí kò tó ìṣẹ́jú kan. O lè ti èyí pa — a ó máa ṣiṣẹ́ nìṣó láìsí lójú ìwé."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kóòdù {{code}}",
-      "gatewayProcess": "ÌṢIṢẸ́ ẸNU Ọ̀NÀ",
-      "lastExit": "Ìjáde kẹ́yìn",
-      "memory": "Ìrántí",
-      "region": "Ẹkùn",
-      "resources": "ÀWỌN OHUN ÈLÒ",
-      "restarts": "Àwọn àtúnbẹ̀rẹ̀",
-      "state": "Ipò",
-      "uptime": "Àkókò ìṣiṣẹ́",
-      "crashed": "Ó DÁWỌ́ DÚRÓ LÁÌRÒTẸ́LẸ̀",
-      "destroying": "Ń PARUN",
-      "provisioned": "A TI PÈSÈ RẸ̀",
-      "restarting": "Ń TÚN BẸ̀RẸ̀",
-      "running": "Ń ṢIṢẸ́",
-      "shuttingDown": "Ń PA Ẹ̀RỌ",
-      "starting": "Ń BẸ̀RẸ̀",
-      "stopped": "TI DÚRÓ",
-      "stopping": "Ń DÁ DÚRÓ",
-      "unknown": "ÀÌMỌ̀",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Tó ga jù lọ",
-      "frontierDescription": "Ìṣiṣẹ́ tó ga jù lọ. Ó ń darí sí àwọn àwòṣe tó ga jù lọ tí wọ́n ní agbára ìrònú.",
-      "balancedDescription": "Ó da ìyára àti agbára pọ̀ dáadáa ní owó tó kéré sí i.",
-      "autoModelA11y": "àwòṣe aládàáṣiṣẹ́ {{label}}",
-      "currentModel": "Àwòṣe tí a ń lò",
-      "browseAllModels": "tàbí yan nínú àwòṣe tó lé ní 500",
-      "browseAllModelsA11y": "Wo gbogbo àwòṣe tó lé ní 500"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Láti máa lo KiloClaw, lọ sí kilo.ai/claw nípasẹ̀ aṣàwákiri rẹ. O kò lè forúkọ sí ètò ìsanwó nínú ìṣàfilọ́lẹ̀.",
-      "subscriptionCanceledTitle": "Ṣe ìforúkọsílẹ̀ sísanwó lórí wẹ́ẹ̀bù",
-      "subscriptionCanceledBody": "Láti lo KiloClaw, lọ sí kilo.ai/claw nípasẹ̀ aṣàwákiri rẹ. O kò lè forúkọ sí ètò ìsanwó nínú ìṣàfilọ́lẹ̀.",
-      "subscriptionCanceledCta": "Ṣí kilo.ai/claw",
-      "subscriptionPastDueTitle": "Ìmúdójúìwọ̀n ìsanwó lórí wẹ́ẹ̀bù",
-      "subscriptionPastDueBody": "Ìṣòro wà pẹ̀lú ìsanwó rẹ tó kẹ́yìn. Lọ sí kilo.ai/claw nípasẹ̀ aṣàwákiri rẹ láti ṣe ìmúdójúìwọ̀n rẹ̀. O kò lè ṣàkóso ìsanwó nínú ìṣàfilọ́lẹ̀.",
-      "quarantinedTitle": "Ẹ̀rọ nílò àtúnṣe",
-      "quarantinedBody": "A ti ya ẹ̀rọ KiloClaw rẹ sọ́tọ̀, o kò sì lè lò ó báyìí. Ẹgbẹ́ wa gbọ́dọ̀ ṣèrànwọ́ láti mú un padà ṣiṣẹ́.",
-      "multipleCurrentConflictBody": "A rí ìforúkọsílẹ̀ ìsanwó tó ń ṣiṣẹ́ ju ọ̀kan lọ lórí àkọọ́lẹ̀ rẹ. A ti dá iṣẹ́ dúró fún ìgbà díẹ̀ kí a má gba owó lọ́wọ́ rẹ lẹ́ẹ̀mejì.",
-      "multipleCurrentConflictCta": "Tẹ̀síwájú lórí kilo.ai",
-      "nonCanonicalEarlybirdTitle": "A rí ètò àtijọ́",
-      "nonCanonicalEarlybirdBody": "Ènìyàn gbọ́dọ̀ ṣe àtúnyẹ̀wò ètò ìwọlé àkọ́kọ́ rẹ kí o tó lè lò ó lórí fóònù.",
-      "iosTitle": "KiloClaw kò sí lórí iOS",
-      "iosBody": "Fún àkọọ́lẹ̀ yìí, a ń ṣàkóso àyè sí KiloClaw ní òde ìṣàfilọ́lẹ̀ iOS.",
-      "iosContact": "Ṣé o ní ìbéèrè? Kàn sí {{supportEmail}}.",
-      "quarantinedCta": "Firánṣẹ́ ímeèlì sí ẹgbẹ́ wa",
-      "nonCanonicalEarlybirdCta": "Ṣàyẹ̀wò ètò rẹ lórí kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} nílò àfiyèsí: {{label}}",
-      "openUnread_one": "Ṣí {{name}}, ìfiranṣẹ́ {{displayCount}} tí a kò tíì kà",
-      "openUnread": "Ṣí {{name}}, ìfiránṣẹ́ {{displayCount}} tí a kò tíì kà",
-      "openUnread_other": "Ṣí {{name}}, ìfiránṣẹ́ {{displayCount}} tí a kò tíì kà",
-      "openSettings": "Ṣí àwọn ètò fún {{name}}",
-      "fixOnKiloAi": "Ṣàtúnṣe lórí kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Fọwọ́ sí àwọn ìbéèrè ẹ̀rọ",
-      "execPolicyDescription": "Àwọn ètò ààbò",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Yíyan àwòṣe AI",
-      "secretsDescription": "Àwọn ẹ̀rí ìwọlé tí a fi ìpàrokò dáàbò bò",
-      "versionPinDescription": "Di ẹ̀dà kan pàtó mú"
-    },
-    "avatar": {
-      "arcade": "Ẹ̀rọ eré",
-      "brain": "Ọpọlọ",
-      "creature": "Ẹ̀dá",
-      "crystal": "Kírísítálì",
-      "custom": "Àwòrán ìdánimọ̀ àkànṣe",
-      "dragon": "Dírágónì",
-      "explorer": "Olùwádìí",
-      "flame": "Ọwọ́ iná",
-      "lightning": "Mọ̀nàmọ́ná",
-      "magicWand": "Ọ̀pá idán",
-      "moon": "Òṣùpá",
-      "operator": "Olùṣiṣẹ́",
-      "orbit": "Ọ̀nà ìyípo",
-      "oracle": "Afọ̀ṣẹ",
-      "rainbow": "Òṣùmàrè",
-      "robot": "Rọ́bọ́ọ̀tì",
-      "satellite": "Satẹ́laìtì",
-      "sparkles": "Àwọn ìtànṣán",
-      "strongArm": "Apá tó lágbára",
-      "talisman": "Oògùn ààbò"
-    },
-    "remoteSpawnFilesNotSupported": "Ẹ̀rọ yìí kò lè gba àwọn fáìlì.",
-    "instanceSwitcherTitle": "Ẹ̀rọ KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Gbé {{filename}} sí òsì",
       "moveRight": "Gbé {{filename}} sí ọ̀tún"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Lẹ àwòrán mọ́ láti ibi ìpamọ́ àdàkọ",
-      "label": "A rí àwòrán, tẹ̀ ẹ́ láti lẹ̀ ẹ́ mọ́"
-    },
     "attachmentPicker": {
       "camera": "Kámẹ́rà",
       "photoLibrary": "Àkójọpọ̀ fọ́tò",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "A ti jáde kúrò nínú ìgbà ìwọlé náà.",
     "signOutThisDeviceTitle": "Jáde lórí ẹ̀rọ yìí?",
     "signOutThisSessionTitle": "Jáde kúrò nínú ìgbà ìwọlé yìí?",
-    "signOutThisSessionMessage": "A ó mú {{device}} jáde. Ẹ̀rọ náà ṣì lè lo API fún àkókò tó tó wákàtí kan."
+    "signOutThisSessionMessage": "A ó mú {{device}} jáde. Ẹ̀rọ náà ṣì lè lo API fún àkókò tó tó wákàtí kan.",
+    "unknownDevice": "Ẹ̀rọ àìmọ̀"
   },
   "forceUpdate": {
     "couldNotOpenStore": "A kò lè ṣí ilé ìtajà ìṣàfilọ́lẹ̀.",

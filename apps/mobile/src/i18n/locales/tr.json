@@ -101,12 +101,9 @@
     "scheduled": "Zamanlandı",
     "keepEditing": "Düzenlemeye devam et",
     "keepRunning": "Çalıştırmaya devam et",
-    "kiloclaw": "KiloClaw",
     "newSession": "Yeni oturum",
-    "noKiloclawInstances": "KiloClaw sunucusu yok",
     "noModelsAvailable": "Kullanılabilir model yok",
     "notFound": "Bulunamadı.",
-    "online": "Çevrimiçi",
     "open": "{{name}} öğesini aç",
     "openPullRequest": "Açık çekme isteği",
     "pending": "Bekliyor",
@@ -257,7 +254,8 @@
     "renamePasskey": "Geçiş anahtarını yeniden adlandır",
     "removePasskey": "Geçiş anahtarını kaldır",
     "removePasskeyTitle": "Geçiş anahtarı kaldırılsın mı?",
-    "removePasskeyMessage": "Artık bu geçiş anahtarıyla oturum açamayacaksınız."
+    "removePasskeyMessage": "Artık bu geçiş anahtarıyla oturum açamayacaksınız.",
+    "changelog": "Yenilikler"
   },
   "preferences": {
     "general": "Genel",
@@ -320,23 +318,18 @@
     "previewGenericDescription": "Bildirimler yalnızca yeni bir gelişme olduğunu gösterir. Mesajı okumak için Kilo'yu aç.",
     "channel": {
       "agentProgress": "Ajan ilerlemesi",
-      "chat": "Sohbet mesajları",
-      "kiloclaw": "KiloClaw etkinliği",
       "balance": "Bakiye uyarıları",
       "security": "Güvenlik bulguları",
       "spend": "Harcama uyarıları",
       "followedSessions": "Takip edilen oturumlar"
     },
     "category": {
-      "chatMessagesSubtitle": "konuşmalarındaki yanıtlar",
       "agentAttentionTitle": "Ajan seni bekliyor",
       "agentAttentionSubtitle": "sorular, izin ve bilgi istekleri",
       "agentUpdatesTitle": "Ajan güncellemeleri",
       "agentUpdatesSubtitle": "görev sırasında ajandan gelen mesajlar",
       "sessionStatusTitle": "Oturum durumu",
       "sessionStatusSubtitle": "bitti / başarısız / kontrol edilmeye hazır",
-      "kiloclawActivitySubtitle": "örnek hazır/başarısız, zamanlanmış eylemler",
-      "kiloclawActivityUnavailable": "KiloClaw etkinliği almak için bir KiloClaw örneği başlat.",
       "balanceAlertsSubtitle": "düşük kuruluş bakiyesi uyarıları",
       "balanceAlertsUnavailable": "Bakiye uyarıları almak için bir kuruluşa katıl.",
       "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları",
@@ -356,72 +349,19 @@
   },
   "tabs": {
     "home": "Ana sayfa",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, sekme, toplam {{total}} sekmenin {{position}}. sekmesi"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Sunucu seçimi",
-      "couldNotLoadInstances": "Sunucular yüklenemedi.",
-      "noInstancesDescription": "Sohbete başlamak için bir sunucu kur.",
-      "setUpKiloclaw": "KiloClaw'ı kur",
-      "currentInstance": "{{title}}, seçili sunucu"
-    },
     "conversation": {
-      "failedToLoad": "Sohbet yüklenemedi.",
-      "notFound": "Sohbet bulunamadı.",
       "untitled": "Başlıksız",
-      "leaveTitle": "Sohbetten ayrılmak ister misin?",
-      "leaveMessage": "Bu sohbet listenden kaldırılacak.",
-      "openHint": "Sohbeti açar. Yeniden adlandırma ve ayrılma seçenekleri için basılı tut.",
-      "unread": "Okunmamış",
-      "optionsFor": "{{title}} için sohbet seçenekleri",
-      "options": "Sohbet seçenekleri",
-      "renameTitle": "Sohbeti yeniden adlandırma",
-      "renamePlaceholder": "Yeni ad",
-      "couldNotReachBot": "Bota ulaşılamadı. Lütfen tekrar dene.",
-      "messageDeliveryFailed": "Mesaj bota iletilemedi.",
-      "couldNotSignIn": "Sohbet için oturum açılamadı.",
-      "couldNotRefreshMessages": "Mesajlar yenilenemedi.",
-      "couldNotLoadHistory": "Sohbet geçmişi yüklenemedi.",
-      "leave": "Ayrıl",
-      "untitledConversation": "Başlıksız sohbet",
-      "createFailed": "Sohbet oluşturulamadı.",
-      "leaveFailed": "Sohbetten ayrılınamadı."
-    },
-    "reactions": {
-      "common": "Sık kullanılanlar",
-      "reactWith": "{{reaction}} ile tepki ver",
-      "accessibility": "{{emoji}} tepkisi, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Yanıtlanan mesaj",
-      "cancelReply": "Yanıtı iptal et",
-      "openInstance": "Sunucuyu aç",
-      "attachFile": "Dosya ekle",
-      "cancelEdit": "Düzenlemeyi iptal et"
+      "renamePlaceholder": "Yeni ad"
     },
     "conversationList": {
-      "couldNotLoad": "Sohbetler yüklenemedi.",
-      "emptyTitle": "Henüz sohbet yok",
-      "emptyDescription": "KiloClaw sunucunla konuşmaya başlamak için bir sohbet oluştur.",
-      "create": "Sohbet oluştur",
-      "newConversation": "Yeni sohbet",
-      "openInstanceSettings": "Sunucu ayarlarını aç",
       "today": "Bugün",
       "yesterday": "Dün",
-      "thisWeek": "Bu hafta",
       "older": "Daha eski"
     },
     "attachment": {
-      "open": "{{filename}} dosyasını aç",
-      "openFailed": "Ek açılamadı. Bağlantını kontrol et ve tekrar dene.",
-      "attachFailed": "Dosya eklenemedi.",
-      "limit": "En fazla {{displayCount}} dosya ekleyebilirsin.",
-      "sizeRejection": "{{filename}} dosyası, {{limit}} boyut sınırını aşıyor.",
-      "unreadable": "{{filename}} okunamadı.",
-      "pastedImage": "yapıştırılan görsel",
-      "defaultName": "Ek",
       "classificationDenied": "Çalıştırılabilir dosyalar eklenemez.",
       "classificationEmpty": "Dosya boş.",
       "classificationTooLarge": "Dosyaların boyutu en fazla 20 MB olmalıdır.",
@@ -431,426 +371,17 @@
       "networkError": "Bir ağ hatası oluştu.",
       "uploadFailed": "Yükleme başarısız oldu.",
       "nothingToPaste": "Yapıştırılacak bir şey yok.",
-      "metadataStripFailed": "Fotoğrafın meta verileri kaldırılamadı.",
-      "limit_one": "En fazla {{displayCount}} dosya ekleyebilirsin.",
-      "limit_other": "En fazla {{displayCount}} dosya ekleyebilirsin."
+      "metadataStripFailed": "Fotoğrafın meta verileri kaldırılamadı."
     },
     "attachmentPreview": {
-      "accessibility": "Dosya: {{filename}}, {{status}}",
-      "retryUploading": "{{filename}} için yüklemeyi tekrar dene",
-      "remove": "{{filename}} dosyasını kaldır"
-    },
-    "messageBubble": {
-      "deleted": "[silinen mesaj]",
-      "yourMessage": "Mesajın",
-      "messageFrom": "{{author}} adlı kişiden mesaj",
-      "moreActions": "Diğer işlemler",
-      "notDelivered": "İletilmedi",
-      "edited": "(düzenlendi)",
-      "image": "Görsel"
+      "accessibility": "Dosya: {{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Kopyalandı",
-      "copyFailed": "Kopyalanamadı.",
-      "title": "Mesaj işlemleri",
-      "deleteTitle": "Mesaj silinsin mi?",
-      "deleteMessage": "Mesaj sohbetten kaldırılacak.",
-      "deleteFailed": "Mesaj silinemedi.",
-      "removeReactionFailed": "Tepki kaldırılamadı.",
-      "addReactionFailed": "Tepki eklenemedi.",
-      "retrySend": "Tekrar gönder",
-      "moreReactions": "Daha fazla tepki",
-      "edit": "Düzenle",
-      "sendFailed": "Mesaj gönderilemedi.",
-      "retrySendFailed": "Mesaj tekrar gönderilemedi.",
-      "editFailed": "Mesaj düzenlenemedi.",
-      "executeFailed": "İşlem gerçekleştirilemedi."
+      "edit": "Düzenle"
     },
     "attachmentPicker": {
-      "takePhoto": "Fotoğraf çek",
-      "photoLibrary": "Fotoğraf arşivi",
-      "files": "Dosya",
       "cameraAccessMessage": "Fotoğraf çekmek için Ayarlar'dan kamera erişimine izin ver."
-    },
-    "typingIndicator": {
-      "someone": "Biri",
-      "typing_one": "{{name}} yazıyor...",
-      "typing": "{{names}} yazıyor...",
-      "typing_other": "{{names}} yazıyor..."
-    },
-    "botStatus": {
-      "offline": "Çevrimdışı",
-      "loadingUser": "Kullanıcı yükleniyor...",
-      "waitingForStatus": "Bot durumu bekleniyor...",
-      "offlineMessage": "Bot çevrimdışı. Yeniden bağlandığında mesajlaşma devam edecek."
-    },
-    "errors": {
-      "notAllowed": "Bu işleme izin verilmiyor.",
-      "messageTooLong": "Mesaj çok uzun. {{limit}} karakterden kısa olmalı.",
-      "titleTooLong": "Başlık çok uzun. {{limit}} karakterden kısa olmalı.",
-      "messageEmpty": "Mesaj boş olamaz."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw örnekleri yüklenemedi.",
-    "billing": {
-      "title": "Faturalandırma",
-      "continueMonthToMonth": "Aylık planla devam et",
-      "plan": "Çalışma planı",
-      "finalTermEnds": "Son dönemin bitiş tarihi",
-      "afterFinalTerm": "Son dönemden sonra",
-      "lessThanOneDay": "1 Günden az",
-      "ends": "Bitiş tarihi",
-      "expires": "Son geçerlilik tarihi",
-      "noActivePlan": "Etkin plan yok",
-      "noActivePlanDescription": "Etkin bir KiloClaw aboneliğin yok.",
-      "managedByAdmin": "Faturalandırmayı kuruluş yöneticin yönetir.",
-      "couldNotLoad": "Faturalandırma bilgileri yüklenemedi.",
-      "manageOnWeb": "Faturalandırmayı web üzerinden yönet",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Son Commit dönemin {{date}} tarihinde sona eriyor. {{price}} karşılığında Standard planıyla devam etmezsen barındırma hizmetin sona erecek.",
-      "freeTrial": "Ücretsiz deneme",
-      "hostingEnds": "Barındırma sona eriyor",
-      "renews": "Yenileme tarihi",
-      "standardMonthToMonth": "Aylık Standard planı",
-      "standardStartsOn": "Standard planı {{date}} tarihinde {{price}} ücretle başlıyor.",
-      "yourStandardMonthlyPrice": "standard planının aylık ücreti",
-      "perMonth": "/ay",
-      "earlybirdAccessUntil": "Earlybird erişimi {{date}} tarihine kadar geçerli.",
-      "earlybirdEnding": "Earlybird erişiminin bitmesine {{remaining}} kaldı.",
-      "paymentPastDue": "Ödemen gecikti. Lütfen ödeme yöntemini güncelle.",
-      "subscriptionCancels": "Abonelik {{date}} tarihinde iptal edilecek.",
-      "trialDaysRemaining": "Deneme süresinin bitmesine {{remaining}} kaldı.",
-      "trialEndingSoon": "Deneme süresi yakında bitiyor. Kalan süre: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Değişiklik kaydı"
-    },
-    "changelog": {
-      "title": "Yenilikler",
-      "couldNotLoad": "Değişiklik günlüğü yüklenemedi.",
-      "noUpdates": "Henüz güncelleme yok",
-      "noUpdatesDescription": "Değişiklik günlüğündeki kayıtlar burada görünecek.",
-      "recentUpdates": "Son güncellemeler",
-      "manageVersion": "Sürümü yönet",
-      "redeployRequired": "Yeniden dağıtım gerekli",
-      "redeploySuggested": "Yeniden dağıtım önerilir",
-      "upgradeRequired": "Yükseltme gerekli"
-    },
-    "dashboard": {
-      "title": "Panel",
-      "couldNotLoad": "Panel yüklenemedi.",
-      "renameInstance": "Örneği yeniden adlandır",
-      "renamePlaceholder": "Yeni ad (en fazla 50 karakter)",
-      "someDetailsFailed": "Bazı anlık bilgiler yüklenemedi.",
-      "destroy": "Kalıcı olarak sil",
-      "destroyMessage": "KiloClaw örneğin ve tüm verileri kalıcı olarak silinecek. Bu işlem geri alınamaz.",
-      "destroyTitle": "Örneği kalıcı olarak sil",
-      "instance": "Örnek",
-      "couldNotCheckStatus": "Hizmet durumu kontrol edilemedi.",
-      "dangerZone": "TEHLİKE BÖLGESİ",
-      "destroying": "Kalıcı olarak siliniyor…",
-      "serviceDegraded": "Hizmette sorun var — durumu görmek için dokun",
-      "up": "ÇALIŞIYOR"
-    },
-    "channels": {
-      "title": "Kanallar",
-      "couldNotLoad": "Kanallar yüklenemedi.",
-      "noChannels": "Kullanılabilir kanal yok",
-      "noChannelsDescription": "Kanal entegrasyonları burada görünecek.",
-      "connected": "{{label}} bağlandı",
-      "disconnectMessage": "{{label}} kaldırılsın mı? Bu kanalın bağlantısı kesilecek.",
-      "disconnectTitle": "Kanalın bağlantısını kes"
-    },
-    "devicePairing": {
-      "title": "Cihaz eşleştirme",
-      "refreshRequests": "Eşleştirme isteklerini yenile",
-      "couldNotLoad": "Eşleştirme istekleri yüklenemedi.",
-      "noPending": "Bekleyen istek yok",
-      "noPendingDescription": "Kanal ve cihaz eşleştirme istekleri burada görünecek.",
-      "channelRequests": "Kanal istekleri",
-      "deviceRequests": "Cihaz istekleri",
-      "approveDeviceMessage": "{{platform}} cihazının örneğine bağlanmasına izin verilsin mi?",
-      "approveDeviceTitle": "Cihazı onayla",
-      "approveMessage": "{{label}} (kod: {{code}}) için örneğine bağlanma izni verilsin mi?",
-      "approveTitle": "Eşleştirme isteğini onayla",
-      "unknownDevice": "Bilinmeyen cihaz"
-    },
-    "execPolicy": {
-      "title": "Yürütme ilkesi",
-      "couldNotLoad": "Komut çalıştırma ilkesi yüklenemedi.",
-      "alwaysAsk": "Her zaman sor",
-      "alwaysAskDescription": "Her komutu çalıştırmadan önce onayla. En güvenli seçenek budur.",
-      "neverAsk": "Asla sorma",
-      "neverAskDescription": "Komutları onay almadan çalıştır. Daha hızlıdır ama daha az güvenlidir."
-    },
-    "google": {
-      "title": "Google hesabı",
-      "couldNotLoad": "Google hesabının durumu yüklenemedi.",
-      "disconnected": "Google hesabının bağlantısı kesildi. Değişikliği uygulamak için örneğini yeniden dağıt.",
-      "setupCommand": "Kurulum komutu",
-      "setupCommandHelp": "Google hesabını bağlamak için bu komutu Docker yüklü bilgisayarında bir terminal açarak çalıştır.",
-      "failedToLoadCommand": "Kurulum komutu yüklenemedi.",
-      "gmailNotifications": "Gmail bildirimleri",
-      "disconnect": "Google hesabının bağlantısını kes",
-      "copied": "Kopyalandı",
-      "copyCommand": "Komutu kopyala",
-      "disconnectConfirm": "Bağlantıyı kes",
-      "disconnectMessage": "Google hesabın bu örnekten kaldırılsın mı? Gmail bildirimleri kapatılacak. Değişiklikleri uygulamak için bağlantıyı kestikten sonra örneğini yeniden dağıt.",
-      "disconnectTitle": "Google bağlantısını kes"
-    },
-    "modelList": {
-      "noMatches": "Aramanla eşleşen model yok",
-      "noModelsDescription": "Modeller kullanılabilir olduğunda burada görünecek.",
-      "noResultsFor": "\"{{query}}\" için sonuç bulunamadı."
-    },
-    "secrets": {
-      "title": "Gizli bilgiler",
-      "couldNotLoad": "Gizli bilgiler yüklenemedi.",
-      "noSecrets": "Kullanılabilir gizli bilgi yok",
-      "noSecretsDescription": "Gizli bilgi entegrasyonları burada görünecek.",
-      "removeMessage": "{{label}} kaldırılsın mı? Bu araç kimlik bilgilerine erişimini kaybeder.",
-      "removeTitle": "Gizli bilgiyi kaldır",
-      "saved": "{{label}} kaydedildi",
-      "allFieldsRequired": "{{label}} bağlantısı için tüm alanların doldurulması gerekir.",
-      "hide": "{{label}} değerini gizle",
-      "removing": "Kaldırılıyor…",
-      "saving": "Kaydediliyor…",
-      "setupGuide": "Kurulum kılavuzu",
-      "setupGuideA11y": "{{label}} kurulum kılavuzu",
-      "setupGuideFallback": "kurulum kılavuzu",
-      "show": "{{label}} değerini göster",
-      "updateToken": "Erişim belirtecini güncelle"
-    },
-    "versionPin": {
-      "title": "Sürüm sabitleme",
-      "couldNotLoad": "Sürüm bilgileri yüklenemedi.",
-      "couldNotLoadMore": "Daha fazla sürüm yüklenemedi.",
-      "loadMore": "Daha fazla sürüm yükle",
-      "showingLatest": "Son 100 sürüm gösteriliyor.",
-      "availableVersions": "Kullanılabilir sürümler",
-      "noVersions": "Kullanılabilir sürüm yok",
-      "noVersionsDescription": "Kullanılabilir OpenClaw sürümleri burada görünecek.",
-      "unpin": "Sabitlemeyi kaldır",
-      "unpinMessage": "Kullanılabilir en son sürüme geri dönülsün mü?",
-      "unpinTitle": "Sürüm sabitlemesini kaldır",
-      "confirmPin": "Sabitlemeyi onayla",
-      "followingLatest": "En son sürüm izleniyor",
-      "latest": "en son",
-      "pin": "Sabitle",
-      "pinnedByAdmin": "Yönetici bu sürümü sabitledi. Değiştirmek için yöneticine başvur.",
-      "pinnedTo": "{{version}} sürümüne sabitlendi",
-      "reasonOptional": "Neden (isteğe bağlı)",
-      "reasonPlaceholder": "Bu sürümü sabitleme nedenin",
-      "replaceAdminPin": "Yöneticinin sabitlemesini değiştir",
-      "replacesAdminPin": "Yöneticinin sabitlediği sürüm (şu anda {{label}}) bu seçimle değiştirilecek."
-    },
-    "redeploy": "Yeniden dağıt",
-    "redeployMessage": "Bu örneği yeniden dağıtmak istediğinden emin misin?",
-    "redeployTitle": "Örneği yeniden dağıt",
-    "accessRequired": {
-      "iosBody": "Bu hesap için KiloClaw erişimi iOS uygulamasının dışında yönetilir.",
-      "iosContact": "Sorun mu var? {{supportEmail}} adresine yaz.",
-      "iosTitle": "KiloClaw iOS'ta kullanılamıyor",
-      "multipleCurrentConflictBody": "Hesabında birden fazla etkin abonelik bulduk. Senden iki kez ücret almamak için işlemleri duraklattık.",
-      "multipleCurrentConflictCta": "Kilo.ai sitesinde devam et",
-      "nonCanonicalEarlybirdBody": "Erken erişim planının mobilde kullanılabilmesi için önce elle incelenmesi gerekiyor.",
-      "nonCanonicalEarlybirdTitle": "Eski plan tespit edildi",
-      "quarantinedBody": "KiloClaw örneğin karantinada ve şu anda kullanılamıyor. Tekrar çalışır hâle gelmesi için ekibimizin müdahalesi gerekiyor.",
-      "quarantinedTitle": "Örnekteki sorunların giderilmesi gerekiyor",
-      "subscriptionCanceledBody": "KiloClaw'ı kullanmak için tarayıcından kilo.ai/claw adresine git. Uygulama içinden abone olamazsın.",
-      "subscriptionCanceledCta": "Kilo.ai/claw'ı aç",
-      "subscriptionCanceledTitle": "Web sitesinden abone ol",
-      "subscriptionPastDueBody": "Son ödemende sorun yaşadık. Ödeme bilgilerini güncellemek için tarayıcından kilo.ai/claw adresine git. Uygulama içinden faturalandırmayı yönetemezsin.",
-      "subscriptionPastDueTitle": "Ödeme bilgilerini web üzerinden güncelle",
-      "trialExpiredBody": "KiloClaw'ı kullanmaya devam etmek için tarayıcından kilo.ai/claw adresine git. Uygulama içinden abone olamazsın.",
-      "quarantinedCta": "Ekibimize e-posta gönder",
-      "nonCanonicalEarlybirdCta": "Planını kilo.ai'de incele"
-    },
-    "controls": {
-      "redeploying": "Yeniden dağıtılıyor…",
-      "restart": "Yeniden başlat",
-      "restartOpenClawMessage": "OpenClaw sürecini yeniden başlatmak istediğinden emin misin?",
-      "restartOpenClawTitle": "OpenClaw'ı yeniden başlat",
-      "restarting": "Yeniden başlatılıyor…",
-      "start": "Başlat",
-      "startMessage": "Bu örneği başlatmak istediğinden emin misin?",
-      "startTitle": "Örneği başlat",
-      "stop": "Durdur",
-      "stopMessage": "Bu örneği durdurmak istediğinden emin misin?",
-      "stopTitle": "Örneği durdur",
-      "stopping": "Durduruluyor…"
-    },
-    "empty": {
-      "finishingSetup": "Kurulum tamamlanıyor",
-      "finishingSetupDescription": "Lütfen bekle, hesap kurulumunu tamamlıyoruz. Bu işlem genellikle kısa sürer.",
-      "getStarted": "Başla",
-      "noInstancesDescription": "Kodlama ajanlarını çalıştırmaya başlamak için ilk örneğini oluştur."
-    },
-    "instance": {
-      "backToInstances": "Örneklere geri dön",
-      "couldNotLoad": "Örnek yüklenemedi.",
-      "notFound": "Örnek bulunamadı",
-      "notFoundDescription": "Bu örnek kalıcı olarak silinmiş olabilir veya bağlantı artık geçerli olmayabilir."
-    },
-    "instanceCard": {
-      "fixOnKiloAi": "Kilo.ai üzerinden düzelt: {{label}}",
-      "needsAttention": "{{name}} için müdahale gerekiyor: {{label}}",
-      "openSettings": "{{name}} için ayarları aç",
-      "openUnread": "{{name}} öğesini aç, {{displayCount}} okunmamış mesaj",
-      "openUnread_other": "{{name}} öğesini aç, {{displayCount}} okunmamış mesaj",
-      "openUnread_one": "{{name}} adlı örneği aç, {{displayCount}} okunmamış mesaj var"
-    },
-    "list": {
-      "createInstance": "Örnek oluştur",
-      "organizations": "Kuruluşlar",
-      "accessIssue": {
-        "trialExpired": "Deneme süresi doldu. Bu örneği kullanmaya devam etmek için abone ol",
-        "subscriptionCanceled": "Abonelik etkin değil. Bu örneği kullanmaya devam etmek için yeniden abone ol",
-        "subscriptionPastDue": "Ödemede sorun var. Bu örneği kullanmaya devam etmek için faturalandırma bilgilerini güncelle",
-        "quarantined": "Örnek karantinaya alındı, elle inceleme gerekiyor",
-        "multipleCurrentConflict": "Hesabın incelenmesi gerekiyor",
-        "nonCanonicalEarlybird": "Eski planın incelenmesi gerekiyor"
-      }
-    },
-    "modelPicker": {
-      "autoModelA11y": "{{label}} otomatik modeli",
-      "balancedDescription": "Daha düşük maliyetle hız ve beceri arasında denge kurar.",
-      "browseAllModels": "veya 500'den fazla model arasından seç",
-      "browseAllModelsA11y": "500'Den fazla modelin tümüne göz at",
-      "currentModel": "Seçili model",
-      "frontierDescription": "En yüksek performansı sunar. Akıl yürütebilen öncü modellere yönlendirir.",
-      "frontierLabel": "Öncü",
-      "kiloAuto": "Kilo Auto"
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}} ile sohbet et",
-        "ready": "{{name}} hazır",
-        "warmedUp": "Tamamen hazır. Ne zaman istersen selam ver."
-      },
-      "flow": {
-        "couldNotLoad": "Kurulum durumu yüklenemedi.",
-        "finishingSetup": "Kurulum tamamlanıyor. Hesabını hazırlarken lütfen bekle.",
-        "genericErrorBody": "Örneğinin kurulumunu şu anda tamamlayamadık.",
-        "identityTitle": "Botuna bir kimlik ver",
-        "manualReviewBody": "Bir örnek oluşturabilmemiz için önce hesabındaki sorunun çözülmesi gerekiyor. kilo.ai üzerinden devam et.",
-        "manualReviewTitle": "Kurulumun elle incelenmesi gerekiyor",
-        "openKiloAi": "Kilo.ai'yi aç",
-        "provisioning": "Hazırlanıyor",
-        "ready": "Hazır",
-        "review": "İnceleme",
-        "settingUp": "Kuruluyor…"
-      },
-      "identity": {
-        "changePersonality": "Kişiliği değiştir",
-        "chooseAvatar": "Avatar seç",
-        "location": "Konum",
-        "locationDeniedMessage": "Şu anki konumunu kullanmak için ayarlardan konum erişimini aç.",
-        "locationDeniedTitle": "Konum erişimi reddedildi",
-        "locationGetFailed": "Konumun alınamadı. Elle gir.",
-        "locationPlaceholder": "Şehir veya bölge (isteğe bağlı)",
-        "locationResolveFailed": "Konumun belirlenemedi. Elle düzenleyebilirsin.",
-        "locationValidationFailed": "Konum doğrulanamadı.",
-        "namePlaceholder": "Botunun adı",
-        "nature": {
-          "aiAssistantLabel": "Yapay zekâ asistanı",
-          "aiAssistantVibe": "Yardımsever, yetenekli, profesyonel",
-          "digitalCreatureLabel": "Dijital yaratık",
-          "digitalCreatureVibe": "Sıra dışı, canlı, biraz öngörülemez",
-          "somethingWeirderLabel": "Daha tuhaf bir şey…",
-          "somethingWeirderVibe": "Kendin tanımla",
-          "virtualCompanionLabel": "Sanal arkadaş",
-          "virtualCompanionVibe": "Sıcakkanlı, hep yanında, seni gerçekten önemser"
-        },
-        "personality": "Kişilik",
-        "selectAvatar": "{{name}} avatarını seç",
-        "useCurrentLocation": "Şu anki konumu kullan"
-      },
-      "notifications": {
-        "couldNotEnable": "Bildirimler etkinleştirilemedi.",
-        "getNotified": "{{name}} bir görevi tamamladığında bildirim al, hiçbir yanıtı kaçırma.",
-        "mockMessage": "Tamamdır! İstediğin özeti hazırladım. Sen hazır olduğunda ben de hazırım.",
-        "now": "şimdi",
-        "settingUp": "Bildirimler ayarlanıyor…",
-        "skipForNow": "Şimdilik atla",
-        "stayInTheLoop": "Gelişmelerden haberdar ol"
-      },
-      "provisioning": {
-        "backgroundHint": "Genellikle bir dakikadan kısa sürer. Bu ekranı kapatabilirsin. Arka planda çalışmaya devam edeceğiz.",
-        "connectingToAgent": "Ajana bağlanılıyor",
-        "continueInBackground": "Arka planda devam et",
-        "queryErrorBody": "{{name}} için kurulum durumunu kontrol ederken bağlantımız kesildi. Kurulum hâlâ devam ediyor olabilir. Tekrar dene veya biraz sonra kontrol et.",
-        "queryErrorTitle": "Kurulum durumu kontrol edilemedi",
-        "settingUp": "{{name}} kuruluyor",
-        "stalledBody": "{{name}} için kurulumu tamamlayamadık. Tekrar dene. Sorun devam ederse {{supportEmail}} adresine e-posta gönder.",
-        "stalledTitle": "Kurulum ilerlemiyor",
-        "startingSandbox": "Korumalı alan başlatılıyor",
-        "stoppedBody": "{{name}} adlı örnek kurulum sırasında beklenmedik şekilde durdu.",
-        "stoppedTitle": "Kurulum durdu",
-        "timeoutBody": "{{name}} kurulumu normalden uzun sürüyor ({{displayMinutes}} dakikadan fazla).",
-        "timeoutTitle": "Beklenenden uzun sürüyor"
-      },
-      "unavailableDescription": "Bir örnek oluşturmak için etkin bir KiloClaw aboneliği gerekir. Mevcut örnekler ve abonelikler normal şekilde devam eder.",
-      "unavailableTitle": "Yeni KiloClaw örnekleri oluşturulamıyor"
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kod {{code}}",
-      "gatewayProcess": "AĞ GEÇİDİ SÜRECİ",
-      "lastExit": "Son çıkış",
-      "memory": "Bellek",
-      "region": "Bölge",
-      "resources": "KAYNAKLAR",
-      "restarts": "Yeniden başlatmalar",
-      "state": "Durum",
-      "uptime": "Çalışma süresi",
-      "crashed": "ÇÖKTÜ",
-      "destroying": "SİLİNİYOR",
-      "provisioned": "HAZIRLANDI",
-      "restarting": "YENİDEN BAŞLATILIYOR",
-      "running": "ÇALIŞIYOR",
-      "shuttingDown": "KAPATILIYOR",
-      "starting": "BAŞLATILIYOR",
-      "stopped": "DURDURULDU",
-      "stopping": "DURDURULUYOR",
-      "unknown": "BİLİNMİYOR",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Cihaz isteklerini onayla",
-      "execPolicyDescription": "Güvenlik ayarları",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Yapay zekâ modeli seçimi",
-      "secretsDescription": "Şifrelenmiş kimlik bilgileri",
-      "versionPinDescription": "Belirli bir sürüme sabitle"
-    },
-    "avatar": {
-      "arcade": "Atari",
-      "brain": "Beyin",
-      "creature": "Yaratık",
-      "crystal": "Kristal",
-      "custom": "Özel avatar",
-      "dragon": "Ejderha",
-      "explorer": "Kâşif",
-      "flame": "Alev",
-      "lightning": "Yıldırım",
-      "magicWand": "Sihirli değnek",
-      "moon": "Ay",
-      "operator": "Operatör",
-      "orbit": "Yörünge",
-      "oracle": "Kâhin",
-      "rainbow": "Gökkuşağı",
-      "robot": "Robot avatarı",
-      "satellite": "Uydu",
-      "sparkles": "Parıltılar",
-      "strongArm": "Güçlü kol",
-      "talisman": "Tılsım"
-    },
-    "remoteSpawnFilesNotSupported": "Bu örnek dosya alamıyor.",
-    "instanceSwitcherTitle": "KiloClaw örneği"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2030,10 +1561,6 @@
       "moveLeft": "{{filename}} dosyasını sola taşı",
       "moveRight": "{{filename}} dosyasını sağa taşı"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Panodan görsel yapıştır",
-      "label": "Görsel bulundu, yapıştırmak için dokun"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Fotoğraf arşivi",
@@ -2229,7 +1756,8 @@
     "sessionSignedOut": "Oturum kapatıldı.",
     "signOutThisDeviceTitle": "Bu cihazın oturumu kapatılsın mı?",
     "signOutThisSessionTitle": "Bu oturum kapatılsın mı?",
-    "signOutThisSessionMessage": "{{device}} cihazındaki oturum kapatılacak. Cihazın API erişimi bir saat daha devam edebilir."
+    "signOutThisSessionMessage": "{{device}} cihazındaki oturum kapatılacak. Cihazın API erişimi bir saat daha devam edebilir.",
+    "unknownDevice": "Bilinmeyen cihaz"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Uygulama mağazası açılamadı.",

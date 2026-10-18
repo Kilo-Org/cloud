@@ -101,12 +101,9 @@
     "scheduled": "Suplanuota",
     "keepEditing": "Tęsti redagavimą",
     "keepRunning": "Tęsti vykdymą",
-    "kiloclaw": "KiloClaw",
     "newSession": "Nauja sesija",
-    "noKiloclawInstances": "Nėra KiloClaw egzempliorių",
     "noModelsAvailable": "Nėra modelių",
     "notFound": "Nerasta.",
-    "online": "Prisijungęs",
     "open": "Atidaryti {{name}}",
     "openPullRequest": "Atidaryti pakeitimų užklausą",
     "pending": "Laukiama",
@@ -257,7 +254,8 @@
     "renamePasskey": "Pervadyti priėjimo raktą",
     "removePasskey": "Pašalinti priėjimo raktą",
     "removePasskeyTitle": "Pašalinti priėjimo raktą?",
-    "removePasskeyMessage": "Daugiau negalėsite prisijungti su šiuo priėjimo raktu."
+    "removePasskeyMessage": "Daugiau negalėsite prisijungti su šiuo priėjimo raktu.",
+    "changelog": "Kas naujo"
   },
   "preferences": {
     "general": "Bendra",
@@ -864,23 +862,18 @@
     "previewGenericDescription": "Pranešimai tik informuoja apie įvykį. Norėdami perskaityti žinutę, atidarykite Kilo.",
     "channel": {
       "agentProgress": "Agentų eiga",
-      "chat": "Pokalbių žinutės",
-      "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",
       "security": "Saugos problemos",
       "spend": "Išlaidų įspėjimai",
       "followedSessions": "Sekamos sesijos"
     },
     "category": {
-      "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",
       "agentAttentionTitle": "Agentui reikia jūsų atsakymo",
       "agentAttentionSubtitle": "klausimai, leidimų ir informacijos prašymai",
       "agentUpdatesTitle": "Agento naujienos",
       "agentUpdatesSubtitle": "agento žinutės užduoties metu",
       "sessionStatusTitle": "Sesijos būsena",
       "sessionStatusSubtitle": "baigta / nepavyko / paruošta valdyti",
-      "kiloclawActivitySubtitle": "egzemplioriaus parengtis ar klaida, suplanuoti veiksmai",
-      "kiloclawActivityUnavailable": "Paleiskite KiloClaw egzempliorių, kad gautumėte KiloClaw veiklą.",
       "balanceAlertsSubtitle": "įspėjimai apie mažą organizacijos likutį",
       "balanceAlertsUnavailable": "Prisijunkite prie organizacijos, kad gautumėte balanso įspėjimus.",
       "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai",
@@ -900,72 +893,19 @@
   },
   "tabs": {
     "home": "Pradžia",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, skirtukas, {{position}} iš {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Egzemplioriaus pasirinkimas",
-      "couldNotLoadInstances": "Nepavyko įkelti egzempliorių.",
-      "noInstancesDescription": "Paruošk egzempliorių, kad galėtum pradėti pokalbį.",
-      "setUpKiloclaw": "Paruošti KiloClaw",
-      "currentInstance": "{{title}}, dabartinis"
-    },
     "conversation": {
-      "failedToLoad": "Nepavyko įkelti pokalbio.",
-      "notFound": "Pokalbis nerastas.",
       "untitled": "Be pavadinimo",
-      "leaveTitle": "Išeiti iš pokalbio?",
-      "leaveMessage": "Pokalbis bus pašalintas iš tavo sąrašo.",
-      "openHint": "Atidaro pokalbį. Paspausk ir palaikyk, kad pamatytum pervadinimo ir išėjimo parinktis.",
-      "unread": "Neskaitytas",
-      "optionsFor": "Pokalbio „{{title}}“ parinktys",
-      "options": "Pokalbio parinktys",
-      "renameTitle": "Pokalbio pervadinimas",
-      "renamePlaceholder": "Naujas pavadinimas",
-      "couldNotReachBot": "Nepavyko susisiekti su robotu. Bandyk dar kartą.",
-      "messageDeliveryFailed": "Žinutės nepavyko pristatyti robotui.",
-      "couldNotSignIn": "Nepavyko prisijungti prie pokalbio.",
-      "couldNotRefreshMessages": "Nepavyko atnaujinti žinučių.",
-      "couldNotLoadHistory": "Nepavyko įkelti pokalbio istorijos.",
-      "leave": "Išeiti",
-      "untitledConversation": "Pokalbis be pavadinimo",
-      "createFailed": "Nepavyko sukurti pokalbio.",
-      "leaveFailed": "Nepavyko išeiti iš pokalbio."
-    },
-    "reactions": {
-      "common": "Dažnos",
-      "reactWith": "Pridėti reakciją {{reaction}}",
-      "accessibility": "{{emoji}} reakcija, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Atsakoma į",
-      "cancelReply": "Atšaukti atsakymą",
-      "openInstance": "Atidaryti egzempliorių",
-      "attachFile": "Pridėti failą",
-      "cancelEdit": "Atšaukti redagavimą"
+      "renamePlaceholder": "Naujas pavadinimas"
     },
     "conversationList": {
-      "couldNotLoad": "Nepavyko įkelti pokalbių.",
-      "emptyTitle": "Pokalbių dar nėra",
-      "emptyDescription": "Sukurk pokalbį, kad galėtum bendrauti su savo KiloClaw egzemplioriumi.",
-      "create": "Sukurti pokalbį",
-      "newConversation": "Naujas pokalbis",
-      "openInstanceSettings": "Atidaryti egzemplioriaus nustatymus",
       "today": "Šiandien",
       "yesterday": "Vakar",
-      "thisWeek": "Šią savaitę",
       "older": "Senesni"
     },
     "attachment": {
-      "open": "Atidaryti {{filename}}",
-      "openFailed": "Nepavyko atidaryti priedo. Patikrink ryšį ir bandyk dar kartą.",
-      "attachFailed": "Nepavyko pridėti failo.",
-      "limit": "Gali pridėti iki {{displayCount}} failų.",
-      "sizeRejection": "Failo „{{filename}}“ dydis viršija leistiną priedo dydį ({{limit}}).",
-      "unreadable": "Nepavyko perskaityti: {{filename}}.",
-      "pastedImage": "įklijuotas paveikslėlis",
-      "defaultName": "Priedas",
       "classificationDenied": "Vykdomųjų failų pridėti negalima.",
       "classificationEmpty": "Failas tuščias.",
       "classificationTooLarge": "Failo dydis negali viršyti 20 MB.",
@@ -975,432 +915,17 @@
       "networkError": "Įvyko tinklo klaida.",
       "uploadFailed": "Nepavyko įkelti.",
       "nothingToPaste": "Nėra ko įklijuoti.",
-      "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų.",
-      "limit_one": "Gali pridėti iki {{displayCount}} failas.",
-      "limit_other": "Gali pridėti iki {{displayCount}} failų.",
-      "limit_few": "Gali pridėti iki {{displayCount}} failai.",
-      "limit_many": "Gali pridėti iki {{displayCount}} failų."
+      "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}. Būsena: {{status}}",
-      "retryUploading": "Bandyti įkelti {{filename}} dar kartą",
-      "remove": "Pašalinti {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[ištrinta žinutė]",
-      "yourMessage": "Tavo žinutė",
-      "messageFrom": "Žinutės autorius: {{author}}",
-      "moreActions": "Daugiau veiksmų",
-      "notDelivered": "Nepristatyta",
-      "edited": "(redaguota)",
-      "image": "Paveikslėlis"
+      "accessibility": "{{filename}}. Būsena: {{status}}"
     },
     "messageActions": {
-      "copied": "Nukopijuota",
-      "copyFailed": "Nepavyko nukopijuoti.",
-      "title": "Žinutės veiksmai",
-      "deleteTitle": "Ištrinti žinutę?",
-      "deleteMessage": "Žinutė bus pašalinta iš pokalbio.",
-      "deleteFailed": "Nepavyko ištrinti žinutės.",
-      "removeReactionFailed": "Nepavyko pašalinti reakcijos.",
-      "addReactionFailed": "Nepavyko pridėti reakcijos.",
-      "retrySend": "Siųsti dar kartą",
-      "moreReactions": "Daugiau reakcijų",
-      "edit": "Redaguoti",
-      "sendFailed": "Nepavyko išsiųsti žinutės.",
-      "retrySendFailed": "Nepavyko išsiųsti dar kartą.",
-      "editFailed": "Nepavyko redaguoti žinutės.",
-      "executeFailed": "Nepavyko atlikti veiksmo."
+      "edit": "Redaguoti"
     },
     "attachmentPicker": {
-      "takePhoto": "Fotografuoti",
-      "photoLibrary": "Nuotraukų biblioteka",
-      "files": "Failai",
       "cameraAccessMessage": "Jei nori fotografuoti, nustatymuose leisk naudoti kamerą."
-    },
-    "typingIndicator": {
-      "someone": "Kažkas",
-      "typing_one": "{{name}} rašo...",
-      "typing": "{{names}} rašo...",
-      "typing_other": "{{names}} rašo...",
-      "typing_few": "{{names}} rašo...",
-      "typing_many": "{{names}} rašo..."
-    },
-    "botStatus": {
-      "offline": "Atsijungęs",
-      "loadingUser": "Įkeliami naudotojo duomenys...",
-      "waitingForStatus": "Laukiama roboto būsenos...",
-      "offlineMessage": "Robotas atsijungęs. Kai jis vėl prisijungs, keitimasis žinutėmis bus tęsiamas."
-    },
-    "errors": {
-      "notAllowed": "Šis veiksmas neleidžiamas.",
-      "messageTooLong": "Žinutė per ilga. Joje turi būti mažiau nei {{limit}} simbolių.",
-      "titleTooLong": "Pavadinimas per ilgas. Jame turi būti mažiau nei {{limit}} simbolių.",
-      "messageEmpty": "Žinutė negali būti tuščia."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Nepavyko įkelti KiloClaw egzempliorių.",
-    "billing": {
-      "title": "Atsiskaitymai",
-      "continueMonthToMonth": "Tęsti su mėnesine prenumerata",
-      "plan": "Planas",
-      "finalTermEnds": "Paskutinio laikotarpio pabaiga",
-      "afterFinalTerm": "Po paskutinio laikotarpio",
-      "lessThanOneDay": "Mažiau nei 1 diena",
-      "ends": "Baigiasi",
-      "expires": "Nustoja galioti",
-      "noActivePlan": "Nėra aktyvaus plano",
-      "noActivePlanDescription": "Neturi aktyvios KiloClaw prenumeratos.",
-      "managedByAdmin": "Atsiskaitymus tvarko tavo organizacijos administratorius.",
-      "couldNotLoad": "Nepavyko įkelti atsiskaitymų informacijos.",
-      "manageOnWeb": "Tvarkyti atsiskaitymus svetainėje",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Paskutinis tavo Commit plano laikotarpis baigiasi {{date}}. Tęsk prenumeratą su Standard planu už {{price}}, kitaip prieglobos paslauga bus nutraukta.",
-      "freeTrial": "Nemokamas bandomasis laikotarpis",
-      "hostingEnds": "Prieglobos paslaugos pabaiga",
-      "renews": "Pratęsiama",
-      "standardMonthToMonth": "Standard mėnesinė prenumerata",
-      "standardStartsOn": "Standard planas pradės galioti {{date}} už {{price}}.",
-      "yourStandardMonthlyPrice": "tavo Standard plano mėnesio kaina",
-      "perMonth": "/mėn.",
-      "earlybirdAccessUntil": "Earlybird prieiga galioja iki {{date}}.",
-      "earlybirdEnding": "Iki Earlybird prieigos pabaigos liko {{remaining}}.",
-      "paymentPastDue": "Mokėjimo terminas praleistas. Atnaujink mokėjimo būdą.",
-      "subscriptionCancels": "Prenumerata bus atšaukta {{date}}.",
-      "trialDaysRemaining": "Iki bandomojo laikotarpio pabaigos liko {{remaining}}.",
-      "trialEndingSoon": "Bandomasis laikotarpis netrukus baigsis. Liko {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Kas naujo",
-      "couldNotLoad": "Nepavyko įkelti pakeitimų žurnalo.",
-      "noUpdates": "Dar nėra atnaujinimų",
-      "noUpdatesDescription": "Pakeitimų žurnalo įrašai bus rodomi čia.",
-      "recentUpdates": "Naujausi atnaujinimai",
-      "manageVersion": "Tvarkyti versiją",
-      "redeployRequired": "Reikia diegti iš naujo",
-      "redeploySuggested": "Siūloma diegti iš naujo",
-      "upgradeRequired": "Reikia atnaujinti"
-    },
-    "dashboard": {
-      "title": "Valdymo skydelis",
-      "couldNotLoad": "Nepavyko įkelti valdymo skydelio.",
-      "renameInstance": "Pervadinti egzempliorių",
-      "renamePlaceholder": "Naujas pavadinimas (iki 50 simbolių)",
-      "someDetailsFailed": "Nepavyko įkelti dalies realiojo laiko duomenų.",
-      "destroy": "Sunaikinti",
-      "destroyMessage": "Tavo KiloClaw egzempliorius ir visi jo duomenys bus sunaikinti visam laikui. Šio veiksmo negalima atšaukti.",
-      "destroyTitle": "Sunaikinti egzempliorių",
-      "instance": "Egzempliorius",
-      "couldNotCheckStatus": "Nepavyko patikrinti paslaugos būsenos.",
-      "dangerZone": "PAVOJINGI VEIKSMAI",
-      "destroying": "Naikinama…",
-      "serviceDegraded": "Paslaugos veikimas sutrikęs — bakstelėk ir peržiūrėk būseną",
-      "up": "VEIKIA"
-    },
-    "channels": {
-      "title": "Kanalai",
-      "couldNotLoad": "Nepavyko įkelti kanalų.",
-      "noChannels": "Nėra prieinamų kanalų",
-      "noChannelsDescription": "Kanalų integracijos bus rodomos čia.",
-      "connected": "Prijungta: {{label}}",
-      "disconnectMessage": "Pašalinti {{label}}? Šis kanalas bus atjungtas.",
-      "disconnectTitle": "Atjungti kanalą"
-    },
-    "devicePairing": {
-      "title": "Įrenginių susiejimas",
-      "refreshRequests": "Atnaujinti susiejimo užklausas",
-      "couldNotLoad": "Nepavyko įkelti susiejimo užklausų.",
-      "noPending": "Nėra nepatvirtintų užklausų",
-      "noPendingDescription": "Kanalų ir įrenginių susiejimo užklausos bus rodomos čia.",
-      "channelRequests": "Kanalų užklausos",
-      "deviceRequests": "Įrenginių užklausos",
-      "approveDeviceMessage": "Leisti {{platform}} prisijungti prie tavo egzemplioriaus?",
-      "approveDeviceTitle": "Patvirtinti įrenginį",
-      "approveMessage": "Leisti {{label}} (kodas: {{code}}) prisijungti prie tavo egzemplioriaus?",
-      "approveTitle": "Patvirtinti susiejimo užklausą",
-      "unknownDevice": "Nežinomas įrenginys"
-    },
-    "execPolicy": {
-      "title": "Vykdymo politika",
-      "couldNotLoad": "Nepavyko įkelti vykdymo politikos.",
-      "alwaysAsk": "Visada klausti",
-      "alwaysAskDescription": "Prieš vykdant kiekvieną komandą prašoma patvirtinimo. Saugiausias pasirinkimas.",
-      "neverAsk": "Niekada neklausti",
-      "neverAskDescription": "Komandos vykdomos be patvirtinimo. Greičiau, bet mažiau saugu."
-    },
-    "google": {
-      "title": "Google paskyra",
-      "couldNotLoad": "Nepavyko įkelti Google paskyros būsenos.",
-      "disconnected": "Google paskyra atjungta. Kad pakeitimas įsigaliotų, iš naujo įdiek egzempliorių.",
-      "setupCommand": "Sąrankos komanda",
-      "setupCommandHelp": "Kad prijungtum Google paskyrą, vykdyk šią komandą savo kompiuterio terminale. Kompiuteryje turi būti įdiegtas Docker.",
-      "failedToLoadCommand": "Nepavyko įkelti sąrankos komandos.",
-      "gmailNotifications": "Gmail pranešimai",
-      "disconnect": "Atjungti Google paskyrą",
-      "copied": "Nukopijuota",
-      "copyCommand": "Kopijuoti komandą",
-      "disconnectConfirm": "Atjungti",
-      "disconnectMessage": "Pašalinti tavo Google paskyrą iš šio egzemplioriaus? Gmail pranešimai bus išjungti. Atjungęs paskyrą iš naujo įdiek egzempliorių, kad pakeitimai įsigaliotų.",
-      "disconnectTitle": "Atjungti Google"
-    },
-    "modelList": {
-      "noMatches": "Nėra paiešką atitinkančių modelių",
-      "noModelsDescription": "Modeliai bus rodomi čia, kai bus prieinami.",
-      "noResultsFor": "Pagal „{{query}}“ rezultatų nerasta."
-    },
-    "secrets": {
-      "title": "Slapti duomenys",
-      "couldNotLoad": "Nepavyko įkelti slaptųjų duomenų.",
-      "noSecrets": "Slaptųjų duomenų nėra",
-      "noSecretsDescription": "Čia bus rodomos slaptųjų duomenų integracijos.",
-      "removeMessage": "Pašalinti {{label}}? Šis įrankis nebeturės prieigos prie savo prisijungimo duomenų.",
-      "removeTitle": "Pašalinti slaptuosius duomenis",
-      "saved": "Išsaugota: {{label}}",
-      "hide": "Slėpti {{label}}",
-      "show": "Rodyti {{label}}",
-      "allFieldsRequired": "Norint prijungti {{label}}, būtina užpildyti visus laukus.",
-      "setupGuideFallback": "sąrankos vadovas",
-      "setupGuideA11y": "{{label}} sąrankos vadovas",
-      "setupGuide": "Sąrankos vadovas",
-      "saving": "Išsaugoma…",
-      "removing": "Šalinama…",
-      "updateToken": "Atnaujinti prieigos raktą"
-    },
-    "versionPin": {
-      "title": "Versijos fiksavimas",
-      "couldNotLoad": "Nepavyko įkelti versijos informacijos.",
-      "couldNotLoadMore": "Nepavyko įkelti daugiau versijų.",
-      "loadMore": "Įkelti daugiau versijų",
-      "showingLatest": "Rodoma 100 naujausių versijų.",
-      "availableVersions": "Prieinamos versijos",
-      "noVersions": "Nėra prieinamų versijų",
-      "noVersionsDescription": "Prieinamos OpenClaw versijos bus rodomos čia.",
-      "unpin": "Panaikinti fiksavimą",
-      "unpinMessage": "Grįžti prie naujausios prieinamos versijos?",
-      "unpinTitle": "Panaikinti versijos fiksavimą",
-      "confirmPin": "Patvirtinti fiksavimą",
-      "followingLatest": "Naudojama naujausia",
-      "latest": "naujausia",
-      "pin": "Fiksuoti",
-      "pinnedByAdmin": "Versiją užfiksavo administratorius. Jei nori ją pakeisti, kreipkis į administratorių.",
-      "pinnedTo": "Užfiksuota versija: {{version}}",
-      "reasonOptional": "Priežastis (neprivaloma)",
-      "reasonPlaceholder": "Versijos fiksavimo priežastis",
-      "replaceAdminPin": "Pakeisti administratoriaus užfiksuotą versiją",
-      "replacesAdminPin": "Ši versija pakeis administratoriaus užfiksuotą versiją (dabar {{label}})."
-    },
-    "redeploy": "Diegti iš naujo",
-    "redeployMessage": "Ar tikrai nori iš naujo įdiegti šį egzempliorių?",
-    "redeployTitle": "Iš naujo įdiegti egzempliorių",
-    "controls": {
-      "redeploying": "Diegiama iš naujo…",
-      "restart": "Paleisti iš naujo",
-      "restartOpenClawMessage": "Ar tikrai nori iš naujo paleisti OpenClaw procesą?",
-      "restartOpenClawTitle": "Paleisti OpenClaw iš naujo",
-      "restarting": "Paleidžiama iš naujo…",
-      "start": "Paleisti",
-      "startMessage": "Ar tikrai nori paleisti šį egzempliorių?",
-      "startTitle": "Paleisti egzempliorių",
-      "stop": "Sustabdyti",
-      "stopMessage": "Ar tikrai nori sustabdyti šį egzempliorių?",
-      "stopTitle": "Sustabdyti egzempliorių",
-      "stopping": "Stabdoma…"
-    },
-    "empty": {
-      "finishingSetup": "Baigiama sąranka",
-      "finishingSetupDescription": "Palauk, baigiame kurti tavo paskyrą. Paprastai tai užtrunka tik akimirką.",
-      "getStarted": "Pradėti",
-      "noInstancesDescription": "Sukurk pirmąjį egzempliorių ir pradėk naudoti programavimo agentus."
-    },
-    "instance": {
-      "backToInstances": "Atgal prie egzempliorių",
-      "couldNotLoad": "Nepavyko įkelti egzemplioriaus.",
-      "notFound": "Egzempliorius nerastas",
-      "notFoundDescription": "Šis egzempliorius galėjo būti sunaikintas arba nuoroda nebegalioja."
-    },
-    "list": {
-      "createInstance": "Sukurti egzempliorių",
-      "organizations": "Organizacijos",
-      "accessIssue": {
-        "trialExpired": "Bandomasis laikotarpis baigėsi — užsisakyk prenumeratą, kad galėtum toliau naudoti šį egzempliorių",
-        "subscriptionCanceled": "Prenumerata neaktyvi — užsisakyk ją iš naujo, kad galėtum toliau naudoti šį egzempliorių",
-        "subscriptionPastDue": "Mokėjimo problema — atnaujink mokėjimo duomenis, kad galėtum toliau naudoti šį egzempliorių",
-        "quarantined": "Egzempliorius izoliuotas — reikia specialistų peržiūros",
-        "multipleCurrentConflict": "Reikia peržiūrėti paskyrą",
-        "nonCanonicalEarlybird": "Senąjį planą reikia peržiūrėti"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Kalbėtis su {{name}}",
-        "ready": "{{name}} jau gali veikti",
-        "warmedUp": "Viskas paruošta. Gali pasisveikinti, kai tik norėsi."
-      },
-      "flow": {
-        "genericErrorBody": "Šiuo metu nepavyko baigti paruošti tavo egzemplioriaus.",
-        "manualReviewBody": "Prieš kuriant egzempliorių reikia patikrinti tavo paskyros būseną. Tęsk svetainėje kilo.ai.",
-        "manualReviewTitle": "Sąranką turi peržiūrėti specialistai",
-        "openKiloAi": "Atidaryti kilo.ai",
-        "provisioning": "Išteklių paruošimas",
-        "review": "Peržiūra",
-        "identityTitle": "Boto tapatybė",
-        "couldNotLoad": "Nepavyko įkelti pradinės sąrankos būsenos.",
-        "finishingSetup": "Baigiame sąranką — palauk, kol baigsime kurti tavo paskyrą.",
-        "ready": "Paruošta",
-        "settingUp": "Ruošiama…"
-      },
-      "unavailableDescription": "Egzemplioriui sukurti reikia galiojančios KiloClaw prenumeratos. Esami egzemplioriai ir prenumeratos veikia kaip įprasta.",
-      "unavailableTitle": "Naujų KiloClaw egzempliorių sukurti negalima",
-      "identity": {
-        "chooseAvatar": "Pasirinkti avatarą",
-        "namePlaceholder": "Boto vardas",
-        "selectAvatar": "Pasirinkti {{name}} kaip avatarą",
-        "personality": "Asmenybė",
-        "changePersonality": "Keisti asmenybę",
-        "location": "Vieta",
-        "locationPlaceholder": "Miestas arba regionas (neprivaloma)",
-        "useCurrentLocation": "Naudoti dabartinę vietą",
-        "locationDeniedTitle": "Neleista pasiekti vietos duomenų",
-        "locationDeniedMessage": "Nustatymuose leisk pasiekti vietos duomenis, kad galėtum naudoti dabartinę vietą.",
-        "locationValidationFailed": "Nepavyko patvirtinti vietos.",
-        "locationResolveFailed": "Nepavyko nustatyti tavo vietos. Gali ją pakeisti rankiniu būdu.",
-        "locationGetFailed": "Nepavyko gauti tavo vietos duomenų. Įvesk vietą rankiniu būdu.",
-        "nature": {
-          "aiAssistantLabel": "DI asistentas",
-          "aiAssistantVibe": "Paslaugus, sumanus, profesionalus",
-          "digitalCreatureLabel": "Skaitmeninė būtybė",
-          "digitalCreatureVibe": "Savita, gyva, šiek tiek nenuspėjama",
-          "virtualCompanionLabel": "Virtualus draugas",
-          "virtualCompanionVibe": "Šiltas, dėmesingas, nuoširdžiai rūpestingas",
-          "somethingWeirderLabel": "Kas nors keistesnio…",
-          "somethingWeirderVibe": "Apibūdink pats"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Atlikta! Parengiau santrauką, kurios prašei. Gali peržiūrėti, kai tik norėsi.",
-        "settingUp": "Nustatomi pranešimai…",
-        "stayInTheLoop": "Naujienos apie užduotis",
-        "getNotified": "Įjunk pranešimus, kad sužinotum, kai {{name}} baigs užduotį, ir nepraleistum nė vieno atsakymo.",
-        "now": "dabar",
-        "skipForNow": "Kol kas praleisti",
-        "couldNotEnable": "Nepavyko įjungti pranešimų."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Nepavyko patikrinti sąrankos",
-        "queryErrorBody": "Tikrinant {{name}} sąrankos būseną nutrūko ryšys. Sąranka vis dar gali vykti. Bandyk dar kartą arba grįžk netrukus.",
-        "stoppedTitle": "Sąranka sustabdyta",
-        "stoppedBody": "Ruošiant {{name}} egzempliorių, jis netikėtai nustojo veikti.",
-        "stalledTitle": "Sąranka užstrigo",
-        "stalledBody": "Nepavyko baigti ruošti {{name}}. Bandyk dar kartą. Jei problema kartojasi, parašyk adresu {{supportEmail}}.",
-        "timeoutTitle": "Užtrunka ilgiau nei tikėtasi",
-        "timeoutBody": "{{name}} sąranka trunka ilgiau nei įprastai (daugiau nei {{displayMinutes}} min.).",
-        "continueInBackground": "Tęsti fone",
-        "settingUp": "Ruošiama: {{name}}",
-        "connectingToAgent": "Jungiamasi prie agento",
-        "startingSandbox": "Paleidžiama izoliuota aplinka",
-        "backgroundHint": "Paprastai tai užtrunka mažiau nei minutę. Gali uždaryti šį ekraną — sąranka tęsis fone."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kodas {{code}}",
-      "gatewayProcess": "ŠLIUZO PROCESAS",
-      "lastExit": "Paskutinis proceso užbaigimas",
-      "memory": "Atmintis",
-      "region": "Regionas",
-      "resources": "IŠTEKLIAI",
-      "restarts": "Paleidimai iš naujo",
-      "state": "Būsena",
-      "uptime": "Veikimo laikas",
-      "crashed": "NULŪŽO",
-      "destroying": "NAIKINAMA",
-      "provisioned": "PARUOŠTA",
-      "restarting": "PALEIDŽIAMA IŠ NAUJO",
-      "running": "VYKDOMA",
-      "shuttingDown": "IŠJUNGIAMA",
-      "starting": "PRADEDAMA",
-      "stopped": "SUSTABDYTA",
-      "stopping": "STABDOMA",
-      "unknown": "NEŽINOMA",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Pažangiausi",
-      "frontierDescription": "Didžiausios galimybės. Užklausos nukreipiamos į pažangiausius samprotaujančius modelius.",
-      "balancedDescription": "Geras greičio ir galimybių derinys už mažesnę kainą.",
-      "autoModelA11y": "{{label}} automatinis modelis",
-      "currentModel": "Dabartinis modelis",
-      "browseAllModels": "arba rinkis iš daugiau nei 500 modelių",
-      "browseAllModelsA11y": "Peržiūrėti daugiau nei 500 modelių"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Jei nori toliau naudoti KiloClaw, naršyklėje atidaryk kilo.ai/claw. Programėlėje prenumeratos užsisakyti negalima.",
-      "subscriptionCanceledTitle": "Užsisakyk prenumeratą svetainėje",
-      "subscriptionCanceledBody": "Jei nori naudoti KiloClaw, naršyklėje atidaryk kilo.ai/claw. Programėlėje prenumeratos užsisakyti negalima.",
-      "subscriptionCanceledCta": "Atidaryti kilo.ai/claw",
-      "subscriptionPastDueTitle": "Mokėjimo duomenų atnaujinimas svetainėje",
-      "subscriptionPastDueBody": "Kilo problema dėl tavo paskutinio mokėjimo. Naršyklėje atidaryk kilo.ai/claw ir atnaujink mokėjimo duomenis. Programėlėje atsiskaitymų tvarkyti negalima.",
-      "quarantinedTitle": "Reikia atkurti egzemplioriaus veikimą",
-      "quarantinedBody": "Tavo KiloClaw egzempliorius izoliuotas, todėl šiuo metu jo naudoti negalima. Jo veikimą turi padėti atkurti mūsų komanda.",
-      "multipleCurrentConflictBody": "Tavo paskyroje radome daugiau nei vieną aktyvią prenumeratą, todėl pristabdėme veikimą, kad nereikėtų mokėti du kartus.",
-      "multipleCurrentConflictCta": "Tęsti svetainėje kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Aptiktas senasis planas",
-      "nonCanonicalEarlybirdBody": "Kad galėtum naudoti ankstyvosios prieigos planą mobiliajame įrenginyje, jį pirmiausia turi peržiūrėti specialistai.",
-      "iosTitle": "KiloClaw nepasiekiamas iOS programėlėje",
-      "iosBody": "Šios paskyros KiloClaw prieiga tvarkoma ne iOS programėlėje.",
-      "iosContact": "Turi klausimų? Parašyk adresu {{supportEmail}}.",
-      "quarantinedCta": "Rašyti mūsų komandai el. paštu",
-      "nonCanonicalEarlybirdCta": "Peržiūrėti savo planą svetainėje kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "Reikia patikrinti {{name}}: {{label}}",
-      "openUnread_one": "Atidaryti {{name}}, {{displayCount}} neskaityta žinutė",
-      "openUnread": "Atidaryti {{name}}, {{displayCount}} neskaitytų žinučių",
-      "openUnread_other": "Atidaryti {{name}}, {{displayCount}} neskaitytų žinučių",
-      "openSettings": "Atidaryti {{name}} nustatymus",
-      "fixOnKiloAi": "Ištaisyti kilo.ai: {{label}}",
-      "openUnread_few": "Atidaryti {{name}}, {{displayCount}} neskaitytos žinutės",
-      "openUnread_many": "Atidaryti {{name}}, {{displayCount}} neskaitytos žinutės"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Patvirtinti įrenginių užklausas",
-      "execPolicyDescription": "Saugos nustatymai",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "DI modelio pasirinkimas",
-      "secretsDescription": "Užšifruoti prisijungimo duomenys",
-      "versionPinDescription": "Užfiksuoti konkrečią versiją"
-    },
-    "avatar": {
-      "arcade": "Žaidimų automatas",
-      "brain": "Smegenys",
-      "creature": "Būtybė",
-      "crystal": "Kristalas",
-      "custom": "Pasirinktinis avataras",
-      "dragon": "Drakonas",
-      "explorer": "Tyrinėtojas",
-      "flame": "Liepsna",
-      "lightning": "Žaibas",
-      "magicWand": "Stebuklinga lazdelė",
-      "moon": "Mėnulis",
-      "operator": "Operatorius",
-      "orbit": "Orbita",
-      "oracle": "Orakulas",
-      "rainbow": "Vaivorykštė",
-      "robot": "Robotas",
-      "satellite": "Palydovas",
-      "sparkles": "Žiburėliai",
-      "strongArm": "Stipri ranka",
-      "talisman": "Talismanas"
-    },
-    "remoteSpawnFilesNotSupported": "Šis egzempliorius negali gauti failų.",
-    "instanceSwitcherTitle": "KiloClaw egzempliorius"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2608,10 +2133,6 @@
       "moveLeft": "Perkelti {{filename}} į kairę",
       "moveRight": "Perkelti {{filename}} į dešinę"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Įklijuoti paveikslėlį iš iškarpinės",
-      "label": "Įklijuoti aptiktą paveikslėlį"
-    },
     "attachmentPicker": {
       "camera": "Fotoaparatas",
       "photoLibrary": "Nuotraukų biblioteka",
@@ -2819,7 +2340,8 @@
     "signOutThisDeviceTitle": "Atsijungti šiame įrenginyje?",
     "signOutThisSessionTitle": "Baigti šią sesiją?",
     "signOutThisSessionMessage": "Įrenginys „{{device}}“ bus atjungtas nuo paskyros. Jo prieiga prie API gali galioti dar iki valandos.",
-    "webBrowser": "Žiniatinklio naršyklė"
+    "webBrowser": "Žiniatinklio naršyklė",
+    "unknownDevice": "Nežinomas įrenginys"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Nepavyko atidaryti programų parduotuvės.",

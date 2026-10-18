@@ -18,10 +18,9 @@ const attentionKv = vi.hoisted(() => ({
   getItem: vi.fn<() => Promise<string | null>>().mockResolvedValue(null),
   setItem: vi.fn().mockResolvedValue(undefined),
 }));
-const kiloclawVisible = vi.hoisted(() => ({ value: false }));
 const routerReplace = vi.hoisted(() => vi.fn());
 
-export { attentionKv, fetchSessions, kiloclawVisible, organization, routerReplace };
+export { attentionKv, fetchSessions, organization, routerReplace };
 
 vi.mock('@/lib/persist/encrypted-kv', () => attentionKv);
 vi.mock('@/lib/trpc', () => {
@@ -140,10 +139,6 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
 vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#666666' }),
-}));
-
-vi.mock('@/lib/hooks/use-kiloclaw-tab-visible', () => ({
-  useKiloClawTabVisible: () => kiloclawVisible.value,
 }));
 
 export function key(organizationId: string | null = null) {

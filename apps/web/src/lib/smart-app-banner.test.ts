@@ -32,7 +32,7 @@ describe('smartAppBannerItunes', () => {
     }
   });
 
-  it.each(['/admin', '/s/sess_1', '/code-reviews/review-md', '/login'] as const)(
+  it.each(['/admin', '/claw', '/s/sess_1', '/code-reviews/review-md', '/login'] as const)(
     'throws for unmapped path %s',
     path => {
       expect(() => smartAppBannerItunes(path)).toThrow(

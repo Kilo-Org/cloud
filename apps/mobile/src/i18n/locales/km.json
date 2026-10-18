@@ -101,12 +101,9 @@
     "scheduled": "បានកំណត់ពេល",
     "keepEditing": "បន្តកែសម្រួល",
     "keepRunning": "បន្តដំណើរការ",
-    "kiloclaw": "KiloClaw",
     "newSession": "វគ្គថ្មី",
-    "noKiloclawInstances": "គ្មានម៉ាស៊ីន KiloClaw",
     "noModelsAvailable": "គ្មានម៉ូដែលសម្រាប់ប្រើ",
     "notFound": "រកមិនឃើញទេ។",
-    "online": "អនឡាញ",
     "open": "បើក {{name}}",
     "openPullRequest": "បើកសំណើបញ្ចូលកូដ",
     "pending": "កំពុងរង់ចាំ",
@@ -257,7 +254,8 @@
     "renamePasskey": "ប្តូរឈ្មោះកូនសោចូល",
     "removePasskey": "ដកកូនសោចូលចេញ",
     "removePasskeyTitle": "ដកកូនសោចូលចេញ?",
-    "removePasskeyMessage": "អ្នកនឹងមិនអាចចូលដោយកូនសោចូលនេះបានទៀតទេ។"
+    "removePasskeyMessage": "អ្នកនឹងមិនអាចចូលដោយកូនសោចូលនេះបានទៀតទេ។",
+    "changelog": "អ្វីថ្មីខ្លះ"
   },
   "preferences": {
     "general": "ទូទៅ",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "ការជូនដំណឹងបង្ហាញថាមានអ្វីមួយបានកើតឡើង។ បើក Kilo ដើម្បីអានវា។",
     "channel": {
       "agentProgress": "វឌ្ឍនភាពភ្នាក់ងារ",
-      "chat": "សារជជែក",
-      "kiloclaw": "សកម្មភាព KiloClaw",
       "balance": "ការជូនដំណឹងអំពីសមតុល្យ",
       "security": "បញ្ហាសុវត្ថិភាពដែលរកឃើញ",
       "spend": "ការជូនដំណឹងអំពីការចំណាយ",
       "followedSessions": "វគ្គដែលបានតាមដាន"
     },
     "category": {
-      "chatMessagesSubtitle": "ការឆ្លើយតបនៅក្នុងការសន្ទនារបស់អ្នក",
       "agentAttentionTitle": "ភ្នាក់ងារត្រូវការការឆ្លើយតបពីអ្នក",
       "agentAttentionSubtitle": "សំណួរ សំណើសុំសិទ្ធិ និងព័ត៌មានដែលត្រូវការ",
       "agentUpdatesTitle": "បច្ចុប្បន្នភាពភ្នាក់ងារ",
       "agentUpdatesSubtitle": "សារពីភ្នាក់ងារពេលកំពុងធ្វើកិច្ចការ",
       "sessionStatusTitle": "ស្ថានភាពវគ្គ",
       "sessionStatusSubtitle": "បានបញ្ចប់ / បានបរាជ័យ / រួចរាល់សម្រាប់ឱ្យអ្នកគ្រប់គ្រង",
-      "kiloclawActivitySubtitle": "ម៉ាស៊ីនរួចរាល់/បរាជ័យ សកម្មភាពតាមកាលវិភាគ",
-      "kiloclawActivityUnavailable": "ចាប់ផ្តើមអ៊ីនស្តង់ KiloClaw ដើម្បីទទួលបានសកម្មភាព KiloClaw។",
       "balanceAlertsSubtitle": "ការព្រមានពេលសមតុល្យរបស់អង្គការទាប",
       "balanceAlertsUnavailable": "ចូលរួមអង្គការមួយ ដើម្បីទទួលបានការព្រមានអំពីសមតុល្យ។",
       "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "ទំព័រដើម",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, ផ្ទាំងទី {{position}} ក្នុងចំណោម {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "ប្តូរអ៊ីនស្តង់",
-      "couldNotLoadInstances": "មិនអាចផ្ទុកអ៊ីនស្តង់បានទេ។",
-      "noInstancesDescription": "រៀបចំអ៊ីនស្តង់មួយដើម្បីចាប់ផ្តើមជជែក។",
-      "setUpKiloclaw": "រៀបចំ KiloClaw",
-      "currentInstance": "{{title}} កំពុងប្រើ"
-    },
     "conversation": {
-      "failedToLoad": "មិនអាចផ្ទុកការសន្ទនាបានទេ។",
-      "notFound": "រកមិនឃើញការសន្ទនាទេ។",
       "untitled": "គ្មានចំណងជើង",
-      "leaveTitle": "ចាកចេញពីការសន្ទនា?",
-      "leaveMessage": "ការសន្ទនានេះនឹងត្រូវដកចេញពីបញ្ជីរបស់អ្នក។",
-      "openHint": "បើកការសន្ទនា។ ចុចឱ្យជាប់ដើម្បីមើលជម្រើសប្តូរឈ្មោះ និងចាកចេញ។",
-      "unread": "មិនទាន់អាន",
-      "optionsFor": "ជម្រើសការសន្ទនាសម្រាប់ {{title}}",
-      "options": "ជម្រើសការសន្ទនា",
-      "renameTitle": "ប្តូរឈ្មោះការសន្ទនា",
-      "renamePlaceholder": "ឈ្មោះថ្មី",
-      "couldNotReachBot": "មិនអាចទាក់ទងបូតបានទេ។ សូមព្យាយាមម្តងទៀត។",
-      "messageDeliveryFailed": "មិនអាចបញ្ជូនសារទៅបូតបានទេ។",
-      "couldNotSignIn": "មិនអាចចូលប្រើការជជែកបានទេ។",
-      "couldNotRefreshMessages": "មិនអាចផ្ទុកសារឡើងវិញបានទេ។",
-      "couldNotLoadHistory": "មិនអាចផ្ទុកប្រវត្តិការសន្ទនាបានទេ។",
-      "leave": "ចាកចេញ",
-      "untitledConversation": "ការសន្ទនាគ្មានចំណងជើង",
-      "createFailed": "មិនអាចបង្កើតការសន្ទនាបានទេ។",
-      "leaveFailed": "មិនអាចចាកចេញពីការសន្ទនាបានទេ។"
-    },
-    "reactions": {
-      "common": "ទូទៅ",
-      "reactWith": "បន្ថែមប្រតិកម្ម {{reaction}}",
-      "accessibility": "ប្រតិកម្ម {{emoji}} ចំនួន {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "កំពុងឆ្លើយតបទៅ",
-      "cancelReply": "បោះបង់ការឆ្លើយតប",
-      "openInstance": "បើកអ៊ីនស្តង់",
-      "attachFile": "ភ្ជាប់ឯកសារ",
-      "cancelEdit": "បោះបង់ការកែសម្រួល"
+      "renamePlaceholder": "ឈ្មោះថ្មី"
     },
     "conversationList": {
-      "couldNotLoad": "មិនអាចផ្ទុកការសន្ទនាបានទេ។",
-      "emptyTitle": "មិនទាន់មានការសន្ទនាទេ",
-      "emptyDescription": "បង្កើតការសន្ទនាដើម្បីចាប់ផ្តើមជជែកជាមួយអ៊ីនស្តង់ KiloClaw របស់អ្នក។",
-      "create": "បង្កើតការសន្ទនា",
-      "newConversation": "ការសន្ទនាថ្មី",
-      "openInstanceSettings": "បើកការកំណត់អ៊ីនស្តង់",
       "today": "ថ្ងៃនេះ",
       "yesterday": "ម្សិលមិញ",
-      "thisWeek": "សប្តាហ៍នេះ",
       "older": "មុននេះ"
     },
     "attachment": {
-      "open": "បើក {{filename}}",
-      "openFailed": "មិនអាចបើកឯកសារភ្ជាប់បានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
-      "attachFailed": "មិនអាចភ្ជាប់ឯកសារបានទេ។",
-      "limit": "អ្នកអាចភ្ជាប់ឯកសារបានរហូតដល់ {{displayCount}}។",
-      "sizeRejection": "{{filename}} មានទំហំលើសកម្រិតឯកសារភ្ជាប់ {{limit}}។",
-      "unreadable": "មិនអាចអាន {{filename}} បានទេ។",
-      "pastedImage": "រូបភាពដែលបានបិទភ្ជាប់",
-      "defaultName": "ឯកសារភ្ជាប់",
       "classificationDenied": "មិនអាចភ្ជាប់ឯកសារប្រតិបត្តិបានទេ។",
       "classificationEmpty": "ឯកសារនេះទទេ។",
       "classificationTooLarge": "ឯកសារត្រូវមានទំហំមិនលើស 20 MB។",
@@ -943,426 +883,17 @@
       "networkError": "មានកំហុសបណ្តាញ។",
       "uploadFailed": "ការផ្ទុកឡើងបានបរាជ័យ។",
       "nothingToPaste": "គ្មានអ្វីសម្រាប់បិទភ្ជាប់ទេ។",
-      "metadataStripFailed": "មិនអាចដកទិន្នន័យមេតារូបថតចេញបានទេ។",
-      "limit_one": "អ្នកអាចភ្ជាប់ឯកសារបានរហូតដល់ {{displayCount}}។",
-      "limit_other": "អ្នកអាចភ្ជាប់ឯកសារបានរហូតដល់ {{displayCount}}។"
+      "metadataStripFailed": "មិនអាចដកទិន្នន័យមេតារូបថតចេញបានទេ។"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}} {{status}}",
-      "retryUploading": "ព្យាយាមផ្ទុក {{filename}} ឡើងម្តងទៀត",
-      "remove": "ដក {{filename}} ចេញ"
-    },
-    "messageBubble": {
-      "deleted": "[សារដែលបានលុប]",
-      "yourMessage": "សាររបស់អ្នក",
-      "messageFrom": "សារពី {{author}}",
-      "moreActions": "សកម្មភាពបន្ថែម",
-      "notDelivered": "បញ្ជូនមិនបាន",
-      "edited": "(បានកែសម្រួល)",
-      "image": "រូបភាព"
+      "accessibility": "{{filename}} {{status}}"
     },
     "messageActions": {
-      "copied": "បានចម្លង",
-      "copyFailed": "មិនអាចចម្លងបានទេ។",
-      "title": "សកម្មភាពលើសារ",
-      "deleteTitle": "លុបសារ?",
-      "deleteMessage": "នេះនឹងដកសារចេញពីការសន្ទនា។",
-      "deleteFailed": "មិនអាចលុបសារបានទេ។",
-      "removeReactionFailed": "មិនអាចដកប្រតិកម្មចេញបានទេ។",
-      "addReactionFailed": "មិនអាចបន្ថែមប្រតិកម្មបានទេ។",
-      "retrySend": "ព្យាយាមផ្ញើម្តងទៀត",
-      "moreReactions": "ប្រតិកម្មច្រើនទៀត",
-      "edit": "កែសម្រួល",
-      "sendFailed": "មិនអាចផ្ញើសារបានទេ។",
-      "retrySendFailed": "មិនអាចព្យាយាមផ្ញើម្តងទៀតបានទេ។",
-      "editFailed": "មិនអាចកែសម្រួលសារបានទេ។",
-      "executeFailed": "មិនអាចអនុវត្តសកម្មភាពបានទេ។"
+      "edit": "កែសម្រួល"
     },
     "attachmentPicker": {
-      "takePhoto": "ថតរូប",
-      "photoLibrary": "បណ្ណាល័យរូបថត",
-      "files": "ឯកសារ",
       "cameraAccessMessage": "សូមអនុញ្ញាតឱ្យចូលប្រើកាមេរ៉ានៅក្នុងការកំណត់ ដើម្បីថតរូប។"
-    },
-    "typingIndicator": {
-      "someone": "នរណាម្នាក់",
-      "typing_one": "{{name}} កំពុងវាយអក្សរ...",
-      "typing": "{{names}} កំពុងវាយសារ…",
-      "typing_other": "{{names}} កំពុងវាយសារ…"
-    },
-    "botStatus": {
-      "offline": "ក្រៅបណ្តាញ",
-      "loadingUser": "កំពុងផ្ទុកព័ត៌មានអ្នកប្រើ...",
-      "waitingForStatus": "កំពុងរង់ចាំស្ថានភាពបូត...",
-      "offlineMessage": "បូតនៅក្រៅបណ្តាញ។ ការបញ្ជូនសារនឹងបន្តនៅពេលបូតភ្ជាប់ឡើងវិញ។"
-    },
-    "errors": {
-      "notAllowed": "មិនអនុញ្ញាតទេ។",
-      "messageTooLong": "សារវែងពេក។ សូមប្រើតិចជាង {{limit}} តួអក្សរ។",
-      "titleTooLong": "ចំណងជើងវែងពេក។ សូមប្រើតិចជាង {{limit}} តួអក្សរ។",
-      "messageEmpty": "សារមិនអាចទទេបានទេ។"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "មិនអាចផ្ទុកអ៊ីនស្តង់ KiloClaw បានទេ។",
-    "billing": {
-      "title": "ការគិតថ្លៃ",
-      "continueMonthToMonth": "បន្តជាវប្រចាំខែ",
-      "plan": "ផែនការ",
-      "finalTermEnds": "កាលបរិច្ឆេទបញ្ចប់អាណត្តិចុងក្រោយ",
-      "afterFinalTerm": "ក្រោយអាណត្តិចុងក្រោយ",
-      "lessThanOneDay": "តិចជាង 1 ថ្ងៃ",
-      "ends": "កាលបរិច្ឆេទបញ្ចប់",
-      "expires": "កាលបរិច្ឆេទផុតកំណត់",
-      "noActivePlan": "គ្មានគម្រោងកំពុងប្រើ",
-      "noActivePlanDescription": "អ្នកមិនមានការជាវ KiloClaw ដែលកំពុងមានសុពលភាពទេ។",
-      "managedByAdmin": "អ្នកគ្រប់គ្រងអង្គការរបស់អ្នកជាអ្នកគ្រប់គ្រងការគិតថ្លៃ។",
-      "couldNotLoad": "មិនអាចផ្ទុកព័ត៌មានការគិតថ្លៃបានទេ។",
-      "manageOnWeb": "គ្រប់គ្រងការគិតថ្លៃនៅលើគេហទំព័រ",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "អាណត្តិចុងក្រោយនៃគម្រោង Commit របស់អ្នកនឹងបញ្ចប់នៅថ្ងៃទី {{date}}។ បន្តជាវគម្រោង Standard ក្នុងតម្លៃ {{price}} បើមិនដូច្នោះទេ សេវាបង្ហោះនឹងបញ្ចប់។",
-      "freeTrial": "សាកល្បងឥតគិតថ្លៃ",
-      "hostingEnds": "សេវាបង្ហោះនឹងបញ្ចប់",
-      "renews": "កាលបរិច្ឆេទបន្តការជាវ",
-      "standardMonthToMonth": "គម្រោង Standard ប្រចាំខែ",
-      "standardStartsOn": "គម្រោង Standard នឹងចាប់ផ្តើមនៅថ្ងៃទី {{date}} ក្នុងតម្លៃ {{price}}។",
-      "yourStandardMonthlyPrice": "តម្លៃប្រចាំខែរបស់អ្នកសម្រាប់គម្រោង Standard",
-      "perMonth": "/ខែ",
-      "earlybirdAccessUntil": "អ្នកអាចប្រើគម្រោង Earlybird រហូតដល់ថ្ងៃទី {{date}}។",
-      "earlybirdEnding": "គម្រោង Earlybird នឹងបញ្ចប់ក្នុងរយៈពេល {{remaining}}។",
-      "paymentPastDue": "ការទូទាត់ហួសកំណត់។ សូមធ្វើបច្ចុប្បន្នភាពវិធីសាស្ត្រទូទាត់របស់អ្នក។",
-      "subscriptionCancels": "ការជាវនឹងត្រូវលុបចោលនៅថ្ងៃទី {{date}}។",
-      "trialDaysRemaining": "ការសាកល្បងនៅសល់ {{remaining}}។",
-      "trialEndingSoon": "ការសាកល្បងនឹងបញ្ចប់ឆាប់ៗ ដោយនៅសល់ {{remaining}}។",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "កូមីត"
-    },
-    "changelog": {
-      "title": "អ្វីថ្មីខ្លះ",
-      "couldNotLoad": "មិនអាចផ្ទុកប្រវត្តិការផ្លាស់ប្តូរបានទេ។",
-      "noUpdates": "មិនទាន់មានការធ្វើបច្ចុប្បន្នភាពទេ",
-      "noUpdatesDescription": "ព័ត៌មានអំពីការផ្លាស់ប្តូរនឹងបង្ហាញនៅទីនេះ។",
-      "recentUpdates": "ការធ្វើបច្ចុប្បន្នភាពថ្មីៗ",
-      "manageVersion": "គ្រប់គ្រងកំណែ",
-      "redeployRequired": "ត្រូវដាក់ពង្រាយឡើងវិញ",
-      "redeploySuggested": "ណែនាំឱ្យដាក់ពង្រាយឡើងវិញ",
-      "upgradeRequired": "ត្រូវដំឡើងកំណែថ្មី"
-    },
-    "dashboard": {
-      "title": "ផ្ទាំងគ្រប់គ្រង",
-      "couldNotLoad": "មិនអាចផ្ទុកផ្ទាំងគ្រប់គ្រងបានទេ។",
-      "renameInstance": "ប្តូរឈ្មោះអ៊ីនស្តង់",
-      "renamePlaceholder": "ឈ្មោះថ្មី (អតិបរមា 50 តួអក្សរ)",
-      "someDetailsFailed": "មិនអាចផ្ទុកព័ត៌មានលម្អិតបច្ចុប្បន្នមួយចំនួនបានទេ។",
-      "destroy": "លុបជាអចិន្ត្រៃយ៍",
-      "destroyMessage": "សកម្មភាពនេះនឹងលុបអ៊ីនស្តង់ KiloClaw របស់អ្នក និងទិន្នន័យទាំងអស់របស់វាជាអចិន្ត្រៃយ៍។ អ្នកមិនអាចស្តារវាឡើងវិញបានទេ។",
-      "destroyTitle": "លុបអ៊ីនស្តង់ជាអចិន្ត្រៃយ៍",
-      "instance": "អ៊ីនស្តង់",
-      "couldNotCheckStatus": "មិនអាចពិនិត្យស្ថានភាពសេវាកម្មបានទេ។",
-      "dangerZone": "តំបន់គ្រោះថ្នាក់",
-      "destroying": "កំពុងលុបជាអចិន្ត្រៃយ៍…",
-      "serviceDegraded": "សេវាកម្មដំណើរការមិនពេញលេញ — ប៉ះដើម្បីមើលស្ថានភាព",
-      "up": "ដំណើរការ"
-    },
-    "channels": {
-      "title": "បណ្តាញទំនាក់ទំនង",
-      "couldNotLoad": "មិនអាចផ្ទុកឆានែលបានទេ។",
-      "noChannels": "គ្មានឆានែលដែលអាចប្រើបាន",
-      "noChannelsDescription": "ការភ្ជាប់ជាមួយឆានែលនានានឹងបង្ហាញនៅទីនេះ។",
-      "connected": "បានភ្ជាប់ {{label}}",
-      "disconnectMessage": "ដក {{label}} ចេញ? ឆានែលនេះនឹងត្រូវផ្តាច់ការភ្ជាប់។",
-      "disconnectTitle": "ផ្តាច់ការភ្ជាប់ឆានែល"
-    },
-    "devicePairing": {
-      "title": "ការផ្គូផ្គងឧបករណ៍",
-      "refreshRequests": "ផ្ទុកសំណើផ្គូផ្គងឡើងវិញ",
-      "couldNotLoad": "មិនអាចផ្ទុកសំណើផ្គូផ្គងបានទេ។",
-      "noPending": "គ្មានសំណើរង់ចាំ",
-      "noPendingDescription": "សំណើផ្គូផ្គងឆានែល និងឧបករណ៍នឹងបង្ហាញនៅទីនេះ។",
-      "channelRequests": "សំណើភ្ជាប់ឆានែល",
-      "deviceRequests": "សំណើភ្ជាប់ឧបករណ៍",
-      "approveDeviceMessage": "អនុញ្ញាតឱ្យ {{platform}} ភ្ជាប់ទៅអ៊ីនស្តង់របស់អ្នក?",
-      "approveDeviceTitle": "អនុម័តឧបករណ៍",
-      "approveMessage": "អនុញ្ញាតឱ្យ {{label}} (កូដ៖ {{code}}) ភ្ជាប់ទៅអ៊ីនស្តង់របស់អ្នក?",
-      "approveTitle": "អនុម័តសំណើផ្គូផ្គង",
-      "unknownDevice": "ឧបករណ៍ដែលមិនស្គាល់"
-    },
-    "execPolicy": {
-      "title": "គោលការណ៍ដំណើរការពាក្យបញ្ជា",
-      "couldNotLoad": "មិនអាចផ្ទុកគោលការណ៍ប្រតិបត្តិពាក្យបញ្ជាបានទេ។",
-      "alwaysAsk": "សួរជានិច្ច",
-      "alwaysAskDescription": "សុំការបញ្ជាក់មុនពេលប្រតិបត្តិពាក្យបញ្ជានីមួយៗ។ ជាជម្រើសដែលមានសុវត្ថិភាពបំផុត។",
-      "neverAsk": "កុំសួរ",
-      "neverAskDescription": "ប្រតិបត្តិពាក្យបញ្ជាដោយមិនសុំការបញ្ជាក់។ លឿនជាង ប៉ុន្តែមិនសូវមានសុវត្ថិភាព។"
-    },
-    "google": {
-      "title": "គណនី Google",
-      "couldNotLoad": "មិនអាចផ្ទុកស្ថានភាពគណនី Google បានទេ។",
-      "disconnected": "បានផ្តាច់ការភ្ជាប់គណនី Google។ ដាក់ពង្រាយអ៊ីនស្តង់របស់អ្នកឡើងវិញ ដើម្បីអនុវត្តការផ្លាស់ប្តូរ។",
-      "setupCommand": "ពាក្យបញ្ជារៀបចំ",
-      "setupCommandHelp": "នៅលើកុំព្យូទ័រផ្ទាល់ខ្លួនដែលបានដំឡើង Docker សូមដំណើរការពាក្យបញ្ជានេះក្នុងស្ថានីយ ដើម្បីភ្ជាប់គណនី Google របស់អ្នក។",
-      "failedToLoadCommand": "មិនអាចផ្ទុកពាក្យបញ្ជារៀបចំបានទេ។",
-      "gmailNotifications": "ការជូនដំណឹង Gmail",
-      "disconnect": "ផ្តាច់ការភ្ជាប់គណនី Google",
-      "copied": "បានចម្លង",
-      "copyCommand": "ចម្លងពាក្យបញ្ជា",
-      "disconnectConfirm": "ផ្តាច់ការភ្ជាប់",
-      "disconnectMessage": "ដកគណនី Google របស់អ្នកចេញពីអ៊ីនស្តង់នេះ? សកម្មភាពនេះនឹងបិទការជូនដំណឹង Gmail។ ដាក់ពង្រាយឡើងវិញបន្ទាប់ពីផ្តាច់ការភ្ជាប់ ដើម្បីអនុវត្តការផ្លាស់ប្តូរ។",
-      "disconnectTitle": "ផ្តាច់ការភ្ជាប់ Google"
-    },
-    "modelList": {
-      "noMatches": "គ្មានម៉ូដែលដែលត្រូវនឹងការស្វែងរករបស់អ្នក",
-      "noModelsDescription": "ម៉ូដែលនឹងបង្ហាញនៅទីនេះ នៅពេលអាចប្រើបាន។",
-      "noResultsFor": "គ្មានលទ្ធផលសម្រាប់ «{{query}}» ទេ។"
-    },
-    "secrets": {
-      "title": "ព័ត៌មានសម្ងាត់",
-      "couldNotLoad": "មិនអាចផ្ទុកព័ត៌មានសម្ងាត់បានទេ។",
-      "noSecrets": "គ្មានព័ត៌មានសម្ងាត់",
-      "noSecretsDescription": "ការភ្ជាប់ដែលប្រើព័ត៌មានសម្ងាត់នឹងបង្ហាញនៅទីនេះ។",
-      "removeMessage": "ដក {{label}} ចេញ? ឧបករណ៍នេះនឹងលែងអាចចូលប្រើព័ត៌មានសម្គាល់អត្តសញ្ញាណរបស់វា។",
-      "removeTitle": "ដកព័ត៌មានសម្ងាត់ចេញ",
-      "saved": "បានរក្សាទុក {{label}}",
-      "hide": "លាក់ {{label}}",
-      "show": "បង្ហាញ {{label}}",
-      "allFieldsRequired": "អ្នកត្រូវបំពេញគ្រប់ប្រអប់ ដើម្បីភ្ជាប់ {{label}}។",
-      "setupGuideFallback": "ការណែនាំអំពីការរៀបចំ",
-      "setupGuideA11y": "ការណែនាំអំពីការរៀបចំ {{label}}",
-      "setupGuide": "ការណែនាំអំពីការរៀបចំ",
-      "saving": "កំពុងរក្សាទុក…",
-      "removing": "កំពុងដកចេញ…",
-      "updateToken": "ធ្វើបច្ចុប្បន្នភាពថូខិន"
-    },
-    "versionPin": {
-      "title": "ការកំណត់កំណែថេរ",
-      "couldNotLoad": "មិនអាចផ្ទុកព័ត៌មានកំណែបានទេ។",
-      "couldNotLoadMore": "មិនអាចផ្ទុកកំណែបន្ថែមបានទេ។",
-      "loadMore": "ផ្ទុកកំណែបន្ថែមទៀត",
-      "showingLatest": "កំពុងបង្ហាញកំណែចុងក្រោយចំនួន 100។",
-      "availableVersions": "កំណែដែលអាចប្រើបាន",
-      "noVersions": "គ្មានកំណែដែលអាចប្រើបាន",
-      "noVersionsDescription": "កំណែ OpenClaw ដែលអាចប្រើបាននឹងបង្ហាញនៅទីនេះ។",
-      "unpin": "ដកការកំណត់កំណែថេរ",
-      "unpinMessage": "ត្រឡប់ទៅកំណែចុងក្រោយដែលអាចប្រើបាន?",
-      "unpinTitle": "ដកការកំណត់កំណែថេរ",
-      "confirmPin": "បញ្ជាក់ការកំណត់កំណែថេរ",
-      "followingLatest": "ប្រើកំណែចុងក្រោយជានិច្ច",
-      "latest": "ចុងក្រោយ",
-      "pin": "កំណត់កំណែថេរ",
-      "pinnedByAdmin": "អ្នកគ្រប់គ្រងបានកំណត់កំណែថេរ។ ទាក់ទងអ្នកគ្រប់គ្រងរបស់អ្នក ដើម្បីប្តូរកំណែ។",
-      "pinnedTo": "បានកំណត់កំណែថេរ {{version}}",
-      "reasonOptional": "មូលហេតុ (ស្រេចចិត្ត)",
-      "reasonPlaceholder": "មូលហេតុនៃការកំណត់កំណែនេះជាកំណែថេរ",
-      "replaceAdminPin": "ជំនួសកំណែថេររបស់អ្នកគ្រប់គ្រង",
-      "replacesAdminPin": "សកម្មភាពនេះនឹងជំនួសកំណែថេរដែលអ្នកគ្រប់គ្រងបានកំណត់ (បច្ចុប្បន្នគឺ {{label}})។"
-    },
-    "redeploy": "ដាក់ពង្រាយឡើងវិញ",
-    "redeployMessage": "តើអ្នកពិតជាចង់ដាក់ពង្រាយអ៊ីនស្តង់នេះឡើងវិញមែនទេ?",
-    "redeployTitle": "ដាក់ពង្រាយអ៊ីនស្តង់ឡើងវិញ",
-    "controls": {
-      "redeploying": "កំពុងដាក់ពង្រាយឡើងវិញ…",
-      "restart": "ចាប់ផ្តើមឡើងវិញ",
-      "restartOpenClawMessage": "តើអ្នកពិតជាចង់ចាប់ផ្តើមដំណើរការ OpenClaw ឡើងវិញមែនទេ?",
-      "restartOpenClawTitle": "ចាប់ផ្តើម OpenClaw ឡើងវិញ",
-      "restarting": "កំពុងចាប់ផ្តើមឡើងវិញ…",
-      "start": "ចាប់ផ្តើម",
-      "startMessage": "តើអ្នកពិតជាចង់ចាប់ផ្តើមអ៊ីនស្តង់នេះមែនទេ?",
-      "startTitle": "ចាប់ផ្តើមអ៊ីនស្តង់",
-      "stop": "បញ្ឈប់",
-      "stopMessage": "តើអ្នកពិតជាចង់បញ្ឈប់អ៊ីនស្តង់នេះមែនទេ?",
-      "stopTitle": "បញ្ឈប់អ៊ីនស្តង់",
-      "stopping": "កំពុងបញ្ឈប់…"
-    },
-    "empty": {
-      "finishingSetup": "កំពុងបញ្ចប់ការរៀបចំ",
-      "finishingSetupDescription": "សូមរង់ចាំបន្តិច យើងកំពុងបញ្ចប់ការរៀបចំគណនីរបស់អ្នក។ ជាធម្មតា វាចំណាយពេលតែបន្តិចប៉ុណ្ណោះ។",
-      "getStarted": "ចាប់ផ្តើម",
-      "noInstancesDescription": "បង្កើតអ៊ីនស្តង់ដំបូងរបស់អ្នក ដើម្បីចាប់ផ្តើមដំណើរការភ្នាក់ងារសរសេរកូដ។"
-    },
-    "instance": {
-      "backToInstances": "ត្រឡប់ទៅបញ្ជីអ៊ីនស្តង់",
-      "couldNotLoad": "មិនអាចផ្ទុកអ៊ីនស្តង់បានទេ។",
-      "notFound": "រកមិនឃើញអ៊ីនស្តង់",
-      "notFoundDescription": "អ៊ីនស្តង់នេះអាចត្រូវបានលុបជាអចិន្ត្រៃយ៍ ឬតំណលែងមានសុពលភាពហើយ។"
-    },
-    "list": {
-      "createInstance": "បង្កើតអ៊ីនស្តង់",
-      "organizations": "អង្គការ",
-      "accessIssue": {
-        "trialExpired": "ការសាកល្បងបានបញ្ចប់ — ជាវដើម្បីបន្តប្រើអ៊ីនស្តង់នេះ",
-        "subscriptionCanceled": "ការជាវលែងមានសុពលភាព — ជាវឡើងវិញដើម្បីបន្តប្រើអ៊ីនស្តង់នេះ",
-        "subscriptionPastDue": "មានបញ្ហាការទូទាត់ — ធ្វើបច្ចុប្បន្នភាពព័ត៌មានការគិតថ្លៃ ដើម្បីបន្តប្រើអ៊ីនស្តង់នេះ",
-        "quarantined": "អ៊ីនស្តង់ត្រូវបានដាក់ឱ្យនៅដាច់ដោយឡែក — ត្រូវការបុគ្គលិកពិនិត្យ",
-        "multipleCurrentConflict": "គណនីត្រូវការការពិនិត្យ",
-        "nonCanonicalEarlybird": "គម្រោងចាស់ត្រូវការពិនិត្យ"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "ជជែកជាមួយ {{name}}",
-        "ready": "{{name}} បានត្រៀមរួចរាល់",
-        "warmedUp": "អ្វីៗរួចរាល់ហើយ។ ចាប់ផ្តើមសួរសុខទុក្ខនៅពេលអ្នករួចរាល់។"
-      },
-      "flow": {
-        "genericErrorBody": "យើងមិនអាចបញ្ចប់ការរៀបចំអ៊ីនស្តង់របស់អ្នកនៅពេលនេះបានទេ។",
-        "manualReviewBody": "យើងត្រូវពិនិត្យស្ថានភាពគណនីរបស់អ្នក មុនពេលអាចបង្កើតអ៊ីនស្តង់បាន។ បន្តនៅលើ kilo.ai។",
-        "manualReviewTitle": "ការរៀបចំត្រូវការបុគ្គលិកពិនិត្យ",
-        "openKiloAi": "បើក kilo.ai",
-        "provisioning": "ការរៀបចំធនធាន",
-        "review": "ការពិនិត្យ",
-        "identityTitle": "ផ្តល់អត្តសញ្ញាណដល់បូតរបស់អ្នក",
-        "couldNotLoad": "មិនអាចផ្ទុកស្ថានភាពរៀបចំដំបូងបានទេ។",
-        "finishingSetup": "កំពុងបញ្ចប់ការរៀបចំ។ សូមរង់ចាំបន្តិច ខណៈយើងបញ្ចប់ការរៀបចំគណនីរបស់អ្នក។",
-        "ready": "រួចរាល់",
-        "settingUp": "កំពុងរៀបចំ…"
-      },
-      "unavailableDescription": "អ្នកត្រូវមានការជាវ KiloClaw ដែលកំពុងមានសុពលភាព ទើបអាចបង្កើតអ៊ីនស្តង់បាន។ អ៊ីនស្តង់ និងការជាវដែលមានស្រាប់នៅតែដំណើរការធម្មតា។",
-      "unavailableTitle": "មិនអាចបង្កើតអ៊ីនស្តង់ KiloClaw ថ្មីបានទេ",
-      "identity": {
-        "chooseAvatar": "ជ្រើសរើសរូបតំណាង",
-        "namePlaceholder": "ឈ្មោះបូតរបស់អ្នក",
-        "selectAvatar": "ជ្រើសរើស {{name}} ជារូបតំណាង",
-        "personality": "បុគ្គលិកលក្ខណៈ",
-        "changePersonality": "ផ្លាស់ប្តូរបុគ្គលិកលក្ខណៈ",
-        "location": "ទីតាំង",
-        "locationPlaceholder": "ទីក្រុង ឬតំបន់ (ស្រេចចិត្ត)",
-        "useCurrentLocation": "ប្រើទីតាំងបច្ចុប្បន្ន",
-        "locationDeniedTitle": "ការចូលប្រើទីតាំងត្រូវបានបដិសេធ",
-        "locationDeniedMessage": "បើកការចូលប្រើទីតាំងនៅក្នុងការកំណត់ ដើម្បីប្រើទីតាំងបច្ចុប្បន្នរបស់អ្នក។",
-        "locationValidationFailed": "មិនអាចផ្ទៀងផ្ទាត់ទីតាំងបានទេ។",
-        "locationResolveFailed": "មិនអាចកំណត់ទីតាំងរបស់អ្នកបានទេ។ អ្នកអាចកែសម្រួលវាដោយខ្លួនឯងបាន។",
-        "locationGetFailed": "មិនអាចទទួលបានទីតាំងរបស់អ្នកទេ។ បញ្ចូលទីតាំងដោយខ្លួនឯង។",
-        "nature": {
-          "aiAssistantLabel": "ជំនួយការ AI",
-          "aiAssistantVibe": "ចូលចិត្តជួយ មានសមត្ថភាព មានវិជ្ជាជីវៈ",
-          "digitalCreatureLabel": "សត្វឌីជីថល",
-          "digitalCreatureVibe": "ប្លែកពីគេ រស់រវើក ពិបាកទាយបន្តិច",
-          "virtualCompanionLabel": "ដៃគូនិម្មិត",
-          "virtualCompanionVibe": "កក់ក្តៅ នៅក្បែរអ្នក យកចិត្តទុកដាក់យ៉ាងពិតប្រាកដ",
-          "somethingWeirderLabel": "អ្វីដែលចម្លែកជាង…",
-          "somethingWeirderVibe": "កំណត់វាដោយខ្លួនអ្នក"
-        }
-      },
-      "notifications": {
-        "mockMessage": "រួចរាល់ហើយ! ខ្ញុំបានរៀបចំសេចក្តីសង្ខេបដែលអ្នកស្នើសុំរួចហើយ។ អ្នកអាចមើលបានគ្រប់ពេលដែលអ្នករួចរាល់។",
-        "settingUp": "កំពុងរៀបចំការជូនដំណឹង…",
-        "stayInTheLoop": "តាមដានព័ត៌មានថ្មីៗ",
-        "getNotified": "ទទួលការជូនដំណឹង នៅពេល {{name}} បញ្ចប់កិច្ចការ ដើម្បីកុំឱ្យអ្នកខកខានការឆ្លើយតបណាមួយ។",
-        "now": "ឥឡូវនេះ",
-        "skipForNow": "រំលងឥឡូវនេះ",
-        "couldNotEnable": "មិនអាចបើកការជូនដំណឹងបានទេ។"
-      },
-      "provisioning": {
-        "queryErrorTitle": "មិនអាចពិនិត្យស្ថានភាពរៀបចំបាន",
-        "queryErrorBody": "ការតភ្ជាប់បានដាច់ ខណៈយើងកំពុងពិនិត្យការរៀបចំ {{name}}។ ការរៀបចំអាចនៅតែបន្ត។ ព្យាយាមម្តងទៀត ឬពិនិត្យម្តងទៀតបន្តិចក្រោយនេះ។",
-        "stoppedTitle": "ការរៀបចំបានឈប់",
-        "stoppedBody": "អ៊ីនស្តង់របស់ {{name}} បានឈប់ដោយមិនបានរំពឹងទុក អំឡុងពេលរៀបចំ។",
-        "stalledTitle": "ការរៀបចំបានជាប់គាំង",
-        "stalledBody": "យើងមិនអាចបញ្ចប់ការរៀបចំ {{name}} បានទេ។ ព្យាយាមម្តងទៀត ឬផ្ញើអ៊ីមែលទៅ {{supportEmail}} ប្រសិនបើវានៅតែកើតឡើង។",
-        "timeoutTitle": "ចំណាយពេលយូរជាងការរំពឹងទុក",
-        "timeoutBody": "ការរៀបចំសម្រាប់ {{name}} កំពុងចំណាយពេលយូរជាងធម្មតា (លើសពី {{displayMinutes}} នាទី)។",
-        "continueInBackground": "បន្តនៅផ្ទៃខាងក្រោយ",
-        "settingUp": "កំពុងរៀបចំ {{name}}",
-        "connectingToAgent": "កំពុងភ្ជាប់ទៅភ្នាក់ងារ",
-        "startingSandbox": "កំពុងចាប់ផ្តើមបរិស្ថានដាច់ដោយឡែក",
-        "backgroundHint": "ជាធម្មតា វាចំណាយពេលតិចជាងមួយនាទី។ អ្នកអាចបិទអេក្រង់នេះបាន។ យើងនឹងបន្តដំណើរការនៅផ្ទៃខាងក្រោយ។"
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "កូដ {{code}}",
-      "gatewayProcess": "ដំណើរការច្រកចេញចូល",
-      "lastExit": "ការបញ្ចប់ដំណើរការចុងក្រោយ",
-      "memory": "អង្គចងចាំ",
-      "region": "តំបន់",
-      "resources": "ធនធាន",
-      "restarts": "ចំនួនដងចាប់ផ្តើមឡើងវិញ",
-      "state": "ស្ថានភាព",
-      "uptime": "រយៈពេលដំណើរការ",
-      "crashed": "គាំង",
-      "destroying": "កំពុងលុបជាអចិន្ត្រៃយ៍",
-      "provisioned": "បានរៀបចំធនធាន",
-      "restarting": "កំពុងចាប់ផ្តើមឡើងវិញ",
-      "running": "កំពុងដំណើរការ",
-      "shuttingDown": "កំពុងបិទ",
-      "starting": "កំពុងចាប់ផ្តើម",
-      "stopped": "បានឈប់",
-      "stopping": "កំពុងបញ្ឈប់",
-      "unknown": "មិនស្គាល់",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "កម្រិតខ្ពស់បំផុត",
-      "frontierDescription": "ប្រសិទ្ធភាពខ្ពស់បំផុត។ បញ្ជូនសំណើទៅម៉ូដែលកម្រិតខ្ពស់បំផុតដែលមានសមត្ថភាពវែកញែក។",
-      "balancedDescription": "មានតុល្យភាពល្អរវាងល្បឿន និងសមត្ថភាព ក្នុងតម្លៃទាបជាង។",
-      "autoModelA11y": "ម៉ូដែលស្វ័យប្រវត្តិ {{label}}",
-      "currentModel": "ម៉ូដែលបច្ចុប្បន្ន",
-      "browseAllModels": "ឬជ្រើសរើសពីម៉ូដែលជាង 500",
-      "browseAllModelsA11y": "រកមើលម៉ូដែលទាំងអស់ជាង 500"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "ដើម្បីបន្តប្រើ KiloClaw សូមចូលទៅ kilo.ai/claw ពីកម្មវិធីរុករករបស់អ្នក។ អ្នកមិនអាចជាវនៅក្នុងកម្មវិធីបានទេ។",
-      "subscriptionCanceledTitle": "ជាវនៅលើគេហទំព័រ",
-      "subscriptionCanceledBody": "ដើម្បីប្រើ KiloClaw សូមចូលទៅ kilo.ai/claw ពីកម្មវិធីរុករករបស់អ្នក។ អ្នកមិនអាចជាវនៅក្នុងកម្មវិធីបានទេ។",
-      "subscriptionCanceledCta": "បើក kilo.ai/claw",
-      "subscriptionPastDueTitle": "ធ្វើបច្ចុប្បន្នភាពព័ត៌មានទូទាត់នៅលើគេហទំព័រ",
-      "subscriptionPastDueBody": "ការទូទាត់ចុងក្រោយរបស់អ្នកមានបញ្ហា។ ចូលទៅ kilo.ai/claw តាមកម្មវិធីរុករក ដើម្បីធ្វើបច្ចុប្បន្នភាពព័ត៌មានទូទាត់។ អ្នកមិនអាចគ្រប់គ្រងការគិតថ្លៃនៅក្នុងកម្មវិធីបានទេ។",
-      "quarantinedTitle": "អ៊ីនស្តង់ត្រូវការដោះស្រាយបញ្ហា",
-      "quarantinedBody": "អ៊ីនស្តង់ KiloClaw របស់អ្នកត្រូវបានដាក់ឱ្យនៅដាច់ដោយឡែក ហើយមិនអាចប្រើបាននៅពេលនេះទេ។ ក្រុមការងាររបស់យើងត្រូវជួយស្តារវាឡើងវិញ។",
-      "multipleCurrentConflictBody": "យើងបានរកឃើញការជាវដែលមានសុពលភាពលើសពីមួយក្នុងគណនីរបស់អ្នក។ ដូច្នេះ យើងបានផ្អាកដំណើរការ ដើម្បីកុំឱ្យគិតថ្លៃអ្នកពីរដង។",
-      "multipleCurrentConflictCta": "បន្តនៅលើ kilo.ai",
-      "nonCanonicalEarlybirdTitle": "រកឃើញគម្រោងចាស់",
-      "nonCanonicalEarlybirdBody": "គម្រោងចូលប្រើមុនរបស់អ្នកត្រូវការបុគ្គលិកពិនិត្យ មុនពេលអាចប្រើនៅលើទូរស័ព្ទបាន។",
-      "iosTitle": "KiloClaw មិនអាចប្រើបាននៅលើ iOS",
-      "iosBody": "ការចូលប្រើ KiloClaw ត្រូវបានគ្រប់គ្រងនៅខាងក្រៅកម្មវិធី iOS សម្រាប់គណនីនេះ។",
-      "iosContact": "មានសំណួរ? ទាក់ទង {{supportEmail}}។",
-      "quarantinedCta": "ផ្ញើអ៊ីមែលទៅក្រុមការងារយើង",
-      "nonCanonicalEarlybirdCta": "ពិនិត្យគម្រោងរបស់អ្នកនៅលើ kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} ត្រូវការការយកចិត្តទុកដាក់៖ {{label}}",
-      "openUnread_one": "បើក {{name}} មានសារមិនទាន់អាន {{displayCount}}",
-      "openUnread": "បើក {{name}} មានសារមិនទាន់អាន {{displayCount}}",
-      "openUnread_other": "បើក {{name}} មានសារមិនទាន់អាន {{displayCount}}",
-      "openSettings": "បើកការកំណត់សម្រាប់ {{name}}",
-      "fixOnKiloAi": "ដោះស្រាយនៅលើ kilo.ai៖ {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "អនុម័តសំណើភ្ជាប់ឧបករណ៍",
-      "execPolicyDescription": "ការកំណត់សុវត្ថិភាព",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "ការជ្រើសរើសម៉ូដែល AI",
-      "secretsDescription": "ព័ត៌មានសម្គាល់អត្តសញ្ញាណដែលបានអ៊ិនគ្រីប",
-      "versionPinDescription": "កំណត់ឱ្យប្រើកំណែជាក់លាក់មួយ"
-    },
-    "avatar": {
-      "arcade": "ម៉ាស៊ីនហ្គេម",
-      "brain": "ខួរក្បាល",
-      "creature": "សត្វ",
-      "crystal": "គ្រីស្តាល់",
-      "custom": "រូបតំណាងផ្ទាល់ខ្លួន",
-      "dragon": "នាគ",
-      "explorer": "អ្នករុករក",
-      "flame": "អណ្តាតភ្លើង",
-      "lightning": "ផ្លេកបន្ទោរ",
-      "magicWand": "ដំបងវេទមន្ត",
-      "moon": "ព្រះច័ន្ទ",
-      "operator": "ប្រតិបត្តិករ",
-      "orbit": "គន្លងគោចរ",
-      "oracle": "អ្នកទស្សន៍ទាយ",
-      "rainbow": "ឥន្ទធនូ",
-      "robot": "មនុស្សយន្ត",
-      "satellite": "ផ្កាយរណប",
-      "sparkles": "ពន្លឺផ្លេកៗ",
-      "strongArm": "ដៃមាំមួន",
-      "talisman": "គ្រឿងមន្តអាគម"
-    },
-    "remoteSpawnFilesNotSupported": "អ៊ីនស្តង់នេះមិនអាចទទួលឯកសារបានទេ។",
-    "instanceSwitcherTitle": "អ៊ីនស្តង់ KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "ផ្លាស់ទី {{filename}} ទៅឆ្វេង",
       "moveRight": "ផ្លាស់ទី {{filename}} ទៅស្តាំ"
     },
-    "attachmentPasteHint": {
-      "accessibility": "បិទភ្ជាប់រូបភាពពីក្តារតម្បៀតខ្ទាស់",
-      "label": "បានរកឃើញរូបភាព ប៉ះដើម្បីបិទភ្ជាប់"
-    },
     "attachmentPicker": {
       "camera": "កាមេរ៉ា",
       "photoLibrary": "បណ្ណាល័យរូបថត",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "ចេញពីគណនីលើឧបករណ៍នេះ?",
     "signOutThisSessionTitle": "ចេញពីគណនីក្នុងវគ្គនេះ?",
     "signOutThisSessionMessage": "ប្រព័ន្ធនឹងឱ្យ {{device}} ចេញពីគណនី។ ឧបករណ៍នេះនៅតែអាចចូលប្រើ API បានរហូតដល់មួយម៉ោងទៀត។",
-    "webBrowser": "កម្មវិធីរុករកគេហទំព័រ"
+    "webBrowser": "កម្មវិធីរុករកគេហទំព័រ",
+    "unknownDevice": "ឧបករណ៍ដែលមិនស្គាល់"
   },
   "forceUpdate": {
     "couldNotOpenStore": "មិនអាចបើកហាងកម្មវិធីបានទេ។",

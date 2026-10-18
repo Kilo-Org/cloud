@@ -1,11 +1,7 @@
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  CountSurfaces,
-  kiloclawVisible,
-  routerReplace,
-} from '@/components/agents/agents-tab-badge.test-helpers';
+import { CountSurfaces, routerReplace } from '@/components/agents/agents-tab-badge.test-helpers';
 import { i18n } from '@/i18n';
 import { type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -32,7 +28,6 @@ function screenOptions(renderer: Mount['renderer']) {
 describe('Tabs layout with the keyboard raised', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    kiloclawVisible.value = false;
     routerReplace.mockClear();
   });
 
@@ -60,8 +55,7 @@ describe('Tabs layout with the keyboard raised', () => {
     expect(options.tabBarStyle.display).toBe('flex');
   });
 
-  it.each([false, true])('always shows Chat with KiloClaw visibility %s', async visible => {
-    kiloclawVisible.value = visible;
+  it('shows Chat third in the four-tab navigation', async () => {
     const result = await renderWithProviders(createElement(CountSurfaces));
     mounts.push(result);
     const chatTab = result.renderer.root.findByProps({ name: '(4_chat)' });
@@ -74,13 +68,13 @@ describe('Tabs layout with the keyboard raised', () => {
     expect(options.tabBarAccessibilityLabel).toBe(
       i18n.t('tabs.position', {
         name: i18n.t('common.chat'),
-        position: visible ? 4 : 3,
-        total: visible ? 5 : 4,
+        position: 3,
+        total: 4,
       })
     );
     expect(routerReplace).not.toHaveBeenCalled();
-    const kiloclawTab = result.renderer.root.findByProps({ name: '(1_kiloclaw)' });
-    const kiloclawOptions = kiloclawTab.props.options as { href?: string | null };
-    expect(kiloclawOptions.href).toBe(visible ? undefined : null);
+    expect(
+      result.renderer.root.findAll(tab => isHostType(tab, 'TabScreen')).map(tab => tab.props.name)
+    ).toEqual(['(0_home)', '(2_agents)', '(4_chat)', '(3_profile)']);
   });
 });

@@ -22,8 +22,6 @@ const MIN_TEXT_RATIO = 4.5;
 
 // The code card is a translucent tint over the bubble, so the text renders on
 // the composite, not the bare bubble. Mirrors how the palette paints it.
-const KILO_CHAT_LIGHT_CODE_TINT = 'rgba(255, 255, 255, 0.1)';
-const KILO_CHAT_LIGHT_CARD = compositeOver(KILO_CHAT_LIGHT_CODE_TINT, '#4F5A10');
 const YELLOW_CODE_TINT = 'rgba(26, 26, 16, 0.1)';
 const YELLOW_CARD = compositeOver(YELLOW_CODE_TINT, '#FFDD00');
 
@@ -91,15 +89,8 @@ describe('compositeOver', () => {
 });
 
 describe('tokenSchemeForSurface', () => {
-  it('treats the bright yellow user and kilo-chat card as onLight', () => {
+  it('treats the bright yellow user card as onLight', () => {
     expect(tokenSchemeForSurface('#FFDD00')).toBe('onLight');
-  });
-
-  it('treats the light theme kilo-chat olive card as onDark', () => {
-    expect(tokenSchemeForSurface('#4F5A10')).toBe('onDark');
-    // The palette feeds the composited card (10% white tint lifts the olive to
-    // #616B28), which must classify the same way the bare primary does.
-    expect(tokenSchemeForSurface(KILO_CHAT_LIGHT_CARD)).toBe('onDark');
   });
 
   it('follows the assistant code card in each theme', () => {
@@ -147,7 +138,7 @@ describe('syntax tokens on their code-card surfaces (WCAG AA text)', () => {
   };
 
   // Bright code cards: the assistant `muted` card, the app card, and the yellow
-  // user/kilo-chat bubble — plus the 10% dark-ink code tint the bubble paints.
+  // user bubble — plus the 10% dark-ink code tint the bubble paints.
   const brightCards = {
     assistant: '#F0EEE6',
     card: '#FFFFFF',
@@ -155,13 +146,9 @@ describe('syntax tokens on their code-card surfaces (WCAG AA text)', () => {
     yellowTint: YELLOW_CARD,
   } as const;
 
-  // Dim code cards: the dark-theme assistant `muted` and `card`, and the
-  // light-theme kilo-chat code card (the olive primary lifted by the 10% white
-  // ink tint). The tokens land on the composite, not the bare primary.
   const dimCards = {
     assistant: '#1F1F24',
     card: '#17171A',
-    kiloChatOliveCard: KILO_CHAT_LIGHT_CARD,
   } as const;
 
   it('every onLight token clears 4.5:1 on each bright card', () => {
@@ -175,7 +162,7 @@ describe('syntax tokens on their code-card surfaces (WCAG AA text)', () => {
     }
   });
 
-  it('every onDark token clears 4.5:1 on each dim card, including the tinted olive card', () => {
+  it('every onDark token clears 4.5:1 on each dim card', () => {
     for (const [token, color] of Object.entries(darkTokens)) {
       for (const [surfaceName, surface] of Object.entries(dimCards)) {
         const ratio = contrastRatio(color, surface);

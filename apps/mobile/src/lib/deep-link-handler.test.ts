@@ -134,6 +134,28 @@ describe('redirectSystemPath', () => {
     });
   });
 
+  describe('removed mobile destinations', () => {
+    it.each([
+      'https://app.kilo.ai/claw',
+      'https://app.kilo.ai/claw/?at=message',
+      'kiloapp://claw',
+      'kiloapp:///claw',
+      'kiloapp://app.kilo.ai/claw',
+      'kiloapp:///kiloclaw/settings',
+      'kiloapp:///chat/sandbox-1/conversation-1',
+      'kiloapp:///onboarding',
+      'kiloapp:///(app)/(tabs)/(1_kiloclaw)/chat/instance-picker',
+      'kiloapp:///%28app%29/%28tabs%29/%281_kiloclaw%29',
+      '/(app)/(tabs)/(1_kiloclaw)',
+      '/chat/sandbox-1/instance-picker',
+    ])('opens the shell cold and leaves the current screen warm for %s', path => {
+      expect(redirectSystemPath({ path, initial: true })).toBe('/');
+      expect(redirectSystemPath({ path, initial: false })).toBeNull();
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+  });
+
   describe('passthrough', () => {
     it.each([
       'https://app.kilo.ai/admin',

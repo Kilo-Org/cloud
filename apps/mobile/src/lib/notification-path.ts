@@ -1,6 +1,5 @@
 import { type PushData } from '@kilocode/notifications';
 
-import { chatConversationRoute, chatSandboxRoute } from './kilo-chat-routes';
 import { providerPrRoutePath } from './pr-review/provider-pr-ref';
 import { parseProviderPrUrl } from './pr-review/provider-pr-url';
 import { getSecurityAgentPath } from './security-agent';
@@ -25,7 +24,11 @@ export function prPathForData(data: PushData): string | null {
   return `${base}${base.includes('?') ? '&' : '?'}via=push`;
 }
 
-export function notificationPathForData(data: PushData): string {
+export function notificationPathForData(
+  data: Extract<PushData, { type: 'cloud_agent_session' }>
+): string;
+export function notificationPathForData(data: PushData): string | null;
+export function notificationPathForData(data: PushData): string | null {
   // `via=push` marks the resulting session_viewed analytics event as
   // push-originated.
   switch (data.type) {
@@ -33,7 +36,7 @@ export function notificationPathForData(data: PushData): string {
       return `/(app)/agent-chat/${data.cliSessionId}?via=push`;
     }
     case 'chat.message': {
-      return `${chatConversationRoute(data.sandboxId, data.conversationId)}?via=push`;
+      return null;
     }
     case 'low_balance': {
       return `/(app)/(tabs)/(3_profile)/organization/credit-activity?org=${data.organizationId}&via=push`;
@@ -56,7 +59,7 @@ export function notificationPathForData(data: PushData): string {
     }
     case 'instance-lifecycle':
     case 'scheduled-action': {
-      return chatSandboxRoute(data.sandboxId);
+      return null;
     }
     case 'active_agents_glanceable':
     case 'session_live_update': {

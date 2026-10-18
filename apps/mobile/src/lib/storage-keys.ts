@@ -24,7 +24,6 @@ export const SESSION_FILTERS_KEY = 'agent-session-filters';
 /** Filter record for the live sessions page. Separate: the pages filter separate lists. */
 export const LIVE_SESSION_FILTERS_KEY = 'live-session-filters';
 export const NOTIFICATION_PROMPT_SEEN_KEY = 'notification-prompt-seen';
-export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
 /** Last "Run on" destination on the new-agent screen. Empty means Cloud Agent. */
 export const LAST_RUN_ON_DESTINATION_KEY = 'last-run-on-destination';
 export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';
@@ -98,7 +97,6 @@ export const ACTIVE_USER_ID_KEY = 'active-user-id';
  * epoch-fenced and NOT deleted on sign-out: it must survive the teardown.
  */
 export const LOGOUT_CLEANUP_TOMBSTONE_KEY = 'logout-cleanup-tombstone';
-export const KILOCLAW_OWNED_KEY = 'kiloclaw-owned';
 export const REFRESH_TOKEN_KEY = 'auth-refresh-token';
 export const TOKEN_EXPIRES_AT_KEY = 'auth-token-expires-at';
 export const LEGACY_EXCHANGE_DONE_KEY = 'auth-legacy-exchange-done';

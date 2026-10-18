@@ -101,12 +101,9 @@
     "scheduled": "Προγραμματισμένο",
     "keepEditing": "Συνέχιση επεξεργασίας",
     "keepRunning": "Συνέχιση εκτέλεσης",
-    "kiloclaw": "KiloClaw",
     "newSession": "Νέα συνεδρία",
-    "noKiloclawInstances": "Δεν υπάρχουν εγκαταστάσεις KiloClaw",
     "noModelsAvailable": "Δεν υπάρχουν διαθέσιμα μοντέλα",
     "notFound": "Δεν βρέθηκε.",
-    "online": "Σε σύνδεση",
     "open": "Άνοιγμα {{name}}",
     "openPullRequest": "Άνοιγμα αιτήματος ενσωμάτωσης",
     "pending": "Σε εκκρεμότητα",
@@ -257,7 +254,8 @@
     "renamePasskey": "Μετονομασία κλειδιού πρόσβασης",
     "removePasskey": "Αφαίρεση κλειδιού πρόσβασης",
     "removePasskeyTitle": "Αφαίρεση κλειδιού πρόσβασης;",
-    "removePasskeyMessage": "Δεν θα μπορείτε πλέον να συνδεθείτε με αυτό το κλειδί πρόσβασης."
+    "removePasskeyMessage": "Δεν θα μπορείτε πλέον να συνδεθείτε με αυτό το κλειδί πρόσβασης.",
+    "changelog": "Τι νέο υπάρχει"
   },
   "preferences": {
     "general": "Γενικά",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Οι ειδοποιήσεις δείχνουν ότι υπάρχει νέα δραστηριότητα. Άνοιξε το Kilo για να διαβάσεις το μήνυμα.",
     "channel": {
       "agentProgress": "Πρόοδος πράκτορα",
-      "chat": "Μηνύματα συνομιλίας",
-      "kiloclaw": "Δραστηριότητα KiloClaw",
       "balance": "Ειδοποιήσεις υπολοίπου",
       "security": "Ευρήματα ασφάλειας",
       "spend": "Ειδοποιήσεις δαπανών",
       "followedSessions": "Συνεδρίες που ακολουθούνται"
     },
     "category": {
-      "chatMessagesSubtitle": "απαντήσεις στις συνομιλίες σου",
       "agentAttentionTitle": "Ο πράκτορας σε χρειάζεται",
       "agentAttentionSubtitle": "ερωτήσεις, αιτήματα άδειας και παροχής στοιχείων",
       "agentUpdatesTitle": "Ενημερώσεις πράκτορα",
       "agentUpdatesSubtitle": "μηνύματα του πράκτορα κατά τη διάρκεια της εργασίας",
       "sessionStatusTitle": "Κατάσταση συνεδρίας",
       "sessionStatusSubtitle": "ολοκληρώθηκε / απέτυχε / έτοιμη για έλεγχο",
-      "kiloclawActivitySubtitle": "περιβάλλον έτοιμο ή με αποτυχία, προγραμματισμένες ενέργειες",
-      "kiloclawActivityUnavailable": "Ξεκινήστε ένα περιβάλλον KiloClaw για να λαμβάνετε δραστηριότητα KiloClaw.",
       "balanceAlertsSubtitle": "προειδοποιήσεις χαμηλού υπολοίπου οργανισμού",
       "balanceAlertsUnavailable": "Συνδεθείτε σε έναν οργανισμό για να λαμβάνετε ειδοποιήσεις υπολοίπου.",
       "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Αρχική",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, καρτέλα, {{position}} από {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Αλλαγή στιγμιοτύπου",
-      "couldNotLoadInstances": "Δεν ήταν δυνατή η φόρτωση των στιγμιοτύπων.",
-      "noInstancesDescription": "Ρύθμισε ένα στιγμιότυπο για να ξεκινήσεις τη συνομιλία.",
-      "setUpKiloclaw": "Ρύθμιση KiloClaw",
-      "currentInstance": "{{title}}, τρέχον"
-    },
     "conversation": {
-      "failedToLoad": "Δεν ήταν δυνατή η φόρτωση της συνομιλίας.",
-      "notFound": "Η συνομιλία δεν βρέθηκε.",
       "untitled": "Χωρίς τίτλο",
-      "leaveTitle": "Αποχώρηση από τη συνομιλία;",
-      "leaveMessage": "Η συνομιλία θα αφαιρεθεί από τη λίστα σου.",
-      "openHint": "Ανοίγει τη συνομιλία. Πάτησε παρατεταμένα για επιλογές μετονομασίας και αποχώρησης.",
-      "unread": "Μη αναγνωσμένη",
-      "optionsFor": "Επιλογές συνομιλίας για {{title}}",
-      "options": "Επιλογές συνομιλίας",
-      "renameTitle": "Μετονομασία συνομιλίας",
-      "renamePlaceholder": "Νέο όνομα",
-      "couldNotReachBot": "Δεν ήταν δυνατή η επικοινωνία με το μποτ. Δοκίμασε ξανά.",
-      "messageDeliveryFailed": "Το μήνυμα δεν μπόρεσε να παραδοθεί στο μποτ.",
-      "couldNotSignIn": "Δεν ήταν δυνατή η σύνδεση στη συνομιλία.",
-      "couldNotRefreshMessages": "Δεν ήταν δυνατή η ανανέωση των μηνυμάτων.",
-      "couldNotLoadHistory": "Δεν ήταν δυνατή η φόρτωση του ιστορικού της συνομιλίας.",
-      "leave": "Αποχώρηση",
-      "untitledConversation": "Συνομιλία χωρίς τίτλο",
-      "createFailed": "Δεν ήταν δυνατή η δημιουργία της συνομιλίας.",
-      "leaveFailed": "Δεν ήταν δυνατή η αποχώρηση από τη συνομιλία."
-    },
-    "reactions": {
-      "common": "Συχνές αντιδράσεις",
-      "reactWith": "Αντίδραση με {{reaction}}",
-      "accessibility": "Αντίδραση {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Απάντηση σε",
-      "cancelReply": "Ακύρωση απάντησης",
-      "openInstance": "Άνοιγμα στιγμιοτύπου",
-      "attachFile": "Επισύναψη αρχείου",
-      "cancelEdit": "Ακύρωση επεξεργασίας"
+      "renamePlaceholder": "Νέο όνομα"
     },
     "conversationList": {
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των συνομιλιών.",
-      "emptyTitle": "Δεν υπάρχουν ακόμα συνομιλίες",
-      "emptyDescription": "Δημιούργησε μια συνομιλία για να μιλήσεις με το στιγμιότυπό σου στο KiloClaw.",
-      "create": "Δημιουργία συνομιλίας",
-      "newConversation": "Νέα συνομιλία",
-      "openInstanceSettings": "Άνοιγμα ρυθμίσεων στιγμιοτύπου",
       "today": "Σήμερα",
       "yesterday": "Χθες",
-      "thisWeek": "Αυτή την εβδομάδα",
       "older": "Παλαιότερες"
     },
     "attachment": {
-      "open": "Άνοιγμα {{filename}}",
-      "openFailed": "Δεν ήταν δυνατό το άνοιγμα του συνημμένου. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
-      "attachFailed": "Δεν ήταν δυνατή η επισύναψη του αρχείου.",
-      "limit": "Μπορείς να επισυνάψεις έως {{displayCount}} αρχεία.",
-      "sizeRejection": "Το {{filename}} υπερβαίνει το όριο μεγέθους συνημμένων των {{limit}}.",
-      "unreadable": "Δεν ήταν δυνατή η ανάγνωση του {{filename}}.",
-      "pastedImage": "η επικολλημένη εικόνα",
-      "defaultName": "Συνημμένο",
       "classificationDenied": "Δεν είναι δυνατή η επισύναψη εκτελέσιμων αρχείων.",
       "classificationEmpty": "Το αρχείο είναι κενό.",
       "classificationTooLarge": "Το μέγεθος κάθε αρχείου δεν πρέπει να υπερβαίνει τα 20 MB.",
@@ -943,426 +883,17 @@
       "networkError": "Παρουσιάστηκε σφάλμα δικτύου.",
       "uploadFailed": "Η μεταφόρτωση απέτυχε.",
       "nothingToPaste": "Δεν υπάρχει τίποτα για επικόλληση.",
-      "metadataStripFailed": "Δεν ήταν δυνατή η αφαίρεση των μεταδεδομένων της φωτογραφίας.",
-      "limit_one": "Μπορείς να επισυνάψεις έως {{displayCount}} αρχείο.",
-      "limit_other": "Μπορείς να επισυνάψεις έως {{displayCount}} αρχεία."
+      "metadataStripFailed": "Δεν ήταν δυνατή η αφαίρεση των μεταδεδομένων της φωτογραφίας."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}: {{status}}",
-      "retryUploading": "Επανάληψη μεταφόρτωσης του {{filename}}",
-      "remove": "Αφαίρεση {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[διαγραμμένο μήνυμα]",
-      "yourMessage": "Το μήνυμά σου",
-      "messageFrom": "Μήνυμα από {{author}}",
-      "moreActions": "Περισσότερες ενέργειες",
-      "notDelivered": "Δεν παραδόθηκε",
-      "edited": "(τροποποιημένο)",
-      "image": "Εικόνα"
+      "accessibility": "{{filename}}: {{status}}"
     },
     "messageActions": {
-      "copied": "Αντιγράφηκε",
-      "copyFailed": "Δεν ήταν δυνατή η αντιγραφή.",
-      "title": "Ενέργειες μηνύματος",
-      "deleteTitle": "Διαγραφή μηνύματος;",
-      "deleteMessage": "Το μήνυμα θα αφαιρεθεί από τη συνομιλία.",
-      "deleteFailed": "Δεν ήταν δυνατή η διαγραφή του μηνύματος.",
-      "removeReactionFailed": "Δεν ήταν δυνατή η αφαίρεση της αντίδρασης.",
-      "addReactionFailed": "Δεν ήταν δυνατή η προσθήκη της αντίδρασης.",
-      "retrySend": "Επανάληψη αποστολής",
-      "moreReactions": "Περισσότερες αντιδράσεις",
-      "edit": "Επεξεργασία",
-      "sendFailed": "Δεν ήταν δυνατή η αποστολή του μηνύματος.",
-      "retrySendFailed": "Δεν ήταν δυνατή η επανάληψη της αποστολής.",
-      "editFailed": "Δεν ήταν δυνατή η επεξεργασία του μηνύματος.",
-      "executeFailed": "Δεν ήταν δυνατή η εκτέλεση της ενέργειας."
+      "edit": "Επεξεργασία"
     },
     "attachmentPicker": {
-      "takePhoto": "Λήψη φωτογραφίας",
-      "photoLibrary": "Φωτοθήκη",
-      "files": "Αρχεία",
       "cameraAccessMessage": "Επίτρεψε την πρόσβαση στην κάμερα από τις ρυθμίσεις για να τραβήξεις φωτογραφία."
-    },
-    "typingIndicator": {
-      "someone": "Κάποιος",
-      "typing_one": "{{name}} πληκτρολογεί…",
-      "typing": "Οι {{names}} πληκτρολογούν...",
-      "typing_other": "Οι {{names}} πληκτρολογούν..."
-    },
-    "botStatus": {
-      "offline": "Εκτός σύνδεσης",
-      "loadingUser": "Φόρτωση χρήστη...",
-      "waitingForStatus": "Αναμονή για την κατάσταση του μποτ…",
-      "offlineMessage": "Το μποτ είναι εκτός σύνδεσης. Η ανταλλαγή μηνυμάτων θα συνεχιστεί όταν επανασυνδεθεί."
-    },
-    "errors": {
-      "notAllowed": "Αυτή η ενέργεια δεν επιτρέπεται.",
-      "messageTooLong": "Το μήνυμα είναι πολύ μεγάλο. Περιόρισέ το σε λιγότερους από {{limit}} χαρακτήρες.",
-      "titleTooLong": "Ο τίτλος είναι πολύ μεγάλος. Περιόρισέ τον σε λιγότερους από {{limit}} χαρακτήρες.",
-      "messageEmpty": "Το μήνυμα δεν μπορεί να είναι κενό."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Δεν ήταν δυνατή η φόρτωση των στιγμιοτύπων KiloClaw.",
-    "billing": {
-      "title": "Χρεώσεις",
-      "continueMonthToMonth": "Συνέχεια με μηνιαία συνδρομή",
-      "plan": "Πλάνο",
-      "finalTermEnds": "Λήξη τελευταίας περιόδου",
-      "afterFinalTerm": "Μετά την τελευταία περίοδο",
-      "lessThanOneDay": "Λιγότερο από 1 ημέρα",
-      "ends": "Λήγει",
-      "expires": "Λήγει",
-      "noActivePlan": "Δεν υπάρχει ενεργό πρόγραμμα",
-      "noActivePlanDescription": "Δεν έχεις ενεργή συνδρομή KiloClaw.",
-      "managedByAdmin": "Ο διαχειριστής του οργανισμού σου διαχειρίζεται τις χρεώσεις.",
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των στοιχείων χρέωσης.",
-      "manageOnWeb": "Διαχείριση χρεώσεων στον ιστότοπο",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Η τελευταία περίοδος του προγράμματος Commit λήγει στις {{date}}. Συνέχισε με το πρόγραμμα Standard με χρέωση {{price}}, διαφορετικά η φιλοξενία θα τερματιστεί.",
-      "freeTrial": "Δωρεάν δοκιμή",
-      "hostingEnds": "Η φιλοξενία λήγει",
-      "renews": "Ανανεώνεται",
-      "standardMonthToMonth": "Standard με μηνιαία συνδρομή",
-      "standardStartsOn": "Το πρόγραμμα Standard ξεκινά στις {{date}} με χρέωση {{price}}.",
-      "yourStandardMonthlyPrice": "η μηνιαία χρέωσή σου για το Standard",
-      "perMonth": "/μήνα",
-      "earlybirdAccessUntil": "Η πρόσβαση Earlybird ισχύει έως {{date}}.",
-      "earlybirdEnding": "Η πρόσβαση Earlybird λήγει σε {{remaining}}.",
-      "paymentPastDue": "Η πληρωμή έχει καθυστερήσει. Ενημέρωσε τον τρόπο πληρωμής σου.",
-      "subscriptionCancels": "Η συνδρομή θα ακυρωθεί στις {{date}}.",
-      "trialDaysRemaining": "Απομένουν {{remaining}} στη δοκιμή.",
-      "trialEndingSoon": "Η δοκιμή λήγει σύντομα: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Καταχώριση"
-    },
-    "changelog": {
-      "title": "Τι νέο υπάρχει",
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση του ιστορικού αλλαγών.",
-      "noUpdates": "Καμία ενημέρωση ακόμα",
-      "noUpdatesDescription": "Εδώ θα εμφανίζεται το ιστορικό αλλαγών.",
-      "recentUpdates": "Πρόσφατες ενημερώσεις",
-      "manageVersion": "Διαχείριση έκδοσης",
-      "redeployRequired": "Απαιτείται εκ νέου ανάπτυξη",
-      "redeploySuggested": "Προτείνεται εκ νέου ανάπτυξη",
-      "upgradeRequired": "Απαιτείται αναβάθμιση"
-    },
-    "dashboard": {
-      "title": "Πίνακας ελέγχου",
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση του πίνακα ελέγχου.",
-      "renameInstance": "Μετονομασία στιγμιοτύπου",
-      "renamePlaceholder": "Νέο όνομα (έως 50 χαρακτήρες)",
-      "someDetailsFailed": "Δεν ήταν δυνατή η φόρτωση ορισμένων στοιχείων σε πραγματικό χρόνο.",
-      "destroy": "Οριστική διαγραφή",
-      "destroyMessage": "Το στιγμιότυπο KiloClaw σου και όλα τα δεδομένα του θα διαγραφούν οριστικά. Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.",
-      "destroyTitle": "Οριστική διαγραφή στιγμιοτύπου",
-      "instance": "Στιγμιότυπο",
-      "couldNotCheckStatus": "Δεν ήταν δυνατός ο έλεγχος της κατάστασης της υπηρεσίας.",
-      "dangerZone": "ΕΠΙΚΙΝΔΥΝΕΣ ΕΝΕΡΓΕΙΕΣ",
-      "destroying": "Οριστική διαγραφή…",
-      "serviceDegraded": "Η υπηρεσία υπολειτουργεί — πάτησε για να δεις την κατάστασή της",
-      "up": "ΕΝΕΡΓΟ"
-    },
-    "channels": {
-      "title": "Κανάλια",
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των καναλιών.",
-      "noChannels": "Δεν υπάρχουν διαθέσιμα κανάλια",
-      "noChannelsDescription": "Εδώ θα εμφανίζονται οι συνδέσεις με κανάλια.",
-      "connected": "Το {{label}} είναι συνδεδεμένο",
-      "disconnectMessage": "Κατάργηση του {{label}}; Αυτό το κανάλι θα αποσυνδεθεί.",
-      "disconnectTitle": "Αποσύνδεση καναλιού"
-    },
-    "devicePairing": {
-      "title": "Σύζευξη συσκευής",
-      "refreshRequests": "Ανανέωση αιτημάτων σύζευξης",
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των αιτημάτων σύζευξης.",
-      "noPending": "Κανένα εκκρεμές αίτημα",
-      "noPendingDescription": "Τα αιτήματα σύζευξης καναλιών και συσκευών θα εμφανιστούν εδώ.",
-      "channelRequests": "Αιτήματα καναλιών",
-      "deviceRequests": "Αιτήματα συσκευών",
-      "approveDeviceMessage": "Να επιτραπεί στο {{platform}} να συνδεθεί στο στιγμιότυπό σου;",
-      "approveDeviceTitle": "Έγκριση συσκευής",
-      "approveMessage": "Να επιτραπεί στο {{label}} (κωδικός: {{code}}) να συνδεθεί στο στιγμιότυπό σου;",
-      "approveTitle": "Έγκριση αιτήματος σύζευξης",
-      "unknownDevice": "Άγνωστη συσκευή"
-    },
-    "execPolicy": {
-      "title": "Πολιτική εκτέλεσης",
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση της πολιτικής εκτέλεσης.",
-      "alwaysAsk": "Επιβεβαίωση πάντα",
-      "alwaysAskDescription": "Ζητά επιβεβαίωση πριν από την εκτέλεση κάθε εντολής. Η πιο ασφαλής επιλογή.",
-      "neverAsk": "Χωρίς επιβεβαίωση",
-      "neverAskDescription": "Εκτελεί εντολές χωρίς επιβεβαίωση. Πιο γρήγορη αλλά λιγότερο ασφαλής επιλογή."
-    },
-    "google": {
-      "title": "Λογαριασμός Google",
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση της κατάστασης του λογαριασμού Google.",
-      "disconnected": "Ο λογαριασμός Google αποσυνδέθηκε. Κάνε εκ νέου ανάπτυξη του στιγμιοτύπου σου για να εφαρμοστεί η αλλαγή.",
-      "setupCommand": "Εντολή ρύθμισης",
-      "setupCommandHelp": "Για να συνδέσεις τον λογαριασμό σου Google, εκτέλεσε αυτή την εντολή σε τερματικό στον υπολογιστή σου. Πρέπει να έχεις εγκαταστήσει το Docker.",
-      "failedToLoadCommand": "Δεν ήταν δυνατή η φόρτωση της εντολής ρύθμισης.",
-      "gmailNotifications": "Ειδοποιήσεις Gmail",
-      "disconnect": "Αποσύνδεση λογαριασμού Google",
-      "copied": "Αντιγράφηκε",
-      "copyCommand": "Αντιγραφή εντολής",
-      "disconnectConfirm": "Αποσύνδεση",
-      "disconnectMessage": "Να αφαιρεθεί ο λογαριασμός σου Google από αυτό το στιγμιότυπο; Οι ειδοποιήσεις Gmail θα απενεργοποιηθούν. Μετά την αποσύνδεση, κάνε εκ νέου ανάπτυξη του στιγμιοτύπου για να εφαρμοστούν οι αλλαγές.",
-      "disconnectTitle": "Αποσύνδεση Google"
-    },
-    "modelList": {
-      "noMatches": "Δεν βρέθηκαν μοντέλα για την αναζήτησή σου",
-      "noModelsDescription": "Τα μοντέλα θα εμφανιστούν εδώ όταν είναι διαθέσιμα.",
-      "noResultsFor": "Δεν βρέθηκαν αποτελέσματα για το «{{query}}»."
-    },
-    "secrets": {
-      "title": "Απόρρητα στοιχεία",
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των απόρρητων στοιχείων.",
-      "noSecrets": "Δεν υπάρχουν διαθέσιμα απόρρητα στοιχεία",
-      "noSecretsDescription": "Εδώ θα εμφανίζονται οι συνδέσεις που χρησιμοποιούν απόρρητα στοιχεία.",
-      "removeMessage": "Να αφαιρεθεί το {{label}}; Αυτό το εργαλείο θα χάσει την πρόσβαση στα διαπιστευτήριά του.",
-      "removeTitle": "Αφαίρεση απόρρητου στοιχείου",
-      "saved": "Το {{label}} αποθηκεύτηκε",
-      "hide": "Απόκρυψη {{label}}",
-      "show": "Εμφάνιση {{label}}",
-      "allFieldsRequired": "Όλα τα πεδία είναι υποχρεωτικά για τη σύνδεση του {{label}}.",
-      "setupGuideFallback": "οδηγός ρύθμισης",
-      "setupGuideA11y": "Οδηγός ρύθμισης {{label}}",
-      "setupGuide": "Οδηγός ρύθμισης",
-      "saving": "Αποθήκευση…",
-      "removing": "Αφαίρεση…",
-      "updateToken": "Ενημέρωση διακριτικού"
-    },
-    "versionPin": {
-      "title": "Κλείδωμα έκδοσης",
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των πληροφοριών έκδοσης.",
-      "couldNotLoadMore": "Δεν ήταν δυνατή η φόρτωση περισσότερων εκδόσεων.",
-      "loadMore": "Φόρτωση περισσότερων εκδόσεων",
-      "showingLatest": "Εμφανίζονται οι 100 νεότερες εκδόσεις.",
-      "availableVersions": "Διαθέσιμες εκδόσεις",
-      "noVersions": "Δεν υπάρχουν διαθέσιμες εκδόσεις",
-      "noVersionsDescription": "Οι διαθέσιμες εκδόσεις OpenClaw θα εμφανιστούν εδώ.",
-      "unpin": "Ξεκλείδωμα",
-      "unpinMessage": "Επιστροφή στη νεότερη διαθέσιμη έκδοση;",
-      "unpinTitle": "Ξεκλείδωμα έκδοσης",
-      "confirmPin": "Επιβεβαίωση κλειδώματος",
-      "followingLatest": "Πάντα η νεότερη",
-      "latest": "νεότερη",
-      "pin": "Κλείδωμα",
-      "pinnedByAdmin": "Ο διαχειριστής έχει κλειδώσει την έκδοση. Επικοινώνησε μαζί του για να την αλλάξεις.",
-      "pinnedTo": "Κλειδωμένη στην έκδοση {{version}}",
-      "reasonOptional": "Λόγος (προαιρετικός)",
-      "reasonPlaceholder": "Λόγος κλειδώματος αυτής της έκδοσης",
-      "replaceAdminPin": "Αντικατάσταση κλειδώματος διαχειριστή",
-      "replacesAdminPin": "Αυτό αντικαθιστά το κλείδωμα που όρισε ο διαχειριστής (τρέχουσα επιλογή: {{label}})."
-    },
-    "redeploy": "Επανάληψη ανάπτυξης",
-    "redeployMessage": "Θέλεις να κάνεις εκ νέου ανάπτυξη αυτού του στιγμιοτύπου;",
-    "redeployTitle": "Εκ νέου ανάπτυξη στιγμιοτύπου",
-    "controls": {
-      "redeploying": "Εκ νέου ανάπτυξη…",
-      "restart": "Επανεκκίνηση",
-      "restartOpenClawMessage": "Θέλεις να επανεκκινήσεις τη διεργασία OpenClaw;",
-      "restartOpenClawTitle": "Επανεκκίνηση OpenClaw",
-      "restarting": "Επανεκκίνηση…",
-      "start": "Εκκίνηση",
-      "startMessage": "Θέλεις να ξεκινήσεις αυτό το στιγμιότυπο;",
-      "startTitle": "Εκκίνηση στιγμιοτύπου",
-      "stop": "Διακοπή",
-      "stopMessage": "Θέλεις να σταματήσεις αυτό το στιγμιότυπο;",
-      "stopTitle": "Διακοπή στιγμιοτύπου",
-      "stopping": "Διακοπή…"
-    },
-    "empty": {
-      "finishingSetup": "Η ρύθμιση ολοκληρώνεται",
-      "finishingSetupDescription": "Περίμενε λίγο, ολοκληρώνουμε τη ρύθμιση του λογαριασμού σου. Συνήθως χρειάζεται μόνο μια στιγμή.",
-      "getStarted": "Έναρξη",
-      "noInstancesDescription": "Δημιούργησε το πρώτο σου στιγμιότυπο για να ξεκινήσεις να εκτελείς πράκτορες προγραμματισμού."
-    },
-    "instance": {
-      "backToInstances": "Επιστροφή στα στιγμιότυπα",
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση του στιγμιοτύπου.",
-      "notFound": "Το στιγμιότυπο δεν βρέθηκε",
-      "notFoundDescription": "Αυτό το στιγμιότυπο μπορεί να έχει διαγραφεί οριστικά ή ο σύνδεσμος να μην ισχύει πλέον."
-    },
-    "list": {
-      "createInstance": "Δημιουργία στιγμιοτύπου",
-      "organizations": "Οργανισμοί",
-      "accessIssue": {
-        "trialExpired": "Η δοκιμή έληξε — απόκτησε συνδρομή για να συνεχίσεις να χρησιμοποιείς αυτό το στιγμιότυπο",
-        "subscriptionCanceled": "Η συνδρομή είναι ανενεργή — ενεργοποίησέ την ξανά για να συνεχίσεις να χρησιμοποιείς αυτό το στιγμιότυπο",
-        "subscriptionPastDue": "Πρόβλημα πληρωμής — ενημέρωσε τα στοιχεία χρέωσης για να συνεχίσεις να χρησιμοποιείς αυτό το στιγμιότυπο",
-        "quarantined": "Το στιγμιότυπο είναι σε καραντίνα — απαιτείται έλεγχος από την ομάδα μας",
-        "multipleCurrentConflict": "Ο λογαριασμός χρειάζεται έλεγχο",
-        "nonCanonicalEarlybird": "Το παλιό πρόγραμμα χρειάζεται έλεγχο"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Συνομιλία με {{name}}",
-        "ready": "{{name}}: όλα έτοιμα",
-        "warmedUp": "Όλα έτοιμα. Πες ένα γεια όποτε θέλεις."
-      },
-      "flow": {
-        "genericErrorBody": "Δεν μπορέσαμε να ολοκληρώσουμε τη ρύθμιση του στιγμιοτύπου σου αυτή τη στιγμή.",
-        "manualReviewBody": "Χρειάζεται έλεγχος του λογαριασμού σου πριν μπορέσουμε να δημιουργήσουμε ένα στιγμιότυπο. Συνέχισε στο kilo.ai.",
-        "manualReviewTitle": "Η ρύθμιση χρειάζεται έλεγχο από την ομάδα μας",
-        "openKiloAi": "Άνοιγμα kilo.ai",
-        "provisioning": "Δημιουργία υποδομής",
-        "review": "Έλεγχος",
-        "identityTitle": "Ταυτότητα του ρομπότ σου",
-        "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση της κατάστασης αρχικής ρύθμισης.",
-        "finishingSetup": "Η ρύθμιση ολοκληρώνεται. Περίμενε λίγο μέχρι να ετοιμάσουμε τον λογαριασμό σου.",
-        "ready": "Έτοιμο",
-        "settingUp": "Ρύθμιση…"
-      },
-      "unavailableDescription": "Απαιτείται ενεργή συνδρομή KiloClaw για τη δημιουργία στιγμιοτύπου. Τα υπάρχοντα στιγμιότυπα και οι συνδρομές συνεχίζουν να λειτουργούν κανονικά.",
-      "unavailableTitle": "Δεν είναι διαθέσιμη η δημιουργία νέων στιγμιοτύπων KiloClaw",
-      "identity": {
-        "chooseAvatar": "Επιλογή εικόνας προφίλ",
-        "namePlaceholder": "Όνομα του ρομπότ σου",
-        "selectAvatar": "Επιλογή της εικόνας {{name}} ως εικόνας προφίλ",
-        "personality": "Προσωπικότητα",
-        "changePersonality": "Αλλαγή προσωπικότητας",
-        "location": "Τοποθεσία",
-        "locationPlaceholder": "Πόλη ή περιοχή (προαιρετικό)",
-        "useCurrentLocation": "Χρήση τρέχουσας τοποθεσίας",
-        "locationDeniedTitle": "Η πρόσβαση στην τοποθεσία απορρίφθηκε",
-        "locationDeniedMessage": "Ενεργοποίησε την πρόσβαση στην τοποθεσία στις ρυθμίσεις για να χρησιμοποιήσεις την τρέχουσα τοποθεσία σου.",
-        "locationValidationFailed": "Δεν ήταν δυνατή η επαλήθευση της τοποθεσίας.",
-        "locationResolveFailed": "Δεν ήταν δυνατός ο προσδιορισμός της τοποθεσίας σου. Μπορείς να την επεξεργαστείς χειροκίνητα.",
-        "locationGetFailed": "Δεν ήταν δυνατή η λήψη της τοποθεσίας σου. Συμπλήρωσέ την χειροκίνητα.",
-        "nature": {
-          "aiAssistantLabel": "Βοηθός τεχνητής νοημοσύνης",
-          "aiAssistantVibe": "Εξυπηρετικός, ικανός, επαγγελματίας",
-          "digitalCreatureLabel": "Ψηφιακό πλάσμα",
-          "digitalCreatureVibe": "Εκκεντρικό, ζωντανό, λίγο απρόβλεπτο",
-          "virtualCompanionLabel": "Εικονικός σύντροφος",
-          "virtualCompanionVibe": "Ζεστός, πάντα δίπλα σου, νοιάζεται πραγματικά",
-          "somethingWeirderLabel": "Κάτι πιο παράξενο…",
-          "somethingWeirderVibe": "Δώσε τη δική σου περιγραφή"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Όλα έτοιμα! Ετοίμασα τη σύνοψη που ζήτησες. Μπορούμε να συνεχίσουμε όποτε θέλεις.",
-        "settingUp": "Ρύθμιση ειδοποιήσεων…",
-        "stayInTheLoop": "Ενημερώσεις για τις εργασίες σου",
-        "getNotified": "Ενεργοποίησε τις ειδοποιήσεις για την ολοκλήρωση εργασιών από το ρομπότ {{name}}, για να μη χάνεις καμία απάντηση.",
-        "now": "τώρα",
-        "skipForNow": "Προσωρινή παράλειψη",
-        "couldNotEnable": "Δεν ήταν δυνατή η ενεργοποίηση των ειδοποιήσεων."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Δεν ήταν δυνατός ο έλεγχος της προόδου ρύθμισης",
-        "queryErrorBody": "Χάθηκε η σύνδεση κατά τον έλεγχο της ρύθμισης για το ρομπότ {{name}}. Η ρύθμιση μπορεί να συνεχίζεται. Δοκίμασε ξανά ή έλεγξε σε λίγο.",
-        "stoppedTitle": "Η ρύθμιση σταμάτησε",
-        "stoppedBody": "Το στιγμιότυπο για το ρομπότ {{name}} σταμάτησε απρόσμενα κατά τη ρύθμιση.",
-        "stalledTitle": "Κάτι κόλλησε",
-        "stalledBody": "Δεν μπορέσαμε να ολοκληρώσουμε τη ρύθμιση για το ρομπότ {{name}}. Δοκίμασε ξανά ή στείλε μήνυμα στο {{supportEmail}} αν το πρόβλημα επιμένει.",
-        "timeoutTitle": "Διαρκεί περισσότερο από το αναμενόμενο",
-        "timeoutBody": "Η ρύθμιση για το ρομπότ {{name}} διαρκεί περισσότερο από το συνηθισμένο (πάνω από {{displayMinutes}} λεπτά).",
-        "continueInBackground": "Συνέχεια στο παρασκήνιο",
-        "settingUp": "Ρύθμιση για το ρομπότ {{name}}",
-        "connectingToAgent": "Σύνδεση με τον πράκτορα",
-        "startingSandbox": "Εκκίνηση απομονωμένου περιβάλλοντος",
-        "backgroundHint": "Συνήθως χρειάζεται λιγότερο από ένα λεπτό. Μπορείς να κλείσεις αυτή την οθόνη — η ρύθμιση θα συνεχιστεί στο παρασκήνιο."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Κωδικός {{code}}",
-      "gatewayProcess": "ΔΙΕΡΓΑΣΙΑ ΠΥΛΗΣ",
-      "lastExit": "Τελευταίος τερματισμός",
-      "memory": "Μνήμη",
-      "region": "Περιοχή",
-      "resources": "ΠΟΡΟΙ",
-      "restarts": "Επανεκκινήσεις",
-      "state": "Κατάσταση",
-      "uptime": "Χρόνος λειτουργίας",
-      "crashed": "ΚΑΤΑΡΡΕΥΣΕ",
-      "destroying": "ΟΡΙΣΤΙΚΗ ΔΙΑΓΡΑΦΗ",
-      "provisioned": "ΔΗΜΙΟΥΡΓΗΘΗΚΕ",
-      "restarting": "ΕΠΑΝΕΚΚΙΝΗΣΗ",
-      "running": "ΣΕ ΕΚΤΕΛΕΣΗ",
-      "shuttingDown": "ΤΕΡΜΑΤΙΣΜΟΣ",
-      "starting": "ΕΚΚΙΝΗΣΗ",
-      "stopped": "ΣΤΑΜΑΤΗΜΕΝΟ",
-      "stopping": "ΔΙΑΚΟΠΗ",
-      "unknown": "ΑΓΝΩΣΤΟ",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Αιχμής",
-      "frontierDescription": "Μέγιστη απόδοση. Χρησιμοποιεί μοντέλα αιχμής με δυνατότητα συλλογισμού.",
-      "balancedDescription": "Έξυπνη ισορροπία ταχύτητας και δυνατοτήτων με χαμηλότερο κόστος.",
-      "autoModelA11y": "αυτόματο μοντέλο {{label}}",
-      "currentModel": "Τρέχον μοντέλο",
-      "browseAllModels": "ή επίλεξε ανάμεσα σε 500+ μοντέλα",
-      "browseAllModelsA11y": "Περιήγηση και στα 500+ μοντέλα"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Για να συνεχίσεις να χρησιμοποιείς το KiloClaw, άνοιξε το kilo.ai/claw στο πρόγραμμα περιήγησής σου. Δεν μπορείς να αποκτήσεις συνδρομή μέσα από την εφαρμογή.",
-      "subscriptionCanceledTitle": "Συνδρομή μέσω της ιστοσελίδας",
-      "subscriptionCanceledBody": "Για να χρησιμοποιήσεις το KiloClaw, άνοιξε το kilo.ai/claw στο πρόγραμμα περιήγησής σου. Δεν μπορείς να αποκτήσεις συνδρομή μέσα από την εφαρμογή.",
-      "subscriptionCanceledCta": "Άνοιγμα kilo.ai/claw",
-      "subscriptionPastDueTitle": "Ενημέρωση στοιχείων πληρωμής στον ιστότοπο",
-      "subscriptionPastDueBody": "Παρουσιάστηκε πρόβλημα με την τελευταία σου πληρωμή. Άνοιξε το kilo.ai/claw στο πρόγραμμα περιήγησής σου για να ενημερώσεις τα στοιχεία πληρωμής. Η διαχείριση χρεώσεων δεν είναι διαθέσιμη μέσα στην εφαρμογή.",
-      "quarantinedTitle": "Το στιγμιότυπο χρειάζεται αποκατάσταση",
-      "quarantinedBody": "Το στιγμιότυπο KiloClaw σου είναι σε καραντίνα και δεν μπορεί να χρησιμοποιηθεί αυτή τη στιγμή. Χρειάζεται βοήθεια από την ομάδα μας για την αποκατάστασή του.",
-      "multipleCurrentConflictBody": "Βρήκαμε περισσότερες από μία ενεργές συνδρομές στον λογαριασμό σου. Διακόψαμε προσωρινά τη διαδικασία για να μη χρεωθείς δύο φορές.",
-      "multipleCurrentConflictCta": "Συνέχεια στο kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Εντοπίστηκε παλιό πρόγραμμα",
-      "nonCanonicalEarlybirdBody": "Το πρόγραμμά σου πρώιμης πρόσβασης χρειάζεται έλεγχο από την ομάδα μας πριν μπορέσεις να το χρησιμοποιήσεις στο κινητό.",
-      "iosTitle": "Το KiloClaw δεν είναι διαθέσιμο στο iOS",
-      "iosBody": "Για αυτόν τον λογαριασμό, η διαχείριση της πρόσβασης στο KiloClaw γίνεται εκτός της εφαρμογής iOS.",
-      "iosContact": "Έχεις ερωτήσεις; Στείλε μήνυμα στο {{supportEmail}}.",
-      "quarantinedCta": "Αποστολή email στην ομάδα μας",
-      "nonCanonicalEarlybirdCta": "Έλεγχος του προγράμματός σας στο kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "Το στιγμιότυπο {{name}} χρειάζεται προσοχή: {{label}}",
-      "openUnread_one": "Άνοιγμα {{name}}, {{displayCount}} μη αναγνωσμένο μήνυμα",
-      "openUnread": "Άνοιγμα {{name}}, {{displayCount}} αδιάβαστα μηνύματα",
-      "openUnread_other": "Άνοιγμα {{name}}, {{displayCount}} αδιάβαστα μηνύματα",
-      "openSettings": "Άνοιγμα ρυθμίσεων για {{name}}",
-      "fixOnKiloAi": "Διόρθωση στο kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Έγκριση αιτημάτων συσκευών",
-      "execPolicyDescription": "Ρυθμίσεις ασφαλείας",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Επιλογή μοντέλου τεχνητής νοημοσύνης",
-      "secretsDescription": "Κρυπτογραφημένα διαπιστευτήρια",
-      "versionPinDescription": "Κλείδωμα σε συγκεκριμένη έκδοση"
-    },
-    "avatar": {
-      "arcade": "Ηλεκτρονικό παιχνίδι",
-      "brain": "Εγκέφαλος",
-      "creature": "Πλάσμα",
-      "crystal": "Κρύσταλλο",
-      "custom": "Προσαρμοσμένη εικόνα προφίλ",
-      "dragon": "Δράκος",
-      "explorer": "Εξερευνητής",
-      "flame": "Φλόγα",
-      "lightning": "Αστραπή",
-      "magicWand": "Μαγικό ραβδί",
-      "moon": "Φεγγάρι",
-      "operator": "Χειριστής",
-      "orbit": "Τροχιά",
-      "oracle": "Μάντης",
-      "rainbow": "Ουράνιο τόξο",
-      "robot": "Ρομπότ",
-      "satellite": "Δορυφόρος",
-      "sparkles": "Λάμψεις",
-      "strongArm": "Δυνατό χέρι",
-      "talisman": "Φυλαχτό"
-    },
-    "remoteSpawnFilesNotSupported": "Αυτό το στιγμιότυπο δεν μπορεί να λάβει αρχεία.",
-    "instanceSwitcherTitle": "Στιγμιότυπο KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Μετακίνηση του {{filename}} αριστερά",
       "moveRight": "Μετακίνηση του {{filename}} δεξιά"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Επικόλληση εικόνας από το πρόχειρο",
-      "label": "Επικόλληση εικόνας που εντοπίστηκε"
-    },
     "attachmentPicker": {
       "camera": "Κάμερα",
       "photoLibrary": "Φωτοθήκη",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Αποσύνδεση από αυτή τη συσκευή;",
     "signOutThisSessionTitle": "Αποσύνδεση από αυτή τη συνεδρία;",
     "signOutThisSessionMessage": "Η συσκευή {{device}} θα αποσυνδεθεί. Μπορεί να διατηρήσει την πρόσβαση στο API για έως και μία ώρα.",
-    "webBrowser": "Πρόγραμμα περιήγησης ιστού"
+    "webBrowser": "Πρόγραμμα περιήγησης ιστού",
+    "unknownDevice": "Άγνωστη συσκευή"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Δεν ήταν δυνατό το άνοιγμα του καταστήματος εφαρμογών.",

@@ -510,7 +510,6 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the mobile app. Bundled into the binary. [PUBLIC]
 - `APPSFLYER_DEV_KEY` - AppsFlyer development key for mobile attribution. Bundled into the binary (not secret — it's a device-level SDK key). [PUBLIC]
 - `APPSFLYER_APP_ID` - AppsFlyer app ID for mobile attribution tracking. [PUBLIC]
-- `KILO_CHAT_URL` - Base URL for Kilo Chat in the mobile app. Bundled into the binary. [PUBLIC]
 - `EVENT_SERVICE_URL` - WebSocket URL for the event service from mobile. Bundled into the binary. [PUBLIC]
 - `NOTIFICATIONS_URL` - HTTP URL for the push-notifications backend from mobile. [PUBLIC]
 - `MOBILE_DEV_HOST` - LAN host override for mobile dev (replaces `localhost` on physical devices); read in `dev/local/mobile-env.ts`. [SERVER]

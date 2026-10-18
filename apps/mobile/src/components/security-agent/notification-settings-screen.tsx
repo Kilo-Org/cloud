@@ -78,8 +78,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   // TextInput on iOS (see apps/mobile/AGENTS.md). The ref holds the raw
   // typed text; `slaNotificationWarningDays` holds the parsed number (or
   // NaN while the text isn't a valid 1-365 integer) purely to drive dirty
-  // and validity checks, mirroring the `canSave` derived-state pattern in
-  // kiloclaw/settings-card.tsx.
+  // and validity checks.
   const warningDaysRef = useRef('');
   const [slaNotificationWarningDays, setSlaNotificationWarningDays] = useState(Number.NaN);
   const hydratedRef = useRef(false);

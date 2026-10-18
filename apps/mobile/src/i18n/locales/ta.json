@@ -101,12 +101,9 @@
     "scheduled": "திட்டமிடப்பட்டது",
     "keepEditing": "தொடர்ந்து திருத்தவும்",
     "keepRunning": "தொடர்ந்து இயங்க விடவும்",
-    "kiloclaw": "KiloClaw",
     "newSession": "புதிய அமர்வு",
-    "noKiloclawInstances": "KiloClaw சேவை நகல்கள் இல்லை",
     "noModelsAvailable": "மாதிரிகள் எதுவும் இல்லை",
     "notFound": "கிடைக்கவில்லை.",
-    "online": "இணையத்தில்",
     "open": "{{name}} என்பதைத் திறக்கவும்",
     "openPullRequest": "PR திறப்பு",
     "pending": "நிலுவையில்",
@@ -257,7 +254,8 @@
     "renamePasskey": "பாஸ்கீயை மறுபெயரிடவும்",
     "removePasskey": "பாஸ்கீயை நீக்கவும்",
     "removePasskeyTitle": "பாஸ்கீயை நீக்கவா?",
-    "removePasskeyMessage": "இந்தப் பாஸ்கீ மூலம் இனி உள்நுழைய முடியாது."
+    "removePasskeyMessage": "இந்தப் பாஸ்கீ மூலம் இனி உள்நுழைய முடியாது.",
+    "changelog": "புதியவை"
   },
   "preferences": {
     "general": "பொது",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "புதிய நிகழ்வு இருப்பதை அறிவிப்புகள் காட்டும். விவரங்களைப் படிக்க Kilo-வைத் திறக்கவும்.",
     "channel": {
       "agentProgress": "ஏஜென்ட் முன்னேற்றம்",
-      "chat": "அரட்டைச் செய்திகள்",
-      "kiloclaw": "KiloClaw செயல்பாடு",
       "balance": "கணக்கு இருப்பு எச்சரிக்கைகள்",
       "security": "கண்டறிந்த பாதுகாப்புச் சிக்கல்கள்",
       "spend": "செலவு எச்சரிக்கைகள்",
       "followedSessions": "பின்தொடரப்பட்ட அமர்வுகள்"
     },
     "category": {
-      "chatMessagesSubtitle": "உங்கள் உரையாடல்களில் வரும் பதில்கள்",
       "agentAttentionTitle": "ஏஜென்ட்டுக்கு உங்கள் உதவி தேவை",
       "agentAttentionSubtitle": "பதில்கள், அனுமதி அல்லது உள்ளீடு தேவைப்படும் நிகழ்வுகள்",
       "agentUpdatesTitle": "ஏஜென்ட் புதுப்பிப்புகள்",
       "agentUpdatesSubtitle": "பணியின்போது ஏஜென்ட் அனுப்பும் செய்திகள்",
       "sessionStatusTitle": "அமர்வு நிலை",
       "sessionStatusSubtitle": "முடிந்தது / தோல்வியடைந்தது / கட்டுப்படுத்தத் தயார்",
-      "kiloclawActivitySubtitle": "இயக்கப் பிரதி தயார் / தோல்வி, திட்டமிட்ட செயல்கள்",
-      "kiloclawActivityUnavailable": "KiloClaw செயல்பாட்டைப் பெற ஒரு KiloClaw இயக்கப் பிரதியைத் தொடங்கவும்.",
       "balanceAlertsSubtitle": "நிறுவனத்தின் இருப்பு குறையும்போது வரும் எச்சரிக்கைகள்",
       "balanceAlertsUnavailable": "இருப்பு எச்சரிக்கைகளைப் பெற ஒரு நிறுவனத்தில் சேருங்கள்.",
       "securityFindingsSubtitle": "புதிய கண்டறிதல்கள் மற்றும் SLA நினைவூட்டல்கள்",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "முகப்பு",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, தாவல், {{total}}-இல் {{position}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "இயக்கச் சூழல் மாற்றம்",
-      "couldNotLoadInstances": "இயக்கச் சூழல்களை ஏற்ற முடியவில்லை.",
-      "noInstancesDescription": "அரட்டையிடத் தொடங்க ஓர் இயக்கச் சூழலை அமைக்கவும்.",
-      "setUpKiloclaw": "KiloClaw-ஐ அமைக்கவும்",
-      "currentInstance": "{{title}}, தற்போதைய இயக்கச் சூழல்"
-    },
     "conversation": {
-      "failedToLoad": "உரையாடலை ஏற்ற முடியவில்லை.",
-      "notFound": "உரையாடல் கிடைக்கவில்லை.",
       "untitled": "தலைப்பு இல்லை",
-      "leaveTitle": "உரையாடலை விட்டு வெளியேறவா?",
-      "leaveMessage": "இதனால் உரையாடல் உங்கள் பட்டியலிலிருந்து நீக்கப்படும்.",
-      "openHint": "உரையாடலைத் திறக்கும். பெயரை மாற்றவும் வெளியேறவும் உள்ள விருப்பங்களைக் காண நீண்ட நேரம் அழுத்தவும்.",
-      "unread": "படிக்கப்படாதது",
-      "optionsFor": "{{title}} உரையாடலுக்கான விருப்பங்கள்",
-      "options": "உரையாடல் விருப்பங்கள்",
-      "renameTitle": "உரையாடலின் பெயர் மாற்றம்",
-      "renamePlaceholder": "புதிய பெயர்",
-      "couldNotReachBot": "போட்டை அணுக முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "messageDeliveryFailed": "செய்தியைப் போட்டுக்கு அனுப்ப முடியவில்லை.",
-      "couldNotSignIn": "அரட்டையில் உள்நுழைய முடியவில்லை.",
-      "couldNotRefreshMessages": "செய்திகளைப் புதுப்பிக்க முடியவில்லை.",
-      "couldNotLoadHistory": "உரையாடல் வரலாற்றை ஏற்ற முடியவில்லை.",
-      "leave": "வெளியேறவும்",
-      "untitledConversation": "தலைப்பில்லாத உரையாடல்",
-      "createFailed": "உரையாடலை உருவாக்க முடியவில்லை.",
-      "leaveFailed": "உரையாடலை விட்டு வெளியேற முடியவில்லை."
-    },
-    "reactions": {
-      "common": "பொதுவானவை",
-      "reactWith": "{{reaction}} எதிர்வினையைச் சேர்க்கவும்",
-      "accessibility": "{{emoji}} எதிர்வினை, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "பதிலளிக்கும் செய்தி",
-      "cancelReply": "பதிலை ரத்து செய்யவும்",
-      "openInstance": "இயக்கச் சூழலைத் திறக்கவும்",
-      "attachFile": "கோப்பை இணைக்கவும்",
-      "cancelEdit": "திருத்தத்தை ரத்து செய்யவும்"
+      "renamePlaceholder": "புதிய பெயர்"
     },
     "conversationList": {
-      "couldNotLoad": "உரையாடல்களை ஏற்ற முடியவில்லை.",
-      "emptyTitle": "இன்னும் உரையாடல்கள் இல்லை",
-      "emptyDescription": "உங்கள் KiloClaw இயக்கச் சூழலுடன் அரட்டையிட ஓர் உரையாடலை உருவாக்கவும்.",
-      "create": "உரையாடலை உருவாக்கவும்",
-      "newConversation": "புதிய உரையாடல்",
-      "openInstanceSettings": "இயக்கச் சூழலின் அமைப்புகளைத் திறக்கவும்",
       "today": "இன்று",
       "yesterday": "நேற்று",
-      "thisWeek": "இந்த வாரம்",
       "older": "பழையவை"
     },
     "attachment": {
-      "open": "{{filename}}-ஐத் திறக்கவும்",
-      "openFailed": "இணைப்புக் கோப்பைத் திறக்க முடியவில்லை. இணைய இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
-      "attachFailed": "கோப்பை இணைக்க முடியவில்லை.",
-      "limit": "நீங்கள் {{displayCount}} கோப்புகள் வரை இணைக்கலாம்.",
-      "sizeRejection": "{{filename}} கோப்பு, இணைப்புகளுக்கான {{limit}} அளவு வரம்பை மீறுகிறது.",
-      "unreadable": "{{filename}}-ஐப் படிக்க முடியவில்லை.",
-      "pastedImage": "ஒட்டப்பட்ட படம்",
-      "defaultName": "இணைப்புக் கோப்பு",
       "classificationDenied": "இயங்கக்கூடிய கோப்புகளை இணைக்க முடியாது.",
       "classificationEmpty": "கோப்பு காலியாக உள்ளது.",
       "classificationTooLarge": "கோப்புகளின் அளவு 20 MB அல்லது அதற்குக் குறைவாக இருக்க வேண்டும்.",
@@ -943,426 +883,17 @@
       "networkError": "பிணையத்தில் பிழை ஏற்பட்டது.",
       "uploadFailed": "பதிவேற்றம் தோல்வியடைந்தது.",
       "nothingToPaste": "ஒட்டுவதற்கு எதுவும் இல்லை.",
-      "metadataStripFailed": "புகைப்படத்தின் மேனிலைத் தரவை அகற்ற முடியவில்லை.",
-      "limit_one": "நீங்கள் {{displayCount}} கோப்பு வரை இணைக்கலாம்.",
-      "limit_other": "நீங்கள் {{displayCount}} கோப்புகள் வரை இணைக்கலாம்."
+      "metadataStripFailed": "புகைப்படத்தின் மேனிலைத் தரவை அகற்ற முடியவில்லை."
     },
     "attachmentPreview": {
-      "accessibility": "கோப்பு: {{filename}}, {{status}}",
-      "retryUploading": "{{filename}}-ஐ மீண்டும் பதிவேற்றவும்",
-      "remove": "{{filename}}-ஐ அகற்றவும்"
-    },
-    "messageBubble": {
-      "deleted": "[நீக்கப்பட்ட செய்தி]",
-      "yourMessage": "உங்கள் செய்தி",
-      "messageFrom": "{{author}} அனுப்பிய செய்தி",
-      "moreActions": "கூடுதல் செயல்கள்",
-      "notDelivered": "சென்றடையவில்லை",
-      "edited": "(திருத்தப்பட்டது)",
-      "image": "படம்"
+      "accessibility": "கோப்பு: {{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "நகலெடுக்கப்பட்டது",
-      "copyFailed": "நகலெடுக்க முடியவில்லை.",
-      "title": "செய்திக்கான செயல்கள்",
-      "deleteTitle": "செய்தியை நீக்கவா?",
-      "deleteMessage": "இது உரையாடலில் இருந்து செய்தியை நீக்கும்.",
-      "deleteFailed": "செய்தியை நீக்க முடியவில்லை.",
-      "removeReactionFailed": "எதிர்வினையை அகற்ற முடியவில்லை.",
-      "addReactionFailed": "எதிர்வினையைச் சேர்க்க முடியவில்லை.",
-      "retrySend": "மீண்டும் அனுப்பவும்",
-      "moreReactions": "கூடுதல் எதிர்வினைகள்",
-      "edit": "திருத்தவும்",
-      "sendFailed": "செய்தியை அனுப்ப முடியவில்லை.",
-      "retrySendFailed": "மீண்டும் அனுப்ப முடியவில்லை.",
-      "editFailed": "செய்தியைத் திருத்த முடியவில்லை.",
-      "executeFailed": "செயலைச் செய்ய முடியவில்லை."
+      "edit": "திருத்தவும்"
     },
     "attachmentPicker": {
-      "takePhoto": "புகைப்படம் எடுக்கவும்",
-      "photoLibrary": "புகைப்படத் தொகுப்பு",
-      "files": "கோப்புகள்",
       "cameraAccessMessage": "புகைப்படம் எடுக்க அமைப்புகளில் கேமரா அணுகலை அனுமதிக்கவும்."
-    },
-    "typingIndicator": {
-      "someone": "யாரோ",
-      "typing_one": "{{name}} தட்டச்சு செய்கிறார்...",
-      "typing": "{{names}} தட்டச்சு செய்கின்றனர்...",
-      "typing_other": "{{names}} தட்டச்சு செய்கின்றனர்..."
-    },
-    "botStatus": {
-      "offline": "இணைப்பில் இல்லை",
-      "loadingUser": "பயனர் விவரங்களை ஏற்றுகிறது...",
-      "waitingForStatus": "போட்டின் நிலைக்காகக் காத்திருக்கிறது...",
-      "offlineMessage": "போட் இணைப்பில் இல்லை. அது மீண்டும் இணைந்ததும் செய்திப் பரிமாற்றம் தொடரும்."
-    },
-    "errors": {
-      "notAllowed": "அனுமதி இல்லை.",
-      "messageTooLong": "செய்தி மிக நீளமாக உள்ளது. {{limit}} எழுத்துகளுக்குக் குறைவாக இருக்குமாறு சுருக்கவும்.",
-      "titleTooLong": "தலைப்பு மிக நீளமாக உள்ளது. {{limit}} எழுத்துகளுக்குக் குறைவாக இருக்குமாறு சுருக்கவும்.",
-      "messageEmpty": "செய்தி காலியாக இருக்கக்கூடாது."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw இன்ஸ்டன்ஸ்களை ஏற்ற முடியவில்லை.",
-    "billing": {
-      "title": "கட்டண விவரங்கள்",
-      "continueMonthToMonth": "மாதந்தோறும் தொடரவும்",
-      "plan": "திட்டம்",
-      "finalTermEnds": "இறுதித் தவணை முடியும் தேதி",
-      "afterFinalTerm": "இறுதித் தவணைக்குப் பிறகு",
-      "lessThanOneDay": "1 நாளுக்கும் குறைவு",
-      "ends": "முடியும் தேதி",
-      "expires": "காலாவதியாகும் தேதி",
-      "noActivePlan": "செயலில் உள்ள திட்டம் இல்லை",
-      "noActivePlanDescription": "உங்களிடம் செயலில் உள்ள KiloClaw சந்தா இல்லை.",
-      "managedByAdmin": "உங்கள் நிறுவன நிர்வாகி கட்டணங்களை நிர்வகிக்கிறார்.",
-      "couldNotLoad": "கட்டண விவரங்களை ஏற்ற முடியவில்லை.",
-      "manageOnWeb": "இணையதளத்தில் கட்டணங்களை நிர்வகிக்கவும்",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "உங்கள் Commit திட்டத்தின் இறுதித் தவணை {{date}} அன்று முடிகிறது. {{price}} கட்டணத்தில் Standard திட்டத்துடன் தொடரவும். இல்லையெனில் சேவையகச் சேவை முடிவடையும்.",
-      "freeTrial": "இலவசச் சோதனை",
-      "hostingEnds": "சேவையகச் சேவை முடிவடைகிறது",
-      "renews": "புதுப்பிக்கப்படும் தேதி",
-      "standardMonthToMonth": "Standard மாதாந்திரத் திட்டம்",
-      "standardStartsOn": "Standard திட்டம் {{date}} அன்று {{price}} கட்டணத்தில் தொடங்குகிறது.",
-      "yourStandardMonthlyPrice": "உங்கள் Standard திட்டத்தின் மாதக் கட்டணம்",
-      "perMonth": "/மாதம்",
-      "earlybirdAccessUntil": "Earlybird அணுகல் {{date}} வரை கிடைக்கும்.",
-      "earlybirdEnding": "Earlybird முடிவடைய மீதமுள்ள நேரம்: {{remaining}}.",
-      "paymentPastDue": "கட்டணம் செலுத்த வேண்டிய தேதி கடந்துவிட்டது. உங்கள் கட்டண முறையைப் புதுப்பிக்கவும்.",
-      "subscriptionCancels": "சந்தா {{date}} அன்று ரத்து செய்யப்படும்.",
-      "trialDaysRemaining": "சோதனைக் காலத்தில் {{remaining}} மீதமுள்ளது.",
-      "trialEndingSoon": "சோதனைக் காலம் விரைவில் முடிகிறது. மீதமுள்ள நேரம்: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "கமிட்"
-    },
-    "changelog": {
-      "title": "புதியவை",
-      "couldNotLoad": "மாற்றப் பதிவை ஏற்ற முடியவில்லை.",
-      "noUpdates": "இன்னும் புதுப்பிப்புகள் இல்லை",
-      "noUpdatesDescription": "மாற்றப் பதிவுகள் இங்கே காட்டப்படும்.",
-      "recentUpdates": "சமீபத்திய புதுப்பிப்புகள்",
-      "manageVersion": "பதிப்பை நிர்வகிக்கவும்",
-      "redeployRequired": "மறுநிறுவல் தேவை",
-      "redeploySuggested": "மறுநிறுவல் பரிந்துரை",
-      "upgradeRequired": "மேம்படுத்தல் தேவை"
-    },
-    "dashboard": {
-      "title": "கட்டுப்பாட்டுப் பலகம்",
-      "couldNotLoad": "கட்டுப்பாட்டுப் பலகத்தை ஏற்ற முடியவில்லை.",
-      "renameInstance": "இன்ஸ்டன்ஸின் பெயரை மாற்றவும்",
-      "renamePlaceholder": "புதிய பெயர் (அதிகபட்சம் 50 எழுத்துகள்)",
-      "someDetailsFailed": "சில நிகழ்நேர விவரங்களை ஏற்ற முடியவில்லை.",
-      "destroy": "அழிக்கவும்",
-      "destroyMessage": "இது உங்கள் KiloClaw இன்ஸ்டன்ஸையும் அதன் எல்லாத் தரவுகளையும் நிரந்தரமாக அழிக்கும். இந்தச் செயலைச் செயல்தவிர்க்க முடியாது.",
-      "destroyTitle": "இன்ஸ்டன்ஸை அழித்தல்",
-      "instance": "இன்ஸ்டன்ஸ்",
-      "couldNotCheckStatus": "சேவை நிலையைச் சரிபார்க்க முடியவில்லை.",
-      "dangerZone": "ஆபத்தான செயல்கள்",
-      "destroying": "அழிக்கப்படுகிறது…",
-      "serviceDegraded": "சேவையின் செயல்திறன் குறைந்துள்ளது — நிலையைப் பார்க்கத் தட்டவும்",
-      "up": "இயங்குகிறது"
-    },
-    "channels": {
-      "title": "சேனல்கள்",
-      "couldNotLoad": "சேனல்களை ஏற்ற முடியவில்லை.",
-      "noChannels": "சேனல்கள் எதுவும் இல்லை",
-      "noChannelsDescription": "சேனல் ஒருங்கிணைப்புகள் இங்கே தோன்றும்.",
-      "connected": "{{label}} இணைக்கப்பட்டது",
-      "disconnectMessage": "{{label}}-ஐ அகற்றவா? இந்தச் சேனலின் இணைப்பு துண்டிக்கப்படும்.",
-      "disconnectTitle": "சேனல் இணைப்பைத் துண்டித்தல்"
-    },
-    "devicePairing": {
-      "title": "சாதனங்களை இணைத்தல்",
-      "refreshRequests": "இணைக்கும் கோரிக்கைகளைப் புதுப்பிக்கவும்",
-      "couldNotLoad": "இணைக்கும் கோரிக்கைகளை ஏற்ற முடியவில்லை.",
-      "noPending": "நிலுவையில் உள்ள கோரிக்கைகள் இல்லை",
-      "noPendingDescription": "சேனல்களையும் சாதனங்களையும் இணைக்கும் கோரிக்கைகள் இங்கே காட்டப்படும்.",
-      "channelRequests": "சேனல் கோரிக்கைகள்",
-      "deviceRequests": "சாதன கோரிக்கைகள்",
-      "approveDeviceMessage": "{{platform}} உங்கள் இன்ஸ்டன்ஸுடன் இணைய அனுமதிக்கவா?",
-      "approveDeviceTitle": "சாதனத்திற்கு ஒப்புதல் அளித்தல்",
-      "approveMessage": "{{label}} (குறியீடு: {{code}}) உங்கள் இன்ஸ்டன்ஸுடன் இணைய அனுமதிக்கவா?",
-      "approveTitle": "இணைக்கும் கோரிக்கைக்கு ஒப்புதல் அளித்தல்",
-      "unknownDevice": "அடையாளம் தெரியாத சாதனம்"
-    },
-    "execPolicy": {
-      "title": "செயலாக்கக் கொள்கை",
-      "couldNotLoad": "கட்டளைகளை இயக்கும் கொள்கையை ஏற்ற முடியவில்லை.",
-      "alwaysAsk": "எப்போதும் கேட்கவும்",
-      "alwaysAskDescription": "ஒவ்வொரு கட்டளையையும் இயக்கும் முன் உறுதிப்படுத்தவும். இதுவே மிகவும் பாதுகாப்பானது.",
-      "neverAsk": "ஒருபோதும் கேட்க வேண்டாம்",
-      "neverAskDescription": "உறுதிப்படுத்தாமல் கட்டளைகளை இயக்கவும். இது வேகமானது, ஆனால் பாதுகாப்பு குறைவானது."
-    },
-    "google": {
-      "title": "Google கணக்கு",
-      "couldNotLoad": "Google கணக்கின் நிலையை ஏற்ற முடியவில்லை.",
-      "disconnected": "Google கணக்கின் இணைப்பு துண்டிக்கப்பட்டது. மாற்றம் செயல்பட உங்கள் இன்ஸ்டன்ஸை மீண்டும் நிறுவவும்.",
-      "setupCommand": "அமைப்பதற்கான கட்டளை",
-      "setupCommandHelp": "உங்கள் Google கணக்கை இணைக்க, Docker நிறுவப்பட்ட உங்கள் சொந்தக் கணினியில் முனையத்தைத் திறந்து இந்தக் கட்டளையை இயக்கவும்.",
-      "failedToLoadCommand": "அமைப்பதற்கான கட்டளையை ஏற்ற முடியவில்லை.",
-      "gmailNotifications": "Gmail அறிவிப்புகள்",
-      "disconnect": "Google கணக்கின் இணைப்பைத் துண்டிக்கவும்",
-      "copied": "நகலெடுக்கப்பட்டது",
-      "copyCommand": "கட்டளையை நகலெடுக்கவும்",
-      "disconnectConfirm": "இணைப்பைத் துண்டிக்கவும்",
-      "disconnectMessage": "இந்த இன்ஸ்டன்ஸிலிருந்து உங்கள் Google கணக்கை அகற்றவா? இது Gmail அறிவிப்புகளை முடக்கும். மாற்றங்கள் செயல்பட, இணைப்பைத் துண்டித்த பிறகு இன்ஸ்டன்ஸை மீண்டும் நிறுவவும்.",
-      "disconnectTitle": "Google இணைப்பைத் துண்டித்தல்"
-    },
-    "modelList": {
-      "noMatches": "உங்கள் தேடலுக்குப் பொருந்தும் மாதிரிகள் இல்லை",
-      "noModelsDescription": "கிடைக்கும்போது மாதிரிகள் இங்கே தோன்றும்.",
-      "noResultsFor": "\"{{query}}\" என்பதற்கான முடிவுகள் இல்லை."
-    },
-    "secrets": {
-      "title": "ரகசியத் தகவல்கள்",
-      "couldNotLoad": "ரகசியத் தகவல்களை ஏற்ற முடியவில்லை.",
-      "noSecrets": "ரகசியத் தகவல்கள் எதுவும் இல்லை",
-      "noSecretsDescription": "ரகசியத் தகவல்களுக்கான ஒருங்கிணைப்புகள் இங்கே காட்டப்படும்.",
-      "removeMessage": "{{label}}-ஐ அகற்றவா? இந்தக் கருவி அதன் அணுகல் சான்றுகளை இனி அணுக முடியாது.",
-      "removeTitle": "ரகசியத் தகவலை அகற்றுதல்",
-      "saved": "{{label}} சேமிக்கப்பட்டது",
-      "hide": "{{label}}-ஐ மறைக்கவும்",
-      "show": "{{label}}-ஐக் காட்டவும்",
-      "allFieldsRequired": "{{label}}-ஐ இணைக்க எல்லாப் புலங்களையும் நிரப்ப வேண்டும்.",
-      "setupGuideFallback": "அமைவு வழிகாட்டி",
-      "setupGuideA11y": "{{label}} அமைப்பு வழிகாட்டி",
-      "setupGuide": "அமைவு வழிகாட்டி",
-      "saving": "சேமிக்கப்படுகிறது…",
-      "removing": "நீக்கப்படுகிறது…",
-      "updateToken": "டோக்கனைப் புதுப்பிக்கவும்"
-    },
-    "versionPin": {
-      "title": "பதிப்பை நிலைப்படுத்துதல்",
-      "couldNotLoad": "பதிப்பு விவரங்களை ஏற்ற முடியவில்லை.",
-      "couldNotLoadMore": "மேலும் பதிப்புகளை ஏற்ற முடியவில்லை.",
-      "loadMore": "மேலும் பதிப்புகளை ஏற்றவும்",
-      "showingLatest": "சமீபத்திய 100 பதிப்புகள் காட்டப்படுகின்றன.",
-      "availableVersions": "கிடைக்கக்கூடிய பதிப்புகள்",
-      "noVersions": "பதிப்புகள் எதுவும் இல்லை",
-      "noVersionsDescription": "கிடைக்கக்கூடிய OpenClaw பதிப்புகள் இங்கே தோன்றும்.",
-      "unpin": "நிலைநிறுத்தலை நீக்கவும்",
-      "unpinMessage": "கிடைக்கும் சமீபத்திய பதிப்புக்கு மீண்டும் மாறவா?",
-      "unpinTitle": "பதிப்பு நிலைநிறுத்தலை நீக்குதல்",
-      "confirmPin": "நிலைநிறுத்தலை உறுதிப்படுத்தவும்",
-      "followingLatest": "சமீபத்திய பதிப்பைப் பயன்படுத்துகிறது",
-      "latest": "சமீபத்தியது",
-      "pin": "நிலைநிறுத்தவும்",
-      "pinnedByAdmin": "நிர்வாகி பதிப்பை நிலைநிறுத்தியுள்ளார் — இதை மாற்ற அவரைத் தொடர்புகொள்ளவும்.",
-      "pinnedTo": "{{version}} பதிப்பில் நிலைநிறுத்தப்பட்டது",
-      "reasonOptional": "காரணம் (கட்டாயமில்லை)",
-      "reasonPlaceholder": "இந்தப் பதிப்பை நிலைநிறுத்துவதற்கான காரணம்",
-      "replaceAdminPin": "நிர்வாகியின் நிலைநிறுத்தலை மாற்றவும்",
-      "replacesAdminPin": "இது நிர்வாகி நிலைநிறுத்திய பதிப்பை மாற்றும் (தற்போது {{label}})."
-    },
-    "redeploy": "மீண்டும் வெளியிடவும்",
-    "redeployMessage": "இந்த இன்ஸ்டன்ஸை மீண்டும் நிறுவவா?",
-    "redeployTitle": "இன்ஸ்டன்ஸை மீண்டும் நிறுவுதல்",
-    "controls": {
-      "redeploying": "மீண்டும் நிறுவப்படுகிறது…",
-      "restart": "மறுதொடக்கம் செய்யவும்",
-      "restartOpenClawMessage": "OpenClaw செயல்முறையை மறுதொடக்கம் செய்யவா?",
-      "restartOpenClawTitle": "OpenClaw மறுதொடக்கம்",
-      "restarting": "மறுதொடக்கம் செய்யப்படுகிறது…",
-      "start": "தொடங்கவும்",
-      "startMessage": "இந்த இன்ஸ்டன்ஸைத் தொடங்கவா?",
-      "startTitle": "இன்ஸ்டன்ஸைத் தொடங்குதல்",
-      "stop": "நிறுத்தவும்",
-      "stopMessage": "இந்த இன்ஸ்டன்ஸை நிறுத்தவா?",
-      "stopTitle": "இன்ஸ்டன்ஸை நிறுத்துதல்",
-      "stopping": "நிறுத்தப்படுகிறது…"
-    },
-    "empty": {
-      "finishingSetup": "அமைவு நிறைவடைகிறது",
-      "finishingSetupDescription": "உங்கள் கணக்கைத் தயார்செய்கிறோம். சிறிது நேரம் காத்திருக்கவும். இது வழக்கமாக விரைவில் முடிந்துவிடும்.",
-      "getStarted": "தொடங்கவும்",
-      "noInstancesDescription": "நிரலாக்க ஏஜெண்டுகளை இயக்க உங்கள் முதல் இன்ஸ்டன்ஸை உருவாக்கவும்."
-    },
-    "instance": {
-      "backToInstances": "இன்ஸ்டன்ஸ் பட்டியலுக்குத் திரும்பவும்",
-      "couldNotLoad": "இன்ஸ்டன்ஸை ஏற்ற முடியவில்லை.",
-      "notFound": "இன்ஸ்டன்ஸ் கிடைக்கவில்லை",
-      "notFoundDescription": "இந்த இன்ஸ்டன்ஸ் அழிக்கப்பட்டிருக்கலாம் அல்லது இணைப்பு இனி செல்லுபடியாகாமல் இருக்கலாம்."
-    },
-    "list": {
-      "createInstance": "இன்ஸ்டன்ஸை உருவாக்கவும்",
-      "organizations": "நிறுவனங்கள்",
-      "accessIssue": {
-        "trialExpired": "சோதனைக் காலம் முடிந்தது — இந்த இன்ஸ்டன்ஸைத் தொடர்ந்து பயன்படுத்தச் சந்தா பெறவும்",
-        "subscriptionCanceled": "சந்தா செயலில் இல்லை — இந்த இன்ஸ்டன்ஸைத் தொடர்ந்து பயன்படுத்த மீண்டும் சந்தா பெறவும்",
-        "subscriptionPastDue": "கட்டணச் சிக்கல் — இந்த இன்ஸ்டன்ஸைத் தொடர்ந்து பயன்படுத்தக் கட்டண விவரங்களைப் புதுப்பிக்கவும்",
-        "quarantined": "இன்ஸ்டன்ஸ் தனிமைப்படுத்தப்பட்டது — நேரடி மதிப்பாய்வு தேவை",
-        "multipleCurrentConflict": "கணக்கை மதிப்பாய்வு செய்ய வேண்டும்",
-        "nonCanonicalEarlybird": "பழைய திட்டத்திற்கு மதிப்பாய்வு தேவை"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}} உடன் உரையாடவும்",
-        "ready": "{{name}} தயாராக உள்ளது",
-        "warmedUp": "எல்லாம் தயார். நீங்கள் தயாரானதும் வணக்கம் சொல்லவும்."
-      },
-      "flow": {
-        "genericErrorBody": "இப்போது உங்கள் இன்ஸ்டன்ஸை அமைத்து முடிக்க முடியவில்லை.",
-        "manualReviewBody": "இன்ஸ்டன்ஸை உருவாக்குவதற்கு முன் உங்கள் கணக்கின் நிலையைச் சரிபார்க்க வேண்டும். kilo.ai-இல் தொடரவும்.",
-        "manualReviewTitle": "அமைப்பிற்கு நேரடி மதிப்பாய்வு தேவை",
-        "openKiloAi": "Kilo.ai-ஐத் திறக்கவும்",
-        "provisioning": "வளங்களைத் தயார்செய்தல்",
-        "review": "மதிப்பாய்வு",
-        "identityTitle": "உங்கள் பாட் அடையாளம்",
-        "couldNotLoad": "தொடக்க அமைப்பின் நிலையை ஏற்ற முடியவில்லை.",
-        "finishingSetup": "அமைப்பு நிறைவடைகிறது — உங்கள் கணக்கைத் தயார்செய்யும் வரை காத்திருக்கவும்.",
-        "ready": "தயார்",
-        "settingUp": "அமைக்கப்படுகிறது…"
-      },
-      "unavailableDescription": "இன்ஸ்டன்ஸை உருவாக்கச் செயலில் உள்ள KiloClaw சந்தா தேவை. ஏற்கெனவே உள்ள இன்ஸ்டன்ஸ்களும் சந்தாக்களும் வழக்கம்போல் தொடரும்.",
-      "unavailableTitle": "புதிய KiloClaw இன்ஸ்டன்ஸ்கள் கிடைக்கவில்லை",
-      "identity": {
-        "chooseAvatar": "சுயவிவரப் படத்தைத் தேர்ந்தெடுக்கவும்",
-        "namePlaceholder": "உங்கள் பாட் பெயர்",
-        "selectAvatar": "{{name}}-ஐச் சுயவிவரப் படமாகத் தேர்ந்தெடுக்கவும்",
-        "personality": "ஆளுமை",
-        "changePersonality": "ஆளுமையை மாற்றவும்",
-        "location": "இருப்பிடம்",
-        "locationPlaceholder": "நகரம் அல்லது பகுதி (கட்டாயமில்லை)",
-        "useCurrentLocation": "தற்போதைய இருப்பிடத்தைப் பயன்படுத்தவும்",
-        "locationDeniedTitle": "இருப்பிட அணுகல் மறுக்கப்பட்டது",
-        "locationDeniedMessage": "உங்கள் தற்போதைய இருப்பிடத்தைப் பயன்படுத்த அமைப்புகளில் இருப்பிட அணுகலை இயக்கவும்.",
-        "locationValidationFailed": "இருப்பிடத்தைச் சரிபார்க்க முடியவில்லை.",
-        "locationResolveFailed": "உங்கள் இருப்பிடத்தை அடையாளம் காண முடியவில்லை. அதை நீங்களே திருத்தலாம்.",
-        "locationGetFailed": "உங்கள் இருப்பிடத்தைப் பெற முடியவில்லை. அதை நீங்களே உள்ளிடவும்.",
-        "nature": {
-          "aiAssistantLabel": "AI உதவியாளர்",
-          "aiAssistantVibe": "உதவும் மனப்பான்மை, திறமை, தொழில்முறை அணுகுமுறை",
-          "digitalCreatureLabel": "டிஜிட்டல் உயிரினம்",
-          "digitalCreatureVibe": "தனித்துவம், உயிரோட்டம், சற்றே கணிக்க முடியாத இயல்பு",
-          "virtualCompanionLabel": "மெய்நிகர் தோழர்",
-          "virtualCompanionVibe": "அன்பு, துணையிருக்கும் பண்பு, உண்மையான அக்கறை",
-          "somethingWeirderLabel": "இன்னும் வித்தியாசமான ஒன்று…",
-          "somethingWeirderVibe": "அதை நீங்களே வரையறுக்கவும்"
-        }
-      },
-      "notifications": {
-        "mockMessage": "முடிந்தது! நீங்கள் கேட்ட சுருக்கத்தைத் தயாரித்துவிட்டேன். நீங்கள் தயாரானதும் பார்க்கலாம்.",
-        "settingUp": "அறிவிப்புகள் அமைக்கப்படுகின்றன…",
-        "stayInTheLoop": "தகவல்களைத் தவறவிடாதீர்கள்",
-        "getNotified": "{{name}} ஒரு பணியை முடித்ததும் அறிவிப்பைப் பெறவும். இதனால் எந்தப் பதிலையும் தவறவிடமாட்டீர்கள்.",
-        "now": "இப்போது",
-        "skipForNow": "இப்போதைக்குத் தவிர்க்கவும்",
-        "couldNotEnable": "அறிவிப்புகளை இயக்க முடியவில்லை."
-      },
-      "provisioning": {
-        "queryErrorTitle": "அமைப்பின் நிலையைச் சரிபார்க்க முடியவில்லை",
-        "queryErrorBody": "{{name}} அமைப்பின் நிலையைச் சரிபார்க்கும்போது இணைப்பு துண்டிக்கப்பட்டது. அமைக்கும் பணி இன்னும் நடந்துகொண்டிருக்கலாம். மீண்டும் முயற்சிக்கவும் அல்லது சிறிது நேரம் கழித்துப் பார்க்கவும்.",
-        "stoppedTitle": "அமைக்கும் பணி நிறுத்தப்பட்டது",
-        "stoppedBody": "அமைக்கும்போது {{name}} இன்ஸ்டன்ஸ் எதிர்பாராத விதமாக நின்றுவிட்டது.",
-        "stalledTitle": "பணி தேங்கிவிட்டது",
-        "stalledBody": "{{name}} அமைப்பை முடிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும். இது தொடர்ந்து நடந்தால் {{supportEmail}}-க்கு மின்னஞ்சல் அனுப்பவும்.",
-        "timeoutTitle": "எதிர்பார்த்ததை விட அதிக நேரம் எடுக்கிறது",
-        "timeoutBody": "{{name}} அமைப்பை முடிக்க வழக்கத்தைவிட அதிக நேரம் ஆகிறது ({{displayMinutes}} நிமிடங்களுக்கு மேல்).",
-        "continueInBackground": "பின்னணியில் தொடரவும்",
-        "settingUp": "{{name}} அமைக்கப்படுகிறது",
-        "connectingToAgent": "ஏஜெண்டுடன் இணைக்கப்படுகிறது",
-        "startingSandbox": "தனிமைப்படுத்தப்பட்ட சூழல் தொடங்கப்படுகிறது",
-        "backgroundHint": "வழக்கமாக ஒரு நிமிடத்திற்குள் முடிந்துவிடும். இதை மூடலாம் — பின்னணியில் பணி தொடரும்."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "குறியீடு {{code}}",
-      "gatewayProcess": "கேட்வே செயல்முறை",
-      "lastExit": "கடைசியாக வெளியேறியது",
-      "memory": "நினைவகம்",
-      "region": "பகுதி",
-      "resources": "வளங்கள்",
-      "restarts": "மறுதொடக்கங்கள்",
-      "state": "நிலை",
-      "uptime": "தொடர்ந்து இயங்கிய நேரம்",
-      "crashed": "செயலிழந்தது",
-      "destroying": "அழிக்கப்படுகிறது",
-      "provisioned": "வளங்கள் தயார்",
-      "restarting": "மறுதொடக்கம் செய்யப்படுகிறது",
-      "running": "இயங்குகிறது",
-      "shuttingDown": "அணைக்கப்படுகிறது",
-      "starting": "தொடங்குகிறது",
-      "stopped": "நிறுத்தப்பட்டது",
-      "stopping": "நிறுத்தப்படுகிறது",
-      "unknown": "தெரியவில்லை",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "முன்னணி",
-      "frontierDescription": "மிக உயர்ந்த செயல்திறன். பகுத்தறியும் திறனுள்ள முன்னணி மாதிரிகளுக்கு வழிமாற்றுகிறது.",
-      "balancedDescription": "குறைந்த செலவில் வேகம் மற்றும் திறனின் சிறந்த சமநிலை.",
-      "autoModelA11y": "{{label}} தானியங்கி மாதிரி",
-      "currentModel": "தற்போதைய மாதிரி",
-      "browseAllModels": "அல்லது 500+ மாதிரிகளில் இருந்து தேர்ந்தெடுக்கவும்",
-      "browseAllModelsA11y": "500-க்கும் மேற்பட்ட அனைத்து மாதிரிகளையும் பார்க்கவும்"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw-ஐத் தொடர்ந்து பயன்படுத்த, உங்கள் உலாவியில் kilo.ai/claw-க்குச் செல்லவும். செயலியில் சந்தா பெற முடியாது.",
-      "subscriptionCanceledTitle": "வலைத்தளத்தில் சந்தா பெறவும்",
-      "subscriptionCanceledBody": "KiloClaw-ஐப் பயன்படுத்த, உங்கள் உலாவியில் kilo.ai/claw-க்குச் செல்லவும். செயலியில் சந்தா பெற முடியாது.",
-      "subscriptionCanceledCta": "Kilo.ai/claw தளத்தைத் திறக்கவும்",
-      "subscriptionPastDueTitle": "இணையதளத்தில் கட்டண விவரங்களைப் புதுப்பித்தல்",
-      "subscriptionPastDueBody": "நீங்கள் கடைசியாகச் செலுத்திய கட்டணத்தில் சிக்கல் ஏற்பட்டது. கட்டண விவரங்களைப் புதுப்பிக்க உங்கள் உலாவியில் kilo.ai/claw-க்குச் செல்லவும். செயலியில் கட்டணங்களை நிர்வகிக்க முடியாது.",
-      "quarantinedTitle": "இன்ஸ்டன்ஸைச் சரிசெய்ய வேண்டும்",
-      "quarantinedBody": "உங்கள் KiloClaw இன்ஸ்டன்ஸ் தனிமைப்படுத்தப்பட்டுள்ளதால் இப்போது அதைப் பயன்படுத்த முடியாது. அதை மீட்டெடுக்க எங்கள் குழுவின் உதவி தேவை.",
-      "multipleCurrentConflictBody": "உங்கள் கணக்கில் ஒன்றுக்கு மேற்பட்ட சந்தாக்கள் செயலில் உள்ளன. இருமுறை கட்டணம் வசூலிப்பதைத் தவிர்க்கச் செயல்பாடுகளை இடைநிறுத்தியுள்ளோம்.",
-      "multipleCurrentConflictCta": "Kilo.ai தளத்தில் தொடரவும்",
-      "nonCanonicalEarlybirdTitle": "பழைய திட்டம் கண்டறியப்பட்டது",
-      "nonCanonicalEarlybirdBody": "உங்கள் முன்கூட்டிய அணுகல் திட்டத்தை மொபைலில் பயன்படுத்துவதற்கு முன் நேரடி மதிப்பாய்வு தேவை.",
-      "iosTitle": "IOS-இல் KiloClaw கிடைக்கவில்லை",
-      "iosBody": "இந்தக் கணக்கிற்கான KiloClaw அணுகல் iOS செயலிக்கு வெளியே நிர்வகிக்கப்படுகிறது.",
-      "iosContact": "கேள்விகள் உள்ளனவா? {{supportEmail}}-க்கு மின்னஞ்சல் அனுப்பவும்.",
-      "quarantinedCta": "எங்கள் குழுவுக்கு மின்னஞ்சல் அனுப்புங்கள்",
-      "nonCanonicalEarlybirdCta": "உங்கள் திட்டத்தை Kilo.ai-ல் மதிப்பாய்வு செய்யுங்கள்"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} — கவனம் தேவை: {{label}}",
-      "openUnread_one": "{{name}}-ஐத் திறக்கவும், {{displayCount}} படிக்காத செய்தி",
-      "openUnread": "{{name}} என்பதைத் திறக்கவும், {{displayCount}} படிக்காத செய்திகள்",
-      "openUnread_other": "{{name}} என்பதைத் திறக்கவும், {{displayCount}} படிக்காத செய்திகள்",
-      "openSettings": "{{name}} அமைப்புகளைத் திறக்கவும்",
-      "fixOnKiloAi": "Kilo.ai-இல் சரிசெய்யவும்: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "சாதனக் கோரிக்கைகளுக்கு ஒப்புதல் அளிக்கவும்",
-      "execPolicyDescription": "பாதுகாப்பு அமைப்புகள்",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "AI மாதிரித் தேர்வு",
-      "secretsDescription": "மறைகுறியாக்கப்பட்ட அணுகல் சான்றுகள்",
-      "versionPinDescription": "ஒரு குறிப்பிட்ட பதிப்பில் நிலைநிறுத்தவும்"
-    },
-    "avatar": {
-      "arcade": "ஆர்கேட் விளையாட்டு",
-      "brain": "மூளை",
-      "creature": "உயிரினம்",
-      "crystal": "படிகம்",
-      "custom": "தனிப்பயன் சுயவிவரப் படம்",
-      "dragon": "டிராகன்",
-      "explorer": "ஆய்வாளர்",
-      "flame": "தீப்பிழம்பு",
-      "lightning": "மின்னல்",
-      "magicWand": "மந்திரக்கோல்",
-      "moon": "நிலா",
-      "operator": "இயக்குபவர்",
-      "orbit": "சுற்றுப்பாதை",
-      "oracle": "குறிசொல்பவர்",
-      "rainbow": "வானவில்",
-      "robot": "ரோபோ",
-      "satellite": "செயற்கைக்கோள்",
-      "sparkles": "மினுமினுப்பு",
-      "strongArm": "வலுவான கை",
-      "talisman": "தாயத்து"
-    },
-    "remoteSpawnFilesNotSupported": "இந்த இன்ஸ்டன்ஸ் கோப்புகளைப் பெற முடியாது.",
-    "instanceSwitcherTitle": "KiloClaw இன்ஸ்டன்ஸ்"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}}-ஐ இடப்புறம் நகர்த்தவும்",
       "moveRight": "{{filename}}-ஐ வலப்புறம் நகர்த்தவும்"
     },
-    "attachmentPasteHint": {
-      "accessibility": "நகலகத்திலிருந்து படத்தை ஒட்டவும்",
-      "label": "படம் கண்டறியப்பட்டது, ஒட்டுவதற்குத் தட்டவும்"
-    },
     "attachmentPicker": {
       "camera": "கேமரா",
       "photoLibrary": "புகைப்படத் தொகுப்பு",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "இந்தச் சாதனத்திலிருந்து வெளியேறவா?",
     "signOutThisSessionTitle": "இந்த அமர்விலிருந்து வெளியேறவா?",
     "signOutThisSessionMessage": "{{device}} சாதனத்தில் கணக்கு வெளியேற்றப்படும். அந்தச் சாதனத்திற்கு ஒரு மணி நேரம் வரை API அணுகல் தொடரலாம்.",
-    "webBrowser": "இணைய உலாவி"
+    "webBrowser": "இணைய உலாவி",
+    "unknownDevice": "அடையாளம் தெரியாத சாதனம்"
   },
   "forceUpdate": {
     "couldNotOpenStore": "செயலிக் கடையைத் திறக்க முடியவில்லை.",

@@ -291,13 +291,12 @@ describe('allowlist filter', () => {
   it('denies unknown, flat, and malformed shapes without throwing', () => {
     expect(isReadCacheAllowedKey([['unknown', 'procedure'], { type: 'query' }])).toBe(false);
     // Every sensitive path is off the allowlist, so it is denied for that
-    // reason alone: transcripts, patches, diffs, tokens, secrets, kiloclaw.
+    // reason alone: transcripts, patches, diffs, tokens and secrets.
     expect(
       isReadCacheAllowedKey([['cliSessionsV2', 'getSessionMessagesPage'], { type: 'query' }])
     ).toBe(false);
     expect(isReadCacheAllowedKey([['git', 'getPatch'], { type: 'query' }])).toBe(false);
     expect(isReadCacheAllowedKey([['auth', 'getToken'], { type: 'query' }])).toBe(false);
-    expect(isReadCacheAllowedKey([['kiloclaw', 'list'], { type: 'query' }])).toBe(false);
     expect(isReadCacheAllowedKey(FLAT_APPLICATION_KEY)).toBe(false);
     expect(isReadCacheAllowedKey('flat-key')).toBe(false);
     expect(isReadCacheAllowedKey(null)).toBe(false);

@@ -101,12 +101,9 @@
     "scheduled": "Terjadwal",
     "keepEditing": "Lanjutkan menyunting",
     "keepRunning": "Biarkan berjalan",
-    "kiloclaw": "KiloClaw",
     "newSession": "Sesi baru",
-    "noKiloclawInstances": "Belum ada instans KiloClaw",
     "noModelsAvailable": "Tidak ada model yang tersedia",
     "notFound": "Tidak ditemukan.",
-    "online": "Daring",
     "open": "Buka {{name}}",
     "openPullRequest": "Buka PR",
     "pending": "Menunggu",
@@ -257,7 +254,8 @@
     "renamePasskey": "Ganti nama kunci sandi",
     "removePasskey": "Hapus kunci sandi",
     "removePasskeyTitle": "Hapus kunci sandi?",
-    "removePasskeyMessage": "Anda tidak akan bisa lagi masuk dengan kunci sandi ini."
+    "removePasskeyMessage": "Anda tidak akan bisa lagi masuk dengan kunci sandi ini.",
+    "changelog": "Yang baru"
   },
   "preferences": {
     "general": "Umum",
@@ -320,23 +318,18 @@
     "previewGenericDescription": "Notifikasi hanya menunjukkan adanya aktivitas. Buka Kilo untuk membaca pesannya.",
     "channel": {
       "agentProgress": "Kemajuan agen",
-      "chat": "Pesan obrolan",
-      "kiloclaw": "Aktivitas KiloClaw",
       "balance": "Peringatan saldo",
       "security": "Temuan keamanan",
       "spend": "Peringatan pengeluaran",
       "followedSessions": "Sesi yang diikuti"
     },
     "category": {
-      "chatMessagesSubtitle": "balasan dalam percakapanmu",
       "agentAttentionTitle": "Agen membutuhkanmu",
       "agentAttentionSubtitle": "pertanyaan, permintaan izin, atau masukan yang dibutuhkan",
       "agentUpdatesTitle": "Pembaruan agen",
       "agentUpdatesSubtitle": "pesan dari agen saat tugas berlangsung",
       "sessionStatusTitle": "Status sesi",
       "sessionStatusSubtitle": "selesai / gagal / siap dikendalikan",
-      "kiloclawActivitySubtitle": "instans siap/gagal, tindakan terjadwal",
-      "kiloclawActivityUnavailable": "Mulai instans KiloClaw untuk mendapatkan aktivitas KiloClaw.",
       "balanceAlertsSubtitle": "peringatan saat saldo organisasi rendah",
       "balanceAlertsUnavailable": "Bergabunglah dengan organisasi untuk mendapatkan peringatan saldo.",
       "securityFindingsSubtitle": "temuan baru dan pengingat SLA",
@@ -356,72 +349,19 @@
   },
   "tabs": {
     "home": "Beranda",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, tab, {{position}} dari {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Ganti instans",
-      "couldNotLoadInstances": "Tidak dapat memuat instans.",
-      "noInstancesDescription": "Siapkan instans untuk mulai mengobrol.",
-      "setUpKiloclaw": "Siapkan KiloClaw",
-      "currentInstance": "{{title}}, instans saat ini"
-    },
     "conversation": {
-      "failedToLoad": "Gagal memuat percakapan.",
-      "notFound": "Percakapan tidak ditemukan.",
       "untitled": "Tanpa judul",
-      "leaveTitle": "Tinggalkan percakapan?",
-      "leaveMessage": "Percakapan ini akan dihapus dari daftarmu.",
-      "openHint": "Membuka percakapan. Tekan lama untuk mengganti nama atau meninggalkan percakapan.",
-      "unread": "Belum dibaca",
-      "optionsFor": "Opsi percakapan untuk {{title}}",
-      "options": "Opsi percakapan",
-      "renameTitle": "Ganti nama percakapan",
-      "renamePlaceholder": "Nama baru",
-      "couldNotReachBot": "Tidak dapat menghubungi bot. Coba lagi.",
-      "messageDeliveryFailed": "Pesan tidak dapat dikirim ke bot.",
-      "couldNotSignIn": "Tidak dapat masuk ke obrolan.",
-      "couldNotRefreshMessages": "Tidak dapat memuat ulang pesan.",
-      "couldNotLoadHistory": "Tidak dapat memuat riwayat percakapan.",
-      "leave": "Tinggalkan",
-      "untitledConversation": "Percakapan tanpa judul",
-      "createFailed": "Gagal membuat percakapan.",
-      "leaveFailed": "Gagal meninggalkan percakapan."
-    },
-    "reactions": {
-      "common": "Umum",
-      "reactWith": "Beri reaksi {{reaction}}",
-      "accessibility": "Reaksi {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Membalas",
-      "cancelReply": "Batalkan balasan",
-      "openInstance": "Buka instans",
-      "attachFile": "Lampirkan berkas",
-      "cancelEdit": "Batalkan pengeditan"
+      "renamePlaceholder": "Nama baru"
     },
     "conversationList": {
-      "couldNotLoad": "Tidak dapat memuat percakapan.",
-      "emptyTitle": "Belum ada percakapan",
-      "emptyDescription": "Buat percakapan untuk mulai mengobrol dengan instans KiloClaw milikmu.",
-      "create": "Buat percakapan",
-      "newConversation": "Percakapan baru",
-      "openInstanceSettings": "Buka pengaturan instans",
       "today": "Hari ini",
       "yesterday": "Kemarin",
-      "thisWeek": "Minggu ini",
       "older": "Lebih lama"
     },
     "attachment": {
-      "open": "Buka {{filename}}",
-      "openFailed": "Tidak dapat membuka lampiran. Periksa koneksimu, lalu coba lagi.",
-      "attachFailed": "Gagal melampirkan berkas.",
-      "limit": "Kamu dapat melampirkan hingga {{displayCount}} berkas.",
-      "sizeRejection": "Ukuran {{filename}} melebihi batas lampiran sebesar {{limit}}.",
-      "unreadable": "Tidak dapat membaca {{filename}}.",
-      "pastedImage": "gambar yang ditempel",
-      "defaultName": "Lampiran",
       "classificationDenied": "Berkas yang dapat dieksekusi tidak dapat dilampirkan.",
       "classificationEmpty": "Berkas ini kosong.",
       "classificationTooLarge": "Ukuran berkas tidak boleh melebihi 20 MB.",
@@ -431,426 +371,17 @@
       "networkError": "Terjadi kesalahan jaringan.",
       "uploadFailed": "Gagal mengunggah.",
       "nothingToPaste": "Tidak ada yang dapat ditempelkan.",
-      "metadataStripFailed": "Metadata foto tidak dapat dihapus.",
-      "limit_one": "Kamu dapat melampirkan hingga {{displayCount}} berkas.",
-      "limit_other": "Kamu dapat melampirkan hingga {{displayCount}} berkas."
+      "metadataStripFailed": "Metadata foto tidak dapat dihapus."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Coba unggah {{filename}} lagi",
-      "remove": "Hapus {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[pesan dihapus]",
-      "yourMessage": "Pesanmu",
-      "messageFrom": "Pesan dari {{author}}",
-      "moreActions": "Tindakan lainnya",
-      "notDelivered": "Tidak terkirim",
-      "edited": "(diedit)",
-      "image": "Gambar"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Disalin",
-      "copyFailed": "Gagal menyalin.",
-      "title": "Tindakan untuk pesan",
-      "deleteTitle": "Hapus pesan?",
-      "deleteMessage": "Ini akan menghapus pesan dari percakapan.",
-      "deleteFailed": "Gagal menghapus pesan.",
-      "removeReactionFailed": "Gagal menghapus reaksi.",
-      "addReactionFailed": "Gagal menambahkan reaksi.",
-      "retrySend": "Kirim ulang",
-      "moreReactions": "Reaksi lainnya",
-      "edit": "Sunting",
-      "sendFailed": "Gagal mengirim pesan.",
-      "retrySendFailed": "Gagal mengirim ulang.",
-      "editFailed": "Gagal mengedit pesan.",
-      "executeFailed": "Gagal menjalankan tindakan."
+      "edit": "Sunting"
     },
     "attachmentPicker": {
-      "takePhoto": "Ambil foto",
-      "photoLibrary": "Galeri foto",
-      "files": "Berkas",
       "cameraAccessMessage": "Izinkan akses kamera di pengaturan untuk mengambil foto."
-    },
-    "typingIndicator": {
-      "someone": "Seseorang",
-      "typing_one": "{{name}} sedang mengetik...",
-      "typing": "{{names}} sedang mengetik...",
-      "typing_other": "{{names}} sedang mengetik..."
-    },
-    "botStatus": {
-      "offline": "Luring",
-      "loadingUser": "Memuat pengguna...",
-      "waitingForStatus": "Menunggu status bot...",
-      "offlineMessage": "Bot sedang luring. Pengiriman pesan akan dilanjutkan saat bot terhubung kembali."
-    },
-    "errors": {
-      "notAllowed": "Tindakan ini tidak diizinkan.",
-      "messageTooLong": "Pesan terlalu panjang. Gunakan kurang dari {{limit}} karakter.",
-      "titleTooLong": "Judul terlalu panjang. Gunakan kurang dari {{limit}} karakter.",
-      "messageEmpty": "Pesan tidak boleh kosong."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Tidak dapat memuat instans KiloClaw.",
-    "billing": {
-      "title": "Penagihan",
-      "continueMonthToMonth": "Lanjutkan dengan langganan bulanan",
-      "plan": "Rencana",
-      "finalTermEnds": "Periode terakhir berakhir",
-      "afterFinalTerm": "Setelah periode terakhir",
-      "ends": "Berakhir",
-      "expires": "Kedaluwarsa",
-      "noActivePlan": "Tidak ada paket aktif",
-      "noActivePlanDescription": "Kamu belum memiliki langganan KiloClaw yang aktif.",
-      "managedByAdmin": "Admin organisasimu mengelola penagihan.",
-      "couldNotLoad": "Tidak dapat memuat informasi penagihan.",
-      "manageOnWeb": "Kelola penagihan di web",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Periode terakhir paket Commit kamu berakhir pada {{date}}. Lanjutkan dengan paket Standard seharga {{price}} agar layanan hosting tetap aktif.",
-      "freeTrial": "Uji coba gratis",
-      "hostingEnds": "Layanan hosting berakhir",
-      "lessThanOneDay": "Kurang dari 1 hari",
-      "renews": "Diperpanjang",
-      "standardMonthToMonth": "Paket Standard bulanan",
-      "standardStartsOn": "Paket Standard mulai berlaku pada {{date}} dengan harga {{price}}.",
-      "yourStandardMonthlyPrice": "harga bulanan paket Standard kamu",
-      "perMonth": "/bulan",
-      "earlybirdAccessUntil": "Akses Earlybird berlaku hingga {{date}}.",
-      "earlybirdEnding": "Akses Earlybird berakhir dalam {{remaining}}.",
-      "paymentPastDue": "Pembayaran sudah melewati jatuh tempo. Perbarui metode pembayaranmu.",
-      "subscriptionCancels": "Langganan akan dibatalkan pada {{date}}.",
-      "trialDaysRemaining": "Masa uji coba tersisa {{remaining}}.",
-      "trialEndingSoon": "Masa uji coba segera berakhir, tersisa {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Yang baru",
-      "couldNotLoad": "Tidak dapat memuat catatan perubahan.",
-      "noUpdates": "Belum ada pembaruan",
-      "noUpdatesDescription": "Catatan perubahan akan muncul di sini.",
-      "recentUpdates": "Pembaruan terbaru",
-      "manageVersion": "Kelola versi",
-      "redeployRequired": "Perlu diterapkan ulang",
-      "redeploySuggested": "Sebaiknya diterapkan ulang",
-      "upgradeRequired": "Perlu peningkatan versi"
-    },
-    "dashboard": {
-      "title": "Dasbor",
-      "couldNotLoad": "Tidak dapat memuat dasbor.",
-      "renameInstance": "Ganti nama instans",
-      "renamePlaceholder": "Nama baru (maksimal 50 karakter)",
-      "someDetailsFailed": "Sebagian informasi terkini gagal dimuat.",
-      "destroy": "Hapus permanen",
-      "destroyMessage": "Instans KiloClaw kamu beserta semua datanya akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan.",
-      "destroyTitle": "Hapus instans secara permanen",
-      "instance": "Instans",
-      "couldNotCheckStatus": "Tidak dapat memeriksa status layanan.",
-      "dangerZone": "ZONA BAHAYA",
-      "destroying": "Menghapus permanen…",
-      "serviceDegraded": "Layanan terganggu — ketuk untuk melihat status",
-      "up": "AKTIF"
-    },
-    "channels": {
-      "title": "Kanal",
-      "couldNotLoad": "Tidak dapat memuat kanal.",
-      "noChannels": "Tidak ada kanal yang tersedia",
-      "noChannelsDescription": "Integrasi kanal akan muncul di sini.",
-      "connected": "{{label}} terhubung",
-      "disconnectMessage": "Hapus {{label}}? Koneksi kanal ini akan diputus.",
-      "disconnectTitle": "Putuskan koneksi kanal"
-    },
-    "devicePairing": {
-      "title": "Pemasangan perangkat",
-      "refreshRequests": "Muat ulang permintaan pemasangan",
-      "couldNotLoad": "Tidak dapat memuat permintaan pemasangan.",
-      "noPending": "Tidak ada permintaan yang menunggu persetujuan",
-      "noPendingDescription": "Permintaan pemasangan kanal dan perangkat akan muncul di sini.",
-      "channelRequests": "Permintaan kanal",
-      "deviceRequests": "Permintaan perangkat",
-      "approveDeviceMessage": "Izinkan {{platform}} terhubung ke instansmu?",
-      "approveDeviceTitle": "Setujui koneksi perangkat",
-      "approveMessage": "Izinkan {{label}} (kode: {{code}}) terhubung ke instansmu?",
-      "approveTitle": "Setujui permintaan pemasangan",
-      "unknownDevice": "Perangkat tidak dikenal"
-    },
-    "execPolicy": {
-      "title": "Kebijakan eksekusi",
-      "couldNotLoad": "Tidak dapat memuat kebijakan eksekusi.",
-      "alwaysAsk": "Selalu minta konfirmasi",
-      "alwaysAskDescription": "Minta konfirmasi sebelum menjalankan setiap perintah. Pilihan paling aman.",
-      "neverAsk": "Tanpa konfirmasi",
-      "neverAskDescription": "Jalankan perintah tanpa konfirmasi. Lebih cepat tetapi kurang aman."
-    },
-    "google": {
-      "title": "Akun Google",
-      "couldNotLoad": "Tidak dapat memuat status akun Google.",
-      "disconnected": "Koneksi akun Google diputus. Terapkan ulang instansmu agar perubahan berlaku.",
-      "setupCommand": "Perintah penyiapan",
-      "setupCommandHelp": "Jalankan perintah ini melalui terminal di komputermu sendiri yang sudah terpasang Docker untuk menghubungkan akun Google kamu.",
-      "failedToLoadCommand": "Gagal memuat perintah penyiapan.",
-      "gmailNotifications": "Notifikasi Gmail",
-      "disconnect": "Putuskan koneksi akun Google",
-      "copied": "Disalin",
-      "copyCommand": "Salin perintah",
-      "disconnectConfirm": "Putuskan koneksi",
-      "disconnectMessage": "Hapus akun Google kamu dari instans ini? Notifikasi Gmail akan dinonaktifkan. Setelah koneksi diputus, terapkan ulang instans agar perubahan berlaku.",
-      "disconnectTitle": "Putuskan koneksi Google"
-    },
-    "modelList": {
-      "noMatches": "Tidak ada model yang cocok dengan pencarianmu",
-      "noModelsDescription": "Model akan muncul di sini setelah tersedia.",
-      "noResultsFor": "Tidak ada hasil untuk \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Data rahasia",
-      "couldNotLoad": "Tidak dapat memuat kredensial.",
-      "noSecrets": "Tidak ada kredensial yang tersedia",
-      "noSecretsDescription": "Integrasi kredensial akan muncul di sini.",
-      "removeMessage": "Hapus {{label}}? Alat ini akan kehilangan akses ke kredensialnya.",
-      "removeTitle": "Hapus kredensial",
-      "saved": "{{label}} disimpan",
-      "allFieldsRequired": "Semua kolom wajib diisi untuk menghubungkan {{label}}.",
-      "hide": "Sembunyikan {{label}}",
-      "removing": "Menghapus…",
-      "saving": "Menyimpan…",
-      "setupGuide": "Panduan penyiapan",
-      "setupGuideA11y": "Panduan penyiapan {{label}}",
-      "setupGuideFallback": "panduan penyiapan",
-      "show": "Tampilkan {{label}}",
-      "updateToken": "Perbarui token"
-    },
-    "versionPin": {
-      "title": "Penguncian versi",
-      "couldNotLoad": "Tidak dapat memuat informasi versi.",
-      "couldNotLoadMore": "Tidak dapat memuat versi lainnya.",
-      "loadMore": "Muat versi lainnya",
-      "showingLatest": "Menampilkan 100 versi terbaru.",
-      "availableVersions": "Versi yang tersedia",
-      "noVersions": "Tidak ada versi yang tersedia",
-      "noVersionsDescription": "Versi OpenClaw yang tersedia akan muncul di sini.",
-      "unpin": "Buka kunci",
-      "unpinMessage": "Kembali ke versi terbaru yang tersedia?",
-      "unpinTitle": "Buka kunci versi",
-      "confirmPin": "Konfirmasi penguncian versi",
-      "followingLatest": "Ikuti versi terbaru",
-      "latest": "terbaru",
-      "pin": "Kunci versi",
-      "pinnedByAdmin": "Versi dikunci oleh admin. Hubungi adminmu untuk mengubahnya.",
-      "pinnedTo": "Dikunci pada {{version}}",
-      "reasonOptional": "Alasan (opsional)",
-      "reasonPlaceholder": "Alasan mengunci versi ini",
-      "replaceAdminPin": "Ganti versi yang dikunci admin",
-      "replacesAdminPin": "Pilihan ini menggantikan versi yang dikunci oleh admin (saat ini {{label}})."
-    },
-    "redeploy": "Terapkan ulang",
-    "redeployMessage": "Yakin ingin menerapkan ulang instans ini?",
-    "redeployTitle": "Terapkan ulang instans",
-    "accessRequired": {
-      "iosBody": "Akses KiloClaw dikelola di luar aplikasi iOS untuk akun ini.",
-      "iosContact": "Ada pertanyaan? Hubungi {{supportEmail}}.",
-      "iosTitle": "KiloClaw tidak tersedia di iOS",
-      "multipleCurrentConflictBody": "Kami menemukan lebih dari satu langganan aktif di akunmu. Layanan dihentikan sementara agar kamu tidak ditagih dua kali.",
-      "multipleCurrentConflictCta": "Lanjutkan di kilo.ai",
-      "nonCanonicalEarlybirdBody": "Paket akses awalmu perlu ditinjau secara manual sebelum dapat digunakan di ponsel.",
-      "nonCanonicalEarlybirdTitle": "Paket lama terdeteksi",
-      "quarantinedBody": "Instans KiloClaw kamu sedang dikarantina dan belum dapat digunakan. Tim kami perlu membantu memulihkannya.",
-      "quarantinedTitle": "Instans perlu dipulihkan",
-      "subscriptionCanceledBody": "Untuk menggunakan KiloClaw, buka kilo.ai/claw melalui peramban. Kamu tidak dapat berlangganan di aplikasi.",
-      "subscriptionCanceledCta": "Buka kilo.ai/claw",
-      "subscriptionCanceledTitle": "Berlangganan di web",
-      "subscriptionPastDueBody": "Pembayaran terakhirmu bermasalah. Buka kilo.ai/claw melalui peramban untuk memperbarui informasi pembayaran. Kamu tidak dapat mengelola penagihan di aplikasi.",
-      "subscriptionPastDueTitle": "Perbarui informasi pembayaran di web",
-      "trialExpiredBody": "Untuk terus menggunakan KiloClaw, buka kilo.ai/claw melalui peramban. Kamu tidak dapat berlangganan di aplikasi.",
-      "quarantinedCta": "Kirim email ke tim kami",
-      "nonCanonicalEarlybirdCta": "Tinjau paket Anda di kilo.ai"
-    },
-    "controls": {
-      "redeploying": "Menerapkan ulang…",
-      "restart": "Mulai ulang",
-      "restartOpenClawMessage": "Yakin ingin memulai ulang proses OpenClaw?",
-      "restartOpenClawTitle": "Mulai ulang OpenClaw",
-      "restarting": "Memulai ulang…",
-      "start": "Mulai",
-      "startMessage": "Yakin ingin memulai instans ini?",
-      "startTitle": "Mulai instans",
-      "stop": "Hentikan",
-      "stopMessage": "Yakin ingin menghentikan instans ini?",
-      "stopTitle": "Hentikan instans",
-      "stopping": "Menghentikan…"
-    },
-    "empty": {
-      "finishingSetup": "Menyelesaikan penyiapan",
-      "finishingSetupDescription": "Tunggu sebentar, kami sedang menyelesaikan penyiapan akunmu. Biasanya proses ini hanya butuh waktu singkat.",
-      "getStarted": "Mulai",
-      "noInstancesDescription": "Buat instans pertamamu untuk mulai menjalankan agen pemrograman."
-    },
-    "instance": {
-      "backToInstances": "Kembali ke daftar instans",
-      "couldNotLoad": "Tidak dapat memuat instans.",
-      "notFound": "Instans tidak ditemukan",
-      "notFoundDescription": "Instans ini mungkin sudah dihapus secara permanen, atau tautannya sudah tidak valid."
-    },
-    "instanceCard": {
-      "fixOnKiloAi": "Perbaiki di kilo.ai: {{label}}",
-      "needsAttention": "{{name}} perlu perhatian: {{label}}",
-      "openSettings": "Buka pengaturan untuk {{name}}",
-      "openUnread": "Buka {{name}}, {{displayCount}} pesan belum dibaca",
-      "openUnread_other": "Buka {{name}}, {{displayCount}} pesan belum dibaca",
-      "openUnread_one": "Buka {{name}}, {{displayCount}} pesan belum dibaca"
-    },
-    "list": {
-      "createInstance": "Buat instans",
-      "organizations": "Organisasi",
-      "accessIssue": {
-        "trialExpired": "Masa uji coba berakhir, berlangganan untuk terus menggunakan instans ini",
-        "subscriptionCanceled": "Langganan tidak aktif, berlangganan lagi untuk terus menggunakan instans ini",
-        "subscriptionPastDue": "Pembayaran bermasalah, perbarui informasi penagihan untuk terus menggunakan instans ini",
-        "quarantined": "Instans dikarantina, perlu ditinjau secara manual",
-        "multipleCurrentConflict": "Akun perlu ditinjau",
-        "nonCanonicalEarlybird": "Paket lama perlu ditinjau"
-      }
-    },
-    "modelPicker": {
-      "autoModelA11y": "model otomatis {{label}}",
-      "balancedDescription": "Kecepatan dan kemampuan yang seimbang dengan biaya lebih rendah.",
-      "browseAllModels": "atau pilih dari 500+ model",
-      "browseAllModelsA11y": "Jelajahi semua 500+ model",
-      "currentModel": "Model saat ini",
-      "frontierDescription": "Kinerja tertinggi. Menggunakan model tercanggih dengan kemampuan penalaran.",
-      "frontierLabel": "Tercanggih",
-      "kiloAuto": "Kilo Auto"
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Mulai obrolan dengan {{name}}",
-        "ready": "{{name}} sudah siap",
-        "warmedUp": "Semua sudah siap. Sapa kapan pun kamu siap."
-      },
-      "flow": {
-        "couldNotLoad": "Tidak dapat memuat status penyiapan.",
-        "finishingSetup": "Penyiapan hampir selesai. Tunggu sebentar sampai akunmu siap.",
-        "genericErrorBody": "Kami belum dapat menyelesaikan penyiapan instansmu.",
-        "identityTitle": "Beri identitas pada botmu",
-        "manualReviewBody": "Status akunmu perlu ditangani sebelum kami dapat membuat instans. Lanjutkan di kilo.ai.",
-        "manualReviewTitle": "Penyiapan perlu ditinjau secara manual",
-        "openKiloAi": "Buka kilo.ai",
-        "provisioning": "Penyiapan instans",
-        "ready": "Siap",
-        "review": "Tinjauan",
-        "settingUp": "Menyiapkan…"
-      },
-      "identity": {
-        "changePersonality": "Ubah kepribadian",
-        "chooseAvatar": "Pilih avatar",
-        "location": "Lokasi",
-        "locationDeniedMessage": "Aktifkan akses lokasi di pengaturan untuk menggunakan lokasimu saat ini.",
-        "locationDeniedTitle": "Akses lokasi ditolak",
-        "locationGetFailed": "Tidak dapat memperoleh lokasimu. Masukkan secara manual.",
-        "locationPlaceholder": "Kota atau wilayah (opsional)",
-        "locationResolveFailed": "Tidak dapat menentukan nama lokasimu. Kamu dapat mengubahnya secara manual.",
-        "locationValidationFailed": "Lokasi tidak dapat divalidasi.",
-        "namePlaceholder": "Nama botmu",
-        "nature": {
-          "aiAssistantLabel": "Asisten AI",
-          "aiAssistantVibe": "Suka membantu, cakap, profesional",
-          "digitalCreatureLabel": "Makhluk digital",
-          "digitalCreatureVibe": "Unik, hidup, sedikit tak terduga",
-          "somethingWeirderLabel": "Sesuatu yang lebih aneh…",
-          "somethingWeirderVibe": "Tentukan sendiri",
-          "virtualCompanionLabel": "Pendamping virtual",
-          "virtualCompanionVibe": "Hangat, selalu ada, tulus peduli"
-        },
-        "personality": "Kepribadian",
-        "selectAvatar": "Pilih {{name}} sebagai avatar",
-        "useCurrentLocation": "Gunakan lokasi saat ini"
-      },
-      "notifications": {
-        "couldNotEnable": "Tidak dapat mengaktifkan notifikasi.",
-        "getNotified": "Dapatkan notifikasi saat {{name}} menyelesaikan tugas agar kamu tidak melewatkan balasannya.",
-        "mockMessage": "Selesai! Aku sudah membuat ringkasan yang kamu minta. Ringkasannya siap dibaca kapan saja.",
-        "now": "sekarang",
-        "settingUp": "Menyiapkan notifikasi…",
-        "skipForNow": "Lewati dulu",
-        "stayInTheLoop": "Jangan lewatkan kabar terbaru"
-      },
-      "provisioning": {
-        "backgroundHint": "Biasanya proses ini butuh waktu kurang dari satu menit. Kamu dapat menutup layar ini. Penyiapan akan terus berjalan di latar belakang.",
-        "connectingToAgent": "Menghubungkan ke agen",
-        "continueInBackground": "Lanjutkan di latar belakang",
-        "queryErrorBody": "Koneksi terputus saat kami memeriksa penyiapan {{name}}. Proses penyiapan mungkin masih berjalan. Coba lagi atau periksa kembali sebentar lagi.",
-        "queryErrorTitle": "Tidak dapat memeriksa status penyiapan",
-        "settingUp": "Menyiapkan {{name}}",
-        "stalledBody": "Kami tidak dapat menyelesaikan penyiapan {{name}}. Coba lagi, atau kirim email ke {{supportEmail}} jika masalah ini terus terjadi.",
-        "stalledTitle": "Penyiapan macet",
-        "startingSandbox": "Memulai lingkungan terisolasi",
-        "stoppedBody": "Instans {{name}} berhenti secara tidak terduga selama penyiapan.",
-        "stoppedTitle": "Penyiapan terhenti",
-        "timeoutBody": "Penyiapan untuk {{name}} memakan waktu lebih lama dari biasanya (lebih dari {{displayMinutes}} menit).",
-        "timeoutTitle": "Lebih lama dari perkiraan"
-      },
-      "unavailableDescription": "Kamu memerlukan langganan KiloClaw aktif untuk membuat instans. Instans dan langganan yang sudah ada tetap berjalan seperti biasa.",
-      "unavailableTitle": "Instans KiloClaw baru tidak tersedia"
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kode {{code}}",
-      "gatewayProcess": "PROSES GERBANG",
-      "lastExit": "Terakhir berhenti",
-      "memory": "Memori",
-      "region": "Wilayah",
-      "resources": "SUMBER DAYA",
-      "restarts": "Jumlah mulai ulang",
-      "state": "Status",
-      "uptime": "Waktu aktif",
-      "crashed": "GAGAL",
-      "destroying": "SEDANG DIHAPUS",
-      "provisioned": "SUDAH DISIAPKAN",
-      "restarting": "MEMULAI ULANG",
-      "running": "BERJALAN",
-      "shuttingDown": "SEDANG DIMATIKAN",
-      "starting": "MEMULAI",
-      "stopped": "BERHENTI",
-      "stopping": "SEDANG DIHENTIKAN",
-      "unknown": "TIDAK DIKETAHUI",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Setujui permintaan perangkat",
-      "execPolicyDescription": "Pengaturan keamanan",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Pemilihan model AI",
-      "secretsDescription": "Kredensial terenkripsi",
-      "versionPinDescription": "Kunci ke versi tertentu"
-    },
-    "avatar": {
-      "arcade": "Arkade",
-      "brain": "Otak",
-      "creature": "Makhluk",
-      "crystal": "Kristal",
-      "custom": "Avatar kustom",
-      "dragon": "Naga",
-      "explorer": "Penjelajah",
-      "flame": "Api",
-      "lightning": "Petir",
-      "magicWand": "Tongkat ajaib",
-      "moon": "Bulan",
-      "operator": "Pengendali",
-      "orbit": "Lintasan orbit",
-      "oracle": "Peramal",
-      "rainbow": "Pelangi",
-      "robot": "Sosok robot",
-      "satellite": "Satelit",
-      "sparkles": "Kilauan",
-      "strongArm": "Lengan kuat",
-      "talisman": "Jimat"
-    },
-    "remoteSpawnFilesNotSupported": "Instans ini tidak dapat menerima file.",
-    "instanceSwitcherTitle": "Instans KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2030,10 +1561,6 @@
       "moveLeft": "Pindahkan {{filename}} ke kiri",
       "moveRight": "Pindahkan {{filename}} ke kanan"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Tempel gambar dari papan klip",
-      "label": "Gambar terdeteksi, ketuk untuk menempelkan"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Galeri foto",
@@ -2229,7 +1756,8 @@
     "signOutThisDeviceTitle": "Keluar dari perangkat ini?",
     "signOutThisSessionTitle": "Keluar dari sesi ini?",
     "signOutThisSessionMessage": "Sesi masuk di {{device}} akan diakhiri. Perangkat tersebut masih dapat mengakses API hingga satu jam.",
-    "webBrowser": "Peramban web"
+    "webBrowser": "Peramban web",
+    "unknownDevice": "Perangkat tidak dikenal"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Tidak dapat membuka toko aplikasi.",

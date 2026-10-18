@@ -101,12 +101,9 @@
     "scheduled": "Planlagt",
     "keepEditing": "Fortsett å redigere",
     "keepRunning": "La kjøringen fortsette",
-    "kiloclaw": "KiloClaw",
     "newSession": "Ny økt",
-    "noKiloclawInstances": "Ingen KiloClaw-instanser",
     "noModelsAvailable": "Ingen modeller tilgjengelige",
     "notFound": "Fant ikke elementet.",
-    "online": "På nett",
     "open": "Åpne {{name}}",
     "openPullRequest": "Åpne PR",
     "pending": "Venter",
@@ -257,7 +254,8 @@
     "renamePasskey": "Gi passnøkkelen nytt navn",
     "removePasskey": "Fjern passnøkkel",
     "removePasskeyTitle": "Fjerne passnøkkel?",
-    "removePasskeyMessage": "Du kan ikke lenger logge inn med denne passnøkkelen."
+    "removePasskeyMessage": "Du kan ikke lenger logge inn med denne passnøkkelen.",
+    "changelog": "Nyheter"
   },
   "preferences": {
     "general": "Generelt",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Varslene viser bare at noe har skjedd. Åpne Kilo for å lese meldingen.",
     "channel": {
       "agentProgress": "Agentfremdrift",
-      "chat": "Samtalemeldinger",
-      "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarsler",
       "security": "Sikkerhetsfunn",
       "spend": "Forbruksvarsler",
       "followedSessions": "Fulgte økter"
     },
     "category": {
-      "chatMessagesSubtitle": "svar i samtalene dine",
       "agentAttentionTitle": "Agenten trenger deg",
       "agentAttentionSubtitle": "spørsmål og behov for tillatelse eller svar",
       "agentUpdatesTitle": "Agentoppdateringer",
       "agentUpdatesSubtitle": "meldinger fra agenten underveis i oppgaven",
       "sessionStatusTitle": "Øktstatus",
       "sessionStatusSubtitle": "fullført / mislykket / klar for fjernstyring",
-      "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
-      "kiloclawActivityUnavailable": "Start en KiloClaw-forekomst for å få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "advarsler om lav organisasjonssaldo",
       "balanceAlertsUnavailable": "Bli med i en organisasjon for å få saldovarsler.",
       "securityFindingsSubtitle": "nye funn og SLA-påminnelser",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Hjem",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, fane, {{position}} av {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Bytt instans",
-      "couldNotLoadInstances": "Kunne ikke laste inn instansene.",
-      "noInstancesDescription": "Sett opp en instans for å begynne å chatte.",
-      "setUpKiloclaw": "Sett opp KiloClaw",
-      "currentInstance": "{{title}}, valgt instans"
-    },
     "conversation": {
-      "failedToLoad": "Kunne ikke laste inn samtalen.",
-      "notFound": "Samtalen ble ikke funnet.",
       "untitled": "Uten tittel",
-      "leaveTitle": "Forlate samtalen?",
-      "leaveMessage": "Dette fjerner den fra listen din.",
-      "openHint": "Åpner samtalen. Trykk og hold for å endre navnet eller forlate samtalen.",
-      "unread": "Ulest",
-      "optionsFor": "Samtalealternativer for {{title}}",
-      "options": "Samtalealternativer",
-      "renameTitle": "Gi samtalen nytt navn",
-      "renamePlaceholder": "Nytt navn",
-      "couldNotReachBot": "Kunne ikke få kontakt med boten. Prøv igjen.",
-      "messageDeliveryFailed": "Meldingen kunne ikke leveres til boten.",
-      "couldNotSignIn": "Kunne ikke logge inn i chatten.",
-      "couldNotRefreshMessages": "Kunne ikke oppdatere meldingene.",
-      "couldNotLoadHistory": "Kunne ikke laste inn samtalehistorikken.",
-      "leave": "Forlat",
-      "untitledConversation": "Samtale uten tittel",
-      "createFailed": "Kunne ikke opprette samtalen.",
-      "leaveFailed": "Kunne ikke forlate samtalen."
-    },
-    "reactions": {
-      "common": "Vanlige reaksjoner",
-      "reactWith": "Reager med {{reaction}}",
-      "accessibility": "{{emoji}}-reaksjon, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Svarer på",
-      "cancelReply": "Avbryt svar",
-      "openInstance": "Åpne instans",
-      "attachFile": "Legg ved fil",
-      "cancelEdit": "Avbryt redigering"
+      "renamePlaceholder": "Nytt navn"
     },
     "conversationList": {
-      "couldNotLoad": "Kunne ikke laste inn samtalene.",
-      "emptyTitle": "Ingen samtaler ennå",
-      "emptyDescription": "Opprett en samtale for å chatte med KiloClaw-instansen din.",
-      "create": "Opprett samtale",
-      "newConversation": "Ny samtale",
-      "openInstanceSettings": "Åpne innstillingene for instansen",
       "today": "I dag",
       "yesterday": "I går",
-      "thisWeek": "Denne uken",
       "older": "Eldre"
     },
     "attachment": {
-      "open": "Åpne {{filename}}",
-      "openFailed": "Kunne ikke åpne vedlegget. Sjekk tilkoblingen og prøv igjen.",
-      "attachFailed": "Kunne ikke legge ved filen.",
-      "limit": "Du kan legge ved opptil {{displayCount}} filer.",
-      "sizeRejection": "{{filename}} er større enn grensen på {{limit}} for vedlegg.",
-      "unreadable": "Kunne ikke lese {{filename}}.",
-      "pastedImage": "bildet som ble limt inn",
-      "defaultName": "Vedlegg",
       "classificationDenied": "Kjørbare filer kan ikke legges ved.",
       "classificationEmpty": "Filen er tom.",
       "classificationTooLarge": "Filer må være på 20 MB eller mindre.",
@@ -943,426 +883,17 @@
       "networkError": "Det oppstod en nettverksfeil.",
       "uploadFailed": "Opplastingen mislyktes.",
       "nothingToPaste": "Det er ingenting å lime inn.",
-      "metadataStripFailed": "Kunne ikke fjerne metadataene fra bildet.",
-      "limit_one": "Du kan legge ved opptil {{displayCount}} fil.",
-      "limit_other": "Du kan legge ved opptil {{displayCount}} filer."
+      "metadataStripFailed": "Kunne ikke fjerne metadataene fra bildet."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Prøv å laste opp {{filename}} igjen",
-      "remove": "Fjern {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[slettet melding]",
-      "yourMessage": "Meldingen din",
-      "messageFrom": "Melding fra {{author}}",
-      "moreActions": "Flere handlinger",
-      "notDelivered": "Ikke levert",
-      "edited": "(redigert)",
-      "image": "Bilde"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Kopiert",
-      "copyFailed": "Kopieringen mislyktes.",
-      "title": "Handlinger for meldingen",
-      "deleteTitle": "Slette meldingen?",
-      "deleteMessage": "Dette fjerner meldingen fra samtalen.",
-      "deleteFailed": "Kunne ikke slette meldingen.",
-      "removeReactionFailed": "Kunne ikke fjerne reaksjonen.",
-      "addReactionFailed": "Kunne ikke legge til reaksjonen.",
-      "retrySend": "Prøv å sende på nytt",
-      "moreReactions": "Flere reaksjoner",
-      "edit": "Rediger",
-      "sendFailed": "Kunne ikke sende meldingen.",
-      "retrySendFailed": "Kunne ikke sende meldingen på nytt.",
-      "editFailed": "Kunne ikke redigere meldingen.",
-      "executeFailed": "Kunne ikke utføre handlingen."
+      "edit": "Rediger"
     },
     "attachmentPicker": {
-      "takePhoto": "Ta bilde",
-      "photoLibrary": "Fotobibliotek",
-      "files": "Filer",
       "cameraAccessMessage": "Gi appen tilgang til kameraet i Innstillinger for å ta et bilde."
-    },
-    "typingIndicator": {
-      "someone": "Noen",
-      "typing_one": "{{name}} skriver...",
-      "typing": "{{names}} skriver...",
-      "typing_other": "{{names}} skriver..."
-    },
-    "botStatus": {
-      "offline": "Frakoblet",
-      "loadingUser": "Laster inn bruker…",
-      "waitingForStatus": "Venter på botstatus...",
-      "offlineMessage": "Boten er frakoblet. Meldingsutvekslingen fortsetter når den kobler seg til igjen."
-    },
-    "errors": {
-      "notAllowed": "Handlingen er ikke tillatt.",
-      "messageTooLong": "Meldingen er for lang. Bruk færre enn {{limit}} tegn.",
-      "titleTooLong": "Tittelen er for lang. Bruk færre enn {{limit}} tegn.",
-      "messageEmpty": "Meldingen kan ikke være tom."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Kunne ikke laste inn KiloClaw-instansene.",
-    "billing": {
-      "title": "Fakturering",
-      "continueMonthToMonth": "Fortsett med månedsabonnement",
-      "plan": "Planvalg",
-      "finalTermEnds": "Siste periode slutter",
-      "afterFinalTerm": "Etter siste periode",
-      "lessThanOneDay": "Mindre enn 1 dag",
-      "ends": "Slutter",
-      "expires": "Utløper",
-      "noActivePlan": "Ingen aktive abonnementer",
-      "noActivePlanDescription": "Du har ikke et aktivt KiloClaw-abonnement.",
-      "managedByAdmin": "Administratoren i organisasjonen din håndterer faktureringen.",
-      "couldNotLoad": "Kunne ikke laste inn faktureringsinformasjonen.",
-      "manageOnWeb": "Administrer fakturering på nettet",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Den siste bindingsperioden for Commit-abonnementet ditt utløper {{date}}. Fortsett med Standard til {{price}}, ellers avsluttes driften.",
-      "freeTrial": "Gratis prøveperiode",
-      "hostingEnds": "Driften avsluttes",
-      "renews": "Fornyes",
-      "standardMonthToMonth": "Standard med månedsabonnement",
-      "standardStartsOn": "Standard starter {{date}} til {{price}}.",
-      "yourStandardMonthlyPrice": "månedsprisen din for Standard",
-      "perMonth": "/måned",
-      "earlybirdAccessUntil": "Du har Earlybird-tilgang til {{date}}.",
-      "earlybirdEnding": "Earlybird-tilgangen utløper om {{remaining}}.",
-      "paymentPastDue": "Betalingen er forfalt. Oppdater betalingsmåten din.",
-      "subscriptionCancels": "Abonnementet avsluttes {{date}}.",
-      "trialDaysRemaining": "Det gjenstår {{remaining}} av prøveperioden.",
-      "trialEndingSoon": "Prøveperioden utløper snart. Det gjenstår {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Innsjekking"
-    },
-    "changelog": {
-      "title": "Nyheter",
-      "couldNotLoad": "Kunne ikke laste inn endringsloggen.",
-      "noUpdates": "Ingen oppdateringer ennå",
-      "noUpdatesDescription": "Oppføringer i endringsloggen vises her.",
-      "recentUpdates": "Nylige oppdateringer",
-      "manageVersion": "Administrer versjon",
-      "redeployRequired": "Ny distribusjon kreves",
-      "redeploySuggested": "Ny distribusjon anbefales",
-      "upgradeRequired": "Oppgradering kreves"
-    },
-    "dashboard": {
-      "title": "Oversikt",
-      "couldNotLoad": "Kunne ikke laste inn oversikten.",
-      "renameInstance": "Gi instansen nytt navn",
-      "renamePlaceholder": "Nytt navn (maks. 50 tegn)",
-      "someDetailsFailed": "Kunne ikke laste inn alle sanntidsopplysningene.",
-      "destroy": "Slett",
-      "destroyMessage": "Dette sletter KiloClaw-instansen din og alle tilhørende data permanent. Handlingen kan ikke angres.",
-      "destroyTitle": "Slett instans",
-      "instance": "Instans",
-      "couldNotCheckStatus": "Kunne ikke sjekke tjenestestatusen.",
-      "dangerZone": "FARESONE",
-      "destroying": "Sletter…",
-      "serviceDegraded": "Tjenesten har driftsproblemer – trykk for å se status",
-      "up": "I DRIFT"
-    },
-    "channels": {
-      "title": "Kanaler",
-      "couldNotLoad": "Kunne ikke laste inn kanalene.",
-      "noChannels": "Ingen kanaler tilgjengelige",
-      "noChannelsDescription": "Kanalintegrasjoner vises her.",
-      "connected": "{{label}} tilkoblet",
-      "disconnectMessage": "Fjerne {{label}}? Denne kanalen blir frakoblet.",
-      "disconnectTitle": "Koble fra kanal"
-    },
-    "devicePairing": {
-      "title": "Sammenkobling av enheter",
-      "refreshRequests": "Oppdater forespørslene om sammenkobling",
-      "couldNotLoad": "Kunne ikke laste inn forespørslene om sammenkobling.",
-      "noPending": "Ingen ventende forespørsler",
-      "noPendingDescription": "Forespørsler om sammenkobling av kanaler og enheter vises her.",
-      "channelRequests": "Kanalforespørsler",
-      "deviceRequests": "Enhetsforespørsler",
-      "approveDeviceMessage": "Vil du tillate at {{platform}} kobler til instansen din?",
-      "approveDeviceTitle": "Godkjenn enhet",
-      "approveMessage": "Vil du tillate at {{label}} (kode: {{code}}) kobler til instansen din?",
-      "approveTitle": "Godkjenn forespørsel om sammenkobling",
-      "unknownDevice": "Ukjent enhet"
-    },
-    "execPolicy": {
-      "title": "Kjøringsregler",
-      "couldNotLoad": "Kunne ikke laste inn reglene for kommandokjøring.",
-      "alwaysAsk": "Spør alltid",
-      "alwaysAskDescription": "Bekreft hver kommando før den kjøres. Dette er det sikreste valget.",
-      "neverAsk": "Spør aldri",
-      "neverAskDescription": "Kjør kommandoer uten bekreftelse. Dette er raskere, men mindre sikkert."
-    },
-    "google": {
-      "title": "Google-konto",
-      "couldNotLoad": "Kunne ikke laste inn statusen for Google-kontoen.",
-      "disconnected": "Google-kontoen er koblet fra. Distribuer instansen på nytt for at endringen skal tre i kraft.",
-      "setupCommand": "Oppsettskommando",
-      "setupCommandHelp": "Kjør denne kommandoen i en terminal på datamaskinen din for å koble til Google-kontoen din. Docker må være installert.",
-      "failedToLoadCommand": "Kunne ikke laste inn oppsettskommandoen.",
-      "gmailNotifications": "Gmail-varsler",
-      "disconnect": "Koble fra Google-konto",
-      "copied": "Kopiert",
-      "copyCommand": "Kopier kommando",
-      "disconnectConfirm": "Koble fra",
-      "disconnectMessage": "Vil du fjerne Google-kontoen din fra denne instansen? Dette deaktiverer Gmail-varsler. Distribuer instansen på nytt etterpå for at endringene skal tre i kraft.",
-      "disconnectTitle": "Koble fra Google"
-    },
-    "modelList": {
-      "noMatches": "Ingen modeller passer til søket ditt",
-      "noModelsDescription": "Modeller vises her når de blir tilgjengelige.",
-      "noResultsFor": "Ingen treff for «{{query}}»."
-    },
-    "secrets": {
-      "title": "Hemmeligheter",
-      "couldNotLoad": "Kunne ikke laste inn hemmelighetene.",
-      "noSecrets": "Ingen hemmeligheter tilgjengelige",
-      "noSecretsDescription": "Integrasjoner som bruker hemmeligheter, vises her.",
-      "removeMessage": "Vil du fjerne {{label}}? Verktøyet mister tilgangen til påloggingsopplysningene sine.",
-      "removeTitle": "Fjern hemmelighet",
-      "saved": "{{label}} lagret",
-      "hide": "Skjul {{label}}",
-      "show": "Vis {{label}}",
-      "allFieldsRequired": "Alle feltene må fylles ut for å koble til {{label}}.",
-      "setupGuideFallback": "oppsettsveiledning",
-      "setupGuideA11y": "oppsettsveiledning for {{label}}",
-      "setupGuide": "Oppsettsveiledning",
-      "saving": "Lagrer…",
-      "removing": "Fjerner…",
-      "updateToken": "Oppdater tilgangstoken"
-    },
-    "versionPin": {
-      "title": "Versjonslåsing",
-      "couldNotLoad": "Kunne ikke laste inn versjonsinformasjonen.",
-      "couldNotLoadMore": "Kunne ikke laste inn flere versjoner.",
-      "loadMore": "Last inn flere versjoner",
-      "showingLatest": "Viser de 100 nyeste versjonene.",
-      "availableVersions": "Tilgjengelige versjoner",
-      "noVersions": "Ingen versjoner tilgjengelige",
-      "noVersionsDescription": "Tilgjengelige OpenClaw-versjoner vises her.",
-      "unpin": "Fjern låsing",
-      "unpinMessage": "Vil du bytte tilbake til den nyeste tilgjengelige versjonen?",
-      "unpinTitle": "Fjern versjonslåsing",
-      "confirmPin": "Bekreft versjonslåsing",
-      "followingLatest": "Følger nyeste",
-      "latest": "nyeste",
-      "pin": "Lås versjon",
-      "pinnedByAdmin": "Administratoren har låst versjonen. Kontakt administratoren din for å endre den.",
-      "pinnedTo": "Låst til {{version}}",
-      "reasonOptional": "Begrunnelse (valgfritt)",
-      "reasonPlaceholder": "Hvorfor låser du til denne versjonen?",
-      "replaceAdminPin": "Overstyr administratorens versjonsvalg",
-      "replacesAdminPin": "Dette erstatter versjonen som administratoren har låst til (nå {{label}})."
-    },
-    "redeploy": "Distribuer på nytt",
-    "redeployMessage": "Er du sikker på at du vil distribuere denne instansen på nytt?",
-    "redeployTitle": "Distribuer instansen på nytt",
-    "controls": {
-      "redeploying": "Distribuerer på nytt…",
-      "restart": "Start på nytt",
-      "restartOpenClawMessage": "Er du sikker på at du vil starte OpenClaw-prosessen på nytt?",
-      "restartOpenClawTitle": "Start OpenClaw på nytt",
-      "restarting": "Starter på nytt…",
-      "start": "Start opp",
-      "startMessage": "Er du sikker på at du vil starte denne instansen?",
-      "startTitle": "Start instans",
-      "stop": "Stopp",
-      "stopMessage": "Er du sikker på at du vil stoppe denne instansen?",
-      "stopTitle": "Stopp instans",
-      "stopping": "Stopper…"
-    },
-    "empty": {
-      "finishingSetup": "Fullfører oppsettet",
-      "finishingSetupDescription": "Vent litt mens vi gjør kontoen din klar. Dette tar vanligvis bare et øyeblikk.",
-      "getStarted": "Kom i gang",
-      "noInstancesDescription": "Opprett din første instans for å begynne å kjøre kodeagenter."
-    },
-    "instance": {
-      "backToInstances": "Tilbake til instanser",
-      "couldNotLoad": "Kunne ikke laste inn instansen.",
-      "notFound": "Fant ikke instansen",
-      "notFoundDescription": "Denne instansen kan ha blitt slettet, eller lenken er ikke lenger gyldig."
-    },
-    "list": {
-      "createInstance": "Opprett instans",
-      "organizations": "Organisasjoner",
-      "accessIssue": {
-        "trialExpired": "Prøveperioden er over – abonner for å fortsette å bruke denne instansen",
-        "subscriptionCanceled": "Abonnementet er inaktivt – abonner på nytt for å fortsette å bruke denne instansen",
-        "subscriptionPastDue": "Betalingsproblem – oppdater betalingsopplysningene for å fortsette å bruke denne instansen",
-        "quarantined": "Instansen er i karantene og må gjennomgås manuelt",
-        "multipleCurrentConflict": "Kontoen må gjennomgås",
-        "nonCanonicalEarlybird": "Eldre abonnement må gjennomgås"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Chatt med {{name}}",
-        "ready": "{{name}} er klar",
-        "warmedUp": "Alt er klart. Si hei når du er klar."
-      },
-      "flow": {
-        "genericErrorBody": "Vi kunne ikke fullføre oppsettet av instansen din akkurat nå.",
-        "manualReviewBody": "Vi må se nærmere på kontoen din før vi kan opprette en instans. Fortsett på kilo.ai.",
-        "manualReviewTitle": "Oppsettet må gjennomgås manuelt",
-        "openKiloAi": "Åpne kilo.ai",
-        "provisioning": "Klargjøring",
-        "review": "Gjennomgang",
-        "identityTitle": "Gi boten din en identitet",
-        "couldNotLoad": "Kunne ikke laste inn oppsettsstatusen.",
-        "finishingSetup": "Fullfører oppsettet. Vent litt mens vi gjør kontoen din klar.",
-        "ready": "Klar",
-        "settingUp": "Setter opp…"
-      },
-      "unavailableDescription": "Du må ha et aktivt KiloClaw-abonnement for å klargjøre en instans. Eksisterende instanser og abonnementer fortsetter som normalt.",
-      "unavailableTitle": "Nye KiloClaw-instanser er ikke tilgjengelige",
-      "identity": {
-        "chooseAvatar": "Velg avatar",
-        "namePlaceholder": "Navn på boten",
-        "selectAvatar": "Velg {{name}} som avatar",
-        "personality": "Personlighet",
-        "changePersonality": "Endre personlighet",
-        "location": "Sted",
-        "locationPlaceholder": "By eller region (valgfritt)",
-        "useCurrentLocation": "Bruk nåværende posisjon",
-        "locationDeniedTitle": "Tilgang til posisjon nektet",
-        "locationDeniedMessage": "Gi tilgang til posisjon i innstillingene for å bruke din nåværende posisjon.",
-        "locationValidationFailed": "Kunne ikke bekrefte stedet.",
-        "locationResolveFailed": "Kunne ikke finne stedet du er på. Du kan endre det manuelt.",
-        "locationGetFailed": "Kunne ikke hente posisjonen din. Skriv inn stedet manuelt.",
-        "nature": {
-          "aiAssistantLabel": "KI-assistent",
-          "aiAssistantVibe": "Hjelpsom, dyktig, profesjonell",
-          "digitalCreatureLabel": "Digitalt vesen",
-          "digitalCreatureVibe": "Sært, levende og litt uforutsigbart",
-          "virtualCompanionLabel": "Virtuell følgesvenn",
-          "virtualCompanionVibe": "Varm, til stede og oppriktig omsorgsfull",
-          "somethingWeirderLabel": "Noe rarere…",
-          "somethingWeirderVibe": "Definer det selv"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Ferdig! Jeg har laget sammendraget du ba om. Det er klart når du er klar.",
-        "settingUp": "Setter opp varsler…",
-        "stayInTheLoop": "Hold deg oppdatert",
-        "getNotified": "Få varsel når {{name}} fullfører en oppgave, så du aldri går glipp av et svar.",
-        "now": "nå",
-        "skipForNow": "Hopp over foreløpig",
-        "couldNotEnable": "Kunne ikke aktivere varsler."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Kunne ikke sjekke fremdriften i oppsettet",
-        "queryErrorBody": "Vi mistet tilkoblingen mens vi sjekket oppsettet av {{name}}. Oppsettet kan fortsatt pågå. Prøv igjen, eller kom tilbake om litt.",
-        "stoppedTitle": "Oppsettet stoppet",
-        "stoppedBody": "Instansen til {{name}} stoppet uventet under oppsettet.",
-        "stalledTitle": "Noe stoppet opp",
-        "stalledBody": "Vi kunne ikke fullføre oppsettet av {{name}}. Prøv igjen, eller send en e-post til {{supportEmail}} hvis det skjer igjen.",
-        "timeoutTitle": "Tar lengre tid enn forventet",
-        "timeoutBody": "Oppsettet av {{name}} tar lengre tid enn vanlig (over {{displayMinutes}} minutter).",
-        "continueInBackground": "Fortsett i bakgrunnen",
-        "settingUp": "Setter opp {{name}}",
-        "connectingToAgent": "Kobler til agenten",
-        "startingSandbox": "Starter sandkassen",
-        "backgroundHint": "Dette tar vanligvis under et minutt. Du kan lukke denne siden. Vi fortsetter i bakgrunnen."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Avslutningskode {{code}}",
-      "gatewayProcess": "PORTNERPROSESS",
-      "lastExit": "Siste avslutning",
-      "memory": "Minne",
-      "region": "Driftsregion",
-      "resources": "RESSURSER",
-      "restarts": "Omstarter",
-      "state": "Status",
-      "uptime": "Oppetid",
-      "crashed": "KRASJET",
-      "destroying": "SLETTER",
-      "provisioned": "KLARGJORT",
-      "restarting": "STARTER PÅ NYTT",
-      "running": "KJØRER",
-      "shuttingDown": "AVSLUTTER",
-      "starting": "STARTER",
-      "stopped": "STOPPET",
-      "stopping": "STOPPER",
-      "unknown": "UKJENT",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Toppytelse",
-      "frontierDescription": "Høyest ytelse. Bruker de mest avanserte modellene med resonnering.",
-      "balancedDescription": "God balanse mellom hastighet og ytelse til en lavere pris.",
-      "autoModelA11y": "automatisk modellvalg: {{label}}",
-      "currentModel": "Valgt modell",
-      "browseAllModels": "eller velg blant 500+ modeller",
-      "browseAllModelsA11y": "Bla gjennom alle de over 500 modellene"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Gå til kilo.ai/claw i nettleseren for å fortsette å bruke KiloClaw. Du kan ikke tegne abonnement i appen.",
-      "subscriptionCanceledTitle": "Abonner på nettet",
-      "subscriptionCanceledBody": "Gå til kilo.ai/claw i nettleseren for å bruke KiloClaw. Du kan ikke tegne abonnement i appen.",
-      "subscriptionCanceledCta": "Åpne kilo.ai/claw",
-      "subscriptionPastDueTitle": "Oppdater betalingsopplysningene på nettet",
-      "subscriptionPastDueBody": "Vi hadde problemer med den siste betalingen din. Gå til kilo.ai/claw i nettleseren for å oppdatere betalingsopplysningene. Du kan ikke administrere fakturering i appen.",
-      "quarantinedTitle": "Instansen må utbedres",
-      "quarantinedBody": "KiloClaw-instansen din er i karantene og kan ikke brukes nå. Teamet vårt må hjelpe til med å gjenopprette den.",
-      "multipleCurrentConflictBody": "Vi fant flere aktive abonnementer på kontoen din. Vi har derfor satt tjenesten på pause for å unngå å fakturere deg dobbelt.",
-      "multipleCurrentConflictCta": "Fortsett på kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Eldre abonnement funnet",
-      "nonCanonicalEarlybirdBody": "Abonnementet ditt for tidlig tilgang må gjennomgås manuelt før det kan brukes på mobilen.",
-      "iosTitle": "KiloClaw ikke tilgjengelig på iOS",
-      "iosBody": "KiloClaw-tilgang administreres utenfor iOS-appen for denne kontoen.",
-      "iosContact": "Spørsmål? Kontakt {{supportEmail}}.",
-      "quarantinedCta": "Send en e-post til teamet vårt",
-      "nonCanonicalEarlybirdCta": "Gå gjennom planen din på kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} må følges opp: {{label}}",
-      "openUnread_one": "Åpne {{name}}, {{displayCount}} ulest melding",
-      "openUnread": "Åpne {{name}}, {{displayCount}} uleste meldinger",
-      "openUnread_other": "Åpne {{name}}, {{displayCount}} uleste meldinger",
-      "openSettings": "Åpne innstillinger for {{name}}",
-      "fixOnKiloAi": "Løs problemet på kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Godkjenn enhetsforespørsler",
-      "execPolicyDescription": "Sikkerhetsinnstillinger",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Valg av KI-modell",
-      "secretsDescription": "Krypterte påloggingsopplysninger",
-      "versionPinDescription": "Lås til en bestemt versjon"
-    },
-    "avatar": {
-      "arcade": "Arkade",
-      "brain": "Hjerne",
-      "creature": "Vesen",
-      "crystal": "Krystall",
-      "custom": "Egendefinert avatar",
-      "dragon": "Drage",
-      "explorer": "Oppdager",
-      "flame": "Flamme",
-      "lightning": "Lyn",
-      "magicWand": "Tryllestav",
-      "moon": "Måne",
-      "operator": "Operatør",
-      "orbit": "Omløpsbane",
-      "oracle": "Orakel",
-      "rainbow": "Regnbue",
-      "robot": "Robotfigur",
-      "satellite": "Satellitt",
-      "sparkles": "Glitter",
-      "strongArm": "Sterk arm",
-      "talisman": "Amulett"
-    },
-    "remoteSpawnFilesNotSupported": "Denne instansen kan ikke motta filer.",
-    "instanceSwitcherTitle": "KiloClaw-instans"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Flytt {{filename}} til venstre",
       "moveRight": "Flytt {{filename}} til høyre"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Lim inn bilde fra utklippstavlen",
-      "label": "Bilde funnet – trykk for å lime inn"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Fotobibliotek",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Logge ut denne enheten?",
     "signOutThisSessionTitle": "Logge ut denne økten?",
     "signOutThisSessionMessage": "{{device}} vil bli logget ut. Den kan beholde API-tilgang i opptil en time.",
-    "webBrowser": "Nettleser"
+    "webBrowser": "Nettleser",
+    "unknownDevice": "Ukjent enhet"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Kunne ikke åpne appbutikken.",

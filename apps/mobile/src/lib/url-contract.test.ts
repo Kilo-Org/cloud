@@ -18,7 +18,6 @@ describe('assertUrlScheme', () => {
   const productionCases: { key: keyof typeof URL_SCHEMES; value: string }[] = [
     { key: 'apiBaseUrl', value: 'https://api.kilo.ai' },
     { key: 'webBaseUrl', value: 'https://app.kilo.ai' },
-    { key: 'kiloChatUrl', value: 'https://chat.kilo.ai' },
     { key: 'notificationsUrl', value: 'https://notifications.kilo.ai' },
     { key: 'cloudAgentWsUrl', value: 'wss://cloud-agent.kilo.ai' },
     { key: 'sessionIngestWsUrl', value: 'wss://session-ingest.kilo.ai' },

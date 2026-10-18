@@ -101,12 +101,9 @@
     "scheduled": "已计划",
     "keepEditing": "继续编辑",
     "keepRunning": "继续运行",
-    "kiloclaw": "KiloClaw",
     "newSession": "新建会话",
-    "noKiloclawInstances": "暂无 KiloClaw 实例",
     "noModelsAvailable": "暂无可用模型",
     "notFound": "未找到此内容。",
-    "online": "在线",
     "open": "打开 {{name}}",
     "openPullRequest": "开启拉取请求",
     "pending": "待处理",
@@ -257,7 +254,8 @@
     "renamePasskey": "重命名通行密钥",
     "removePasskey": "移除通行密钥",
     "removePasskeyTitle": "移除通行密钥？",
-    "removePasskeyMessage": "您将无法再使用此通行密钥登录。"
+    "removePasskeyMessage": "您将无法再使用此通行密钥登录。",
+    "changelog": "更新内容"
   },
   "preferences": {
     "general": "通用",
@@ -320,23 +318,18 @@
     "previewGenericDescription": "通知仅提示有新动态。请打开 Kilo 查看详情。",
     "channel": {
       "agentProgress": "智能体进度",
-      "chat": "聊天消息",
-      "kiloclaw": "KiloClaw 活动",
       "balance": "余额提醒",
       "security": "安全问题",
       "spend": "支出提醒",
       "followedSessions": "已关注的会话"
     },
     "category": {
-      "chatMessagesSubtitle": "对话中的回复",
       "agentAttentionTitle": "智能体需要你处理",
       "agentAttentionSubtitle": "需要回答问题、授权或提供信息",
       "agentUpdatesTitle": "智能体动态",
       "agentUpdatesSubtitle": "智能体在执行任务期间发送的消息",
       "sessionStatusTitle": "会话状态",
       "sessionStatusSubtitle": "已完成 / 已失败 / 可接管",
-      "kiloclawActivitySubtitle": "实例就绪/失败、计划操作",
-      "kiloclawActivityUnavailable": "启动 KiloClaw 实例以接收 KiloClaw 活动。",
       "balanceAlertsSubtitle": "组织余额不足警告",
       "balanceAlertsUnavailable": "加入组织以接收余额提醒。",
       "securityFindingsSubtitle": "新发现的安全问题和 SLA 提醒",
@@ -356,72 +349,19 @@
   },
   "tabs": {
     "home": "首页",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}，标签页，第 {{position}} 个，共 {{total}} 个"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "切换实例",
-      "couldNotLoadInstances": "无法加载实例。",
-      "noInstancesDescription": "配置实例后即可开始聊天。",
-      "setUpKiloclaw": "配置 KiloClaw",
-      "currentInstance": "{{title}}，当前实例"
-    },
     "conversation": {
-      "failedToLoad": "加载对话失败。",
-      "notFound": "未找到对话。",
       "untitled": "无标题",
-      "leaveTitle": "退出对话？",
-      "leaveMessage": "退出后，此对话将从你的列表中移除。",
-      "openHint": "打开对话。长按可选择重命名或退出对话。",
-      "unread": "未读",
-      "optionsFor": "{{title}} 的对话选项",
-      "options": "对话选项",
-      "renameTitle": "重命名对话",
-      "renamePlaceholder": "新名称",
-      "couldNotReachBot": "无法连接到机器人。请重试。",
-      "messageDeliveryFailed": "无法将消息发送给机器人。",
-      "couldNotSignIn": "无法登录聊天服务。",
-      "couldNotRefreshMessages": "无法刷新消息。",
-      "couldNotLoadHistory": "无法加载历史对话记录。",
-      "leave": "退出",
-      "untitledConversation": "无标题对话",
-      "createFailed": "创建对话失败。",
-      "leaveFailed": "退出对话失败。"
-    },
-    "reactions": {
-      "common": "常用",
-      "reactWith": "使用 {{reaction}} 回应",
-      "accessibility": "{{emoji}} 回应，{{displayCount}} 次"
-    },
-    "composer": {
-      "replyingTo": "正在回复",
-      "cancelReply": "取消回复",
-      "openInstance": "打开实例",
-      "attachFile": "附加文件",
-      "cancelEdit": "取消编辑"
+      "renamePlaceholder": "新名称"
     },
     "conversationList": {
-      "couldNotLoad": "无法加载对话列表。",
-      "emptyTitle": "暂无对话",
-      "emptyDescription": "创建对话，即可与你的 KiloClaw 实例聊天。",
-      "create": "创建对话",
-      "newConversation": "新对话",
-      "openInstanceSettings": "打开实例设置",
       "today": "今天",
       "yesterday": "昨天",
-      "thisWeek": "本周",
       "older": "更早"
     },
     "attachment": {
-      "open": "打开 {{filename}}",
-      "openFailed": "无法打开附件。请检查网络连接后重试。",
-      "attachFailed": "附加文件失败。",
-      "limit": "最多可附加 {{displayCount}} 个文件。",
-      "sizeRejection": "{{filename}} 超出了 {{limit}} 的附件大小限制。",
-      "unreadable": "无法读取 {{filename}}。",
-      "pastedImage": "粘贴的图片",
-      "defaultName": "附件",
       "classificationDenied": "不能附加可执行文件。",
       "classificationEmpty": "文件为空。",
       "classificationTooLarge": "文件大小不能超过 20 MB。",
@@ -431,426 +371,17 @@
       "networkError": "网络出错。",
       "uploadFailed": "上传失败。",
       "nothingToPaste": "没有可粘贴的内容。",
-      "metadataStripFailed": "无法移除照片元数据。",
-      "limit_one": "最多可附加 {{displayCount}} 个文件。",
-      "limit_other": "最多可附加 {{displayCount}} 个文件。"
+      "metadataStripFailed": "无法移除照片元数据。"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}，{{status}}",
-      "retryUploading": "重试上传 {{filename}}",
-      "remove": "移除 {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[已删除的消息]",
-      "yourMessage": "你的消息",
-      "messageFrom": "来自 {{author}} 的消息",
-      "moreActions": "更多操作",
-      "notDelivered": "未送达",
-      "edited": "（已编辑）",
-      "image": "图片"
+      "accessibility": "{{filename}}，{{status}}"
     },
     "messageActions": {
-      "copied": "已复制",
-      "copyFailed": "复制失败。",
-      "title": "消息操作",
-      "deleteTitle": "删除消息？",
-      "deleteMessage": "这将从对话中移除该消息。",
-      "deleteFailed": "删除消息失败。",
-      "removeReactionFailed": "移除回应失败。",
-      "addReactionFailed": "添加回应失败。",
-      "retrySend": "重新发送",
-      "moreReactions": "更多回应",
-      "edit": "编辑",
-      "sendFailed": "发送消息失败。",
-      "retrySendFailed": "重新发送失败。",
-      "editFailed": "编辑消息失败。",
-      "executeFailed": "执行操作失败。"
+      "edit": "编辑"
     },
     "attachmentPicker": {
-      "takePhoto": "拍照",
-      "photoLibrary": "相册",
-      "files": "文件",
       "cameraAccessMessage": "请在设置中开启相机权限，以便拍照。"
-    },
-    "typingIndicator": {
-      "someone": "某人",
-      "typing_one": "{{name}} 正在输入…",
-      "typing": "{{names}} 正在输入……",
-      "typing_other": "{{names}} 正在输入……"
-    },
-    "botStatus": {
-      "offline": "离线",
-      "loadingUser": "正在加载用户信息…",
-      "waitingForStatus": "正在等待机器人状态…",
-      "offlineMessage": "机器人已离线，重新连接后将恢复消息传输。"
-    },
-    "errors": {
-      "notAllowed": "不允许执行此操作。",
-      "messageTooLong": "消息过长，请控制在 {{limit}} 个字符以内。",
-      "titleTooLong": "标题过长，请控制在 {{limit}} 个字符以内。",
-      "messageEmpty": "消息不能为空。"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "无法加载 KiloClaw 实例。",
-    "billing": {
-      "title": "账单",
-      "continueMonthToMonth": "继续按月订阅",
-      "plan": "计划",
-      "finalTermEnds": "最后一期到期日",
-      "afterFinalTerm": "最后一期到期后",
-      "lessThanOneDay": "不到 1 天",
-      "ends": "结束日期",
-      "expires": "到期日期",
-      "noActivePlan": "暂无有效套餐",
-      "noActivePlanDescription": "你目前没有有效的 KiloClaw 订阅。",
-      "managedByAdmin": "账单由你所在组织的管理员管理。",
-      "couldNotLoad": "无法加载账单信息。",
-      "manageOnWeb": "在网页端管理账单",
-      "earlybird": "早鸟套餐",
-      "finalCommitTermEndsOn": "你的 Commit 套餐最后一期将于 {{date}} 到期。可按 {{price}} 续订标准套餐，否则托管服务将终止。",
-      "freeTrial": "免费试用",
-      "hostingEnds": "托管服务终止",
-      "renews": "续订日期",
-      "standardMonthToMonth": "标准套餐（按月订阅）",
-      "standardStartsOn": "标准套餐将于 {{date}} 生效，费用为 {{price}}。",
-      "yourStandardMonthlyPrice": "你的标准套餐月费",
-      "perMonth": "/月",
-      "earlybirdAccessUntil": "早鸟套餐可用至 {{date}}。",
-      "earlybirdEnding": "早鸟套餐即将到期，剩余 {{remaining}}。",
-      "paymentPastDue": "付款已逾期。请更新付款方式。",
-      "subscriptionCancels": "订阅将于 {{date}} 取消。",
-      "trialDaysRemaining": "试用剩余 {{remaining}}。",
-      "trialEndingSoon": "试用即将结束，剩余 {{remaining}}。",
-      "planName": {
-        "standard": "标准套餐"
-      },
-      "commit": "提交"
-    },
-    "changelog": {
-      "title": "更新内容",
-      "couldNotLoad": "无法加载更新日志。",
-      "noUpdates": "暂无更新",
-      "noUpdatesDescription": "更新内容将显示在这里。",
-      "recentUpdates": "近期更新",
-      "manageVersion": "管理版本",
-      "redeployRequired": "需重新部署",
-      "redeploySuggested": "建议重新部署",
-      "upgradeRequired": "需升级"
-    },
-    "dashboard": {
-      "title": "仪表盘",
-      "couldNotLoad": "无法加载仪表盘。",
-      "renameInstance": "重命名实例",
-      "renamePlaceholder": "新名称（最多 50 个字符）",
-      "someDetailsFailed": "部分实时信息加载失败。",
-      "destroy": "销毁",
-      "destroyMessage": "这将永久销毁你的 KiloClaw 实例及其所有数据。此操作无法撤销。",
-      "destroyTitle": "销毁实例",
-      "instance": "实例",
-      "couldNotCheckStatus": "无法检查服务状态。",
-      "dangerZone": "危险操作",
-      "destroying": "正在销毁…",
-      "serviceDegraded": "服务性能下降，点按查看状态",
-      "up": "运行中"
-    },
-    "channels": {
-      "title": "消息渠道",
-      "couldNotLoad": "无法加载渠道。",
-      "noChannels": "暂无可用渠道",
-      "noChannelsDescription": "可集成的渠道将显示在这里。",
-      "connected": "{{label}} 已连接",
-      "disconnectMessage": "移除 {{label}}？此渠道的连接将断开。",
-      "disconnectTitle": "断开渠道连接"
-    },
-    "devicePairing": {
-      "title": "设备配对",
-      "refreshRequests": "刷新配对请求",
-      "couldNotLoad": "无法加载配对请求。",
-      "noPending": "暂无待处理请求",
-      "noPendingDescription": "渠道和设备的配对请求将显示在这里。",
-      "channelRequests": "渠道配对请求",
-      "deviceRequests": "设备配对请求",
-      "approveDeviceMessage": "允许 {{platform}} 连接到你的实例？",
-      "approveDeviceTitle": "批准设备连接",
-      "approveMessage": "允许 {{label}}（配对码：{{code}}）连接到你的实例？",
-      "approveTitle": "批准配对请求",
-      "unknownDevice": "未知设备"
-    },
-    "execPolicy": {
-      "title": "执行策略",
-      "couldNotLoad": "无法加载执行策略。",
-      "alwaysAsk": "始终询问",
-      "alwaysAskDescription": "每条命令执行前都需确认，安全性最高。",
-      "neverAsk": "从不询问",
-      "neverAskDescription": "执行命令时无需确认，速度更快，但安全性较低。"
-    },
-    "google": {
-      "title": "Google 账号",
-      "couldNotLoad": "无法加载 Google 账号状态。",
-      "disconnected": "Google 账号已断开连接。请重新部署实例以应用更改。",
-      "setupCommand": "配置命令",
-      "setupCommandHelp": "请在自己的电脑上安装 Docker，然后在终端中运行此命令，连接 Google 账号。",
-      "failedToLoadCommand": "无法加载配置命令。",
-      "gmailNotifications": "Gmail 通知",
-      "disconnect": "断开 Google 账号连接",
-      "copied": "已复制",
-      "copyCommand": "复制命令",
-      "disconnectConfirm": "断开连接",
-      "disconnectMessage": "从此实例移除你的 Google 账号？这会关闭 Gmail 通知。断开连接后，请重新部署实例以使更改生效。",
-      "disconnectTitle": "断开 Google 连接"
-    },
-    "modelList": {
-      "noMatches": "没有匹配的模型",
-      "noModelsDescription": "模型可用后将显示在此处。",
-      "noResultsFor": "没有与“{{query}}”相关的结果。"
-    },
-    "secrets": {
-      "title": "机密信息",
-      "couldNotLoad": "无法加载密钥。",
-      "noSecrets": "暂无可用密钥",
-      "noSecretsDescription": "可通过密钥连接的集成将显示在这里。",
-      "removeMessage": "移除 {{label}}？此工具将无法再访问其凭据。",
-      "removeTitle": "移除密钥",
-      "saved": "{{label}} 已保存",
-      "allFieldsRequired": "请填写所有字段，才能连接 {{label}}。",
-      "hide": "隐藏 {{label}}",
-      "removing": "正在移除…",
-      "saving": "正在保存…",
-      "setupGuide": "设置指南",
-      "setupGuideA11y": "{{label}} 配置指南",
-      "setupGuideFallback": "设置指南",
-      "show": "显示 {{label}}",
-      "updateToken": "更新令牌"
-    },
-    "versionPin": {
-      "title": "版本锁定",
-      "couldNotLoad": "无法加载版本信息。",
-      "couldNotLoadMore": "无法加载更多版本。",
-      "loadMore": "加载更多版本",
-      "showingLatest": "当前显示最新的 100 个版本。",
-      "availableVersions": "可用版本",
-      "noVersions": "暂无可用版本",
-      "noVersionsDescription": "可用的 OpenClaw 版本将显示在这里。",
-      "unpin": "取消固定",
-      "unpinMessage": "切换回最新可用版本？",
-      "unpinTitle": "取消固定版本",
-      "confirmPin": "确认固定",
-      "followingLatest": "使用最新版本",
-      "latest": "最新",
-      "pin": "固定",
-      "pinnedByAdmin": "管理员已固定版本。如需更改，请联系管理员。",
-      "pinnedTo": "已固定到 {{version}}",
-      "reasonOptional": "原因（可选）",
-      "reasonPlaceholder": "固定此版本的原因",
-      "replaceAdminPin": "替换管理员固定的版本",
-      "replacesAdminPin": "这将替换管理员设置的固定版本（当前为 {{label}}）。"
-    },
-    "redeploy": "重新部署",
-    "redeployMessage": "确定要重新部署此实例吗？",
-    "redeployTitle": "重新部署实例",
-    "accessRequired": {
-      "iosBody": "此账号的 KiloClaw 使用权限需在 iOS 应用外管理。",
-      "iosContact": "如有疑问，请联系 {{supportEmail}}。",
-      "iosTitle": "IOS 暂不支持使用 KiloClaw",
-      "multipleCurrentConflictBody": "我们发现你的账号有多个有效订阅，已暂停服务，避免重复扣费。",
-      "multipleCurrentConflictCta": "前往 kilo.ai 继续",
-      "nonCanonicalEarlybirdBody": "你的抢先体验套餐需要通过人工审核后，才能在手机上使用。",
-      "nonCanonicalEarlybirdTitle": "检测到旧版套餐",
-      "quarantinedBody": "你的 KiloClaw 实例已被隔离，目前无法使用，需要我们的团队协助恢复。",
-      "quarantinedTitle": "实例需要修复",
-      "subscriptionCanceledBody": "要使用 KiloClaw，请在浏览器中打开 kilo.ai/claw。应用内不支持订阅。",
-      "subscriptionCanceledCta": "打开 kilo.ai/claw",
-      "subscriptionCanceledTitle": "前往网页版订阅",
-      "subscriptionPastDueBody": "你最近一次付款出现了问题。请在浏览器中打开 kilo.ai/claw 更新付款信息。应用内不支持管理账单。",
-      "subscriptionPastDueTitle": "在网页端更新付款方式",
-      "trialExpiredBody": "要继续使用 KiloClaw，请在浏览器中打开 kilo.ai/claw。应用内不支持订阅。",
-      "quarantinedCta": "给我们的团队发邮件",
-      "nonCanonicalEarlybirdCta": "前往 kilo.ai 查看您的套餐"
-    },
-    "controls": {
-      "redeploying": "正在重新部署…",
-      "restart": "重启",
-      "restartOpenClawMessage": "确定要重启 OpenClaw 进程吗？",
-      "restartOpenClawTitle": "重启 OpenClaw",
-      "restarting": "正在重启…",
-      "start": "启动",
-      "startMessage": "确定要启动此实例吗？",
-      "startTitle": "启动实例",
-      "stop": "停止",
-      "stopMessage": "确定要停止此实例吗？",
-      "stopTitle": "停止实例",
-      "stopping": "正在停止…"
-    },
-    "empty": {
-      "finishingSetup": "正在完成设置",
-      "finishingSetupDescription": "请稍候，账号设置即将完成，通常只需片刻。",
-      "getStarted": "开始使用",
-      "noInstancesDescription": "创建你的第一个实例，开始运行编程智能体。"
-    },
-    "instance": {
-      "backToInstances": "返回实例列表",
-      "couldNotLoad": "无法加载实例。",
-      "notFound": "未找到实例",
-      "notFoundDescription": "此实例可能已被销毁，或链接已失效。"
-    },
-    "instanceCard": {
-      "fixOnKiloAi": "前往 kilo.ai 处理：{{label}}",
-      "needsAttention": "{{name}} 需要处理：{{label}}",
-      "openSettings": "打开 {{name}} 的设置",
-      "openUnread": "打开 {{name}}，有 {{displayCount}} 条未读消息",
-      "openUnread_other": "打开 {{name}}，有 {{displayCount}} 条未读消息",
-      "openUnread_one": "打开 {{name}}，{{displayCount}} 条未读消息"
-    },
-    "list": {
-      "createInstance": "创建实例",
-      "organizations": "组织",
-      "accessIssue": {
-        "trialExpired": "试用已结束，订阅后可继续使用此实例",
-        "subscriptionCanceled": "订阅已失效，重新订阅后可继续使用此实例",
-        "subscriptionPastDue": "付款出现问题，更新账单信息后可继续使用此实例",
-        "quarantined": "实例已被隔离，需要人工审核",
-        "multipleCurrentConflict": "账号待审查",
-        "nonCanonicalEarlybird": "旧版套餐需要审核"
-      }
-    },
-    "modelPicker": {
-      "autoModelA11y": "自动选择模型：{{label}}",
-      "balancedDescription": "以更低成本兼顾速度与能力。",
-      "browseAllModels": "或从 500 多个模型中选择",
-      "browseAllModelsA11y": "浏览全部 500 多个模型",
-      "currentModel": "当前模型",
-      "frontierDescription": "性能最强，自动选择具备推理能力的前沿模型。",
-      "frontierLabel": "前沿",
-      "kiloAuto": "Kilo Auto"
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "与 {{name}} 聊天",
-        "ready": "{{name}} 已就绪",
-        "warmedUp": "一切就绪。准备好后随时打个招呼。"
-      },
-      "flow": {
-        "couldNotLoad": "无法加载初始设置状态。",
-        "finishingSetup": "账号设置即将完成，请稍候。",
-        "genericErrorBody": "刚才未能完成你的实例设置。",
-        "identityTitle": "设定机器人的身份",
-        "manualReviewBody": "创建实例前，需要先处理你的账号状态问题。请前往 kilo.ai 继续操作。",
-        "manualReviewTitle": "设置需要人工审核",
-        "openKiloAi": "打开 kilo.ai",
-        "provisioning": "正在配置",
-        "ready": "就绪",
-        "review": "审查",
-        "settingUp": "正在设置…"
-      },
-      "identity": {
-        "changePersonality": "更改个性",
-        "chooseAvatar": "选择头像",
-        "location": "位置",
-        "locationDeniedMessage": "请在设置中开启位置访问权限，以使用当前位置。",
-        "locationDeniedTitle": "未获位置访问权限",
-        "locationGetFailed": "无法获取你的位置。请手动输入。",
-        "locationPlaceholder": "城市或地区（可选）",
-        "locationResolveFailed": "无法识别你所在的位置。你可以手动修改。",
-        "locationValidationFailed": "无法验证位置。",
-        "namePlaceholder": "机器人名称",
-        "nature": {
-          "aiAssistantLabel": "AI 助手",
-          "aiAssistantVibe": "热心、能干、专业",
-          "digitalCreatureLabel": "数字生物",
-          "digitalCreatureVibe": "古灵精怪、充满活力、有点难以捉摸",
-          "somethingWeirderLabel": "更特别的角色…",
-          "somethingWeirderVibe": "由你定义",
-          "virtualCompanionLabel": "虚拟伙伴",
-          "virtualCompanionVibe": "温暖贴心、随时陪伴、真心关怀"
-        },
-        "personality": "个性",
-        "selectAvatar": "选择 {{name}} 作为头像",
-        "useCurrentLocation": "使用当前位置"
-      },
-      "notifications": {
-        "couldNotEnable": "无法启用通知。",
-        "getNotified": "开启通知，{{name}} 完成任务时就会提醒你，不错过任何回复。",
-        "mockMessage": "完成了！你要的摘要已经整理好，随时可以查看。",
-        "now": "刚刚",
-        "settingUp": "正在设置通知…",
-        "skipForNow": "暂时跳过",
-        "stayInTheLoop": "及时接收通知"
-      },
-      "provisioning": {
-        "backgroundHint": "通常不到一分钟即可完成。你可以关闭此页面，设置会在后台继续。",
-        "connectingToAgent": "正在连接智能体",
-        "continueInBackground": "在后台继续",
-        "queryErrorBody": "查看 {{name}} 的设置进度时连接中断。设置可能仍在进行，请重试或稍后查看。",
-        "queryErrorTitle": "无法查看设置进度",
-        "settingUp": "正在设置 {{name}}",
-        "stalledBody": "未能完成 {{name}} 的设置。请重试；如果问题持续出现，请发送邮件至 {{supportEmail}}。",
-        "stalledTitle": "设置未能完成",
-        "startingSandbox": "正在启动沙盒",
-        "stoppedBody": "{{name}} 的实例在设置过程中意外停止。",
-        "stoppedTitle": "设置已停止",
-        "timeoutBody": "{{name}} 的设置耗时比平时更长（已超过 {{displayMinutes}} 分钟）。",
-        "timeoutTitle": "耗时比预期更长"
-      },
-      "unavailableDescription": "配置实例需要有效的 KiloClaw 订阅。现有实例和订阅不受影响。",
-      "unavailableTitle": "无法创建新的 KiloClaw 实例"
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "退出码 {{code}}",
-      "gatewayProcess": "网关进程",
-      "lastExit": "上次退出",
-      "memory": "内存",
-      "region": "区域",
-      "resources": "资源",
-      "restarts": "重启次数",
-      "state": "状态",
-      "uptime": "运行时长",
-      "crashed": "已崩溃",
-      "destroying": "正在销毁",
-      "provisioned": "已配置",
-      "restarting": "正在重启",
-      "running": "运行中",
-      "shuttingDown": "正在关闭",
-      "starting": "启动中",
-      "stopped": "已停止",
-      "stopping": "正在停止",
-      "unknown": "未知",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "settings": {
-      "channelsDescription": "Telegram、Discord、Slack",
-      "devicePairingDescription": "批准设备配对请求",
-      "execPolicyDescription": "安全设置",
-      "googleDescription": "Gmail、Calendar、Docs",
-      "modelDescription": "AI 模型选择",
-      "secretsDescription": "加密凭据",
-      "versionPinDescription": "固定到特定版本"
-    },
-    "avatar": {
-      "arcade": "街机",
-      "brain": "大脑",
-      "creature": "生物",
-      "crystal": "水晶",
-      "custom": "自定义头像",
-      "dragon": "龙",
-      "explorer": "探险家",
-      "flame": "火焰",
-      "lightning": "闪电",
-      "magicWand": "魔法棒",
-      "moon": "月亮",
-      "operator": "操作员",
-      "orbit": "轨道",
-      "oracle": "先知",
-      "rainbow": "彩虹",
-      "robot": "机器人",
-      "satellite": "卫星",
-      "sparkles": "星光",
-      "strongArm": "强壮的手臂",
-      "talisman": "护身符"
-    },
-    "remoteSpawnFilesNotSupported": "此实例无法接收文件。",
-    "instanceSwitcherTitle": "KiloClaw 实例"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2030,10 +1561,6 @@
       "moveLeft": "将 {{filename}} 向左移动",
       "moveRight": "将 {{filename}} 向右移动"
     },
-    "attachmentPasteHint": {
-      "accessibility": "从剪贴板粘贴图片",
-      "label": "检测到图片，点击粘贴"
-    },
     "attachmentPicker": {
       "camera": "相机",
       "photoLibrary": "相册",
@@ -2229,7 +1756,8 @@
     "sessionSignedOut": "会话已退出登录。",
     "signOutThisDeviceTitle": "在此设备上退出登录？",
     "signOutThisSessionTitle": "退出此登录会话？",
-    "signOutThisSessionMessage": "{{device}} 将退出登录，但其 API 访问权限最多仍可保留一小时。"
+    "signOutThisSessionMessage": "{{device}} 将退出登录，但其 API 访问权限最多仍可保留一小时。",
+    "unknownDevice": "未知设备"
   },
   "forceUpdate": {
     "couldNotOpenStore": "无法打开应用商店。",

@@ -101,12 +101,9 @@
     "scheduled": "නියමිතයි",
     "keepEditing": "දිගටම සංස්කරණය කරන්න",
     "keepRunning": "දිගටම ක්‍රියාත්මක කරන්න",
-    "kiloclaw": "KiloClaw",
     "newSession": "නව සැසියක්",
-    "noKiloclawInstances": "KiloClaw ඉන්ස්ටන්ස් නැත",
     "noModelsAvailable": "ආකෘති නොමැත",
     "notFound": "හමු නොවීය.",
-    "online": "මාර්ගගත",
     "open": "{{name}} විවෘත කරන්න",
     "openPullRequest": "විවෘත PR",
     "pending": "පොරොත්තුවෙන්",
@@ -257,7 +254,8 @@
     "renamePasskey": "ප්‍රවේශ යතුරට නව නමක් දෙන්න",
     "removePasskey": "ප්‍රවේශ යතුර ඉවත් කරන්න",
     "removePasskeyTitle": "ප්‍රවේශ යතුර ඉවත් කරන්නද?",
-    "removePasskeyMessage": "ඔබට තවදුරටත් මෙම ප්‍රවේශ යතුරෙන් පිවිසිය නොහැක."
+    "removePasskeyMessage": "ඔබට තවදුරටත් මෙම ප්‍රවේශ යතුරෙන් පිවිසිය නොහැක.",
+    "changelog": "අලුත් දේ"
   },
   "preferences": {
     "general": "සාමාන්‍ය",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "දැනුම්දීම් යමක් සිදු වූ බව පෙන්වයි. එය කියවීමට Kilo විවෘත කරන්න.",
     "channel": {
       "agentProgress": "නියෝජිත ප්‍රගතිය",
-      "chat": "කතාබස් පණිවිඩ",
-      "kiloclaw": "KiloClaw ක්‍රියාකාරකම්",
       "balance": "ශේෂය පිළිබඳ ඇඟවීම්",
       "security": "හඳුනාගත් ආරක්ෂක ගැටලු",
       "spend": "වියදම් දැනුම්දීම්",
       "followedSessions": "අනුගමනය කරන සැසි"
     },
     "category": {
-      "chatMessagesSubtitle": "ඔබේ සංවාදවල පිළිතුරු",
       "agentAttentionTitle": "නියෝජිතයාට ඔබේ සහාය අවශ්‍යයි",
       "agentAttentionSubtitle": "පිළිතුරු, අවසර හෝ තොරතුරු අවශ්‍ය අවස්ථා",
       "agentUpdatesTitle": "නියෝජිත යාවත්කාලීන",
       "agentUpdatesSubtitle": "කාර්යය කරන අතරතුර නියෝජිතයා එවන පණිවිඩ",
       "sessionStatusTitle": "සැසි තත්ත්වය",
       "sessionStatusSubtitle": "අවසන් / අසාර්ථක / පාලනයට සූදානම්",
-      "kiloclawActivitySubtitle": "පිටපත සූදානම් හෝ අසාර්ථක වීම, කාලසටහන්ගත ක්‍රියා",
-      "kiloclawActivityUnavailable": "KiloClaw ක්‍රියාකාරකම් ලබා ගැනීමට KiloClaw පිටපතක් අරඹන්න.",
       "balanceAlertsSubtitle": "සංවිධානයේ ශේෂය අඩු වීමේ දැනුම්දීම්",
       "balanceAlertsUnavailable": "ශේෂ අනතුරු ඇඟවීම් ලබා ගැනීමට සංවිධානයකට සම්බන්ධ වන්න.",
       "securityFindingsSubtitle": "නව සොයාගැනීම් සහ SLA මතක් කිරීම්",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "මුල් පිටුව",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, පටිත්ත, {{total}} න් {{position}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "ඉන්ස්ටන්සය මාරු කිරීම",
-      "couldNotLoadInstances": "ඉන්ස්ටන්ස පූරණය කළ නොහැකි විය.",
-      "noInstancesDescription": "කතාබස් ආරම්භ කිරීමට ඉන්ස්ටන්සයක් සකසන්න.",
-      "setUpKiloclaw": "KiloClaw සකසන්න",
-      "currentInstance": "{{title}}, දැනට භාවිතයේ"
-    },
     "conversation": {
-      "failedToLoad": "සංවාදය පූරණය කළ නොහැකි විය.",
-      "notFound": "සංවාදය හමු නොවීය.",
       "untitled": "නම් නොකළ",
-      "leaveTitle": "සංවාදයෙන් ඉවත් වන්නද?",
-      "leaveMessage": "මෙයින් සංවාදය ඔබේ ලැයිස්තුවෙන් ඉවත් වේ.",
-      "openHint": "සංවාදය විවෘත කරයි. නම වෙනස් කිරීමට හෝ ඉවත් වීමට ඇති විකල්ප බැලීමට ඔබාගෙන සිටින්න.",
-      "unread": "නොකියවූ",
-      "optionsFor": "{{title}} සඳහා සංවාද විකල්ප",
-      "options": "සංවාද විකල්ප",
-      "renameTitle": "සංවාදයේ නම වෙනස් කිරීම",
-      "renamePlaceholder": "නව නම",
-      "couldNotReachBot": "බොට් සමඟ සම්බන්ධ විය නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
-      "messageDeliveryFailed": "බොට් වෙත පණිවිඩය යැවිය නොහැකි විය.",
-      "couldNotSignIn": "කතාබසට පිවිසිය නොහැකි විය.",
-      "couldNotRefreshMessages": "පණිවිඩ නැවත පූරණය කළ නොහැකි විය.",
-      "couldNotLoadHistory": "සංවාද ඉතිහාසය පූරණය කළ නොහැකි විය.",
-      "leave": "ඉවත් වන්න",
-      "untitledConversation": "නම් නොකළ සංවාදය",
-      "createFailed": "සංවාදය සෑදිය නොහැකි විය.",
-      "leaveFailed": "සංවාදයෙන් ඉවත් විය නොහැකි විය."
-    },
-    "reactions": {
-      "common": "පොදු",
-      "reactWith": "{{reaction}} යොදා ප්‍රතික්‍රියාවක් දක්වන්න",
-      "accessibility": "{{emoji}} ප්‍රතික්‍රියාව, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "පිළිතුරු දෙන්නේ",
-      "cancelReply": "පිළිතුර අවලංගු කරන්න",
-      "openInstance": "ඉන්ස්ටන්සය විවෘත කරන්න",
-      "attachFile": "ගොනුව අමුණන්න",
-      "cancelEdit": "සංස්කරණය අවලංගු කරන්න"
+      "renamePlaceholder": "නව නම"
     },
     "conversationList": {
-      "couldNotLoad": "සංවාද පූරණය කළ නොහැකි විය.",
-      "emptyTitle": "තවමත් සංවාද නොමැත",
-      "emptyDescription": "ඔබේ KiloClaw ඉන්ස්ටන්සය සමඟ කතාබස් ආරම්භ කිරීමට සංවාදයක් සාදන්න.",
-      "create": "සංවාදයක් සාදන්න",
-      "newConversation": "නව සංවාදය",
-      "openInstanceSettings": "ඉන්ස්ටන්සයේ සැකසුම් විවෘත කරන්න",
       "today": "අද",
       "yesterday": "ඊයේ",
-      "thisWeek": "මෙම සතිය",
       "older": "පැරණි"
     },
     "attachment": {
-      "open": "{{filename}} විවෘත කරන්න",
-      "openFailed": "ඇමුණුම විවෘත කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
-      "attachFailed": "ගොනුව ඇමිණිය නොහැකි විය.",
-      "limit": "ඔබට ගොනු {{displayCount}} ක් දක්වා ඇමිණිය හැක.",
-      "sizeRejection": "{{filename}} ගොනුවේ ප්‍රමාණය ඇමුණුම් සඳහා ඇති {{limit}} සීමාව ඉක්මවයි.",
-      "unreadable": "{{filename}} කියවීමට නොහැකි විය.",
-      "pastedImage": "අලවන ලද රූපය",
-      "defaultName": "ඇමුණුම",
       "classificationDenied": "ක්‍රියාත්මක කළ හැකි ගොනු ඇමිණිය නොහැක.",
       "classificationEmpty": "ගොනුව හිස්ය.",
       "classificationTooLarge": "ගොනුවල ප්‍රමාණය 20 MB හෝ ඊට අඩු විය යුතුය.",
@@ -943,426 +883,17 @@
       "networkError": "ජාල දෝෂයක් ඇති විය.",
       "uploadFailed": "උඩුගත කිරීම අසාර්ථක විය.",
       "nothingToPaste": "ඇලවීමට කිසිවක් නැත.",
-      "metadataStripFailed": "ඡායාරූපයේ පාරදත්ත ඉවත් කළ නොහැකි විය.",
-      "limit_one": "ඔබට ගොනු {{displayCount}} ක් දක්වා ඇමිණිය හැක.",
-      "limit_other": "ඔබට ගොනු {{displayCount}} ක් දක්වා ඇමිණිය හැක."
+      "metadataStripFailed": "ඡායාරූපයේ පාරදත්ත ඉවත් කළ නොහැකි විය."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "{{filename}} උඩුගත කිරීම නැවත උත්සාහ කරන්න",
-      "remove": "{{filename}} ඉවත් කරන්න"
-    },
-    "messageBubble": {
-      "deleted": "[මකා දැමූ පණිවිඩය]",
-      "yourMessage": "ඔබේ පණිවිඩය",
-      "messageFrom": "{{author}} වෙතින් ලැබුණු පණිවිඩය",
-      "moreActions": "තවත් ක්‍රියා",
-      "notDelivered": "ලබා දී නොමැත",
-      "edited": "(සංස්කරණය කළ)",
-      "image": "රූපය"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "පිටපත් කර ඇත",
-      "copyFailed": "පිටපත් කළ නොහැකි විය.",
-      "title": "පණිවිඩ ක්‍රියා",
-      "deleteTitle": "පණිවිඩය මකන්නද?",
-      "deleteMessage": "මෙය පණිවිඩය සංවාදයෙන් ඉවත් කරයි.",
-      "deleteFailed": "පණිවිඩය මකා දැමිය නොහැකි විය.",
-      "removeReactionFailed": "ප්‍රතික්‍රියාව ඉවත් කළ නොහැකි විය.",
-      "addReactionFailed": "ප්‍රතික්‍රියාව එක් කළ නොහැකි විය.",
-      "retrySend": "නැවත යවන්න",
-      "moreReactions": "තවත් ප්‍රතික්‍රියා",
-      "edit": "සංස්කරණය කරන්න",
-      "sendFailed": "පණිවිඩය යැවිය නොහැකි විය.",
-      "retrySendFailed": "නැවත යැවීමට උත්සාහ කළ නොහැකි විය.",
-      "editFailed": "පණිවිඩය සංස්කරණය කළ නොහැකි විය.",
-      "executeFailed": "ක්‍රියාව ක්‍රියාත්මක කළ නොහැකි විය."
+      "edit": "සංස්කරණය කරන්න"
     },
     "attachmentPicker": {
-      "takePhoto": "ඡායාරූපයක් ගන්න",
-      "photoLibrary": "ඡායාරූප එකතුව",
-      "files": "ගොනු",
       "cameraAccessMessage": "ඡායාරූපයක් ගැනීමට සැකසුම් හරහා කැමරාව භාවිත කිරීමට අවසර දෙන්න."
-    },
-    "typingIndicator": {
-      "someone": "කෙනෙක්",
-      "typing_one": "{{name}} ටයිප් කරමින් සිටී...",
-      "typing": "{{names}} ටයිප් කරමින් සිටී...",
-      "typing_other": "{{names}} ටයිප් කරමින් සිටී..."
-    },
-    "botStatus": {
-      "offline": "නොබැඳි",
-      "loadingUser": "පරිශීලක තොරතුරු පූරණය කරමින්...",
-      "waitingForStatus": "බොට්ගේ තත්ත්වය ලැබෙන තෙක් රැඳී සිටී...",
-      "offlineMessage": "බොට් නොබැඳිව ඇත. එය නැවත සම්බන්ධ වූ විට පණිවිඩ හුවමාරුව නැවත ආරම්භ වේ."
-    },
-    "errors": {
-      "notAllowed": "අවසර නැත.",
-      "messageTooLong": "පණිවිඩය දිග වැඩියි. අක්ෂර {{limit}} ට අඩුවෙන් ලියන්න.",
-      "titleTooLong": "ශීර්ෂකය දිග වැඩියි. අක්ෂර {{limit}} ට අඩුවෙන් ලියන්න.",
-      "messageEmpty": "පණිවිඩය හිස් විය නොහැක."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw ඉන්ස්ටන්ස පූරණය කිරීමට නොහැකි විය.",
-    "billing": {
-      "title": "බිල්පත්",
-      "continueMonthToMonth": "මාසිකව දිගටම කරගෙන යන්න",
-      "plan": "සැලැස්ම",
-      "finalTermEnds": "අවසන් ගිවිසුම් කාලය අවසන් වන දිනය",
-      "afterFinalTerm": "අවසන් ගිවිසුම් කාලයෙන් පසු",
-      "lessThanOneDay": "දින 1 කට අඩුයි",
-      "ends": "අවසන් වන දිනය",
-      "expires": "කල් ඉකුත් වන දිනය",
-      "noActivePlan": "සක්‍රීය සැලැස්මක් නොමැත",
-      "noActivePlanDescription": "ඔබට සක්‍රීය KiloClaw දායකත්වයක් නොමැත.",
-      "managedByAdmin": "ඔබේ සංවිධානයේ පරිපාලකයා බිල්පත් කළමනාකරණය කරයි.",
-      "couldNotLoad": "බිල්පත් තොරතුරු පූරණය කිරීමට නොහැකි විය.",
-      "manageOnWeb": "වෙබ් අඩවියේ බිල්පත් කළමනාකරණය කරන්න",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "ඔබේ අවසන් Commit ගිවිසුම් කාලය {{date}} දින අවසන් වේ. {{price}} මිලට Standard සැලැස්ම සමඟ දිගටම රැඳී සිටින්න. එසේ නොකළහොත් සත්කාරක සේවාව අවසන් වේ.",
-      "freeTrial": "නොමිලේ අත්හදා බැලීම",
-      "hostingEnds": "සත්කාරක සේවාව අවසන් වේ",
-      "renews": "අලුත් වන දිනය",
-      "standardMonthToMonth": "මාසික Standard සැලැස්ම",
-      "standardStartsOn": "Standard සැලැස්ම {{date}} දින {{price}} මිලට ආරම්භ වේ.",
-      "yourStandardMonthlyPrice": "ඔබේ Standard සැලැස්මේ මාසික මිල",
-      "perMonth": "/මසකට",
-      "earlybirdAccessUntil": "Earlybird ප්‍රවේශය {{date}} දක්වා වලංගුයි.",
-      "earlybirdEnding": "Earlybird අවසන් වීමට {{remaining}} ඉතිරියි.",
-      "paymentPastDue": "ගෙවීම ප්‍රමාද වී ඇත. කරුණාකර ඔබේ ගෙවීම් ක්‍රමය යාවත්කාලීන කරන්න.",
-      "subscriptionCancels": "දායකත්වය {{date}} දින අවලංගු වේ.",
-      "trialDaysRemaining": "අත්හදා බැලීමේ කාලයෙන් {{remaining}} ඉතිරියි.",
-      "trialEndingSoon": "අත්හදා බැලීම ඉක්මනින් අවසන් වේ: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "කොමිට්"
-    },
-    "changelog": {
-      "title": "අලුත් දේ",
-      "couldNotLoad": "වෙනස්කම් සටහන පූරණය කිරීමට නොහැකි විය.",
-      "noUpdates": "තවමත් යාවත්කාලීන කිරීම් නොමැත",
-      "noUpdatesDescription": "වෙනස්කම් සටහනේ විස්තර මෙහි දිස්වනු ඇත.",
-      "recentUpdates": "මෑත යාවත්කාලීන කිරීම්",
-      "manageVersion": "අනුවාදය කළමනාකරණය කරන්න",
-      "redeployRequired": "නැවත යෙදවීම අවශ්‍යයි",
-      "redeploySuggested": "නැවත යෙදවීම නිර්දේශිතයි",
-      "upgradeRequired": "උත්ශ්‍රේණි කිරීම අවශ්‍යයි"
-    },
-    "dashboard": {
-      "title": "පාලක පුවරුව",
-      "couldNotLoad": "පාලක පුවරුව පූරණය කිරීමට නොහැකි විය.",
-      "renameInstance": "ඉන්ස්ටන්සයේ නම වෙනස් කරන්න",
-      "renamePlaceholder": "නව නම (උපරිම අක්ෂර 50)",
-      "someDetailsFailed": "සමහර සජීවී විස්තර පූරණය කිරීමට නොහැකි විය.",
-      "destroy": "ස්ථිරව මකන්න",
-      "destroyMessage": "මෙයින් ඔබේ KiloClaw ඉන්ස්ටන්සය සහ එහි සියලුම දත්ත ස්ථිරව මකා දැමේ. මෙම ක්‍රියාව ආපසු හැරවිය නොහැක.",
-      "destroyTitle": "ඉන්ස්ටන්සය ස්ථිරව මැකීම",
-      "instance": "ඉන්ස්ටන්සය",
-      "couldNotCheckStatus": "සේවා තත්ත්වය පරීක්ෂා කිරීමට නොහැකි විය.",
-      "dangerZone": "අවදානම් ක්‍රියා",
-      "destroying": "ස්ථිරව මකමින්…",
-      "serviceDegraded": "සේවාවේ ක්‍රියාකාරීත්වය අඩාලයි — තත්ත්වය බැලීමට තට්ටු කරන්න",
-      "up": "ක්‍රියාත්මකයි"
-    },
-    "channels": {
-      "title": "නාලිකා",
-      "couldNotLoad": "නාලිකා පූරණය කිරීමට නොහැකි විය.",
-      "noChannels": "නාලිකා නොමැත",
-      "noChannelsDescription": "නාලිකා ඒකාබද්ධ කිරීම් මෙහි දිස්වනු ඇත.",
-      "connected": "{{label}} සම්බන්ධ විය",
-      "disconnectMessage": "{{label}} ඉවත් කරන්නද? මෙම නාලිකාව විසන්ධි වේ.",
-      "disconnectTitle": "නාලිකාව විසන්ධි කරන්න"
-    },
-    "devicePairing": {
-      "title": "උපාංග යුගලනය",
-      "refreshRequests": "යුගලන ඉල්ලීම් නැවුම් කරන්න",
-      "couldNotLoad": "යුගලන ඉල්ලීම් පූරණය කිරීමට නොහැකි විය.",
-      "noPending": "අනුමැතියට ඇති ඉල්ලීම් නොමැත",
-      "noPendingDescription": "නාලිකා සහ උපාංග යුගලන ඉල්ලීම් මෙහි දිස්වනු ඇත.",
-      "channelRequests": "නාලිකා ඉල්ලීම්",
-      "deviceRequests": "උපාංග ඉල්ලීම්",
-      "approveDeviceMessage": "{{platform}} වෙත ඔබේ ඉන්ස්ටන්සයට සම්බන්ධ වීමට අවසර දෙන්නද?",
-      "approveDeviceTitle": "උපාංගය අනුමත කරන්න",
-      "approveMessage": "{{label}} (කේතය: {{code}}) වෙත ඔබේ ඉන්ස්ටන්සයට සම්බන්ධ වීමට අවසර දෙන්නද?",
-      "approveTitle": "යුගලන ඉල්ලීම අනුමත කරන්න",
-      "unknownDevice": "නොදන්නා උපාංගය"
-    },
-    "execPolicy": {
-      "title": "ක්‍රියාත්මක කිරීමේ ප්‍රතිපත්තිය",
-      "couldNotLoad": "විධාන ක්‍රියාත්මක කිරීමේ ප්‍රතිපත්තිය පූරණය කිරීමට නොහැකි විය.",
-      "alwaysAsk": "සැමවිටම අසන්න",
-      "alwaysAskDescription": "ක්‍රියාත්මක කිරීමට පෙර සෑම විධානයක්ම තහවුරු කරන්න. වඩාත්ම ආරක්ෂිත ක්‍රමය මෙයයි.",
-      "neverAsk": "කිසිවිට නොඅසන්න",
-      "neverAskDescription": "තහවුරු කිරීමකින් තොරව විධාන ක්‍රියාත්මක කරන්න. මෙය වේගවත් නමුත් ආරක්ෂාව අඩුයි."
-    },
-    "google": {
-      "title": "Google ගිණුම",
-      "couldNotLoad": "Google ගිණුමේ තත්ත්වය පූරණය කිරීමට නොහැකි විය.",
-      "disconnected": "Google ගිණුම විසන්ධි කර ඇත. වෙනස යෙදීමට ඔබේ ඉන්ස්ටන්සය නැවත යොදවන්න.",
-      "setupCommand": "සැකසුම් විධානය",
-      "setupCommandHelp": "ඔබේ Google ගිණුම සම්බන්ධ කිරීමට, Docker ස්ථාපනය කර ඇති ඔබේම පරිගණකයේ ටර්මිනලයක මෙම විධානය ක්‍රියාත්මක කරන්න.",
-      "failedToLoadCommand": "සැකසුම් විධානය පූරණය කිරීමට නොහැකි විය.",
-      "gmailNotifications": "Gmail දැනුම්දීම්",
-      "disconnect": "Google ගිණුම විසන්ධි කරන්න",
-      "copied": "පිටපත් කර ඇත",
-      "copyCommand": "විධානය පිටපත් කරන්න",
-      "disconnectConfirm": "විසන්ධි කරන්න",
-      "disconnectMessage": "ඔබේ Google ගිණුම මෙම ඉන්ස්ටන්සයෙන් ඉවත් කරන්නද? මෙයින් Gmail දැනුම්දීම් අක්‍රීය වේ. වෙනස්කම් යෙදීමට විසන්ධි කිරීමෙන් පසු ඉන්ස්ටන්සය නැවත යොදවන්න.",
-      "disconnectTitle": "Google විසන්ධි කරන්න"
-    },
-    "modelList": {
-      "noMatches": "ඔබේ සෙවීමට ගැළපෙන ආකෘති නොමැත",
-      "noModelsDescription": "ආකෘති ලබා ගත හැකි වූ විට මෙහි දිස්වනු ඇත.",
-      "noResultsFor": "\"{{query}}\" සඳහා ප්‍රතිඵල නොමැත."
-    },
-    "secrets": {
-      "title": "රහස්",
-      "couldNotLoad": "රහස් පූරණය කිරීමට නොහැකි විය.",
-      "noSecrets": "රහස් නොමැත",
-      "noSecretsDescription": "රහස් භාවිත කරන ඒකාබද්ධ කිරීම් මෙහි දිස්වනු ඇත.",
-      "removeMessage": "{{label}} ඉවත් කරන්නද? මෙම මෙවලමට එහි අක්තපත්‍ර වෙත ප්‍රවේශය අහිමි වේ.",
-      "removeTitle": "රහස ඉවත් කරන්න",
-      "saved": "{{label}} සුරකින ලදී",
-      "hide": "{{label}} සඟවන්න",
-      "show": "{{label}} පෙන්වන්න",
-      "allFieldsRequired": "{{label}} සම්බන්ධ කිරීමට සියලුම ක්ෂේත්‍ර පිරවිය යුතුය.",
-      "setupGuideFallback": "සැකසුම් මාර්ගෝපදේශය",
-      "setupGuideA11y": "{{label}} සැකසුම් මාර්ගෝපදේශය",
-      "setupGuide": "සැකසුම් මාර්ගෝපදේශය",
-      "saving": "සුරකිමින්…",
-      "removing": "ඉවත් කරමින්…",
-      "updateToken": "ටෝකනය යාවත්කාලීන කරන්න"
-    },
-    "versionPin": {
-      "title": "අනුවාදය ස්ථිර කිරීම",
-      "couldNotLoad": "අනුවාද තොරතුරු පූරණය කිරීමට නොහැකි විය.",
-      "couldNotLoadMore": "තවත් අනුවාද පූරණය කිරීමට නොහැකි විය.",
-      "loadMore": "තවත් අනුවාද පූරණය කරන්න",
-      "showingLatest": "නවතම අනුවාද 100 පෙන්වයි.",
-      "availableVersions": "ලබා ගත හැකි අනුවාද",
-      "noVersions": "අනුවාද නොමැත",
-      "noVersionsDescription": "ලබා ගත හැකි OpenClaw අනුවාද මෙහි දිස්වනු ඇත.",
-      "unpin": "ස්ථිර කිරීම ඉවත් කරන්න",
-      "unpinMessage": "ලබා ගත හැකි නවතම අනුවාදයට නැවත මාරු වන්නද?",
-      "unpinTitle": "අනුවාදයේ ස්ථිර කිරීම ඉවත් කරන්න",
-      "confirmPin": "ස්ථිර කිරීම තහවුරු කරන්න",
-      "followingLatest": "නවතම අනුවාදය අනුව",
-      "latest": "නවතම",
-      "pin": "ස්ථිර කරන්න",
-      "pinnedByAdmin": "පරිපාලකයා අනුවාදය ස්ථිර කර ඇත — එය වෙනස් කිරීමට ඔබේ පරිපාලකයා අමතන්න.",
-      "pinnedTo": "{{version}} අනුවාදයට ස්ථිර කර ඇත",
-      "reasonOptional": "හේතුව (අනිවාර්ය නැත)",
-      "reasonPlaceholder": "මෙම අනුවාදය ස්ථිර කිරීමට හේතුව",
-      "replaceAdminPin": "පරිපාලකයා ස්ථිර කළ අනුවාදය වෙනස් කරන්න",
-      "replacesAdminPin": "මෙයින් පරිපාලකයා ස්ථිර කළ අනුවාදය (දැනට {{label}}) වෙනස් වේ."
-    },
-    "redeploy": "නැවත යොදවන්න",
-    "redeployMessage": "මෙම ඉන්ස්ටන්සය නැවත යෙදවීමට අවශ්‍ය බව විශ්වාසද?",
-    "redeployTitle": "ඉන්ස්ටන්සය නැවත යොදවන්න",
-    "controls": {
-      "redeploying": "නැවත යොදවමින්…",
-      "restart": "නැවත ආරම්භ කරන්න",
-      "restartOpenClawMessage": "OpenClaw ක්‍රියාවලිය නැවත ආරම්භ කිරීමට අවශ්‍ය බව විශ්වාසද?",
-      "restartOpenClawTitle": "OpenClaw නැවත ආරම්භ කරන්න",
-      "restarting": "නැවත ආරම්භ කරමින්…",
-      "start": "ආරම්භ කරන්න",
-      "startMessage": "මෙම ඉන්ස්ටන්සය ආරම්භ කිරීමට අවශ්‍ය බව විශ්වාසද?",
-      "startTitle": "ඉන්ස්ටන්සය ආරම්භ කරන්න",
-      "stop": "නවත්වන්න",
-      "stopMessage": "මෙම ඉන්ස්ටන්සය නැවැත්වීමට අවශ්‍ය බව විශ්වාසද?",
-      "stopTitle": "ඉන්ස්ටන්සය නවත්වන්න",
-      "stopping": "නවත්වමින්…"
-    },
-    "empty": {
-      "finishingSetup": "සැකසුම අවසන් වෙමින්",
-      "finishingSetupDescription": "ඔබේ ගිණුම සකසා අවසන් කරන තුරු මොහොතක් රැඳී සිටින්න. සාමාන්‍යයෙන් මෙයට ගත වන්නේ සුළු වේලාවක් පමණි.",
-      "getStarted": "ආරම්භ කරන්න",
-      "noInstancesDescription": "කේත ලියන නියෝජිතයන් ක්‍රියාත්මක කිරීමට ඔබේ පළමු ඉන්ස්ටන්සය සාදන්න."
-    },
-    "instance": {
-      "backToInstances": "ඉන්ස්ටන්ස වෙත ආපසු යන්න",
-      "couldNotLoad": "ඉන්ස්ටන්සය පූරණය කිරීමට නොහැකි විය.",
-      "notFound": "ඉන්ස්ටන්සය සොයා ගත නොහැකි විය",
-      "notFoundDescription": "මෙම ඉන්ස්ටන්සය ස්ථිරව මකා දමා තිබිය හැක, නැතහොත් සබැඳිය තවදුරටත් වලංගු නොවේ."
-    },
-    "list": {
-      "createInstance": "ඉන්ස්ටන්සයක් සාදන්න",
-      "organizations": "සංවිධාන",
-      "accessIssue": {
-        "trialExpired": "අත්හදා බැලීම අවසන් වී ඇත — මෙම ඉන්ස්ටන්සය දිගටම භාවිත කිරීමට දායක වන්න",
-        "subscriptionCanceled": "දායකත්වය අක්‍රීයයි — මෙම ඉන්ස්ටන්සය දිගටම භාවිත කිරීමට නැවත දායක වන්න",
-        "subscriptionPastDue": "ගෙවීමේ ගැටලුවක් ඇත — මෙම ඉන්ස්ටන්සය දිගටම භාවිත කිරීමට බිල්පත් තොරතුරු යාවත්කාලීන කරන්න",
-        "quarantined": "ඉන්ස්ටන්සය හුදකලා කර ඇත — පුද්ගලයෙකුගේ සමාලෝචනයක් අවශ්‍යයි",
-        "multipleCurrentConflict": "ගිණුම සමාලෝචනය කළ යුතුය",
-        "nonCanonicalEarlybird": "පැරණි සැලැස්ම සමාලෝචනය කළ යුතුය"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}} සමඟ කතා කරන්න",
-        "ready": "{{name}} සූදානම්",
-        "warmedUp": "සියල්ල සූදානම්. ඔබ සූදානම් වූ විට ආයුබෝවන් කියන්න."
-      },
-      "flow": {
-        "genericErrorBody": "මේ මොහොතේ ඔබේ ඉන්ස්ටන්සය සකසා අවසන් කිරීමට අපට නොහැකි විය.",
-        "manualReviewBody": "ඉන්ස්ටන්සයක් සෑදීමට පෙර ඔබේ ගිණුමේ තත්ත්වය පිළිබඳව අවධානය යොමු කළ යුතුය. kilo.ai හි ඉදිරියට යන්න.",
-        "manualReviewTitle": "සැකසුමට පුද්ගලයෙකුගේ සමාලෝචනයක් අවශ්‍යයි",
-        "openKiloAi": "Kilo.ai විවෘත කරන්න",
-        "provisioning": "සම්පත් සූදානම් කිරීම",
-        "review": "සමාලෝචනය",
-        "identityTitle": "ඔබේ බොට්ගේ අනන්‍යතාවය",
-        "couldNotLoad": "ආරම්භක සැකසුමේ තත්ත්වය පූරණය කිරීමට නොහැකි විය.",
-        "finishingSetup": "සැකසුම අවසන් කරමින් පවතී — ඔබේ ගිණුම සකසා අවසන් කරන තුරු මොහොතක් රැඳී සිටින්න.",
-        "ready": "සූදානම්",
-        "settingUp": "සකසමින්…"
-      },
-      "unavailableDescription": "ඉන්ස්ටන්සයක් සූදානම් කිරීමට සක්‍රීය KiloClaw දායකත්වයක් අවශ්‍යයි. පවතින ඉන්ස්ටන්ස සහ දායකත්ව සාමාන්‍ය පරිදි දිගටම ක්‍රියාත්මක වේ.",
-      "unavailableTitle": "නව KiloClaw ඉන්ස්ටන්ස ලබා ගත නොහැක",
-      "identity": {
-        "chooseAvatar": "පැතිකඩ රූපයක් තෝරන්න",
-        "namePlaceholder": "ඔබේ බොට්ගේ නම",
-        "selectAvatar": "පැතිකඩ රූපය ලෙස {{name}} තෝරන්න",
-        "personality": "පෞරුෂත්වය",
-        "changePersonality": "පෞරුෂත්වය වෙනස් කරන්න",
-        "location": "ස්ථානය",
-        "locationPlaceholder": "නගරය හෝ කලාපය (අනිවාර්ය නැත)",
-        "useCurrentLocation": "දැනට පිහිටි ස්ථානය භාවිතා කරන්න",
-        "locationDeniedTitle": "ස්ථානයට ප්‍රවේශ වීමට අවසර නැත",
-        "locationDeniedMessage": "ඔබ දැන් සිටින ස්ථානය භාවිත කිරීමට සැකසුම් තුළ ස්ථාන ප්‍රවේශය සක්‍රීය කරන්න.",
-        "locationValidationFailed": "ස්ථානය වලංගු බව තහවුරු කිරීමට නොහැකි විය.",
-        "locationResolveFailed": "ඔබේ ස්ථානය හඳුනා ගැනීමට නොහැකි විය. ඔබට එය අතින් සංස්කරණය කළ හැක.",
-        "locationGetFailed": "ඔබේ ස්ථානය ලබා ගැනීමට නොහැකි විය. එය අතින් ඇතුළත් කරන්න.",
-        "nature": {
-          "aiAssistantLabel": "AI සහායක",
-          "aiAssistantVibe": "උපකාරශීලී, දක්ෂ, වෘත්තීය",
-          "digitalCreatureLabel": "ඩිජිටල් ජීවියා",
-          "digitalCreatureVibe": "අමුතු, ජීවමාන, ටිකක් අනපේක්ෂිත",
-          "virtualCompanionLabel": "අතථ්‍ය සහකරු",
-          "virtualCompanionVibe": "සුහදයි, ළඟින් සිටියි, සැබෑවටම සැලකිලිමත් වෙයි",
-          "somethingWeirderLabel": "තවත් අමුතු දෙයක්…",
-          "somethingWeirderVibe": "එය ඔබම අර්ථ දක්වන්න"
-        }
-      },
-      "notifications": {
-        "mockMessage": "වැඩේ ඉවරයි! ඔබ ඉල්ලූ සාරාංශය මම සකස් කළා. ඔබට අවශ්‍ය වෙලාවක බලන්න පුළුවන්.",
-        "settingUp": "දැනුම්දීම් සකසමින්…",
-        "stayInTheLoop": "අලුත් තොරතුරු දැනගන්න",
-        "getNotified": "ප්‍රතිචාරයක් මඟ නොහැරීමට, {{name}} කාර්යයක් අවසන් කළ විට දැනුම්දීමක් ලබා ගන්න.",
-        "now": "දැන්",
-        "skipForNow": "දැන් මඟ හරින්න",
-        "couldNotEnable": "දැනුම්දීම් සක්‍රීය කිරීමට නොහැකි විය."
-      },
-      "provisioning": {
-        "queryErrorTitle": "සැකසුම පරීක්ෂා කළ නොහැකි විය",
-        "queryErrorBody": "{{name}} සඳහා සැකසුමේ තත්ත්වය පරීක්ෂා කරන අතරතුර සම්බන්ධතාවය බිඳ වැටුණි. සැකසුම තවමත් ක්‍රියාත්මක විය හැක. නැවත උත්සාහ කරන්න, නැතහොත් ටික වේලාවකින් නැවත පරීක්ෂා කරන්න.",
-        "stoppedTitle": "සැකසුම නතර විය",
-        "stoppedBody": "{{name}} සඳහා වූ ඉන්ස්ටන්සය සැකසුම අතරතුර අනපේක්ෂිතව නතර විය.",
-        "stalledTitle": "සැකසුම ඇණහිට ඇත",
-        "stalledBody": "{{name}} සකසා අවසන් කිරීමට අපට නොහැකි විය. නැවත උත්සාහ කරන්න. මෙය දිගටම සිදු වුවහොත් {{supportEmail}} වෙත ඊමේල් පණිවිඩයක් යවන්න.",
-        "timeoutTitle": "බලාපොරොත්තු වූවාට වඩා වැඩි කාලයක් ගත වේ",
-        "timeoutBody": "{{name}} සඳහා සැකසුමට සාමාන්‍යයට වඩා වැඩි කාලයක් ගත වෙමින් පවතී (මිනිත්තු {{displayMinutes}} කට වැඩි කාලයක්).",
-        "continueInBackground": "පසුබිමේ දිගටම කරගෙන යන්න",
-        "settingUp": "{{name}} සකසමින්",
-        "connectingToAgent": "නියෝජිතයාට සම්බන්ධ වෙමින්",
-        "startingSandbox": "හුදකලා පරිසරය ආරම්භ කරමින්",
-        "backgroundHint": "සාමාන්‍යයෙන් මෙයට මිනිත්තුවකට අඩු කාලයක් ගත වේ. ඔබට මෙය වසා දැමිය හැක — සැකසුම පසුබිමේ දිගටම සිදු වේ."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "කේතය {{code}}",
-      "gatewayProcess": "ද්වාර ක්‍රියාවලිය",
-      "lastExit": "අවසාන පිටවීම",
-      "memory": "මතකය",
-      "region": "කලාපය",
-      "resources": "සම්පත්",
-      "restarts": "නැවත ආරම්භ කිරීම්",
-      "state": "තත්ත්වය",
-      "uptime": "ක්‍රියාත්මක වූ කාලය",
-      "crashed": "කඩා වැටුණි",
-      "destroying": "ස්ථිරව මකමින්",
-      "provisioned": "සම්පත් සූදානම්",
-      "restarting": "නැවත ආරම්භ කරමින්",
-      "running": "ක්‍රියාත්මකයි",
-      "shuttingDown": "වසා දමමින්",
-      "starting": "ආරම්භ වෙමින්",
-      "stopped": "නතර කර ඇත",
-      "stopping": "නවත්වමින්",
-      "unknown": "නොදන්නා",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "අතිනවීන",
-      "frontierDescription": "ඉහළම කාර්ය සාධනය ලබා දෙයි. තර්කන හැකියාව සහිත අතිනවීන ආකෘති වෙත යොමු කරයි.",
-      "balancedDescription": "අඩු පිරිවැයකින් වේගය සහ හැකියාව හොඳින් සමබර කරයි.",
-      "autoModelA11y": "{{label}} ස්වයංක්‍රීය ආකෘතිය",
-      "currentModel": "වර්තමාන ආකෘතිය",
-      "browseAllModels": "නැතහොත් ආකෘති 500 කට වැඩි ගණනකින් තෝරන්න",
-      "browseAllModelsA11y": "500 කට වැඩි සියලුම ආකෘති බලන්න"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw දිගටම භාවිත කිරීමට ඔබේ බ්‍රවුසරයෙන් kilo.ai/claw වෙත යන්න. යෙදුම තුළින් දායක විය නොහැක.",
-      "subscriptionCanceledTitle": "වෙබ් අඩවිය හරහා දායක වන්න",
-      "subscriptionCanceledBody": "KiloClaw භාවිත කිරීමට ඔබේ බ්‍රවුසරයෙන් kilo.ai/claw වෙත යන්න. යෙදුම තුළින් දායක විය නොහැක.",
-      "subscriptionCanceledCta": "Kilo.ai/claw විවෘත කරන්න",
-      "subscriptionPastDueTitle": "වෙබ් අඩවියෙන් ගෙවීම් තොරතුරු යාවත්කාලීන කිරීම",
-      "subscriptionPastDueBody": "ඔබේ අවසන් ගෙවීම සම්බන්ධයෙන් ගැටලුවක් ඇති විය. එය යාවත්කාලීන කිරීමට ඔබේ බ්‍රවුසරයෙන් kilo.ai/claw වෙත යන්න. යෙදුම තුළින් බිල්පත් කළමනාකරණය කළ නොහැක.",
-      "quarantinedTitle": "ඉන්ස්ටන්සය යථා තත්ත්වයට පත් කළ යුතුය",
-      "quarantinedBody": "ඔබේ KiloClaw ඉන්ස්ටන්සය හුදකලා කර ඇති බැවින් දැන් භාවිත කළ නොහැක. එය යථා තත්ත්වයට පත් කිරීමට අපේ කණ්ඩායමේ සහාය අවශ්‍යයි.",
-      "multipleCurrentConflictBody": "ඔබේ ගිණුමේ සක්‍රීය දායකත්ව එකකට වඩා හමු විය. ඔබෙන් දෙවරක් මුදල් අය වීම වැළැක්වීමට අපි ක්‍රියාවලිය තාවකාලිකව නවතා ඇත.",
-      "multipleCurrentConflictCta": "Kilo.ai හරහා ඉදිරියට යන්න",
-      "nonCanonicalEarlybirdTitle": "පැරණි සැලැස්මක් හඳුනා ගන්නා ලදී",
-      "nonCanonicalEarlybirdBody": "ඔබේ මුල් ප්‍රවේශ සැලැස්ම ජංගම දුරකථනයෙන් භාවිත කිරීමට පෙර පුද්ගලයෙකු විසින් සමාලෝචනය කළ යුතුය.",
-      "iosTitle": "IOS හි KiloClaw ලබා ගත නොහැක",
-      "iosBody": "මෙම ගිණුමේ KiloClaw ප්‍රවේශය කළමනාකරණය කරන්නේ iOS යෙදුමෙන් පිටතදීය.",
-      "iosContact": "ප්‍රශ්න තිබේද? {{supportEmail}} වෙත ඊමේල් පණිවිඩයක් යවන්න.",
-      "quarantinedCta": "අපේ කණ්ඩායමට ඊමේල් යවන්න",
-      "nonCanonicalEarlybirdCta": "ඔබේ සැලැස්ම Kilo.ai හි පරීක්ෂා කරන්න"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} පිළිබඳව අවධානය යොමු කළ යුතුය: {{label}}",
-      "openUnread_one": "{{name}} විවෘත කරන්න, නොකියවූ පණිවිඩ {{displayCount}} ක් ඇත",
-      "openUnread": "{{name}} විවෘත කරන්න, නොකියවූ පණිවිඩ {{displayCount}}ක්",
-      "openUnread_other": "{{name}} විවෘත කරන්න, නොකියවූ පණිවිඩ {{displayCount}}ක්",
-      "openSettings": "{{name}} සඳහා සැකසුම් විවෘත කරන්න",
-      "fixOnKiloAi": "Kilo.ai හි විසඳන්න: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "උපාංග ඉල්ලීම් අනුමත කරන්න",
-      "execPolicyDescription": "ආරක්ෂක සැකසුම්",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "AI ආකෘති තේරීම",
-      "secretsDescription": "ගුප්තකේතනය කළ අක්තපත්‍ර",
-      "versionPinDescription": "නිශ්චිත අනුවාදයකට ස්ථිර කරන්න"
-    },
-    "avatar": {
-      "arcade": "ආකේඩ් ක්‍රීඩාව",
-      "brain": "මොළය",
-      "creature": "ජීවියා",
-      "crystal": "ස්ඵටිකය",
-      "custom": "අභිරුචි පැතිකඩ රූපය",
-      "dragon": "මකරා",
-      "explorer": "ගවේෂකයා",
-      "flame": "ගිනි දැල්ල",
-      "lightning": "විදුලි කෙටීම",
-      "magicWand": "මැජික් යෂ්ටිය",
-      "moon": "සඳ",
-      "operator": "ක්‍රියාකරු",
-      "orbit": "කක්ෂය",
-      "oracle": "අනාගත වක්තෘ",
-      "rainbow": "දේදුන්න",
-      "robot": "රොබෝව",
-      "satellite": "චන්ද්‍රිකාව",
-      "sparkles": "දිලිසීම්",
-      "strongArm": "ශක්තිමත් බාහුව",
-      "talisman": "සුරය"
-    },
-    "remoteSpawnFilesNotSupported": "මෙම ඉන්ස්ටන්සයට ගොනු ලබා ගත නොහැක.",
-    "instanceSwitcherTitle": "KiloClaw ඉන්ස්ටන්සය"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}} වමට ගෙන යන්න",
       "moveRight": "{{filename}} දකුණට ගෙන යන්න"
     },
-    "attachmentPasteHint": {
-      "accessibility": "පසුරු පුවරුවෙන් රූපය අලවන්න",
-      "label": "රූපයක් හමු විය, ඇලවීමට තට්ටු කරන්න"
-    },
     "attachmentPicker": {
       "camera": "කැමරාව",
       "photoLibrary": "ඡායාරූප එකතුව",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "මෙම උපාංගයෙන් පිටවන්නද?",
     "signOutThisSessionTitle": "මෙම සැසියෙන් පිටවන්නද?",
     "signOutThisSessionMessage": "{{device}} උපාංගයේ ගිණුමෙන් පිටවනු ඇත. එයට තවත් පැයක් දක්වා API ප්‍රවේශය තිබිය හැක.",
-    "webBrowser": "වෙබ් බ්‍රවුසරය"
+    "webBrowser": "වෙබ් බ්‍රවුසරය",
+    "unknownDevice": "නොදන්නා උපාංගය"
   },
   "forceUpdate": {
     "couldNotOpenStore": "යෙදුම් වෙළඳසැල විවෘත කළ නොහැකි විය.",

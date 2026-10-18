@@ -152,7 +152,7 @@ const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
 /**
  * True when a query key is an allowlisted tRPC shape. The exact-path allowlist
  * is the only filter: every other path — transcript pages, patches, diffs,
- * tokens, secrets, kiloclaw — is denied because it is not on the list.
+ * tokens and secrets — is denied because it is not on the list.
  */
 export function isReadCacheAllowedKey(queryKey: unknown): boolean {
   if (!Array.isArray(queryKey) || queryKey.length < 2) {

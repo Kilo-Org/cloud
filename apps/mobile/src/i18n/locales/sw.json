@@ -101,12 +101,9 @@
     "scheduled": "Imepangwa",
     "keepEditing": "Endelea kuhariri",
     "keepRunning": "Acha iendelee",
-    "kiloclaw": "KiloClaw",
     "newSession": "Kikao kipya",
-    "noKiloclawInstances": "Hakuna nakala za KiloClaw",
     "noModelsAvailable": "Hakuna modeli zinazopatikana",
     "notFound": "Haikupatikana.",
-    "online": "Mtandaoni",
     "open": "Fungua {{name}}",
     "openPullRequest": "Fungua ombi la kuunganisha",
     "pending": "Inasubiri",
@@ -257,7 +254,8 @@
     "renamePasskey": "Badilisha jina la ufunguo wa kuingia",
     "removePasskey": "Ondoa ufunguo wa kuingia",
     "removePasskeyTitle": "Ondoa ufunguo wa kuingia?",
-    "removePasskeyMessage": "Hutaweza tena kuingia kwa ufunguo huu wa kuingia."
+    "removePasskeyMessage": "Hutaweza tena kuingia kwa ufunguo huu wa kuingia.",
+    "changelog": "Mapya"
   },
   "preferences": {
     "general": "Jumla",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Arifa zinaonyesha kwamba jambo limetokea. Fungua Kilo ili usome ujumbe.",
     "channel": {
       "agentProgress": "Maendeleo ya wakala",
-      "chat": "Ujumbe wa mazungumzo",
-      "kiloclaw": "Shughuli za KiloClaw",
       "balance": "Tahadhari za salio",
       "security": "Matokeo ya ukaguzi wa usalama",
       "spend": "Tahadhari za matumizi",
       "followedSessions": "Vikao vinavyofuatiliwa"
     },
     "category": {
-      "chatMessagesSubtitle": "majibu kwenye mazungumzo yako",
       "agentAttentionTitle": "Wakala anakuhitaji",
       "agentAttentionSubtitle": "maswali, maombi ya ruhusa na maelezo yanayohitajika",
       "agentUpdatesTitle": "Masasisho ya wakala",
       "agentUpdatesSubtitle": "ujumbe kutoka kwa wakala wakati kazi inaendelea",
       "sessionStatusTitle": "Hali ya kikao",
       "sessionStatusSubtitle": "kimekamilika / kimeshindikana / kiko tayari kudhibitiwa",
-      "kiloclawActivitySubtitle": "nakala iko tayari au imeshindikana, vitendo vilivyoratibiwa",
-      "kiloclawActivityUnavailable": "Anzisha instance ya KiloClaw ili kupata shughuli za KiloClaw.",
       "balanceAlertsSubtitle": "maonyo ya salio la chini la shirika",
       "balanceAlertsUnavailable": "Jiunge na shirika ili kupata maonyo ya salio.",
       "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Nyumbani",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, kichupo, {{position}} kati ya {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Badilisha seva",
-      "couldNotLoadInstances": "Imeshindikana kupakia seva.",
-      "noInstancesDescription": "Sanidi seva ili kuanza kupiga gumzo.",
-      "setUpKiloclaw": "Sanidi KiloClaw",
-      "currentInstance": "{{title}}, ya sasa"
-    },
     "conversation": {
-      "failedToLoad": "Imeshindikana kupakia mazungumzo.",
-      "notFound": "Mazungumzo hayakupatikana.",
       "untitled": "Bila jina",
-      "leaveTitle": "Ungependa kuondoka kwenye mazungumzo?",
-      "leaveMessage": "Hii itayaondoa kwenye orodha yako.",
-      "openHint": "Hufungua mazungumzo. Bonyeza kwa muda ili kuona machaguo ya kubadilisha jina na kuondoka.",
-      "unread": "Hayajasomwa",
-      "optionsFor": "Machaguo ya mazungumzo ya {{title}}",
-      "options": "Machaguo ya mazungumzo",
-      "renameTitle": "Badilisha jina la mazungumzo",
-      "renamePlaceholder": "Jina jipya",
-      "couldNotReachBot": "Imeshindikana kuwasiliana na roboti. Tafadhali jaribu tena.",
-      "messageDeliveryFailed": "Ujumbe haukuweza kufikishwa kwa roboti.",
-      "couldNotSignIn": "Imeshindikana kuingia kwenye gumzo.",
-      "couldNotRefreshMessages": "Imeshindikana kuonyesha upya ujumbe.",
-      "couldNotLoadHistory": "Imeshindikana kupakia historia ya mazungumzo.",
-      "leave": "Ondoka",
-      "untitledConversation": "Mazungumzo yasiyo na jina",
-      "createFailed": "Imeshindikana kuunda mazungumzo.",
-      "leaveFailed": "Imeshindikana kuondoka kwenye mazungumzo."
-    },
-    "reactions": {
-      "common": "Kawaida",
-      "reactWith": "Itikia kwa {{reaction}}",
-      "accessibility": "Mwitikio wa {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Unamjibu",
-      "cancelReply": "Ghairi jibu",
-      "openInstance": "Fungua seva",
-      "attachFile": "Ambatisha faili",
-      "cancelEdit": "Ghairi uhariri"
+      "renamePlaceholder": "Jina jipya"
     },
     "conversationList": {
-      "couldNotLoad": "Imeshindikana kupakia mazungumzo.",
-      "emptyTitle": "Hakuna mazungumzo bado",
-      "emptyDescription": "Unda mazungumzo ili kuanza kupiga gumzo na seva yako ya KiloClaw.",
-      "create": "Unda mazungumzo",
-      "newConversation": "Mazungumzo mapya",
-      "openInstanceSettings": "Fungua mipangilio ya seva",
       "today": "Leo",
       "yesterday": "Jana",
-      "thisWeek": "Wiki hii",
       "older": "Zamani"
     },
     "attachment": {
-      "open": "Fungua {{filename}}",
-      "openFailed": "Imeshindikana kufungua kiambatisho. Angalia muunganisho wako na ujaribu tena.",
-      "attachFailed": "Imeshindikana kuambatisha faili.",
-      "limit": "Unaweza kuambatisha hadi faili {{displayCount}}.",
-      "sizeRejection": "{{filename}} inazidi kikomo cha ukubwa wa kiambatisho cha {{limit}}.",
-      "unreadable": "Imeshindikana kusoma {{filename}}.",
-      "pastedImage": "picha iliyobandikwa",
-      "defaultName": "Kiambatisho",
       "classificationDenied": "Faili zinazoweza kutekelezwa haziwezi kuambatishwa.",
       "classificationEmpty": "Faili ni tupu.",
       "classificationTooLarge": "Ukubwa wa kila faili hauwezi kuzidi MB 20.",
@@ -943,426 +883,17 @@
       "networkError": "Hitilafu ya mtandao imetokea.",
       "uploadFailed": "Upakiaji umeshindikana.",
       "nothingToPaste": "Hakuna cha kubandika.",
-      "metadataStripFailed": "Imeshindikana kuondoa taarifa za ziada za picha.",
-      "limit_one": "Unaweza kuambatisha hadi faili {{displayCount}}.",
-      "limit_other": "Unaweza kuambatisha hadi faili {{displayCount}}."
+      "metadataStripFailed": "Imeshindikana kuondoa taarifa za ziada za picha."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Jaribu tena kupakia {{filename}}",
-      "remove": "Ondoa {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[ujumbe uliofutwa]",
-      "yourMessage": "Ujumbe wako",
-      "messageFrom": "Ujumbe kutoka kwa {{author}}",
-      "moreActions": "Hatua zaidi",
-      "notDelivered": "Haukuwasilishwa",
-      "edited": "(umehaririwa)",
-      "image": "Picha"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Imenakiliwa",
-      "copyFailed": "Imeshindikana kunakili.",
-      "title": "Hatua za ujumbe",
-      "deleteTitle": "Ungependa kufuta ujumbe?",
-      "deleteMessage": "Hii itaondoa ujumbe kwenye mazungumzo.",
-      "deleteFailed": "Imeshindikana kufuta ujumbe.",
-      "removeReactionFailed": "Imeshindikana kuondoa mwitikio.",
-      "addReactionFailed": "Imeshindikana kuongeza mwitikio.",
-      "retrySend": "Jaribu kutuma tena",
-      "moreReactions": "Miitikio zaidi",
-      "edit": "Hariri",
-      "sendFailed": "Imeshindikana kutuma ujumbe.",
-      "retrySendFailed": "Imeshindikana kujaribu kutuma tena.",
-      "editFailed": "Imeshindikana kuhariri ujumbe.",
-      "executeFailed": "Imeshindikana kutekeleza hatua."
+      "edit": "Hariri"
     },
     "attachmentPicker": {
-      "takePhoto": "Piga picha",
-      "photoLibrary": "Maktaba ya picha",
-      "files": "Faili",
       "cameraAccessMessage": "Ruhusu matumizi ya kamera kwenye mipangilio ili kupiga picha."
-    },
-    "typingIndicator": {
-      "someone": "Mtu",
-      "typing_one": "{{name}} anaandika...",
-      "typing": "{{names}} wanaandika...",
-      "typing_other": "{{names}} wanaandika..."
-    },
-    "botStatus": {
-      "offline": "Nje ya mtandao",
-      "loadingUser": "Inapakia taarifa za mtumiaji...",
-      "waitingForStatus": "Inasubiri hali ya roboti...",
-      "offlineMessage": "Roboti iko nje ya mtandao. Ujumbe utaendelea kutumwa itakapounganishwa tena."
-    },
-    "errors": {
-      "notAllowed": "Huruhusiwi kufanya hivyo.",
-      "messageTooLong": "Ujumbe ni mrefu sana — tumia vibambo vichache kuliko {{limit}}.",
-      "titleTooLong": "Kichwa ni kirefu sana — tumia vibambo vichache kuliko {{limit}}.",
-      "messageEmpty": "Ujumbe hauwezi kuwa tupu."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Imeshindikana kupakia vizio vya KiloClaw.",
-    "billing": {
-      "title": "Malipo",
-      "continueMonthToMonth": "Endelea kwa malipo ya kila mwezi",
-      "plan": "Mpango",
-      "finalTermEnds": "Kipindi cha mwisho kinaisha",
-      "afterFinalTerm": "Baada ya kipindi cha mwisho",
-      "lessThanOneDay": "Chini ya siku 1",
-      "ends": "Inaisha",
-      "expires": "Muda unaisha",
-      "noActivePlan": "Hakuna mpango unaotumika",
-      "noActivePlanDescription": "Huna usajili wa KiloClaw unaotumika.",
-      "managedByAdmin": "Malipo yanasimamiwa na msimamizi wa shirika lako.",
-      "couldNotLoad": "Imeshindikana kupakia taarifa za malipo.",
-      "manageOnWeb": "Simamia malipo kwenye wavuti",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Kipindi chako cha mwisho cha Commit kinaisha tarehe {{date}}. Endelea na Standard kwa {{price}}, la sivyo huduma ya uhifadhi kwenye seva itaisha.",
-      "freeTrial": "Jaribio la bure",
-      "hostingEnds": "Huduma ya uhifadhi kwenye seva inaisha",
-      "renews": "Inasasishwa",
-      "standardMonthToMonth": "Standard ya kila mwezi",
-      "standardStartsOn": "Standard inaanza tarehe {{date}} kwa {{price}}.",
-      "yourStandardMonthlyPrice": "bei yako ya kila mwezi kwa Standard",
-      "perMonth": "/mwezi",
-      "earlybirdAccessUntil": "Unaweza kutumia Earlybird hadi {{date}}.",
-      "earlybirdEnding": "Earlybird inaisha baada ya {{remaining}}.",
-      "paymentPastDue": "Malipo yamechelewa. Tafadhali sasisha njia yako ya malipo.",
-      "subscriptionCancels": "Usajili utaghairiwa tarehe {{date}}.",
-      "trialDaysRemaining": "Jaribio lina muda uliobaki wa {{remaining}}.",
-      "trialEndingSoon": "Jaribio linaisha hivi karibuni: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Hifadhi ya mabadiliko"
-    },
-    "changelog": {
-      "title": "Mapya",
-      "couldNotLoad": "Imeshindikana kupakia kumbukumbu ya mabadiliko.",
-      "noUpdates": "Hakuna masasisho bado",
-      "noUpdatesDescription": "Maelezo ya mabadiliko yataonekana hapa.",
-      "recentUpdates": "Masasisho ya hivi karibuni",
-      "manageVersion": "Simamia toleo",
-      "redeployRequired": "Lazima usambaze upya",
-      "redeploySuggested": "Inapendekezwa kusambaza upya",
-      "upgradeRequired": "Kusasisha kunahitajika"
-    },
-    "dashboard": {
-      "title": "Dashibodi",
-      "couldNotLoad": "Imeshindikana kupakia dashibodi.",
-      "renameInstance": "Badilisha jina la kizio",
-      "renamePlaceholder": "Jina jipya (lisizidi vibambo 50)",
-      "someDetailsFailed": "Imeshindikana kupakia baadhi ya taarifa za wakati halisi.",
-      "destroy": "Futa kabisa",
-      "destroyMessage": "Kitendo hiki kitafuta kabisa kizio chako cha KiloClaw na data yake yote. Hakiwezi kutenduliwa.",
-      "destroyTitle": "Futa kizio kabisa",
-      "instance": "Kizio",
-      "couldNotCheckStatus": "Imeshindikana kuangalia hali ya huduma.",
-      "dangerZone": "ENEO LA HATARI",
-      "destroying": "Inafuta kabisa…",
-      "serviceDegraded": "Huduma haifanyi kazi kikamilifu — gusa ili uone hali",
-      "up": "INAFANYA KAZI"
-    },
-    "channels": {
-      "title": "Vituo",
-      "couldNotLoad": "Imeshindikana kupakia chaneli.",
-      "noChannels": "Hakuna chaneli zinazopatikana",
-      "noChannelsDescription": "Miunganisho ya chaneli itaonekana hapa.",
-      "connected": "{{label}} imeunganishwa",
-      "disconnectMessage": "Ungependa kuondoa {{label}}? Muunganisho wa chaneli hii utakatishwa.",
-      "disconnectTitle": "Katisha muunganisho wa chaneli"
-    },
-    "devicePairing": {
-      "title": "Uoanishaji wa vifaa",
-      "refreshRequests": "Onyesha upya maombi ya uoanishaji",
-      "couldNotLoad": "Imeshindikana kupakia maombi ya uoanishaji.",
-      "noPending": "Hakuna maombi yanayosubiri",
-      "noPendingDescription": "Maombi ya uoanishaji wa chaneli na vifaa yataonekana hapa.",
-      "channelRequests": "Maombi ya chaneli",
-      "deviceRequests": "Maombi ya vifaa",
-      "approveDeviceMessage": "Ungependa kuruhusu {{platform}} kuunganishwa kwenye kizio chako?",
-      "approveDeviceTitle": "Idhinisha kifaa",
-      "approveMessage": "Ungependa kuruhusu {{label}} (msimbo: {{code}}) kuunganishwa kwenye kizio chako?",
-      "approveTitle": "Idhinisha ombi la uoanishaji",
-      "unknownDevice": "Kifaa kisichojulikana"
-    },
-    "execPolicy": {
-      "title": "Sera ya utekelezaji",
-      "couldNotLoad": "Imeshindikana kupakia sera ya utekelezaji.",
-      "alwaysAsk": "Uliza kila wakati",
-      "alwaysAskDescription": "Thibitisha kila amri kabla ya kuitekeleza. Hili ndilo chaguo salama zaidi.",
-      "neverAsk": "Usiulize kamwe",
-      "neverAskDescription": "Tekeleza amri bila uthibitisho. Hii ni haraka zaidi lakini usalama wake ni mdogo."
-    },
-    "google": {
-      "title": "Akaunti ya Google",
-      "couldNotLoad": "Imeshindikana kupakia hali ya akaunti ya Google.",
-      "disconnected": "Muunganisho wa akaunti ya Google umekatishwa. Sambaza upya kizio chako ili mabadiliko yatumike.",
-      "setupCommand": "Amri ya usanidi",
-      "setupCommandHelp": "Kwenye kompyuta yako yenye Docker iliyosakinishwa, tekeleza amri hii kwenye kiolesura cha amri ili uunganishe akaunti yako ya Google.",
-      "failedToLoadCommand": "Imeshindikana kupakia amri ya usanidi.",
-      "gmailNotifications": "Arifa za Gmail",
-      "disconnect": "Katisha muunganisho wa akaunti ya Google",
-      "copied": "Imenakiliwa",
-      "copyCommand": "Nakili amri",
-      "disconnectConfirm": "Katisha muunganisho",
-      "disconnectMessage": "Ungependa kuondoa akaunti yako ya Google kwenye kizio hiki? Hii itazima arifa za Gmail. Baada ya kukatisha muunganisho, sambaza upya kizio ili mabadiliko yatumike.",
-      "disconnectTitle": "Katisha muunganisho wa Google"
-    },
-    "modelList": {
-      "noMatches": "Hakuna modeli zinazolingana na utafutaji wako",
-      "noModelsDescription": "Modeli zitaonekana hapa zikipatikana.",
-      "noResultsFor": "Hakuna matokeo ya \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Siri",
-      "couldNotLoad": "Imeshindikana kupakia siri.",
-      "noSecrets": "Hakuna siri zinazopatikana",
-      "noSecretsDescription": "Miunganisho ya siri itaonekana hapa.",
-      "removeMessage": "Ungependa kuondoa {{label}}? Zana hii haitaweza tena kufikia taarifa zake za uthibitishaji.",
-      "removeTitle": "Ondoa siri",
-      "saved": "{{label}} imehifadhiwa",
-      "hide": "Ficha {{label}}",
-      "show": "Onyesha {{label}}",
-      "allFieldsRequired": "Lazima ujaze sehemu zote ili uunganishe {{label}}.",
-      "setupGuideFallback": "mwongozo wa usanidi",
-      "setupGuideA11y": "mwongozo wa usanidi wa {{label}}",
-      "setupGuide": "Mwongozo wa usanidi",
-      "saving": "Inahifadhi…",
-      "removing": "Inaondoa…",
-      "updateToken": "Sasisha tokeni"
-    },
-    "versionPin": {
-      "title": "Kufunga toleo",
-      "couldNotLoad": "Imeshindikana kupakia taarifa za toleo.",
-      "couldNotLoadMore": "Imeshindikana kupakia matoleo zaidi.",
-      "loadMore": "Pakia matoleo zaidi",
-      "showingLatest": "Inaonyesha matoleo 100 ya hivi karibuni.",
-      "availableVersions": "Matoleo yanayopatikana",
-      "noVersions": "Hakuna matoleo yanayopatikana",
-      "noVersionsDescription": "Matoleo ya OpenClaw yanayopatikana yataonekana hapa.",
-      "unpin": "Ondoa kifungo",
-      "unpinMessage": "Ungependa kurudi kwenye toleo jipya zaidi linalopatikana?",
-      "unpinTitle": "Ondoa kifungo cha toleo",
-      "confirmPin": "Thibitisha kifungo",
-      "followingLatest": "Inafuata toleo jipya zaidi",
-      "latest": "jipya zaidi",
-      "pin": "Funga toleo",
-      "pinnedByAdmin": "Msimamizi amefunga toleo — wasiliana naye ili kulibadilisha.",
-      "pinnedTo": "Imefungwa kwenye {{version}}",
-      "reasonOptional": "Sababu (hiari)",
-      "reasonPlaceholder": "Sababu ya kufunga toleo hili",
-      "replaceAdminPin": "Badilisha kifungo cha msimamizi",
-      "replacesAdminPin": "Hii itabadilisha kifungo cha toleo kilichowekwa na msimamizi (kwa sasa {{label}})."
-    },
-    "redeploy": "Sambaza tena",
-    "redeployMessage": "Una uhakika unataka kusambaza upya kizio hiki?",
-    "redeployTitle": "Sambaza upya kizio",
-    "controls": {
-      "redeploying": "Inasambaza upya…",
-      "restart": "Anzisha upya",
-      "restartOpenClawMessage": "Una uhakika unataka kuanzisha mchakato wa OpenClaw upya?",
-      "restartOpenClawTitle": "Anzisha OpenClaw upya",
-      "restarting": "Inaanzisha upya…",
-      "start": "Anzisha",
-      "startMessage": "Una uhakika unataka kuanzisha kizio hiki?",
-      "startTitle": "Anzisha kizio",
-      "stop": "Simamisha",
-      "stopMessage": "Una uhakika unataka kusimamisha kizio hiki?",
-      "stopTitle": "Simamisha kizio",
-      "stopping": "Inasimamisha…"
-    },
-    "empty": {
-      "finishingSetup": "Usanidi unakamilishwa",
-      "finishingSetupDescription": "Subiri kidogo tunapokamilisha usanidi wa akaunti yako. Kwa kawaida hii huchukua muda mfupi.",
-      "getStarted": "Anza",
-      "noInstancesDescription": "Unda kizio chako cha kwanza ili uanze kuendesha mawakala wa kuandika msimbo."
-    },
-    "instance": {
-      "backToInstances": "Rudi kwenye vizio",
-      "couldNotLoad": "Imeshindikana kupakia kizio.",
-      "notFound": "Kizio hakijapatikana",
-      "notFoundDescription": "Huenda kizio hiki kimefutwa kabisa, au kiungo si halali tena."
-    },
-    "list": {
-      "createInstance": "Unda kizio",
-      "organizations": "Mashirika",
-      "accessIssue": {
-        "trialExpired": "Jaribio limeisha — jisajili ili uendelee kutumia kizio hiki",
-        "subscriptionCanceled": "Usajili hautumiki — jisajili tena ili uendelee kutumia kizio hiki",
-        "subscriptionPastDue": "Kuna tatizo la malipo — sasisha taarifa za malipo ili uendelee kutumia kizio hiki",
-        "quarantined": "Kizio kimetengwa — kinahitaji kukaguliwa na mtu",
-        "multipleCurrentConflict": "Akaunti inahitaji ukaguzi",
-        "nonCanonicalEarlybird": "Mpango wa zamani unahitaji ukaguzi"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Zungumza na {{name}}",
-        "ready": "{{name}} yuko tayari",
-        "warmedUp": "Kila kitu kiko tayari. Sema hujambo ukiwa tayari."
-      },
-      "flow": {
-        "genericErrorBody": "Hatukuweza kukamilisha usanidi wa kizio chako sasa hivi.",
-        "manualReviewBody": "Hali ya akaunti yako inahitaji kushughulikiwa kabla hatujaweza kuunda kizio. Endelea kwenye kilo.ai.",
-        "manualReviewTitle": "Usanidi unahitaji kukaguliwa na mtu",
-        "openKiloAi": "Fungua kilo.ai",
-        "provisioning": "Utayarishaji",
-        "review": "Ukaguzi",
-        "identityTitle": "Utambulisho wa boti yako",
-        "couldNotLoad": "Imeshindikana kupakia hali ya usanidi.",
-        "finishingSetup": "Tunakamilisha usanidi — subiri tunapomalizia kuandaa akaunti yako.",
-        "ready": "Tayari",
-        "settingUp": "Inasanidi…"
-      },
-      "unavailableDescription": "Unahitaji usajili wa KiloClaw unaotumika ili kutayarisha kizio. Vizio na usajili uliopo vinaendelea kama kawaida.",
-      "unavailableTitle": "Vizio vipya vya KiloClaw havipatikani",
-      "identity": {
-        "chooseAvatar": "Chagua picha ya wasifu",
-        "namePlaceholder": "Jina la boti yako",
-        "selectAvatar": "Chagua {{name}} kuwa picha ya wasifu",
-        "personality": "Haiba",
-        "changePersonality": "Badilisha haiba",
-        "location": "Mahali",
-        "locationPlaceholder": "Mji au eneo (hiari)",
-        "useCurrentLocation": "Tumia mahali ulipo sasa",
-        "locationDeniedTitle": "Ruhusa ya kupata mahali ulipo imekataliwa",
-        "locationDeniedMessage": "Ruhusu ufikiaji wa mahali ulipo kwenye mipangilio ili kutumia mahali ulipo sasa.",
-        "locationValidationFailed": "Imeshindikana kuthibitisha mahali ulipo.",
-        "locationResolveFailed": "Imeshindikana kutambua mahali ulipo. Unaweza kubadilisha taarifa hiyo mwenyewe.",
-        "locationGetFailed": "Imeshindikana kupata mahali ulipo. Andika taarifa hiyo mwenyewe.",
-        "nature": {
-          "aiAssistantLabel": "Msaidizi wa AI",
-          "aiAssistantVibe": "Anasaidia, ana uwezo, anafanya kazi kitaalamu",
-          "digitalCreatureLabel": "Kiumbe cha kidijitali",
-          "digitalCreatureVibe": "Kina tabia zisizo za kawaida, kiko hai, hakitabiriki kabisa",
-          "virtualCompanionLabel": "Rafiki wa kidijitali",
-          "virtualCompanionVibe": "Mchangamfu, yupo kwa ajili yako, anajali kwa dhati",
-          "somethingWeirderLabel": "Kitu cha ajabu zaidi…",
-          "somethingWeirderVibe": "Fafanua mwenyewe"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Nimemaliza! Nimeandaa muhtasari ulioomba. Niko tayari ukiwa tayari.",
-        "settingUp": "Inasanidi arifa…",
-        "stayInTheLoop": "Endelea kupata taarifa",
-        "getNotified": "Pokea arifa {{name}} anapomaliza kazi ili usikose jibu.",
-        "now": "sasa",
-        "skipForNow": "Ruka kwa sasa",
-        "couldNotEnable": "Imeshindikana kuwezesha arifa."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Imeshindikana kuangalia hali ya usanidi",
-        "queryErrorBody": "Muunganisho ulikatika tulipokuwa tukiangalia usanidi wa {{name}}. Huenda bado unaendelea. Jaribu tena au angalia baada ya muda mfupi.",
-        "stoppedTitle": "Usanidi umesimamishwa",
-        "stoppedBody": "Kizio cha {{name}} kilisimama bila kutarajiwa wakati wa usanidi.",
-        "stalledTitle": "Kuna kitu kimekwama",
-        "stalledBody": "Hatukuweza kukamilisha usanidi wa {{name}}. Jaribu tena, au tuma barua pepe kwa {{supportEmail}} ikiwa tatizo hili linaendelea.",
-        "timeoutTitle": "Inachukua muda mrefu kuliko ilivyotarajiwa",
-        "timeoutBody": "Usanidi wa {{name}} unachukua muda mrefu kuliko kawaida (zaidi ya dakika {{displayMinutes}}).",
-        "continueInBackground": "Endelea chinichini",
-        "settingUp": "Usanidi wa {{name}}",
-        "connectingToAgent": "Inaunganisha kwa wakala",
-        "startingSandbox": "Inaanzisha mazingira yaliyotengwa",
-        "backgroundHint": "Kwa kawaida hii huchukua chini ya dakika moja. Unaweza kufunga skrini hii — tutaendelea kufanya kazi chinichini."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Msimbo {{code}}",
-      "gatewayProcess": "MCHAKATO WA LANGO",
-      "lastExit": "Kusitishwa kwa mwisho",
-      "memory": "Kumbukumbu",
-      "region": "Eneo",
-      "resources": "RASILIMALI",
-      "restarts": "Idadi ya kuanzishwa upya",
-      "state": "Hali",
-      "uptime": "Muda wa kufanya kazi",
-      "crashed": "IMEPATA HITILAFU",
-      "destroying": "INAFUTWA",
-      "provisioned": "IMETAYARISHWA",
-      "restarting": "INAANZISHWA UPYA",
-      "running": "INAENDELEA",
-      "shuttingDown": "INAZIMA",
-      "starting": "INAANZA",
-      "stopped": "IMESIMAMA",
-      "stopping": "INASIMAMISHWA",
-      "unknown": "HAIJULIKANI",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Ya hali ya juu",
-      "frontierDescription": "Utendaji wa juu zaidi. Huelekeza kwenye modeli za hali ya juu zenye uwezo wa kufikiri.",
-      "balancedDescription": "Uwiano mzuri wa kasi na uwezo kwa gharama ya chini.",
-      "autoModelA11y": "modeli ya kiotomatiki ya {{label}}",
-      "currentModel": "Modeli ya sasa",
-      "browseAllModels": "au chagua kati ya modeli zaidi ya 500",
-      "browseAllModelsA11y": "Vinjari modeli zote zaidi ya 500"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Ili uendelee kutumia KiloClaw, nenda kwenye kilo.ai/claw kupitia kivinjari chako. Huwezi kujisajili ndani ya programu.",
-      "subscriptionCanceledTitle": "Jiunge na usajili kwenye wavuti",
-      "subscriptionCanceledBody": "Ili utumie KiloClaw, nenda kwenye kilo.ai/claw kupitia kivinjari chako. Huwezi kujisajili ndani ya programu.",
-      "subscriptionCanceledCta": "Fungua kilo.ai/claw",
-      "subscriptionPastDueTitle": "Sasisha malipo kwenye wavuti",
-      "subscriptionPastDueBody": "Tulipata tatizo kwenye malipo yako ya mwisho. Nenda kwenye kilo.ai/claw kupitia kivinjari chako ili usasishe taarifa za malipo. Huwezi kusimamia malipo ndani ya programu.",
-      "quarantinedTitle": "Kizio kinahitaji kurekebishwa",
-      "quarantinedBody": "Kizio chako cha KiloClaw kimetengwa na hakiwezi kutumika sasa hivi. Timu yetu inahitaji kusaidia kukirejesha.",
-      "multipleCurrentConflictBody": "Tumepata zaidi ya usajili mmoja unaotumika kwenye akaunti yako. Tumesitisha huduma kwa muda ili usitozwe mara mbili.",
-      "multipleCurrentConflictCta": "Endelea kwenye kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Mpango wa zamani umegunduliwa",
-      "nonCanonicalEarlybirdBody": "Mpango wako wa ufikiaji wa mapema unahitaji kukaguliwa na mtu kabla ya kutumika kwenye simu.",
-      "iosTitle": "KiloClaw haipatikani kwenye iOS",
-      "iosBody": "Ufikiaji wa KiloClaw unasimamiwa nje ya programu ya iOS kwa akaunti hii.",
-      "iosContact": "Maswali? Wasiliana na {{supportEmail}}.",
-      "quarantinedCta": "Tuma barua pepe kwa timu yetu",
-      "nonCanonicalEarlybirdCta": "Kagua mpango wako kwenye kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} inahitaji kushughulikiwa: {{label}}",
-      "openUnread_one": "Fungua {{name}}, ujumbe {{displayCount}} ambao haujasomwa",
-      "openUnread": "Fungua {{name}}, ujumbe {{displayCount}} ambao haujasomwa",
-      "openUnread_other": "Fungua {{name}}, ujumbe {{displayCount}} ambao haujasomwa",
-      "openSettings": "Fungua mipangilio ya {{name}}",
-      "fixOnKiloAi": "Suluhisha kwenye kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Idhinisha maombi ya vifaa",
-      "execPolicyDescription": "Mipangilio ya usalama",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Uchaguzi wa modeli ya AI",
-      "secretsDescription": "Taarifa za uthibitishaji zilizosimbwa kwa njia fiche",
-      "versionPinDescription": "Funga kwenye toleo mahususi"
-    },
-    "avatar": {
-      "arcade": "Mashine ya michezo",
-      "brain": "Ubongo",
-      "creature": "Kiumbe",
-      "crystal": "Fuwele",
-      "custom": "Picha maalum ya wasifu",
-      "dragon": "Joka",
-      "explorer": "Mtafiti",
-      "flame": "Mwali",
-      "lightning": "Radi",
-      "magicWand": "Fimbo ya kichawi",
-      "moon": "Mwezi",
-      "operator": "Opereta",
-      "orbit": "Mzingo",
-      "oracle": "Mtabiri",
-      "rainbow": "Upinde wa mvua",
-      "robot": "Roboti",
-      "satellite": "Satelaiti",
-      "sparkles": "Vimeta",
-      "strongArm": "Mkono wenye nguvu",
-      "talisman": "Hirizi"
-    },
-    "remoteSpawnFilesNotSupported": "Kizio hiki hakiwezi kupokea faili.",
-    "instanceSwitcherTitle": "Kizio cha KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Sogeza {{filename}} kushoto",
       "moveRight": "Sogeza {{filename}} kulia"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Bandika picha kutoka kwenye ubao wa kunakili",
-      "label": "Picha imetambuliwa, gusa ubandike"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Maktaba ya picha",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Ungependa kutoka kwenye akaunti kwenye kifaa hiki?",
     "signOutThisSessionTitle": "Ungependa kuondoka kwenye kikao hiki?",
     "signOutThisSessionMessage": "{{device}} kitaondolewa kwenye akaunti. Kinaweza kuendelea kufikia API kwa hadi saa moja.",
-    "webBrowser": "Kivinjari cha wavuti"
+    "webBrowser": "Kivinjari cha wavuti",
+    "unknownDevice": "Kifaa kisichojulikana"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Imeshindikana kufungua duka la programu.",

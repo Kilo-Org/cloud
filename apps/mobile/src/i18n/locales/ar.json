@@ -101,12 +101,9 @@
     "scheduled": "مجدول",
     "keepEditing": "متابعة التعديل",
     "keepRunning": "متابعة التشغيل",
-    "kiloclaw": "KiloClaw",
     "newSession": "جلسة جديدة",
-    "noKiloclawInstances": "لا توجد مثيلات KiloClaw",
     "noModelsAvailable": "لا توجد نماذج متاحة",
     "notFound": "لم نعثر على العنصر المطلوب.",
-    "online": "متصل",
     "open": "فتح {{name}}",
     "openPullRequest": "فتح طلب السحب",
     "pending": "قيد الانتظار",
@@ -257,7 +254,8 @@
     "renamePasskey": "إعادة تسمية مفتاح المرور",
     "removePasskey": "إزالة مفتاح المرور",
     "removePasskeyTitle": "إزالة مفتاح المرور؟",
-    "removePasskeyMessage": "لن تتمكن بعد الآن من تسجيل الدخول بمفتاح المرور هذا."
+    "removePasskeyMessage": "لن تتمكن بعد الآن من تسجيل الدخول بمفتاح المرور هذا.",
+    "changelog": "ما الجديد"
   },
   "preferences": {
     "general": "عام",
@@ -320,23 +318,18 @@
     "previewGenericDescription": "تُعلمك الإشعارات بوجود نشاط جديد دون عرض محتواه. افتح Kilo لقراءته.",
     "channel": {
       "agentProgress": "تقدم الوكيل",
-      "chat": "رسائل الدردشة",
-      "kiloclaw": "نشاط KiloClaw",
       "balance": "تنبيهات الرصيد",
       "security": "ملاحظات الأمان",
       "spend": "تنبيهات الإنفاق",
       "followedSessions": "الجلسات المتابَعة"
     },
     "category": {
-      "chatMessagesSubtitle": "الردود في محادثاتك",
       "agentAttentionTitle": "الوكيل بحاجة إليك",
       "agentAttentionSubtitle": "أسئلة وطلبات إذن ومعلومات مطلوبة",
       "agentUpdatesTitle": "تحديثات الوكيل",
       "agentUpdatesSubtitle": "رسائل من الوكيل أثناء تنفيذ المهمة",
       "sessionStatusTitle": "حالة الجلسة",
       "sessionStatusSubtitle": "مكتملة / تعذّر إكمالها / جاهزة للتحكم",
-      "kiloclawActivitySubtitle": "جاهزية المثيل أو فشله، وإجراءات مجدولة",
-      "kiloclawActivityUnavailable": "ابدأ مثيل KiloClaw للحصول على نشاط KiloClaw.",
       "balanceAlertsSubtitle": "تحذيرات انخفاض رصيد المؤسسة",
       "balanceAlertsUnavailable": "انضم إلى مؤسسة للحصول على تنبيهات الرصيد.",
       "securityFindingsSubtitle": "نتائج جديدة وتذكيرات SLA",
@@ -356,72 +349,19 @@
   },
   "tabs": {
     "home": "الرئيسية",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}، تبويب، {{position}} من {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "تبديل المثيل",
-      "couldNotLoadInstances": "تعذّر تحميل المثيلات.",
-      "noInstancesDescription": "أعِدّ مثيلًا لبدء الدردشة.",
-      "setUpKiloclaw": "إعداد KiloClaw",
-      "currentInstance": "{{title}}، المثيل الحالي"
-    },
     "conversation": {
-      "failedToLoad": "تعذّر تحميل المحادثة.",
-      "notFound": "المحادثة غير موجودة.",
       "untitled": "بدون عنوان",
-      "leaveTitle": "مغادرة المحادثة؟",
-      "leaveMessage": "سيؤدي هذا إلى إزالتها من قائمتك.",
-      "openHint": "يفتح المحادثة. اضغط مطولًا لعرض خيارات إعادة التسمية والمغادرة.",
-      "unread": "غير مقروءة",
-      "optionsFor": "خيارات المحادثة: {{title}}",
-      "options": "خيارات المحادثة",
-      "renameTitle": "إعادة تسمية المحادثة",
-      "renamePlaceholder": "الاسم الجديد",
-      "couldNotReachBot": "تعذّر الاتصال بالروبوت. حاول مرة أخرى.",
-      "messageDeliveryFailed": "تعذّر تسليم الرسالة إلى الروبوت.",
-      "couldNotSignIn": "تعذّر تسجيل الدخول إلى الدردشة.",
-      "couldNotRefreshMessages": "تعذّر تحديث الرسائل.",
-      "couldNotLoadHistory": "تعذّر تحميل سجل المحادثة.",
-      "leave": "مغادرة",
-      "untitledConversation": "محادثة بدون عنوان",
-      "createFailed": "تعذّر إنشاء المحادثة.",
-      "leaveFailed": "تعذّرت مغادرة المحادثة."
-    },
-    "reactions": {
-      "common": "التفاعلات الشائعة",
-      "reactWith": "التفاعل بـ {{reaction}}",
-      "accessibility": "تفاعل {{emoji}}، {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "الرد على",
-      "cancelReply": "إلغاء الرد",
-      "openInstance": "فتح المثيل",
-      "attachFile": "إرفاق ملف",
-      "cancelEdit": "إلغاء التعديل"
+      "renamePlaceholder": "الاسم الجديد"
     },
     "conversationList": {
-      "couldNotLoad": "تعذّر تحميل المحادثات.",
-      "emptyTitle": "لا توجد محادثات بعد",
-      "emptyDescription": "أنشئ محادثة لبدء الدردشة مع مثيل KiloClaw الخاص بك.",
-      "create": "إنشاء محادثة",
-      "newConversation": "محادثة جديدة",
-      "openInstanceSettings": "فتح إعدادات المثيل",
       "today": "اليوم",
       "yesterday": "أمس",
-      "thisWeek": "هذا الأسبوع",
       "older": "محادثات أقدم"
     },
     "attachment": {
-      "open": "فتح {{filename}}",
-      "openFailed": "تعذر فتح المرفق. تحقق من اتصالك وحاول مرة أخرى.",
-      "attachFailed": "تعذّر إرفاق الملف.",
-      "limit": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفات.",
-      "sizeRejection": "يتجاوز حجم {{filename}} الحد الأقصى للمرفق، وهو {{limit}}.",
-      "unreadable": "تعذر قراءة {{filename}}.",
-      "pastedImage": "الصورة الملصقة",
-      "defaultName": "مرفق",
       "classificationDenied": "لا يمكن إرفاق الملفات القابلة للتنفيذ.",
       "classificationEmpty": "الملف فارغ.",
       "classificationTooLarge": "يجب ألا يتجاوز حجم الملف 20 ميغابايت.",
@@ -431,438 +371,17 @@
       "networkError": "حدث خطأ في الشبكة.",
       "uploadFailed": "تعذّر الرفع.",
       "nothingToPaste": "لا يوجد محتوى للصقه.",
-      "metadataStripFailed": "تعذّرت إزالة البيانات الوصفية للصورة.",
-      "limit_one": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملف.",
-      "limit_other": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفات.",
-      "limit_zero": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفات.",
-      "limit_two": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفان.",
-      "limit_few": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفات.",
-      "limit_many": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفًا."
+      "metadataStripFailed": "تعذّرت إزالة البيانات الوصفية للصورة."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}، {{status}}",
-      "retryUploading": "إعادة محاولة رفع {{filename}}",
-      "remove": "إزالة {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[رسالة محذوفة]",
-      "yourMessage": "رسالتك",
-      "messageFrom": "رسالة من {{author}}",
-      "moreActions": "مزيد من الإجراءات",
-      "notDelivered": "لم يتم التسليم",
-      "edited": "(تم التعديل)",
-      "image": "صورة"
+      "accessibility": "{{filename}}، {{status}}"
     },
     "messageActions": {
-      "copied": "تم النسخ",
-      "copyFailed": "تعذّر النسخ.",
-      "title": "إجراءات الرسالة",
-      "deleteTitle": "حذف الرسالة؟",
-      "deleteMessage": "سيؤدي هذا إلى إزالة الرسالة من المحادثة.",
-      "deleteFailed": "تعذّر حذف الرسالة.",
-      "removeReactionFailed": "تعذّرت إزالة التفاعل.",
-      "addReactionFailed": "تعذّرت إضافة التفاعل.",
-      "retrySend": "إعادة الإرسال",
-      "moreReactions": "مزيد من التفاعلات",
-      "edit": "تعديل",
-      "sendFailed": "تعذّر إرسال الرسالة.",
-      "retrySendFailed": "تعذّرت إعادة الإرسال.",
-      "editFailed": "تعذّر تعديل الرسالة.",
-      "executeFailed": "تعذّر تنفيذ الإجراء."
+      "edit": "تعديل"
     },
     "attachmentPicker": {
-      "takePhoto": "التقاط صورة",
-      "photoLibrary": "مكتبة الصور",
-      "files": "ملف",
       "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة."
-    },
-    "typingIndicator": {
-      "someone": "شخص ما",
-      "typing_one": "{{name}} يكتب...",
-      "typing": "{{names}} يكتبون...",
-      "typing_other": "{{names}} يكتبون...",
-      "typing_zero": "لا أحد يكتب الآن… {{names}}",
-      "typing_two": "{{names}} يكتبان…",
-      "typing_few": "{{names}} يكتبون…",
-      "typing_many": "{{names}} يكتبون…"
-    },
-    "botStatus": {
-      "offline": "غير متصل",
-      "loadingUser": "جارٍ تحميل بيانات المستخدم...",
-      "waitingForStatus": "في انتظار حالة الروبوت...",
-      "offlineMessage": "الروبوت غير متصل. سيُستأنف تبادل الرسائل عند اتصاله مجددًا."
-    },
-    "errors": {
-      "notAllowed": "هذا الإجراء غير مسموح به.",
-      "messageTooLong": "الرسالة طويلة جدًا. اجعل عدد أحرفها أقل من {{limit}}.",
-      "titleTooLong": "العنوان طويل جدًا. اجعل عدد أحرفه أقل من {{limit}}.",
-      "messageEmpty": "لا يمكن إرسال رسالة فارغة."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "تعذّر تحميل مثيلات KiloClaw.",
-    "billing": {
-      "title": "الفوترة",
-      "continueMonthToMonth": "المتابعة باشتراك شهري",
-      "plan": "خطة",
-      "finalTermEnds": "نهاية الفترة الأخيرة",
-      "afterFinalTerm": "بعد الفترة الأخيرة",
-      "ends": "تاريخ الانتهاء",
-      "expires": "انتهاء الصلاحية",
-      "noActivePlan": "لا توجد خطة نشطة",
-      "noActivePlanDescription": "ليس لديك اشتراك نشط في KiloClaw.",
-      "managedByAdmin": "يدير مسؤول مؤسستك الفوترة.",
-      "couldNotLoad": "تعذّر تحميل معلومات الفوترة.",
-      "manageOnWeb": "إدارة الفوترة على الويب",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "تنتهي الفترة الأخيرة من خطة Commit في {{date}}. تابع بخطة Standard بسعر {{price}}، وإلا فستنتهي الاستضافة.",
-      "freeTrial": "فترة تجريبية مجانية",
-      "hostingEnds": "تنتهي الاستضافة",
-      "renews": "تاريخ التجديد",
-      "standardMonthToMonth": "خطة Standard باشتراك شهري",
-      "standardStartsOn": "تبدأ خطة Standard في {{date}} بسعر {{price}}.",
-      "yourStandardMonthlyPrice": "السعر الشهري لخطة Standard لديك",
-      "perMonth": "/شهر",
-      "earlybirdAccessUntil": "يتاح لك استخدام خطة Earlybird حتى {{date}}.",
-      "earlybirdEnding": "الوقت المتبقي حتى انتهاء خطة Earlybird: {{remaining}}.",
-      "paymentPastDue": "تأخر سداد الدفعة المستحقة. حدّث طريقة الدفع.",
-      "subscriptionCancels": "سيُلغى الاشتراك في {{date}}.",
-      "trialDaysRemaining": "المتبقي من الفترة التجريبية: {{remaining}}.",
-      "trialEndingSoon": "تنتهي الفترة التجريبية قريبًا. الوقت المتبقي: {{remaining}}.",
-      "lessThanOneDay": "أقل من يوم واحد",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "إيداع"
-    },
-    "changelog": {
-      "title": "ما الجديد",
-      "couldNotLoad": "تعذّر تحميل سجل التغييرات.",
-      "noUpdates": "لا توجد تحديثات بعد",
-      "noUpdatesDescription": "ستظهر تفاصيل التحديثات هنا.",
-      "recentUpdates": "التحديثات الأخيرة",
-      "manageVersion": "إدارة الإصدار",
-      "redeployRequired": "إعادة النشر مطلوبة",
-      "redeploySuggested": "إعادة النشر مقترحة",
-      "upgradeRequired": "الترقية مطلوبة"
-    },
-    "dashboard": {
-      "title": "لوحة التحكم",
-      "couldNotLoad": "تعذّر تحميل لوحة التحكم.",
-      "renameInstance": "إعادة تسمية المثيل",
-      "renamePlaceholder": "اسم جديد (50 حرفًا كحد أقصى)",
-      "someDetailsFailed": "تعذّر تحميل بعض التفاصيل الآنية.",
-      "destroy": "حذف نهائي",
-      "destroyMessage": "سيُحذف مثيل KiloClaw وجميع بياناته نهائيًا. لا يمكن التراجع عن هذا الإجراء.",
-      "destroyTitle": "حذف المثيل نهائيًا",
-      "instance": "المثيل",
-      "couldNotCheckStatus": "تعذّر التحقق من حالة الخدمة.",
-      "dangerZone": "إجراءات خطرة",
-      "destroying": "جارٍ الحذف النهائي…",
-      "serviceDegraded": "تراجع أداء الخدمة — اضغط لعرض الحالة",
-      "up": "يعمل"
-    },
-    "channels": {
-      "title": "القنوات",
-      "couldNotLoad": "تعذّر تحميل القنوات.",
-      "noChannels": "لا توجد قنوات متاحة",
-      "noChannelsDescription": "ستظهر هنا خدمات القنوات التي يمكنك ربطها.",
-      "connected": "تم ربط {{label}}",
-      "disconnectMessage": "إزالة {{label}}؟ سيُلغى ربط هذه القناة.",
-      "disconnectTitle": "إلغاء ربط القناة"
-    },
-    "devicePairing": {
-      "title": "إقران الأجهزة",
-      "refreshRequests": "تحديث طلبات الإقران",
-      "couldNotLoad": "تعذّر تحميل طلبات الإقران.",
-      "noPending": "لا توجد طلبات قيد الانتظار",
-      "noPendingDescription": "ستظهر طلبات إقران القنوات والأجهزة هنا.",
-      "channelRequests": "طلبات القنوات",
-      "deviceRequests": "طلبات الأجهزة",
-      "approveDeviceMessage": "هل تسمح باتصال {{platform}} بمثيلك؟",
-      "approveDeviceTitle": "الموافقة على طلب الجهاز",
-      "approveMessage": "هل تسمح باتصال {{label}} (الرمز: {{code}}) بمثيلك؟",
-      "approveTitle": "الموافقة على طلب الإقران",
-      "unknownDevice": "جهاز غير معروف"
-    },
-    "execPolicy": {
-      "title": "سياسة التنفيذ",
-      "couldNotLoad": "تعذّر تحميل سياسة التنفيذ.",
-      "alwaysAsk": "طلب التأكيد دائمًا",
-      "alwaysAskDescription": "يُطلب التأكيد قبل تنفيذ كل أمر. هذا هو الخيار الأكثر أمانًا.",
-      "neverAsk": "عدم طلب التأكيد",
-      "neverAskDescription": "تُنفّذ الأوامر دون تأكيد. هذا الخيار أسرع لكنه أقل أمانًا."
-    },
-    "google": {
-      "title": "حساب Google",
-      "couldNotLoad": "تعذّر تحميل حالة حساب Google.",
-      "disconnected": "أُلغي ربط حساب Google. أعد نشر مثيلك لتطبيق التغيير.",
-      "setupCommand": "أمر الإعداد",
-      "setupCommandHelp": "لربط حسابك على Google، ثبّت Docker على حاسوبك ثم شغّل هذا الأمر في الطرفية.",
-      "failedToLoadCommand": "تعذّر تحميل أمر الإعداد.",
-      "gmailNotifications": "إشعارات Gmail",
-      "disconnect": "إلغاء ربط حساب Google",
-      "copied": "تم النسخ",
-      "copyCommand": "نسخ الأمر",
-      "disconnectConfirm": "إلغاء الربط",
-      "disconnectMessage": "إزالة حسابك على Google من هذا المثيل؟ سيؤدي ذلك إلى تعطيل إشعارات Gmail. أعد النشر بعد إلغاء الربط لتطبيق التغييرات.",
-      "disconnectTitle": "إلغاء ربط Google"
-    },
-    "modelList": {
-      "noMatches": "لا توجد نماذج تطابق بحثك",
-      "noModelsDescription": "ستظهر النماذج هنا عندما تصبح متاحة.",
-      "noResultsFor": "لا توجد نتائج تطابق «{{query}}»."
-    },
-    "secrets": {
-      "title": "البيانات السرية",
-      "couldNotLoad": "تعذّر تحميل البيانات السرية.",
-      "noSecrets": "لا توجد بيانات سرية متاحة",
-      "noSecretsDescription": "ستظهر هنا الخدمات التي يمكنك ربطها باستخدام بيانات سرية.",
-      "removeMessage": "إزالة {{label}}؟ لن تتمكن هذه الأداة من الوصول إلى بيانات اعتمادها.",
-      "removeTitle": "إزالة البيانات السرية",
-      "saved": "تم حفظ {{label}}",
-      "allFieldsRequired": "يجب ملء جميع الحقول لربط {{label}}.",
-      "hide": "إخفاء {{label}}",
-      "removing": "جارٍ الإزالة…",
-      "saving": "جارٍ الحفظ…",
-      "setupGuide": "دليل الإعداد",
-      "setupGuideA11y": "دليل إعداد {{label}}",
-      "setupGuideFallback": "دليل الإعداد",
-      "show": "إظهار {{label}}",
-      "updateToken": "تحديث الرمز المميز"
-    },
-    "versionPin": {
-      "title": "تثبيت الإصدار",
-      "couldNotLoad": "تعذّر تحميل معلومات الإصدار.",
-      "couldNotLoadMore": "تعذّر تحميل المزيد من الإصدارات.",
-      "loadMore": "تحميل المزيد من الإصدارات",
-      "showingLatest": "تُعرض أحدث 100 نسخة.",
-      "availableVersions": "الإصدارات المتاحة",
-      "noVersions": "لا توجد إصدارات متاحة",
-      "noVersionsDescription": "ستظهر إصدارات OpenClaw المتاحة هنا.",
-      "unpin": "إلغاء تثبيت النسخة",
-      "unpinMessage": "العودة إلى أحدث إصدار متاح؟",
-      "unpinTitle": "إلغاء تثبيت النسخة المختارة",
-      "confirmPin": "تأكيد تثبيت النسخة",
-      "followingLatest": "استخدام الأحدث تلقائيًا",
-      "latest": "الأحدث",
-      "pin": "تثبيت النسخة",
-      "pinnedByAdmin": "ثبّت المسؤول النسخة المستخدمة. تواصل معه لتغييرها.",
-      "pinnedTo": "النسخة المثبّتة: {{version}}",
-      "reasonOptional": "السبب (اختياري)",
-      "reasonPlaceholder": "سبب تثبيت هذه النسخة",
-      "replaceAdminPin": "تغيير النسخة التي ثبّتها المسؤول",
-      "replacesAdminPin": "سيحل هذا الاختيار محل النسخة التي ثبّتها المسؤول (حاليًا {{label}})."
-    },
-    "redeploy": "إعادة النشر",
-    "redeployMessage": "هل تريد إعادة نشر هذا المثيل؟",
-    "redeployTitle": "إعادة نشر المثيل",
-    "accessRequired": {
-      "iosBody": "تُدار صلاحية الوصول إلى KiloClaw خارج تطبيق iOS لهذا الحساب.",
-      "iosContact": "لديك أسئلة؟ تواصل مع {{supportEmail}}.",
-      "iosTitle": "KiloClaw غير متاح في iOS",
-      "multipleCurrentConflictBody": "وجدنا أكثر من اشتراك نشط في حسابك، لذا أوقفنا الخدمة مؤقتًا لتجنب تحصيل الرسوم مرتين.",
-      "multipleCurrentConflictCta": "متابعة على kilo.ai",
-      "nonCanonicalEarlybirdBody": "تحتاج خطة الوصول المبكر لديك إلى مراجعة يدوية قبل استخدامها على الجوال.",
-      "nonCanonicalEarlybirdTitle": "تم اكتشاف خطة قديمة",
-      "quarantinedBody": "مثيل KiloClaw معزول ولا يمكن استخدامه الآن. يجب أن يتدخل فريقنا للمساعدة في استعادته.",
-      "quarantinedTitle": "المثيل يحتاج إلى إصلاح",
-      "subscriptionCanceledBody": "لاستخدام KiloClaw، انتقل إلى kilo.ai/claw من متصفحك. لا يمكنك الاشتراك داخل التطبيق.",
-      "subscriptionCanceledCta": "فتح kilo.ai/claw",
-      "subscriptionCanceledTitle": "الاشتراك عبر الموقع",
-      "subscriptionPastDueBody": "واجهنا مشكلة في دفعتك الأخيرة. انتقل إلى kilo.ai/claw من متصفحك لتحديث بيانات الدفع. لا يمكنك إدارة الفوترة داخل التطبيق.",
-      "subscriptionPastDueTitle": "تحديث بيانات الدفع عبر الويب",
-      "trialExpiredBody": "لمواصلة استخدام KiloClaw، انتقل إلى kilo.ai/claw من متصفحك. لا يمكنك الاشتراك داخل التطبيق.",
-      "quarantinedCta": "مراسلة فريقنا عبر البريد",
-      "nonCanonicalEarlybirdCta": "مراجعة خطتك على kilo.ai"
-    },
-    "controls": {
-      "redeploying": "جارٍ إعادة النشر…",
-      "restart": "إعادة التشغيل",
-      "restartOpenClawMessage": "هل تريد إعادة تشغيل عملية OpenClaw؟",
-      "restartOpenClawTitle": "إعادة تشغيل OpenClaw",
-      "restarting": "جارٍ إعادة التشغيل…",
-      "start": "تشغيل",
-      "startMessage": "هل تريد تشغيل هذا المثيل؟",
-      "startTitle": "تشغيل المثيل",
-      "stop": "إيقاف",
-      "stopMessage": "هل تريد إيقاف هذا المثيل؟",
-      "stopTitle": "إيقاف المثيل",
-      "stopping": "جارٍ الإيقاف…"
-    },
-    "empty": {
-      "finishingSetup": "جارٍ إكمال الإعداد",
-      "finishingSetupDescription": "انتظر قليلًا ريثما نكمل إعداد حسابك. لا يستغرق ذلك عادةً وقتًا طويلًا.",
-      "getStarted": "البدء",
-      "noInstancesDescription": "أنشئ مثيلك الأول لبدء تشغيل وكلاء البرمجة."
-    },
-    "instance": {
-      "backToInstances": "العودة إلى المثيلات",
-      "couldNotLoad": "تعذّر تحميل المثيل.",
-      "notFound": "المثيل غير موجود",
-      "notFoundDescription": "ربما حُذف هذا المثيل نهائيًا، أو لم يعد الرابط صالحًا."
-    },
-    "instanceCard": {
-      "fixOnKiloAi": "الإصلاح على kilo.ai: {{label}}",
-      "needsAttention": "{{name}} يحتاج إلى تدخل: {{label}}",
-      "openSettings": "فتح إعدادات {{name}}",
-      "openUnread": "فتح {{name}}، الرسائل غير المقروءة: {{displayCount}}",
-      "openUnread_other": "فتح {{name}}، الرسائل غير المقروءة: {{displayCount}}",
-      "openUnread_one": "فتح {{name}}، رسالة غير مقروءة ({{displayCount}})",
-      "openUnread_zero": "فتح {{name}}، عدد الرسائل غير المقروءة: {{displayCount}}",
-      "openUnread_two": "فتح {{name}}، رسالتان غير مقروءتان ({{displayCount}})",
-      "openUnread_few": "فتح {{name}}، {{displayCount}} رسائل غير مقروءة",
-      "openUnread_many": "فتح {{name}}، {{displayCount}} رسالةً غير مقروءة"
-    },
-    "list": {
-      "createInstance": "إنشاء مثيل",
-      "organizations": "المؤسسات",
-      "accessIssue": {
-        "trialExpired": "انتهت الفترة التجريبية، اشترك لمواصلة استخدام هذا المثيل",
-        "subscriptionCanceled": "الاشتراك غير نشط، أعد الاشتراك لمواصلة استخدام هذا المثيل",
-        "subscriptionPastDue": "مشكلة في الدفع، حدّث بيانات الفوترة لمواصلة استخدام هذا المثيل",
-        "quarantined": "المثيل معزول ويحتاج إلى مراجعة يدوية",
-        "multipleCurrentConflict": "الحساب يحتاج إلى مراجعة",
-        "nonCanonicalEarlybird": "الخطة القديمة تحتاج إلى مراجعة"
-      }
-    },
-    "modelPicker": {
-      "autoModelA11y": "النموذج التلقائي: {{label}}",
-      "balancedDescription": "توازن ذكي بين السرعة والقدرة بتكلفة أقل.",
-      "browseAllModels": "أو اختر من بين أكثر من 500 نموذج",
-      "browseAllModelsA11y": "استعراض جميع النماذج التي يزيد عددها عن 500",
-      "currentModel": "النموذج الحالي",
-      "frontierDescription": "أعلى أداء. يوجّه الطلبات إلى أحدث النماذج المتقدمة التي تدعم الاستدلال.",
-      "frontierLabel": "متقدم",
-      "kiloAuto": "Kilo Auto"
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "الدردشة مع {{name}}",
-        "ready": "{{name}} جاهز",
-        "warmedUp": "كل شيء جاهز. ألقِ التحية متى شئت."
-      },
-      "flow": {
-        "couldNotLoad": "تعذّر تحميل حالة الإعداد.",
-        "finishingSetup": "جارٍ إكمال الإعداد. انتظر قليلًا ريثما نكمل إعداد حسابك.",
-        "genericErrorBody": "لم نتمكن من إنهاء إعداد مثيلك الآن.",
-        "identityTitle": "هوية روبوتك",
-        "manualReviewBody": "تحتاج إلى معالجة مشكلة في حسابك قبل أن نتمكن من إنشاء مثيل. تابع على kilo.ai.",
-        "manualReviewTitle": "يحتاج الإعداد إلى مراجعة يدوية",
-        "openKiloAi": "فتح kilo.ai",
-        "provisioning": "التجهيز",
-        "ready": "جاهز",
-        "review": "مراجعة",
-        "settingUp": "جارٍ الإعداد…"
-      },
-      "identity": {
-        "changePersonality": "تغيير الشخصية",
-        "chooseAvatar": "اختيار الصورة الرمزية",
-        "location": "الموقع",
-        "locationDeniedMessage": "فعّل الوصول إلى الموقع في الإعدادات لاستخدام موقعك الحالي.",
-        "locationDeniedTitle": "تم رفض الوصول إلى الموقع",
-        "locationGetFailed": "تعذّر الحصول على موقعك. أدخله يدويًا.",
-        "locationPlaceholder": "المدينة أو المنطقة (اختياري)",
-        "locationResolveFailed": "تعذّر تحديد موقعك. يمكنك تعديله يدويًا.",
-        "locationValidationFailed": "تعذّر التحقق من الموقع.",
-        "namePlaceholder": "اسم الروبوت",
-        "nature": {
-          "aiAssistantLabel": "مساعد ذكاء اصطناعي",
-          "aiAssistantVibe": "متعاون وكفؤ ومحترف",
-          "digitalCreatureLabel": "كائن رقمي",
-          "digitalCreatureVibe": "غريب الأطوار ونابض بالحياة ويصعب توقع تصرفاته أحيانًا",
-          "somethingWeirderLabel": "شيء أغرب…",
-          "somethingWeirderVibe": "عرّفه بنفسك",
-          "virtualCompanionLabel": "رفيق افتراضي",
-          "virtualCompanionVibe": "ودود ومتواجد ويهتم بصدق"
-        },
-        "personality": "الشخصية",
-        "selectAvatar": "اختيار {{name}} كصورة رمزية",
-        "useCurrentLocation": "استخدام الموقع الحالي"
-      },
-      "notifications": {
-        "couldNotEnable": "تعذّر تفعيل الإشعارات.",
-        "getNotified": "تلقّ إشعارًا عندما ينهي {{name}} مهمة حتى لا يفوتك أي رد.",
-        "mockMessage": "انتهيت! جهّزت الملخص الذي طلبته. يمكنك الاطلاع عليه متى شئت.",
-        "now": "الآن",
-        "settingUp": "جارٍ إعداد الإشعارات…",
-        "skipForNow": "تخطي الآن",
-        "stayInTheLoop": "ابقَ على اطلاع"
-      },
-      "provisioning": {
-        "backgroundHint": "يستغرق الإعداد عادةً أقل من دقيقة. يمكنك إغلاق هذه الشاشة، وسنواصل العمل في الخلفية.",
-        "connectingToAgent": "جارٍ الاتصال بالوكيل",
-        "continueInBackground": "المتابعة في الخلفية",
-        "queryErrorBody": "انقطع الاتصال أثناء التحقق من تقدّم إعداد {{name}}. ربما لا يزال الإعداد جاريًا. حاول مرة أخرى أو عُد بعد قليل.",
-        "queryErrorTitle": "تعذّر التحقق من تقدّم الإعداد",
-        "settingUp": "جارٍ إعداد {{name}}",
-        "stalledBody": "لم نتمكن من إنهاء إعداد {{name}}. حاول مرة أخرى، أو راسل {{supportEmail}} إذا استمر حدوث ذلك.",
-        "stalledTitle": "تعثّر الإعداد",
-        "startingSandbox": "جارٍ تشغيل البيئة المعزولة",
-        "stoppedBody": "توقف مثيل {{name}} بشكل غير متوقع أثناء الإعداد.",
-        "stoppedTitle": "توقف الإعداد",
-        "timeoutBody": "يستغرق إعداد {{name}} وقتًا أطول من المعتاد (أكثر من {{displayMinutes}} دقيقة).",
-        "timeoutTitle": "يستغرق وقتًا أطول من المتوقع"
-      },
-      "unavailableDescription": "يلزم اشتراك نشط في KiloClaw لتجهيز مثيل. تستمر المثيلات والاشتراكات الحالية كالمعتاد.",
-      "unavailableTitle": "مثيلات KiloClaw الجديدة غير متاحة"
-    },
-    "status": {
-      "cpu": "المعالج",
-      "exitCode": "رمز الخروج: {{code}}",
-      "gatewayProcess": "عملية البوابة",
-      "lastExit": "آخر خروج",
-      "memory": "الذاكرة",
-      "region": "المنطقة",
-      "resources": "الموارد",
-      "restarts": "مرات إعادة التشغيل",
-      "state": "الحالة",
-      "uptime": "مدة التشغيل",
-      "crashed": "متعطل",
-      "destroying": "جارٍ الحذف النهائي",
-      "provisioned": "تم التجهيز",
-      "restarting": "جارٍ إعادة التشغيل",
-      "running": "قيد التشغيل",
-      "shuttingDown": "جارٍ إيقاف التشغيل",
-      "starting": "جارٍ البدء",
-      "stopped": "متوقف",
-      "stopping": "جارٍ الإيقاف",
-      "unknown": "غير معروف",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "settings": {
-      "channelsDescription": "Telegram وDiscord وSlack",
-      "devicePairingDescription": "الموافقة على طلبات الأجهزة",
-      "execPolicyDescription": "إعدادات الأمان",
-      "googleDescription": "Gmail وCalendar وDocs",
-      "modelDescription": "اختيار نموذج الذكاء الاصطناعي",
-      "secretsDescription": "بيانات اعتماد مشفّرة",
-      "versionPinDescription": "تثبيت النسخة المستخدمة على إصدار محدد"
-    },
-    "avatar": {
-      "arcade": "آركيد",
-      "brain": "دماغ",
-      "creature": "مخلوق",
-      "crystal": "بلورة",
-      "custom": "صورة رمزية مخصصة",
-      "dragon": "تنين",
-      "explorer": "مستكشف",
-      "flame": "لهب",
-      "lightning": "برق",
-      "magicWand": "عصا سحرية",
-      "moon": "قمر",
-      "operator": "مشغّل",
-      "orbit": "مدار",
-      "oracle": "عرّاف",
-      "rainbow": "قوس قزح",
-      "robot": "روبوت",
-      "satellite": "قمر صناعي",
-      "sparkles": "بريق",
-      "strongArm": "ذراع قوية",
-      "talisman": "طلسم"
-    },
-    "remoteSpawnFilesNotSupported": "لا يمكن لهذا المثيل استقبال الملفات.",
-    "instanceSwitcherTitle": "مثيل KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2098,10 +1617,6 @@
       "moveLeft": "نقل {{filename}} إلى اليسار",
       "moveRight": "نقل {{filename}} إلى اليمين"
     },
-    "attachmentPasteHint": {
-      "accessibility": "لصق صورة من الحافظة",
-      "label": "لصق الصورة من الحافظة"
-    },
     "attachmentPicker": {
       "camera": "الكاميرا",
       "photoLibrary": "مكتبة الصور",
@@ -2321,7 +1836,8 @@
     "sessionSignedOut": "تم تسجيل الخروج من الجلسة.",
     "signOutThisDeviceTitle": "تسجيل الخروج من هذا الجهاز؟",
     "signOutThisSessionTitle": "تسجيل الخروج من هذه الجلسة؟",
-    "signOutThisSessionMessage": "سيتم تسجيل الخروج من {{device}}. قد يظل قادرًا على الوصول إلى API لمدة تصل إلى ساعة."
+    "signOutThisSessionMessage": "سيتم تسجيل الخروج من {{device}}. قد يظل قادرًا على الوصول إلى API لمدة تصل إلى ساعة.",
+    "unknownDevice": "جهاز غير معروف"
   },
   "forceUpdate": {
     "couldNotOpenStore": "تعذّر فتح متجر التطبيقات.",

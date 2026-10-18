@@ -340,7 +340,7 @@ vi.mock('@/components/agents/session-message-list', () => ({
     );
   },
 }));
-vi.mock('@/components/kilo-chat/hooks/use-cli-session-presence', () => ({
+vi.mock('@/lib/hooks/use-cli-session-presence', () => ({
   resolveLoadedCliSessionPresenceId: vi.fn(),
   useCliSessionPresence: vi.fn(),
 }));

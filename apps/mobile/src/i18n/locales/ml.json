@@ -101,12 +101,9 @@
     "scheduled": "ഷെഡ്യൂൾ ചെയ്തത്",
     "keepEditing": "തിരുത്തുന്നത് തുടരുക",
     "keepRunning": "പ്രവർത്തനം തുടരുക",
-    "kiloclaw": "KiloClaw",
     "newSession": "പുതിയ സെഷൻ",
-    "noKiloclawInstances": "KiloClaw ഇൻസ്റ്റൻസുകളൊന്നുമില്ല",
     "noModelsAvailable": "മോഡലുകൾ ലഭ്യമല്ല",
     "notFound": "കണ്ടെത്താനായില്ല.",
-    "online": "ഓൺലൈൻ",
     "open": "{{name}} തുറക്കുക",
     "openPullRequest": "തുറന്ന പുൾ റിക്വസ്റ്റ്",
     "pending": "കാത്തിരിക്കുന്നു",
@@ -257,7 +254,8 @@
     "renamePasskey": "പാസ്കീ പുനർനാമകരണം ചെയ്യുക",
     "removePasskey": "പാസ്കീ നീക്കുക",
     "removePasskeyTitle": "പാസ്കീ നീക്കണോ?",
-    "removePasskeyMessage": "ഈ പാസ്കീ ഉപയോഗിച്ച് ഇനി സൈൻ ഇൻ ചെയ്യാനാവില്ല."
+    "removePasskeyMessage": "ഈ പാസ്കീ ഉപയോഗിച്ച് ഇനി സൈൻ ഇൻ ചെയ്യാനാവില്ല.",
+    "changelog": "പുതിയ വിശേഷങ്ങൾ"
   },
   "preferences": {
     "general": "പൊതുവായത്",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "സന്ദേശത്തിന്റെ ഉള്ളടക്കത്തിന് പകരം പുതിയ പ്രവർത്തനമുണ്ടെന്ന വിവരം മാത്രം അറിയിപ്പുകളിൽ കാണിക്കും. സന്ദേശം വായിക്കാൻ Kilo തുറക്കുക.",
     "channel": {
       "agentProgress": "ഏജന്റിന്റെ പുരോഗതി",
-      "chat": "ചാറ്റ് സന്ദേശങ്ങൾ",
-      "kiloclaw": "KiloClaw പ്രവർത്തനം",
       "balance": "ബാലൻസ് മുന്നറിയിപ്പുകൾ",
       "security": "സുരക്ഷാ കണ്ടെത്തലുകൾ",
       "spend": "ചെലവ് മുന്നറിയിപ്പുകൾ",
       "followedSessions": "പിന്തുടരുന്ന സെഷനുകൾ"
     },
     "category": {
-      "chatMessagesSubtitle": "നിങ്ങളുടെ സംഭാഷണങ്ങളിലെ മറുപടികൾ",
       "agentAttentionTitle": "ഏജന്റിന് നിങ്ങളുടെ സഹായം വേണം",
       "agentAttentionSubtitle": "ഉത്തരം, അനുമതി, വിവരങ്ങൾ എന്നിവയ്ക്കുള്ള അഭ്യർത്ഥനകൾ",
       "agentUpdatesTitle": "ഏജന്റ് അപ്ഡേറ്റുകൾ",
       "agentUpdatesSubtitle": "ജോലിക്കിടെ ഏജന്റ് അയയ്ക്കുന്ന സന്ദേശങ്ങൾ",
       "sessionStatusTitle": "സെഷൻ നില",
       "sessionStatusSubtitle": "പൂർത്തിയായി / പരാജയപ്പെട്ടു / നിയന്ത്രിക്കാൻ തയ്യാർ",
-      "kiloclawActivitySubtitle": "ഇൻസ്റ്റൻസ് തയ്യാറാകൽ/പരാജയപ്പെടൽ, മുൻകൂട്ടി നിശ്ചയിച്ച പ്രവർത്തനങ്ങൾ",
-      "kiloclawActivityUnavailable": "KiloClaw പ്രവർത്തനം ലഭിക്കാൻ ഒരു KiloClaw ഇൻസ്റ്റൻസ് ആരംഭിക്കുക.",
       "balanceAlertsSubtitle": "ഓർഗനൈസേഷന്റെ ബാലൻസ് കുറയുമ്പോഴുള്ള മുന്നറിയിപ്പുകൾ",
       "balanceAlertsUnavailable": "ബാലൻസ് മുന്നറിയിപ്പുകൾ ലഭിക്കാൻ ഒരു ഓർഗനൈസേഷനിൽ ചേരുക.",
       "securityFindingsSubtitle": "പുതിയ കണ്ടെത്തലുകളും SLA ഓർമ്മപ്പെടുത്തലുകളും",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "ഹോം",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, ടാബ്, {{total}}-ൽ {{position}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "ഇൻസ്റ്റൻസ് തിരഞ്ഞെടുക്കൽ",
-      "couldNotLoadInstances": "ഇൻസ്റ്റൻസുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "noInstancesDescription": "ചാറ്റ് ചെയ്യാൻ ഒരു ഇൻസ്റ്റൻസ് സജ്ജീകരിക്കുക.",
-      "setUpKiloclaw": "KiloClaw സജ്ജീകരിക്കുക",
-      "currentInstance": "{{title}}, ഇപ്പോൾ ഉപയോഗിക്കുന്നത്"
-    },
     "conversation": {
-      "failedToLoad": "സംഭാഷണം ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "notFound": "സംഭാഷണം കണ്ടെത്തിയില്ല.",
       "untitled": "പേരില്ലാത്തത്",
-      "leaveTitle": "സംഭാഷണത്തിൽ നിന്ന് പുറത്തുപോകണോ?",
-      "leaveMessage": "ഇത് സംഭാഷണത്തെ നിങ്ങളുടെ പട്ടികയിൽ നിന്ന് നീക്കം ചെയ്യും.",
-      "openHint": "സംഭാഷണം തുറക്കുന്നു. പേര് മാറ്റാനോ പുറത്തുപോകാനോ അമർത്തിപ്പിടിക്കുക.",
-      "unread": "വായിക്കാത്തത്",
-      "optionsFor": "{{title}}-നുള്ള സംഭാഷണ ഓപ്ഷനുകൾ",
-      "options": "സംഭാഷണ ഓപ്ഷനുകൾ",
-      "renameTitle": "സംഭാഷണത്തിന്റെ പേര് മാറ്റൽ",
-      "renamePlaceholder": "പുതിയ പേര്",
-      "couldNotReachBot": "ബോട്ടുമായി ബന്ധപ്പെടാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
-      "messageDeliveryFailed": "ബോട്ടിന് സന്ദേശം എത്തിക്കാൻ കഴിഞ്ഞില്ല.",
-      "couldNotSignIn": "ചാറ്റിൽ സൈൻ ഇൻ ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "couldNotRefreshMessages": "സന്ദേശങ്ങൾ പുതുക്കാൻ കഴിഞ്ഞില്ല.",
-      "couldNotLoadHistory": "സംഭാഷണ ചരിത്രം ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "leave": "പുറത്തുപോകുക",
-      "untitledConversation": "പേരില്ലാത്ത സംഭാഷണം",
-      "createFailed": "സംഭാഷണം സൃഷ്ടിക്കാൻ കഴിഞ്ഞില്ല.",
-      "leaveFailed": "സംഭാഷണത്തിൽ നിന്ന് പുറത്തുപോകാൻ കഴിഞ്ഞില്ല."
-    },
-    "reactions": {
-      "common": "പതിവായി ഉപയോഗിക്കുന്നവ",
-      "reactWith": "{{reaction}} ഉപയോഗിച്ച് പ്രതികരിക്കുക",
-      "accessibility": "{{emoji}} പ്രതികരണം, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "മറുപടി നൽകുന്നത്",
-      "cancelReply": "മറുപടി റദ്ദാക്കുക",
-      "openInstance": "ഇൻസ്റ്റൻസ് തുറക്കുക",
-      "attachFile": "ഫയൽ അറ്റാച്ച് ചെയ്യുക",
-      "cancelEdit": "തിരുത്തൽ റദ്ദാക്കുക"
+      "renamePlaceholder": "പുതിയ പേര്"
     },
     "conversationList": {
-      "couldNotLoad": "സംഭാഷണങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "emptyTitle": "ഇതുവരെ സംഭാഷണങ്ങളില്ല",
-      "emptyDescription": "നിങ്ങളുടെ KiloClaw ഇൻസ്റ്റൻസുമായി ചാറ്റ് ചെയ്യാൻ ഒരു സംഭാഷണം സൃഷ്ടിക്കുക.",
-      "create": "സംഭാഷണം സൃഷ്ടിക്കുക",
-      "newConversation": "പുതിയ സംഭാഷണം",
-      "openInstanceSettings": "ഇൻസ്റ്റൻസ് ക്രമീകരണങ്ങൾ തുറക്കുക",
       "today": "ഇന്ന്",
       "yesterday": "ഇന്നലെ",
-      "thisWeek": "ഈ ആഴ്ച",
       "older": "പഴയവ"
     },
     "attachment": {
-      "open": "{{filename}} തുറക്കുക",
-      "openFailed": "അറ്റാച്ച്മെന്റ് തുറക്കാനായില്ല. നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
-      "attachFailed": "ഫയൽ അറ്റാച്ച് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "limit": "പരമാവധി {{displayCount}} ഫയലുകൾ അറ്റാച്ച് ചെയ്യാം.",
-      "sizeRejection": "{{filename}} എന്ന ഫയലിന്റെ വലുപ്പം അറ്റാച്ച്മെന്റിനുള്ള {{limit}} പരിധി കവിയുന്നു.",
-      "unreadable": "{{filename}} വായിക്കാനായില്ല.",
-      "pastedImage": "ഒട്ടിച്ച ചിത്രം",
-      "defaultName": "അറ്റാച്ച്മെന്റ്",
       "classificationDenied": "എക്സിക്യൂട്ടബിൾ ഫയലുകൾ അറ്റാച്ച് ചെയ്യാൻ കഴിയില്ല.",
       "classificationEmpty": "ഫയൽ ശൂന്യമാണ്.",
       "classificationTooLarge": "ഫയലുകളുടെ വലുപ്പം 20 MB-യോ അതിൽ കുറവോ ആയിരിക്കണം.",
@@ -943,426 +883,17 @@
       "networkError": "നെറ്റ്വർക്കിൽ പിശകുണ്ടായി.",
       "uploadFailed": "അപ്ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "nothingToPaste": "ഒട്ടിക്കാൻ ഒന്നുമില്ല.",
-      "metadataStripFailed": "ഫോട്ടോയുടെ മെറ്റാഡാറ്റ നീക്കം ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "limit_one": "പരമാവധി {{displayCount}} ഫയൽ അറ്റാച്ച് ചെയ്യാം.",
-      "limit_other": "പരമാവധി {{displayCount}} ഫയലുകൾ അറ്റാച്ച് ചെയ്യാം."
+      "metadataStripFailed": "ഫോട്ടോയുടെ മെറ്റാഡാറ്റ നീക്കം ചെയ്യാൻ കഴിഞ്ഞില്ല."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}} — {{status}}",
-      "retryUploading": "{{filename}} അപ്ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
-      "remove": "{{filename}} നീക്കം ചെയ്യുക"
-    },
-    "messageBubble": {
-      "deleted": "[ഇല്ലാതാക്കിയ സന്ദേശം]",
-      "yourMessage": "നിങ്ങളുടെ സന്ദേശം",
-      "messageFrom": "{{author}} അയച്ച സന്ദേശം",
-      "moreActions": "കൂടുതൽ പ്രവർത്തനങ്ങൾ",
-      "notDelivered": "എത്തിച്ചിട്ടില്ല",
-      "edited": "(തിരുത്തിയത്)",
-      "image": "ചിത്രം"
+      "accessibility": "{{filename}} — {{status}}"
     },
     "messageActions": {
-      "copied": "പകർത്തി",
-      "copyFailed": "പകർത്താൻ കഴിഞ്ഞില്ല.",
-      "title": "സന്ദേശത്തിനുള്ള പ്രവർത്തനങ്ങൾ",
-      "deleteTitle": "സന്ദേശം ഇല്ലാതാക്കണോ?",
-      "deleteMessage": "ഇത് സംഭാഷണത്തിൽ നിന്ന് സന്ദേശം നീക്കം ചെയ്യും.",
-      "deleteFailed": "സന്ദേശം ഇല്ലാതാക്കാൻ കഴിഞ്ഞില്ല.",
-      "removeReactionFailed": "പ്രതികരണം നീക്കം ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "addReactionFailed": "പ്രതികരണം ചേർക്കാൻ കഴിഞ്ഞില്ല.",
-      "retrySend": "വീണ്ടും അയയ്ക്കുക",
-      "moreReactions": "കൂടുതൽ പ്രതികരണങ്ങൾ",
-      "edit": "തിരുത്തുക",
-      "sendFailed": "സന്ദേശം അയയ്ക്കാൻ കഴിഞ്ഞില്ല.",
-      "retrySendFailed": "വീണ്ടും അയയ്ക്കാൻ കഴിഞ്ഞില്ല.",
-      "editFailed": "സന്ദേശം തിരുത്താൻ കഴിഞ്ഞില്ല.",
-      "executeFailed": "പ്രവർത്തനം നടത്താൻ കഴിഞ്ഞില്ല."
+      "edit": "തിരുത്തുക"
     },
     "attachmentPicker": {
-      "takePhoto": "ഫോട്ടോ എടുക്കുക",
-      "photoLibrary": "ഫോട്ടോ ലൈബ്രറി",
-      "files": "ഫയലുകൾ",
       "cameraAccessMessage": "ഫോട്ടോ എടുക്കാൻ ക്രമീകരണങ്ങളിൽ ക്യാമറ ഉപയോഗിക്കാനുള്ള അനുമതി നൽകുക."
-    },
-    "typingIndicator": {
-      "someone": "ആരോ",
-      "typing_one": "{{name}} ടൈപ്പ് ചെയ്യുന്നു...",
-      "typing": "{{names}} ടൈപ്പ് ചെയ്യുന്നു...",
-      "typing_other": "{{names}} ടൈപ്പ് ചെയ്യുന്നു..."
-    },
-    "botStatus": {
-      "offline": "ഓഫ്ലൈൻ",
-      "loadingUser": "ഉപയോക്താവിന്റെ വിവരങ്ങൾ ലോഡ് ചെയ്യുന്നു...",
-      "waitingForStatus": "ബോട്ടിന്റെ നില അറിയാൻ കാത്തിരിക്കുന്നു...",
-      "offlineMessage": "ബോട്ട് ഓഫ്ലൈനാണ്. വീണ്ടും കണക്റ്റ് ചെയ്യുമ്പോൾ സന്ദേശങ്ങൾ അയയ്ക്കുന്നതും സ്വീകരിക്കുന്നതും തുടരും."
-    },
-    "errors": {
-      "notAllowed": "ഇതിന് അനുമതിയില്ല.",
-      "messageTooLong": "സന്ദേശത്തിന് നീളം കൂടുതലാണ്. {{limit}} അക്ഷരങ്ങളിൽ കുറവാക്കി ചുരുക്കുക.",
-      "titleTooLong": "ശീർഷകത്തിന് നീളം കൂടുതലാണ്. {{limit}} അക്ഷരങ്ങളിൽ കുറവാക്കി ചുരുക്കുക.",
-      "messageEmpty": "സന്ദേശം ശൂന്യമായിരിക്കരുത്."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw ഇൻസ്റ്റൻസുകൾ ലോഡ് ചെയ്യാനായില്ല.",
-    "billing": {
-      "title": "ബില്ലിംഗ്",
-      "continueMonthToMonth": "പ്രതിമാസ പ്ലാനിൽ തുടരുക",
-      "plan": "പ്ലാൻ",
-      "finalTermEnds": "അവസാന കാലയളവ് തീരുന്നത്",
-      "afterFinalTerm": "അവസാന കാലയളവിന് ശേഷം",
-      "lessThanOneDay": "1 ദിവസത്തിൽ കുറവ്",
-      "ends": "അവസാനിക്കുന്നത്",
-      "expires": "കാലാവധി തീരുന്നത്",
-      "noActivePlan": "സജീവ പ്ലാൻ ഇല്ല",
-      "noActivePlanDescription": "നിങ്ങൾക്ക് സജീവമായ KiloClaw സബ്സ്ക്രിപ്ഷൻ ഇല്ല.",
-      "managedByAdmin": "ബില്ലിംഗ് നിങ്ങളുടെ ഓർഗനൈസേഷൻ അഡ്മിനാണ് കൈകാര്യം ചെയ്യുന്നത്.",
-      "couldNotLoad": "ബില്ലിംഗ് വിവരങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
-      "manageOnWeb": "വെബിൽ ബില്ലിംഗ് കൈകാര്യം ചെയ്യുക",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "നിങ്ങളുടെ അവസാന Commit കാലയളവ് {{date}}-ന് അവസാനിക്കും. {{price}} നിരക്കിൽ Standard പ്ലാനിൽ തുടരുക. അല്ലെങ്കിൽ ഹോസ്റ്റിംഗ് അവസാനിക്കും.",
-      "freeTrial": "സൗജന്യ പരീക്ഷണം",
-      "hostingEnds": "ഹോസ്റ്റിംഗ് അവസാനിക്കുന്നു",
-      "renews": "പുതുക്കുന്നത്",
-      "standardMonthToMonth": "Standard പ്രതിമാസ പ്ലാൻ",
-      "standardStartsOn": "Standard പ്ലാൻ {{date}}-ന് {{price}} നിരക്കിൽ ആരംഭിക്കും.",
-      "yourStandardMonthlyPrice": "നിങ്ങളുടെ Standard പ്ലാനിന്റെ പ്രതിമാസ നിരക്ക്",
-      "perMonth": "/മാസം",
-      "earlybirdAccessUntil": "Earlybird ഉപയോഗിക്കാൻ {{date}} വരെ സമയമുണ്ട്.",
-      "earlybirdEnding": "Earlybird അവസാനിക്കാൻ {{remaining}} ബാക്കി.",
-      "paymentPastDue": "പണമടയ്ക്കേണ്ട തീയതി കഴിഞ്ഞു. പണമടയ്ക്കൽ രീതി അപ്ഡേറ്റ് ചെയ്യുക.",
-      "subscriptionCancels": "സബ്സ്ക്രിപ്ഷൻ {{date}}-ന് റദ്ദാകും.",
-      "trialDaysRemaining": "സൗജന്യ പരീക്ഷണത്തിന് {{remaining}} ബാക്കിയുണ്ട്.",
-      "trialEndingSoon": "സൗജന്യ പരീക്ഷണം ഉടൻ അവസാനിക്കും: {{remaining}} ബാക്കി.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "കമ്മിറ്റ്"
-    },
-    "changelog": {
-      "title": "പുതിയ വിശേഷങ്ങൾ",
-      "couldNotLoad": "മാറ്റങ്ങളുടെ പട്ടിക ലോഡ് ചെയ്യാനായില്ല.",
-      "noUpdates": "ഇതുവരെ അപ്ഡേറ്റുകളില്ല",
-      "noUpdatesDescription": "പുതിയ മാറ്റങ്ങൾ ഇവിടെ കാണാം.",
-      "recentUpdates": "പുതിയ അപ്ഡേറ്റുകൾ",
-      "manageVersion": "പതിപ്പ് കൈകാര്യം ചെയ്യുക",
-      "redeployRequired": "വീണ്ടും വിന്യസിക്കണം",
-      "redeploySuggested": "വീണ്ടും വിന്യസിക്കുന്നത് ഉചിതം",
-      "upgradeRequired": "അപ്ഗ്രേഡ് ആവശ്യമാണ്"
-    },
-    "dashboard": {
-      "title": "ഡാഷ്ബോർഡ്",
-      "couldNotLoad": "ഡാഷ്ബോർഡ് ലോഡ് ചെയ്യാനായില്ല.",
-      "renameInstance": "ഇൻസ്റ്റൻസിന്റെ പേര് മാറ്റുക",
-      "renamePlaceholder": "പുതിയ പേര് (പരമാവധി 50 പ്രതീകങ്ങൾ)",
-      "someDetailsFailed": "ചില തത്സമയ വിവരങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
-      "destroy": "ഇല്ലാതാക്കുക",
-      "destroyMessage": "നിങ്ങളുടെ KiloClaw ഇൻസ്റ്റൻസും അതിലെ എല്ലാ ഡാറ്റയും എന്നെന്നേക്കുമായി ഇല്ലാതാകും. ഇത് പഴയപടിയാക്കാനാവില്ല.",
-      "destroyTitle": "ഇൻസ്റ്റൻസ് ഇല്ലാതാക്കണോ?",
-      "instance": "ഇൻസ്റ്റൻസ്",
-      "couldNotCheckStatus": "സേവനത്തിന്റെ നില പരിശോധിക്കാനായില്ല.",
-      "dangerZone": "അപകട മേഖല",
-      "destroying": "ഇല്ലാതാക്കുന്നു…",
-      "serviceDegraded": "സേവനത്തിൽ തടസ്സങ്ങളുണ്ട് — നില കാണാൻ ടാപ്പ് ചെയ്യുക",
-      "up": "പ്രവർത്തനക്ഷമം"
-    },
-    "channels": {
-      "title": "ചാനലുകൾ",
-      "couldNotLoad": "ചാനലുകൾ ലോഡ് ചെയ്യാനായില്ല.",
-      "noChannels": "ചാനലുകൾ ലഭ്യമല്ല",
-      "noChannelsDescription": "ചാനൽ സംയോജനങ്ങൾ ഇവിടെ ദൃശ്യമാകും.",
-      "connected": "{{label}} കണക്റ്റ് ചെയ്തു",
-      "disconnectMessage": "{{label}} നീക്കം ചെയ്യണോ? ഈ ചാനലുമായുള്ള ബന്ധം വിച്ഛേദിക്കും.",
-      "disconnectTitle": "ചാനൽ വിച്ഛേദിക്കുക"
-    },
-    "devicePairing": {
-      "title": "ഉപകരണങ്ങൾ ജോടിയാക്കൽ",
-      "refreshRequests": "ജോടിയാക്കൽ അഭ്യർത്ഥനകൾ പുതുക്കുക",
-      "couldNotLoad": "ജോടിയാക്കൽ അഭ്യർത്ഥനകൾ ലോഡ് ചെയ്യാനായില്ല.",
-      "noPending": "അംഗീകാരം കാത്തിരിക്കുന്ന അഭ്യർത്ഥനകളില്ല",
-      "noPendingDescription": "ചാനൽ, ഉപകരണ ജോടിയാക്കൽ അഭ്യർത്ഥനകൾ ഇവിടെ ദൃശ്യമാകും.",
-      "channelRequests": "ചാനൽ അഭ്യർത്ഥനകൾ",
-      "deviceRequests": "ഉപകരണ അഭ്യർത്ഥനകൾ",
-      "approveDeviceMessage": "{{platform}} എന്ന ഉപകരണത്തെ നിങ്ങളുടെ ഇൻസ്റ്റൻസിലേക്ക് കണക്റ്റ് ചെയ്യാൻ അനുവദിക്കണോ?",
-      "approveDeviceTitle": "ഉപകരണം അംഗീകരിക്കുക",
-      "approveMessage": "നിങ്ങളുടെ ഇൻസ്റ്റൻസിലേക്ക് കണക്റ്റ് ചെയ്യാൻ {{label}} (കോഡ്: {{code}}) എന്ന അഭ്യർത്ഥനയ്ക്ക് അനുമതി നൽകണോ?",
-      "approveTitle": "ജോടിയാക്കൽ അഭ്യർത്ഥന അംഗീകരിക്കുക",
-      "unknownDevice": "അജ്ഞാത ഉപകരണം"
-    },
-    "execPolicy": {
-      "title": "കമാൻഡുകൾ പ്രവർത്തിപ്പിക്കുന്നതിനുള്ള നയം",
-      "couldNotLoad": "കമാൻഡ് പ്രവർത്തന നയം ലോഡ് ചെയ്യാനായില്ല.",
-      "alwaysAsk": "എപ്പോഴും ചോദിക്കുക",
-      "alwaysAskDescription": "പ്രവർത്തിപ്പിക്കുന്നതിന് മുമ്പ് ഓരോ കമാൻഡിനും അനുമതി ചോദിക്കുക. ഏറ്റവും സുരക്ഷിതമായ രീതി.",
-      "neverAsk": "ഒരിക്കലും ചോദിക്കരുത്",
-      "neverAskDescription": "അനുമതി ചോദിക്കാതെ കമാൻഡുകൾ പ്രവർത്തിപ്പിക്കുക. വേഗം കൂടുതലാണ്, പക്ഷേ സുരക്ഷ കുറവാണ്."
-    },
-    "google": {
-      "title": "Google അക്കൗണ്ട്",
-      "couldNotLoad": "Google അക്കൗണ്ടിന്റെ നില ലോഡ് ചെയ്യാനായില്ല.",
-      "disconnected": "Google അക്കൗണ്ടുമായുള്ള ബന്ധം വിച്ഛേദിച്ചു. മാറ്റം പ്രയോഗിക്കാൻ ഇൻസ്റ്റൻസ് വീണ്ടും വിന്യസിക്കുക.",
-      "setupCommand": "സജ്ജീകരണ കമാൻഡ്",
-      "setupCommandHelp": "നിങ്ങളുടെ Google അക്കൗണ്ട് കണക്റ്റ് ചെയ്യാൻ, Docker ഇൻസ്റ്റാൾ ചെയ്തിട്ടുള്ള സ്വന്തം കമ്പ്യൂട്ടറിലെ ടെർമിനലിൽ ഈ കമാൻഡ് പ്രവർത്തിപ്പിക്കുക.",
-      "failedToLoadCommand": "സജ്ജീകരണ കമാൻഡ് ലോഡ് ചെയ്യാനായില്ല.",
-      "gmailNotifications": "Gmail അറിയിപ്പുകൾ",
-      "disconnect": "Google അക്കൗണ്ട് വിച്ഛേദിക്കുക",
-      "copied": "പകർത്തി",
-      "copyCommand": "കമാൻഡ് പകർത്തുക",
-      "disconnectConfirm": "വിച്ഛേദിക്കുക",
-      "disconnectMessage": "ഈ ഇൻസ്റ്റൻസിൽ നിന്ന് നിങ്ങളുടെ Google അക്കൗണ്ട് നീക്കം ചെയ്യണോ? ഇതോടെ Gmail അറിയിപ്പുകൾ നിലയ്ക്കും. മാറ്റങ്ങൾ പ്രയോഗിക്കാൻ ബന്ധം വിച്ഛേദിച്ച ശേഷം ഇൻസ്റ്റൻസ് വീണ്ടും വിന്യസിക്കുക.",
-      "disconnectTitle": "Google വിച്ഛേദിക്കുക"
-    },
-    "modelList": {
-      "noMatches": "നിങ്ങളുടെ തിരയലുമായി ഒത്തുപോകുന്ന മോഡലുകളില്ല",
-      "noModelsDescription": "ലഭ്യമായിക്കഴിഞ്ഞാൽ മോഡലുകൾ ഇവിടെ ദൃശ്യമാകും.",
-      "noResultsFor": "\"{{query}}\" എന്നതിന് ഫലങ്ങളൊന്നുമില്ല."
-    },
-    "secrets": {
-      "title": "രഹസ്യ വിവരങ്ങൾ",
-      "couldNotLoad": "രഹസ്യവിവരങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
-      "noSecrets": "രഹസ്യവിവരങ്ങൾ ലഭ്യമല്ല",
-      "noSecretsDescription": "രഹസ്യവിവരങ്ങൾ ഉപയോഗിച്ചുള്ള സംയോജനങ്ങൾ ഇവിടെ കാണാം.",
-      "removeMessage": "{{label}} നീക്കം ചെയ്യണോ? ഈ ടൂളിന് അതിന്റെ പ്രവേശന വിവരങ്ങൾ ഉപയോഗിക്കാൻ കഴിയാതാകും.",
-      "removeTitle": "രഹസ്യവിവരം നീക്കം ചെയ്യുക",
-      "saved": "{{label}} സംരക്ഷിച്ചു",
-      "hide": "{{label}} മറയ്ക്കുക",
-      "show": "{{label}} കാണിക്കുക",
-      "allFieldsRequired": "{{label}} കണക്റ്റ് ചെയ്യാൻ എല്ലാ ഫീൽഡുകളും പൂരിപ്പിക്കണം.",
-      "setupGuideFallback": "സജ്ജീകരണത്തിനുള്ള മാർഗനിർദേശം",
-      "setupGuideA11y": "{{label}} സജ്ജീകരിക്കാനുള്ള സഹായം",
-      "setupGuide": "സജ്ജീകരണത്തിനുള്ള മാർഗനിർദേശം",
-      "saving": "സംരക്ഷിക്കുന്നു…",
-      "removing": "നീക്കം ചെയ്യുന്നു…",
-      "updateToken": "ടോക്കൺ അപ്ഡേറ്റ് ചെയ്യുക"
-    },
-    "versionPin": {
-      "title": "പതിപ്പ് സ്ഥിരപ്പെടുത്തൽ",
-      "couldNotLoad": "പതിപ്പിന്റെ വിവരങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
-      "couldNotLoadMore": "കൂടുതൽ പതിപ്പുകൾ ലോഡ് ചെയ്യാനായില്ല.",
-      "loadMore": "കൂടുതൽ പതിപ്പുകൾ ലോഡ് ചെയ്യുക",
-      "showingLatest": "ഏറ്റവും പുതിയ 100 പതിപ്പുകൾ കാണിക്കുന്നു.",
-      "availableVersions": "ലഭ്യമായ പതിപ്പുകൾ",
-      "noVersions": "പതിപ്പുകൾ ലഭ്യമല്ല",
-      "noVersionsDescription": "ലഭ്യമായ OpenClaw പതിപ്പുകൾ ഇവിടെ ദൃശ്യമാകും.",
-      "unpin": "നിലനിർത്തൽ നീക്കുക",
-      "unpinMessage": "ലഭ്യമായ ഏറ്റവും പുതിയ പതിപ്പിലേക്ക് തിരികെ മാറണോ?",
-      "unpinTitle": "പതിപ്പ് നിലനിർത്തൽ നീക്കണോ?",
-      "confirmPin": "പതിപ്പ് നിലനിർത്തൽ സ്ഥിരീകരിക്കുക",
-      "followingLatest": "ഏറ്റവും പുതിയത് പിന്തുടരുന്നു",
-      "latest": "ഏറ്റവും പുതിയത്",
-      "pin": "നിലനിർത്തുക",
-      "pinnedByAdmin": "അഡ്മിൻ ഈ പതിപ്പ് നിലനിർത്താൻ നിശ്ചയിച്ചു. ഇത് മാറ്റാൻ അഡ്മിനുമായി ബന്ധപ്പെടുക.",
-      "pinnedTo": "{{version}} പതിപ്പ് നിലനിർത്തുന്നു",
-      "reasonOptional": "കാരണം (നിർബന്ധമില്ല)",
-      "reasonPlaceholder": "ഈ പതിപ്പ് നിലനിർത്താനുള്ള കാരണം",
-      "replaceAdminPin": "അഡ്മിൻ നിശ്ചയിച്ച പതിപ്പ് മാറ്റുക",
-      "replacesAdminPin": "ഇത് അഡ്മിൻ നിലനിർത്താൻ നിശ്ചയിച്ച പതിപ്പിന് പകരമാകും (നിലവിൽ {{label}})."
-    },
-    "redeploy": "വീണ്ടും വിന്യസിക്കുക",
-    "redeployMessage": "ഈ ഇൻസ്റ്റൻസ് വീണ്ടും വിന്യസിക്കണമെന്ന് നിങ്ങൾക്ക് ഉറപ്പാണോ?",
-    "redeployTitle": "ഇൻസ്റ്റൻസ് വീണ്ടും വിന്യസിക്കുക",
-    "controls": {
-      "redeploying": "വീണ്ടും വിന്യസിക്കുന്നു…",
-      "restart": "പുനരാരംഭിക്കുക",
-      "restartOpenClawMessage": "OpenClaw പ്രക്രിയ പുനരാരംഭിക്കണമെന്ന് നിങ്ങൾക്ക് ഉറപ്പാണോ?",
-      "restartOpenClawTitle": "OpenClaw പുനരാരംഭിക്കുക",
-      "restarting": "പുനരാരംഭിക്കുന്നു…",
-      "start": "ആരംഭിക്കുക",
-      "startMessage": "ഈ ഇൻസ്റ്റൻസ് ആരംഭിക്കണമെന്ന് നിങ്ങൾക്ക് ഉറപ്പാണോ?",
-      "startTitle": "ഇൻസ്റ്റൻസ് ആരംഭിക്കുക",
-      "stop": "നിർത്തുക",
-      "stopMessage": "ഈ ഇൻസ്റ്റൻസ് നിർത്തണമെന്ന് നിങ്ങൾക്ക് ഉറപ്പാണോ?",
-      "stopTitle": "ഇൻസ്റ്റൻസ് നിർത്തുക",
-      "stopping": "നിർത്തുന്നു…"
-    },
-    "empty": {
-      "finishingSetup": "സജ്ജീകരണം പൂർത്തിയാക്കുന്നു",
-      "finishingSetupDescription": "അൽപ്പം കാത്തിരിക്കുക. നിങ്ങളുടെ അക്കൗണ്ടിന്റെ സജ്ജീകരണം പൂർത്തിയാക്കുന്നു. സാധാരണയായി ഇതിന് അധികം സമയമെടുക്കില്ല.",
-      "getStarted": "ആരംഭിക്കുക",
-      "noInstancesDescription": "കോഡിംഗ് ഏജന്റുകൾ പ്രവർത്തിപ്പിക്കാൻ നിങ്ങളുടെ ആദ്യ ഇൻസ്റ്റൻസ് സൃഷ്ടിക്കുക."
-    },
-    "instance": {
-      "backToInstances": "ഇൻസ്റ്റൻസുകളിലേക്ക് മടങ്ങുക",
-      "couldNotLoad": "ഇൻസ്റ്റൻസ് ലോഡ് ചെയ്യാനായില്ല.",
-      "notFound": "ഇൻസ്റ്റൻസ് കണ്ടെത്തിയില്ല",
-      "notFoundDescription": "ഈ ഇൻസ്റ്റൻസ് ഇല്ലാതാക്കിയിരിക്കാം, അല്ലെങ്കിൽ ലിങ്ക് ഇനി സാധുവല്ല."
-    },
-    "list": {
-      "createInstance": "ഇൻസ്റ്റൻസ് സൃഷ്ടിക്കുക",
-      "organizations": "ഓർഗനൈസേഷനുകൾ",
-      "accessIssue": {
-        "trialExpired": "സൗജന്യ പരീക്ഷണം അവസാനിച്ചു — ഈ ഇൻസ്റ്റൻസ് ഉപയോഗിക്കുന്നത് തുടരാൻ സബ്സ്ക്രൈബ് ചെയ്യുക",
-        "subscriptionCanceled": "സബ്സ്ക്രിപ്ഷൻ സജീവമല്ല — ഈ ഇൻസ്റ്റൻസ് ഉപയോഗിക്കുന്നത് തുടരാൻ വീണ്ടും സബ്സ്ക്രൈബ് ചെയ്യുക",
-        "subscriptionPastDue": "പണമടയ്ക്കുന്നതിൽ പ്രശ്നമുണ്ട് — ഈ ഇൻസ്റ്റൻസ് ഉപയോഗിക്കുന്നത് തുടരാൻ ബില്ലിംഗ് വിവരങ്ങൾ അപ്ഡേറ്റ് ചെയ്യുക",
-        "quarantined": "ഇൻസ്റ്റൻസ് ഒറ്റപ്പെടുത്തിയിരിക്കുന്നു — നേരിട്ടുള്ള അവലോകനം ആവശ്യമാണ്",
-        "multipleCurrentConflict": "അക്കൗണ്ട് പരിശോധിക്കണം",
-        "nonCanonicalEarlybird": "പഴയ പ്ലാൻ അവലോകനം ചെയ്യണം"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}}-നോട് ചാറ്റ് ചെയ്യുക",
-        "ready": "{{name}} തയ്യാറാണ്",
-        "warmedUp": "എല്ലാം തയ്യാറായി. നിങ്ങൾ തയ്യാറാകുമ്പോൾ ഹായ് പറയുക."
-      },
-      "flow": {
-        "genericErrorBody": "നിങ്ങളുടെ ഇൻസ്റ്റൻസിന്റെ സജ്ജീകരണം ഇപ്പോൾ പൂർത്തിയാക്കാനായില്ല.",
-        "manualReviewBody": "ഇൻസ്റ്റൻസ് സൃഷ്ടിക്കുന്നതിന് മുമ്പ് നിങ്ങളുടെ അക്കൗണ്ടിലെ പ്രശ്നം പരിഹരിക്കണം. kilo.ai-യിൽ തുടരുക.",
-        "manualReviewTitle": "സജ്ജീകരണത്തിന് നേരിട്ടുള്ള അവലോകനം ആവശ്യമാണ്",
-        "openKiloAi": "Kilo.ai തുറക്കുക",
-        "provisioning": "ഇൻസ്റ്റൻസ് ഒരുക്കൽ",
-        "review": "പരിശോധന",
-        "identityTitle": "ബോട്ടിന്റെ രൂപവും സ്വഭാവവും",
-        "couldNotLoad": "പ്രാരംഭ സജ്ജീകരണത്തിന്റെ നില ലോഡ് ചെയ്യാനായില്ല.",
-        "finishingSetup": "സജ്ജീകരണം പൂർത്തിയാക്കുന്നു. നിങ്ങളുടെ അക്കൗണ്ട് തയ്യാറാകുന്നതുവരെ അൽപ്പം കാത്തിരിക്കുക.",
-        "ready": "തയ്യാറാണ്",
-        "settingUp": "സജ്ജമാക്കുന്നു…"
-      },
-      "unavailableDescription": "ഇൻസ്റ്റൻസ് ഒരുക്കാൻ സജീവമായ KiloClaw സബ്സ്ക്രിപ്ഷൻ ആവശ്യമാണ്. നിലവിലുള്ള ഇൻസ്റ്റൻസുകളും സബ്സ്ക്രിപ്ഷനുകളും പതിവുപോലെ തുടരും.",
-      "unavailableTitle": "പുതിയ KiloClaw ഇൻസ്റ്റൻസുകൾ ലഭ്യമല്ല",
-      "identity": {
-        "chooseAvatar": "അവതാർ തിരഞ്ഞെടുക്കുക",
-        "namePlaceholder": "ബോട്ടിന്റെ പേര്",
-        "selectAvatar": "{{name}} അവതാറായി തിരഞ്ഞെടുക്കുക",
-        "personality": "വ്യക്തിത്വം",
-        "changePersonality": "വ്യക്തിത്വം മാറ്റുക",
-        "location": "സ്ഥലം",
-        "locationPlaceholder": "നഗരം അല്ലെങ്കിൽ പ്രദേശം (നിർബന്ധമില്ല)",
-        "useCurrentLocation": "നിലവിലെ സ്ഥലം ഉപയോഗിക്കുക",
-        "locationDeniedTitle": "സ്ഥലം അറിയാനുള്ള അനുമതി നിഷേധിച്ചു",
-        "locationDeniedMessage": "നിലവിലെ സ്ഥലം ഉപയോഗിക്കാൻ ക്രമീകരണങ്ങളിൽ സ്ഥലം അറിയാനുള്ള അനുമതി നൽകുക.",
-        "locationValidationFailed": "സ്ഥലം ശരിയാണെന്ന് സ്ഥിരീകരിക്കാനായില്ല.",
-        "locationResolveFailed": "നിങ്ങളുടെ സ്ഥലം തിരിച്ചറിയാനായില്ല. അത് നേരിട്ട് തിരുത്താം.",
-        "locationGetFailed": "നിങ്ങളുടെ സ്ഥലം കണ്ടെത്താനായില്ല. അത് നേരിട്ട് നൽകുക.",
-        "nature": {
-          "aiAssistantLabel": "AI സഹായി",
-          "aiAssistantVibe": "സഹായമനസ്കം, കഴിവുറ്റത്, പ്രൊഫഷണൽ",
-          "digitalCreatureLabel": "ഡിജിറ്റൽ ജീവി",
-          "digitalCreatureVibe": "വേറിട്ട സ്വഭാവം, ചുറുചുറുക്ക്, അൽപ്പം പ്രവചനാതീതം",
-          "virtualCompanionLabel": "വെർച്വൽ കൂട്ടാളി",
-          "virtualCompanionVibe": "സ്നേഹത്തോടെ ഒപ്പമുണ്ടാകും, ആത്മാർത്ഥമായി കരുതും",
-          "somethingWeirderLabel": "കൂടുതൽ വിചിത്രമായ എന്തെങ്കിലും…",
-          "somethingWeirderVibe": "അത് സ്വയം നിർവചിക്കുക"
-        }
-      },
-      "notifications": {
-        "mockMessage": "എല്ലാം പൂർത്തിയായി! നിങ്ങൾ ആവശ്യപ്പെട്ട സംഗ്രഹം ഞാൻ തയ്യാറാക്കി. നിങ്ങൾ തയ്യാറാകുമ്പോൾ നോക്കാം.",
-        "settingUp": "അറിയിപ്പുകൾ സജ്ജമാക്കുന്നു…",
-        "stayInTheLoop": "വിവരങ്ങൾ അറിയാം",
-        "getNotified": "{{name}} ഒരു ജോലി പൂർത്തിയാക്കുമ്പോൾ അറിയിപ്പ് നേടുക. ഒരു മറുപടിയും നഷ്ടമാകില്ല.",
-        "now": "ഇപ്പോൾ",
-        "skipForNow": "ഇപ്പോൾ ഒഴിവാക്കുക",
-        "couldNotEnable": "അറിയിപ്പുകൾ പ്രവർത്തനക്ഷമമാക്കാൻ കഴിഞ്ഞില്ല."
-      },
-      "provisioning": {
-        "queryErrorTitle": "സജ്ജീകരണത്തിന്റെ നില പരിശോധിക്കാനായില്ല",
-        "queryErrorBody": "{{name}}-ന്റെ സജ്ജീകരണം പരിശോധിക്കുമ്പോൾ കണക്ഷൻ നഷ്ടപ്പെട്ടു. സജ്ജീകരണം ഇപ്പോഴും നടക്കുന്നുണ്ടാകാം. വീണ്ടും ശ്രമിക്കുക, അല്ലെങ്കിൽ അൽപ്പം കഴിഞ്ഞ് പരിശോധിക്കുക.",
-        "stoppedTitle": "സജ്ജീകരണം നിലച്ചു",
-        "stoppedBody": "{{name}}-ന്റെ ഇൻസ്റ്റൻസ് സജ്ജീകരണത്തിനിടെ അപ്രതീക്ഷിതമായി നിലച്ചു.",
-        "stalledTitle": "എന്തോ തടസ്സപ്പെട്ടു",
-        "stalledBody": "{{name}}-ന്റെ സജ്ജീകരണം പൂർത്തിയാക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക. ഇത് ആവർത്തിച്ചാൽ {{supportEmail}}-യിലേക്ക് ഇമെയിൽ അയയ്ക്കുക.",
-        "timeoutTitle": "പ്രതീക്ഷിച്ചതിലും കൂടുതൽ സമയമെടുക്കുന്നു",
-        "timeoutBody": "{{name}}-ന്റെ സജ്ജീകരണത്തിന് പതിവിലും കൂടുതൽ സമയമെടുക്കുന്നു ({{displayMinutes}} മിനിറ്റിലധികം).",
-        "continueInBackground": "പശ്ചാത്തലത്തിൽ തുടരുക",
-        "settingUp": "{{name}} സജ്ജമാക്കുന്നു",
-        "connectingToAgent": "ഏജന്റുമായി കണക്റ്റ് ചെയ്യുന്നു",
-        "startingSandbox": "സാൻഡ്ബോക്സ് ആരംഭിക്കുന്നു",
-        "backgroundHint": "സാധാരണയായി ഒരു മിനിറ്റിൽ താഴെ സമയമേ എടുക്കൂ. ഇത് അടയ്ക്കാം — സജ്ജീകരണം പശ്ചാത്തലത്തിൽ തുടരും."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "കോഡ് {{code}}",
-      "gatewayProcess": "ഗേറ്റ്വേ പ്രോസസ്സ്",
-      "lastExit": "അവസാനം നിലച്ചത്",
-      "memory": "മെമ്മറി",
-      "region": "മേഖല",
-      "resources": "റിസോഴ്സുകൾ",
-      "restarts": "പുനരാരംഭങ്ങൾ",
-      "state": "നില",
-      "uptime": "പ്രവർത്തന സമയം",
-      "crashed": "തകർന്നു",
-      "destroying": "ഇല്ലാതാക്കുന്നു",
-      "provisioned": "ഒരുക്കി",
-      "restarting": "പുനരാരംഭിക്കുന്നു",
-      "running": "പ്രവർത്തിക്കുന്നു",
-      "shuttingDown": "ഷട്ട്ഡൗൺ ചെയ്യുന്നു",
-      "starting": "ആരംഭിക്കുന്നു",
-      "stopped": "നിർത്തി",
-      "stopping": "നിർത്തുന്നു",
-      "unknown": "അജ്ഞാതം",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "ഫ്രന്റിയർ",
-      "frontierDescription": "ഏറ്റവും മികച്ച പ്രകടനം. യുക്തിചിന്താശേഷിയുള്ള അത്യാധുനിക മോഡലുകളിലേക്ക് അഭ്യർത്ഥനകൾ അയയ്ക്കുന്നു.",
-      "balancedDescription": "കുറഞ്ഞ ചെലവിൽ വേഗവും കഴിവും ഒരുപോലെ ലഭിക്കുന്നു.",
-      "autoModelA11y": "{{label}} ഓട്ടോ മോഡൽ",
-      "currentModel": "നിലവിലെ മോഡൽ",
-      "browseAllModels": "അല്ലെങ്കിൽ 500+ മോഡലുകളിൽ നിന്ന് തിരഞ്ഞെടുക്കുക",
-      "browseAllModelsA11y": "500-ലധികം മോഡലുകൾ കാണുക"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw ഉപയോഗിക്കുന്നത് തുടരാൻ ബ്രൗസറിൽ kilo.ai/claw തുറക്കുക. ആപ്പിൽ സബ്സ്ക്രൈബ് ചെയ്യാനാവില്ല.",
-      "subscriptionCanceledTitle": "വെബ്സൈറ്റിൽ സബ്സ്ക്രൈബ് ചെയ്യുക",
-      "subscriptionCanceledBody": "KiloClaw ഉപയോഗിക്കാൻ ബ്രൗസറിൽ kilo.ai/claw തുറക്കുക. ആപ്പിൽ സബ്സ്ക്രൈബ് ചെയ്യാനാവില്ല.",
-      "subscriptionCanceledCta": "Kilo.ai/claw തുറക്കുക",
-      "subscriptionPastDueTitle": "വെബിൽ പണമടയ്ക്കൽ വിവരങ്ങൾ അപ്ഡേറ്റ് ചെയ്യുക",
-      "subscriptionPastDueBody": "നിങ്ങളുടെ ഏറ്റവും ഒടുവിലത്തെ പണമടയ്ക്കലിൽ പ്രശ്നമുണ്ടായി. വിവരങ്ങൾ അപ്ഡേറ്റ് ചെയ്യാൻ ബ്രൗസറിൽ kilo.ai/claw തുറക്കുക. ആപ്പിൽ ബില്ലിംഗ് കൈകാര്യം ചെയ്യാനാവില്ല.",
-      "quarantinedTitle": "ഇൻസ്റ്റൻസിലെ പ്രശ്നം പരിഹരിക്കണം",
-      "quarantinedBody": "നിങ്ങളുടെ KiloClaw ഇൻസ്റ്റൻസ് ഒറ്റപ്പെടുത്തിയതിനാൽ ഇപ്പോൾ ഉപയോഗിക്കാനാവില്ല. അത് പുനഃസ്ഥാപിക്കാൻ ഞങ്ങളുടെ ടീമിന്റെ സഹായം ആവശ്യമാണ്.",
-      "multipleCurrentConflictBody": "നിങ്ങളുടെ അക്കൗണ്ടിൽ ഒന്നിലധികം സജീവ സബ്സ്ക്രിപ്ഷനുകൾ കണ്ടെത്തി. രണ്ടുതവണ പണം ഈടാക്കാതിരിക്കാൻ സേവനം താൽക്കാലികമായി നിർത്തി.",
-      "multipleCurrentConflictCta": "Kilo.ai-യിൽ തുടരുക",
-      "nonCanonicalEarlybirdTitle": "പഴയ പ്ലാൻ കണ്ടെത്തി",
-      "nonCanonicalEarlybirdBody": "നിങ്ങളുടെ മുൻകൂർ പ്രവേശന പ്ലാൻ മൊബൈലിൽ ഉപയോഗിക്കുന്നതിന് മുമ്പ് നേരിട്ടുള്ള അവലോകനം ആവശ്യമാണ്.",
-      "iosTitle": "IOS-ൽ KiloClaw ലഭ്യമല്ല",
-      "iosBody": "ഈ അക്കൗണ്ടിന്റെ KiloClaw ഉപയോഗാനുമതി കൈകാര്യം ചെയ്യുന്നത് iOS ആപ്പിന് പുറത്താണ്.",
-      "iosContact": "ചോദ്യങ്ങളുണ്ടോ? {{supportEmail}}-യുമായി ബന്ധപ്പെടുക.",
-      "quarantinedCta": "ഞങ്ങളുടെ ടീമിന് ഇമെയിൽ അയയ്ക്കുക",
-      "nonCanonicalEarlybirdCta": "നിങ്ങളുടെ പ്ലാൻ Kilo.ai-ൽ പരിശോധിക്കുക"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}}-ന് ശ്രദ്ധ ആവശ്യമാണ്: {{label}}",
-      "openUnread_one": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശം",
-      "openUnread": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശങ്ങൾ",
-      "openUnread_other": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശങ്ങൾ",
-      "openSettings": "{{name}}-ന്റെ ക്രമീകരണങ്ങൾ തുറക്കുക",
-      "fixOnKiloAi": "Kilo.ai-യിൽ പരിഹരിക്കുക: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "ഉപകരണ അഭ്യർത്ഥനകൾ അംഗീകരിക്കുക",
-      "execPolicyDescription": "സുരക്ഷാ ക്രമീകരണങ്ങൾ",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "AI മോഡൽ തിരഞ്ഞെടുപ്പ്",
-      "secretsDescription": "എൻക്രിപ്റ്റ് ചെയ്ത പ്രവേശന വിവരങ്ങൾ",
-      "versionPinDescription": "ഒരു നിർദിഷ്ട പതിപ്പ് നിലനിർത്തുക"
-    },
-    "avatar": {
-      "arcade": "ആർക്കേഡ്",
-      "brain": "തലച്ചോറ്",
-      "creature": "ജീവി",
-      "crystal": "ക്രിസ്റ്റൽ",
-      "custom": "ഇഷ്ടാനുസൃത അവതാർ",
-      "dragon": "ഡ്രാഗൺ",
-      "explorer": "പര്യവേക്ഷകൻ",
-      "flame": "ജ്വാല",
-      "lightning": "മിന്നൽ",
-      "magicWand": "മാന്ത്രിക വടി",
-      "moon": "ചന്ദ്രൻ",
-      "operator": "ഓപ്പറേറ്റർ",
-      "orbit": "പരിക്രമണപഥം",
-      "oracle": "പ്രവാചകൻ",
-      "rainbow": "മഴവില്ല്",
-      "robot": "റോബോട്ട്",
-      "satellite": "ഉപഗ്രഹം",
-      "sparkles": "തിളക്കങ്ങൾ",
-      "strongArm": "ശക്തമായ കൈ",
-      "talisman": "തായത്ത്"
-    },
-    "remoteSpawnFilesNotSupported": "ഈ ഇൻസ്റ്റൻസിന് ഫയലുകൾ സ്വീകരിക്കാൻ കഴിയില്ല.",
-    "instanceSwitcherTitle": "KiloClaw ഇൻസ്റ്റൻസ്"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "{{filename}} ഇടത്തേക്ക് നീക്കുക",
       "moveRight": "{{filename}} വലത്തേക്ക് നീക്കുക"
     },
-    "attachmentPasteHint": {
-      "accessibility": "ക്ലിപ്പ്ബോർഡിൽ നിന്ന് ചിത്രം ഒട്ടിക്കുക",
-      "label": "ചിത്രം കണ്ടെത്തി, ഒട്ടിക്കാൻ ടാപ്പ് ചെയ്യുക"
-    },
     "attachmentPicker": {
       "camera": "ക്യാമറ",
       "photoLibrary": "ഫോട്ടോ ലൈബ്രറി",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "സെഷൻ സൈൻ ഔട്ട് ചെയ്തു.",
     "signOutThisDeviceTitle": "ഈ ഉപകരണത്തിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",
     "signOutThisSessionTitle": "ഈ സെഷനിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",
-    "signOutThisSessionMessage": "{{device}} സൈൻ ഔട്ട് ആകും. അതിൽ നിന്ന് ഒരു മണിക്കൂർ വരെ API ഉപയോഗിക്കാൻ കഴിഞ്ഞേക്കാം."
+    "signOutThisSessionMessage": "{{device}} സൈൻ ഔട്ട് ആകും. അതിൽ നിന്ന് ഒരു മണിക്കൂർ വരെ API ഉപയോഗിക്കാൻ കഴിഞ്ഞേക്കാം.",
+    "unknownDevice": "അജ്ഞാത ഉപകരണം"
   },
   "forceUpdate": {
     "couldNotOpenStore": "ആപ്പ് സ്റ്റോർ തുറക്കാനായില്ല.",

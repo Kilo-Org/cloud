@@ -6,10 +6,11 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 
 ## Feature availability
 
-- Chat and PR Review always appear in signed-in navigation.
+- The four signed-in tabs are Home, Agents, Chat, and Profile. Home and Profile include PR Review.
+- Quick Chat runs conversations on Kilo, custom backends, or supported on-device models.
+- Profile retains account, device sessions, notification preferences, and billing settings.
 - The `mobile-chat` and `mobile-pr-review` flags no longer control these features.
 - PostHog feature flag infrastructure and the version-aware registry remain available for future flags.
-- KiloClaw tab visibility still depends on instance ownership.
 
 ## Getting started
 
@@ -17,8 +18,6 @@ Generally speaking, you only need a new dev build if making dependency/native ch
 
 Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
 The camera and photo library prompts explain AI agent attachments and include specific examples.
-Background location descriptions remain disabled because the app does not request background location.
-Apple requires a localized motion description for the location library's linked APIs, even though Kilo does not use or collect motion activity.
 Every build localizes the local-network prompt, because Chat can connect to a local model server.
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 

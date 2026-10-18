@@ -13,11 +13,9 @@ import { type AppSettingEntry } from './types';
  * agent's change shows up on that screen.
  */
 const NOTIFICATION_DESCRIPTIONS = {
-  chatMessages: 'Notify about new chat messages.',
   agentAttention: 'Notify when an agent needs your attention.',
   agentUpdates: 'Notify about agent progress updates.',
   sessionStatus: 'Notify when a session starts or finishes.',
-  kiloclawActivity: 'Notify about KiloClaw activity.',
   balanceAlerts: 'Notify about balance alerts.',
   securityFindings: 'Notify about security findings.',
   spendAlerts: 'Notify about spend alerts: threshold crossings and hourly spikes.',

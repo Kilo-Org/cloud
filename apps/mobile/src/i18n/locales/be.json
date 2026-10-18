@@ -101,12 +101,9 @@
     "scheduled": "Запланавана",
     "keepEditing": "Працягнуць рэдагаванне",
     "keepRunning": "Працягнуць працу",
-    "kiloclaw": "KiloClaw",
     "newSession": "Новы сеанс",
-    "noKiloclawInstances": "Няма асобнікаў KiloClaw",
     "noModelsAvailable": "Няма даступных мадэляў",
     "notFound": "Нічога не знойдзена.",
-    "online": "У сетцы",
     "open": "Адкрыць {{name}}",
     "openPullRequest": "Адкрыць запыт на зліццё",
     "pending": "Чакае",
@@ -257,7 +254,8 @@
     "renamePasskey": "Перайменаваць ключ доступу",
     "removePasskey": "Выдаліць ключ доступу",
     "removePasskeyTitle": "Выдаліць ключ доступу?",
-    "removePasskeyMessage": "Вы больш не зможаце ўвайсці з гэтым ключом доступу."
+    "removePasskeyMessage": "Вы больш не зможаце ўвайсці з гэтым ключом доступу.",
+    "changelog": "Што новага"
   },
   "preferences": {
     "general": "Агульныя",
@@ -864,23 +862,18 @@
     "previewGenericDescription": "Апавяшчэнні толькі паведамляюць пра падзею. Адкрыйце Kilo, каб прачытаць паведамленне.",
     "channel": {
       "agentProgress": "Ход выканання агента",
-      "chat": "Паведамленні ў чаце",
-      "kiloclaw": "Актыўнасць KiloClaw",
       "balance": "Апавяшчэнні аб балансе",
       "security": "Выяўленыя праблемы бяспекі",
       "spend": "Апавяшчэнні аб выдатаках",
       "followedSessions": "Адсочваемыя сеансы"
     },
     "category": {
-      "chatMessagesSubtitle": "адказы ў вашых размовах",
       "agentAttentionTitle": "Агенту патрэбна ваша ўвага",
       "agentAttentionSubtitle": "пытанні, запыты дазволаў і даных",
       "agentUpdatesTitle": "Навіны ад агента",
       "agentUpdatesSubtitle": "паведамленні ад агента падчас выканання задачы",
       "sessionStatusTitle": "Статус сеанса",
       "sessionStatusSubtitle": "завершаны / памылка / гатовы да кіравання",
-      "kiloclawActivitySubtitle": "экзэмпляр гатовы або завяршыўся з памылкай, запланаваныя дзеянні",
-      "kiloclawActivityUnavailable": "Запусціце экзэмпляр KiloClaw, каб атрымліваць актыўнасць KiloClaw.",
       "balanceAlertsSubtitle": "папярэджанні аб нізкім балансе арганізацыі",
       "balanceAlertsUnavailable": "Далучыцеся да арганізацыі, каб атрымліваць папярэджанні аб балансе.",
       "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA",
@@ -900,72 +893,19 @@
   },
   "tabs": {
     "home": "Галоўная",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, укладка, {{position}} з {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Выбар асобніка",
-      "couldNotLoadInstances": "Не атрымалася загрузіць асобнікі.",
-      "noInstancesDescription": "Наладзьце асобнік, каб пачаць размову.",
-      "setUpKiloclaw": "Наладзіць KiloClaw",
-      "currentInstance": "{{title}}, бягучы"
-    },
     "conversation": {
-      "failedToLoad": "Не атрымалася загрузіць размову.",
-      "notFound": "Размова не знойдзена.",
       "untitled": "Без назвы",
-      "leaveTitle": "Пакінуць размову?",
-      "leaveMessage": "Гэта выдаліць яе са спісу.",
-      "openHint": "Адкрывае размову. Націсніце і ўтрымлівайце, каб перайменаваць або пакінуць размову.",
-      "unread": "Непрачытана",
-      "optionsFor": "Дзеянні з размовай {{title}}",
-      "options": "Дзеянні з размовай",
-      "renameTitle": "Новая назва размовы",
-      "renamePlaceholder": "Новая назва",
-      "couldNotReachBot": "Не атрымалася звязацца з ботам. Паспрабуйце яшчэ раз.",
-      "messageDeliveryFailed": "Не атрымалася даставіць паведамленне боту.",
-      "couldNotSignIn": "Не атрымалася ўвайсці ў чат.",
-      "couldNotRefreshMessages": "Не атрымалася абнавіць паведамленні.",
-      "couldNotLoadHistory": "Не атрымалася загрузіць гісторыю размовы.",
-      "leave": "Пакінуць",
-      "untitledConversation": "Размова без назвы",
-      "createFailed": "Не атрымалася стварыць размову.",
-      "leaveFailed": "Не атрымалася пакінуць размову."
-    },
-    "reactions": {
-      "common": "Частыя",
-      "reactWith": "Дадаць рэакцыю {{reaction}}",
-      "accessibility": "Рэакцыя {{emoji}}, колькасць: {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Адказ на",
-      "cancelReply": "Адмяніць адказ",
-      "openInstance": "Адкрыць асобнік",
-      "attachFile": "Далучыць файл",
-      "cancelEdit": "Адмяніць рэдагаванне"
+      "renamePlaceholder": "Новая назва"
     },
     "conversationList": {
-      "couldNotLoad": "Не атрымалася загрузіць размовы.",
-      "emptyTitle": "Пакуль няма размоваў",
-      "emptyDescription": "Стварыце размову, каб пачаць зносіны з вашым асобнікам KiloClaw.",
-      "create": "Стварыць размову",
-      "newConversation": "Новая размова",
-      "openInstanceSettings": "Адкрыць налады асобніка",
       "today": "Сёння",
       "yesterday": "Учора",
-      "thisWeek": "Гэты тыдзень",
       "older": "Раней"
     },
     "attachment": {
-      "open": "Адкрыць {{filename}}",
-      "openFailed": "Не атрымалася адкрыць далучэнне. Праверце падключэнне і паспрабуйце яшчэ раз.",
-      "attachFailed": "Не атрымалася далучыць файл.",
-      "limit": "Вы можаце далучыць да {{displayCount}} файлаў.",
-      "sizeRejection": "Памер файла {{filename}} перавышае ліміт {{limit}} для далучэнняў.",
-      "unreadable": "Не атрымалася прачытаць {{filename}}.",
-      "pastedImage": "устаўленая выява",
-      "defaultName": "Укладанне",
       "classificationDenied": "Выканальныя файлы нельга далучаць.",
       "classificationEmpty": "Файл пусты.",
       "classificationTooLarge": "Памер файла не павінен перавышаць 20 МБ.",
@@ -975,432 +915,17 @@
       "networkError": "Узнікла памылка сеткі.",
       "uploadFailed": "Не атрымалася загрузіць далучэнне.",
       "nothingToPaste": "Няма чаго ўставіць.",
-      "metadataStripFailed": "Не атрымалася выдаліць метаданыя фота.",
-      "limit_one": "Вы можаце далучыць да {{displayCount}} файл.",
-      "limit_other": "Вы можаце далучыць да {{displayCount}} файлаў.",
-      "limit_few": "Вы можаце далучыць да {{displayCount}} файлы.",
-      "limit_many": "Вы можаце далучыць да {{displayCount}} файлаў."
+      "metadataStripFailed": "Не атрымалася выдаліць метаданыя фота."
     },
     "attachmentPreview": {
-      "accessibility": "Файл: {{filename}}, {{status}}",
-      "retryUploading": "Паўтарыць загрузку файла {{filename}}",
-      "remove": "Выдаліць {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[выдаленае паведамленне]",
-      "yourMessage": "Ваша паведамленне",
-      "messageFrom": "Паведамленне ад {{author}}",
-      "moreActions": "Іншыя дзеянні",
-      "notDelivered": "Не дастаўлена",
-      "edited": "(адрэдагавана)",
-      "image": "Выява"
+      "accessibility": "Файл: {{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Скапіявана",
-      "copyFailed": "Не атрымалася скапіраваць.",
-      "title": "Дзеянні з паведамленнем",
-      "deleteTitle": "Выдаліць паведамленне?",
-      "deleteMessage": "Гэта выдаліць паведамленне з размовы.",
-      "deleteFailed": "Не атрымалася выдаліць паведамленне.",
-      "removeReactionFailed": "Не атрымалася выдаліць рэакцыю.",
-      "addReactionFailed": "Не атрымалася дадаць рэакцыю.",
-      "retrySend": "Адправіць яшчэ раз",
-      "moreReactions": "Іншыя рэакцыі",
-      "edit": "Рэдагаваць",
-      "sendFailed": "Не атрымалася адправіць паведамленне.",
-      "retrySendFailed": "Не атрымалася паўторна адправіць паведамленне.",
-      "editFailed": "Не атрымалася адрэдагаваць паведамленне.",
-      "executeFailed": "Не атрымалася выканаць дзеянне."
+      "edit": "Рэдагаваць"
     },
     "attachmentPicker": {
-      "takePhoto": "Зрабіць фота",
-      "photoLibrary": "Галерэя фота",
-      "files": "Файлы",
       "cameraAccessMessage": "Каб зрабіць фота, дазволь доступ да камеры ў наладах."
-    },
-    "typingIndicator": {
-      "someone": "Нехта",
-      "typing_one": "{{name}} піша…",
-      "typing": "{{names}} пішуць…",
-      "typing_other": "{{names}} пішуць…",
-      "typing_few": "{{names}} пішуць…",
-      "typing_many": "{{names}} пішуць…"
-    },
-    "botStatus": {
-      "offline": "Не ў сетцы",
-      "loadingUser": "Загрузка даных карыстальніка…",
-      "waitingForStatus": "Чаканне стану бота…",
-      "offlineMessage": "Бот не ў сетцы. Абмен паведамленнямі адновіцца пасля яго падключэння."
-    },
-    "errors": {
-      "notAllowed": "Гэтае дзеянне не дазволена.",
-      "messageTooLong": "Паведамленне занадта доўгае. Яно павінна змяшчаць менш за {{limit}} сімвалаў.",
-      "titleTooLong": "Назва занадта доўгая. Яна павінна змяшчаць менш за {{limit}} сімвалаў.",
-      "messageEmpty": "Паведамленне не можа быць пустым."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Не атрымалася загрузіць экзэмпляры KiloClaw.",
-    "billing": {
-      "title": "Аплата",
-      "continueMonthToMonth": "Працягнуць са штомесячнай аплатай",
-      "plan": "План",
-      "finalTermEnds": "Канец апошняга перыяду",
-      "afterFinalTerm": "Пасля апошняга перыяду",
-      "ends": "Сканчаецца",
-      "expires": "Тэрмін дзеяння сканчаецца",
-      "noActivePlan": "Няма актыўнага тарыфу",
-      "noActivePlanDescription": "У цябе няма актыўнай падпіскі на KiloClaw.",
-      "managedByAdmin": "Аплатай кіруе адміністратар тваёй арганізацыі.",
-      "couldNotLoad": "Не атрымалася загрузіць звесткі пра аплату.",
-      "manageOnWeb": "Кіраваць аплатай у вэб-версіі",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Твой апошні перыяд тарыфу Commit сканчаецца {{date}}. Перайдзі на тарыф Standard за {{price}}, інакш хостынг спыніцца.",
-      "freeTrial": "Бясплатны пробны перыяд",
-      "hostingEnds": "Хостынг спыняецца",
-      "renews": "Падаўжаецца",
-      "standardMonthToMonth": "Standard са штомесячнай аплатай",
-      "standardStartsOn": "Тарыф Standard пачне дзейнічаць {{date}} па цане {{price}}.",
-      "yourStandardMonthlyPrice": "твая штомесячная плата за тарыф Standard",
-      "perMonth": "/мес.",
-      "earlybirdAccessUntil": "Доступ па тарыфе Earlybird дзейнічае да {{date}}.",
-      "earlybirdEnding": "Да канца тарыфу Earlybird засталося: {{remaining}}.",
-      "paymentPastDue": "Аплата пратэрмінавана. Абнаві спосаб аплаты.",
-      "subscriptionCancels": "Падпіска будзе скасавана {{date}}.",
-      "trialDaysRemaining": "Да канца пробнага перыяду засталося: {{remaining}}.",
-      "trialEndingSoon": "Пробны перыяд хутка скончыцца. Засталося: {{remaining}}.",
-      "lessThanOneDay": "Менш за 1 дзень",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Што новага",
-      "couldNotLoad": "Не атрымалася загрузіць журнал змен.",
-      "noUpdates": "Пакуль няма абнаўленняў",
-      "noUpdatesDescription": "Тут з'явяцца запісы пра змены.",
-      "recentUpdates": "Апошнія абнаўленні",
-      "manageVersion": "Кіраваць версіяй",
-      "redeployRequired": "Патрэбна паўторнае разгортванне",
-      "redeploySuggested": "Рэкамендуецца паўторнае разгортванне",
-      "upgradeRequired": "Патрабуецца абнаўленне"
-    },
-    "dashboard": {
-      "title": "Панэль кіравання",
-      "couldNotLoad": "Не атрымалася загрузіць панэль кіравання.",
-      "renameInstance": "Перайменаваць экзэмпляр",
-      "renamePlaceholder": "Новая назва (да 50 сімвалаў)",
-      "someDetailsFailed": "Не атрымалася загрузіць частку даных у рэальным часе.",
-      "destroy": "Знішчыць",
-      "destroyMessage": "Гэта назаўсёды знішчыць твой экзэмпляр KiloClaw і ўсе яго даныя. Гэтае дзеянне нельга адмяніць.",
-      "destroyTitle": "Знішчыць экзэмпляр",
-      "instance": "Экзэмпляр",
-      "couldNotCheckStatus": "Не атрымалася праверыць стан сэрвісу.",
-      "dangerZone": "НЕБЯСПЕЧНАЯ ЗОНА",
-      "destroying": "Знішчэнне…",
-      "serviceDegraded": "Сэрвіс працуе са збоямі — націсні, каб паглядзець стан",
-      "up": "ПРАЦУЕ"
-    },
-    "channels": {
-      "title": "Каналы",
-      "couldNotLoad": "Не атрымалася загрузіць каналы.",
-      "noChannels": "Няма даступных каналаў",
-      "noChannelsDescription": "Тут з'явяцца інтэграцыі з каналамі.",
-      "connected": "Падключана: {{label}}",
-      "disconnectMessage": "Выдаліць {{label}}? Гэты канал будзе адключаны.",
-      "disconnectTitle": "Адключыць канал"
-    },
-    "devicePairing": {
-      "title": "Спалучэнне прылад",
-      "refreshRequests": "Абнавіць запыты на спалучэнне",
-      "couldNotLoad": "Не атрымалася загрузіць запыты на спалучэнне.",
-      "noPending": "Няма запытаў у чаканні",
-      "noPendingDescription": "Тут з'явяцца запыты на спалучэнне каналаў і прылад.",
-      "channelRequests": "Запыты каналаў",
-      "deviceRequests": "Запыты прылад",
-      "approveDeviceMessage": "Дазволіць {{platform}} падключыцца да твайго экзэмпляра?",
-      "approveDeviceTitle": "Ухваліць прыладу",
-      "approveMessage": "Дазволіць {{label}} (код: {{code}}) падключыцца да твайго экзэмпляра?",
-      "approveTitle": "Ухваліць запыт на спалучэнне",
-      "unknownDevice": "Невядомая прылада"
-    },
-    "execPolicy": {
-      "title": "Палітыка выканання",
-      "couldNotLoad": "Не атрымалася загрузіць правілы выканання каманд.",
-      "alwaysAsk": "Заўсёды пытацца",
-      "alwaysAskDescription": "Кожная каманда патрабуе пацвярджэння перад выкананнем. Самы бяспечны варыянт.",
-      "neverAsk": "Ніколі не пытацца",
-      "neverAskDescription": "Каманды выконваюцца без пацвярджэння. Хутчэй, але менш бяспечна."
-    },
-    "google": {
-      "title": "Уліковы запіс Google",
-      "couldNotLoad": "Не атрымалася загрузіць стан уліковага запісу Google.",
-      "disconnected": "Уліковы запіс Google адключаны. Паўторна разгарні экзэмпляр, каб ужыць змену.",
-      "setupCommand": "Каманда наладкі",
-      "setupCommandHelp": "Каб падключыць уліковы запіс Google, усталюй Docker на сваім камп'ютары і выканай гэтую каманду ў тэрмінале.",
-      "failedToLoadCommand": "Не атрымалася загрузіць каманду наладкі.",
-      "gmailNotifications": "Апавяшчэнні Gmail",
-      "disconnect": "Адключыць уліковы запіс Google",
-      "copied": "Скапіявана",
-      "copyCommand": "Скапіраваць каманду",
-      "disconnectConfirm": "Адключыць",
-      "disconnectMessage": "Выдаліць твой уліковы запіс Google з гэтага экзэмпляра? Гэта адключыць апавяшчэнні Gmail. Пасля адключэння паўторна разгарні экзэмпляр, каб ужыць змены.",
-      "disconnectTitle": "Адключыць Google"
-    },
-    "modelList": {
-      "noMatches": "Мадэляў паводле запыту не знойдзена",
-      "noModelsDescription": "Мадэлі з'явяцца тут, калі стануць даступнымі.",
-      "noResultsFor": "Паводле запыту «{{query}}» нічога не знойдзена."
-    },
-    "secrets": {
-      "title": "Сакрэты",
-      "couldNotLoad": "Не атрымалася загрузіць сакрэты.",
-      "noSecrets": "Няма даступных сакрэтаў",
-      "noSecretsDescription": "Тут з'явяцца інтэграцыі, якія выкарыстоўваюць сакрэты.",
-      "removeMessage": "Выдаліць {{label}}? Гэты інструмент страціць доступ да сваіх уліковых даных.",
-      "removeTitle": "Выдаліць сакрэт",
-      "saved": "Захавана: {{label}}",
-      "hide": "Схаваць {{label}}",
-      "show": "Паказаць {{label}}",
-      "allFieldsRequired": "Каб падключыць {{label}}, трэба запоўніць усе палі.",
-      "setupGuideFallback": "інструкцыя па наладжванні",
-      "setupGuideA11y": "Кіраўніцтва па наладцы {{label}}",
-      "setupGuide": "Інструкцыя па наладжванні",
-      "saving": "Захаванне…",
-      "removing": "Выдаленне…",
-      "updateToken": "Абнавіць токен"
-    },
-    "versionPin": {
-      "title": "Замацаванне версіі",
-      "couldNotLoad": "Не атрымалася загрузіць звесткі пра версію.",
-      "couldNotLoadMore": "Не атрымалася загрузіць астатнія версіі.",
-      "loadMore": "Загрузіць яшчэ версіі",
-      "showingLatest": "Паказаны 100 апошніх версій.",
-      "availableVersions": "Даступныя версіі",
-      "noVersions": "Няма даступных версій",
-      "noVersionsDescription": "Даступныя версіі OpenClaw з'явяцца тут.",
-      "unpin": "Адмацаваць",
-      "unpinMessage": "Вярнуцца да апошняй даступнай версіі?",
-      "unpinTitle": "Адмацаваць версію",
-      "confirmPin": "Пацвердзіць замацаванне",
-      "followingLatest": "Заўсёды апошняя версія",
-      "latest": "апошняя",
-      "pin": "Замацаваць",
-      "pinnedByAdmin": "Версію замацаваў адміністратар. Каб змяніць яе, звярніся да яго.",
-      "pinnedTo": "Замацавана версія {{version}}",
-      "reasonOptional": "Прычына (неабавязкова)",
-      "reasonPlaceholder": "Прычына замацавання гэтай версіі",
-      "replaceAdminPin": "Замяніць замацаванне адміністратара",
-      "replacesAdminPin": "Гэта заменіць версію, замацаваную адміністратарам (цяпер {{label}})."
-    },
-    "redeploy": "Разгарнуць паўторна",
-    "redeployMessage": "Сапраўды разгарнуць гэты экзэмпляр паўторна?",
-    "redeployTitle": "Паўторна разгарнуць экзэмпляр",
-    "controls": {
-      "redeploying": "Паўторнае разгортванне…",
-      "restart": "Перазапусціць",
-      "restartOpenClawMessage": "Сапраўды перазапусціць працэс OpenClaw?",
-      "restartOpenClawTitle": "Перазапусціць OpenClaw",
-      "restarting": "Перазапуск…",
-      "start": "Запусціць",
-      "startMessage": "Сапраўды запусціць гэты экзэмпляр?",
-      "startTitle": "Запусціць экзэмпляр",
-      "stop": "Спыніць",
-      "stopMessage": "Сапраўды спыніць гэты экзэмпляр?",
-      "stopTitle": "Спыніць экзэмпляр",
-      "stopping": "Спыненне…"
-    },
-    "empty": {
-      "finishingSetup": "Завяршэнне наладжвання",
-      "finishingSetupDescription": "Пачакай, мы завяршаем наладку твайго ўліковага запісу. Звычайна гэта займае зусім няшмат часу.",
-      "getStarted": "Пачаць",
-      "noInstancesDescription": "Ствары свой першы экзэмпляр, каб запускаць агентаў для напісання кода."
-    },
-    "instance": {
-      "backToInstances": "Назад да экзэмпляраў",
-      "couldNotLoad": "Не атрымалася загрузіць экзэмпляр.",
-      "notFound": "Экзэмпляр не знойдзены",
-      "notFoundDescription": "Магчыма, гэты экзэмпляр знішчылі або спасылка больш не дзейнічае."
-    },
-    "list": {
-      "createInstance": "Стварыць экзэмпляр",
-      "organizations": "Арганізацыі",
-      "accessIssue": {
-        "trialExpired": "Пробны перыяд скончыўся — аформі падпіску, каб працягнуць карыстацца гэтым экзэмплярам",
-        "subscriptionCanceled": "Падпіска неактыўная — аформі яе зноў, каб працягнуць карыстацца гэтым экзэмплярам",
-        "subscriptionPastDue": "Праблема з аплатай — абнаві плацежныя даныя, каб працягнуць карыстацца гэтым экзэмплярам",
-        "quarantined": "Экзэмпляр на карантыне, патрабуецца ручная праверка",
-        "multipleCurrentConflict": "Уліковы запіс патрабуе праверкі",
-        "nonCanonicalEarlybird": "Стары тарыф патрабуе праверкі"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Пачаць чат з {{name}}",
-        "ready": "{{name}} гатовы да працы",
-        "warmedUp": "Усё гатова. Можаш павітацца, калі захочаш."
-      },
-      "flow": {
-        "genericErrorBody": "Зараз не атрымалася завяршыць наладку твайго экзэмпляра.",
-        "manualReviewBody": "Перш чым стварыць экзэмпляр, трэба вырашыць праблему з тваім уліковым запісам. Працягні на kilo.ai.",
-        "manualReviewTitle": "Наладка патрабуе ручной праверкі",
-        "openKiloAi": "Адкрыць kilo.ai",
-        "provisioning": "Падрыхтоўка экзэмпляра",
-        "review": "Праверка",
-        "identityTitle": "Імя і характар бота",
-        "couldNotLoad": "Не атрымалася загрузіць стан пачатковай наладкі.",
-        "finishingSetup": "Завяршаем наладку — пачакай, пакуль твой уліковы запіс будзе гатовы.",
-        "ready": "Гатова",
-        "settingUp": "Наладка…"
-      },
-      "unavailableDescription": "Каб падрыхтаваць экзэмпляр, патрэбна актыўная падпіска на KiloClaw. Наяўныя экзэмпляры і падпіскі працягваюць працаваць як звычайна.",
-      "unavailableTitle": "Новыя экзэмпляры KiloClaw недаступныя",
-      "identity": {
-        "chooseAvatar": "Выбраць аватар",
-        "namePlaceholder": "Імя бота",
-        "selectAvatar": "Выбраць {{name}} як аватар",
-        "personality": "Характар",
-        "changePersonality": "Змяніць характар",
-        "location": "Месцазнаходжанне",
-        "locationPlaceholder": "Горад або рэгіён (неабавязкова)",
-        "useCurrentLocation": "Выкарыстаць бягучае месцазнаходжанне",
-        "locationDeniedTitle": "Доступ да месцазнаходжання забаронены",
-        "locationDeniedMessage": "Каб выкарыстаць сваё бягучае месцазнаходжанне, дазволь доступ да яго ў наладах.",
-        "locationValidationFailed": "Не атрымалася праверыць месцазнаходжанне.",
-        "locationResolveFailed": "Не атрымалася вызначыць тваё месцазнаходжанне. Можаш змяніць яго ўручную.",
-        "locationGetFailed": "Не атрымалася атрымаць тваё месцазнаходжанне. Увядзі яго ўручную.",
-        "nature": {
-          "aiAssistantLabel": "ШІ-памочнік",
-          "aiAssistantVibe": "Карысны, умелы, прафесійны",
-          "digitalCreatureLabel": "Лічбавая істота",
-          "digitalCreatureVibe": "Дзівакаватая, жывая, крыху непрадказальная",
-          "virtualCompanionLabel": "Віртуальны кампаньён",
-          "virtualCompanionVibe": "Прыязны, заўсёды побач, шчыра клапоціцца",
-          "somethingWeirderLabel": "Нешта дзіўнейшае…",
-          "somethingWeirderVibe": "Прыдумай свой варыянт"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Гатова! Тваё падсумаванне ўжо падрыхтавана. Можаш прачытаць яго, калі будзе зручна.",
-        "settingUp": "Наладка апавяшчэнняў…",
-        "stayInTheLoop": "Заўсёды ў курсе",
-        "getNotified": "Атрымлівай апавяшчэнні, калі {{name}} завершыць задачу, каб не прапусціць адказ.",
-        "now": "зараз",
-        "skipForNow": "Пакуль прапусціць",
-        "couldNotEnable": "Не атрымалася ўключыць апавяшчэнні."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Не атрымалася праверыць ход наладкі",
-        "queryErrorBody": "Падчас праверкі ходу наладкі {{name}} злучэнне перарвалася. Сама наладка магла працягнуцца. Паспрабуй яшчэ раз або правер крыху пазней.",
-        "stoppedTitle": "Наладка спынена",
-        "stoppedBody": "Экзэмпляр {{name}} нечакана спыніўся падчас наладкі.",
-        "stalledTitle": "Наладка затрымалася",
-        "stalledBody": "Не атрымалася завяршыць наладку {{name}}. Паспрабуй яшчэ раз. Калі праблема паўтараецца, напішы на {{supportEmail}}.",
-        "timeoutTitle": "Гэта займае больш часу, чым чакалася",
-        "timeoutBody": "Наладка {{name}} займае больш часу, чым звычайна (больш за {{displayMinutes}} хвіл.).",
-        "continueInBackground": "Працягнуць у фонавым рэжыме",
-        "settingUp": "Наладка {{name}}",
-        "connectingToAgent": "Падключэнне да агента",
-        "startingSandbox": "Запуск пясочніцы",
-        "backgroundHint": "Звычайна гэта займае менш за хвіліну. Можаш закрыць гэты экран — наладка працягнецца ў фонавым рэжыме."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Код {{code}}",
-      "gatewayProcess": "ПРАЦЭС ШЛЮЗА",
-      "lastExit": "Апошняе завяршэнне працы",
-      "memory": "Памяць",
-      "region": "Рэгіён",
-      "resources": "РЭСУРСЫ",
-      "restarts": "Перазапускі",
-      "state": "Стан",
-      "uptime": "Час працы",
-      "crashed": "ЗБОЙ",
-      "destroying": "ЗНІШЧЭННЕ",
-      "provisioned": "ПАДРЫХТАВАНЫ",
-      "restarting": "ПЕРАЗАПУСК",
-      "running": "ПРАЦУЕ",
-      "shuttingDown": "ВЫКЛЮЧЭННЕ",
-      "starting": "ЗАПУСК",
-      "stopped": "СПЫНЕНЫ",
-      "stopping": "СПЫНЕННЕ",
-      "unknown": "НЕВЯДОМА",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Перадавыя",
-      "frontierDescription": "Найлепшыя вынікі. Выкарыстоўвае перадавыя мадэлі з разважаннем.",
-      "balancedDescription": "Удалае спалучэнне хуткасці і магчымасцей за меншыя грошы.",
-      "autoModelA11y": "Аўтаматычны выбар мадэлі: {{label}}",
-      "currentModel": "Бягучая мадэль",
-      "browseAllModels": "або выбраць з больш чым 500 мадэляў",
-      "browseAllModelsA11y": "Прагледзець усе мадэлі — больш за 500"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Каб працягнуць карыстацца KiloClaw, адкрый kilo.ai/claw у браўзеры. У праграме нельга аформіць падпіску.",
-      "subscriptionCanceledTitle": "Аформіць падпіску на сайце",
-      "subscriptionCanceledBody": "Каб карыстацца KiloClaw, адкрый kilo.ai/claw у браўзеры. У праграме нельга аформіць падпіску.",
-      "subscriptionCanceledCta": "Адкрыць kilo.ai/claw",
-      "subscriptionPastDueTitle": "Абнаўленне аплаты на сайце",
-      "subscriptionPastDueBody": "Узнікла праблема з тваім апошнім плацяжом. Адкрый kilo.ai/claw у браўзеры, каб абнавіць плацежныя даныя. У праграме нельга кіраваць аплатай.",
-      "quarantinedTitle": "Экзэмпляр патрабуе аднаўлення",
-      "quarantinedBody": "Твой экзэмпляр KiloClaw на карантыне, таму зараз ім нельга карыстацца. Для аднаўлення патрэбна дапамога нашай каманды.",
-      "multipleCurrentConflictBody": "Мы знайшлі некалькі актыўных падпісак у тваім уліковым запісе. Таму мы прыпынілі аперацыі, каб не спагнаць плату двойчы.",
-      "multipleCurrentConflictCta": "Працягнуць на kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Выяўлены стары тарыф",
-      "nonCanonicalEarlybirdBody": "Перш чым карыстацца тваім тарыфам ранняга доступу на мабільнай прыладзе, трэба праверыць яго ўручную.",
-      "iosTitle": "KiloClaw недаступны ў iOS",
-      "iosBody": "Для гэтага ўліковага запісу кіраваць доступам да KiloClaw можна толькі па-за праграмай для iOS.",
-      "iosContact": "Ёсць пытанні? Напішы на {{supportEmail}}.",
-      "quarantinedCta": "Напісаць нашай камандзе",
-      "nonCanonicalEarlybirdCta": "Праверыць свой тарыф на kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} патрабуе ўвагі: {{label}}",
-      "openUnread_one": "Адкрыць {{name}}, {{displayCount}} непрачытанае паведамленне",
-      "openUnread": "Адкрыць {{name}}, {{displayCount}} непрачытанага паведамлення",
-      "openUnread_other": "Адкрыць {{name}}, {{displayCount}} непрачытанага паведамлення",
-      "openSettings": "Адкрыць налады для {{name}}",
-      "fixOnKiloAi": "Выправіць на kilo.ai: {{label}}",
-      "openUnread_few": "Адкрыць {{name}}, {{displayCount}} непрачытаныя паведамленні",
-      "openUnread_many": "Адкрыць {{name}}, {{displayCount}} непрачытаных паведамленняў"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Ухваленне запытаў прылад",
-      "execPolicyDescription": "Налады бяспекі",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Выбар мадэлі ШІ",
-      "secretsDescription": "Зашыфраваныя ўліковыя даныя",
-      "versionPinDescription": "Замацаваць канкрэтную версію"
-    },
-    "avatar": {
-      "arcade": "Гульнявы аўтамат",
-      "brain": "Мозг",
-      "creature": "Істота",
-      "crystal": "Крышталь",
-      "custom": "Уласны аватар",
-      "dragon": "Цмок",
-      "explorer": "Даследчык",
-      "flame": "Полымя",
-      "lightning": "Маланка",
-      "magicWand": "Чароўная палачка",
-      "moon": "Месяц",
-      "operator": "Аператар",
-      "orbit": "Арбіта",
-      "oracle": "Аракул",
-      "rainbow": "Вясёлка",
-      "robot": "Робат",
-      "satellite": "Спадарожнік",
-      "sparkles": "Бліскаўкі",
-      "strongArm": "Моцная рука",
-      "talisman": "Талісман"
-    },
-    "remoteSpawnFilesNotSupported": "Гэты экзэмпляр не можа атрымліваць файлы.",
-    "instanceSwitcherTitle": "Экзэмпляр KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2608,10 +2133,6 @@
       "moveLeft": "Перамясціць {{filename}} улева",
       "moveRight": "Перамясціць {{filename}} управа"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Уставіць выяву з буфера абмену",
-      "label": "Уставіць выяву з буфера абмену"
-    },
     "attachmentPicker": {
       "camera": "Камера",
       "photoLibrary": "Галерэя фота",
@@ -2819,7 +2340,8 @@
     "sessionSignedOut": "Сеанс завершаны.",
     "signOutThisDeviceTitle": "Выйсці з уліковага запісу на гэтай прыладзе?",
     "signOutThisSessionTitle": "Завяршыць гэты сеанс?",
-    "signOutThisSessionMessage": "Сеанс на прыладзе {{device}} будзе завершаны. Доступ да API можа захоўвацца яшчэ да гадзіны."
+    "signOutThisSessionMessage": "Сеанс на прыладзе {{device}} будзе завершаны. Доступ да API можа захоўвацца яшчэ да гадзіны.",
+    "unknownDevice": "Невядомая прылада"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Не атрымалася адкрыць краму праграм.",

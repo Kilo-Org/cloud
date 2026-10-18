@@ -101,12 +101,9 @@
     "scheduled": "Планирана",
     "keepEditing": "Продължи редактирането",
     "keepRunning": "Продължи изпълнението",
-    "kiloclaw": "KiloClaw",
     "newSession": "Нова сесия",
-    "noKiloclawInstances": "Няма инстанции на KiloClaw",
     "noModelsAvailable": "Няма налични модели",
     "notFound": "Не е намерено.",
-    "online": "Онлайн",
     "open": "Отвори {{name}}",
     "openPullRequest": "Отваряне на заявка за сливане",
     "pending": "В изчакване",
@@ -257,7 +254,8 @@
     "renamePasskey": "Преименуване на ключа за достъп",
     "removePasskey": "Премахване на ключа за достъп",
     "removePasskeyTitle": "Да се премахне ли ключът за достъп?",
-    "removePasskeyMessage": "Вече няма да можете да влезете с този ключ за достъп."
+    "removePasskeyMessage": "Вече няма да можете да влезете с този ключ за достъп.",
+    "changelog": "Какво е новото"
   },
   "preferences": {
     "general": "Общи",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Известията само съобщават за нова активност. Отвори Kilo, за да прочетеш съобщението.",
     "channel": {
       "agentProgress": "Напредък на агентите",
-      "chat": "Съобщения в чата",
-      "kiloclaw": "Активност на KiloClaw",
       "balance": "Известия за салдото",
       "security": "Проблеми със сигурността",
       "spend": "Известия за разходи",
       "followedSessions": "Следвани сесии"
     },
     "category": {
-      "chatMessagesSubtitle": "отговори в разговорите ти",
       "agentAttentionTitle": "Агентът се нуждае от теб",
       "agentAttentionSubtitle": "въпроси, искания за разрешение или информация",
       "agentUpdatesTitle": "Новини от агента",
       "agentUpdatesSubtitle": "съобщения от агента по време на задача",
       "sessionStatusTitle": "Статус на сесията",
       "sessionStatusSubtitle": "завършена / неуспешна / готова за управление",
-      "kiloclawActivitySubtitle": "готова инстанция или грешка, планирани действия",
-      "kiloclawActivityUnavailable": "Стартирайте инстанция KiloClaw, за да получавате активност на KiloClaw.",
       "balanceAlertsSubtitle": "предупреждения за ниска наличност на организацията",
       "balanceAlertsUnavailable": "Присъединете се към организация, за да получавате предупреждения за баланса.",
       "securityFindingsSubtitle": "нови открити проблеми и напомняния за SLA",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Начало",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, раздел, {{position}} от {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Смяна на инстанция",
-      "couldNotLoadInstances": "Не успяхме да заредим инстанциите.",
-      "noInstancesDescription": "Настрой инстанция, за да започнеш разговор.",
-      "setUpKiloclaw": "Настрой KiloClaw",
-      "currentInstance": "{{title}}, текуща"
-    },
     "conversation": {
-      "failedToLoad": "Не успяхме да заредим разговора.",
-      "notFound": "Разговорът не е намерен.",
       "untitled": "Без заглавие",
-      "leaveTitle": "Да се напусне ли разговорът?",
-      "leaveMessage": "Това ще го премахне от списъка ти.",
-      "openHint": "Отваря разговора. Натисни и задръж за опциите за преименуване и напускане.",
-      "unread": "Непрочетен",
-      "optionsFor": "Опции за разговора {{title}}",
-      "options": "Опции за разговора",
-      "renameTitle": "Преименуване на разговор",
-      "renamePlaceholder": "Ново име",
-      "couldNotReachBot": "Не успяхме да се свържем с бота. Опитай отново.",
-      "messageDeliveryFailed": "Съобщението не можа да бъде доставено на бота.",
-      "couldNotSignIn": "Не успяхме да влезем в чата.",
-      "couldNotRefreshMessages": "Не успяхме да обновим съобщенията.",
-      "couldNotLoadHistory": "Не успяхме да заредим историята на разговора.",
-      "leave": "Напусни",
-      "untitledConversation": "Разговор без заглавие",
-      "createFailed": "Не успяхме да създадем разговора.",
-      "leaveFailed": "Не успяхме да напуснем разговора."
-    },
-    "reactions": {
-      "common": "Често използвани",
-      "reactWith": "Реагирай с {{reaction}}",
-      "accessibility": "Реакция {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Отговаряш на",
-      "cancelReply": "Отмени отговора",
-      "openInstance": "Отвори инстанцията",
-      "attachFile": "Прикачи файл",
-      "cancelEdit": "Отмени редактирането"
+      "renamePlaceholder": "Ново име"
     },
     "conversationList": {
-      "couldNotLoad": "Не успяхме да заредим разговорите.",
-      "emptyTitle": "Все още няма разговори",
-      "emptyDescription": "Създай разговор, за да общуваш с инстанцията си на KiloClaw.",
-      "create": "Създай разговор",
-      "newConversation": "Нов разговор",
-      "openInstanceSettings": "Отвори настройките на инстанцията",
       "today": "Днес",
       "yesterday": "Вчера",
-      "thisWeek": "Тази седмица",
       "older": "По-стари"
     },
     "attachment": {
-      "open": "Отвори {{filename}}",
-      "openFailed": "Не можахме да отворим прикачения файл. Провери връзката си и опитай отново.",
-      "attachFailed": "Не успяхме да прикачим файла.",
-      "limit": "Можеш да прикачиш до {{displayCount}} файла.",
-      "sizeRejection": "{{filename}} надхвърля лимита за прикачени файлове от {{limit}}.",
-      "unreadable": "Не можахме да прочетем {{filename}}.",
-      "pastedImage": "поставеното изображение",
-      "defaultName": "Прикачен файл",
       "classificationDenied": "Не можеш да прикачваш изпълними файлове.",
       "classificationEmpty": "Файлът е празен.",
       "classificationTooLarge": "Размерът на всеки файл трябва да е най-много 20 MB.",
@@ -943,426 +883,17 @@
       "networkError": "Възникна мрежова грешка.",
       "uploadFailed": "Качването завърши неуспешно.",
       "nothingToPaste": "Няма какво да поставиш.",
-      "metadataStripFailed": "Метаданните на снимката не можаха да бъдат премахнати.",
-      "limit_one": "Можеш да прикачиш до {{displayCount}} файл.",
-      "limit_other": "Можеш да прикачиш до {{displayCount}} файла."
+      "metadataStripFailed": "Метаданните на снимката не можаха да бъдат премахнати."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Опитай отново качването на {{filename}}",
-      "remove": "Премахни {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[изтрито съобщение]",
-      "yourMessage": "Твоето съобщение",
-      "messageFrom": "Съобщение от {{author}}",
-      "moreActions": "Още действия",
-      "notDelivered": "Недоставено",
-      "edited": "(редактирано)",
-      "image": "Изображение"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Копирано",
-      "copyFailed": "Копирането завърши неуспешно.",
-      "title": "Действия със съобщението",
-      "deleteTitle": "Да се изтрие ли съобщението?",
-      "deleteMessage": "Това ще премахне съобщението от разговора.",
-      "deleteFailed": "Не успяхме да изтрием съобщението.",
-      "removeReactionFailed": "Не успяхме да премахнем реакцията.",
-      "addReactionFailed": "Не успяхме да добавим реакцията.",
-      "retrySend": "Изпрати отново",
-      "moreReactions": "Още реакции",
-      "edit": "Редактиране",
-      "sendFailed": "Не успяхме да изпратим съобщението.",
-      "retrySendFailed": "Не успяхме да изпратим съобщението отново.",
-      "editFailed": "Не успяхме да редактираме съобщението.",
-      "executeFailed": "Не успяхме да изпълним действието."
+      "edit": "Редактиране"
     },
     "attachmentPicker": {
-      "takePhoto": "Снимай",
-      "photoLibrary": "Фотогалерия",
-      "files": "Файлове",
       "cameraAccessMessage": "Разреши достъпа до камерата в настройките, за да направиш снимка."
-    },
-    "typingIndicator": {
-      "someone": "Някой",
-      "typing_one": "{{name}} пише…",
-      "typing": "{{names}} пишат…",
-      "typing_other": "{{names}} пишат…"
-    },
-    "botStatus": {
-      "offline": "Офлайн",
-      "loadingUser": "Зареждане на потребителя…",
-      "waitingForStatus": "Изчакване на състоянието на бота…",
-      "offlineMessage": "Ботът е офлайн. Обменът на съобщения ще се възобнови, когато ботът се свърже отново."
-    },
-    "errors": {
-      "notAllowed": "Действието не е разрешено.",
-      "messageTooLong": "Съобщението е твърде дълго — съкрати го до по-малко от {{limit}} знака.",
-      "titleTooLong": "Заглавието е твърде дълго — съкрати го до по-малко от {{limit}} знака.",
-      "messageEmpty": "Съобщението не може да е празно."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Не можахме да заредим инстанциите на KiloClaw.",
-    "billing": {
-      "title": "Плащания",
-      "continueMonthToMonth": "Продължи с месечен абонамент",
-      "plan": "План",
-      "finalTermEnds": "Край на последния период",
-      "afterFinalTerm": "След последния период",
-      "ends": "Изтича",
-      "expires": "Изтича",
-      "noActivePlan": "Няма активен план",
-      "noActivePlanDescription": "Нямаш активен абонамент за KiloClaw.",
-      "managedByAdmin": "Администраторът на организацията ти управлява плащанията.",
-      "couldNotLoad": "Не можахме да заредим информацията за плащанията.",
-      "manageOnWeb": "Управлявай плащанията в сайта",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Последният ти период по плана Commit изтича на {{date}}. Продължи с плана Standard за {{price}}, иначе хостингът ще бъде прекратен.",
-      "freeTrial": "Безплатен пробен период",
-      "hostingEnds": "Хостингът се прекратява",
-      "renews": "Подновява се",
-      "standardMonthToMonth": "Standard с месечен абонамент",
-      "standardStartsOn": "Планът Standard започва на {{date}} на цена {{price}}.",
-      "yourStandardMonthlyPrice": "месечната ти цена за плана Standard",
-      "perMonth": "/месец",
-      "earlybirdAccessUntil": "Достъпът по плана Earlybird е валиден до {{date}}.",
-      "earlybirdEnding": "Оставащо време по плана Earlybird: {{remaining}}.",
-      "paymentPastDue": "Плащането е просрочено. Моля, актуализирай начина на плащане.",
-      "subscriptionCancels": "Абонаментът ще бъде прекратен на {{date}}.",
-      "trialDaysRemaining": "Оставащо време от пробния период: {{remaining}}.",
-      "trialEndingSoon": "Пробният период приключва скоро. Оставащо време: {{remaining}}.",
-      "lessThanOneDay": "По-малко от 1 ден",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Комит"
-    },
-    "changelog": {
-      "title": "Какво е новото",
-      "couldNotLoad": "Не можахме да заредим списъка с промените.",
-      "noUpdates": "Все още няма актуализации",
-      "noUpdatesDescription": "Тук ще се показват новите промени.",
-      "recentUpdates": "Скорошни актуализации",
-      "manageVersion": "Управлявай версията",
-      "redeployRequired": "Нужно е повторно разгръщане",
-      "redeploySuggested": "Препоръчано повторно разгръщане",
-      "upgradeRequired": "Изисква се надграждане"
-    },
-    "dashboard": {
-      "title": "Табло",
-      "couldNotLoad": "Не можахме да заредим таблото.",
-      "renameInstance": "Преименувай инстанцията",
-      "renamePlaceholder": "Ново име (до 50 знака)",
-      "someDetailsFailed": "Част от данните в реално време не се заредиха.",
-      "destroy": "Унищожи",
-      "destroyMessage": "Това ще унищожи окончателно инстанцията ти на KiloClaw и всичките ѝ данни. Действието не може да бъде отменено.",
-      "destroyTitle": "Унищожаване на инстанцията",
-      "instance": "Инстанция",
-      "couldNotCheckStatus": "Не можахме да проверим състоянието на услугата.",
-      "dangerZone": "ОПАСНА ЗОНА",
-      "destroying": "Унищожаване…",
-      "serviceDegraded": "Услугата работи с проблеми — докосни, за да видиш състоянието",
-      "up": "РАБОТИ"
-    },
-    "channels": {
-      "title": "Канали",
-      "couldNotLoad": "Не можахме да заредим каналите.",
-      "noChannels": "Няма налични канали",
-      "noChannelsDescription": "Интеграциите с канали ще се появят тук.",
-      "connected": "Установена е връзка с {{label}}",
-      "disconnectMessage": "Да се премахне ли {{label}}? Връзката с този канал ще бъде прекъсната.",
-      "disconnectTitle": "Прекъсване на връзката с канала"
-    },
-    "devicePairing": {
-      "title": "Сдвояване на устройства",
-      "refreshRequests": "Опресни заявките за сдвояване",
-      "couldNotLoad": "Не можахме да заредим заявките за сдвояване.",
-      "noPending": "Няма чакащи заявки",
-      "noPendingDescription": "Заявките за сдвояване на канали и устройства ще се появят тук.",
-      "channelRequests": "Заявки за канали",
-      "deviceRequests": "Заявки за устройства",
-      "approveDeviceMessage": "Разрешаваш ли на {{platform}} да се свърже с инстанцията ти?",
-      "approveDeviceTitle": "Одобряване на устройство",
-      "approveMessage": "Разрешаваш ли на {{label}} (код: {{code}}) да се свърже с инстанцията ти?",
-      "approveTitle": "Одобряване на заявка за сдвояване",
-      "unknownDevice": "Неизвестно устройство"
-    },
-    "execPolicy": {
-      "title": "Политика за изпълнение",
-      "couldNotLoad": "Не можахме да заредим политиката за изпълнение.",
-      "alwaysAsk": "Винаги питай",
-      "alwaysAskDescription": "Изисквай потвърждение за всяка команда преди изпълнение. Това е най-сигурният вариант.",
-      "neverAsk": "Никога не питай",
-      "neverAskDescription": "Изпълнявай команди без потвърждение. Това е по-бързо, но по-несигурно."
-    },
-    "google": {
-      "title": "Акаунт в Google",
-      "couldNotLoad": "Не можахме да заредим състоянието на акаунта в Google.",
-      "disconnected": "Връзката с акаунта в Google е прекъсната. Разгърни инстанцията отново, за да приложиш промяната.",
-      "setupCommand": "Команда за настройка",
-      "setupCommandHelp": "За да свържеш акаунта си в Google, изпълни тази команда в терминал на своя компютър. На компютъра трябва да е инсталиран Docker.",
-      "failedToLoadCommand": "Не можахме да заредим командата за настройка.",
-      "gmailNotifications": "Известия от Gmail",
-      "disconnect": "Прекъсни връзката с акаунта в Google",
-      "copied": "Копирано",
-      "copyCommand": "Копирай командата",
-      "disconnectConfirm": "Прекъсни връзката",
-      "disconnectMessage": "Да се премахне ли акаунтът ти в Google от тази инстанция? Това ще изключи известията от Gmail. След като прекъснеш връзката, разгърни инстанцията отново, за да приложиш промените.",
-      "disconnectTitle": "Прекъсване на връзката с Google"
-    },
-    "modelList": {
-      "noMatches": "Няма модели за това търсене",
-      "noModelsDescription": "Моделите ще се появят тук, когато са налични.",
-      "noResultsFor": "Няма резултати за „{{query}}“."
-    },
-    "secrets": {
-      "title": "Поверителни данни",
-      "couldNotLoad": "Не можахме да заредим поверителните данни.",
-      "noSecrets": "Няма поверителни данни",
-      "noSecretsDescription": "Тук ще се показват интеграциите с поверителни данни.",
-      "removeMessage": "Да се премахне ли {{label}}? Този инструмент ще загуби достъп до данните си за удостоверяване.",
-      "removeTitle": "Премахване на поверителните данни",
-      "saved": "Запазени данни за {{label}}",
-      "hide": "Скрий {{label}}",
-      "show": "Покажи {{label}}",
-      "allFieldsRequired": "Всички полета са задължителни, за да се свърже {{label}}.",
-      "setupGuideFallback": "ръководство за настройка",
-      "setupGuideA11y": "Ръководство за настройка на {{label}}",
-      "setupGuide": "Ръководство за настройка",
-      "saving": "Запазване…",
-      "removing": "Премахване…",
-      "updateToken": "Актуализирай токена"
-    },
-    "versionPin": {
-      "title": "Фиксиране на версията",
-      "couldNotLoad": "Не можахме да заредим информацията за версията.",
-      "couldNotLoadMore": "Не можахме да заредим още версии.",
-      "loadMore": "Зареди още версии",
-      "showingLatest": "Показват се най-новите 100 версии.",
-      "availableVersions": "Налични версии",
-      "noVersions": "Няма налични версии",
-      "noVersionsDescription": "Наличните версии на OpenClaw ще се появят тук.",
-      "unpin": "Премахни фиксирането",
-      "unpinMessage": "Да се премине ли отново към най-новата налична версия?",
-      "unpinTitle": "Премахване на фиксираната версия",
-      "confirmPin": "Потвърди фиксирането",
-      "followingLatest": "Автоматично най-новата",
-      "latest": "най-нова",
-      "pin": "Фиксирай",
-      "pinnedByAdmin": "Версията е фиксирана от администратор. Свържи се с администратора си, за да я промениш.",
-      "pinnedTo": "Фиксирана версия: {{version}}",
-      "reasonOptional": "Причина (незадължително)",
-      "reasonPlaceholder": "Защо фиксираш тази версия?",
-      "replaceAdminPin": "Замени фиксираната от администратора версия",
-      "replacesAdminPin": "Това заменя фиксираната от администратора версия (в момента {{label}})."
-    },
-    "redeploy": "Разгърни отново",
-    "redeployMessage": "Сигурен ли си, че искаш да разгърнеш отново тази инстанция?",
-    "redeployTitle": "Повторно разгръщане на инстанцията",
-    "controls": {
-      "redeploying": "Повторно разгръщане…",
-      "restart": "Рестартирай",
-      "restartOpenClawMessage": "Сигурен ли си, че искаш да рестартираш процеса OpenClaw?",
-      "restartOpenClawTitle": "Рестартиране на OpenClaw",
-      "restarting": "Рестартиране…",
-      "start": "Стартирай",
-      "startMessage": "Сигурен ли си, че искаш да стартираш тази инстанция?",
-      "startTitle": "Стартиране на инстанцията",
-      "stop": "Спри",
-      "stopMessage": "Сигурен ли си, че искаш да спреш тази инстанция?",
-      "stopTitle": "Спиране на инстанцията",
-      "stopping": "Спиране…"
-    },
-    "empty": {
-      "finishingSetup": "Приключване на настройката",
-      "finishingSetupDescription": "Изчакай малко, довършваме настройката на акаунта ти. Обикновено това отнема само миг.",
-      "getStarted": "Започни",
-      "noInstancesDescription": "Създай първата си инстанция, за да започнеш да използваш агенти за програмиране."
-    },
-    "instance": {
-      "backToInstances": "Обратно към инстанциите",
-      "couldNotLoad": "Не можахме да заредим инстанцията.",
-      "notFound": "Инстанцията не е намерена",
-      "notFoundDescription": "Тази инстанция може да е унищожена или връзката вече да не е валидна."
-    },
-    "list": {
-      "createInstance": "Създай инстанция",
-      "organizations": "Организации",
-      "accessIssue": {
-        "trialExpired": "Пробният период приключи; абонирай се, за да продължиш да използваш тази инстанция",
-        "subscriptionCanceled": "Абонаментът е неактивен; поднови абонамента, за да продължиш да използваш тази инстанция",
-        "subscriptionPastDue": "Има проблем с плащането — обнови данните за плащане, за да продължиш да използваш тази инстанция",
-        "quarantined": "Инстанцията е под карантина и се нуждае от ръчна проверка",
-        "multipleCurrentConflict": "Акаунтът изисква преглед",
-        "nonCanonicalEarlybird": "Старият план изисква проверка"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Разговаряй с {{name}}",
-        "ready": "{{name}} е готов",
-        "warmedUp": "Всичко е готово. Поздрави го, когато пожелаеш."
-      },
-      "flow": {
-        "genericErrorBody": "В момента не можахме да завършим настройката на инстанцията ти.",
-        "manualReviewBody": "Трябва да проверим състоянието на акаунта ти, преди да създадем инстанция. Продължи в kilo.ai.",
-        "manualReviewTitle": "Настройката се нуждае от ръчна проверка",
-        "openKiloAi": "Отвори kilo.ai",
-        "provisioning": "Подготовка на ресурсите",
-        "review": "Преглед",
-        "identityTitle": "Самоличност на бота",
-        "couldNotLoad": "Не можахме да заредим състоянието на първоначалната настройка.",
-        "finishingSetup": "Довършваме настройката. Изчакай, докато подготвим акаунта ти.",
-        "ready": "Готово",
-        "settingUp": "Настройване…"
-      },
-      "unavailableDescription": "За създаване на инстанция е необходим активен абонамент за KiloClaw. Съществуващите инстанции и абонаменти продължават да работят както досега.",
-      "unavailableTitle": "Създаването на инстанции на KiloClaw е недостъпно",
-      "identity": {
-        "chooseAvatar": "Избери аватар",
-        "namePlaceholder": "Име на бота",
-        "selectAvatar": "Избери {{name}} като аватар",
-        "personality": "Характер",
-        "changePersonality": "Промени характера",
-        "location": "Местоположение",
-        "locationPlaceholder": "Град или регион (незадължително)",
-        "useCurrentLocation": "Използвай текущото местоположение",
-        "locationDeniedTitle": "Достъпът до местоположението е отказан",
-        "locationDeniedMessage": "Разреши достъпа до местоположението в настройките, за да използваш текущото си местоположение.",
-        "locationValidationFailed": "Местоположението не можа да бъде потвърдено.",
-        "locationResolveFailed": "Не можахме да определим местоположението ти. Можеш да го редактираш ръчно.",
-        "locationGetFailed": "Не успяхме да получим местоположението ти. Въведи го ръчно.",
-        "nature": {
-          "aiAssistantLabel": "Асистент с изкуствен интелект",
-          "aiAssistantVibe": "Полезен, способен, професионален",
-          "digitalCreatureLabel": "Цифрово създание",
-          "digitalCreatureVibe": "Чудато, жизнено, малко непредсказуемо",
-          "virtualCompanionLabel": "Виртуален спътник",
-          "virtualCompanionVibe": "Сърдечен, внимателен, искрено загрижен",
-          "somethingWeirderLabel": "Нещо по-странно…",
-          "somethingWeirderVibe": "Опиши го по свой вкус"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Готово! Подготвих обобщението, което поиска. На твое разположение съм.",
-        "settingUp": "Настройване на известията…",
-        "stayInTheLoop": "Винаги в течение",
-        "getNotified": "Получавай известие, когато {{name}} завърши задача, за да не изпуснеш нито един отговор.",
-        "now": "сега",
-        "skipForNow": "Пропусни засега",
-        "couldNotEnable": "Не можахме да включим известията."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Неуспешна проверка на настройката",
-        "queryErrorBody": "Връзката прекъсна, докато проверявахме настройката на {{name}}. Настройката може още да е в ход. Опитай отново или провери след малко.",
-        "stoppedTitle": "Настройката е спряна",
-        "stoppedBody": "Инстанцията на {{name}} спря неочаквано по време на настройката.",
-        "stalledTitle": "Настройката не напредва",
-        "stalledBody": "Не успяхме да завършим настройката на {{name}}. Опитай отново или пиши на {{supportEmail}}, ако това продължава.",
-        "timeoutTitle": "Отнема повече от очакваното",
-        "timeoutBody": "Настройката на {{name}} отнема повече от обичайното (над {{displayMinutes}} минути).",
-        "continueInBackground": "Продължи във фонов режим",
-        "settingUp": "Настройване на {{name}}",
-        "connectingToAgent": "Свързване с агента",
-        "startingSandbox": "Стартиране на изолираната среда",
-        "backgroundHint": "Обикновено отнема по-малко от минута. Можеш да затвориш този екран — ще продължим във фонов режим."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Код {{code}}",
-      "gatewayProcess": "ПРОЦЕС НА ШЛЮЗА",
-      "lastExit": "Последно приключване",
-      "memory": "Памет",
-      "region": "Регион",
-      "resources": "РЕСУРСИ",
-      "restarts": "Рестартирания",
-      "state": "Състояние",
-      "uptime": "Време на работа",
-      "crashed": "СРИВ",
-      "destroying": "УНИЩОЖАВАНЕ",
-      "provisioned": "ПОДГОТВЕНА",
-      "restarting": "РЕСТАРТИРАНЕ",
-      "running": "ИЗПЪЛНЯВА СЕ",
-      "shuttingDown": "ИЗКЛЮЧВАНЕ",
-      "starting": "СТАРТИРАНЕ",
-      "stopped": "СПРЯНА",
-      "stopping": "СПИРАНЕ",
-      "unknown": "НЕИЗВЕСТНО",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Водещи модели",
-      "frontierDescription": "Най-висока производителност. Насочва заявките към водещи модели със способност за разсъждение.",
-      "balancedDescription": "Добър баланс между бързина и възможности на по-ниска цена.",
-      "autoModelA11y": "Автоматичен модел: {{label}}",
-      "currentModel": "Текущ модел",
-      "browseAllModels": "или избери от над 500 модела",
-      "browseAllModelsA11y": "Разгледай всичките над 500 модела"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "За да продължиш да използваш KiloClaw, отвори kilo.ai/claw от браузъра си. Не можеш да се абонираш в приложението.",
-      "subscriptionCanceledTitle": "Абонирай се през сайта",
-      "subscriptionCanceledBody": "За да използваш KiloClaw, отвори kilo.ai/claw от браузъра си. Не можеш да се абонираш в приложението.",
-      "subscriptionCanceledCta": "Отвори kilo.ai/claw",
-      "subscriptionPastDueTitle": "Обновяване на данните за плащане в сайта",
-      "subscriptionPastDueBody": "Имахме проблем с последното ти плащане. Отвори kilo.ai/claw в браузъра си, за да обновиш данните за плащане. Не можеш да управляваш плащанията в приложението.",
-      "quarantinedTitle": "Инстанцията се нуждае от възстановяване",
-      "quarantinedBody": "Инстанцията ти на KiloClaw е под карантина и в момента не може да се използва. Екипът ни трябва да помогне за възстановяването ѝ.",
-      "multipleCurrentConflictBody": "Открихме повече от един активен абонамент в акаунта ти. Затова временно спряхме достъпа, за да не те таксуваме два пъти.",
-      "multipleCurrentConflictCta": "Продължи на kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Открит е стар план",
-      "nonCanonicalEarlybirdBody": "Твоят план за ранен достъп се нуждае от ръчна проверка, преди да може да се използва на мобилно устройство.",
-      "iosTitle": "KiloClaw не е наличен в iOS",
-      "iosBody": "Достъпът до KiloClaw за този акаунт се управлява извън приложението за iOS.",
-      "iosContact": "Въпроси? Свържи се с {{supportEmail}}.",
-      "quarantinedCta": "Изпрати имейл на екипа ни",
-      "nonCanonicalEarlybirdCta": "Прегледай плана си в kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} се нуждае от внимание: {{label}}",
-      "openUnread_one": "Отвори {{name}}, {{displayCount}} непрочетено съобщение",
-      "openUnread": "Отвори {{name}}, {{displayCount}} непрочетени съобщения",
-      "openUnread_other": "Отвори {{name}}, {{displayCount}} непрочетени съобщения",
-      "openSettings": "Отвори настройките за {{name}}",
-      "fixOnKiloAi": "Отстрани проблема в kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Одобряване на заявки от устройства",
-      "execPolicyDescription": "Настройки за сигурност",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Избор на модел с изкуствен интелект",
-      "secretsDescription": "Криптирани данни за удостоверяване",
-      "versionPinDescription": "Фиксиране на конкретна версия"
-    },
-    "avatar": {
-      "arcade": "Аркада",
-      "brain": "Мозък",
-      "creature": "Създание",
-      "crystal": "Кристал",
-      "custom": "Персонализиран аватар",
-      "dragon": "Дракон",
-      "explorer": "Изследовател",
-      "flame": "Пламък",
-      "lightning": "Светкавица",
-      "magicWand": "Вълшебна пръчка",
-      "moon": "Луна",
-      "operator": "Оператор",
-      "orbit": "Орбита",
-      "oracle": "Оракул",
-      "rainbow": "Дъга",
-      "robot": "Робот",
-      "satellite": "Сателит",
-      "sparkles": "Блясъци",
-      "strongArm": "Силна ръка",
-      "talisman": "Талисман"
-    },
-    "remoteSpawnFilesNotSupported": "Тази инстанция не може да получава файлове.",
-    "instanceSwitcherTitle": "Инстанция на KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Премести {{filename}} наляво",
       "moveRight": "Премести {{filename}} надясно"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Постави изображение от клипборда",
-      "label": "Открито е изображение — докосни, за да го поставиш"
-    },
     "attachmentPicker": {
       "camera": "Камера",
       "photoLibrary": "Фотогалерия",
@@ -2741,7 +2268,8 @@
     "sessionSignedOut": "Сесията е прекратена.",
     "signOutThisDeviceTitle": "Да се излезе ли от акаунта на това устройство?",
     "signOutThisSessionTitle": "Да се прекрати ли тази сесия?",
-    "signOutThisSessionMessage": "Сесията на {{device}} ще бъде прекратена. Устройството може да запази достъп до API до един час."
+    "signOutThisSessionMessage": "Сесията на {{device}} ще бъде прекратена. Устройството може да запази достъп до API до един час.",
+    "unknownDevice": "Неизвестно устройство"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Не можахме да отворим магазина за приложения.",

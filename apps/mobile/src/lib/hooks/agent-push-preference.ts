@@ -16,11 +16,9 @@ export const DEFAULT_NOTIFICATION_PREFERENCE = true as const;
 
 /** tRPC keys for the per-category toggles on the dedicated Notifications screen. */
 export const NOTIFICATION_CATEGORY_KEYS = [
-  'chatMessages',
   'agentAttention',
   'agentUpdates',
   'sessionStatus',
-  'kiloclawActivity',
   'balanceAlerts',
   'spendAlerts',
   'securityFindings',
@@ -30,11 +28,9 @@ export type NotificationCategoryKey = (typeof NOTIFICATION_CATEGORY_KEYS)[number
 
 /** Full shape of a single row in the tRPC cache for `getNotificationPreferences`. */
 export type NotificationPreferences = Readonly<{
-  chatMessages: boolean;
   agentAttention: boolean;
   agentUpdates: boolean;
   sessionStatus: boolean;
-  kiloclawActivity: boolean;
   balanceAlerts: boolean;
   spendAlerts: boolean;
   securityFindings: boolean;
@@ -107,11 +103,9 @@ function defaultPreferences(
   overrides: Partial<NotificationPreferences> = {}
 ): NotificationPreferences {
   return {
-    chatMessages: DEFAULT_NOTIFICATION_PREFERENCE,
     agentAttention: DEFAULT_NOTIFICATION_PREFERENCE,
     agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
     sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
-    kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
     balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
     spendAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
     securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,

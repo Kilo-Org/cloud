@@ -84,13 +84,6 @@ vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreferenc
 vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
   clearHideThinkingPreference: vi.fn(),
 }));
-vi.mock('@/lib/kiloclaw-tab-ownership', () => ({
-  gateKiloClawOwned: vi.fn(),
-  clearKiloClawOwned: vi.fn(),
-}));
-vi.mock('@/lib/last-active-instance', () => ({
-  clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
-}));
 // The sign-out block clears the launcher surfaces and the last-opened record.
 // Stub them like the rest of the teardown graph: the native wrapper imports
 // `expo`, which needs `__DEV__` and cannot load in the node test environment.

@@ -67,9 +67,6 @@ export function useOrganizationMutations(
     await queryClient.invalidateQueries({ queryKey: withMembersKey });
   };
 
-  // Every optimistic mutation here only touches the withMembers cache, so the
-  // key is fixed rather than threaded through like use-kiloclaw-mutations.ts
-  // (which juggles many caches across a personal/org split).
   // onError policy: roll back the onMutate snapshot (latest generation only);
   // toast error.message, or the caller renders the error inline when silent.
   function optimistic<TInput>(

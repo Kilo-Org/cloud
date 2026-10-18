@@ -101,12 +101,9 @@
     "scheduled": "E planifikuar",
     "keepEditing": "Vazhdo redaktimin",
     "keepRunning": "Vazhdo ekzekutimin",
-    "kiloclaw": "KiloClaw",
     "newSession": "Sesion i ri",
-    "noKiloclawInstances": "Asnjë instancë KiloClaw",
     "noModelsAvailable": "Nuk ka modele të disponueshme",
     "notFound": "Nuk u gjet.",
-    "online": "Në linjë",
     "open": "Hap {{name}}",
     "openPullRequest": "Hapja e kërkesës së bashkimit",
     "pending": "Në pritje",
@@ -257,7 +254,8 @@
     "renamePasskey": "Riemërto çelësin e hyrjes",
     "removePasskey": "Hiq çelësin e hyrjes",
     "removePasskeyTitle": "Të hiqet çelësi i hyrjes?",
-    "removePasskeyMessage": "Nuk do të mund të hysh më me këtë çelës hyrjeje."
+    "removePasskeyMessage": "Nuk do të mund të hysh më me këtë çelës hyrjeje.",
+    "changelog": "Çfarë ka të re"
   },
   "preferences": {
     "general": "Të përgjithshme",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Njoftimet tregojnë se diçka ndodhi. Hap Kilo për ta lexuar.",
     "channel": {
       "agentProgress": "Ecuria e agjentit",
-      "chat": "Mesazhet e bisedës",
-      "kiloclaw": "Aktiviteti i KiloClaw",
       "balance": "Njoftimet për gjendjen e llogarisë",
       "security": "Gjetjet e sigurisë",
       "spend": "Njoftime për shpenzimet",
       "followedSessions": "Sesione të ndjekura"
     },
     "category": {
-      "chatMessagesSubtitle": "përgjigje në bisedat e tua",
       "agentAttentionTitle": "Agjenti ka nevojë për ty",
       "agentAttentionSubtitle": "pyetje, kërkesa për leje dhe informacion",
       "agentUpdatesTitle": "Përditësimet e agjentit",
       "agentUpdatesSubtitle": "mesazhe nga agjenti gjatë detyrës",
       "sessionStatusTitle": "Statusi i seancës",
       "sessionStatusSubtitle": "e përfunduar / e dështuar / gati për kontroll",
-      "kiloclawActivitySubtitle": "instancë gati / e dështuar, veprime të planifikuara",
-      "kiloclawActivityUnavailable": "Nis një instancë KiloClaw për të marrë aktivitetin e KiloClaw.",
       "balanceAlertsSubtitle": "paralajmërime për gjendje të ulët të organizatës",
       "balanceAlertsUnavailable": "Bashkohu me një organizatë për të marrë paralajmërime për gjendjen.",
       "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Kreu",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, skedë, {{position}} nga {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Zgjedhja e instancës",
-      "couldNotLoadInstances": "Nuk u ngarkuan instancat.",
-      "noInstancesDescription": "Konfiguro një instancë për të filluar bisedën.",
-      "setUpKiloclaw": "Konfiguro KiloClaw",
-      "currentInstance": "{{title}}, aktuale"
-    },
     "conversation": {
-      "failedToLoad": "Nuk u ngarkua biseda.",
-      "notFound": "Biseda nuk u gjet.",
       "untitled": "Pa titull",
-      "leaveTitle": "Dëshiron të dalësh nga biseda?",
-      "leaveMessage": "Kjo e heq atë nga lista jote.",
-      "openHint": "Hap bisedën. Mbaje shtypur për opsionet e riemërtimit dhe daljes.",
-      "unread": "E palexuar",
-      "optionsFor": "Opsionet e bisedës për {{title}}",
-      "options": "Opsionet e bisedës",
-      "renameTitle": "Riemërtimi i bisedës",
-      "renamePlaceholder": "Emri i ri",
-      "couldNotReachBot": "Nuk u vendos lidhja me botin. Provo përsëri.",
-      "messageDeliveryFailed": "Mesazhi nuk u dorëzua te boti.",
-      "couldNotSignIn": "Nuk u krye hyrja në bisedë.",
-      "couldNotRefreshMessages": "Nuk u rifreskuan mesazhet.",
-      "couldNotLoadHistory": "Nuk u ngarkua historiku i bisedës.",
-      "leave": "Dil",
-      "untitledConversation": "Bisedë pa titull",
-      "createFailed": "Nuk u krijua biseda.",
-      "leaveFailed": "Nuk u krye dalja nga biseda."
-    },
-    "reactions": {
-      "common": "Të zakonshme",
-      "reactWith": "Reago me {{reaction}}",
-      "accessibility": "Reagimi {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Po i përgjigjesh",
-      "cancelReply": "Anulo përgjigjen",
-      "openInstance": "Hap instancën",
-      "attachFile": "Bashkëngjit skedar",
-      "cancelEdit": "Anulo redaktimin"
+      "renamePlaceholder": "Emri i ri"
     },
     "conversationList": {
-      "couldNotLoad": "Nuk u ngarkuan bisedat.",
-      "emptyTitle": "Ende pa biseda",
-      "emptyDescription": "Krijo një bisedë për të komunikuar me instancën tënde të KiloClaw.",
-      "create": "Krijo bisedë",
-      "newConversation": "Bisedë e re",
-      "openInstanceSettings": "Hap cilësimet e instancës",
       "today": "Sot",
       "yesterday": "Dje",
-      "thisWeek": "Këtë javë",
       "older": "Më të vjetra"
     },
     "attachment": {
-      "open": "Hap {{filename}}",
-      "openFailed": "Nuk u hap bashkëngjitja. Kontrollo lidhjen dhe provo përsëri.",
-      "attachFailed": "Nuk u bashkëngjit skedari.",
-      "limit": "Mund të bashkëngjitësh deri në {{displayCount}} skedarë.",
-      "sizeRejection": "{{filename}} tejkalon madhësinë e lejuar prej {{limit}} për bashkëngjitjet.",
-      "unreadable": "Nuk u lexua {{filename}}.",
-      "pastedImage": "imazhi i ngjitur",
-      "defaultName": "Bashkëngjitje",
       "classificationDenied": "Skedarët e ekzekutueshëm nuk mund të bashkëngjiten.",
       "classificationEmpty": "Skedari është bosh.",
       "classificationTooLarge": "Madhësia e skedarëve nuk duhet të kalojë 20 MB.",
@@ -943,426 +883,17 @@
       "networkError": "Ndodhi një gabim në rrjet.",
       "uploadFailed": "Ngarkimi dështoi.",
       "nothingToPaste": "Nuk ka asgjë për të ngjitur.",
-      "metadataStripFailed": "Nuk u hoqën të dhënat shtesë të fotos.",
-      "limit_one": "Mund të bashkëngjitësh deri në {{displayCount}} skedar.",
-      "limit_other": "Mund të bashkëngjitësh deri në {{displayCount}} skedarë."
+      "metadataStripFailed": "Nuk u hoqën të dhënat shtesë të fotos."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Riprovo ngarkimin për {{filename}}",
-      "remove": "Hiq {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[mesazh i fshirë]",
-      "yourMessage": "Mesazhi yt",
-      "messageFrom": "Mesazh nga {{author}}",
-      "moreActions": "Më shumë veprime",
-      "notDelivered": "Nuk u dorëzua",
-      "edited": "(i redaktuar)",
-      "image": "Imazhi"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "U kopjua",
-      "copyFailed": "Kopjimi dështoi.",
-      "title": "Veprimet e mesazhit",
-      "deleteTitle": "Të fshihet mesazhi?",
-      "deleteMessage": "Kjo do ta heqë mesazhin nga biseda.",
-      "deleteFailed": "Nuk u fshi mesazhi.",
-      "removeReactionFailed": "Nuk u hoq reagimi.",
-      "addReactionFailed": "Nuk u shtua reagimi.",
-      "retrySend": "Riprovo dërgimin",
-      "moreReactions": "Më shumë reagime",
-      "edit": "Redakto",
-      "sendFailed": "Nuk u dërgua mesazhi.",
-      "retrySendFailed": "Nuk u riprovua dërgimi.",
-      "editFailed": "Nuk u redaktua mesazhi.",
-      "executeFailed": "Nuk u krye veprimi."
+      "edit": "Redakto"
     },
     "attachmentPicker": {
-      "takePhoto": "Bëj foto",
-      "photoLibrary": "Biblioteka e fotove",
-      "files": "Skedarë",
       "cameraAccessMessage": "Lejo qasjen te kamera në cilësime për të bërë një foto."
-    },
-    "typingIndicator": {
-      "someone": "Dikush",
-      "typing_one": "{{name}} po shkruan...",
-      "typing": "{{names}} po shkruajnë...",
-      "typing_other": "{{names}} po shkruajnë..."
-    },
-    "botStatus": {
-      "offline": "Jashtë linje",
-      "loadingUser": "Po ngarkohet përdoruesi...",
-      "waitingForStatus": "Po pritet statusi i botit...",
-      "offlineMessage": "Boti është jashtë linje. Shkëmbimi i mesazheve do të rifillojë kur boti të lidhet përsëri."
-    },
-    "errors": {
-      "notAllowed": "Ky veprim nuk lejohet.",
-      "messageTooLong": "Mesazhi është shumë i gjatë. Përdor më pak se {{limit}} karaktere.",
-      "titleTooLong": "Titulli është shumë i gjatë. Përdor më pak se {{limit}} karaktere.",
-      "messageEmpty": "Mesazhi nuk mund të jetë bosh."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Nuk u ngarkuan instancat KiloClaw.",
-    "billing": {
-      "title": "Faturimi",
-      "continueMonthToMonth": "Vazhdo me abonim mujor",
-      "plan": "Plani",
-      "finalTermEnds": "Periudha e fundit përfundon",
-      "afterFinalTerm": "Pas periudhës së fundit",
-      "lessThanOneDay": "Më pak se 1 ditë",
-      "ends": "Përfundon",
-      "expires": "Skadon",
-      "noActivePlan": "Asnjë plan aktiv",
-      "noActivePlanDescription": "Nuk ke një abonim aktiv KiloClaw.",
-      "managedByAdmin": "Faturimin e menaxhon administratori i organizatës tënde.",
-      "couldNotLoad": "Nuk u ngarkuan të dhënat e faturimit.",
-      "manageOnWeb": "Menaxho faturimin në ueb",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Periudha jote e fundit në planin Commit përfundon më {{date}}. Vazhdo me planin Standard me çmimin {{price}}, përndryshe shërbimi i pritjes do të përfundojë.",
-      "freeTrial": "Provë falas",
-      "hostingEnds": "Shërbimi i pritjes përfundon",
-      "renews": "Rinovohet",
-      "standardMonthToMonth": "Standard me abonim mujor",
-      "standardStartsOn": "Plani Standard fillon më {{date}} me çmimin {{price}}.",
-      "yourStandardMonthlyPrice": "çmimi yt mujor për planin Standard",
-      "perMonth": "/muaj",
-      "earlybirdAccessUntil": "Qasja me planin Earlybird vazhdon deri më {{date}}.",
-      "earlybirdEnding": "Koha e mbetur në planin Earlybird: {{remaining}}.",
-      "paymentPastDue": "Pagesa është vonuar. Përditëso metodën tënde të pagesës.",
-      "subscriptionCancels": "Abonimi anulohet më {{date}}.",
-      "trialDaysRemaining": "Koha e mbetur e provës: {{remaining}}.",
-      "trialEndingSoon": "Prova përfundon së shpejti: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Depozitim"
-    },
-    "changelog": {
-      "title": "Çfarë ka të re",
-      "couldNotLoad": "Nuk u ngarkua regjistri i ndryshimeve.",
-      "noUpdates": "Ende pa përditësime",
-      "noUpdatesDescription": "Shënimet për ndryshimet do të shfaqen këtu.",
-      "recentUpdates": "Përditësimet e fundit",
-      "manageVersion": "Menaxho versionin",
-      "redeployRequired": "Kërkohet rivendosje",
-      "redeploySuggested": "Sugjerohet rivendosje",
-      "upgradeRequired": "Kërkohet kalim në version të ri"
-    },
-    "dashboard": {
-      "title": "Paneli",
-      "couldNotLoad": "Nuk u ngarkua paneli.",
-      "renameInstance": "Riemërto instancën",
-      "renamePlaceholder": "Emri i ri (deri në 50 karaktere)",
-      "someDetailsFailed": "Disa të dhëna në kohë reale nuk u ngarkuan.",
-      "destroy": "Fshi përgjithmonë",
-      "destroyMessage": "Kjo do ta fshijë përgjithmonë instancën tënde KiloClaw dhe të gjitha të dhënat e saj. Ky veprim nuk mund të zhbëhet.",
-      "destroyTitle": "Fshi instancën përgjithmonë",
-      "instance": "Instanca",
-      "couldNotCheckStatus": "Nuk u kontrollua statusi i shërbimit.",
-      "dangerZone": "ZONA E RREZIKUT",
-      "destroying": "Po fshihet…",
-      "serviceDegraded": "Shërbimi ka probleme — prek për të parë statusin",
-      "up": "AKTIV"
-    },
-    "channels": {
-      "title": "Kanalet",
-      "couldNotLoad": "Nuk u ngarkuan kanalet.",
-      "noChannels": "Asnjë kanal i disponueshëm",
-      "noChannelsDescription": "Integrimet e kanaleve do të shfaqen këtu.",
-      "connected": "{{label}} u lidh",
-      "disconnectMessage": "Të hiqet {{label}}? Ky kanal do të shkëputet.",
-      "disconnectTitle": "Shkëput kanalin"
-    },
-    "devicePairing": {
-      "title": "Çiftimi i pajisjeve",
-      "refreshRequests": "Rifresko kërkesat e çiftimit",
-      "couldNotLoad": "Nuk u ngarkuan kërkesat e çiftimit.",
-      "noPending": "Asnjë kërkesë në pritje",
-      "noPendingDescription": "Kërkesat e çiftimit të kanaleve dhe pajisjeve do të shfaqen këtu.",
-      "channelRequests": "Kërkesat e kanaleve",
-      "deviceRequests": "Kërkesat e pajisjeve",
-      "approveDeviceMessage": "Të lejohet {{platform}} të lidhet me instancën tënde?",
-      "approveDeviceTitle": "Mirato pajisjen",
-      "approveMessage": "Të lejohet {{label}} (kodi: {{code}}) të lidhet me instancën tënde?",
-      "approveTitle": "Mirato kërkesën e çiftimit",
-      "unknownDevice": "Pajisje e panjohur"
-    },
-    "execPolicy": {
-      "title": "Politika e ekzekutimit",
-      "couldNotLoad": "Nuk u ngarkua politika e ekzekutimit.",
-      "alwaysAsk": "Pyet gjithmonë",
-      "alwaysAskDescription": "Konfirmo çdo komandë përpara ekzekutimit. Ky është opsioni më i sigurt.",
-      "neverAsk": "Mos pyet kurrë",
-      "neverAskDescription": "Ekzekuto komandat pa konfirmim. Ky opsion është më i shpejtë, por më pak i sigurt."
-    },
-    "google": {
-      "title": "Llogaria Google",
-      "couldNotLoad": "Nuk u ngarkua statusi i llogarisë Google.",
-      "disconnected": "Llogaria Google u shkëput. Rivendos instancën tënde për të zbatuar ndryshimin.",
-      "setupCommand": "Komanda e konfigurimit",
-      "setupCommandHelp": "Për të lidhur llogarinë tënde Google, ekzekuto këtë komandë në terminalin e kompjuterit tënd. Docker duhet të jetë i instaluar në kompjuter.",
-      "failedToLoadCommand": "Nuk u ngarkua komanda e konfigurimit.",
-      "gmailNotifications": "Njoftimet e Gmail",
-      "disconnect": "Shkëput llogarinë Google",
-      "copied": "U kopjua",
-      "copyCommand": "Kopjo komandën",
-      "disconnectConfirm": "Shkëput",
-      "disconnectMessage": "Të hiqet llogaria jote Google nga kjo instancë? Kjo do të çaktivizojë njoftimet e Gmail. Rivendos instancën pas shkëputjes për të zbatuar ndryshimet.",
-      "disconnectTitle": "Shkëput Google"
-    },
-    "modelList": {
-      "noMatches": "Asnjë model nuk përputhet me kërkimin tënd",
-      "noModelsDescription": "Modelet do të shfaqen këtu sapo të jenë të disponueshme.",
-      "noResultsFor": "Nuk ka rezultate për \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Sekretet",
-      "couldNotLoad": "Nuk u ngarkuan sekretet.",
-      "noSecrets": "Asnjë sekret i disponueshëm",
-      "noSecretsDescription": "Integrimet e sekreteve do të shfaqen këtu.",
-      "removeMessage": "Të hiqet {{label}}? Ky mjet do të humbasë qasjen te kredencialet e tij.",
-      "removeTitle": "Hiq sekretin",
-      "saved": "{{label}} u ruajt",
-      "hide": "Fshih {{label}}",
-      "show": "Shfaq {{label}}",
-      "allFieldsRequired": "Të gjitha fushat janë të detyrueshme për të lidhur {{label}}.",
-      "setupGuideFallback": "udhëzuesi i konfigurimit",
-      "setupGuideA11y": "Udhëzuesi i konfigurimit të {{label}}",
-      "setupGuide": "Udhëzuesi i konfigurimit",
-      "saving": "Po ruhet…",
-      "removing": "Po hiqet…",
-      "updateToken": "Përditëso kodin e autentikimit"
-    },
-    "versionPin": {
-      "title": "Fiksimi i versionit",
-      "couldNotLoad": "Nuk u ngarkuan të dhënat e versionit.",
-      "couldNotLoadMore": "Nuk u ngarkuan më shumë versione.",
-      "loadMore": "Ngarko më shumë versione",
-      "showingLatest": "Po shfaqen 100 versionet më të fundit.",
-      "availableVersions": "Versionet e disponueshme",
-      "noVersions": "Asnjë version i disponueshëm",
-      "noVersionsDescription": "Versionet e disponueshme të OpenClaw do të shfaqen këtu.",
-      "unpin": "Hiq fiksimin",
-      "unpinMessage": "Të kalohet te versioni më i fundit i disponueshëm?",
-      "unpinTitle": "Hiq fiksimin e versionit",
-      "confirmPin": "Konfirmo fiksimin",
-      "followingLatest": "Ndjek versionin e fundit",
-      "latest": "më i fundit",
-      "pin": "Fikso",
-      "pinnedByAdmin": "Administratori e ka fiksuar versionin. Kontaktoje për ta ndryshuar.",
-      "pinnedTo": "I fiksuar te {{version}}",
-      "reasonOptional": "Arsyeja (opsionale)",
-      "reasonPlaceholder": "Pse po e fikson këtë version?",
-      "replaceAdminPin": "Zëvendëso fiksimin e administratorit",
-      "replacesAdminPin": "Kjo zëvendëson fiksimin e vendosur nga administratori (aktualisht {{label}})."
-    },
-    "redeploy": "Rivendos në punë",
-    "redeployMessage": "Dëshiron vërtet ta rivendosësh këtë instancë?",
-    "redeployTitle": "Rivendos instancën",
-    "controls": {
-      "redeploying": "Po rivendoset…",
-      "restart": "Rinis",
-      "restartOpenClawMessage": "Dëshiron vërtet ta rinisësh procesin OpenClaw?",
-      "restartOpenClawTitle": "Rinis OpenClaw",
-      "restarting": "Po riniset…",
-      "start": "Nis",
-      "startMessage": "Dëshiron vërtet ta nisësh këtë instancë?",
-      "startTitle": "Nis instancën",
-      "stop": "Ndal",
-      "stopMessage": "Dëshiron vërtet ta ndalësh këtë instancë?",
-      "stopTitle": "Ndal instancën",
-      "stopping": "Po ndalet…"
-    },
-    "empty": {
-      "finishingSetup": "Duke përfunduar konfigurimin",
-      "finishingSetupDescription": "Prit pak, po përfundojmë përgatitjen e llogarisë tënde. Zakonisht kjo zgjat pak.",
-      "getStarted": "Fillo tani",
-      "noInstancesDescription": "Krijo instancën tënde të parë për të nisur agjentët e programimit."
-    },
-    "instance": {
-      "backToInstances": "Kthehu te instancat",
-      "couldNotLoad": "Nuk u ngarkua instanca.",
-      "notFound": "Instanca nuk u gjet",
-      "notFoundDescription": "Kjo instancë mund të jetë fshirë përgjithmonë ose lidhja nuk është më e vlefshme."
-    },
-    "list": {
-      "createInstance": "Krijo instancë",
-      "organizations": "Organizatat",
-      "accessIssue": {
-        "trialExpired": "Prova përfundoi, abonohu për të vazhduar përdorimin e kësaj instance",
-        "subscriptionCanceled": "Abonimi është joaktiv, abonohu përsëri për të vazhduar përdorimin e kësaj instance",
-        "subscriptionPastDue": "Problem me pagesën, përditëso të dhënat e faturimit për të vazhduar përdorimin e kësaj instance",
-        "quarantined": "Instanca është në karantinë, kërkon shqyrtim manual",
-        "multipleCurrentConflict": "Llogaria kërkon shqyrtim",
-        "nonCanonicalEarlybird": "Plani i vjetër kërkon rishikim"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Bisedo me {{name}}",
-        "ready": "{{name}} është gati",
-        "warmedUp": "Gjithçka është gati. Përshëndete kur të jesh gati."
-      },
-      "flow": {
-        "genericErrorBody": "Nuk arritëm ta përfundonim konfigurimin e instancës tënde këtë herë.",
-        "manualReviewBody": "Duhet të zgjidhet një problem me llogarinë tënde përpara se të krijojmë një instancë. Vazhdo në kilo.ai.",
-        "manualReviewTitle": "Konfigurimi kërkon shqyrtim manual",
-        "openKiloAi": "Hap kilo.ai",
-        "provisioning": "Përgatitja e instancës",
-        "review": "Shqyrtimi",
-        "identityTitle": "Jepi botit tënd një identitet",
-        "couldNotLoad": "Nuk u ngarkua gjendja e konfigurimit fillestar.",
-        "finishingSetup": "Po përfundojmë konfigurimin. Prit pak derisa të përgatisim llogarinë tënde.",
-        "ready": "Gati",
-        "settingUp": "Po konfigurohet…"
-      },
-      "unavailableDescription": "Duhet një abonim aktiv KiloClaw për të krijuar një instancë. Instancat dhe abonimet ekzistuese vazhdojnë si zakonisht.",
-      "unavailableTitle": "Nuk mund të krijohen instanca të reja KiloClaw",
-      "identity": {
-        "chooseAvatar": "Zgjidh avatarin",
-        "namePlaceholder": "Emri i botit tënd",
-        "selectAvatar": "Zgjidh {{name}} si avatar",
-        "personality": "Personaliteti",
-        "changePersonality": "Ndrysho personalitetin",
-        "location": "Vendndodhja",
-        "locationPlaceholder": "Qyteti ose rajoni (opsionale)",
-        "useCurrentLocation": "Përdor vendndodhjen aktuale",
-        "locationDeniedTitle": "Qasja te vendndodhja u refuzua",
-        "locationDeniedMessage": "Aktivizo qasjen te vendndodhja në cilësimet e pajisjes për të përdorur vendndodhjen tënde aktuale.",
-        "locationValidationFailed": "Nuk u verifikua vendndodhja.",
-        "locationResolveFailed": "Nuk u arrit të përcaktohej vendndodhja jote. Mund ta redaktosh manualisht.",
-        "locationGetFailed": "Nuk u arrit të merrej vendndodhja jote. Shkruaje manualisht.",
-        "nature": {
-          "aiAssistantLabel": "Asistent me inteligjencë artificiale",
-          "aiAssistantVibe": "I dobishëm, i aftë, profesional",
-          "digitalCreatureLabel": "Krijesë digjitale",
-          "digitalCreatureVibe": "E çuditshme, e gjallë, pak e paparashikueshme",
-          "virtualCompanionLabel": "Shok virtual",
-          "virtualCompanionVibe": "I ngrohtë, i pranishëm, kujdeset vërtet",
-          "somethingWeirderLabel": "Diçka më e çuditshme…",
-          "somethingWeirderVibe": "Përcaktoje vetë"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Mbarova! Përgatita përmbledhjen që kërkove. Mund ta shohësh kur të jesh gati.",
-        "settingUp": "Po konfigurohen njoftimet…",
-        "stayInTheLoop": "Qëndro në dijeni",
-        "getNotified": "Merr njoftim kur {{name}} të përfundojë një detyrë, që të mos humbësh kurrë një përgjigje.",
-        "now": "tani",
-        "skipForNow": "Anashkalo tani për tani",
-        "couldNotEnable": "Nuk u arrit të aktivizoheshin njoftimet."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Nuk u arrit të kontrollohej konfigurimi",
-        "queryErrorBody": "Humbëm lidhjen gjatë kontrollit të konfigurimit të {{name}}. Konfigurimi mund të vazhdojë ende. Provo përsëri ose kontrollo pas pak.",
-        "stoppedTitle": "Konfigurimi u ndal",
-        "stoppedBody": "Instanca e {{name}} u ndal papritur gjatë konfigurimit.",
-        "stalledTitle": "Diçka u bllokua",
-        "stalledBody": "Nuk arritëm ta përfundonim konfigurimin e {{name}}. Provo përsëri ose shkruaj në {{supportEmail}} nëse kjo vazhdon të ndodhë.",
-        "timeoutTitle": "Po zgjat më shumë nga sa pritej",
-        "timeoutBody": "Konfigurimi i {{name}} po zgjat më shumë se zakonisht (mbi {{displayMinutes}} minuta).",
-        "continueInBackground": "Vazhdo në sfond",
-        "settingUp": "Konfigurimi i {{name}}",
-        "connectingToAgent": "Po lidhet me agjentin",
-        "startingSandbox": "Po niset mjedisi i izoluar",
-        "backgroundHint": "Zakonisht zgjat më pak se një minutë. Mund ta mbyllësh këtë ekran. Ne do të vazhdojmë punën në sfond."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kodi {{code}}",
-      "gatewayProcess": "PROCESI I PORTËS NDËRLIDHËSE",
-      "lastExit": "Dalja e fundit",
-      "memory": "Memoria",
-      "region": "Rajoni",
-      "resources": "BURIMET",
-      "restarts": "Rinisjet",
-      "state": "Gjendja",
-      "uptime": "Koha në punë",
-      "crashed": "U NDËRPRE NGA GABIMI",
-      "destroying": "PO FSHIHET",
-      "provisioned": "U KRIJUA",
-      "restarting": "PO RINISET",
-      "running": "NË EKZEKUTIM",
-      "shuttingDown": "PO FIKET",
-      "starting": "PO FILLON",
-      "stopped": "U NDAL",
-      "stopping": "PO NDALET",
-      "unknown": "PA TË DHËNA",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Më të avancuarat",
-      "frontierDescription": "Performanca më e lartë. I dërgon kërkesat te modelet më të avancuara me aftësi arsyetimi.",
-      "balancedDescription": "Ekuilibër i mirë mes shpejtësisë dhe aftësive, me kosto më të ulët.",
-      "autoModelA11y": "modeli automatik {{label}}",
-      "currentModel": "Modeli aktual",
-      "browseAllModels": "ose zgjidh mes mbi 500 modeleve",
-      "browseAllModelsA11y": "Shfleto të gjitha modelet, mbi 500 gjithsej"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Për të vazhduar përdorimin e KiloClaw, shko te kilo.ai/claw nga shfletuesi yt. Nuk mund të abonohesh brenda aplikacionit.",
-      "subscriptionCanceledTitle": "Abonohu në ueb",
-      "subscriptionCanceledBody": "Për të përdorur KiloClaw, shko te kilo.ai/claw nga shfletuesi yt. Nuk mund të abonohesh brenda aplikacionit.",
-      "subscriptionCanceledCta": "Hap kilo.ai/claw",
-      "subscriptionPastDueTitle": "Përditësimi i pagesës në ueb",
-      "subscriptionPastDueBody": "Patëm problem me pagesën tënde më të fundit. Shko te kilo.ai/claw nga shfletuesi yt për ta përditësuar. Nuk mund ta menaxhosh faturimin brenda aplikacionit.",
-      "quarantinedTitle": "Instanca kërkon rikuperim",
-      "quarantinedBody": "Instanca jote KiloClaw është në karantinë dhe nuk mund të përdoret tani. Nevojitet ndihma e ekipit tonë për ta rikthyer në punë.",
-      "multipleCurrentConflictBody": "Gjetëm më shumë se një abonim aktiv në llogarinë tënde. E kemi pezulluar shërbimin që të mos faturohesh dy herë.",
-      "multipleCurrentConflictCta": "Vazhdo te kilo.ai",
-      "nonCanonicalEarlybirdTitle": "U gjet një plan i vjetër",
-      "nonCanonicalEarlybirdBody": "Plani yt i qasjes së hershme kërkon rishikim manual përpara se ta përdorësh në telefon.",
-      "iosTitle": "KiloClaw i padisponueshëm në iOS",
-      "iosBody": "Qasja te KiloClaw menaxhohet jashtë aplikacionit iOS për këtë llogari.",
-      "iosContact": "Ke pyetje? Shkruaj në {{supportEmail}}.",
-      "quarantinedCta": "Dërgo email për ekipin tonë",
-      "nonCanonicalEarlybirdCta": "Shqyrto planin tënd në kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} kërkon vëmendje: {{label}}",
-      "openUnread_one": "Hap {{name}}, {{displayCount}} mesazh i palexuar",
-      "openUnread": "Hap {{name}}, {{displayCount}} mesazhe të palexuara",
-      "openUnread_other": "Hap {{name}}, {{displayCount}} mesazhe të palexuara",
-      "openSettings": "Hap cilësimet për {{name}}",
-      "fixOnKiloAi": "Rregullo te kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Mirato kërkesat e pajisjeve",
-      "execPolicyDescription": "Cilësimet e sigurisë",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Përzgjedhja e modelit të inteligjencës artificiale",
-      "secretsDescription": "Kredenciale të enkriptuara",
-      "versionPinDescription": "Fikso një version të caktuar"
-    },
-    "avatar": {
-      "arcade": "Lojë elektronike",
-      "brain": "Truri",
-      "creature": "Krijesa",
-      "crystal": "Kristali",
-      "custom": "Avatar i personalizuar",
-      "dragon": "Dragoi",
-      "explorer": "Eksploruesi",
-      "flame": "Flaka",
-      "lightning": "Vetëtima",
-      "magicWand": "Shkopi magjik",
-      "moon": "Hëna",
-      "operator": "Operatori",
-      "orbit": "Orbita",
-      "oracle": "Orakulli",
-      "rainbow": "Ylberi",
-      "robot": "Roboti",
-      "satellite": "Sateliti",
-      "sparkles": "Shkëndijat",
-      "strongArm": "Krahu i fortë",
-      "talisman": "Talismani"
-    },
-    "remoteSpawnFilesNotSupported": "Kjo instancë nuk mund të marrë skedarë.",
-    "instanceSwitcherTitle": "Instanca KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Zhvendos {{filename}} majtas",
       "moveRight": "Zhvendos {{filename}} djathtas"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Ngjit imazhin nga kujtesa e kopjimit",
-      "label": "U gjet një imazh, prek për ta ngjitur"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Biblioteka e fotove",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Do të dalësh nga kjo pajisje?",
     "signOutThisSessionTitle": "Të mbyllet kjo seancë?",
     "signOutThisSessionMessage": "Seanca në {{device}} do të mbyllet. Pajisja mund të ruajë qasjen në API deri në një orë.",
-    "webBrowser": "Shfletuesi i uebit"
+    "webBrowser": "Shfletuesi i uebit",
+    "unknownDevice": "Pajisje e panjohur"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Nuk u hap dyqani i aplikacioneve.",

@@ -36,7 +36,7 @@ const DISCONNECTED_FLOOR_POLL_MS = 10_000;
  * shape `screen-tracking-decision.ts` matches.
  *
  * Every tabs segment is here: the tab layout renders the Agents tab badge from
- * the same cache on every tab (`_layout.tsx`), so Profile, KiloClaw and the
+ * the same cache on every tab (`_layout.tsx`), so Profile and the
  * quick-chat tab show the needs-input count too. Polling only the two row
  * screens left that badge stale on the other tabs until a foreground, push or
  * socket refresh happened to land.
@@ -44,7 +44,7 @@ const DISCONNECTED_FLOOR_POLL_MS = 10_000;
  * - `(0_home)`: home-screen.tsx renders the Active now tray.
  * - `(2_agents)`: session-list-screen.tsx and use-agent-session-list-data.ts
  *   render and derive the Agents list and its badge.
- * - `(1_kiloclaw)`, `(3_profile)`, `(4_chat)`: the tab bar's Agents badge.
+ * - `(3_profile)`, `(4_chat)`: the tab bar's Agents badge.
  * - `share-gate`: share-gate-sheet.tsx shows the same live rows for sharing.
  *
  * Session, chat-detail and pr-review routes are deliberately absent: the tab
@@ -54,7 +54,6 @@ const DISCONNECTED_FLOOR_POLL_MS = 10_000;
  */
 export const LIVE_AGENTS_SURFACE_SEGMENTS: readonly string[] = [
   '(0_home)',
-  '(1_kiloclaw)',
   '(2_agents)',
   '(3_profile)',
   '(4_chat)',

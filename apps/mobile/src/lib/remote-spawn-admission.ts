@@ -3,7 +3,7 @@ import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { type SharePayload } from '@/lib/share-payload';
 
 export const remoteSpawnFilesNotSupportedToast = () =>
-  i18n.t('kiloclaw.remoteSpawnFilesNotSupported');
+  i18n.t('agentChat.composer.cannotReceiveFiles');
 
 export function resolveRemoteSpawnAdmission(input: {
   instance: InstancePickerInstance;

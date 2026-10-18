@@ -101,12 +101,9 @@
     "scheduled": "Ajastettu",
     "keepEditing": "Jatka muokkausta",
     "keepRunning": "Jatka suoritusta",
-    "kiloclaw": "KiloClaw",
     "newSession": "Uusi istunto",
-    "noKiloclawInstances": "Ei KiloClaw-instansseja",
     "noModelsAvailable": "Ei malleja saatavilla",
     "notFound": "Kohdetta ei löytynyt.",
-    "online": "Verkossa",
     "open": "Avaa {{name}}",
     "openPullRequest": "Avaa muutospyyntö",
     "pending": "Odottaa",
@@ -257,7 +254,8 @@
     "renamePasskey": "Nimeä pääsyavain uudelleen",
     "removePasskey": "Poista pääsyavain",
     "removePasskeyTitle": "Poistetaanko pääsyavain?",
-    "removePasskeyMessage": "Et voi enää kirjautua tällä pääsyavaimella."
+    "removePasskeyMessage": "Et voi enää kirjautua tällä pääsyavaimella.",
+    "changelog": "Mitä uutta"
   },
   "preferences": {
     "general": "Yleiset",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Ilmoitukset kertovat uudesta tapahtumasta. Avaa Kilo, jotta voit lukea viestin.",
     "channel": {
       "agentProgress": "Agentin eteneminen",
-      "chat": "Keskusteluviestit",
-      "kiloclaw": "KiloClaw-tapahtumat",
       "balance": "Saldoilmoitukset",
       "security": "Tietoturvahavainnot",
       "spend": "Kulutusvaroitukset",
       "followedSessions": "Seuratut istunnot"
     },
     "category": {
-      "chatMessagesSubtitle": "vastaukset keskusteluissasi",
       "agentAttentionTitle": "Agentti tarvitsee sinua",
       "agentAttentionSubtitle": "kysymykset, lupapyynnöt ja vastausta vaativat tilanteet",
       "agentUpdatesTitle": "Agentin tilannepäivitykset",
       "agentUpdatesSubtitle": "agentin viestit tehtävän aikana",
       "sessionStatusTitle": "Istunnon tila",
       "sessionStatusSubtitle": "valmis / epäonnistui / valmis hallittavaksi",
-      "kiloclawActivitySubtitle": "instanssi valmis/epäonnistui, ajoitetut toiminnot",
-      "kiloclawActivityUnavailable": "Käynnistä KiloClaw-instanssi saadaksesi KiloClaw-toimintaa.",
       "balanceAlertsSubtitle": "varoitukset organisaation alhaisesta saldosta",
       "balanceAlertsUnavailable": "Liity organisaatioon saadaksesi saldovaroituksia.",
       "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Etusivu",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, välilehti {{position}}, yhteensä {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Instanssin vaihto",
-      "couldNotLoadInstances": "Instansseja ei voitu ladata.",
-      "noInstancesDescription": "Ota instanssi käyttöön, niin voit aloittaa keskustelun.",
-      "setUpKiloclaw": "Ota KiloClaw käyttöön",
-      "currentInstance": "{{title}}, nykyinen"
-    },
     "conversation": {
-      "failedToLoad": "Keskustelun lataaminen epäonnistui.",
-      "notFound": "Keskustelua ei löytynyt.",
       "untitled": "Nimetön",
-      "leaveTitle": "Poistutko keskustelusta?",
-      "leaveMessage": "Tämä poistaa keskustelun listaltasi.",
-      "openHint": "Avaa keskustelun. Pitkä painallus avaa uudelleennimeämis- ja poistumisvalinnat.",
-      "unread": "Lukematon",
-      "optionsFor": "Keskustelun {{title}} toiminnot",
-      "options": "Keskustelun toiminnot",
-      "renameTitle": "Keskustelun nimen vaihto",
-      "renamePlaceholder": "Uusi nimi",
-      "couldNotReachBot": "Bottiin ei saatu yhteyttä. Yritä uudelleen.",
-      "messageDeliveryFailed": "Viestiä ei voitu toimittaa botille.",
-      "couldNotSignIn": "Keskusteluun ei voitu kirjautua.",
-      "couldNotRefreshMessages": "Viestien päivittäminen epäonnistui.",
-      "couldNotLoadHistory": "Keskusteluhistoriaa ei voitu ladata.",
-      "leave": "Poistu",
-      "untitledConversation": "Nimetön keskustelu",
-      "createFailed": "Keskustelun luominen epäonnistui.",
-      "leaveFailed": "Keskustelusta poistuminen epäonnistui."
-    },
-    "reactions": {
-      "common": "Yleiset",
-      "reactWith": "Lisää reaktio: {{reaction}}",
-      "accessibility": "Reaktio: {{emoji}}, määrä: {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Vastaat käyttäjälle",
-      "cancelReply": "Peruuta vastaus",
-      "openInstance": "Avaa instanssi",
-      "attachFile": "Liitä tiedosto",
-      "cancelEdit": "Peruuta muokkaus"
+      "renamePlaceholder": "Uusi nimi"
     },
     "conversationList": {
-      "couldNotLoad": "Keskusteluja ei voitu ladata.",
-      "emptyTitle": "Ei vielä keskusteluja",
-      "emptyDescription": "Luo uusi keskustelu KiloClaw-instanssisi kanssa.",
-      "create": "Luo keskustelu",
-      "newConversation": "Uusi keskustelu",
-      "openInstanceSettings": "Avaa instanssin asetukset",
       "today": "Tänään",
       "yesterday": "Eilen",
-      "thisWeek": "Tällä viikolla",
       "older": "Vanhemmat"
     },
     "attachment": {
-      "open": "Avaa {{filename}}",
-      "openFailed": "Liitettä ei voitu avata. Tarkista yhteys ja yritä uudelleen.",
-      "attachFailed": "Tiedoston liittäminen epäonnistui.",
-      "limit": "Voit liittää enintään {{displayCount}} tiedostoa.",
-      "sizeRejection": "Tiedoston {{filename}} koko ylittää liitteen kokorajan: {{limit}}.",
-      "unreadable": "Tiedostoa {{filename}} ei voitu lukea.",
-      "pastedImage": "liitetty kuva",
-      "defaultName": "Liite",
       "classificationDenied": "Suoritettavia tiedostoja ei voi liittää.",
       "classificationEmpty": "Tiedosto on tyhjä.",
       "classificationTooLarge": "Tiedoston koko saa olla enintään 20 Mt.",
@@ -943,426 +883,17 @@
       "networkError": "Verkkoyhteydessä tapahtui virhe.",
       "uploadFailed": "Lähetys epäonnistui.",
       "nothingToPaste": "Leikepöydällä ei ole mitään liitettävää.",
-      "metadataStripFailed": "Valokuvan metatietoja ei voitu poistaa.",
-      "limit_one": "Voit liittää enintään {{displayCount}} tiedosto.",
-      "limit_other": "Voit liittää enintään {{displayCount}} tiedostoa."
+      "metadataStripFailed": "Valokuvan metatietoja ei voitu poistaa."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, tila: {{status}}",
-      "retryUploading": "Yritä lähettää {{filename}} uudelleen",
-      "remove": "Poista {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[poistettu viesti]",
-      "yourMessage": "Viestisi",
-      "messageFrom": "Viesti käyttäjältä {{author}}",
-      "moreActions": "Lisää toimintoja",
-      "notDelivered": "Ei toimitettu",
-      "edited": "(muokattu)",
-      "image": "Kuva"
+      "accessibility": "{{filename}}, tila: {{status}}"
     },
     "messageActions": {
-      "copied": "Kopioitu",
-      "copyFailed": "Kopiointi epäonnistui.",
-      "title": "Viestin toiminnot",
-      "deleteTitle": "Poistetaanko viesti?",
-      "deleteMessage": "Tämä poistaa viestin keskustelusta.",
-      "deleteFailed": "Viestin poistaminen epäonnistui.",
-      "removeReactionFailed": "Reaktion poistaminen epäonnistui.",
-      "addReactionFailed": "Reaktion lisääminen epäonnistui.",
-      "retrySend": "Yritä lähettää uudelleen",
-      "moreReactions": "Lisää reaktioita",
-      "edit": "Muokkaa",
-      "sendFailed": "Viestin lähetys epäonnistui.",
-      "retrySendFailed": "Viestin lähettäminen uudelleen epäonnistui.",
-      "editFailed": "Viestin muokkaus epäonnistui.",
-      "executeFailed": "Toiminnon suoritus epäonnistui."
+      "edit": "Muokkaa"
     },
     "attachmentPicker": {
-      "takePhoto": "Ota valokuva",
-      "photoLibrary": "Kuvakirjasto",
-      "files": "Tiedostot",
       "cameraAccessMessage": "Salli kameran käyttö asetuksissa, jotta voit ottaa kuvan."
-    },
-    "typingIndicator": {
-      "someone": "Joku",
-      "typing_one": "{{name}} kirjoittaa…",
-      "typing": "{{names}} kirjoittavat…",
-      "typing_other": "{{names}} kirjoittavat…"
-    },
-    "botStatus": {
-      "offline": "Ei yhteyttä",
-      "loadingUser": "Ladataan käyttäjätietoja…",
-      "waitingForStatus": "Odotetaan botin tilaa…",
-      "offlineMessage": "Bottiin ei ole yhteyttä. Viestintä jatkuu, kun yhteys palautuu."
-    },
-    "errors": {
-      "notAllowed": "Toiminto ei ole sallittu.",
-      "messageTooLong": "Viesti on liian pitkä. Lyhennä se alle {{limit}} merkkiin.",
-      "titleTooLong": "Otsikko on liian pitkä. Lyhennä se alle {{limit}} merkkiin.",
-      "messageEmpty": "Viesti ei voi olla tyhjä."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw-instansseja ei voitu ladata.",
-    "billing": {
-      "title": "Laskutus",
-      "continueMonthToMonth": "Jatka kuukausitilauksella",
-      "plan": "Tilaus",
-      "finalTermEnds": "Viimeinen tilausjakso päättyy",
-      "afterFinalTerm": "Viimeisen tilausjakson jälkeen",
-      "lessThanOneDay": "Alle 1 päivä",
-      "ends": "Päättyy",
-      "expires": "Vanhenee",
-      "noActivePlan": "Ei voimassa olevaa tilausta",
-      "noActivePlanDescription": "Sinulla ei ole voimassa olevaa KiloClaw-tilausta.",
-      "managedByAdmin": "Laskutuksen hoitaa organisaatiosi ylläpitäjä.",
-      "couldNotLoad": "Laskutustietoja ei voitu ladata.",
-      "manageOnWeb": "Hallinnoi laskutusta verkossa",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Viimeinen Commit-tilausjaksosi päättyy {{date}}. Jatka Standard-tilauksella hintaan {{price}}, tai palvelimen ylläpito päättyy.",
-      "freeTrial": "Ilmainen kokeilu",
-      "hostingEnds": "Palvelimen ylläpito päättyy",
-      "renews": "Uusiutuu",
-      "standardMonthToMonth": "Standard-kuukausitilaus",
-      "standardStartsOn": "Standard-tilaus alkaa {{date}} hintaan {{price}}.",
-      "yourStandardMonthlyPrice": "standard-kuukausihintasi",
-      "perMonth": "/kk",
-      "earlybirdAccessUntil": "Earlybird-käyttöoikeus on voimassa {{date}} asti.",
-      "earlybirdEnding": "Earlybird-käyttöoikeus päättyy: {{remaining}}.",
-      "paymentPastDue": "Maksu on myöhässä. Päivitä maksutapasi.",
-      "subscriptionCancels": "Tilaus päättyy {{date}}.",
-      "trialDaysRemaining": "Kokeilua on jäljellä {{remaining}}.",
-      "trialEndingSoon": "Kokeilu päättyy pian: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Mitä uutta",
-      "couldNotLoad": "Muutoslokia ei voitu ladata.",
-      "noUpdates": "Ei vielä päivityksiä",
-      "noUpdatesDescription": "Muutoslokin merkinnät näkyvät täällä.",
-      "recentUpdates": "Viimeisimmät päivitykset",
-      "manageVersion": "Hallinnoi versiota",
-      "redeployRequired": "Uudelleenkäyttöönotto vaaditaan",
-      "redeploySuggested": "Uudelleenkäyttöönottoa suositellaan",
-      "upgradeRequired": "Päivitys vaaditaan"
-    },
-    "dashboard": {
-      "title": "Hallintapaneeli",
-      "couldNotLoad": "Hallintapaneelia ei voitu ladata.",
-      "renameInstance": "Nimeä instanssi uudelleen",
-      "renamePlaceholder": "Uusi nimi (enintään 50 merkkiä)",
-      "someDetailsFailed": "Osaa reaaliaikaisista tiedoista ei voitu ladata.",
-      "destroy": "Tuhoa",
-      "destroyMessage": "Tämä tuhoaa pysyvästi KiloClaw-instanssisi ja kaikki sen tiedot. Tätä toimintoa ei voi kumota.",
-      "destroyTitle": "Tuhoa instanssi",
-      "instance": "Instanssi",
-      "couldNotCheckStatus": "Palvelun tilaa ei voitu tarkistaa.",
-      "dangerZone": "VAARAVYÖHYKE",
-      "destroying": "Tuhotaan…",
-      "serviceDegraded": "Palvelussa on häiriöitä – näytä tila napauttamalla",
-      "up": "KÄYNNISSÄ"
-    },
-    "channels": {
-      "title": "Kanavat",
-      "couldNotLoad": "Kanavia ei voitu ladata.",
-      "noChannels": "Ei käytettävissä olevia kanavia",
-      "noChannelsDescription": "Kanavaintegraatiot näkyvät täällä.",
-      "connected": "{{label}} yhdistetty",
-      "disconnectMessage": "Poistetaanko {{label}}? Yhteys tähän kanavaan katkaistaan.",
-      "disconnectTitle": "Katkaise kanavan yhteys"
-    },
-    "devicePairing": {
-      "title": "Laitteen pariliitos",
-      "refreshRequests": "Päivitä pariliitospyynnöt",
-      "couldNotLoad": "Pariliitospyyntöjä ei voitu ladata.",
-      "noPending": "Ei odottavia pyyntöjä",
-      "noPendingDescription": "Kanavien ja laitteiden pariliitospyynnöt näkyvät tässä.",
-      "channelRequests": "Kanavapyynnöt",
-      "deviceRequests": "Laitepyynnöt",
-      "approveDeviceMessage": "Sallitaanko yhteys instanssiisi laitteesta {{platform}}?",
-      "approveDeviceTitle": "Hyväksy laite",
-      "approveMessage": "Sallitaanko yhteys instanssiisi: {{label}} (koodi: {{code}})?",
-      "approveTitle": "Hyväksy pariliitospyyntö",
-      "unknownDevice": "Tuntematon laite"
-    },
-    "execPolicy": {
-      "title": "Suorituskäytäntö",
-      "couldNotLoad": "Suorituskäytäntöä ei voitu ladata.",
-      "alwaysAsk": "Kysy aina",
-      "alwaysAskDescription": "Vahvista jokainen komento ennen suoritusta. Turvallisin vaihtoehto.",
-      "neverAsk": "Älä kysy koskaan",
-      "neverAskDescription": "Suorita komennot ilman vahvistusta. Nopeampi mutta turvattomampi vaihtoehto."
-    },
-    "google": {
-      "title": "Google-tili",
-      "couldNotLoad": "Google-tilin tilaa ei voitu ladata.",
-      "disconnected": "Google-tilin yhteys on katkaistu. Ota instanssi uudelleen käyttöön, jotta muutos tulee voimaan.",
-      "setupCommand": "Käyttöönottokomento",
-      "setupCommandHelp": "Yhdistä Google-tilisi suorittamalla tämä komento oman tietokoneesi päätteessä. Tietokoneessa on oltava Docker asennettuna.",
-      "failedToLoadCommand": "Käyttöönottokomentoa ei voitu ladata.",
-      "gmailNotifications": "Gmail-ilmoitukset",
-      "disconnect": "Katkaise Google-tilin yhteys",
-      "copied": "Kopioitu",
-      "copyCommand": "Kopioi komento",
-      "disconnectConfirm": "Katkaise yhteys",
-      "disconnectMessage": "Poistetaanko Google-tilisi tästä instanssista? Gmail-ilmoitukset poistetaan käytöstä. Ota instanssi uudelleen käyttöön yhteyden katkaisun jälkeen, jotta muutokset tulevat voimaan.",
-      "disconnectTitle": "Katkaise Google-yhteys"
-    },
-    "modelList": {
-      "noMatches": "Mikään malli ei vastaa hakua",
-      "noModelsDescription": "Mallit näkyvät täällä, kun niitä on saatavilla.",
-      "noResultsFor": "Haulla ”{{query}}” ei löytynyt tuloksia."
-    },
-    "secrets": {
-      "title": "Salaiset tiedot",
-      "couldNotLoad": "Tunnistetietoja ei voitu ladata.",
-      "noSecrets": "Ei tunnistetietoja saatavilla",
-      "noSecretsDescription": "Tunnistetietoja käyttävät integraatiot näkyvät tässä.",
-      "removeMessage": "Poistetaanko {{label}}? Työkalu ei voi enää käyttää tunnistetietojaan.",
-      "removeTitle": "Poista tunnistetiedot",
-      "saved": "{{label}} tallennettu",
-      "hide": "Piilota {{label}}",
-      "show": "Näytä {{label}}",
-      "allFieldsRequired": "Täytä kaikki kentät, jotta voit muodostaa yhteyden palveluun {{label}}.",
-      "setupGuideFallback": "käyttöönotto-opas",
-      "setupGuideA11y": "Käyttöönotto-ohje: {{label}}",
-      "setupGuide": "Käyttöönotto-opas",
-      "saving": "Tallennetaan…",
-      "removing": "Poistetaan…",
-      "updateToken": "Päivitä pääsytunniste"
-    },
-    "versionPin": {
-      "title": "Version lukitseminen",
-      "couldNotLoad": "Versiotietoja ei voitu ladata.",
-      "couldNotLoadMore": "Lisää versioita ei voitu ladata.",
-      "loadMore": "Lataa lisää versioita",
-      "showingLatest": "Näytetään 100 uusinta versiota.",
-      "availableVersions": "Saatavilla olevat versiot",
-      "noVersions": "Ei versioita saatavilla",
-      "noVersionsDescription": "Saatavilla olevat OpenClaw-versiot näkyvät tässä.",
-      "unpin": "Poista lukitus",
-      "unpinMessage": "Palataanko uusimpaan saatavilla olevaan versioon?",
-      "unpinTitle": "Poista version lukitus",
-      "confirmPin": "Vahvista lukitus",
-      "followingLatest": "Seurataan uusinta",
-      "latest": "uusin",
-      "pin": "Lukitse",
-      "pinnedByAdmin": "Ylläpitäjä on lukinnut version. Pyydä ylläpitäjää muuttamaan lukitusta.",
-      "pinnedTo": "Lukittu versioon {{version}}",
-      "reasonOptional": "Syy (valinnainen)",
-      "reasonPlaceholder": "Miksi lukitset tämän version?",
-      "replaceAdminPin": "Korvaa ylläpitäjän lukitus",
-      "replacesAdminPin": "Tämä korvaa ylläpitäjän asettaman lukituksen (tällä hetkellä {{label}})."
-    },
-    "redeploy": "Ota uudelleen käyttöön",
-    "redeployMessage": "Haluatko varmasti ottaa tämän instanssin uudelleen käyttöön?",
-    "redeployTitle": "Ota instanssi uudelleen käyttöön",
-    "controls": {
-      "redeploying": "Otetaan uudelleen käyttöön…",
-      "restart": "Käynnistä uudelleen",
-      "restartOpenClawMessage": "Haluatko varmasti käynnistää OpenClaw-prosessin uudelleen?",
-      "restartOpenClawTitle": "Käynnistä OpenClaw uudelleen",
-      "restarting": "Käynnistetään uudelleen…",
-      "start": "Käynnistä",
-      "startMessage": "Haluatko varmasti käynnistää tämän instanssin?",
-      "startTitle": "Käynnistä instanssi",
-      "stop": "Pysäytä",
-      "stopMessage": "Haluatko varmasti pysäyttää tämän instanssin?",
-      "stopTitle": "Pysäytä instanssi",
-      "stopping": "Pysäytetään…"
-    },
-    "empty": {
-      "finishingSetup": "Viimeistellään käyttöönottoa",
-      "finishingSetupDescription": "Viimeistelemme tiliäsi. Odota hetki.",
-      "getStarted": "Aloita",
-      "noInstancesDescription": "Luo ensimmäinen instanssisi, niin voit aloittaa koodausagenttien käytön."
-    },
-    "instance": {
-      "backToInstances": "Takaisin instansseihin",
-      "couldNotLoad": "Instanssia ei voitu ladata.",
-      "notFound": "Instanssia ei löytynyt",
-      "notFoundDescription": "Tämä instanssi on saatettu tuhota, tai linkki ei ole enää voimassa."
-    },
-    "list": {
-      "createInstance": "Luo instanssi",
-      "organizations": "Organisaatiot",
-      "accessIssue": {
-        "trialExpired": "Kokeilu päättyi, tilaa jatkaaksesi tämän instanssin käyttöä",
-        "subscriptionCanceled": "Tilaus ei ole aktiivinen, tilaa uudelleen jatkaaksesi tämän instanssin käyttöä",
-        "subscriptionPastDue": "Maksussa on ongelma – päivitä laskutustiedot, jotta voit jatkaa instanssin käyttöä",
-        "quarantined": "Instanssi on karanteenissa ja vaatii manuaalisen tarkistuksen",
-        "multipleCurrentConflict": "Tili vaatii tarkistuksen",
-        "nonCanonicalEarlybird": "Vanha tilaus vaatii tarkistuksen"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Keskustele: {{name}}",
-        "ready": "{{name}} on valmis",
-        "warmedUp": "Kaikki valmiina. Sano hei, kun olet valmis."
-      },
-      "flow": {
-        "genericErrorBody": "Instanssisi käyttöönottoa ei voitu viimeistellä juuri nyt.",
-        "manualReviewBody": "Tilisi vaatii tarkistuksen, ennen kuin voimme luoda instanssin. Jatka osoitteessa kilo.ai.",
-        "manualReviewTitle": "Käyttöönotto vaatii manuaalisen tarkistuksen",
-        "openKiloAi": "Avaa kilo.ai",
-        "provisioning": "Instanssin luonti",
-        "review": "Tarkistus",
-        "identityTitle": "Botin identiteetti",
-        "couldNotLoad": "Käyttöönoton tilaa ei voitu ladata.",
-        "finishingSetup": "Viimeistelemme käyttöönottoa ja tiliäsi. Odota hetki.",
-        "ready": "Valmis",
-        "settingUp": "Otetaan käyttöön…"
-      },
-      "unavailableDescription": "Instanssin luomiseen tarvitaan voimassa oleva KiloClaw-tilaus. Nykyiset instanssit ja tilaukset toimivat entiseen tapaan.",
-      "unavailableTitle": "Uusia KiloClaw-instansseja ei voi luoda",
-      "identity": {
-        "chooseAvatar": "Valitse profiilikuva",
-        "namePlaceholder": "Botin nimi",
-        "selectAvatar": "Valitse profiilikuvaksi {{name}}",
-        "personality": "Persoonallisuus",
-        "changePersonality": "Vaihda persoonallisuutta",
-        "location": "Sijainti",
-        "locationPlaceholder": "Kaupunki tai alue (valinnainen)",
-        "useCurrentLocation": "Käytä nykyistä sijaintia",
-        "locationDeniedTitle": "Sijainnin käyttö estetty",
-        "locationDeniedMessage": "Salli sijainnin käyttö asetuksissa, jotta voit käyttää nykyistä sijaintiasi.",
-        "locationValidationFailed": "Sijaintia ei voitu vahvistaa.",
-        "locationResolveFailed": "Sijaintiasi ei voitu selvittää. Voit muokata sitä manuaalisesti.",
-        "locationGetFailed": "Sijaintiasi ei voitu hakea. Syötä se manuaalisesti.",
-        "nature": {
-          "aiAssistantLabel": "Tekoälyavustaja",
-          "aiAssistantVibe": "Auttavainen, osaava, ammattimainen",
-          "digitalCreatureLabel": "Digitaalinen olento",
-          "digitalCreatureVibe": "Omaperäinen, elävä, hieman arvaamaton",
-          "virtualCompanionLabel": "Virtuaalinen seuralainen",
-          "virtualCompanionVibe": "Lämmin, läsnä oleva, aidosti välittävä",
-          "somethingWeirderLabel": "Jotain omituisempaa…",
-          "somethingWeirderVibe": "Määritä se itse"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Valmista! Kokosin pyytämäsi yhteenvedon. Voit lukea sen, kun sinulle sopii.",
-        "settingUp": "Otetaan ilmoituksia käyttöön…",
-        "stayInTheLoop": "Pysy ajan tasalla",
-        "getNotified": "Saat ilmoituksen, kun {{name}} saa tehtävän valmiiksi. Näin yksikään vastaus ei jää huomaamatta.",
-        "now": "nyt",
-        "skipForNow": "Ohita toistaiseksi",
-        "couldNotEnable": "Ilmoituksia ei voitu ottaa käyttöön."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Käyttöönoton tilaa ei voitu tarkistaa",
-        "queryErrorBody": "Yhteys katkesi käyttöönoton tilaa tarkistettaessa: {{name}}. Käyttöönotto voi silti jatkua. Yritä uudelleen tai palaa hetken kuluttua.",
-        "stoppedTitle": "Käyttöönotto keskeytyi",
-        "stoppedBody": "Instanssi {{name}} pysähtyi odottamatta käyttöönoton aikana.",
-        "stalledTitle": "Käyttöönotto ei etene",
-        "stalledBody": "Käyttöönottoa ei voitu viimeistellä: {{name}}. Yritä uudelleen. Jos ongelma jatkuu, lähetä sähköpostia osoitteeseen {{supportEmail}}.",
-        "timeoutTitle": "Kestää odotettua kauemmin",
-        "timeoutBody": "Käyttöönotto kestää tavallista kauemmin (yli {{displayMinutes}} minuuttia): {{name}}.",
-        "continueInBackground": "Jatka taustalla",
-        "settingUp": "Otetaan käyttöön: {{name}}",
-        "connectingToAgent": "Yhdistetään agenttiin",
-        "startingSandbox": "Käynnistetään eristettyä ympäristöä",
-        "backgroundHint": "Käyttöönotto kestää yleensä alle minuutin. Voit sulkea tämän näkymän. Käyttöönotto jatkuu taustalla."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Paluukoodi {{code}}",
-      "gatewayProcess": "YHDYSKÄYTÄVÄPROSESSI",
-      "lastExit": "Viimeisin päättyminen",
-      "memory": "Muisti",
-      "region": "Alue",
-      "resources": "RESURSSIT",
-      "restarts": "Uudelleenkäynnistykset",
-      "state": "Tila",
-      "uptime": "Käynnissäoloaika",
-      "crashed": "KAATUNUT",
-      "destroying": "TUHOTAAN",
-      "provisioned": "LUOTU",
-      "restarting": "KÄYNNISTETÄÄN UUDELLEEN",
-      "running": "KÄYNNISSÄ",
-      "shuttingDown": "SAMMUTETAAN",
-      "starting": "KÄYNNISTETÄÄN",
-      "stopped": "PYSÄYTETTY",
-      "stopping": "PYSÄYTETÄÄN",
-      "unknown": "TUNTEMATON",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Huipputaso",
-      "frontierDescription": "Paras suorituskyky. Ohjaa pyynnöt edistyneimpiin päättelymalleihin.",
-      "balancedDescription": "Nopeutta ja monipuolisuutta edulliseen hintaan.",
-      "autoModelA11y": "Automaattinen mallinvalinta: {{label}}",
-      "currentModel": "Nykyinen malli",
-      "browseAllModels": "tai valitse yli 500 mallista",
-      "browseAllModelsA11y": "Selaa kaikkia yli 500 mallia"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Jatka KiloClawin käyttöä avaamalla selaimessa kilo.ai/claw. Tilausta ei voi tehdä sovelluksessa.",
-      "subscriptionCanceledTitle": "Tilaa verkossa",
-      "subscriptionCanceledBody": "Aloita KiloClawin käyttö avaamalla selaimessa kilo.ai/claw. Tilausta ei voi tehdä sovelluksessa.",
-      "subscriptionCanceledCta": "Avaa kilo.ai/claw",
-      "subscriptionPastDueTitle": "Päivitä maksutiedot verkossa",
-      "subscriptionPastDueBody": "Viimeisimmän maksusi käsittelyssä oli ongelma. Päivitä maksutietosi avaamalla selaimessa kilo.ai/claw. Laskutusta ei voi hallinnoida sovelluksessa.",
-      "quarantinedTitle": "Instanssi vaatii korjausta",
-      "quarantinedBody": "KiloClaw-instanssisi on karanteenissa, eikä sitä voi käyttää juuri nyt. Sen palauttamiseen tarvitaan tiimimme apua.",
-      "multipleCurrentConflictBody": "Tililläsi on useita voimassa olevia tilauksia. Keskeytimme käytön, jotta sinua ei laskuteta kahteen kertaan.",
-      "multipleCurrentConflictCta": "Jatka osoitteessa kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Vanha tilaus havaittu",
-      "nonCanonicalEarlybirdBody": "Ennakkokäyttötilauksesi on tarkistettava manuaalisesti, ennen kuin voit käyttää sitä mobiililaitteella.",
-      "iosTitle": "KiloClaw ei ole käytettävissä iOS:ssä",
-      "iosBody": "Tämän tilin KiloClaw-käyttöoikeutta hallinnoidaan iOS-sovelluksen ulkopuolella.",
-      "iosContact": "Kysyttävää? Lähetä sähköpostia osoitteeseen {{supportEmail}}.",
-      "quarantinedCta": "Lähetä sähköpostia tiimillemme",
-      "nonCanonicalEarlybirdCta": "Tarkista tilauksesi osoitteessa kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}} vaatii huomiota: {{label}}",
-      "openUnread_one": "Avaa {{name}}, {{displayCount}} lukematon viesti",
-      "openUnread": "Avaa {{name}}, {{displayCount}} lukematonta viestiä",
-      "openUnread_other": "Avaa {{name}}, {{displayCount}} lukematonta viestiä",
-      "openSettings": "Avaa instanssin asetukset: {{name}}",
-      "fixOnKiloAi": "Korjaa osoitteessa kilo.ai: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Hyväksy laitepyynnöt",
-      "execPolicyDescription": "Tietoturva-asetukset",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Tekoälymallin valinta",
-      "secretsDescription": "Salatut tunnistetiedot",
-      "versionPinDescription": "Lukitse tiettyyn versioon"
-    },
-    "avatar": {
-      "arcade": "Pelihalli",
-      "brain": "Aivot",
-      "creature": "Olento",
-      "crystal": "Kristalli",
-      "custom": "Oma profiilikuva",
-      "dragon": "Lohikäärme",
-      "explorer": "Tutkimusmatkaaja",
-      "flame": "Liekki",
-      "lightning": "Salama",
-      "magicWand": "Taikasauva",
-      "moon": "Kuu",
-      "operator": "Operaattori",
-      "orbit": "Kiertorata",
-      "oracle": "Oraakkeli",
-      "rainbow": "Sateenkaari",
-      "robot": "Robotti",
-      "satellite": "Satelliitti",
-      "sparkles": "Kimallus",
-      "strongArm": "Vahva käsivarsi",
-      "talisman": "Talismaani"
-    },
-    "remoteSpawnFilesNotSupported": "Tämä instanssi ei voi vastaanottaa tiedostoja.",
-    "instanceSwitcherTitle": "KiloClaw-instanssi"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Siirrä {{filename}} vasemmalle",
       "moveRight": "Siirrä {{filename}} oikealle"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Liitä kuva leikepöydältä",
-      "label": "Liitä havaittu kuva napauttamalla"
-    },
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Kuvakirjasto",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Kirjataanko tämä laite ulos?",
     "signOutThisSessionTitle": "Kirjataanko tämä istunto ulos?",
     "signOutThisSessionMessage": "Laite {{device}} kirjataan ulos. Sen API-käyttöoikeus voi säilyä vielä tunnin ajan.",
-    "webBrowser": "Verkkoselain"
+    "webBrowser": "Verkkoselain",
+    "unknownDevice": "Tuntematon laite"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Sovelluskauppaa ei voitu avata.",

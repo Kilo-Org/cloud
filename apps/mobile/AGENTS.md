@@ -38,14 +38,6 @@ git diff --check
 
 - Install with `npx expo install <package>` (or `--dev`), never `pnpm add`.
 - After dependency changes, run `pnpx expo-doctor` and fix every issue.
-- `@kilocode/kilo-chat-hooks` is copied, not symlinked. After editing it:
-
-  ```bash
-  pnpm install --filter kilo-app...
-  rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
-  ```
-
-  Then restart Metro and force-quit the app.
 
 ## Library First
 

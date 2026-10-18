@@ -101,12 +101,9 @@
     "scheduled": "予定",
     "keepEditing": "編集を続ける",
     "keepRunning": "実行を続ける",
-    "kiloclaw": "KiloClaw",
     "newSession": "新しいセッション",
-    "noKiloclawInstances": "KiloClawインスタンスがありません",
     "noModelsAvailable": "利用可能なモデルはありません",
     "notFound": "見つかりません。",
-    "online": "オンライン",
     "open": "{{name}}を開く",
     "openPullRequest": "プルリクエストを開く",
     "pending": "保留中",
@@ -257,7 +254,8 @@
     "renamePasskey": "パスキーの名前を変更",
     "removePasskey": "パスキーを削除",
     "removePasskeyTitle": "パスキーを削除しますか?",
-    "removePasskeyMessage": "このパスキーではサインインできなくなります。"
+    "removePasskeyMessage": "このパスキーではサインインできなくなります。",
+    "changelog": "新着情報"
   },
   "preferences": {
     "general": "一般",
@@ -320,23 +318,18 @@
     "previewGenericDescription": "通知では新しい動きがあったことだけを知らせます。内容を読むにはKiloを開いてください。",
     "channel": {
       "agentProgress": "エージェントの進捗",
-      "chat": "チャットメッセージ",
-      "kiloclaw": "KiloClawのアクティビティ",
       "balance": "残高アラート",
       "security": "セキュリティの検出事項",
       "spend": "支出アラート",
       "followedSessions": "フォロー中のセッション"
     },
     "category": {
-      "chatMessagesSubtitle": "会話内の返信",
       "agentAttentionTitle": "エージェントからの対応依頼",
       "agentAttentionSubtitle": "質問への回答、操作の許可、入力の依頼",
       "agentUpdatesTitle": "エージェントからの進捗報告",
       "agentUpdatesSubtitle": "タスクの実行中にエージェントが送信するメッセージ",
       "sessionStatusTitle": "セッションの状態",
       "sessionStatusSubtitle": "完了 / 失敗 / 操作可能",
-      "kiloclawActivitySubtitle": "インスタンスの準備完了や失敗、予定された操作",
-      "kiloclawActivityUnavailable": "KiloClawアクティビティを受け取るには、KiloClawインスタンスを開始してください。",
       "balanceAlertsSubtitle": "組織の残高低下に関する警告",
       "balanceAlertsUnavailable": "残高アラートを受け取るには、組織に参加してください。",
       "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー",
@@ -356,72 +349,19 @@
   },
   "tabs": {
     "home": "ホーム",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}、タブ、全{{total}}個中{{position}}番目"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "インスタンスの切り替え",
-      "couldNotLoadInstances": "インスタンスを読み込めませんでした。",
-      "noInstancesDescription": "チャットを開始するにはインスタンスを設定してください。",
-      "setUpKiloclaw": "KiloClawを設定",
-      "currentInstance": "{{title}}、選択中"
-    },
     "conversation": {
-      "failedToLoad": "会話を読み込めませんでした。",
-      "notFound": "会話が見つかりません。",
       "untitled": "無題",
-      "leaveTitle": "会話から退出しますか？",
-      "leaveMessage": "この会話が自分の一覧から削除されます。",
-      "openHint": "会話を開きます。長押しで名前変更と退出のオプションが表示されます。",
-      "unread": "未読",
-      "optionsFor": "{{title}}の会話オプション",
-      "options": "会話オプション",
-      "renameTitle": "会話名の変更",
-      "renamePlaceholder": "新しい名前",
-      "couldNotReachBot": "ボットに接続できませんでした。もう一度お試しください。",
-      "messageDeliveryFailed": "ボットにメッセージを送信できませんでした。",
-      "couldNotSignIn": "チャットにサインインできませんでした。",
-      "couldNotRefreshMessages": "メッセージを更新できませんでした。",
-      "couldNotLoadHistory": "会話履歴を読み込めませんでした。",
-      "leave": "退出",
-      "untitledConversation": "無題の会話",
-      "createFailed": "会話を作成できませんでした。",
-      "leaveFailed": "会話から退出できませんでした。"
-    },
-    "reactions": {
-      "common": "よく使うリアクション",
-      "reactWith": "{{reaction}}でリアクション",
-      "accessibility": "{{emoji}}のリアクション、{{displayCount}}件"
-    },
-    "composer": {
-      "replyingTo": "返信先",
-      "cancelReply": "返信をキャンセル",
-      "openInstance": "インスタンスを開く",
-      "attachFile": "ファイルを添付",
-      "cancelEdit": "編集をキャンセル"
+      "renamePlaceholder": "新しい名前"
     },
     "conversationList": {
-      "couldNotLoad": "会話を読み込めませんでした。",
-      "emptyTitle": "まだ会話はありません",
-      "emptyDescription": "KiloClawインスタンスとチャットを開始するには会話を作成してください。",
-      "create": "会話を作成",
-      "newConversation": "新しい会話",
-      "openInstanceSettings": "インスタンス設定を開く",
       "today": "今日",
       "yesterday": "昨日",
-      "thisWeek": "今週",
       "older": "それ以前"
     },
     "attachment": {
-      "open": "{{filename}}を開く",
-      "openFailed": "添付ファイルを開けませんでした。接続を確認して、もう一度お試しください。",
-      "attachFailed": "ファイルを添付できませんでした。",
-      "limit": "ファイルは最大{{displayCount}}件まで添付できます。",
-      "sizeRejection": "{{filename}}のサイズが添付ファイルの上限（{{limit}}）を超えています。",
-      "unreadable": "{{filename}}を読み取れませんでした。",
-      "pastedImage": "貼り付けた画像",
-      "defaultName": "添付ファイル",
       "classificationDenied": "実行可能ファイルは添付できません。",
       "classificationEmpty": "ファイルが空です。",
       "classificationTooLarge": "添付できるファイルのサイズは20 MB以下です。",
@@ -431,426 +371,17 @@
       "networkError": "ネットワークエラーが発生しました。",
       "uploadFailed": "アップロードに失敗しました。",
       "nothingToPaste": "貼り付ける内容がありません。",
-      "metadataStripFailed": "写真のメタデータを削除できませんでした。",
-      "limit_one": "ファイルは最大{{displayCount}}件まで添付できます。",
-      "limit_other": "ファイルは最大{{displayCount}}件まで添付できます。"
+      "metadataStripFailed": "写真のメタデータを削除できませんでした。"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}、{{status}}",
-      "retryUploading": "{{filename}}のアップロードを再試行",
-      "remove": "{{filename}}を削除"
-    },
-    "messageBubble": {
-      "deleted": "メッセージは削除されました。",
-      "yourMessage": "あなたのメッセージ",
-      "messageFrom": "{{author}}からのメッセージ",
-      "moreActions": "その他の操作",
-      "notDelivered": "未配信",
-      "edited": "（編集済み）",
-      "image": "画像"
+      "accessibility": "{{filename}}、{{status}}"
     },
     "messageActions": {
-      "copied": "コピー済み",
-      "copyFailed": "コピーに失敗しました。",
-      "title": "メッセージの操作",
-      "deleteTitle": "メッセージを削除しますか？",
-      "deleteMessage": "会話からこのメッセージが削除されます。",
-      "deleteFailed": "メッセージを削除できませんでした。",
-      "removeReactionFailed": "リアクションを削除できませんでした。",
-      "addReactionFailed": "リアクションを追加できませんでした。",
-      "retrySend": "再送信",
-      "moreReactions": "その他のリアクション",
-      "edit": "編集",
-      "sendFailed": "メッセージを送信できませんでした。",
-      "retrySendFailed": "メッセージを再送信できませんでした。",
-      "editFailed": "メッセージを編集できませんでした。",
-      "executeFailed": "操作を実行できませんでした。"
+      "edit": "編集"
     },
     "attachmentPicker": {
-      "takePhoto": "写真を撮る",
-      "photoLibrary": "写真ライブラリ",
-      "files": "ファイル",
       "cameraAccessMessage": "写真を撮るには、設定でカメラへのアクセスを許可してください。"
-    },
-    "typingIndicator": {
-      "someone": "誰か",
-      "typing_one": "{{name}}が入力中…",
-      "typing": "{{names}}が入力中…",
-      "typing_other": "{{names}}が入力中…"
-    },
-    "botStatus": {
-      "offline": "オフライン",
-      "loadingUser": "ユーザー情報を読み込み中…",
-      "waitingForStatus": "ボットの状態を取得中…",
-      "offlineMessage": "ボットはオフラインです。再接続するとメッセージのやり取りが再開します。"
-    },
-    "errors": {
-      "notAllowed": "この操作は許可されていません。",
-      "messageTooLong": "メッセージが長すぎます。{{limit}}文字未満にしてください。",
-      "titleTooLong": "タイトルが長すぎます。{{limit}}文字未満にしてください。",
-      "messageEmpty": "メッセージを空にすることはできません。"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClawのインスタンスを読み込めませんでした。",
-    "billing": {
-      "title": "請求",
-      "continueMonthToMonth": "月額プランで継続",
-      "plan": "プラン",
-      "finalTermEnds": "最終契約期間の終了日",
-      "afterFinalTerm": "最終契約期間の終了後",
-      "lessThanOneDay": "1日未満",
-      "ends": "終了日",
-      "expires": "有効期限",
-      "noActivePlan": "契約中のプランはありません",
-      "noActivePlanDescription": "現在契約中のKiloClawサブスクリプションはありません。",
-      "managedByAdmin": "請求に関する設定は組織の管理者が管理しています。",
-      "couldNotLoad": "請求情報を読み込めませんでした。",
-      "manageOnWeb": "ウェブで請求を管理",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Commitプランの最終契約期間は{{date}}に終了します。Standardプランを{{price}}で継続しない場合、ホスティングは終了します。",
-      "freeTrial": "無料トライアル",
-      "hostingEnds": "ホスティング終了",
-      "renews": "更新日",
-      "standardMonthToMonth": "Standard（月額）",
-      "standardStartsOn": "Standardプランは{{date}}から{{price}}で開始します。",
-      "yourStandardMonthlyPrice": "ご契約のStandardプランの月額料金",
-      "perMonth": "/月",
-      "earlybirdAccessUntil": "Earlybirdプランは{{date}}まで利用できます。",
-      "earlybirdEnding": "Earlybirdプランの終了まで残り{{remaining}}です。",
-      "paymentPastDue": "お支払いの期限が過ぎています。お支払い方法を更新してください。",
-      "subscriptionCancels": "サブスクリプションは{{date}}に解約されます。",
-      "trialDaysRemaining": "トライアル期間は残り{{remaining}}です。",
-      "trialEndingSoon": "トライアルはまもなく終了します。残り{{remaining}}です。",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "コミット"
-    },
-    "changelog": {
-      "title": "新着情報",
-      "couldNotLoad": "変更履歴を読み込めませんでした。",
-      "noUpdates": "まだ更新はありません",
-      "noUpdatesDescription": "更新内容がここに表示されます。",
-      "recentUpdates": "最近の更新",
-      "manageVersion": "バージョンを管理",
-      "redeployRequired": "要再デプロイ",
-      "redeploySuggested": "再デプロイ推奨",
-      "upgradeRequired": "要アップグレード"
-    },
-    "dashboard": {
-      "title": "ダッシュボード",
-      "couldNotLoad": "ダッシュボードを読み込めませんでした。",
-      "renameInstance": "インスタンス名を変更",
-      "renamePlaceholder": "新しい名前（50文字以内）",
-      "someDetailsFailed": "最新の詳細情報を一部読み込めませんでした。",
-      "destroy": "削除",
-      "destroyMessage": "KiloClawのインスタンスとそのすべてのデータを完全に削除します。この操作は元に戻せません。",
-      "destroyTitle": "インスタンスの削除",
-      "instance": "インスタンス",
-      "couldNotCheckStatus": "サービスの稼働状況を確認できませんでした。",
-      "dangerZone": "注意が必要な操作",
-      "destroying": "削除中…",
-      "serviceDegraded": "サービスの一部に問題があります。タップして稼働状況を確認",
-      "up": "稼働中"
-    },
-    "channels": {
-      "title": "チャンネル",
-      "couldNotLoad": "チャンネルを読み込めませんでした。",
-      "noChannels": "利用可能なチャンネルがありません",
-      "noChannelsDescription": "チャンネル連携がここに表示されます。",
-      "connected": "{{label}}に接続しました",
-      "disconnectMessage": "{{label}}を削除しますか？このチャンネルは切断されます。",
-      "disconnectTitle": "チャンネルを切断"
-    },
-    "devicePairing": {
-      "title": "デバイスのペアリング",
-      "refreshRequests": "ペアリングリクエストを更新",
-      "couldNotLoad": "ペアリングリクエストを読み込めませんでした。",
-      "noPending": "承認待ちのリクエストはありません",
-      "noPendingDescription": "チャンネルとデバイスのペアリングリクエストがここに表示されます。",
-      "channelRequests": "チャンネルのペアリングリクエスト",
-      "deviceRequests": "デバイスのペアリングリクエスト",
-      "approveDeviceMessage": "{{platform}}からこのインスタンスへの接続を許可しますか？",
-      "approveDeviceTitle": "デバイスを承認",
-      "approveMessage": "{{label}}（コード：{{code}}）からこのインスタンスへの接続を許可しますか？",
-      "approveTitle": "ペアリングリクエストを承認",
-      "unknownDevice": "不明なデバイス"
-    },
-    "execPolicy": {
-      "title": "実行ポリシー",
-      "couldNotLoad": "実行ポリシーを読み込めませんでした。",
-      "alwaysAsk": "常に確認",
-      "alwaysAskDescription": "実行前に各コマンドを確認します。最も安全です。",
-      "neverAsk": "確認しない",
-      "neverAskDescription": "確認せずにコマンドを実行します。処理は速くなりますが、安全性は低くなります。"
-    },
-    "google": {
-      "title": "Googleアカウント",
-      "couldNotLoad": "Googleアカウントの状態を読み込めませんでした。",
-      "disconnected": "Googleアカウントが切断されました。変更を適用するにはインスタンスを再デプロイしてください。",
-      "setupCommand": "セットアップコマンド",
-      "setupCommandHelp": "Googleアカウントを接続するには、Dockerをインストールしたお使いのパソコンのターミナルで、このコマンドを実行してください。",
-      "failedToLoadCommand": "セットアップコマンドを読み込めませんでした。",
-      "gmailNotifications": "Gmailの通知",
-      "disconnect": "Googleアカウントを切断",
-      "copied": "コピー済み",
-      "copyCommand": "コマンドをコピー",
-      "disconnectConfirm": "切断",
-      "disconnectMessage": "このインスタンスからGoogleアカウントを削除しますか？Gmailの通知が無効になります。変更を反映するには、切断後にインスタンスを再デプロイしてください。",
-      "disconnectTitle": "Googleを切断"
-    },
-    "modelList": {
-      "noMatches": "検索に一致するモデルはありません",
-      "noModelsDescription": "モデルは利用可能になるとここに表示されます。",
-      "noResultsFor": "「{{query}}」に一致するモデルはありません。"
-    },
-    "secrets": {
-      "title": "シークレット",
-      "couldNotLoad": "シークレットを読み込めませんでした。",
-      "noSecrets": "利用可能なシークレットがありません",
-      "noSecretsDescription": "シークレット連携がここに表示されます。",
-      "removeMessage": "{{label}}を削除しますか？このツールから認証情報にアクセスできなくなります。",
-      "removeTitle": "シークレットを削除",
-      "saved": "{{label}}を保存しました",
-      "allFieldsRequired": "{{label}}に接続するには、すべての項目を入力する必要があります。",
-      "hide": "{{label}}を非表示",
-      "removing": "削除中…",
-      "saving": "保存中…",
-      "setupGuide": "セットアップガイド",
-      "setupGuideA11y": "{{label}}のセットアップガイド",
-      "setupGuideFallback": "セットアップガイド",
-      "show": "{{label}}を表示",
-      "updateToken": "トークンを更新"
-    },
-    "versionPin": {
-      "title": "バージョンの固定",
-      "couldNotLoad": "バージョン情報を読み込めませんでした。",
-      "couldNotLoadMore": "追加のバージョンを読み込めませんでした。",
-      "loadMore": "さらにバージョンを読み込む",
-      "showingLatest": "最新の100バージョンを表示しています。",
-      "availableVersions": "利用可能なバージョン",
-      "noVersions": "利用可能なバージョンがありません",
-      "noVersionsDescription": "利用可能なOpenClawのバージョンがここに表示されます。",
-      "unpin": "固定を解除",
-      "unpinMessage": "利用可能な最新バージョンに戻しますか？",
-      "unpinTitle": "バージョンの固定を解除",
-      "confirmPin": "このバージョンに固定",
-      "followingLatest": "最新版に追従",
-      "latest": "最新",
-      "pin": "固定",
-      "pinnedByAdmin": "管理者がバージョンを固定しています。変更するには管理者に連絡してください。",
-      "pinnedTo": "{{version}}に固定",
-      "reasonOptional": "理由（任意）",
-      "reasonPlaceholder": "このバージョンに固定する理由",
-      "replaceAdminPin": "管理者の固定設定を上書き",
-      "replacesAdminPin": "管理者によるバージョンの固定設定（現在は{{label}}）を上書きします。"
-    },
-    "redeploy": "再デプロイ",
-    "redeployMessage": "このインスタンスを再デプロイしますか？",
-    "redeployTitle": "インスタンスを再デプロイ",
-    "accessRequired": {
-      "iosBody": "このアカウントでは、KiloClawへのアクセスはiOSアプリの外で管理されています。",
-      "iosContact": "ご不明な点は{{supportEmail}}までお問い合わせください。",
-      "iosTitle": "IOSではKiloClawを利用できません",
-      "multipleCurrentConflictBody": "このアカウントに有効なサブスクリプションが複数見つかりました。二重請求を防ぐため、処理を一時停止しています。",
-      "multipleCurrentConflictCta": "Kilo.aiで続行",
-      "nonCanonicalEarlybirdBody": "先行アクセスプランをモバイルで利用するには、担当者による確認が必要です。",
-      "nonCanonicalEarlybirdTitle": "旧プランを確認しました",
-      "quarantinedBody": "お使いのKiloClawインスタンスは隔離されているため、現在利用できません。復旧にはサポートチームの対応が必要です。",
-      "quarantinedTitle": "インスタンスの修復が必要です",
-      "subscriptionCanceledBody": "KiloClawを利用するには、ブラウザーからkilo.ai/clawにアクセスしてください。アプリ内ではプランを契約できません。",
-      "subscriptionCanceledCta": "Kilo.ai/clawを開く",
-      "subscriptionCanceledTitle": "ウェブでプランを契約",
-      "subscriptionPastDueBody": "直近のお支払いに問題がありました。ブラウザーからkilo.ai/clawにアクセスし、お支払い情報を更新してください。アプリ内では請求に関する設定を変更できません。",
-      "subscriptionPastDueTitle": "ウェブでお支払い情報を更新",
-      "trialExpiredBody": "KiloClawを使い続けるには、ブラウザーからkilo.ai/clawにアクセスしてください。アプリ内ではプランを契約できません。",
-      "quarantinedCta": "サポートチームにメールする",
-      "nonCanonicalEarlybirdCta": "プランをKilo.aiで確認する"
-    },
-    "controls": {
-      "redeploying": "再デプロイ中…",
-      "restart": "再起動",
-      "restartOpenClawMessage": "OpenClawのプロセスを再起動しますか？",
-      "restartOpenClawTitle": "OpenClawを再起動",
-      "restarting": "再起動中…",
-      "start": "起動",
-      "startMessage": "このインスタンスを起動しますか？",
-      "startTitle": "インスタンスを起動",
-      "stop": "停止",
-      "stopMessage": "このインスタンスを停止しますか？",
-      "stopTitle": "インスタンスを停止",
-      "stopping": "停止中…"
-    },
-    "empty": {
-      "finishingSetup": "セットアップの最終処理中",
-      "finishingSetupDescription": "アカウントの準備を仕上げています。通常はすぐに完了しますので、少しお待ちください。",
-      "getStarted": "始める",
-      "noInstancesDescription": "最初のインスタンスを作成して、コーディングエージェントを動かしましょう。"
-    },
-    "instance": {
-      "backToInstances": "インスタンス一覧に戻る",
-      "couldNotLoad": "インスタンスを読み込めませんでした。",
-      "notFound": "インスタンスが見つかりません",
-      "notFoundDescription": "このインスタンスは削除されたか、リンクが無効になっている可能性があります。"
-    },
-    "instanceCard": {
-      "fixOnKiloAi": "Kilo.aiで対応：{{label}}",
-      "needsAttention": "{{name}}への対応が必要です：{{label}}",
-      "openSettings": "{{name}}の設定を開く",
-      "openUnread": "{{name}}を開く、未読メッセージ{{displayCount}}件",
-      "openUnread_other": "{{name}}を開く、未読メッセージ{{displayCount}}件",
-      "openUnread_one": "{{name}}を開く（未読メッセージ{{displayCount}}件）"
-    },
-    "list": {
-      "createInstance": "インスタンスを作成",
-      "organizations": "組織",
-      "accessIssue": {
-        "trialExpired": "トライアル終了。このインスタンスを使い続けるにはプランを契約",
-        "subscriptionCanceled": "サブスクリプションが無効です。このインスタンスを使い続けるには再契約",
-        "subscriptionPastDue": "お支払いに問題があります。このインスタンスを使い続けるには請求情報を更新",
-        "quarantined": "インスタンスを隔離中。担当者による確認が必要です",
-        "multipleCurrentConflict": "アカウントの確認が必要",
-        "nonCanonicalEarlybird": "旧プランの確認が必要です"
-      }
-    },
-    "modelPicker": {
-      "autoModelA11y": "モデルの自動選択：{{label}}",
-      "balancedDescription": "コストを抑えながら、速度と性能を両立します。",
-      "browseAllModels": "または500以上のモデルから選択",
-      "browseAllModelsA11y": "500以上のモデルをすべて表示",
-      "currentModel": "現在のモデル",
-      "frontierDescription": "性能を最優先し、推論機能を備えた最先端のモデルを選びます。",
-      "frontierLabel": "最先端",
-      "kiloAuto": "Kilo Auto"
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}}とチャット",
-        "ready": "{{name}}の準備ができました",
-        "warmedUp": "準備完了です。いつでも話しかけてください。"
-      },
-      "flow": {
-        "couldNotLoad": "初期設定の状態を読み込めませんでした。",
-        "finishingSetup": "セットアップを仕上げています。アカウントの準備が完了するまで、少しお待ちください。",
-        "genericErrorBody": "インスタンスのセットアップを完了できませんでした。",
-        "identityTitle": "ボットのプロフィール設定",
-        "manualReviewBody": "インスタンスを作成する前に、アカウントの状態を確認する必要があります。kilo.aiで手続きを続けてください。",
-        "manualReviewTitle": "セットアップには担当者の確認が必要です",
-        "openKiloAi": "Kilo.aiを開く",
-        "provisioning": "構築中",
-        "ready": "準備完了",
-        "review": "レビュー",
-        "settingUp": "セットアップ中…"
-      },
-      "identity": {
-        "changePersonality": "性格を変更",
-        "chooseAvatar": "アバターを選択",
-        "location": "場所",
-        "locationDeniedMessage": "現在地を使用するには、設定で位置情報へのアクセスを許可してください。",
-        "locationDeniedTitle": "位置情報へのアクセスが拒否されました",
-        "locationGetFailed": "現在地を取得できませんでした。手動で入力してください。",
-        "locationPlaceholder": "市区町村または地域（任意）",
-        "locationResolveFailed": "現在地を特定できませんでした。手動で修正できます。",
-        "locationValidationFailed": "入力した場所を確認できませんでした。",
-        "namePlaceholder": "ボットの名前",
-        "nature": {
-          "aiAssistantLabel": "AIアシスタント",
-          "aiAssistantVibe": "親切で有能、仕事もきっちり",
-          "digitalCreatureLabel": "デジタル生物",
-          "digitalCreatureVibe": "個性的で生き生き、ちょっと予測不能",
-          "somethingWeirderLabel": "もっと変わった存在…",
-          "somethingWeirderVibe": "自分で自由に設定",
-          "virtualCompanionLabel": "バーチャルな相棒",
-          "virtualCompanionVibe": "温かく寄り添い、心から気にかけてくれる"
-        },
-        "personality": "性格",
-        "selectAvatar": "{{name}}をアバターとして選択",
-        "useCurrentLocation": "現在地を使用"
-      },
-      "notifications": {
-        "couldNotEnable": "通知を有効にできませんでした。",
-        "getNotified": "{{name}}がタスクを完了したら通知を受け取れます。返信を見逃さないようにしましょう。",
-        "mockMessage": "できました！ご依頼の要約をまとめました。いつでも確認できます。",
-        "now": "たった今",
-        "settingUp": "通知を設定中…",
-        "skipForNow": "今はスキップ",
-        "stayInTheLoop": "通知でお知らせ"
-      },
-      "provisioning": {
-        "backgroundHint": "通常は1分以内に完了します。この画面を閉じても、バックグラウンドで処理は続きます。",
-        "connectingToAgent": "エージェントに接続中",
-        "continueInBackground": "バックグラウンドで続行",
-        "queryErrorBody": "{{name}}のセットアップ状況を確認中に接続が切れました。セットアップは続いている可能性があります。もう一度お試しいただくか、しばらくしてから確認してください。",
-        "queryErrorTitle": "セットアップの状況を確認できませんでした",
-        "settingUp": "{{name}}をセットアップ中",
-        "stalledBody": "{{name}}のセットアップを完了できませんでした。もう一度お試しください。問題が続く場合は、{{supportEmail}}までメールでお問い合わせください。",
-        "stalledTitle": "処理が進んでいません",
-        "startingSandbox": "サンドボックスを起動中",
-        "stoppedBody": "セットアップ中に{{name}}のインスタンスが予期せず停止しました。",
-        "stoppedTitle": "セットアップが停止しました",
-        "timeoutBody": "{{name}}のセットアップに通常より時間がかかっています（{{displayMinutes}}分以上）。",
-        "timeoutTitle": "予想より時間がかかっています"
-      },
-      "unavailableDescription": "インスタンスを構築するには、有効なKiloClawサブスクリプションが必要です。既存のインスタンスとサブスクリプションは引き続き利用できます。",
-      "unavailableTitle": "KiloClawの新規インスタンスは作成できません"
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "終了コード：{{code}}",
-      "gatewayProcess": "ゲートウェイプロセス",
-      "lastExit": "前回の終了",
-      "memory": "メモリ",
-      "region": "リージョン",
-      "resources": "リソース",
-      "restarts": "再起動回数",
-      "state": "状態",
-      "uptime": "稼働時間",
-      "crashed": "クラッシュ",
-      "destroying": "削除中",
-      "provisioned": "構築済み",
-      "restarting": "再起動中",
-      "running": "実行中",
-      "shuttingDown": "シャットダウン中",
-      "starting": "起動中",
-      "stopped": "停止",
-      "stopping": "停止中",
-      "unknown": "不明",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "settings": {
-      "channelsDescription": "Telegram、Discord、Slack",
-      "devicePairingDescription": "デバイスのペアリングリクエストを承認",
-      "execPolicyDescription": "セキュリティ設定",
-      "googleDescription": "Gmail、カレンダー、ドキュメント",
-      "modelDescription": "AIモデルの選択",
-      "secretsDescription": "暗号化された認証情報",
-      "versionPinDescription": "特定のバージョンに固定"
-    },
-    "avatar": {
-      "arcade": "アーケード",
-      "brain": "脳",
-      "creature": "生き物",
-      "crystal": "クリスタル",
-      "custom": "カスタムアバター",
-      "dragon": "ドラゴン",
-      "explorer": "探検家",
-      "flame": "炎",
-      "lightning": "稲妻",
-      "magicWand": "魔法の杖",
-      "moon": "月",
-      "operator": "オペレーター",
-      "orbit": "軌道",
-      "oracle": "予言者",
-      "rainbow": "虹",
-      "robot": "ロボット",
-      "satellite": "人工衛星",
-      "sparkles": "きらめき",
-      "strongArm": "力こぶ",
-      "talisman": "お守り"
-    },
-    "remoteSpawnFilesNotSupported": "このインスタンスはファイルを受信できません。",
-    "instanceSwitcherTitle": "KiloClawインスタンス"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2030,10 +1561,6 @@
       "moveLeft": "{{filename}}を左に移動",
       "moveRight": "{{filename}}を右に移動"
     },
-    "attachmentPasteHint": {
-      "accessibility": "クリップボードから画像を貼り付け",
-      "label": "検出した画像をタップして貼り付け"
-    },
     "attachmentPicker": {
       "camera": "カメラ",
       "photoLibrary": "写真ライブラリ",
@@ -2229,7 +1756,8 @@
     "signOutThisDeviceTitle": "このデバイスからサインアウトしますか？",
     "signOutThisSessionTitle": "このセッションからサインアウトしますか？",
     "signOutThisSessionMessage": "{{device}}からサインアウトします。ただし、最大1時間はAPIにアクセスできる状態が続くことがあります。",
-    "webBrowser": "ウェブブラウザー"
+    "webBrowser": "ウェブブラウザー",
+    "unknownDevice": "不明なデバイス"
   },
   "forceUpdate": {
     "couldNotOpenStore": "アプリストアを開けませんでした。",

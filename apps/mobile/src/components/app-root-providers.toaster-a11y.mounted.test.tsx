@@ -137,8 +137,8 @@ it('clears the floating tab bar while a tab screen is on top', async () => {
  */
 it('keeps the resting offset when the route hides the tab bar', async () => {
   platform.OS = 'android';
-  route.segments = ['(app)', '(tabs)', '(1_kiloclaw)', 'chat', 'sandbox', 'conversation'];
-  route.pathname = '/chat/sandbox/conversation';
+  route.segments = ['(app)', 'agent-chat', '[session-id]'];
+  route.pathname = '/agent-chat/ses_1';
   await mount();
 
   const toasters = unlockRoot().findAllByType('Toaster' as ElementType);

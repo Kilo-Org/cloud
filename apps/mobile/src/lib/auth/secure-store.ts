@@ -74,21 +74,3 @@ export async function deleteItemAsync(key: string, options?: SecureStoreOptions)
     reportAndRethrow('delete', error);
   }
 }
-
-export function getItem(key: string, options?: SecureStoreOptions): string | null {
-  assertProtectedDataAvailable();
-  try {
-    return ExpoSecureStore.getItem(key, ...secureStoreOptionsArgs(options));
-  } catch (error) {
-    return reportAndRethrow('read', error);
-  }
-}
-
-export function setItem(key: string, value: string, options?: SecureStoreOptions): void {
-  assertProtectedDataAvailable();
-  try {
-    ExpoSecureStore.setItem(key, value, ...secureStoreOptionsArgs(options));
-  } catch (error) {
-    reportAndRethrow('write', error);
-  }
-}

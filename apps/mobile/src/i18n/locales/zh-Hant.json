@@ -101,12 +101,9 @@
     "scheduled": "已排程",
     "keepEditing": "繼續編輯",
     "keepRunning": "繼續執行",
-    "kiloclaw": "KiloClaw",
     "newSession": "新增工作階段",
-    "noKiloclawInstances": "沒有 KiloClaw 執行個體",
     "noModelsAvailable": "沒有可用的模型",
     "notFound": "找不到項目。",
-    "online": "在線上",
     "open": "開啟 {{name}}",
     "openPullRequest": "開啟提取要求",
     "pending": "待處理",
@@ -257,7 +254,8 @@
     "renamePasskey": "重新命名通行密鑰",
     "removePasskey": "移除通行密鑰",
     "removePasskeyTitle": "移除通行密鑰？",
-    "removePasskeyMessage": "您將無法再使用此通行密鑰登入。"
+    "removePasskeyMessage": "您將無法再使用此通行密鑰登入。",
+    "changelog": "最新消息"
   },
   "preferences": {
     "general": "一般",
@@ -320,23 +318,18 @@
     "previewGenericDescription": "通知只會提示有新動態。開啟 Kilo 即可查看內容。",
     "channel": {
       "agentProgress": "智慧代理進度",
-      "chat": "聊天訊息",
-      "kiloclaw": "KiloClaw 活動",
       "balance": "餘額提醒",
       "security": "資安問題",
       "spend": "支出提醒",
       "followedSessions": "已關注的會話"
     },
     "category": {
-      "chatMessagesSubtitle": "對話中的回覆",
       "agentAttentionTitle": "智慧代理需要你處理",
       "agentAttentionSubtitle": "需要回答問題、授權或提供資訊",
       "agentUpdatesTitle": "智慧代理動態",
       "agentUpdatesSubtitle": "智慧代理執行任務期間傳送的訊息",
       "sessionStatusTitle": "工作階段狀態",
       "sessionStatusSubtitle": "已完成／失敗／可開始控制",
-      "kiloclawActivitySubtitle": "執行個體就緒或失敗、排程動作",
-      "kiloclawActivityUnavailable": "啟動 KiloClaw 執行個體以接收 KiloClaw 活動。",
       "balanceAlertsSubtitle": "組織餘額不足警告",
       "balanceAlertsUnavailable": "加入組織以接收餘額提醒。",
       "securityFindingsSubtitle": "新發現的安全問題與 SLA 提醒",
@@ -356,72 +349,19 @@
   },
   "tabs": {
     "home": "首頁",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}，分頁，第 {{position}} 個，共 {{total}} 個"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "切換執行個體",
-      "couldNotLoadInstances": "無法載入執行個體。",
-      "noInstancesDescription": "設定執行個體以開始聊天。",
-      "setUpKiloclaw": "設定 KiloClaw",
-      "currentInstance": "{{title}}，目前使用的執行個體"
-    },
     "conversation": {
-      "failedToLoad": "無法載入對話。",
-      "notFound": "找不到對話。",
       "untitled": "無標題",
-      "leaveTitle": "要離開對話嗎？",
-      "leaveMessage": "這會將對話從你的清單中移除。",
-      "openHint": "開啟對話。長按可顯示重新命名與離開的選項。",
-      "unread": "未讀",
-      "optionsFor": "{{title}} 的對話選項",
-      "options": "對話選項",
-      "renameTitle": "重新命名對話",
-      "renamePlaceholder": "新名稱",
-      "couldNotReachBot": "無法連上機器人。請再試一次。",
-      "messageDeliveryFailed": "無法將訊息傳送給機器人。",
-      "couldNotSignIn": "無法登入聊天服務。",
-      "couldNotRefreshMessages": "無法重新整理訊息。",
-      "couldNotLoadHistory": "無法載入對話記錄。",
-      "leave": "離開",
-      "untitledConversation": "無標題對話",
-      "createFailed": "無法建立對話。",
-      "leaveFailed": "無法離開對話。"
-    },
-    "reactions": {
-      "common": "常用",
-      "reactWith": "用 {{reaction}} 表情回應",
-      "accessibility": "{{emoji}} 表情回應，共 {{displayCount}} 個"
-    },
-    "composer": {
-      "replyingTo": "正在回覆",
-      "cancelReply": "取消回覆",
-      "openInstance": "開啟執行個體",
-      "attachFile": "附加檔案",
-      "cancelEdit": "取消編輯"
+      "renamePlaceholder": "新名稱"
     },
     "conversationList": {
-      "couldNotLoad": "無法載入對話。",
-      "emptyTitle": "尚無對話",
-      "emptyDescription": "建立對話，即可開始與你的 KiloClaw 執行個體聊天。",
-      "create": "建立對話",
-      "newConversation": "新對話",
-      "openInstanceSettings": "開啟執行個體設定",
       "today": "今天",
       "yesterday": "昨天",
-      "thisWeek": "本週",
       "older": "較早"
     },
     "attachment": {
-      "open": "開啟 {{filename}}",
-      "openFailed": "無法開啟附件。請檢查連線後再試一次。",
-      "attachFailed": "無法附加檔案。",
-      "limit": "最多可附加 {{displayCount}} 個檔案。",
-      "sizeRejection": "{{filename}} 超出 {{limit}} 的附件大小限制。",
-      "unreadable": "無法讀取 {{filename}}。",
-      "pastedImage": "貼上的圖片",
-      "defaultName": "附件",
       "classificationDenied": "無法附加可執行檔。",
       "classificationEmpty": "檔案沒有內容。",
       "classificationTooLarge": "檔案大小不得超過 20 MB。",
@@ -431,426 +371,17 @@
       "networkError": "網路發生錯誤。",
       "uploadFailed": "上傳失敗。",
       "nothingToPaste": "沒有可貼上的內容。",
-      "metadataStripFailed": "無法移除相片中繼資料。",
-      "limit_one": "最多可附加 {{displayCount}} 個檔案。",
-      "limit_other": "最多可附加 {{displayCount}} 個檔案。"
+      "metadataStripFailed": "無法移除相片中繼資料。"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}，{{status}}",
-      "retryUploading": "重新上傳 {{filename}}",
-      "remove": "移除 {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[已刪除的訊息]",
-      "yourMessage": "你的訊息",
-      "messageFrom": "來自 {{author}} 的訊息",
-      "moreActions": "更多操作",
-      "notDelivered": "未送達",
-      "edited": "（已編輯）",
-      "image": "圖片"
+      "accessibility": "{{filename}}，{{status}}"
     },
     "messageActions": {
-      "copied": "已複製",
-      "copyFailed": "複製失敗。",
-      "title": "訊息操作",
-      "deleteTitle": "要刪除訊息嗎？",
-      "deleteMessage": "這會將該訊息從對話中移除。",
-      "deleteFailed": "無法刪除訊息。",
-      "removeReactionFailed": "無法移除表情回應。",
-      "addReactionFailed": "無法新增表情回應。",
-      "retrySend": "重新傳送",
-      "moreReactions": "更多表情回應",
-      "edit": "編輯",
-      "sendFailed": "無法傳送訊息。",
-      "retrySendFailed": "無法重新傳送訊息。",
-      "editFailed": "無法編輯訊息。",
-      "executeFailed": "無法執行操作。"
+      "edit": "編輯"
     },
     "attachmentPicker": {
-      "takePhoto": "拍照",
-      "photoLibrary": "照片圖庫",
-      "files": "檔案",
       "cameraAccessMessage": "請在設定中允許使用相機，才能拍照。"
-    },
-    "typingIndicator": {
-      "someone": "某人",
-      "typing_one": "{{name}} 正在輸入…",
-      "typing": "{{names}} 正在輸入…",
-      "typing_other": "{{names}} 正在輸入…"
-    },
-    "botStatus": {
-      "offline": "離線",
-      "loadingUser": "正在載入使用者…",
-      "waitingForStatus": "正在等待機器人狀態…",
-      "offlineMessage": "機器人已離線。重新連線後，訊息傳送就會恢復。"
-    },
-    "errors": {
-      "notAllowed": "不允許此操作。",
-      "messageTooLong": "訊息太長，請縮短至 {{limit}} 個字元以內。",
-      "titleTooLong": "標題太長，請縮短至 {{limit}} 個字元以內。",
-      "messageEmpty": "訊息不得留空。"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "無法載入 KiloClaw 執行個體。",
-    "billing": {
-      "title": "帳單",
-      "continueMonthToMonth": "繼續按月訂閱",
-      "plan": "計畫",
-      "finalTermEnds": "最後一期到期日",
-      "afterFinalTerm": "最後一期結束後",
-      "lessThanOneDay": "不到 1 天",
-      "ends": "結束日期",
-      "expires": "到期日",
-      "noActivePlan": "目前沒有有效方案",
-      "noActivePlanDescription": "你目前沒有有效的 KiloClaw 訂閱。",
-      "managedByAdmin": "帳單由你的組織管理員管理。",
-      "couldNotLoad": "無法載入帳單資訊。",
-      "manageOnWeb": "前往網頁管理帳單",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "你的最後一期 Commit 方案將於 {{date}} 到期。可改以 {{price}} 續訂 Standard 方案，否則託管服務將終止。",
-      "freeTrial": "免費試用",
-      "hostingEnds": "託管服務終止",
-      "renews": "續訂日期",
-      "standardMonthToMonth": "Standard 月繳方案",
-      "standardStartsOn": "Standard 方案將於 {{date}} 生效，費用為 {{price}}。",
-      "yourStandardMonthlyPrice": "你的 Standard 方案月費",
-      "perMonth": "/月",
-      "earlybirdAccessUntil": "Earlybird 方案可使用至 {{date}}。",
-      "earlybirdEnding": "Earlybird 方案即將到期，剩餘 {{remaining}}。",
-      "paymentPastDue": "付款已逾期。請更新你的付款方式。",
-      "subscriptionCancels": "訂閱將於 {{date}} 取消。",
-      "trialDaysRemaining": "試用期還剩 {{remaining}}。",
-      "trialEndingSoon": "試用即將結束，剩餘 {{remaining}}。",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "提交"
-    },
-    "changelog": {
-      "title": "最新消息",
-      "couldNotLoad": "無法載入更新紀錄。",
-      "noUpdates": "尚無更新",
-      "noUpdatesDescription": "更新內容會顯示在這裡。",
-      "recentUpdates": "最近更新",
-      "manageVersion": "管理版本",
-      "redeployRequired": "需要重新部署",
-      "redeploySuggested": "建議重新部署",
-      "upgradeRequired": "需要升級"
-    },
-    "dashboard": {
-      "title": "儀表板",
-      "couldNotLoad": "無法載入儀表板。",
-      "renameInstance": "重新命名執行個體",
-      "renamePlaceholder": "新名稱（最多 50 個字元）",
-      "someDetailsFailed": "部分即時資訊載入失敗。",
-      "destroy": "銷毀",
-      "destroyMessage": "這會永久銷毀你的 KiloClaw 執行個體及其所有資料。此操作無法復原。",
-      "destroyTitle": "銷毀執行個體",
-      "instance": "執行個體",
-      "couldNotCheckStatus": "無法檢查服務狀態。",
-      "dangerZone": "危險區域",
-      "destroying": "正在銷毀…",
-      "serviceDegraded": "服務效能下降，點一下即可檢視狀態",
-      "up": "執行中"
-    },
-    "channels": {
-      "title": "頻道",
-      "couldNotLoad": "無法載入頻道。",
-      "noChannels": "沒有可用頻道",
-      "noChannelsDescription": "可整合的頻道會顯示在這裡。",
-      "connected": "{{label}} 已連線",
-      "disconnectMessage": "要移除 {{label}} 嗎？此頻道將中斷連線。",
-      "disconnectTitle": "中斷頻道連線"
-    },
-    "devicePairing": {
-      "title": "裝置配對",
-      "refreshRequests": "重新整理配對要求",
-      "couldNotLoad": "無法載入配對要求。",
-      "noPending": "沒有待處理的要求",
-      "noPendingDescription": "頻道和裝置配對要求將顯示在這裡。",
-      "channelRequests": "頻道配對要求",
-      "deviceRequests": "裝置配對要求",
-      "approveDeviceMessage": "要允許 {{platform}} 連線到你的執行個體嗎？",
-      "approveDeviceTitle": "核准裝置",
-      "approveMessage": "要允許 {{label}}（代碼：{{code}}）連線到你的執行個體嗎？",
-      "approveTitle": "核准配對要求",
-      "unknownDevice": "未知裝置"
-    },
-    "execPolicy": {
-      "title": "執行原則",
-      "couldNotLoad": "無法載入執行原則。",
-      "alwaysAsk": "一律詢問",
-      "alwaysAskDescription": "每個指令都需確認後才執行，安全性最高。",
-      "neverAsk": "一律不詢問",
-      "neverAskDescription": "不經確認就執行指令。速度較快，但安全性較低。"
-    },
-    "google": {
-      "title": "Google 帳戶",
-      "couldNotLoad": "無法載入 Google 帳戶狀態。",
-      "disconnected": "Google 帳戶已中斷連線。請重新部署執行個體以套用變更。",
-      "setupCommand": "設定指令",
-      "setupCommandHelp": "請在自己的電腦上安裝 Docker，再開啟終端機執行此指令，即可連結你的 Google 帳戶。",
-      "failedToLoadCommand": "無法載入設定指令。",
-      "gmailNotifications": "Gmail 通知",
-      "disconnect": "中斷 Google 帳戶連線",
-      "copied": "已複製",
-      "copyCommand": "複製指令",
-      "disconnectConfirm": "中斷連線",
-      "disconnectMessage": "要從此執行個體移除你的 Google 帳戶嗎？這會停用 Gmail 通知。中斷連線後，請重新部署以套用變更。",
-      "disconnectTitle": "中斷 Google 連線"
-    },
-    "modelList": {
-      "noMatches": "沒有符合搜尋條件的模型",
-      "noModelsDescription": "有可用模型時，會顯示在這裡。",
-      "noResultsFor": "找不到「{{query}}」的搜尋結果。"
-    },
-    "secrets": {
-      "title": "機密資料",
-      "couldNotLoad": "無法載入機密資料。",
-      "noSecrets": "沒有可用的機密資料",
-      "noSecretsDescription": "需要機密資料的整合服務會顯示在這裡。",
-      "removeMessage": "要移除 {{label}} 嗎？此工具將無法再存取其驗證資訊。",
-      "removeTitle": "移除機密資料",
-      "saved": "{{label}} 已儲存",
-      "allFieldsRequired": "必須填妥所有欄位才能連結 {{label}}。",
-      "hide": "隱藏 {{label}}",
-      "removing": "正在移除…",
-      "saving": "正在儲存…",
-      "setupGuide": "設定指南",
-      "setupGuideA11y": "{{label}} 設定指南",
-      "setupGuideFallback": "設定指南",
-      "show": "顯示 {{label}}",
-      "updateToken": "更新權杖"
-    },
-    "versionPin": {
-      "title": "版本鎖定",
-      "couldNotLoad": "無法載入版本資訊。",
-      "couldNotLoadMore": "無法載入更多版本。",
-      "loadMore": "載入更多版本",
-      "showingLatest": "目前顯示最新的 100 個版本。",
-      "availableVersions": "可用版本",
-      "noVersions": "沒有可用版本",
-      "noVersionsDescription": "可用的 OpenClaw 版本將顯示在這裡。",
-      "unpin": "取消固定",
-      "unpinMessage": "切換回最新可用版本？",
-      "unpinTitle": "取消固定版本",
-      "confirmPin": "確認固定",
-      "followingLatest": "使用最新版本",
-      "latest": "最新",
-      "pin": "固定",
-      "pinnedByAdmin": "管理員已固定版本。如需變更，請聯絡管理員。",
-      "pinnedTo": "已固定使用 {{version}}",
-      "reasonOptional": "原因（非必填）",
-      "reasonPlaceholder": "固定此版本的原因",
-      "replaceAdminPin": "取代管理員的版本設定",
-      "replacesAdminPin": "這將取代管理員設定的固定版本（目前為 {{label}}）。"
-    },
-    "redeploy": "重新部署",
-    "redeployMessage": "確定要重新部署此執行個體嗎？",
-    "redeployTitle": "重新部署執行個體",
-    "accessRequired": {
-      "iosBody": "此帳戶的 KiloClaw 存取權限需在 iOS 應用程式外管理。",
-      "iosContact": "有問題嗎？請聯絡 {{supportEmail}}。",
-      "iosTitle": "無法在 iOS 上使用 KiloClaw",
-      "multipleCurrentConflictBody": "你的帳戶有多個有效訂閱。為避免重複收費，我們已暫停服務。",
-      "multipleCurrentConflictCta": "前往 kilo.ai 繼續操作",
-      "nonCanonicalEarlybirdBody": "你的搶先體驗方案必須通過人工審核，才能在行動裝置上使用。",
-      "nonCanonicalEarlybirdTitle": "偵測到舊版方案",
-      "quarantinedBody": "你的 KiloClaw 執行個體已隔離，目前無法使用，需要由我們的團隊協助恢復。",
-      "quarantinedTitle": "執行個體需要修復",
-      "subscriptionCanceledBody": "若要使用 KiloClaw，請透過瀏覽器前往 kilo.ai/claw。應用程式內無法訂閱。",
-      "subscriptionCanceledCta": "開啟 kilo.ai/claw",
-      "subscriptionCanceledTitle": "前往網頁版訂閱",
-      "subscriptionPastDueBody": "你最近一次付款出了問題。請透過瀏覽器前往 kilo.ai/claw 更新付款方式。應用程式內無法管理帳單。",
-      "subscriptionPastDueTitle": "在網頁上更新付款方式",
-      "trialExpiredBody": "若要繼續使用 KiloClaw，請透過瀏覽器前往 kilo.ai/claw。應用程式內無法訂閱。",
-      "quarantinedCta": "寄電子郵件給我們的團隊",
-      "nonCanonicalEarlybirdCta": "前往 kilo.ai 檢視您的方案"
-    },
-    "controls": {
-      "redeploying": "正在重新部署…",
-      "restart": "重新啟動",
-      "restartOpenClawMessage": "確定要重新啟動 OpenClaw 程序嗎？",
-      "restartOpenClawTitle": "重新啟動 OpenClaw",
-      "restarting": "正在重新啟動…",
-      "start": "啟動",
-      "startMessage": "確定要啟動此執行個體嗎？",
-      "startTitle": "啟動執行個體",
-      "stop": "停止",
-      "stopMessage": "確定要停止此執行個體嗎？",
-      "stopTitle": "停止執行個體",
-      "stopping": "正在停止…"
-    },
-    "empty": {
-      "finishingSetup": "正在完成最後設定",
-      "finishingSetupDescription": "請稍候，帳戶設定即將完成，通常只需片刻。",
-      "getStarted": "開始使用",
-      "noInstancesDescription": "建立你的第一個執行個體，即可開始執行程式開發代理程式。"
-    },
-    "instance": {
-      "backToInstances": "返回執行個體清單",
-      "couldNotLoad": "無法載入執行個體。",
-      "notFound": "找不到執行個體",
-      "notFoundDescription": "此執行個體可能已被銷毀，或連結已失效。"
-    },
-    "instanceCard": {
-      "fixOnKiloAi": "在 kilo.ai 上修復：{{label}}",
-      "needsAttention": "{{name}} 需要處理：{{label}}",
-      "openSettings": "開啟 {{name}} 的設定",
-      "openUnread": "開啟 {{name}}，{{displayCount}} 則未讀訊息",
-      "openUnread_other": "開啟 {{name}}，{{displayCount}} 則未讀訊息",
-      "openUnread_one": "開啟 {{name}}，{{displayCount}} 則未讀訊息"
-    },
-    "list": {
-      "createInstance": "建立執行個體",
-      "organizations": "組織",
-      "accessIssue": {
-        "trialExpired": "試用已結束，請訂閱以繼續使用此執行個體",
-        "subscriptionCanceled": "訂閱已停用，請重新訂閱以繼續使用此執行個體",
-        "subscriptionPastDue": "付款異常，請更新帳單資訊以繼續使用此執行個體",
-        "quarantined": "執行個體已隔離，需要人工審核",
-        "multipleCurrentConflict": "帳戶待審查",
-        "nonCanonicalEarlybird": "舊版方案需要審核"
-      }
-    },
-    "modelPicker": {
-      "autoModelA11y": "自動選擇模型：{{label}}",
-      "balancedDescription": "以較低成本兼顧速度與能力。",
-      "browseAllModels": "或從 500 多個模型中選擇",
-      "browseAllModelsA11y": "瀏覽全部 500 多個模型",
-      "currentModel": "目前模型",
-      "frontierDescription": "效能最強，自動選用具備推理能力的頂尖模型。",
-      "frontierLabel": "頂尖",
-      "kiloAuto": "Kilo Auto"
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "與 {{name}} 聊天",
-        "ready": "{{name}} 已就緒",
-        "warmedUp": "一切就緒。準備好後隨時打聲招呼。"
-      },
-      "flow": {
-        "couldNotLoad": "無法載入初始設定進度。",
-        "finishingSetup": "帳戶設定即將完成，請稍候。",
-        "genericErrorBody": "剛才無法完成你的執行個體設定。",
-        "identityTitle": "為你的機器人設定身分",
-        "manualReviewBody": "建立執行個體前，必須先處理你的帳戶問題。請前往 kilo.ai 繼續操作。",
-        "manualReviewTitle": "設定需要人工審核",
-        "openKiloAi": "開啟 kilo.ai",
-        "provisioning": "正在佈建",
-        "ready": "就緒",
-        "review": "審查",
-        "settingUp": "正在設定…"
-      },
-      "identity": {
-        "changePersonality": "變更個性",
-        "chooseAvatar": "選擇頭像",
-        "location": "位置",
-        "locationDeniedMessage": "請在設定中允許位置存取，即可使用目前位置。",
-        "locationDeniedTitle": "未取得位置存取權限",
-        "locationGetFailed": "無法取得你的位置。請手動輸入。",
-        "locationPlaceholder": "城市或地區（非必填）",
-        "locationResolveFailed": "無法辨識你的所在地。你可以手動修改。",
-        "locationValidationFailed": "無法驗證位置。",
-        "namePlaceholder": "機器人名稱",
-        "nature": {
-          "aiAssistantLabel": "AI 助理",
-          "aiAssistantVibe": "熱心、能幹、專業",
-          "digitalCreatureLabel": "數位生物",
-          "digitalCreatureVibe": "古靈精怪、充滿活力、有點難以捉摸",
-          "somethingWeirderLabel": "更特別的角色…",
-          "somethingWeirderVibe": "由你自由定義",
-          "virtualCompanionLabel": "虛擬夥伴",
-          "virtualCompanionVibe": "溫暖、隨時陪伴、真心關懷"
-        },
-        "personality": "個性",
-        "selectAvatar": "選擇 {{name}} 作為頭像",
-        "useCurrentLocation": "使用目前位置"
-      },
-      "notifications": {
-        "couldNotEnable": "無法啟用通知。",
-        "getNotified": "開啟通知，{{name}} 完成任務時就會通知你，不錯過任何回覆。",
-        "mockMessage": "完成了！你要的摘要已經整理好，隨時可以查看。",
-        "now": "剛剛",
-        "settingUp": "正在設定通知…",
-        "skipForNow": "暫時略過",
-        "stayInTheLoop": "掌握最新動態"
-      },
-      "provisioning": {
-        "backgroundHint": "通常不到一分鐘就能完成。你可以關閉此畫面，設定會繼續在背景執行。",
-        "connectingToAgent": "正在連線至代理程式",
-        "continueInBackground": "繼續在背景執行",
-        "queryErrorBody": "查詢 {{name}} 的設定進度時，連線中斷了。設定可能仍在進行，請再試一次或稍後查看。",
-        "queryErrorTitle": "無法確認設定進度",
-        "settingUp": "正在設定 {{name}}",
-        "stalledBody": "無法完成 {{name}} 的設定。請再試一次；如果問題持續發生，請寄信至 {{supportEmail}}。",
-        "stalledTitle": "設定卡住了",
-        "startingSandbox": "正在啟動沙箱",
-        "stoppedBody": "{{name}} 的執行個體在設定過程中意外停止。",
-        "stoppedTitle": "設定已停止",
-        "timeoutBody": "{{name}} 的設定耗時比平常更久（已超過 {{displayMinutes}} 分鐘）。",
-        "timeoutTitle": "耗時比預期更久"
-      },
-      "unavailableDescription": "佈建執行個體需要有效的 KiloClaw 訂閱。現有執行個體與訂閱將照常運作。",
-      "unavailableTitle": "無法建立新的 KiloClaw 執行個體"
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "結束代碼 {{code}}",
-      "gatewayProcess": "閘道程序",
-      "lastExit": "上次結束",
-      "memory": "記憶體",
-      "region": "區域",
-      "resources": "資源",
-      "restarts": "重新啟動次數",
-      "state": "狀態",
-      "uptime": "持續執行時間",
-      "crashed": "已當機",
-      "destroying": "銷毀中",
-      "provisioned": "已佈建",
-      "restarting": "重新啟動中",
-      "running": "執行中",
-      "shuttingDown": "關機中",
-      "starting": "啟動中",
-      "stopped": "已停止",
-      "stopping": "停止中",
-      "unknown": "未知",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "settings": {
-      "channelsDescription": "Telegram、Discord、Slack",
-      "devicePairingDescription": "核准裝置配對要求",
-      "execPolicyDescription": "安全性設定",
-      "googleDescription": "Gmail、Calendar、Docs",
-      "modelDescription": "選擇 AI 模型",
-      "secretsDescription": "加密的驗證資訊",
-      "versionPinDescription": "固定至特定版本"
-    },
-    "avatar": {
-      "arcade": "街機",
-      "brain": "大腦",
-      "creature": "生物",
-      "crystal": "水晶",
-      "custom": "自訂頭像",
-      "dragon": "龍",
-      "explorer": "探險家",
-      "flame": "火焰",
-      "lightning": "閃電",
-      "magicWand": "魔法棒",
-      "moon": "月亮",
-      "operator": "操作員",
-      "orbit": "軌道",
-      "oracle": "先知",
-      "rainbow": "彩虹",
-      "robot": "機器人",
-      "satellite": "衛星",
-      "sparkles": "星光",
-      "strongArm": "強壯的手臂",
-      "talisman": "護身符"
-    },
-    "remoteSpawnFilesNotSupported": "此執行個體無法接收檔案。",
-    "instanceSwitcherTitle": "KiloClaw 執行個體"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2030,10 +1561,6 @@
       "moveLeft": "將 {{filename}} 向左移動",
       "moveRight": "將 {{filename}} 向右移動"
     },
-    "attachmentPasteHint": {
-      "accessibility": "從剪貼簿貼上圖片",
-      "label": "偵測到圖片，點一下即可貼上"
-    },
     "attachmentPicker": {
       "camera": "相機",
       "photoLibrary": "照片圖庫",
@@ -2229,7 +1756,8 @@
     "sessionSignedOut": "工作階段已登出。",
     "signOutThisDeviceTitle": "登出此裝置？",
     "signOutThisSessionTitle": "登出此工作階段？",
-    "signOutThisSessionMessage": "{{device}} 將登出，但最長仍可存取 API 一小時。"
+    "signOutThisSessionMessage": "{{device}} 將登出，但最長仍可存取 API 一小時。",
+    "unknownDevice": "未知裝置"
   },
   "forceUpdate": {
     "couldNotOpenStore": "無法開啟應用程式商店。",

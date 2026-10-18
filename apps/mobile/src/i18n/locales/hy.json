@@ -101,12 +101,9 @@
     "scheduled": "Պլանավորված",
     "keepEditing": "Շարունակել խմբագրել",
     "keepRunning": "Շարունակել կատարումը",
-    "kiloclaw": "KiloClaw",
     "newSession": "Նոր աշխատաշրջան",
-    "noKiloclawInstances": "KiloClaw-ի օրինակներ չկան",
     "noModelsAvailable": "Հասանելի մոդելներ չկան",
     "notFound": "Չի գտնվել։",
-    "online": "Առցանց",
     "open": "Բացել {{name}}-ը",
     "openPullRequest": "Բաց միավորման հարցում",
     "pending": "Սպասման մեջ",
@@ -257,7 +254,8 @@
     "renamePasskey": "Վերանվանել մուտքի բանալին",
     "removePasskey": "Հեռացնել մուտքի բանալին",
     "removePasskeyTitle": "Հեռացնե՞լ մուտքի բանալին։",
-    "removePasskeyMessage": "Այլևս չեք կարողանա մուտք գործել այս մուտքի բանալիով։"
+    "removePasskeyMessage": "Այլևս չեք կարողանա մուտք գործել այս մուտքի բանալիով։",
+    "changelog": "Նորություններ"
   },
   "preferences": {
     "general": "Ընդհանուր",
@@ -832,23 +830,18 @@
     "previewGenericDescription": "Ծանուցումները հայտնում են միայն նոր իրադարձության մասին։ Բացեք Kilo-ն՝ հաղորդագրությունը կարդալու համար։",
     "channel": {
       "agentProgress": "Գործակալի ընթացքը",
-      "chat": "Զրույցի հաղորդագրություններ",
-      "kiloclaw": "KiloClaw-ի ակտիվություն",
       "balance": "Մնացորդի մասին զգուշացումներ",
       "security": "Հայտնաբերված անվտանգության խնդիրներ",
       "spend": "Ծախսերի ծանուցումներ",
       "followedSessions": "Հետևված սեսիաներ"
     },
     "category": {
-      "chatMessagesSubtitle": "պատասխաններ ձեր զրույցներում",
       "agentAttentionTitle": "Գործակալին ձեր մասնակցությունն է պետք",
       "agentAttentionSubtitle": "հարցեր, թույլտվության և տվյալների հարցումներ",
       "agentUpdatesTitle": "Գործակալի թարմացումներ",
       "agentUpdatesSubtitle": "գործակալի հաղորդագրություններ՝ առաջադրանքի կատարման ընթացքում",
       "sessionStatusTitle": "Նիստի կարգավիճակ",
       "sessionStatusSubtitle": "ավարտված / ձախողված / պատրաստ է կառավարման",
-      "kiloclawActivitySubtitle": "միջավայրը պատրաստ է կամ ձախողվել է, պլանավորված գործողություններ",
-      "kiloclawActivityUnavailable": "Սկսեք KiloClaw միջավայր՝ KiloClaw ակտիվություն ստանալու համար։",
       "balanceAlertsSubtitle": "կազմակերպության ցածր մնացորդի նախազգուշացումներ",
       "balanceAlertsUnavailable": "Միացեք կազմակերպությանը՝ մնացորդի նախազգուշացումներ ստանալու համար։",
       "securityFindingsSubtitle": "հայտնաբերված նոր խնդիրներ և SLA հիշեցումներ",
@@ -868,72 +861,19 @@
   },
   "tabs": {
     "home": "Սկիզբ",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, ներդիր՝ {{total}}-ից {{position}}-ը"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Օրինակի ընտրություն",
-      "couldNotLoadInstances": "Չհաջողվեց բեռնել օրինակները։",
-      "noInstancesDescription": "Կարգավորիր օրինակ՝ զրույց սկսելու համար։",
-      "setUpKiloclaw": "Կարգավորել KiloClaw-ը",
-      "currentInstance": "{{title}}, ընթացիկ"
-    },
     "conversation": {
-      "failedToLoad": "Չհաջողվեց բեռնել զրույցը։",
-      "notFound": "Զրույցը չի գտնվել։",
       "untitled": "Անվերնագիր",
-      "leaveTitle": "Դո՞ւրս գալ զրույցից",
-      "leaveMessage": "Զրույցը կհեռացվի քո ցանկից։",
-      "openHint": "Բացում է զրույցը։ Սեղմած պահիր՝ վերանվանելու կամ դուրս գալու ընտրանքները բացելու համար։",
-      "unread": "Չկարդացված",
-      "optionsFor": "{{title}} զրույցի ընտրանքներ",
-      "options": "Զրույցի ընտրանքներ",
-      "renameTitle": "Զրույցի վերանվանում",
-      "renamePlaceholder": "Նոր անուն",
-      "couldNotReachBot": "Չհաջողվեց կապվել բոտի հետ։ Կրկին փորձիր։",
-      "messageDeliveryFailed": "Չհաջողվեց հաղորդագրությունը հասցնել բոտին։",
-      "couldNotSignIn": "Չհաջողվեց մուտք գործել զրույց։",
-      "couldNotRefreshMessages": "Չհաջողվեց թարմացնել հաղորդագրությունները։",
-      "couldNotLoadHistory": "Չհաջողվեց բեռնել զրույցի պատմությունը։",
-      "leave": "Դուրս գալ",
-      "untitledConversation": "Անվերնագիր զրույց",
-      "createFailed": "Չհաջողվեց ստեղծել զրույցը։",
-      "leaveFailed": "Չհաջողվեց դուրս գալ զրույցից։"
-    },
-    "reactions": {
-      "common": "Հաճախ օգտագործվող",
-      "reactWith": "Արձագանքել {{reaction}}-ով",
-      "accessibility": "{{emoji}} արձագանք, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Պատասխան՝",
-      "cancelReply": "Չեղարկել պատասխանը",
-      "openInstance": "Բացել օրինակը",
-      "attachFile": "Կցել ֆայլ",
-      "cancelEdit": "Չեղարկել խմբագրումը"
+      "renamePlaceholder": "Նոր անուն"
     },
     "conversationList": {
-      "couldNotLoad": "Չհաջողվեց բեռնել զրույցները։",
-      "emptyTitle": "Դեռ զրույցներ չկան",
-      "emptyDescription": "Ստեղծիր զրույց՝ քո KiloClaw օրինակի հետ զրուցելու համար։",
-      "create": "Ստեղծել զրույց",
-      "newConversation": "Նոր զրույց",
-      "openInstanceSettings": "Բացել օրինակի կարգավորումները",
       "today": "Այսօր",
       "yesterday": "Երեկ",
-      "thisWeek": "Այս շաբաթ",
       "older": "Ավելի վաղ"
     },
     "attachment": {
-      "open": "Բացել {{filename}}-ը",
-      "openFailed": "Չհաջողվեց բացել կցորդը։ Ստուգիր կապը և կրկին փորձիր։",
-      "attachFailed": "Չհաջողվեց կցել ֆայլը։",
-      "limit": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։",
-      "sizeRejection": "{{filename}} ֆայլի չափը գերազանցում է կցորդի թույլատրելի {{limit}} սահմանը։",
-      "unreadable": "Չհաջողվեց կարդալ {{filename}}-ը։",
-      "pastedImage": "տեղադրված պատկերը",
-      "defaultName": "Կցված ֆայլ",
       "classificationDenied": "Գործարկվող ֆայլերը հնարավոր չէ կցել։",
       "classificationEmpty": "Ֆայլը դատարկ է։",
       "classificationTooLarge": "Ֆայլերի չափը չպետք է գերազանցի 20 ՄԲ-ը։",
@@ -943,426 +883,17 @@
       "networkError": "Ցանցային սխալ է տեղի ունեցել։",
       "uploadFailed": "Վերբեռնումը ձախողվեց։",
       "nothingToPaste": "Տեղադրելու բան չկա։",
-      "metadataStripFailed": "Չհաջողվեց հեռացնել լուսանկարի մետատվյալները։",
-      "limit_one": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։",
-      "limit_other": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։"
+      "metadataStripFailed": "Չհաջողվեց հեռացնել լուսանկարի մետատվյալները։"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}՝ {{status}}",
-      "retryUploading": "Կրկին փորձել վերբեռնել {{filename}}-ը",
-      "remove": "Հեռացնել {{filename}}-ը"
-    },
-    "messageBubble": {
-      "deleted": "[ջնջված հաղորդագրություն]",
-      "yourMessage": "Քո հաղորդագրությունը",
-      "messageFrom": "{{author}}-ի հաղորդագրությունը",
-      "moreActions": "Այլ գործողություններ",
-      "notDelivered": "Չի առաքվել",
-      "edited": "(խմբագրված)",
-      "image": "Պատկեր"
+      "accessibility": "{{filename}}՝ {{status}}"
     },
     "messageActions": {
-      "copied": "Պատճենված",
-      "copyFailed": "Չհաջողվեց պատճենել։",
-      "title": "Գործողություններ հաղորդագրության հետ",
-      "deleteTitle": "Ջնջե՞լ հաղորդագրությունը",
-      "deleteMessage": "Հաղորդագրությունը կհեռացվի զրույցից։",
-      "deleteFailed": "Չհաջողվեց ջնջել հաղորդագրությունը։",
-      "removeReactionFailed": "Չհաջողվեց հեռացնել արձագանքը։",
-      "addReactionFailed": "Չհաջողվեց ավելացնել արձագանքը։",
-      "retrySend": "Կրկին ուղարկել",
-      "moreReactions": "Այլ արձագանքներ",
-      "edit": "Խմբագրել",
-      "sendFailed": "Չհաջողվեց ուղարկել հաղորդագրությունը։",
-      "retrySendFailed": "Չհաջողվեց կրկին ուղարկել։",
-      "editFailed": "Չհաջողվեց խմբագրել հաղորդագրությունը։",
-      "executeFailed": "Չհաջողվեց կատարել գործողությունը։"
+      "edit": "Խմբագրել"
     },
     "attachmentPicker": {
-      "takePhoto": "Լուսանկարել",
-      "photoLibrary": "Լուսանկարներ",
-      "files": "Ֆայլեր",
       "cameraAccessMessage": "Լուսանկար անելու համար կարգավորումներում թույլատրիր տեսախցիկի օգտագործումը։"
-    },
-    "typingIndicator": {
-      "someone": "Ինչ-որ մեկը",
-      "typing_one": "{{name}} գրում է...",
-      "typing": "{{names}} գրում են…",
-      "typing_other": "{{names}} գրում են…"
-    },
-    "botStatus": {
-      "offline": "Անցանց",
-      "loadingUser": "Բեռնվում են օգտատիրոջ տվյալները...",
-      "waitingForStatus": "Սպասում ենք բոտի կարգավիճակին...",
-      "offlineMessage": "Բոտն անցանց է։ Հաղորդագրությունների փոխանակումը կվերսկսվի, երբ այն կրկին միանա։"
-    },
-    "errors": {
-      "notAllowed": "Թույլատրված չէ։",
-      "messageTooLong": "Հաղորդագրությունը չափազանց երկար է։ Այն պետք է {{limit}} նիշից պակաս լինի։",
-      "titleTooLong": "Վերնագիրը չափազանց երկար է։ Այն պետք է {{limit}} նիշից պակաս լինի։",
-      "messageEmpty": "Հաղորդագրությունը չի կարող դատարկ լինել։"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Չհաջողվեց բեռնել KiloClaw-ի օրինակները։",
-    "billing": {
-      "title": "Վճարումներ",
-      "continueMonthToMonth": "Շարունակել ամսական վճարմամբ",
-      "plan": "Պլան",
-      "finalTermEnds": "Վերջին շրջանն ավարտվում է",
-      "afterFinalTerm": "Վերջին շրջանից հետո",
-      "ends": "Ավարտվում է",
-      "expires": "Ժամկետը լրանում է",
-      "noActivePlan": "Ակտիվ սակագին չկա",
-      "noActivePlanDescription": "KiloClaw-ի ակտիվ բաժանորդագրություն չունես։",
-      "managedByAdmin": "Վճարումները կառավարում է քո կազմակերպության ադմինիստրատորը։",
-      "couldNotLoad": "Չհաջողվեց բեռնել վճարումների տվյալները։",
-      "manageOnWeb": "Կառավարել վճարումները կայքում",
-      "earlybird": "Վաղ հասանելիություն",
-      "finalCommitTermEndsOn": "Commit սակագնիդ վերջին շրջանն ավարտվում է {{date}}-ին։ Շարունակիր Standard սակագնով՝ {{price}} գնով, այլապես հոսթինգը կդադարեցվի։",
-      "freeTrial": "Անվճար փորձաշրջան",
-      "hostingEnds": "Հոսթինգն ավարտվում է",
-      "lessThanOneDay": "1 Օրից պակաս",
-      "renews": "Երկարաձգվում է",
-      "standardMonthToMonth": "Standard՝ ամսական վճարմամբ",
-      "standardStartsOn": "Standard սակագինը կգործի {{date}}-ից՝ {{price}} գնով։",
-      "yourStandardMonthlyPrice": "standard սակագնիդ ամսական վճարը",
-      "perMonth": "/ամիս",
-      "earlybirdAccessUntil": "Վաղ հասանելիությունը գործում է մինչև {{date}}։",
-      "earlybirdEnding": "Վաղ հասանելիության ավարտին մնացել է {{remaining}}։",
-      "paymentPastDue": "Վճարումն ուշացել է։ Թարմացրու վճարման եղանակդ։",
-      "subscriptionCancels": "Բաժանորդագրությունը կչեղարկվի {{date}}-ին։",
-      "trialDaysRemaining": "Փորձաշրջանի ավարտին մնացել է {{remaining}}։",
-      "trialEndingSoon": "Փորձաշրջանը շուտով կավարտվի․ մնացել է {{remaining}}։",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Կոմիտ"
-    },
-    "changelog": {
-      "title": "Նորություններ",
-      "couldNotLoad": "Չհաջողվեց բեռնել փոփոխությունների ցանկը։",
-      "noUpdates": "Թարմացումներ դեռ չկան",
-      "noUpdatesDescription": "Փոփոխությունների մասին գրառումները կհայտնվեն այստեղ։",
-      "recentUpdates": "Վերջին թարմացումները",
-      "manageVersion": "Կառավարել տարբերակը",
-      "redeployRequired": "Պահանջվում է վերատեղակայում",
-      "redeploySuggested": "Առաջարկվում է վերատեղակայում",
-      "upgradeRequired": "Պահանջվում է թարմացում"
-    },
-    "dashboard": {
-      "title": "Կառավարման վահանակ",
-      "couldNotLoad": "Չհաջողվեց բեռնել կառավարման վահանակը։",
-      "renameInstance": "Վերանվանել օրինակը",
-      "renamePlaceholder": "Նոր անուն (առավելագույնը 50 նիշ)",
-      "someDetailsFailed": "Չհաջողվեց բեռնել իրական ժամանակի որոշ տվյալներ։",
-      "destroy": "Ոչնչացնել",
-      "destroyMessage": "KiloClaw-ի քո օրինակը և դրա բոլոր տվյալները վերջնականապես կոչնչացվեն։ Այս գործողությունը հնարավոր չէ հետարկել։",
-      "destroyTitle": "Ոչնչացնել օրինակը",
-      "instance": "Օրինակ",
-      "couldNotCheckStatus": "Չհաջողվեց ստուգել ծառայության կարգավիճակը։",
-      "dangerZone": "ՎՏԱՆԳԱՎՈՐ ԳՈՏԻ",
-      "destroying": "Ոչնչացվում է…",
-      "serviceDegraded": "Ծառայությունն աշխատում է խափանումներով — հպիր՝ կարգավիճակը դիտելու համար",
-      "up": "ԱՇԽԱՏՈՒՄ Է"
-    },
-    "channels": {
-      "title": "Ալիքներ",
-      "couldNotLoad": "Չհաջողվեց բեռնել ալիքները։",
-      "noChannels": "Հասանելի ալիքներ չկան",
-      "noChannelsDescription": "Ալիքների ինտեգրացիաները կհայտնվեն այստեղ։",
-      "connected": "{{label}}-ը միացված է",
-      "disconnectMessage": "Հեռացնե՞լ {{label}}-ը։ Այս ալիքը կանջատվի։",
-      "disconnectTitle": "Անջատել ալիքը"
-    },
-    "devicePairing": {
-      "title": "Սարքի զուգակցում",
-      "refreshRequests": "Թարմացնել զուգակցման հարցումները",
-      "couldNotLoad": "Չհաջողվեց բեռնել զուգակցման հարցումները։",
-      "noPending": "Սպասման մեջ գտնվող հարցումներ չկան",
-      "noPendingDescription": "Ալիքների և սարքերի զուգակցման հարցումները կհայտնվեն այստեղ։",
-      "channelRequests": "Ալիքների հարցումներ",
-      "deviceRequests": "Սարքերի հարցումներ",
-      "approveDeviceMessage": "Թույլ տա՞լ {{platform}}-ին միանալ քո օրինակին։",
-      "approveDeviceTitle": "Հաստատել սարքը",
-      "approveMessage": "Թույլ տա՞լ {{label}}-ին (կոդ՝ {{code}}) միանալ քո օրինակին։",
-      "approveTitle": "Հաստատել զուգակցման հարցումը",
-      "unknownDevice": "Անհայտ սարք"
-    },
-    "execPolicy": {
-      "title": "Կատարման քաղաքականություն",
-      "couldNotLoad": "Չհաջողվեց բեռնել կատարման քաղաքականությունը։",
-      "alwaysAsk": "Միշտ հարցնել",
-      "alwaysAskDescription": "Յուրաքանչյուր հրաման կատարելուց առաջ պահանջվում է հաստատում։ Ամենաանվտանգ տարբերակն է։",
-      "neverAsk": "Երբեք չհարցնել",
-      "neverAskDescription": "Հրամանները կատարվում են առանց հաստատման։ Ավելի արագ է, բայց պակաս անվտանգ։"
-    },
-    "google": {
-      "title": "Google-ի հաշիվ",
-      "couldNotLoad": "Չհաջողվեց բեռնել Google-ի հաշվի կարգավիճակը։",
-      "disconnected": "Google-ի հաշիվն անջատված է։ Վերատեղակայիր քո օրինակը՝ փոփոխությունը կիրառելու համար։",
-      "setupCommand": "Կարգավորման հրաման",
-      "setupCommandHelp": "Google-ի հաշիվդ միացնելու համար այս հրամանը կատարիր քո համակարգչի տերմինալում։ Համակարգչում պետք է տեղադրված լինի Docker-ը։",
-      "failedToLoadCommand": "Չհաջողվեց բեռնել կարգավորման հրամանը։",
-      "gmailNotifications": "Gmail-ի ծանուցումներ",
-      "disconnect": "Անջատել Google-ի հաշիվը",
-      "copied": "Պատճենված",
-      "copyCommand": "Պատճենել հրամանը",
-      "disconnectConfirm": "Անջատել",
-      "disconnectMessage": "Հեռացնե՞լ Google-ի հաշիվդ այս օրինակից։ Gmail-ի ծանուցումները կանջատվեն։ Անջատելուց հետո վերատեղակայիր օրինակը՝ փոփոխությունները կիրառելու համար։",
-      "disconnectTitle": "Անջատել Google-ը"
-    },
-    "modelList": {
-      "noMatches": "Որոնմանը համապատասխան մոդելներ չկան",
-      "noModelsDescription": "Մոդելները հասանելի դառնալուն պես կհայտնվեն այստեղ։",
-      "noResultsFor": "«{{query}}»-ի համար արդյունքներ չկան։"
-    },
-    "secrets": {
-      "title": "Գաղտնի տվյալներ",
-      "couldNotLoad": "Չհաջողվեց բեռնել գաղտնի տվյալները։",
-      "noSecrets": "Հասանելի գաղտնի տվյալներ չկան",
-      "noSecretsDescription": "Գաղտնի տվյալներ օգտագործող ինտեգրացիաները կհայտնվեն այստեղ։",
-      "removeMessage": "Հեռացնե՞լ {{label}}-ը։ Այս գործիքն այլևս հասանելիություն չի ունենա իր մուտքի տվյալներին։",
-      "removeTitle": "Հեռացնել գաղտնի տվյալները",
-      "saved": "{{label}}-ը պահպանվել է",
-      "hide": "Թաքցնել {{label}}-ը",
-      "show": "Ցույց տալ {{label}}-ը",
-      "allFieldsRequired": "{{label}}-ը միացնելու համար անհրաժեշտ է լրացնել բոլոր դաշտերը։",
-      "setupGuideFallback": "կարգավորման ուղեցույց",
-      "setupGuideA11y": "{{label}}-ի կարգավորման ուղեցույց",
-      "setupGuide": "Կարգավորման ուղեցույց",
-      "saving": "Պահպանվում է…",
-      "removing": "Հեռացվում է…",
-      "updateToken": "Թարմացնել մուտքի թոքենը"
-    },
-    "versionPin": {
-      "title": "Տարբերակի ամրագրում",
-      "couldNotLoad": "Չհաջողվեց բեռնել տարբերակի տվյալները։",
-      "couldNotLoadMore": "Չհաջողվեց բեռնել հավելյալ տարբերակները։",
-      "loadMore": "Բեռնել հավելյալ տարբերակներ",
-      "showingLatest": "Ցուցադրվում են վերջին 100 տարբերակները։",
-      "availableVersions": "Հասանելի տարբերակներ",
-      "noVersions": "Հասանելի տարբերակներ չկան",
-      "noVersionsDescription": "OpenClaw-ի հասանելի տարբերակները կհայտնվեն այստեղ։",
-      "unpin": "Հանել ամրագրումը",
-      "unpinMessage": "Վերադառնա՞լ վերջին հասանելի տարբերակին։",
-      "unpinTitle": "Հանել տարբերակի ամրագրումը",
-      "confirmPin": "Հաստատել ամրագրումը",
-      "followingLatest": "Միշտ վերջին տարբերակը",
-      "latest": "վերջին",
-      "pin": "Ամրագրել",
-      "pinnedByAdmin": "Ադմինիստրատորն ամրագրել է տարբերակը։ Փոփոխելու համար դիմիր նրան։",
-      "pinnedTo": "Ամրագրված տարբերակ՝ {{version}}",
-      "reasonOptional": "Պատճառ (պարտադիր չէ)",
-      "reasonPlaceholder": "Ամրագրման պատճառը",
-      "replaceAdminPin": "Փոխարինել ադմինիստրատորի ամրագրումը",
-      "replacesAdminPin": "Սա կփոխարինի ադմինիստրատորի ամրագրումը (այժմ՝ {{label}})։"
-    },
-    "redeploy": "Վերատեղակայել",
-    "redeployMessage": "Համոզվա՞ծ ես, որ ուզում ես վերատեղակայել այս օրինակը։",
-    "redeployTitle": "Վերատեղակայել օրինակը",
-    "controls": {
-      "redeploying": "Վերատեղակայվում է…",
-      "restart": "Վերագործարկել",
-      "restartOpenClawMessage": "Համոզվա՞ծ ես, որ ուզում ես վերագործարկել OpenClaw-ի գործընթացը։",
-      "restartOpenClawTitle": "Վերագործարկել OpenClaw-ը",
-      "restarting": "Վերագործարկվում է…",
-      "start": "Գործարկել",
-      "startMessage": "Համոզվա՞ծ ես, որ ուզում ես գործարկել այս օրինակը։",
-      "startTitle": "Գործարկել օրինակը",
-      "stop": "Կանգնեցնել",
-      "stopMessage": "Համոզվա՞ծ ես, որ ուզում ես կանգնեցնել այս օրինակը։",
-      "stopTitle": "Կանգնեցնել օրինակը",
-      "stopping": "Կանգնեցվում է…"
-    },
-    "empty": {
-      "finishingSetup": "Ավարտվում է կարգավորումը",
-      "finishingSetupDescription": "Մի քիչ սպասիր, ավարտում ենք քո հաշվի կարգավորումը։ Սա սովորաբար կարճ է տևում։",
-      "getStarted": "Սկսել",
-      "noInstancesDescription": "Ստեղծիր քո առաջին օրինակը՝ ծրագրավորման գործակալներ գործարկելու համար։"
-    },
-    "instance": {
-      "backToInstances": "Վերադառնալ օրինակների ցանկին",
-      "couldNotLoad": "Չհաջողվեց բեռնել օրինակը։",
-      "notFound": "Օրինակը չի գտնվել",
-      "notFoundDescription": "Հնարավոր է՝ այս օրինակն արդեն ոչնչացվել է, կամ հղումն այլևս վավեր չէ։"
-    },
-    "list": {
-      "createInstance": "Ստեղծել օրինակ",
-      "organizations": "Կազմակերպություններ",
-      "accessIssue": {
-        "trialExpired": "Փորձաշրջանն ավարտվել է․ բաժանորդագրվիր՝ այս օրինակից օգտվելը շարունակելու համար",
-        "subscriptionCanceled": "Բաժանորդագրությունն ակտիվ չէ․ կրկին բաժանորդագրվիր՝ այս օրինակից օգտվելը շարունակելու համար",
-        "subscriptionPastDue": "Վճարման խնդիր կա․ թարմացրու վճարման տվյալները՝ այս օրինակից օգտվելը շարունակելու համար",
-        "quarantined": "Օրինակը մեկուսացված է․ անհրաժեշտ է մասնագետի ստուգում",
-        "multipleCurrentConflict": "Հաշիվը ստուգման կարիք ունի",
-        "nonCanonicalEarlybird": "Հին սակագինը ստուգման կարիք ունի"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Զրուցել {{name}}-ի հետ",
-        "ready": "{{name}}-ը պատրաստ է",
-        "warmedUp": "Ամեն ինչ պատրաստ է։ Բարևիր, երբ պատրաստ լինես։"
-      },
-      "flow": {
-        "genericErrorBody": "Այս պահին չհաջողվեց ավարտել քո օրինակի կարգավորումը։",
-        "manualReviewBody": "Նախքան օրինակ ստեղծելը պետք է ստուգենք քո հաշվի վիճակը։ Շարունակիր kilo.ai-ում։",
-        "manualReviewTitle": "Կարգավորումը մասնագետի ստուգման կարիք ունի",
-        "openKiloAi": "Բացել kilo.ai",
-        "provisioning": "Ռեսուրսների տրամադրում",
-        "review": "Ստուգում",
-        "identityTitle": "Քո բոտի կերպարը",
-        "couldNotLoad": "Չհաջողվեց բեռնել սկզբնական կարգավորման վիճակը։",
-        "finishingSetup": "Կարգավորումն ավարտվում է։ Մի քիչ սպասիր, մինչև ավարտենք քո հաշվի կարգավորումը։",
-        "ready": "Պատրաստ",
-        "settingUp": "Կարգավորվում է…"
-      },
-      "unavailableDescription": "Օրինակ ստեղծելու համար անհրաժեշտ է KiloClaw-ի ակտիվ բաժանորդագրություն։ Գործող օրինակներն ու բաժանորդագրությունները շարունակում են աշխատել սովորական ռեժիմով։",
-      "unavailableTitle": "KiloClaw-ի նոր օրինակները հասանելի չեն",
-      "identity": {
-        "chooseAvatar": "Ընտրել ավատարը",
-        "namePlaceholder": "Բոտի անունը",
-        "selectAvatar": "Ընտրել {{name}}-ը որպես ավատար",
-        "personality": "Բնավորություն",
-        "changePersonality": "Փոխել բնավորությունը",
-        "location": "Գտնվելու վայր",
-        "locationPlaceholder": "Քաղաք կամ տարածաշրջան (պարտադիր չէ)",
-        "useCurrentLocation": "Օգտագործել ներկա գտնվելու վայրը",
-        "locationDeniedTitle": "Գտնվելու վայրին հասանելիությունը մերժված է",
-        "locationDeniedMessage": "Կարգավորումներում թույլատրիր հասանելիությունը գտնվելու վայրին՝ ներկա գտնվելու վայրդ օգտագործելու համար։",
-        "locationValidationFailed": "Չհաջողվեց հաստատել գտնվելու վայրը։",
-        "locationResolveFailed": "Չհաջողվեց որոշել քո գտնվելու վայրը։ Կարող ես այն ձեռքով խմբագրել։",
-        "locationGetFailed": "Չհաջողվեց ստանալ քո գտնվելու վայրը։ Մուտքագրիր այն ձեռքով։",
-        "nature": {
-          "aiAssistantLabel": "Արհեստական բանականության օգնական",
-          "aiAssistantVibe": "Օգտակար, հմուտ, արհեստավարժ",
-          "digitalCreatureLabel": "Թվային էակ",
-          "digitalCreatureVibe": "Ինքնատիպ, աշխույժ, մի փոքր անկանխատեսելի",
-          "virtualCompanionLabel": "Վիրտուալ ուղեկից",
-          "virtualCompanionVibe": "Ջերմ, միշտ կողքիդ, անկեղծ հոգատար",
-          "somethingWeirderLabel": "Ավելի տարօրինակ բան…",
-          "somethingWeirderVibe": "Ինքդ որոշիր"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Ամեն ինչ պատրաստ է։ Կազմել եմ քո խնդրած ամփոփումը։ Կարող ենք շարունակել, երբ պատրաստ լինես։",
-        "settingUp": "Կարգավորվում են ծանուցումները…",
-        "stayInTheLoop": "Միշտ տեղեկացված",
-        "getNotified": "Ստացիր ծանուցում, երբ {{name}}-ն ավարտի առաջադրանքը, որպեսզի ոչ մի պատասխան բաց չթողնես։",
-        "now": "հիմա",
-        "skipForNow": "Առայժմ բաց թողնել",
-        "couldNotEnable": "Չհաջողվեց միացնել ծանուցումները։"
-      },
-      "provisioning": {
-        "queryErrorTitle": "Չհաջողվեց ստուգել կարգավորման ընթացքը",
-        "queryErrorBody": "Կապն ընդհատվեց {{name}}-ի կարգավորման ընթացքը ստուգելիս։ Հնարավոր է՝ կարգավորումը դեռ շարունակվում է։ Կրկին փորձիր կամ քիչ անց նորից ստուգիր։",
-        "stoppedTitle": "Կարգավորումը դադարել է",
-        "stoppedBody": "{{name}}-ի օրինակն անսպասելիորեն կանգ է առել կարգավորման ընթացքում։",
-        "stalledTitle": "Գործընթացը կանգ է առել",
-        "stalledBody": "Չհաջողվեց ավարտել {{name}}-ի կարգավորումը։ Կրկին փորձիր։ Եթե խնդիրը կրկնվի, գրիր {{supportEmail}} հասցեին։",
-        "timeoutTitle": "Ավելի երկար է տևում, քան սպասվում էր",
-        "timeoutBody": "{{name}}-ի կարգավորումը սովորականից երկար է տևում (ավելի քան {{displayMinutes}} րոպե)։",
-        "continueInBackground": "Շարունակել հետին պլանում",
-        "settingUp": "{{name}}-ի կարգավորում",
-        "connectingToAgent": "Կապ է հաստատվում գործակալի հետ",
-        "startingSandbox": "Գործարկվում է մեկուսացված միջավայրը",
-        "backgroundHint": "Սա սովորաբար մեկ րոպեից պակաս է տևում։ Կարող ես փակել այս պատուհանը․ մենք կշարունակենք աշխատել հետին պլանում։"
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Կոդ՝ {{code}}",
-      "gatewayProcess": "ՑԱՆՑԱՅԻՆ ԴԱՐՊԱՍԻ ԳՈՐԾԸՆԹԱՑ",
-      "lastExit": "Վերջին ավարտը",
-      "memory": "Հիշողություն",
-      "region": "Տարածաշրջան",
-      "resources": "ՌԵՍՈՒՐՍՆԵՐ",
-      "restarts": "Վերագործարկումներ",
-      "state": "Վիճակ",
-      "uptime": "Անխափան աշխատանքի տևողություն",
-      "crashed": "ՎԹԱՐՎԵԼ Է",
-      "destroying": "ՈՉՆՉԱՑՎՈՒՄ Է",
-      "provisioned": "ՌԵՍՈՒՐՍՆԵՐԸ ՏՐԱՄԱԴՐՎԱԾ ԵՆ",
-      "restarting": "ՎԵՐԱԳՈՐԾԱՐԿՎՈՒՄ Է",
-      "running": "ԸՆԹԱՑՔՈՒՄ Է",
-      "shuttingDown": "ԱՆՋԱՏՎՈՒՄ Է",
-      "starting": "ՍԿՍՎՈՒՄ Է",
-      "stopped": "ԿԱՆԳՆԵՑՎԱԾ Է",
-      "stopping": "ԿԱՆԳՆԵՑՎՈՒՄ Է",
-      "unknown": "ԱՆՀԱՅՏ",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Առաջատար",
-      "frontierDescription": "Ամենաբարձր կատարողականությունն է։ Հարցումներն ուղղվում են տրամաբանելու ունակ առաջատար մոդելներին։",
-      "balancedDescription": "Արագությունն ու հնարավորությունները հավասարակշռված են ավելի ցածր գնով։",
-      "autoModelA11y": "Մոդելի ավտոմատ ընտրություն՝ {{label}}",
-      "currentModel": "Ընթացիկ մոդել",
-      "browseAllModels": "կամ ընտրիր ավելի քան 500 մոդելից",
-      "browseAllModelsA11y": "Դիտել բոլոր մոդելները՝ ավելի քան 500"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw-ից օգտվելը շարունակելու համար դիտարկիչով բացիր kilo.ai/claw հասցեն։ Հավելվածում բաժանորդագրվել հնարավոր չէ։",
-      "subscriptionCanceledTitle": "Բաժանորդագրվել կայքում",
-      "subscriptionCanceledBody": "KiloClaw-ից օգտվելու համար դիտարկիչով բացիր kilo.ai/claw հասցեն։ Հավելվածում բաժանորդագրվել հնարավոր չէ։",
-      "subscriptionCanceledCta": "Բացել kilo.ai/claw",
-      "subscriptionPastDueTitle": "Վճարման տվյալների թարմացում կայքում",
-      "subscriptionPastDueBody": "Վերջին վճարման հետ խնդիր է առաջացել։ Դիտարկիչով բացիր kilo.ai/claw հասցեն՝ վճարման տվյալները թարմացնելու համար։ Հավելվածում վճարումները կառավարել հնարավոր չէ։",
-      "quarantinedTitle": "Օրինակը վերականգնման կարիք ունի",
-      "quarantinedBody": "KiloClaw-ի քո օրինակը մեկուսացված է, և այս պահին այն հնարավոր չէ օգտագործել։ Այն վերականգնելու համար անհրաժեշտ է մեր թիմի օգնությունը։",
-      "multipleCurrentConflictBody": "Քո հաշվում մեկից ավելի ակտիվ բաժանորդագրություն ենք գտել։ Գործողությունները կասեցրել ենք, որպեսզի քեզնից կրկնակի վճար չգանձվի։",
-      "multipleCurrentConflictCta": "Շարունակել kilo.ai-ում",
-      "nonCanonicalEarlybirdTitle": "Հայտնաբերվել է հին սակագին",
-      "nonCanonicalEarlybirdBody": "Նախքան վաղ հասանելիության քո սակագինը հեռախոսով օգտագործելը մասնագետը պետք է ստուգի այն։",
-      "iosTitle": "KiloClaw-ը հասանելի չէ iOS-ում",
-      "iosBody": "Այս հաշվի համար KiloClaw-ի հասանելիությունը կառավարվում է iOS հավելվածից դուրս։",
-      "iosContact": "Հարցե՞ր ունես։ Գրիր {{supportEmail}} հասցեին։",
-      "quarantinedCta": "Գրել մեր թիմին",
-      "nonCanonicalEarlybirdCta": "Ստուգել Ձեր սակագինեը kilo.ai-ում"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}}-ն ուշադրության կարիք ունի՝ {{label}}",
-      "openUnread_one": "Բացել {{name}}-ը, {{displayCount}} չկարդացված հաղորդագրություն",
-      "openUnread": "Բացել {{name}}-ը, {{displayCount}} չկարդացված հաղորդագրություն",
-      "openUnread_other": "Բացել {{name}}-ը, {{displayCount}} չկարդացված հաղորդագրություն",
-      "openSettings": "Բացել {{name}}-ի կարգավորումները",
-      "fixOnKiloAi": "Շտկել kilo.ai-ում՝ {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Հաստատել սարքերի հարցումները",
-      "execPolicyDescription": "Անվտանգության կարգավորումներ",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Արհեստական բանականության մոդելի ընտրություն",
-      "secretsDescription": "Գաղտնագրված մուտքի տվյալներ",
-      "versionPinDescription": "Ամրագրել որոշակի տարբերակ"
-    },
-    "avatar": {
-      "arcade": "Խաղային ավտոմատ",
-      "brain": "Ուղեղ",
-      "creature": "Էակ",
-      "crystal": "Բյուրեղ",
-      "custom": "Անհատական ավատար",
-      "dragon": "Վիշապ",
-      "explorer": "Հետախույզ",
-      "flame": "Բոց",
-      "lightning": "Կայծակ",
-      "magicWand": "Կախարդական գավազան",
-      "moon": "Լուսին",
-      "operator": "Օպերատոր",
-      "orbit": "Ուղեծիր",
-      "oracle": "Գուշակ",
-      "rainbow": "Ծիածան",
-      "robot": "Ռոբոտ",
-      "satellite": "Արբանյակ",
-      "sparkles": "Կայծիկներ",
-      "strongArm": "Ուժեղ թև",
-      "talisman": "Թալիսման"
-    },
-    "remoteSpawnFilesNotSupported": "Այս օրինակը չի կարող ստանալ ֆայլեր։",
-    "instanceSwitcherTitle": "KiloClaw-ի օրինակ"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2542,10 +2073,6 @@
       "moveLeft": "Տեղափոխել {{filename}}-ը ձախ",
       "moveRight": "Տեղափոխել {{filename}}-ը աջ"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Տեղադրել պատկերը սեղմատախտակից",
-      "label": "Պատկեր է հայտնաբերվել, հպեք՝ տեղադրելու համար"
-    },
     "attachmentPicker": {
       "camera": "Տեսախցիկ",
       "photoLibrary": "Լուսանկարներ",
@@ -2741,7 +2268,8 @@
     "signOutThisDeviceTitle": "Դո՞ւրս գալ այս սարքի հաշվից",
     "signOutThisSessionTitle": "Դո՞ւրս գալ այս նիստից",
     "signOutThisSessionMessage": "{{device}} սարքը դուրս կգա հաշվից։ Այն կարող է պահպանել API-ի հասանելիությունը մինչև մեկ ժամ։",
-    "webBrowser": "Վեբ զննարկիչ"
+    "webBrowser": "Վեբ զննարկիչ",
+    "unknownDevice": "Անհայտ սարք"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Չհաջողվեց բացել հավելվածների խանութը։",

@@ -101,12 +101,9 @@
     "scheduled": "Sceidealaithe",
     "keepEditing": "Lean den eagarthóireacht",
     "keepRunning": "Fág ag rith é",
-    "kiloclaw": "KiloClaw",
     "newSession": "Seisiún nua",
-    "noKiloclawInstances": "Níl aon ásc KiloClaw ann",
     "noModelsAvailable": "Níl aon samhail ar fáil",
     "notFound": "Níor aimsíodh é.",
-    "online": "Ar líne",
     "open": "Oscail {{name}}",
     "openPullRequest": "Oscail an t-iarratas tarraingthe",
     "pending": "Ar feitheamh",
@@ -257,7 +254,8 @@
     "renamePasskey": "Athainmnigh eochair rochtana",
     "removePasskey": "Bain eochair rochtana",
     "removePasskeyTitle": "Bain eochair rochtana?",
-    "removePasskeyMessage": "Ní bheidh tú in ann síniú isteach leis an eochair rochtana seo a thuilleadh."
+    "removePasskeyMessage": "Ní bheidh tú in ann síniú isteach leis an eochair rochtana seo a thuilleadh.",
+    "changelog": "Na rudaí nua"
   },
   "preferences": {
     "general": "Ginearálta",
@@ -880,23 +878,18 @@
     "previewGenericDescription": "Léiríonn na fógraí gur tharla rud éigin. Oscail Kilo chun an teachtaireacht a léamh.",
     "channel": {
       "agentProgress": "Dul chun cinn na ngníomhairí",
-      "chat": "Teachtaireachtaí comhrá",
-      "kiloclaw": "Gníomhaíocht KiloClaw",
       "balance": "Foláirimh iarmhéid",
       "security": "Torthaí slándála",
       "spend": "Foláirimh chaiteachais",
       "followedSessions": "Seisiúin leanta"
     },
     "category": {
-      "chatMessagesSubtitle": "freagraí i do chomhráite",
       "agentAttentionTitle": "Tá do chabhair ag teastáil ón ngníomhaire",
       "agentAttentionSubtitle": "ceisteanna agus iarratais ar chead nó ar ionchur",
       "agentUpdatesTitle": "Nuashonruithe gníomhairí",
       "agentUpdatesSubtitle": "teachtaireachtaí ón ngníomhaire le linn an taisc",
       "sessionStatusTitle": "Stádas seisiúin",
       "sessionStatusSubtitle": "críochnaithe / teipthe / réidh le rialú",
-      "kiloclawActivitySubtitle": "ásc réidh nó teipthe, gníomhartha sceidealaithe",
-      "kiloclawActivityUnavailable": "Tosaigh ásc KiloClaw chun gníomhaíocht KiloClaw a fháil.",
       "balanceAlertsSubtitle": "rabhaidh faoi iarmhéid íseal na heagraíochta",
       "balanceAlertsUnavailable": "Bí páirteach in eagraíocht chun rabhaidh iarmhéid a fháil.",
       "securityFindingsSubtitle": "torthaí nua agus meabhrúcháin SLA",
@@ -916,72 +909,19 @@
   },
   "tabs": {
     "home": "Baile",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, cluaisín, {{position}} as {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Athrú áisc",
-      "couldNotLoadInstances": "Níorbh fhéidir na háisc a lódáil.",
-      "noInstancesDescription": "Cuir ásc ar bun chun tosú ag comhrá.",
-      "setUpKiloclaw": "Cuir KiloClaw ar bun",
-      "currentInstance": "{{title}}, reatha"
-    },
     "conversation": {
-      "failedToLoad": "Níorbh fhéidir an comhrá a lódáil.",
-      "notFound": "Níor aimsíodh an comhrá.",
       "untitled": "Gan teideal",
-      "leaveTitle": "Ar mhaith leat an comhrá a fhágáil?",
-      "leaveMessage": "Bainfear an comhrá de do liosta.",
-      "openHint": "Osclaíonn sé an comhrá. Brúigh agus coinnigh síos chun roghanna athainmnithe agus fágála a fheiceáil.",
-      "unread": "Gan léamh",
-      "optionsFor": "Roghanna comhrá do {{title}}",
-      "options": "Roghanna comhrá",
-      "renameTitle": "Athainmniú comhrá",
-      "renamePlaceholder": "Ainm nua",
-      "couldNotReachBot": "Níorbh fhéidir teagmháil a dhéanamh leis an róbat. Bain triail as arís le do thoil.",
-      "messageDeliveryFailed": "Níorbh fhéidir an teachtaireacht a sheachadadh don róbat.",
-      "couldNotSignIn": "Níorbh fhéidir síniú isteach sa chomhrá.",
-      "couldNotRefreshMessages": "Níorbh fhéidir na teachtaireachtaí a athnuachan.",
-      "couldNotLoadHistory": "Níorbh fhéidir stair an chomhrá a lódáil.",
-      "leave": "Fág",
-      "untitledConversation": "Comhrá gan teideal",
-      "createFailed": "Níorbh fhéidir an comhrá a chruthú.",
-      "leaveFailed": "Níorbh fhéidir an comhrá a fhágáil."
-    },
-    "reactions": {
-      "common": "Imoibrithe coitianta",
-      "reactWith": "Imoibrigh le {{reaction}}",
-      "accessibility": "Imoibriú {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Ag freagairt do",
-      "cancelReply": "Cealaigh freagra",
-      "openInstance": "Oscail an t-ásc",
-      "attachFile": "Ceangail comhad",
-      "cancelEdit": "Cealaigh an eagarthóireacht"
+      "renamePlaceholder": "Ainm nua"
     },
     "conversationList": {
-      "couldNotLoad": "Níorbh fhéidir na comhráite a lódáil.",
-      "emptyTitle": "Níl aon chomhrá ann fós",
-      "emptyDescription": "Cruthaigh comhrá chun labhairt le d'ásc KiloClaw.",
-      "create": "Cruthaigh comhrá",
-      "newConversation": "Comhrá nua",
-      "openInstanceSettings": "Oscail socruithe an áisc",
       "today": "Inniu",
       "yesterday": "Inné",
-      "thisWeek": "An tseachtain seo",
       "older": "Níos sine"
     },
     "attachment": {
-      "open": "Oscail {{filename}}",
-      "openFailed": "Níorbh fhéidir an ceangaltán a oscailt. Seiceáil do nasc agus bain triail as arís.",
-      "attachFailed": "Níorbh fhéidir an comhad a cheangal.",
-      "limit": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
-      "sizeRejection": "Tá {{filename}} níos mó ná an teorainn {{limit}} do cheangaltáin.",
-      "unreadable": "Níorbh fhéidir {{filename}} a léamh.",
-      "pastedImage": "an íomhá ghreamaithe",
-      "defaultName": "Ceangaltán",
       "classificationDenied": "Ní féidir comhaid inrite a cheangal.",
       "classificationEmpty": "Tá an comhad folamh.",
       "classificationTooLarge": "Ní féidir le comhad a bheith níos mó ná 20 MB.",
@@ -991,435 +931,17 @@
       "networkError": "Tharla earráid líonra.",
       "uploadFailed": "Theip ar an uaslódáil.",
       "nothingToPaste": "Níl aon rud le greamú.",
-      "metadataStripFailed": "Níorbh fhéidir meiteashonraí an ghrianghraif a bhaint.",
-      "limit_one": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
-      "limit_other": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
-      "limit_two": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
-      "limit_few": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
-      "limit_many": "Is féidir leat suas le {{displayCount}} comhad a cheangal."
+      "metadataStripFailed": "Níorbh fhéidir meiteashonraí an ghrianghraif a bhaint."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "Bain triail as {{filename}} a uaslódáil arís",
-      "remove": "Bain {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[teachtaireacht scriosta]",
-      "yourMessage": "Do theachtaireacht",
-      "messageFrom": "Teachtaireacht ó {{author}}",
-      "moreActions": "Tuilleadh gníomhartha",
-      "notDelivered": "Gan seachadadh",
-      "edited": "(curtha in eagar)",
-      "image": "Íomhá"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "Cóipeáilte",
-      "copyFailed": "Theip ar an gcóipeáil.",
-      "title": "Gníomhartha teachtaireachta",
-      "deleteTitle": "An scriosfar an teachtaireacht?",
-      "deleteMessage": "Bainfidh sé seo an teachtaireacht ón gcomhrá.",
-      "deleteFailed": "Níorbh fhéidir an teachtaireacht a scriosadh.",
-      "removeReactionFailed": "Níorbh fhéidir an t-imoibriú a bhaint.",
-      "addReactionFailed": "Níorbh fhéidir an t-imoibriú a chur leis.",
-      "retrySend": "Seol arís",
-      "moreReactions": "Tuilleadh imoibrithe",
-      "edit": "Cuir in eagar",
-      "sendFailed": "Níorbh fhéidir an teachtaireacht a sheoladh.",
-      "retrySendFailed": "Níorbh fhéidir an teachtaireacht a sheoladh arís.",
-      "editFailed": "Níorbh fhéidir an teachtaireacht a chur in eagar.",
-      "executeFailed": "Níorbh fhéidir an gníomh a dhéanamh."
+      "edit": "Cuir in eagar"
     },
     "attachmentPicker": {
-      "takePhoto": "Tóg grianghraf",
-      "photoLibrary": "Leabharlann grianghraf",
-      "files": "Comhaid",
       "cameraAccessMessage": "Ceadaigh rochtain ar an gceamara sna socruithe chun grianghraf a ghlacadh."
-    },
-    "typingIndicator": {
-      "someone": "Duine éigin",
-      "typing_one": "Tá {{name}} ag clóscríobh...",
-      "typing": "Tá {{names}} ag clóscríobh...",
-      "typing_other": "Tá {{names}} ag clóscríobh...",
-      "typing_two": "Tá {{names}} ag clóscríobh...",
-      "typing_few": "Tá {{names}} ag clóscríobh...",
-      "typing_many": "Tá {{names}} ag clóscríobh..."
-    },
-    "botStatus": {
-      "offline": "As líne",
-      "loadingUser": "Ag lódáil úsáideora...",
-      "waitingForStatus": "Ag fanacht le stádas an róbait...",
-      "offlineMessage": "Tá an róbat as líne. Atosóidh seoladh na dteachtaireachtaí nuair a athcheanglóidh sé."
-    },
-    "errors": {
-      "notAllowed": "Ní cheadaítear é seo.",
-      "messageTooLong": "Tá an teachtaireacht rófhada. Úsáid níos lú ná {{limit}} carachtar.",
-      "titleTooLong": "Tá an teideal rófhada. Úsáid níos lú ná {{limit}} carachtar.",
-      "messageEmpty": "Ní féidir leis an teachtaireacht a bheith folamh."
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Níorbh fhéidir na háisc KiloClaw a lódáil.",
-    "billing": {
-      "title": "Billeáil",
-      "continueMonthToMonth": "Lean ar aghaidh mí ar mhí",
-      "plan": "Plean",
-      "finalTermEnds": "Críochnaíonn an téarma deiridh",
-      "afterFinalTerm": "Tar éis an téarma dheiridh",
-      "ends": "Críochnaíonn",
-      "expires": "Téann in éag",
-      "noActivePlan": "Níl aon phlean gníomhach",
-      "noActivePlanDescription": "Níl síntiús gníomhach KiloClaw agat.",
-      "managedByAdmin": "Bainistíonn riarthóir d'eagraíochta an bhilleáil.",
-      "couldNotLoad": "Níorbh fhéidir an fhaisnéis bhilleála a lódáil.",
-      "manageOnWeb": "Bainistigh an bhilleáil ar an ngréasán",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Críochnaíonn téarma deiridh do phlean Commit ar {{date}}. Lean ar aghaidh leis an bplean Caighdeánach ar {{price}}, nó cuirfear deireadh leis an óstáil.",
-      "freeTrial": "Triail saor in aisce",
-      "hostingEnds": "Críochnaíonn an t-óstáil",
-      "lessThanOneDay": "Níos lú ná 1 lá",
-      "renews": "Athnuaitear",
-      "standardMonthToMonth": "Plean Caighdeánach mí ar mhí",
-      "standardStartsOn": "Tosóidh an plean Caighdeánach ar {{date}} ar {{price}}.",
-      "yourStandardMonthlyPrice": "praghas míosúil do phlean Caighdeánach",
-      "perMonth": "/mí",
-      "earlybirdAccessUntil": "Tá rochtain Earlybird agat go dtí {{date}}.",
-      "earlybirdEnding": "Tá Earlybird ag druidim chun deiridh: {{remaining}}.",
-      "paymentPastDue": "Tá íocaíocht thar téarma. Nuashonraigh do mhodh íocaíochta.",
-      "subscriptionCancels": "Cuirfear an síntiús ar ceal ar {{date}}.",
-      "trialDaysRemaining": "Tá {{remaining}} fágtha sa triail.",
-      "trialEndingSoon": "Tá an triail ag druidim chun deiridh: {{remaining}}.",
-      "planName": {
-        "standard": "Caighdeánach"
-      },
-      "commit": "Tiomnú"
-    },
-    "changelog": {
-      "title": "Na rudaí nua",
-      "couldNotLoad": "Níorbh fhéidir an loga athruithe a lódáil.",
-      "noUpdates": "Gan aon nuashonrú fós",
-      "noUpdatesDescription": "Beidh iontrálacha ón loga athruithe le feiceáil anseo.",
-      "recentUpdates": "Nuashonruithe le déanaí",
-      "manageVersion": "Bainistigh an leagan",
-      "redeployRequired": "Athimscaradh riachtanach",
-      "redeploySuggested": "Athimscaradh molta",
-      "upgradeRequired": "Uasghrádú riachtanach"
-    },
-    "dashboard": {
-      "title": "Deais",
-      "couldNotLoad": "Níorbh fhéidir an deais a lódáil.",
-      "renameInstance": "Athainmnigh an t-ásc",
-      "renamePlaceholder": "Ainm nua (50 carachtar ar a mhéad)",
-      "someDetailsFailed": "Níorbh fhéidir roinnt sonraí fíor-ama a lódáil.",
-      "destroy": "Scrios",
-      "destroyMessage": "Scriosfar d'ásc KiloClaw agus a chuid sonraí go léir go buan. Ní féidir an gníomh seo a chur ar ceal.",
-      "destroyTitle": "Scrios an t-ásc",
-      "instance": "Ásc",
-      "couldNotCheckStatus": "Níorbh fhéidir stádas na seirbhíse a sheiceáil.",
-      "dangerZone": "CRIOS CONTÚIRTE",
-      "destroying": "Ag scriosadh…",
-      "serviceDegraded": "Seirbhís lagaithe — tapáil chun an stádas a fheiceáil",
-      "up": "AR SIÚL"
-    },
-    "channels": {
-      "title": "Cainéil",
-      "couldNotLoad": "Níorbh fhéidir na cainéil a lódáil.",
-      "noChannels": "Gan aon chainéal ar fáil",
-      "noChannelsDescription": "Beidh comhtháthuithe cainéal le feiceáil anseo.",
-      "connected": "{{label}} nasctha",
-      "disconnectMessage": "An mbainfear {{label}}? Dícheanglófar an cainéal seo.",
-      "disconnectTitle": "Dícheangail cainéal"
-    },
-    "devicePairing": {
-      "title": "Péireáil gléis",
-      "refreshRequests": "Athnuaigh iarratais péireála",
-      "couldNotLoad": "Níorbh fhéidir na hiarratais péireála a lódáil.",
-      "noPending": "Gan aon iarratas ar feitheamh",
-      "noPendingDescription": "Beidh iarratais chun cainéil agus gléasanna a phéireáil le feiceáil anseo.",
-      "channelRequests": "Iarratais cainéal",
-      "deviceRequests": "Iarratais gléasanna",
-      "approveDeviceMessage": "An dtabharfar cead do {{platform}} nascadh le d'ásc?",
-      "approveDeviceTitle": "Formheas an gléas",
-      "approveMessage": "An dtabharfar cead do {{label}} (cód: {{code}}) nascadh le d'ásc?",
-      "approveTitle": "Formheas an t-iarratas péireála",
-      "unknownDevice": "Gléas anaithnid"
-    },
-    "execPolicy": {
-      "title": "Beartas forghníomhaithe",
-      "couldNotLoad": "Níorbh fhéidir an beartas forghníomhaithe a lódáil.",
-      "alwaysAsk": "Fiafraigh i gcónaí",
-      "alwaysAskDescription": "Iarr deimhniú sula rithfear gach ordú. Seo an rogha is sláine.",
-      "neverAsk": "Ná fiafraigh riamh",
-      "neverAskDescription": "Rith orduithe gan deimhniú. Tá sé seo níos tapúla ach níl sé chomh sábháilte."
-    },
-    "google": {
-      "title": "Cuntas Google",
-      "couldNotLoad": "Níorbh fhéidir stádas an chuntais Google a lódáil.",
-      "disconnected": "Dícheanglaíodh an cuntas Google. Athimscar d'ásc chun an t-athrú a chur i bhfeidhm.",
-      "setupCommand": "Ordú socraithe",
-      "setupCommandHelp": "Chun do chuntas Google a nascadh, rith an t-ordú seo i dteirminéal ar do ríomhaire féin. Caithfidh Docker a bheith suiteáilte air.",
-      "failedToLoadCommand": "Níorbh fhéidir an t-ordú socraithe a lódáil.",
-      "gmailNotifications": "Fógraí Gmail",
-      "disconnect": "Dícheangail an cuntas Google",
-      "copied": "Cóipeáilte",
-      "copyCommand": "Cóipeáil an t-ordú",
-      "disconnectConfirm": "Dícheangail",
-      "disconnectMessage": "An mbainfear do chuntas Google den ásc seo? Díchumasófar fógraí Gmail. Athimscar an t-ásc tar éis an dícheangail chun na hathruithe a chur i bhfeidhm.",
-      "disconnectTitle": "Dícheangail Google"
-    },
-    "modelList": {
-      "noMatches": "Níl aon samhail ag teacht le do chuardach",
-      "noModelsDescription": "Beidh samhlacha le feiceáil anseo nuair a bheidh siad ar fáil.",
-      "noResultsFor": "Níor aimsíodh aon toradh ar \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "Rúin",
-      "couldNotLoad": "Níorbh fhéidir na rúin a lódáil.",
-      "noSecrets": "Gan aon rún ar fáil",
-      "noSecretsDescription": "Beidh comhtháthuithe rúin le feiceáil anseo.",
-      "removeMessage": "An mbainfear {{label}}? Caillfidh an uirlis seo rochtain ar a dintiúir.",
-      "removeTitle": "Bain rún",
-      "saved": "{{label}} sábháilte",
-      "hide": "Folaigh {{label}}",
-      "show": "Taispeáin {{label}}",
-      "allFieldsRequired": "Caithfear gach réimse a líonadh chun {{label}} a nascadh.",
-      "setupGuideFallback": "treoir socraithe",
-      "setupGuideA11y": "treoir socraithe {{label}}",
-      "setupGuide": "Treoir socraithe",
-      "saving": "Ag sábháil…",
-      "removing": "Ag baint…",
-      "updateToken": "Nuashonraigh an comhartha"
-    },
-    "versionPin": {
-      "title": "Pionnáil leagain",
-      "couldNotLoad": "Níorbh fhéidir an fhaisnéis leagain a lódáil.",
-      "couldNotLoadMore": "Níorbh fhéidir tuilleadh leaganacha a lódáil.",
-      "loadMore": "Lódáil tuilleadh leaganacha",
-      "showingLatest": "Tá na 100 leagan is déanaí á dtaispeáint.",
-      "availableVersions": "Leaganacha atá ar fáil",
-      "noVersions": "Gan aon leagan ar fáil",
-      "noVersionsDescription": "Beidh na leaganacha de OpenClaw atá ar fáil le feiceáil anseo.",
-      "unpin": "Bain an ghlasáil",
-      "unpinMessage": "An aistreoidh tú ar ais go dtí an leagan is déanaí atá ar fáil?",
-      "unpinTitle": "Bain glasáil an leagain",
-      "confirmPin": "Deimhnigh an ghlasáil",
-      "followingLatest": "An leagan is déanaí i gcónaí",
-      "latest": "is déanaí",
-      "pin": "Glasáil",
-      "pinnedByAdmin": "Ghlasáil an riarthóir an leagan — déan teagmháil le do riarthóir chun é a athrú.",
-      "pinnedTo": "Glasáilte ar {{version}}",
-      "reasonOptional": "Cúis (roghnach)",
-      "reasonPlaceholder": "Cén fáth ar mhaith leat an leagan seo a ghlasáil?",
-      "replaceAdminPin": "Athraigh glasáil an riarthóra",
-      "replacesAdminPin": "Tiocfaidh an ghlasáil seo in ionad na glasála a shocraigh an riarthóir ({{label}} faoi láthair)."
-    },
-    "redeploy": "Athimscar",
-    "redeployMessage": "An bhfuil tú cinnte gur mhaith leat an t-ásc seo a athimscaradh?",
-    "redeployTitle": "Athimscar an t-ásc",
-    "controls": {
-      "redeploying": "Ag athimscaradh…",
-      "restart": "Atosaigh",
-      "restartOpenClawMessage": "An bhfuil tú cinnte gur mhaith leat próiseas OpenClaw a atosú?",
-      "restartOpenClawTitle": "Atosaigh OpenClaw",
-      "restarting": "Ag atosú…",
-      "start": "Tosaigh",
-      "startMessage": "An bhfuil tú cinnte gur mhaith leat an t-ásc seo a thosú?",
-      "startTitle": "Tosaigh an t-ásc",
-      "stop": "Stad",
-      "stopMessage": "An bhfuil tú cinnte gur mhaith leat an t-ásc seo a stad?",
-      "stopTitle": "Stad an t-ásc",
-      "stopping": "Ag stad…"
-    },
-    "empty": {
-      "finishingSetup": "Ag cur bailchríoch ar an socrú",
-      "finishingSetupDescription": "Fan nóiméad agus muid ag cur bailchríoch ar do chuntas. Ní thógann sé seo ach tamall beag de ghnáth.",
-      "getStarted": "Tosaigh",
-      "noInstancesDescription": "Cruthaigh do chéad ásc chun gníomhairí códaithe a rith."
-    },
-    "instance": {
-      "backToInstances": "Ar ais chuig na háisc",
-      "couldNotLoad": "Níorbh fhéidir an t-ásc a lódáil.",
-      "notFound": "Ásc gan aimsiú",
-      "notFoundDescription": "Seans gur scriosadh an t-ásc seo, nó nach bhfuil an nasc bailí a thuilleadh."
-    },
-    "list": {
-      "createInstance": "Cruthaigh ásc",
-      "organizations": "Eagraíochtaí",
-      "accessIssue": {
-        "trialExpired": "Tá deireadh leis an triail — glac síntiús chun leanúint den ásc seo a úsáid",
-        "subscriptionCanceled": "Síntiús neamhghníomhach — glac síntiús arís chun leanúint den ásc seo a úsáid",
-        "subscriptionPastDue": "Fadhb íocaíochta — nuashonraigh do shonraí billeála chun leanúint den ásc seo a úsáid",
-        "quarantined": "Ásc ar coraintín — athbhreithniú daonna de dhíth",
-        "multipleCurrentConflict": "Teastaíonn athbhreithniú ar an gcuntas",
-        "nonCanonicalEarlybird": "Tá athbhreithniú de dhíth ar an seanphlean"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Déan comhrá le {{name}}",
-        "ready": "Tá {{name}} réidh",
-        "warmedUp": "Tá gach rud réidh. Abair haigh nuair a bheidh tú réidh."
-      },
-      "flow": {
-        "genericErrorBody": "Níorbh fhéidir linn socrú d'ásc a chríochnú faoi láthair.",
-        "manualReviewBody": "Tá fadhb le do chuntas le réiteach sular féidir linn ásc a chruthú. Lean ar aghaidh ar kilo.ai.",
-        "manualReviewTitle": "Athbhreithniú daonna de dhíth ar an socrú",
-        "openKiloAi": "Oscail kilo.ai",
-        "provisioning": "Soláthar",
-        "review": "Athbhreithniú",
-        "identityTitle": "Céannacht do róbait",
-        "couldNotLoad": "Níorbh fhéidir stádas an tsocraithe a lódáil.",
-        "finishingSetup": "Tá an socrú á chríochnú — fan nóiméad agus muid ag cur bailchríoch ar do chuntas.",
-        "ready": "Réidh",
-        "settingUp": "Ag socrú…"
-      },
-      "unavailableDescription": "Tá síntiús gníomhach KiloClaw de dhíth chun ásc a sholáthar. Leanfaidh na háisc agus na síntiúis atá ann cheana ar aghaidh mar is gnách.",
-      "unavailableTitle": "Níl áisc nua KiloClaw ar fáil",
-      "identity": {
-        "chooseAvatar": "Roghnaigh abhatár",
-        "namePlaceholder": "Ainm do róbait",
-        "selectAvatar": "Roghnaigh {{name}} mar abhatár",
-        "personality": "Pearsantacht",
-        "changePersonality": "Athraigh pearsantacht",
-        "location": "Suíomh",
-        "locationPlaceholder": "Cathair nó réigiún (roghnach)",
-        "useCurrentLocation": "Úsáid an suíomh reatha",
-        "locationDeniedTitle": "Rochtain ar an suíomh diúltaithe",
-        "locationDeniedMessage": "Cumasaigh rochtain ar an suíomh sna socruithe chun do shuíomh reatha a úsáid.",
-        "locationValidationFailed": "Níorbh fhéidir an suíomh a bhailíochtú.",
-        "locationResolveFailed": "Níorbh fhéidir do shuíomh a chinneadh. Is féidir leat é a chur in eagar de láimh.",
-        "locationGetFailed": "Níorbh fhéidir do shuíomh a fháil. Cuir isteach é de láimh.",
-        "nature": {
-          "aiAssistantLabel": "Cúntóir AI",
-          "aiAssistantVibe": "Cabhrach, cumasach, gairmiúil",
-          "digitalCreatureLabel": "Créatúr digiteach",
-          "digitalCreatureVibe": "Aisteach, beo, beagáinín dothuartha",
-          "virtualCompanionLabel": "Compánach fíorúil",
-          "virtualCompanionVibe": "Cairdiúil, aireach, cásmhar ó chroí",
-          "somethingWeirderLabel": "Rud níos aistí…",
-          "somethingWeirderVibe": "Sainmhínigh é tú féin"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Tá sé déanta! D'ullmhaigh mé an achoimre a d'iarr tú. Táim réidh nuair a bheidh tusa réidh.",
-        "settingUp": "Ag socrú fógraí…",
-        "stayInTheLoop": "An scéala is déanaí",
-        "getNotified": "Faigh fógra nuair a chríochnaíonn {{name}} tasc ionas nach gcaillfidh tú freagra riamh.",
-        "now": "anois",
-        "skipForNow": "Scipeáil go fóill",
-        "couldNotEnable": "Níorbh fhéidir fógraí a chumasú."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Níorbh fhéidir an socrú a sheiceáil",
-        "queryErrorBody": "Cailleadh an nasc agus socrú {{name}} á sheiceáil. Seans go bhfuil sé fós ar siúl. Bain triail as arís nó seiceáil i gceann tamaill.",
-        "stoppedTitle": "Stadadh an socrú",
-        "stoppedBody": "Stad ásc {{name}} gan choinne le linn an tsocraithe.",
-        "stalledTitle": "Chuaigh rud éigin i bhfostú",
-        "stalledBody": "Níorbh fhéidir linn socrú {{name}} a chríochnú. Bain triail as arís, nó seol ríomhphost chuig {{supportEmail}} má tharlaíonn sé seo arís agus arís eile.",
-        "timeoutTitle": "Ag tógáil níos faide ná mar a bhíothas ag súil leis",
-        "timeoutBody": "Tá socrú {{name}} ag tógáil níos faide ná mar is gnách (breis agus {{displayMinutes}} nóiméad).",
-        "continueInBackground": "Lean ar aghaidh sa chúlra",
-        "settingUp": "Ag socrú {{name}}",
-        "connectingToAgent": "Ag ceangal leis an ngníomhaire",
-        "startingSandbox": "Ag tosú an bhosca gainimh",
-        "backgroundHint": "Tógann sé níos lú ná nóiméad de ghnáth. Is féidir leat é seo a dhúnadh — leanfaimid ag obair sa chúlra."
-      }
-    },
-    "status": {
-      "cpu": "LAP",
-      "exitCode": "Cód {{code}}",
-      "gatewayProcess": "PRÓISEAS GEATA",
-      "lastExit": "Scor deireanach",
-      "memory": "Cuimhne",
-      "region": "Réigiún",
-      "resources": "ACMHAINNÍ",
-      "restarts": "Atosuithe",
-      "state": "Staid",
-      "uptime": "Aga fónaimh",
-      "crashed": "TUAIRTEÁILTE",
-      "destroying": "AG SCRIOSADH",
-      "provisioned": "SOLÁTHRAITHE",
-      "restarting": "AG ATOSÚ",
-      "running": "AG RITH",
-      "shuttingDown": "AG MÚCHADH",
-      "starting": "AG TOSÚ",
-      "stopped": "STADTA",
-      "stopping": "AG STAD",
-      "unknown": "ANAITHNID",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Ardfheidhmíocht",
-      "frontierDescription": "An fheidhmíocht is airde. Seoltar iarratais chuig na samhlacha is forbartha a úsáideann réasúnaíocht.",
-      "balancedDescription": "Cothromaíocht chliste idir luas agus cumas ar chostas níos ísle.",
-      "autoModelA11y": "samhail uathoibríoch {{label}}",
-      "currentModel": "Samhail reatha",
-      "browseAllModels": "nó roghnaigh as breis agus 500 samhail",
-      "browseAllModelsA11y": "Brabhsáil na samhlacha go léir, breis agus 500 díobh"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Chun leanúint de KiloClaw a úsáid, téigh chuig kilo.ai/claw i do bhrabhsálaí. Ní féidir síntiús a ghlacadh san aip.",
-      "subscriptionCanceledTitle": "Liostáil ar an ngréasán",
-      "subscriptionCanceledBody": "Chun KiloClaw a úsáid, téigh chuig kilo.ai/claw i do bhrabhsálaí. Ní féidir síntiús a ghlacadh san aip.",
-      "subscriptionCanceledCta": "Oscail kilo.ai/claw",
-      "subscriptionPastDueTitle": "Nuashonrú íocaíochta ar an ngréasán",
-      "subscriptionPastDueBody": "Bhí fadhb le d'íocaíocht is déanaí. Téigh chuig kilo.ai/claw i do bhrabhsálaí chun í a nuashonrú. Ní féidir an bhilleáil a bhainistiú san aip.",
-      "quarantinedTitle": "Deisiú de dhíth ar an ásc",
-      "quarantinedBody": "Tá d'ásc KiloClaw ar coraintín agus ní féidir é a úsáid faoi láthair. Caithfidh ár bhfoireann cabhrú lena athchóiriú.",
-      "multipleCurrentConflictBody": "D'aimsíomar níos mó ná síntiús gníomhach amháin ar do chuntas. Chuireamar an tseirbhís ar sos chun nach ngearrfaí táille ort faoi dhó.",
-      "multipleCurrentConflictCta": "Lean ar aghaidh ar kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Seanphlean aimsithe",
-      "nonCanonicalEarlybirdBody": "Tá athbhreithniú daonna de dhíth ar do phlean luathrochtana sular féidir é a úsáid ar do ghuthán.",
-      "iosTitle": "Níl KiloClaw ar fáil in iOS",
-      "iosBody": "Bainistítear rochtain ar KiloClaw don chuntas seo taobh amuigh den aip iOS.",
-      "iosContact": "Ceisteanna? Déan teagmháil le {{supportEmail}}.",
-      "quarantinedCta": "Seol ríomhphost chuig ár bhfoireann",
-      "nonCanonicalEarlybirdCta": "Athbhreithnigh do phlean ar kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "Teastaíonn aird ar {{name}}: {{label}}",
-      "openUnread_one": "Oscail {{name}}, {{displayCount}} teachtaireacht amháin gan léamh",
-      "openUnread": "Oscail {{name}}, {{displayCount}} teachtaireacht gan léamh",
-      "openUnread_other": "Oscail {{name}}, {{displayCount}} teachtaireacht gan léamh",
-      "openSettings": "Oscail socruithe do {{name}}",
-      "fixOnKiloAi": "Deisigh ar kilo.ai: {{label}}",
-      "openUnread_two": "Oscail {{name}}, {{displayCount}} theachtaireacht gan léamh",
-      "openUnread_few": "Oscail {{name}}, {{displayCount}} theachtaireacht gan léamh",
-      "openUnread_many": "Oscail {{name}}, {{displayCount}} dteachtaireacht gan léamh"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Formheas iarratais gléasanna",
-      "execPolicyDescription": "Socruithe slándála",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "Roghnú samhla AI",
-      "secretsDescription": "Dintiúir chripteáilte",
-      "versionPinDescription": "Glasáil ar leagan ar leith"
-    },
-    "avatar": {
-      "arcade": "Meaisín físchluichí",
-      "brain": "Inchinn",
-      "creature": "Créatúr",
-      "crystal": "Criostal",
-      "custom": "Abhatár saincheaptha",
-      "dragon": "Dragún",
-      "explorer": "Taiscéalaí",
-      "flame": "Lasair",
-      "lightning": "Tintreach",
-      "magicWand": "Slat draíochta",
-      "moon": "Gealach",
-      "operator": "Oibreoir",
-      "orbit": "Fithis",
-      "oracle": "Fáidh",
-      "rainbow": "Bogha ceatha",
-      "robot": "Róbat",
-      "satellite": "Satailít",
-      "sparkles": "Drithlíní",
-      "strongArm": "Géag láidir",
-      "talisman": "Seoid chosanta"
-    },
-    "remoteSpawnFilesNotSupported": "Ní féidir leis an ásc seo comhaid a fháil.",
-    "instanceSwitcherTitle": "Ásc KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2641,10 +2163,6 @@
       "moveLeft": "Bog {{filename}} ar chlé",
       "moveRight": "Bog {{filename}} ar dheis"
     },
-    "attachmentPasteHint": {
-      "accessibility": "Greamaigh íomhá ón ngearrthaisce",
-      "label": "Aimsíodh íomhá, tapáil chun í a ghreamú"
-    },
     "attachmentPicker": {
       "camera": "Ceamara",
       "photoLibrary": "Leabharlann grianghraf",
@@ -2858,7 +2376,8 @@
     "signOutThisDeviceTitle": "An bhfuil tú ag iarraidh síniú amach ón ngléas seo?",
     "signOutThisSessionTitle": "An bhfuil tú ag iarraidh síniú amach ón seisiún seo?",
     "signOutThisSessionMessage": "Síneofar {{device}} amach. Is féidir leis rochtain API a choinneáil ar feadh uair an chloig ar a mhéad.",
-    "webBrowser": "Brabhsálaí gréasáin"
+    "webBrowser": "Brabhsálaí gréasáin",
+    "unknownDevice": "Gléas anaithnid"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Níorbh fhéidir an siopa aipeanna a oscailt.",

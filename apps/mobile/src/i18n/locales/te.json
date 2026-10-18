@@ -2498,6 +2498,7 @@
       "title": "సెషన్‌లను ఫిల్టర్ చేయండి",
       "platformCloud": "క్లౌడ్",
       "platformExtension": "ఎక్స్‌టెన్షన్",
+      "platformDesktop": "డెస్క్‌టాప్",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

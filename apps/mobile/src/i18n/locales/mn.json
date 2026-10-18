@@ -2498,6 +2498,7 @@
       "title": "Сессийг шүүх",
       "platformCloud": "Үүлэн орчин",
       "platformExtension": "Өргөтгөл",
+      "platformDesktop": "Ширээний компьютер",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

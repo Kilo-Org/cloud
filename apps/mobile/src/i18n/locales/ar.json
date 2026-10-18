@@ -2054,6 +2054,7 @@
       "title": "تصفية الجلسات",
       "platformCloud": "السحابة",
       "platformExtension": "الامتداد",
+      "platformDesktop": "سطح المكتب",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

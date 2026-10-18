@@ -1339,6 +1339,21 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           offset: input.offset,
         });
 
+        const foreignFindingIds = findings
+          .filter(finding => !deps.verifyFindingOwnership(finding, ctx, input))
+          .map(finding => finding.id);
+        if (foreignFindingIds.length > 0) {
+          console.error('Security finding list returned rows outside the requested owner scope', {
+            ownerType: owner.type,
+            ownerId: owner.id,
+            foreignFindingIds,
+          });
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Unable to list security findings',
+          });
+        }
+
         const concurrencyCheck = await canStartAnalysis(securityOwner);
         const [configWithStatus, integration] = await Promise.all([
           getSecurityAgentConfigWithStatus(owner),

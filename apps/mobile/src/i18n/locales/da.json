@@ -2498,6 +2498,7 @@
       "title": "Filtrér sessioner",
       "platformCloud": "Skyen",
       "platformExtension": "Udvidelse",
+      "platformDesktop": "Skrivebord",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

@@ -609,6 +609,7 @@ function WorktreeGroupRow({
 const PLATFORM_FILTERS = [
   'cloud-agent',
   'extension',
+  'desktop',
   'cli',
   'slack',
   'github',
@@ -622,6 +623,8 @@ function platformFilterLabel(p: string): string {
       return 'Cloud';
     case 'extension':
       return 'Extension';
+    case 'desktop':
+      return 'Desktop';
     case 'cli':
       return 'CLI';
     case 'slack':

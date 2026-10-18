@@ -2498,6 +2498,7 @@
       "title": "Sessiyaları filtrlə",
       "platformCloud": "Bulud",
       "platformExtension": "Genişləndirmə",
+      "platformDesktop": "Masaüstü",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",

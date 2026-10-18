@@ -9,6 +9,7 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-settings-route-ha
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
+  getCachedFrontierRoutingTable: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/resolution', () => ({
   getAutoFreeCandidates: jest.fn(),

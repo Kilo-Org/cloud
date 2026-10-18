@@ -1,4 +1,3 @@
-import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
@@ -16,10 +15,7 @@ import {
   KILO_AUTO_SMALL_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
-  modeSchema,
   KILO_AUTO_FRONTIER_MODEL,
-  FRONTIER_MODE_TO_MODEL,
-  FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
@@ -49,7 +45,6 @@ import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 type ResolveAutoModelParams = {
   model: string;
   modeHeader: string | null;
-  featureHeader: FeatureValue | null;
   sessionId: string | null;
   apiKind: GatewayRequest['kind'] | null;
   clientIp: string | null;
@@ -63,13 +58,6 @@ type ResolveAutoModelParams = {
     plan?: OrganizationPlan;
   }>;
 };
-
-function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
-  const parsedMode = modeSchema.safeParse(modeHeader?.trim() ?? '');
-  if (parsedMode.success) return parsedMode.data;
-  if (featureHeader === 'kiloclaw' || featureHeader === 'openclaw') return 'claw' as const;
-  return null;
-}
 
 /**
  * Returns the eligible models for kilo-auto/free routing from the admin
@@ -143,6 +131,7 @@ function resolveOrganizationAutoRouteTarget(
 export type ResolveAutoModelResult =
   | { kind: 'ok'; resolved: ResolvedAutoModel; routingTarget?: string }
   | { kind: 'no_free_models_available' }
+  | { kind: 'auto_routing_unavailable' }
   | { kind: 'organization_auto_configuration_error'; message: string };
 
 async function resolveOrganizationAutoModel(
@@ -271,7 +260,7 @@ export async function resolveAutoModel(
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ): Promise<ResolveAutoModelResult> {
-  const { model, modeHeader, featureHeader, sessionId, apiKind, clientIp } = params;
+  const { model, sessionId, apiKind, clientIp } = params;
   if (model === ORG_AUTO_MODEL.id) {
     return await resolveOrganizationAutoModel(params, userPromise, balancePromise);
   }
@@ -348,11 +337,7 @@ export async function resolveAutoModel(
       }
     }
   }
-  const mode = resolveMode(modeHeader, featureHeader);
-  return {
-    kind: 'ok',
-    resolved: (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL,
-  };
+  return { kind: 'auto_routing_unavailable' };
 }
 
 export async function applyResolvedAutoModel(

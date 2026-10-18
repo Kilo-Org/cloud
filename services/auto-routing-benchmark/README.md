@@ -77,6 +77,13 @@ efficient table is fabricated for it. Before enabling frontier serving, administ
 save a frontier configuration with its own decider models, benchmark those entries, and
 publish a complete frontier table.
 
+Frontier serves all authenticated callers through the benchmark router.
+It has no per-user rollout toggle or mode-based legacy model selection.
+Publish a complete Frontier table before deploying the gateway cutover.
+Missing or invalid Frontier decisions return service unavailable without invoking a legacy or organization fallback model.
+Authentication, organization access, privacy restrictions, and classification billing retain their existing checks.
+Catalog annotations and pre-classification denial hints use visible Frontier table candidates, independently of Efficient custom pools.
+
 Decider execution uses a global pool of reusable container slots, not run reservations.
 An atomic D1 claim selects an eligible unfinished chunk from any running run whenever a
 slot becomes free. Queued and executing claims both count against the limit.

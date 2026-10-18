@@ -1,6 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
-import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import {
+  getCachedFrontierRoutingTable,
+  getCachedRoutingTable,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
@@ -9,6 +12,7 @@ import {
   collectDeniedAutoRoutingModelIds,
   deniedModelIdsForCandidates,
   policyNeedsCandidateEvaluation,
+  loadAutoRoutingCandidateModelIds,
 } from './auto-routing-denied-models';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client', () => ({
@@ -16,6 +20,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client', () =>
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
+  getCachedFrontierRoutingTable: jest.fn(),
 }));
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
@@ -106,6 +111,31 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
       'meta/muse-spark-1.3-contributor',
       'provider/free-model:free',
     ]);
+  });
+
+  it('uses frontier candidates for privacy denials rather than the efficient table or custom pool', async () => {
+    jest.mocked(getAutoRoutingSettings).mockClear();
+    jest.mocked(getCachedFrontierRoutingTable).mockResolvedValue({
+      routes: {
+        'implementation/code_generation': [
+          { model: 'frontier/private-model' },
+          { model: 'frontier/ordinary-model' },
+        ],
+      },
+    } as never);
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValue(new Set(['frontier/private-model']));
+
+    const frontierOwner = { ...owner, router: 'frontier' as const };
+    await expect(loadAutoRoutingCandidateModelIds(frontierOwner)).resolves.toEqual([
+      'frontier/private-model',
+      'frontier/ordinary-model',
+    ]);
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds(frontierOwner)).resolves.toEqual([
+      'frontier/private-model',
+    ]);
+    expect(getAutoRoutingSettings).not.toHaveBeenCalled();
   });
 });
 

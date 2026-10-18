@@ -18,8 +18,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () 
 
 import type * as AutoModelResolution from './resolution';
 import {
-  FRONTIER_CODE_MODEL,
-  FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
@@ -36,7 +34,6 @@ const { resolveAutoModel, applyResolvedAutoModel } =
 const baseParams = {
   model: KILO_AUTO_EFFICIENT_MODEL.id,
   modeHeader: null,
-  featureHeader: null,
   sessionId: null,
   clientIp: null,
   isAutoFreeCandidateAllowed: null,
@@ -431,7 +428,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
 
 describe('resolveAutoModel — kilo-auto/frontier branch', () => {
   it.each(['code', 'architect', null] as const)(
-    'preserves the static mapping for mode %s when routing is disabled',
+    'fails closed without a frontier decision for mode %s',
     async modeHeader => {
       const efficientDecision = jest.fn(async () => sampleDecision);
       const result = await resolveAutoModel(
@@ -446,10 +443,7 @@ describe('resolveAutoModel — kilo-auto/frontier branch', () => {
         zeroBalancePromise
       );
 
-      expect(result).toEqual({
-        kind: 'ok',
-        resolved: modeHeader ? FRONTIER_MODE_TO_MODEL[modeHeader] : FRONTIER_CODE_MODEL,
-      });
+      expect(result).toEqual({ kind: 'auto_routing_unavailable' });
       expect(efficientDecision).not.toHaveBeenCalled();
     }
   );
@@ -489,7 +483,7 @@ describe('resolveAutoModel — kilo-auto/frontier branch', () => {
     ['missing frontier table', null],
     ['virtual model', { ...sampleDecision, model: KILO_AUTO_EFFICIENT_MODEL.id }],
     ['missing catalog variant', { ...sampleDecision, variant: 'missing-variant' }],
-  ] as const)('uses the unchanged mode mapping for %s', async (_, decision) => {
+  ] as const)('fails closed without legacy routing for %s', async (_, decision) => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
@@ -502,7 +496,7 @@ describe('resolveAutoModel — kilo-auto/frontier branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: FRONTIER_MODE_TO_MODEL.architect });
+    expect(result).toEqual({ kind: 'auto_routing_unavailable' });
   });
 
   it('keeps efficient routing independent of a supplied frontier decision', async () => {
@@ -679,6 +673,7 @@ describe('resolveAutoModel — Organization Auto branch', () => {
         model: ORG_AUTO_MODEL.id,
         modeHeader: 'plan',
         apiKind: 'chat_completions',
+        frontierDecision: async () => sampleDecision,
         organizationContext: Promise.resolve({
           organizationId: 'org-1',
           plan: 'enterprise',
@@ -700,9 +695,36 @@ describe('resolveAutoModel — Organization Auto branch', () => {
 
     expect(result).toEqual({
       kind: 'ok',
-      resolved: FRONTIER_MODE_TO_MODEL.plan,
+      resolved: { model: sampleDecision.model },
       routingTarget: 'kilo-auto/frontier',
     });
+  });
+
+  it('does not fall back from an unavailable organization frontier route', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        modeHeader: 'code',
+        apiKind: 'chat_completions',
+        frontierDecision: async () => null,
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: {
+              routes: { code: 'kilo-auto/frontier' },
+              fallback_model: 'kilo-auto/balanced',
+            },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'auto_routing_unavailable' });
   });
 
   it('falls build back to the canonical code route', async () => {
@@ -712,6 +734,7 @@ describe('resolveAutoModel — Organization Auto branch', () => {
         model: ORG_AUTO_MODEL.id,
         modeHeader: 'build',
         apiKind: 'chat_completions',
+        frontierDecision: async () => sampleDecision,
         organizationContext: Promise.resolve({
           organizationId: 'org-1',
           plan: 'enterprise',
@@ -777,6 +800,7 @@ describe('resolveAutoModel — Organization Auto branch', () => {
         model: ORG_AUTO_MODEL.id,
         modeHeader: 'plan',
         apiKind: 'chat_completions',
+        frontierDecision: async () => sampleDecision,
         organizationContext: Promise.resolve({
           organizationId: 'org-1',
           plan: 'enterprise',
@@ -937,6 +961,10 @@ describe('applyResolvedAutoModel', () => {
         model: KILO_AUTO_FRONTIER_MODEL.id,
         modeHeader: 'code',
         apiKind: 'chat_completions',
+        frontierDecision: async () => ({
+          ...sampleDecision,
+          reasoningEffort: 'high',
+        }),
       },
       request,
       nullUserPromise,
@@ -944,8 +972,8 @@ describe('applyResolvedAutoModel', () => {
     );
 
     expect(request.body).toMatchObject({
-      model: FRONTIER_CODE_MODEL.model,
-      reasoning: FRONTIER_CODE_MODEL.reasoning,
+      model: sampleDecision.model,
+      reasoning: { enabled: true, effort: 'high' },
     });
     expect(request.body).not.toHaveProperty('reasoning_effort');
   });

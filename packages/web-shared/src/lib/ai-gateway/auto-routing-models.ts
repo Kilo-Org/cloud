@@ -1,7 +1,6 @@
 import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   AUTO_SMALL_TARGET_MODELS,
-  FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
@@ -10,7 +9,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { getAutoFreeCandidates } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
-import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import {
+  getCachedFrontierRoutingTable,
+  getCachedRoutingTable,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 
 function visibleConcreteModelIds(models: Iterable<string>, availableModelIds: ReadonlySet<string>) {
   return [
@@ -32,8 +34,9 @@ export async function addAutoRoutingModels(
     return models;
   }
 
-  const [table, autoFreeCandidates] = await Promise.all([
+  const [table, frontierTable, autoFreeCandidates] = await Promise.all([
     getCachedRoutingTable(),
+    getCachedFrontierRoutingTable(),
     getAutoFreeCandidates(null).catch(() => null),
   ]);
 
@@ -44,7 +47,9 @@ export async function addAutoRoutingModels(
     availableModelIds
   );
   const frontierModelIds = visibleConcreteModelIds(
-    Object.values(FRONTIER_MODE_TO_MODEL).map(({ model }) => model),
+    Object.values(frontierTable?.routes ?? {})
+      .flat()
+      .map(candidate => candidate.model),
     availableModelIds
   );
   const freeModelIds = visibleConcreteModelIds(autoFreeCandidates ?? [], availableModelIds);

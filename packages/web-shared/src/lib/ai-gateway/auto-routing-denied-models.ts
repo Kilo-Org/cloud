@@ -1,6 +1,9 @@
-import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
+import { isVirtualAutoModelId, type AutoRouter } from '@kilocode/auto-routing-contracts';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
-import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import {
+  getCachedFrontierRoutingTable,
+  getCachedRoutingTable,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -12,6 +15,7 @@ import {
 export type AutoRoutingOwner = {
   userId: string;
   organizationId: string | null;
+  router?: AutoRouter;
 };
 
 export function policyNeedsCandidateEvaluation(policy: EffectiveOrganizationModelPolicy): boolean {
@@ -70,6 +74,9 @@ export async function loadEffectivePoolModelIds(owner: AutoRoutingOwner): Promis
 }
 
 export async function loadAutoRoutingCandidateModelIds(owner: AutoRoutingOwner): Promise<string[]> {
+  if (owner.router === 'frontier') {
+    return candidateModelIdsFromSources(await getCachedFrontierRoutingTable(), null);
+  }
   const [table, poolModelIds] = await Promise.all([
     getCachedRoutingTable(),
     loadEffectivePoolModelIds(owner),

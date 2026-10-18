@@ -485,14 +485,6 @@ export async function disableCodeReviewForRepeatedCloneTimeoutsToday(
 
       // Temporarily disabled until after focus week: this is too sensitive to
       // GitHub clone outages and could disable many cloud reviews at once.
-      // await tx
-      //   .update(cloud_agent_code_reviews)
-      //   .set({
-      //     terminal_reason: REPEATED_REPOSITORY_CLONE_TIMEOUT_REASON,
-      //     updated_at: new Date().toISOString(),
-      //   })
-      //   .where(eq(cloud_agent_code_reviews.id, args.reviewId));
-      // return true;
       return false;
     }
   );

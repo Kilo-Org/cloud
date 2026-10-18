@@ -538,8 +538,6 @@ async function applyStoreUpgradeCreditAdjustments(
  */
 const PLAY_REPLACEMENT_FIRST_ORDER_TOLERANCE_MS = 5 * 60 * 1000;
 
-// ----- purchase ledger (P1-A-08d) -------------------------------------------
-
 const PURCHASE_LEDGER_DOMAIN = 'purchase' as const;
 const PURCHASE_LEDGER_INTENT = 'complete_store_purchase' as const;
 const PURCHASE_LEDGER_LEASE_SECONDS = 120;

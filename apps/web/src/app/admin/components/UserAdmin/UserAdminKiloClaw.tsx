@@ -37,19 +37,11 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { formatDate, formatRelativeTime } from '@/lib/admin-utils';
 import { toast } from 'sonner';
 
-// ---------------------------------------------------------------------------
-// Types (derived from the tRPC router output)
-// ---------------------------------------------------------------------------
-
 type RouterOutputs = inferRouterOutputs<RootRouter>;
 type KiloClawState = RouterOutputs['admin']['users']['getKiloClawState'];
 type Subscription = KiloClawState['subscriptions'][number];
 
 const DEFAULT_TRIAL_DAYS = 7;
-
-// ---------------------------------------------------------------------------
-// Small formatting helpers
-// ---------------------------------------------------------------------------
 
 function toLocalDateInputValue(date: string): string {
   const parsed = new Date(date);
@@ -133,10 +125,8 @@ function getScope(sub: Subscription) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Chain grouping — walk `transferred_to_subscription_id` linked list so
 // predecessor subscriptions nest under their tail/current record.
-// ---------------------------------------------------------------------------
 
 type Chain = { tail: Subscription; predecessors: Subscription[] };
 
@@ -208,10 +198,6 @@ function computeNextKeyDate(sub: Subscription): {
 
   return { label, date, severity };
 }
-
-// ---------------------------------------------------------------------------
-// Small UI building blocks
-// ---------------------------------------------------------------------------
 
 function DateWithRelative({
   date,
@@ -324,10 +310,8 @@ function PaymentSourceLabel({ sub }: { sub: Subscription }) {
   return <span className="text-xs text-muted-foreground">No payment source</span>;
 }
 
-// ---------------------------------------------------------------------------
 // Early Access — canonical per-user toggle. The instance admin page mirrors
 // this read-only and links here, since the underlying flag lives on the user.
-// ---------------------------------------------------------------------------
 
 function EarlyAccessRow({ userId, initialValue }: { userId: string; initialValue: boolean }) {
   const trpc = useTRPC();
@@ -396,10 +380,6 @@ function EarlyAccessRow({ userId, initialValue }: { userId: string; initialValue
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Summary strip — consistent access/plan/payment/next-date header.
-// ---------------------------------------------------------------------------
 
 function SummaryStrip({
   state,
@@ -486,10 +466,6 @@ function SummaryStrip({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Past-due banner — single source of truth for past-due/destruction messaging.
-// ---------------------------------------------------------------------------
-
 function PastDueBanner({ sub }: { sub: Subscription }) {
   return (
     <div className="rounded-lg border border-red-500/40 bg-red-950/20 p-3 text-sm">
@@ -517,10 +493,6 @@ function PastDueBanner({ sub }: { sub: Subscription }) {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Contextual field computation — only surface fields relevant to the state.
-// ---------------------------------------------------------------------------
 
 function getRelevantFields(
   sub: Subscription,
@@ -665,10 +637,6 @@ function getRelevantFields(
 
   return fields;
 }
-
-// ---------------------------------------------------------------------------
-// Subscription card (primary tail record)
-// ---------------------------------------------------------------------------
 
 type SubscriptionCardActions = {
   onChangeLog: (subscriptionId: string) => void;
@@ -869,10 +837,8 @@ function SubscriptionCard({
   );
 }
 
-// ---------------------------------------------------------------------------
 // Compact row — single-line expandable. Used for predecessors and for
 // standalone inactive chains.
-// ---------------------------------------------------------------------------
 
 function CompactSubscriptionRow({
   sub,
@@ -954,10 +920,6 @@ function CompactSubscriptionRow({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Bulk collapsed group — used when many canceled chains and no active chain.
-// ---------------------------------------------------------------------------
-
 function BulkCanceledGroup({
   chains,
   onChangeLog,
@@ -1018,10 +980,6 @@ function BulkCanceledGroup({
     </Collapsible>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Section — Personal / Organization subscription groups.
-// ---------------------------------------------------------------------------
 
 function SubscriptionsSection({
   title,
@@ -1138,19 +1096,11 @@ function SubscriptionsSection({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Cancel mode helper
-// ---------------------------------------------------------------------------
-
 const CANCEL_MODES = ['period_end', 'immediate'] as const;
 type CancelMode = (typeof CANCEL_MODES)[number];
 function isCancelMode(value: string): value is CancelMode {
   return (CANCEL_MODES as readonly string[]).includes(value);
 }
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
 
 export function UserAdminKiloClaw({ userId }: { userId: string }) {
   const trpc = useTRPC();

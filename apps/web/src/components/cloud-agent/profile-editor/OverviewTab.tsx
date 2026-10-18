@@ -95,10 +95,6 @@ function AutoSaveField({ kind, id, label, placeholder, initialValue, onSave }: A
   );
 }
 
-// -------------------------------------------------------------------
-// OverviewTab
-// -------------------------------------------------------------------
-
 type OverviewTabProps = {
   profile: NonNullable<ReturnType<typeof useProfile>['data']>;
   ownerType: ProfileOwnerType;

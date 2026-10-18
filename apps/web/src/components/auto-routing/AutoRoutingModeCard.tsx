@@ -39,10 +39,6 @@ import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-uti
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { cn } from '@/lib/utils';
 
-// ---------------------------------------------------------------------------
-// Types (mirror the web settings API response; client-safe, no server-only import)
-// ---------------------------------------------------------------------------
-
 export type PoolEntryWithAvailability = PoolEntry & {
   unavailable: boolean;
 };
@@ -82,10 +78,6 @@ type Props = {
   readonly?: boolean;
 };
 
-// ---------------------------------------------------------------------------
-// Copy (exact strings from plan task 5.3)
-// ---------------------------------------------------------------------------
-
 export const PERSONAL_EMPTY_POOL_COPY = 'No custom pool. Efficient uses the platform model pool.';
 
 export const ORGANIZATION_EMPTY_POOL_COPY =
@@ -97,10 +89,6 @@ export const UNAVAILABLE_ENTRY_EXPLANATION =
 export const SETTINGS_POLL_INTERVAL_MS = 15_000;
 
 export const POOL_ROLLOUT_NOTE = 'Custom pools are being rolled out and will be available shortly.';
-
-// ---------------------------------------------------------------------------
-// Pure helpers (exported for focused component tests)
-// ---------------------------------------------------------------------------
 
 export function settingsEndpoint(organizationId: string | undefined): string {
   if (!organizationId) return '/api/auto-routing/settings';
@@ -568,10 +556,6 @@ function availabilityByKey(
   return map;
 }
 
-// ---------------------------------------------------------------------------
-// Fetch / mutate
-// ---------------------------------------------------------------------------
-
 async function fetchSettings(
   organizationId: string | undefined
 ): Promise<AutoRoutingSettingsApiResponse> {
@@ -635,10 +619,6 @@ async function putMode(
     throwSaveError(body, response.status);
   }
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function AutoRoutingModeCard({ organizationId, readonly = false }: Props) {
   const queryClient = useQueryClient();

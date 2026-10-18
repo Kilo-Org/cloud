@@ -17,19 +17,11 @@ import type { PrepareSessionInput } from './cloud-agent-client';
  * designed for headless consumers like the Slack bot and security agent.
  */
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 const CLOUD_AGENT_NEXT_WS_URL = getEnvVariable('NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL');
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL');
 
 const DEFAULT_STREAM_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 const COMPLETE_GRACE_MS = 1000; // Wait 1s after 'complete' for final events
-
-// ---------------------------------------------------------------------------
-// URL resolution
-// ---------------------------------------------------------------------------
 
 /**
  * Resolve a (possibly relative) stream URL returned by initiateFromPreparedSession
@@ -64,10 +56,6 @@ export function resolveStreamUrl(streamUrl: string): string {
   return url.toString();
 }
 
-// ---------------------------------------------------------------------------
-// Text extraction
-// ---------------------------------------------------------------------------
-
 type MessagePart = ProcessedMessage['parts'][number];
 type TextMessagePart = Extract<MessagePart, { type: 'text' }>;
 
@@ -85,10 +73,6 @@ export function extractTextFromMessage(message: ProcessedMessage): string {
     .join('')
     .trim();
 }
-
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
 
 /** Input for runSessionToCompletion */
 export type RunSessionInput = {
@@ -123,10 +107,6 @@ export type RunSessionResult = {
   /** Collected status/error messages for diagnostics. */
   statusMessages: string[];
 };
-
-// ---------------------------------------------------------------------------
-// Main entry point
-// ---------------------------------------------------------------------------
 
 /**
  * Run a cloud-agent-next session to completion, returning the final text result.

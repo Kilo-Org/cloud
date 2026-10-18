@@ -48,10 +48,6 @@ import {
   isPartStreaming,
 } from './types';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type PartRendererProps = {
   part: Part;
   isStreaming?: boolean;
@@ -61,10 +57,6 @@ export type PartRendererProps = {
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
 };
-
-// ============================================================================
-// Shared Components
-// ============================================================================
 
 /** True when the link text is the address itself, as in a bare autolinked URL. */
 function isAddressText(children: ReactNode, href: string): boolean {
@@ -113,10 +105,6 @@ function LinkRenderer({ href, children }: { href?: string; children?: ReactNode 
 
 const markdownComponents = { a: LinkRenderer };
 const remarkPlugins = [remarkGfm];
-
-// ============================================================================
-// Part Renderers
-// ============================================================================
 
 /**
  * Renders a TextPart as markdown
@@ -446,10 +434,6 @@ function UnknownPartRenderer({ part }: { part: Part }) {
     </div>
   );
 }
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 /**
  * Error fallback for individual parts

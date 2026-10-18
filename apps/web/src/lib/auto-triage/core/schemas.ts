@@ -10,10 +10,6 @@ import type { AutoTriageTicket } from '@kilocode/db/schema';
 import { OwnerSchema, type Owner } from '@/lib/agent-config/core/owner';
 import { AUTO_TRIAGE_CONSTANTS } from './constants';
 
-// ============================================================================
-// Status and Ownership Schemas
-// ============================================================================
-
 /**
  * Auto triage ticket status enum
  */
@@ -39,10 +35,6 @@ export const ActionTakenSchema = z.enum([
   'closed_duplicate',
   'needs_clarification',
 ]);
-
-// ============================================================================
-// Configuration Schemas
-// ============================================================================
 
 /**
  * Auto triage agent configuration schema
@@ -138,10 +130,6 @@ export const SaveAutoTriageConfigSchema = z
   })
   .strict();
 
-// ============================================================================
-// GitHub Webhook Schemas
-// ============================================================================
-
 /**
  * GitHub user schema
  */
@@ -191,10 +179,6 @@ export const WebhookIssuePayloadSchema = z.object({
   repository: GitHubRepositorySchema,
   sender: GitHubUserSchema,
 });
-
-// ============================================================================
-// Database Operation Schemas
-// ============================================================================
 
 /**
  * Create ticket params schema
@@ -250,10 +234,6 @@ export const ListTicketsParamsSchema = z.object({
   classification: ClassificationTypeSchema.optional(),
   repoFullName: z.string().optional(),
 });
-
-// ============================================================================
-// tRPC Input Schemas
-// ============================================================================
 
 /**
  * List triage tickets input (for organizations)
@@ -311,10 +291,6 @@ export const GetAutoTriageConfigInputSchema = z.object({
   organizationId: z.string().uuid(),
 });
 
-// ============================================================================
-// Classification Result Schemas
-// ============================================================================
-
 /**
  * Classification result from LLM analysis
  */
@@ -326,10 +302,6 @@ export const ClassificationResultSchema = z.object({
   reasoning: z.string().optional().describe('Explanation of the classification'),
   suggestedAction: z.string().optional().describe('Suggested action to take on this issue'),
 });
-
-// ============================================================================
-// Duplicate Detection Result Schemas
-// ============================================================================
 
 /**
  * Similar ticket found during duplicate detection
@@ -352,10 +324,6 @@ export const DuplicateDetectionResultSchema = z.object({
   similarTickets: z.array(SimilarTicketSchema).optional(),
   reasoning: z.string().optional().describe('LLM reasoning for duplicate decision'),
 });
-
-// ============================================================================
-// Worker Communication Schemas
-// ============================================================================
 
 /**
  * Triage status update from worker to backend
@@ -398,10 +366,6 @@ export const DispatchTriageRequestSchema = z.object({
     maxPRCreationTimeMinutes: z.number().int().positive().min(5).max(30).optional(),
   }),
 });
-
-// ============================================================================
-// Inferred TypeScript Types from Zod Schemas
-// ============================================================================
 
 /**
  * Infer TypeScript types from Zod schemas for use in function signatures.

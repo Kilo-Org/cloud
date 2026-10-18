@@ -69,10 +69,6 @@ import { parseAdminResponse } from './admin-fetch';
 import { SchedulerConfigCard } from './SchedulerConfigCard';
 import { useSystemOneModelOptions } from './system-one-models';
 
-// ---------------------------------------------------------------------------
-// Pure helpers (exported for unit tests)
-// ---------------------------------------------------------------------------
-
 export function formatAccuracy(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
 }
@@ -217,10 +213,6 @@ export function policyOverridesFromForm(
   return Object.keys(overrides).length > 0 ? overrides : null;
 }
 
-// ---------------------------------------------------------------------------
-// Model picker helpers (exported for unit tests)
-// ---------------------------------------------------------------------------
-
 /** Pins a saved model id that is absent from the eligible catalog so it stays selectable. */
 export function pinnedModelFor(id: string): ModelOption {
   return { id, name: id };
@@ -248,10 +240,6 @@ export function effortCoverageForModel(
     .map(entry => `${entry.variant ?? 'default'}: ${entry.status ?? 'not measured'}`);
   return `${supported} · ${measured} of ${efforts.length} measured${outstanding.length > 0 ? ` · ${outstanding.join(', ')}` : ''}`;
 }
-
-// ---------------------------------------------------------------------------
-// Fetch helpers
-// ---------------------------------------------------------------------------
 
 async function fetchBenchmarkConfig(router: AutoRouter) {
   const response = await fetch(`/admin/api/auto-routing/benchmark-config?router=${router}`);
@@ -337,10 +325,6 @@ async function fetchBenchmarkRoutingTable(router: AutoRouter) {
     BenchmarkRoutingTableResponseSchema
   );
 }
-
-// ---------------------------------------------------------------------------
-// Local form state type for decider model rows
-// ---------------------------------------------------------------------------
 
 type DeciderModelRow = BenchmarkPlatformModel;
 
@@ -469,10 +453,6 @@ export function formStateToConfig(
     updatedBy: base?.updatedBy ?? null,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Config editor sub-component
-// ---------------------------------------------------------------------------
 
 function ConfigSectionHeading({ title, description }: { title: string; description: string }) {
   return (
@@ -1135,10 +1115,6 @@ function BenchmarkConfigEditor({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Run summaries expandable table
-// ---------------------------------------------------------------------------
-
 function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
   const isDecider = run.kind === 'decider';
 
@@ -1221,10 +1197,6 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
     </TableRow>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Runs table
-// ---------------------------------------------------------------------------
 
 function statusBadgeVariant(
   status: BenchmarkRun['status']
@@ -1338,10 +1310,6 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Routing table view
-// ---------------------------------------------------------------------------
 
 function RoutingTableSummary({ table }: { table: BenchmarkRoutingTableResponse['table'] }) {
   if (!table) return null;
@@ -1465,10 +1433,6 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
   );
 }
 
-// ---------------------------------------------------------------------------
-// Registry summary
-// ---------------------------------------------------------------------------
-
 const REGISTRY_STATUSES = ['pending', 'running', 'ready', 'failed'] as const;
 
 function RegistrySummary({
@@ -1524,10 +1488,6 @@ function RegistrySummary({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Main exported section component
-// ---------------------------------------------------------------------------
 
 export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
   const queryClient = useQueryClient();

@@ -1,7 +1,5 @@
 import * as z from 'zod';
 
-// --- Request schemas ---
-
 /** Where the request originates from */
 export const SourcePlatform = z.enum([
   'openclaw', // Self-hosted OpenClaw instance (plugin installed manually)
@@ -94,8 +92,6 @@ export const ShellSecurityRequestSchema = z
   });
 export type ShellSecurityRequest = z.infer<typeof ShellSecurityRequestSchema>;
 
-// --- Response schemas ---
-
 export const RecommendationPriority = z.enum(['immediate', 'high', 'medium', 'low']);
 export type RecommendationPriority = z.infer<typeof RecommendationPriority>;
 
@@ -139,8 +135,6 @@ export const ShellSecurityResponseSchema = z.object({
 });
 export type ShellSecurityResponse = z.infer<typeof ShellSecurityResponseSchema>;
 
-// --- Error schema ---
-
 export const ShellSecurityErrorCode = z.enum([
   'unauthorized',
   'rate_limited',
@@ -161,8 +155,6 @@ export const ShellSecurityErrorSchema = z.object({
 });
 export type ShellSecurityError = z.infer<typeof ShellSecurityErrorSchema>;
 
-// --- Comparison schema ---
-
 export const KiloClawComparisonEntry = z.object({
   area: z.string(),
   summary: z.string(),
@@ -170,8 +162,6 @@ export const KiloClawComparisonEntry = z.object({
   matchCheckIds: z.array(z.string()),
 });
 export type KiloClawComparisonEntry = z.infer<typeof KiloClawComparisonEntry>;
-
-// --- Constants ---
 
 export const API_VERSION = '2026-04-01' as const;
 export const RATE_LIMIT_PER_DAY = 50;

@@ -145,10 +145,6 @@ function installLinkedomDom(): { cleanup: () => void; container: HTMLElement } {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
 const entryReady: PoolEntry = { model: 'anthropic/claude-sonnet-4' };
 const entryFailed: PoolEntry = { model: 'google/gemini-2.5-flash' };
 const entryPending: PoolEntry = { model: 'openai/gpt-5' };
@@ -246,10 +242,6 @@ function findSaveButton(container: HTMLElement): HTMLButtonElement {
   return save as HTMLButtonElement;
 }
 
-// ---------------------------------------------------------------------------
-// Endpoint / query key
-// ---------------------------------------------------------------------------
-
 describe('settings endpoint and query key', () => {
   it('uses the settings route for pool-aware reads/writes', () => {
     expect(settingsEndpoint(undefined)).toBe('/api/auto-routing/settings');
@@ -264,10 +256,6 @@ describe('settings endpoint and query key', () => {
     expect(modeEndpoint('org-1')).toBe('/api/auto-routing/mode?organizationId=org-1');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Empty state copy (exact strings from the card module)
-// ---------------------------------------------------------------------------
 
 describe('empty / inherited pool copy', () => {
   it('uses the exact personal empty string', () => {
@@ -286,10 +274,6 @@ describe('empty / inherited pool copy', () => {
     expect(ORGANIZATION_EMPTY_POOL_COPY.toLowerCase()).not.toContain('merged');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Status mapping (real helper used by the card rows)
-// ---------------------------------------------------------------------------
 
 describe('mapPoolEntryDisplayStatus', () => {
   it('maps ready, pending/running, failed, and unavailable exactly', () => {
@@ -377,10 +361,6 @@ describe('mapPoolEntryDisplayStatus', () => {
     expect(display.label).toBe('Not saved');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Polling stop condition
-// ---------------------------------------------------------------------------
 
 describe('settingsRefetchInterval / hasBenchmarkingEntries', () => {
   const configured: PoolEntryWithAvailability[] = [
@@ -475,10 +455,6 @@ describe('settingsRefetchInterval / hasBenchmarkingEntries', () => {
     expect(settingsRefetchInterval(undefined)).toBe(false);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Draft resolution the card executes on every render (poll-safe overrides)
-// ---------------------------------------------------------------------------
 
 describe('resolveEffectiveDraft (card-executed override-over-saved)', () => {
   it('keeps overrides when a poll updates the saved snapshot (dirty draft preserved)', () => {
@@ -588,10 +564,6 @@ describe('resolveEffectiveDraft (card-executed override-over-saved)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Save / retry mutation callbacks the card wires into useMutation
-// ---------------------------------------------------------------------------
-
 describe('applySaveMutationSuccess / applySaveMutationError', () => {
   it('on save success updates the query cache and clears the save-error panel', () => {
     const setQueryData = jest.fn();
@@ -679,10 +651,6 @@ describe('applyRetryMutationSuccess', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Add flow
-// ---------------------------------------------------------------------------
-
 describe('tryAddPoolEntry', () => {
   it('adds a model without requiring an effort selection', () => {
     expect(
@@ -736,10 +704,6 @@ describe('tryAddPoolEntry', () => {
     expect(result.reason).toBe('pool_full');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Eligibility
-// ---------------------------------------------------------------------------
 
 describe('isDirectByokOnlyModel / isEligiblePoolModel', () => {
   it('excludes direct-BYOK-only entries via hasUserByokAvailable + provider prefix', () => {
@@ -826,10 +790,6 @@ describe('toEligibleModelOptions', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Save / retry bodies
-// ---------------------------------------------------------------------------
-
 describe('buildSaveBody / buildRetryBody / buildModeSaveBody', () => {
   it('PUTs { mode, pool } with nulls for inherit (happy save payload)', () => {
     expect(buildSaveBody({ mode: 'inherit', pool: null })).toEqual({
@@ -876,10 +836,6 @@ describe('removePoolEntry / clear', () => {
     expect(removePoolEntry([entryFailed], entryFailed)).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Clear pool + editable chrome (card-executed visibility)
-// ---------------------------------------------------------------------------
 
 describe('shouldShowClearPoolControl / resolveEditableChrome', () => {
   it('shows Clear pool only when a saved configured pool exists', () => {
@@ -936,10 +892,6 @@ describe('shouldShowClearPoolControl / resolveEditableChrome', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Errors
-// ---------------------------------------------------------------------------
-
 describe('error messages', () => {
   it('load failure message surfaces the API error string', () => {
     expect(formatLoadErrorMessage({ error: 'Authentication required' })).toBe(
@@ -967,10 +919,6 @@ describe('error messages', () => {
     expect(message.toLowerCase()).toMatch(/after /);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Readonly / permission isolation (org member) — call-site derivation
-// ---------------------------------------------------------------------------
 
 describe('readonly org member controls', () => {
   it('billing-manager edit permission is isolated from page-level canEdit', () => {
@@ -1015,20 +963,12 @@ describe('readonly org member controls', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Variant labels used by real card rows
-// ---------------------------------------------------------------------------
-
 describe('variantLabel', () => {
   it('labels null as Default and known effort keys for display', () => {
     expect(variantLabel(null)).toBe('Default');
     expect(variantLabel('high')).toBe('High');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Mounted card: poolSupported === false (legacy worker fallback)
-// ---------------------------------------------------------------------------
 
 describe('AutoRoutingModeCard poolSupported=false', () => {
   const originalFetch = global.fetch;

@@ -75,10 +75,6 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
   let currentCloudSessionId: string | null = null;
   let currentAbortController: AbortController | null = null;
 
-  // ---------------------------------------------------------------------------
-  // WebSocket + EventProcessor
-  // ---------------------------------------------------------------------------
-
   /** Returns the appropriate message updater for parent vs child session messages. */
   function messageUpdater(
     sessionId: string,
@@ -309,10 +305,6 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
     wsManager.connect();
   }
 
-  // ---------------------------------------------------------------------------
-  // tRPC mutations
-  // ---------------------------------------------------------------------------
-
   /**
    * Calls the appropriate mutation to initiate a prepared session.
    * Returns the cloudAgentSessionId for WebSocket connection.
@@ -356,10 +348,6 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
       return { sessionId: result.cloudAgentSessionId, workerVersion: result.workerVersion };
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Public API
-  // ---------------------------------------------------------------------------
 
   /**
    * Sends a user message.

@@ -19,8 +19,6 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { analytics_event_outbox, operation_ledgers } from '@kilocode/db/schema';
 import { admitOperation } from '@kilocode/db/operation-ledger';
 
-// --- Mock functions ---
-
 const mockGetCodeReviewById = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.getCodeReviewById
 >;
@@ -105,8 +103,6 @@ const mockDisableCodeReviewForRepeatedCloneTimeoutsToday = jest.fn<any>();
 const mockClassifyCodeReviewPublication = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockRecordCodeReviewPublicationOutcome = jest.fn<any>();
-
-// --- Module mocks ---
 
 jest.mock('next/server', () => {
   const actual = jest.requireActual<typeof nextServerModule>('next/server');
@@ -231,8 +227,6 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({
 jest.mock('@/lib/integrations/core/constants', () => ({
   PLATFORM: { GITHUB: 'github', GITLAB: 'gitlab', BITBUCKET: 'bitbucket' },
 }));
-
-// --- Helpers ---
 
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const REVIEW_ID = '00000000-0000-0000-0000-000000000001';
@@ -412,8 +406,6 @@ function mockCreatedInfraRetryFlow(
 
   return { failedAttemptId, retryAttemptId, sessionId, cliSessionId };
 }
-
-// --- Tests ---
 
 import type {
   POST as POSTType,

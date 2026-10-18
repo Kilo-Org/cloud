@@ -70,8 +70,6 @@ function subscriptionStatusBadge(status: string | null) {
   );
 }
 
-// --- Component ---
-
 const ACTION_CONFIG = {
   extended: { label: 'Extended', icon: Clock, variant: 'default' as const },
   restarted: { label: 'Restarted', icon: RotateCcw, variant: 'secondary' as const },

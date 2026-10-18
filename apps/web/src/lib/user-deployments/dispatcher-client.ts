@@ -47,8 +47,6 @@ class DispatcherClient {
     };
   }
 
-  // ---- Password protection ----
-
   async getPasswordStatus(workerSlug: string): Promise<GetPasswordStatusResponse> {
     const response = await fetchWithTimeout(
       `${this.baseUrl}/api/password/${workerSlug}`,
@@ -101,8 +99,6 @@ class DispatcherClient {
     return successResponseSchema.parse(await response.json());
   }
 
-  // ---- Slug mappings ----
-
   async setSlugMapping(workerName: string, slug: string) {
     const response = await fetchWithTimeout(
       `${this.baseUrl}/api/slug-mapping/${workerName}`,
@@ -143,8 +139,6 @@ class DispatcherClient {
 
     return successResponseSchema.parse(await response.json());
   }
-
-  // ---- Banner ----
 
   async enableBanner(workerName: string) {
     const response = await fetchWithTimeout(

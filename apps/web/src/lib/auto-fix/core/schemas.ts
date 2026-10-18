@@ -9,10 +9,6 @@ import * as z from 'zod';
 import type { AutoFixTicket } from '@kilocode/db/schema';
 import { OwnerSchema, type Owner } from '@/lib/agent-config/core/owner';
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 export const AUTO_FIX_CONSTANTS = {
   DEFAULT_PAGE_SIZE: 20,
   MAX_PAGE_SIZE: 100,
@@ -21,10 +17,6 @@ export const AUTO_FIX_CONSTANTS = {
   MIN_PR_CREATION_TIME_MINUTES: 5,
   MAX_PR_CREATION_TIME_MINUTES: 30,
 } as const;
-
-// ============================================================================
-// Status and Ownership Schemas
-// ============================================================================
 
 /**
  * Auto fix ticket status enum
@@ -35,10 +27,6 @@ export const FixStatusSchema = z.enum(['pending', 'running', 'completed', 'faile
  * Classification types for issues (subset from triage)
  */
 export const FixClassificationTypeSchema = z.enum(['bug', 'feature', 'question', 'unclear']);
-
-// ============================================================================
-// Configuration Schemas
-// ============================================================================
 
 /**
  * Auto fix agent configuration schema
@@ -135,10 +123,6 @@ export const SaveAutoFixConfigSchema = z
   })
   .strict();
 
-// ============================================================================
-// GitHub Label Event Schemas
-// ============================================================================
-
 /**
  * GitHub label schema
  */
@@ -175,10 +159,6 @@ export const IssueLabeledPayloadSchema = z.object({
     full_name: z.string(),
   }),
 });
-
-// ============================================================================
-// Database Operation Schemas
-// ============================================================================
 
 /**
  * Create fix ticket params schema
@@ -241,10 +221,6 @@ export const ListFixTicketsParamsSchema = z.object({
   classification: FixClassificationTypeSchema.optional(),
   repoFullName: z.string().optional(),
 });
-
-// ============================================================================
-// tRPC Input Schemas
-// ============================================================================
 
 /**
  * List fix tickets input (for organizations)
@@ -317,10 +293,6 @@ export const ToggleAutoFixAgentInputSchema = z.object({
   isEnabled: z.boolean(),
 });
 
-// ============================================================================
-// Worker Communication Schemas
-// ============================================================================
-
 /**
  * Fix status update from worker to backend
  */
@@ -373,10 +345,6 @@ export const DispatchFixRequestSchema = z.object({
     diffHunk: z.string().optional(),
   }),
 });
-
-// ============================================================================
-// Inferred TypeScript Types from Zod Schemas
-// ============================================================================
 
 /**
  * Infer TypeScript types from Zod schemas for use in function signatures.

@@ -862,10 +862,6 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   );
 }
 
-// =============================================================================
-// Hooks
-// =============================================================================
-
 /** No-op subscribe for when there's no active session */
 function noopSubscribe() {
   return () => {};

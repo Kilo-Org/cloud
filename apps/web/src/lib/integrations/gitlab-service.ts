@@ -459,10 +459,6 @@ export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSe
   return { webhookSecret: newWebhookSecret };
 }
 
-// ============================================================================
-// Project Access Token (PrAT) Management
-// ============================================================================
-
 /** Legacy plaintext project credential retained only until backfill and scrub. */
 export type StoredProjectAccessToken = {
   /** GitLab token ID (for rotation/revocation) */
@@ -930,10 +926,6 @@ export async function importExistingProjectAccessToken(
 
   return existingToken;
 }
-
-// ============================================================================
-// Personal Access Token (PAT) Connection
-// ============================================================================
 
 /**
  * Re-export validatePersonalAccessToken for use in tRPC router

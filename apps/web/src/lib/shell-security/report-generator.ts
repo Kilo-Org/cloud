@@ -10,8 +10,6 @@ import type {
 import { findCoverageForCheckId, type LoadedShellSecurityContent } from './content-loader';
 import { isKiloClawMitigated } from './kiloclaw-mitigations';
 
-// --- Grading ---
-
 /**
  * Per-finding score deductions. Critical findings dominate the grade; warnings
  * stack up linearly; info is visibility-only and does not affect the score.
@@ -36,8 +34,6 @@ function computeGrade(
     score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
   return { score, grade };
 }
-
-// --- Report generation ---
 
 interface GenerateReportOptions {
   audit: ShellSecurityRequest['audit'];
@@ -231,8 +227,6 @@ function priorityBadge(priority: RecommendationPriority): string {
   }
 }
 
-// --- Markdown rendering ---
-
 interface RenderOptions {
   findings: ReportFinding[];
   recommendations: Recommendation[];
@@ -395,8 +389,6 @@ function renderFinding(lines: string[], finding: ReportFinding): void {
     lines.push('');
   }
 }
-
-// --- Helpers ---
 
 function getContent(content: LoadedShellSecurityContent, key: string, fallback: string): string {
   return content.content.get(key) ?? fallback;

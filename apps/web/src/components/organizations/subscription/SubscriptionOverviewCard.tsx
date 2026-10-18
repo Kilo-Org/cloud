@@ -112,13 +112,8 @@ export function SubscriptionOverviewCard({
   seatsUsed: number;
   totalSeats: number;
 }) {
-  // Get current period dates from subscription.items[0] if it exists, otherwise from subscription
   const firstItem = subscription.items?.data?.[0] as SubscriptionItemWithPeriod | undefined;
   const subscriptionWithPeriod = subscription as SubscriptionWithPeriod;
-
-  // Try to get from items first, then fallback to subscription properties
-  // const currentPeriodStart =
-  //   firstItem?.current_period_start || subscriptionWithPeriod.current_period_start;
   const currentPeriodEnd =
     firstItem?.current_period_end || subscriptionWithPeriod.current_period_end;
 

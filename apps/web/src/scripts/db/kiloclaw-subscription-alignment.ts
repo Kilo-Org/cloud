@@ -1922,7 +1922,6 @@ async function applyDuplicateActiveInstanceRow(
         return 'skipped';
       }
 
-      // ---- MUTATION BARRIER ----
       // Past this point the sub has been moved off the duplicate. Any later
       // failure MUST throw so drizzle rolls the tx back; returning 'skipped'
       // would leave the canonical instance with the sub but the duplicate
@@ -2389,7 +2388,6 @@ async function applyMissingPersonalBackfillRow(
         return 'skipped';
       }
 
-      // ---- MUTATION BARRIER ----
       // Past this point the successor row exists in the tx. Any downstream
       // failure MUST throw so drizzle rolls the tx back; returning 'skipped'
       // would commit the orphan successor and violate the single-current-row
@@ -2781,7 +2779,6 @@ type MultiRowAllDestroyedOutcome =
   | 'skipped_race'
   | 'skipped_not_collapsible';
 
-// ---------------------------------------------------------------------------
 // Multi-row-all-destroyed collapse
 //
 // Scope: users whose `personalCurrentSubscriptionWhere` predicate returns >1 rows
@@ -2807,7 +2804,6 @@ type MultiRowAllDestroyedOutcome =
 // transferred_to_subscription_id IS NULL, we set it to the immediately-next
 // row's id. We skip any pair whose target already has a predecessor (to avoid
 // UQ violations from pre-existing partial chains), so re-runs are idempotent.
-// ---------------------------------------------------------------------------
 
 type MultiRowAllDestroyedSourceRow = {
   subscriptionId: string;

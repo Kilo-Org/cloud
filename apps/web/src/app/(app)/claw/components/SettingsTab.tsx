@@ -133,10 +133,6 @@ function joinFriendlyList(items: string[]): string {
   return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
 }
 
-// ---------------------------------------------------------------------------
-// 1Password setup guide dialog
-// ---------------------------------------------------------------------------
-
 function OnePasswordSetupGuide() {
   return (
     <Dialog>
@@ -220,10 +216,6 @@ function OnePasswordSetupGuide() {
     </Dialog>
   );
 }
-
-// ---------------------------------------------------------------------------
-// AgentCard setup guide dialog
-// ---------------------------------------------------------------------------
 
 function AgentCardSetupGuide() {
   return (
@@ -326,10 +318,6 @@ function GoogleGIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Google Calendar (official Kilo OAuth client, credential_profile=kilo_owned)
-// ---------------------------------------------------------------------------
 
 // Read-only capability summary, mirrored from the onboarding calendar step
 // (CalendarConnectStep.tsx) so the settings copy stays consistent.
@@ -503,10 +491,6 @@ function GoogleCalendarCard({
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Google Account (collapsible card, matches SecretEntrySection card style)
-// ---------------------------------------------------------------------------
 
 function GoogleAccountCard({
   connected,
@@ -1525,10 +1509,6 @@ function MorningBriefingCard({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Default Permissions section
-// ---------------------------------------------------------------------------
-
 function PermissionPresetSection({
   isRunning,
   status,
@@ -1865,10 +1845,6 @@ function InboundEmailCard({
   );
 }
 
-// ---------------------------------------------------------------------------
-// MemorySection
-// ---------------------------------------------------------------------------
-
 function MemorySection({
   config,
   mutations,
@@ -2045,10 +2021,6 @@ function MemorySection({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// SettingsTab
-// ---------------------------------------------------------------------------
 
 export function SettingsTab({
   status,

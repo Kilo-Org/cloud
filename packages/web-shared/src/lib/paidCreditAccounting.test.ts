@@ -1,6 +1,7 @@
 import {
   computeCreditLotAllocations,
   computeExpiration,
+  reconcileCreditExpirationsInTransaction,
   type ExpiringTransaction,
 } from '@kilocode/db/credit-expiration';
 import { credit_transactions, kilocode_users, organizations } from '@kilocode/db/schema';
@@ -8,7 +9,7 @@ import { db } from './drizzle';
 import { processTopUp } from './credits';
 import { processLocalExpirations, processOrganizationExpirationsBatch } from './creditExpiration';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { createOrganization } from './organizations/organizations';
 
 const lot = (
@@ -292,4 +293,82 @@ describe('organization batch source preservation', () => {
     });
     expect(preserved?.expiration_baseline_microdollars_used).toBe(40);
   });
+});
+
+describe('large credit histories', () => {
+  it.each(['user', 'organization', 'organization batch'] as const)(
+    'expires an oversized %s history atomically and remains replay safe',
+    async mode => {
+      const user = await insertTestUser();
+      const organization =
+        mode === 'user' ? null : await createOrganization('Expiry boundary', user.id);
+      const id = organization?.id ?? user.id;
+      const amount = 800_000;
+      const past = '2020-01-01T00:00:00.000Z';
+      await db.execute(sql`
+        INSERT INTO credit_transactions (
+          kilo_user_id, organization_id, amount_microdollars, is_free,
+          expiry_date, paid_credit_policy, credit_source, expiration_baseline_microdollars_used
+        )
+        SELECT ${user.id}, ${organization?.id ?? null}::uuid, 100, false,
+          ${past}::timestamptz, 'one_year', 'stripe', 0
+        FROM generate_series(1, 8000)
+      `);
+      if (organization) {
+        await db
+          .update(organizations)
+          .set({
+            total_microdollars_acquired: amount,
+            microdollars_balance: amount,
+            next_credit_expiration_at: past,
+          })
+          .where(eq(organizations.id, id));
+      } else {
+        await db
+          .update(kilocode_users)
+          .set({ total_microdollars_acquired: amount, next_credit_expiration_at: past })
+          .where(eq(kilocode_users.id, id));
+      }
+      for (let replay = 0; replay < 2; replay++) {
+        if (mode === 'organization batch') {
+          const [snapshot] = await db.select().from(organizations).where(eq(organizations.id, id));
+          await processOrganizationExpirationsBatch([snapshot], new Date());
+        } else {
+          await db.transaction(tx =>
+            reconcileCreditExpirationsInTransaction({ type: mode, id }, tx)
+          );
+        }
+      }
+      const table = organization ? organizations : kilocode_users;
+      const [state] = await db
+        .select({
+          acquired: table.total_microdollars_acquired,
+          used: table.microdollars_used,
+          next: table.next_credit_expiration_at,
+        })
+        .from(table)
+        .where(eq(table.id, id));
+      expect(state).toEqual({ acquired: 0, used: 0, next: null });
+      if (organization) {
+        const [row] = await db.select().from(organizations).where(eq(organizations.id, id));
+        expect(row.microdollars_balance).toBe(0);
+      }
+      const [expired] = await db
+        .select({
+          count: sql<number>`count(*)::int`,
+          amount: sql<number>`sum(${credit_transactions.amount_microdollars})::int`,
+        })
+        .from(credit_transactions)
+        .where(
+          and(
+            organization
+              ? eq(credit_transactions.organization_id, id)
+              : eq(credit_transactions.kilo_user_id, id),
+            eq(credit_transactions.credit_category, 'credits_expired')
+          )
+        );
+      expect(expired).toEqual({ count: 8000, amount: -amount });
+    },
+    30_000
+  );
 });

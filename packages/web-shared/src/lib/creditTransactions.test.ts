@@ -18,6 +18,7 @@ import {
   KiloPassIssuanceSource,
   KiloPassTier,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { retireCreditBalance, transferCreditLots } from './creditAdjustments';
 
 describe('Credit Transactions', () => {
   describe('getCreditTransactionsSummaryByUserId', () => {
@@ -106,6 +107,33 @@ describe('Credit Transactions', () => {
       expect(summary.total_purchased_musd).toBe(90_000_000);
       expect(summary.total_promotional_musd).toBe(0);
       expect(summary.credit_transaction_count).toBe(5);
+    });
+
+    test('does not report untracked legacy balance movements as negative purchases', async () => {
+      const source = await insertTestUser({ total_microdollars_acquired: 100_000_000 });
+      const target = await insertTestUser();
+      await db.transaction(tx =>
+        transferCreditLots(tx, {
+          from: { type: 'user', id: source.id },
+          to: { type: 'user', id: target.id },
+          actorId: source.id,
+          amountMicrodollars: 40_000_000,
+          incomingCategory: 'parent_to_child_transfer_in',
+          outgoingCategory: 'parent_to_child_transfer_out',
+          incomingDescription: 'Incoming legacy credit',
+          outgoingDescription: 'Outgoing legacy credit',
+        })
+      );
+      await db.transaction(tx =>
+        retireCreditBalance(tx, {
+          owner: { type: 'user', id: source.id },
+          actorId: source.id,
+          creditCategory: 'organization_custom',
+          description: 'Retire remaining legacy credit',
+        })
+      );
+      expect((await getCreditTransactionsSummaryByUserId(source.id)).total_purchased_musd).toBe(0);
+      expect((await getCreditTransactionsSummaryByUserId(target.id)).total_purchased_musd).toBe(0);
     });
 
     test('should return zeros for user with no transactions', async () => {

@@ -218,6 +218,8 @@ describe('recomputeUserBalances', () => {
     consumed_microdollars: 0,
     retired_microdollars: 0,
     credit_source: null,
+    paid_credit_policy: null,
+    credit_category: null,
   };
 
   test('should skip baseline updates when values already match', () => {

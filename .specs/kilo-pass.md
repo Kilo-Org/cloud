@@ -165,6 +165,11 @@ These rules extend rules 8-12 and take effect only after `PAID_CREDIT_EXPIRATION
 - Bonus, welcome-promo, and referral deadlines are unchanged by these rules.
 - Credits with the earliest deadline MUST be consumed first; non-expiring credits last. Expiration alone MUST NOT trigger
   automatic top-up.
+- Expiry writes MUST remain atomic when an owner's credit history exceeds the database parameter limit.
+- Balance responses after reconciliation MUST use acquired credits and usage from the same refreshed state.
+- Internal credit movements MUST NOT change reported paid principal, including movements of untracked legacy balances.
+- Balance repair MUST preserve remaining lot exposure when it corrects cumulative usage.
+- Positive repair adjustments MUST NOT create additional spendable lot exposure.
 
 ### Monthly Ramp and Welcome Promo
 

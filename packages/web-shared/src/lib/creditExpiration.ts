@@ -361,8 +361,10 @@ export async function processOrganizationExpirationsBatch(
             }))
           : []
       );
-      if (expirationTransactions.length > 0) {
-        await tx.insert(creditTransactionsTable).values(expirationTransactions);
+      for (let offset = 0; offset < expirationTransactions.length; offset += 1000) {
+        await tx
+          .insert(creditTransactionsTable)
+          .values(expirationTransactions.slice(offset, offset + 1000));
       }
 
       const baselineUpdates = prepared.flatMap(item =>

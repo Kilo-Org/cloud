@@ -9,6 +9,7 @@ export const isPaidCreditReportingSql = sql`(
       ${credit_transactions.source_transaction_id} is null
       and ${credit_transactions.credit_category} is distinct from 'credits_expired'
       and ${credit_transactions.paid_credit_policy} is distinct from 'settlement'
+      and (not ${credit_transactions.is_free} or ${credit_transactions.amount_microdollars} > 0)
     )
   )
 )`;

@@ -218,19 +218,25 @@ export async function reconcileCreditExpirationsInTransaction(
     total_microdollars_acquired: entity.total_microdollars_acquired + adjustment,
     next_credit_expiration_at: nextExpiration,
   };
-  if (result.newTransactions.length > 0) {
+  for (let offset = 0; offset < result.newTransactions.length; offset += 1000) {
     await tx.insert(creditTransactionsTable).values(
-      result.newTransactions.map(transaction => ({
+      result.newTransactions.slice(offset, offset + 1000).map(transaction => ({
         ...transaction,
         ...(owner.type === 'organization' ? { organization_id: owner.id } : {}),
       }))
     );
   }
-  for (const [id, baseline] of result.newBaselines) {
-    await tx
-      .update(creditTransactionsTable)
-      .set({ expiration_baseline_microdollars_used: baseline })
-      .where(eq(creditTransactionsTable.id, id));
+  if (result.newBaselines.size > 0) {
+    const updates = [...result.newBaselines].map(([id, baseline]) => ({ id, baseline }));
+    await tx.execute(sql`
+      UPDATE ${creditTransactionsTable} AS credit_transaction
+      SET expiration_baseline_microdollars_used = update_values.baseline
+      FROM jsonb_to_recordset(${JSON.stringify(updates)}::jsonb) AS update_values(
+        id uuid,
+        baseline bigint
+      )
+      WHERE credit_transaction.id = update_values.id
+    `);
   }
   if (result.newTransactions.length > 0 || entity.next_credit_expiration_at !== nextExpiration) {
     if (owner.type === 'user') {

@@ -14,6 +14,11 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { hasOrganizationEverPaid } from '@kilocode/web-shared/lib/creditTransactions';
 import type { User, Organization } from '@kilocode/db/schema';
+import * as creditExpiration from '@kilocode/web-shared/lib/creditExpiration';
+
+jest.mock('@kilocode/web-shared/lib/creditExpiration', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/creditExpiration'),
+}));
 
 let ownerUser: User;
 let memberUser: User;
@@ -168,6 +173,47 @@ describe('organization funds router', () => {
         .from(organizations)
         .where(eq(organizations.id, childA.id));
       expect(updated.next).toBeNull();
+    });
+
+    it('uses current child usage when consumption commits before expiry reconciliation', async () => {
+      const past = '2020-01-01T00:00:00.000Z';
+      await db
+        .update(organizations)
+        .set({
+          total_microdollars_acquired: 2_000_000,
+          microdollars_used: 0,
+          microdollars_balance: 2_000_000,
+          next_credit_expiration_at: past,
+        })
+        .where(eq(organizations.id, childA.id));
+      await db.insert(credit_transactions).values({
+        kilo_user_id: ownerUser.id,
+        organization_id: childA.id,
+        amount_microdollars: 2_000_000,
+        is_free: false,
+        expiry_date: past,
+        expiration_baseline_microdollars_used: 0,
+      });
+      const reconcile = creditExpiration.processOrganizationExpirations;
+      const interception = jest
+        .spyOn(creditExpiration, 'processOrganizationExpirations')
+        .mockImplementationOnce(async (snapshot, now) => {
+          await db
+            .update(organizations)
+            .set({ microdollars_used: 800_000, microdollars_balance: 1_200_000 })
+            .where(eq(organizations.id, childA.id));
+          return reconcile(snapshot, now);
+        });
+      try {
+        const caller = await createCallerForUser(ownerUser.id);
+        const result = await caller.organizations.funds.childBalances({
+          organizationId: parentOrg.id,
+        });
+        expect(result.children.find(child => child.id === childA.id)?.balanceMicrodollars).toBe(0);
+        expect(balanceOf(await getOrg(childA.id))).toBe(0);
+      } finally {
+        interception.mockRestore();
+      }
     });
 
     it('reports hasExpiringCredits when the parent has a future expiry date', async () => {

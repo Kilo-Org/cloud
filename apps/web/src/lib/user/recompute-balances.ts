@@ -137,6 +137,8 @@ async function fetchUserBalanceData(userId: string) {
       consumed_microdollars: credit_transactions.consumed_microdollars,
       retired_microdollars: credit_transactions.retired_microdollars,
       credit_source: credit_transactions.credit_source,
+      paid_credit_policy: credit_transactions.paid_credit_policy,
+      credit_category: credit_transactions.credit_category,
     })
     .from(credit_transactions)
     .where(
@@ -151,6 +153,12 @@ export function computeUserBalanceUpdates(
   data: NonNullable<Awaited<ReturnType<typeof fetchUserBalanceData>>>
 ) {
   const { user, usageRecords, creditTransactions } = data;
+  const hasNormalizedLots = creditTransactions.some(
+    transaction =>
+      transaction.paid_credit_policy !== 'settlement' &&
+      transaction.credit_category !== 'accounting_adjustment' &&
+      (transaction.consumed_microdollars > 0 || transaction.retired_microdollars > 0)
+  );
 
   // Compute total usage AND original baselines in a single pass.
   // usageRecords contains LLM, Exa, and metered-compute charges, merge-sorted
@@ -166,7 +174,7 @@ export function computeUserBalanceUpdates(
     }
     computedOriginalBaselines.set(
       txn.id,
-      txn.credit_source !== null
+      txn.credit_source !== null || hasNormalizedLots
         ? (txn.original_baseline_microdollars_used ?? cumulativeUsage)
         : cumulativeUsage
     );
@@ -185,7 +193,9 @@ export function computeUserBalanceUpdates(
       ...t,
       expiration_baseline_microdollars_used:
         t.credit_source !== null
-          ? t.expiration_baseline_microdollars_used
+          ? (t.expiration_baseline_microdollars_used ?? 0) +
+            cumulativeUsage -
+            user.microdollars_used
           : (computedOriginalBaselines.get(t.id) ?? 0),
     }));
 
@@ -196,18 +206,17 @@ export function computeUserBalanceUpdates(
     .map(t => new Date(t.created_at))
     .reduce((max, d) => (d > max ? d : max), new Date(0));
 
-  const expirationResult = computeExpiration(
-    expiringTransactions,
-    { id: user.id, microdollars_used: cumulativeUsage },
-    lastExpirationTime,
-    user.id
-  );
-
-  // Merge: original baselines as base, then overwrite with any shifts from computeExpiration
-  const computedExpirationBaselines = new Map([
-    ...computedOriginalBaselines,
-    ...expirationResult.newBaselines,
-  ]);
+  const computedExpirationBaselines = hasNormalizedLots
+    ? new Map<string, number>()
+    : new Map([
+        ...computedOriginalBaselines,
+        ...computeExpiration(
+          expiringTransactions,
+          { id: user.id, microdollars_used: cumulativeUsage },
+          lastExpirationTime,
+          user.id
+        ).newBaselines,
+      ]);
 
   const updatesForOriginalBaseline = creditTransactions
     .map(t => ({
@@ -218,13 +227,18 @@ export function computeUserBalanceUpdates(
     .filter(t => t.baseline !== t.db);
 
   const updatesForExpirationBaseline = creditTransactions
-    .filter(t => t.expiry_date != null && t.credit_source === null)
+    .filter(t => t.amount_microdollars > 0)
     .map(t => ({
       id: t.id,
-      baseline: computedExpirationBaselines.get(t.id) ?? 0,
+      baseline:
+        hasNormalizedLots || t.credit_source !== null || t.expiry_date === null
+          ? (t.expiration_baseline_microdollars_used ?? 0) +
+            cumulativeUsage -
+            user.microdollars_used
+          : (computedExpirationBaselines.get(t.id) ?? 0),
       db: t.expiration_baseline_microdollars_used,
     }))
-    .filter(t => t.baseline !== t.db);
+    .filter(t => t.baseline !== (t.db ?? 0));
 
   const new_microdollars_used = cumulativeUsage;
   const credit_transactions_sum = creditTransactions.reduce(
@@ -284,6 +298,7 @@ async function applyUserBalanceUpdates(updates: UserBalanceUpdates): Promise<boo
         amount_microdollars: accounting_error_mUsd,
         is_free: true,
         credit_category: 'accounting_adjustment',
+        retired_microdollars: Math.max(0, accounting_error_mUsd),
         description: 'Correction to match cached balance during recomputation',
         original_baseline_microdollars_used: user_update.microdollars_used,
       });

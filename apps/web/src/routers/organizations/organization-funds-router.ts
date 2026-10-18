@@ -139,6 +139,7 @@ export const organizationFundsRouter = createTRPCRouter({
       const children: { id: string; name: string; balanceMicrodollars: number }[] = [];
       for (const child of childRows) {
         let totalAcquired = child.total_microdollars_acquired;
+        let used = child.microdollars_used;
         if (child.next_credit_expiration_at && now >= new Date(child.next_credit_expiration_at)) {
           const expiryResult = await processOrganizationExpirations(
             {
@@ -151,12 +152,13 @@ export const organizationFundsRouter = createTRPCRouter({
           );
           if (expiryResult) {
             totalAcquired = expiryResult.total_microdollars_acquired;
+            used = expiryResult.microdollars_used;
           }
         }
         children.push({
           id: child.id,
           name: child.name,
-          balanceMicrodollars: totalAcquired - child.microdollars_used,
+          balanceMicrodollars: totalAcquired - used,
         });
       }
 

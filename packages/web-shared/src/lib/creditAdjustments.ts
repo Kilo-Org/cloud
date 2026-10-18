@@ -81,15 +81,35 @@ async function normalizeCreditLots(tx: DrizzleTransaction, owner: CreditOwner, s
       )
     );
   const allocations = computeCreditLotAllocations(lots, state);
-  for (const allocation of allocations) {
-    await tx
-      .update(credit_transactions)
-      .set({
-        consumed_microdollars:
-          (allocation.transaction.consumed_microdollars ?? 0) + allocation.consumed_microdollars,
-        expiration_baseline_microdollars_used: state.microdollars_used,
-      })
-      .where(eq(credit_transactions.id, allocation.transaction.id));
+  const updates = allocations.flatMap(allocation => {
+    const consumed =
+      (allocation.transaction.consumed_microdollars ?? 0) + allocation.consumed_microdollars;
+    if (
+      allocation.transaction.consumed_microdollars === consumed &&
+      allocation.transaction.expiration_baseline_microdollars_used === state.microdollars_used
+    ) {
+      return [];
+    }
+    return [
+      {
+        id: allocation.transaction.id,
+        consumed,
+        baseline: state.microdollars_used,
+      },
+    ];
+  });
+  if (updates.length > 0) {
+    await tx.execute(sql`
+      UPDATE ${credit_transactions} AS credit_transaction
+      SET consumed_microdollars = update_values.consumed,
+          expiration_baseline_microdollars_used = update_values.baseline
+      FROM jsonb_to_recordset(${JSON.stringify(updates)}::jsonb) AS update_values(
+        id uuid,
+        consumed bigint,
+        baseline bigint
+      )
+      WHERE credit_transaction.id = update_values.id
+    `);
   }
   return allocations;
 }

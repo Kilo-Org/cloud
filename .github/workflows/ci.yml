@@ -550,6 +550,10 @@ jobs:
       - name: Run web tests
         run: pnpm --filter web test --shard=${{ matrix.shard }}/8
 
+      - name: Run inference reservation PostgreSQL tests
+        if: matrix.shard == 1
+        run: pnpm --filter @kilocode/db test --runInBand --testPathIgnorePatterns /node_modules/ --runTestsByPath src/inference-reservations.test.ts
+
   test-scripts:
     needs: changes
     if: needs.changes.outputs.kilocode_backend == 'true'

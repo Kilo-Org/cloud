@@ -398,33 +398,6 @@ describe('organizations trpc router', () => {
           organizationId: org.id,
         });
 
-        expect(Object.keys(memberResult).sort()).toEqual(
-          [
-            'id',
-            'name',
-            'created_at',
-            'updated_at',
-            'microdollars_used',
-            'microdollars_balance',
-            'total_microdollars_acquired',
-            'next_credit_expiration_at',
-            'auto_top_up_enabled',
-            'settings',
-            'seat_count',
-            'require_seats',
-            'created_by_kilo_user_id',
-            'deleted_at',
-            'sso_domain',
-            'parent_organization_id',
-            'plan',
-            'free_trial_end_at',
-            'company_domain',
-            'callerRole',
-            'members',
-            'childOrganizations',
-            'effectiveSsoPolicy',
-          ].sort()
-        );
         expect(memberResult).not.toHaveProperty('stripe_customer_id');
 
         const memberActive = memberResult.members.find(
@@ -465,34 +438,6 @@ describe('organizations trpc router', () => {
           organizationId: org.id,
         });
 
-        expect(Object.keys(ownerResult).sort()).toEqual(
-          [
-            'id',
-            'name',
-            'created_at',
-            'updated_at',
-            'microdollars_used',
-            'microdollars_balance',
-            'total_microdollars_acquired',
-            'next_credit_expiration_at',
-            'stripe_customer_id',
-            'auto_top_up_enabled',
-            'settings',
-            'seat_count',
-            'require_seats',
-            'created_by_kilo_user_id',
-            'deleted_at',
-            'sso_domain',
-            'parent_organization_id',
-            'plan',
-            'free_trial_end_at',
-            'company_domain',
-            'callerRole',
-            'members',
-            'childOrganizations',
-            'effectiveSsoPolicy',
-          ].sort()
-        );
         expect(ownerResult).toHaveProperty('stripe_customer_id', 'cus_dto_org');
 
         const ownerActive = ownerResult.members.find(

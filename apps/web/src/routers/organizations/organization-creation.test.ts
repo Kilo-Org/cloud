@@ -90,7 +90,7 @@ describe('organization creation limit', () => {
       where: eq(organizations.parent_organization_id, parent.id),
     });
     expect(children).toHaveLength(4);
-    expect(children.every(child => child.created_by_kilo_user_id === user.id)).toBe(true);
+    expect(children.every(child => child.created_by_kilo_user_id === null)).toBe(true);
     const memberships = await db.query.organization_memberships.findMany({
       where: eq(organization_memberships.kilo_user_id, user.id),
     });
@@ -150,6 +150,46 @@ describe('organization creation limit', () => {
     ).rejects.toMatchObject({
       code: 'TOO_MANY_REQUESTS',
     });
+  });
+
+  test('rejects further creation after another admin increases inherited access', async () => {
+    const owner = await insertTestUser();
+    const admin = await insertTestUser();
+    const parent = await createOrganization('Shared Parent', owner.id);
+    await addUserToOrganization(parent.id, admin.id, 'admin');
+    for (let index = 0; index < 3; index++) {
+      await createChildOrganization(`Shared Existing ${index}`, parent.id);
+    }
+
+    const ownerCaller = await createCallerForUser(owner.id);
+    const adminCaller = await createCallerForUser(admin.id);
+    await ownerCaller.organizations.create({
+      name: 'Owner fifth organization',
+      autoAddCreator: true,
+    });
+    await adminCaller.organizations.createChild({
+      organizationId: parent.id,
+      name: 'Admin fifth organization',
+    });
+
+    const ownerOrganizations = await db.query.organizations.findMany({
+      where: or(
+        eq(organizations.created_by_kilo_user_id, owner.id),
+        eq(organizations.parent_organization_id, parent.id)
+      ),
+    });
+    expect(ownerOrganizations).toHaveLength(6);
+    await expect(
+      ownerCaller.organizations.create({ name: 'Owner over inherited limit' })
+    ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+    for (const caller of [ownerCaller, adminCaller]) {
+      await expect(
+        caller.organizations.createChild({
+          organizationId: parent.id,
+          name: 'Over inherited child limit',
+        })
+      ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+    }
   });
 
   test('serializes concurrent parent and child creation at the shared limit', async () => {

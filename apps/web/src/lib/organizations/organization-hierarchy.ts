@@ -117,7 +117,6 @@ export async function createChildOrganization(
         require_seats: false,
         free_trial_end_at: null,
         parent_organization_id: parentOrganizationId,
-        created_by_kilo_user_id: userId,
         settings: {
           enable_usage_limits: false,
           code_indexing_enabled: true,

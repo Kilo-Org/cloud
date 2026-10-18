@@ -164,6 +164,7 @@ export async function saveOpenAiChatGptConnection(
     created_by: createdBy,
     usage_limit_reached_at: null,
     usage_limit_resets_at: null,
+    usage_limit_error_code: null,
   };
 
   // Each owner shape upserts through its own partial unique index.
@@ -203,6 +204,7 @@ export async function saveOpenAiChatGptConnection(
         is_enabled: true,
         usage_limit_reached_at: null,
         usage_limit_resets_at: null,
+        usage_limit_error_code: null,
       },
     });
 }
@@ -220,11 +222,12 @@ export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): P
 export async function readOpenAiChatGptUsageLimit(
   owner: OpenAiChatGptOwner,
   now: number = Date.now()
-): Promise<{ reachedAt: string; resetsAt: string | null } | null> {
+): Promise<{ reachedAt: string; resetsAt: string | null; code: string | null } | null> {
   const rows = await db
     .select({
       usage_limit_reached_at: openai_chatgpt_connections.usage_limit_reached_at,
       usage_limit_resets_at: openai_chatgpt_connections.usage_limit_resets_at,
+      usage_limit_error_code: openai_chatgpt_connections.usage_limit_error_code,
     })
     .from(openai_chatgpt_connections)
     .where(openAiChatGptOwnerWhere(owner))
@@ -241,6 +244,7 @@ export async function readOpenAiChatGptUsageLimit(
     // normalized to ISO before it leaves the database layer.
     reachedAt: new Date(row.usage_limit_reached_at).toISOString(),
     resetsAt: row.usage_limit_resets_at ? new Date(row.usage_limit_resets_at).toISOString() : null,
+    code: row.usage_limit_error_code,
   };
 }
 
@@ -259,6 +263,7 @@ export async function recordOpenAiChatGptUsageLimit(
       usage_limit_reached_at: new Date().toISOString(),
       usage_limit_resets_at:
         limit.resetsAt === null ? null : new Date(limit.resetsAt).toISOString(),
+      usage_limit_error_code: limit.code,
     })
     .where(openAiChatGptOwnerWhere(owner));
 }
@@ -277,7 +282,11 @@ export async function recordOpenAiChatGptUsageLimit(
 export async function clearOpenAiChatGptUsageLimit(owner: OpenAiChatGptOwner): Promise<void> {
   await db
     .update(openai_chatgpt_connections)
-    .set({ usage_limit_reached_at: null, usage_limit_resets_at: null })
+    .set({
+      usage_limit_reached_at: null,
+      usage_limit_resets_at: null,
+      usage_limit_error_code: null,
+    })
     .where(
       and(
         openAiChatGptOwnerWhere(owner),

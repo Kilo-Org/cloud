@@ -388,6 +388,17 @@ The application consists of the Next.js app plus several Cloudflare Worker servi
 
 AI inference works locally without any extra services. The Next.js app includes an OpenRouter proxy route (`/api/openrouter/[...path]`) that calls real AI providers using API keys from `.env.local`. There are no mocks or local stubs — all inference hits real APIs (OpenRouter, OpenAI, Anthropic, Mistral, etc.).
 
+### Sign in with ChatGPT usage limits
+
+The gateway records plan limits on the connection that serves the request.
+The personal, organization-member, and shared-services settings cards show the recorded notice.
+
+- Consumer limits retain the **Manage usage** action.
+- `subscription_sharing_workplace_individual_usage_limit_exceeded` selects the Business notice.
+- **Copy request for admin** copies a message for the user's ChatGPT workspace admin.
+- Copying does not send the message, change the limit, or switch billing.
+- A successful request or a reconnect clears the recorded notice.
+
 ### Running workers locally
 
 Each worker in the workspace can be started individually with `wrangler dev` (or `pnpm dev`) from its directory. Workers communicate with Next.js over HTTP using env vars like `CLOUD_AGENT_NEXT_API_URL`, `CODE_REVIEW_WORKER_URL`, etc. Dev ports are defined in each worker's `wrangler.jsonc`.

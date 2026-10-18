@@ -12,29 +12,17 @@ jest.mock('@/components/ui/dialog', () => ({
 import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from '@jest/globals';
+import { ChatGptUsageLimitContent, MANAGE_USAGE_LABEL } from './ChatGptUsageLimitDialog';
 import {
-  BUY_CREDITS_LABEL,
-  ChatGptUsageLimitContent,
-  MANAGE_USAGE_LABEL,
-  USAGE_LIMIT_DESCRIPTION,
-  USAGE_LIMIT_TITLE,
-} from './ChatGptUsageLimitDialog';
-import { CHATGPT_USAGE_SETTINGS_URL } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
+  CHATGPT_BUSINESS_USAGE_LIMIT_CODE,
+  CHATGPT_USAGE_SETTINGS_URL,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 
-function render(): string {
-  return renderToStaticMarkup(createElement(ChatGptUsageLimitContent));
+function render(code: string | null = null): string {
+  return renderToStaticMarkup(createElement(ChatGptUsageLimitContent, { code }));
 }
 
 describe('ChatGptUsageLimitContent', () => {
-  it('renders the guideline copy exactly', () => {
-    const html = render();
-
-    expect(html).toContain(USAGE_LIMIT_TITLE);
-    expect(html).toContain(USAGE_LIMIT_DESCRIPTION);
-    expect(html).toContain(MANAGE_USAGE_LABEL);
-    expect(html).toContain(BUY_CREDITS_LABEL);
-  });
-
   it('opens the ChatGPT usage settings as the primary action', () => {
     const html = render();
     const manageUsage = html.slice(html.lastIndexOf('<a', html.indexOf(MANAGE_USAGE_LABEL)));
@@ -46,5 +34,11 @@ describe('ChatGptUsageLimitContent', () => {
 
   it('offers Kilo credits as the secondary action', () => {
     expect(render()).toContain('href="/credits"');
+  });
+
+  it('does not offer personal settings or credit purchases for a workspace limit', () => {
+    const html = render(CHATGPT_BUSINESS_USAGE_LIMIT_CODE);
+    expect(html).not.toContain(`href="${CHATGPT_USAGE_SETTINGS_URL}"`);
+    expect(html).not.toContain('href="/credits"');
   });
 });

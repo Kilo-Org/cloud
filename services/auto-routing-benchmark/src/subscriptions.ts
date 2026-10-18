@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import {
   benchmarkPairKey,
+  resolveBenchmarkIdentity,
   type AutoRouter,
   type BenchmarkConfig,
   type BenchmarkPair,
@@ -205,7 +206,11 @@ export async function syncSubscriptionSnapshot(
       );
     const catalog = needsResolution
       ? (options.catalog ??
-        (await fetchExecutableBenchmarkModelCatalog(env, config, options.fetchImpl)))
+        (await fetchExecutableBenchmarkModelCatalog(
+          env,
+          resolveBenchmarkIdentity(config),
+          options.fetchImpl
+        )))
       : null;
     const snapshot = resolveSubscriptionSnapshot(
       models,
@@ -263,7 +268,11 @@ export async function dailyReconcileSubscriptions(
 ): Promise<void> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return;
-  const catalog = await fetchExecutableBenchmarkModelCatalog(env, config, fetchImpl);
+  const catalog = await fetchExecutableBenchmarkModelCatalog(
+    env,
+    resolveBenchmarkIdentity(config),
+    fetchImpl
+  );
   try {
     await syncSubscriptionSnapshot(
       env,

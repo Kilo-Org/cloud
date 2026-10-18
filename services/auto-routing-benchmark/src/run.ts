@@ -971,7 +971,7 @@ export async function drainQueue(
   const current = { router, engineIdentity, repetitions };
   const pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
   if (pending.length === 0) return null;
-  const catalog = await fetchExecutableBenchmarkModelCatalog(env, config);
+  const catalog = await fetchExecutableBenchmarkModelCatalog(env, resolveBenchmarkIdentity(config));
   const unavailable = pending.filter(
     row =>
       !catalogSupportsBenchmarkPair(catalog, {
@@ -1054,6 +1054,9 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
   if (initialized) return true;
   const { run, models } = (await getRunWithModels(env.BENCH_DB, runId)) ?? {};
   if (!run || !models || run.status !== 'running') return false;
+  if (!run.benchmark_user_id) {
+    throw new BenchmarkRunConfigError('Benchmark run is missing its execution identity.');
+  }
   const catalog = await fetchExecutableBenchmarkModelCatalog(env, {
     benchmarkUserId: run.benchmark_user_id,
     benchmarkOrgId: run.benchmark_org_id,

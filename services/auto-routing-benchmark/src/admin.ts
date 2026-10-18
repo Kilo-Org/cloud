@@ -373,7 +373,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       }
       try {
         const owner = { ownerType: body.ownerType, ownerId: body.ownerId };
-        const catalog = await fetchExecutableBenchmarkModelCatalog(c.env, config);
+        const catalog = await fetchExecutableBenchmarkModelCatalog(
+          c.env,
+          resolveBenchmarkIdentity(config)
+        );
         const previous = await loadSubscriptionSnapshot(c.env.BENCH_DB, config.router, owner);
         const snapshot = resolveSubscriptionSnapshot(body.entries, previous, catalog, false, true);
         const pairs = snapshotPairs(snapshot).filter(pair =>

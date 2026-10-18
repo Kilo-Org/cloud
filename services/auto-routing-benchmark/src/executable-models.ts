@@ -1,14 +1,13 @@
-import { resolveBenchmarkIdentity, type BenchmarkConfig } from '@kilocode/auto-routing-contracts';
 import type * as z from 'zod';
 import { fetchBenchmarkUserToken } from './benchmark-token';
 import { BenchmarkModelCatalogSchema, catalogModelSupportsTools } from './platform-models';
 
 export async function fetchExecutableBenchmarkModelCatalog(
   env: Env,
-  config: Pick<BenchmarkConfig, 'benchmarkUserId' | 'benchmarkOrgId'>,
+  identity: { benchmarkUserId: string; benchmarkOrgId: string | null },
   fetchImpl: typeof fetch = fetch
 ): Promise<z.infer<typeof BenchmarkModelCatalogSchema>> {
-  const { benchmarkUserId, benchmarkOrgId } = resolveBenchmarkIdentity(config);
+  const { benchmarkUserId, benchmarkOrgId } = identity;
   const token = await fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId, fetchImpl);
   const path = benchmarkOrgId
     ? `/api/organizations/${encodeURIComponent(benchmarkOrgId)}/models`

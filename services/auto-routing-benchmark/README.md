@@ -205,6 +205,7 @@ measurements are included in routing-table version hashes.
 - An omitted Efficient pool defaults to `~deepseek/deepseek-flash-latest`; an omitted Frontier pool defaults to `~openai/gpt-sol-latest`.
 - New admin forms use these presets. Explicit saved pools remain unchanged, and an explicit empty pool is invalid.
 - Admission uses the authenticated catalog for the benchmark identity, including its organization context.
+- Resumed runs preserve their saved user and organization scope. Configuration defaults do not replace a saved personal execution scope.
 - The worker applies the CLI's tool-support rule and validates exact reasoning variants before scheduling.
 - Platform and owner pools share measurements for identical concrete model, variant, engine, and repetition settings.
 - Variants must contain explicit `reasoning.enabled` or `reasoning.effort` controls. Unrelated presets do not create benchmark entries.

@@ -40,7 +40,11 @@ function catalogFetch() {
 describe('executable benchmark catalog', () => {
   it('mints the benchmark identity and fetches the CLI organization catalog with matching credentials', async () => {
     const fetch = catalogFetch();
-    const catalog = await fetchExecutableBenchmarkModelCatalog(env, config, fetch);
+    const catalog = await fetchExecutableBenchmarkModelCatalog(
+      env,
+      resolveBenchmarkIdentity(config),
+      fetch
+    );
     const [tokenCall, modelsCall] = fetch.mock.calls;
     expect(tokenCall[0] instanceof Request ? tokenCall[0].url : tokenCall[0].toString()).toBe(
       'https://internal.test/api/internal/auto-routing-benchmark/token'
@@ -70,7 +74,7 @@ describe('executable benchmark catalog', () => {
     const defaults = { ...config, benchmarkUserId: null, benchmarkOrgId: null };
     const identity = resolveBenchmarkIdentity(defaults);
     const fetch = catalogFetch();
-    await fetchExecutableBenchmarkModelCatalog(env, defaults, fetch);
+    await fetchExecutableBenchmarkModelCatalog(env, identity, fetch);
     expect(fetch.mock.calls[0][1]?.body).toBe(
       JSON.stringify({ userId: identity.benchmarkUserId, organizationId: identity.benchmarkOrgId })
     );
@@ -82,7 +86,12 @@ describe('executable benchmark catalog', () => {
 
   it('uses the personal catalog without an organization header when no effective organization exists', async () => {
     const fetch = catalogFetch();
-    await fetchExecutableBenchmarkModelCatalog(env, { ...config, benchmarkOrgId: '' }, fetch);
+    await fetchExecutableBenchmarkModelCatalog(
+      env,
+      { benchmarkUserId: 'benchmark-user', benchmarkOrgId: null },
+      fetch
+    );
+    expect(fetch.mock.calls[0][1]?.body).toBe(JSON.stringify({ userId: 'benchmark-user' }));
     const modelsInput = fetch.mock.calls[1][0];
     expect(modelsInput instanceof Request ? modelsInput.url : modelsInput.toString()).toBe(
       'https://cli.test/api/openrouter/models'
@@ -97,9 +106,9 @@ describe('executable benchmark catalog', () => {
         Response.json({ token: 'candidate-token', expiresAt: '2026-10-18T01:00:00Z' })
       )
       .mockResolvedValueOnce(new Response('private response body', { status: 403 }));
-    await expect(fetchExecutableBenchmarkModelCatalog(env, config, fetch)).rejects.toThrow(
-      'benchmark executable model catalog failed: HTTP 403'
-    );
+    await expect(
+      fetchExecutableBenchmarkModelCatalog(env, resolveBenchmarkIdentity(config), fetch)
+    ).rejects.toThrow('benchmark executable model catalog failed: HTTP 403');
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -107,9 +116,9 @@ describe('executable benchmark catalog', () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
       .mockResolvedValue(new Response('private response body', { status: 500 }));
-    await expect(fetchExecutableBenchmarkModelCatalog(env, config, fetch)).rejects.toThrow(
-      'token mint failed: HTTP 500'
-    );
+    await expect(
+      fetchExecutableBenchmarkModelCatalog(env, resolveBenchmarkIdentity(config), fetch)
+    ).rejects.toThrow('token mint failed: HTTP 500');
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

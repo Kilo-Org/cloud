@@ -187,7 +187,10 @@ describe('processDeadLetter — scheduler claims', () => {
 });
 
 describe('processDeadLetter — legacy migration', () => {
-  function mockRun(status: 'running' | 'completed' | 'failed' = 'running') {
+  function mockRun(
+    status: 'running' | 'completed' | 'failed' = 'running',
+    organizationId: string | null = 'benchmark-org-snapshot'
+  ) {
     vi.mocked(getRunWithModels).mockResolvedValue({
       run: {
         id: runId,
@@ -200,7 +203,7 @@ describe('processDeadLetter — legacy migration', () => {
         best_accuracy_switch_threshold: 0.05,
         max_concurrency: 0,
         benchmark_user_id: 'user-1',
-        benchmark_org_id: 'benchmark-org-snapshot',
+        benchmark_org_id: organizationId,
         repetitions: 2,
         classifier_max_p95_latency_ms: null,
         purpose: 'platform',
@@ -212,71 +215,77 @@ describe('processDeadLetter — legacy migration', () => {
     } as never);
   }
 
-  it('schedules the whole run instead of recording death for a legacy shard', async () => {
-    mockRun();
-    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-      const url = new URL(input instanceof Request ? input.url : input);
-      const headers = new Headers(init?.headers);
-      if (url.href === 'https://app.test/api/internal/auto-routing-benchmark/token') {
-        if (typeof init?.body !== 'string') throw new Error('Expected a JSON token request.');
-        expect(init?.method).toBe('POST');
-        expect(headers.get('authorization')).toBe(`Bearer ${'internal-test-secret'}`);
-        expect(JSON.parse(init.body)).toMatchObject({
-          userId: 'user-1',
-          organizationId: 'benchmark-org-snapshot',
-        });
-        return Response.json({
-          token: 'dead-letter-test-token',
-          expiresAt: '2026-10-18T13:00:00.000Z',
-        });
-      }
-      if (url.href === 'https://api.test/api/organizations/benchmark-org-snapshot/models') {
-        expect(headers.get('authorization')).toBe(`Bearer ${'dead-letter-test-token'}`);
-        expect(headers.get('X-KiloCode-OrganizationId')).toBe('benchmark-org-snapshot');
-        return Response.json({
-          data: [
-            {
-              id: 'b/dead',
-              supported_parameters: ['tools'],
-              opencode: {
-                variants: {
-                  high: { reasoning: { effort: 'high' } },
-                  low: { reasoning: { effort: 'low' } },
+  it.each(['benchmark-org-snapshot', null])(
+    'materializes legacy work under its persisted execution scope: %s',
+    async organizationId => {
+      mockRun('running', organizationId);
+      const catalogUrl = organizationId
+        ? `https://api.test/api/organizations/${organizationId}/models`
+        : 'https://api.test/api/openrouter/models';
+      const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = new URL(input instanceof Request ? input.url : input);
+        const headers = new Headers(init?.headers);
+        if (url.href === 'https://app.test/api/internal/auto-routing-benchmark/token') {
+          if (typeof init?.body !== 'string') throw new Error('Expected a JSON token request.');
+          expect(init?.method).toBe('POST');
+          expect(headers.get('authorization')).toBe(`Bearer ${'internal-test-secret'}`);
+          expect(JSON.parse(init.body)).toEqual({
+            userId: 'user-1',
+            ...(organizationId ? { organizationId } : {}),
+          });
+          return Response.json({
+            token: 'dead-letter-test-token',
+            expiresAt: '2026-10-18T13:00:00.000Z',
+          });
+        }
+        if (url.href === catalogUrl) {
+          expect(headers.get('authorization')).toBe(`Bearer ${'dead-letter-test-token'}`);
+          expect(headers.get('X-KiloCode-OrganizationId')).toBe(organizationId);
+          return Response.json({
+            data: [
+              {
+                id: 'b/dead',
+                supported_parameters: ['tools'],
+                opencode: {
+                  variants: {
+                    high: { reasoning: { effort: 'high' } },
+                    low: { reasoning: { effort: 'low' } },
+                  },
                 },
               },
-            },
-          ],
+            ],
+          });
+        }
+        throw new Error(`Unexpected fixture request: ${url.href}`);
+      });
+      try {
+        await processDeadLetter(env, {
+          runId,
+          kind: 'decider',
+          model: 'b/dead',
+          rep: 99,
+          shard: 8,
+          chunk: 999,
+          caseIds: ['obsolete-case'],
         });
+        expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+          runId,
+          entries: [
+            { model: 'b/dead', variant: 'high', providers: [] },
+            { model: 'b/dead', variant: 'low', providers: [] },
+          ],
+          repetitions: 2,
+          caseIds: DECIDER_CASES.map(c => c.id),
+          chunkSize: 1,
+        });
+        expect(deferChunk).not.toHaveBeenCalled();
+        expect(claimScheduledChunks).toHaveBeenCalled();
+        expectNoDirectLaneDeath();
+      } finally {
+        fetcher.mockRestore();
       }
-      throw new Error(`Unexpected fixture request: ${url.href}`);
-    });
-    try {
-      await processDeadLetter(env, {
-        runId,
-        kind: 'decider',
-        model: 'b/dead',
-        rep: 99,
-        shard: 8,
-        chunk: 999,
-        caseIds: ['obsolete-case'],
-      });
-      expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
-        runId,
-        entries: [
-          { model: 'b/dead', variant: 'high', providers: [] },
-          { model: 'b/dead', variant: 'low', providers: [] },
-        ],
-        repetitions: 2,
-        caseIds: DECIDER_CASES.map(c => c.id),
-        chunkSize: 1,
-      });
-      expect(deferChunk).not.toHaveBeenCalled();
-      expect(claimScheduledChunks).toHaveBeenCalled();
-      expectNoDirectLaneDeath();
-    } finally {
-      fetcher.mockRestore();
     }
-  });
+  );
 
   it.each(['completed', 'failed'] as const)('does not initialize a %s legacy run', async status => {
     mockRun(status);

@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { createServer } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BenchmarkRegistryResponseSchema,
@@ -10,6 +11,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { app } from './index';
 import type * as DbModule from './db';
+import type * as ExecutableModelsModule from './executable-models';
 import type * as ProfilesModule from './profiles';
 import type * as SchedulerModule from './scheduler';
 import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
@@ -1110,10 +1112,6 @@ describe('owner model aliases', () => {
           pairs,
           retryPairs: pairs,
         });
-        expect(fetchExecutableBenchmarkModelCatalog).toHaveBeenCalledExactlyOnceWith(
-          env,
-          expect.objectContaining({ router: 'efficient', deciderRepetitions: 1 })
-        );
       } else {
         expect(lookupProfileStatuses).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
           pairs,
@@ -1390,14 +1388,6 @@ describe('POST /admin/profiles/register', () => {
         retryPairs: [{ model: 'a/b', variant: null }],
       })
     );
-    expect(fetchExecutableBenchmarkModelCatalog).toHaveBeenCalledExactlyOnceWith(
-      env,
-      expect.objectContaining({
-        benchmarkUserId: null,
-        benchmarkOrgId: null,
-        deciderRepetitions: TEST_CONFIG.deciderRepetitions,
-      })
-    );
     expect(
       await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', {
         ownerType: 'user',
@@ -1416,55 +1406,105 @@ describe('POST /admin/profiles/register', () => {
   it.each(['benchmark-org', null])(
     'uses configured benchmark credentials rather than the requesting owner (%s)',
     async benchmarkOrgId => {
-      vi.mocked(getConfigRows).mockResolvedValueOnce({
-        ...TEST_CONFIG_ROWS,
-        config: {
-          ...TEST_CONFIG_ROWS.config,
-          benchmark_user_id: 'benchmark-user',
-          benchmark_org_id: benchmarkOrgId,
-        },
+      const expectedOrganization = benchmarkOrgId ?? DEFAULT_BENCHMARK_ORG_ID;
+      const catalogToken = 'scope-catalog-token';
+      const server = createServer(async (request, response) => {
+        response.setHeader('content-type', 'application/json');
+        if (request.url === '/api/internal/auto-routing-benchmark/token') {
+          const chunks: Buffer[] = [];
+          for await (const chunk of request) {
+            if (!Buffer.isBuffer(chunk)) throw new Error('Expected a binary request chunk.');
+            chunks.push(chunk);
+          }
+          const body: unknown = JSON.parse(Buffer.concat(chunks).toString());
+          if (
+            request.headers.authorization !== 'Bearer bench-token' ||
+            typeof body !== 'object' ||
+            body === null ||
+            !('userId' in body) ||
+            body.userId !== 'benchmark-user' ||
+            !('organizationId' in body) ||
+            body.organizationId !== expectedOrganization
+          ) {
+            response.writeHead(403).end('{}');
+            return;
+          }
+          response.end(JSON.stringify({ token: catalogToken, expiresAt: '2030-01-01T00:00:00Z' }));
+          return;
+        }
+        if (
+          request.url !== `/api/organizations/${expectedOrganization}/models` ||
+          request.headers.authorization !== `Bearer ${catalogToken}` ||
+          request.headers['x-kilocode-organizationid'] !== expectedOrganization
+        ) {
+          response.writeHead(403).end('{}');
+          return;
+        }
+        response.end(JSON.stringify({ data: [{ id: 'a/b', supported_parameters: ['tools'] }] }));
       });
-      const statuses = [
-        {
-          entry: { model: 'a/b', variant: null },
-          status: 'pending' as const,
-          failureReason: null,
-        },
-      ];
-      vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses });
-      const response = await authedPost('/admin/profiles/register', {
-        ownerType: 'org',
-        ownerId: 'requesting-org',
-        entries: [{ model: 'a/b' }],
-      });
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ statuses });
-      expect(fetchExecutableBenchmarkModelCatalog).toHaveBeenCalledExactlyOnceWith(
-        env,
-        expect.objectContaining({
-          benchmarkUserId: 'benchmark-user',
-          benchmarkOrgId,
-        })
+      await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+      const address = server.address();
+      if (address === null || typeof address === 'string')
+        throw new Error('Expected a loopback port.');
+      const originalWebUrl = env.KILO_WEB_API_BASE_URL;
+      const originalCliUrl = env.KILO_CLI_API_URL;
+      env.KILO_WEB_API_BASE_URL = `http://127.0.0.1:${address.port}`;
+      env.KILO_CLI_API_URL = env.KILO_WEB_API_BASE_URL;
+      vi.unstubAllGlobals();
+      const actual = await vi.importActual<typeof ExecutableModelsModule>('./executable-models');
+      vi.mocked(fetchExecutableBenchmarkModelCatalog).mockImplementation(
+        actual.fetchExecutableBenchmarkModelCatalog
       );
-      expect(registerProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
-        ownerType: 'org',
-        ownerId: 'requesting-org',
-        pairs: [{ model: 'a/b', variant: null }],
-        retryPairs: [],
-      });
-      expect(
-        await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', {
+      try {
+        vi.mocked(getConfigRows).mockResolvedValueOnce({
+          ...TEST_CONFIG_ROWS,
+          config: {
+            ...TEST_CONFIG_ROWS.config,
+            benchmark_user_id: 'benchmark-user',
+            benchmark_org_id: benchmarkOrgId,
+          },
+        });
+        const statuses = [
+          {
+            entry: { model: 'a/b', variant: null },
+            status: 'pending' as const,
+            failureReason: null,
+          },
+        ];
+        vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses });
+        const response = await authedPost('/admin/profiles/register', {
           ownerType: 'org',
           ownerId: 'requesting-org',
-        })
-      ).toEqual([
-        {
-          model: 'a/b',
+          entries: [{ model: 'a/b' }],
+        });
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toEqual({ statuses });
+        expect(registerProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+          ownerType: 'org',
+          ownerId: 'requesting-org',
           pairs: [{ model: 'a/b', variant: null }],
-          servingPairs: [],
-          resolutionError: null,
-        },
-      ]);
+          retryPairs: [],
+        });
+        expect(
+          await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', {
+            ownerType: 'org',
+            ownerId: 'requesting-org',
+          })
+        ).toEqual([
+          {
+            model: 'a/b',
+            pairs: [{ model: 'a/b', variant: null }],
+            servingPairs: [],
+            resolutionError: null,
+          },
+        ]);
+      } finally {
+        env.KILO_WEB_API_BASE_URL = originalWebUrl;
+        env.KILO_CLI_API_URL = originalCliUrl;
+        await new Promise<void>((resolve, reject) =>
+          server.close(error => (error ? reject(error) : resolve()))
+        );
+      }
     }
   );
 
@@ -1668,11 +1708,6 @@ describe('POST /admin/profiles/subscriptions', () => {
         },
       ]);
       expect(registerProfiles).not.toHaveBeenCalled();
-      expect(fetchExecutableBenchmarkModelCatalog).toHaveBeenCalledExactlyOnceWith(
-        env,
-        expect.objectContaining({ router: 'efficient', deciderRepetitions: 1 }),
-        undefined
-      );
     }
   );
 

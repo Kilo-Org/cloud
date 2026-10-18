@@ -1,6 +1,7 @@
 import {
   AutoRouterSchema,
   RefreshBenchmarkProfilesRequestSchema,
+  resolveBenchmarkIdentity,
 } from '@kilocode/auto-routing-contracts';
 import { zodJsonValidator } from '@kilocode/worker-utils';
 import type { Hono } from 'hono';
@@ -22,7 +23,10 @@ export function registerProfileRefreshRoute(app: Hono<HonoEnv>): void {
       const config = await getBenchmarkConfig(c.env.BENCH_DB, router);
       if (!config)
         return c.json({ error: 'Save the benchmark config before refreshing profiles.' }, 400);
-      const catalog = await fetchExecutableBenchmarkModelCatalog(c.env, config);
+      const catalog = await fetchExecutableBenchmarkModelCatalog(
+        c.env,
+        resolveBenchmarkIdentity(config)
+      );
       try {
         return c.json(
           await refreshCurrentProfiles(

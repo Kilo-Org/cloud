@@ -1291,6 +1291,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
               pinnedModel={{ id: '__none__', name: 'None', showGatewayMetadata: false }}
               value={draftFallback?.model ?? '__none__'}
               onValueChange={model => {
+                if (model === (draftFallback?.model ?? '__none__')) return;
                 const variants = fallbackModels.find(option => option.id === model)?.variants ?? [];
                 setFallbackOverride(
                   model === '__none__'

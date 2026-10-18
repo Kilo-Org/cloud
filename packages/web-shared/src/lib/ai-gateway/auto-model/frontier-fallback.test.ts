@@ -153,6 +153,57 @@ describe('getOwnerFrontierFallback', () => {
     expect(resolveOrganizationDefaultModelPolicy).not.toHaveBeenCalled();
   });
 
+  it.each([429, 503])(
+    'recovers the saved fallback after a transient settings status %s',
+    async status => {
+      jest
+        .mocked(getFrontierFallback)
+        .mockResolvedValueOnce({ status, body: { error: 'Temporarily unavailable' } } as never)
+        .mockResolvedValueOnce({
+          status: 200,
+          body: { configuredPool: null, frontierFallback: opus },
+        } as never);
+      await expect(getOwnerFrontierFallback(owner)).resolves.toEqual(opus);
+      expect(initializeFrontierFallback).not.toHaveBeenCalled();
+    }
+  );
+
+  it('recovers the saved fallback after a transient settings transport failure', async () => {
+    jest
+      .mocked(getFrontierFallback)
+      .mockRejectedValueOnce(new Error('Connection reset'))
+      .mockResolvedValueOnce({
+        status: 200,
+        body: { configuredPool: null, frontierFallback: opus },
+      } as never);
+    await expect(getOwnerFrontierFallback(owner)).resolves.toEqual(opus);
+    expect(initializeFrontierFallback).not.toHaveBeenCalled();
+  });
+
+  it('bounds retries when fallback settings remain unavailable', async () => {
+    jest.mocked(getFrontierFallback).mockResolvedValue({
+      status: 503,
+      body: { error: 'Temporarily unavailable' },
+    } as never);
+    await expect(getOwnerFrontierFallback(owner)).rejects.toThrow(
+      'Frontier fallback settings are unavailable'
+    );
+    expect(getFrontierFallback).toHaveBeenCalledTimes(2);
+    expect(initializeFrontierFallback).not.toHaveBeenCalled();
+  });
+
+  it('does not retry an undeployed fallback settings endpoint', async () => {
+    jest.mocked(getFrontierFallback).mockResolvedValue({
+      status: 404,
+      body: { error: 'Not found' },
+    } as never);
+    await expect(getOwnerFrontierFallback(owner)).rejects.toThrow(
+      'Frontier fallback settings are not deployed'
+    );
+    expect(getFrontierFallback).toHaveBeenCalledTimes(1);
+    expect(initializeFrontierFallback).not.toHaveBeenCalled();
+  });
+
   it('returns the atomic initialization winner rather than its proposed default', async () => {
     jest.mocked(initializeFrontierFallback).mockResolvedValue({
       status: 200,

@@ -89,11 +89,9 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
       this.getPool(),
       this.ctx.storage.get(FRONTIER_FALLBACK_STORAGE_KEY),
     ]);
-    const frontierFallback =
-      rawFallback === undefined
-        ? undefined
-        : FrontierFallbackEntrySchema.nullable().parse(rawFallback);
-    return { mode, pool, ...(frontierFallback !== undefined ? { frontierFallback } : {}) };
+    if (rawFallback === undefined) return { mode, pool };
+    const parsed = FrontierFallbackEntrySchema.nullable().safeParse(rawFallback);
+    return { mode, pool, frontierFallback: parsed.success ? parsed.data : null };
   }
 
   async initializeFrontierFallback(

@@ -16,6 +16,10 @@ import {
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getModelIdToProviderSlugsIndex } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  CLAUDE_SONNET_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { ResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 
@@ -26,9 +30,16 @@ export async function getOwnerFrontierFallback(owner: {
   const settingsOwner = owner.organizationId
     ? { ownerType: 'org' as const, ownerId: owner.organizationId }
     : { ownerType: 'user' as const, ownerId: owner.userId };
-  const result = await getFrontierFallback(settingsOwner);
+  let result = await getFrontierFallback(settingsOwner).catch(() => null);
+  if (result === null || result.status === 429 || result.status >= 500) {
+    result = await getFrontierFallback(settingsOwner);
+  }
   if (result.status !== 200 || !('configuredPool' in result.body)) {
-    throw new Error('Frontier fallback settings are unavailable');
+    throw new Error(
+      result.status === 404
+        ? 'Frontier fallback settings are not deployed'
+        : 'Frontier fallback settings are unavailable'
+    );
   }
   if (result.body.frontierFallback !== undefined) return result.body.frontierFallback;
 
@@ -50,12 +61,14 @@ export async function getOwnerFrontierFallback(owner: {
     throw new Error('Frontier fallback model policy snapshot is unavailable');
   }
   const catalog = await getEnhancedOpenRouterModels();
-  const candidates = ['anthropic/claude-sonnet-5.5', 'anthropic/claude-opus-5.5'].flatMap(model => {
-    const candidate = catalog.data.find(candidate => candidate.id === model);
-    return candidate && getReasoningVariantKeys(candidate.opencode?.variants).includes('medium')
-      ? [candidate]
-      : [];
-  });
+  const candidates = [CLAUDE_SONNET_CURRENT_MODEL_ID, CLAUDE_OPUS_CURRENT_MODEL_ID].flatMap(
+    model => {
+      const candidate = catalog.data.find(candidate => candidate.id === model);
+      return candidate && getReasoningVariantKeys(candidate.opencode?.variants).includes('medium')
+        ? [candidate]
+        : [];
+    }
+  );
   if (candidates.length === 0) {
     throw new Error('Frontier fallback model catalog is unavailable');
   }

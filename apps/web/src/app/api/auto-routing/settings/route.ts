@@ -7,6 +7,7 @@ import {
   type AutoRoutingSettingsResponse,
 } from '@kilocode/auto-routing-contracts';
 import { TRPCError } from '@trpc/server';
+import { captureException } from '@sentry/nextjs';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   getAutoRoutingMode,
@@ -116,7 +117,8 @@ async function annotateWorkerSuccess(
       } satisfies AutoRoutingSettingsApiResponse,
       { status }
     );
-  } catch {
+  } catch (error) {
+    captureException(error, { tags: { operation: 'frontier_fallback_settings' } });
     apiBody.frontierFallbackSupported = false;
   }
   return NextResponse.json(apiBody, { status });

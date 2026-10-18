@@ -185,6 +185,20 @@ describe('AutoRoutingModeConfigDO', () => {
     await expect(modeDO.getSettings()).resolves.toEqual({ mode: null, pool: null });
   });
 
+  it.each([{ model: '', variant: null }, { model: 'provider/model' }, 'invalid'])(
+    'preserves mode and pool when the stored fallback is malformed: %j',
+    async rawFallback => {
+      const { modeDO, storage } = createModeDO();
+      await modeDO.setSettings({ mode: 'best_accuracy', pool: SAMPLE_POOL });
+      storage.entries.set('frontierFallback', rawFallback);
+      await expect(modeDO.getSettings()).resolves.toEqual({
+        mode: 'best_accuracy',
+        pool: SAMPLE_POOL,
+        frontierFallback: null,
+      });
+    }
+  );
+
   it('preserves an omitted fallback and stores explicit null without deleting it', async () => {
     const { modeDO, storage } = createModeDO();
     const frontierFallback = { model: 'anthropic/claude-sonnet-4.6', variant: 'medium' };

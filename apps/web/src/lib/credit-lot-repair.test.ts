@@ -241,12 +241,20 @@ describe('legacy expiration replay', () => {
       credit_source: 'promotion',
     };
     const result = computeUserBalanceUpdates({
-      user: defineTestUser({ microdollars_used: 80, total_microdollars_acquired: 140 }),
+      user: defineTestUser({ microdollars_used: 80, total_microdollars_acquired: 180 }),
       usageRecords: [
         { cost: 40, created_at: '2029-01-01' },
         { cost: 50, created_at: '2029-02-01' },
       ],
       creditTransactions: [
+        {
+          ...defaults,
+          id: crypto.randomUUID(),
+          amount_microdollars: 40,
+          created_at: '2028-01-01',
+          expiry_date: null,
+          expiration_baseline_microdollars_used: 0,
+        },
         earlier,
         legacy,
         {
@@ -257,6 +265,7 @@ describe('legacy expiration replay', () => {
           expiry_date: null,
           expiration_baseline_microdollars_used: null,
           original_transaction_id: earlier.id,
+          credit_category: 'credits_expired',
         },
       ],
     });
@@ -269,7 +278,12 @@ describe('legacy expiration replay', () => {
       new Date('2033-01-01'),
       result.user.id
     );
-    expect(expiry.newTransactions[0].amount_microdollars).toBe(-90);
+    const balance =
+      result.user_update.total_microdollars_acquired - result.user_update.microdollars_used;
+    expect(balance).toBe(100);
+    expect(expiry.newTransactions[0].amount_microdollars).toBe(
+      result.accounting_error_mUsd - balance
+    );
   });
 
   it.each(['settlement', 'accounting_adjustment'])(

@@ -17,6 +17,7 @@ import type { User, Organization } from '@kilocode/db/schema';
 import * as creditExpiration from '@kilocode/web-shared/lib/creditExpiration';
 
 jest.mock('@kilocode/web-shared/lib/creditExpiration', () => ({
+  __esModule: true,
   ...jest.requireActual('@kilocode/web-shared/lib/creditExpiration'),
 }));
 
@@ -210,7 +211,10 @@ describe('organization funds router', () => {
           organizationId: parentOrg.id,
         });
         expect(result.children.find(child => child.id === childA.id)?.balanceMicrodollars).toBe(0);
-        expect(balanceOf(await getOrg(childA.id))).toBe(0);
+        expect(await getOrg(childA.id)).toEqual({
+          total_microdollars_acquired: 800_000,
+          microdollars_used: 800_000,
+        });
       } finally {
         interception.mockRestore();
       }

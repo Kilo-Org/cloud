@@ -58,6 +58,11 @@ import { fetchCustomRoutingTable } from './benchmark-origin';
 import { getRoutingTable } from './routing-table';
 import { getEffectiveAutoRoutingSettings } from './routing-mode';
 import type { HonoEnv } from './hono-env';
+import {
+  inheritedLegacyPoolMode,
+  resolveLegacyPoolRouting,
+  type LegacyPoolRouting,
+} from './legacy-pool-overlap';
 import { getModelCapabilities } from './model-capabilities';
 import type { ModelCapabilitiesMap } from './model-capabilities';
 import { recordClassifierUsage, type ClassifierCallKind } from './classifier-usage';
@@ -411,7 +416,11 @@ export type DecisionRun = {
   routingTable: RoutingTable | null;
 };
 
-function platformTarget(c: Context<HonoEnv>, payload: MirrorPayload): DecisionTarget {
+function platformTarget(
+  c: Context<HonoEnv>,
+  payload: MirrorPayload,
+  settings?: LegacyPoolRouting
+): DecisionTarget {
   const router = payload.router ?? DEFAULT_AUTO_ROUTER;
   return {
     scope: router,
@@ -419,10 +428,12 @@ function platformTarget(c: Context<HonoEnv>, payload: MirrorPayload): DecisionTa
     deniedModelIds: new Set(payload.routingPolicy?.deniedModelIds ?? []),
     loadRouting: async timings => {
       const settingsStartedAt = performance.now();
-      const effectiveSettings = await getEffectiveAutoRoutingSettings(c.env, {
-        userId: payload.userId,
-        organizationId: payload.organizationId,
-      });
+      const effectiveSettings =
+        settings ??
+        (await getEffectiveAutoRoutingSettings(c.env, {
+          userId: payload.userId,
+          organizationId: payload.organizationId,
+        }));
       timings.settingsMs = performance.now() - settingsStartedAt;
       const configuredPool = router === 'efficient' ? effectiveSettings.pool : null;
 
@@ -893,8 +904,9 @@ async function decideCustomRouter(
 ): Promise<Response> {
   try {
     const owner = customRouterOwner(reference, payload);
-    const router = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
-    if (!router) throw new CustomRouterError('router_not_found', 'Custom router not found');
+    const stored = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
+    if (!stored) throw new CustomRouterError('router_not_found', 'Custom router not found');
+    const router = await inheritedLegacyPoolMode(c.env, stored, payload);
     const routing = customRouting(
       router,
       payload.clientEntries ?? [],
@@ -903,7 +915,12 @@ async function decideCustomRouter(
     const run = await runDecision(
       c,
       payload,
-      customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing)
+      customRouterTarget(
+        c.env,
+        promise => c.executionCtx.waitUntil(promise),
+        routing,
+        payload.input.requestedModel
+      )
     );
     return c.json({ ...run.response, decision: customRouterDecision(routing, run) });
   } catch (error) {
@@ -928,6 +945,33 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   }
   const payload = parsed.data;
   if (payload.customRouter) return decideCustomRouter(c, payload, payload.customRouter);
-  const { response } = await runDecision(c, payload, platformTarget(c, payload));
+  const settings =
+    (payload.router ?? DEFAULT_AUTO_ROUTER) === 'efficient'
+      ? await resolveLegacyPoolRouting(c.env, payload)
+      : undefined;
+  if (settings?.router) {
+    try {
+      const routing = customRouting(
+        settings.router,
+        payload.clientEntries ?? [],
+        new Set(payload.routingPolicy?.deniedModelIds ?? [])
+      );
+      const run = await runDecision(
+        c,
+        payload,
+        customRouterTarget(
+          c.env,
+          promise => c.executionCtx.waitUntil(promise),
+          routing,
+          payload.input.requestedModel
+        )
+      );
+      return c.json({ ...run.response, decision: customRouterDecision(routing, run) });
+    } catch (error) {
+      if (error instanceof CustomRouterError) return customRouterErrorResponse(error);
+      throw error;
+    }
+  }
+  const { response } = await runDecision(c, payload, platformTarget(c, payload, settings));
   return c.json(response);
 };

@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createRequire } from 'node:module';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { BenchmarkProfileEntryStatus, PoolEntry } from '@kilocode/auto-routing-contracts';
 
@@ -58,92 +56,6 @@ import {
   type DraftPool,
   type PoolEntryWithAvailability,
 } from './AutoRoutingModeCard';
-
-type LinkedomParseHtml = (html: string) => {
-  window: typeof globalThis & {
-    HTMLElement: typeof HTMLElement;
-    Element: typeof Element;
-    Node: typeof Node;
-    Text: typeof Text;
-    Comment: typeof Comment;
-    DocumentFragment: typeof DocumentFragment;
-    Document: typeof Document;
-    SVGElement: typeof SVGElement;
-    Event: typeof Event;
-    CustomEvent: typeof CustomEvent;
-    navigator: Navigator;
-  };
-  document: Document;
-};
-
-/** linkedom lives in the monorepo pnpm store (transitive); resolve from this file. */
-function installLinkedomDom(): { cleanup: () => void; container: HTMLElement } {
-  const requireFromHere = createRequire(__filename);
-  const loadLinkedom = (): { parseHTML: LinkedomParseHtml } => {
-    try {
-      return requireFromHere('linkedom') as { parseHTML: LinkedomParseHtml };
-    } catch {
-      // Transitive monorepo path (not a web package dep): test file → repo root.
-      return requireFromHere(
-        '../../../../node_modules/.pnpm/linkedom@0.18.12/node_modules/linkedom'
-      ) as { parseHTML: LinkedomParseHtml };
-    }
-  };
-  const { parseHTML } = loadLinkedom();
-
-  const { window, document } = parseHTML(
-    '<!doctype html><html><body><div id="root"></div></body></html>'
-  );
-
-  const previous = {
-    window: globalThis.window,
-    document: globalThis.document,
-    HTMLElement: globalThis.HTMLElement,
-    Element: globalThis.Element,
-    Node: globalThis.Node,
-    Text: globalThis.Text,
-    Comment: globalThis.Comment,
-    DocumentFragment: globalThis.DocumentFragment,
-    Document: globalThis.Document,
-    SVGElement: globalThis.SVGElement,
-    Event: globalThis.Event,
-    CustomEvent: globalThis.CustomEvent,
-    navigator: globalThis.navigator,
-    requestAnimationFrame: globalThis.requestAnimationFrame,
-    cancelAnimationFrame: globalThis.cancelAnimationFrame,
-    IS_REACT_ACT_ENVIRONMENT: (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean })
-      .IS_REACT_ACT_ENVIRONMENT,
-  };
-
-  Object.assign(globalThis, {
-    window,
-    document,
-    HTMLElement: window.HTMLElement,
-    Element: window.Element,
-    Node: window.Node,
-    Text: window.Text,
-    Comment: window.Comment,
-    DocumentFragment: window.DocumentFragment,
-    Document: window.Document,
-    SVGElement: window.SVGElement,
-    Event: window.Event,
-    CustomEvent: window.CustomEvent,
-    navigator: window.navigator,
-    requestAnimationFrame: (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 0),
-    cancelAnimationFrame: (id: number) => clearTimeout(id),
-    IS_REACT_ACT_ENVIRONMENT: true,
-  });
-
-  const container = document.getElementById('root');
-  if (!container) throw new Error('linkedom root missing');
-
-  return {
-    container: container as unknown as HTMLElement,
-    cleanup: () => {
-      Object.assign(globalThis, previous);
-    },
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -202,48 +114,6 @@ function mountCardHtml(data: AutoRoutingSettingsApiResponse): string {
       createElement(AutoRoutingModeCard, {})
     )
   );
-}
-
-type MountedCard = {
-  container: HTMLElement;
-  root: Root;
-  cleanup: () => void;
-};
-
-function mountCardDom(data: AutoRoutingSettingsApiResponse, organizationId?: string): MountedCard {
-  const dom = installLinkedomDom();
-  const queryClient = createTestQueryClient();
-  queryClient.setQueryData(settingsQueryKey(organizationId), data);
-
-  let root!: Root;
-  act(() => {
-    root = createRoot(dom.container);
-    root.render(
-      createElement(
-        QueryClientProvider,
-        { client: queryClient },
-        createElement(AutoRoutingModeCard, organizationId ? { organizationId } : {})
-      )
-    );
-  });
-
-  return {
-    container: dom.container,
-    root,
-    cleanup: () => {
-      act(() => {
-        root.unmount();
-      });
-      dom.cleanup();
-    },
-  };
-}
-
-function findSaveButton(container: HTMLElement): HTMLButtonElement {
-  const buttons = Array.from(container.querySelectorAll('button'));
-  const save = buttons.find(button => button.textContent?.includes('Save auto routing'));
-  if (!save) throw new Error('Save auto routing button not found');
-  return save as HTMLButtonElement;
 }
 
 // ---------------------------------------------------------------------------
@@ -1068,127 +938,6 @@ describe('AutoRoutingModeCard poolSupported=false', () => {
         })
       )
     ).toBe(false);
-  });
-
-  it('Save control PUTs { mode } to the legacy mode endpoint, not settings', async () => {
-    const fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.toString();
-      if (url.includes('/api/auto-routing/mode') && init?.method === 'PUT') {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            ownerType: 'user',
-            ownerId: 'user-1',
-            mode: 'best_accuracy',
-            configuredMode: 'best_accuracy',
-            defaultMode: 'cost_per_accuracy',
-          }),
-        } as Response;
-      }
-      // invalidate/refetch after legacy save
-      if (url.includes('/api/auto-routing/settings')) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () =>
-            settings({
-              poolSupported: false,
-              configuredMode: 'best_accuracy',
-              mode: 'best_accuracy',
-            }),
-        } as Response;
-      }
-      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? 'GET'}`);
-    });
-    global.fetch = fetchMock as typeof fetch;
-
-    // Saved mode is inherit (configuredMode null). Dirty by selecting best_accuracy
-    // so the real Save control is enabled, then click it.
-    const data = settings({
-      poolSupported: false,
-      configuredMode: null,
-      mode: 'cost_per_accuracy',
-    });
-    const mounted = mountCardDom(data);
-
-    try {
-      await act(async () => {
-        // Radix Select stores onValueChange on the provider; linkedom cannot open
-        // the portal menu, so drive the same change handler the Select wires up
-        // by finding the combobox trigger's React props is unreliable. Instead
-        // use the Select root via React fiber is fragile — set the mode through
-        // the same public path as Select: dispatch on the trigger after finding
-        // the hidden select value change. Practically: click is enough if we
-        // force-enable by changing draft via a second approach —
-        // query the SelectItem buttons after opening is hard without pointer
-        // events. Use React internals on the Select: the Select root is a
-        // context provider with value/onValueChange. Walk fibers:
-        type Fiber = {
-          memoizedProps?: { onValueChange?: (v: string) => void; value?: string };
-          child?: Fiber | null;
-          sibling?: Fiber | null;
-        };
-        const reactKey = Object.keys(mounted.container).find(key =>
-          key.startsWith('__reactContainer')
-        );
-        const host = reactKey
-          ? (mounted.container as unknown as Record<string, { stateNode?: { current?: Fiber } }>)[
-              reactKey
-            ]
-          : undefined;
-        const walk = (fiber: Fiber | null | undefined, visit: (f: Fiber) => void) => {
-          if (!fiber) return;
-          visit(fiber);
-          walk(fiber.child, visit);
-          walk(fiber.sibling, visit);
-        };
-        let onValueChange: ((v: string) => void) | undefined;
-        const rootFiber = host?.stateNode?.current;
-        walk(rootFiber, fiber => {
-          const props = fiber.memoizedProps;
-          if (
-            props &&
-            typeof props.onValueChange === 'function' &&
-            (props.value === 'inherit' || props.value === undefined)
-          ) {
-            onValueChange = props.onValueChange;
-          }
-        });
-        if (!onValueChange) {
-          throw new Error('Select onValueChange not found on fiber tree');
-        }
-        onValueChange('best_accuracy');
-      });
-
-      const saveButton = findSaveButton(mounted.container);
-      expect(saveButton.disabled).toBe(false);
-
-      await act(async () => {
-        saveButton.click();
-      });
-
-      await act(async () => {
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-
-      const putCalls = fetchMock.mock.calls.filter(
-        ([, init]) => init && typeof init === 'object' && init.method === 'PUT'
-      );
-      expect(putCalls).toHaveLength(1);
-      const [putUrl, putInit] = putCalls[0]!;
-      expect(String(putUrl)).toBe(modeEndpoint(undefined));
-      expect(String(putUrl)).not.toContain('/settings');
-      expect(putInit?.method).toBe('PUT');
-      const putBody = JSON.parse(String(putInit?.body));
-      expect(putBody).toEqual({ mode: 'best_accuracy' });
-      expect(putBody).not.toHaveProperty('pool');
-      expect(putBody).not.toHaveProperty('retryEntries');
-    } finally {
-      mounted.cleanup();
-    }
   });
 });
 

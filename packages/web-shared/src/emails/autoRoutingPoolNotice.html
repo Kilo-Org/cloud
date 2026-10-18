@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <body style="margin: 0; background: #ffffff">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+      <tr>
+        <td align="center" style="padding: 32px 20px">
+          <table
+            width="520"
+            cellpadding="0"
+            cellspacing="0"
+            role="presentation"
+            style="max-width: 520px"
+          >
+            <tr>
+              <td
+                style="
+                  font-family:
+                    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+                    sans-serif;
+                  color: #333;
+                  font-size: 15px;
+                  line-height: 24px;
+                "
+              >
+                <h1 style="margin: 0 0 16px; color: #1a1a1a; font-size: 24px; line-height: 32px">
+                  Your custom Auto pool is ready now
+                </h1>
+                <p style="margin: 0 0 18px">
+                  We have moved your saved Efficient Auto pool into a custom router. Your models,
+                  routing mode, and default model are preserved. Select the new model ID below now
+                  to keep using your own pool after the upcoming change.
+                </p>
+                <ul style="margin: 0 0 18px; padding-left: 20px">
+                  {{ routers }}
+                </ul>
+                <p style="margin: 0 0 18px">
+                  Until <strong>{{ cutover_at }}</strong>, your current
+                  <code>kilo-auto/efficient</code> model ID continues to use your saved pool. During
+                  this notice period, the old and new model IDs share one editable pool. Manage it
+                  under Custom routers; your changes apply to both model IDs.
+                </p>
+                <p style="margin: 0 0 18px">
+                  At that time, <code>kilo-auto/efficient</code> will switch to Kilo's
+                  platform-managed pool. Your custom router will keep your own pool, so update your
+                  model selection and any integrations to the new ID before the date above. There is
+                  no need to recreate your pool.
+                </p>
+                <p style="margin: 0 0 22px">
+                  Questions? Reply to this email or contact {{ support_email }}.
+                </p>
+              </td>
+            </tr>
+          </table>
+          <table width="520" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td align="center" style="padding: 30px 20px; border-top: 1px solid #eee">
+                <p
+                  style="
+                    margin: 0;
+                    font-size: 11px;
+                    color: #ccc;
+                    font-family:
+                      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+                      sans-serif;
+                  "
+                >
+                  © {{ year }} Kilo Code, Inc<br />455 Market St, Ste 1940 PMB 993504<br />San
+                  Francisco, CA 94105, USA
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

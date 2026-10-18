@@ -103,6 +103,7 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
   const [draft, setDraft] = useState<Draft>(() => initialDraft(router));
   const [addModelId, setAddModelId] = useState<string | undefined>();
   const [submitted, setSubmitted] = useState(false);
+  const [modeEdited, setModeEdited] = useState(false);
   const modelsQuery = useModelSelectorList(organizationId);
 
   const entryKeys = useMemo(() => new Set(draft.entries.map(customRouterEntryKey)), [draft]);
@@ -130,15 +131,33 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
       const fields = {
         name: draft.name.trim(),
         baseRouter: draft.baseRouter,
-        mode: draft.mode,
+        ...(!router?.legacyModeInherited || modeEdited ? { mode: draft.mode } : {}),
         entries: draft.entries,
         defaultEntryKey: draft.defaultEntryKey,
       };
+      const patch = router
+        ? {
+            name: fields.name,
+            ...(draft.baseRouter !== router.baseRouter ? { baseRouter: draft.baseRouter } : {}),
+            ...((router.legacyModeInherited ? modeEdited : draft.mode !== router.mode)
+              ? { mode: draft.mode }
+              : {}),
+            ...(draft.entries.length !== router.entries.length ||
+            draft.entries.some(
+              (entry, index) => customRouterEntryKey(entry) !== router.entries[index]?.key
+            )
+              ? { entries: draft.entries }
+              : {}),
+            ...(draft.defaultEntryKey !== router.defaultEntryKey
+              ? { defaultEntryKey: draft.defaultEntryKey }
+              : {}),
+          }
+        : fields;
       const response = router
         ? await fetch(customRouterItemEndpoint(router.scope, router.slug, organizationId), {
             method: 'PATCH',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(fields),
+            body: JSON.stringify(patch),
           })
         : await fetch(customRoutersEndpoint(organizationId), {
             method: 'POST',
@@ -249,7 +268,7 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
               <Label htmlFor={fieldId('base')}>Base router</Label>
               <Select
                 value={draft.baseRouter}
-                disabled={pending}
+                disabled={pending || router?.legacyPool}
                 onValueChange={value =>
                   setDraft(current => ({ ...current, baseRouter: AutoRouterSchema.parse(value) }))
                 }
@@ -266,22 +285,30 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
                 </SelectContent>
               </Select>
               <p className="text-muted-foreground text-xs">
-                Sets the benchmark dataset and routing thresholds.
+                {router?.legacyPool
+                  ? 'The base stays Efficient while this pool also serves kilo-auto/efficient.'
+                  : 'Sets the benchmark dataset and routing thresholds.'}
               </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor={fieldId('mode')}>Routing mode</Label>
               <Select
-                value={draft.mode}
+                value={router?.legacyModeInherited && !modeEdited ? 'inherit' : draft.mode}
                 disabled={pending}
-                onValueChange={value =>
-                  setDraft(current => ({ ...current, mode: AutoRoutingModeSchema.parse(value) }))
-                }
+                onValueChange={value => {
+                  setModeEdited(value !== 'inherit');
+                  if (value !== 'inherit') {
+                    setDraft(current => ({ ...current, mode: AutoRoutingModeSchema.parse(value) }));
+                  }
+                }}
               >
                 <SelectTrigger id={fieldId('mode')}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  {router?.legacyModeInherited ? (
+                    <SelectItem value="inherit">Keep inherited mode</SelectItem>
+                  ) : null}
                   {MODE_OPTIONS.map(option => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}

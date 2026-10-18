@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import { findEffectiveLegacyPoolRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   resolveOrganizationMemberModelPolicy,
@@ -13,6 +14,7 @@ import {
   deniedAutoRoutingModelIdsForMember,
   deniedModelIdsForCandidates,
   policyNeedsCandidateEvaluation,
+  loadEffectivePoolModelIds,
 } from './auto-routing-denied-models';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client', () => ({
@@ -20,6 +22,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client', () =>
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
+  findEffectiveLegacyPoolRouter: jest.fn().mockResolvedValue(null),
 }));
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
@@ -103,6 +108,35 @@ describe('collectDeniedAutoRoutingModelIds', () => {
       )
     ).resolves.toEqual([]);
     expect(getCachedRoutingTable).not.toHaveBeenCalled();
+  });
+});
+
+describe('migrated pool candidates', () => {
+  it('uses the canonical edited gateway entries rather than the legacy snapshot', async () => {
+    jest.mocked(findEffectiveLegacyPoolRouter).mockResolvedValueOnce({
+      id: '00000000-0000-4000-8000-000000000001',
+      ownerType: 'user',
+      ownerId: owner.userId,
+      slug: 'efficient',
+      name: 'Efficient',
+      baseRouter: 'efficient',
+      mode: 'best_accuracy',
+      entries: [{ kind: 'gateway', model: 'openai/edited-model' }],
+      defaultEntryKey: 'gateway:openai/edited-model',
+      legacyPool: true,
+    });
+    jest.mocked(getAutoRoutingSettings).mockClear();
+
+    await expect(loadEffectivePoolModelIds(owner)).resolves.toEqual(['openai/edited-model']);
+    expect(getAutoRoutingSettings).not.toHaveBeenCalled();
+  });
+
+  it('propagates a canonical lookup failure instead of using a stale snapshot', async () => {
+    jest
+      .mocked(findEffectiveLegacyPoolRouter)
+      .mockRejectedValueOnce(new Error('database unavailable'));
+
+    await expect(loadEffectivePoolModelIds(owner)).rejects.toThrow('database unavailable');
   });
 });
 

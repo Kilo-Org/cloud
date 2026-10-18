@@ -10,11 +10,14 @@ import { clearModelCapabilitiesCache } from './model-capabilities';
 import type * as ModelCapabilitiesModule from './model-capabilities';
 import { clearCustomRoutingTableCache } from './decide';
 import { AutoRoutingDecisionCacheDO, clearClassificationHotCache } from './decision-cache';
-import { clearAutoRoutingSettingsCache } from './routing-mode';
+import { clearAutoRoutingSettingsCache, type StoredOwnerSettings } from './routing-mode';
 import { app } from './index';
 import { ClassifierRunError, type ClassifierRunResult } from './model-classifier';
 import type * as DbModule from '@kilocode/db';
 import type * as ModelClassifierModule from './model-classifier';
+import type * as CustomRouterStoreModule from './custom-router-store';
+import { toCustomRouterDefinition } from './custom-router-store';
+import type { AutoRoutingCustomRouter } from '@kilocode/db';
 import type {
   AutoRoutingMode,
   ClassifierOutput,
@@ -23,7 +26,11 @@ import type {
   NormalizedClassifierInput,
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
-import { CLASSIFIER_WINNER_KV_KEY } from '@kilocode/auto-routing-contracts';
+import {
+  CLASSIFIER_WINNER_KV_KEY,
+  OwnerPoolConversionRequestSchema,
+  convertedOwnerPoolRouter,
+} from '@kilocode/auto-routing-contracts';
 import { computeContentHashes } from './conversation-identity';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import {
@@ -38,6 +45,12 @@ const dbSelect = vi.hoisted(() => vi.fn());
 const dbFrom = vi.hoisted(() => vi.fn());
 const dbWhereCaps = vi.hoisted(() => vi.fn());
 const getModelCapabilitiesMock = vi.hoisted(() => vi.fn());
+const findLegacyPoolRouter = vi.hoisted(() => vi.fn());
+
+vi.mock('./custom-router-store', async importOriginal => ({
+  ...(await importOriginal<typeof CustomRouterStoreModule>()),
+  findLegacyPoolRouter,
+}));
 
 vi.mock('./model-classifier', async importOriginal => {
   const actual = await importOriginal<typeof ModelClassifierModule>();
@@ -277,6 +290,7 @@ function decideRequest(payload: unknown) {
 
 describe('auto routing worker', () => {
   beforeEach(async () => {
+    findLegacyPoolRouter.mockReset().mockResolvedValue(null);
     clearClassifierConfigCache();
     clearRoutingTableCache();
     clearModelCapabilitiesCache();
@@ -1154,6 +1168,68 @@ describe('auto routing worker', () => {
     }) {
       let mode: AutoRoutingMode | null = initial?.mode ?? null;
       let poolValue: EfficientModelPool | null = initial?.pool ?? null;
+      let canonical: AutoRoutingCustomRouter | null = null;
+      let pending: StoredOwnerSettings | null = null;
+      const ownerLock = vi.fn(async () => {});
+      const tx = {
+        execute: ownerLock,
+        select: () => ({
+          from: () => ({ where: () => ({ limit: async () => (canonical ? [canonical] : []) }) }),
+        }),
+        update: () => ({
+          set: (values: Partial<AutoRoutingCustomRouter>) => ({
+            where: () => ({
+              returning: async () => {
+                if (!canonical) return [];
+                canonical = { ...canonical, ...values };
+                return [canonical];
+              },
+            }),
+          }),
+        }),
+      };
+      getWorkerDb.mockReturnValue({
+        select: dbSelect,
+        transaction: async (work: (transaction: typeof tx) => Promise<unknown>) => work(tx),
+      });
+      findLegacyPoolRouter.mockImplementation(async () =>
+        canonical ? toCustomRouterDefinition(canonical) : null
+      );
+      mockedFetch.mockImplementation(async (_url, init) => {
+        if (typeof init?.body !== 'string') throw new Error('Expected a JSON conversion body');
+        const conversion = OwnerPoolConversionRequestSchema.parse(JSON.parse(init.body))
+          .conversions[0];
+        if (!conversion) throw new Error('Expected one conversion');
+        const definition = convertedOwnerPoolRouter(conversion);
+        const outcome = canonical ? 'exists' : 'created';
+        canonical ??= {
+          id: '11111111-1111-4111-8111-111111111111',
+          owned_by_user_id: conversion.owner.type === 'user' ? conversion.owner.id : null,
+          owned_by_organization_id: conversion.owner.type === 'org' ? conversion.owner.id : null,
+          created_by_user_id: null,
+          slug: definition.slug,
+          name: definition.name,
+          base_router: definition.baseRouter,
+          mode: definition.mode,
+          entries: definition.entries,
+          default_entry_key: definition.defaultEntryKey,
+          legacy_pool: true,
+          legacy_mode_inherited: conversion.configuredMode === null,
+          created_at: '2026-10-18T00:00:00.000Z',
+          updated_at: '2026-10-18T00:00:00.000Z',
+        };
+        return Response.json({
+          results: [
+            {
+              owner: conversion.owner,
+              outcome,
+              modelId: 'kilo-auto/custom/efficient',
+              noticesSent: 0,
+              noticesFailed: 0,
+            },
+          ],
+        });
+      });
       const setSettings = vi.fn(
         async (settings: { mode: AutoRoutingMode | null; pool: EfficientModelPool | null }) => {
           mode = settings.mode;
@@ -1171,6 +1247,20 @@ describe('auto routing worker', () => {
         }),
         getSettings: vi.fn(async () => ({ mode, pool: poolValue })),
         setSettings,
+        beginConversion: vi.fn(
+          async (requested: { mode: AutoRoutingMode | null; pool: EfficientModelPool | null }) => {
+            pending ??= {
+              mode: poolValue ? mode : requested.mode,
+              pool: poolValue ?? requested.pool,
+              invalidMode: false,
+              invalidPool: false,
+              convertedAt: null,
+              failedAt: null,
+            };
+            return pending;
+          }
+        ),
+        markConverted: vi.fn(async () => {}),
       }));
       return {
         get mode() {
@@ -1180,6 +1270,10 @@ describe('auto routing worker', () => {
           return poolValue;
         },
         setSettings,
+        get canonical() {
+          return canonical;
+        },
+        ownerLock,
       };
     }
 
@@ -1259,7 +1353,7 @@ describe('auto routing worker', () => {
       });
     });
 
-    it('PUT persists only after successful register and reuses register statuses', async () => {
+    it('PUT registers profiles and acknowledges only after saving the canonical row', async () => {
       const store = ownerSettingsStore();
       benchmarkFetch.mockImplementation(async (url: string) => {
         if (String(url).includes('/admin/profiles/register')) {
@@ -1291,8 +1385,14 @@ describe('auto routing worker', () => {
         configuredPool: pool,
         poolStatuses: statuses,
       });
-      expect(store.setSettings).toHaveBeenCalledWith({ mode: 'best_accuracy', pool });
-      expect(store.pool).toEqual(pool);
+      expect(store.setSettings).not.toHaveBeenCalled();
+      expect(store.pool).toBeNull();
+      expect(store.canonical).toMatchObject({
+        mode: 'best_accuracy',
+        entries: [{ kind: 'gateway', model: 'custom/chat' }],
+        legacy_pool: true,
+      });
+      expect(store.ownerLock).toHaveBeenCalledOnce();
       expect(benchmarkFetch).toHaveBeenCalledWith(
         expect.stringContaining('/admin/profiles/register'),
         expect.objectContaining({ method: 'POST' })
@@ -1301,6 +1401,39 @@ describe('auto routing worker', () => {
         expect.stringContaining('/admin/profiles/status'),
         expect.anything()
       );
+    });
+
+    it('keeps the migrated pool unchanged when admission rejects a replacement', async () => {
+      const store = ownerSettingsStore();
+      let exhausted = false;
+      benchmarkFetch.mockImplementation(async () =>
+        exhausted
+          ? {
+              ok: false,
+              status: 429,
+              json: async () => ({ error: 'quota exceeded', retryAt: '2099-01-01T00:00:00.000Z' }),
+              text: async () => 'quota exceeded',
+            }
+          : { ok: true, status: 200, json: async () => ({ statuses }) }
+      );
+      const save = (models: EfficientModelPool) =>
+        request('/admin/routing-settings', {
+          method: 'PUT',
+          headers: {
+            authorization: 'Bearer classifier-token',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            ownerType: 'user',
+            ownerId: 'user-1',
+            mode: 'best_accuracy',
+            pool: models,
+          }),
+        });
+      expect((await save(pool)).status).toBe(200);
+      exhausted = true;
+      expect((await save([{ model: 'replacement/model' }])).status).toBe(429);
+      expect(store.canonical?.entries).toEqual([{ kind: 'gateway', model: 'custom/chat' }]);
     });
 
     it('PUT maps register 429 to 429 with retryAt and persists nothing', async () => {
@@ -1369,7 +1502,7 @@ describe('auto routing worker', () => {
       );
     });
 
-    it('PUT forwards retryEntries on register and persists only after success', async () => {
+    it('PUT forwards retryEntries on register before saving the canonical row', async () => {
       const store = ownerSettingsStore();
       const retryEntries = [{ model: 'custom/chat' }];
       let registerBody: unknown;
@@ -1413,9 +1546,12 @@ describe('auto routing worker', () => {
         entries: pool,
         retryEntries,
       });
-      expect(store.setSettings).toHaveBeenCalledTimes(1);
-      expect(store.setSettings).toHaveBeenCalledWith({ mode: 'best_accuracy', pool });
-      expect(store.pool).toEqual(pool);
+      expect(store.setSettings).not.toHaveBeenCalled();
+      expect(store.pool).toBeNull();
+      expect(store.canonical).toMatchObject({
+        mode: 'best_accuracy',
+        entries: [{ kind: 'gateway', model: 'custom/chat' }],
+      });
     });
   });
 

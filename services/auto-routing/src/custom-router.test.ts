@@ -28,6 +28,7 @@ import { app } from './index';
 
 const findCustomRouter = vi.hoisted(() => vi.fn());
 const findCustomRouterById = vi.hoisted(() => vi.fn());
+const findLegacyPoolRouter = vi.hoisted(() => vi.fn());
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const findOrganizationMemberRole = vi.hoisted(() => vi.fn());
 const findOrganizationMemberBalanceRow = vi.hoisted(() => vi.fn());
@@ -40,6 +41,7 @@ vi.mock('./custom-router-store', async importOriginal => ({
   ...(await importOriginal<typeof CustomRouterStoreModule>()),
   findCustomRouter,
   findCustomRouterById,
+  findLegacyPoolRouter,
 }));
 
 vi.mock('./model-classifier', async importOriginal => ({
@@ -200,6 +202,10 @@ const env = {
       putStickyDecision: async () => {},
     }),
   },
+  AUTO_ROUTING_MODE_CONFIG: {
+    idFromName: (name: string) => name,
+    get: () => ({ getSettings: async () => ({ mode: null, pool: null }) }),
+  },
 };
 
 const backgroundTasks: Promise<unknown>[] = [];
@@ -343,6 +349,7 @@ beforeEach(() => {
   dbRows.organization = [{ total_microdollars_acquired: 3_000_000, microdollars_used: 0 }];
   findCustomRouter.mockReset().mockResolvedValue(customRouter());
   findCustomRouterById.mockReset().mockResolvedValue(customRouter());
+  findLegacyPoolRouter.mockReset().mockResolvedValue(null);
   findOrganizationMemberRole.mockReset().mockResolvedValue('member');
   findOrganizationMemberBalanceRow.mockReset().mockResolvedValue(memberBalanceRow());
   classifyNormalizedInput.mockReset().mockResolvedValue({
@@ -659,7 +666,10 @@ describe('public custom router decide', () => {
 });
 
 describe('internal custom router decide', () => {
-  function internalDecide(payload: Partial<MirrorPayload>) {
+  function internalDecide(
+    payload: Partial<MirrorPayload>,
+    requestedModel = 'kilo-auto/custom/mine'
+  ) {
     return app.request(
       'https://auto-routing.example.com/decide',
       {
@@ -668,7 +678,7 @@ describe('internal custom router decide', () => {
         body: JSON.stringify({
           input: {
             apiKind: 'chat_completions',
-            requestedModel: 'kilo-auto/custom/mine',
+            requestedModel,
             systemPromptPrefix: '',
             userPromptPrefix: 'Add a feature flag.',
             latestUserPromptPrefix: null,
@@ -703,6 +713,55 @@ describe('internal custom router decide', () => {
       stale: false,
       fallback: false,
     });
+  });
+
+  it('routes old and new Efficient IDs through the same canonical table and cache scope', async () => {
+    const canonical = customRouter({
+      slug: 'efficient',
+      legacyPool: true,
+      entries: [sonnet],
+    });
+    findLegacyPoolRouter.mockResolvedValue(canonical);
+    findCustomRouter.mockResolvedValue(canonical);
+    const oldResponse = await internalDecide({ router: 'efficient' }, 'kilo-auto/efficient');
+    const newResponse = await internalDecide(
+      { customRouter: { scope: 'user', slug: 'efficient' } },
+      'kilo-auto/custom/efficient'
+    );
+    expect(oldResponse.status).toBe(200);
+    expect(newResponse.status).toBe(200);
+    const oldBody = await oldResponse.json();
+    const newBody = await newResponse.json();
+    expect(oldBody).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
+    expect(newBody).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+    expect(
+      cacheIdFromName.mock.calls.every(([key]) => key.startsWith(`custom:${ROUTER_ID}:`))
+    ).toBe(true);
+    await drainBackgroundTasks();
+    expect(recordUsage.mock.calls.map(([usage]) => usage.core.requested_model)).toContain(
+      'kilo-auto/efficient'
+    );
+  });
+
+  it('never falls back outside a migrated legacy pool when policy denies its only gateway entry', async () => {
+    findLegacyPoolRouter.mockResolvedValue(
+      customRouter({ slug: 'efficient', legacyPool: true, entries: [sonnet] })
+    );
+    const response = await internalDecide(
+      { router: 'efficient', routingPolicy: { deniedModelIds: [SONNET] } },
+      'kilo-auto/efficient'
+    );
+    expect(response.status).toBe(422);
+    expect(await errorCode(response)).toBe('custom_router_unavailable');
+  });
+
+  it('does not consult a platform table after a canonical lookup fails', async () => {
+    findLegacyPoolRouter.mockRejectedValue(new Error('canonical storage unavailable'));
+    const response = await internalDecide({ router: 'efficient' }, 'kilo-auto/efficient');
+    expect(response.status).toBe(500);
+    expect(benchmarkFetch).not.toHaveBeenCalled();
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
   it('returns router_not_found for an organization router without an organization', async () => {

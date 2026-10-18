@@ -9,10 +9,11 @@ import {
 import type { Handler } from 'hono';
 import {
   clearAutoRoutingSettingsCache,
-  getConfiguredAutoRoutingMode,
+  LEGACY_POOL_MIGRATION_WRITE_ERROR,
   setAutoRoutingMode,
 } from './routing-mode';
 import type { HonoEnv } from './hono-env';
+import { getSharedOwnerSettings, updateSharedPoolRouter } from './legacy-pool-overlap';
 
 function responseBody(params: {
   ownerType: AutoRoutingModeOwnerType;
@@ -37,7 +38,7 @@ export const getRoutingModeHandler: Handler<HonoEnv> = async c => {
     return c.json({ error: 'Invalid routing mode owner' }, 400);
   }
 
-  const configuredMode = await getConfiguredAutoRoutingMode(c.env, parsed.data);
+  const { mode: configuredMode } = await getSharedOwnerSettings(c.env, parsed.data);
   return c.json(responseBody({ ...parsed.data, configuredMode }));
 };
 
@@ -54,7 +55,26 @@ export const putRoutingModeHandler: Handler<HonoEnv> = async c => {
     return c.json({ error: 'Invalid routing mode' }, 400);
   }
 
-  await setAutoRoutingMode(c.env, parsed.data, parsed.data.mode);
+  const configured = await getSharedOwnerSettings(c.env, parsed.data);
+  if (configured.router) {
+    const updated = await updateSharedPoolRouter(c.env, configured.router, {
+      mode: parsed.data.mode,
+    });
+    return c.json(
+      responseBody({
+        ...parsed.data,
+        configuredMode: updated.legacyModeInherited ? null : updated.mode,
+      })
+    );
+  }
+  try {
+    await setAutoRoutingMode(c.env, parsed.data, parsed.data.mode);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes(LEGACY_POOL_MIGRATION_WRITE_ERROR)) {
+      return c.json({ error: LEGACY_POOL_MIGRATION_WRITE_ERROR }, 409);
+    }
+    throw error;
+  }
   clearAutoRoutingSettingsCache();
   return c.json(responseBody({ ...parsed.data, configuredMode: parsed.data.mode }));
 };

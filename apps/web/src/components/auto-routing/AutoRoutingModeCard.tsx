@@ -38,6 +38,8 @@ import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { cn } from '@/lib/utils';
+import { customRoutersQueryKey } from './CustomRoutersCard';
+import { fetchCustomRouters } from './custom-router-display';
 
 // ---------------------------------------------------------------------------
 // Types (mirror the web settings API response; client-safe, no server-only import)
@@ -672,6 +674,15 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     refetchOnWindowFocus: true,
   });
 
+  const customRoutersQuery = useQuery({
+    queryKey: customRoutersQueryKey(organizationId),
+    queryFn: () => fetchCustomRouters(organizationId),
+    refetchInterval: current => (current.state.data ? SETTINGS_POLL_INTERVAL_MS : false),
+  });
+  const migratedRouter = customRoutersQuery.data?.routers?.find(
+    router => router.scope === (organizationId ? 'org' : 'user') && router.legacyPool
+  );
+
   // Local draft overrides. `undefined` means "follow the latest server snapshot".
   // Polls/refetches update statuses via query.data without touching these.
   const [modeOverride, setModeOverride] = useState<ModeSelection | undefined>(undefined);
@@ -907,6 +918,25 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
   };
 
   const poolSectionDescription = emptyPoolCopy(organizationId);
+
+  if (migratedRouter) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Efficient pool migrated</CardTitle>
+          <CardDescription>
+            Your pool is now managed under Custom routers. During the transition, edits there apply
+            to both model IDs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <a className="text-sm underline" href={`#custom-routers-${migratedRouter.scope}`}>
+            Edit {migratedRouter.modelId}
+          </a>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (query.isLoading && !query.data) {
     return (

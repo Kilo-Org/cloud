@@ -55,11 +55,12 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
   const nameError = organizations.isError && organizationId !== null;
   const unavailable =
     !organizations.isError && orgs !== undefined && organizationId !== null && !selected;
-  const statusMessage = nameError
-    ? t('organization.boundary.loadErrorTitle')
-    : unavailable
-      ? t('organization.boundary.organizationUnavailable')
-      : null;
+  let statusMessage: string | null = null;
+  if (nameError) {
+    statusMessage = t('organization.boundary.loadErrorTitle');
+  } else if (unavailable) {
+    statusMessage = t('organization.boundary.organizationUnavailable');
+  }
 
   const line = (
     <Text

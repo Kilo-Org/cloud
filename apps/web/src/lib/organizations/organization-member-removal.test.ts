@@ -1,5 +1,6 @@
 import { describe, test, expect, afterEach, beforeEach } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   organizations,
   organization_invitations,
@@ -7,6 +8,7 @@ import {
   organization_membership_removals,
   organization_seats_purchases,
   organization_user_limits,
+  external_side_effect_outbox,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -52,6 +54,8 @@ describe('removeUserFromOrganization', () => {
   });
 
   afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(external_side_effect_outbox);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organization_user_limits);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -192,6 +196,106 @@ describe('removeUserFromOrganization', () => {
 
     expect(added).toBe(false);
     expect(await getUserOrganizationsWithSeats(member.id)).toHaveLength(0);
+  });
+
+  test('deletes pending invitations for the member and marks their outbox rows terminal', async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const organization = await createOrganization('Removal Org', owner.id);
+
+    const invitation = await inviteUserToOrganization(
+      organization.id,
+      owner.id,
+      member.google_user_email,
+      'member'
+    );
+
+    await db.insert(external_side_effect_outbox).values({
+      operation: 'send_org_invite_email',
+      invitation_id: invitation.id,
+      payload: {
+        invitationId: invitation.id,
+        to: member.google_user_email,
+        organizationName: 'Removal Org',
+        inviterName: 'Test User',
+        acceptInviteUrl: `https://app.kilo.ai/invite/${invitation.token}`,
+      },
+    });
+
+    await addUserToOrganization(organization.id, member.id, 'member');
+    await removeUserFromOrganization(organization.id, member.id, owner.id);
+
+    const invitations = await db
+      .select()
+      .from(organization_invitations)
+      .where(
+        and(
+          eq(organization_invitations.organization_id, organization.id),
+          eq(organization_invitations.email, member.google_user_email)
+        )
+      );
+    expect(invitations).toHaveLength(0);
+
+    const [outboxRow] = await db
+      .select()
+      .from(external_side_effect_outbox)
+      .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+    expect(outboxRow.status).toBe('failed');
+    expect(outboxRow.last_error).toBe('revoked');
+    expect(outboxRow.claimed_at).toBeNull();
+    expect(outboxRow.next_attempt_at).toBeNull();
+  });
+
+  test('keeps accepted, expired, and other-organization invitations during removal', async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const otherOwner = await insertTestUser();
+    const organization = await createOrganization('Keep Invites Org', owner.id);
+    const otherOrganization = await createOrganization('Other Org', otherOwner.id);
+
+    const accepted = await inviteUserToOrganization(
+      organization.id,
+      owner.id,
+      member.google_user_email,
+      'member'
+    );
+    await db
+      .update(organization_invitations)
+      .set({ accepted_at: sql`NOW()` })
+      .where(eq(organization_invitations.id, accepted.id));
+
+    const expired = await inviteUserToOrganization(
+      organization.id,
+      owner.id,
+      `${member.id}-second@example.com`,
+      'member'
+    );
+    await db
+      .update(organization_invitations)
+      .set({ expires_at: sql`NOW() - INTERVAL '1 hour'` })
+      .where(eq(organization_invitations.id, expired.id));
+
+    const otherOrg = await inviteUserToOrganization(
+      otherOrganization.id,
+      otherOwner.id,
+      member.google_user_email,
+      'member'
+    );
+
+    await addUserToOrganization(organization.id, member.id, 'member');
+    await removeUserFromOrganization(organization.id, member.id, owner.id);
+
+    const remaining = await db
+      .select({ id: organization_invitations.id })
+      .from(organization_invitations)
+      .where(eq(organization_invitations.email, member.google_user_email));
+    expect(remaining.map(row => row.id).sort()).toEqual([accepted.id, otherOrg.id].sort());
+
+    const remainingExpired = await db
+      .select({ id: organization_invitations.id })
+      .from(organization_invitations)
+      .where(eq(organization_invitations.id, expired.id));
+    expect(remainingExpired).toHaveLength(1);
   });
 
   describe('Organizations', () => {

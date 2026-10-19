@@ -748,6 +748,22 @@ export async function acceptOrganizationInvite(
         });
       }
 
+      // The invitation must be newer than the removal record to be accepted.
+      const [removal] = await tx
+        .select({ removedAt: organization_membership_removals.removed_at })
+        .from(organization_membership_removals)
+        .where(
+          and(
+            eq(organization_membership_removals.organization_id, invitation.organization_id),
+            eq(organization_membership_removals.kilo_user_id, userId)
+          )
+        )
+        .limit(1);
+
+      if (removal && new Date(invitation.created_at) <= new Date(removal.removedAt)) {
+        return failureResult('Invitation is no longer valid');
+      }
+
       // Add user to organization
       await tx.insert(organization_memberships).values({
         organization_id: invitation.organization_id,

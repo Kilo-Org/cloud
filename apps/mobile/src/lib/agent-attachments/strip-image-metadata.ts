@@ -27,31 +27,50 @@ function saveFormatFor(extension: AgentAttachmentExtension): ImageManipulator.Sa
   return ImageManipulator.SaveFormat.JPEG;
 }
 
+export type StripImageMetadataResult =
+  | { ok: true; uri: string; extension: AgentAttachmentExtension }
+  | { ok: false };
+
 /**
  * Re-encode an image with no operations, which drops EXIF, GPS, and maker
- * notes. Returns the new cache URI. On failure it reports to Sentry and
- * returns the original URI so the caller keeps the unmodified file.
+ * notes. Returns the new cache URI and the extension of the produced file. If
+ * the format-matched re-encode fails, retries once with a forced JPEG output
+ * (the one format every platform's encoder supports). Only when that retry
+ * also fails does the result say so — the original URI is never returned as a
+ * success value, so a caller can never treat an unstripped image as sanitized.
  */
 export async function stripImageMetadata(
   uri: string,
   extension: AgentAttachmentExtension
-): Promise<string> {
+): Promise<StripImageMetadataResult> {
   try {
     // eslint-disable-next-line typescript-eslint/no-deprecated -- manipulateAsync is the documented no-op re-encode; the contextual API adds no benefit for a zero-transformation re-encode
     const result = await ImageManipulator.manipulateAsync(uri, [], {
       compress: 1,
       format: saveFormatFor(extension),
     });
-    return result.uri;
+    return { ok: true, uri: result.uri, extension: strippedExtension(extension) };
   } catch {
-    Sentry.captureException(new Error('Attachment image metadata strip failed'), {
-      tags: {
-        'error.subsystem': 'agent-attachments',
-        'error.operation': 'strip-image-metadata',
-      },
-      extra: { outputExtension: strippedExtension(extension) },
-      fingerprint: ['agent-attachments-strip-image-metadata'],
-    });
-    return uri;
+    try {
+      // eslint-disable-next-line typescript-eslint/no-deprecated -- see above
+      const result = await ImageManipulator.manipulateAsync(uri, [], {
+        compress: 1,
+        format: ImageManipulator.SaveFormat.JPEG,
+      });
+      return { ok: true, uri: result.uri, extension: 'jpg' };
+    } catch (retryError) {
+      Sentry.captureException(
+        new Error('Attachment image metadata strip failed', { cause: retryError }),
+        {
+          tags: {
+            'error.subsystem': 'agent-attachments',
+            'error.operation': 'strip-image-metadata',
+          },
+          extra: { inputExtension: extension },
+          fingerprint: ['agent-attachments-strip-image-metadata', extension],
+        }
+      );
+      return { ok: false };
+    }
   }
 }

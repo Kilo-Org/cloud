@@ -31,6 +31,7 @@ vi.mock('react-i18next', async importOriginal => {
 const routerPush = vi.fn();
 const routerBack = vi.fn();
 const routerCanGoBack = vi.fn(() => true);
+const routerDismissTo = vi.fn();
 const shareMock = vi.hoisted(() => vi.fn(() => ({ action: 'sharedAction' })));
 
 vi.mock('react', async () => {
@@ -58,7 +59,12 @@ vi.mock('react', async () => {
 
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
-  useRouter: () => ({ push: routerPush, back: routerBack, canGoBack: routerCanGoBack }),
+  useRouter: () => ({
+    push: routerPush,
+    back: routerBack,
+    canGoBack: routerCanGoBack,
+    dismissTo: routerDismissTo,
+  }),
 }));
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -785,5 +791,35 @@ describe('PrReviewScreen header eyebrow cap', () => {
       value: 1,
     });
     expect(header).not.toBeNull();
+  });
+});
+
+describe('PrReviewScreen Back target', () => {
+  beforeEach(() => {
+    routerDismissTo.mockClear();
+    prQueryResult = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      isFetching: false,
+    };
+  });
+
+  it('dismisses to the PR Review inbox instead of popping to the tab anchor', () => {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const header = findElement({
+      node: element,
+      type: 'ScreenHeader',
+      prop: 'showBackButton',
+      value: true,
+    });
+    expect(header).not.toBeNull();
+
+    const onBack = (header?.props as { onBack?: () => void } | undefined)?.onBack;
+    onBack?.();
+
+    expect(routerDismissTo).toHaveBeenCalledExactlyOnceWith('/(app)/pr-review');
+    expect(routerBack).not.toHaveBeenCalled();
   });
 });

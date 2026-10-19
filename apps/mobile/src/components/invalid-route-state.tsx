@@ -10,6 +10,10 @@ import { Text } from '@/components/ui/text';
  * Terminal state for a route whose params fail runtime validation (bad
  * scope/platform/id, or an unsupported scope+platform combination) —
  * matches the "instance not found" pattern in instance-context-boundary.tsx.
+ *
+ * Back returns to the screen the user came from when the app still has that
+ * history, and otherwise replaces this route with `backTo`, so the control
+ * never strands the user on a terminal screen and never leaves the app.
  */
 export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
   const router = useRouter();
@@ -25,6 +29,10 @@ export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
         <Button
           variant="outline"
           onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
             router.replace(backTo);
           }}
         >

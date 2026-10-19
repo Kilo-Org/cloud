@@ -24,6 +24,7 @@ import {
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PR_REVIEW_ENTRY_HREF } from '@/lib/pr-review/pr-review-entry';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { providerPrTriple, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
@@ -297,6 +298,14 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         eyebrow={`${owner}/${repo}`}
         eyebrowNumberOfLines={1}
         titleNumberOfLines={1}
+        showBackButton
+        onBack={() => {
+          // Deep-linked PRs mount on top of the tab anchor, where a plain pop
+          // would leave PR review for Home. Dismissing to the inbox pops back
+          // to it when the user came from there and replaces this screen with
+          // it otherwise (see PR_REVIEW_ENTRY_HREF).
+          router.dismissTo(PR_REVIEW_ENTRY_HREF);
+        }}
         allowHeaderRightStacking={false}
         headerRight={
           <View className="flex-row items-center gap-1">

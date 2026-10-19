@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 
 import { getDatabaseClientConfig } from './database-url';
 
@@ -62,6 +62,22 @@ describe('getDatabaseClientConfig', () => {
       );
 
       expect(config.ssl).toBe(false);
+    });
+
+    it('keeps TLS off for sslmode=allow because pg cannot negotiate an upgrade', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=allow'
+      );
+
+      expect(config.ssl).toBe(false);
+    });
+
+    it('does not treat Object.prototype keys as modes', () => {
+      expect(() =>
+        getDatabaseClientConfig(
+          'postgres://user:secret@db.example.com:5432/mydb?sslmode=constructor'
+        )
+      ).toThrow(/Unsupported sslmode/);
     });
 
     it('matches sslmode values case-insensitively and trims whitespace', () => {

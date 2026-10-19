@@ -42,9 +42,17 @@ export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
   return clientConfig;
 }
 
+/**
+ * The connection string's sslmode decides whether TLS is used when `DATABASE_CA`
+ * is unset. `require`/`prefer` encrypt without a certificate check;
+ * `verify-ca`/`verify-full` verify the server certificate against the Node
+ * system trust store. `allow` negotiates plaintext first and upgrades to TLS,
+ * which Node's `pg` cannot retry, so it is treated like `disable` rather than
+ * forcing a connection style the caller did not pin down.
+ */
 const VERIFY_CERTIFICATE_BY_SSLMODE: Record<string, boolean> = {
-  require: false,
   prefer: false,
+  require: false,
   'verify-ca': true,
   'verify-full': true,
 };
@@ -57,12 +65,12 @@ const VERIFY_CERTIFICATE_BY_SSLMODE: Record<string, boolean> = {
 function resolveSslFromSslmode(databaseUrl: URL): ClientConfig['ssl'] {
   const sslmode = databaseUrl.searchParams.get('sslmode')?.trim().toLowerCase();
 
-  if (!sslmode || sslmode === 'disable') return false;
+  if (!sslmode || sslmode === 'disable' || sslmode === 'allow') return false;
 
-  const verifyCertificate = VERIFY_CERTIFICATE_BY_SSLMODE[sslmode];
-  if (verifyCertificate === undefined) {
+  // Object.hasOwn so inherited keys like 'constructor' never resolve to a mode.
+  if (!Object.hasOwn(VERIFY_CERTIFICATE_BY_SSLMODE, sslmode)) {
     throw new Error(`Unsupported sslmode in database URL: ${sslmode}`);
   }
 
-  return { rejectUnauthorized: verifyCertificate };
+  return { rejectUnauthorized: VERIFY_CERTIFICATE_BY_SSLMODE[sslmode] };
 }

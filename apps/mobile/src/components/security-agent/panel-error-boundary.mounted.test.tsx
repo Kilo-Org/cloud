@@ -208,20 +208,40 @@ describe('PanelErrorBoundary with the real analysis panel', () => {
     expect(events).toHaveLength(0);
   });
 
-  it('recovers the panel when the parent refetches and remounts the boundary', () => {
-    const onRetry = vi.fn<() => void>();
-    const tree = mountBoundary(analysisFixture(partialSandboxPayload()), { onRetry });
+  it('recovers the panel when the fallback Retry refetches a whole payload', () => {
+    // What the detail screen's retry does: the fallback's Retry refetches the
+    // analysis query, and the parent bumps the boundary's key only once that
+    // refetch settles. While the stale crashing payload is still cached, the
+    // fresh boundary instance would throw again and pin the fallback through
+    // the refetch.
+    let query = analysisFixture(partialSandboxPayload());
+    let refetchCount = 0;
+    const onRetry = vi.fn<() => void>(() => {
+      refetchCount += 1;
+      // The screen's handler swaps the cached payload only as the refetch
+      // settles; drive the query through that order here.
+      query = analysisFixture({ analysis: { sandboxAnalysis: completeSandbox() } });
+    });
+    const tree = mountBoundary(query, { onRetry });
     expect(tree.root.findByType(QueryError)).toBeDefined();
 
-    // What the detail screen's retry does: refetch, then remount the boundary
-    // with a fresh key once the payload is whole again.
-    act(onRetry);
+    // First press: the fallback's own Retry button, wired to onRetry.
+    const error = tree.root.findByType(QueryError);
+    expect(error.props.message).toBe('securityAgent.analysis.couldNotLoad');
+    expect(tree.root.findAllByType(FindingAnalysisPanel)).toHaveLength(0);
+    const fallbackRetry = error.props.onRetry as () => void;
+    act(() => {
+      fallbackRetry();
+    });
+
+    // The refetch settled before the parent remounts the boundary: the fresh
+    // instance mounts against the recovered payload and renders the panel.
     const recovered = (
       <PanelErrorBoundary key="analysis-1" onRetry={onRetry}>
         <FindingAnalysisPanel
           scope="personal"
           findingId="finding-1"
-          analysis={analysisFixture({ analysis: { sandboxAnalysis: completeSandbox() } })}
+          analysis={query}
           isLoading={false}
           isError={false}
           onRetry={() => undefined}
@@ -232,7 +252,7 @@ describe('PanelErrorBoundary with the real analysis panel', () => {
       tree.update(recovered);
     });
 
-    expect(onRetry).toHaveBeenCalledOnce();
+    expect(refetchCount).toBe(1);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
     expect(tree.root.findAllByType(FindingAnalysisPanel)).toHaveLength(1);
     expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(1);

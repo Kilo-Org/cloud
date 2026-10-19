@@ -57,12 +57,21 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const colors = useThemeColors();
   const { t } = useTranslation();
   const [tab, setTab] = useState<FindingTab>('details');
-  // Bumped after the boundary's recovery action runs, so the boundary
-  // remounts with clean state instead of pinning its fallback over the
-  // recovered panel.
-  const [panelRetryCount, setPanelRetryCount] = useState(0);
   const findingQuery = useSecurityFinding(scope, findingId);
   const analysisQuery = useSecurityAnalysis(scope, findingId);
+  // Bumped once the boundary's recovery refetch settles, so the boundary
+  // remounts with clean state over the recovered payload. Bumping it in the
+  // same tick would mount the fresh boundary against the still-cached
+  // crashing payload: it would throw again and pin the fallback through the
+  // refetch.
+  const [panelRetryCount, setPanelRetryCount] = useState(0);
+  const retryAnalysisPanel = useCallback(() => {
+    const settle = async () => {
+      await analysisQuery.refetch();
+      setPanelRetryCount(count => count + 1);
+    };
+    void settle();
+  }, [analysisQuery]);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const capability = useSecurityAgentCapability(scope);
   const dismissDraft = useSecurityDismissDraft(scope, findingId);
@@ -258,10 +267,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
       {tab === 'analysis' && (
         <PanelErrorBoundary
           key={`analysis-${panelRetryCount}`}
-          onRetry={() => {
-            void analysisQuery.refetch();
-            setPanelRetryCount(count => count + 1);
-          }}
+          onRetry={retryAnalysisPanel}
           fallbackMessage={t('securityAgent.analysis.couldNotLoad')}
         >
           <FindingAnalysisPanel
@@ -277,10 +283,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
       {tab === 'remediation' && (
         <PanelErrorBoundary
           key={`remediation-${panelRetryCount}`}
-          onRetry={() => {
-            void analysisQuery.refetch();
-            setPanelRetryCount(count => count + 1);
-          }}
+          onRetry={retryAnalysisPanel}
           fallbackMessage={t('securityAgent.remediation.couldNotLoad')}
         >
           <FindingRemediationPanel

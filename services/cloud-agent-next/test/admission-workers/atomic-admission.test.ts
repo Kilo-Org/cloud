@@ -57,7 +57,7 @@ const bindings = env as Pick<Env, 'HYPERDRIVE' | 'CLOUD_AGENT_CONTAINER_CONCURRE
 const resources = { vcpus: 2, memory: 4096 } as const;
 const ATTEMPTS = 6;
 
-function fakePhysicalProvider() {
+function fakePhysicalProvider(runsOnCreate = true) {
   const creates: Array<{
     intent: ProviderCreateIntent;
     release: () => void;
@@ -76,7 +76,7 @@ function fakePhysicalProvider() {
           intent,
           release() {
             pending.delete(providerRef);
-            running.add(providerRef);
+            if (runsOnCreate) running.add(providerRef);
             resolve({ providerRef });
           },
           fail(error) {
@@ -165,7 +165,7 @@ async function runRace(race: Race) {
       actor: attemptActor,
       owner: attemptActor.type === 'user' ? attemptActor.id : users[index % 2],
       stub: bindings.SANDBOX_CONTROL.getByName(sandboxId),
-      provider: fakePhysicalProvider(),
+      provider: fakePhysicalProvider(!cloudflareLaunchFailure),
       input: {
         ...(cloudflareLaunchFailure
           ? { provider: 'cloudflare' as const }
@@ -440,6 +440,7 @@ async function runRace(race: Race) {
       });
       await waitFor(async () => {
         expect(winner.provider.launches).toHaveLength(1);
+        expect(winner.provider.pending.size + winner.provider.running.size).toBe(0);
         expect((await readAttemptRows()).rows).toEqual([
           expect.objectContaining({
             status: 'closed',
@@ -504,7 +505,7 @@ async function runRace(race: Race) {
         });
         if (race.outcome === 'ambiguous-failure') {
           await observer.query(
-            "UPDATE container_usage_interval SET last_seen_at = now() - interval '12 minutes' WHERE instance_id = $1",
+            "UPDATE container_usage_interval SET started_at = started_at - interval '2 minutes', last_seen_at = last_seen_at - interval '2 minutes' WHERE instance_id = $1",
             [winner.sandboxId]
           );
         } else {
@@ -732,7 +733,7 @@ describe('atomic admission across real SandboxControlV2 Durable Objects and mete
     await runRace({ scope: 'personal', slots: 1, outcome: 'definite-failure' });
   });
 
-  it('renews an ambiguous reservation beyond the live window without speculative billing', async () => {
+  it('renews an ambiguous reservation within the create-and-settle window without speculative billing', async () => {
     await runRace({ scope: 'personal', slots: 1, outcome: 'ambiguous-failure' });
   });
 

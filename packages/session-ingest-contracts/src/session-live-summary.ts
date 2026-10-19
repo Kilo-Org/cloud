@@ -72,10 +72,27 @@ export const sessionLiveSummarySchema = z.object({
 export type SessionLiveSummary = z.infer<typeof sessionLiveSummarySchema>;
 
 /**
+ * Whether the code point draws nothing and only affects how the text around it
+ * is laid out. Display text keeps just the characters it draws, so these are
+ * removed. Compared numerically because a character class naming them reads in
+ * the source as the characters themselves.
+ */
+function isFormatControl(code: number): boolean {
+  return (
+    code === 0x061c ||
+    (code >= 0x200b && code <= 0x200f) ||
+    (code >= 0x202a && code <= 0x202e) ||
+    code === 0x2060 ||
+    (code >= 0x2066 && code <= 0x2069) ||
+    code === 0xfeff
+  );
+}
+
+/**
  * One line of display text: control characters and line breaks become spaces,
- * runs of white space collapse, and text longer than `limit` ends with an
- * ellipsis inside the limit. The cut never splits a UTF-16 surrogate pair.
- * Empty text gives null.
+ * format controls that draw nothing are removed, runs of white space collapse,
+ * and text longer than `limit` ends with an ellipsis inside the limit. The cut
+ * never splits a UTF-16 surrogate pair. Empty text gives null.
  */
 export function sessionLiveText(raw: unknown, limit: number): string | null {
   if (typeof raw !== 'string') return null;
@@ -85,6 +102,7 @@ export function sessionLiveText(raw: unknown, limit: number): string | null {
   const flattened = [...raw]
     .map(char => {
       const code = char.codePointAt(0) ?? 0;
+      if (isFormatControl(code)) return '';
       return code <= 0x1f || code === 0x7f || code === 0x2028 || code === 0x2029 ? ' ' : char;
     })
     .join('');

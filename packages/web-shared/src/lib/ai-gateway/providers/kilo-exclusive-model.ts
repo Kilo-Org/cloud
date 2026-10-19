@@ -78,7 +78,6 @@ export type KiloExclusiveModel = {
   description: string;
   context_length: number;
   max_completion_tokens: number;
-  status: 'public' | 'hidden' | 'disabled';
   flags: KiloExclusiveModelFlag[];
   provider: Provider;
   internal_id: string;

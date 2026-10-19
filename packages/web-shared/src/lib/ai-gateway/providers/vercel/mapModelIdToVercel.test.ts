@@ -83,8 +83,8 @@ describe('mapModelIdToVercel', () => {
     });
   });
 
-  describe('first-party inference provider inference', () => {
-    it('rewrites the anthropic/ prefix unchanged', async () => {
+  describe('model prefix mapping', () => {
+    it('leaves the anthropic/ prefix unchanged', async () => {
       await expect(mapModelIdToVercel('anthropic/claude-sonnet-4.5')).resolves.toBe(
         'anthropic/claude-sonnet-4.5'
       );
@@ -152,9 +152,6 @@ describe('mapModelIdToVercel', () => {
       await expect(mapModelIdToVercel('stealth/claude-sonnet-4.6')).resolves.toBe(
         'stealth/claude-sonnet-4.6'
       );
-      await expect(mapModelIdToVercel('stepfun/step-5-preview-free')).resolves.toBe(
-        'stepfun/step-5-preview-free'
-      );
     });
 
     it('maps the Vercel-served Glyph Cluster stealth model to its gateway id', async () => {
@@ -163,16 +160,9 @@ describe('mapModelIdToVercel', () => {
       );
     });
 
-    it('maps the Vercel-served Cat Jam stealth model to its gateway id', async () => {
-      await expect(mapModelIdToVercel('stealth/cat-jam')).resolves.toBe('stealth/cat-jam');
-    });
-
-    it('does not use internal_id for disabled exclusives even when vercel-routed', async () => {
-      // minimax_m25_free_model has the 'vercel-routing' flag but status
-      // 'disabled', so it must not be substituted by internal_id and instead
-      // pass the public id through the generic prefix rewrite.
-      await expect(mapModelIdToVercel('minimax/minimax-m2.5:free')).resolves.toBe(
-        'minimax/minimax-m2.5:free'
+    it('maps the Vercel-served Reflection Beam free model to its gateway id', async () => {
+      await expect(mapModelIdToVercel('reflection/beam-free')).resolves.toBe(
+        'reflection/beam-free'
       );
     });
   });

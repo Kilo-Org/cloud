@@ -1,6 +1,5 @@
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { inferVercelFirstPartyInferenceProviderForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 const vercelModelIdMapping: Record<string, string | undefined> = {
   'mistralai/codestral-2508': 'mistral/codestral',
@@ -52,6 +51,13 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'glm-5.2': 'zai/glm-5.2',
 };
 
+const vercelModelPrefixMapping: Record<string, string | undefined> = {
+  mistralai: 'mistral',
+  qwen: 'alibaba',
+  'x-ai': 'spacexai',
+  'z-ai': 'zai',
+};
+
 export function mapResolvedModelIdToVercel(modelId: string) {
   const hardcodedVercelId = vercelModelIdMapping[modelId];
   if (hardcodedVercelId) {
@@ -62,7 +68,6 @@ export function mapResolvedModelIdToVercel(modelId: string) {
     kiloExclusiveModels.find(
       m =>
         m.public_id === modelId &&
-        m.status !== 'disabled' &&
         (m.provider.id === 'vercel' || m.flags.includes('vercel-routing'))
     )?.internal_id ?? modelId;
 
@@ -71,12 +76,8 @@ export function mapResolvedModelIdToVercel(modelId: string) {
     return internalId;
   }
 
-  if (internalId.startsWith('x-ai/')) {
-    return `spacexai${internalId.slice(slashIndex)}`;
-  }
-
-  const firstPartyProvider = inferVercelFirstPartyInferenceProviderForModel(internalId);
-  return firstPartyProvider ? firstPartyProvider + internalId.slice(slashIndex) : internalId;
+  const vercelPrefix = vercelModelPrefixMapping[internalId.slice(0, slashIndex)];
+  return vercelPrefix ? vercelPrefix + internalId.slice(slashIndex) : internalId;
 }
 
 export async function mapModelIdToVercel(modelId: string): Promise<string> {

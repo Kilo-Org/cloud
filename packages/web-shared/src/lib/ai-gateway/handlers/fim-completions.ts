@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -222,7 +223,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   // slight replication lag, and provides lower latency for US users
   const { balance, plan, payer } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
-  if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
+  if (!canSpendPaidUsage(balance) && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },
@@ -237,6 +238,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
       organizationId,
       kiloUserId: user.id,
       modelId: requestBody.model,
+      fromDb: readDb,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
     if (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(fimProvider)) {

@@ -38,7 +38,6 @@ function freeExclusiveModel(
     description: '',
     context_length: 1,
     max_completion_tokens: 1,
-    status: 'public',
     flags: [],
     provider: OPENROUTER,
     pricing: null,
@@ -135,22 +134,7 @@ describe('applyFreeEndpointDataPolicy', () => {
     expect(second.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
   });
 
-  test('ignores hidden free exclusive models', () => {
-    const model = offering('example/model');
-    const hidden = freeExclusiveModel('example/model:free', []);
-    hidden.status = 'hidden';
-
-    applyFreeEndpointDataPolicy({
-      providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],
-      openRouterFreeEndpoints: [],
-      kiloExclusiveModels: [hidden],
-      unavailableModelIds: noUnavailableModels,
-    });
-
-    expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
-  });
-
-  test('applies public data-collection exclusive model policy', () => {
+  test('applies data-collection exclusive model policy', () => {
     const model = offering('example/model');
 
     applyFreeEndpointDataPolicy({
@@ -202,10 +186,8 @@ describe('applyFreeEndpointDataPolicy', () => {
     expect(second.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
   });
 
-  test('ignores disabled and paid exclusive models without data collection', () => {
+  test('ignores paid exclusive models without data collection', () => {
     const model = offering('example/model');
-    const disabled = freeExclusiveModel('example/model:free', []);
-    disabled.status = 'disabled';
     const paid = freeExclusiveModel('example/model:discounted', []);
     paid.pricing = {
       tiers: [
@@ -224,7 +206,7 @@ describe('applyFreeEndpointDataPolicy', () => {
     applyFreeEndpointDataPolicy({
       providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],
       openRouterFreeEndpoints: [],
-      kiloExclusiveModels: [disabled, paid],
+      kiloExclusiveModels: [paid],
       unavailableModelIds: noUnavailableModels,
     });
 

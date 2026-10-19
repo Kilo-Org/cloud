@@ -449,6 +449,7 @@ export const NOTIFICATIONS_WORKER_URL = getEnvVariable('NOTIFICATIONS_WORKER_URL
 
 // Auto routing worker
 export const AUTO_ROUTING_WORKER_URL = getEnvVariable('AUTO_ROUTING_WORKER_URL') || '';
+export const AUTO_ROUTING_DECISION_SECRET = getEnvVariable('AUTO_ROUTING_DECISION_SECRET') || '';
 
 // Auto routing benchmark worker
 export const AUTO_ROUTING_BENCHMARK_WORKER_URL =

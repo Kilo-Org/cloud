@@ -227,7 +227,10 @@ export function CodeReviewJobsCard({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { modelOptions, isLoadingModels, defaultModel } = useOrganizationModels(organizationId);
+  const { modelOptions, isLoadingModels, defaultModel } = useOrganizationModels(
+    organizationId,
+    'shared_services'
+  );
 
   const offset = (currentPage - 1) * PAGE_SIZE;
   const prLabel = platform === 'gitlab' ? 'merge requests' : 'pull requests';

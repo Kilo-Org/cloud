@@ -101,6 +101,17 @@ export function platformRegistryEntries(
   return entries;
 }
 
+/** The concrete catalog model behind `modelId` and its reasoning variants, or null when absent. */
+export function catalogModelVariants(
+  catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
+  modelId: string
+): { model: string; variants: (string | null)[] } | null {
+  const model = resolveCatalogModel(modelId, new Map(catalog.data.map(m => [m.id, m])));
+  if (!model) return null;
+  const variants = getReasoningVariantKeys(model.opencode?.variants);
+  return { model: model.id, variants: variants.length > 0 ? variants : [null] };
+}
+
 /**
  * Concrete target of an alias pair: `undefined` when the alias is unresolvable
  * (absent, or its target is missing from the catalog), `null` when the target

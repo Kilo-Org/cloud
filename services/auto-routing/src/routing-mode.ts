@@ -1,18 +1,39 @@
 import {
   AutoRoutingModeSchema,
   DEFAULT_AUTO_ROUTING_MODE,
+  CustomRouterEntriesSchema,
   PersistedEfficientModelPoolSchema,
   type AutoRoutingMode,
   type AutoRoutingModeOwnerType,
   type EfficientModelPool,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
+import * as z from 'zod';
 import { DurableObject } from 'cloudflare:workers';
 
 type AutoRoutingModeEnv = Pick<Env, 'AUTO_ROUTING_MODE_CONFIG'>;
 
 const MODE_STORAGE_KEY = 'mode';
 const POOL_STORAGE_KEY = 'pool';
+const CONVERTED_AT_KEY = 'convertedAt';
+const FAILED_AT_KEY = 'conversionFailedAt';
+const CONVERSION_PENDING_KEY = 'conversionPending';
+const POOL_MIGRATED_KEY = 'poolMigratedAt';
+
+const PendingConversionSettingsSchema = z.object({
+  mode: AutoRoutingModeSchema.nullable(),
+  pool: PersistedEfficientModelPoolSchema,
+});
+
+export const LEGACY_POOL_MIGRATION_WRITE_ERROR =
+  'This pool is being migrated or already migrated. Retry the edit in custom router settings.';
+
+export type StoredOwnerSettings = AutoRoutingOwnerSettings & {
+  invalidMode: boolean;
+  invalidPool: boolean;
+  convertedAt: string | null;
+  failedAt: string | null;
+};
 
 export type AutoRoutingOwnerSettings = {
   mode: AutoRoutingMode | null;
@@ -39,17 +60,109 @@ function parseStoredMode(raw: unknown): AutoRoutingMode | null {
   return parsed.success ? parsed.data : null;
 }
 
+function parseStoredOwnerSettings(stored: Map<string, unknown>): StoredOwnerSettings {
+  const rawMode = stored.get(MODE_STORAGE_KEY);
+  const rawPool = stored.get(POOL_STORAGE_KEY);
+  const convertedAt = stored.get(CONVERTED_AT_KEY);
+  const failedAt = stored.get(FAILED_AT_KEY);
+  const mode = AutoRoutingModeSchema.safeParse(rawMode);
+  const pool = PersistedEfficientModelPoolSchema.safeParse(rawPool);
+  const pending = PendingConversionSettingsSchema.safeParse(stored.get(CONVERSION_PENDING_KEY));
+  return {
+    mode: pending.success ? pending.data.mode : mode.success ? mode.data : null,
+    pool: pending.success ? pending.data.pool : pool.success ? pool.data : null,
+    invalidMode: !pending.success && rawMode !== undefined && rawMode !== null && !mode.success,
+    invalidPool: !pending.success && rawPool !== undefined && rawPool !== null && !pool.success,
+    convertedAt: typeof convertedAt === 'string' ? convertedAt : null,
+    failedAt: typeof failedAt === 'string' ? failedAt : null,
+  };
+}
+
 export class AutoRoutingModeConfigDO extends DurableObject<Env> {
+  async readStoredSettings(): Promise<StoredOwnerSettings> {
+    const stored = await this.ctx.storage.get<unknown>([
+      MODE_STORAGE_KEY,
+      POOL_STORAGE_KEY,
+      CONVERTED_AT_KEY,
+      FAILED_AT_KEY,
+      CONVERSION_PENDING_KEY,
+    ]);
+    return parseStoredOwnerSettings(stored);
+  }
+
+  async beginConversion(requested?: AutoRoutingOwnerSettings): Promise<StoredOwnerSettings> {
+    return this.ctx.storage.transaction(async txn => {
+      const stored = await txn.get<unknown>([
+        MODE_STORAGE_KEY,
+        POOL_STORAGE_KEY,
+        CONVERTED_AT_KEY,
+        FAILED_AT_KEY,
+        CONVERSION_PENDING_KEY,
+        POOL_MIGRATED_KEY,
+      ]);
+      let settings = parseStoredOwnerSettings(stored);
+      if (
+        requested?.pool &&
+        !stored.has(CONVERSION_PENDING_KEY) &&
+        !stored.has(POOL_MIGRATED_KEY) &&
+        (settings.pool === null ||
+          !CustomRouterEntriesSchema.safeParse(
+            settings.pool.map(entry => ({ kind: 'gateway', model: entry.model }))
+          ).success)
+      ) {
+        settings = { ...settings, ...requested, invalidMode: false, invalidPool: false };
+      }
+      if (
+        settings.convertedAt === null &&
+        settings.pool !== null &&
+        CustomRouterEntriesSchema.safeParse(
+          settings.pool.map(entry => ({ kind: 'gateway', model: entry.model }))
+        ).success
+      ) {
+        if (
+          requested &&
+          !stored.has(CONVERSION_PENDING_KEY) &&
+          !stored.has(POOL_MIGRATED_KEY) &&
+          JSON.stringify(requested.pool) === JSON.stringify(settings.pool)
+        ) {
+          settings = { ...settings, mode: requested.mode, invalidMode: false };
+          if (requested.mode === null) await txn.delete(MODE_STORAGE_KEY);
+          else await txn.put(MODE_STORAGE_KEY, requested.mode);
+        }
+        await txn.put(CONVERSION_PENDING_KEY, { mode: settings.mode, pool: settings.pool });
+      }
+      return settings;
+    });
+  }
+
+  async markConverted(at: string, migrated = false): Promise<void> {
+    await this.ctx.storage.transaction(async txn => {
+      await txn.put({
+        [CONVERTED_AT_KEY]: at,
+        ...(migrated ? { [POOL_MIGRATED_KEY]: at } : {}),
+      });
+      await txn.delete(CONVERSION_PENDING_KEY);
+    });
+  }
+
+  private async assertLegacyWritesAllowed(txn: DurableObjectTransaction): Promise<void> {
+    const markers = await txn.get([CONVERSION_PENDING_KEY, POOL_MIGRATED_KEY]);
+    if (markers.has(CONVERSION_PENDING_KEY) || markers.has(POOL_MIGRATED_KEY)) {
+      throw new Error(LEGACY_POOL_MIGRATION_WRITE_ERROR);
+    }
+  }
+
+  async markFailed(at: string): Promise<void> {
+    await this.ctx.storage.put(FAILED_AT_KEY, at);
+  }
+
   async getMode(): Promise<AutoRoutingMode | null> {
     return parseStoredMode(await this.ctx.storage.get(MODE_STORAGE_KEY));
   }
 
   async setMode(mode: AutoRoutingMode | null): Promise<void> {
-    if (mode === null) {
-      await this.ctx.storage.delete(MODE_STORAGE_KEY);
-      return;
-    }
-    await this.ctx.storage.put(MODE_STORAGE_KEY, mode);
+    if (mode === null) await this.ctx.storage.delete(MODE_STORAGE_KEY);
+    else await this.ctx.storage.put(MODE_STORAGE_KEY, mode);
   }
 
   async getPool(): Promise<EfficientModelPool | null> {
@@ -72,11 +185,11 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
   }
 
   async setPool(pool: EfficientModelPool | null): Promise<void> {
-    if (pool === null) {
-      await this.ctx.storage.delete(POOL_STORAGE_KEY);
-      return;
-    }
-    await this.ctx.storage.put(POOL_STORAGE_KEY, pool);
+    await this.ctx.storage.transaction(async txn => {
+      await this.assertLegacyWritesAllowed(txn);
+      if (pool === null) await txn.delete(POOL_STORAGE_KEY);
+      else await txn.put(POOL_STORAGE_KEY, pool);
+    });
   }
 
   async getSettings(): Promise<AutoRoutingOwnerSettings> {
@@ -85,8 +198,6 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
   }
 
   async setSettings(settings: AutoRoutingOwnerSettings): Promise<void> {
-    // Mode and pool commit or fail together in one storage transaction.
-    // setMode/setPool stay single-key for individual callers.
     const toPut: Record<string, unknown> = {};
     const toDelete: string[] = [];
     if (settings.mode === null) {
@@ -103,6 +214,7 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
       return;
     }
     await this.ctx.storage.transaction(async txn => {
+      await this.assertLegacyWritesAllowed(txn);
       if (Object.keys(toPut).length > 0) {
         await txn.put(toPut);
       }
@@ -118,22 +230,27 @@ function modeStub(env: AutoRoutingModeEnv, ownerType: AutoRoutingModeOwnerType, 
   return namespace.get(namespace.idFromName(modeKey(ownerType, ownerId)));
 }
 
+export function readConfiguredAutoRoutingMode(
+  env: AutoRoutingModeEnv,
+  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+): Promise<AutoRoutingMode | null> {
+  return modeStub(env, owner.ownerType, owner.ownerId).getMode();
+}
+
 export async function getConfiguredAutoRoutingMode(
   env: AutoRoutingModeEnv,
   owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
 ): Promise<AutoRoutingMode | null> {
-  return modeStub(env, owner.ownerType, owner.ownerId)
-    .getMode()
-    .catch((error: unknown) => {
-      console.warn(
-        JSON.stringify({
-          event: 'auto_routing_config_read_failed',
-          key: modeKey(owner.ownerType, owner.ownerId),
-          ...formatError(error),
-        })
-      );
-      return null;
-    });
+  return readConfiguredAutoRoutingMode(env, owner).catch((error: unknown) => {
+    console.warn(
+      JSON.stringify({
+        event: 'auto_routing_config_read_failed',
+        key: modeKey(owner.ownerType, owner.ownerId),
+        ...formatError(error),
+      })
+    );
+    return null;
+  });
 }
 
 async function readAutoRoutingSettings(
@@ -161,7 +278,7 @@ export async function getConfiguredAutoRoutingSettings(
   return readAutoRoutingSettings(env, owner).catch(() => ({ mode: null, pool: null }));
 }
 
-function getCachedAutoRoutingSettings(
+export function getCachedAutoRoutingSettings(
   env: AutoRoutingModeEnv,
   owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
 ): Promise<AutoRoutingOwnerSettings> {
@@ -193,8 +310,13 @@ export async function getAutoRoutingMode(
   env: AutoRoutingModeEnv,
   owner: { userId: string; organizationId: string | null }
 ): Promise<AutoRoutingMode> {
-  const settings = await getEffectiveAutoRoutingSettings(env, owner);
-  return settings.mode;
+  const [orgMode, userMode] = await Promise.all([
+    owner.organizationId
+      ? getConfiguredAutoRoutingMode(env, { ownerType: 'org', ownerId: owner.organizationId })
+      : null,
+    getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: owner.userId }),
+  ]);
+  return orgMode ?? userMode ?? DEFAULT_AUTO_ROUTING_MODE;
 }
 
 /**
@@ -230,6 +352,7 @@ export async function setAutoRoutingMode(
   mode: AutoRoutingMode | null
 ): Promise<void> {
   await modeStub(env, owner.ownerType, owner.ownerId).setMode(mode);
+  clearAutoRoutingSettingsCache();
 }
 
 export async function setAutoRoutingSettings(

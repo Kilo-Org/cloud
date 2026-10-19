@@ -217,11 +217,11 @@ describe('cloud-agent model validation through real web authentication', () => {
           procedure,
         })
       ).resolves.toBeUndefined();
-      expect(getAvailableModelsForOrganization).toHaveBeenCalledWith(org.id, {
-        type: 'member',
-        kiloUserId: user.id,
-        allowNonMember: true,
-      });
+      expect(getAvailableModelsForOrganization).toHaveBeenCalledWith(
+        org.id,
+        { type: 'member', kiloUserId: user.id, allowNonMember: true },
+        'member'
+      );
     }
   );
 

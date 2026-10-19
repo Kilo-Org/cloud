@@ -97,6 +97,249 @@
     ],
     "searchBlob": "activeSessions.widgetSnapshot Get the home widget snapshot of active agents and sessions for the current user, optionally scoped to an organization, for rendering a glanceable dashboard widget. Use this to fetch the widget's data payload. activesessions widgetsnapshot organizationid organizationId"
   },
+  "agentBriefing.dismiss": {
+    "path": "agentBriefing.dismiss",
+    "kind": "mutation",
+    "summary": "Dismiss or hide an agent briefing report for the current user.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "dismiss",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.dismiss Dismiss or hide an agent briefing report for the current user. agentbriefing dismiss reportid reportId"
+  },
+  "agentBriefing.estimateSummary": {
+    "path": "agentBriefing.estimateSummary",
+    "kind": "query",
+    "summary": "Preview or estimate the content and cost of an agent briefing summary before generating it for a user or organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "maxSpendMicrodollars": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxDurationSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "estimatesummary",
+      "organizationid",
+      "model",
+      "maxspendmicrodollars",
+      "maxdurationseconds",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.estimateSummary Preview or estimate the content and cost of an agent briefing summary before generating it for a user or organization. agentbriefing estimatesummary organizationid model maxspendmicrodollars maxdurationseconds reportid organizationId model maxSpendMicrodollars maxDurationSeconds reportId"
+  },
+  "agentBriefing.get": {
+    "path": "agentBriefing.get",
+    "kind": "query",
+    "summary": "Fetch a single agent briefing report by ID, including its full contents.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "get",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.get Fetch a single agent briefing report by ID, including its full contents. agentbriefing get reportid reportId"
+  },
+  "agentBriefing.list": {
+    "path": "agentBriefing.list",
+    "kind": "query",
+    "summary": "List existing agent briefing reports for the user, optionally filtered by personal or organization scope with pagination.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "all",
+            "personal",
+            "organization"
+          ]
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cursor": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "currentOnly": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "list",
+      "scope",
+      "organizationid",
+      "cursor",
+      "limit",
+      "currentonly"
+    ],
+    "searchBlob": "agentBriefing.list List existing agent briefing reports for the user, optionally filtered by personal or organization scope with pagination. agentbriefing list scope organizationid cursor limit currentonly scope organizationId cursor limit currentOnly"
+  },
+  "agentBriefing.preferences": {
+    "path": "agentBriefing.preferences",
+    "kind": "query",
+    "summary": "Get the current user's agent briefing preferences, such as timezone, language, and notification schedule.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "preferences",
+      "timezone",
+      "language"
+    ],
+    "searchBlob": "agentBriefing.preferences Get the current user's agent briefing preferences, such as timezone, language, and notification schedule. agentbriefing preferences timezone language timezone language"
+  },
+  "agentBriefing.read": {
+    "path": "agentBriefing.read",
+    "kind": "mutation",
+    "summary": "Mark an agent briefing report as read for the current user.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "read",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.read Mark an agent briefing report as read for the current user. agentbriefing read reportid reportId"
+  },
+  "agentBriefing.updatePreferences": {
+    "path": "agentBriefing.updatePreferences",
+    "kind": "mutation",
+    "summary": "Update agent briefing settings for the current user, including timezone, language, and notification windows.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        },
+        "nightStart": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "morningStart": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "morningEnd": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "notificationsEnabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "updatepreferences",
+      "timezone",
+      "language",
+      "nightstart",
+      "morningstart",
+      "morningend",
+      "notificationsenabled"
+    ],
+    "searchBlob": "agentBriefing.updatePreferences Update agent briefing settings for the current user, including timezone, language, and notification windows. agentbriefing updatepreferences timezone language nightstart morningstart morningend notificationsenabled timezone language nightStart morningStart morningEnd notificationsEnabled"
+  },
   "agentProfiles.applyConfigImport": {
     "path": "agentProfiles.applyConfigImport",
     "kind": "mutation",
@@ -18043,6 +18286,26 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
+            }
+          ]
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
             }
           ]
         }
@@ -18056,9 +18319,10 @@
       "autotopup",
       "changepaymentmethod",
       "organizationid",
-      "amountcents"
+      "amountcents",
+      "thresholdcents"
     ],
-    "searchBlob": "organizations.autoTopUp.changePaymentMethod Start the flow to set a new payment method for an organization's automatic top-up. Use to replace the card on file. organizations autotopup changepaymentmethod organizationid amountcents organizationId amountCents"
+    "searchBlob": "organizations.autoTopUp.changePaymentMethod Start the flow to set a new payment method for an organization's automatic top-up. Use to replace the card on file. organizations autotopup changepaymentmethod organizationid amountcents thresholdcents organizationId amountCents thresholdCents"
   },
   "organizations.autoTopUp.getConfig": {
     "path": "organizations.autoTopUp.getConfig",
@@ -18141,6 +18405,26 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
+            }
+          ]
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
             }
           ]
         }
@@ -18156,9 +18440,10 @@
       "toggle",
       "organizationid",
       "currentenabled",
-      "amountcents"
+      "amountcents",
+      "thresholdcents"
     ],
-    "searchBlob": "organizations.autoTopUp.toggle Turn automatic balance top-up on or off for an organization, or start payment-method setup. Use to enable or disable auto top-up. organizations autotopup toggle organizationid currentenabled amountcents organizationId currentEnabled amountCents"
+    "searchBlob": "organizations.autoTopUp.toggle Turn automatic balance top-up on or off for an organization, or start payment-method setup. Use to enable or disable auto top-up. organizations autotopup toggle organizationid currentenabled amountcents thresholdcents organizationId currentEnabled amountCents thresholdCents"
   },
   "organizations.autoTopUp.updateAmount": {
     "path": "organizations.autoTopUp.updateAmount",
@@ -18186,6 +18471,10 @@
             {
               "type": "number",
               "const": 100000
+            },
+            {
+              "type": "number",
+              "const": 500000
             }
           ]
         }
@@ -18203,6 +18492,50 @@
       "amountcents"
     ],
     "searchBlob": "organizations.autoTopUp.updateAmount Set the amount an organization automatically tops up when its balance is low. Use to change the auto top-up amount. organizations autotopup updateamount organizationid amountcents organizationId amountCents"
+  },
+  "organizations.autoTopUp.updateThreshold": {
+    "path": "organizations.autoTopUp.updateThreshold",
+    "kind": "mutation",
+    "summary": "Set the balance threshold that triggers automatic top-up for an organization, so credit is refilled when it falls below the configured amount. Use to change when auto-recharge kicks in for a team or organization account.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "thresholdCents": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 5000
+            },
+            {
+              "type": "number",
+              "const": 10000
+            },
+            {
+              "type": "number",
+              "const": 50000
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "thresholdCents"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "autotopup",
+      "updatethreshold",
+      "organizationid",
+      "thresholdcents"
+    ],
+    "searchBlob": "organizations.autoTopUp.updateThreshold Set the balance threshold that triggers automatic top-up for an organization, so credit is refilled when it falls below the configured amount. Use to change when auto-recharge kicks in for a team or organization account. organizations autotopup updatethreshold organizationid thresholdcents organizationId thresholdCents"
   },
   "organizations.autoTriage.getAutoTriageConfig": {
     "path": "organizations.autoTriage.getAutoTriageConfig",
@@ -29878,6 +30211,14 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "audience": {
+          "default": "member",
+          "type": "string",
+          "enum": [
+            "member",
+            "shared_services"
+          ]
         }
       },
       "required": [
@@ -29888,9 +30229,10 @@
       "organizations",
       "settings",
       "listavailablemodels",
-      "organizationid"
+      "organizationid",
+      "audience"
     ],
-    "searchBlob": "organizations.settings.listAvailableModels List the AI models available to an organization's members according to its model access policy. organizations settings listavailablemodels organizationid organizationId"
+    "searchBlob": "organizations.settings.listAvailableModels List the AI models available to an organization's members according to its model access policy. organizations settings listavailablemodels organizationid audience organizationId audience"
   },
   "organizations.settings.setOrganizationAutoRoute": {
     "path": "organizations.settings.setOrganizationAutoRoute",

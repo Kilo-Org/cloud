@@ -3175,6 +3175,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         kiloUserId: user.id,
         organizationId: org.id,
         amountCents: '2000',
+        thresholdCents: '10000',
         serviceFeePrincipalMinor: '2000',
       },
     } as unknown as Stripe.PaymentIntent;
@@ -3190,6 +3191,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       expect(configAfterFirst?.owned_by_organization_id).toBe(org.id);
       expect(configAfterFirst?.stripe_payment_method_id).toBe(firstPaymentIntent.payment_method);
       expect(configAfterFirst?.amount_cents).toBe(2000);
+      expect(configAfterFirst?.threshold_cents).toBe(10000);
       expect(configAfterFirst?.disabled_reason).toBeNull();
 
       const orgAfterFirst = await db.query.organizations.findFirst({
@@ -3224,6 +3226,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       });
       expect(configAfterSecond?.stripe_payment_method_id).toBe(secondPaymentIntent.payment_method);
       expect(configAfterSecond?.amount_cents).toBe(5000);
+      expect(configAfterSecond?.threshold_cents).toBe(5000);
       expect(configAfterSecond?.disabled_reason).toBeNull();
     } finally {
       retrieveSpy.mockRestore();

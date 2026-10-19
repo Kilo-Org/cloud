@@ -712,6 +712,27 @@ describe('POST /api/auth/native/token', () => {
       expect(mockReleaseSignInCode).toHaveBeenCalled();
     });
 
+    it('returns 403 SIGNUP-STEP-UP with the methods and releases the reservation', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: false,
+        error: 'SIGNUP-STEP-UP',
+        methods: ['google', 'apple'],
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'SIGNUP-STEP-UP',
+        methods: ['google', 'apple'],
+      });
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
     it('releases the code on DIFFERENT-OAUTH settlement failure so retry succeeds', async () => {
       mockCreateOrUpdateUser.mockResolvedValue({
         success: false,
@@ -891,6 +912,25 @@ describe('POST /api/auth/native/token', () => {
     expect(response.status).toBe(status);
     expect(data).toEqual({ error });
     expect(mockGenerateApiToken).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 SIGNUP-STEP-UP with the methods for a Google signup without credentials', async () => {
+    mockVerifyNativeGoogleIdToken.mockResolvedValue({
+      sub: 'google-sub-1',
+      email: 'googleuser@example.com',
+    });
+    mockCreateOrUpdateUser.mockResolvedValue({
+      success: false,
+      error: 'SIGNUP-STEP-UP',
+      methods: ['apple'],
+    });
+
+    const response = await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'SIGNUP-STEP-UP', methods: ['apple'] });
+    expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
   });
 
   it('does not mint a token for an individually blocked user', async () => {

@@ -13,7 +13,7 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { createGatewayRepository } from '@/lib/mcp-gateway/repository';
 import { createOAuthGrantService } from '@/lib/mcp-gateway/oauth-grant-service';
-import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
 function serializeTimestamp(value: string) {
@@ -32,7 +32,7 @@ export const mcpGatewayAuthorizationsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       if (input?.organizationId) {
-        const isMember = await isOrganizationMember(input.organizationId, ctx.user.id);
+        const isMember = await isOrganizationMember(db, input.organizationId, ctx.user.id);
         if (!isMember) {
           throw new TRPCError({
             code: 'FORBIDDEN',

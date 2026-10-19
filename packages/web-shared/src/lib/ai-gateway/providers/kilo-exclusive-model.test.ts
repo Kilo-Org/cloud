@@ -27,7 +27,6 @@ function makeModel(
     description: '',
     context_length: 0,
     max_completion_tokens: 0,
-    status: 'public',
     flags: [],
     provider: OPENROUTER,
     pricing: null,

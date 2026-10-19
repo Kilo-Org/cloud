@@ -134,7 +134,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     primaryForeground: '#111111',
   }),
 }));
-vi.mock('@/lib/hooks/use-available-models', () => ({ useAvailableModels: () => ({ models: [] }) }));
+vi.mock('@/lib/hooks/use-reviewer-models', () => ({ useReviewerModels: () => ({ models: [] }) }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({

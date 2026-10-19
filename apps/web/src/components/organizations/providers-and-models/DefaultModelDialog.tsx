@@ -34,6 +34,7 @@ import {
 import {
   hasActiveOrganizationModelPolicy,
   isOrganizationAutoTargetModel,
+  isOrganizationCustomRouterTarget,
   ORGANIZATION_AUTO_MODEL_FLAG,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
 import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -185,6 +186,7 @@ export function DefaultModelDialog({
     () =>
       availableModels.filter(model => {
         if (model.id.startsWith(CUSTOM_LLM_PREFIX)) return false;
+        if (isOrganizationCustomRouterTarget(model.id)) return true;
         if (model.id.startsWith('kilo-auto/')) {
           return !hasActiveModelPolicy && isOrganizationAutoTargetModel(model.id);
         }

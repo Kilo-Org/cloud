@@ -9,6 +9,7 @@ import type {
 import type * as Producer from './organization-models';
 import type * as Cache from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import type { OrganizationModelAudience } from '@kilocode/app-shared/organizations';
 import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 
 let mockPublicationEnabled = true;
@@ -80,6 +81,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: mockTagChatGpt,
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
+  openAiChatGptSharedServicesOwner: (organizationId: string) => ({
+    organizationId,
+    scope: 'shared_services',
+  }),
 }));
 
 const checkedAt = '2026-09-01T00:00:00.000Z';
@@ -242,8 +249,12 @@ function pauseAt(stage: 'byok' | 'custom') {
   return { entered: entered.promise, release: release.resolve };
 }
 
-async function resultFor(policySubject = subject) {
-  const result = await producer.getAvailableModelsForOrganization('fixture-org', policySubject);
+async function resultFor(policySubject = subject, audience: OrganizationModelAudience = 'member') {
+  const result = await producer.getAvailableModelsForOrganization(
+    'fixture-org',
+    policySubject,
+    audience
+  );
   if (!result) throw new Error('Expected organization catalog');
   expect(result).toHaveProperty('fixtureCatalogMarker', 'preserved');
   const serialized = JSON.stringify(result);
@@ -323,11 +334,12 @@ describe('organization model producer publication', () => {
     mockAutoEnabled = true;
     const defaultSubject: OrganizationPolicySubject = { type: 'defaultAccess' };
     const results = await Promise.all([resultFor(), resultFor(defaultSubject), resultFor()]);
-    expect(mockGetContext).toHaveBeenCalledWith({ organizationId: 'fixture-org', subject });
-    expect(mockGetContext).toHaveBeenCalledWith({
-      organizationId: 'fixture-org',
-      subject: defaultSubject,
-    });
+    expect(mockGetContext).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'fixture-org', subject })
+    );
+    expect(mockGetContext).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'fixture-org', subject: defaultSubject })
+    );
     expect(mockEvaluatePolicy).toHaveBeenCalledWith(mockContext);
     expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group']);
     expect(mockByok).toHaveBeenCalledWith('fixture-org');
@@ -422,5 +434,41 @@ describe('organization model producer publication', () => {
     expect(
       defaultResult.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable
     ).toBe(false);
+  });
+
+  it('marks a shared-services list only from the shared-services ChatGPT connection', async () => {
+    const connected = { member: true, sharedServices: false };
+    mockTagChatGpt.mockImplementation(async (owner, models: OpenRouterModel[]) => {
+      const isShared =
+        typeof owner === 'object' &&
+        owner !== null &&
+        'scope' in owner &&
+        owner.scope === 'shared_services';
+      if (!(isShared ? connected.sharedServices : connected.member)) return models;
+      return models.map(model =>
+        model.id === 'provider/training' ? { ...model, hasUserByokAvailable: true } : model
+      );
+    });
+    async function byokFor(audience: OrganizationModelAudience) {
+      const result = await resultFor(subject, audience);
+      return result.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable;
+    }
+
+    // Only the viewing member has a connection: a service run cannot use it.
+    await expect(byokFor('member')).resolves.toBe(true);
+    await expect(byokFor('shared_services')).resolves.toBe(false);
+    expect(mockTagChatGpt).toHaveBeenLastCalledWith(
+      { organizationId: 'fixture-org', scope: 'shared_services' },
+      expect.any(Array)
+    );
+
+    connected.sharedServices = true;
+    await expect(byokFor('shared_services')).resolves.toBe(true);
+
+    // The organization BYOK key path marks a shared-services list as before.
+    const result = await resultFor({ type: 'defaultAccess' }, 'shared_services');
+    expect(result.data.find(model => model.id === 'provider/allowed')?.hasUserByokAvailable).toBe(
+      true
+    );
   });
 });

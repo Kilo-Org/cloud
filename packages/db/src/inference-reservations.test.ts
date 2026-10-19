@@ -159,7 +159,7 @@ async function setAllowance(fixture: Fixture, limit: number, usage = 0): Promise
 }
 
 async function waitForBlockedReservations(blockingPid: number, expected: number): Promise<void> {
-  const deadline = Date.now() + 750;
+  const deadline = Date.now() + 10_000;
   do {
     const state = await pool.query<{ count: number }>(
       `

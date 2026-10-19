@@ -176,6 +176,7 @@ const sum = (values: number[]) => values.reduce((total, value) => total + value,
 
 function summarizeStage(samples: Measurement[]) {
   const queryCounts = samples.map(sample => sample.queryMs.length);
+  const totalQueries = sum(queryCounts);
   return {
     wall: latency(samples.map(sample => sample.wallMs)),
     acquisitionWaitPerCheckout: latency(samples.flatMap(sample => sample.acquisitionMs)),
@@ -189,10 +190,14 @@ function summarizeStage(samples: Measurement[]) {
       )
     ),
     queries: {
-      total: sum(queryCounts),
-      meanPerCall: samples.length ? sum(queryCounts) / samples.length : null,
-      minPerCall: samples.length ? Math.min(...queryCounts) : null,
-      maxPerCall: samples.length ? Math.max(...queryCounts) : null,
+      total: totalQueries,
+      meanPerCall: samples.length ? totalQueries / samples.length : null,
+      minPerCall: samples.length
+        ? queryCounts.reduce((minimum, count) => Math.min(minimum, count), Infinity)
+        : null,
+      maxPerCall: samples.length
+        ? queryCounts.reduce((maximum, count) => Math.max(maximum, count), 0)
+        : null,
       failed: samples.reduce((total, sample) => total + sample.failedQueries, 0),
     },
   };

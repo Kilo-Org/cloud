@@ -440,7 +440,7 @@ Run the reservation tests and `pnpm drizzle:verify-bootstrap` against disposable
 Use a separate migrated database for `scripts/benchmark-inference-reservations.ts`.
 The benchmark requires explicit loopback addressing, a benchmark database name, and exclusively synthetic accounts.
 
-It exercises the actual usage writer with baseline, reserved, and mixed traffic against distributed and concentrated payers.
+It exercises the actual usage writer with baseline, held, and mixed traffic against distributed and concentrated payers.
 Repeated runs rotate scenario order and remove their own fixtures.
 
 The `denied` mode reports insufficient-credit decisions without billing or settlement.

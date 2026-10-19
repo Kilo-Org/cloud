@@ -38,7 +38,7 @@ import { INTERNAL_BOT_USER_ID_PREFIX } from '@/lib/bot-users/types';
 
 const RequestSchema = z.object({
   userId: z.string().min(1),
-  organizationId: z.string().min(1),
+  organizationId: z.string().uuid(),
 });
 
 const ONE_HOUR_IN_SECONDS = 60 * 60;

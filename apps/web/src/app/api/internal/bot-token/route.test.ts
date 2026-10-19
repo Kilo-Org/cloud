@@ -19,28 +19,46 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   isResourceTokenIssuanceEnabled: jest.fn(() => mockConfig.modern),
 }));
 
-const mockUserRows: unknown[] = [];
-const mockMembershipRows: unknown[] = [];
+type MockMembership = { kilo_user_id: string; organization_id: string; role: string };
+const mockUserRows: Array<{ id: string }> = [];
+const mockMembershipRows: MockMembership[] = [];
 let mockSelectCallCount = 0;
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: {
-    select: () => {
-      const callIndex = mockSelectCallCount++;
-      return {
-        from: () => ({
-          where: () => ({
-            limit: () => Promise.resolve(callIndex === 0 ? mockUserRows : mockMembershipRows),
+// Rows are filtered by the bound parameters of the real `where` SQL, so a
+// route that drops the user or organization predicate stops matching.
+jest.mock('@kilocode/web-shared/lib/drizzle', () => {
+  const { PgDialect } = jest.requireActual('drizzle-orm/pg-core');
+  const { kilocode_users } = jest.requireActual('@kilocode/db/schema');
+  const dialect = new PgDialect();
+  return {
+    db: {
+      select: () => {
+        mockSelectCallCount++;
+        return {
+          from: (table: unknown) => ({
+            where: (condition: unknown) => ({
+              limit: () => {
+                const { params } = dialect.sqlToQuery(condition) as { params: unknown[] };
+                return Promise.resolve(
+                  table === kilocode_users
+                    ? mockUserRows.filter(user => params.includes(user.id))
+                    : mockMembershipRows.filter(
+                        m => params.includes(m.kilo_user_id) && params.includes(m.organization_id)
+                      )
+                );
+              },
+            }),
           }),
-        }),
-      };
+        };
+      },
     },
-  },
-}));
+  };
+});
 
 import { POST } from './route';
 
 const BOT_ID = 'bot-internal-bouncer-watch';
-const ORG_ID = 'org-1';
+const ORG_ID = '9d278969-0000-4000-8000-000000000001';
+const OTHER_ORG_ID = '9d278969-0000-4000-8000-000000000002';
 const AUTH = { authorization: 'Bearer mint-secret' };
 
 function eligibleBot(overrides: Record<string, unknown> = {}) {
@@ -52,6 +70,10 @@ function eligibleBot(overrides: Record<string, unknown> = {}) {
     blocked_reason: null,
     ...overrides,
   };
+}
+
+function membership(role: string, overrides: Partial<MockMembership> = {}): MockMembership {
+  return { kilo_user_id: BOT_ID, organization_id: ORG_ID, role, ...overrides };
 }
 
 function createRequest(body: unknown, headers: Record<string, string> = AUTH) {
@@ -81,7 +103,7 @@ describe('POST /api/internal/bot-token', () => {
       ['non-bearer', { authorization: 'mint-secret' }],
     ])('returns 401 for a %s secret without touching the database', async (_label, headers) => {
       mockUserRows.push(eligibleBot());
-      mockMembershipRows.push({ role: 'member' });
+      mockMembershipRows.push(membership('member'));
       const res = await POST(createRequest(validBody, headers));
       expect(res.status).toBe(401);
       expect(mockSelectCallCount).toBe(0);
@@ -90,7 +112,7 @@ describe('POST /api/internal/bot-token', () => {
     it.each([undefined, ''])('fails closed when the mint secret is %p', async secret => {
       mockConfig.secret = secret;
       mockUserRows.push(eligibleBot());
-      mockMembershipRows.push({ role: 'member' });
+      mockMembershipRows.push(membership('member'));
       const res = await POST(createRequest(validBody, { authorization: 'Bearer ' }));
       expect(res.status).toBe(401);
       const resWithAnyToken = await POST(createRequest(validBody, { authorization: 'Bearer x' }));
@@ -103,12 +125,15 @@ describe('POST /api/internal/bot-token', () => {
     { userId: BOT_ID },
     { organizationId: ORG_ID },
     { userId: '', organizationId: ORG_ID },
+    { userId: BOT_ID, organizationId: 'org-1' },
   ])('returns 400 when the body is %p', async body => {
     const res = await POST(createRequest(body));
     expect(res.status).toBe(400);
+    expect(mockSelectCallCount).toBe(0);
   });
 
   it('returns 404 when the user does not exist', async () => {
+    mockUserRows.push(eligibleBot({ id: 'bot-internal-other' }));
     const res = await POST(createRequest(validBody));
     expect(res.status).toBe(404);
   });
@@ -122,14 +147,14 @@ describe('POST /api/internal/bot-token', () => {
     ['a null pepper', { api_token_pepper: null }],
     ['an empty pepper', { api_token_pepper: '  ' }],
   ])('returns 403 for %s, in both token modes', async (_label, overrides) => {
+    const user = eligibleBot(overrides);
     for (const modern of [true, false]) {
       mockConfig.modern = modern;
-      mockSelectCallCount = 0;
       mockUserRows.length = 0;
-      mockUserRows.push(eligibleBot(overrides));
+      mockUserRows.push(user);
       mockMembershipRows.length = 0;
-      mockMembershipRows.push({ role: 'member' });
-      const res = await POST(createRequest(validBody));
+      mockMembershipRows.push(membership('member', { kilo_user_id: user.id }));
+      const res = await POST(createRequest({ userId: user.id, organizationId: ORG_ID }));
       expect(res.status).toBe(403);
     }
   });
@@ -141,14 +166,20 @@ describe('POST /api/internal/bot-token', () => {
     await expect(res.json()).resolves.toEqual({ error: 'Organization membership not found' });
   });
 
+  it('returns 404 when the bot is only a member of a different organization', async () => {
+    mockUserRows.push(eligibleBot());
+    mockMembershipRows.push(membership('owner', { organization_id: OTHER_ORG_ID }));
+    const res = await POST(createRequest(validBody));
+    expect(res.status).toBe(404);
+  });
+
   it.each(['billing_manager'])('returns 403 for the %s role in both token modes', async role => {
     for (const modern of [true, false]) {
       mockConfig.modern = modern;
-      mockSelectCallCount = 0;
       mockUserRows.length = 0;
       mockUserRows.push(eligibleBot());
       mockMembershipRows.length = 0;
-      mockMembershipRows.push({ role });
+      mockMembershipRows.push(membership(role));
       const res = await POST(createRequest(validBody));
       expect(res.status).toBe(403);
     }
@@ -158,7 +189,7 @@ describe('POST /api/internal/bot-token', () => {
     'issues a one-hour API and gateway token for an eligible %s bot',
     async role => {
       mockUserRows.push(eligibleBot());
-      mockMembershipRows.push({ role });
+      mockMembershipRows.push(membership(role));
       const before = Date.now();
 
       const res = await POST(createRequest(validBody));
@@ -197,7 +228,7 @@ describe('POST /api/internal/bot-token', () => {
   it('issues a one-hour legacy token while the family flag is off', async () => {
     mockConfig.modern = false;
     mockUserRows.push(eligibleBot());
-    mockMembershipRows.push({ role: 'member' });
+    mockMembershipRows.push(membership('member'));
 
     const res = await POST(createRequest(validBody));
 

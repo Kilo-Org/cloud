@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { randomUUID } from 'crypto';
-import { ensureInternalBotUser, InternalBotIdConflictError } from './bot-user-service';
+import { ensureInternalBotUser, InternalBotUnusableError } from './bot-user-service';
 
 async function membershipsOf(userId: string) {
   return db
@@ -82,15 +82,31 @@ describe('ensureInternalBotUser', () => {
     expect(memberships[0].role).toBe('owner');
   });
 
-  it('refuses to adopt an existing non-bot user with the internal bot id', async () => {
+  it.each([
+    ['a non-bot user', { is_bot: false }],
+    ['a bot with blocked_at set', { is_bot: true, blocked_at: '2026-10-01T00:00:00.000Z' }],
+    ['a soft-deleted bot', { is_bot: true, blocked_reason: 'soft-deleted' }],
+    ['a bot with an empty pepper', { is_bot: true, api_token_pepper: '' }],
+  ])('refuses to adopt %s that holds the internal bot id', async (_label, overrides) => {
     const org = await newOrganization();
     const slug = `t-${randomUUID().slice(0, 8)}`;
-    await insertTestUser({ id: `bot-internal-${slug}`, is_bot: false });
+    await insertTestUser({ id: `bot-internal-${slug}`, ...overrides });
 
     await expect(
       ensureInternalBotUser({ slug, displayName: 'Test Bot', organizationId: org.id })
-    ).rejects.toBeInstanceOf(InternalBotIdConflictError);
+    ).rejects.toBeInstanceOf(InternalBotUnusableError);
     expect(await membershipsOf(`bot-internal-${slug}`)).toHaveLength(0);
+  });
+
+  it('creates exactly one user and one membership under concurrent calls', async () => {
+    const org = await newOrganization();
+    const slug = `t-${randomUUID().slice(0, 8)}`;
+    const input = { slug, displayName: 'Test Bot', organizationId: org.id };
+
+    const results = await Promise.all([ensureInternalBotUser(input), ensureInternalBotUser(input)]);
+
+    expect(results.map(r => r.user.id)).toEqual([`bot-internal-${slug}`, `bot-internal-${slug}`]);
+    expect(await membershipsOf(`bot-internal-${slug}`)).toHaveLength(1);
   });
 
   it('rejects a slug outside the allowed pattern', async () => {

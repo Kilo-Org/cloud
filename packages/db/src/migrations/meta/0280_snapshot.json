@@ -1,5 +1,5 @@
 {
-  "id": "ea309684-291a-4313-8b0c-f9bd968b1ae9",
+  "id": "40367b11-de2c-44c0-a26d-a983f5f914b8",
   "prevId": "f8b451f3-429d-47f5-8951-fc356a41bd80",
   "version": "7",
   "dialect": "postgresql",
@@ -391,6 +391,104 @@
           "columns": [
             "profile_id",
             "sequence"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_instructions": {
+      "name": "agent_environment_profile_instructions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_instructions_profile_id": {
+          "name": "IDX_agent_env_profile_instructions_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_instructions_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_instructions_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_instructions",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_instructions_profile_name": {
+          "name": "UQ_agent_env_profile_instructions_profile_name",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "name"
           ]
         }
       },
@@ -42694,45 +42792,6 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.vercel_model_id_overrides": {
-      "name": "vercel_model_id_overrides",
-      "schema": "",
-      "columns": {
-        "openrouter_model_id": {
-          "name": "openrouter_model_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "vercel_model_id": {
-          "name": "vercel_model_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

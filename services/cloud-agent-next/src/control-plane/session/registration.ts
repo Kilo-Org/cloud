@@ -92,8 +92,8 @@ function withoutRawKiloToken(
  * Sandbox DO's grant issuance supplies the `git`/`kilo` aliases in the projected
  * spec (B3 N3).
  *
- * `payload.mcp` is materialized only to prove it decrypts and to force
- * per-session isolation; the plaintext is deliberately not copied into the
+ * `payload.mcp` is materialized to prove it decrypts and preserve compatibility
+ * isolation. The plaintext is deliberately not copied into the
  * persisted spec. The Sandbox DO materializes the encrypted credential-source
  * `mcpServers` immediately before the authenticated `session.prepare` frame.
  */
@@ -112,9 +112,7 @@ export function controlPlaneRouteSpecFromAttachPayload(
           ...(payload.git.platform ? { platform: payload.git.platform } : {}),
         };
   const env = withoutRawKiloToken(payload.env);
-  // Materialized MCP servers are per-session user config: sharing a runtime
-  // would let one session's servers leak into another, so they force isolation
-  // (legacy `adaptSessionAttachPayloadForWrapper`).
+  // Preserve the original MCP runtime layout until the Sandbox negotiates sharing.
   const runtimeIsolation = payload.mcp ? 'per-session' : options?.runtimeIsolation;
   return {
     sessionId: ids.sessionId,
@@ -162,8 +160,8 @@ function materializeAttachPayload(
 /**
  * Builds the DO registration from grouped metadata and the Worker's selection.
  * One owner: the DO records the given selection rather than re-deriving it (H2).
- * `runtimeIsolation` follows modern runtime authorization (M1) or materialized
- * MCP servers. `mcpPrivateKey` decrypts `profile.mcpServers` transiently to fail
+ * `runtimeIsolation` retains the original layout for existing allocations.
+ * The Sandbox omits it on frames for negotiated worktree runtimes. `mcpPrivateKey` decrypts `profile.mcpServers` transiently to fail
  * closed before any route is prepared; the encrypted snapshot rides the
  * DO-private credential source and only the Sandbox DO decrypts it before a
  * frame.

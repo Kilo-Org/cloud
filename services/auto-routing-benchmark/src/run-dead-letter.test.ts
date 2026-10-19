@@ -1,328 +1,297 @@
-/**
- * Dead-letter handling: a queue message that exhausted retries must record its
- * lane death and finalize the run — profile runs complete per-entry, platform
- * runs fail fast. Mocks the db module; SQL guards are covered honestly in
- * lane-failure-sql.test.ts.
- */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from './db';
+import type * as SchedulerModule from './scheduler';
 import { DECIDER_CASES } from './datasets/decider-cases';
 
 vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
   return {
     ...actual,
-    countCaseResultsByLane: vi.fn(),
-    existsNewerCompletedRun: vi.fn(),
-    getCaseResults: vi.fn(),
-    getRunningRun: vi.fn(),
     getLiveContainerLanes: vi.fn(),
     getRunWithModels: vi.fn(),
-    getSummaries: vi.fn(),
-    listLaneFailures: vi.fn(),
-    listPendingCurrentProfiles: vi.fn(),
     markProfilesFailedForEntries: vi.fn(),
-    markProfilesFailedForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
     markRunCompleted: vi.fn(),
     markRunFailed: vi.fn(),
     recordLaneFailure: vi.fn(),
-    replaceModelSummaries: vi.fn(),
-    saveRoutingTable: vi.fn(),
+  };
+});
+
+vi.mock('./scheduler', async importOriginal => {
+  const actual = await importOriginal<typeof SchedulerModule>();
+  return {
+    ...actual,
+    claimScheduledChunks: vi.fn(),
+    deferChunk: vi.fn(),
+    getChunk: vi.fn(),
+    recoverChunks: vi.fn(),
+    scheduleRunChunks: vi.fn(),
   };
 });
 
 import {
-  countCaseResultsByLane,
-  getCaseResults,
-  getRunningRun,
   getLiveContainerLanes,
   getRunWithModels,
-  getSummaries,
-  listLaneFailures,
-  listPendingCurrentProfiles,
   markProfilesFailedForEntries,
   markProfilesReadyForRun,
   markRunCompleted,
   markRunFailed,
   recordLaneFailure,
-  replaceModelSummaries,
-  saveRoutingTable,
 } from './db';
-import { processDeadLetter, PROFILE_LANE_DEAD_FAILURE_REASON } from './run';
+import {
+  claimScheduledChunks,
+  deferChunk,
+  getChunk,
+  recoverChunks,
+  scheduleRunChunks,
+  type SchedulerClaim,
+} from './scheduler';
+import { processDeadLetter } from './run';
 
+const queueSend = vi.fn();
 const queueSendBatch = vi.fn();
-const kvDelete = vi.fn();
+const schedulerFirst = vi.fn();
+const schedulerAll = vi.fn();
+const schedulerRun = vi.fn();
+const schedulerPrepare = vi.fn(() => {
+  const statement = {
+    first: schedulerFirst,
+    all: schedulerAll,
+    run: schedulerRun,
+  };
+  return { ...statement, bind: vi.fn(() => statement) };
+});
 const runId = 'profile-dead-1';
-
+const claim = {
+  id: 'chunk-27',
+  run_id: runId,
+  model: 'b/dead',
+  variant: 'high',
+  providers: '["provider-b"]',
+  rep: 0,
+  chunk: 27,
+  case_ids: JSON.stringify([DECIDER_CASES[27].id]),
+  slot: 3,
+  token: 'owned-token',
+  attempts: 2,
+} satisfies SchedulerClaim;
 const env = {
-  BENCH_DB: {} as D1Database,
-  BENCH_QUEUE: { sendBatch: queueSendBatch },
-  AUTO_ROUTING_CONFIG: { delete: kvDelete },
-  INTERNAL_API_SECRET_PROD: { get: async () => 'secret' },
+  BENCH_DB: { prepare: schedulerPrepare } as unknown as D1Database,
+  BENCH_QUEUE: { send: queueSend, sendBatch: queueSendBatch },
+  BENCHMARK_SCHEDULER_CONFIG: '{}',
   KILO_WEB_API_BASE_URL: 'https://app.test',
   KILO_CLI_API_URL: 'https://api.test',
+  INTERNAL_API_SECRET_PROD: { get: async () => 'internal-test-secret' },
 } as unknown as Env;
 
-function mockRunState(
-  models: { model: string; variant: string }[],
-  purpose: 'platform' | 'profile' = 'profile',
-  status: 'running' | 'failed' = 'running'
-): void {
-  vi.mocked(getRunWithModels).mockResolvedValue({
-    run: {
-      id: runId,
-      kind: 'decider',
-      status,
-      started_at: '2026-08-07T09:00:00.000Z',
-      completed_at: null,
-      error: null,
-      min_accuracy: 0.7,
-      switch_cost_factor: 3,
-      best_accuracy_switch_threshold: 0.05,
-      max_concurrency: 4,
-      benchmark_user_id: 'user-1',
-      benchmark_org_id: null,
-      repetitions: 1,
-      classifier_max_p95_latency_ms: null,
-      engine_identity: 'v1:test',
-      purpose,
-    },
-    models: models.map(m => ({
-      run_id: runId,
-      model: m.model,
-      variant: m.variant,
-      enqueued: true,
-      reasoning_effort: null,
-    })),
-  } as never);
-}
-
-function deadLetterMessage(overrides: Record<string, unknown> = {}) {
+function deadLetterMessage() {
   return {
     runId,
     kind: 'decider' as const,
-    model: 'b/dead',
-    variant: 'high',
-    chunk: 27,
-    shard: 0,
-    rep: 0,
-    caseIds: DECIDER_CASES.slice(135, 140).map(c => c.id),
-    ...overrides,
+    model: claim.model,
+    claimId: claim.id,
+    claimToken: claim.token,
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(countCaseResultsByLane).mockResolvedValue([]);
-  vi.mocked(listLaneFailures).mockResolvedValue([]);
-  vi.mocked(recordLaneFailure).mockResolvedValue(undefined);
-  vi.mocked(getCaseResults).mockResolvedValue([]);
-  vi.mocked(getSummaries).mockResolvedValue([]);
-  vi.mocked(replaceModelSummaries).mockResolvedValue(undefined);
-  vi.mocked(markRunCompleted).mockResolvedValue(undefined);
-  vi.mocked(markRunFailed).mockResolvedValue(undefined);
-  vi.mocked(markProfilesFailedForEntries).mockResolvedValue(undefined);
-  vi.mocked(markProfilesReadyForRun).mockResolvedValue(undefined);
-  vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  schedulerFirst.mockResolvedValue(null);
+  schedulerAll.mockResolvedValue({ results: [] });
+  schedulerRun.mockResolvedValue({ meta: { changes: 0 } });
+  queueSend.mockResolvedValue(undefined);
+  vi.mocked(getChunk).mockResolvedValue(claim);
+  vi.mocked(deferChunk).mockResolvedValue(undefined);
+  vi.mocked(claimScheduledChunks).mockResolvedValue([]);
+  vi.mocked(recoverChunks).mockResolvedValue([]);
+  vi.mocked(scheduleRunChunks).mockResolvedValue(true);
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
-  vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
-  queueSendBatch.mockResolvedValue(undefined);
 });
 
-describe('processDeadLetter', () => {
-  it('records the lane death and completes a profile run per-entry', async () => {
-    mockRunState([
-      { model: 'a/ok', variant: '' },
-      { model: 'b/dead', variant: 'high' },
-    ]);
-    vi.mocked(countCaseResultsByLane).mockResolvedValue([
-      { model: 'a/ok', variant: '', rep: 0, n: DECIDER_CASES.length },
-    ]);
-    // The post-record read already sees the failure.
-    vi.mocked(listLaneFailures).mockResolvedValue([
-      {
-        run_id: runId,
-        model: 'b/dead',
-        variant: 'high',
-        rep: 0,
-        chunk: 27,
-        shard: 0,
-        failed_at: '2026-08-07T12:00:00.000Z',
-      },
-    ]);
+function expectNoDirectLaneDeath() {
+  expect(recordLaneFailure).not.toHaveBeenCalled();
+  expect(markRunCompleted).not.toHaveBeenCalled();
+  expect(markRunFailed).not.toHaveBeenCalled();
+  expect(markProfilesFailedForEntries).not.toHaveBeenCalled();
+  expect(markProfilesReadyForRun).not.toHaveBeenCalled();
+}
 
+describe('processDeadLetter — scheduler claims', () => {
+  it('defers only queued matching ownership without revoking a live execution', async () => {
     await processDeadLetter(env, deadLetterMessage());
+    expect(getChunk).not.toHaveBeenCalled();
+    expect(deferChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      claim.id,
+      claim.token,
+      expect.any(Number),
+      true
+    );
+    expect(recoverChunks).toHaveBeenCalledWith(env.BENCH_DB, expect.any(Number));
+    expect(claimScheduledChunks).toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
+    expectNoDirectLaneDeath();
+  });
 
-    expect(recordLaneFailure).toHaveBeenCalledWith(env.BENCH_DB, {
+  it('ignores stale ownership while still dispatching other work', async () => {
+    vi.mocked(getChunk).mockResolvedValue(null);
+    await processDeadLetter(env, { ...deadLetterMessage(), claimToken: 'stale-token' });
+    expect(getChunk).not.toHaveBeenCalled();
+    expect(deferChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      claim.id,
+      'stale-token',
+      expect.any(Number),
+      true
+    );
+    expect(claimScheduledChunks).toHaveBeenCalled();
+    expectNoDirectLaneDeath();
+  });
+
+  it('dispatches a replacement using the newly claimed token rather than the dead message', async () => {
+    const next = { ...claim, id: 'next-chunk', token: 'fresh-token', model: 'other/model' };
+    vi.mocked(claimScheduledChunks).mockResolvedValueOnce([next]).mockResolvedValue([]);
+    await processDeadLetter(env, deadLetterMessage());
+    expect(queueSend).toHaveBeenCalledWith({
       runId,
-      model: 'b/dead',
-      variant: 'high',
-      rep: 0,
-      chunk: 27,
-      shard: 0,
+      kind: 'decider',
+      model: 'other/model',
+      claimId: 'next-chunk',
+      claimToken: 'fresh-token',
     });
-    expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    // Only the dead entry fails; the completed entry still goes ready.
-    expect(markProfilesFailedForEntries).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      runId,
-      [{ model: 'b/dead', variant: 'high' }],
-      PROFILE_LANE_DEAD_FAILURE_REASON
-    );
-    expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    // Nothing is ready in the registry, so no table is published.
-    expect(saveRoutingTable).not.toHaveBeenCalled();
-    expect(kvDelete).not.toHaveBeenCalled();
+    expectNoDirectLaneDeath();
   });
 
-  it('fails only the dead entry of a platform-queue run, never the whole run', async () => {
-    mockRunState([{ model: 'b/dead', variant: 'high' }], 'platform');
-    vi.mocked(listLaneFailures).mockResolvedValue([
-      {
-        run_id: runId,
-        model: 'b/dead',
-        variant: 'high',
-        rep: 0,
-        chunk: 27,
-        shard: 0,
-        failed_at: '2026-08-07T12:00:00.000Z',
-      },
-    ]);
-
-    await processDeadLetter(env, deadLetterMessage());
-
-    // Platform-queue runs feed the same registry as user-queue runs, so a dead
-    // lane costs that entry only — the run itself still completes.
-    expect(markRunFailed).not.toHaveBeenCalled();
-    expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    expect(markProfilesFailedForEntries).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      runId,
-      [{ model: 'b/dead', variant: 'high' }],
-      PROFILE_LANE_DEAD_FAILURE_REASON
-    );
+  it('propagates reconciliation failures so the DLQ message can be retried', async () => {
+    vi.mocked(recoverChunks).mockRejectedValueOnce(new Error('D1 transient'));
+    await expect(processDeadLetter(env, deadLetterMessage())).rejects.toThrow('D1 transient');
+    expect(claimScheduledChunks).not.toHaveBeenCalled();
+    expectNoDirectLaneDeath();
   });
 
-  it('does not finalize while another lane is still pending', async () => {
-    mockRunState([
-      { model: 'a/pending', variant: '' },
-      { model: 'b/dead', variant: 'high' },
-    ]);
-    // a/pending has no rows and no failure record yet.
-    vi.mocked(listLaneFailures).mockResolvedValue([
-      {
-        run_id: runId,
-        model: 'b/dead',
-        variant: 'high',
-        rep: 0,
-        chunk: 27,
-        shard: 0,
-        failed_at: '2026-08-07T12:00:00.000Z',
-      },
-    ]);
-
-    await processDeadLetter(env, deadLetterMessage());
-
-    expect(recordLaneFailure).toHaveBeenCalled();
-    expect(markRunCompleted).not.toHaveBeenCalled();
-    expect(markRunFailed).not.toHaveBeenCalled();
-    expect(markProfilesFailedForEntries).not.toHaveBeenCalled();
-  });
-
-  it('keeps entries distinct when delimiter-joined keys would collide', async () => {
-    // Space-join would collapse these two entries to the same key ('a b c');
-    // only the dead one may fail.
-    mockRunState([
-      { model: 'a b', variant: 'c' },
-      { model: 'a', variant: 'b c' },
-    ]);
-    vi.mocked(countCaseResultsByLane).mockResolvedValue([
-      { model: 'a', variant: 'b c', rep: 0, n: DECIDER_CASES.length },
-    ]);
-    vi.mocked(listLaneFailures).mockResolvedValue([
-      {
-        run_id: runId,
-        model: 'a b',
-        variant: 'c',
-        rep: 0,
-        chunk: 27,
-        shard: 0,
-        failed_at: '2026-08-07T12:00:00.000Z',
-      },
-    ]);
-
-    await processDeadLetter(env, deadLetterMessage({ model: 'a b', variant: 'c' }));
-
-    expect(markProfilesFailedForEntries).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      runId,
-      [{ model: 'a b', variant: 'c' }],
-      PROFILE_LANE_DEAD_FAILURE_REASON
-    );
-    expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
-  });
-
-  it('lets written rows win over a failure record (message died after writes)', async () => {
-    mockRunState([{ model: 'b/dead', variant: 'high' }]);
-    vi.mocked(countCaseResultsByLane).mockResolvedValue([
-      { model: 'b/dead', variant: 'high', rep: 0, n: DECIDER_CASES.length },
-    ]);
-    vi.mocked(listLaneFailures).mockResolvedValue([
-      {
-        run_id: runId,
-        model: 'b/dead',
-        variant: 'high',
-        rep: 0,
-        chunk: 27,
-        shard: 0,
-        failed_at: '2026-08-07T12:00:00.000Z',
-      },
-    ]);
-
-    await processDeadLetter(env, deadLetterMessage());
-
-    expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
-    expect(markProfilesFailedForEntries).not.toHaveBeenCalled();
-    expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
-  });
-
-  it('ignores messages for a run that is no longer running', async () => {
-    mockRunState([{ model: 'b/dead', variant: 'high' }], 'profile', 'failed');
+  it('drops malformed messages without touching claims or lane accounting', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    await processDeadLetter(env, deadLetterMessage());
-
-    expect(recordLaneFailure).not.toHaveBeenCalled();
-    expect(markRunCompleted).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('benchmark_deadletter_run_not_running')
-    );
-    warn.mockRestore();
+    try {
+      await processDeadLetter(env, { nope: true });
+      expect(getChunk).not.toHaveBeenCalled();
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(claimScheduledChunks).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('benchmark_deadletter_invalid_message')
+      );
+      expectNoDirectLaneDeath();
+    } finally {
+      warn.mockRestore();
+    }
   });
+});
 
-  it('drops malformed messages without recording', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+describe('processDeadLetter — legacy migration', () => {
+  function mockRun(
+    status: 'running' | 'completed' | 'failed' = 'running',
+    organizationId: string | null = 'benchmark-org-snapshot'
+  ) {
+    vi.mocked(getRunWithModels).mockResolvedValue({
+      run: {
+        id: runId,
+        router: 'efficient',
+        kind: 'decider',
+        status,
+        started_at: '2026-08-07T09:00:00.000Z',
+        min_accuracy: 0.7,
+        switch_cost_factor: 3,
+        best_accuracy_switch_threshold: 0.05,
+        max_concurrency: 0,
+        benchmark_user_id: 'user-1',
+        benchmark_org_id: organizationId,
+        repetitions: 2,
+        classifier_max_p95_latency_ms: null,
+        purpose: 'platform',
+      },
+      models: [
+        { model: 'b/dead', variant: 'high', enqueued: true, reasoning_effort: 'high' },
+        { model: 'b/dead', variant: 'low', enqueued: true, reasoning_effort: 'low' },
+      ],
+    } as never);
+  }
 
-    await processDeadLetter(env, { nope: true });
+  it.each(['benchmark-org-snapshot', null])(
+    'materializes legacy work under its persisted execution scope: %s',
+    async organizationId => {
+      mockRun('running', organizationId);
+      const catalogUrl = organizationId
+        ? `https://api.test/api/organizations/${organizationId}/models`
+        : 'https://api.test/api/openrouter/models';
+      const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = new URL(input instanceof Request ? input.url : input);
+        const headers = new Headers(init?.headers);
+        if (url.href === 'https://app.test/api/internal/auto-routing-benchmark/token') {
+          if (typeof init?.body !== 'string') throw new Error('Expected a JSON token request.');
+          expect(init?.method).toBe('POST');
+          expect(headers.get('authorization')).toBe(`Bearer ${'internal-test-secret'}`);
+          expect(JSON.parse(init.body)).toEqual({
+            userId: 'user-1',
+            ...(organizationId ? { organizationId } : {}),
+          });
+          return Response.json({
+            token: 'dead-letter-test-token',
+            expiresAt: '2026-10-18T13:00:00.000Z',
+          });
+        }
+        if (url.href === catalogUrl) {
+          expect(headers.get('authorization')).toBe(`Bearer ${'dead-letter-test-token'}`);
+          expect(headers.get('X-KiloCode-OrganizationId')).toBe(organizationId);
+          return Response.json({
+            data: [
+              {
+                id: 'b/dead',
+                supported_parameters: ['tools'],
+                opencode: {
+                  variants: {
+                    high: { reasoning: { effort: 'high' } },
+                    low: { reasoning: { effort: 'low' } },
+                  },
+                },
+              },
+            ],
+          });
+        }
+        throw new Error(`Unexpected fixture request: ${url.href}`);
+      });
+      try {
+        await processDeadLetter(env, {
+          runId,
+          kind: 'decider',
+          model: 'b/dead',
+          rep: 99,
+          shard: 8,
+          chunk: 999,
+          caseIds: ['obsolete-case'],
+        });
+        expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+          runId,
+          entries: [
+            { model: 'b/dead', variant: 'high', providers: [] },
+            { model: 'b/dead', variant: 'low', providers: [] },
+          ],
+          repetitions: 2,
+          caseIds: DECIDER_CASES.map(c => c.id),
+          chunkSize: 1,
+        });
+        expect(deferChunk).not.toHaveBeenCalled();
+        expect(claimScheduledChunks).toHaveBeenCalled();
+        expectNoDirectLaneDeath();
+      } finally {
+        fetcher.mockRestore();
+      }
+    }
+  );
 
-    expect(recordLaneFailure).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('benchmark_deadletter_invalid_message')
-    );
-    warn.mockRestore();
-  });
-
-  it('resolves the sole snapshot row variant for legacy variant-less messages', async () => {
-    mockRunState([{ model: 'b/dead', variant: 'high' }]);
-    const message = deadLetterMessage();
-    delete (message as { variant?: unknown }).variant;
-
-    await processDeadLetter(env, message);
-
-    expect(recordLaneFailure).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.objectContaining({ model: 'b/dead', variant: 'high' })
-    );
+  it.each(['completed', 'failed'] as const)('does not initialize a %s legacy run', async status => {
+    mockRun(status);
+    await processDeadLetter(env, { runId, kind: 'decider', model: 'b/dead' });
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    expect(claimScheduledChunks).toHaveBeenCalled();
+    expectNoDirectLaneDeath();
   });
 });

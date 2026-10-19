@@ -42,7 +42,10 @@ import {
   type WorktreeKiloAuth,
 } from '../control/worktree-runtime.js';
 import { createOutputRedactor, createSecretRedactor } from '../redact-output.js';
-import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
+import {
+  KiloWorktreeCredentialClassMismatchError,
+  KiloWorktreeMcpMismatchError,
+} from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
@@ -76,6 +79,15 @@ const CLONE_RETRY_BACKOFF_MS = [1_000, 2_000];
 const STEP_RETRY_ATTEMPTS = 2;
 /** Upper bound on one setup-output event so a chatty command cannot flood the wire. */
 const SETUP_OUTPUT_EVENT_LIMIT = 8_192;
+/**
+ * Release cleanup bounds. Aborting a released route's Kilo session tree is best
+ * effort: it must terminate and never block the route release, so the walk is
+ * capped by depth, node count and a shared deadline, with one retry per step.
+ */
+const RELEASE_CLEANUP_MAX_DEPTH = 8;
+const RELEASE_CLEANUP_MAX_NODES = 64;
+const RELEASE_CLEANUP_DEADLINE_MS = 10_000;
+const RELEASE_CLEANUP_ATTEMPTS = 2;
 
 /**
  * Spec §7: eligible managed GitHub HTTPS preparation clone/fetch opts into the
@@ -128,6 +140,11 @@ export type PrepareRuntimePort = {
   installCredentials(key: string, env: Record<string, string>): Promise<void>;
   /** True when the runtime is gone or has spent its restart budget. */
   isUnavailable(key: string): boolean;
+  /**
+   * The runtime's client only while it is live; undefined during a restart, when
+   * unavailable, or after shutdown. Never throws.
+   */
+  getLiveClient(key: string): WrapperKiloClient | undefined;
   remove(key: string): void;
   release(key: string): void;
 };
@@ -174,6 +191,8 @@ export type PrepareDeps = {
   now?: () => number;
   inheritedEnv?: NodeJS.ProcessEnv;
   homeRoot?: string;
+  /** Bounds release cleanup; defaults to `RELEASE_CLEANUP_DEADLINE_MS`. */
+  releaseCleanupDeadlineMs?: number;
 };
 
 type PreparedRoute = {
@@ -183,6 +202,15 @@ type PreparedRoute = {
   home: string;
   kilo: WorktreeKiloAuth;
   env: Record<string, string>;
+};
+
+type PreparingRoute = {
+  promise: Promise<void>;
+  released: boolean;
+  /** `runtimeKey(spec)` captured before the first await, for last-route release. */
+  runtimeKey: string;
+  /** A credentials frame that arrived before the route was prepared. */
+  pendingCredentials?: ControlPlaneSessionCredentialsPayload;
 };
 
 export type PreparationManager = {
@@ -243,15 +271,11 @@ async function defaultSessionExists(
   return true;
 }
 
+/** Keep existing allocations on their original runtime and HOME identities. */
 export function runtimeKey(spec: ControlPlaneRouteSpec): string {
   return spec.runtimeIsolation === 'per-session' ? spec.sessionId : spec.directory;
 }
 
-/**
- * Spec §7: a per-session runtime gets its own HOME keyed by the session (legacy
- * `worktree-runtime.ts` hashes the runtime key under per-session isolation);
- * a shared runtime keys HOME by the worktree scope so every session sees one.
- */
 function homeKey(spec: ControlPlaneRouteSpec): string {
   return spec.runtimeIsolation === 'per-session'
     ? spec.sessionId
@@ -269,6 +293,112 @@ function isNetworkFailure(subtype: WorkspaceFailureSubtype | undefined): boolean
 
 function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): boolean {
   return error instanceof Error && error.message === `${step} timed out`;
+}
+
+type ReleaseCleanupResult = {
+  ok: boolean;
+  sessions: number;
+  failures: number;
+  elapsedMs: number;
+};
+
+type InflightCleanup = {
+  promise: Promise<void>;
+  controller: AbortController;
+};
+
+/**
+ * Best-effort abort of a released route's Kilo session tree. Walks children from
+ * the root with a visited set and shared depth/node/deadline bounds; each step
+ * retries once. It must terminate on a cyclic or unbounded tree, never throw,
+ * and never block the route release that called it. `externalSignal` lets a
+ * re-prepare stop the walk before it can abort the new session under the same
+ * kiloSessionId.
+ */
+async function cleanupKiloSessionTree(
+  client: WrapperKiloClient,
+  directory: string,
+  rootSessionId: string,
+  deadlineMs: number,
+  externalSignal: AbortSignal
+): Promise<ReleaseCleanupResult> {
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const signal = controller.signal;
+  const onExternalAbort = (): void => controller.abort();
+  externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+  if (externalSignal.aborted) controller.abort();
+  const timer = setTimeout(() => controller.abort(), deadlineMs);
+  const abortedError = new Error('release cleanup deadline exceeded');
+  const deadline = new Promise<never>((_, reject) => {
+    signal.addEventListener('abort', () => reject(abortedError), { once: true });
+  });
+  void deadline.catch(() => undefined);
+  const visited = new Set<string>();
+  const queue: Array<{ id: string; depth: number }> = [{ id: rootSessionId, depth: 0 }];
+  let sessions = 0;
+  let failures = 0;
+
+  const attempt = async (operation: () => Promise<void>): Promise<boolean> => {
+    for (let attemptNumber = 1; attemptNumber <= RELEASE_CLEANUP_ATTEMPTS; attemptNumber += 1) {
+      if (signal.aborted) return false;
+      try {
+        await Promise.race([operation(), deadline]);
+        return true;
+      } catch {
+        if (attemptNumber === RELEASE_CLEANUP_ATTEMPTS) return false;
+      }
+    }
+    return false;
+  };
+
+  try {
+    while (queue.length > 0 && sessions < RELEASE_CLEANUP_MAX_NODES && !signal.aborted) {
+      const next = queue.shift();
+      if (next === undefined) break;
+      if (visited.has(next.id)) continue;
+      visited.add(next.id);
+      sessions += 1;
+      if (
+        !(await attempt(async () => {
+          await client.abortSessionForCleanup({ sessionId: next.id, directory, signal });
+        }))
+      ) {
+        failures += 1;
+      }
+      if (
+        !(await attempt(async () => {
+          await client.stopSessionProcesses({ sessionId: next.id, directory, signal });
+        }))
+      ) {
+        failures += 1;
+      }
+      if (next.depth >= RELEASE_CLEANUP_MAX_DEPTH) continue;
+      let children: Array<{ id: string; directory: string }> = [];
+      if (
+        !(await attempt(async () => {
+          children = await client.children({ sessionId: next.id, directory, signal });
+        }))
+      ) {
+        failures += 1;
+        continue;
+      }
+      for (const child of children) {
+        if (child.directory !== directory) continue;
+        if (!visited.has(child.id)) queue.push({ id: child.id, depth: next.depth + 1 });
+      }
+    }
+
+    return {
+      ok: failures === 0 && !signal.aborted,
+      sessions,
+      failures,
+      elapsedMs: Date.now() - startedAt,
+    };
+  } finally {
+    clearTimeout(timer);
+    externalSignal.removeEventListener('abort', onExternalAbort);
+  }
 }
 
 export function createPreparationManager(deps: PrepareDeps): PreparationManager {
@@ -297,7 +427,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const now = deps.now ?? Date.now;
   const homeRoot = deps.homeRoot ?? path.join(os.tmpdir(), 'kilo-worktrees');
   const prepared = new Map<string, PreparedRoute>();
-  const preparing = new Map<string, { promise: Promise<void>; released: boolean }>();
+  const preparing = new Map<string, PreparingRoute>();
+  const releaseCleanups = new Map<string, InflightCleanup>();
+  const releaseCleanupDeadlineMs = deps.releaseCleanupDeadlineMs ?? RELEASE_CLEANUP_DEADLINE_MS;
   // Spec §7: clone/checkout/setup mutate one shared worktree, so they must not
   // run concurrently for two sessions on the same directory. The lock is keyed
   // by directory, mirroring legacy `serializeWorkspacePreparation`.
@@ -920,9 +1052,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       try {
         return await operation();
       } catch (error) {
-        // A per-session MCP drift is permanent for this key; retrying would drop
-        // the existing runtime and accept the changed servers.
-        if (!isCurrent() || error instanceof KiloWorktreeMcpMismatchError) throw error;
+        // An MCP or credential-class drift against the shared runtime is permanent for this key;
+        // retrying would drop the existing runtime and accept the changed configuration.
+        if (
+          !isCurrent() ||
+          error instanceof KiloWorktreeMcpMismatchError ||
+          error instanceof KiloWorktreeCredentialClassMismatchError
+        ) {
+          throw error;
+        }
         lastError = error;
         // M1: a hung spawn leaves `ensure` returning the same pending promise,
         // so drop the runtime before the retry starts a fresh one.
@@ -932,17 +1070,117 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     throw lastError;
   }
 
+  /**
+   * Whether any route other than `excludeSessionId` still holds `key`. Counts
+   * prepared routes and in-flight prepares that are not themselves released, so
+   * a route releasing while a sibling prepare is still running is not the last.
+   */
+  function hasRoutesForKey(key: string, excludeSessionId: string): boolean {
+    for (const [sessionId, route] of prepared) {
+      if (sessionId !== excludeSessionId && route.key === key) return true;
+    }
+    for (const [sessionId, record] of preparing) {
+      if (sessionId === excludeSessionId || record.released) continue;
+      if (record.runtimeKey === key) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Finish a route that left `prepared`, or never reached it. When it was the
+   * last holder of its runtime key the process is released: the runtime's owned
+   * process scope reaps the background processes it started, so walking a dying
+   * client would only emit false unreaped-process diagnostics. When a sibling
+   * still holds the key, the route's Kilo session tree is aborted instead.
+   */
+  function finishReleasedRoute(input: {
+    key: string;
+    sessionId: string;
+    spec: ControlPlaneRouteSpec;
+  }): void {
+    if (!hasRoutesForKey(input.key, input.sessionId)) {
+      deps.runtimes.release(input.key);
+      return;
+    }
+    // Resolve the CURRENT live client: a restart replaces the runtime on a new
+    // port, and reading `.client` during a restart throws. When no client is
+    // live the old process is gone, so its sessions are dead and cleanup is a
+    // no-op rather than an error.
+    const client = deps.runtimes.getLiveClient(input.key);
+    if (!client) return;
+    const entry: InflightCleanup = {
+      controller: new AbortController(),
+      promise: Promise.resolve(),
+    };
+    entry.promise = cleanupKiloSessionTree(
+      client,
+      input.spec.directory,
+      input.spec.kiloSessionId,
+      releaseCleanupDeadlineMs,
+      entry.controller.signal
+    )
+      .then(result => {
+        if (!result.ok) {
+          log(
+            `control-plane release cleanup incomplete session=${input.sessionId} sessions=${result.sessions} failures=${result.failures}`
+          );
+        }
+        // Closed native record: counts only, never a handle or session body.
+        deps.onNativeDiagnostic?.('session.task', {
+          phase: result.ok ? 'finished' : 'failed',
+          stage: 'process_cleanup',
+          ok: result.ok,
+          sessionCount: result.sessions,
+          failureCount: result.failures,
+          elapsedMs: result.elapsedMs,
+          sessionId: input.sessionId,
+        });
+      })
+      .catch(() => undefined);
+    releaseCleanups.set(input.sessionId, entry);
+    void entry.promise.finally(() => {
+      if (releaseCleanups.get(input.sessionId) === entry) releaseCleanups.delete(input.sessionId);
+    });
+  }
+
+  /**
+   * Stop any release cleanup still walking `sessionId` before a re-prepare
+   * resolves the same Kilo session. Bounded by the cleanup's own deadline.
+   */
+  async function settleReleaseCleanup(sessionId: string): Promise<void> {
+    const entry = releaseCleanups.get(sessionId);
+    if (!entry) return;
+    entry.controller.abort();
+    await entry.promise;
+  }
+
+  /**
+   * The single finalizer for a preparing record: run it exactly when this owner
+   * is the active record leaving `preparing` and its session never made it into
+   * `prepared`.
+   */
+  function finalizePreparingOwner(owner: PreparingRoute, spec: ControlPlaneRouteSpec): void {
+    if (preparing.get(spec.sessionId) !== owner) return;
+    preparing.delete(spec.sessionId);
+    if (prepared.has(spec.sessionId)) return;
+    finishReleasedRoute({
+      key: owner.runtimeKey,
+      sessionId: spec.sessionId,
+      spec,
+    });
+  }
+
   async function runPrepare(
     spec: ControlPlaneRouteSpec,
     credentials: ControlPlaneSessionCredentialsPayload | undefined,
-    owner: { released: boolean }
+    owner: PreparingRoute
   ): Promise<void> {
     const sessionId = spec.sessionId;
     let currentStep: ControlPlanePreparationStep = 'kilo_runtime';
     const kiloConfig = spec.kilo;
     // Spec §6: behind the runtime credential proxy the wrapper talks to the
-    // Worker facade with the per-session handle; otherwise it uses the spec's
-    // alias and targets.
+    // Worker facade with the scope's runtime-proxy handle; otherwise it uses the
+    // spec's alias and targets.
     const kiloToken = credentials?.proxy?.handle ?? credentials?.kilo.token ?? kiloConfig?.token;
     if (!kiloConfig || !kiloToken) {
       log(`control-plane prepare is missing the Kilo context session=${sessionId}`);
@@ -969,7 +1207,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // Built inside the failure scope: an over-limit CLI config must surface as
       // `session.failed`, not reject the prepare promise (which the caller
       // swallows while the route waits out its timeout).
-      const env = withRuntimeProfileEnvironment(
+      const builtEnv = withRuntimeProfileEnvironment(
         buildWorktreeKiloEnvironment(
           directory,
           home,
@@ -986,7 +1224,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         [
           spec.env ?? {},
           {
-            ...env,
+            ...builtEnv,
             ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
           },
         ],
@@ -1005,7 +1243,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         workspace = await prepareWorkspace(
           spec,
           directory,
-          env,
+          builtEnv,
           redact,
           home,
           step => {
@@ -1020,7 +1258,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               const diffs = await (deps.recoverWorktree ?? restoreWorktreeRecovery)(
                 directory,
                 recovery,
-                env,
+                builtEnv,
                 AbortSignal.timeout(30_000)
               );
               log(
@@ -1050,48 +1288,66 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       }
       currentStep = 'kilo_runtime';
       emitProgress(sessionId, 'kilo_runtime');
-      if (spec.runtimeIsolation === 'per-session') await materializeRuntimeProfile(home, spec);
-      const client = await withRuntimeStartRetry(
+      await materializeRuntimeProfile(home, spec);
+      const started = await withRuntimeStartRetry(
         key,
         () =>
           withinStep('kilo_runtime', timers.kiloRuntimeStartMs, () =>
-            deps.runtimes.ensure({ key, directory, env })
+            deps.runtimes.ensure({ key, directory, env: builtEnv })
           ),
         () => !owner.released
       );
-      if (owner.released) {
-        if (spec.runtimeIsolation === 'per-session') deps.runtimes.release(key);
-        return;
-      }
+      if (owner.released) return;
       currentStep = 'kilo_session';
       emitProgress(sessionId, 'kilo_session');
+      // A previous release's tree walk may still be running on this runtime;
+      // stop it before resolving so it cannot abort the new session.
+      await settleReleaseCleanup(sessionId);
       await withOneRetry(
         () =>
           withinStep('kilo_session', timers.kiloSessionMs, signal =>
             resolveKiloSession(
               spec,
               directory,
-              env,
-              client,
+              builtEnv,
+              started,
               signal,
               !(replacementWorkspace && localRecoveryApplied)
             )
           ),
         () => !owner.released
       );
-      if (owner.released) {
-        if (spec.runtimeIsolation === 'per-session') deps.runtimes.release(key);
-        return;
+      if (owner.released) return;
+      prepared.set(sessionId, {
+        key,
+        spec,
+        directory,
+        home,
+        kilo: kiloAuth,
+        env: builtEnv,
+      });
+      // A credentials frame that arrived while this route was preparing is
+      // applied before the route reports ready; a release during the apply
+      // suppresses ready and leaves the already-released route torn down.
+      const pending = owner.pendingCredentials;
+      owner.pendingCredentials = undefined;
+      if (pending) {
+        try {
+          await installCredentialsFor(pending);
+        } catch (error) {
+          log(
+            `control-plane buffered credential apply failed session=${sessionId} error=${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+        }
       }
-      prepared.set(sessionId, { key, spec, directory, home, kilo: kiloAuth, env });
+      if (owner.released) return;
       emitSessionReadyNative(sessionId);
       deps.emit({ type: 'session.ready', sessionId, ...(workspace ? { workspace } : {}) });
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
     } catch (error) {
-      if (owner.released) {
-        if (spec.runtimeIsolation === 'per-session') deps.runtimes.release(key);
-        return;
-      }
+      if (owner.released) return;
       log(
         `control-plane prepare failed session=${sessionId} step=${currentStep} error=${
           error instanceof Error ? error.message : String(error)
@@ -1107,7 +1363,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     credentials: ControlPlaneSessionCredentialsPayload
   ): Promise<void> {
     const route = prepared.get(credentials.sessionId);
-    if (!route) return;
+    if (!route) {
+      const preparation = preparing.get(credentials.sessionId);
+      if (preparation && !preparation.released) preparation.pendingCredentials = credentials;
+      return;
+    }
     const nextEnv = withRuntimeProfileEnvironment(
       buildWorktreeKiloEnvironment(
         route.directory,
@@ -1148,20 +1408,34 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       const existing = preparing.get(spec.sessionId);
       if (existing && !existing.released) return existing.promise;
       if (existing) {
-        const owner = { promise: Promise.resolve(), released: false };
+        const owner: PreparingRoute = {
+          promise: Promise.resolve(),
+          released: false,
+          runtimeKey: runtimeKey(spec),
+        };
         owner.promise = existing.promise
           .then(() => {
             if (owner.released) return;
             preparing.delete(spec.sessionId);
-            return prepare(spec, credentials);
+            // A frame buffered on this owner would be lost when the re-entrant
+            // prepare creates a fresh owner for the same session.
+            const pending = owner.pendingCredentials;
+            const next = prepare(spec, credentials);
+            if (pending) {
+              const created = preparing.get(spec.sessionId);
+              if (created) created.pendingCredentials = pending;
+            }
+            return next;
           })
-          .finally(() => {
-            if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);
-          });
+          .finally(() => finalizePreparingOwner(owner, spec));
         preparing.set(spec.sessionId, owner);
         return owner.promise;
       }
-      const owner = { promise: Promise.resolve(), released: false };
+      const owner: PreparingRoute = {
+        promise: Promise.resolve(),
+        released: false,
+        runtimeKey: runtimeKey(spec),
+      };
       const route = prepared.get(spec.sessionId);
       if (route) {
         // M2: a failed route (spent restart budget / dead runtime) must start
@@ -1185,17 +1459,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               emitSessionReadyNative(spec.sessionId);
               deps.emit({ type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' });
             }
-          })().finally(() => {
-            if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);
-          });
+          })().finally(() => finalizePreparingOwner(owner, spec));
           owner.promise = running;
           preparing.set(spec.sessionId, owner);
           return running;
         }
       }
-      const running = runPrepare(spec, credentials, owner).finally(() => {
-        if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);
-      });
+      const running = runPrepare(spec, credentials, owner).finally(() =>
+        finalizePreparingOwner(owner, spec)
+      );
       owner.promise = running;
       preparing.set(spec.sessionId, owner);
       return running;
@@ -1206,7 +1478,16 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       const route = prepared.get(sessionId);
       if (!route) return;
       prepared.delete(sessionId);
-      if (route.spec.runtimeIsolation === 'per-session') deps.runtimes.release(route.key);
+      const owner = preparing.get(sessionId);
+      if (owner) {
+        // The in-flight prepare's finalizer owns the decision.
+        return;
+      }
+      finishReleasedRoute({
+        key: route.key,
+        sessionId,
+        spec: route.spec,
+      });
     },
     isPrepared: sessionId => prepared.has(sessionId),
     isPreparing: () => preparing.size > 0,

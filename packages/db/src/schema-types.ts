@@ -1,3 +1,4 @@
+import { SecureProxyUpstreamUrlSchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
 import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
@@ -961,6 +962,9 @@ export type OrganizationPlan = z.infer<typeof OrganizationPlanSchema>;
 
 export const ORGANIZATION_AUTO_MODEL_ID = 'kilo-auto/org';
 export const MAX_ORGANIZATION_AUTO_ROUTES = 100;
+// Custom router model ID prefixes from @kilocode/auto-routing-contracts (ADR 0005).
+const CUSTOM_ROUTER_MODEL_PREFIX = 'kilo-auto/custom/';
+const ORG_CUSTOM_ROUTER_MODEL_PREFIX = 'kilo-auto/custom/org/';
 
 const OrganizationAutoModelRouteSlugSchema = z
   .string()
@@ -980,7 +984,13 @@ const OrganizationAutoModelTargetSchema = z
   })
   .refine(value => value !== ORGANIZATION_AUTO_MODEL_ID, {
     message: 'Organization Auto cannot target itself',
-  });
+  })
+  .refine(
+    value =>
+      !value.startsWith(CUSTOM_ROUTER_MODEL_PREFIX) ||
+      value.startsWith(ORG_CUSTOM_ROUTER_MODEL_PREFIX),
+    { message: 'Organization Auto can only target organization custom routers' }
+  );
 
 export const OrganizationAutoModelSettingsSchema = z.object({
   routes: z
@@ -1946,6 +1956,8 @@ export const OpenRouterProvider = z.object({
     training: z.boolean(),
     retainsPrompts: z.boolean(),
     canPublish: z.boolean(),
+    termsOfServiceURL: z.string().optional(),
+    privacyPolicyURL: z.string().optional(),
   }),
   headquarters: z.string().optional(),
   datacenters: z.array(z.string()).optional(),
@@ -1974,6 +1986,8 @@ export const NormalizedProvider = z.object({
     training: z.boolean(),
     retainsPrompts: z.boolean(),
     canPublish: z.boolean(),
+    termsOfServiceURL: z.string().optional(),
+    privacyPolicyURL: z.string().optional(),
   }),
   headquarters: z.string().optional(),
   datacenters: z.array(z.string()).optional(),
@@ -2105,7 +2119,6 @@ export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 export const CustomLlmProviderSchema = z.enum([
   'anthropic', // uses Messages API
   'openai', // uses Responses API
-  'openai-compatible', // uses Chat Completions API with reasoning_content
   'openrouter', // uses Chat Completions API with reasoning_details
 ]);
 
@@ -2243,10 +2256,27 @@ export const CustomLlmXApiKeyCredentialsSchema = z.object({
 
 export type CustomLlmXApiKeyCredentials = z.infer<typeof CustomLlmXApiKeyCredentialsSchema>;
 
+/**
+ * Routes requests through apps/ai-gateway-secure-proxy. The definition's
+ * `base_url` is the proxy's `/api/proxy` URL, used as-is; `config.url` takes the
+ * role `base_url` has for direct custom LLMs, including `disable_url_suffix`.
+ */
+export const CustomLlmSecureProxyCredentialsSchema = z.object({
+  type: z.literal('secure_proxy'),
+  proxy_secret: z.string().min(1),
+  config: z.object({
+    url: SecureProxyUpstreamUrlSchema,
+    extra_headers: CustomLlmExtraHeadersSchema.optional(),
+  }),
+});
+
+export type CustomLlmSecureProxyCredentials = z.infer<typeof CustomLlmSecureProxyCredentialsSchema>;
+
 export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
   CustomLlmXApiKeyCredentialsSchema,
   GoogleServiceAccountKeySchema,
+  CustomLlmSecureProxyCredentialsSchema,
 ]);
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
@@ -2382,6 +2412,9 @@ export const EndpointSchema = z.object({
       discount: z.number().optional(),
     })
     .optional(),
+  // Vercel AI Gateway endpoint data policy flags; OpenRouter does not set them.
+  has_zdr: z.boolean().optional().catch(undefined),
+  has_no_training: z.boolean().optional().catch(undefined),
 });
 
 export type Endpoint = z.infer<typeof EndpointSchema>;

@@ -5,10 +5,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { NOTE_MAX_LENGTH } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import {
+  DEFAULT_VERCEL_ROUTING_ENABLED,
+  NOTE_MAX_LENGTH,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 
 export function RoutingContent() {
   const trpc = useTRPC();
@@ -16,12 +20,14 @@ export function RoutingContent() {
 
   const { data, isLoading } = useQuery(trpc.admin.gatewayConfig.get.queryOptions());
 
+  const [vercelEnabled, setVercelEnabled] = useState(DEFAULT_VERCEL_ROUTING_ENABLED);
   const [optOutModelsValue, setOptOutModelsValue] = useState('');
   const [noteValue, setNoteValue] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     if (data) {
+      setVercelEnabled(data.vercel_routing_enabled);
       setOptOutModelsValue(data.vercel_routing_opt_out_models.join('\n'));
       setNoteValue(data.note ?? '');
       setHasChanges(false);
@@ -34,7 +40,7 @@ export function RoutingContent() {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.gatewayConfig.get.queryKey(),
         });
-        toast.success('Vercel routing configuration updated');
+        toast.success('Gateway routing configuration updated');
       },
       onError: error => {
         toast.error(error.message || 'Failed to update');
@@ -42,18 +48,27 @@ export function RoutingContent() {
     })
   );
 
+  function noteInput(): string | null {
+    const trimmed = noteValue.trim();
+    return trimmed === '' ? null : trimmed;
+  }
+
+  function optOutModels() {
+    return [
+      ...new Set(
+        optOutModelsValue
+          .split('\n')
+          .map(model => model.trim())
+          .filter(Boolean)
+      ),
+    ];
+  }
+
   function handleSave() {
-    const note = noteValue.trim();
     mutation.mutate({
-      vercel_routing_opt_out_models: [
-        ...new Set(
-          optOutModelsValue
-            .split('\n')
-            .map(model => model.trim())
-            .filter(Boolean)
-        ),
-      ],
-      note: note === '' ? null : note,
+      vercel_routing_enabled: vercelEnabled,
+      vercel_routing_opt_out_models: optOutModels(),
+      note: noteInput(),
     });
   }
 
@@ -61,74 +76,94 @@ export function RoutingContent() {
     return <div className="text-muted-foreground py-8 text-sm">Loading...</div>;
   }
 
+  const savedEnabled = data?.vercel_routing_enabled ?? DEFAULT_VERCEL_ROUTING_ENABLED;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Vercel Routing</CardTitle>
-        <CardDescription>
-          Every eligible request routes to the Vercel AI Gateway. A request is eligible when its
-          model is available on Vercel, is not opted out below, and its provider preferences can be
-          met there. Everything else goes to OpenRouter.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="routing-opt-out-models">Opt-out models</Label>
-          <Textarea
-            id="routing-opt-out-models"
-            aria-describedby="routing-opt-out-models-description"
-            placeholder={'moonshotai/kimi-k3\nprovider/another-model'}
-            value={optOutModelsValue}
-            onChange={e => {
-              setOptOutModelsValue(e.target.value);
-              setHasChanges(true);
-            }}
-            rows={6}
-            className="font-mono text-sm"
-          />
-          <p id="routing-opt-out-models-description" className="text-muted-foreground text-xs">
-            One model ID per line. Matching is exact after entries are lowercased; matching models
-            always go to OpenRouter. Changes take effect within one minute on warm instances.
-          </p>
-        </div>
+    <div className="flex w-full flex-col gap-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Gateway Routing</CardTitle>
+          <CardDescription>
+            When on, all free and paid traffic for models available on the Vercel AI Gateway is
+            routed to Vercel. When off, that traffic goes to OpenRouter. Models not available on
+            Vercel, opt-out models, and requests whose provider preferences Vercel cannot satisfy
+            always go to OpenRouter. On by default.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <Switch
+              id="routing-vercel-enabled"
+              checked={vercelEnabled}
+              onCheckedChange={checked => {
+                setVercelEnabled(checked);
+                setHasChanges(true);
+              }}
+            />
+            <Label htmlFor="routing-vercel-enabled" className="cursor-pointer">
+              Route eligible traffic to Vercel
+            </Label>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="routing-opt-out-models">Opt-out models</Label>
+            <Textarea
+              id="routing-opt-out-models"
+              aria-describedby="routing-opt-out-models-description"
+              placeholder={'moonshotai/kimi-k3\nprovider/another-model'}
+              value={optOutModelsValue}
+              onChange={e => {
+                setOptOutModelsValue(e.target.value);
+                setHasChanges(true);
+              }}
+              rows={6}
+              className="font-mono text-sm"
+            />
+            <p id="routing-opt-out-models-description" className="text-muted-foreground text-xs">
+              One model ID per line. Matching is exact after entries are lowercased; matching models
+              are never routed to Vercel. Changes take effect within one minute on warm instances.
+            </p>
+          </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="routing-note">Note (optional)</Label>
-          <Textarea
-            id="routing-note"
-            placeholder="Why is this change being made?"
-            maxLength={NOTE_MAX_LENGTH}
-            value={noteValue}
-            onChange={e => {
-              setNoteValue(e.target.value);
-              setHasChanges(true);
-            }}
-            className="min-h-20"
-          />
-        </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="routing-note">Note (optional)</Label>
+            <Textarea
+              id="routing-note"
+              placeholder="Why is this change being made?"
+              maxLength={NOTE_MAX_LENGTH}
+              value={noteValue}
+              onChange={e => {
+                setNoteValue(e.target.value);
+                setHasChanges(true);
+              }}
+              className="min-h-20"
+            />
+          </div>
 
-        <div>
-          <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">
-            {mutation.isPending ? 'Saving...' : 'Save'}
-          </Button>
-        </div>
+          <div>
+            <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">
+              {mutation.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
 
-        {(data?.updated_by_email || data?.note) && (
           <div className="text-muted-foreground text-sm">
-            {data.updated_by_email && (
-              <p>
-                Last updated by {data.updated_by_email}
-                {data.updated_at && <> at {new Date(data.updated_at).toLocaleString()}</>}.
-              </p>
-            )}
-            {data.note && (
+            <p>
+              Vercel routing is{' '}
+              <span className="text-foreground font-medium">{savedEnabled ? 'on' : 'off'}</span>.
+              {data?.updated_by_email && (
+                <span className="ml-1">
+                  Set by {data.updated_by_email}
+                  {data.updated_at && <> at {new Date(data.updated_at).toLocaleString()}</>}.
+                </span>
+              )}
+            </p>
+            {data?.note && (
               <p className="mt-2 whitespace-pre-wrap">
                 <span className="font-medium">Previous note:</span> {data.note}
               </p>
             )}
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

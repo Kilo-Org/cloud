@@ -6,7 +6,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
   convertFromKiloExclusiveModel,
-  getInferenceProvider,
+  getInferenceProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type {
   NormalizedOpenRouterResponse,
@@ -32,7 +32,10 @@ import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/providers/openrouter/free-endpoint-data-policy';
-import { injectExtraProviderModels } from '@/lib/providers/openrouter/inject-extra-provider-models';
+import {
+  injectExtraProviderModels,
+  injectVercelOnlyProviders,
+} from '@/lib/providers/openrouter/inject-extra-provider-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
@@ -186,14 +189,14 @@ async function syncProviders(params: {
   );
 
   injectExtraProviderModels(vercelModels, providerModelData);
+  injectVercelOnlyProviders(vercelModels, providerModelData);
 
   const mappedExtraModels = kiloExclusiveModels
-    .flatMap(kfm => {
-      if (kfm.status !== 'public') return [];
-      const inferenceProvider = getInferenceProvider(kfm);
-      if (!inferenceProvider) return [];
-      return [{ kfm, inferenceProvider }];
-    })
+    .flatMap(kfm =>
+      unavailableModelIds.has(kfm.public_id)
+        ? []
+        : getInferenceProviders(kfm).map(inferenceProvider => ({ kfm, inferenceProvider }))
+    )
     .map(({ kfm, inferenceProvider }) => {
       const model = convertFromKiloExclusiveModel(kfm);
       return {
@@ -277,6 +280,8 @@ async function syncProviders(params: {
         training: data.provider.dataPolicy.training,
         retainsPrompts: data.provider.dataPolicy.retainsPrompts,
         canPublish: data.provider.dataPolicy.canPublish,
+        termsOfServiceURL: data.provider.dataPolicy.termsOfServiceURL,
+        privacyPolicyURL: data.provider.dataPolicy.privacyPolicyURL,
       },
       headquarters: data.provider.headquarters,
       datacenters: data.provider.datacenters,

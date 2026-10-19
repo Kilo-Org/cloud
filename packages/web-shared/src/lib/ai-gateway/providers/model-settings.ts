@@ -69,7 +69,7 @@ export function getAiSdkProvider(
   directProviderId: DirectUserByokInferenceProviderId | null
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
   if (directProviderId === 'morph-byok') {
-    return 'openai-compatible';
+    return undefined;
   }
   if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
     return 'anthropic';

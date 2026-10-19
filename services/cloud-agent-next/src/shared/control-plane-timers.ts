@@ -16,6 +16,8 @@ export type ControlPlaneTimers = {
     acceptedBackstopMs: number;
     sandboxRpcDeadlineMs: number;
     transportRecoveryMs: number;
+    /** Total bound on serving one scope handle through a surviving member. */
+    scopeResolutionMs: number;
   };
   sandbox: {
     providerCreateMs: number;
@@ -26,10 +28,13 @@ export type ControlPlaneTimers = {
     reconnectMs: number;
     routePreparationMs: number;
     idleMs: number;
+    unattendedIdleMs: number;
     sessionNotifyDeadlineMs: number;
     providerLeaseMs: number;
     credentialGrantMs: number;
     credentialGrantReissueBelowMs: number;
+    /** Bounds one member's backing renewal during scope-handle resolution. */
+    scopeBackingTokenMs: number;
     providerStopAttemptMs: number;
     providerStopLadderMs: readonly number[];
   };
@@ -85,11 +90,15 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     reconnectMs: ms(90_000),
     routePreparationMs: 12 * MINUTE_MS,
     idleMs: ms(10 * MINUTE_MS),
+    unattendedIdleMs: ms(MINUTE_MS),
     // Bounds one Sandbox -> Session notification; real (not scaled) like the
     // other bounds on external work.
     sessionNotifyDeadlineMs: 2_000,
     credentialGrantMs: 4 * HOUR_MS,
     credentialGrantReissueBelowMs: HOUR_MS,
+    // Bounds external token renewal, so it stays real and short enough for the
+    // Session DO's total scope-resolution bound.
+    scopeBackingTokenMs: 3_000,
     providerStopAttemptMs: 30_000,
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
   };
@@ -129,6 +138,10 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   return {
     session: {
       sandboxRpcDeadlineMs: 2_000,
+      // Bounds external work (member token renewal), so it stays real. Well
+      // under the facade's retry budget: a handle that cannot be served in this
+      // window fails as `unavailable` rather than hanging the proxy response.
+      scopeResolutionMs: 6_000,
       transportRecoveryMs: ms(15_000),
       queuedBackstopMs:
         sandbox.reconnectMs + sandbox.routePreparationMs + QUEUED_BACKSTOP_MARGIN_MS,
@@ -144,6 +157,18 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
 }
 
 export const CONTROL_PLANE_TIMERS: ControlPlaneTimers = buildControlPlaneTimers(1);
+
+export type SandboxIdlePolicy = 'interactive' | 'unattended';
+
+/**
+ * The idle policy for a sandbox from its routes' session origins. A sandbox
+ * without routes keeps the interactive window so a released route (session
+ * deletion, runtime-authorization refresh) does not stop a sandbox the next
+ * prepare could reuse.
+ */
+export function sandboxIdlePolicyForOrigins(origins: readonly unknown[]): SandboxIdlePolicy {
+  return origins.length === 0 || origins.includes('cloud-agent-web') ? 'interactive' : 'unattended';
+}
 
 // Positive integer divisor that shortens internal deadline timers for local E2E. Pass `env` on the Worker/DO side or `process.env` in the wrapper. Development-only by absence from production config; do not add it to wrangler.jsonc.
 export function resolveControlPlaneTimers(

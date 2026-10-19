@@ -81,7 +81,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `STYTCH_PROJECT_SECRET` - Stytch project secret. `[SECRET]`
 - `STYTCH_PUBLIC_TOKEN` - Stytch legacy public token alias used in some test fixtures. [PUBLIC]
 - `INTERNAL_API_SECRET` - Shared secret for internal API calls between services; used in `apps/web/src/lib/kiloclaw/cli-runs.test.ts`, `kiloclaw-router.test.ts`, dev seed scripts, and other service routers. `[SECRET]`
-- `USAGE_SHADOW_PUBLISH_ENABLED` - Enables background gateway shadow publication only when exactly `true`; default off. Enqueues the finalized usage event in both function regions through an independently tracked `after()` promise. Enqueueing starts after lifetime registration succeeds, without waiting for response close. Current billing remains authoritative and independent of queue acceptance. HTTP 202 means enqueued, not processed or billed. [SERVER]
+- `USAGE_QUEUE_ONLY_ENABLED` - Staging queue-preferred correctness experiment with direct fallback; default off. Enabled only when exactly `true`, `VERCEL_TARGET_ENV=staging`, and `VERCEL_ENV` is not `production`. In both function regions, awaits one finalized event publication within the accounting lifetime. HTTP 202 skips the direct usage write and returns a queued identity, not a committed row; spend-watched Bouncer events are delivered by the writer after its outbox commits, with cron retry on failure. Missing publisher configuration, lifetime registration failure, unavailable publication or unexpected rejection falls back to the existing direct writer with the same ID/payload. Takes precedence over shadow mode, so an event is never published twice by the gateway. Requires an independently verified processing consumer and authenticated writer; this flag does not establish readiness or a durable production publication guarantee. [SERVER]
+- `USAGE_SHADOW_PUBLISH_ENABLED` - Enables background gateway shadow publication only when exactly `true`; default off. Enqueues the finalized usage event in both function regions through an independently tracked `after()` promise. Enqueueing starts after lifetime registration succeeds, without waiting for response close. Current billing remains authoritative and independent of queue acceptance. HTTP 202 means enqueued, not processed or billed. Ignored when the staging queue-only mode is active. [SERVER]
 - `USAGE_INGEST_URL` - Optional complete usage-ingest HTTP endpoint (for example, ending in `/usage`) for the gateway usage publisher helper. No default; missing URL or publisher secret disables the helper. It makes one attempt with a two-second timeout and accepts only HTTP 202. For isolated local tests, use `http://127.0.0.1:<fixture-port>/usage` with the real usage-ingest Worker and a local queue. Configuring it alone does not activate gateway publication. [SERVER]
 - `USAGE_INGEST_PUBLISH_SECRET` - Optional dedicated Bearer secret for the gateway usage publisher helper; must match the usage-ingest Worker's setting of the same name. Separate from `INTERNAL_API_SECRET` and user credentials. Use only a synthetic matching value in local fixtures. `[SECRET]`
 - `SUPPORT_API_SECRET` - Shared bearer token for Customer Support Automation (CSA) internal API calls. Cloud uses it to authorize CSA → Cloud `apps/web/src/app/api/internal/support/` and Cloud → CSA `POST /api/internal/cloud/users/gdpr-scrub`. A CSA compromise can also call Cloud deletion and Cloud can scrub CSA-local PII. Leak can look up any email and enqueue deletion for non-admin, non-bot, non-live-subscription customers; access disable is deferred to worker preflight and pending requests can be cancelled. Keep production values off preview deployments; rotate Cloud and CSA together. `[SECRET]`
@@ -215,6 +216,8 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 ### Database
 
 - `POSTGRES_URL` - Primary Postgres connection string. `[SECRET]`
+- `POSTGRES_REPLICA_US_URL` - US read replica used by `readDb` in US Vercel regions (`sfo1`); see `packages/web-shared/src/lib/drizzle.ts`. When unset, `readDb` falls back to the primary, so it must be set on every project that runs in `sfo1`, including `kilocode-ai-gateway`. `[SECRET]`
+- `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; `readDb` picks one at random in EU regions and falls back to the primary when neither is set. `[SECRET]`
 - `POSTGRES_SCRIPT_URL` - Alternate Postgres URL used by one-off scripts/backfills in `src/scripts/` and tests. `[SECRET]`
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
 - `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (default/typical: 10000). [SERVER]
@@ -247,6 +250,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `MODEL_EVAL_INGEST_URL` - URL for model evaluation ingest worker. [SERVER]
 - `SESSION_INGEST_WORKER_URL` - URL for the session ingest worker. [SERVER]
 - `NOTIFICATIONS_WORKER_URL` - URL for the push-notifications worker internal dispatch endpoint. [SERVER]
+- `AUTO_ROUTING_DECISION_SECRET` - HMAC secret the AI gateway uses to verify `x-kilo-auto-decision` custom router decisions signed by the auto-routing worker (ADR 0005). Must match the worker's `AUTO_ROUTING_DECISION_SECRET` Secrets Store binding. When unset, the gateway answers requests that carry the header with HTTP 503. `[SECRET]`
 - `USER_DATA_EXPORT_WORKER_URL` - Internal user data export Worker URL. Production: `https://user-data-export.kilosessions.ai`; local development is generated by `dev:env`. [SERVER]
 - `NEXT_PUBLIC_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the browser. [PUBLIC]
 - `CODE_REVIEW_WORKER_URL` - URL for the code review worker. [SERVER]
@@ -278,8 +282,11 @@ The connection-role migration preserves a sole eligible connection, prefers an u
   - Signup calls `/api/v1/signup-decide` only for new users, after account resolution and before Stripe customer creation. Existing sign-in and provider linking never consume signup quotas. The call uses `INTERNAL_API_SECRET` and a 3,000 ms budget.
   - Development skips admission. In other environments, signup requires a usable IP and a validated Bouncer verdict. Missing configuration, timeouts, transport errors, HTTP errors, invalid JSON, and unknown response shapes fail closed with `SIGNUP-UNAVAILABLE`.
   - An unavailable verdict creates no Stripe customer, user, or auth provider. Web signup shows a retry message. Native token exchange returns HTTP 503 and releases the email-code reservation so the same code can be retried.
-  - Only a validated enforced `signup_rate_limited` response returns `SIGNUP-RATE-LIMITED`. Cloud accepts at most five merged IP/JA4 flags, including `signup:ja4`, and never exposes internal flags to the user.
-  - Signup sends `{ operationId, ip, ja4? }`. JA4 comes only from the original request's `x-vercel-ja4-digest` header, not the Cloud-to-Bouncer TLS fingerprint. It is trimmed, lowercased, and bounded to `^[a-z0-9_]{1,128}$`; missing or invalid values are omitted whole, never truncated, and IP admission still runs. `signupOperationId` hashes the existing normalized email with SHA-256 and prefixes the digest with `signup:`.
+  - A validated enforced `signup_rate_limited` response returns `SIGNUP-RATE-LIMITED`. Cloud accepts at most eight merged IP, domain, and JA4 flags, including `signup:busy`, `signup:domain`, and `signup:ja4`, and never exposes internal flags to the user.
+  - A validated enforced `signup_step_up` response returns `SIGNUP-STEP-UP` with its `methods` (1 to 8 values of `^[a-z0-9-]{1,32}$`). It creates no Stripe customer, user, or auth provider. Cloud shows only `google` and `apple`, in that order, and ignores other values. Web signup redirects to sign-in with `error=SIGNUP-STEP-UP&methods=<comma-separated>` and asks the user to continue with those methods; the copy never names a signal. Native token exchange returns HTTP 403 `{ error: "SIGNUP-STEP-UP", methods }`; the mobile app names the allowed Apple or Google button when that button is on its screen, and otherwise points to its browser sign-in options.
+  - Signup sends `{ operationId, ip, ja4?, method?, emailDomain? }`. JA4 comes only from the original request's `x-vercel-ja4-digest` header, not the Cloud-to-Bouncer TLS fingerprint. It is trimmed, lowercased, and bounded to `^[a-z0-9_]{1,128}$`; missing or invalid values are omitted whole, never truncated, and IP admission still runs. `signupOperationId` hashes the existing normalized email with SHA-256 and prefixes the digest with `signup:`.
+  - `method` is the signup's auth provider ID. `emailDomain` is the registrable domain (`tldts` `getDomain`, private suffixes included) of the normalized email's host, or the full host when it has none, so subdomains of one domain share a counter. It is sent for every method; Bouncer counts it only for email signups. Each field is omitted whole when invalid. Without `method`, Bouncer applies its method-less policy, as for an old Cloud build.
+  - With `enforcement.signupStepUp` on, Bouncer steps up a risky signup instead of rejecting it: it asks for Google or Apple, and admits Apple and WorkOS on a shared IP. Deploy Bouncer with `enforcement.signupStepUp=false` before this Cloud change, measure the shadow `stepUp` audit field, and only then let Igor turn it on.
   - The identity helper lives in `packages/web-shared/src/lib/bouncer/signup.ts`. Live admission and historical import must use the same helper.
   - Cloud validates the forwarded first-hop IP. Bouncer canonicalizes addresses and groups IPv6 by /64.
   - Bouncer defaults to 3 admissions per canonical IP per rolling 30 days. The shorter 24-hour limit is also 3.
@@ -398,6 +405,12 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_API_REQUEST_LOG_ACCESS_KEY_ID` - R2 access key ID used only for the `api_request_log` bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
 - `R2_API_REQUEST_LOG_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_API_REQUEST_LOG_ACCESS_KEY_ID`. `[SECRET]`
 
+## AI Gateway Secure Proxy (apps/ai-gateway-secure-proxy)
+
+Set manually on the `kilocode-ai-gateway-secure-proxy` Vercel project; not managed by `pnpm web:env`.
+
+- `KILO_AI_GATEWAY_SECURE_PROXY_SECRET` - Shared secret the gateway sends as `Authorization: Bearer <secret>`; read in `apps/ai-gateway-secure-proxy/src/lib/secure-proxy.ts`. Admins store the same value as `proxy_secret` in `secure_proxy` custom LLM credentials. When unset, the proxy rejects every request. `[SECRET]`
+
 ## Services
 
 ### Notifications Worker
@@ -479,6 +492,13 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `LOCAL_AUTH_TOKEN` - Auth token for the local deployment dispatcher env. `[SECRET]`
 - `STAGING_AUTH_TOKEN` - Auth token for the staging deployment dispatcher env. `[SECRET]`
 - `PROD_AUTH_TOKEN` - Auth token for the production deployment dispatcher env. `[SECRET]`
+
+### Auto Routing Worker
+
+- `KILO_AI_GATEWAY_BASE_URL` - Origin of the AI gateway that `services/auto-routing` asks which custom router gateway entries the organization model policy denies (`/api/v1/internal/auto-routing/denied-models`). A `wrangler.jsonc` var for production; `pnpm dev:env` writes the local gateway port to `.dev.vars`. [SERVER]
+- `AUTO_ROUTING_DECISION_SECRET` - HMAC secret that signs custom router decision IDs; the AI gateway verifies them with the same value. Production Secrets Store name `AUTO_ROUTING_DECISION_SECRET_PROD`; locally `pnpm dev:env` seeds it from `.env.local`. `[SECRET]`
+- `AUTO_ROUTING_UPSTASH_REDIS_REST_URL` - Upstash REST URL of the web app's Redis, read by `services/auto-routing` for the blocked email domains. Production Secrets Store name `AUTO_ROUTING_UPSTASH_REDIS_REST_URL_PROD`; locally the dev `redis-http` container. `[SECRET]`
+- `AUTO_ROUTING_UPSTASH_REDIS_REST_READONLY_TOKEN` - Read-only Upstash REST token for that database. Production Secrets Store name `AUTO_ROUTING_UPSTASH_REDIS_REST_READONLY_TOKEN_PROD`; locally `example_token`. `[SECRET]`
 
 ### Other Services
 

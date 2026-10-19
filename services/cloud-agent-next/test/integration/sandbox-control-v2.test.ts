@@ -44,7 +44,10 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
-import { ContainerConcurrencyLimitError } from '../../src/container-concurrency.js';
+import {
+  ContainerCapacityUnavailableError,
+  ContainerConcurrencyLimitError,
+} from '../../src/container-concurrency.js';
 import { VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/sandbox-control/vercel-billing.js';
 import { encodeVercelProviderRef } from '../../src/sandbox-control/vercel-provider.js';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
@@ -641,24 +644,68 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     );
   });
 
-  it('fails a container limit denial from the sandbox start without retrying the create', async () => {
-    const provider = createFakeProvider({ gateLaunch: true });
-    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
-    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
-    await releaseGate(stub, () =>
-      provider.launchGates[0](
-        new Error(`remote: ${new ContainerConcurrencyLimitError('personal', 20).message}`)
-      )
-    );
-    await waitFor(async () =>
-      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
-        state: 'failed',
-        reason: 'container_limit_reached',
-      })
-    );
-    await waitFor(async () => expect((await readState(stub)).kind).not.toBe('creating'));
-    expect(provider.createCalls).toBe(1);
-  });
+  it.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
+    'does not call the %s provider when database admission is unavailable',
+    async providerKind => {
+      const sandboxId = `ses-${'b'.repeat(48)}`;
+      const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
+      const stub = sandboxNamespace.getByName(sandboxId);
+      await runInDurableObject(stub, instance => {
+        Object.assign(instance, {
+          env: {
+            ...instance.env,
+            CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'false',
+            HYPERDRIVE: undefined,
+          },
+        });
+      });
+      const provider = createFakeProvider();
+      await startAllocation(provider, {
+        sandboxId,
+        provider: providerKind,
+        preparingRoute: sessionId,
+        billing: {
+          sandboxId,
+          subject: { type: 'user', id: 'owner-1' },
+          actor: { type: 'user', id: 'owner-1' },
+          sessionId,
+          metadata: { origin: 'cloud-agent' },
+        },
+      });
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId })).view).toMatchObject({
+          state: 'failed',
+          reason: 'billing_unavailable',
+        })
+      );
+      expect((await readState(stub)).kind).not.toBe('creating');
+      expect(provider.createCalls).toBe(0);
+      expect(provider.launchEnvs).toHaveLength(0);
+    }
+  );
+
+  it.each([
+    [new ContainerConcurrencyLimitError('personal', 20), 'container_limit_reached'],
+    [new ContainerCapacityUnavailableError(), 'billing_unavailable'],
+  ] as const)(
+    'fails capacity denial from the sandbox start without retrying creation: %s',
+    async (failure, reason) => {
+      const provider = createFakeProvider({ gateLaunch: true });
+      const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+      await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+      await releaseGate(stub, () =>
+        provider.launchGates[0](new Error(`remote: ${failure.message}`))
+      );
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+          state: 'failed',
+          reason,
+        })
+      );
+      await waitFor(async () => expect((await readState(stub)).kind).not.toBe('creating'));
+      expect(provider.createCalls).toBe(1);
+    }
+  );
 
   it('ignores a permanent late launch rejection after hello has acquired the allocation', async () => {
     const provider = createFakeProvider({ gateLaunch: true });
@@ -3437,7 +3484,7 @@ describe('SandboxControlV2 prepare frame secrets', () => {
       expect(frame.spec.env?.DATABASE_URL).toBe(secretValue);
       expect(frame.spec.secretEnvKeys).toEqual(['DATABASE_URL']);
       expect(frame.spec).toMatchObject(profile);
-      expect(frame.spec.runtimeIsolation).toBe('per-session');
+      expect(frame.spec.runtimeIsolation).toBeUndefined();
 
       const row = await readRouteRow(stub, sessionId);
       expect(row?.spec ?? '').not.toContain(secretValue);

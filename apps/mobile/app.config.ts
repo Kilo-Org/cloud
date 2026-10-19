@@ -203,6 +203,13 @@ const config: ExpoConfig = {
       // be enabled on the App ID (`com.kilocode.kiloapp`) in the Apple
       // Developer portal for a provisioning profile to include it.
       'com.apple.developer.usernotifications.time-sensitive': true,
+      // A GGUF context for on-device llama.rn inference needs the raised memory
+      // ceiling. These stay on for every build profile: EAS syncs App ID
+      // capabilities from the entitlements of whichever build or `eas
+      // credentials` run touches `com.kilocode.kiloapp`, so a run without them
+      // disables both capabilities and the App Store profile loses them.
+      'com.apple.developer.kernel.extended-virtual-addressing': true,
+      'com.apple.developer.kernel.increased-memory-limit': true,
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -318,14 +325,16 @@ const config: ExpoConfig = {
         },
       },
     ],
-    // llama.cpp for on-device GGUF inference. The two options are the defaults
-    // turned off: the podspec already compiles itself as C++20, and the app
-    // offloads nothing to Android GPUs, so neither global Podfile flags nor
-    // Qualcomm native libraries belong in the manifest. iOS memory entitlements
-    // stay on: a GGUF context needs the raised ceiling.
+    // llama.cpp for on-device GGUF inference. Each option below turns off a
+    // plugin behavior that is on by default. The podspec already compiles
+    // itself as C++20, and the app offloads nothing to Android GPUs, so neither
+    // global Podfile flags nor Qualcomm native libraries belong in the
+    // manifest. The plugin adds the iOS memory entitlements only under the
+    // production profile, so ios.entitlements declares them for every profile.
     [
       'llama.rn',
       {
+        enableEntitlements: false,
         forceCxx20: false,
         enableOpenCLAndHexagon: false,
       },

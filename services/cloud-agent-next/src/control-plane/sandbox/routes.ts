@@ -15,7 +15,10 @@ import {
 import type { SessionCredentialGrant } from '../../sandbox-control/session-credentials.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import { routes as routesTable } from './sqlite-schema.js';
+import type { SyncAcceptedHandleStorage } from './accepted-handles.js';
+import { lastSentHandleKey } from './scope-handle-delivery.js';
 import { readScopeGrant, removeScopeMember, scopeGrantId } from './scope-grants.js';
+import { admissionFailureStage } from './scope-handle-adoption.js';
 
 export type RouteDatabase = ReturnType<typeof drizzle>;
 
@@ -68,6 +71,8 @@ export type RouteGrantIssue = {
  */
 export type RouteContext = {
   db: RouteDatabase;
+  /** The Sandbox DO's synchronous KV view for accepted-handle retirement. */
+  acceptedHandles: SyncAcceptedHandleStorage;
   now: () => number;
   routePreparationMs: number;
   /** Sends `session.prepare` when a wrapper socket is bound; a no-op otherwise. */
@@ -180,8 +185,6 @@ export function routeView(
   return { state: 'preparing', attemptId: route.attemptId, ...sandboxProgress };
 }
 
-// --- storage -----------------------------------------------------------------
-
 export async function readRoute(db: RouteDatabase, sessionId: string): Promise<RouteRecord | null> {
   const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
   const row = rows[0];
@@ -201,9 +204,16 @@ export function writeRoute(db: Pick<RouteDatabase, 'insert'>, route: RouteRecord
     .run();
 }
 
-export async function deleteRoute(db: RouteDatabase, sessionId: string): Promise<void> {
+export async function deleteRoute(
+  db: RouteDatabase,
+  acceptedHandles: SyncAcceptedHandleStorage,
+  sessionId: string
+): Promise<void> {
   db.transaction(tx => {
-    removeScopeMember(tx, sessionId);
+    removeScopeMember(tx, acceptedHandles, sessionId);
+    // The per-route credentials marker shares this lifecycle; deleting it here
+    // keeps every removal path (release, wipe, failed admission) from leaking it.
+    acceptedHandles.delete(lastSentHandleKey(sessionId));
     tx.delete(routesTable).where(eq(routesTable.session_id, sessionId)).run();
   });
 }
@@ -232,12 +242,11 @@ export async function earliestRouteDeadlineAt(db: RouteDatabase): Promise<number
   return values.length === 0 ? null : Math.min(...values);
 }
 
-// --- route transitions -------------------------------------------------------
-
 /**
  * A route spec with no issuer material, used only when issuance fails. It is
  * never sent to a wrapper (the route is `failed`), and it keeps native tokens
- * and env out of the routes table.
+ * and env out of the routes table. The deprecated `runtimeIsolation` field is
+ * dropped: a route keys its runtime by directory.
  */
 function redactRouteSpec(spec: ControlPlaneRouteSpec): ControlPlaneRouteSpec {
   return {
@@ -247,7 +256,6 @@ function redactRouteSpec(spec: ControlPlaneRouteSpec): ControlPlaneRouteSpec {
     ...(spec.branch === undefined ? {} : { branch: spec.branch }),
     ...(spec.branchMode === undefined ? {} : { branchMode: spec.branchMode }),
     ...(spec.setupCommands === undefined ? {} : { setupCommands: spec.setupCommands }),
-    ...(spec.runtimeIsolation === undefined ? {} : { runtimeIsolation: spec.runtimeIsolation }),
     attemptId: spec.attemptId,
   };
 }
@@ -353,13 +361,13 @@ export async function startAttempt(
   let issued: RouteGrantIssue;
   try {
     issued = await ctx.issueGrant(attemptSpec, source);
-  } catch {
+  } catch (error) {
     return failRoute(
       ctx,
       attemptSpec,
       attemptId,
       'workspace_setup_failed',
-      'credential_grant_failed'
+      admissionFailureStage(error, 'credential_grant_failed')
     );
   }
   const route = newPreparingRoute(
@@ -451,8 +459,27 @@ export async function dropReadyRoutes(
 ): Promise<void> {
   for (const route of await listRoutes(ctx.db)) {
     if (route.state !== 'ready') continue;
-    await deleteRoute(ctx.db, route.sessionId);
+    await deleteRoute(ctx.db, ctx.acceptedHandles, route.sessionId);
     await ctx.notify(route.sessionId, { state: 'lost', attemptId: route.attemptId, reason });
+  }
+}
+
+/**
+ * Fails every ready route in one scope with the existing `workspace_setup_failed`
+ * mechanism. Used when an accepted scope handle can no longer be served by any
+ * member: the route is already losing its credential, so it fails fast instead of
+ * waiting out a preparation deadline. A route that is not `ready` (or belongs to
+ * another scope) is untouched.
+ */
+export async function failReadyRoutesForScope(
+  ctx: RouteContext,
+  targetScopeGrantId: string,
+  stage: string
+): Promise<void> {
+  for (const route of await listRoutes(ctx.db)) {
+    if (route.state !== 'ready') continue;
+    if (route.grant === null || scopeGrantId(route.grant) !== targetScopeGrantId) continue;
+    await failRoute(ctx, route.spec, route.attemptId, 'workspace_setup_failed', stage);
   }
 }
 

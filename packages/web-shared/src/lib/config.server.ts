@@ -65,6 +65,10 @@ export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
 export const USAGE_SHADOW_PUBLISH_ENABLED =
   getEnvVariable('USAGE_SHADOW_PUBLISH_ENABLED') === 'true';
+export const USAGE_QUEUE_ONLY_ENABLED =
+  getEnvVariable('USAGE_QUEUE_ONLY_ENABLED') === 'true' &&
+  getEnvVariable('VERCEL_TARGET_ENV') === 'staging' &&
+  getEnvVariable('VERCEL_ENV') !== 'production';
 // Shared secret with the MCP catalog CI job
 // (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in
 // app/api/internal/mcp-catalog/token; it is never accepted as a Kilo credential.
@@ -178,11 +182,6 @@ export const USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY =
  */
 export const USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY =
   getEnvVariable('USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY') || '';
-
-// openssl rand -base64 32
-export const USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY = getEnvVariable(
-  'USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY'
-);
 
 /**
  * AES-256 encryption key for BYOK API keys.
@@ -454,6 +453,7 @@ export const NOTIFICATIONS_WORKER_URL = getEnvVariable('NOTIFICATIONS_WORKER_URL
 
 // Auto routing worker
 export const AUTO_ROUTING_WORKER_URL = getEnvVariable('AUTO_ROUTING_WORKER_URL') || '';
+export const AUTO_ROUTING_DECISION_SECRET = getEnvVariable('AUTO_ROUTING_DECISION_SECRET') || '';
 
 // Auto routing benchmark worker
 export const AUTO_ROUTING_BENCHMARK_WORKER_URL =

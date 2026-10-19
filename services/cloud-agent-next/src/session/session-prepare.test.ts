@@ -1746,6 +1746,21 @@ describe('explicit sandbox session creation', () => {
   });
 });
 
+describe('sessionCreateIntentFingerprint', () => {
+  it('changes when resolved runtime instructions change', async () => {
+    const base = makeRequest({
+      profile: { resolved: { runtimeInstructions: [{ name: 'repo-rules', content: 'v1' }] } },
+    });
+    const changed = makeRequest({
+      profile: { resolved: { runtimeInstructions: [{ name: 'repo-rules', content: 'v2' }] } },
+    });
+
+    expect(await sessionCreateIntentFingerprint(base)).not.toBe(
+      await sessionCreateIntentFingerprint(changed)
+    );
+  });
+});
+
 describe('createSessionWithLedger admission ladder', () => {
   beforeEach(() => {
     vi.clearAllMocks();

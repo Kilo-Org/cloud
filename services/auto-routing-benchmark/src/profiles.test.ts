@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
+import { MAX_POOL_ENTRIES, type BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import type * as DbSchemaModule from './db-schema';
 import type * as DrizzleOrmModule from 'drizzle-orm';
 import type { ProfileRow } from './profiles';
@@ -25,7 +25,7 @@ type PendingStmt =
   | {
       kind: 'profile';
       values: ProfileRow;
-      onConflict: 'update_if_failed' | 'do_nothing' | 'replace';
+      onConflict: 'update_if_failed' | 'do_nothing';
     };
 
 const store = vi.hoisted(() => {
@@ -128,6 +128,7 @@ vi.mock('drizzle-orm/d1', () => {
       status: row.status as ProfileRow['status'],
       run_id: (row.run_id as string | null) ?? null,
       failure_reason: (row.failure_reason as string | null) ?? null,
+      invalidated_at: (row.invalidated_at as string | null) ?? null,
       requested_at: String(row.requested_at),
       updated_at: String(row.updated_at),
       completed_at: (row.completed_at as string | null) ?? null,
@@ -210,16 +211,11 @@ vi.mock('drizzle-orm/d1', () => {
             }
             const profileValues = profileValuesFromRow(row);
             return {
-              onConflictDoUpdate(config?: { where?: { type?: string; value?: string } }) {
-                // Register path: WHERE status = 'failed'
-                const whereFailed =
-                  !!config?.where &&
-                  (config.where as { type?: string; value?: string }).type === 'eq' &&
-                  (config.where as { value?: string }).value === 'failed';
+              onConflictDoUpdate() {
                 const stmt: PendingStmt = {
                   kind: 'profile',
                   values: profileValues,
-                  onConflict: whereFailed ? 'update_if_failed' : 'replace',
+                  onConflict: 'update_if_failed',
                 };
                 return wrapStmt(stmt);
               },
@@ -394,6 +390,7 @@ function profileRow(
     repetitions: REPS,
     run_id: null,
     failure_reason: null,
+    invalidated_at: null,
     requested_at: '2026-07-27T00:00:00.000Z',
     updated_at: '2026-07-27T00:00:00.000Z',
     completed_at: null,
@@ -430,6 +427,7 @@ async function applyProductionAdmissionBatch(opts: {
       chargedEventInsertStatement(orm, {
         owner_type: ev.ownerType,
         owner_id: ev.ownerId,
+        router: 'efficient',
         model: ev.entry.model,
         variant: variantToStorage(ev.entry.variant),
         engine_identity: ENGINE,
@@ -840,9 +838,8 @@ describe('registerProfiles', () => {
     expect(current?.status).toBe('pending');
   });
 
-  it('allows 10 charged admissions in 24h and rejects the 11th with nothing written', async () => {
+  it('allows the rolling limit of charged admissions and rejects one more with nothing written', async () => {
     const owner = { ownerType: 'user' as const, ownerId: 'quota-user' };
-    // Seed 10 prior charged events in the window.
     for (let i = 0; i < PROFILE_ADMISSION_LIMIT; i++) {
       store.seedEvent({
         owner_type: owner.ownerType,
@@ -900,7 +897,7 @@ describe('registerProfiles', () => {
 
   it('rejects the whole batch when any charged admission would exceed quota', async () => {
     const owner = { ownerType: 'user' as const, ownerId: 'batch-quota' };
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < PROFILE_ADMISSION_LIMIT - 1; i++) {
       store.seedEvent({
         owner_type: owner.ownerType,
         owner_id: owner.ownerId,
@@ -911,7 +908,7 @@ describe('registerProfiles', () => {
         admitted_at: new Date(NOW.getTime() - 60_000).toISOString(),
       });
     }
-    // 9 existing + 2 new charged = 11 → reject both, write nothing.
+    // One below the limit + 2 new charged → reject both, write nothing.
     await expect(
       registerProfiles({} as D1Database, config, {
         ...owner,
@@ -921,10 +918,10 @@ describe('registerProfiles', () => {
     ).rejects.toBeInstanceOf(ProfileQuotaExceededError);
 
     expect(store.profiles.size).toBe(0);
-    expect(store.events).toHaveLength(9);
+    expect(store.events).toHaveLength(PROFILE_ADMISSION_LIMIT - 1);
   });
 
-  it('counts ten admitted models rather than expanded effort pairs for quota', async () => {
+  it('counts admitted models rather than expanded effort pairs for quota', async () => {
     const owner = { ownerType: 'user' as const, ownerId: 'model-quota' };
     const efforts = ['low', 'medium', 'high'];
     const pairs = Array.from(
@@ -932,11 +929,18 @@ describe('registerProfiles', () => {
       (_, i) => `vendor/m-${i}`
     ).flatMap(model => efforts.map(variant => entry(model, variant)));
 
-    const result = await registerProfiles({} as D1Database, config, {
-      ...owner,
-      pairs,
-      now: NOW,
-    });
+    const perRequest = MAX_POOL_ENTRIES * efforts.length;
+    const results = [];
+    for (let offset = 0; offset < pairs.length; offset += perRequest) {
+      results.push(
+        await registerProfiles({} as D1Database, config, {
+          ...owner,
+          pairs: pairs.slice(offset, offset + perRequest),
+          now: NOW,
+        })
+      );
+    }
+    const result = { statuses: results.flatMap(r => r.statuses) };
 
     expect(result.statuses).toHaveLength(pairs.length);
     expect(result.statuses.every(s => s.status === 'pending')).toBe(true);
@@ -983,7 +987,7 @@ describe('registerProfiles', () => {
       registerProfiles({} as D1Database, config, {
         ownerType: 'user',
         ownerId: 'u1',
-        pairs: Array.from({ length: PROFILE_ADMISSION_LIMIT + 1 }, (_, i) => entry(`many/${i}`)),
+        pairs: Array.from({ length: MAX_POOL_ENTRIES + 1 }, (_, i) => entry(`many/${i}`)),
         now: NOW,
       })
     ).rejects.toBeInstanceOf(ProfileValidationError);

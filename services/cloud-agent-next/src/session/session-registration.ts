@@ -276,8 +276,6 @@ type NewSessionAllocation = SessionRegistrationResult & {
   runtimeAuthorization?: { token: string; seal: string };
 };
 
-// ----- operation-ledger boundary (P1-A-08b) -----------------------------------
-
 /**
  * Allocation failure stages reported to the operation ledger, matching the
  * `session_create_settled` `failure_stage` enum for pre-DO work.
@@ -1630,8 +1628,6 @@ export async function startNewSession(
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
 
-// ----- ledger-guarded session creation ----------------------------------------
-
 /**
  * Ledger `canonical_result` key holding the SHA-256 fingerprint of the immutable
  * create intent, recorded with the first admitted create's progress. A same-key
@@ -1775,6 +1771,7 @@ function profileCreateIntent(
     runtimeSkills: resolved.runtimeSkills,
     runtimeAgents: resolved.runtimeAgents,
     kiloCommands: resolved.kiloCommands,
+    runtimeInstructions: resolved.runtimeInstructions,
   };
 }
 

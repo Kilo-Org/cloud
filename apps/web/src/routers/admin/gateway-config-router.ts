@@ -35,6 +35,7 @@ export const adminGatewayConfigRouter = createTRPCRouter({
       ),
     ];
     const config: GatewayConfig = {
+      vercel_routing_enabled: input.vercel_routing_enabled,
       vercel_routing_opt_out_models: optOutModels,
       updated_at: new Date().toISOString(),
       updated_by: ctx.user.id,

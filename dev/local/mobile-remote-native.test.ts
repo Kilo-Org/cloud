@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { artifactName, assertToolchainMatches, pickDispatchedRun } from './mobile-remote-native';
+import {
+  artifactName,
+  assertSimulatorRuntimeSupports,
+  pickDispatchedRun,
+} from './mobile-remote-native';
 
 const HEAD = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
@@ -31,19 +35,36 @@ test('artifact names stay hash-keyed per platform', () => {
   assert.equal(artifactName('android', 'deadbeef'), 'mobile-native-android-deadbeef');
 });
 
-const TOOLCHAIN = { xcodeBuildVersion: '17A324', simulatorSdkVersion: '26.0' };
-
-test('accepts an artifact built by the same toolchain', () => {
-  assertToolchainMatches({ ...TOOLCHAIN }, TOOLCHAIN);
+test('accepts an artifact on a simulator runtime at least as new as its SDK', () => {
+  assertSimulatorRuntimeSupports(
+    { xcodeBuildVersion: '17F113', simulatorSdkVersion: '26.5' },
+    '26.5'
+  );
+  assertSimulatorRuntimeSupports(
+    { xcodeBuildVersion: '17F113', simulatorSdkVersion: '26.5' },
+    '27.1'
+  );
+  assertSimulatorRuntimeSupports({ simulatorSdkVersion: '26' }, '26.0.1');
 });
 
-test('rejects an artifact built by a different simulator SDK', () => {
+test('rejects an artifact whose SDK is newer than the simulator runtime', () => {
   assert.throws(
-    () => assertToolchainMatches({ ...TOOLCHAIN, simulatorSdkVersion: '18.4' }, TOOLCHAIN),
-    /does not match local/
+    () => assertSimulatorRuntimeSupports({ simulatorSdkVersion: '27.1' }, '26.5'),
+    /cannot run on simulator runtime 26.5/
+  );
+  assert.throws(
+    () => assertSimulatorRuntimeSupports({ simulatorSdkVersion: '26.10' }, '26.9'),
+    /cannot run/
   );
 });
 
-test('rejects an artifact with no recorded toolchain', () => {
-  assert.throws(() => assertToolchainMatches(null, TOOLCHAIN), /does not match local/);
+test('rejects an artifact with no readable simulator SDK', () => {
+  for (const toolchain of [
+    null,
+    {},
+    { simulatorSdkVersion: 26.5 },
+    { simulatorSdkVersion: 'beta' },
+  ]) {
+    assert.throws(() => assertSimulatorRuntimeSupports(toolchain, '27.1'), /cannot run/);
+  }
 });

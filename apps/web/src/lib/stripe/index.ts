@@ -29,6 +29,7 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+  parseOrgAutoTopUpThresholdCents,
   SYSTEM_AUTO_TOP_UP_USER_ID,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { findUserByStripeCustomerId } from '@/lib/user';
@@ -721,6 +722,11 @@ async function handleOrgAutoTopUpSetup(
   const amountCents = paymentIntent.metadata.amountCents
     ? parseInt(paymentIntent.metadata.amountCents, 10)
     : DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
+  const thresholdCents = parseOrgAutoTopUpThresholdCents(
+    paymentIntent.metadata.thresholdCents
+      ? parseInt(paymentIntent.metadata.thresholdCents, 10)
+      : undefined
+  );
 
   await db
     .insert(auto_top_up_configs)
@@ -728,6 +734,7 @@ async function handleOrgAutoTopUpSetup(
       owned_by_organization_id: organizationId,
       stripe_payment_method_id: paymentMethodId,
       amount_cents: amountCents,
+      threshold_cents: thresholdCents,
       disabled_reason: null,
       created_by_user_id: kiloUserId,
     })
@@ -736,6 +743,7 @@ async function handleOrgAutoTopUpSetup(
       set: {
         stripe_payment_method_id: paymentMethodId,
         amount_cents: amountCents,
+        threshold_cents: thresholdCents,
         disabled_reason: null,
         created_by_user_id: kiloUserId,
       },

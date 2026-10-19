@@ -26,7 +26,6 @@ import {
   organization_invitations,
   organization_recommendation_dismissals,
   security_audit_log,
-  free_model_usage,
   organizations,
   user_feedback,
   cloud_agent_feedback,
@@ -65,6 +64,11 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  agent_briefing_reports,
+  agent_briefing_events,
+  agent_briefing_context_preferences,
+  agent_briefing_preferences,
+  cli_sessions_v2,
   spend_alert_settings,
   spend_alert_rules,
   spend_alert_rule_state,
@@ -89,6 +93,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  auto_routing_custom_routers,
   github_install_states,
   code_review_feedback_events,
   code_review_memory_proposals,
@@ -304,7 +309,6 @@ describe('User', () => {
     await db.delete(organization_user_usage);
     await db.delete(organization_user_limits);
     await db.delete(organization_memberships);
-    await db.delete(free_model_usage);
     await db.delete(microdollar_usage_metadata);
     await db.delete(microdollar_usage);
     await db.delete(user_feedback);
@@ -348,6 +352,7 @@ describe('User', () => {
     await db.delete(platform_integrations);
     await db.delete(github_app_installations);
     await db.delete(organizations);
+    await db.delete(cli_sessions_v2);
     await db.delete(kilocode_users);
   });
 
@@ -978,7 +983,7 @@ describe('User', () => {
     });
     it.each([
       'unknown response',
-      'invalid six-flag rejection',
+      'invalid nine-flag rejection',
       'transport failure',
       'HTTP failure',
       'invalid JSON',
@@ -992,13 +997,13 @@ describe('User', () => {
         case 'unknown response':
           fetchMock.mockResolvedValue(Response.json(null));
           break;
-        case 'invalid six-flag rejection':
+        case 'invalid nine-flag rejection':
           fetchMock.mockResolvedValue(
             Response.json({
               enforced: true,
               code: 'signup_rate_limited',
               retryAfterMs: 1_000,
-              flags: Array.from({ length: 6 }, () => ({
+              flags: Array.from({ length: 9 }, () => ({
                 name: 'signup:ja4',
                 source: 'ja4',
                 decision: 'throttle',
@@ -1110,6 +1115,92 @@ describe('User', () => {
         ).toBeUndefined();
       }
     );
+
+    it.each(['email', 'github', 'google'] as const)(
+      'returns SIGNUP-STEP-UP for a %s signup without Stripe or user rows',
+      async provider => {
+        const email = `bouncer-step-up-${provider}@example.test`;
+        const providerAccountId = `${provider}-bouncer-step-up`;
+        mockSignupDecide.mockImplementation(actualSignupDecide);
+        const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+          Response.json({
+            enforced: true,
+            code: 'signup_step_up',
+            methods: ['apple', 'passkey', 'google'],
+            flags: [
+              {
+                name: 'signup:domain',
+                source: 'domain',
+                decision: 'throttle',
+                enforced: true,
+                until: null,
+              },
+            ],
+          })
+        );
+        const result = await createOrUpdateUser(
+          {
+            google_user_email: email,
+            google_user_name: 'Step Up',
+            google_user_image_url: '',
+            hosted_domain: null,
+            provider,
+            provider_account_id: providerAccountId,
+          },
+          undefined,
+          false,
+          new Headers({ 'x-forwarded-for': '203.0.113.64' })
+        );
+
+        expect(result).toEqual({
+          success: false,
+          error: 'SIGNUP-STEP-UP',
+          methods: ['google', 'apple'],
+        });
+        expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+          operationId: expect.stringMatching(/^signup:[a-f0-9]{64}$/),
+          ip: '203.0.113.64',
+          method: provider,
+          emailDomain: 'example.test',
+        });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(deleteStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, email),
+          })
+        ).toBeUndefined();
+        expect(
+          await db.query.user_auth_provider.findFirst({
+            where: eq(user_auth_provider.provider_account_id, providerAccountId),
+          })
+        ).toBeUndefined();
+      }
+    );
+
+    it.each([
+      ['mail.team.example.test', 'example.test'],
+      ['x.my.id', 'x.my.id'],
+    ])('sends the registrable domain of %s as %s', async (host, emailDomain) => {
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: `bouncer-domain@${host}`,
+          google_user_name: 'Bouncer Domain',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: `bouncer-domain@${host}`,
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.65' })
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockSignupDecide).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'email', emailDomain })
+      );
+    });
 
     it('propagates a Stripe failure without creating a user', async () => {
       const email = 'bouncer-stripe-failure@example.com';
@@ -5485,6 +5576,66 @@ describe('User', () => {
       expect(rows).toHaveLength(0);
     });
 
+    it('removes owned briefing reports, excerpts, consent and schedule without touching another user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const now = new Date().toISOString();
+      for (const account of [user, otherUser]) {
+        const sessionId = `ses_briefing_delete_${crypto.randomUUID()}`;
+        await db
+          .insert(cli_sessions_v2)
+          .values({ session_id: sessionId, kilo_user_id: account.id, created_on_platform: 'cli' });
+        await db
+          .insert(agent_briefing_preferences)
+          .values({ kilo_user_id: account.id, timezone: 'UTC', next_run_at: now });
+        await db.insert(agent_briefing_context_preferences).values({
+          kilo_user_id: account.id,
+          context_key: 'personal',
+          model: 'test/model',
+          ai_enabled: true,
+        });
+        await db.insert(agent_briefing_events).values({
+          id: crypto.randomUUID(),
+          kilo_user_id: account.id,
+          session_id: sessionId,
+          kind: 'activity',
+          occurred_at: now,
+          payload: { excerpt: 'Private selected outcome' },
+        });
+        await db.insert(agent_briefing_reports).values({
+          kilo_user_id: account.id,
+          context_key: 'personal',
+          local_date: now.slice(0, 10),
+          night_start_at: now,
+          cutoff_at: now,
+          morning_end_at: now,
+          evidence_hash: 'private',
+          facts: { sessionTitle: 'Private work' },
+          summary: { text: 'Private briefing' },
+        });
+      }
+      await softDeleteUser(user.id);
+      for (const table of [
+        agent_briefing_reports,
+        agent_briefing_events,
+        agent_briefing_context_preferences,
+        agent_briefing_preferences,
+      ]) {
+        expect(
+          await db
+            .select({ userId: table.kilo_user_id })
+            .from(table)
+            .where(eq(table.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select({ userId: table.kilo_user_id })
+            .from(table)
+            .where(eq(table.kilo_user_id, otherUser.id))
+        ).toHaveLength(1);
+      }
+    });
+
     it('should delete personal spend alert settings, rules, counters, and deliveries', async () => {
       const user = await insertTestUser();
       const scopeKey = `user:${user.id}`;
@@ -5583,6 +5734,38 @@ describe('User', () => {
         .from(coding_plan_availability_intents)
         .where(eq(coding_plan_availability_intents.user_id, user.id));
       expect(intents).toHaveLength(0);
+    });
+
+    it('should delete user-owned custom auto routers and keep another owner’s', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const router = (ownerId: string, slug: string) => ({
+        owned_by_user_id: ownerId,
+        slug,
+        name: slug,
+        base_router: 'efficient' as const,
+        mode: 'cost_per_accuracy' as const,
+        entries: [{ kind: 'gateway' as const, model: 'anthropic/claude-sonnet-4' }],
+        default_entry_key: 'gateway:anthropic/claude-sonnet-4',
+      });
+      await db
+        .insert(auto_routing_custom_routers)
+        .values([router(user.id, 'mine'), router(otherUser.id, 'theirs')]);
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.owned_by_user_id, otherUser.id))
+      ).toHaveLength(1);
     });
 
     it('should delete github_branch_pull_requests owned by user', async () => {
@@ -5768,22 +5951,6 @@ describe('User', () => {
       await softDeleteUser(user.id);
       const retained = await db.select().from(github_app_installations);
       expect(retained.map(row => row.id)).toEqual([canonicals[1]?.id]);
-    });
-
-    it('should nullify free_model_usage FK', async () => {
-      const user = await insertTestUser();
-
-      await db.insert(free_model_usage).values([
-        { ip_address: '1.2.3.4', model: 'test-model', kilo_user_id: user.id },
-        { ip_address: '1.2.3.4', model: 'test-model', kilo_user_id: null },
-      ]);
-
-      await softDeleteUser(user.id);
-
-      // User's free model usage should have kilo_user_id nulled, anonymous record untouched
-      const usages = await db.select().from(free_model_usage);
-      expect(usages).toHaveLength(2);
-      expect(usages.every(u => u.kilo_user_id === null)).toBe(true);
     });
 
     it('should anonymize security_advisor_scans and null public_ip', async () => {

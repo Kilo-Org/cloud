@@ -15,8 +15,8 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
-  createOrganization,
   addUserToOrganization,
   markOrganizationAsDeleted,
 } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -56,7 +56,7 @@ describe('organization admin router', () => {
       is_admin: false,
     });
 
-    testOrganization = await createOrganization('Test Admin Organization', adminUser.id);
+    testOrganization = await createTestOrganization('Test Admin Organization', adminUser.id, 0);
   });
 
   afterAll(async () => {
@@ -928,7 +928,7 @@ describe('organization admin router', () => {
 
     it('does not overcount multi-member orgs when has_multiple_users is off', async () => {
       const searchName = `Admin Count No Member Join ${crypto.randomUUID()}`;
-      const org = await createOrganization(searchName, adminUser.id);
+      const org = await createTestOrganization(searchName, adminUser.id, 0);
       const member = await insertTestUser({
         google_user_email: `${crypto.randomUUID()}@count-no-member-join.example.com`,
       });
@@ -957,7 +957,7 @@ describe('organization admin router', () => {
 
     it('counts only non-bot non-billing-manager users for has_multiple_users totals', async () => {
       const searchName = `Admin Count Excluded Members ${crypto.randomUUID()}`;
-      const org = await createOrganization(searchName, adminUser.id);
+      const org = await createTestOrganization(searchName, adminUser.id, 0);
       const billingManager = await insertTestUser({
         google_user_email: `${crypto.randomUUID()}@billing-manager.example.com`,
       });
@@ -1014,13 +1014,26 @@ describe('organization admin router', () => {
   describe('getHierarchy', () => {
     it('returns parent and child organization summaries', async () => {
       const searchPrefix = `Admin Org Hierarchy ${crypto.randomUUID()}`;
-      const grandparentOrganization = await createOrganization(
+      const grandparentOrganization = await createTestOrganization(
         `${searchPrefix} grandparent`,
-        adminUser.id
+        adminUser.id,
+        0
       );
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
-      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
-      const siblingOrganization = await createOrganization(`${searchPrefix} sibling`, adminUser.id);
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
+      const siblingOrganization = await createTestOrganization(
+        `${searchPrefix} sibling`,
+        adminUser.id,
+        0
+      );
 
       try {
         await db
@@ -1088,7 +1101,11 @@ describe('organization admin router', () => {
   describe('hierarchy management', () => {
     it('creates an empty child organization under a parent organization', async () => {
       const searchPrefix = `Admin Create Child Org ${crypto.randomUUID()}`;
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
       const caller = await createCallerForUser(adminUser.id);
       let childOrganizationId: string | null = null;
 
@@ -1137,8 +1154,16 @@ describe('organization admin router', () => {
 
     it('sets an existing organization as a child organization', async () => {
       const searchPrefix = `Admin Set Child Org ${crypto.randomUUID()}`;
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
-      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
 
       try {
         const caller = await createCallerForUser(adminUser.id);
@@ -1179,17 +1204,31 @@ describe('organization admin router', () => {
 
     it('only returns addable organizations from child autocomplete search', async () => {
       const searchPrefix = `Admin Addable Child Search ${crypto.randomUUID()}`;
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
-      const directChildOrganization = await createOrganization(
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
+      const directChildOrganization = await createTestOrganization(
         `${searchPrefix} direct child`,
-        adminUser.id
+        adminUser.id,
+        0
       );
-      const parentCandidate = await createOrganization(`${searchPrefix} has child`, adminUser.id);
-      const childOfCandidate = await createOrganization(
+      const parentCandidate = await createTestOrganization(
+        `${searchPrefix} has child`,
+        adminUser.id,
+        0
+      );
+      const childOfCandidate = await createTestOrganization(
         `${searchPrefix} child of candidate`,
-        adminUser.id
+        adminUser.id,
+        0
       );
-      const addableOrganization = await createOrganization(`${searchPrefix} addable`, adminUser.id);
+      const addableOrganization = await createTestOrganization(
+        `${searchPrefix} addable`,
+        adminUser.id,
+        0
+      );
 
       try {
         await db
@@ -1230,11 +1269,20 @@ describe('organization admin router', () => {
 
     it('returns no addable autocomplete results when the target parent is a child', async () => {
       const searchPrefix = `Admin Child Target Search ${crypto.randomUUID()}`;
-      const rootOrganization = await createOrganization(`${searchPrefix} root`, adminUser.id);
-      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
-      const candidateOrganization = await createOrganization(
+      const rootOrganization = await createTestOrganization(
+        `${searchPrefix} root`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
+      const candidateOrganization = await createTestOrganization(
         `${searchPrefix} candidate`,
-        adminUser.id
+        adminUser.id,
+        0
       );
 
       try {
@@ -1270,8 +1318,16 @@ describe('organization admin router', () => {
 
     it('rejects hierarchy cycles', async () => {
       const searchPrefix = `Admin Hierarchy Cycle ${crypto.randomUUID()}`;
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
-      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
 
       try {
         await db
@@ -1301,11 +1357,20 @@ describe('organization admin router', () => {
 
     it('rejects adding child organizations to a child organization', async () => {
       const searchPrefix = `Admin Child Parent ${crypto.randomUUID()}`;
-      const rootOrganization = await createOrganization(`${searchPrefix} root`, adminUser.id);
-      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
-      const newChildOrganization = await createOrganization(
+      const rootOrganization = await createTestOrganization(
+        `${searchPrefix} root`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
+      const newChildOrganization = await createTestOrganization(
         `${searchPrefix} new child`,
-        adminUser.id
+        adminUser.id,
+        0
       );
 
       try {
@@ -1351,14 +1416,20 @@ describe('organization admin router', () => {
 
     it('rejects adding a parent to an organization with child organizations', async () => {
       const searchPrefix = `Admin Parent Child ${crypto.randomUUID()}`;
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
-      const existingParentOrganization = await createOrganization(
-        `${searchPrefix} existing parent`,
-        adminUser.id
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
       );
-      const existingChildOrganization = await createOrganization(
+      const existingParentOrganization = await createTestOrganization(
+        `${searchPrefix} existing parent`,
+        adminUser.id,
+        0
+      );
+      const existingChildOrganization = await createTestOrganization(
         `${searchPrefix} existing child`,
-        adminUser.id
+        adminUser.id,
+        0
       );
 
       try {
@@ -1394,9 +1465,10 @@ describe('organization admin router', () => {
     });
 
     it('rejects self-parenting', async () => {
-      const organization = await createOrganization(
+      const organization = await createTestOrganization(
         `Admin Hierarchy Self Parent ${crypto.randomUUID()}`,
-        adminUser.id
+        adminUser.id,
+        0
       );
 
       try {
@@ -1450,9 +1522,13 @@ describe('organization admin router', () => {
         futureIsEffective?: boolean;
       }) {
         const prefix = `Kilo Pass hierarchy ${crypto.randomUUID()}`;
-        const parent = await createOrganization(`${prefix} parent`, adminUser.id);
-        const child = await createOrganization(`${prefix} child`, adminUser.id);
-        const replacementParent = await createOrganization(`${prefix} replacement`, adminUser.id);
+        const parent = await createTestOrganization(`${prefix} parent`, adminUser.id, 0);
+        const child = await createTestOrganization(`${prefix} child`, adminUser.id, 0);
+        const replacementParent = await createTestOrganization(
+          `${prefix} replacement`,
+          adminUser.id,
+          0
+        );
         organizationIds.push(parent.id, child.id, replacementParent.id);
         await db
           .update(organizations)
@@ -1666,12 +1742,21 @@ describe('organization admin router', () => {
   describe('list — trial active filter', () => {
     it('uses effective trial end date and trial_active threshold', async () => {
       const searchPrefix = `Admin Trial Active ${crypto.randomUUID()}`;
-      const fallbackActiveOrg = await createOrganization(`${searchPrefix} fallback`, adminUser.id);
-      const explicitActiveOrg = await createOrganization(
-        `${searchPrefix} explicit active`,
-        adminUser.id
+      const fallbackActiveOrg = await createTestOrganization(
+        `${searchPrefix} fallback`,
+        adminUser.id,
+        0
       );
-      const endingSoonOrg = await createOrganization(`${searchPrefix} ending soon`, adminUser.id);
+      const explicitActiveOrg = await createTestOrganization(
+        `${searchPrefix} explicit active`,
+        adminUser.id,
+        0
+      );
+      const endingSoonOrg = await createTestOrganization(
+        `${searchPrefix} ending soon`,
+        adminUser.id,
+        0
+      );
 
       try {
         await db
@@ -1727,8 +1812,8 @@ describe('organization admin router', () => {
   describe('list — organization Kilo Pass tier sorting', () => {
     it('sorts by the organization-owned agreement tier selected for display', async () => {
       const searchPrefix = `Admin Kilo Pass Sort ${crypto.randomUUID()}`;
-      const tier19Org = await createOrganization(`${searchPrefix} tier 19`, adminUser.id);
-      const tier49Org = await createOrganization(`${searchPrefix} tier 49`, adminUser.id);
+      const tier19Org = await createTestOrganization(`${searchPrefix} tier 19`, adminUser.id, 0);
+      const tier49Org = await createTestOrganization(`${searchPrefix} tier 49`, adminUser.id, 0);
       const termVersionIds: string[] = [];
       const agreementIds: string[] = [];
 
@@ -1822,7 +1907,7 @@ describe('organization admin router', () => {
 
   describe('serviceFeeExemption', () => {
     async function createExemptionTestOrganization(name = 'Service fee exemption') {
-      return createOrganization(`${name} ${crypto.randomUUID()}`, adminUser.id);
+      return createTestOrganization(`${name} ${crypto.randomUUID()}`, adminUser.id, 0);
     }
 
     async function cleanupExemptionTestOrganization(organizationId: string) {
@@ -2037,9 +2122,10 @@ describe('organization admin router', () => {
     });
 
     it('does not expose exemption fields through customer organization APIs', async () => {
-      const org = await createOrganization(
+      const org = await createTestOrganization(
         `Customer surface ${crypto.randomUUID()}`,
-        nonAdminUser.id
+        nonAdminUser.id,
+        0
       );
       try {
         const adminCaller = await createCallerForUser(adminUser.id);
@@ -2066,13 +2152,15 @@ describe('organization admin router', () => {
 
   describe('getKiloPassSummary', () => {
     it('returns the parent agreement as read-only information for a child organization', async () => {
-      const parent = await createOrganization(
+      const parent = await createTestOrganization(
         `Admin pass parent ${crypto.randomUUID()}`,
-        adminUser.id
+        adminUser.id,
+        0
       );
-      const child = await createOrganization(
+      const child = await createTestOrganization(
         `Admin pass child ${crypto.randomUUID()}`,
-        adminUser.id
+        adminUser.id,
+        0
       );
       await db
         .update(organizations)

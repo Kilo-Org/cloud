@@ -71,7 +71,6 @@ import { adminShellSecurityContentRouter } from '@/routers/admin/shell-security-
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
-import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
 import { adminModelTrafficRouter } from '@/routers/admin/model-traffic-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
 import { adminUserDataExportsRouter } from '@/routers/admin/user-data-exports-router';
@@ -289,6 +288,10 @@ function isKiloClawCancelDesiredState(params: {
 
 function parseJsonSafe(text: string): unknown {
   return JSON.parse(text) as unknown;
+}
+
+function isManualProviderSyncEnabled(): boolean {
+  return process.env.VERCEL_ENV !== 'production';
 }
 
 const AddNoteSchema = z.object({
@@ -2276,7 +2279,14 @@ export const adminRouter = createTRPCRouter({
   }),
 
   syncProviders: createTRPCRouter({
+    getManualSyncEnabled: adminProcedure.query(() => isManualProviderSyncEnabled()),
     triggerSync: adminProcedure.mutation(async () => {
+      if (!isManualProviderSyncEnabled()) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Manual provider sync is disabled in production; the cron handles syncing.',
+        });
+      }
       const result = await syncAndStoreProviders();
       return result;
     }),
@@ -2604,7 +2614,6 @@ export const adminRouter = createTRPCRouter({
   // Backing router renamed to `adminShellSecurityContentRouter` as part of
   // the shell-security rebrand; the key/symbol asymmetry is intentional.
   securityAdvisorContent: adminShellSecurityContentRouter,
-  freeModelUsage: adminFreeModelUsageRouter,
   modelTraffic: adminModelTrafficRouter,
   modelEvalIngest: adminModelEvalIngestRouter,
   userDataExports: adminUserDataExportsRouter,

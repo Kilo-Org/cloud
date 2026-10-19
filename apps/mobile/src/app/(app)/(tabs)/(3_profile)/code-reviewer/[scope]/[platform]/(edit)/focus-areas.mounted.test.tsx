@@ -10,8 +10,8 @@ import '@/i18n';
 import FocusAreasRoute from './focus-areas';
 import {
   renderWithProviders,
-  waitFor,
   type RenderWithProvidersResult,
+  waitFor,
 } from '@/test/render-with-providers';
 const state = vi.hoisted(() => ({
   config: null as unknown,

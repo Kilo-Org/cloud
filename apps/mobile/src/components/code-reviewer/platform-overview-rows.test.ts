@@ -5,6 +5,9 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
+import { buildOverviewRows } from './platform-overview-rows';
+
 import '@/i18n';
 
 // The pure project cannot parse the icon chain (react-native's Flow
@@ -19,16 +22,10 @@ vi.mock('@/components/ui/icons', () => ({
   ShieldCheck: 'ShieldCheck',
 }));
 
-import {
-  PLATFORM_CAPABILITIES,
-  type ReviewConfigData,
-} from '@/lib/code-reviewer-config';
-import { buildOverviewRows } from './platform-overview-rows';
-
 const capabilities = PLATFORM_CAPABILITIES.github;
 
 function makeConfig(over: Partial<ReviewConfigData> = {}): ReviewConfigData {
-  return {
+  const base = {
     isEnabled: true,
     reviewStyle: 'balanced',
     focusAreas: [],
@@ -39,21 +36,22 @@ function makeConfig(over: Partial<ReviewConfigData> = {}): ReviewConfigData {
     repositorySelectionMode: 'all',
     selectedRepositoryIds: [],
     ...over,
-  } as ReviewConfigData;
+  } satisfies Partial<ReviewConfigData>;
+  return base as ReviewConfigData;
 }
 
 function focusSubtitle(config: ReviewConfigData): string {
-  const row = buildOverviewRows({
+  const focusRow = buildOverviewRows({
     data: config,
     capabilities,
     models: [],
     modelsLoading: false,
-    onOpenModelPicker: () => {},
+    onOpenModelPicker: () => undefined,
   }).find(row => row.field === 'focus-areas');
-  if (!row) {
+  if (!focusRow) {
     throw new Error('focus-areas row not found');
   }
-  return row.subtitle;
+  return focusRow.subtitle;
 }
 
 describe('buildOverviewRows focus-area labels', () => {
@@ -78,8 +76,6 @@ describe('buildOverviewRows focus-area labels', () => {
   });
 
   it('treats an area named after an inherited object member as unknown, not a label', () => {
-    expect(focusSubtitle(makeConfig({ focusAreas: ['constructor'] }))).toBe(
-      'Other (constructor)'
-    );
+    expect(focusSubtitle(makeConfig({ focusAreas: ['constructor'] }))).toBe('Other (constructor)');
   });
 });

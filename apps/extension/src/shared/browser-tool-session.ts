@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
+import { redactSensitiveBody, redactSensitiveHeaders } from './browser-tool-redaction';
 import {
   DEBUGGER_PROTOCOL_VERSION,
   discoverWebMcpToolsInTab,
@@ -1213,13 +1214,17 @@ const formatNetworkRequestDetail = (request: BrowserNetworkRequest): string => {
     lines.push(`mimeType: ${request.mimeType}`);
   }
   if (request.requestHeaders !== undefined) {
-    lines.push(`request headers: ${JSON.stringify(request.requestHeaders)}`);
+    lines.push(
+      `request headers: ${JSON.stringify(redactSensitiveHeaders(request.requestHeaders))}`
+    );
   }
   if (request.responseHeaders !== undefined) {
-    lines.push(`response headers: ${JSON.stringify(request.responseHeaders)}`);
+    lines.push(
+      `response headers: ${JSON.stringify(redactSensitiveHeaders(request.responseHeaders))}`
+    );
   }
   if (request.postData !== undefined) {
-    lines.push(`request body: ${request.postData}`);
+    lines.push(`request body: ${redactSensitiveBody(request.postData) ?? request.postData}`);
   }
 
   return lines.join('\n');

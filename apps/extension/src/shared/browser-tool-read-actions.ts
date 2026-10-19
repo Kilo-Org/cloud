@@ -14,6 +14,7 @@ import {
 import type { BrowserAriaSnapshotLine, BrowserToolPageSession } from './browser-tool-snapshot';
 import type { EvalTabResult } from './tab-debugger';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
+import { redactSensitiveBody, redactSensitiveHeaders } from './browser-tool-redaction';
 
 /**
  * The eight upstream Playwright MCP read-only tools (`readOnlyHint: true`),
@@ -368,11 +369,13 @@ const formatNetworkRequestLine = (request: BrowserNetworkRequest, position: numb
 };
 
 const formatHeaders = (headers: Readonly<Record<string, string>> | undefined): string => {
-  if (headers === undefined) {
+  const redacted = redactSensitiveHeaders(headers);
+
+  if (redacted === undefined) {
     return '(none)';
   }
 
-  const entries = Object.entries(headers);
+  const entries = Object.entries(redacted);
 
   return entries.length === 0
     ? '(none)'
@@ -400,7 +403,11 @@ const requestPartText = async (
   }
 
   if (part === 'request-body') {
-    return request.postData === undefined || request.postData === '' ? '(none)' : request.postData;
+    if (request.postData === undefined || request.postData === '') {
+      return '(none)';
+    }
+
+    return redactSensitiveBody(request.postData) ?? request.postData;
   }
 
   if (part === 'response-headers') {
@@ -435,7 +442,7 @@ const formatRequestDetails = (request: BrowserNetworkRequest, position: number):
     formatHeaders(request.requestHeaders),
     'Response headers:',
     formatHeaders(request.responseHeaders),
-    `Request body: ${request.postData === undefined || request.postData === '' ? '(none)' : request.postData}`,
+    `Request body: ${request.postData === undefined || request.postData === '' ? '(none)' : "(use part: 'request-body')"}`,
   ].join('\n');
 };
 

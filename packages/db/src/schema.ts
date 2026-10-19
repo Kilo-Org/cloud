@@ -7211,7 +7211,7 @@ export const openai_chatgpt_connections = pgTable(
     /**
      * True for the organization's shared-services connection: one row per
      * organization, used by the platform's own callers (code reviewer, Slack
-     * bot, auto-triage) instead of any member's personal connection. The
+     * bot) instead of any member's personal connection. The
      * connecting person is recorded in `kilo_user_id` and `created_by`.
      */
     is_shared_services: boolean().default(false).notNull(),
@@ -8133,137 +8133,6 @@ export const slack_bot_requests = pgTable(
 
 export type SlackBotRequest = typeof slack_bot_requests.$inferSelect;
 export type NewSlackBotRequest = typeof slack_bot_requests.$inferInsert;
-
-// Auto Triage
-export const auto_triage_tickets = pgTable(
-  'auto_triage_tickets',
-  {
-    id: idPrimaryKeyColumn,
-
-    // Ownership (exactly one must be set)
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-    }),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
-    }),
-
-    // Platform integration
-    platform_integration_id: uuid().references(() => platform_integrations.id, {
-      onDelete: 'set null',
-    }),
-
-    // GitHub metadata
-    platform: text().notNull().default('github'),
-    repo_full_name: text().notNull(),
-    issue_number: integer().notNull(),
-    issue_url: text().notNull(),
-    issue_title: text().notNull(),
-    issue_body: text(),
-    issue_author: text().notNull(),
-    issue_type: text().notNull().$type<'issue' | 'pull_request'>(),
-    issue_labels: text()
-      .array()
-      .default(sql`'{}'`),
-
-    // Classification results
-    classification: text().$type<'bug' | 'feature' | 'question' | 'duplicate' | 'unclear'>(),
-    confidence: decimal({ precision: 3, scale: 2 }),
-    intent_summary: text(),
-    related_files: text().array(),
-
-    // Duplicate detection
-    is_duplicate: boolean().default(false),
-    duplicate_of_ticket_id: uuid().references((): AnyPgColumn => auto_triage_tickets.id),
-    similarity_score: decimal({ precision: 3, scale: 2 }),
-    qdrant_point_id: text(), // MD5 hash
-
-    // Triage session
-    session_id: text(),
-
-    // Status
-    status: text()
-      .notNull()
-      .default('pending')
-      .$type<'pending' | 'analyzing' | 'actioned' | 'failed' | 'skipped'>(),
-    action_taken: text().$type<
-      'pr_created' | 'comment_posted' | 'closed_duplicate' | 'needs_clarification'
-    >(),
-    action_metadata: jsonb(),
-    error_message: text(),
-
-    // Timestamps
-    started_at: timestamp({ withTimezone: true, mode: 'string' }),
-    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    // Unique index on repo and issue number
-    uniqueIndex('UQ_auto_triage_tickets_repo_issue').on(table.repo_full_name, table.issue_number),
-    // Indexes for ownership lookups
-    index('IDX_auto_triage_tickets_owned_by_org').on(table.owned_by_organization_id),
-    index('IDX_auto_triage_tickets_owned_by_user').on(table.owned_by_user_id),
-    // Indexes for status and filtering
-    index('IDX_auto_triage_tickets_status').on(table.status),
-    index('IDX_auto_triage_tickets_created_at').on(table.created_at),
-    index('IDX_auto_triage_tickets_qdrant_point_id').on(table.qdrant_point_id),
-    // Composite indexes for common query patterns
-    index('IDX_auto_triage_tickets_owner_status_created').on(
-      table.owned_by_organization_id,
-      table.status,
-      table.created_at
-    ),
-    index('IDX_auto_triage_tickets_user_status_created').on(
-      table.owned_by_user_id,
-      table.status,
-      table.created_at
-    ),
-    index('IDX_auto_triage_tickets_repo_classification').on(
-      table.repo_full_name,
-      table.classification,
-      table.created_at
-    ),
-    // Owner check constraint (exactly one must be set)
-    check(
-      'auto_triage_tickets_owner_check',
-      sql`(
-        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
-        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
-      )`
-    ),
-    // CHECK constraints for enums and ranges
-    check(
-      'auto_triage_tickets_issue_type_check',
-      sql`${table.issue_type} IN ('issue', 'pull_request')`
-    ),
-    check(
-      'auto_triage_tickets_classification_check',
-      sql`${table.classification} IN ('bug', 'feature', 'question', 'duplicate', 'unclear')`
-    ),
-    check(
-      'auto_triage_tickets_confidence_check',
-      sql`${table.confidence} >= 0 AND ${table.confidence} <= 1`
-    ),
-    check(
-      'auto_triage_tickets_similarity_score_check',
-      sql`${table.similarity_score} >= 0 AND ${table.similarity_score} <= 1`
-    ),
-    check(
-      'auto_triage_tickets_status_check',
-      sql`${table.status} IN ('pending', 'analyzing', 'actioned', 'failed', 'skipped')`
-    ),
-    check(
-      'auto_triage_tickets_action_taken_check',
-      sql`${table.action_taken} IN ('pr_created', 'comment_posted', 'closed_duplicate', 'needs_clarification')`
-    ),
-  ]
-);
-
-export type AutoTriageTicket = typeof auto_triage_tickets.$inferSelect;
 
 // ============ AGENT ENVIRONMENT PROFILES ============
 // Profiles for storing reusable environment configurations for cloud-agent sessions

@@ -26,6 +26,7 @@ import {
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   wrapInSafeNextResponse,
+  zeroDataRetentionByokResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -59,7 +60,10 @@ import {
   validateEmbeddingDimensions,
 } from '@kilocode/web-shared/lib/ai-gateway/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import {
+  getVercelInferenceProviderConfigForUserByok,
+  isZeroDataRetentionUnsupportedForByok,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   OrganizationPlan,
@@ -356,6 +360,11 @@ export async function handleEmbeddingsRequest(
     requestPrivacy.data,
     organizationDataCollection
   );
+
+  if (isZeroDataRetentionUnsupportedForByok(provider.id, userByok, effectivePrivacy)) {
+    return zeroDataRetentionByokResponse();
+  }
+
   const upstreamBody = buildUpstreamBody(
     {
       ...requestBodyParsed,
@@ -376,7 +385,6 @@ export async function handleEmbeddingsRequest(
       gateway: {
         only: Object.keys(byokProviders),
         byok: byokProviders,
-        zeroDataRetention: effectivePrivacy.zdr,
         disallowPromptTraining: effectivePrivacy.data_collection === 'deny' || undefined,
       },
     };

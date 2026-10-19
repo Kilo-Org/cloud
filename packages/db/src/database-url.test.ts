@@ -3,7 +3,15 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';
 
 const originalCa = process.env.DATABASE_CA;
-const originalEnv = { ...process.env };
+const originalEnv = {
+  NODE_ENV: process.env.NODE_ENV,
+  JEST_WORKER_ID: process.env.JEST_WORKER_ID,
+  POSTGRES_URL: process.env.POSTGRES_URL,
+};
+
+function withEnv(name: string, value: string | undefined): void {
+  Object.defineProperty(process.env, name, { value, configurable: true });
+}
 
 afterEach(() => {
   if (originalCa === undefined) {
@@ -11,16 +19,16 @@ afterEach(() => {
   } else {
     process.env.DATABASE_CA = originalCa;
   }
-  process.env.NODE_ENV = originalEnv.NODE_ENV;
-  process.env.JEST_WORKER_ID = originalEnv.JEST_WORKER_ID;
-  process.env.POSTGRES_URL = originalEnv.POSTGRES_URL;
+  withEnv('NODE_ENV', originalEnv.NODE_ENV);
+  withEnv('JEST_WORKER_ID', originalEnv.JEST_WORKER_ID);
+  withEnv('POSTGRES_URL', originalEnv.POSTGRES_URL);
 });
 
 describe('computeDatabaseUrl', () => {
   it('appends the jest worker id to the database name, not the query string', () => {
-    process.env.NODE_ENV = 'test';
-    process.env.JEST_WORKER_ID = '3';
-    process.env.POSTGRES_URL = 'postgres://user:secret@db.example.com:5432/mydb?sslmode=require';
+    withEnv('NODE_ENV', 'test');
+    withEnv('JEST_WORKER_ID', '3');
+    withEnv('POSTGRES_URL', 'postgres://user:secret@db.example.com:5432/mydb?sslmode=require');
 
     expect(computeDatabaseUrl()).toBe(
       'postgres://user:secret@db.example.com:5432/mydb-3?sslmode=require'
@@ -28,8 +36,8 @@ describe('computeDatabaseUrl', () => {
   });
 
   it('returns the configured URL untouched outside test runs', () => {
-    process.env.NODE_ENV = 'development';
-    process.env.POSTGRES_URL = 'postgres://user:secret@db.example.com:5432/mydb?sslmode=require';
+    withEnv('NODE_ENV', 'development');
+    withEnv('POSTGRES_URL', 'postgres://user:secret@db.example.com:5432/mydb?sslmode=require');
 
     expect(computeDatabaseUrl()).toBe(
       'postgres://user:secret@db.example.com:5432/mydb?sslmode=require'

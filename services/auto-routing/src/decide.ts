@@ -2,6 +2,7 @@ import {
   ClassifierOutputSchema,
   MirrorPayloadSchema,
   DEFAULT_AUTO_ROUTER,
+  isCustomRouterModelId,
   poolEntryKey,
   taxonomyRouteKey,
   type AutoRoutingDecision,
@@ -902,8 +903,13 @@ async function decideCustomRouter(
     const owner = customRouterOwner(reference, payload);
     const stored = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
     if (!stored) throw new CustomRouterError('router_not_found', 'Custom router not found');
+    // A platform alias resolved to its canonical pool keeps platform mode precedence (ADR 0005).
+    const platformMode =
+      stored.legacyPool && !isCustomRouterModelId(payload.input.requestedModel.toLowerCase())
+        ? (await resolveLegacyPoolRouting(c.env, payload))?.mode
+        : undefined;
     const routing = customRouting(
-      stored,
+      platformMode ? { ...stored, mode: platformMode } : stored,
       payload.clientEntries ?? [],
       new Set(payload.routingPolicy?.deniedModelIds ?? [])
     );

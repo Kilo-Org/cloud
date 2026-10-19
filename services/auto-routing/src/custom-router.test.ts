@@ -866,6 +866,48 @@ describe('internal custom router decide', () => {
     expect(platformModes.get(`user:${USER_ID}`)).toBe('cost_per_accuracy');
   });
 
+  it('uses platform mode for a gateway-resolved platform alias and the row mode for the explicit custom ID', async () => {
+    const canonical = customRouter({
+      slug: 'efficient',
+      legacyPool: true,
+      legacyModeInherited: true,
+      mode: 'best_accuracy',
+    });
+    findLegacyPoolRouter.mockResolvedValue(canonical);
+    findCustomRouter.mockResolvedValue(canonical);
+    platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
+    customTable = table({
+      [ROUTE]: [
+        {
+          model: 'client:ollama/qwen3:32b',
+          accuracy: 0.8,
+          avgCostUsd: 0,
+          meetsThreshold: true,
+          variant: null,
+        },
+        { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+      ],
+    });
+    const clientEntries = [{ provider: 'ollama', model: 'qwen3:32b' }];
+    const reference = { scope: 'user', slug: 'efficient' } as const;
+    const gatewayAlias = await internalDecide(
+      { customRouter: reference, clientEntries },
+      'kilo-auto/efficient'
+    );
+    const explicit = await internalDecide(
+      { customRouter: reference, clientEntries },
+      'kilo-auto/custom/efficient'
+    );
+    expect(gatewayAlias.status).toBe(200);
+    expect(explicit.status).toBe(200);
+    await expect(gatewayAlias.json()).resolves.toMatchObject({
+      decision: { model: 'client:ollama/qwen3:32b', fallback: false },
+    });
+    await expect(explicit.json()).resolves.toMatchObject({
+      decision: { model: SONNET, fallback: false },
+    });
+  });
+
   it('never falls back outside a migrated legacy pool when policy denies its only gateway entry', async () => {
     findLegacyPoolRouter.mockResolvedValue(
       customRouter({ slug: 'efficient', legacyPool: true, entries: [sonnet] })

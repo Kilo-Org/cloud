@@ -1056,6 +1056,52 @@ describe('resolveAutoModel — custom routers', () => {
     });
   });
 
+  it('uses the shared migrated pool when Organization Auto targets Balanced', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        apiKind: 'chat_completions',
+        legacyPoolRouter: async () => ({ scope: 'org', slug: 'efficient' }),
+        customRouterDecision: okDecide(),
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: {
+              routes: {},
+              fallback_model: KILO_AUTO_BALANCED_MODEL.id,
+            },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: haiku, reasoning: { enabled: true, effort: 'max' }, verbosity: 'max' },
+      routingTarget: KILO_AUTO_BALANCED_MODEL.id,
+    });
+  });
+
+  it('fails closed when the migrated-pool lookup fails before Efficient resolution', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        legacyPoolRouter: async () => {
+          throw new Error('storage unavailable');
+        },
+        efficientDecision: async () => sampleDecision,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+    expect(result).toEqual({ kind: 'auto_routing_unavailable' });
+  });
+
   it('resolves an Organization Auto route to an organization custom router', async () => {
     mockedFindCustomRouter.mockResolvedValue(orgRouter);
     const decide = okDecide();

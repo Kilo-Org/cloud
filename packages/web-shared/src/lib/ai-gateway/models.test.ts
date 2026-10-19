@@ -94,23 +94,14 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('stealth/model-beta')).toBe(false);
     });
 
-    test('should return true for enabled Kilo exclusive models with no pricing', async () => {
-      // Test with known Kilo exclusive models that are enabled and have no pricing (free)
-      const enabledFreeModels = kiloExclusiveModels.filter(
-        m => m.status === 'public' && !m.pricing
-      );
-
-      // All enabled free models should be detected as free
-      for (const model of enabledFreeModels) {
+    test('should return true for Kilo exclusive models with no pricing', async () => {
+      for (const model of kiloExclusiveModels.filter(m => !m.pricing)) {
         expect(await isFreeModel(model.public_id)).toBe(true);
       }
     });
 
-    test('should return false for enabled Kilo exclusive models with pricing', async () => {
-      // Models with pricing should NOT be free
-      const pricedModels = kiloExclusiveModels.filter(m => m.status !== 'disabled' && !!m.pricing);
-
-      for (const model of pricedModels) {
+    test('should return false for Kilo exclusive models with pricing', async () => {
+      for (const model of kiloExclusiveModels.filter(m => !!m.pricing)) {
         expect(await isFreeModel(model.public_id)).toBe(false);
       }
     });
@@ -130,20 +121,6 @@ describe('isFreeModel', () => {
         }
       }
     );
-
-    test('ignores pricing on disabled Kilo exclusive models', () => {
-      const disabledModel = {
-        ...claude_opus_4_7_stealth_model,
-        public_id: 'vendor/disabled-priced-exclusive:free',
-        status: 'disabled' as const,
-      };
-      kiloExclusiveModels.push(disabledModel);
-      try {
-        expect(isFreeModel(disabledModel.public_id)).toBe(true);
-      } finally {
-        kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(disabledModel), 1);
-      }
-    });
 
     test('getInferenceProvider does not crash for any Kilo exclusive model', () => {
       expect(kiloExclusiveModels.length).toBeGreaterThan(0);

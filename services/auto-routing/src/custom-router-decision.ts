@@ -133,12 +133,13 @@ function entryCapabilities(entry: CustomRouterEntry): ModelCapabilities | null {
 export function customRouterTarget(
   env: Env,
   waitUntil: (promise: Promise<unknown>) => void,
-  routing: CustomRouting
+  routing: CustomRouting,
+  requestedModel = customRouterModelId(routing.router.ownerType, routing.router.slug)
 ): DecisionTarget {
   const { router } = routing;
   return {
     scope: customRouterDecisionScope(router.id),
-    requestedModel: customRouterModelId(router.ownerType, router.slug),
+    requestedModel,
     deniedModelIds: routing.deniedModelIds,
     loadRouting: async timings => {
       const tableStartedAt = performance.now();

@@ -122,8 +122,9 @@ export function PrReviewCommentComposerScreen() {
           },
         },
       ],
-      // Android back dismisses and leaves the composer on its empty edit
-      // state; the formSheet's own back still navigates out from there.
+      // Android back dismisses the alert and leaves the composer exactly as
+      // the OK button does: onDismiss routes the dismissal through
+      // router.back, matching the OK press.
       {
         cancelable: true,
         onDismiss: () => {

@@ -195,6 +195,11 @@ async function handleConnect(
         expectedAudience: canonicalUrl,
       });
     } catch {
+      // The credential did not verify, so the runtime windows do not apply:
+      // charge the request to the client-IP window before challenging.
+      phase = 'limit_anonymous';
+      const limited = await enforceAnonymousClientLimit(c);
+      if (limited) return limited;
       return challengeResponse(c, canonicalUrl);
     }
     if (!parseScopeString(claims.scope).includes(GatewayMcpAccessScope)) {

@@ -451,6 +451,21 @@ describe('MCP gateway route surface', () => {
     expect(mockRuntimeLimit).not.toHaveBeenCalled();
   });
 
+  it('charges the client-IP window when a bearer credential does not verify', async () => {
+    mockVerifyGatewayToken.mockRejectedValue(new Error('bad token'));
+
+    const response = await app.request(
+      `https://mcp.kilosessions.ai${userRoute}`,
+      { headers: { Authorization: 'Bearer unverified-credential' } },
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockUnauthLimit).toHaveBeenCalledTimes(1);
+    expect(mockRuntimeLimit).not.toHaveBeenCalled();
+    expect(mockResolveActiveRoute).not.toHaveBeenCalled();
+  });
+
   it('returns 429 on the runtime path when the per-user limit is exhausted', async () => {
     mockVerifyGatewayToken.mockResolvedValue(validMcpAccessToken());
     mockRuntimeLimit.mockImplementation(({ key }: { key: string }) =>

@@ -4,7 +4,7 @@ import {
   isEmailBlacklistedByDomainAsync,
   isBlockedTLD,
 } from '@kilocode/web-shared/lib/user/server';
-import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
+import { findUserByNormalizedEmail } from '@/lib/user';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 
 jest.mock('@vercel/firewall', () => ({
@@ -16,7 +16,6 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
 }));
 jest.mock('@/lib/user', () => ({
   findUserByNormalizedEmail: jest.fn(),
-  getWorkOSOrganization: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({
   resolveSsoAuthorityForDomain: jest.fn(),

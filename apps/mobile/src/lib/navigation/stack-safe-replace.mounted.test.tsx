@@ -184,6 +184,168 @@ describe('useStackSafeReplace', () => {
     });
   });
 
+  it('retires every replaced source when a second replace runs before the first transition ends', () => {
+    const renderer = mount();
+
+    latestReplace?.('/(app)/agent-chat/ses_1');
+    setStack(
+      [
+        { key: 'tabs-1', name: '(tabs)' },
+        { key: 'new-1', name: 'agent-chat/new' },
+        { key: 'session-1', name: 'agent-chat/[session-id]' },
+      ],
+      2
+    );
+    latestReplace?.('/(app)/agent-chat/ses_2');
+    setStack(
+      [
+        { key: 'tabs-1', name: '(tabs)' },
+        { key: 'new-1', name: 'agent-chat/new' },
+        { key: 'session-1', name: 'agent-chat/[session-id]' },
+        { key: 'session-2', name: 'agent-chat/[session-id]' },
+      ],
+      3
+    );
+
+    act(() => {
+      nav.transitionEnd?.();
+    });
+
+    // One cleanup retires both sources at once, so back skips past every
+    // replaced screen — the end state a chain of `router.replace` would leave.
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    expect(resetMock.mock.calls[0]?.[0]).toEqual({
+      routes: [
+        { key: 'tabs-1', name: '(tabs)' },
+        { key: 'session-2', name: 'agent-chat/[session-id]' },
+      ],
+      index: 1,
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps working across chained replaces that each get their own transition', () => {
+    const renderer = mount();
+
+    latestReplace?.('/(app)/agent-chat/ses_1');
+    setStack(
+      [
+        { key: 'tabs-1', name: '(tabs)' },
+        { key: 'new-1', name: 'agent-chat/new' },
+        { key: 'session-1', name: 'agent-chat/[session-id]' },
+      ],
+      2
+    );
+    act(() => {
+      nav.transitionEnd?.();
+    });
+    expect(resetMock).toHaveBeenCalledTimes(1);
+
+    latestReplace?.('/(app)/agent-chat/ses_2');
+    setStack(
+      [
+        { key: 'tabs-1', name: '(tabs)' },
+        { key: 'session-1', name: 'agent-chat/[session-id]' },
+        { key: 'session-2', name: 'agent-chat/[session-id]' },
+      ],
+      2
+    );
+    act(() => {
+      nav.transitionEnd?.();
+    });
+
+    expect(resetMock.mock.calls[1]?.[0]).toEqual({
+      routes: [
+        { key: 'tabs-1', name: '(tabs)' },
+        { key: 'session-2', name: 'agent-chat/[session-id]' },
+      ],
+      index: 1,
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('retires the sources still on the stack and skips ones that left another way', () => {
+    setStack(
+      [
+        { key: 'new-1', name: 'agent-chat/new' },
+        { key: 'new-2', name: 'agent-chat/new' },
+      ],
+      1
+    );
+    const renderer = mount();
+
+    latestReplace?.('/(app)/agent-chat/ses_1');
+    setStack(
+      [
+        { key: 'new-1', name: 'agent-chat/new' },
+        { key: 'new-2', name: 'agent-chat/new' },
+        { key: 'session-1', name: 'agent-chat/[session-id]' },
+      ],
+      2
+    );
+    // The user backs out of the pushed screen and the source before the first
+    // transition ends, so `new-2` and `session-1` both leave the stack.
+    setStack([{ key: 'new-1', name: 'agent-chat/new' }], 0);
+    latestReplace?.('/(app)/agent-chat/ses_2');
+    setStack(
+      [
+        { key: 'new-1', name: 'agent-chat/new' },
+        { key: 'session-2', name: 'agent-chat/[session-id]' },
+      ],
+      1
+    );
+
+    act(() => {
+      nav.transitionEnd?.();
+    });
+
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    // `new-2` is gone, so only `new-1`, the source of the second replace, is
+    // retired here; the reset leaves the pushed target focused.
+    expect(resetMock.mock.calls[0]?.[0]).toEqual({
+      routes: [{ key: 'session-2', name: 'agent-chat/[session-id]' }],
+      index: 0,
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('does not remove a pending source that the ended transition focused again', () => {
+    setStack([{ key: 'new-1', name: 'agent-chat/new' }], 0);
+    const renderer = mount();
+
+    latestReplace?.('/(app)/agent-chat/ses_1');
+    setStack(
+      [
+        { key: 'new-1', name: 'agent-chat/new' },
+        { key: 'session-1', name: 'agent-chat/[session-id]' },
+      ],
+      1
+    );
+    // The user backed out before the push settled, so the transition that ends
+    // is focused on the pending source itself: dropping it here would tear the
+    // screen the user just navigated back to.
+    setStack([{ key: 'new-1', name: 'agent-chat/new' }], 0);
+
+    act(() => {
+      nav.transitionEnd?.();
+    });
+
+    expect(resetMock).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('leaves the stack alone when the source route is already gone', () => {
     const renderer = mount();
 

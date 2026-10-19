@@ -299,6 +299,25 @@ describe('OrganizationProvider lost-membership recovery', () => {
     unmount();
   });
 
+  it('recovers a stored selection whose very first snapshot already misses it (cold start without read cache)', async () => {
+    // The stored selection names an organization no longer in the list: the
+    // persisted read cache expired, so the first live snapshot is the baseline.
+    storeSelection();
+    hoisted.list.mockResolvedValue([
+      { organizationId: 'org-kept', organizationName: 'Kept org', role: 'member' },
+    ]);
+    const { getCtx, unmount } = await mountProvider();
+
+    // The first settled snapshot arms and switches without a prior good list.
+    await waitFor(() => getCtx().organizationId === 'org-kept');
+    expect(hoisted.setAccountMetadata).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY, 'org-kept');
+    expect(hoisted.toastWarning).toHaveBeenCalledWith(
+      'You no longer have access to this organization. Switched to Kept org.'
+    );
+
+    unmount();
+  });
+
   it('does not re-switch when the user picks another context during recovery', async () => {
     storeSelection();
     hoisted.list.mockResolvedValue([

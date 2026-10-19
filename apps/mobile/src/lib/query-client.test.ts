@@ -281,9 +281,11 @@ describe('organizations.list refresh on permission loss', () => {
       })
     ).rejects.toBe(error);
 
-    // No observer was attached to the list and no refetch was scheduled: the
-    // cached payload is untouched and still fresh.
+    // No observer was attached to the list, no invalidation was scheduled: the
+    // cached payload stays fresh and unmarked, so a later mount refetches
+    // nothing.
     expect(queryClient.getQueryState(LIST_KEY)?.dataUpdatedAt).toBeGreaterThan(0);
+    expect(queryClient.getQueryState(LIST_KEY)?.isInvalidated).toBe(false);
   });
 });
 

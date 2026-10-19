@@ -226,36 +226,29 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     persist,
   ]);
 
-  // Detection: compare each settled, successful list snapshot against the one
-  // the current selection was published with. Only a NEW snapshot missing the
-  // stored organization means the membership vanished server-side; the
-  // selection's own snapshot is valid by construction. The recovery effect
-  // (declared below `setOrganizationId`, which it calls) owns the switch.
-  // Personal (null) needs no recovery, and the default resolution (above)
-  // already switched away from a list that emptied.
+  // Detection: a settled, successful snapshot that no longer names the stored
+  // organization arms the recovery effect (declared below `setOrganizationId`,
+  // which it calls). A pick records the snapshot it was made against (above);
+  // a restored selection has no baseline, so its very first snapshot is
+  // evaluated — a cold start whose list already misses the stored org recovers
+  // instead of trusting the dead selection. Personal (null) and the default
+  // resolution (above) need no detection. The baseline updates only after the
+  // guards pass, so a snapshot observed during an error is re-evaluated once
+  // the error clears.
   useEffect(() => {
     if (!state.isLoaded || !organizationsFetched || organizationsError) {
       selectionListSeen.current = undefined;
       return;
     }
-    if (organizationsFetching) {
+    if (organizationsFetching || state.error !== null || state.organizationId === null) {
       return;
     }
     const snapshot = organizations ?? [];
-    if (selectionListSeen.current === undefined) {
-      // First settled snapshot for this selection: baseline, never stale.
-      selectionListSeen.current = snapshot;
-      return;
-    }
     if (snapshot === selectionListSeen.current) {
       return;
     }
-    selectionListSeen.current = snapshot;
-    const selected = state.organizationId;
-    if (selected === null || state.error !== null) {
-      return;
-    }
-    if (snapshot.some(entry => entry.organizationId === selected)) {
+    if (snapshot.some(entry => entry.organizationId === state.organizationId)) {
+      selectionListSeen.current = snapshot;
       return;
     }
     recoveringRef.current = snapshot[0]?.organizationId ?? null;
@@ -292,7 +285,11 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
   const setOrganizationId = useCallback(
     (id: string | null) => {
       // A manual selection disarms the recovery switch: the user moved first.
+      // The picker only offers orgs from the current snapshot, so that
+      // snapshot is the selection's baseline; the next snapshot missing the
+      // selection means the membership vanished after the pick.
       recoveringRef.current = undefined;
+      selectionListSeen.current = organizations;
       // An explicit selection always settles a pending default, even when it
       // matches the placeholder published while waiting; otherwise the default
       // would publish later and override the user's choice.
@@ -331,7 +328,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       }));
       void persist(id);
     },
-    [token, persist, state.organizationId]
+    [token, persist, state.organizationId, organizations]
   );
 
   // A stored selection can go stale server-side: the host removes the

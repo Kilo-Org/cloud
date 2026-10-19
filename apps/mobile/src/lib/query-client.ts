@@ -241,7 +241,13 @@ function refreshOrganizationsListOnPermissionLoss(
   if (organizationId === undefined || organizationId === null) {
     return;
   }
-  void queryClient.invalidateQueries({ queryKey: [['organizations', 'list']] });
+  // `cancelRefetch: false` keeps one in-flight list fetch alive when several
+  // org-scoped queries fail around the same time, instead of cancelling and
+  // restarting the shared fetch once per denial.
+  void queryClient.invalidateQueries(
+    { queryKey: [['organizations', 'list']] },
+    { cancelRefetch: false }
+  );
 }
 
 /**

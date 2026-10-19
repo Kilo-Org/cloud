@@ -19,14 +19,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
-import { useAvailableModels } from '@/lib/hooks/use-available-models';
-import {
-  PERSONAL_SCOPE,
-  useGitHubStatus,
-  useGitLabStatus,
-  useReviewConfig,
-} from '@/lib/hooks/use-code-reviewer';
+import { useGitHubStatus, useGitLabStatus, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
+import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -78,7 +73,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const [urlError, setUrlError] = useState<string | null>(null);
   const config = useReviewConfig(scope, platform);
   const createReview = useCreateManualReview(scope);
-  const { models } = useAvailableModels(scope === PERSONAL_SCOPE ? undefined : scope);
+  const { models } = useReviewerModels(scope);
   const [modelChoice, setModelChoice] = useState<ModelChoice | null>(null);
   const effectiveModel = modelChoice ?? {
     modelSlug: config.data?.modelSlug ?? '',

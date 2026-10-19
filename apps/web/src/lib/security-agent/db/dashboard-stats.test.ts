@@ -242,7 +242,7 @@ describe('getDashboardStats', () => {
     expect(repoScoped.severity).toEqual({ critical: 0, high: 1, medium: 0, low: 0 });
     expect(repoScoped.sla.overall).toEqual({ total: 1, withinSla: 0, overdue: 1 });
     expect(repoScoped.priorityFinding?.repoFullName).toBe('Kilo-Org/web');
-    expect(repoScoped.overdue.every(o => o.repoFullName === 'Kilo-Org/web')).toBe(true);
+    expect(repoScoped.overdue.map(o => o.repoFullName)).toEqual(['Kilo-Org/web']);
     expect(repoScoped.mttr.bySeverity.medium).toMatchObject({ count: 1 });
     expect(repoScoped.analysis.total).toBe(1);
   });

@@ -51,15 +51,15 @@ to send platform feedback and bug reports rather than a support channel.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**893 procedures** — **380 queries**, **513 mutations** — under **54 prefixes**.
+**891 procedures** — **380 queries**, **511 mutations** — under **54 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
-| `organizations` | 303 | 131 | 172 |
+| `organizations` | 302 | 131 | 171 |
 | `kiloclaw` | 96 | 35 | 61 |
 | `user` | 40 | 15 | 25 |
 | `agentProfiles` | 36 | 4 | 32 |
-| `cloudAgentNext` | 33 | 13 | 20 |
+| `cloudAgentNext` | 32 | 13 | 19 |
 | `securityAgent` | 26 | 15 | 11 |
 | `kiloPass` | 21 | 11 | 10 |
 | `githubPrReview` | 20 | 6 | 14 |
@@ -114,7 +114,7 @@ each row's `summary` and `tags` are what the search matches.
 
 The second path segment of each area that splits, with procedure counts:
 
-- `organizations.*` — 303: `kiloclaw` 66, `cloudAgentNext` 32, `securityAgent` 26, `(direct)` 19, `appBuilder` 17, `deployments` 17, `groups` 14, `reviewAgent` 13, `subscription` 12, `kiloPass` 11, `settings` 11, `autoTriage` 8, `autoFix` 7, `members` 7, `autoTopUp` 6, `bitbucket` 6, `sso` 6, `modes` 5, `subOrganizations` 5, `usageDetails` 5, `securityAuditLog` 4, `auditLogs` 3, `funds` 2, `salesDemo` 1
+- `organizations.*` — 302: `kiloclaw` 66, `cloudAgentNext` 31, `securityAgent` 26, `(direct)` 19, `appBuilder` 17, `deployments` 17, `groups` 14, `reviewAgent` 13, `subscription` 12, `kiloPass` 11, `settings` 11, `autoTriage` 8, `autoFix` 7, `members` 7, `autoTopUp` 6, `bitbucket` 6, `sso` 6, `modes` 5, `subOrganizations` 5, `usageDetails` 5, `securityAuditLog` 4, `auditLogs` 3, `funds` 2, `salesDemo` 1
 
 - `todos.*` — 16: `items` 11, `lists` 5
 

@@ -341,7 +341,7 @@ function countedCall(text, keyStart) {
   ) {
     return null;
   }
-  const first = argsText.slice(0, comma).trim();
+  const first = argsText.slice(0, comma).replace(/\s+/g, ' ').trim();
   const firstArgStart = argsText.length - argsText.trimStart().length;
   const literal = literalKeyArgument(argsText, firstArgStart);
   return literal === null ? { dynamic: first } : { key: literal };
@@ -405,6 +405,7 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'modelChat.mcp.off',
         'modelChat.mcp.unauthorized',
         'modelChat.mcp.unavailable',
+        'modelChat.mcp.unreachable',
       ],
       reason: 'McpStatusKey union in mcp-settings-state.ts; only the count-free statuses',
     },
@@ -419,6 +420,7 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'modelChat.mcp.off',
         'modelChat.mcp.unauthorized',
         'modelChat.mcp.unavailable',
+        'modelChat.mcp.unreachable',
       ],
       reason: 'same McpStatusKey union through kiloServerRow in mcp-settings-state.ts',
     },

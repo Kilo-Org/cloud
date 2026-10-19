@@ -3543,10 +3543,10 @@
     "emptyDescription": "Abuur profile si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
     "loadFailed": "Waa la rari waayay muuqaallada",
     "counts": {
-      "vars_one": "{{count}} doorsoomayaal",
+      "vars_one": "{{count}} doorsoome",
       "vars_other": "{{count}} doorsoomayaal",
       "mcp": "{{count}} MCP",
-      "skills_one": "{{count}} xirfado",
+      "skills_one": "{{count}} xirfad",
       "skills_other": "{{count}} xirfado",
       "commands_one": "{{count}} amar",
       "commands_other": "{{count}} amar",

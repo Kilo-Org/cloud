@@ -3395,7 +3395,7 @@
       "serverToolCount_few": "{{count}} įrankiai",
       "serverToolCount_many": "{{count}} įrankių",
       "serverToolCount_one": "{{count}} įrankis",
-      "serverToolCount_other": "{{count}} įrankių",
+      "serverToolCount_other": "{{count}} įrankiai",
       "serverUnreachable": "Nepavyko pasiekti šio serverio",
       "serverOff": "Šis serveris išjungtas"
     },

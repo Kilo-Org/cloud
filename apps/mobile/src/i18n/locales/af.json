@@ -3310,7 +3310,7 @@
       "settingsToolsOn": "Aan — die instellingsgereedskap word aan die model gestuur",
       "settingsToolsOff": "Af — geen instellingsgereedskap word aan die model gestuur nie",
       "serverChecking": "Kontroleer hierdie bediener…",
-      "serverToolCount_one": "{{count}} gereedskap",
+      "serverToolCount_one": "{{count}} gereedskapstuk",
       "serverToolCount_other": "{{count}} gereedskap",
       "serverUnreachable": "Kon nie hierdie bediener bereik nie",
       "serverOff": "Hierdie bediener is af"

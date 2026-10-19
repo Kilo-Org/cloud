@@ -3544,7 +3544,7 @@
     "loadFailed": "ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "counts": {
       "vars_one": "{{count}} ಅಸ್ಥಿರ",
-      "vars_other": "{{count}} ಅಸ್ಥಿರಗಳು",
+      "vars_other": "{{count}} ಅಸ್ಥಿರ",
       "mcp": "{{count}} MCP",
       "skills_one": "{{count}} ಕೌಶಲ್ಯ",
       "skills_other": "{{count}} ಕೌಶಲ್ಯಗಳು",

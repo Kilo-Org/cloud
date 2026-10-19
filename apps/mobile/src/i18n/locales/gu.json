@@ -3547,7 +3547,7 @@
       "vars_other": "{{count}} ચલો",
       "mcp": "{{count}} MCP",
       "skills_one": "{{count}} કૌશલ્ય",
-      "skills_other": "{{count}} કૌશલ્યો",
+      "skills_other": "{{count}} કૌશલ્ય",
       "commands_one": "{{count}} આદેશ",
       "commands_other": "{{count}} આદેશો",
       "varsShort": "{{count}}ચ",

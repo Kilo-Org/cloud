@@ -3543,7 +3543,7 @@
     "emptyDescription": "Unda wasifu ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote.",
     "loadFailed": "Haikuweza kupakia wasifu",
     "counts": {
-      "vars_one": "{{count}} vigezo",
+      "vars_one": "{{count}} kigezo",
       "vars_other": "{{count}} vigezo",
       "mcp": "{{count}} MCP",
       "skills_one": "{{count}} ujuzi",

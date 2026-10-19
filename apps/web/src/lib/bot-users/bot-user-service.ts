@@ -6,6 +6,7 @@ import { eq, and, isNull, like } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import crypto from 'crypto';
+import { isUniqueViolation } from '@/lib/db-errors';
 import type { BotType } from './types';
 import {
   generateBotUserId,
@@ -130,12 +131,17 @@ async function ensureBotIsOrgMember(botUserId: string, organizationId: string): 
     return;
   }
 
-  // Add bot as organization member
-  await db.insert(organization_memberships).values({
-    organization_id: organizationId,
-    kilo_user_id: botUserId,
-    role: 'member',
-  });
+  // Add bot as organization member; a concurrent insert of the same pair is a no-op.
+  await db
+    .insert(organization_memberships)
+    .values({
+      organization_id: organizationId,
+      kilo_user_id: botUserId,
+      role: 'member',
+    })
+    .onConflictDoNothing({
+      target: [organization_memberships.organization_id, organization_memberships.kilo_user_id],
+    });
 
   logExceptInTest('[ensureBotIsOrgMember] Added bot to organization', {
     botUserId,
@@ -195,17 +201,24 @@ export async function ensureBotUserForOrg(organizationId: string, botType: BotTy
   }
 }
 
-export class InternalBotIdConflictError extends Error {
-  constructor(id: string) {
-    super(`User ${id} exists but is not a bot`);
-    this.name = 'InternalBotIdConflictError';
+/** The `bot-internal-<slug>` id is taken by a row that cannot be used as an internal bot. */
+export class InternalBotUnusableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InternalBotUnusableError';
   }
+}
+
+async function selectUserById(id: string): Promise<User | undefined> {
+  const [user] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, id)).limit(1);
+  return user;
 }
 
 /**
  * Get or create an internal bot user (`bot-internal-<slug>`) and make it a
- * `member` of the organization. Safe to call repeatedly: an existing user or
- * membership is reused. Returns whether the user row was newly created.
+ * `member` of the organization. Safe to call repeatedly and concurrently: an
+ * existing user or membership is reused. A blocked or non-bot row with the id
+ * is refused rather than re-adopted. Returns whether the user row was created.
  */
 export async function ensureInternalBotUser(input: {
   slug: string;
@@ -216,25 +229,36 @@ export async function ensureInternalBotUser(input: {
     throw new Error('Invalid internal bot slug');
   }
   const id = internalBotUserId(input.slug);
-  const [existing] = await db
-    .select()
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, id))
-    .limit(1);
-
-  if (existing && !existing.is_bot) {
-    throw new InternalBotIdConflictError(id);
+  let user = await selectUserById(id);
+  let created = false;
+  if (!user) {
+    try {
+      user = await insertBotUser({
+        id,
+        email: internalBotUserEmail(input.slug),
+        displayName: input.displayName,
+      });
+      created = true;
+    } catch (error) {
+      // A concurrent create won the insert; reuse its row.
+      if (!isUniqueViolation(error)) throw error;
+      user = await selectUserById(id);
+      if (!user) throw error;
+    }
   }
-  const user =
-    existing ??
-    (await insertBotUser({
-      id,
-      email: internalBotUserEmail(input.slug),
-      displayName: input.displayName,
-    }));
+
+  if (!user.is_bot) {
+    throw new InternalBotUnusableError(`User ${id} exists but is not a bot`);
+  }
+  if (user.blocked_at !== null || user.blocked_reason !== null) {
+    throw new InternalBotUnusableError(`Bot user ${id} is blocked`);
+  }
+  if (!user.api_token_pepper?.trim()) {
+    throw new InternalBotUnusableError(`Bot user ${id} has no API token pepper`);
+  }
 
   await ensureBotIsOrgMember(user.id, input.organizationId);
-  return { user, created: !existing };
+  return { user, created };
 }
 
 export async function listInternalBotUsers() {
@@ -245,6 +269,7 @@ export async function listInternalBotUsers() {
       email: kilocode_users.google_user_email,
       createdAt: kilocode_users.created_at,
       blockedAt: kilocode_users.blocked_at,
+      blockedReason: kilocode_users.blocked_reason,
       organizationId: organization_memberships.organization_id,
       role: organization_memberships.role,
     })

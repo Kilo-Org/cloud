@@ -2,11 +2,11 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   ensureInternalBotUser,
-  InternalBotIdConflictError,
+  InternalBotUnusableError,
   listInternalBotUsers,
 } from '@/lib/bot-users/bot-user-service';
 import { INTERNAL_BOT_SLUG_PATTERN } from '@/lib/bot-users/types';
@@ -29,7 +29,7 @@ export const adminInternalBotUsersRouter = createTRPCRouter({
     const [organization] = await db
       .select({ id: organizations.id })
       .from(organizations)
-      .where(eq(organizations.id, input.organizationId))
+      .where(and(eq(organizations.id, input.organizationId), isNull(organizations.deleted_at)))
       .limit(1);
     if (!organization) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
@@ -38,7 +38,7 @@ export const adminInternalBotUsersRouter = createTRPCRouter({
       const { user, created } = await ensureInternalBotUser(input);
       return { id: user.id, created };
     } catch (error) {
-      if (error instanceof InternalBotIdConflictError) {
+      if (error instanceof InternalBotUnusableError) {
         throw new TRPCError({ code: 'CONFLICT', message: error.message });
       }
       throw error;

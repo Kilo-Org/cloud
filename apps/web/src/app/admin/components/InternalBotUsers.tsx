@@ -132,7 +132,7 @@ export function InternalBotUsers() {
                       <TableCell className="font-mono">{bot.organizationId ?? '—'}</TableCell>
                       <TableCell>{bot.role ?? '—'}</TableCell>
                       <TableCell>
-                        {bot.blockedAt ? (
+                        {bot.blockedAt || bot.blockedReason ? (
                           <Badge variant="destructive">Blocked</Badge>
                         ) : (
                           <Badge variant="secondary">Active</Badge>

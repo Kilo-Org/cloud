@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
-import { denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
+import {
+  denyDeviceAuthRequest,
+  getDeviceAuthRequest,
+  isDeviceAuthRequestExpired,
+} from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { checkRateLimit } from '@vercel/firewall';
@@ -11,6 +15,37 @@ import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-t
 type RouteContext = {
   params: Promise<{ code: string }>;
 };
+
+// ──────────────── status-only poll (temporary) ────────────────
+// @ponytail: remove this GET after all shipped clients migrate.
+
+export const GET = withRestTiming(
+  '/api/device-auth/codes/[code]',
+  async (_request: Request, context: RouteContext) => {
+    const { code } = await context.params;
+
+    if (!code) {
+      return NextResponse.json({ error: 'Code parameter is required' }, { status: 400 });
+    }
+
+    const request = await getDeviceAuthRequest(code);
+    if (!request) {
+      return NextResponse.json({ status: 'expired' }, { status: 410 });
+    }
+    if (isDeviceAuthRequestExpired(request) || request.status === 'consumed') {
+      return NextResponse.json({ status: 'expired' }, { status: 410 });
+    }
+    switch (request.status) {
+      case 'pending':
+        return NextResponse.json({ status: 'pending' }, { status: 202 });
+      case 'denied':
+        return NextResponse.json({ status: 'denied' }, { status: 403 });
+      case 'approved':
+      default:
+        return NextResponse.json({ status: 'pending' }, { status: 202 });
+    }
+  }
+);
 
 // ──────────────── deny with viewer token ────────────────
 

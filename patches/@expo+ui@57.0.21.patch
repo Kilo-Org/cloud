@@ -90,7 +90,7 @@ index 2351ee8..e9c590f 100644
  export interface TextProps extends CommonViewModifierProps {
    /**
 diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
-index e90edd3fd6..9389880190 100644
+index e90edd3fd6..c21fd01d18 100644
 --- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 +++ b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 @@ -8,6 +8,7 @@ import android.content.Context
@@ -109,20 +109,10 @@ index e90edd3fd6..9389880190 100644
  import kotlinx.coroutines.withContext
  import kotlin.coroutines.cancellation.CancellationException
  
-@@ -161,6 +163,41 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
+@@ -161,6 +163,31 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
      ),
      modifier = ModifierRegistry.applyModifiers(props.modifiers, appContext, composableScope, globalEventDispatcher)
    ) {
-+    // Material3 composes its own back handler as
-+    // `PredictiveBackHandler(enabled = backHandlerEnabled && state.isVisible)`, and `isVisible`
-+    // reads the settled state: it stays false for the whole show animation. A back press during
-+    // the opening animation therefore finds no enabled callback in the sheet dialog's dispatcher
-+    // and the press is swallowed (the dialog's cancel() is a no-op), so the sheet ignores back
-+    // until the animation settles. This handler runs inside the sheet dialog's composition —
-+    // the same dispatcher Material3's handler registers on, composed after it, and androidx
-+    // dispatches to the last-composed enabled handler — so it wins exactly while Material3's is
-+    // disabled and hands back to the predictive handler once the sheet has settled. The dismiss
-+    // path mirrors Material3's own settle-to-dismiss.
 +    if (props.properties.shouldDismissOnBackPress) {
 +      // Material3 composes its own back handler as
 +      // `PredictiveBackHandler(enabled = backHandlerEnabled && state.isVisible)`. During the

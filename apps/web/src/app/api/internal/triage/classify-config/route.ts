@@ -32,6 +32,7 @@ interface ClassifyConfigRequest {
 
 interface ClassifyConfigResponse {
   githubToken?: string;
+  issueAuthor: string;
   config: {
     model_slug: string;
     custom_instructions?: string | null;
@@ -118,9 +119,11 @@ export async function POST(req: NextRequest) {
     // Labels used for gating (skip/required) should not be offered to the AI for auto-labeling
     const excluded_labels = [...(config.skip_labels ?? []), ...(config.required_labels ?? [])];
 
-    // Return configuration for DO to use
+    // Return configuration for DO to use. issueAuthor lets the worker gate
+    // label application on the author's repository permission.
     const response: ClassifyConfigResponse = {
       githubToken,
+      issueAuthor: ticket.issue_author,
       config: {
         model_slug: config.model_slug,
         custom_instructions: config.custom_instructions,

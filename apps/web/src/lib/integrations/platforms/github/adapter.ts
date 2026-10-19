@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import { z } from 'zod';
+import { parseCollaboratorPermission } from '@kilocode/worker-utils/github-collaborator-permission';
 import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 import crypto from 'crypto';
@@ -441,10 +442,11 @@ export async function addReactionToPRReviewComment(
 /**
  * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
+ * Parsing delegates to the shared collaborator-permission module; octokit
+ * returns 'maintain' for maintain-tier collaborators, which the shared parser
+ * normalizes alongside the other known levels.
  */
 export type CollaboratorPermission = 'admin' | 'write' | 'read' | 'none';
-
-const KNOWN_PERMISSIONS = new Set<string>(['admin', 'write', 'read', 'none']);
 
 export async function getCollaboratorPermissionLevel(
   installationId: string,
@@ -463,11 +465,9 @@ export async function getCollaboratorPermissionLevel(
       username,
     });
 
-    if (KNOWN_PERMISSIONS.has(data.permission)) {
-      // Safe: value validated against the known set above
-      return data.permission as CollaboratorPermission;
-    }
-    return null;
+    const permission = parseCollaboratorPermission(data);
+    if (permission === 'maintain') return null;
+    return permission;
   } catch {
     return null;
   }

@@ -39,8 +39,36 @@ function createTicket(): TriageTicket {
   };
 }
 
-function createHarness() {
-  let storedState = createTicket();
+function createAutoFixTicket(author?: string): TriageTicket {
+  return {
+    ...createTicket(),
+    issueAuthor: author,
+    githubToken: 'github-token',
+  };
+}
+
+const highConfidencePayload = {
+  cloudAgentSessionId,
+  status: 'completed' as const,
+  lastAssistantMessageText:
+    'Classification complete.\n```json\n{"classification":"bug","confidence":0.98,"intentSummary":"Crash on startup","selectedLabels":[]}\n```',
+};
+
+function labelsInFetchCalls(
+  calls: Array<unknown[]>
+): Array<{ labels?: string[]; autoFixSkipped?: boolean }> {
+  return calls.map(call => {
+    const init = call[1] as { body?: string } | undefined;
+    const body = JSON.parse(init?.body ?? '{}') as {
+      labels?: string[];
+      actionMetadata?: { autoFixSkipped?: boolean };
+    };
+    return { labels: body.labels, autoFixSkipped: body.actionMetadata?.autoFixSkipped };
+  });
+}
+
+function createHarness(ticket: TriageTicket = createTicket()) {
+  let storedState = ticket;
   const put = vi.fn(async (_key: string, value: TriageTicket) => {
     storedState = structuredClone(value);
   });
@@ -138,6 +166,101 @@ describe('TriageOrchestrator classification failure callbacks', () => {
       expect.objectContaining({
         body: JSON.stringify({ status: 'failed', errorMessage: 'legacy wrapper error' }),
       })
+    );
+  });
+});
+
+describe('TriageOrchestrator auto-fix label permission gate', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function stubFetchResponses(responses: Array<{ urlPart: string; body: unknown }>) {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      for (const response of responses) {
+        if (url.includes(response.urlPart)) {
+          return new Response(JSON.stringify(response.body), { status: 200 });
+        }
+      }
+      return new Response(null, { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  const permissionUrl = 'https://api.github.com/repos/kilocode/example/collaborators';
+
+  it('withstands a read-permission author at high confidence: auto-fix label is not applied', async () => {
+    const harness = createHarness(createAutoFixTicket('outside-contributor'));
+    const fetchMock = await stubFetchResponses([
+      { urlPart: permissionUrl, body: { permission: 'read' } },
+    ]);
+
+    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
+
+    const calls = labelsInFetchCalls(fetchMock.mock.calls);
+    expect(calls.some(call => call.labels?.includes('kilo-triaged'))).toBe(true);
+    expect(calls.some(call => call.labels?.includes('kilo-auto-fix'))).toBe(false);
+    expect(calls.some(call => call.autoFixSkipped)).toBe(true);
+    expect(harness.getStoredState()).toMatchObject({ status: 'actioned' });
+  });
+
+  it('applies the auto-fix label for a maintainer at high confidence', async () => {
+    const harness = createHarness(createAutoFixTicket('repo-maintainer'));
+    const fetchMock = await stubFetchResponses([
+      { urlPart: permissionUrl, body: { permission: 'write' } },
+    ]);
+
+    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
+
+    const calls = labelsInFetchCalls(fetchMock.mock.calls);
+    expect(calls.some(call => call.labels?.includes('kilo-auto-fix'))).toBe(true);
+    expect(harness.getStoredState()).toMatchObject({ status: 'actioned' });
+  });
+
+  it('fails closed when the permission lookup returns an unexpected level', async () => {
+    const harness = createHarness(createAutoFixTicket('unknown-tier'));
+    const fetchMock = await stubFetchResponses([
+      { urlPart: permissionUrl, body: { permission: 'tier-1' } },
+    ]);
+
+    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
+
+    const calls = labelsInFetchCalls(fetchMock.mock.calls);
+    expect(calls.some(call => call.labels?.includes('kilo-auto-fix'))).toBe(false);
+    expect(calls.some(call => call.autoFixSkipped)).toBe(true);
+  });
+
+  it('fails closed when no GitHub token is available', async () => {
+    const ticket = { ...createAutoFixTicket('some-author'), githubToken: undefined };
+    const harness = createHarness(ticket);
+    const fetchMock = await stubFetchResponses([]);
+
+    await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
+
+    expect(fetchMock.mock.calls.some(call => String(call[0]).includes('api.github.com'))).toBe(
+      false
+    );
+    const calls = labelsInFetchCalls(fetchMock.mock.calls);
+    expect(calls.some(call => call.labels?.includes('kilo-auto-fix'))).toBe(false);
+  });
+
+  it('does not call the permission API on the low-confidence path', async () => {
+    const harness = createHarness(createAutoFixTicket('outside-contributor'));
+    const fetchMock = await stubFetchResponses([
+      { urlPart: permissionUrl, body: { permission: 'read' } },
+    ]);
+
+    await harness.orchestrator.completeClassification(callbackSecret, {
+      cloudAgentSessionId,
+      status: 'completed',
+      lastAssistantMessageText:
+        'Classification complete.\n```json\n{"classification":"bug","confidence":0.4,"intentSummary":"Crash on startup","selectedLabels":[]}\n```',
+    });
+
+    expect(fetchMock.mock.calls.some(call => String(call[0]).includes('api.github.com'))).toBe(
+      false
     );
   });
 });

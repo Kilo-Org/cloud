@@ -24,6 +24,8 @@ export interface SessionInput {
   issueNumber: number;
   issueTitle: string;
   issueBody: string | null;
+  /** GitHub login of the issue author, used to gate the auto-fix label. */
+  issueAuthor?: string;
   githubToken?: string;
   kilocodeOrganizationId?: string;
   duplicateThreshold: number;
@@ -58,11 +60,15 @@ export interface TriageTicket {
   callbackSecret?: string;
   /** Labels snapshotted from classify-config so the callback can parse without a re-call */
   availableLabels?: string[];
+  /** Issue author snapshotted from classify-config so the callback can gate the auto-fix label */
+  issueAuthor?: string;
   /** Classify config snapshotted so the callback can parse and label-check without a re-call */
   classifyConfig?: {
     model_slug: string;
     custom_instructions?: string | null;
   };
+  /** GitHub token snapshotted from classify-config for the callback permission check */
+  githubToken?: string;
   classification?: TriageClassification;
   confidence?: number;
   intentSummary?: string;

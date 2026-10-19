@@ -53,6 +53,7 @@
     "./direct-byok-model": "./src/direct-byok-model.ts",
     "./user-id-encoding": "./src/user-id-encoding.ts",
     "./github-authorization": "./src/github-authorization.ts",
+    "./github-collaborator-permission": "./src/github-collaborator-permission.ts",
     "./bounded-stream-reader": "./src/bounded-stream-reader.ts",
     "./usage-writer-client": "./src/usage-writer-client.ts"
   },

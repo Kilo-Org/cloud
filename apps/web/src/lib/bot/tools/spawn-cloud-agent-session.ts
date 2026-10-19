@@ -240,7 +240,7 @@ export default async function spawnCloudAgentSession(
   try {
     const eligibility = await computeCloudAgentNextBalanceCheckEligibility({
       fromDb: db,
-      user: { id: payerUserId ?? '' },
+      user: { id: payerUserId ?? owner.id },
       modelId: model,
       organizationId: kilocodeOrganizationId,
     });
@@ -276,6 +276,9 @@ export default async function spawnCloudAgentSession(
     });
   } catch (error) {
     if (error instanceof InsufficientCreditsError) {
+      // The session record exists at this point; release it promptly with a
+      // best-effort cleanup so it does not linger until periodic expiry.
+      void Promise.resolve(client.cleanupSession?.(cloudAgentSessionId)).catch(() => {});
       return { response: INSUFFICIENT_CREDITS_RESPONSE };
     }
     const message = error instanceof Error ? error.message : String(error);

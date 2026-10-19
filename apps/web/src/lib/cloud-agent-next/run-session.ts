@@ -206,6 +206,11 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   } catch (error) {
     if (error instanceof InsufficientCreditsError) {
       console.error(`${logPrefix} Insufficient credits: session not started`);
+      // The session record exists at this point; release it promptly with a
+      // best-effort cleanup so it does not linger until periodic expiry.
+      if (sessionId) {
+        void Promise.resolve(client.cleanupSession?.(sessionId)).catch(() => {});
+      }
       return {
         response: INSUFFICIENT_CREDITS_RESPONSE,
         sessionId,

@@ -102,12 +102,14 @@ describe('runSessionToCompletion', () => {
 
   it('returns the credits response when initiateFromPreparedSession rejects with InsufficientCreditsError', async () => {
     const { InsufficientCreditsError } = await import('./cloud-agent-client');
+    const cleanupSession = jest.fn<() => Promise<{ success: boolean }>>();
     const client = {
       prepareSession: jest.fn().mockResolvedValue({
         cloudAgentSessionId: 'agent-credits',
         kiloSessionId: 'kilo-credits',
       }),
       initiateFromPreparedSession: jest.fn().mockRejectedValue(new InsufficientCreditsError()),
+      cleanupSession,
     } as unknown as CloudAgentNextClient;
 
     const result = await runSessionToCompletion({
@@ -120,6 +122,7 @@ describe('runSessionToCompletion', () => {
     expect(result.hasError).toBe(true);
     expect(result.response).toBe(INSUFFICIENT_CREDITS_RESPONSE);
     expect(result.sessionId).toBe('agent-credits');
+    expect(cleanupSession).toHaveBeenCalledWith('agent-credits');
     expect(mockDisconnect).not.toHaveBeenCalled();
   });
 });

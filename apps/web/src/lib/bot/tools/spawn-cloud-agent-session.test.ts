@@ -93,6 +93,7 @@ const profileDerivedInlineFields = [
 const mockPrepareSession =
   jest.fn<(input: unknown) => Promise<{ cloudAgentSessionId: string; kiloSessionId: string }>>();
 const mockInitiateFromPreparedSession = jest.fn<(input: unknown) => Promise<unknown>>();
+const mockCleanupSession = jest.fn<(sessionId: string) => Promise<{ success: boolean }>>();
 let spawnCloudAgentSession: typeof SpawnCloudAgentSession;
 let mockResolveGitHubRepositoryForOwner: jest.MockedFunction<
   typeof ResolveGitHubRepositoryForOwner
@@ -130,6 +131,7 @@ describe('spawnCloudAgentSession delegation', () => {
     mockCreateCloudAgentNextClient.mockReturnValue({
       prepareSession: mockPrepareSession,
       initiateFromPreparedSession: mockInitiateFromPreparedSession,
+      cleanupSession: mockCleanupSession,
     } as never);
     mockPrepareSession.mockResolvedValue({
       cloudAgentSessionId: 'cloud-session-1',
@@ -366,5 +368,27 @@ describe('spawnCloudAgentSession delegation', () => {
 
     expect(result.response).toBe(INSUFFICIENT_CREDITS_RESPONSE);
     expect(result).not.toHaveProperty('cloudAgentSessionId');
+    expect(mockCleanupSession).toHaveBeenCalledWith('cloud-session-1');
+  });
+
+  it('falls back to the integration owner for the payer user when none is supplied', async () => {
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
+      isFree: true,
+      hasUserByokAvailable: false,
+    });
+
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'kilo-auto/free',
+      userIntegration,
+      'auth-token',
+      'request-owner-payer',
+      undefined,
+      { chatPlatform: 'slack' }
+    );
+
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+      expect.objectContaining({ user: { id: 'owner-1' } })
+    );
   });
 });

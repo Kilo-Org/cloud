@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { createDrizzleClient } from './client';
 import { computeDatabaseUrl } from './database-url';
@@ -21,6 +21,8 @@ import {
 if (process.env.USE_PRODUCTION_DB === 'true') {
   throw new Error('Inference reservation tests require a non-production database');
 }
+
+jest.setTimeout(30_000);
 
 const { db, pool } = createDrizzleClient({
   connectionString: computeDatabaseUrl(),

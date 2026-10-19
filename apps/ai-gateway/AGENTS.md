@@ -20,9 +20,6 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
 - Tests live next to the routes and run in the `apps/web` Jest suite, which
   includes this app as a root. Import from this app and `@kilocode/web-shared`
   only; `@/` resolves to `apps/web` there.
-- `sfo1` is far from the Frankfurt primary database. Gateway handlers must not
-  touch the primary before inference; follow "AI gateway database access" in
-  `packages/web-shared/AGENTS.md`.
 - Route files are thin facades over handlers in `packages/web-shared`. Keep the
   `apps/web` `maxDuration` and `withRestTiming` usage, with route patterns that
   match this app's paths. Import them as `@kilocode/web-shared/…`; see

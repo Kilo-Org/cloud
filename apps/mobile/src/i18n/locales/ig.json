@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} adịkwaghị. A na-eji ihe nlereanya ndabara gị.",
       "couldNotReadPendingSessions": "Enweghị ike ịgụ nnọkọ ndị na-echere. Nwaa ọzọ.",
       "failedToCreate": "Enweghị ike ịmepụta nnọkọ.",
+      "checkOrganizationAccess": "Nyochaa ma ị nwere ohere ịnweta nzukọ a, ma nwaa ọzọ.",
       "couldNotRefreshRepositories": "Enweghị ike ibudata ebe nchekwa koodu ọzọ. Biko nwaa ọzọ.",
       "discardDraftTitle": "Tụfuo ozi a na-ede?",
       "discardDraftMessage": "Ihe ị dere ga-efu.",

@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} haipatikani tena. Modeli yako chaguomsingi inatumika.",
       "couldNotReadPendingSessions": "Imeshindikana kusoma vikao vinavyosubiri. Jaribu tena.",
       "failedToCreate": "Imeshindikana kuunda kikao.",
+      "checkOrganizationAccess": "Tafadhali angalia ufikiaji wako wa shirika hili, kisha ujaribu tena.",
       "couldNotRefreshRepositories": "Imeshindikana kupakia upya hazina. Tafadhali jaribu tena.",
       "discardDraftTitle": "Ungependa kufuta rasimu?",
       "discardDraftMessage": "Maagizo yako yatapotea.",

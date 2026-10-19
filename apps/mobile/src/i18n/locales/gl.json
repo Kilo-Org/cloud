@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} xa non está dispoñible. Usarase o teu modelo predeterminado.",
       "couldNotReadPendingSessions": "Non se puideron ler as sesións pendentes. Téntao de novo.",
       "failedToCreate": "Non se puido crear a sesión.",
+      "checkOrganizationAccess": "Comproba o teu acceso a esta organización e téntao de novo.",
       "couldNotRefreshRepositories": "Non se puideron actualizar os repositorios. Téntao de novo.",
       "discardDraftTitle": "Descartar o borrador?",
       "discardDraftMessage": "Perderase a túa instrución.",

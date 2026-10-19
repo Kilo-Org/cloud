@@ -1721,6 +1721,7 @@
       "prefillModelUnavailable": "Model {{model}} nie jest już dostępny. Używany jest twój domyślny model.",
       "couldNotReadPendingSessions": "Nie udało się odczytać oczekujących sesji. Spróbuj ponownie.",
       "failedToCreate": "Nie udało się utworzyć sesji.",
+      "checkOrganizationAccess": "Sprawdź dostęp do tej organizacji, a następnie spróbuj ponownie.",
       "couldNotRefreshRepositories": "Nie udało się odświeżyć repozytoriów. Spróbuj ponownie.",
       "discardDraftTitle": "Odrzucić szkic?",
       "discardDraftMessage": "Twoje polecenie zostanie usunięte.",

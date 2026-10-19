@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} енді қолжетімсіз. Әдепкі моделіңіз қолданылуда.",
       "couldNotReadPendingSessions": "Кезектегі сессияларды оқу мүмкін болмады. Қайталап көріңіз.",
       "failedToCreate": "Сессияны жасау мүмкін болмады.",
+      "checkOrganizationAccess": "Осы ұйымға кіру рұқсатын тексеріп, қайталап көріңіз.",
       "couldNotRefreshRepositories": "Репозиторийлерді жаңарту мүмкін болмады. Қайталап көріңіз.",
       "discardDraftTitle": "Нобайды жою керек пе?",
       "discardDraftMessage": "Сұрауыңыз жойылады.",

@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} अब उपलब्ध छैन। तपाईंको पूर्वनिर्धारित मोडेल प्रयोग हुँदैछ।",
       "couldNotReadPendingSessions": "पर्खाइमा रहेका सत्रहरू पढ्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "failedToCreate": "सत्र बनाउन सकिएन।",
+      "checkOrganizationAccess": "यस संगठनमा तपाईंको पहुँच जाँच गर्नुहोस्, अनि फेरि प्रयास गर्नुहोस्।",
       "couldNotRefreshRepositories": "रिपोजिटरीहरूको सूची ताजा गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "discardDraftTitle": "मस्यौदा मेट्ने?",
       "discardDraftMessage": "तपाईंको प्रम्प्ट मेटिनेछ।",

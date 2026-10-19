@@ -1721,6 +1721,7 @@
       "prefillModelUnavailable": "Модель {{model}} більше недоступна. Використовується ваша типова модель.",
       "couldNotReadPendingSessions": "Не вдалося прочитати дані сеансів у черзі. Спробуйте ще раз.",
       "failedToCreate": "Не вдалося створити сеанс.",
+      "checkOrganizationAccess": "Перевірте свій доступ до цієї організації, а потім спробуйте ще раз.",
       "couldNotRefreshRepositories": "Не вдалося оновити список репозиторіїв. Спробуйте ще раз.",
       "discardDraftTitle": "Видалити чернетку?",
       "discardDraftMessage": "Ваш запит буде втрачено.",

@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} веќе не е достапен. Се користи твојот стандарден модел.",
       "couldNotReadPendingSessions": "Не успеа вчитувањето на сесиите што чекаат. Обиди се повторно.",
       "failedToCreate": "Не успеа создавањето на сесијата.",
+      "checkOrganizationAccess": "Провери го пристапот до оваа организација и обиди се повторно.",
       "couldNotRefreshRepositories": "Не успеа освежувањето на репозиториумите. Обиди се повторно.",
       "discardDraftTitle": "Да се отфрли нацртот?",
       "discardDraftMessage": "Твоето упатство ќе се изгуби.",

@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} kana booda hin argamu. Moodela durtii kee fayyadamaa jirra.",
       "couldNotReadPendingSessions": "Turtiiwwan eegumsarra jiran dubbisuu hin danda'amne. Deebi'ii yaali.",
       "failedToCreate": "Turtii uumuu hin danda'amne.",
+      "checkOrganizationAccess": "Dhaabbata kanaaf galii kee mirkaneessitii deebi'ii yaali.",
       "couldNotRefreshRepositories": "Kuusaawwan koodii haaromsuu hin danda'amne. Deebi'ii yaali.",
       "discardDraftTitle": "Wixinee haqxaa?",
       "discardDraftMessage": "Gaaffiin kee ni bada.",

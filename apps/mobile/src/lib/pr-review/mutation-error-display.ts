@@ -40,7 +40,7 @@ type MutationErrorDisplay = {
 type Classification = ReturnType<typeof classifyPrReviewMutationError>;
 
 type MutationErrorDisplayOptions = {
-  /** The raw thrown error, used for the retryable composer / edit-comment copy. */
+  /** The raw thrown error, read for the ambiguous / persistence markers and the 404 code. */
   readonly rawError?: unknown;
   /**
    * The connected provider's noun, already translated (s6f): on the submit
@@ -69,8 +69,8 @@ function badRequestMessage(surface: MutationErrorDisplaySurface, term?: string):
 }
 
 /**
- * Maps a mutation classification (and optional raw error for retryable
- * composer copy) to the inline message the sheet should show.
+ * Maps a mutation classification (and the raw error for the ambiguous /
+ * persistence / 404 markers) to the inline message the sheet should show.
  */
 export function mutationErrorDisplay(
   surface: MutationErrorDisplaySurface,
@@ -109,9 +109,11 @@ export function mutationErrorDisplay(
   if (surface === 'submit') {
     return { kind: 'retryable', message: i18n.t('prReview.mutationError.couldNotSubmitReview') };
   }
+  // The raw provider / transport text never reaches the inline box: a
+  // retryable failure shows the surface's localized copy.
   const message =
-    rawError instanceof Error && rawError.message.length > 0
-      ? rawError.message
+    surface === 'edit-comment'
+      ? i18n.t('prReview.discussion.commentEditFailed')
       : i18n.t('prReview.mutationError.couldNotPostComment');
   return { kind: 'retryable', message };
 }

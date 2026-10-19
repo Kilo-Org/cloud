@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "Ez a modell már nem érhető el: {{model}}. Helyette az alapértelmezett modelledet használjuk.",
       "couldNotReadPendingSessions": "Nem sikerült beolvasni a függőben lévő munkameneteket. Próbáld újra.",
       "failedToCreate": "Nem sikerült létrehozni a munkamenetet.",
+      "checkOrganizationAccess": "Ellenőrizd a hozzáférésed ehhez a szervezethez, majd próbáld újra.",
       "couldNotRefreshRepositories": "Nem sikerült frissíteni a tárolókat. Próbáld újra.",
       "discardDraftTitle": "Piszkozat elvetése?",
       "discardDraftMessage": "Az utasításod elvész.",

@@ -2293,6 +2293,7 @@
       "prefillModelUnavailable": "{{model}} m'għadux disponibbli. Qed jintuża l-mudell prestabbilit tiegħek.",
       "couldNotReadPendingSessions": "Ma setgħux jinqraw is-sessjonijiet pendenti. Erġa' pprova.",
       "failedToCreate": "Ma setgħetx tinħoloq is-sessjoni.",
+      "checkOrganizationAccess": "Iċċekkja l-aċċess tiegħek għal din l-organizzazzjoni, imbagħad erġa' pprova.",
       "couldNotRefreshRepositories": "Ma setgħux jiġu aġġornati r-repożitorji. Erġa' pprova.",
       "discardDraftTitle": "Twarrab l-abbozz?",
       "discardDraftMessage": "L-istruzzjoni tiegħek se tintilef.",

@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} نور د لاسرسي وړ نه دی. ستاسو تلواله ماډل کارول کېږي.",
       "couldNotReadPendingSessions": "په تمه ناستې ونه لوستل شوې. بیا هڅه وکړئ.",
       "failedToCreate": "ناسته جوړه نه شوه.",
+      "checkOrganizationAccess": "د دې ادارې لاسرسی وګورئ، بیا هڅه وکړئ.",
       "couldNotRefreshRepositories": "زېرمتونونه تازه نه شول. بیا هڅه وکړئ.",
       "discardDraftTitle": "مسوده ړنګه کړم؟",
       "discardDraftMessage": "ستاسو پرامپټ به له منځه ولاړ شي.",

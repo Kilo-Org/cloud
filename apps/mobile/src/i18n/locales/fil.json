@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "Hindi na magamit ang {{model}}. Ginagamit ang iyong paunang itinakdang modelo.",
       "couldNotReadPendingSessions": "Hindi mabasa ang mga nakabinbing sesyon. Subukang muli.",
       "failedToCreate": "Hindi makagawa ng sesyon.",
+      "checkOrganizationAccess": "Suriin ang iyong access sa organization na ito, at subukang muli.",
       "couldNotRefreshRepositories": "Hindi ma-refresh ang mga imbakan ng code. Subukang muli.",
       "discardDraftTitle": "Burahin ang burador?",
       "discardDraftMessage": "Mawawala ang iyong prompt.",

@@ -2237,6 +2237,7 @@
       "prefillModelUnavailable": "{{model}} ja no està disponible. S'està utilitzant el teu model predeterminat.",
       "couldNotReadPendingSessions": "No s'han pogut llegir les sessions pendents. Torna-ho a provar.",
       "failedToCreate": "No s'ha pogut crear la sessió.",
+      "checkOrganizationAccess": "Comproveu el vostre accés a aquesta organització i torneu-ho a provar.",
       "couldNotRefreshRepositories": "No s'han pogut actualitzar els repositoris. Torna-ho a provar.",
       "discardDraftTitle": "Vols descartar l'esborrany?",
       "discardDraftMessage": "Es perdrà el teu missatge.",

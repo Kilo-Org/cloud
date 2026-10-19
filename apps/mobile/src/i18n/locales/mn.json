@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} загварыг ашиглах боломжгүй болсон. Таны үндсэн загварыг ашиглаж байна.",
       "couldNotReadPendingSessions": "Хүлээгдэж буй сессүүдийг уншиж чадсангүй. Дахин оролдоно уу.",
       "failedToCreate": "Сесс үүсгэж чадсангүй.",
+      "checkOrganizationAccess": "Энэ байгууллагад хандах эрхээ шалгаад дахин оролдоно уу.",
       "couldNotRefreshRepositories": "Кодын сангийн жагсаалтыг шинэчилж чадсангүй. Дахин оролдоно уу.",
       "discardDraftTitle": "Нооргийг устгах уу?",
       "discardDraftMessage": "Таны бичсэн заавар устах болно.",

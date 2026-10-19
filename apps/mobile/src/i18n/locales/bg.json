@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} вече не е наличен. Използва се твоят модел по подразбиране.",
       "couldNotReadPendingSessions": "Не успяхме да прочетем чакащите сесии. Опитай отново.",
       "failedToCreate": "Не успяхме да създадем сесия.",
+      "checkOrganizationAccess": "Провери достъпа си до тази организация и опитай отново.",
       "couldNotRefreshRepositories": "Не успяхме да опресним хранилищата. Опитай отново.",
       "discardDraftTitle": "Да се изтрие ли черновата?",
       "discardDraftMessage": "Подканата ти ще се загуби.",

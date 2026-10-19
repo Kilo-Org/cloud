@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "An daina samun {{model}}. Ana amfani da samfurinka na asali.",
       "couldNotReadPendingSessions": "An kasa karanta zamannin da ke jira. Sake gwadawa.",
       "failedToCreate": "An kasa ƙirƙirar zama.",
+      "checkOrganizationAccess": "Ka duba damar shiga ga wannan ƙungiya, ka sake gwadawa.",
       "couldNotRefreshRepositories": "An kasa sabunta ma'ajiyoyi. Sake gwadawa.",
       "discardDraftTitle": "Watsar da daftari?",
       "discardDraftMessage": "Za a rasa umarnin aikinka.",

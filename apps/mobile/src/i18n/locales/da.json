@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} er ikke længere tilgængelig. Din standardmodel bruges i stedet.",
       "couldNotReadPendingSessions": "Kunne ikke læse de ventende sessioner. Prøv igen.",
       "failedToCreate": "Kunne ikke oprette en session.",
+      "checkOrganizationAccess": "Tjek din adgang til denne organisation, og prøv igen.",
       "couldNotRefreshRepositories": "Kunne ikke opdatere listen over kodelagre. Prøv igen.",
       "discardDraftTitle": "Kassér kladde?",
       "discardDraftMessage": "Din forespørgsel går tabt.",

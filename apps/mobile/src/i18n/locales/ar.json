@@ -1745,6 +1745,7 @@
       "prefillModelUnavailable": "لم يعد {{model}} متاحًا. نستخدم نموذجك الافتراضي.",
       "couldNotReadPendingSessions": "تعذّرت قراءة الجلسات المعلقة. حاول مرة أخرى.",
       "failedToCreate": "تعذّر إنشاء الجلسة.",
+      "checkOrganizationAccess": "تحقّق من صلاحية وصولك إلى هذه المؤسسة، ثم حاول مرة أخرى.",
       "couldNotRefreshRepositories": "تعذّر تحديث المستودعات. حاول مرة أخرى.",
       "discardDraftTitle": "حذف المسودة؟",
       "discardDraftMessage": "ستفقد التعليمات التي كتبتها.",

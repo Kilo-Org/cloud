@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} ei ole enää käytettävissä. Käytetään oletusmalliasi.",
       "couldNotReadPendingSessions": "Odottavia istuntoja ei voitu lukea. Yritä uudelleen.",
       "failedToCreate": "Istunnon luonti epäonnistui.",
+      "checkOrganizationAccess": "Tarkista oikeutesi tähän organisaatioon ja yritä uudelleen.",
       "couldNotRefreshRepositories": "Repositorioita ei voitu päivittää. Yritä uudelleen.",
       "discardDraftTitle": "Hylätäänkö luonnos?",
       "discardDraftMessage": "Kehotteesi poistetaan.",

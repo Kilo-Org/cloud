@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} jada ez dago erabilgarri. Zure modelo lehenetsia erabiltzen ari da.",
       "couldNotReadPendingSessions": "Ezin izan dira zain dauden saioak irakurri. Saiatu berriro.",
       "failedToCreate": "Ezin izan da saioa sortu.",
+      "checkOrganizationAccess": "Egiaztatu zure sarbidea erakunde honetara eta saiatu berriro.",
       "couldNotRefreshRepositories": "Ezin izan da biltegien zerrenda freskatu. Saiatu berriro.",
       "discardDraftTitle": "Baztertu zirriborroa?",
       "discardDraftMessage": "Zure eskaera galduko da.",

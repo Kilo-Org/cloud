@@ -1610,6 +1610,7 @@
       "prefillModelUnavailable": "{{model}} n'est plus disponible. Votre modèle par défaut est utilisé.",
       "couldNotReadPendingSessions": "Impossible de lire les sessions en attente. Réessayez.",
       "failedToCreate": "Impossible de créer la session.",
+      "checkOrganizationAccess": "Vérifiez votre accès à cette organisation, puis réessayez.",
       "couldNotRefreshRepositories": "Impossible d'actualiser les dépôts. Réessayez.",
       "discardDraftTitle": "Supprimer le brouillon ?",
       "discardDraftMessage": "Votre consigne sera perdue.",

@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} pole enam saadaval. Kasutatakse sinu vaikemudelit.",
       "couldNotReadPendingSessions": "Ootel seansside lugemine ebaõnnestus. Proovi uuesti.",
       "failedToCreate": "Seansi loomine ebaõnnestus.",
+      "checkOrganizationAccess": "Kontrolli oma juurdepääsu sellele organisatsioonile ja proovi uuesti.",
       "couldNotRefreshRepositories": "Hoidlate värskendamine ebaõnnestus. Proovi uuesti.",
       "discardDraftTitle": "Kas loobuda mustandist?",
       "discardDraftMessage": "Sinu viip läheb kaotsi.",

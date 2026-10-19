@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} چیتر بەردەست نییە. مۆدێلی بنەڕەتیت بەکار دەهێنرێت.",
       "couldNotReadPendingSessions": "نەتوانرا سێشنە چاوەڕوانەکان بخوێنرێنەوە. دووبارە هەوڵ بدەرەوە.",
       "failedToCreate": "نەتوانرا سێشنێک دروست بکرێت.",
+      "checkOrganizationAccess": "تکایە دەستپێگەیشتنی خۆت بۆ ئەم ڕێکخراوە پشکنین بکە و دووبارە هەوڵ بدەرەوە.",
       "couldNotRefreshRepositories": "نەتوانرا کۆگاکان نوێ بکرێنەوە. تکایە دووبارە هەوڵ بدەرەوە.",
       "discardDraftTitle": "سڕینەوەی ڕەشنووس؟",
       "discardDraftMessage": "داواکارییەکەت لەدەست دەچێت.",

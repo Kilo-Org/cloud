@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "«{{model}}» մոդելն այլևս հասանելի չէ։ Օգտագործվում է ձեր լռելյայն մոդելը։",
       "couldNotReadPendingSessions": "Չհաջողվեց կարդալ սպասող նիստերը։ Կրկին փորձեք։",
       "failedToCreate": "Չհաջողվեց ստեղծել նիստը։",
+      "checkOrganizationAccess": "Ստուգեք ձեր մուտքը դեպի այս կազմակերպությունը, ապա կրկին փորձեք։",
       "couldNotRefreshRepositories": "Չհաջողվեց թարմացնել պահոցները։ Կրկին փորձեք։",
       "discardDraftTitle": "Ջնջե՞լ սևագիրը",
       "discardDraftMessage": "Ձեր հուշումը կկորչի։",

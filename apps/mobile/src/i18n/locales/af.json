@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} is nie meer beskikbaar nie. Jou standaardmodel word gebruik.",
       "couldNotReadPendingSessions": "Die hangende sessies kon nie gelees word nie. Probeer weer.",
       "failedToCreate": "Die sessie kon nie geskep word nie.",
+      "checkOrganizationAccess": "Kontroleer jou toegang tot hierdie organisasie en probeer asseblief weer.",
       "couldNotRefreshRepositories": "Die bewaarplekke kon nie verfris word nie. Probeer asseblief weer.",
       "discardDraftTitle": "Konsep weggooi?",
       "discardDraftMessage": "Jou opdrag sal verlore gaan.",

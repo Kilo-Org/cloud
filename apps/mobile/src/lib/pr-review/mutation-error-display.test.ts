@@ -131,10 +131,10 @@ describe('mutationErrorDisplay', () => {
       message: "This comment can't be edited. It may have been deleted.",
     });
     // Other surfaces keep the retryable fall-through: their 404s are outside
-    // the own-comment edit slice.
+    // the own-comment edit slice, and the localized copy replaces the raw text.
     expect(mutationErrorDisplayFromError('composer', gone)).toEqual({
       kind: 'retryable',
-      message: 'PR not found, you do not have access',
+      message: 'Could not post comment.',
     });
   });
 
@@ -187,9 +187,11 @@ describe('mutationErrorDisplay', () => {
   it('keeps retryable kinds with surface-appropriate messages', () => {
     const networkError = new Error('Network request failed');
     const classification = classifyPrReviewMutationError(networkError);
+    // The raw transport text never reaches the inline box: the retryable
+    // fall-through shows the surface's localized copy.
     expect(mutationErrorDisplay('composer', classification, { rawError: networkError })).toEqual({
       kind: 'retryable',
-      message: 'Network request failed',
+      message: 'Could not post comment.',
     });
     expect(mutationErrorDisplay('composer', classification)).toEqual({
       kind: 'retryable',
@@ -198,6 +200,12 @@ describe('mutationErrorDisplay', () => {
     expect(mutationErrorDisplay('submit', classification, { rawError: networkError })).toEqual({
       kind: 'retryable',
       message: 'Could not submit review. Check your connection and try again.',
+    });
+    expect(
+      mutationErrorDisplay('edit-comment', classification, { rawError: networkError })
+    ).toEqual({
+      kind: 'retryable',
+      message: "Couldn't save your comment. Check your connection and try again.",
     });
   });
 

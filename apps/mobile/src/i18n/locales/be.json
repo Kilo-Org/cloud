@@ -2265,6 +2265,7 @@
       "prefillModelUnavailable": "Мадэль {{model}} больш недаступная. Выкарыстоўваецца ваша прадвызначаная мадэль.",
       "couldNotReadPendingSessions": "Не ўдалося прачытаць даныя сеансаў у чаканні. Паспрабуйце яшчэ раз.",
       "failedToCreate": "Не ўдалося стварыць сеанс.",
+      "checkOrganizationAccess": "Праверце доступ да гэтай арганізацыі і паспрабуйце яшчэ раз.",
       "couldNotRefreshRepositories": "Не ўдалося абнавіць рэпазіторыі. Паспрабуйце яшчэ раз.",
       "discardDraftTitle": "Выдаліць чарнавік?",
       "discardDraftMessage": "Ваш запыт будзе страчаны.",

@@ -1697,6 +1697,7 @@
       "prefillModelUnavailable": "{{model}}は利用できなくなりました。デフォルトモデルを使用します。",
       "couldNotReadPendingSessions": "保留中のセッションを読み取れませんでした。もう一度お試しください。",
       "failedToCreate": "セッションを作成できませんでした。",
+      "checkOrganizationAccess": "この組織へのアクセス権を確認して、もう一度お試しください。",
       "couldNotRefreshRepositories": "リポジトリを更新できませんでした。もう一度お試しください。",
       "discardDraftTitle": "下書きを破棄しますか？",
       "discardDraftMessage": "入力したプロンプトが削除されます。",

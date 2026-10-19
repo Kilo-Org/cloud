@@ -1697,6 +1697,7 @@
       "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Model bawaanmu digunakan sebagai pengganti.",
       "couldNotReadPendingSessions": "Tidak dapat membaca sesi yang menunggu diproses. Coba lagi.",
       "failedToCreate": "Gagal membuat sesi.",
+      "checkOrganizationAccess": "Periksa aksesmu ke organisasi ini, lalu coba lagi.",
       "couldNotRefreshRepositories": "Tidak dapat memuat ulang repositori. Coba lagi.",
       "discardDraftTitle": "Buang draf?",
       "discardDraftMessage": "Instruksimu akan hilang.",

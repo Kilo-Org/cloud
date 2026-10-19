@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} ከእንግዲህ አይገኝም። ነባሪ ሞዴልዎ ጥቅም ላይ እየዋለ ነው።",
       "couldNotReadPendingSessions": "የሚጠባበቁ ክፍለ ጊዜዎችን ማንበብ አልተቻለም። እንደገና ይሞክሩ።",
       "failedToCreate": "ክፍለ ጊዜ መፍጠር አልተሳካም።",
+      "checkOrganizationAccess": "እባክዎ ወደ ይህ ድርጅት ያለዎትን መዳረሻ ያረጋግጡ እና እንደገና ይሞክሩ።",
       "couldNotRefreshRepositories": "ማከማቻዎችን ማደስ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "discardDraftTitle": "ረቂቁን ማስወገድ ይፈልጋሉ?",
       "discardDraftMessage": "ጥያቄዎ ይጠፋል።",

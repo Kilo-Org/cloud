@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} artıq əlçatan deyil. Standart modelindən istifadə olunur.",
       "couldNotReadPendingSessions": "Gözləyən sessiyaları oxumaq mümkün olmadı. Yenidən cəhd et.",
       "failedToCreate": "Sessiya yaratmaq mümkün olmadı.",
+      "checkOrganizationAccess": "Bu təşkilata çıxışını yoxla və yenidən cəhd et.",
       "couldNotRefreshRepositories": "Repozitoriyaları yeniləmək mümkün olmadı. Yenidən cəhd et.",
       "discardDraftTitle": "Qaralama silinsin?",
       "discardDraftMessage": "Sorğun silinəcək.",

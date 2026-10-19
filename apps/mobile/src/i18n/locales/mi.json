@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "Kāore a {{model}} e wātea ana ināianei. Kei te whakamahia tō tauira taunoa.",
       "couldNotReadPendingSessions": "Kāore i taea te pānui i ngā wātū e tatari ana. Whakamātau anō.",
       "failedToCreate": "Kāore i taea te hanga i te wātū.",
+      "checkOrganizationAccess": "Tirohia tō urunga ki tēnei rōpū, kātahi ka whakamātau anō.",
       "couldNotRefreshRepositories": "Kāore i taea te whakahou i ngā putunga waehere. Whakamātau anō.",
       "discardDraftTitle": "Mukua te hukihuki?",
       "discardDraftMessage": "Ka ngaro ō tohutohu.",

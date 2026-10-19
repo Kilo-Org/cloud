@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} ayisatholakali. Kusetshenziswa imodeli yakho ezenzakalelayo.",
       "couldNotReadPendingSessions": "Asikwazanga ukufunda iziseshini ezilindile. Zama futhi.",
       "failedToCreate": "Asikwazanga ukudala iseshini.",
+      "checkOrganizationAccess": "Sicela uhlolo ukufinyelela kwakho kule nhlangano, bese uzama futhi.",
       "couldNotRefreshRepositories": "Asikwazanga ukuvuselela izinqolobane zekhodi. Sicela uzame futhi.",
       "discardDraftTitle": "Uyafuna ukulahla okusalungiswa?",
       "discardDraftMessage": "Isicelo sakho sizolahleka.",

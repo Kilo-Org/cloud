@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} kò sí mọ́. Àwòṣe àiyípadà rẹ ni a ń lò.",
       "couldNotReadPendingSessions": "A kò lè ka àwọn ìgbà iṣẹ́ tó ń dúró. Gbìyànjú lẹ́ẹ̀kan sí i.",
       "failedToCreate": "A kò lè ṣẹ̀dá ìgbà iṣẹ́.",
+      "checkOrganizationAccess": "Jọ̀wọ́ ṣàyẹ̀wò ìgbàsílẹ̀ rẹ sí àjọ yìí, kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "couldNotRefreshRepositories": "A kò lè tún àwọn ibi ìpamọ́ kóòdù gbé wọlé. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "discardDraftTitle": "Pa àkọ́kọ́ ìkọ̀wé rẹ́?",
       "discardDraftMessage": "Ọ̀rọ̀ ìtọ́ni rẹ yóò sọnù.",

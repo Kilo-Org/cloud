@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} ใช้ไม่ได้แล้ว กำลังใช้โมเดลเริ่มต้นของคุณแทน",
       "couldNotReadPendingSessions": "ไม่สามารถอ่านเซสชันที่รอดำเนินการได้ ลองอีกครั้ง",
       "failedToCreate": "ไม่สามารถสร้างเซสชันได้",
+      "checkOrganizationAccess": "กรุณาตรวจสอบสิทธิ์การเข้าถึงของคุณในองค์กรนี้ แล้วลองอีกครั้ง",
       "couldNotRefreshRepositories": "ไม่สามารถรีเฟรชรายการคลังโค้ดได้ กรุณาลองอีกครั้ง",
       "discardDraftTitle": "ทิ้งฉบับร่างหรือไม่?",
       "discardDraftMessage": "พรอมต์ที่คุณเขียนไว้จะหายไป",

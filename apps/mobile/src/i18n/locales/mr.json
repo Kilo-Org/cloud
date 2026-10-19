@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} आता उपलब्ध नाही. त्याऐवजी तुमचे डीफॉल्ट मॉडेल वापरले जात आहे.",
       "couldNotReadPendingSessions": "प्रलंबित सत्रे वाचता आली नाहीत. पुन्हा प्रयत्न करा.",
       "failedToCreate": "सत्र तयार करता आले नाही.",
+      "checkOrganizationAccess": "या संस्थेकडील तुमचा प्रवेश तपासा आणि पुन्हा प्रयत्न करा.",
       "couldNotRefreshRepositories": "रिपॉझिटरींची यादी रिफ्रेश करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
       "discardDraftTitle": "मसुदा रद्द करायचा?",
       "discardDraftMessage": "तुमचा प्रॉम्प्ट हटवला जाईल.",

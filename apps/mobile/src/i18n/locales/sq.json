@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} nuk është më i disponueshëm. Po përdoret modeli yt i parazgjedhur.",
       "couldNotReadPendingSessions": "Nuk u lexuan seancat në pritje. Provo përsëri.",
       "failedToCreate": "Nuk u krijua seanca.",
+      "checkOrganizationAccess": "Kontrollo aksesin tënd në këtë organizatë dhe provo përsëri.",
       "couldNotRefreshRepositories": "Nuk u rifreskuan depot. Provo përsëri.",
       "discardDraftTitle": "Të fshihet drafti?",
       "discardDraftMessage": "Kërkesa jote do të humbasë.",

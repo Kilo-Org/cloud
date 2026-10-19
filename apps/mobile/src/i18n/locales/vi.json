@@ -1697,6 +1697,7 @@
       "prefillModelUnavailable": "{{model}} không còn dùng được. Hiện đang dùng mô hình mặc định của bạn.",
       "couldNotReadPendingSessions": "Không thể đọc danh sách phiên đang chờ. Vui lòng thử lại.",
       "failedToCreate": "Không thể tạo phiên.",
+      "checkOrganizationAccess": "Vui lòng kiểm tra quyền truy cập của bạn vào tổ chức này rồi thử lại.",
       "couldNotRefreshRepositories": "Không thể làm mới danh sách kho mã. Vui lòng thử lại.",
       "discardDraftTitle": "Hủy bản nháp?",
       "discardDraftMessage": "Nội dung yêu cầu của bạn sẽ bị mất.",

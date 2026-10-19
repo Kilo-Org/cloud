@@ -1709,6 +1709,7 @@
       "prefillModelUnavailable": "{{model}} ya no está disponible. Se está usando tu modelo predeterminado.",
       "couldNotReadPendingSessions": "No se pudieron leer las sesiones pendientes. Inténtalo de nuevo.",
       "failedToCreate": "No se pudo crear la sesión.",
+      "checkOrganizationAccess": "Comprueba tu acceso a esta organización e inténtalo de nuevo.",
       "couldNotRefreshRepositories": "No se pudieron actualizar los repositorios. Inténtalo de nuevo.",
       "discardDraftTitle": "¿Descartar borrador?",
       "discardDraftMessage": "Se perderán tus instrucciones.",

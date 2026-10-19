@@ -1697,6 +1697,7 @@
       "prefillModelUnavailable": "{{model}} 已無法使用。目前使用你的預設模型。",
       "couldNotReadPendingSessions": "無法讀取待處理的工作階段。請再試一次。",
       "failedToCreate": "無法建立工作階段。",
+      "checkOrganizationAccess": "請檢查您對此組織的存取權限，然後再試一次。",
       "couldNotRefreshRepositories": "無法重新整理儲存庫。請再試一次。",
       "discardDraftTitle": "捨棄草稿？",
       "discardDraftMessage": "你輸入的提示詞將不會保留。",

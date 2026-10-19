@@ -1678,6 +1678,7 @@
       "prefillModelUnavailable": "{{model}} não está mais disponível. Seu modelo padrão está em uso.",
       "couldNotReadPendingSessions": "Não foi possível ler as sessões pendentes. Tente novamente.",
       "failedToCreate": "Não foi possível criar a sessão.",
+      "checkOrganizationAccess": "Verifique seu acesso a esta organização e tente novamente.",
       "couldNotRefreshRepositories": "Não foi possível atualizar os repositórios. Tente novamente.",
       "discardDraftTitle": "Descartar rascunho?",
       "discardDraftMessage": "Seu prompt será perdido.",

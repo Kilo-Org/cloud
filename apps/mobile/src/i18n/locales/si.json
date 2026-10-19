@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} තවදුරටත් ලබා ගත නොහැක. ඔබේ පෙරනිමි මාදිලිය භාවිත වේ.",
       "couldNotReadPendingSessions": "පොරොත්තුවේ ඇති සැසි කියවිය නොහැකි විය. නැවත උත්සාහ කරන්න.",
       "failedToCreate": "සැසියක් සෑදිය නොහැකි විය.",
+      "checkOrganizationAccess": "මෙම සංවිධානයට ඔබගේ ප්‍රවේශය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "couldNotRefreshRepositories": "ගබඩා නැවුම් කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "discardDraftTitle": "කටු සටහන ඉවතලන්නද?",
       "discardDraftMessage": "ඔබේ ඉල්ලීම අහිමි වනු ඇත.",

@@ -2237,6 +2237,7 @@
       "prefillModelUnavailable": "{{model}} više nije dostupan. Koristi se tvoj zadani model.",
       "couldNotReadPendingSessions": "Nije moguće učitati sesije na čekanju. Pokušaj ponovo.",
       "failedToCreate": "Nije moguće kreirati sesiju.",
+      "checkOrganizationAccess": "Provjeri svoj pristup ovoj organizaciji i pokušaj ponovo.",
       "couldNotRefreshRepositories": "Nije moguće osvježiti repozitorije. Pokušaj ponovo.",
       "discardDraftTitle": "Odbaciti nacrt?",
       "discardDraftMessage": "Tvoj upit će biti izgubljen.",

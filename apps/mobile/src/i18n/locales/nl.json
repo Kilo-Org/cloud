@@ -1697,6 +1697,7 @@
       "prefillModelUnavailable": "{{model}} is niet meer beschikbaar. Je standaardmodel wordt gebruikt.",
       "couldNotReadPendingSessions": "De wachtende sessies konden niet worden uitgelezen. Probeer het opnieuw.",
       "failedToCreate": "De sessie kon niet worden aangemaakt.",
+      "checkOrganizationAccess": "Controleer je toegang tot deze organisatie en probeer het opnieuw.",
       "couldNotRefreshRepositories": "De repositories konden niet worden vernieuwd. Probeer het opnieuw.",
       "discardDraftTitle": "Concept verwijderen?",
       "discardDraftMessage": "Je prompt gaat verloren.",

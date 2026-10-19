@@ -1697,6 +1697,7 @@
       "prefillModelUnavailable": "{{model}} 已不可用。当前使用你的默认模型。",
       "couldNotReadPendingSessions": "无法读取待处理的会话。请重试。",
       "failedToCreate": "创建会话失败。",
+      "checkOrganizationAccess": "请检查你对该组织的访问权限，然后重试。",
       "couldNotRefreshRepositories": "无法刷新仓库。请重试。",
       "discardDraftTitle": "丢弃草稿？",
       "discardDraftMessage": "你输入的提示词将丢失。",

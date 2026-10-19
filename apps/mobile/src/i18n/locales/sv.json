@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} är inte längre tillgänglig. Din standardmodell används i stället.",
       "couldNotReadPendingSessions": "Det gick inte att läsa in väntande sessioner. Försök igen.",
       "failedToCreate": "Det gick inte att skapa sessionen.",
+      "checkOrganizationAccess": "Kontrollera din åtkomst till den här organisationen och försök igen.",
       "couldNotRefreshRepositories": "Det gick inte att uppdatera kodarkiven. Försök igen.",
       "discardDraftTitle": "Ta bort utkastet?",
       "discardDraftMessage": "Din prompt går förlorad.",

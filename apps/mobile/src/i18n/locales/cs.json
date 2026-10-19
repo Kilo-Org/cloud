@@ -2265,6 +2265,7 @@
       "prefillModelUnavailable": "{{model}} již není k dispozici. Používá se váš výchozí model.",
       "couldNotReadPendingSessions": "Čekající relace se nepodařilo načíst. Zkuste to znovu.",
       "failedToCreate": "Relaci se nepodařilo vytvořit.",
+      "checkOrganizationAccess": "Zkontrolujte svůj přístup k této organizaci a zkuste to znovu.",
       "couldNotRefreshRepositories": "Seznam repozitářů se nepodařilo obnovit. Zkuste to znovu.",
       "discardDraftTitle": "Zahodit koncept?",
       "discardDraftMessage": "Vaše zadání se smaže.",

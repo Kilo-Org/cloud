@@ -2265,6 +2265,7 @@
       "prefillModelUnavailable": "Modelis „{{model}}“ nebepasiekiamas. Naudojamas numatytasis modelis.",
       "couldNotReadPendingSessions": "Nepavyko nuskaityti laukiančių sesijų. Bandykite dar kartą.",
       "failedToCreate": "Nepavyko sukurti sesijos.",
+      "checkOrganizationAccess": "Patikrinkite prieigą prie šios organizacijos ir bandykite dar kartą.",
       "couldNotRefreshRepositories": "Nepavyko atnaujinti saugyklų. Bandykite dar kartą.",
       "discardDraftTitle": "Atmesti juodraštį?",
       "discardDraftMessage": "Jūsų užklausa bus prarasta.",

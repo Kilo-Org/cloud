@@ -1697,6 +1697,7 @@
       "prefillModelUnavailable": "{{model}} artık kullanılamıyor. Varsayılan modelin kullanılıyor.",
       "couldNotReadPendingSessions": "Bekleyen oturumlar okunamadı. Tekrar dene.",
       "failedToCreate": "Oturum oluşturulamadı.",
+      "checkOrganizationAccess": "Bu kuruluşa erişiminizi kontrol edin, ardından tekrar deneyin.",
       "couldNotRefreshRepositories": "Depolar yenilenemedi. Tekrar dene.",
       "discardDraftTitle": "Taslak silinsin mi?",
       "discardDraftMessage": "İstemin silinecek.",

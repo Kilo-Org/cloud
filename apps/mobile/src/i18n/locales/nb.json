@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} er ikke lenger tilgjengelig. Standardmodellen din brukes i stedet.",
       "couldNotReadPendingSessions": "Kunne ikke lese ventende økter. Prøv igjen.",
       "failedToCreate": "Kunne ikke opprette en økt.",
+      "checkOrganizationAccess": "Kontroller tilgangen din til denne organisasjonen, og prøv igjen.",
       "couldNotRefreshRepositories": "Kunne ikke oppdatere kodelagrene. Prøv igjen.",
       "discardDraftTitle": "Forkaste utkast?",
       "discardDraftMessage": "Instruksjonen din går tapt.",

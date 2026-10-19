@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} mar dambe lama heli karo. Waxaa la isticmaalayaa moodeelkaaga caadiga ah.",
       "couldNotReadPendingSessions": "Kalfadhiyada sugaya lama akhrin karin. Mar kale isku day.",
       "failedToCreate": "Kalfadhiga lama abuuri karin.",
+      "checkOrganizationAccess": "Hubi gelitaankaada ururkan, markaa mar kale isku day.",
       "couldNotRefreshRepositories": "Kaydadka lama cusboonaysiin karin. Fadlan mar kale isku day.",
       "discardDraftTitle": "Ma tirtiraysaa qabyada?",
       "discardDraftMessage": "Tilmaantaadu way lumi doontaa.",

@@ -2321,6 +2321,7 @@
       "prefillModelUnavailable": "Nid yw {{model}} ar gael mwyach. Mae eich model diofyn yn cael ei ddefnyddio.",
       "couldNotReadPendingSessions": "Methu darllen y sesiynau sy'n aros. Ceisiwch eto.",
       "failedToCreate": "Methu creu'r sesiwn.",
+      "checkOrganizationAccess": "Gwiriwch eich mynediad i'r sefydliad hwn a cheisiwch eto.",
       "couldNotRefreshRepositories": "Methu adnewyddu'r ystorfeydd. Ceisiwch eto.",
       "discardDraftTitle": "Dileu'r drafft?",
       "discardDraftMessage": "Byddwch yn colli'ch anogiad.",

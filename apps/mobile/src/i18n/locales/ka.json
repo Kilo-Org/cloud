@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} აღარ არის ხელმისაწვდომი. გამოიყენება თქვენი ნაგულისხმევი მოდელი.",
       "couldNotReadPendingSessions": "მომლოდინე სესიების წაკითხვა ვერ მოხერხდა. სცადეთ ხელახლა.",
       "failedToCreate": "სესიის შექმნა ვერ მოხერხდა.",
+      "checkOrganizationAccess": "შეამოწმეთ წვდომა ამ ორგანიზაციაზე და სცადეთ ხელახლა.",
       "couldNotRefreshRepositories": "რეპოზიტორიების განახლება ვერ მოხერხდა. სცადეთ ხელახლა.",
       "discardDraftTitle": "წაიშალოს მონახაზი?",
       "discardDraftMessage": "თქვენი მოთხოვნა დაიკარგება.",

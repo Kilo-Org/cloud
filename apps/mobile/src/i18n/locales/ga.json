@@ -2293,6 +2293,7 @@
       "prefillModelUnavailable": "Níl {{model}} ar fáil a thuilleadh. Tá do shamhail réamhshocraithe in úsáid.",
       "couldNotReadPendingSessions": "Níorbh fhéidir na seisiúin atá ar feitheamh a léamh. Bain triail as arís.",
       "failedToCreate": "Níorbh fhéidir an seisiún a chruthú.",
+      "checkOrganizationAccess": "Seiceáil do rochtain ar an eagraíocht seo, agus bain triail as arís.",
       "couldNotRefreshRepositories": "Níorbh fhéidir stórtha a athnuachan. Bain triail as arís le do thoil.",
       "discardDraftTitle": "An gcaithfear an dréacht ar lár?",
       "discardDraftMessage": "Caillfear do leid.",

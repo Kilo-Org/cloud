@@ -1709,6 +1709,7 @@
       "prefillModelUnavailable": "{{model}} כבר אינו זמין. במקומו ייעשה שימוש במודל ברירת המחדל שלך.",
       "couldNotReadPendingSessions": "לא ניתן היה לקרוא את הסשנים הממתינים. נסה שוב.",
       "failedToCreate": "לא ניתן היה ליצור סשן.",
+      "checkOrganizationAccess": "בדוק את הגישה שלך לארגון הזה, ואז נסה שוב.",
       "couldNotRefreshRepositories": "לא ניתן היה לרענן מאגרים. נסה שוב.",
       "discardDraftTitle": "למחוק את הטיוטה?",
       "discardDraftMessage": "ההנחיה שלך תימחק.",

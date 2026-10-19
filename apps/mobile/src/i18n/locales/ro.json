@@ -2237,6 +2237,7 @@
       "prefillModelUnavailable": "{{model}} nu mai este disponibil. Se folosește modelul tău implicit.",
       "couldNotReadPendingSessions": "Nu s-au putut citi sesiunile în așteptare. Încearcă din nou.",
       "failedToCreate": "Nu s-a putut crea sesiunea.",
+      "checkOrganizationAccess": "Verifică accesul la această organizație și încearcă din nou.",
       "couldNotRefreshRepositories": "Nu s-au putut reîmprospăta depozitele. Încearcă din nou.",
       "discardDraftTitle": "Renunți la ciornă?",
       "discardDraftMessage": "Instrucțiunile tale se vor pierde.",

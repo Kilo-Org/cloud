@@ -2237,6 +2237,7 @@
       "prefillModelUnavailable": "{{model}} vairs nav pieejams. Tiek izmantots tavs noklusējuma modelis.",
       "couldNotReadPendingSessions": "Neizdevās nolasīt gaidošās sesijas. Mēģini vēlreiz.",
       "failedToCreate": "Neizdevās izveidot sesiju.",
+      "checkOrganizationAccess": "Pārbaudi savu piekļuvi šai organizācijai un mēģini vēlreiz.",
       "couldNotRefreshRepositories": "Neizdevās atsvaidzināt repozitorijus. Lūdzu, mēģini vēlreiz.",
       "discardDraftTitle": "Atmest melnrakstu?",
       "discardDraftMessage": "Tava uzvedne tiks dzēsta.",

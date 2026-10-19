@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} હવે ઉપલબ્ધ નથી. તમારા ડિફોલ્ટ મોડલનો ઉપયોગ થઈ રહ્યો છે.",
       "couldNotReadPendingSessions": "બાકી રહેલાં સત્રો વાંચી શકાયાં નહીં. ફરી પ્રયાસ કરો.",
       "failedToCreate": "સત્ર બનાવી શકાયું નહીં.",
+      "checkOrganizationAccess": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ છે કે નહીં તે તપાસો, પછી ફરી પ્રયાસ કરો.",
       "couldNotRefreshRepositories": "રિપોઝિટરીઓ રિફ્રેશ કરી શકાઈ નહીં. ફરી પ્રયાસ કરો.",
       "discardDraftTitle": "ડ્રાફ્ટ કાઢી નાખવો?",
       "discardDraftMessage": "તમારો પ્રોમ્પ્ટ કાઢી નાખવામાં આવશે.",

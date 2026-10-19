@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਤੁਹਾਡਾ ਪੂਰਵ-ਨਿਰਧਾਰਤ ਮਾਡਲ ਵਰਤਿਆ ਜਾ ਰਿਹਾ ਹੈ।",
       "couldNotReadPendingSessions": "ਉਡੀਕ ਵਿੱਚ ਪਏ ਸੈਸ਼ਨ ਪੜ੍ਹੇ ਨਹੀਂ ਜਾ ਸਕੇ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "failedToCreate": "ਸੈਸ਼ਨ ਨਹੀਂ ਬਣਾਇਆ ਜਾ ਸਕਿਆ।",
+      "checkOrganizationAccess": "ਇਸ ਸੰਗਠਨ ਲਈ ਆਪਣੀ ਪਹੁੰਚ ਜਾਂਚੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "couldNotRefreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "discardDraftTitle": "ਕੀ ਡਰਾਫਟ ਰੱਦ ਕਰਨਾ ਹੈ?",
       "discardDraftMessage": "ਤੁਹਾਡਾ ਪ੍ਰੌਂਪਟ ਮਿਟ ਜਾਵੇਗਾ।",

@@ -1721,6 +1721,7 @@
       "prefillModelUnavailable": "{{model}} больше недоступна. Используется ваша модель по умолчанию.",
       "couldNotReadPendingSessions": "Не удалось прочитать данные сеансов в очереди. Попробуйте снова.",
       "failedToCreate": "Не удалось создать сеанс.",
+      "checkOrganizationAccess": "Проверьте доступ к этой организации и попробуйте снова.",
       "couldNotRefreshRepositories": "Не удалось обновить список репозиториев. Попробуйте снова.",
       "discardDraftTitle": "Удалить черновик?",
       "discardDraftMessage": "Ваш запрос будет удалён.",

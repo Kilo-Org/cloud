@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} លែងអាចប្រើបានទៀតហើយ។ កំពុងប្រើម៉ូដែលលំនាំដើមរបស់អ្នក។",
       "couldNotReadPendingSessions": "មិនអាចអានវគ្គដែលកំពុងរង់ចាំបានទេ។ ព្យាយាមម្តងទៀត។",
       "failedToCreate": "មិនអាចបង្កើតវគ្គបានទេ។",
+      "checkOrganizationAccess": "សូមពិនិត្យការចូលប្រើអង្គការនេះរបស់អ្នក រួចសូមព្យាយាមម្តងទៀត។",
       "couldNotRefreshRepositories": "មិនអាចផ្ទុកបញ្ជីឃ្លាំងកូដឡើងវិញបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "discardDraftTitle": "បោះបង់សេចក្តីព្រាង?",
       "discardDraftMessage": "សេចក្តីណែនាំដែលអ្នកបានសរសេរនឹងបាត់បង់។",

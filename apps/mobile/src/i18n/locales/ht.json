@@ -2209,6 +2209,7 @@
       "prefillModelUnavailable": "{{model}} pa disponib ankò. Nou ap itilize modèl pa defo ou a.",
       "couldNotReadPendingSessions": "Nou pa t ka li sesyon annatant yo. Eseye ankò.",
       "failedToCreate": "Nou pa t ka kreye sesyon an.",
+      "checkOrganizationAccess": "Verifye si ou gen aksè a òganizasyon sa a, epi eseye ankò.",
       "couldNotRefreshRepositories": "Nou pa t ka rafrechi depo yo. Tanpri eseye ankò.",
       "discardDraftTitle": "Jete bouyon an?",
       "discardDraftMessage": "Ou ap pèdi enstriksyon ou yo.",

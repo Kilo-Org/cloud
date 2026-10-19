@@ -62,9 +62,9 @@ async function checkout(config: string, recipe?: string, mode = 'downloaded') {
   vi.stubEnv('GITHUB_OUTPUT', '');
   return { root, sha: git(['rev-parse', 'HEAD']) };
 }
-const config = (mode = 'downloaded') =>
+const config = () =>
   JSON.stringify({
-    vars: { RUNTIME_STARTUP_MODE: mode, NATIVE_RUNTIME_IMAGE: 'all-in-one' },
+    vars: {},
     r2_buckets: [{ binding: 'RUNTIME_RELEASE_BUCKET', bucket_name: 'runtime-test' }],
     containers: [
       {
@@ -93,7 +93,7 @@ it('fails a downloaded deployment promptly when publication is disabled', async 
   expect(lookup).not.toHaveBeenCalled();
 });
 it('rejects malformed JSONC before writing a deploy configuration', async () => {
-  const f = await checkout(config('preinstalled').slice(0, -1), undefined, 'preinstalled');
+  const f = await checkout(config().slice(0, -1), undefined, 'preinstalled');
   await expect(main(['production', f.sha], f.root)).rejects.toThrow('Invalid wrangler.jsonc');
   expect(lookup).not.toHaveBeenCalled();
   await expect(
@@ -102,7 +102,7 @@ it('rejects malformed JSONC before writing a deploy configuration', async () => 
 });
 it('accepts JSONC comments and trailing commas without runtime storage in preinstalled mode', async () => {
   const f = await checkout(
-    config('preinstalled').slice(0, -1) + ', // supported JSONC\n}',
+    config().slice(0, -1) + ', // supported JSONC\n}',
     undefined,
     'preinstalled'
   );

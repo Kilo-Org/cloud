@@ -489,8 +489,8 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
    and asks the Sandbox DO to clean up the failed container and launch the image for the same
    allocation. Cleanup and fallback only run while that allocation is still creating; a wrapper
    that already connected is never destroyed by fallback. Before cleanup, the Sandbox DO rotates
-   the launch credential so a late wrapper from the failed snapshot cannot connect. The snapshot attempt uses half the
-   remaining launch budget, reserving time for cleanup and the image within the original deadline.
+   the launch credential so a late wrapper from the failed snapshot cannot connect. The snapshot attempt, cleanup and image fallback share the original
+   launch deadline. No separate half-budget reservation exists.
    Each later sandbox start retries the snapshot once, up to ten failed starts per snapshot ID
    in that sandbox's durable record. After that it uses the image; a replacement snapshot gets
    its own failure budget. Failure never deletes or changes the shared snapshot index.
@@ -516,7 +516,10 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
 - **No session snapshots.** A stop destroys the container without a snapshot. A restarted session
   uses the repository snapshot, then restores its Kilo history from session-ingest.
 - **Image tie.** A deploy that changes the image changes the index key, so the next start per key is
-  cold. The platform keeps an unused snapshot for 30 days; there is no list or delete API.
+  cold. The platform keeps an unused snapshot for 30 days; there is no list or delete API. The
+  runtime-free image changes only when its own inputs change, so a runtime-only deploy keeps
+  `downloaded` snapshots. A restored `downloaded` sandbox runs the bootstrap first; the captured
+  runtime never starts.
 
 ## 7. Wrapper
 
@@ -832,8 +835,8 @@ On the native Cloudflare Containers runtime the container main process is the st
 after install. PID 1 identity (`/proc/1/cmdline`) is the issuance confirmation when it is either
 argv, bounded by the wrapper readiness deadline. PID 1 identity is not wrapper readiness: the
 wrapper socket and the Sandbox DO `starting` timer stay the readiness owner, and no provider poll or
-wrapper-child probe is added for that path. Sandbox SDK and Vercel run the startup command against
-a living PID 1.
+wrapper-child probe is added for that path. Sandbox SDK and Vercel run the preinstalled startup
+command against a living PID 1; downloaded startup is native-only.
 
 A native attempt that already issued the main process does not start another supervisor when that
 process is gone; the persisted `exec_pending` fence is not reset, and the next allocation may start a
@@ -935,11 +938,18 @@ Bootstrap → Worker (HTTPS on the `WORKER_URL` host, `downloaded` mode only): `
 the artifact grant, and `POST` one startup-failure report with the wrapper launch credential. The
 Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
 
-### Runtime release publication
+### Startup mode rollout
 
+- A deploy does not replace a running native container, so an existing allocation keeps its mode.
 - CI publishes runtime payloads create-only by content hash, and the descriptor last. The deploy
   reads an immutable handoff for the exact commit, and verifies the base image digest and both
   payloads before it deploys a `downloaded` target.
+- Roll out on an isolated target first: `downloaded` on the all-in-one image, then `downloaded` on
+  the runtime-free image, then production. Roll back the first step by mode and the second by image.
+- The runtime-free image change relies on B1 (#7914), which is already merged: a running container
+  captures under the image that it started with, including after DO reconstruction.
+- `runtime-targets.json` owns mode and image. Deployment renders Worker vars and the native image
+  from it. Real-provider qualification remains an explicit approval gate; see `runtime-rollout.md`.
 
 ### Runtime credential proxy
 
@@ -1382,6 +1392,8 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
   start metadata. Its narrow scope and short expiry bound the exposure.
 - A restored snapshot is trusted like its owner's own container. The bootstrap does not defend
   against a replaced host tool in the root filesystem.
+- Remote native qualification of `downloaded` is pending: restore from A to B, install time on the
+  minimum instance, and provider retention of start metadata.
 - A killed container is not found by polling the provider. It is a wrapper connection that does not
   return. The user waits at most the reconnect window, then the message fails `connection_lost`.
 - The reconnect window is short so a queued message does not wait long on a wrapper that is gone. A

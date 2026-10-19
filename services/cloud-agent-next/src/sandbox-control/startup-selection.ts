@@ -1,3 +1,4 @@
+import { runtimeStartupConfigSchema } from '../shared/runtime-startup-config.js';
 import type { AgentSandboxProvider, Env } from '../types.js';
 import { ProviderCreationError } from './provider.js';
 
@@ -12,14 +13,12 @@ export function selectStartup(
   env: Pick<Env, 'RUNTIME_STARTUP_MODE' | 'NATIVE_RUNTIME_IMAGE' | 'RUNTIME_RELEASE_DESCRIPTOR'>,
   provider: AgentSandboxProvider
 ): StartupSelection {
-  const mode = env.RUNTIME_STARTUP_MODE ?? 'preinstalled';
-  const image = env.NATIVE_RUNTIME_IMAGE ?? 'all-in-one';
-  if (
-    (mode !== 'preinstalled' && mode !== 'downloaded') ||
-    (image !== 'all-in-one' && image !== 'runtime-free') ||
-    (image === 'runtime-free' && mode !== 'downloaded')
-  )
-    throw new ProviderCreationError('invalid_configuration');
+  const selected = runtimeStartupConfigSchema.safeParse({
+    mode: env.RUNTIME_STARTUP_MODE ?? 'preinstalled',
+    image: env.NATIVE_RUNTIME_IMAGE ?? 'all-in-one',
+  });
+  if (!selected.success) throw new ProviderCreationError('invalid_configuration');
+  const { mode, image } = selected.data;
   // Downloaded startup is native-only. SDK and Vercel pins keep preinstalled startup.
   if (mode === 'preinstalled' || provider !== 'cloudflare-containers')
     return { mode: 'preinstalled', image };

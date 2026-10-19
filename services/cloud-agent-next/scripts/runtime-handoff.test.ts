@@ -8,7 +8,7 @@ import { publishRuntimeHandoff, loadRuntimeHandoff, runtimeHandoffKey } from './
 import { runtimeBaseInputId, type RuntimeBase } from './runtime-base.js';
 import { parse } from 'jsonc-parser';
 import { URL } from 'node:url';
-import { runtimeDeploymentStartup, prepareRuntimeDeployment } from './prepare-runtime-deploy.js';
+import { prepareRuntimeDeployment } from './prepare-runtime-deploy.js';
 import { RUNTIME_BASE_ABI } from '../src/sandbox-control/runtime-release.js';
 import {
   runtimeArtifactObjectKey,
@@ -86,19 +86,16 @@ describe('retained exact-SHA handoff', () => {
   });
 });
 describe('deployment preparation', () => {
-  const config = (mode = 'downloaded', image = 'runtime-free') => ({
+  const config = () => ({
     r2_buckets: [{ binding: 'RUNTIME_RELEASE_BUCKET', bucket_name: 'runtime-test' }],
-    vars: { RUNTIME_STARTUP_MODE: mode, NATIVE_RUNTIME_IMAGE: image },
+    vars: {},
     containers: [
       {
         class_name: 'SandboxContainers',
         scheduling_policy: 'durable_object',
         images: {
           app: {
-            dockerfile:
-              image === 'runtime-free'
-                ? './Dockerfile.containers.runtime-free'
-                : './Dockerfile.containers',
+            dockerfile: './Dockerfile.containers',
           },
         },
       },
@@ -108,17 +105,13 @@ describe('deployment preparation', () => {
     const f = await fixture();
     await publishRuntimeHandoff({ ...f, descriptor: f.packaged.descriptor });
     const raw = parse(await fs.readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
-    raw.vars = {
-      ...raw.vars,
-      RUNTIME_STARTUP_MODE: 'downloaded',
-      NATIVE_RUNTIME_IMAGE: 'all-in-one',
-    };
     raw.r2_buckets = [
       ...raw.r2_buckets,
       { binding: 'RUNTIME_RELEASE_BUCKET', bucket_name: 'runtime-test' },
     ];
     const result = await prepareRuntimeDeployment({
       config: raw,
+      startup: { mode: 'downloaded', image: 'all-in-one' },
       environment: 'production',
       sourceSha: f.sourceSha,
       bucket: 'runtime-test',
@@ -138,12 +131,13 @@ describe('deployment preparation', () => {
   it('rejects mixed all-in-one image fields before base verification', async () => {
     const f = await fixture();
     await publishRuntimeHandoff({ ...f, descriptor: f.packaged.descriptor });
-    const changed = config('downloaded', 'all-in-one');
+    const changed = config();
     Object.assign(changed.containers[0].images.app, { image: f.base.image });
     let verified = false;
     await expect(
       prepareRuntimeDeployment({
         config: changed,
+        startup: { mode: 'downloaded', image: 'all-in-one' },
         environment: 'production',
         sourceSha: f.sourceSha,
         bucket: 'runtime-test',
@@ -154,14 +148,15 @@ describe('deployment preparation', () => {
           verified = true;
         },
       })
-    ).rejects.toThrow('All-in-one target image configuration changed');
+    ).rejects.toThrow('configuration drift');
     expect(verified).toBe(false);
   });
   it('preinstalled does not touch unavailable publication storage', async () => {
     const f = await fixture();
     let reads = 0;
     const result = await prepareRuntimeDeployment({
-      config: config('preinstalled', 'all-in-one'),
+      config: config(),
+      startup: { mode: 'preinstalled', image: 'all-in-one' },
       environment: 'production',
       sourceSha: f.sourceSha,
       bucket: 'runtime-test',
@@ -178,7 +173,7 @@ describe('deployment preparation', () => {
         throw new Error('must not verify base');
       },
     });
-    expect(result).toBeNull();
+    expect(result?.vars?.RUNTIME_STARTUP_MODE).toBe('preinstalled');
     expect(reads).toBe(0);
   });
   it('renders the verified digest and descriptor only after verification', async () => {
@@ -187,6 +182,7 @@ describe('deployment preparation', () => {
     const order: string[] = [];
     const result = await prepareRuntimeDeployment({
       config: config(),
+      startup: { mode: 'downloaded', image: 'runtime-free' },
       environment: 'production',
       sourceSha: f.sourceSha,
       bucket: 'runtime-test',
@@ -211,6 +207,7 @@ describe('deployment preparation', () => {
     await expect(
       prepareRuntimeDeployment({
         config: changed,
+        startup: { mode: 'downloaded', image: 'runtime-free' },
         environment: 'production',
         sourceSha: f.sourceSha,
         bucket: 'runtime-test',
@@ -221,14 +218,41 @@ describe('deployment preparation', () => {
           verified = true;
         },
       })
-    ).rejects.toThrow('configuration changed');
+    ).rejects.toThrow('configuration drift');
     expect(verified).toBe(false);
+  });
+  it('rejects bucket drift before any publication lookup', async () => {
+    const f = await fixture();
+    const changed = config();
+    changed.r2_buckets[0].bucket_name = 'other-runtime';
+    let reads = 0;
+    await expect(
+      prepareRuntimeDeployment({
+        config: changed,
+        environment: 'production',
+        startup: { mode: 'downloaded', image: 'all-in-one' },
+        sourceSha: f.sourceSha,
+        bucket: 'runtime-test',
+        accountId: 'c'.repeat(32),
+        baseInputId: f.base.inputId,
+        store: {
+          ...f.store,
+          getBytes: async () => {
+            reads++;
+            throw new Error('must not query storage');
+          },
+        },
+        verifyBase: () => {},
+      })
+    ).rejects.toThrow('bucket binding changed');
+    expect(reads).toBe(0);
   });
   it('rejects runtime-free with preinstalled', async () => {
     const f = await fixture();
     await expect(
       prepareRuntimeDeployment({
-        config: config('preinstalled'),
+        config: config(),
+        startup: { mode: 'preinstalled', image: 'runtime-free' } as never,
         environment: 'production',
         sourceSha: f.sourceSha,
         bucket: 'runtime-test',
@@ -256,10 +280,4 @@ describe('base input matrix', () => {
     await fs.appendFile(recipe, 'COPY undeclared /tmp/file\n');
     await expect(runtimeBaseInputId(root)).rejects.toThrow('Declare and hash');
   });
-});
-
-it('validates a misspelled mode before publication lookup', () => {
-  expect(() =>
-    runtimeDeploymentStartup({ vars: { RUNTIME_STARTUP_MODE: 'downlaoded' } }, 'production')
-  ).toThrow();
 });

@@ -53,6 +53,9 @@ The trigger stays disabled until infrastructure owners approve and provision:
 
 No resources or credentials were provisioned by this change. No deployed target selects downloaded startup.
 
+`runtime-targets.json` owns target mode/image selection. See [runtime-rollout.md](runtime-rollout.md)
+for rendering, isolated qualification and rollback.
+
 Downloaded deployment preparation uses the exact checked-out source SHA. It fails at once when the
 enablement variable is not `true`. Otherwise it waits at most 45 minutes for that SHA's handoff
 without holding the publisher's concurrency lock. It checks source identity,

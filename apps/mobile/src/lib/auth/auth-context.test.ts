@@ -61,6 +61,9 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),
 }));
+vi.mock('@/lib/hooks/use-tracking-permission-prompt', () => ({
+  clearTrackingPromptDismissed: vi.fn(),
+}));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
   clearReasoningPreference: vi.fn(),

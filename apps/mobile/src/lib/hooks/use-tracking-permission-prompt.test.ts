@@ -26,7 +26,24 @@ vi.mock('react-native', () => ({
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock('@sentry/react-native', () => ({ captureException }));
 
-import { useTrackingPermissionPrompt } from './use-tracking-permission-prompt';
+// The dismissed preference loads through secure-store-preference, whose chain
+// reaches expo-secure-store, sonner-native and the bundle-time config. Stub
+// them the way secure-store-preference.test.ts does.
+const { getItemAsync, setItemAsync, deleteItemAsync } = vi.hoisted(() => ({
+  getItemAsync: vi.fn<(key: string, options?: unknown) => Promise<string | null>>(),
+  setItemAsync: vi.fn<(key: string, options?: unknown) => Promise<void>>(),
+  deleteItemAsync: vi.fn<(key: string, options?: unknown) => Promise<void>>(),
+}));
+vi.mock('expo-secure-store', () => ({ getItemAsync, setItemAsync, deleteItemAsync }));
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
+vi.mock('sonner-native', () => ({ toast: { error: toastError } }));
+const configStub = vi.hoisted(() => new Proxy({}, { get: () => undefined, has: () => true }));
+vi.mock('@/lib/config', () => configStub);
+
+import {
+  clearTrackingPromptDismissed,
+  useTrackingPermissionPrompt,
+} from './use-tracking-permission-prompt';
 
 type AlertButton = { text: string; style?: string; onPress?: () => void };
 
@@ -47,16 +64,7 @@ function mountHarness(enabled: boolean): TestRenderer.ReactTestRenderer {
 
 // Helper to produce a controllable promise without uninitialized variables.
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
-  let storedResolve: ((value: T) => void) | undefined = undefined;
-  const promise = new Promise<T>(resolve => {
-    storedResolve = resolve;
-  });
-  return {
-    promise,
-    resolve: (value: T) => {
-      storedResolve?.(value);
-    },
-  };
+  return Promise.withResolvers<T>();
 }
 
 function getAlertButtons(): [AlertButton, AlertButton] {
@@ -71,12 +79,28 @@ function getAlertButtons(): [AlertButton, AlertButton] {
   return buttons as [AlertButton, AlertButton];
 }
 
+// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+function flushMicrotasks(): Promise<undefined> {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  setImmediate(() => {
+    resolve(undefined);
+  });
+  return promise;
+}
+
 describe('useTrackingPermissionPrompt', () => {
   beforeEach(() => {
     getTrackingPermissionsAsync.mockReset();
     requestTrackingPermissionsAsync.mockReset();
     alertMock.mockReset();
     captureException.mockReset();
+    getItemAsync.mockReset();
+    setItemAsync.mockReset();
+    deleteItemAsync.mockReset();
+    // Default: nothing persisted, so the preference reads its default value.
+    getItemAsync.mockResolvedValue(null);
+    setItemAsync.mockResolvedValue(undefined);
+    deleteItemAsync.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -166,6 +190,80 @@ describe('useTrackingPermissionPrompt', () => {
 
     expect(requestTrackingPermissionsAsync).not.toHaveBeenCalled();
     renderer.unmount();
+
+    // Not now persists the dismissal so later mounts never see the alert.
+    await flushMicrotasks();
+    expect(setItemAsync).toHaveBeenCalledWith('tracking-prompt-dismissed', 'true');
+
+    // The store is module-level: reset it so later tests start undismissed.
+    clearTrackingPromptDismissed();
+    await flushMicrotasks();
+  });
+
+  // Remembered dismissal: a launch with the flag persisted shows no alert.
+  // The preference store is module-level and caches after its first load, so
+  // this test resets the module registry and imports the hook dynamically:
+  // a static import would reuse a store that already resolved its disk read
+  // in an earlier test and would never see the seeded value.
+  it('does not show the pre-prompt again on a later launch after Not now was persisted', async () => {
+    getItemAsync.mockResolvedValue('true');
+    getTrackingPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
+
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    await act(async () => {
+      vi.resetModules();
+      const { useTrackingPermissionPrompt: freshHook } = await import(
+        './use-tracking-permission-prompt'
+      );
+      const FreshHarness: FC<{ enabled: boolean }> = ({ enabled }) => {
+        freshHook(enabled);
+        return null;
+      };
+      renderer = TestRenderer.create(createElement(FreshHarness, { enabled: true }));
+      await flushMicrotasks();
+    });
+
+    expect(alertMock).not.toHaveBeenCalled();
+    expect(requestTrackingPermissionsAsync).not.toHaveBeenCalled();
+    // The hook skips the ATT read entirely once the dismissal is on disk.
+    expect(getTrackingPermissionsAsync).not.toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- renderer assigned inside act
+    (renderer as unknown as TestRenderer.ReactTestRenderer).unmount();
+  });
+
+  // A fast ATT check must not win the race against the asynchronous flag read:
+  // the hook awaits the flag load before consulting ATT, so the alert stays
+  // hidden when the flag lands after the mount.
+  it('still suppresses the alert when the flag read resolves after the mount', async () => {
+    const { promise: diskPromise, resolve: resolveDisk } =
+      Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValue(diskPromise);
+    getTrackingPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
+
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    await act(async () => {
+      vi.resetModules();
+      const { useTrackingPermissionPrompt: freshHook } = await import(
+        './use-tracking-permission-prompt'
+      );
+      const FreshHarness: FC<{ enabled: boolean }> = ({ enabled }) => {
+        freshHook(enabled);
+        return null;
+      };
+      renderer = TestRenderer.create(createElement(FreshHarness, { enabled: true }));
+      await Promise.resolve();
+    });
+    expect(alertMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveDisk('true');
+      await flushMicrotasks();
+    });
+
+    expect(alertMock).not.toHaveBeenCalled();
+    expect(requestTrackingPermissionsAsync).not.toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- renderer assigned inside act
+    (renderer as unknown as TestRenderer.ReactTestRenderer).unmount();
   });
 
   // Request failure: Sentry receives error; no rethrow or retry.

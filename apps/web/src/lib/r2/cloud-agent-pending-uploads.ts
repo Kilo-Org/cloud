@@ -68,8 +68,9 @@ export async function admitPendingUpload({
       like(cloud_agent_pending_uploads.object_key, `%${suffix}`)
     );
 
-    const countFilter = and(
+    const messageCountFilter = and(
       eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+      eq(cloud_agent_pending_uploads.message_uuid, messageUuid),
       eq(cloud_agent_pending_uploads.status, 'pending'),
       not(sameAttachment ?? sql`false`)
     );
@@ -77,7 +78,7 @@ export async function admitPendingUpload({
     const messageRows = await tx
       .select({ messagePendingCount: count() })
       .from(cloud_agent_pending_uploads)
-      .where(and(countFilter, eq(cloud_agent_pending_uploads.message_uuid, messageUuid)));
+      .where(messageCountFilter);
     const messagePendingCount = messageRows[0]?.messagePendingCount ?? 0;
 
     if (messagePendingCount >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT) {
@@ -87,10 +88,19 @@ export async function admitPendingUpload({
       });
     }
 
+    const sameAttachmentInMessage = and(
+      sameAttachment,
+      eq(cloud_agent_pending_uploads.message_uuid, messageUuid)
+    );
+    const accountCountFilter = and(
+      eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+      eq(cloud_agent_pending_uploads.status, 'pending'),
+      not(sameAttachmentInMessage ?? sql`false`)
+    );
     const accountRows = await tx
       .select({ accountPendingCount: count() })
       .from(cloud_agent_pending_uploads)
-      .where(countFilter);
+      .where(accountCountFilter);
     const accountPendingCount = accountRows[0]?.accountPendingCount ?? 0;
 
     if (accountPendingCount >= CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT) {
@@ -263,12 +273,34 @@ export async function releasePendingUploads(
 }
 
 /**
- * Delete the private objects behind every upload row this user admitted,
- * whatever its status, so account deletion removes the objects together
- * with their ledger rows.
+ * Delete the private objects behind every live upload row this user admitted,
+ * one bounded batch at a time, so account deletion removes the objects
+ * together with their ledger rows.
  */
 export async function purgeUserPendingUploads(kiloUserId: string): Promise<void> {
-  await claimAndDeleteUploadObjects(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId));
+  for (;;) {
+    const batch = db
+      .select({ id: cloud_agent_pending_uploads.id })
+      .from(cloud_agent_pending_uploads)
+      .where(
+        and(
+          eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+          inArray(cloud_agent_pending_uploads.status, ['pending', 'linked'])
+        )
+      )
+      .limit(CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH);
+
+    const reaped = await claimAndDeleteUploadObjects(
+      and(
+        eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+        inArray(cloud_agent_pending_uploads.status, ['pending', 'linked']),
+        inArray(cloud_agent_pending_uploads.id, batch)
+      )
+    );
+
+    // A short batch means every row for this user is claimed.
+    if (reaped < CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH) return;
+  }
 }
 
 /**

@@ -7,7 +7,7 @@
 
 import { z } from 'zod';
 
-type AeQueryEnv = {
+export type AeQueryEnv = {
   O11Y_CF_ACCOUNT_ID: string;
   O11Y_CF_AE_API_TOKEN: SecretsStoreSecret;
 };
@@ -78,15 +78,43 @@ export function queryErrorRates(
   return queryAnalyticsEngine<ErrorRateRow>(sql, env);
 }
 
+const MODEL_ID_PATTERN = /^[A-Za-z0-9._:/@-]+$/;
+const MODEL_ID_MAX_LENGTH = 200;
+
+/**
+ * A model identifier that is safe to interpolate into an Analytics Engine SQL
+ * string literal: restricted to a fixed character set and length, with quotes,
+ * whitespace, and backslashes rejected outright.
+ */
+export const ModelIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MODEL_ID_MAX_LENGTH)
+  .regex(MODEL_ID_PATTERN, 'contains characters that are not allowed in a model id');
+
 function escapeSqlString(value: string): string {
-  return value.replaceAll("'", "''");
+  return value.replaceAll('\\', '\\\\').replaceAll("'", "''");
+}
+
+/**
+ * Returns the model id when it is safe to interpolate into an Analytics Engine
+ * SQL string literal; throws otherwise. Quotes, whitespace, and backslashes are
+ * rejected outright.
+ */
+export function parseModelId(value: string): string {
+  const parsed = ModelIdSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error(`Invalid model id: ${value.slice(0, MODEL_ID_MAX_LENGTH + 1)}`);
+  }
+  return parsed.data;
 }
 
 export async function queryErrorRateBaseline(
   model: string,
   env: AeQueryEnv
 ): Promise<ErrorRateBaselineRow | null> {
-  const modelValue = escapeSqlString(model);
+  const modelValue = escapeSqlString(parseModelId(model));
   const sql = `
 		SELECT
 			SUM(IF(timestamp > NOW() - INTERVAL '1' DAY, _sample_interval, 0)) AS weighted_total_1d,
@@ -165,7 +193,7 @@ type TtfbBaseline3dRow = {
  * Only considers successful requests (blob4 = '0').
  */
 export async function queryTtfbBaseline(model: string, env: AeQueryEnv): Promise<TtfbBaselineRow> {
-  const modelValue = escapeSqlString(model);
+  const modelValue = escapeSqlString(parseModelId(model));
   const sql = `
 		SELECT
 			quantileExactWeighted(0.50)(double1, _sample_interval) AS p50_ttfb,

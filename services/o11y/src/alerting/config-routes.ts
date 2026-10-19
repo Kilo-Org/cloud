@@ -13,11 +13,21 @@ import {
   listTtfbAlertingConfigs,
   upsertTtfbAlertingConfig,
 } from './ttfb-config-store';
-import { queryErrorRateBaseline, queryTtfbBaseline } from './query';
+import {
+  ModelIdSchema,
+  queryErrorRateBaseline,
+  queryTtfbBaseline,
+} from './query';
 
 function errorRate(errors: number, total: number): number {
   if (total <= 0) return 0;
   return errors / total;
+}
+
+/** Parses the `model` query parameter, or null when it is missing or invalid. */
+function queryModelParam(c: { req: { query(name: string): string | undefined } }): string | null {
+  const parsed = ModelIdSchema.safeParse(c.req.query('model') ?? '');
+  return parsed.success ? parsed.data : null;
 }
 
 export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void {
@@ -51,8 +61,8 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
   });
 
   app.get('/alerting/baseline', requireAdmin, async c => {
-    const model = c.req.query('model')?.trim();
-    if (!model || model.length === 0) {
+    const model = queryModelParam(c);
+    if (!model) {
       return c.json({ success: false, error: 'model is required' }, 400);
     }
 
@@ -113,8 +123,8 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
   });
 
   app.get('/alerting/ttfb-baseline', requireAdmin, async c => {
-    const model = c.req.query('model')?.trim();
-    if (!model || model.length === 0) {
+    const model = queryModelParam(c);
+    if (!model) {
       return c.json({ success: false, error: 'model is required' }, 400);
     }
 

@@ -5,7 +5,7 @@ import {
   createKiloPairing,
   fetchOrgOptions,
   fetchUserIsAdmin,
-  pollKiloPairing,
+  redeemKiloPairing,
 } from './kilo-pairing';
 import { PERSONAL_ORG_ID } from './pages';
 
@@ -30,10 +30,12 @@ function forwardedHeaders(init: RequestInit | undefined): Record<string, string>
 }
 
 describe('createKiloPairing', () => {
-  it('POSTs to apps/web and returns the pairing code', async () => {
-    const fetchImpl = fetchMock(() => Response.json({ code: 'PAIR-1' }));
+  it('POSTs to apps/web and returns the pairing code and device secret', async () => {
+    const fetchImpl = fetchMock(() =>
+      Response.json({ code: 'PAIR-1', device_code: 'device-secret-1' })
+    );
     const result = await createKiloPairing({ webBaseUrl: WEB, fetchImpl }, authorizeRequest());
-    expect(result).toEqual({ ok: true, pairingCode: 'PAIR-1' });
+    expect(result).toEqual({ ok: true, pairingCode: 'PAIR-1', deviceCode: 'device-secret-1' });
     const [url, init] = fetchImpl.mock.calls[0]!;
     expect(url).toBe(`${WEB}/api/device-auth/codes`);
     expect(init?.method).toBe('POST');
@@ -42,7 +44,9 @@ describe('createKiloPairing', () => {
   });
 
   it('forwards the Cloudflare client IP and user-agent to apps/web', async () => {
-    const fetchImpl = fetchMock(() => Response.json({ code: 'PAIR-1' }));
+    const fetchImpl = fetchMock(() =>
+      Response.json({ code: 'PAIR-1', device_code: 'device-secret-1' })
+    );
     await createKiloPairing(
       { webBaseUrl: WEB, fetchImpl },
       authorizeRequest({
@@ -58,7 +62,9 @@ describe('createKiloPairing', () => {
   });
 
   it('falls back to x-forwarded-for when CF-Connecting-IP is absent', async () => {
-    const fetchImpl = fetchMock(() => Response.json({ code: 'PAIR-1' }));
+    const fetchImpl = fetchMock(() =>
+      Response.json({ code: 'PAIR-1', device_code: 'device-secret-1' })
+    );
     await createKiloPairing(
       { webBaseUrl: WEB, fetchImpl },
       authorizeRequest({ 'x-forwarded-for': '198.51.100.2' })
@@ -67,7 +73,9 @@ describe('createKiloPairing', () => {
   });
 
   it('drops a header that fails validation without dropping the rest', async () => {
-    const fetchImpl = fetchMock(() => Response.json({ code: 'PAIR-1' }));
+    const fetchImpl = fetchMock(() =>
+      Response.json({ code: 'PAIR-1', device_code: 'device-secret-1' })
+    );
     await createKiloPairing(
       { webBaseUrl: WEB, fetchImpl },
       authorizeRequest({
@@ -114,62 +122,64 @@ describe('createKiloPairing', () => {
         authorizeRequest()
       )
     ).resolves.toEqual({ ok: false, kind: 'unreachable' });
+    await expect(
+      createKiloPairing(
+        { webBaseUrl: WEB, fetchImpl: fetchMock(() => Response.json({ code: 'PAIR-1' })) },
+        authorizeRequest()
+      )
+    ).resolves.toEqual({ ok: false, kind: 'unreachable' });
   });
 });
 
-describe('pollKiloPairing', () => {
+describe('redeemKiloPairing', () => {
   const deps = { webBaseUrl: WEB };
 
-  it('maps 202/403/410 and a malformed success body', async () => {
+  it('POSTs the device secret to the token endpoint and maps 202/403/410', async () => {
+    const fetchImpl = fetchMock(() => new Response('', { status: 202 }));
+    await expect(redeemKiloPairing({ ...deps, fetchImpl }, 'device-secret-9')).resolves.toEqual({
+      status: 'pending',
+    });
+    expect(fetchImpl.mock.calls[0]![0]).toBe(`${WEB}/api/device-auth/token`);
+    const init = fetchImpl.mock.calls[0]![1];
+    expect(init?.method).toBe('POST');
+    expect(init?.body).toBe(JSON.stringify({ deviceCode: 'device-secret-9' }));
     await expect(
-      pollKiloPairing(
-        { ...deps, fetchImpl: fetchMock(() => new Response('', { status: 202 })) },
-        'PAIR-1'
-      )
-    ).resolves.toEqual({ status: 'pending' });
-    await expect(
-      pollKiloPairing(
+      redeemKiloPairing(
         { ...deps, fetchImpl: fetchMock(() => new Response('', { status: 403 })) },
-        'PAIR-1'
+        'device-secret-9'
       )
     ).resolves.toEqual({ status: 'denied' });
     await expect(
-      pollKiloPairing(
+      redeemKiloPairing(
         { ...deps, fetchImpl: fetchMock(() => new Response('', { status: 410 })) },
-        'PAIR-1'
+        'device-secret-9'
       )
     ).resolves.toEqual({ status: 'expired' });
-    await expect(
-      pollKiloPairing(
-        { ...deps, fetchImpl: fetchMock(() => Response.json({ status: 'approved' })) },
-        'PAIR-1'
-      )
-    ).resolves.toEqual({ status: 'unreachable' });
   });
 
   it('returns token + userId on an approved pairing', async () => {
     const fetchImpl = fetchMock(() =>
       Response.json({ status: 'approved', token: 'kilo-jwt', userId: 'u-7' })
     );
-    await expect(pollKiloPairing({ ...deps, fetchImpl }, 'PAIR-9')).resolves.toEqual({
+    await expect(redeemKiloPairing({ ...deps, fetchImpl }, 'device-secret-9')).resolves.toEqual({
       status: 'approved',
       token: 'kilo-jwt',
       userId: 'u-7',
     });
-    expect(fetchImpl.mock.calls[0]![0]).toBe(`${WEB}/api/device-auth/codes/PAIR-9`);
+    expect(fetchImpl.mock.calls[0]![0]).toBe(`${WEB}/api/device-auth/token`);
   });
 
   it('treats a transport failure or a non-OK status as unreachable', async () => {
     await expect(
-      pollKiloPairing(
+      redeemKiloPairing(
         { ...deps, fetchImpl: fetchMock(() => Promise.reject(new Error('down'))) },
-        'P'
+        'device-secret-9'
       )
     ).resolves.toEqual({ status: 'unreachable' });
     await expect(
-      pollKiloPairing(
+      redeemKiloPairing(
         { ...deps, fetchImpl: fetchMock(() => new Response('', { status: 500 })) },
-        'P'
+        'device-secret-9'
       )
     ).resolves.toEqual({ status: 'unreachable' });
   });

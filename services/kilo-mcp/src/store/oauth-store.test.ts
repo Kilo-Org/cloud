@@ -597,9 +597,9 @@ describe('production token routing (real provider + DO SQLite)', () => {
         vi.fn(async (input: string | URL) => {
           const url = String(input);
           if (url.endsWith('/api/device-auth/codes')) {
-            return Response.json({ code: 'PAIR-1' });
+            return Response.json({ code: 'PAIR-1', device_code: 'device-secret-2' });
           }
-          if (url.endsWith('/api/device-auth/codes/PAIR-1')) {
+          if (url.endsWith('/api/device-auth/token')) {
             return Response.json({ status: 'approved', token: 'kilo-token-2', userId: 'user-2' });
           }
           throw new Error(`unexpected fetch during the consent flow: ${url}`);

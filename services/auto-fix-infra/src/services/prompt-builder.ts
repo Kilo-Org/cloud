@@ -49,6 +49,12 @@ const neutralizeEnvelopeDelimiters = (input: string): string =>
   input.replace(/<()(\/?untrusted_[a-z_]+)/gi, '&lt;$2');
 
 /**
+ * Limit text to a maximum number of characters without splitting a code point.
+ */
+const truncateByCodePoints = (input: string, max: number): string =>
+  Array.from(input).slice(0, max).join('');
+
+/**
  * Condition issue-derived text before it is embedded in the prompt as a
  * labeled data section.
  */
@@ -56,11 +62,35 @@ const sanitizeIssueTextInput = (input: string): string => {
   let sanitized = neutralizeEnvelopeDelimiters(sanitizeInputPatterns(input));
 
   if (sanitized.length > MAX_ISSUE_TEXT_LENGTH) {
-    sanitized = `${sanitized.slice(0, MAX_ISSUE_TEXT_LENGTH)}\n[truncated]`;
+    sanitized = `${truncateByCodePoints(sanitized, MAX_ISSUE_TEXT_LENGTH)}\n[truncated]`;
   }
 
   return sanitized;
 };
+
+/**
+ * Condition the issue body for embedding: rewrite section labels, replace
+ * override phrases, and cap length while keeping fenced code content intact,
+ * since that content usually holds reproduction details.
+ */
+const sanitizeIssueBodyInput = (input: string): string => {
+  let sanitized = neutralizeEnvelopeDelimiters(replaceOverridePhrases(input));
+
+  if (sanitized.length > MAX_ISSUE_TEXT_LENGTH) {
+    sanitized = `${truncateByCodePoints(sanitized, MAX_ISSUE_TEXT_LENGTH)}\n[truncated]`;
+  }
+
+  return sanitized;
+};
+
+/**
+ * Replace override phrases found in external text with a fixed marker.
+ */
+const replaceOverridePhrases = (input: string): string =>
+  input.replace(
+    /(?:ignore|disregard|forget|override|bypass)\s+(?:all\s+)?(?:previous|above|prior)\s+(?:instructions?|rules?|guidelines?)/gi,
+    '[instruction override attempt removed]'
+  );
 
 /**
  * Sanitize user input to prevent prompt injection
@@ -71,10 +101,7 @@ const sanitizeInputPatterns = (input: string): string => {
   let sanitized = input.replace(/```[\s\S]*?```/g, '[code block removed]');
 
   // Remove potential instruction patterns
-  sanitized = sanitized.replace(
-    /(?:ignore|disregard|forget|override|bypass)\s+(?:all\s+)?(?:previous|above|prior)\s+(?:instructions?|rules?|guidelines?)/gi,
-    '[instruction override attempt removed]'
-  );
+  sanitized = replaceOverridePhrases(sanitized);
 
   return sanitized;
 };
@@ -111,7 +138,7 @@ const buildIssueContext = (
   const { repoFullName, issueNumber, issueBody } = issueInfo;
   const { intentSummary, relatedFiles, reasoning } = classification;
 
-  const issueBodySafe = sanitizeIssueTextInput(issueBody || '');
+  const issueBodySafe = sanitizeIssueBodyInput(issueBody || '');
   const intentSummarySafe = sanitizeIssueTextInput(intentSummary);
   const reasoningSafe = reasoning ? sanitizeIssueTextInput(reasoning) : '';
 

@@ -235,6 +235,20 @@ export const StripeServiceFeeOutcome = {
 export type StripeServiceFeeOutcome =
   (typeof StripeServiceFeeOutcome)[keyof typeof StripeServiceFeeOutcome];
 
+// ADR 0005 custom router values. Declared here rather than imported from
+// @kilocode/auto-routing-contracts: consumers that typecheck this package's
+// source would otherwise pull in the contracts source, which needs a newer
+// TypeScript lib than several of them set. Values mirror the ADR table.
+export const CustomRouterBaseRouter = {
+  Efficient: 'efficient',
+  Frontier: 'frontier',
+} as const;
+
+export const CustomRouterMode = {
+  CostPerAccuracy: 'cost_per_accuracy',
+  BestAccuracy: 'best_accuracy',
+} as const;
+
 export const SCHEMA_CHECK_ENUMS = {
   StripeServiceFeeFlow,
   StripeServiceFeeOutcome,
@@ -328,6 +342,8 @@ export const SCHEMA_CHECK_ENUMS = {
   MCPGatewayAuthorizationRequestStatus,
   MCPGatewayPendingProviderAuthorizationStatus,
   MCPGatewayAuditOutcome,
+  CustomRouterBaseRouter,
+  CustomRouterMode,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -12273,3 +12289,80 @@ export const stripe_service_fee_assessments = pgTable(
 
 export type StripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferSelect;
 export type NewStripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferInsert;
+
+// Mirrors the contracts pool entry union (ADR 0005). Consumers pass values
+// typed by @kilocode/auto-routing-contracts, so a shape change here fails to
+// compile at those call sites.
+export type AutoRoutingCustomRouterEntry =
+  | { kind: 'gateway'; model: string }
+  | {
+      kind: 'client';
+      provider: string;
+      model: string;
+      variants: string[];
+      capabilities: {
+        contextLength: number | null;
+        inputModalities: string[];
+        toolCall: boolean;
+        reasoning: boolean;
+      };
+      pricing: {
+        inputPerMTokUsd: number;
+        outputPerMTokUsd: number;
+        cacheReadPerMTokUsd?: number;
+      } | null;
+    };
+
+// ADR 0005: custom auto routers owned by a user or an organization.
+export const auto_routing_custom_routers = pgTable(
+  'auto_routing_custom_routers',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    // Audit trail; nulled by nothing, so a deleted creator stays unattributed.
+    created_by_user_id: text(),
+    slug: text().notNull(),
+    name: text().notNull(),
+    base_router: text()
+      .$type<(typeof CustomRouterBaseRouter)[keyof typeof CustomRouterBaseRouter]>()
+      .notNull(),
+    mode: text().$type<(typeof CustomRouterMode)[keyof typeof CustomRouterMode]>().notNull(),
+    entries: jsonb().$type<AutoRoutingCustomRouterEntry[]>().notNull(),
+    default_entry_key: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_auto_routing_custom_routers_org_slug')
+      .on(table.owned_by_organization_id, table.slug)
+      .where(isNotNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_auto_routing_custom_routers_user_slug')
+      .on(table.owned_by_user_id, table.slug)
+      .where(isNotNull(table.owned_by_user_id)),
+    index('IDX_auto_routing_custom_routers_org_id').on(table.owned_by_organization_id),
+    index('IDX_auto_routing_custom_routers_user_id').on(table.owned_by_user_id),
+    check(
+      'auto_routing_custom_routers_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    enumCheck(
+      'auto_routing_custom_routers_base_router_check',
+      table.base_router,
+      CustomRouterBaseRouter
+    ),
+    enumCheck('auto_routing_custom_routers_mode_check', table.mode, CustomRouterMode),
+  ]
+);
+
+export type AutoRoutingCustomRouter = typeof auto_routing_custom_routers.$inferSelect;
+export type NewAutoRoutingCustomRouter = typeof auto_routing_custom_routers.$inferInsert;

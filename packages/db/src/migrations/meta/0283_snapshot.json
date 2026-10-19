@@ -1,5 +1,5 @@
 {
-  "id": "8279e365-4d4e-4ed5-848f-50a86bab4683",
+  "id": "d48371da-3faf-40a7-b7b0-8deaef61ed7b",
   "prevId": "3817863b-1d7c-4d90-a0d1-4b8da3398992",
   "version": "7",
   "dialect": "postgresql",
@@ -2863,6 +2863,209 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.auto_routing_custom_routers": {
+      "name": "auto_routing_custom_routers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_router": {
+          "name": "base_router",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entries": {
+          "name": "entries",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "default_entry_key": {
+          "name": "default_entry_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_auto_routing_custom_routers_org_slug": {
+          "name": "UQ_auto_routing_custom_routers_org_slug",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"auto_routing_custom_routers\".\"owned_by_organization_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_auto_routing_custom_routers_user_slug": {
+          "name": "UQ_auto_routing_custom_routers_user_slug",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"auto_routing_custom_routers\".\"owned_by_user_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_auto_routing_custom_routers_org_id": {
+          "name": "IDX_auto_routing_custom_routers_org_id",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_auto_routing_custom_routers_user_id": {
+          "name": "IDX_auto_routing_custom_routers_user_id",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "auto_routing_custom_routers_owned_by_organization_id_organizations_id_fk": {
+          "name": "auto_routing_custom_routers_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "auto_routing_custom_routers",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "auto_routing_custom_routers_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "auto_routing_custom_routers_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "auto_routing_custom_routers",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "auto_routing_custom_routers_owner_check": {
+          "name": "auto_routing_custom_routers_owner_check",
+          "value": "(\n        (\"auto_routing_custom_routers\".\"owned_by_user_id\" IS NOT NULL AND \"auto_routing_custom_routers\".\"owned_by_organization_id\" IS NULL) OR\n        (\"auto_routing_custom_routers\".\"owned_by_user_id\" IS NULL AND \"auto_routing_custom_routers\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        },
+        "auto_routing_custom_routers_base_router_check": {
+          "name": "auto_routing_custom_routers_base_router_check",
+          "value": "\"auto_routing_custom_routers\".\"base_router\" IN ('efficient', 'frontier')"
+        },
+        "auto_routing_custom_routers_mode_check": {
+          "name": "auto_routing_custom_routers_mode_check",
+          "value": "\"auto_routing_custom_routers\".\"mode\" IN ('cost_per_accuracy', 'best_accuracy')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.auto_top_up_configs": {
@@ -15920,153 +16123,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.inference_reservations": {
-      "name": "inference_reservations",
-      "schema": "",
-      "columns": {
-        "request_id": {
-          "name": "request_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "amount_microdollars": {
-          "name": "amount_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actual_cost_microdollars": {
-          "name": "actual_cost_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'reserved'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "finalized_at": {
-          "name": "finalized_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "IDX_inference_reservations_user": {
-          "name": "IDX_inference_reservations_user",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_inference_reservations_org_user_status": {
-          "name": "IDX_inference_reservations_org_user_status",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"inference_reservations\".\"organization_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "inference_reservations_kilo_user_id_kilocode_users_id_fk": {
-          "name": "inference_reservations_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "inference_reservations",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "inference_reservations_organization_id_organizations_id_fk": {
-          "name": "inference_reservations_organization_id_organizations_id_fk",
-          "tableFrom": "inference_reservations",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "inference_reservations_amount_check": {
-          "name": "inference_reservations_amount_check",
-          "value": "\"inference_reservations\".\"amount_microdollars\" BETWEEN 0 AND 9007199254740991"
-        },
-        "inference_reservations_actual_cost_check": {
-          "name": "inference_reservations_actual_cost_check",
-          "value": "\"inference_reservations\".\"actual_cost_microdollars\" BETWEEN 0 AND 9007199254740991"
-        },
-        "inference_reservations_state_check": {
-          "name": "inference_reservations_state_check",
-          "value": "(\n        \"inference_reservations\".\"status\" = 'reserved'\n        AND \"inference_reservations\".\"actual_cost_microdollars\" IS NULL\n        AND \"inference_reservations\".\"finalized_at\" IS NULL\n      ) OR (\n        \"inference_reservations\".\"status\" = 'settled'\n        AND \"inference_reservations\".\"actual_cost_microdollars\" IS NOT NULL\n        AND \"inference_reservations\".\"finalized_at\" IS NOT NULL\n      ) OR (\n        \"inference_reservations\".\"status\" = 'released'\n        AND \"inference_reservations\".\"actual_cost_microdollars\" IS NULL\n        AND \"inference_reservations\".\"finalized_at\" IS NOT NULL\n      )"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.ja4_digest": {
       "name": "ja4_digest",
       "schema": "",
@@ -22534,13 +22590,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'0'"
-        },
-        "inference_microdollars_held": {
-          "name": "inference_microdollars_held",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
         },
         "kilo_pass_threshold": {
           "name": "kilo_pass_threshold",
@@ -29493,13 +29542,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'0'"
-        },
-        "inference_microdollars_held": {
-          "name": "inference_microdollars_held",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
         },
         "microdollars_balance": {
           "name": "microdollars_balance",

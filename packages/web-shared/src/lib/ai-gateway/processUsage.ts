@@ -1,3 +1,4 @@
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { randomUUID } from 'crypto';
 import { billingDb, db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
@@ -1597,7 +1598,13 @@ function bouncerUsageEvent(
     if (bouncer.clientIp == null) return null;
     return { ...fields, tier: 'anonymous', ip: bouncer.clientIp };
   }
-  return { ...fields, accountId: bouncer.accountId, ip: bouncer.clientIp };
+  return {
+    ...fields,
+    accountId: bouncer.accountId,
+    ip: bouncer.clientIp,
+    // Only set for a request served on the person's delegated ChatGPT connection.
+    ...(usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID ? { siwc: true } : {}),
+  };
 }
 
 async function getGenerationLookupProvider(

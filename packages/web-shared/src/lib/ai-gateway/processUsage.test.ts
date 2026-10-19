@@ -1618,6 +1618,25 @@ describe('logMicrodollarUsage', () => {
       expect(mockedReportUsageEvent).toHaveBeenCalledWith(
         expect.objectContaining({ requestId, costMicrodollars: BASE_USAGE_STATS.cost_mUsd })
       );
+      expect(mockedReportUsageEvent.mock.calls[0]?.[0]).not.toHaveProperty('siwc');
+    });
+
+    test('marks a request served on the delegated ChatGPT connection as siwc', async () => {
+      const user = await insertTestUser({
+        id: 'test-bouncer-siwc-user',
+        microdollars_used: 0,
+        google_user_email: 'bouncer-siwc@example.com',
+      });
+      const requestId = 'req-bouncer-siwc';
+
+      await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: null },
+        { ...spendWatchContext(user, requestId, false), provider: 'openai-chatgpt' }
+      );
+
+      expect(mockedReportUsageEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId, accountId: `user:${user.id}`, siwc: true })
+      );
     });
   });
 });

@@ -89,6 +89,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  auto_routing_custom_routers,
   github_install_states,
   code_review_feedback_events,
   code_review_memory_proposals,
@@ -5670,6 +5671,38 @@ describe('User', () => {
         .from(coding_plan_availability_intents)
         .where(eq(coding_plan_availability_intents.user_id, user.id));
       expect(intents).toHaveLength(0);
+    });
+
+    it('should delete user-owned custom auto routers and keep another owner’s', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const router = (ownerId: string, slug: string) => ({
+        owned_by_user_id: ownerId,
+        slug,
+        name: slug,
+        base_router: 'efficient' as const,
+        mode: 'cost_per_accuracy' as const,
+        entries: [{ kind: 'gateway' as const, model: 'anthropic/claude-sonnet-4' }],
+        default_entry_key: 'gateway:anthropic/claude-sonnet-4',
+      });
+      await db
+        .insert(auto_routing_custom_routers)
+        .values([router(user.id, 'mine'), router(otherUser.id, 'theirs')]);
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.owned_by_user_id, otherUser.id))
+      ).toHaveLength(1);
     });
 
     it('should delete github_branch_pull_requests owned by user', async () => {

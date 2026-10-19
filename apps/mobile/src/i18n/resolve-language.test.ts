@@ -38,6 +38,7 @@ describe('resolveLanguageTag', () => {
     expect(resolveLanguageTag([{ languageTag: 'pt-AO' }])).toBe('pt');
     expect(resolveLanguageTag([{ languageTag: 'pt-MZ' }])).toBe('pt');
     expect(resolveLanguageTag([{ languageTag: 'pt-MO' }])).toBe('pt');
+    expect(resolveLanguageTag([{ languageTag: 'pt-GQ' }])).toBe('pt');
     expect(resolveLanguageTag([{ languageTag: 'pt', regionCode: 'AO' } as const])).toBe('pt');
     // Script-bearing Portugal tags resolve by their region subtag.
     expect(resolveLanguageTag([{ languageTag: 'pt-Latn-PT' }])).toBe('pt');

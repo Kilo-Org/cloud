@@ -37,8 +37,8 @@ function chineseScriptFor(tag: string): SupportedLanguage | undefined {
  * Portuguese resolves to the Brazilian variant unless the tag names a
  * European-Portuguese region: `pt-PT` (in any subtag order, so `pt-Latn-PT`
  * counts), the other regions whose norms follow the Portugal catalogue
- * (`pt-AO`, `pt-MZ`, `pt-CV`, `pt-GW`, `pt-ST`, `pt-TL`, `pt-MO`), or bare
- * `pt` with one of those regions in `regionCode`. Runs before the
+ * (`pt-AO`, `pt-MZ`, `pt-CV`, `pt-GW`, `pt-ST`, `pt-TL`, `pt-MO`, `pt-GQ`),
+ * or bare `pt` with one of those regions in `regionCode`. Runs before the
  * exact-match branch, which a bare `pt` would otherwise win against the
  * Portugal entry. `tag` arrives lowercased from `normalizeLocale`, so the
  * region comparisons use lowercase.
@@ -53,6 +53,7 @@ const IS_EUROPEAN_PORTUGUESE_REGION = {
   st: true,
   tl: true,
   mo: true,
+  gq: true,
 } satisfies Record<string, true>;
 
 function portugueseVariantFor(

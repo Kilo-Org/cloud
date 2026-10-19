@@ -31,6 +31,8 @@ type SurfaceGeometry = SurfaceMeasurement & {
 
 type ScreenLayoutProps = Parameters<NonNullable<ComponentProps<typeof Stack>['screenLayout']>>[0];
 
+export type { ScreenLayoutProps };
+
 const StateSurfaceContext = createContext<SurfaceGeometry | null>(null);
 
 export function useStateSurface() {

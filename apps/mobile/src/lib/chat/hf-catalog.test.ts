@@ -154,6 +154,14 @@ describe('a Hugging Face model detail', () => {
     expect(detail.hasGgufFiles).toBe(true);
   });
 
+  it('drops an auxiliary embedding file when the repository states no parameter count', () => {
+    const detail = readModelDetail(info({ gguf: { context_length: 32_768 } }), [
+      file('model-embeddings-Q8_0.gguf', 900, '1'),
+      file('ggml-model.gguf', 500, '2'),
+    ]);
+    expect(detail.quants.map(quant => quant.label)).toEqual(['ggml-model']);
+  });
+
   it('drops a file far smaller than its quantization needs for the stated parameters', () => {
     const detail = readModelDetail(info({ gguf: { total: 27_000_000_000 } }), [
       file('Model-27B-Q4_0.gguf', 1_610_000_000, '1'),

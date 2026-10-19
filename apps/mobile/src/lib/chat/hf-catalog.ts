@@ -276,10 +276,8 @@ function projectorFor(label: string, projectors: readonly HfFile[]): HfFile | un
  */
 function quantFiles(files: readonly HfFile[], parameters: number | undefined): readonly HfFile[] {
   const models = files.filter(file => {
-    const auxiliary =
-      (PROJECTOR_FILE.test(file.path) || AUXILIARY_FILE.test(file.path)) &&
-      !EMBEDDING_MODEL.test(file.path);
-    if (auxiliary) {
+    const auxiliaryName = AUXILIARY_FILE.test(file.path) && !EMBEDDING_MODEL.test(file.path);
+    if (auxiliaryName || PROJECTOR_FILE.test(file.path)) {
       return false;
     }
     if (parameters === undefined) {

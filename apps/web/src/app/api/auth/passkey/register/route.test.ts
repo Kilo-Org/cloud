@@ -92,19 +92,22 @@ describe('POST /api/auth/passkey/register', () => {
   it.each([
     ['not-found', 'is not configured'],
     ['blocked', 'could not be evaluated'],
-  ] as const)('refuses minting when the registration limiter reports %s', async (error, message) => {
-    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error });
+  ] as const)(
+    'refuses minting when the registration limiter reports %s',
+    async (error, message) => {
+      mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error });
 
-    const response = await POST(createRequest({ action: 'options' }));
+      const response = await POST(createRequest({ action: 'options' }));
 
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
-    expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
-    expect(mockCaptureMessage).toHaveBeenCalledWith(
-      `Firewall rate limit 'passkey-registration-options' ${message}`,
-      { level: 'error', tags: { source: 'passkey_register_options' } }
-    );
-  });
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
+      expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        `Firewall rate limit 'passkey-registration-options' ${message}`,
+        { level: 'error', tags: { source: 'passkey_register_options' } }
+      );
+    }
+  );
 
   it('binds the credential to the session user, ignoring the request body', async () => {
     mockVerifyRegistration.mockResolvedValue({ credential_id: 'credential-1' } as never);

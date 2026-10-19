@@ -166,6 +166,61 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     return { claims: sent, killed, ms };
   }
 
+  it('settles failed-lane tails without completing a run that still has runnable work', async () => {
+    insertRun('settled', 'user', 2, 1);
+    insertRun('busy', 'platform', 1, 1);
+    for (const id of ['settled', 'busy']) {
+      await scheduleRunChunks(setupDb, {
+        runId: id,
+        entries: [{ model: `${id}/model-0`, variant: null, providers: ['deepinfra'] }],
+        repetitions: 1,
+        caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+        chunkSize: 1,
+      });
+      sqlite
+        .prepare(`INSERT INTO benchmark_profiles (
+          router, model, variant, engine_identity, repetitions, status, run_id, requested_at, updated_at
+        ) VALUES ('efficient', ?, '', 'scheduler-init-test', 1, 'running', ?, ?, ?)`)
+        .run(`${id}/model-0`, id, new Date(NOW).toISOString(), new Date(NOW).toISOString());
+    }
+    sqlite
+      .prepare(`INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, shard, failed_at)
+        VALUES ('settled', 'settled/model-0', '', 0, 0, 0, ?)`)
+      .run(new Date(NOW).toISOString());
+    sqlite
+      .prepare(`INSERT INTO benchmark_profiles (
+        router, model, variant, engine_identity, repetitions, status, run_id, requested_at, updated_at
+      ) VALUES ('efficient', 'settled/model-1', '', 'scheduler-init-test', 1, 'running', 'settled', ?, ?)`)
+      .run(new Date(NOW).toISOString(), new Date(NOW).toISOString());
+    const result = sqlite.prepare(`INSERT INTO case_results (
+      run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd, rep, exit_code
+    ) VALUES ('settled', 'settled/model-1', '', ?, ?, 1, 100, 0, 0, 0)`);
+    for (const benchCase of DECIDER_CASES) {
+      result.run(benchCase.id, `${benchCase.taskType}/${benchCase.subtaskType}`);
+    }
+
+    await dispatchScheduler(env);
+
+    expect(sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'settled'").get()).toEqual({
+      status: 'completed',
+    });
+    expect(
+      sqlite
+        .prepare(
+          "SELECT model, status FROM benchmark_profiles WHERE run_id = 'settled' ORDER BY model"
+        )
+        .all()
+    ).toEqual([
+      { model: 'settled/model-0', status: 'failed' },
+      { model: 'settled/model-1', status: 'ready' },
+    ]);
+    expect(sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'busy'").get()).toEqual({
+      status: 'running',
+    });
+    expect(sent.some(message => message.runId === 'busy')).toBe(true);
+    expect(sent.some(message => message.runId === 'settled')).toBe(false);
+  });
+
   it('fails an identity-less run and releases its profiles without blocking a sibling', async () => {
     insertRun('invalid', 'platform', 1, 1);
     insertRun('healthy', 'user', 1, 1);

@@ -838,6 +838,9 @@ Classifier dead-letter handling remains fail-fast.
 `run_lane_failures` preserves lane-aware finalization: a run settles once each
 (model, variant, repetition) lane has all its cases or a recorded infrastructure failure.
 
+The periodic dispatch sweep ignores pending chunks in failed lanes when checking run completion.
+It retries finalization after a canceled completion handler without starting duplicate inference.
+
 - **Decider runs of either queue** complete per-entry: entries whose lanes all
   finished go `ready`; entries with a dead lane go `failed` ("Benchmark lane did
   not finish…"). A requeue re-admits them — the owner's Retry (quota-charged) or

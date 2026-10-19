@@ -6,33 +6,43 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 // Dependency-contract guard for the repository release-age policy in
-// pnpm-workspace.yaml. The global minimumReleaseAge gate must stay intact, the
-// container-runtime exemptions must each name one exact package@version (a
-// name-only or wildcard entry would un-gate every future release), and every
-// pre-existing base exclusion must survive unchanged.
+// pnpm-workspace.yaml. The global minimumReleaseAge gate must stay intact, and
+// every exclusion must name one exact package@version, matching the workspace
+// config's convention for every entry.
 const EXPECTED_MINIMUM_RELEASE_AGE_MINUTES = 6842;
 
 const BASE_EXCLUDE_ENTRIES = [
-  'tsx',
-  'expo-dev-client',
-  'expo-dev-launcher',
-  'expo-dev-menu',
-  'expo-dev-menu-interface',
-  'expo-manifests',
-  'expo-updates-interface',
-  '@expo/schema-utils',
-  '@typescript/native-preview',
-  '@typescript/native-preview-darwin-arm64',
-  '@typescript/native-preview-darwin-x64',
-  '@typescript/native-preview-linux-arm',
-  '@typescript/native-preview-linux-arm64',
-  '@typescript/native-preview-linux-x64',
-  '@typescript/native-preview-win32-arm64',
-  '@typescript/native-preview-win32-x64',
-  '@ai-sdk/anthropic',
-  '@anthropic-ai/sdk',
-  '@kilocode/sdk',
-  'openclaw',
+  'tsx@4.21.0',
+  'expo-dev-client@57.0.19',
+  'expo-dev-launcher@57.0.20',
+  'expo-dev-menu@57.0.18',
+  'expo-dev-menu-interface@57.0.0',
+  'expo-manifests@57.0.2',
+  'expo-updates-interface@57.0.2',
+  '@expo/schema-utils@57.0.2',
+  '@typescript/native-preview@7.0.0-dev.20260514.1',
+  '@typescript/native-preview@7.0.0-dev.20251019.1',
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20251019.1',
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20251019.1',
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20251019.1',
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20251019.1',
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20251019.1',
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20251019.1',
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20251019.1',
+  '@ai-sdk/anthropic@4.0.15',
+  '@anthropic-ai/sdk@0.104.1',
+  '@anthropic-ai/sdk@0.109.1',
+  '@kilocode/sdk@7.2.14',
+  '@kilocode/sdk@7.2.52',
+  '@kilocode/sdk@7.8.1',
+  'openclaw@2026.7.1',
 ] as const;
 
 // The DO-managed Cloudflare containers runtime needs wrangler 4.134.0+, and
@@ -132,13 +142,6 @@ describe('minimum release age policy contract', () => {
   it('preserves every base exclusion unchanged', () => {
     for (const base of BASE_EXCLUDE_ENTRIES) {
       expect(excludeEntries).toContain(base);
-    }
-    // Base entries keep their name-only style: none of them was rewritten to
-    // carry a version suffix.
-    for (const entry of excludeEntries) {
-      if (baseExcludes.includes(entry)) {
-        expect(baseExcludes).toContain(entry);
-      }
     }
   });
 });

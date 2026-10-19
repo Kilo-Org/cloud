@@ -7,6 +7,7 @@ import { r2Client, r2CloudAgentAttachmentsBucketName } from '@kilocode/web-share
 import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
+  CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT,
 } from '@/lib/cloud-agent/constants';
 import { cloud_agent_pending_uploads } from '@kilocode/db/schema';
 
@@ -27,13 +28,14 @@ export type AdmitPendingUploadParams = {
 
 /**
  * Admit a presigned upload into the pending-upload ledger and return the
- * admitted object key. Runs in one transaction: take the per-(user, message)
- * advisory lock, count pending rows, reject at the file-count bound, reject
- * oversized uploads, then admit a pending row with a 24-hour lease.
+ * admitted object key. Runs in one transaction: take the per-user advisory
+ * lock, count live pending rows per message and per account, reject at either
+ * bound, reject oversized uploads, then admit a pending row with a 24-hour
+ * lease.
  *
  * A client Retry presigns the same ids. If the attachment already has a
  * 'pending' row, that row is refreshed in place, keeps its key (which can be
- * an earlier fresh key), and does not count against the bound. Otherwise a
+ * an earlier fresh key), and does not count against either bound. Otherwise a
  * row for objectKey in any other state keeps its key, and the upload gets freshObjectKey:
  * a release or reaper claim sets 'reaped' before its DeleteObject runs, so a
  * PUT to the old key could land before that delete, and a 'linked' key holds
@@ -50,11 +52,12 @@ export async function admitPendingUpload({
   byteSize,
 }: AdmitPendingUploadParams): Promise<string> {
   return db.transaction(async tx => {
-    // The composer presigns every attached file at once, so an unlocked
-    // count-then-insert lets parallel admits all read the same count and
-    // insert past the bound. The lock releases on commit or rollback.
+    // The composer presigns every attached file at once, and the account-wide
+    // count below spans messages, so an unlocked count-then-insert lets
+    // parallel admits all read the same count and insert past a bound. The
+    // per-user lock covers both bounds and releases on commit or rollback.
     await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${`cloud-agent-pending-upload:${kiloUserId}:${messageUuid}`}))`
+      sql`select pg_advisory_xact_lock(hashtext(${`cloud-agent-pending-upload-user:${kiloUserId}`}))`
     );
 
     // A retry of this attachment: same id and same key suffix. A different
@@ -65,23 +68,35 @@ export async function admitPendingUpload({
       like(cloud_agent_pending_uploads.object_key, `%${suffix}`)
     );
 
-    const pendingRows = await tx
-      .select({ pendingCount: count() })
-      .from(cloud_agent_pending_uploads)
-      .where(
-        and(
-          eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
-          eq(cloud_agent_pending_uploads.message_uuid, messageUuid),
-          eq(cloud_agent_pending_uploads.status, 'pending'),
-          not(sameAttachment ?? sql`false`)
-        )
-      );
-    const pendingCount = pendingRows[0]?.pendingCount ?? 0;
+    const countFilter = and(
+      eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+      eq(cloud_agent_pending_uploads.status, 'pending'),
+      not(sameAttachment ?? sql`false`)
+    );
 
-    if (pendingCount >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT) {
+    const messageRows = await tx
+      .select({ messagePendingCount: count() })
+      .from(cloud_agent_pending_uploads)
+      .where(and(countFilter, eq(cloud_agent_pending_uploads.message_uuid, messageUuid)));
+    const messagePendingCount = messageRows[0]?.messagePendingCount ?? 0;
+
+    if (messagePendingCount >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: `Maximum ${CLOUD_AGENT_ATTACHMENT_MAX_COUNT} attachments allowed per message`,
+      });
+    }
+
+    const accountRows = await tx
+      .select({ accountPendingCount: count() })
+      .from(cloud_agent_pending_uploads)
+      .where(countFilter);
+    const accountPendingCount = accountRows[0]?.accountPendingCount ?? 0;
+
+    if (accountPendingCount >= CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Maximum ${CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT} uploads allowed per account`,
       });
     }
 
@@ -248,16 +263,12 @@ export async function releasePendingUploads(
 }
 
 /**
- * Delete the private objects behind every pending upload this user admitted,
- * so account deletion does not drop the only handle the reaper has on them.
+ * Delete the private objects behind every upload row this user admitted,
+ * whatever its status, so account deletion removes the objects together
+ * with their ledger rows.
  */
 export async function purgeUserPendingUploads(kiloUserId: string): Promise<void> {
-  await claimAndDeleteUploadObjects(
-    and(
-      eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
-      eq(cloud_agent_pending_uploads.status, 'pending')
-    )
-  );
+  await claimAndDeleteUploadObjects(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId));
 }
 
 /**

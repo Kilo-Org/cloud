@@ -68,7 +68,6 @@ import {
   baseCreatePreviewNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
-  cloudAgentLinkPendingUploadsSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from '../cloud-agent-next-schemas';
 import {
@@ -199,10 +198,6 @@ const ImageUploadUrlInput = cloudAgentGetImageUploadUrlSchema.extend({
 });
 
 const AttachmentUploadUrlInput = cloudAgentGetAttachmentUploadUrlSchema.extend({
-  organizationId: z.uuid(),
-});
-
-const LinkPendingUploadsInput = cloudAgentLinkPendingUploadsSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -771,19 +766,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         contentLength: input.contentLength,
         ...(input.extension ? { extension: input.extension } : {}),
       });
-    }),
-
-  /**
-   * Finalize send-time attachment ledger rows in the organization context.
-   * The pending rows are keyed by the uploading member's user id, so the link
-   * is still scoped to ctx.user.id; organizationId only gates membership.
-   */
-  linkPendingUploads: organizationMemberMutationProcedure
-    .input(LinkPendingUploadsInput)
-    .output(z.object({ success: z.boolean() }))
-    .mutation(async ({ ctx, input }) => {
-      await linkPendingUploads(ctx.user.id, input.messageUuid, input.objectKeys);
-      return { success: true };
     }),
 
   /**

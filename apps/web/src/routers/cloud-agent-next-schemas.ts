@@ -175,17 +175,6 @@ export const cloudAgentGetAttachmentDownloadUrlSchema = z.object({
 });
 
 /**
- * Send-time finalization input for the pending-upload ledger. The object keys
- * are full R2 keys produced by the upload presign; the server scopes the link
- * to the caller's own rows, so the array needs no per-key structure beyond a
- * length cap that reuses the landed attachment-count constant.
- */
-export const cloudAgentLinkPendingUploadsSchema = z.object({
-  messageUuid: z.uuid(),
-  objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
-});
-
-/**
  * Release-time input for the pending-upload ledger. A removed composer file
  * releases its admitted row so it stops consuming the per-message quota. The
  * keys are full R2 keys scoped to the caller; only 'pending' rows are released,

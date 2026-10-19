@@ -54,6 +54,13 @@ export const CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 export const CLOUD_AGENT_ATTACHMENT_PRESIGNED_URL_EXPIRY_SECONDS = 900; // 15 min
 
 /**
+ * Ceiling on live pending-upload rows per account, summed across every
+ * message. Rows expire on a 24-hour lease, so the window renews as the
+ * reaper clears expired rows.
+ */
+export const CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT = 25;
+
+/**
  * Filename-derived extensions that are never stored or downloaded, regardless
  * of the caller-supplied MIME. The allow-list is enforced at every layer that
  * validates a stored filename: the web tRPC schemas, the cloud-agent-next

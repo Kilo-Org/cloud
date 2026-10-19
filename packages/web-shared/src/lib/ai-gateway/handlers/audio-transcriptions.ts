@@ -19,6 +19,7 @@ import {
   extractHeaderAndLimitLength,
   invalidRequestResponse,
   modelNotAllowedResponse,
+  dataCollectionRequiredResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   wrapInSafeNextResponse,
@@ -280,10 +281,8 @@ export async function handleAudioTranscriptionsRequest(
 
   setTag('ui.ai_model', requestedModel);
 
-  const { balance, plan, balanceLimitedByUserAllowance, payer } = await getBalanceAndOrgSettings(
-    organizationId,
-    user
-  );
+  const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
+    await getBalanceAndOrgSettings(organizationId, user);
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
@@ -294,6 +293,12 @@ export async function handleAudioTranscriptionsRequest(
       organizationId,
       balanceLimitedByUserAllowance,
     });
+  }
+
+  // The organization data-collection setting applies here: the upstream
+  // accepts no per-request privacy fields, so it cannot be forwarded.
+  if (settings?.data_collection === 'deny') {
+    return dataCollectionRequiredResponse();
   }
 
   if (organizationId) {

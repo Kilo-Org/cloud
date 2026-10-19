@@ -7,6 +7,7 @@ import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight'
 import type { User } from '@kilocode/db/schema';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
 jest.mock('next/server', () => {
   return {
@@ -159,7 +160,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       settings: {
         provider_allow_list: ['openai'],
         model_deny_list: [],
-        data_collection: 'deny',
+        data_collection: 'allow',
       } satisfies OrganizationSettings,
       plan: 'enterprise',
     });
@@ -178,6 +179,60 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     const [, init] = mockedFetch.mock.calls[0];
     const upstream = JSON.parse(init?.body as string);
     expect(upstream).not.toHaveProperty('provider');
+  });
+
+  it('rejects organization data collection denied for JSON requests', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        provider_allow_list: ['openai'],
+        model_deny_list: [],
+        data_collection: 'deny',
+      } satisfies OrganizationSettings,
+      plan: 'enterprise',
+    });
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: ProxyErrorType.data_collection_required,
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects organization data collection denied for multipart requests', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        provider_allow_list: ['openai'],
+        model_deny_list: [],
+        data_collection: 'deny',
+      } satisfies OrganizationSettings,
+      plan: 'enterprise',
+    });
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeMultipartRequest(
+        { model: 'openai/gpt-4o-mini-transcribe' },
+        { blob: new Blob(['UklGRiQA'], { type: 'audio/wav' }), filename: 'speech.wav' }
+      ) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: ProxyErrorType.data_collection_required,
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('rejects malformed transcription bodies before proxying without reporting to Sentry', async () => {
@@ -341,7 +396,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       settings: {
         provider_allow_list: ['openai'],
         model_deny_list: [],
-        data_collection: 'deny',
+        data_collection: 'allow',
       } satisfies OrganizationSettings,
       plan: 'enterprise',
     });

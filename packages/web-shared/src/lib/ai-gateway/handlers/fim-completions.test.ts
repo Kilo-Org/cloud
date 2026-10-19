@@ -10,6 +10,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
@@ -86,7 +87,7 @@ function makeRequest(model = 'inception/mercury-edit-2') {
   });
 }
 
-function setOrganizationAuth(balance: number) {
+function setOrganizationAuth(balance: number, settings?: OrganizationSettings) {
   mockedGetUserFromAuth.mockResolvedValue({
     user: {
       id: 'user-123',
@@ -98,7 +99,7 @@ function setOrganizationAuth(balance: number) {
   });
   mockedGetBalanceAndOrgSettings.mockResolvedValue({
     balance,
-    settings: undefined,
+    settings,
     plan: 'teams',
   });
   mockedGetBYOKforOrganization.mockResolvedValue(null);
@@ -203,6 +204,19 @@ describe('POST /api/fim/completions', () => {
     );
 
     expect(response.status).toBe(402);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects direct provider requests when organization data collection is denied', async () => {
+    setOrganizationAuth(1000, { data_collection: 'deny' } satisfies OrganizationSettings);
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: ProxyErrorType.data_collection_required,
+    });
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 

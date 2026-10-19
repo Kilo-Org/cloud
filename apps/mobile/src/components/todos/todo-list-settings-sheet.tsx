@@ -22,6 +22,7 @@ import {
   todoListRepoSelection,
 } from '@/lib/todos/todo-model';
 import { type TodoList } from '@/lib/todos/todo-types';
+import { showNamePreview } from '@/components/todos/list-settings-name-selection';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 
 type ListSettingsFormProps = {
@@ -31,6 +32,62 @@ type ListSettingsFormProps = {
 
 function FieldLabel({ children }: Readonly<{ children: string }>) {
   return <Text className="text-sm font-medium text-foreground">{children}</Text>;
+}
+
+/**
+ * The name box, over the shared `Input`: an unfocused single-line Android
+ * field keeps its caret wherever it last was and draws the tail of a long
+ * saved name — a programmatic start selection does not scroll it (verified on
+ * the emulator). While unfocused this renders a one-line `Text` preview that
+ * clips the END, so the field shows the beginning of the name, matching the
+ * list header; tapping or focusing swaps in the real `Input`.
+ */
+function NameField(props: Readonly<{
+  defaultValue: string;
+  autoFocus: boolean;
+  onChangeText: (text: string) => void;
+  onSubmitEditing: () => void;
+  maxLength: number;
+  placeholder: string;
+  accessibilityLabel: string;
+}>) {
+  const [editing, setEditing] = useState(false);
+  // The live value: the preview after a blur must show the text the user
+  // typed, not the name the sheet opened with.
+  const [text, setText] = useState(props.defaultValue);
+  if (showNamePreview({ editing, hasText: text.length > 0 })) {
+    return (
+      <Pressable
+        accessibilityLabel={props.accessibilityLabel}
+        accessibilityRole="text"
+        accessibilityValue={{ text }}
+        onPress={() => {
+          setEditing(true);
+        }}
+        className="rounded-lg border border-border bg-secondary pl-3 pr-3"
+      >
+        <Text className="min-h-[44px] text-base leading-[normal] text-foreground" numberOfLines={1}>
+          {text}
+        </Text>
+      </Pressable>
+    );
+  }
+  return (
+    <Input
+      {...props}
+      defaultValue={text}
+      onChangeText={value => {
+        setText(value);
+        props.onChangeText(value);
+      }}
+      returnKeyType="done"
+      autoFocus={props.autoFocus || editing}
+      className="rounded-lg border border-border bg-secondary text-base text-foreground"
+      onBlur={() => {
+        setEditing(false);
+      }}
+    />
+  );
 }
 
 function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormProps>) {
@@ -106,7 +163,7 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
           </View>
           <View className="min-w-0 flex-1 gap-2">
             <FieldLabel>{t('todos.listSettings.name')}</FieldLabel>
-            <Input
+            <NameField
               defaultValue={list?.name ?? ''}
               autoFocus={!list}
               onChangeText={text => {
@@ -115,11 +172,9 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
                 setHasName(current => (current === next ? current : next));
               }}
               onSubmitEditing={save}
-              returnKeyType="done"
               maxLength={TODO_LIST_NAME_MAX_LENGTH}
               placeholder={t('todos.listSettings.namePlaceholder')}
               accessibilityLabel={t('todos.listSettings.name')}
-              className="rounded-lg border border-border bg-secondary text-base text-foreground"
             />
           </View>
         </View>

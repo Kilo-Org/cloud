@@ -4,7 +4,6 @@ import {
   DirectUserByokInferenceProviderIdSchema,
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
-  normalizeInferenceProviderId,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   VertexCredentialsSchema,
@@ -17,17 +16,13 @@ import type {
   VercelProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   getCachedVercelInferenceProviderIdsForModel,
-  getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import type { StoredModel } from '@kilocode/db/schema-types';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
-import { passesRoutingPercentage } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-percentage';
 
 export function hasCompatibleVercelInferenceProvider(
   openRouterInferenceProviders: string[],
@@ -64,75 +59,23 @@ export function getVercelInferenceProvidersExcludingIgnored(
   ];
 }
 
-export function passesVercelRoutingPercentage(randomSeed: string, routingPercentage: number) {
-  return passesRoutingPercentage('vercel', randomSeed, routingPercentage);
-}
-
 export function isVercelRoutingOptOut(requestedModel: string, optOutModels: ReadonlySet<string>) {
   return optOutModels.has(requestedModel);
-}
-
-/**
- * Whether OpenRouter has no endpoint for `openRouterModel` among the providers
- * that `only` and `ignore` leave allowed. Unknown endpoint data never counts as
- * excluding OpenRouter.
- */
-export function excludesAllOpenRouterEndpoints(
-  openRouterModel: StoredModel | undefined,
-  provider: Pick<OpenRouterProviderConfig, 'only' | 'ignore'> | undefined
-) {
-  if (!openRouterModel || !provider?.only) return false;
-  const openRouterProviders = new Set(
-    openRouterModel.endpoints.flatMap(endpoint =>
-      endpoint.tag ? [normalizeInferenceProviderId(endpoint.tag)] : []
-    )
-  );
-  if (openRouterProviders.size === 0) return false;
-  const ignored = new Set(
-    (provider.ignore ?? []).map(providerId => normalizeInferenceProviderId(providerId))
-  );
-  return !provider.only
-    .map(providerId => normalizeInferenceProviderId(providerId))
-    .some(providerId => !ignored.has(providerId) && openRouterProviders.has(providerId));
 }
 
 export async function shouldRouteToVercel(
   requestedModel: string,
   request: GatewayRequest,
-  randomSeed: string,
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ) {
   const routingConfig = await getRuntimeGatewayRoutingConfig();
-  if (isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels)) {
-    console.debug(`[shouldRouteToVercel] model ${requestedModel} opted out of Vercel routing`);
+  if (!routingConfig.vercelEnabled) {
     return false;
   }
 
-  console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  const routingPercentage = isFreeModel(requestedModel)
-    ? routingConfig.vercelFree
-    : routingConfig.vercelPaid;
-
-  const passedRandomization = passesVercelRoutingPercentage(randomSeed, routingPercentage);
-  let providerConfig: Promise<OpenRouterProviderConfig | undefined> | undefined;
-  const resolveProviderConfig = () => (providerConfig ??= getRoutingProviderConfig());
-
-  if (!passedRandomization) {
-    if (routingPercentage <= 0) {
-      return false;
-    }
-    const openRouterModels = await getOpenRouterModelsMetadataFromDatabase();
-    if (
-      !excludesAllOpenRouterEndpoints(
-        openRouterModels[requestedModel],
-        await resolveProviderConfig()
-      )
-    ) {
-      return false;
-    }
-    console.debug(
-      '[shouldRouteToVercel] provider preferences exclude every OpenRouter endpoint, trying Vercel'
-    );
+  if (isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels)) {
+    console.debug(`[shouldRouteToVercel] model ${requestedModel} opted out of Vercel routing`);
+    return false;
   }
 
   const vercelModels = await getVercelModelsFromDatabase();
@@ -142,7 +85,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const provider = await resolveProviderConfig();
+  const provider = await getRoutingProviderConfig();
   if (provider && (provider.only || provider.ignore?.length)) {
     const { only, ignore } = provider;
     const vercelInferenceProviders =
@@ -176,6 +119,21 @@ export async function shouldRouteToVercel(
   }
 
   return true;
+}
+
+function getConversationId(request: GatewayRequest): string | undefined {
+  const id = request.kind === 'messages' ? request.body.session_id : request.body.prompt_cache_key;
+  return typeof id === 'string' && id.length > 0 ? id : undefined;
+}
+
+// An explicit session ID makes Vercel pin the exact credential that served the
+// session, keeping its prompt cache warm after a fallback.
+// https://vercel.com/docs/ai-gateway/models-and-providers/session-affinity
+function getSessionAffinityOptions(
+  request: GatewayRequest
+): Pick<NonNullable<VercelProviderConfig['gateway']>, 'sessionId' | 'sessionAffinity'> {
+  const sessionId = getConversationId(request);
+  return sessionId ? { sessionId, sessionAffinity: true } : { sessionAffinity: true };
 }
 
 function convertProviderSort(
@@ -229,6 +187,7 @@ export function convertProviderOptions(
       disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
       models: requestToMutate.body.models,
       serviceTier: serviceTier === 'flex' || serviceTier === 'priority' ? serviceTier : undefined,
+      ...getSessionAffinityOptions(requestToMutate),
     },
   };
 }
@@ -342,6 +301,7 @@ export async function applyVercelSettings(
         sort: convertProviderSort(requestToMutate.body.provider?.sort),
         byok: byokProviders,
         models: requestToMutate.body.models,
+        ...getSessionAffinityOptions(requestToMutate),
       },
     };
   } else {

@@ -3,7 +3,10 @@ import {
   COMPATIBLE_USER_AGENT,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import { isReasoningExplicitlyDisabled } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import {
+  isReasoningExplicitlyDisabled,
+  replaceReasoningObjectWithReasoningEffort,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 
 export default {
   id: 'kimi-coding',
@@ -16,6 +19,7 @@ export default {
     context.request.body.thinking = {
       type: reasoningDisabled ? 'disabled' : 'enabled',
     };
+    replaceReasoningObjectWithReasoningEffort(context.request);
     if (
       context.request.kind === 'chat_completions' &&
       context.request.body.reasoning_effort === 'none'

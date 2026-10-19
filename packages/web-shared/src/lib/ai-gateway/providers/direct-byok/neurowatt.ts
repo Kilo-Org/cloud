@@ -1,4 +1,5 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   faviconIcon,
@@ -11,7 +12,9 @@ export default {
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
   reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
-  transformRequest(_context) {},
+  transformRequest(context) {
+    replaceReasoningObjectWithReasoningEffort(context.request);
+  },
   models: cachedEnhancedDirectByokModelList({
     providerId: 'neuralwatt',
     recommendedModels: [

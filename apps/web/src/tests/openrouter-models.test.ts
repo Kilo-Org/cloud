@@ -134,6 +134,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-models', () => {
   return { ...actual, addAutoRoutingModels: jest.fn(actual.addAutoRoutingModels) };
 });
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
+  listUsableCustomRouters: jest.fn(async () => []),
+}));
+
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
   const actual = jest.requireActual<typeof DirectByok>(
     '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
@@ -434,9 +438,8 @@ describe('GET /api/v1/models', () => {
     expect(model).not.toHaveProperty('terminalBench');
   });
 
-  test('enriches public Kilo-exclusive models but not virtual catalog entries', async () => {
-    const exclusiveModel = kiloExclusiveModels.find(model => model.status === 'public');
-    if (!exclusiveModel) throw new Error('Expected a public Kilo-exclusive model fixture');
+  test('enriches listed Kilo-exclusive models but not virtual catalog entries', async () => {
+    const exclusiveModel = qwen36_plus_stealth_model;
     const exclusiveBenchmark = { ...enkryptBenchmark, model_name: exclusiveModel.display_name };
     jest
       .mocked(mockRows)

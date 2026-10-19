@@ -226,8 +226,6 @@ export const MCPServerConfigSchema = z.discriminatedUnion('type', [
   MCPRemoteServerConfigSchema,
 ]);
 
-// --- Runtime instructions ---
-
 /**
  * Runtime instruction schema. Each entry is materialized to
  * `${SESSION_HOME}/.kilocode/rules/<name>.md` at preparation time, alongside
@@ -277,8 +275,6 @@ export const InitialExecutionPayloadSchema = z.discriminatedUnion('type', [
 ]);
 
 export type InitialExecutionPayload = z.infer<typeof InitialExecutionPayloadSchema>;
-
-// --- Profile bundle ---
 
 /**
  * Schema for the profile-derived configuration bundle persisted with a
@@ -341,7 +337,6 @@ export const MetadataSchema = z.object({
    * legacy record parsing.
    */
   profile: SessionProfileBundleSchema.optional(),
-  // --- Legacy flat profile fields (read-only fallback, no longer written) ---
   ...SharedSessionProfileFields,
   upstreamBranch: branchNameSchema.optional(),
   kiloSessionId: z.string().optional(),

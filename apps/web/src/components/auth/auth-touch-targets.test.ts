@@ -319,6 +319,7 @@ describe('sign-in touch targets', () => {
       'PROVIDER-ALREADY-LINKED',
       'LINKING-FAILED',
       'SIGNUP-RATE-LIMITED',
+      'SIGNUP-STEP-UP',
       'EMAIL-ALREADY-USED',
       'EMAIL-MUST-BE-LOWERCASE',
       'EMAIL-CANNOT-CONTAIN-PLUS',

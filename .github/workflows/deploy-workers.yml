@@ -179,7 +179,7 @@ jobs:
           while IFS= read -r cfg; do
             dir=$(dirname "$cfg")
             WORKERS+=("$dir")
-          done < <(find services -name "wrangler.jsonc" -not -path "*/node_modules/*" | sort)
+          done < <(find services -name "wrangler.jsonc" -not -path "*/node_modules/*" -not -path "*/test/fixtures/*" | sort)
 
           # Filter out excluded workers
           DEPLOYABLE=()

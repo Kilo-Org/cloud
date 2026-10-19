@@ -11,7 +11,10 @@ import {
 import type {
   AutoRouter,
   BenchmarkKind,
+  BenchmarkModelSummary,
   CandidatePricing,
+  CustomRouterEntryRef,
+  CustomRouterScope,
   ProductionTokenProfile,
   EffortByComplexity,
   BenchmarkProfileStatus,
@@ -20,6 +23,8 @@ import type {
   PolicySettingComputedMap,
   PolicySettingOverrides,
 } from '@kilocode/auto-routing-contracts';
+
+export type ClientProfileStatus = 'pending' | 'ready' | 'failed';
 
 // Migrations are generated via `pnpm db:generate` (drizzle-kit) and applied
 // via wrangler d1 migrations apply.
@@ -183,6 +188,8 @@ export const caseResults = sqliteTable(
     rep: integer('rep').notNull().default(0),
     // 1 when the case was killed by the wall-clock timeout, 0 otherwise.
     timed_out: integer('timed_out').notNull().default(0),
+    // PROMPT_TRANSPORT_REVISION of the CLI call that produced this result.
+    prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   // The composite PK's leftmost column already serves run_id-prefix lookups
   // (count/fetch by run); no separate run_id index is needed.
@@ -202,6 +209,7 @@ export const pendingDeciderOutputs = sqliteTable(
     case_id: text('case_id').notNull(),
     rep: integer('rep').notNull(),
     payload: text('payload').notNull(),
+    prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   table => [
     primaryKey({ columns: [table.run_id, table.model, table.variant, table.case_id, table.rep] }),
@@ -270,6 +278,11 @@ export const schedulerExecutions = sqliteTable(
     rep: integer('rep').notNull(),
     case_id: text('case_id').notNull(),
     token: text('token').notNull(),
+    started_at: integer('started_at').notNull().default(0),
+    // The prompt transport the worker that opened this paid call used, so a container
+    // result recovered by a later deploy is stored under the transport that produced it.
+    // A pre-migration worker leaves the default, which is the argv transport.
+    prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   table => [
     primaryKey({ columns: [table.run_id, table.model, table.variant, table.rep, table.case_id] }),
@@ -277,10 +290,11 @@ export const schedulerExecutions = sqliteTable(
 );
 
 /**
- * Single row (id = 1) serializing dispatch passes. A pass holds the lease while it
- * reads live occupancy and claims; another dispatcher that finds the lease held
+ * Scheduler lease rows. Row 1 serializes dispatch passes: a pass holds the lease while
+ * it reads live occupancy and claims; another dispatcher that finds the lease held
  * returns immediately and the next completion or cron wake retries. Model,
  * provider and slot caps are only exact if one pass at a time reads occupancy.
+ * Row 2, created on first use, serializes run initialization passes.
  */
 export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
   id: integer('id').primaryKey(),
@@ -396,9 +410,37 @@ export const benchmarkProfiles = sqliteTable(
 );
 
 /**
- * Rolling owner admission ledger for the 24h profile request quota. One row
- * per charged model admission (new under current engine, or explicit failed
- * retry). Stale engine-drift re-admissions are free and do not insert here.
+ * Ready registry rows queued to re-measure the cases the revision-1 prompt transport
+ * measured unreliably. Kept beside the profile so the profile stays `ready` on its
+ * previous run and keeps serving: a run claims the row (`run_id`), copies the previous
+ * run's other results, measures the affected cases, and only on completion moves the
+ * profile's provenance to the new run.
+ */
+export const profileRemeasures = sqliteTable(
+  'profile_remeasures',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    run_id: text('run_id'),
+    requested_at: text('requested_at').notNull(),
+    claimed_at: text('claimed_at'),
+  },
+  table => [
+    primaryKey({
+      columns: [table.router, table.model, table.variant, table.engine_identity, table.repetitions],
+    }),
+    index('IDX_profile_remeasures_run').on(table.run_id),
+  ]
+);
+
+/**
+ * Rolling owner admission ledger for the 24h profile request quota, counted per
+ * base router. One row per charged model admission (new under current engine, or
+ * explicit failed retry). Stale engine-drift re-admissions are free and do not
+ * insert here.
  */
 export const profileRequestEvents = sqliteTable(
   'profile_request_events',
@@ -406,6 +448,7 @@ export const profileRequestEvents = sqliteTable(
     id: integer('id').primaryKey({ autoIncrement: true }),
     owner_type: text('owner_type').notNull(),
     owner_id: text('owner_id').notNull(),
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
     model: text('model').notNull(),
     variant: text('variant').notNull().default(''),
     engine_identity: text('engine_identity').notNull(),
@@ -413,13 +456,92 @@ export const profileRequestEvents = sqliteTable(
     admitted_at: text('admitted_at').notNull(),
   },
   table => [
-    // Lookup window: count an owner's admissions in the preceding 24 hours.
-    index('IDX_profile_request_events_owner_admitted').on(
+    index('IDX_profile_request_events_owner_router_admitted').on(
       table.owner_type,
       table.owner_id,
+      table.router,
       table.admitted_at
     ),
   ]
+);
+
+/**
+ * Owner-scoped measurements uploaded by the owner's CLI (ADR 0005). Never shared
+ * with another owner, never read by the platform table, never promoted to
+ * `benchmark_profiles`. The rollup columns summarize `client_case_results`;
+ * `results` guards concurrent rollups so the most complete view wins.
+ */
+export const clientProfiles = sqliteTable(
+  'client_profiles',
+  {
+    id: text('id').primaryKey(),
+    owner_type: text('owner_type').$type<CustomRouterScope>().notNull(),
+    owner_id: text('owner_id').notNull(),
+    router: text('router').$type<AutoRouter>().notNull(),
+    entry_kind: text('entry_kind').$type<CustomRouterEntryRef['kind']>().notNull(),
+    // '' for gateway entries.
+    provider: text('provider').notNull().default(''),
+    model: text('model').notNull(),
+    // Canonical variant key at the D1 boundary. '' means null/default variant.
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    status: text('status').$type<ClientProfileStatus>().notNull(),
+    failure_reason: text('failure_reason'),
+    results: integer('results').notNull().default(0),
+    accuracy: real('accuracy'),
+    errors: integer('errors').notNull().default(0),
+    timeouts: integer('timeouts').notNull().default(0),
+    avg_cost_usd: real('avg_cost_usd'),
+    p50_latency_ms: real('p50_latency_ms'),
+    p95_latency_ms: real('p95_latency_ms'),
+    route_summaries: text('route_summaries', { mode: 'json' })
+      .$type<BenchmarkModelSummary[]>()
+      .notNull()
+      .default(sql`'[]'`),
+    // Last upload revision handed out for this profile. Never decreases, so a case deleted
+    // and uploaded again gets a revision no earlier rollup view has seen.
+    upload_seq: integer('upload_seq').notNull().default(0),
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_client_profiles_identity').on(
+      table.owner_type,
+      table.owner_id,
+      table.router,
+      table.entry_kind,
+      table.provider,
+      table.model,
+      table.variant,
+      table.engine_identity,
+      table.repetitions
+    ),
+  ]
+);
+
+export const clientCaseResults = sqliteTable(
+  'client_case_results',
+  {
+    profile_id: text('profile_id')
+      .notNull()
+      .references(() => clientProfiles.id, { onDelete: 'cascade' }),
+    case_id: text('case_id').notNull(),
+    rep: integer('rep').notNull(),
+    route_key: text('route_key').notNull(),
+    output: text('output').notNull(),
+    cost_usd: real('cost_usd').notNull(),
+    duration_ms: integer('duration_ms').notNull(),
+    exit_code: integer('exit_code'),
+    timed_out: integer('timed_out', { mode: 'boolean' }).notNull(),
+    score: real('score').notNull(),
+    grader_cost_usd: real('grader_cost_usd').notNull(),
+    uploaded_at: text('uploaded_at').notNull(),
+    // This upload's revision from the profile's `upload_seq`, unique within the profile even
+    // across same-millisecond uploads and delete-and-reinsert; the rollup guard compares it.
+    revision: integer('revision').notNull().default(0),
+  },
+  table => [primaryKey({ columns: [table.profile_id, table.case_id, table.rep] })]
 );
 
 /**

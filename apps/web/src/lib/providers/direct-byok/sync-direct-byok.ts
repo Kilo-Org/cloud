@@ -49,7 +49,16 @@ const ModelsDevModelSchema = z.object({
     })
     .optional(),
   tool_call: z.boolean().optional(),
+  provider: z.object({ npm: z.string().optional() }).optional().catch(undefined),
 });
+
+// A models.dev per-model `provider.npm` names the SDK for the model's own endpoint. Several SDK
+// names, such as `@ai-sdk/mistral`, still speak Chat Completions, so only SDKs for the native
+// Gemini API, which the gateway cannot proxy, are excluded.
+const GEMINI_API_MODELS_DEV_SDKS: ReadonlySet<string> = new Set([
+  '@ai-sdk/google',
+  '@ai-sdk/google-vertex',
+]);
 
 const ModelsDevProviderSchema = z.object({
   models: z.record(z.string(), ModelsDevModelSchema),
@@ -140,7 +149,8 @@ export function parseModelsDevProviderModels(
         (!model.modalities?.output || model.modalities.output.includes('text')) &&
         (!availableModelIds || availableModelIds.has(model.id)) &&
         model.tool_call !== false &&
-        (!model.modalities?.input || model.modalities.input.includes('text'))
+        (!model.modalities?.input || model.modalities.input.includes('text')) &&
+        (!model.provider?.npm || !GEMINI_API_MODELS_DEV_SDKS.has(model.provider.npm))
     )
     .map(model => {
       return {

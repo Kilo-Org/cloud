@@ -51,6 +51,7 @@ vi.mock('react-native-safe-area-context', () => ({
 // The composer reads the keyboard from the provider, not from a listener of its own.
 vi.mock('react-native-keyboard-controller', () => ({
   useKeyboardState: <T,>(selector: (state: { height: number }) => T) => selector({ height: 0 }),
+  useReanimatedKeyboardAnimation: () => ({ progress: { value: 0 }, height: { value: 0 } }),
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -73,6 +74,8 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useSharedValue: <T,>(value: T) => ({ value }),
+  useAnimatedStyle: (style: () => unknown) => style(),
 }));
 
 vi.mock('@/lib/a11y/motion', () => ({

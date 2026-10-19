@@ -7,7 +7,6 @@ import {
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { captureMessage } from '@sentry/nextjs';
 import type {
   MemberOrganizationWithMembers,
   OrganizationSsoPolicyView,
@@ -124,8 +123,6 @@ function daysAgo(days: number): Date {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 }
 
-const MAX_ORGANIZATIONS_PER_USER = 5;
-
 function getDateThreshold(period: string): Date | null {
   switch (period) {
     case 'week':
@@ -221,25 +218,6 @@ export const organizationsRouter = createTRPCRouter({
 
   create: baseProcedure.input(OrganizationCreateRequestSchema).mutation(async opts => {
     const { user } = opts.ctx;
-    const existingOrgMemberships = await getUserOrganizationsWithSeats(user.id);
-
-    if (
-      existingOrgMemberships.length >= MAX_ORGANIZATIONS_PER_USER &&
-      !user.google_user_email.endsWith('kilocode.ai')
-    ) {
-      captureMessage('User hit max organizations', {
-        level: 'warning',
-        extra: {
-          userId: user.id,
-          existingOrgMemberships: existingOrgMemberships.length,
-          max: MAX_ORGANIZATIONS_PER_USER,
-        },
-      });
-      throw new TRPCError({
-        code: 'TOO_MANY_REQUESTS',
-        message: `You have reached the maximum number of organizations (${MAX_ORGANIZATIONS_PER_USER}) allowed. Please contact support if you need more.`,
-      });
-    }
     const org = await createOrganization(
       opts.input.name,
       user.id,
@@ -486,8 +464,12 @@ export const organizationsRouter = createTRPCRouter({
 
   createChild: organizationAdminMutationProcedure
     .input(OrganizationCreateChildSchema)
-    .mutation(async ({ input }) => {
-      const organization = await createChildOrganization(input.name, input.organizationId);
+    .mutation(async ({ input, ctx }) => {
+      const organization = await createChildOrganization(
+        input.name,
+        input.organizationId,
+        ctx.user.id
+      );
       return { organization };
     }),
 

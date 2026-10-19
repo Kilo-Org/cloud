@@ -1,6 +1,7 @@
-import { type Ref } from 'react';
+import { type Ref, useEffect } from 'react';
+import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -10,8 +11,9 @@ import {
   type ChatComposerControl,
   type ChatComposerSendOptions,
 } from '@/components/agents/chat-composer';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { BlurBar } from '@/components/ui/blur-bar';
+import { announceForA11y } from '@/lib/a11y/announce';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
@@ -30,6 +32,8 @@ async function noSessionExit(): Promise<void> {}
 type ChatComposerAreaProps = {
   /** The harness chat state the area draws its status from. */
   status: 'opening' | 'idle' | 'working';
+  /** The transcript the working row names its current step from. */
+  messages: StoredMessage[];
   /** Set while the turn is failing; the Retry may be withheld while a question waits. */
   failureKey: string | null;
   /** False while a typed question still waits; then the Retry is withheld. */
@@ -50,11 +54,12 @@ type ChatComposerAreaProps = {
 };
 
 /**
- * The transcript-adjacent half of the conversation: the reserved status slot,
- * the failure row, and the composer.
+ * The transcript-adjacent half of the conversation: the working row, the
+ * failure row, and the composer.
  */
 export function ChatComposerArea({
   status,
+  messages,
   failureKey,
   retryable,
   onRetry,
@@ -88,20 +93,24 @@ export function ChatComposerArea({
     [bottom]
   );
 
+  // The working row is drawn text, not a live region, so a screen reader hears
+  // the reply start once here instead of on every tick of its elapsed time.
+  const generatingLabel = t('common.generating');
+  useEffect(() => {
+    if (status === 'working') {
+      announceForA11y(generatingLabel);
+    }
+  }, [status, generatingLabel]);
+
   return (
     <>
-      <View testID="chat-status-slot" className="h-10 flex-row items-center gap-2 px-4">
-        {status === 'working' ? (
-          <>
-            <ActivityIndicator />
-            <AccessibleStatus
-              message={t('common.generating')}
-              tone="status"
-              className="text-sm font-medium text-foreground"
-            />
-          </>
-        ) : null}
-      </View>
+      {/* The same footer row as the agent session screens: it takes space only
+          while a reply is generating, so an idle chat ends at the composer. */}
+      {status === 'working' ? (
+        <View className="bg-background">
+          <WorkingIndicator messages={messages} isStreaming />
+        </View>
+      ) : null}
 
       {status === 'idle' && failureKey !== null ? (
         <ChatFailureRow failureKey={failureKey} onRetry={retryable ? onRetry : undefined} />

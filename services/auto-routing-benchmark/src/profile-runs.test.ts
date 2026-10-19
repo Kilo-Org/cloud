@@ -50,6 +50,7 @@ vi.mock('./db', async importOriginal => {
     markStaleRunsFailed: vi.fn(),
     listStaleRunningDeciderRuns: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
+    collapsePendingOwnerAliasRows: vi.fn(),
     markProfilesFailedForEntries: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
@@ -75,10 +76,14 @@ vi.mock('./db', async importOriginal => {
     recordLaneFailure: vi.fn(),
     failOrphanedRunningProfiles: vi.fn(),
     releaseProfileClaims: vi.fn(),
+    listQueuedRemeasures: vi.fn().mockResolvedValue([]),
+    copyRemeasureBaselines: vi.fn().mockResolvedValue(0),
+    settleRemeasuresForRun: vi.fn().mockResolvedValue(undefined),
   };
 });
 
 import {
+  collapsePendingOwnerAliasRows,
   countCaseResultsByLane,
   existsNewerCompletedRun,
   getCaseResults,
@@ -98,6 +103,7 @@ import {
   countCurrentProfilesByStatus,
   getLatestRoutingTable,
   listReadyCurrentProfilesForEntries,
+  listQueuedRemeasures,
   listStaleRunningDeciderRuns,
   failOrphanedRunningProfiles,
   recordLaneFailure,
@@ -225,7 +231,7 @@ beforeEach(() => {
         models,
       };
     });
-  vi.mocked(scheduleRunChunks).mockReset().mockResolvedValue(undefined);
+  vi.mocked(scheduleRunChunks).mockReset().mockResolvedValue(true);
   vi.mocked(claimScheduledChunks).mockReset().mockResolvedValue([]);
   vi.mocked(recoverChunks).mockReset().mockResolvedValue([]);
   vi.mocked(startChunk).mockReset().mockResolvedValue(true);
@@ -236,6 +242,7 @@ beforeEach(() => {
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
+  vi.mocked(listQueuedRemeasures).mockResolvedValue([]);
   vi.mocked(markProfilesRunningForRun).mockImplementation(async (_db, _runId, entries) => [
     ...entries,
   ]);
@@ -538,6 +545,7 @@ describe('decider run completion', () => {
       last_event_types: 'x',
       rep: 0,
       timed_out: 0,
+      prompt_revision: 2,
     }));
   }
 
@@ -782,6 +790,43 @@ describe('drainQueue', () => {
     expect(modelRows[1].model).toBe('m/new');
   });
 
+  it('hands pending owner aliases to their concrete pair before claiming', async () => {
+    catalogFetch.mockImplementation(async () =>
+      Response.json({
+        data: [
+          { id: 'platform/a' },
+          { id: '~platform/a-latest', alias_target: 'platform/a' },
+          { id: '~platform/gone-latest', alias_target: 'platform/gone' },
+        ],
+      })
+    );
+    const requestedAt = '2026-06-01T00:00:00.000Z';
+    vi.mocked(listPendingCurrentProfiles)
+      .mockResolvedValueOnce([
+        { model: '~platform/a-latest', variant: '', requested_at: requestedAt },
+        { model: 'platform/a', variant: '', requested_at: requestedAt },
+        { model: '~platform/gone-latest', variant: '', requested_at: requestedAt },
+      ])
+      .mockResolvedValueOnce([
+        { model: 'platform/a', variant: '', requested_at: requestedAt },
+        { model: '~platform/gone-latest', variant: '', requested_at: requestedAt },
+      ]);
+
+    const result = await drainQueue(env, 'user');
+
+    expect(collapsePendingOwnerAliasRows).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), [
+      {
+        alias: { model: '~platform/a-latest', variant: '' },
+        target: { model: 'platform/a', variant: null },
+      },
+    ]);
+    expect(result!.entryCount).toBe(2);
+    expect(vi.mocked(insertRun).mock.calls[0][2].map(row => row.model)).toEqual([
+      'platform/a',
+      '~platform/gone-latest',
+    ]);
+  });
+
   it('skips only the queue whose own slot is occupied', async () => {
     // A running user-queue run must not block the platform queue: the two hold
     // independent slots.
@@ -832,6 +877,25 @@ describe('drainQueue', () => {
     expect(insertRun).toHaveBeenCalledOnce();
     expect(scheduleRunChunks).toHaveBeenCalledOnce();
     expect(queueSend).not.toHaveBeenCalled();
+  });
+
+  it('reserves batch space for a queued re-measure ahead of a full pending backlog', async () => {
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue(
+      Array.from({ length: 100 }, (_, i) => ({
+        model: `m/${String(i).padStart(3, '0')}`,
+        variant: '',
+        requested_at: '2026-06-01T00:00:00.000Z',
+      }))
+    );
+    vi.mocked(listQueuedRemeasures).mockResolvedValue([
+      { model: 'm/repair', variant: '', requested_at: '2026-06-05T00:00:00.000Z' },
+    ]);
+    const result = await drainQueue(env, 'platform');
+    expect(result!.entryCount).toBe(100);
+    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
+    expect(modelRows).toHaveLength(100);
+    expect(modelRows[0].model).toBe('m/repair');
+    expect(modelRows.at(-1)?.model).toBe('m/098');
   });
 
   it("drainQueues('both') starts one run per queue", async () => {
@@ -1032,28 +1096,41 @@ describe('frontier router runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
-  it('rejects frontier owner queues before any profile claim', async () => {
-    await expect(drainQueues(env, 'user', undefined, 'frontier')).rejects.toThrow(
-      'does not support owner queues'
+  it('starts a frontier owner run under the frontier/user share', async () => {
+    mockConfig({ router: 'frontier' });
+    const entries = [{ model: 'owner/a', variant: null }];
+    const result = await startRun(env, 'decider', {
+      router: 'frontier',
+      purpose: 'user',
+      entries,
+    });
+    expect(result.runId).toMatch(/^frontier-user-/);
+    expect(insertRun).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier', purpose: 'user' }),
+      expect.anything(),
+      []
     );
-    await expect(
-      startRun(env, 'decider', {
-        router: 'frontier',
-        purpose: 'user',
-        entries: [{ model: 'model', variant: null }],
-      })
-    ).rejects.toThrow('does not support owner queues');
-    expect(markProfilesRunningForRun).not.toHaveBeenCalled();
+    expect(markProfilesRunningForRun).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      result.runId,
+      entries,
+      expect.objectContaining({ router: 'frontier' })
+    );
   });
 
-  it('limits frontier both-queue drains to its platform registry', async () => {
+  it('drains both frontier registry queues', async () => {
     mockConfig({ router: 'frontier' });
     await drainQueues(env, 'both', undefined, 'frontier');
-    expect(listPendingCurrentProfiles).toHaveBeenCalledOnce();
     expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({ router: 'frontier' }),
       'platform'
+    );
+    expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      'user'
     );
   });
 

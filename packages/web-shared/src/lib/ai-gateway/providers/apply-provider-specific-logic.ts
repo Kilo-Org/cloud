@@ -59,6 +59,11 @@ import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/goo
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
+import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
+import {
+  addReflectionReasoningPlaceholders,
+  isReflectionModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -83,6 +88,7 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
     }
 
     delete message.thoughtSignature;
+    delete message.reasoning;
 
     const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
     for (const toolCall of toolCalls) {
@@ -312,6 +318,11 @@ export async function applyProviderSpecificLogic(
     removeRecursiveToolSchemaRefs(requestToMutate);
   }
 
+  if (isClaudeModel(requestedModel)) {
+    // Anthropic rejects tools with "input_schema does not support oneOf, allOf, or anyOf at the top level"
+    removeTopLevelToolSchemaCombinators(requestToMutate);
+  }
+
   if (requestToMutate.kind === 'chat_completions') {
     scrubOpenCodeSpecificProperties(requestToMutate.body);
 
@@ -363,6 +374,10 @@ export async function applyProviderSpecificLogic(
 
   if (isQwenExplicitCacheModel(requestedModel)) {
     addCacheBreakpoints(requestToMutate);
+  }
+
+  if (isReflectionModel(requestedModel)) {
+    addReflectionReasoningPlaceholders(requestedModel, requestToMutate);
   }
 
   if (provider.id === 'vercel') {

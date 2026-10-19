@@ -212,9 +212,8 @@ describe('useTrackingPermissionPrompt', () => {
     let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
     await act(async () => {
       vi.resetModules();
-      const { useTrackingPermissionPrompt: freshHook } = await import(
-        './use-tracking-permission-prompt'
-      );
+      const { useTrackingPermissionPrompt: freshHook } =
+        await import('./use-tracking-permission-prompt');
       const FreshHarness: FC<{ enabled: boolean }> = ({ enabled }) => {
         freshHook(enabled);
         return null;
@@ -235,17 +234,15 @@ describe('useTrackingPermissionPrompt', () => {
   // the hook awaits the flag load before consulting ATT, so the alert stays
   // hidden when the flag lands after the mount.
   it('still suppresses the alert when the flag read resolves after the mount', async () => {
-    const { promise: diskPromise, resolve: resolveDisk } =
-      Promise.withResolvers<string | null>();
+    const { promise: diskPromise, resolve: resolveDisk } = Promise.withResolvers<string | null>();
     getItemAsync.mockReturnValue(diskPromise);
     getTrackingPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
 
     let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
     await act(async () => {
       vi.resetModules();
-      const { useTrackingPermissionPrompt: freshHook } = await import(
-        './use-tracking-permission-prompt'
-      );
+      const { useTrackingPermissionPrompt: freshHook } =
+        await import('./use-tracking-permission-prompt');
       const FreshHarness: FC<{ enabled: boolean }> = ({ enabled }) => {
         freshHook(enabled);
         return null;

@@ -113,6 +113,7 @@ describe('notificationPathForData', () => {
         status: 'happy',
         running: 1,
         needsInput: 0,
+        needsApproval: 0,
         idle: 0,
         scheduled: 0,
         updatedAt: '2026-01-01T00:00:00.000Z',

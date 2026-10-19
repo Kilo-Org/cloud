@@ -502,9 +502,7 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     getMetadata: async () => deps.getMetadata(),
     getTerminal,
     requestConnect,
-    // V2 has no activity RPC: terminal input is a wrapper-side signal, reported
-    // as heartbeat `active` only while input is recent (spec §6). The Session DO
-    // therefore has nothing to forward from a socket message.
+    // Terminal input must not renew sandbox activity (spec §6).
     reportActivity: async () => undefined,
     markEnded,
     resolveDirectory: () => deps.getDirectory(),

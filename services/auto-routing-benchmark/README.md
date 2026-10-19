@@ -76,10 +76,16 @@ falls back to the system value. Publishing reads effective values only.
   measurement-effort knobs have no measured basis for a daily recomputation. The Policy tab
   shows their value and the reason they are read-only.
 
-Frontier initially has no saved configuration or published table. No default model pool or
-efficient table is fabricated for it. Before enabling frontier serving, administrators must
-save a frontier configuration with its own decider models, benchmark those entries, and
-publish a complete frontier table.
+An omitted Frontier pool uses its router-specific alias preset.
+The worker benchmarks that pool before it publishes a complete Frontier table.
+It does not fabricate measurements or reuse the Efficient table.
+
+Frontier serves all authenticated callers through the benchmark router.
+It has no per-user rollout toggle or mode-based legacy model selection.
+Publish a complete Frontier table before deploying the gateway cutover.
+Missing or invalid Frontier decisions return service unavailable without invoking a legacy or organization fallback model.
+Authentication, organization access, privacy restrictions, and classification billing retain their existing checks.
+Catalog annotations and pre-classification denial hints use visible Frontier table candidates, independently of Efficient custom pools.
 
 Decider execution uses a global pool of reusable container slots, not run reservations.
 An atomic D1 claim selects an eligible unfinished chunk from any running run whenever a
@@ -158,6 +164,10 @@ materializes, and a second lease row keeps concurrent dispatchers from initializ
 same time; a pass that completes a run's initialization claims again so its chunks start at
 once.
 
+Initialization failures stay isolated to their run, so healthy runs can still dispatch.
+A run without its saved execution identity fails and releases its claimed profiles.
+Transient catalog failures leave the run eligible for another initialization attempt.
+
 Run completion accounting reads every case result of the run, so it does not run per
 completed chunk. A completion first asks whether the run still has scheduled work — an
 index probe for a chunk that is pending, queued or active in a lane that has not
@@ -207,17 +217,83 @@ measurements are included in routing-table version hashes.
 ## Platform model selection
 
 - Select a model, not one effort, in the platform configuration.
-- The worker resolves `~` model aliases through the catalog's `alias_target` when the concrete target is present, then expands every reasoning variant from that target's current `/api/openrouter/models` entry. An alias whose target is absent stays alias-keyed.
-- Exact resolved `(model, variant)` pairs are deduplicated: an alias and its target, or multiple aliases for one target, share a measurement. Retargeting an alias requests the new concrete pair instead of reusing the old target's result.
+- An omitted Efficient pool defaults to `~deepseek/deepseek-flash-latest`; an omitted Frontier pool defaults to `~openai/gpt-sol-latest`.
+- New admin forms use these presets. Explicit saved pools remain unchanged, and an explicit empty pool is invalid.
+- Admission uses the authenticated catalog for the benchmark identity, including its organization context.
+- Resumed runs preserve their saved user and organization scope. Configuration defaults do not replace a saved personal execution scope.
+- The worker applies the CLI's tool-support rule and validates exact reasoning variants before scheduling.
+- Platform and owner pools share measurements for identical concrete model, variant, engine, and repetition settings.
 - Variants must contain explicit `reasoning.enabled` or `reasoning.effort` controls. Unrelated presets do not create benchmark entries.
 - A model without reasoning controls creates one `(model, null)` entry.
-- If the catalog fails or omits a selected model, reconciliation fails. It does not infer a default effort.
-- Catalog requests have a 10-second deadline, including body reads, so a stalled response cannot block both queues indefinitely.
+- An unavailable model fails its profile without blocking unrelated entries. Catalog request failures leave the existing snapshots intact.
+- Catalog requests have a bounded deadline, including body reads.
 - Manual and automatic selections use the same expansion. Existing saved effort selections no longer restrict platform measurements.
-- Owner pools use the same alias resolution and all-efforts expansion, sharing concrete measurements with the platform. Status responses preserve the requested model ids; custom routing tables use concrete ids.
-- Before the owner queue claims a batch, each pending owner-requested alias row whose target resolves hands its owner request to the concrete pair (creating it pending when absent) and drops its own. This converts owner rows registered before alias resolution, and stops an alias and its target from being measured twice. A variant the target no longer offers only loses the request; the next status lookup re-admits the target's current pairs. Running, failed, and ready alias rows are untouched.
-- Custom tables are already scoped to the requested resolved pairs by the benchmark worker. The serving worker accepts those concrete candidates and loads capabilities by their ids rather than re-filtering against saved alias ids.
-- Deploy the serving worker before the benchmark worker when introducing alias resolution; older serving workers filter concrete custom-table candidates against the original pool aliases.
+- Status responses preserve requested alias IDs. Routing tables contain measured concrete IDs.
+
+### Daily alias snapshots
+
+- New subscriptions resolve once when admitted. Existing subscriptions check for target changes daily at 05:00 UTC.
+- Queue dispatch, publication, policy edits, and status reads use persisted targets. They do not silently retarget an existing alias.
+- An unchanged target with current measurements needs no benchmark.
+- A changed target reuses current cached measurements or enters the normal benchmark queue.
+- The previous serving target remains active until every replacement variant is ready.
+- Resolution failures, unavailable replacements, and failed measurements retain the previous serving target.
+- Removing an alias stops its subscription from following later updates.
+- Daily target changes do not consume the owner's request quota.
+- An unchanged concrete ID has no automatic measurement expiry. Use targeted refresh after a confirmed provider change.
+
+Saved owner pools enter the subscription index when settings are read, saved, or used to assemble a custom table.
+Untouched historical Durable Objects are not centrally enumerable. Backfill known owners before relying on daily coverage for those pools.
+Send the existing full pool to `POST /admin/profiles/subscriptions`:
+
+```json
+{
+  "ownerType": "user",
+  "ownerId": "owner-from-settings",
+  "entries": [{ "model": "~vendor/latest" }]
+}
+```
+
+This authenticated endpoint replaces the owner's tracked pool without editing its saved routing settings.
+Send `entries: null` to remove its subscriptions.
+Use `restorePrevious: true` only to compensate a failed settings save.
+Ordinary removal and re-addition resolve a new subscription instead of restoring its previous target.
+Apply the additive D1 migration and deploy both routing workers before resuming paused benchmark queues.
+
+The serving worker bounds its owner-table cache and retains its existing expiry and single-flight loading.
+A mode-only save returns current pool statuses without changing the alias subscription.
+If that status lookup fails, the save leaves the previous mode unchanged.
+A save without an owner pool does not require the benchmark service.
+
+
+### Unavailable models and targeted refresh
+
+A confirmed lookup failure for the requested model is not a quality score.
+It fails that exact profile and stops its remaining queued work.
+Already executing cases retain their slots and paid-execution records until they settle.
+Ordinary incorrect answers and genuine model failures retain their existing scoring.
+
+Use `POST /admin/registry/refresh` with explicit concrete model/variant pairs:
+
+```json
+{
+  "router": "efficient",
+  "mode": "repair_unavailable",
+  "entries": [{ "model": "vendor/model", "variant": null }]
+}
+```
+
+- `repair_unavailable` resets only selected profiles with recorded model-lookup failures.
+- `refresh` explicitly invalidates selected current measurements, including otherwise valid ready profiles.
+- Executable pairs become pending. Unavailable pairs remain failed instead of entering another doomed run.
+- The response lists `refreshed`, `unavailable`, and `skipped` pairs.
+- A selection containing an in-flight measurement returns conflict without partial changes.
+- Historical results remain available for inspection. The invalidation cutoff prevents their reuse by refreshed pairs.
+- Other profiles and ordinary retry reuse remain unchanged. No global engine-version bump occurs.
+
+The refresh endpoint handles affected `ready` rows directly. The failed-only requeue endpoint cannot repair them.
+Container recovery waits for response completion before suppressing its callback.
+Callback retries remain bounded, and exhausted delivery logs contain categories rather than credentials or result contents.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
 The worker admits bounded oldest-first registry batches independently of available execution slots.
@@ -901,6 +977,9 @@ Classifier dead-letter handling remains fail-fast.
 
 `run_lane_failures` preserves lane-aware finalization: a run settles once each
 (model, variant, repetition) lane has all its cases or a recorded infrastructure failure.
+
+The periodic dispatch sweep ignores pending chunks in failed lanes when checking run completion.
+It retries finalization after a canceled completion handler without starting duplicate inference.
 
 - **Decider runs of either queue** complete per-entry: entries whose lanes all
   finished go `ready`; entries with a dead lane go `failed` ("Benchmark lane did

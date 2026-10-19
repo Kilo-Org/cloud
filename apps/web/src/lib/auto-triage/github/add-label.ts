@@ -2,7 +2,7 @@
  * GitHub Issue Label Helper
  *
  * Adds labels to GitHub issues using the GitHub REST API.
- * Used by the auto-triage system to add the kilo-auto-fix label.
+ * Used by the auto-triage system to add classification labels.
  */
 
 import 'server-only';

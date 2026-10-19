@@ -5,6 +5,7 @@ import {
   type DirectByokModel,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import type { OpenRouterProvider } from '@kilocode/db/schema-types';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -14,6 +15,16 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+
+/** Providers for `/api/v1/providers` that the general provider list lacks. */
+export function getDirectByokProviderListings(): OpenRouterProvider[] {
+  const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
+  return providers.flatMap(({ id, provider_listing }) => {
+    if (!provider_listing) return [];
+    const name = DIRECT_BYOK_PROVIDERS_META[id];
+    return [{ name, displayName: name, slug: id, ...provider_listing }];
+  });
+}
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();

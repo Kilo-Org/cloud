@@ -28,7 +28,6 @@ function createTicket(): TriageTicket {
       issueTitle: 'Failure callback',
       issueBody: null,
       duplicateThreshold: 0.8,
-      autoFixThreshold: 0.9,
       modelSlug: 'test-model',
     },
     owner: { type: 'user', id: 'user-1', userId: 'user-1' },

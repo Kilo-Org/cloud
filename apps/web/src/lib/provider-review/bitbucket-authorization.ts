@@ -14,6 +14,12 @@ import 'server-only';
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import {
+  isNetworkFailure,
+  ProviderApiStatusError,
+  ProviderReviewError,
+  type ProviderReviewErrorKind,
+} from '@kilocode/app-shared/provider-review';
 import { BITBUCKET_WORKSPACE_ACCESS_TOKEN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
 import { generateInternalServiceToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
@@ -39,37 +45,24 @@ export type BitbucketReviewOwner =
 export const BITBUCKET_ORGANIZATION_ONLY_MESSAGE =
   'Bitbucket pull requests are available in an organization context only. Switch to an organization with a connected Bitbucket workspace.';
 
-export type BitbucketReviewErrorKind =
-  | 'not_found'
-  | 'forbidden'
-  | 'stale_head'
-  | 'bad_request'
-  | 'retryable';
+export type BitbucketReviewErrorKind = ProviderReviewErrorKind;
 
 /**
  * A classified provider failure. `retryable` is true only for 5xx/network
  * outcomes. The message is fixed copy and never embeds a token or a
  * workspace identity, so every output of this layer is safe to show or log.
  */
-export class BitbucketReviewError extends Error {
-  readonly kind: BitbucketReviewErrorKind;
-  readonly retryable: boolean;
-
-  constructor(kind: BitbucketReviewErrorKind, message: string) {
-    super(message);
+export class BitbucketReviewError extends ProviderReviewError {
+  constructor(kind: ProviderReviewErrorKind, message: string) {
+    super(kind, message);
     this.name = 'BitbucketReviewError';
-    this.kind = kind;
-    this.retryable = kind === 'retryable';
   }
 }
 
 /** An HTTP failure raised by this layer's own Bitbucket JSON requests. */
-export class BitbucketApiStatusError extends Error {
-  constructor(
-    readonly status: number,
-    message: string
-  ) {
-    super(message);
+export class BitbucketApiStatusError extends ProviderApiStatusError {
+  constructor(status: number, message: string) {
+    super(status, message);
     this.name = 'BitbucketApiStatusError';
   }
 }
@@ -107,15 +100,6 @@ export function classifyBitbucketStatus(status: number): BitbucketReviewError {
     );
   }
   return new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected error.');
-}
-
-function isNetworkFailure(error: Error): boolean {
-  return (
-    error.name === 'TypeError' ||
-    error.name === 'TimeoutError' ||
-    error.name === 'AbortError' ||
-    error.message.toLowerCase().includes('fetch failed')
-  );
 }
 
 function classifyTrpcError(code: TRPCError['code']): BitbucketReviewError {

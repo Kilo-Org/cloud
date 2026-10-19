@@ -137,6 +137,7 @@ import type {
   CustomLlmDefinition,
   AutoFreeConfig,
   GatewayModelListConfig,
+  VercelModelIdOverridesConfig,
   KiloClawAdminAuditAction,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
@@ -5758,6 +5759,7 @@ export const ai_gateway_config = pgTable(
     auto_free: jsonb().$type<AutoFreeConfig>(),
     preferred_models: jsonb().$type<GatewayModelListConfig>(),
     unavailable_models: jsonb().$type<GatewayModelListConfig>(),
+    vercel_model_id_overrides: jsonb().$type<VercelModelIdOverridesConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
@@ -6401,6 +6403,7 @@ export const cli_sessions_v2 = pgTable(
     pr_link_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
     status: text(),
     status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    status_transition_id: text(),
     last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),
     total_cost_microdollars: bigint({ mode: 'number' }),
     // The small derived summary the session card shows. Derived by
@@ -8176,9 +8179,6 @@ export const auto_triage_tickets = pgTable(
     // Triage session
     session_id: text(),
 
-    // Auto Fix trigger
-    should_auto_fix: boolean().default(false),
-
     // Status
     status: text()
       .notNull()
@@ -8262,133 +8262,6 @@ export const auto_triage_tickets = pgTable(
 );
 
 export type AutoTriageTicket = typeof auto_triage_tickets.$inferSelect;
-
-// Auto Fix
-export const auto_fix_tickets = pgTable(
-  'auto_fix_tickets',
-  {
-    id: idPrimaryKeyColumn,
-
-    // Ownership (exactly one must be set)
-    owned_by_organization_id: uuid().references(() => organizations.id, {
-      onDelete: 'cascade',
-    }),
-    owned_by_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'cascade',
-    }),
-
-    // Platform integration
-    platform_integration_id: uuid().references(() => platform_integrations.id, {
-      onDelete: 'set null',
-    }),
-
-    // Link to triage ticket (optional)
-    triage_ticket_id: uuid().references(() => auto_triage_tickets.id, {
-      onDelete: 'set null',
-    }),
-
-    // GitHub metadata
-    platform: text().notNull().default('github'),
-    repo_full_name: text().notNull(),
-    issue_number: integer().notNull(),
-    issue_url: text().notNull(),
-    issue_title: text().notNull(),
-    issue_body: text(),
-    issue_author: text().notNull(),
-    issue_labels: text()
-      .array()
-      .default(sql`'{}'`),
-
-    // Trigger source: 'label' for issue label triggers, 'review_comment' for PR review comment triggers
-    trigger_source: text().notNull().default('label').$type<'label' | 'review_comment'>(),
-
-    // Review comment context (populated when trigger_source='review_comment')
-    review_comment_id: bigint({ mode: 'number' }),
-    review_comment_body: text(),
-    file_path: text(),
-    line_number: integer(),
-    diff_hunk: text(),
-    pr_head_ref: text(),
-
-    // Classification from triage (denormalized for convenience)
-    classification: text().$type<'bug' | 'feature' | 'question' | 'unclear'>(),
-    confidence: decimal({ precision: 3, scale: 2 }),
-    intent_summary: text(),
-    related_files: text().array(),
-
-    // Cloud Agent session
-    session_id: text(), // Cloud agent session ID (agent_xxx)
-    cli_session_id: uuid().references(() => cliSessions.session_id, {
-      onDelete: 'set null',
-    }),
-
-    // PR information
-    pr_number: integer(),
-    pr_url: text(),
-    pr_branch: text(),
-
-    // Status
-    status: text()
-      .notNull()
-      .default('pending')
-      .$type<'pending' | 'running' | 'completed' | 'failed' | 'cancelled'>(),
-    error_message: text(),
-
-    // Timestamps
-    started_at: timestamp({ withTimezone: true, mode: 'string' }),
-    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    // Unique constraint: one fix per repo+issue combination (for label-triggered fixes)
-    uniqueIndex('UQ_auto_fix_tickets_repo_issue')
-      .on(table.repo_full_name, table.issue_number)
-      .where(sql`${table.trigger_source} = 'label'`),
-    // Unique constraint: one fix per repo+review_comment (for review-comment-triggered fixes)
-    uniqueIndex('UQ_auto_fix_tickets_repo_review_comment')
-      .on(table.repo_full_name, table.review_comment_id)
-      .where(sql`${table.review_comment_id} IS NOT NULL`),
-    // Indexes for ownership lookups
-    index('IDX_auto_fix_tickets_owned_by_org').on(table.owned_by_organization_id),
-    index('IDX_auto_fix_tickets_owned_by_user').on(table.owned_by_user_id),
-    // Indexes for status and filtering
-    index('IDX_auto_fix_tickets_status').on(table.status),
-    index('IDX_auto_fix_tickets_created_at').on(table.created_at),
-    index('IDX_auto_fix_tickets_triage_ticket_id').on(table.triage_ticket_id),
-    index('IDX_auto_fix_tickets_session_id').on(table.session_id),
-    // Owner check constraint (exactly one must be set)
-    check(
-      'auto_fix_tickets_owner_check',
-      sql`(
-        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
-        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
-      )`
-    ),
-    // CHECK constraints for enums and ranges
-    check(
-      'auto_fix_tickets_status_check',
-      sql`${table.status} IN ('pending', 'running', 'completed', 'failed', 'cancelled')`
-    ),
-    check(
-      'auto_fix_tickets_classification_check',
-      sql`${table.classification} IN ('bug', 'feature', 'question', 'unclear')`
-    ),
-    check(
-      'auto_fix_tickets_confidence_check',
-      sql`${table.confidence} >= 0 AND ${table.confidence} <= 1`
-    ),
-    check(
-      'auto_fix_tickets_trigger_source_check',
-      sql`${table.trigger_source} IN ('label', 'review_comment')`
-    ),
-  ]
-);
-
-export type AutoFixTicket = typeof auto_fix_tickets.$inferSelect;
 
 // ============ AGENT ENVIRONMENT PROFILES ============
 // Profiles for storing reusable environment configurations for cloud-agent sessions
@@ -12243,6 +12116,121 @@ export const stripe_service_fee_assessments = pgTable(
 export type StripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferSelect;
 export type NewStripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferInsert;
 
+export const agent_briefing_preferences = pgTable(
+  'agent_briefing_preferences',
+  {
+    kilo_user_id: text()
+      .primaryKey()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    timezone: text().notNull(),
+    night_start: text().notNull().default('22:00'),
+    morning_start: text().notNull().default('08:00'),
+    morning_end: text().notNull().default('12:00'),
+    language: text().notNull().default('en'),
+    notifications_enabled: boolean().notNull().default(false),
+    next_run_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+  },
+  table => [index('agent_briefing_preferences_due').on(table.next_run_at)]
+);
+
+export const agent_briefing_context_preferences = pgTable(
+  'agent_briefing_context_preferences',
+  {
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    context_key: text().notNull(),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    ai_enabled: boolean().notNull().default(false),
+    model: text().notNull(),
+    max_duration_seconds: integer().notNull().default(600),
+    max_spend_microdollars: bigint({ mode: 'number' }).notNull().default(2_000_000),
+  },
+  table => [
+    primaryKey({ columns: [table.kilo_user_id, table.context_key] }),
+    check(
+      'agent_briefing_context_limits',
+      sql`${table.max_duration_seconds} BETWEEN 1 AND 600 AND ${table.max_spend_microdollars} > 0`
+    ),
+  ]
+);
+
+export const agent_briefing_events = pgTable(
+  'agent_briefing_events',
+  {
+    id: text().primaryKey(),
+    kilo_user_id: text().notNull(),
+    session_id: text().notNull(),
+    organization_id: uuid(),
+    kind: text().notNull(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    recorded_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    status: text(),
+    title: text(),
+    url: text(),
+    payload: jsonb().$type<Record<string, unknown>>(),
+  },
+  table => [
+    foreignKey({
+      columns: [table.session_id, table.kilo_user_id],
+      foreignColumns: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
+      name: 'agent_briefing_events_session_fk',
+    }).onDelete('cascade'),
+    index('agent_briefing_events_user_window').on(table.kilo_user_id, table.occurred_at),
+    index('agent_briefing_events_session_window').on(
+      table.session_id,
+      table.kilo_user_id,
+      table.occurred_at
+    ),
+  ]
+);
+
+export const agent_briefing_reports = pgTable(
+  'agent_briefing_reports',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    context_key: text().notNull(),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    local_date: text().notNull(),
+    night_start_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    cutoff_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    morning_end_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    published_at: timestamp({ withTimezone: true, mode: 'string' }),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    next_refresh_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
+    next_charge_check_at: timestamp({ withTimezone: true, mode: 'string' }),
+    read_at: timestamp({ withTimezone: true, mode: 'string' }),
+    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revision: integer().notNull().default(1),
+    evidence_hash: text().notNull(),
+    facts: jsonb().notNull().$type<Record<string, unknown>>(),
+    summary: jsonb().notNull().$type<Record<string, unknown>>(),
+    generation_id: text(),
+    generation_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    generation_finished_at: timestamp({ withTimezone: true, mode: 'string' }),
+    generation_deadline_at: timestamp({ withTimezone: true, mode: 'string' }),
+    generation_revision: integer(),
+    generation_max_cost: bigint({ mode: 'number' }),
+    notification_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('agent_briefing_reports_window').on(
+      table.kilo_user_id,
+      table.context_key,
+      table.local_date
+    ),
+    index('agent_briefing_reports_user_history').on(table.kilo_user_id, table.cutoff_at),
+    index('agent_briefing_reports_active').on(table.morning_end_at),
+    index('agent_briefing_reports_refresh_due').on(table.next_refresh_at),
+    index('agent_briefing_reports_charge_due').on(table.next_charge_check_at),
+  ]
+);
+
 // Mirrors the contracts pool entry union (ADR 0005). Consumers pass values
 // typed by @kilocode/auto-routing-contracts, so a shape change here fails to
 // compile at those call sites.
@@ -12286,6 +12274,8 @@ export const auto_routing_custom_routers = pgTable(
     mode: text().$type<(typeof CustomRouterMode)[keyof typeof CustomRouterMode]>().notNull(),
     entries: jsonb().$type<AutoRoutingCustomRouterEntry[]>().notNull(),
     default_entry_key: text().notNull(),
+    legacy_pool: boolean().default(false).notNull(),
+    legacy_mode_inherited: boolean().default(false).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

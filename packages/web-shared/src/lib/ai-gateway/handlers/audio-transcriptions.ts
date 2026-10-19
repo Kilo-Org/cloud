@@ -26,6 +26,7 @@ import {
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -282,7 +283,8 @@ export async function handleAudioTranscriptionsRequest(
 
   const { balance, plan, balanceLimitedByUserAllowance, payer } = await getBalanceAndOrgSettings(
     organizationId,
-    user
+    user,
+    readDb
   );
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
@@ -301,6 +303,7 @@ export async function handleAudioTranscriptionsRequest(
       organizationId,
       kiloUserId: user.id,
       modelId: requestedModelLowerCased,
+      fromDb: readDb,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
   }

@@ -1366,6 +1366,9 @@ async function proxyOwnedKiloSessionRequest(params: {
 
   const upstreamSearchParams = new URLSearchParams(url.searchParams);
   upstreamSearchParams.delete('directory');
+  if (params.persistedRead?.kind === 'messages' && !upstreamSearchParams.has('limit')) {
+    upstreamSearchParams.set('limit', String(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE));
+  }
   const upstreamSearch = upstreamSearchParams.size > 0 ? `?${upstreamSearchParams.toString()}` : '';
   const targetUrl = buildWrapperKiloProxyUrl({
     wrapperPort: target.port,

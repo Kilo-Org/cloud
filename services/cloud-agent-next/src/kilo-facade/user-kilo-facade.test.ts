@@ -1849,6 +1849,28 @@ describe('handleKiloFacadeRequest', () => {
     expect(new URL(forwardedRequest.url).search).toBe('?limit=1');
   });
 
+  it('applies the resolved page size to a live message read that omits a limit', async () => {
+    const containerFetch = vi.fn<ContainerFetch>(async () => Response.json(sdkMessageHistory()));
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_live',
+        })),
+        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const [forwardedRequest] = containerFetch.mock.calls[0];
+    expect(new URL(forwardedRequest.url).search).toBe(
+      `?limit=${DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE}`
+    );
+  });
+
   it('preserves owner-visible structured paths and file text in live messages', async () => {
     const containerFetch = vi.fn<ContainerFetch>(async () =>
       Response.json(sdkMessageHistoryWithOwnerVisibleStructuredPaths())

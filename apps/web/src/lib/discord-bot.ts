@@ -1,8 +1,12 @@
 import 'server-only';
 import {
   createCloudAgentNextClient,
+  createCloudAgentNextClientForModel,
+  type CloudAgentNextClient,
   type PrepareSessionInput,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { runSessionToCompletion } from '@/lib/cloud-agent-next/run-session';
 import {
   getGitHubTokenForUser,
@@ -182,8 +186,26 @@ async function spawnCloudAgentSession(
     ? args.prompt + buildPrSignature(requesterInfo)
     : args.prompt;
 
+  // Mirror the web router: free and BYOK-billable models skip the worker-side
+  // $1 balance minimum; paid models use the default client so the balance
+  // middleware gates initiate.
+  let client: CloudAgentNextClient;
+  try {
+    const eligibility = await computeCloudAgentNextBalanceCheckEligibility({
+      fromDb: db,
+      user: { id: ticketUserId },
+      modelId: model,
+      organizationId: kilocodeOrganizationId,
+    });
+    client = createCloudAgentNextClientForModel(authToken, eligibility);
+  } catch (error) {
+    console.error('[DiscordBot] Failed to resolve balance-check eligibility:', error);
+    // Fail closed: the default client keeps the balance check enabled.
+    client = createCloudAgentNextClient(authToken);
+  }
+
   const result = await runSessionToCompletion({
-    client: createCloudAgentNextClient(authToken, { skipBalanceCheck: true }),
+    client,
     prepareInput: {
       githubRepo: args.githubRepo,
       prompt: promptWithSignature,

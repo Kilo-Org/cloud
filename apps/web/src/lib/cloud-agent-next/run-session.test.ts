@@ -9,6 +9,14 @@ jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
     name === 'NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL' ? 'https://worker.example.com' : undefined,
 }));
 
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  INTERNAL_API_SECRET: 'test-secret',
+}));
+
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+}));
+
 jest.mock('@/lib/cloud-agent/stream-ticket', () => ({
   signStreamTicket: jest.fn(() => ({ ticket: 'stream-ticket' })),
 }));
@@ -24,7 +32,7 @@ jest.mock('./websocket-manager', () => ({
   })),
 }));
 
-import { runSessionToCompletion } from './run-session';
+import { runSessionToCompletion, INSUFFICIENT_CREDITS_RESPONSE } from './run-session';
 
 describe('runSessionToCompletion', () => {
   beforeEach(() => {
@@ -69,5 +77,49 @@ describe('runSessionToCompletion', () => {
       'Message failed before execution: Pending message delivery failed'
     );
     expect(mockDisconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the credits response when prepareSession rejects with InsufficientCreditsError', async () => {
+    const { InsufficientCreditsError } = await import('./cloud-agent-client');
+    const client = {
+      prepareSession: jest.fn().mockRejectedValue(new InsufficientCreditsError()),
+      initiateFromPreparedSession: jest.fn(),
+    } as unknown as CloudAgentNextClient;
+
+    const result = await runSessionToCompletion({
+      client,
+      prepareInput: {} as never,
+      ticketPayload: { userId: 'user-credits' },
+      streamTimeoutMs: 60_000,
+    });
+
+    expect(result.hasError).toBe(true);
+    expect(result.response).toBe(INSUFFICIENT_CREDITS_RESPONSE);
+    expect(result.sessionId).toBeUndefined();
+    expect(client.initiateFromPreparedSession).not.toHaveBeenCalled();
+    expect(mockDisconnect).not.toHaveBeenCalled();
+  });
+
+  it('returns the credits response when initiateFromPreparedSession rejects with InsufficientCreditsError', async () => {
+    const { InsufficientCreditsError } = await import('./cloud-agent-client');
+    const client = {
+      prepareSession: jest.fn().mockResolvedValue({
+        cloudAgentSessionId: 'agent-credits',
+        kiloSessionId: 'kilo-credits',
+      }),
+      initiateFromPreparedSession: jest.fn().mockRejectedValue(new InsufficientCreditsError()),
+    } as unknown as CloudAgentNextClient;
+
+    const result = await runSessionToCompletion({
+      client,
+      prepareInput: {} as never,
+      ticketPayload: { userId: 'user-credits' },
+      streamTimeoutMs: 60_000,
+    });
+
+    expect(result.hasError).toBe(true);
+    expect(result.response).toBe(INSUFFICIENT_CREDITS_RESPONSE);
+    expect(result.sessionId).toBe('agent-credits');
+    expect(mockDisconnect).not.toHaveBeenCalled();
   });
 });

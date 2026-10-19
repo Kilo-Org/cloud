@@ -1,7 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { PlatformIntegration } from '@kilocode/db';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
-import type { createCloudAgentNextClient as CreateCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type {
   buildGitLabCloneUrl as BuildGitLabCloneUrl,
   getGitLabInstanceUrlForUser as GetGitLabInstanceUrlForUser,
@@ -9,9 +8,17 @@ import type {
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type { resolveGitHubRepositoryForOwner as ResolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import type SpawnCloudAgentSession from './spawn-cloud-agent-session';
+import { INSUFFICIENT_CREDITS_RESPONSE } from '@/lib/cloud-agent-next/run-session';
 
 const mockGetGitHubIntegrationById =
   jest.fn<(...args: unknown[]) => Promise<PlatformIntegration | null>>();
+
+// Hoisted jest fns referenced from the jest.mock factories below; typed
+// loosely to avoid re-instantiating the factories' drizzle generics.
+const mockCreateCloudAgentNextClient = jest.fn<(...args: unknown[]) => unknown>();
+const mockCreateCloudAgentNextClientForModel = jest.fn<(...args: unknown[]) => unknown>();
+const mockComputeCloudAgentNextBalanceCheckEligibility =
+  jest.fn<(...args: unknown[]) => Promise<{ isFree: boolean; hasUserByokAvailable: boolean }>>();
 
 jest.mock('@/lib/web-config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'callback-secret',
@@ -22,7 +29,24 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({
 }));
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
-  createCloudAgentNextClient: jest.fn(),
+  createCloudAgentNextClient: mockCreateCloudAgentNextClient,
+  createCloudAgentNextClientForModel: mockCreateCloudAgentNextClientForModel,
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {
+    readonly httpStatus = 402;
+    readonly code = 'PAYMENT_REQUIRED';
+    constructor(message = 'Insufficient credits: $1 minimum required') {
+      super(message);
+      this.name = 'InsufficientCreditsError';
+    }
+  },
+}));
+
+jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
+  computeCloudAgentNextBalanceCheckEligibility: mockComputeCloudAgentNextBalanceCheckEligibility,
+}));
+
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
+  db: {},
 }));
 
 jest.mock('@/lib/slack-bot/github-repository-context', () => ({
@@ -70,7 +94,6 @@ const mockPrepareSession =
   jest.fn<(input: unknown) => Promise<{ cloudAgentSessionId: string; kiloSessionId: string }>>();
 const mockInitiateFromPreparedSession = jest.fn<(input: unknown) => Promise<unknown>>();
 let spawnCloudAgentSession: typeof SpawnCloudAgentSession;
-let mockCreateCloudAgentNextClient: jest.MockedFunction<typeof CreateCloudAgentNextClient>;
 let mockResolveGitHubRepositoryForOwner: jest.MockedFunction<
   typeof ResolveGitHubRepositoryForOwner
 >;
@@ -79,13 +102,13 @@ let mockGetGitLabInstanceUrlForUser: jest.MockedFunction<typeof GetGitLabInstanc
 let mockBuildGitLabCloneUrl: jest.MockedFunction<typeof BuildGitLabCloneUrl>;
 
 describe('spawnCloudAgentSession delegation', () => {
+  // Dynamic imports keep the mocked modules' lazy `server-only` / config
+  // side effects from running before jest.mock factories are registered.
   beforeAll(async () => {
-    const client = await import('@/lib/cloud-agent-next/cloud-agent-client');
     const githubRepositoryContext = await import('@/lib/slack-bot/github-repository-context');
     const gitlab = await import('@/lib/cloud-agent/gitlab-integration-helpers');
     const spawn = await import('./spawn-cloud-agent-session');
 
-    mockCreateCloudAgentNextClient = jest.mocked(client.createCloudAgentNextClient);
     mockResolveGitHubRepositoryForOwner = jest.mocked(
       githubRepositoryContext.resolveGitHubRepositoryForOwner
     );
@@ -97,6 +120,13 @@ describe('spawnCloudAgentSession delegation', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({
+      isFree: false,
+      hasUserByokAvailable: false,
+    });
+    mockCreateCloudAgentNextClientForModel.mockImplementation(
+      token => mockCreateCloudAgentNextClient(token) as never
+    );
     mockCreateCloudAgentNextClient.mockReturnValue({
       prepareSession: mockPrepareSession,
       initiateFromPreparedSession: mockInitiateFromPreparedSession,
@@ -156,9 +186,7 @@ describe('spawnCloudAgentSession delegation', () => {
     for (const field of profileDerivedInlineFields) {
       expect(prepareInput).not.toHaveProperty(field);
     }
-    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('auth-token', {
-      skipBalanceCheck: true,
-    });
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('auth-token');
     expect(mockGetGitHubIntegrationById).toHaveBeenCalledWith(
       { type: 'org', id: 'organization-1' },
       'github-association-1'
@@ -256,4 +284,87 @@ describe('spawnCloudAgentSession delegation', () => {
       );
     }
   );
+
+  it('selects the client through model eligibility with the payer user and organization', async () => {
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
+      isFree: true,
+      hasUserByokAvailable: false,
+    });
+
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'kilo-auto/free',
+      organizationIntegration,
+      'auth-token',
+      'request-eligible',
+      undefined,
+      { chatPlatform: 'slack', payerUserId: 'user-9' }
+    );
+
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: { id: 'user-9' },
+        modelId: 'kilo-auto/free',
+        organizationId: 'organization-1',
+      })
+    );
+    expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('auth-token', {
+      isFree: true,
+      hasUserByokAvailable: false,
+    });
+  });
+
+  it('falls back to the balance-checked client when eligibility resolution fails', async () => {
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockRejectedValueOnce(new Error('db down'));
+
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-fallback',
+      undefined,
+      { chatPlatform: 'slack' }
+    );
+
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('auth-token');
+    expect(mockPrepareSession).toHaveBeenCalled();
+  });
+
+  it('returns the credits response and starts no session when prepare is rejected for insufficient credits', async () => {
+    const { InsufficientCreditsError } = await import('@/lib/cloud-agent-next/cloud-agent-client');
+    mockPrepareSession.mockRejectedValueOnce(new InsufficientCreditsError());
+
+    const result = await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-credits',
+      undefined,
+      { chatPlatform: 'slack' }
+    );
+
+    expect(result.response).toBe(INSUFFICIENT_CREDITS_RESPONSE);
+    expect(result).not.toHaveProperty('cloudAgentSessionId');
+    expect(mockInitiateFromPreparedSession).not.toHaveBeenCalled();
+  });
+
+  it('returns the credits response and starts no session when initiate is rejected for insufficient credits', async () => {
+    const { InsufficientCreditsError } = await import('@/lib/cloud-agent-next/cloud-agent-client');
+    mockInitiateFromPreparedSession.mockRejectedValueOnce(new InsufficientCreditsError());
+
+    const result = await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-credits-initiate',
+      undefined,
+      { chatPlatform: 'slack' }
+    );
+
+    expect(result.response).toBe(INSUFFICIENT_CREDITS_RESPONSE);
+    expect(result).not.toHaveProperty('cloudAgentSessionId');
+  });
 });

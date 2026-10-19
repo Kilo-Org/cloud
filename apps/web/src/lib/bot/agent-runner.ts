@@ -309,6 +309,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               chatPlatform,
               currentStep,
               attachments: params.attachments,
+              payerUserId: params.user.id,
             }
           );
 

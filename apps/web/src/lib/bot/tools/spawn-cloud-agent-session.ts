@@ -1,9 +1,15 @@
 import {
   createCloudAgentNextClient,
+  createCloudAgentNextClientForModel,
+  InsufficientCreditsError,
+  type CloudAgentNextClient,
   type AgentMode,
   type PrepareSessionInput,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { RunSessionInput } from '@/lib/cloud-agent-next/run-session';
+import { INSUFFICIENT_CREDITS_RESPONSE } from '@/lib/cloud-agent-next/run-session';
 import {
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
@@ -96,6 +102,8 @@ export default async function spawnCloudAgentSession(
     chatPlatform?: string;
     currentStep?: number;
     attachments?: CloudAgentAttachments;
+    /** Linked Kilo user the caller authenticates as; selects the balance-check client for org payers. */
+    payerUserId?: string;
   }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
@@ -115,6 +123,7 @@ export default async function spawnCloudAgentSession(
   let prepareInput: PrepareSessionInput;
   const mode: AgentMode = args.mode;
   const chatPlatform = options?.chatPlatform ?? 'slack';
+  const payerUserId = options?.payerUserId;
   const callbackTarget = {
     url: buildBotCallbackUrl(botRequestId, options?.currentStep),
     headers: { 'X-Bot-Callback-Token': deriveBotCallbackToken(botRequestId) },
@@ -224,7 +233,27 @@ export default async function spawnCloudAgentSession(
     };
   }
 
-  const client = createCloudAgentNextClient(authToken, { skipBalanceCheck: true });
+  // Mirror the web router: free and BYOK-billable models skip the worker-side
+  // $1 balance minimum (they cost the payer nothing); paid models use the
+  // default client so the balance middleware gates initiate.
+  let client: CloudAgentNextClient;
+  try {
+    const eligibility = await computeCloudAgentNextBalanceCheckEligibility({
+      fromDb: db,
+      user: { id: payerUserId ?? '' },
+      modelId: model,
+      organizationId: kilocodeOrganizationId,
+    });
+    client = createCloudAgentNextClientForModel(authToken, eligibility);
+  } catch (error) {
+    console.error('[KiloBot] Failed to resolve balance-check eligibility:', error);
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'spawn-cloud-agent-session' },
+      extra: { botRequestId, model },
+    });
+    // Fail closed: the default client keeps the balance check enabled.
+    client = createCloudAgentNextClient(authToken);
+  }
 
   let cloudAgentSessionId: string;
   let kiloSessionId: string;
@@ -234,6 +263,9 @@ export default async function spawnCloudAgentSession(
     cloudAgentSessionId = prepared.cloudAgentSessionId;
     kiloSessionId = prepared.kiloSessionId;
   } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      return { response: INSUFFICIENT_CREDITS_RESPONSE };
+    }
     const message = error instanceof Error ? error.message : String(error);
     return { response: `Error preparing Cloud Agent: ${message}` };
   }
@@ -243,6 +275,9 @@ export default async function spawnCloudAgentSession(
       cloudAgentSessionId,
     });
   } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      return { response: INSUFFICIENT_CREDITS_RESPONSE };
+    }
     const message = error instanceof Error ? error.message : String(error);
     return {
       response: `Error initiating Cloud Agent: ${message}`,

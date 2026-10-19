@@ -33,6 +33,8 @@ import { loadStaticHeaders } from '../lib/credentials';
 import { proxyUpstream } from '../lib/upstream-proxy';
 import { challengeResponse, forbiddenResponse, insufficientScopeResponse } from '../lib/responses';
 import { validateIncomingOrigin } from '../lib/origin';
+import { resolveActiveRouteCached } from '../lib/route-cache';
+import { enforceRuntimeLimits, limitedResponse, recordProxyUsage } from '../lib/usage';
 
 function bearerToken(header: string | undefined): string | null {
   if (!header?.toLowerCase().startsWith('bearer ')) return null;
@@ -42,6 +44,7 @@ function bearerToken(header: string | undefined): string | null {
 
 type RuntimePhase =
   | 'parse_route'
+  | 'limit_runtime'
   | 'load_route'
   | 'load_jwt_keyset'
   | 'verify_token'
@@ -155,8 +158,8 @@ async function handleConnect(
     hasBearerToken = Boolean(token);
     if (!token) {
       phase = 'load_route';
-      const activeRoute = await resolveActiveRoute({ env: c.env, route });
-      if (!activeRoute) {
+      const cachedRoute = await resolveActiveRouteCached({ env: c.env, route });
+      if (!cachedRoute) {
         return c.json({ error: 'not_found' }, 404);
       }
       return challengeResponse(c, canonicalUrl);
@@ -187,6 +190,16 @@ async function handleConnect(
     }
     if (!parseScopeString(claims.scope).includes(GatewayMcpAccessScope)) {
       return insufficientScopeResponse(c, canonicalUrl);
+    }
+    phase = 'limit_runtime';
+    if (
+      !(await enforceRuntimeLimits({
+        env: c.env,
+        userId: claims.sub,
+        configId: route.configId,
+      }))
+    ) {
+      return limitedResponse(c);
     }
     if (
       claims.sub.length === 0 ||
@@ -241,7 +254,12 @@ async function handleConnect(
       }
     }
     phase = 'load_runtime_state';
-    let resolution = await resolveRuntimeState({ env: c.env, route, userId: claims.sub });
+    let resolution = await resolveRuntimeState({
+      env: c.env,
+      route,
+      userId: claims.sub,
+      resolvedRoute: activeRoute,
+    });
     if (!resolution) {
       return forbiddenResponse(c);
     }
@@ -321,6 +339,13 @@ async function handleConnect(
         status: response.status,
       });
     }
+    recordProxyUsage({
+      env: c.env,
+      configId: route.configId,
+      ownerScope: route.ownerScope,
+      method: c.req.method,
+      outcomeStatus: response.status,
+    });
     c.executionCtx.waitUntil(
       recordRuntimeAudit({
         env: c.env,

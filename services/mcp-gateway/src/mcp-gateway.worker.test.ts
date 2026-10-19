@@ -1,16 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import { clearRouteCacheForTests } from './lib/route-cache';
 
 const {
   mockResolveActiveOAuthGrant,
   mockResolveActiveRoute,
   mockResolveRuntimeState,
   mockVerifyGatewayToken,
+  mockWriteDataPoint,
+  mockUnauthLimit,
+  mockRuntimeLimit,
 } = vi.hoisted(() => ({
   mockResolveActiveOAuthGrant: vi.fn(),
   mockResolveActiveRoute: vi.fn(),
   mockResolveRuntimeState: vi.fn(),
   mockVerifyGatewayToken: vi.fn(),
+  mockWriteDataPoint: vi.fn(),
+  mockUnauthLimit: vi.fn(),
+  mockRuntimeLimit: vi.fn(),
 }));
 
 vi.mock('./db/runtime-repository', () => ({
@@ -23,6 +30,12 @@ vi.mock('./db/runtime-repository', () => ({
 
 vi.mock('./lib/jwt', () => ({
   verifyGatewayToken: mockVerifyGatewayToken,
+}));
+
+const { mockProxyUpstream } = vi.hoisted(() => ({ mockProxyUpstream: vi.fn() }));
+
+vi.mock('./lib/upstream-proxy', () => ({
+  proxyUpstream: mockProxyUpstream,
 }));
 
 vi.mock('cloudflare:workers', () => ({
@@ -44,13 +57,23 @@ const env = {
   MCP_GATEWAY_BASE_URL: 'https://mcp.kilosessions.ai',
   MCP_GATEWAY_JWT_ISSUER: 'https://app.kilo.ai',
   MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON: '{"keys":[]}',
-} as Env;
+  MCP_GATEWAY_UNAUTH_LIMITER: { limit: mockUnauthLimit },
+  MCP_GATEWAY_RUNTIME_LIMITER: { limit: mockRuntimeLimit },
+  MCP_GATEWAY_ANALYTICS: { writeDataPoint: mockWriteDataPoint },
+} as unknown as Env;
 
 async function request(path: string, method = 'GET') {
   return app.request(`https://mcp.kilosessions.ai${path}`, { method }, env);
 }
 
 beforeEach(() => {
+  clearRouteCacheForTests();
+  mockUnauthLimit.mockReset();
+  mockUnauthLimit.mockResolvedValue({ success: true });
+  mockRuntimeLimit.mockReset();
+  mockRuntimeLimit.mockResolvedValue({ success: true });
+  mockWriteDataPoint.mockReset();
+  mockProxyUpstream.mockReset();
   mockResolveActiveRoute.mockReset();
   mockResolveActiveRoute.mockImplementation(({ route }: { route: { routeKey: string } }) =>
     route.routeKey === 'abcdefghijklmnopqrstuvwxyzABCDEF'
@@ -337,4 +360,212 @@ describe('MCP gateway route surface', () => {
 
     expect(response.status).toBe(404);
   });
+
+  it('resolves an unknown route once for repeated tokenless requests', async () => {
+    const unknownRoute =
+      '/mcp-connect/user/user-123/11111111-1111-4111-8111-111111111111/abcdefghijklmnopqrstuvwxyzABCDEZ';
+
+    const first = await request(unknownRoute);
+    const second = await request(unknownRoute);
+
+    expect(first.status).toBe(404);
+    expect(second.status).toBe(404);
+    expect(mockResolveActiveRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves a known route once for repeated tokenless requests', async () => {
+    const first = await request(userRoute);
+    const second = await request(userRoute);
+
+    expect(first.status).toBe(401);
+    expect(second.status).toBe(401);
+    expect(mockResolveActiveRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('serves scoped protected-resource metadata through the route cache', async () => {
+    const first = await request(userMetadataRoute);
+    const second = await request(userMetadataRoute);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(mockResolveActiveRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('rate limits anonymous requests on scoped runtime and metadata surfaces', async () => {
+    mockUnauthLimit.mockResolvedValue({ success: false });
+
+    const responses = await Promise.all([
+      request(userRoute),
+      request(userMetadataRoute),
+      request(`${userRoute}/tools/list`, 'POST'),
+    ]);
+
+    for (const response of responses) {
+      expect(response.status).toBe(429);
+      await expect(response.json()).resolves.toEqual({ error: 'rate_limited' });
+    }
+    expect(mockResolveActiveRoute).not.toHaveBeenCalled();
+  });
+
+  it('limits per client IP key from the edge-provided header', async () => {
+    const response = await app.request(`https://mcp.kilosessions.ai${userRoute}`, {}, env);
+
+    expect(response.status).toBe(401);
+    expect(mockUnauthLimit).toHaveBeenCalledWith(
+      expect.objectContaining({ key: expect.stringContaining('ip:') })
+    );
+  });
+
+  it('returns 429 on the runtime path when the per-user limit is exhausted', async () => {
+    mockVerifyGatewayToken.mockResolvedValue(validMcpAccessToken());
+    mockRuntimeLimit.mockImplementation(({ key }: { key: string }) =>
+      Promise.resolve({ success: !key.startsWith('user:') })
+    );
+
+    const response = await app.request(
+      `https://mcp.kilosessions.ai${userRoute}`,
+      { headers: { Authorization: 'Bearer limited-user-token' } },
+      env
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({ error: 'rate_limited' });
+    expect(mockResolveActiveRoute).not.toHaveBeenCalled();
+    expect(mockResolveRuntimeState).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 on the runtime path when the per-config limit is exhausted', async () => {
+    mockVerifyGatewayToken.mockResolvedValue(validMcpAccessToken());
+    mockRuntimeLimit.mockImplementation(({ key }: { key: string }) =>
+      Promise.resolve({ success: !key.startsWith('config:') })
+    );
+
+    const response = await app.request(
+      `https://mcp.kilosessions.ai${userRoute}`,
+      { headers: { Authorization: 'Bearer limited-config-token' } },
+      env
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({ error: 'rate_limited' });
+    expect(mockResolveRuntimeState).not.toHaveBeenCalled();
+  });
+
+  it('checks both user and config limits before loading runtime state', async () => {
+    mockVerifyGatewayToken.mockResolvedValue(validMcpAccessToken());
+
+    const response = await app.request(
+      `https://mcp.kilosessions.ai${userRoute}`,
+      { headers: { Authorization: 'Bearer valid-mcp-access-token' } },
+      env
+    );
+
+    expect(response.status).toBe(403);
+    expect(mockRuntimeLimit).toHaveBeenCalledTimes(2);
+    expect(mockRuntimeLimit.mock.calls.some(([arg]) => arg.key === 'user:user-123')).toBe(true);
+    expect(
+      mockRuntimeLimit.mock.calls.some(
+        ([arg]) => arg.key === 'config:11111111-1111-4111-8111-111111111111'
+      )
+    ).toBe(true);
+  });
+
+  it('records one usage data point per proxied request', async () => {
+    mockVerifyGatewayToken.mockResolvedValue(validMcpAccessToken());
+    mockResolveRuntimeState.mockResolvedValue(runtimeResolutionFixture());
+    mockProxyUpstream.mockResolvedValue(
+      new Response('upstream-body', { status: 200, headers: { 'Content-Type': 'text/plain' } })
+    );
+
+    const response = await app.fetch(
+      new Request(`https://mcp.kilosessions.ai${userRoute}`, {
+        headers: { Authorization: 'Bearer metered-token' },
+      }),
+      env,
+      {
+        waitUntil: () => {},
+        passThroughOnException: () => {},
+        props: {},
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockProxyUpstream).toHaveBeenCalledOnce();
+    expect(mockWriteDataPoint).toHaveBeenCalledTimes(1);
+    expect(mockWriteDataPoint).toHaveBeenCalledWith(
+      expect.objectContaining({
+        indexes: ['11111111-1111-4111-8111-111111111111'],
+        doubles: [200],
+      })
+    );
+    const blobs = mockWriteDataPoint.mock.calls[0][0].blobs as string[];
+    expect(blobs[0]).toBe('runtime_proxy');
+    expect(blobs[1]).toBe('personal');
+    expect(mockResolveRuntimeState.mock.calls[0][0].resolvedRoute).toEqual({
+      route: expect.objectContaining({
+        connect_resource_id: '55555555-5555-4555-8555-555555555555',
+      }),
+      config: expect.objectContaining({ enabled: true }),
+    });
+  });
+
+  it('does not record usage data points for rejected requests', async () => {
+    mockVerifyGatewayToken.mockResolvedValue(validMcpAccessToken());
+
+    await app.request(
+      `https://mcp.kilosessions.ai${userRoute}`,
+      { headers: { Authorization: 'Bearer rejected-token' } },
+      env
+    );
+
+    // Valid token, full scope and claims match, but runtime state is missing:
+    // forbidden before proxying, so nothing is metered.
+    expect(mockWriteDataPoint).not.toHaveBeenCalled();
+  });
 });
+
+function validMcpAccessToken() {
+  return {
+    iss: 'https://app.kilo.ai',
+    sub: 'user-123',
+    aud: `https://mcp.kilosessions.ai${userRoute}`,
+    exp: Math.floor(Date.now() / 1000) + 900,
+    iat: Math.floor(Date.now() / 1000),
+    token_source: 'derived_connect',
+    scope: 'mcp:access',
+    MCPID:
+      'personal:user-123:11111111-1111-4111-8111-111111111111:abcdefghijklmnopqrstuvwxyzABCDEF',
+    owner_scope: 'personal',
+    owner_id: 'user-123',
+    config_id: '11111111-1111-4111-8111-111111111111',
+    route_key: 'abcdefghijklmnopqrstuvwxyzABCDEF',
+    instance_id: '44444444-4444-4444-8444-444444444444',
+    execution_context: { type: 'personal' },
+    config_version: 1,
+  };
+}
+
+function runtimeResolutionFixture() {
+  return {
+    route: { route_key: 'abcdefghijklmnopqrstuvwxyzABCDEF' },
+    config: {
+      auth_mode: 'none',
+      owner_scope: 'personal',
+      owner_id: 'user-123',
+      config_id: '11111111-1111-4111-8111-111111111111',
+      config_version: 1,
+      remote_url: 'https://remote.example/mcp',
+      path_passthrough: false,
+      auxiliary_headers: {},
+    },
+    user: { id: 'user-123' },
+    membership: null,
+    assignment: null,
+    instance: {
+      instance_id: '44444444-4444-4444-8444-444444444444',
+      instance_status: 'active',
+    },
+    grant: null,
+    staticSecret: null,
+  };
+}

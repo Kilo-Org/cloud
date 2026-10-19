@@ -10,6 +10,7 @@ import {
   redirectToAuthorizationServerAuthorizeMetadata,
   redirectToAuthorizationServerMetadata,
 } from './handlers/authorization-server-metadata.handler';
+import { anonymousClientLimiter } from './lib/usage';
 import type { MCPGatewayEnv } from './types';
 import { runCleanup } from './lib/cleanup';
 
@@ -18,6 +19,12 @@ export { MCPGatewayInstance } from './durable-objects/MCPGatewayInstance.do';
 export const app = new Hono<MCPGatewayEnv>();
 
 app.get('/health', c => handleHealth(c));
+
+// Anonymous-client window for the scoped runtime and metadata surfaces. Health,
+// generic protected-resource metadata, and the authorization-server redirect
+// aliases stay unlimited because they do not touch route state.
+app.use('/mcp-connect/*', anonymousClientLimiter);
+app.use('/.well-known/oauth-protected-resource/mcp-connect/*', anonymousClientLimiter);
 
 app.get('/mcp-connect/user/:userId/:configId/:routeKey', c => handleUserConnect(c, c.req.param()));
 app.post('/mcp-connect/user/:userId/:configId/:routeKey', c => handleUserConnect(c, c.req.param()));

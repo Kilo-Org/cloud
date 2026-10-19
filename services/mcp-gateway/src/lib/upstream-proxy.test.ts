@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { proxyUpstream } from './upstream-proxy';
+import { clearDnsCacheForTests } from './url-policy';
 
 describe('proxyUpstream', () => {
+  beforeEach(() => {
+    clearDnsCacheForTests();
+  });
+
   it('streams to a validated upstream with credential-safe headers', async () => {
     const calls: Array<{ url: string; headers: Headers }> = [];
     const fetchImpl: typeof fetch = async (input, init) => {
@@ -132,5 +137,95 @@ describe('proxyUpstream', () => {
         fetchImpl,
       })
     ).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+
+  it('validates one hostname through DNS once within the cache window', async () => {
+    let dnsCalls = 0;
+    const fetchImpl: typeof fetch = async input => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
+        dnsCalls += 1;
+        return new Response(JSON.stringify({ Answer: [{ data: '8.8.8.8' }] }), { status: 200 });
+      }
+      return new Response('upstream-body', { status: 200 });
+    };
+    const baseParams = {
+      env: {} as Env,
+      request: new Request('https://mcp.kilosessions.ai/mcp-connect/user/u/c/r'),
+      descendantPath: null,
+      pathPassthrough: false,
+      fetchImpl,
+    } as const;
+
+    const first = await proxyUpstream({ ...baseParams, remoteUrl: 'https://cached.example/mcp' });
+    const second = await proxyUpstream({ ...baseParams, remoteUrl: 'https://cached.example/other' });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(dnsCalls).toBe(2);
+  });
+
+  it('re-validates a hostname after the DNS cache entry expires', async () => {
+    let dnsCalls = 0;
+    const fetchImpl: typeof fetch = async input => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
+        dnsCalls += 1;
+        return new Response(JSON.stringify({ Answer: [{ data: '8.8.8.8' }] }), { status: 200 });
+      }
+      return new Response('upstream-body', { status: 200 });
+    };
+    const baseParams = {
+      env: {} as Env,
+      request: new Request('https://mcp.kilosessions.ai/mcp-connect/user/u/c/r'),
+      descendantPath: null,
+      pathPassthrough: false,
+      fetchImpl,
+    } as const;
+
+    await proxyUpstream({ ...baseParams, remoteUrl: 'https://expiring.example/mcp' });
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 31_000);
+    try {
+      await proxyUpstream({ ...baseParams, remoteUrl: 'https://expiring.example/mcp' });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(dnsCalls).toBe(4);
+  });
+
+  it('caches a failed validation for the hostname within the window', async () => {
+    let dnsCalls = 0;
+    const fetchImpl: typeof fetch = async input => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
+        dnsCalls += 1;
+        if (url.includes('type=AAAA')) {
+          return new Response(JSON.stringify({ Answer: [{ data: 'fd00::1' }] }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ Answer: [{ data: '8.8.8.8' }] }), { status: 200 });
+      }
+      return new Response('upstream-body', { status: 200 });
+    };
+    const baseParams = {
+      env: {} as Env,
+      request: new Request('https://mcp.kilosessions.ai/mcp-connect/user/u/c/r'),
+      descendantPath: null,
+      pathPassthrough: false,
+      fetchImpl,
+    } as const;
+
+    await expect(
+      proxyUpstream({ ...baseParams, remoteUrl: 'https://blocked.example/mcp' })
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(
+      proxyUpstream({ ...baseParams, remoteUrl: 'https://blocked.example/other' })
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+
+    expect(dnsCalls).toBe(2);
   });
 });

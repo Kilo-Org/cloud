@@ -124,9 +124,11 @@ export async function resolveRuntimeState(params: {
   env: MCPGatewayEnv['Bindings'];
   route: ScopedConnectRoute;
   userId: string;
+  /** Route already resolved for this request; skips the duplicate route query. */
+  resolvedRoute?: { route: typeof mcp_gateway_connect_resources.$inferSelect; config: typeof mcp_gateway_configs.$inferSelect };
 }): Promise<RuntimeResolution | null> {
   const db = getRuntimeDb(params.env);
-  const resolved = await resolveActiveRoute(params);
+  const resolved = params.resolvedRoute ?? (await resolveActiveRoute(params));
   if (!resolved) return null;
 
   const [user] = await db

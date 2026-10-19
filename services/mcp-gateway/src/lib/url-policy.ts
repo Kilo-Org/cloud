@@ -73,29 +73,66 @@ async function queryDnsAnswers(hostname: string, type: 'A' | 'AAAA', fetchImpl: 
   return parsed.data.Answer?.map(answer => answer.data).filter(isIpAddress) ?? [];
 }
 
+export const DNS_CACHE_TTL_MS = 30_000;
+export const DNS_CACHE_MAX_ENTRIES = 200;
+
+type CachedDnsOutcome = { valid: boolean; expiresAtMs: number };
+
+const dnsCache: Map<string, CachedDnsOutcome> = new Map();
+
+function readDnsOutcome(hostname: string, nowMs: number): boolean | null {
+  const entry = dnsCache.get(hostname);
+  if (!entry) return null;
+  if (entry.expiresAtMs <= nowMs) {
+    dnsCache.delete(hostname);
+    return null;
+  }
+  return entry.valid;
+}
+
+function writeDnsOutcome(hostname: string, valid: boolean, nowMs: number): void {
+  if (dnsCache.size >= DNS_CACHE_MAX_ENTRIES && !dnsCache.has(hostname)) {
+    const oldestKey = dnsCache.keys().next().value;
+    if (oldestKey !== undefined) dnsCache.delete(oldestKey);
+  }
+  dnsCache.set(hostname, { valid, expiresAtMs: nowMs + DNS_CACHE_TTL_MS });
+}
+
 export async function validateResolvedPublicUrl(
   value: string,
-  fetchImpl: typeof fetch
+  fetchImpl: typeof fetch,
+  nowMs: number = Date.now()
 ): Promise<URL> {
   const target = validatePublicHttpsUrl(value);
   const hostname = target.hostname.toLowerCase();
   if (isIpAddress(hostname)) return target;
-  const [ipv4, ipv6] = await Promise.all([
-    queryDnsAnswers(hostname, 'A', fetchImpl),
-    queryDnsAnswers(hostname, 'AAAA', fetchImpl),
-  ]);
-  const addresses = [...ipv4, ...ipv6];
-  if (addresses.length === 0) {
+  const cachedOutcome = readDnsOutcome(hostname, nowMs);
+  if (cachedOutcome === null) {
+    const [ipv4, ipv6] = await Promise.all([
+      queryDnsAnswers(hostname, 'A', fetchImpl),
+      queryDnsAnswers(hostname, 'AAAA', fetchImpl),
+    ]);
+    const addresses = [...ipv4, ...ipv6];
+    let valid = true;
+    if (addresses.length === 0 || addresses.some(address => !isPublicIp(address))) {
+      valid = false;
+    }
+    writeDnsOutcome(hostname, valid, nowMs);
+    if (!valid) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidRequest,
+        addresses.length === 0
+          ? 'Upstream DNS could not be validated'
+          : 'Upstream resolves to a private destination',
+        400
+      );
+    }
+    return target;
+  }
+  if (!cachedOutcome) {
     throw createGatewayError(
       GatewayErrorCode.InvalidRequest,
       'Upstream DNS could not be validated',
-      400
-    );
-  }
-  if (addresses.some(address => !isPublicIp(address))) {
-    throw createGatewayError(
-      GatewayErrorCode.InvalidRequest,
-      'Upstream resolves to a private destination',
       400
     );
   }
@@ -107,4 +144,9 @@ export async function validateRedirectTarget(
   fetchImpl: typeof fetch
 ): Promise<URL> {
   return await validateResolvedPublicUrl(location, fetchImpl);
+}
+
+/** Test hook: clear the per-hostname DNS validation cache. */
+export function clearDnsCacheForTests(): void {
+  dnsCache.clear();
 }

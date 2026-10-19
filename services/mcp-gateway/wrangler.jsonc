@@ -47,6 +47,18 @@
       "dataset": "mcp_gateway_events",
     },
   ],
+  "ratelimits": [
+    {
+      "name": "MCP_GATEWAY_UNAUTH_LIMITER",
+      "namespace_id": "1101",
+      "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      "name": "MCP_GATEWAY_RUNTIME_LIMITER",
+      "namespace_id": "1102",
+      "simple": { "limit": 600, "period": 60 },
+    },
+  ],
   "secrets": {
     "required": [
       "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
@@ -101,6 +113,18 @@
         {
           "binding": "MCP_GATEWAY_ANALYTICS",
           "dataset": "mcp_gateway_events",
+        },
+      ],
+      "ratelimits": [
+        {
+          "name": "MCP_GATEWAY_UNAUTH_LIMITER",
+          "namespace_id": "1101",
+          "simple": { "limit": 60, "period": 60 },
+        },
+        {
+          "name": "MCP_GATEWAY_RUNTIME_LIMITER",
+          "namespace_id": "1102",
+          "simple": { "limit": 600, "period": 60 },
         },
       ],
       "secrets": {

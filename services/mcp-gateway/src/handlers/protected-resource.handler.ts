@@ -9,7 +9,7 @@ import {
   type UserConnectRouteParams,
 } from '@kilocode/mcp-gateway';
 import type { MCPGatewayEnv } from '../types';
-import { resolveActiveRoute } from '../db/runtime-repository';
+import { resolveActiveRouteCached } from '../lib/route-cache';
 
 function metadata(c: Context<MCPGatewayEnv>, resource: string) {
   return c.json({
@@ -34,7 +34,7 @@ export async function handleUserProtectedResourceMetadata(
     `/mcp-connect/user/${validatedParams.userId}/${validatedParams.configId}/${validatedParams.routeKey}`
   );
   if (!route) return c.json({ error: 'not_found' }, 404);
-  const activeRoute = await resolveActiveRoute({ env: c.env, route });
+  const activeRoute = await resolveActiveRouteCached({ env: c.env, route });
   if (!activeRoute) return c.json({ error: 'not_found' }, 404);
   const resource = buildScopedConnectCanonicalUrl(c.env.MCP_GATEWAY_BASE_URL, {
     ownerScope: 'personal',
@@ -56,7 +56,7 @@ export async function handleOrgProtectedResourceMetadata(
     `/mcp-connect/org/${validatedParams.orgId}/${validatedParams.configId}/${validatedParams.routeKey}`
   );
   if (!route) return c.json({ error: 'not_found' }, 404);
-  const activeRoute = await resolveActiveRoute({ env: c.env, route });
+  const activeRoute = await resolveActiveRouteCached({ env: c.env, route });
   if (!activeRoute) return c.json({ error: 'not_found' }, 404);
   const resource = buildScopedConnectCanonicalUrl(c.env.MCP_GATEWAY_BASE_URL, {
     ownerScope: 'organization',

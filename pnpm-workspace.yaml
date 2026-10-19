@@ -279,6 +279,14 @@ patchedDependencies:
   # A finished first entry made a cold start re-enqueue with REPLACE, which
   # cancelled the glanceable refresh run in progress.
   expo-background-task@57.0.21: patches/expo-background-task@57.0.21.patch
+  # Android: the sheet insets observer registered from the host fragment's
+  # ON_START dereferenced reactContext.currentActivity with a checkNotNull, but
+  # the fragment can reach ON_START while React holds no current activity
+  # (activity recreation with a form sheet in the tree). That turned an ordinary
+  # return to the app into a fatal "Attempt to access activity on detached
+  # context" crash. Defer the registration to ON_RESUME, where onHostResume has
+  # restored the current activity; mirrors software-mansion/react-native-screens#4531.
+  react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

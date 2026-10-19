@@ -73,7 +73,9 @@ export function getContainerCapacityFailureReason(
   return undefined;
 }
 
-export function isContainerConcurrencyExempt(request: ContainerCapacityRequest): boolean {
+export function isContainerConcurrencyExempt(
+  request: Pick<ContainerCapacityRequest, 'instanceId' | 'billingOrigin'>
+): boolean {
   return request.billingOrigin === 'code-review' || request.instanceId.startsWith('crv-');
 }
 

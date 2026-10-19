@@ -4,6 +4,7 @@ import {
   createContainerUsageClient,
   DEFAULT_BILLING_HEARTBEAT_SECONDS,
   getBillingContext,
+  isContainerConcurrencyExempt,
   installBillingHeartbeat,
   type BillingHeartbeatController,
 } from '@kilocode/container-usage';
@@ -302,6 +303,17 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
     } catch {
       return 'unavailable';
     }
+    if (
+      !enforced &&
+      (deps.env().CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true' ||
+        isContainerConcurrencyExempt({
+          instanceId: billing.sandboxId,
+          billingOrigin: billing.metadata?.origin,
+        }))
+    ) {
+      await active.lifecycle.seedShadowGeneration(active.identity, billing);
+      return 'admitted';
+    }
     const outcome = await active.lifecycle.openIntervalBeforeCreate(active.identity, {
       ...billing,
       enforcementRequested: enforced,
@@ -334,7 +346,6 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
       context.metadata?.allocation_id === allocationId &&
       (await loadVercelBillingBinding(deps.storage, context.generation)) !== undefined
     ) {
-      await prepareSettlement(context.generation);
       return;
     }
     await active?.lifecycle.releaseBillingAdmission(allocationId);
@@ -383,6 +394,16 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
       return false;
     const active = await ensureRuntime();
     if (active?.identity === undefined) return false;
+    if (
+      deps.env().CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true' ||
+      isContainerConcurrencyExempt({
+        instanceId: billing.sandboxId,
+        billingOrigin: billing.metadata?.origin,
+      })
+    ) {
+      await active.lifecycle.seedShadowGeneration(active.identity, billing);
+      return true;
+    }
     const outcome = await active.lifecycle.openIntervalBeforeCreate(active.identity, billing);
     if (outcome.kind !== 'acked') return false;
     await deps.schedule.ensure(

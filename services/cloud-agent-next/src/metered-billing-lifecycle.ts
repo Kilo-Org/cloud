@@ -21,6 +21,7 @@ import {
   assertContainerCapacity,
   ContainerCapacityUnavailableError,
   getContainerCapacityFailureReason,
+  isContainerConcurrencyExempt,
 } from './container-concurrency.js';
 import {
   assertSandboxBillingAllocation,
@@ -185,6 +186,17 @@ export class MeteredBillingLifecycle {
     return this.runBillingExclusive(async () => {
       await this.host.storage.put(PENDING_ATTRIBUTION_STORAGE_KEY, parsed);
       const block = await this.getBillingBlock();
+      if (
+        !block &&
+        !parsed.enforcementRequested &&
+        (this.host.containerConcurrencyDisabled ||
+          isContainerConcurrencyExempt({
+            instanceId: parsed.sandboxId,
+            billingOrigin: parsed.metadata?.origin,
+          }))
+      ) {
+        return { success: true };
+      }
       let active = await getBillingContext(this.host.storage);
 
       if (active && !active.measurementStarted && !block && !active.pendingStop) {
@@ -356,6 +368,18 @@ export class MeteredBillingLifecycle {
       }
       await this.host.storage.delete(BILLING_BLOCK_STORAGE_KEY);
       return { kind: 'acked', generation: context.generation };
+    });
+  }
+
+  async seedShadowGeneration(identity: BillingIdentity, input: unknown): Promise<string> {
+    const parsed = parseSandboxBillingInput(input);
+    assertSandboxBillingAllocation(identity.sandboxClassName, parsed);
+    return this.runBillingExclusive(async () => {
+      await this.host.storage.put(PENDING_ATTRIBUTION_STORAGE_KEY, parsed);
+      const existing = await getBillingContext(this.host.storage);
+      const context =
+        existing ?? (await this.createBillingGeneration(identity, parsed, 'attribution-adoption'));
+      return context.generation;
     });
   }
 

@@ -1,5 +1,8 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
-import { getContainerCapacityFailureReason } from '../container-concurrency.js';
+import {
+  getContainerCapacityFailureReason,
+  isContainerConcurrencyExempt,
+} from '../container-concurrency.js';
 import {
   containersBillingIdentity,
   parseSandboxBillingInput,
@@ -48,6 +51,7 @@ function mapObservation(
 
 export function createCloudflareContainersProviderAdapter(deps: {
   logicalSandboxId: string;
+  containerConcurrencyDisabled?: boolean;
   allocationName: string;
   instance?: ContainerInstanceSize;
   egressAllowlist?: string[];
@@ -91,7 +95,17 @@ export function createCloudflareContainersProviderAdapter(deps: {
     } catch {
       blocked = input.enforcementRequested === true;
     }
-    if (input.enforcementRequested || blocked || input.allocationId !== undefined) {
+    const reserveCapacity =
+      !deps.containerConcurrencyDisabled &&
+      !isContainerConcurrencyExempt({
+        instanceId: input.sandboxId,
+        billingOrigin: input.metadata?.origin,
+      });
+    if (
+      input.enforcementRequested ||
+      blocked ||
+      (reserveCapacity && input.allocationId !== undefined)
+    ) {
       let admission: SandboxBillingAdmissionResult;
       try {
         admission = await withDORetry(

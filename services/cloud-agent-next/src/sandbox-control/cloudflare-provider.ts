@@ -22,7 +22,10 @@ import { ProviderCreationError } from './provider.js';
 import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { parseWrapperProcScanOutput, WRAPPER_PROC_SCAN_COMMAND } from './wrapper-proc-scan.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { getContainerCapacityFailureReason } from '../container-concurrency.js';
+import {
+  getContainerCapacityFailureReason,
+  isContainerConcurrencyExempt,
+} from '../container-concurrency.js';
 
 export const WRAPPER_PROC_PROBE_TIMEOUT_MS = 5_000;
 
@@ -73,6 +76,7 @@ type SandboxOptions = { containment: boolean };
 
 export function createCloudflareProviderAdapter(deps: {
   sandboxId: string;
+  containerConcurrencyDisabled?: boolean;
   getSandbox: (id: string, options: SandboxOptions) => CloudflareSandboxHandle;
   destroy: (allocationId: string, options: SandboxOptions) => Promise<void>;
 }): CloudflareProviderAdapter {
@@ -112,7 +116,17 @@ export function createCloudflareProviderAdapter(deps: {
     }
     const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
     const blocked = await isSandboxBillingBlocked(sandbox, input.enforcementRequested);
-    if (input.enforcementRequested || blocked || input.allocationId !== undefined) {
+    const reserveCapacity =
+      !deps.containerConcurrencyDisabled &&
+      !isContainerConcurrencyExempt({
+        instanceId: input.sandboxId,
+        billingOrigin: input.metadata?.origin,
+      });
+    if (
+      input.enforcementRequested ||
+      blocked ||
+      (reserveCapacity && input.allocationId !== undefined)
+    ) {
       const admission = await withDORetry(
         () => deps.getSandbox(parsed.sandboxId, { containment: parsed.containment }),
         sandbox => ensureSandboxBillingAdmissionInput(sandbox, input),

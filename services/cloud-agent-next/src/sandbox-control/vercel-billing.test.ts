@@ -18,6 +18,7 @@ import { VERCEL_BILLING_CAPACITIES } from '../container-usage-context.js';
 import { VERCEL_CREATE_SETTLE_MS } from '../agent-sandbox/vercel/vercel-runtime-state.js';
 import { MeteredBillingLifecycle, type BillingIdentity } from '../metered-billing-lifecycle.js';
 import type { AllocationState, SandboxTimers } from '../control-plane/sandbox/allocation.js';
+import type { StoredProviderPin } from '../control-plane/sandbox/sandbox-do.js';
 import { createVercelBillingRuntime } from '../control-plane/sandbox/vercel-billing-runtime.js';
 import type { ProviderAdapter } from './provider.js';
 import type { VercelSandboxSession } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
@@ -797,7 +798,11 @@ describe('createVercelBillingRuntime', () => {
   }
 
   function harness(
-    options: { requestStop?: () => Promise<void>; observe?: ProviderAdapter['observe'] } = {}
+    options: {
+      requestStop?: () => Promise<void>;
+      observe?: ProviderAdapter['observe'];
+      containerConcurrencyDisabled?: boolean;
+    } = {}
   ) {
     const { storage, meter, pending, heartbeat } = setup();
     const schedule = helperSchedule();
@@ -808,7 +813,13 @@ describe('createVercelBillingRuntime', () => {
     const requestStop = vi.fn(options.requestStop ?? (async () => undefined));
     const runtime = createVercelBillingRuntime({
       storage: storage as unknown as DurableObjectStorage,
-      env: () => ({ CONTAINER_USAGE_METER: meter }) as never,
+      env: () =>
+        ({
+          CONTAINER_USAGE_METER: meter,
+          CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: options.containerConcurrencyDisabled
+            ? 'true'
+            : undefined,
+        }) as never,
       sandboxId: 'ses-abcdef',
       schedule: schedule as unknown as BillingScheduleTable,
       currentProvider: () => 'vercel',
@@ -855,6 +866,38 @@ describe('createVercelBillingRuntime', () => {
       },
     };
   }
+
+  it.each([
+    { disabled: true, origin: 'cloud-agent' },
+    { disabled: false, origin: 'code-review' },
+  ])(
+    'admits a shadow Vercel create without the unavailable meter when disabled=$disabled and origin=$origin',
+    async ({ disabled, origin }) => {
+      const h = harness({ containerConcurrencyDisabled: disabled });
+      const resources = resourcesFor(capacityA);
+      h.setResources(resources);
+      h.meter.recordStartBehavior = 'reject';
+      const pin: StoredProviderPin = {
+        provider: 'vercel',
+        allocationName: 'ses-abcdef',
+        configuration: { provider: 'vercel', resources },
+        locator: null,
+        containment: null,
+        billing: {
+          ...BILLING_INPUT,
+          sandboxId: 'ses-abcdef',
+          allocationId: 'a1',
+          enforcementRequested: false,
+          metadata: { origin },
+        },
+      };
+
+      await expect(h.runtime.admitCreate(pin)).resolves.toBe('admitted');
+
+      expect(h.meter.recordStartInputs).toEqual([]);
+      expect((await getBillingContext(h.storage))?.metadata?.allocation_id).toBe('a1');
+    }
+  );
 
   it('releases an unknown create after its deadline and settle window even while observe throws', async () => {
     const observe = vi.fn(async () => {

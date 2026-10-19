@@ -258,6 +258,7 @@ function setup(
     storage?: FakeStorage;
     container?: FakeContainer;
     meter?: FakeMeter;
+    containerConcurrencyDisabled?: boolean;
   } = {}
 ) {
   const container = options.container ?? new FakeContainer();
@@ -281,7 +282,12 @@ function setup(
     },
   } as unknown as DurableObjectState;
   const meter = options.meter ?? new FakeMeter();
-  const instance = new SandboxContainers(ctx, { CONTAINER_USAGE_METER: meter } as unknown as Env);
+  const instance = new SandboxContainers(ctx, {
+    CONTAINER_USAGE_METER: meter,
+    CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: options.containerConcurrencyDisabled
+      ? 'true'
+      : undefined,
+  } as unknown as Env);
   return { storage, container, meter, instance, pendingTasks };
 }
 
@@ -337,6 +343,39 @@ afterEach(() => {
 });
 
 describe('ContainersBilling identity and admission', () => {
+  it.each([
+    { disabled: true, origin: 'cloud-agent' },
+    { disabled: false, origin: 'code-review' },
+  ])(
+    'keeps a shadow native start available during a meter outage when disabled=$disabled and origin=$origin',
+    async ({ disabled, origin }) => {
+      const { instance, container, meter, pendingTasks } = setup({
+        containerConcurrencyDisabled: disabled,
+      });
+      const recordStart = vi
+        .spyOn(meter, 'recordStart')
+        .mockRejectedValue(new Error('Meter unavailable'));
+      await instance.ensureBillingAdmission(
+        {
+          ...BILLING_INPUT,
+          allocationId: 'allocation-1',
+          enforcementRequested: false,
+          metadata: { origin },
+        },
+        'standard-4'
+      );
+      expect(meter.recordStartInputs).toEqual([]);
+      expect(recordStart).not.toHaveBeenCalled();
+
+      await expect(launch(instance, REF_A, 'standard-4')).resolves.toBeDefined();
+      await vi.runAllTimersAsync();
+      await flushPending(pendingTasks);
+
+      expect(container.startCalls).toHaveLength(1);
+      expect(container.running).toBe(true);
+    }
+  );
+
   it('releases a failed native launch before the container starts with zero usage', async () => {
     const { instance, container, storage, meter } = setup();
     await instance.ensureBillingAdmission(

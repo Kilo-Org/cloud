@@ -113,6 +113,46 @@ describe('native egress policy forwarding', () => {
 });
 
 describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation causes', kind => {
+  it.each([
+    { disabled: true, origin: 'cloud-agent' },
+    { disabled: false, origin: 'code-review' },
+  ])(
+    'keeps shadow creates off the meter when disabled=$disabled and origin=$origin',
+    async ({ disabled, origin }) => {
+      const ensureBillingAdmission = vi.fn().mockRejectedValue(new Error('Meter unavailable'));
+      const configureBilling = vi.fn().mockResolvedValue(undefined);
+      const handle = {
+        isBillingBlocked: async () => false,
+        ensureBillingAdmission,
+        configureBilling,
+      };
+      const provider =
+        kind === 'cloudflare'
+          ? createCloudflareProviderAdapter({
+              sandboxId: SANDBOX_ID,
+              containerConcurrencyDisabled: disabled,
+              getSandbox: () => handle as unknown as MeteredSandboxInstance,
+              destroy: async () => {},
+            })
+          : createCloudflareContainersProviderAdapter({
+              logicalSandboxId: SANDBOX_ID,
+              allocationName: SANDBOX_ID,
+              containerConcurrencyDisabled: disabled,
+              getContainer: () => handle as unknown as DurableObjectStub<SandboxContainers>,
+            });
+
+      await expect(
+        provider.create({
+          ...intent,
+          billing: { ...billing, enforcementRequested: false, metadata: { origin } },
+        })
+      ).resolves.toMatchObject({ providerRef: expect.any(String) });
+
+      expect(ensureBillingAdmission).not.toHaveBeenCalled();
+      expect(configureBilling).toHaveBeenCalledOnce();
+    }
+  );
+
   it('retries shadow capacity admission with a fresh handle and the same allocation', async () => {
     const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
     const failed = {

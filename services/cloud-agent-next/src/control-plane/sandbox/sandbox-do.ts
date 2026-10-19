@@ -4980,6 +4980,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
             : undefined;
         return createCloudflareContainersProviderAdapter({
           logicalSandboxId: this.sandboxId,
+          containerConcurrencyDisabled:
+            this.env.CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true',
           allocationName,
           ...(instance === undefined ? {} : { instance }),
           ...(pin.egressAllowlist === undefined ? {} : { egressAllowlist: pin.egressAllowlist }),
@@ -4989,6 +4991,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'cloudflare':
         return createCloudflareProviderAdapter({
           sandboxId: allocationName,
+          containerConcurrencyDisabled:
+            this.env.CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true',
           getSandbox: (id, options) =>
             getSandbox(this.sandboxNamespace(pin, id, options.containment), id),
           destroy: (id, options) =>

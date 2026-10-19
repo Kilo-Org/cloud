@@ -188,7 +188,8 @@ function createSandbox(
     | 'SandboxSmallContainment'
     | 'SandboxCodeReview'
     | 'SandboxDIND' = 'SandboxSmallContainment',
-  heartbeatSeconds?: string
+  heartbeatSeconds?: string,
+  containerConcurrencyDisabled = false
 ) {
   const storage = new MemoryStorage();
   const shadowTasks: Promise<unknown>[] = [];
@@ -227,6 +228,7 @@ function createSandbox(
     sandbox: new TestSandbox(ctx, {
       CONTAINER_USAGE_METER: rpc,
       CONTAINER_BILLING_HEARTBEAT_SECONDS: heartbeatSeconds,
+      CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: containerConcurrencyDisabled ? 'true' : undefined,
     } as never) as unknown as TestRuntime,
   };
 }
@@ -1535,6 +1537,28 @@ describe('MeteredSandbox', () => {
 });
 
 describe('MeteredSandbox container capacity', () => {
+  it.each([
+    { disabled: true, origin: 'cloud-agent' },
+    { disabled: false, origin: 'code-review' },
+  ])(
+    'starts without a synchronous shadow meter dependency when disabled=$disabled and origin=$origin',
+    async ({ disabled, origin }) => {
+      const rpc = createRpc();
+      vi.mocked(rpc.recordStart).mockRejectedValue(new Error('Meter unavailable'));
+      const { sandbox } = createSandbox(rpc, false, 'SandboxSmallContainment', undefined, disabled);
+      await sandbox.configureBilling({
+        ...billingInput,
+        allocationId: 'allocation-1',
+        metadata: { origin },
+      });
+
+      await expect(sandbox.start()).resolves.toBeUndefined();
+
+      expect(sandbox.startCalls).toBe(1);
+      expect(rpc.recordStart).not.toHaveBeenCalled();
+    }
+  );
+
   it('does not start until the interval reservation is durably acknowledged', async () => {
     const rpc = createRpc();
     const { sandbox, storage } = createSandbox(rpc);

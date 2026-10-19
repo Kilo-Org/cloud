@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigation } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, StatusBar, View } from 'react-native';
 
@@ -31,6 +32,16 @@ import { useScreenInsets } from '@/lib/screen-insets';
  *   the inset would only be a dead band above the title.
  */
 export type SheetHeaderTopInset = 'always' | 'bottom-form-sheet' | 'ios-page-sheet' | 'never';
+
+/**
+ * Whether a measured window Y counts as the header sitting at the window top.
+ * Only a surface that truly starts at y ≈ 0 needs its own status-bar
+ * clearance; a sheet edge the detent cap placed below the status bar already
+ * provides it, and reserving the inset again would be a dead band.
+ */
+export function isAtWindowTop(y: number | undefined): boolean {
+  return y !== undefined && y <= 1;
+}
 
 export function SheetHeader({
   title,
@@ -78,13 +89,14 @@ export function SheetHeader({
   // without branching on Platform.OS.
   const statusBarHeight = StatusBar.currentHeight ?? 0;
   const resolvedTopInset = insets.top > 0 ? insets.top : statusBarHeight;
-  // On Android a bottom formSheet surface reaches the window top only at its
-  // largest detent (`sheetShouldOverflowTopInset`), so the header reserves the
-  // status-bar inset only while it actually sits at the window top, measured
-  // against the sheet's own window. At smaller detents the surface starts
-  // below the status bar and the inset would only be a dead band above the
-  // title. The native detent index is not observable from JS on Android, so
-  // the header measures its own window position once per layout settle.
+  // On Android a bottom formSheet surface reaches the window top only in the
+  // degenerate frame where the detent cap reports no inset
+  // (`useFormSheetDetents`); at every settled detent the cap already places
+  // the sheet edge below the status bar, so reserving the inset there would
+  // only double the clearance. The header therefore reserves the inset only
+  // while it measures at the window top itself (y ≈ 0) and re-measures when
+  // the sheet settles at another detent — the native detent index is not
+  // otherwise observable from JS on Android.
   const [reachesWindowTop, setReachesWindowTop] = useState(true);
   // On iOS the native sheet presents below the status bar, so the header
   // reserves no top clearance there — the window inset would only be a dead
@@ -105,22 +117,37 @@ export function SheetHeader({
           ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
         }
       : undefined;
-  // Native row direction and logical margin keep Cancel/Share leading and Done
-  // trailing. Do not derive sides from i18n.dir() or the stale I18nManager.isRTL.
   const containerRef = useRef<View | null>(null);
   const remeasureWindowTop = useCallback(() => {
-    // A detent change (user drag) re-lays the sheet; re-measure so the
-    // clearance follows the surface to the window top.
     containerRef.current?.measureInWindow((_x, y) => {
-      setReachesWindowTop(y <= (StatusBar.currentHeight ?? 0) + 1);
+      setReachesWindowTop(isAtWindowTop(y));
     });
   }, []);
   const setContainerRef = useCallback((view: View | null) => {
     containerRef.current = view;
     view?.measureInWindow((_x, y) => {
-      setReachesWindowTop(y <= (StatusBar.currentHeight ?? 0) + 1);
+      setReachesWindowTop(isAtWindowTop(y));
     });
   }, []);
+  // `onLayout` cannot track a native detent change: the header keeps the same
+  // frame inside the sheet content while the sheet itself moves. Follow the
+  // NativeStateSurface pattern and re-measure when the sheet settles. The
+  // native-stack events are not on the untyped navigation's event map, so the
+  // listener registration is structurally typed here.
+  const navigation = useNavigation();
+  useEffect(() => {
+    const addListener = navigation.addListener as
+      | ((event: string, callback: () => void) => (() => void) | undefined)
+      | undefined;
+    const removeTransition = addListener?.('transitionEnd', remeasureWindowTop);
+    const removeDetent = addListener?.('sheetDetentChange', remeasureWindowTop);
+    return () => {
+      removeTransition?.();
+      removeDetent?.();
+    };
+  }, [navigation, remeasureWindowTop]);
+  // Native row direction and logical margin keep Cancel/Share leading and Done
+  // trailing. Do not derive sides from i18n.dir() or the stale I18nManager.isRTL.
   return (
     // collapsable={false}: react-native-screens lays out a formSheet's scroll
     // view by finding the header at the screen content's subview index 0 — a

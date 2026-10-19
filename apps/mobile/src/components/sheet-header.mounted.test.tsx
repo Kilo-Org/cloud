@@ -4,11 +4,14 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PickerSheet } from './picker-sheet';
-import { SheetHeader } from './sheet-header';
+import { isAtWindowTop, SheetHeader } from './sheet-header';
 import '@/i18n';
 
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const rn = vi.hoisted(() => ({ os: 'ios', statusHeight: 0 }));
+const navigationEvents = vi.hoisted(() => ({
+  listeners: new Map<string, Set<() => void>>(),
+}));
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -28,6 +31,21 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
+}));
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({
+    addListener: (event: string, handler: () => void) => {
+      let set = navigationEvents.listeners.get(event);
+      if (!set) {
+        set = new Set();
+        navigationEvents.listeners.set(event, set);
+      }
+      set.add(handler);
+      return () => {
+        set.delete(handler);
+      };
+    },
+  }),
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -571,10 +589,12 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
-  it('reserves the top clearance for a bottom formSheet on Android', async () => {
-    // On Android sheetShouldOverflowTopInset lets the sheet surface reach the
-    // window top, so the header must clear the status bar itself (the branch
-    // picker header drew into it in landscape otherwise).
+  it('reserves the top clearance for a bottom formSheet on Android at the window top', async () => {
+    // The degenerate frame where the detent cap reports no inset: the sheet
+    // surface reaches the window top and the header must clear the status bar
+    // itself (the branch picker header drew into it in landscape otherwise).
+    // The inert test-renderer measure keeps `reachesWindowTop` at its initial
+    // true; isAtWindowTop covers the threshold both ways.
     rn.os = 'android';
     rn.statusHeight = 48;
     safeArea.top = 24;
@@ -589,6 +609,35 @@ describe('SheetHeader', () => {
     expect(wrapper.props.style).toEqual({ paddingTop: 24 });
 
     renderer.unmount();
+  });
+
+  it('re-measures the window top when the sheet settles at another detent', async () => {
+    // onLayout cannot track a native detent change; the header follows the
+    // NativeStateSurface pattern and re-measures on the navigation events.
+    rn.os = 'android';
+    rn.statusHeight = 48;
+    safeArea.top = 24;
+    const renderer = await mount({
+      title: 'Voice language',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+      topInset: 'bottom-form-sheet',
+    });
+
+    expect(navigationEvents.listeners.get('sheetDetentChange')?.size).toBe(1);
+    expect(navigationEvents.listeners.get('transitionEnd')?.size).toBe(1);
+
+    renderer.unmount();
+    expect(navigationEvents.listeners.get('sheetDetentChange')?.size ?? 0).toBe(0);
+    expect(navigationEvents.listeners.get('transitionEnd')?.size ?? 0).toBe(0);
+  });
+
+  it('classifies a measured window Y as the window top only near zero', () => {
+    expect(isAtWindowTop(0)).toBe(true);
+    expect(isAtWindowTop(1)).toBe(true);
+    expect(isAtWindowTop(2)).toBe(false);
+    expect(isAtWindowTop(137)).toBe(false);
+    expect(isAtWindowTop(undefined)).toBe(false);
   });
 
   it.each(['ios', 'android'])(

@@ -180,6 +180,13 @@ describe('infinite-query refetch fan-out through withInfiniteRetention', () => {
     }
     expect(observer.getCurrentResult().data?.pages).toHaveLength(3);
 
+    // A 4th page exists; the cap of 3 must evict the oldest page instead of
+    // retaining it. Without the helper's maxPages, the pages array would grow
+    // to 4 and the refetch below would fan out 4 requests.
+    // eslint-disable-next-line no-await-in-loop -- the cursor chain continues from page 3.
+    await observer.fetchNextPage();
+    expect(observer.getCurrentResult().data?.pages).toHaveLength(3);
+
     calls = 0;
     await observer.refetch();
 

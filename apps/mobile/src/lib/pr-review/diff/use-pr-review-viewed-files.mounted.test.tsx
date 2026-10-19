@@ -27,16 +27,41 @@ vi.mock('@/lib/trpc', () => ({
 const storeMocks = vi.hoisted(() => ({
   getViewedFiles: vi.fn(),
   toggleViewedFile: vi.fn(),
-  // The real key is the provider-scoped identity (rule 17); the store only
-  // needs it to be stable per ref, so the stub stringifies the ref.
-  viewedFilesKey: vi.fn((ref: unknown) => JSON.stringify(ref)),
 }));
 
-vi.mock('@/lib/pr-review/viewed-files', () => storeMocks);
+// Only the durable I/O layer is faked; `viewedFilesKey` stays the real
+// provider-scoped implementation so the tests exercise the identity rule the
+// hook exists for. The real `viewed-files` module loads fine in this node
+// environment once its SecureStore chain is stubbed.
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn(async () => null),
+  setItemAsync: vi.fn(async () => undefined),
+  deleteItemAsync: vi.fn(async () => undefined),
+}));
 
+vi.mock('@/lib/storage-keys', () => ({
+  PR_REVIEW_VIEWED_KEY: 'pr-review-viewed',
+}));
+
+vi.mock('@/lib/pr-review/viewed-files', async importOriginal => {
+  const actual = await importOriginal<{
+    getViewedFiles: unknown;
+    toggleViewedFile: unknown;
+    viewedFilesKey: unknown;
+  }>();
+  return {
+    ...actual,
+    getViewedFiles: storeMocks.getViewedFiles,
+    toggleViewedFile: storeMocks.toggleViewedFile,
+  };
+});
+
+// The two fixtures share the legacy `owner/repo#number` triple: only the
+// provider-scoped key suffix (`providerPrRefKey`) separates their viewed
+// sets, so a real key that dropped the suffix would fail this suite.
 const GITLAB_REF: ProviderPrRef = {
   platform: 'gitlab',
-  projectPath: 'group/sub/repo',
+  projectPath: 'octocat/hello-world',
   mrIid: 12,
   instanceHint: 'https://gitlab.example.com',
 };

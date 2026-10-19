@@ -27,9 +27,9 @@ function createTrpcStub(infiniteQueryOptions: unknown) {
 
 describe('buildPrReviewFileListQueryOptions', () => {
   // The literal ceiling, not the constant: this is the documented server page
-  // cap (60 pages × 100/page = 6,000 files). Comparing the builder's output to
-  // the same constant it imports could never catch the constant drifting to an
-  // unsafe value.
+  // cap (60 pages × 50/page = 3,000 files, the same as the truncation banner).
+  // Comparing the builder's output to the same constant it imports could
+  // never catch the constant drifting to an unsafe value.
   it('caps retention at the server page ceiling of 60', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildPrReviewFileListQueryOptions(createTrpcStub(infiniteQueryOptions), {

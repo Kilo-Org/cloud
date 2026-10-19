@@ -101,7 +101,10 @@ describe('usePrDiffPageGate hold-until-drag', () => {
     act(() => {
       gateOf(holder).onEndReached();
     });
+    // onDragStart is wired to both the scroll-begin and touch-move paths, so
+    // one gesture can report it repeatedly; only the first consumes the hold.
     act(() => {
+      gateOf(holder).onDragStart();
       gateOf(holder).onDragStart();
     });
 
@@ -159,14 +162,29 @@ describe('usePrDiffPageGate hold-until-drag', () => {
     const query = queryStub();
     const { holder, rerender } = await mountGate('pr-1', query);
 
-    // The previous PR's list reported its end; the reader then switched PRs.
+    // Case 1: the reader dragged the previous PR, then switched. The reset
+    // must discard userDragged too, or the new PR's mount-time end-reach
+    // fetches immediately.
+    act(() => {
+      gateOf(holder).onDragStart();
+    });
+    rerender('pr-2');
+    act(() => {
+      gateOf(holder).onEndReached();
+    });
+    expect(query.fetchNextPage).not.toHaveBeenCalled();
+  });
+
+  it('discards a held end-reach from the previous PR on identity change', async () => {
+    const query = queryStub();
+    const { holder, rerender } = await mountGate('pr-1', query);
+
+    // Case 2: an end-reach arrived on the previous PR, then the reader
+    // switched. A drag on the PR the reader left must not load the new one.
     act(() => {
       gateOf(holder).onEndReached();
     });
     rerender('pr-2');
-
-    // A drag on the PR the reader left must not open the new PR's gate: the
-    // reset discarded the held end-reach, so this drag loads nothing.
     act(() => {
       gateOf(holder).onDragStart();
     });

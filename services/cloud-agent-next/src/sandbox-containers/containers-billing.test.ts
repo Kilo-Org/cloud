@@ -29,8 +29,9 @@ import { ContainersBillingScheduler } from './containers-billing.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import { SandboxContainers, type ContainerInstanceSize } from './SandboxContainers.js';
 import { createCloudflareContainersProviderAdapter } from '../sandbox-control/cloudflare-containers-provider.js';
+import type * as ContainerConcurrency from '../container-concurrency.js';
 
-type CapacityModule = typeof import('../container-concurrency.js');
+type CapacityModule = typeof ContainerConcurrency;
 const capacity = vi.hoisted(() => ({
   readCapacity: vi.fn<(request: ContainerCapacityRequest) => Promise<ContainerCapacityCheck[]>>(),
 }));

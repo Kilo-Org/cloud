@@ -488,17 +488,23 @@ export function NewSessionScreenBody() {
   // failed spawn keeps the screen mounted (draft preserved for retry); a
   // blocked admission or cancelled voice submit never arms the marker, so
   // the unmount flush preserves the draft.
-  const { markRemoteSpawnAttempted } = useRemoteSpawnDraftCleanup({
+  const { markRemoteSpawnAttempted, markRemoteSpawnFailed } = useRemoteSpawnDraftCleanup({
     userId: isCloneEntry ? undefined : userId,
   });
 
   // A committed remote spawn arms the discard-confirm bypass alongside the
   // draft-clearing marker. The bypass is reset when the spawn settles without
-  // navigating (a failed spawn), so an abandon after a failure still confirms.
+  // navigating (a failed spawn), so an abandon after a failure still confirms,
+  // and the failure also disarms the draft-clearing marker so the draft
+  // survives leaving to Home.
   const handleSpawnAdmitted = useCallback(() => {
     markRemoteSpawnAttempted();
     skipDiscardGuardRef.current = true;
   }, [markRemoteSpawnAttempted]);
+  const handleSpawnFailed = useCallback(() => {
+    markRemoteSpawnFailed();
+    skipDiscardGuardRef.current = false;
+  }, [markRemoteSpawnFailed]);
 
   // Clone entry never touches the shared draft. The inline "Run on" reason is
   // a delivered clone/import failure (or an incapable CLI, derived below) and
@@ -624,12 +630,12 @@ export function NewSessionScreenBody() {
     // a blocked admission or cancelled voice submit never clears the draft.
     onSpawnAdmitted: handleSpawnAdmitted,
     // A committed spawn that settles without navigating (retryable or
-    // non-retryable) must re-arm the discard confirm, so an abandon after a
-    // failed spawn still asks. A successful spawn replaces the screen before
-    // this can run, so the bypass stays armed and the guard consumes it.
-    onSpawnFailed: () => {
-      skipDiscardGuardRef.current = false;
-    },
+    // non-retryable) disarms the draft-clearing marker (the draft survives
+    // the failure and the leave to Home) and re-arms the discard confirm, so
+    // an abandon after a failed spawn still asks. A successful spawn replaces
+    // the screen before this can run, so the bypass stays armed and the guard
+    // consumes it.
+    onSpawnFailed: handleSpawnFailed,
     cloneFromKiloSessionId: isCloneEntry ? cloneFromKiloSessionId : null,
     cloneUpToMessageId: cloneUpToMessageId || null,
     forkPrefillText: forkPrefillText || null,

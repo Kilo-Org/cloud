@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "प्राथमिक - पिकर में दिखाया गया है",
       "visibilitySubagent": "सबएजेंट - केवल दूसरों से कॉल करने योग्य",
       "visibilityAll": "सभी - दोनों",
+      "modePrimary": "प्राथमिक",
       "saveFailed": "एजेंट को बचाया नहीं जा सका",
       "nameRequired": "एक एजेंट का नाम दर्ज करें",
       "slugRequired": "एक एजेंट स्लग दर्ज करें",

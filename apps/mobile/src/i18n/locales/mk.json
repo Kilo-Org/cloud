@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Примарно - прикажано во избирачот",
       "visibilitySubagent": "Субагент - може да се повика само од други",
       "visibilityAll": "Сите - и двете",
+      "modePrimary": "Примарно",
       "saveFailed": "Не може да се зачува агентот",
       "nameRequired": "Внесете име на агент",
       "slugRequired": "Внесете голтка агент",

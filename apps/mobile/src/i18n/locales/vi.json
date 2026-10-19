@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Chính — hiển thị trong bộ chọn",
       "visibilitySubagent": "Subagent - chỉ có thể gọi được từ người khác",
       "visibilityAll": "Tất cả - cả hai",
+      "modePrimary": "Chính",
       "saveFailed": "Không thể lưu đại lý",
       "nameRequired": "Nhập tên đại lý",
       "slugRequired": "Nhập sên đại lý",

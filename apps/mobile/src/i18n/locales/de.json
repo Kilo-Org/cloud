@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Primär – wird im Picker angezeigt",
       "visibilitySubagent": "Subagent – nur von anderen aufrufbar",
       "visibilityAll": "Alle – beides",
+      "modePrimary": "Primär",
       "saveFailed": "Der Agent konnte nicht gespeichert werden",
       "nameRequired": "Geben Sie einen Agentennamen ein",
       "slugRequired": "Geben Sie einen Agenten-Slug ein",

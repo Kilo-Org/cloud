@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Asosiy - tanlovchida ko'rsatilgan",
       "visibilitySubagent": "Subagent - faqat boshqalar tomonidan chaqirilishi mumkin",
       "visibilityAll": "Hammasi - ikkalasi ham",
+      "modePrimary": "Asosiy",
       "saveFailed": "Agentni saqlab boʻlmadi",
       "nameRequired": "Agent nomini kiriting",
       "slugRequired": "Agent slug'ini kiriting",

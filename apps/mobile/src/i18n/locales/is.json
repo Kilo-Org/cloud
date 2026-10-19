@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Aðal — sýnt í veljarann",
       "visibilitySubagent": "Subagent — aðeins hægt að hringja frá öðrum",
       "visibilityAll": "Allt - bæði",
+      "modePrimary": "Aðal",
       "saveFailed": "Ekki tókst að vista umboðsmann",
       "nameRequired": "Sláðu inn nafn umboðsmanns",
       "slugRequired": "Sláðu inn umboðssnigl",

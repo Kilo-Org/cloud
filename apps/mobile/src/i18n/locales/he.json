@@ -3701,6 +3701,7 @@
       "visibilityPrimary": "ראשי - מוצג בבוחר",
       "visibilitySubagent": "סוכן משנה - ניתן להתקשרות מאחרים בלבד",
       "visibilityAll": "הכל - שניהם",
+      "modePrimary": "ראשי",
       "saveFailed": "לא ניתן היה להציל את הסוכן",
       "nameRequired": "הזן שם סוכן",
       "slugRequired": "הזן שבלול סוכן",

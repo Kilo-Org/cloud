@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Esmane – kuvatakse valijas",
       "visibilitySubagent": "Subagent — ainult teistelt helistatav",
       "visibilityAll": "Kõik - mõlemad",
+      "modePrimary": "Esmane",
       "saveFailed": "Agenti ei õnnestunud salvestada",
       "nameRequired": "Sisestage agendi nimi",
       "slugRequired": "Sisestage agent nälkjas",

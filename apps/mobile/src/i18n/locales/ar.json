@@ -3824,6 +3824,7 @@
       "visibilityPrimary": "الأساسي - يظهر في المنتقي",
       "visibilitySubagent": "وكيل فرعي - يمكن الاتصال به فقط من الآخرين",
       "visibilityAll": "الكل - كلاهما",
+      "modePrimary": "الأساسي",
       "saveFailed": "تعذر حفظ الوكيل",
       "nameRequired": "أدخل اسم الوكيل",
       "slugRequired": "أدخل سبيكة وكيل",

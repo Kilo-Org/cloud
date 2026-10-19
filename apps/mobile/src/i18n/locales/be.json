@@ -3742,6 +3742,7 @@
       "visibilityPrimary": "Асноўны — паказваецца ў выбары",
       "visibilitySubagent": "Субагент — можна выклікаць толькі ад іншых",
       "visibilityAll": "Усё — абодва",
+      "modePrimary": "Асноўны",
       "saveFailed": "Не ўдалося захаваць агента",
       "nameRequired": "Увядзіце імя агента",
       "slugRequired": "Увядзіце смоўж агента",

@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Utama — ditunjukkan dalam pemilih",
       "visibilitySubagent": "Subagen — hanya boleh dipanggil daripada orang lain",
       "visibilityAll": "Semua - kedua-duanya",
+      "modePrimary": "Utama",
       "saveFailed": "Tidak dapat menyelamatkan ejen",
       "nameRequired": "Masukkan nama ejen",
       "slugRequired": "Masukkan slug ejen",

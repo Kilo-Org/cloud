@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Primario: móstrase no selector",
       "visibilitySubagent": "Subaxente: só se pode chamar desde outros",
       "visibilityAll": "Todos - ambos",
+      "modePrimary": "Primario",
       "saveFailed": "Non se puido gardar o axente",
       "nameRequired": "Introduza un nome de axente",
       "slugRequired": "Introduza unha babosa de axente",

@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Əsas — seçicidə göstərilir",
       "visibilitySubagent": "Subagent — yalnız başqalarından zəng etmək olar",
       "visibilityAll": "Hamısı - hər ikisi",
+      "modePrimary": "Əsas",
       "saveFailed": "Agenti saxlamaq mümkün olmadı",
       "nameRequired": "Agent adını daxil edin",
       "slugRequired": "Agent slug daxil edin",

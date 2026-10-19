@@ -3701,6 +3701,7 @@
       "visibilityPrimary": "Primario: se muestra en el selector",
       "visibilitySubagent": "Subagente: solo puede ser invocado por otros",
       "visibilityAll": "Todos - ambos",
+      "modePrimary": "Primario",
       "saveFailed": "No se pudo guardar al agente",
       "nameRequired": "Ingrese el nombre de un agente",
       "slugRequired": "Introduzca una babosa de agente",

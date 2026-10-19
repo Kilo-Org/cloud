@@ -3742,6 +3742,7 @@
       "visibilityPrimary": "Первичный — отображается в окне выбора.",
       "visibilitySubagent": "Субагент — доступен только для вызова от других",
       "visibilityAll": "Все — оба",
+      "modePrimary": "Первичный",
       "saveFailed": "Не удалось сохранить агента.",
       "nameRequired": "Введите имя агента",
       "slugRequired": "Введите ярлык агента",

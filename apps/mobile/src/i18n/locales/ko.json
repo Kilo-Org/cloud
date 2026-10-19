@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "기본 — 선택기에 표시됨",
       "visibilitySubagent": "하위 에이전트 — 다른 사람에게서만 호출 가능",
       "visibilityAll": "모두 — 둘 다",
+      "modePrimary": "기본",
       "saveFailed": "에이전트를 저장할 수 없습니다.",
       "nameRequired": "상담사 이름을 입력하세요.",
       "slugRequired": "에이전트 슬러그를 입력하세요",

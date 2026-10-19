@@ -3701,6 +3701,7 @@
       "visibilityPrimary": "Primaire : affiché dans le sélecteur",
       "visibilitySubagent": "Sous-agent – appelable uniquement par d'autres",
       "visibilityAll": "Tous — les deux",
+      "modePrimary": "Primaire",
       "saveFailed": "Impossible de sauvegarder l'agent",
       "nameRequired": "Entrez un nom d'agent",
       "slugRequired": "Entrez un slug d'agent",

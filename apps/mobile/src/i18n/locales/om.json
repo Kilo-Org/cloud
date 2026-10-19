@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Primary — kan agarsiifame picker keessatti",
       "visibilitySubagent": "Subagent — kanneen biroo irraa qofa kan waamamu",
       "visibilityAll": "Hundi — lamaan isaanii",
+      "modePrimary": "Primary",
       "saveFailed": "Bakka bu'aa qusachuu hin dandeenye",
       "nameRequired": "Maqaa bakka bu'aa galchi",
       "slugRequired": "Slug ergamaa galchi",

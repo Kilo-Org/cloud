@@ -3742,6 +3742,7 @@
       "visibilityPrimary": "Primarno — prikazano v izbirniku",
       "visibilitySubagent": "Subagent — na klic samo od drugih",
       "visibilityAll": "Vse — oboje",
+      "modePrimary": "Primarno",
       "saveFailed": "Agenta ni bilo mogoče shraniti",
       "nameRequired": "Vnesite ime agenta",
       "slugRequired": "Vnesite polža agenta",

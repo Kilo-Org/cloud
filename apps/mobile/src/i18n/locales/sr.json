@@ -3701,6 +3701,7 @@
       "visibilityPrimary": "Primarni — prikazuje se u biraču",
       "visibilitySubagent": "Subagent — može se pozvati samo od drugih",
       "visibilityAll": "Svi — oboje",
+      "modePrimary": "Primarni",
       "saveFailed": "Nije moguće sačuvati agenta",
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite slug agenta",

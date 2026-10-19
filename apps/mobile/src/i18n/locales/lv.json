@@ -3701,6 +3701,7 @@
       "visibilityPrimary": "Primārais — parādīts atlasītājā",
       "visibilitySubagent": "Subaģents — izsaucams tikai no citiem",
       "visibilityAll": "Visi - abi",
+      "modePrimary": "Primārais",
       "saveFailed": "Nevarēja saglabāt aģentu",
       "nameRequired": "Ievadiet aģenta nosaukumu",
       "slugRequired": "Ievadiet aģenta lodes",

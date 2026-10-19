@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "หลัก — แสดงในเครื่องมือเลือก",
       "visibilitySubagent": "Subagent — สามารถเรียกได้จากผู้อื่นเท่านั้น",
       "visibilityAll": "ทั้งหมด - ทั้งสองอย่าง",
+      "modePrimary": "หลัก",
       "saveFailed": "ไม่สามารถบันทึกตัวแทนได้",
       "nameRequired": "ป้อนชื่อตัวแทน",
       "slugRequired": "ใส่ตัวแทนทาก",

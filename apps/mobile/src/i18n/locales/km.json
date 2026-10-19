@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "បឋម - បង្ហាញក្នុងកម្មវិធីជ្រើសរើស",
       "visibilitySubagent": "Subagent - អាចហៅបានតែពីអ្នកដទៃប៉ុណ្ណោះ។",
       "visibilityAll": "ទាំងអស់ - ទាំងពីរ",
+      "modePrimary": "បឋម",
       "saveFailed": "មិនអាចរក្សាទុកភ្នាក់ងារបានទេ។",
       "nameRequired": "បញ្ចូលឈ្មោះភ្នាក់ងារ",
       "slugRequired": "បញ្ចូល slug ភ្នាក់ងារ",

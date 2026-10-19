@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Негізгі — таңдаушыда көрсетіледі",
       "visibilitySubagent": "Субагент — тек басқалардан шақыруға болады",
       "visibilityAll": "Барлығы - екеуі де",
+      "modePrimary": "Негізгі",
       "saveFailed": "Агентті сақтау мүмкін болмады",
       "nameRequired": "Агент атын енгізіңіз",
       "slugRequired": "Агент слогын енгізіңіз",

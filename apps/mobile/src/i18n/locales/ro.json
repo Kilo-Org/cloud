@@ -3701,6 +3701,7 @@
       "visibilityPrimary": "Primar — afișat în selector",
       "visibilitySubagent": "Subagent - apelabil numai de la alții",
       "visibilityAll": "Toate — ambele",
+      "modePrimary": "Primar",
       "saveFailed": "Agentul nu a putut fi salvat",
       "nameRequired": "Introduceți un nume de agent",
       "slugRequired": "Introduceți un melc de agent",

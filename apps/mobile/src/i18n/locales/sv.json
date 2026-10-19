@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Primär — visas i väljaren",
       "visibilitySubagent": "Subagent — endast anropsbar från andra",
       "visibilityAll": "Alla - båda",
+      "modePrimary": "Primär",
       "saveFailed": "Det gick inte att spara agenten",
       "nameRequired": "Ange ett agentnamn",
       "slugRequired": "Ange en agentsnigel",

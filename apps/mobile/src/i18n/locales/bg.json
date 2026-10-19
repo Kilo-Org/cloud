@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Основен — показва се в инструмента за избор",
       "visibilitySubagent": "Субагент — може да се извиква само от други",
       "visibilityAll": "Всички - и двете",
+      "modePrimary": "Основен",
       "saveFailed": "Агентът не можа да бъде запазен",
       "nameRequired": "Въведете име на агент",
       "slugRequired": "Въведете агент slug",

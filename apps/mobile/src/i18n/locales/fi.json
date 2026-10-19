@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Ensisijainen – näkyy poimijassa",
       "visibilitySubagent": "Subagent - vain soitettavissa muilta",
       "visibilityAll": "Kaikki - molemmat",
+      "modePrimary": "Ensisijainen",
       "saveFailed": "Agenttia ei voitu tallentaa",
       "nameRequired": "Anna agentin nimi",
       "slugRequired": "Syötä agentti etana",

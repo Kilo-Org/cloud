@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "ປະຖົມ — ສະແດງໃຫ້ເຫັນຢູ່ໃນຕົວເລືອກ",
       "visibilitySubagent": "Subagent — ພຽງແຕ່ສາມາດໂທໄດ້ຈາກຄົນອື່ນ",
       "visibilityAll": "ທັງຫມົດ - ທັງຫມົດ",
+      "modePrimary": "ປະຖົມ",
       "saveFailed": "ບໍ່ສາມາດບັນທຶກຕົວແທນໄດ້",
       "nameRequired": "ໃສ່ຊື່ຕົວແທນ",
       "slugRequired": "ໃສ່ຕົວແທນ slug",

@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Utama — ditampilkan di alat pilih",
       "visibilitySubagent": "Subagen — hanya dapat dihubungi dari orang lain",
       "visibilityAll": "Semua—keduanya",
+      "modePrimary": "Utama",
       "saveFailed": "Tidak dapat menyelamatkan agen",
       "nameRequired": "Masukkan nama agen",
       "slugRequired": "Masukkan siput agen",

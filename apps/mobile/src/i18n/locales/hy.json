@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Առաջնային — ցուցադրվում է ընտրիչում",
       "visibilitySubagent": "Ենթաբաժին. կարելի է կանչել միայն ուրիշներից",
       "visibilityAll": "Բոլորը - երկուսն էլ",
+      "modePrimary": "Առաջնային",
       "saveFailed": "Չհաջողվեց փրկել գործակալին",
       "nameRequired": "Մուտքագրեք գործակալի անունը",
       "slugRequired": "Մուտքագրեք գործակալ slug",

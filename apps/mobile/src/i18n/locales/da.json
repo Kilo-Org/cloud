@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Primær — vist i vælgeren",
       "visibilitySubagent": "Subagent — kan kun kaldes fra andre",
       "visibilityAll": "Alle - begge",
+      "modePrimary": "Primær",
       "saveFailed": "Agenten kunne ikke gemmes",
       "nameRequired": "Indtast et agentnavn",
       "slugRequired": "Indtast en agentsnegl",

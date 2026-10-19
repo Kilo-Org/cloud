@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Primary — shown in the picker",
       "visibilitySubagent": "Subagent — only callable from others",
       "visibilityAll": "All — both",
+      "modePrimary": "Primary",
       "saveFailed": "Couldn't save agent",
       "nameRequired": "Enter an agent name",
       "slugRequired": "Enter an agent slug",

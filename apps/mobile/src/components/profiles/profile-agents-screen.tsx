@@ -5,7 +5,11 @@ import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
-import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
+import {
+  agentRows,
+  type AgentSource,
+  type AgentVisibility,
+} from '@/components/profiles/profile-agents-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -23,6 +27,35 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_AGENTS: AgentProfileDetail['agents'] = [];
 
+/** The mode badge copy keys, each localized without explanatory suffixes. */
+export type AgentVisibilityLabelKey =
+  | 'profiles.agents.modePrimary'
+  | 'agentChat.childSession.subagent'
+  | 'common.all';
+
+/**
+ * The badge copy per agent visibility: short labels, unlike the add sheet's
+ * picker labels which carry explanatory suffixes. `subagent` and `all` reuse
+ * the existing "Subagent"/"All" keys so no catalog holds the same English
+ * copy twice.
+ */
+export function agentVisibilityLabelKey(visibility: AgentVisibility): AgentVisibilityLabelKey {
+  switch (visibility) {
+    case 'primary': {
+      return 'profiles.agents.modePrimary';
+    }
+    case 'subagent': {
+      return 'agentChat.childSession.subagent';
+    }
+    case 'all': {
+      return 'common.all';
+    }
+    default: {
+      return visibility satisfies never;
+    }
+  }
+}
+
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
 function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
@@ -31,7 +64,7 @@ function hasUsableMessage(error: unknown): boolean {
 type AgentRowViewProps = Readonly<{
   name: string;
   slug: string;
-  visibility: string;
+  visibility: AgentVisibility;
   description: string;
   model: string;
   onEdit: () => void;
@@ -62,7 +95,7 @@ function AgentRowView({
             {slug}
           </Text>
           <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-            {visibility}
+            {t(agentVisibilityLabelKey(visibility))}
           </Text>
         </View>
         {model.length > 0 ? (

@@ -3742,6 +3742,7 @@
       "visibilityPrimary": "Podstawowy — pokazany w selektorze",
       "visibilitySubagent": "Subagent — można go wywołać tylko od innych osób",
       "visibilityAll": "Wszyscy – oba",
+      "modePrimary": "Podstawowy",
       "saveFailed": "Nie udało się zapisać agenta",
       "nameRequired": "Wprowadź nazwę agenta",
       "slugRequired": "Wprowadź ślimak agenta",

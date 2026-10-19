@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Үндсэн - сонгогч дээр харуулав",
       "visibilitySubagent": "Дэд агент - зөвхөн бусдаас дуудах боломжтой",
       "visibilityAll": "Бүгд - хоёулаа",
+      "modePrimary": "Үндсэн",
       "saveFailed": "Агентийг хадгалж чадсангүй",
       "nameRequired": "Агентын нэрийг оруулна уу",
       "slugRequired": "Агент slug оруулна уу",

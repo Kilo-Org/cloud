@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "प्राथमिक — पिकरमा देखाइएको छ",
       "visibilitySubagent": "Subagent - अरूबाट मात्र कल गर्न मिल्ने",
       "visibilityAll": "सबै - दुबै",
+      "modePrimary": "प्राथमिक",
       "saveFailed": "एजेन्ट सुरक्षित गर्न सकिएन",
       "nameRequired": "एजेन्टको नाम प्रविष्ट गर्नुहोस्",
       "slugRequired": "एजेन्ट स्लग प्रविष्ट गर्नुहोस्",

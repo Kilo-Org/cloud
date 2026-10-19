@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "プライマリ — ピッカーに表示されます",
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",
       "visibilityAll": "すべて — 両方",
+      "modePrimary": "プライマリ",
       "saveFailed": "エージェントを保存できませんでした",
       "nameRequired": "エージェント名を入力してください",
       "slugRequired": "エージェントスラッグを入力してください",

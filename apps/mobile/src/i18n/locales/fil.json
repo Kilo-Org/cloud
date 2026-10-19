@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Pangunahin — ipinapakita sa picker",
       "visibilitySubagent": "Subagent — matatawag lang mula sa iba",
       "visibilityAll": "Lahat - pareho",
+      "modePrimary": "Pangunahin",
       "saveFailed": "Hindi ma-save ang ahente",
       "nameRequired": "Maglagay ng pangalan ng ahente",
       "slugRequired": "Maglagay ng agent slug",

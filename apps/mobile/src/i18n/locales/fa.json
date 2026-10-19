@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "اولیه - در انتخابگر نشان داده شده است",
       "visibilitySubagent": "Subagent - فقط از دیگران قابل تماس است",
       "visibilityAll": "همه - هر دو",
+      "modePrimary": "اولیه",
       "saveFailed": "عامل ذخیره نشد",
       "nameRequired": "یک نام نماینده وارد کنید",
       "slugRequired": "یک اسلاگ عامل را وارد کنید",

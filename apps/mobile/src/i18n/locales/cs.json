@@ -3742,6 +3742,7 @@
       "visibilityPrimary": "Primární – zobrazí se ve výběru",
       "visibilitySubagent": "Subagent — lze volat pouze od ostatních",
       "visibilityAll": "Všichni – oba",
+      "modePrimary": "Primární",
       "saveFailed": "Agenta se nepodařilo uložit",
       "nameRequired": "Zadejte jméno agenta",
       "slugRequired": "Zadejte agenta slimáka",

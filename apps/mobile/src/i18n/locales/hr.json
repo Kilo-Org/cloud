@@ -3701,6 +3701,7 @@
       "visibilityPrimary": "Primarno — prikazano u alatu za odabir",
       "visibilitySubagent": "Subagent — samo poziv od drugih",
       "visibilityAll": "Sve — oboje",
+      "modePrimary": "Primarno",
       "saveFailed": "Nije moguće spremiti agenta",
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite agenta",

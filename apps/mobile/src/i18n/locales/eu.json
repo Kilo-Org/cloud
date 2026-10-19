@@ -3660,6 +3660,7 @@
       "visibilityPrimary": "Lehen mailakoa: hautatzailean agertzen da",
       "visibilitySubagent": "Azpi-agentea - besteengandik bakarrik dei daiteke",
       "visibilityAll": "Guztiak - biak",
+      "modePrimary": "Lehen mailakoa",
       "saveFailed": "Ezin izan da agentea gorde",
       "nameRequired": "Sartu agentearen izena",
       "slugRequired": "Sartu agente bare bat",

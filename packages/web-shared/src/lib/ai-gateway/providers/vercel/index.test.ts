@@ -439,6 +439,40 @@ describe('applyVercelSettings BYOK pinning', () => {
     expect(request.body.provider).toBeUndefined();
   });
 
+  it('keeps the same gateway options on BYOK and managed paths for identical provider preferences', async () => {
+    const provider = {
+      sort: 'latency' as const,
+      zdr: true,
+      data_collection: 'deny' as const,
+    };
+    const byok = byokRequest([]);
+    byok.body.provider = { ...provider };
+    const managed: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { ...provider },
+      },
+    };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', byok, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+    const managedOptions = convertProviderOptions(managed, null).gateway;
+
+    const { byok: byokCredentials, ...byokOptions } = byok.body.providerOptions?.gateway ?? {};
+    expect(byokCredentials).toEqual({ anthropic: [{ apiKey: 'sk-anthropic' }] });
+    for (const [key, value] of Object.entries(managedOptions)) {
+      if (key === 'only' || key === 'order' || key === 'sessionId') {
+        continue;
+      }
+      expect(byokOptions[key as keyof typeof byokOptions]).toEqual(value);
+    }
+    expect(byokOptions.zeroDataRetention).toBe(true);
+    expect(byokOptions.disallowPromptTraining).toBe(true);
+  });
+
   it('sets zeroDataRetention and disallowPromptTraining in the BYOK gateway options', async () => {
     const request = byokRequest([]);
     request.body.provider = { zdr: true, data_collection: 'deny' };

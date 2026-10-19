@@ -95,6 +95,22 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.source_sha || github.sha }}
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      # scripts/changed-dependencies.mjs parses pnpm-lock.yaml with js-yaml,
+      # so detection needs the root dependencies.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install root dependencies
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
+
       - name: Find changed workers
         id: set-matrix
         run: |
@@ -196,11 +212,33 @@ jobs:
             fi
           done
 
+          # A worker redeploys when its own files change, or when a workspace
+          # it depends on changes (scripts/affected-workspaces.mjs). A change to
+          # an unrelated shared package must not restart the worker: a rollout
+          # kills in-flight containers. If detection fails, selects everything,
+          # or the worker is not a workspace, use the broad rule.
+          AFFECTED_DIRS=""
+          NARROW=false
+          if affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA") \
+            && [ "$(jq -r '.full' <<< "$affected")" = false ]; then
+            NARROW=true
+            AFFECTED_DIRS=$(jq -r '.dirs[]' <<< "$affected")
+            WORKSPACE_DIRS=$(pnpm ls -r --depth -1 --json | jq -r --arg root "$(pwd -P)/" '.[].path | ltrimstr($root)')
+          else
+            echo "Workspace detection unavailable or selected everything; using the broad rule"
+          fi
+
           CHANGED=()
           for dir in "${DEPLOYABLE[@]}"; do
             if [ "$TARGET_ENVIRONMENT" != "production" ] && ! has_named_environment "$dir/wrangler.jsonc"; then
               echo "Skipping $dir: wrangler.jsonc does not define env.$TARGET_ENVIRONMENT"
-            elif ! git diff --quiet "$BASE_SHA" HEAD -- "$dir/" packages pnpm-lock.yaml pnpm-workspace.yaml patches; then
+            elif ! git diff --quiet "$BASE_SHA" HEAD -- "$dir/"; then
+              CHANGED+=("$dir")
+            elif [ "$NARROW" = true ] && grep -Fxq "$dir" <<< "$WORKSPACE_DIRS"; then
+              if grep -Fxq "$dir" <<< "$AFFECTED_DIRS"; then
+                CHANGED+=("$dir")
+              fi
+            elif ! git diff --quiet "$BASE_SHA" HEAD -- packages pnpm-lock.yaml pnpm-workspace.yaml patches; then
               CHANGED+=("$dir")
             fi
           done

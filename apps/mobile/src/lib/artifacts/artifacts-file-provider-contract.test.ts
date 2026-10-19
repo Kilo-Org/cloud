@@ -113,8 +113,50 @@ describe('artifacts File Provider extension contract', () => {
   it('reports sessions as folders and their files as items', () => {
     expect(extensionSource).toContain('contentType: .folder');
     expect(extensionSource).toContain('filename: session.title');
-    expect(extensionSource).toContain('filename: file.name');
+    // The file item's filename is the session-resolved safe name, never the
+    // raw manifest name (see the filename resolution test below).
+    expect(extensionSource).toContain('filename: name,');
     expect(extensionSource).toContain('contentType: UTType(mimeType: file.mime) ?? .data');
+  });
+
+  it('resolves every file item filename to one safe unique component', () => {
+    // The manifest's names are sanitized and deduplicated in the manifest
+    // writer, but a stale or older index can still carry a name with a path
+    // separator, a `..` component or a NUL, so the extension applies the same
+    // contract itself before a name becomes a filename or a staging path
+    // component.
+    expect(extensionSource).toContain('enum ArtifactFileName {');
+    expect(extensionSource).toContain(
+      'static func sanitize(id: String, name: String, mime: String) -> String'
+    );
+    expect(extensionSource).toContain(
+      'static func unique(_ name: String, taken: inout Set<String>) -> String'
+    );
+    expect(extensionSource).toContain('static let maxBytes = 200');
+    // Enumeration resolves every entry through the sanitizer, in the
+    // manifest's own order, so the first duplicate keeps its name and a later
+    // one takes a counter suffix.
+    expect(itemsBody).toContain('ArtifactFileName.sanitize(');
+    expect(itemsBody).toContain('ArtifactFileName.unique(');
+    // The stage path asserts the invariant at the boundary: the component it
+    // appends to the per-fetch UUID directory is always one safe component.
+    expect(extensionSource).toContain(
+      'precondition(ArtifactPath.isSafeComponent(filename), "staged name must be one path component")'
+    );
+  });
+
+  it('exposes an item version and honours the requested version', () => {
+    // The version is the mirror file's own size and modification date, which
+    // the wholesale rewrite changes on every rewrite.
+    expect(extensionSource).toContain('let contentModificationDate: Date?');
+    expect(extensionSource).toContain('let itemVersion: String?');
+    expect(extensionSource).toContain(
+      'static func contentVersion(size: Int, modified: Date?) -> String?'
+    );
+    // A non-nil request whose pinned content version differs from the
+    // current one fails instead of returning bytes that do not match it.
+    expect(extensionSource).toContain('NSFileProviderError(.versionNoLongerAvailable)');
+    expect(fetchContentsBody).toContain('requestedVersion.contentVersion != current');
   });
 
   it('shows the session label the mirror sanitizes into one path component', () => {
@@ -388,6 +430,9 @@ const fileBody = swiftFunctionBody(
 const itemsBody = swiftFunctionBody(
   'func items(in container: ArtifactItemIdentifier) -> [ArtifactItem] {'
 );
+const fetchContentsBody = swiftFunctionBody(
+  'func fetchContents(\n    for itemIdentifier: NSFileProviderItemIdentifier,\n    version requestedVersion: NSFileProviderItemVersion?,'
+);
 
 type MemoFile = { id: string; name: string; mime: string; size: number };
 type MemoSession = { id: string; title: string; files: MemoFile[] };
@@ -563,6 +608,6 @@ describe('artifacts File Provider manifest memoization', () => {
     expect(sessionBody).toContain('manifest()?.sessions.first');
     expect(fileBody).toContain('session(id: sessionId)?.files.first');
     expect(itemsBody).toContain('manifest()?.sessions ?? []');
-    expect(itemsBody).toContain('session(id: sessionId)?.files ?? []');
+    expect(itemsBody).toContain('guard let session = session(id: sessionId) else');
   });
 });

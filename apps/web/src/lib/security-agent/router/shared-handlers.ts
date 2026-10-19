@@ -425,10 +425,15 @@ function replayedSecurityResponse(canonical: Record<string, unknown>) {
 /**
  * Runs the Worker submission under an already-admitted row:
  * - acceptance records the provider reference durably, then returns accepted;
- * - a definitive pre-acceptance rejection settles the row `failed`;
+ * - a definitive pre-acceptance rejection settles the row `failed` and marks
+ *   the thrown error with `PRE_ACCEPTANCE_REJECTION` so callers can recover
+ *   admission-time state;
  * - an ambiguous transport outcome (BAD_GATEWAY) marks the row
  *   `reconcile_pending` and surfaces a retryable CONFLICT.
  */
+const PRE_ACCEPTANCE_REJECTION = Symbol('security.pre-acceptance-rejection');
+
+type PreAcceptanceTaggableError = Error & { [PRE_ACCEPTANCE_REJECTION]?: true };
 async function executeSecurityCommandSubmit(args: {
   row: OperationLedgerRow;
   intent: SecurityLedgerIntent;
@@ -477,6 +482,10 @@ async function executeSecurityCommandSubmit(args: {
       });
     } catch (settleError) {
       console.error('Failed to settle the security operation ledger row', settleError);
+    }
+    const taggable = error as PreAcceptanceTaggableError;
+    if (taggable instanceof Error && Object.isExtensible(taggable)) {
+      taggable[PRE_ACCEPTANCE_REJECTION] = true;
     }
     throw error;
   }
@@ -1766,11 +1775,12 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             },
           });
         } catch (error) {
-          // Release only for a definitive pre-acceptance rejection: the
-          // ledger row settled `pre_acceptance_rejected`, so the Worker has
-          // no command to run. Ambiguous outcomes reconcile through the
-          // ledger and the Worker keeps lifecycle control.
-          if (!input.restartActive && error instanceof TRPCError && error.code !== 'CONFLICT') {
+          // Release only for a definitive pre-acceptance rejection, tagged by
+          // the ledger submit after settling the row. Ambiguous outcomes and
+          // post-acceptance ledger-write failures keep the reservation while
+          // the ledger reconciles or the Worker owns the lifecycle.
+          const taggable = error as PreAcceptanceTaggableError;
+          if (!input.restartActive && taggable[PRE_ACCEPTANCE_REJECTION] === true) {
             await releaseAnalysisStartReservation(input.findingId);
           }
           throw error;

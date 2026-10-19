@@ -993,12 +993,10 @@ describe('queue-backed handlers', () => {
     expect(mockSubmitManualAnalysisStart).not.toHaveBeenCalled();
   });
 
-  it('releases the reservation when the worker submission fails with a definitive rejection', async () => {
+  it('releases the reservation when the worker submission fails before acceptance', async () => {
     mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
     mockTryReserveAnalysisStartSlot.mockResolvedValue({ reserved: true });
-    mockSubmitManualAnalysisStart.mockRejectedValue(
-      new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'worker unreachable' })
-    );
+    mockSubmitManualAnalysisStart.mockRejectedValue(new Error('worker unreachable'));
     mockAdmitOperation.mockResolvedValue({
       admission: 'admitted',
       row: {
@@ -1025,7 +1023,7 @@ describe('queue-backed handlers', () => {
     mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
     mockTryReserveAnalysisStartSlot.mockResolvedValue({ reserved: true });
     mockSubmitManualAnalysisStart.mockRejectedValue(
-      new TRPCError({ code: 'CONFLICT', message: 'ambiguous' })
+      new TRPCError({ code: 'BAD_GATEWAY', message: 'ambiguous' })
     );
     mockAdmitOperation.mockResolvedValue({
       admission: 'admitted',
@@ -1042,7 +1040,7 @@ describe('queue-backed handlers', () => {
         ctx: context,
         input: { findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
       })
-    ).rejects.toThrow('ambiguous');
+    ).rejects.toThrow("Couldn't confirm — check the security review before retrying.");
 
     expect(mockReleaseAnalysisStartReservation).not.toHaveBeenCalled();
   });

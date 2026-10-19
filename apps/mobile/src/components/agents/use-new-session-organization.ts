@@ -7,7 +7,11 @@ import {
 import { readCloneFromKiloSessionId } from '@/components/agents/new-session-prefill';
 import { useOrganization } from '@/lib/organization-context';
 
-export type NewSessionOrganizationScope = NewSessionOrganization & { isCloneEntry: boolean };
+export type NewSessionOrganizationScope = NewSessionOrganization & {
+  isCloneEntry: boolean;
+  /** True when the active account decides this screen's scope. */
+  usesActiveAccount: boolean;
+};
 
 /** `useNewSessionOrganization` reads the route and the active account. */
 export function useNewSessionOrganization(): NewSessionOrganizationScope {
@@ -29,5 +33,6 @@ export function useNewSessionOrganization(): NewSessionOrganizationScope {
       isActiveResolved: isLoaded,
     }),
     isCloneEntry,
+    usesActiveAccount: !isCloneEntry && !routeOrganizationId,
   };
 }

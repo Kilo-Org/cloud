@@ -11,14 +11,18 @@ import { useOrganization } from '@/lib/organization-context';
 
 export default function NewSessionScreen() {
   const { t } = useTranslation();
-  const { organizationId, isResolved } = useNewSessionOrganization();
+  const { organizationId, isResolved, usesActiveAccount } = useNewSessionOrganization();
   const { error, retry } = useOrganization();
   // Nothing account-scoped mounts before the account is known: the model
   // catalog, the repositories, the profiles and the create all take this value,
   // and an unresolved one reads as Personal. A stored organization or an
   // explicit Personal choice resolves from storage; with neither, the account
-  // list decides, so the wait is a network round trip and can fail.
-  if (!isResolved) {
+  // list decides, so the wait is a network round trip. A failed account list
+  // falls back to Personal across the app, which is not a choice the user made:
+  // when the active account is what decides this screen, that failure keeps the
+  // form gated behind its retry instead of creating in the fallback.
+  const accountPending = !isResolved || (usesActiveAccount && error === 'restore');
+  if (accountPending) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('common.newSession')} />

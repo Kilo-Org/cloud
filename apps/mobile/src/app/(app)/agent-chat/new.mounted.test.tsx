@@ -6,11 +6,15 @@ import '@/i18n';
 import NewSessionScreen from '@/app/(app)/agent-chat/new';
 
 const state = vi.hoisted(() => ({
-  organization: { organizationId: undefined as string | undefined, isResolved: true },
+  organization: {
+    organizationId: undefined as string | undefined,
+    isResolved: true,
+    usesActiveAccount: true,
+  },
   context: { error: null as 'restore' | 'save' | null, retry: vi.fn() },
 }));
 vi.mock('@/components/agents/use-new-session-organization', () => ({
-  useNewSessionOrganization: () => ({ ...state.organization, isCloneEntry: false }),
+  useNewSessionOrganization: () => ({ isCloneEntry: false, ...state.organization }),
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => state.context,
@@ -51,13 +55,13 @@ function unmount(renderer: TestRenderer.ReactTestRenderer) {
 }
 
 beforeEach(() => {
-  state.organization = { organizationId: undefined, isResolved: true };
+  state.organization = { organizationId: undefined, isResolved: true, usesActiveAccount: true };
   state.context = { error: null, retry: vi.fn() };
 });
 
 describe('NewSessionScreen account gate', () => {
   it('mounts nothing account-scoped until the account resolves', async () => {
-    state.organization = { organizationId: undefined, isResolved: false };
+    state.organization = { organizationId: undefined, isResolved: false, usesActiveAccount: true };
     const renderer = await render();
     // A form mounted here would read as Personal until the account settles,
     // and its model selection would stay on that first list.
@@ -68,7 +72,7 @@ describe('NewSessionScreen account gate', () => {
   });
 
   it('surfaces a failed account restore with a retry', async () => {
-    state.organization = { organizationId: undefined, isResolved: false };
+    state.organization = { organizationId: undefined, isResolved: false, usesActiveAccount: true };
     state.context = { error: 'restore', retry: vi.fn() };
     const renderer = await render();
     expect(renderer.root.findAllByType(ModelProvider)).toHaveLength(0);
@@ -82,8 +86,35 @@ describe('NewSessionScreen account gate', () => {
     unmount(renderer);
   });
 
+  it('keeps the form gated when the account list fails and the active account decides', async () => {
+    // The context falls back to Personal for the whole app; that fallback is
+    // not a choice, so the create must not run on it.
+    state.organization = {
+      organizationId: undefined,
+      isResolved: true,
+      usesActiveAccount: true,
+    };
+    state.context = { error: 'restore', retry: vi.fn() };
+    const renderer = await render();
+    expect(renderer.root.findAllByType(ModelProvider)).toHaveLength(0);
+    expect(renderer.root.findAllByType(Retry)).toHaveLength(1);
+    unmount(renderer);
+  });
+
+  it('mounts a route-scoped form when only the account list failed', async () => {
+    state.organization = {
+      organizationId: 'org-a',
+      isResolved: true,
+      usesActiveAccount: false,
+    };
+    state.context = { error: 'restore', retry: vi.fn() };
+    const renderer = await render();
+    expect(renderer.root.findByType(ModelProvider).props.organizationId).toBe('org-a');
+    unmount(renderer);
+  });
+
   it('mounts the form with the resolved organization', async () => {
-    state.organization = { organizationId: 'org-a', isResolved: true };
+    state.organization = { organizationId: 'org-a', isResolved: true, usesActiveAccount: true };
     const renderer = await render();
     expect(renderer.root.findByType(ModelProvider).props.organizationId).toBe('org-a');
     expect(renderer.root.findAllByType(Body)).toHaveLength(1);

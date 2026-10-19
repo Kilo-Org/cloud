@@ -3,21 +3,20 @@ import { type LayoutChangeEvent, View } from 'react-native';
 type FoldSpacerProps = {
   /** The measured height to reserve; values below one dp clamp to one. */
   readonly height: number;
-  readonly onMeasure: (event: LayoutChangeEvent) => void;
 };
 
 /**
  * Blank tail inside a scroll view whose actions are pinned below it.
  *
- * When the content is taller than the viewport, the fold lands in this spacer
- * instead of inside a text row: a half-rendered sentence at the fold reads as
- * broken text with nothing inviting a scroll. Measured height should track
- * the pinned footer, so the last row can always rise above it.
+ * When the scrolled-to-bottom position would park the last text row against
+ * the footer's top edge, this spacer carries the tail instead: the row scrolls
+ * to a full-height slot above the footer and the tail band the user sees at
+ * the end of the scroll is blank rather than a half-covered sentence. The
+ * height tracks the pinned footer's measured height from the caller, so the
+ * clearance always matches the band that sits below the scroll viewport.
  */
-export function FoldSpacer({ height, onMeasure }: FoldSpacerProps) {
-  return (
-    <View className="bg-background" onLayout={onMeasure} style={{ height: Math.max(height, 1) }} />
-  );
+export function FoldSpacer({ height }: FoldSpacerProps) {
+  return <View className="bg-background" style={{ height: Math.max(height, 1) }} />;
 }
 
 /** The measured layout height of a view, rounded to whole pixels. */

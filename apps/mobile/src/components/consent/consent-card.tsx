@@ -308,9 +308,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             <DirectionalChevronRight size={16} color={colors.primary} />
           </Pressable>
         </View>
-        {/* Tail clearance matching the footer's measured height: the fold lands
-            in blank spacer space, never inside a text row. */}
-        <FoldSpacer height={footerContentHeight} onMeasure={reportFooterHeight} />
+        {/* Tail clearance matching the footer's measured height: the last row
+            scrolls to a full-height slot above the footer's top edge instead
+            of parking half-covered against it. */}
+        <FoldSpacer height={footerContentHeight} />
       </ScrollView>
 
       <View

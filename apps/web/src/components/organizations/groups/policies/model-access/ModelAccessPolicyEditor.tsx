@@ -74,7 +74,7 @@ export function ModelAccessPolicyEditor({
   const [retainsFilter, setRetainsFilter] = useState<ProviderPolicyFilter>('all');
   const [locations, setLocations] = useState<string[]>([]);
 
-  const selectedModels = useMemo(() => new Set(modelIds.map(normalizeModelId)), [modelIds]);
+  const selectedModels = useMemo(() => new Set(modelIds), [modelIds]);
   const selectedProviders = useMemo(() => new Set(providerSlugs), [providerSlugs]);
   const providerIndex = useMemo(() => buildModelProvidersIndex(providers), [providers]);
 

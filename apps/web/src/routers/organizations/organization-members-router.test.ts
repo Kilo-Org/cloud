@@ -1289,7 +1289,7 @@ describe('organizations members trpc router', () => {
       const childOrg = await createOrganization('Child Members Organization', regularUser.id);
       await db
         .update(organizations)
-        .set({ parent_organization_id: testOrganization.id })
+        .set({ parent_organization_id: testOrganization.id, require_seats: false })
         .where(eq(organizations.id, childOrg.id));
 
       const caller = await createCallerForUser(regularUser.id);

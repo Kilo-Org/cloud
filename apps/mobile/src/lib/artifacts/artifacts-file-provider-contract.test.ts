@@ -177,16 +177,19 @@ describe('artifacts File Provider extension contract', () => {
     // so the entitlement is carried in three places — the extension's
     // entitlements, the EAS app-extension entry, and the app target (whose
     // process performs the registration) — each gated to non-production, and
-    // the Swift mode is compiled out of release binaries. The contract test
-    // pins the pairing so neither half drifts.
+    // the Swift mode reads the Info.plist key the app config bakes under the
+    // same gate (`#if DEBUG` would not fire: EAS builds non-production
+    // profiles with the Release configuration). The contract test pins the
+    // pairing so neither half drifts.
     expect(entitlements).toContain('com.apple.developer.fileprovider.testing-mode');
     expect(pluginSource).toContain("'com.apple.developer.fileprovider.testing-mode': true");
     expect(pluginSource).toContain("process.env.EAS_BUILD_PROFILE === 'production'");
     expect(pluginSource).toContain(String.raw`com\.apple\.developer\.fileprovider\.testing-mode`);
     expect(providerModuleSource).toContain('domain.testingModes = [.alwaysEnabled]');
-    expect(providerModuleSource).toContain('#if DEBUG');
+    expect(providerModuleSource).toContain('KiloArtifactsFileProviderTesting');
     expect(appConfigSource).toContain("'com.apple.developer.fileprovider.testing-mode': true");
     expect(appConfigSource).toContain('...(isProductionBuild');
+    expect(appConfigSource).toContain('KiloArtifactsFileProviderTesting');
   });
 
   it('shows the session label the mirror sanitizes into one path component', () => {

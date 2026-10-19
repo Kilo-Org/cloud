@@ -240,6 +240,13 @@ const config: ExpoConfig = {
       // composer) can be opened in place.
       UIFileSharingEnabled: true,
       LSSupportsOpeningDocumentsInPlace: true,
+      // Dev-only signal paired with the testing-mode entitlement above: the
+      // artifacts provider module reads it from the app bundle's Info.plist
+      // to decide whether to register the domain with the automatically-
+      // enabled testing mode. `#if DEBUG` is the wrong gate — EAS builds
+      // non-production profiles with the Release configuration — so the
+      // profile is the signal on both sides.
+      ...(isProductionBuild ? {} : { KiloArtifactsFileProviderTesting: true }),
     },
   },
   android: {

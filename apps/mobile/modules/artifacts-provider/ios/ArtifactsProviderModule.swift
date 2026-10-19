@@ -103,14 +103,16 @@ public final class ArtifactsProviderModule: Module {
       identifier: NSFileProviderDomainIdentifier(rawValue: domainIdentifier),
       displayName: domainDisplayName
     )
-    #if DEBUG
     // Dev-only: automatically enables the domain so the Files app can open the
-    // location without the per-user enable step. The testing-mode entitlement
-    // gates this — the plugin strips it from production builds — and iOS
-    // rejects any build that sets a testing mode without the entitlement, so
-    // the mode is compiled out of release binaries.
-    domain.testingModes = [.alwaysEnabled]
-    #endif
+    // location without the per-user enable step. The signal is the
+    // Info.plist key the app config bakes for non-production profiles (the
+    // same profiles that carry the testing-mode entitlement) — `#if DEBUG`
+    // would not fire, because EAS builds non-production profiles with the
+    // Release configuration. iOS rejects any build that sets a testing mode
+    // without the entitlement, and production builds carry neither.
+    if Bundle.main.object(forInfoDictionaryKey: "KiloArtifactsFileProviderTesting") != nil {
+      domain.testingModes = [.alwaysEnabled]
+    }
     return domain
   }
 

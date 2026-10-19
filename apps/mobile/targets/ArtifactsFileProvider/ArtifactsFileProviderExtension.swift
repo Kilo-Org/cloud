@@ -776,12 +776,16 @@ enum ArtifactFileName {
       return name
     }
     let (stem, extension_) = splitExtension(name)
+    // The extension is capped at half the bound, mirroring the mirror
+    // writer's budget, so a very long extension cannot push the collision
+    // name past `maxBytes` or starve the stem entirely.
+    let boundedExtension = truncateUtf8(extension_, maxBytes / 2)
     for index in 2...taken.count + 2 {
       let suffix = " (\(index))"
       // The suffix's bytes are budgeted against the same bound the base name
       // holds, so a colliding name never grows past `maxBytes`.
-      let stemBudget = maxBytes - extension_.utf8.count - suffix.utf8.count
-      let candidate = "\(truncateUtf8(stem, stemBudget))\(suffix)\(extension_)"
+      let stemBudget = maxBytes - boundedExtension.utf8.count - suffix.utf8.count
+      let candidate = "\(truncateUtf8(stem, stemBudget))\(suffix)\(boundedExtension)"
       if !taken.contains(candidate) {
         taken.insert(candidate)
         return candidate

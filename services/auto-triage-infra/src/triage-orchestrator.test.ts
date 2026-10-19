@@ -177,8 +177,7 @@ describe('TriageOrchestrator auto-fix label permission gate', () => {
 
   async function stubFetchResponses(responses: Array<{ urlPart: string; body: unknown }>) {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url =
-        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
       for (const response of responses) {
         if (url.includes(response.urlPart)) {
           return new Response(JSON.stringify(response.body), { status: 200 });
@@ -195,8 +194,7 @@ describe('TriageOrchestrator auto-fix label permission gate', () => {
   function calledGithubPermissionApi(fetchMock: FetchMock): boolean {
     return fetchMock.mock.calls.some(call => {
       const input = call[0];
-      const url =
-        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
       return url.includes('api.github.com');
     });
   }

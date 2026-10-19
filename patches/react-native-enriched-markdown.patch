@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-index 7bb48f44c5415f7c6b914934db90705825bfea13..39df59647764c7348ec75131b78183bcbc93bc06 100644
+index 7bb48f44c5415f7c6b914934db90705825bfea13..d45ec94d81403f35a930598c3ddb1ddd6091251a 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 @@ -50,6 +50,14 @@ import kotlin.math.ceil
@@ -107,18 +107,18 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..39df59647764c7348ec75131b78183bc
  
              val segmentMaxLineWidth = (0 until layout.lineCount).maxOfOrNull { layout.getLineWidth(it) } ?: 0f
 +
-+            // The display view wraps at the width Yoga assigns this node, which
-+            // the shadow-node contract reports as the full available width when
-+            // the parent assigns one exactly, and as the widest line otherwise.
-+            // Its per-run font fallback (emoji, combining marks) can add a
-+            // sub-pixel or two of advance over this single TextPaint, so a line
-+            // measured as fitting at that width can wrap in the display view.
-+            // Re-measure the height a hair narrower than the display width
-+            // whenever the widest line comes within that hair of it; text that
-+            // sits comfortably inside the width keeps the height measured above.
++            // The display view wraps at the width Yoga assigns this node: the
++            // full available width when the parent assigns one exactly, and the
++            // widest line otherwise. Its per-run font fallback (emoji,
++            // combining marks) can add a sub-pixel or two of advance over this
++            // single TextPaint, so a line measured as fitting at that width can
++            // still wrap. A hugged width is the widest line itself, so it is
++            // always re-measured; an assigned width is only re-measured when the
++            // widest line fills it, where the same flip is possible.
 +            val displayWidthPx =
 +              if (exactWidth) widthPx else minOf(widthPx, ceil(segmentMaxLineWidth).toInt())
-+            if (segmentMaxLineWidth > displayWidthPx - HUG_WIDTH_SAFETY_PX) {
++            val fillsAssignedWidth = segmentMaxLineWidth > displayWidthPx - HUG_WIDTH_SAFETY_PX
++            if (!exactWidth || fillsAssignedWidth) {
 +              val huggedWidth = maxOf(1, displayWidthPx - HUG_WIDTH_SAFETY_PX)
 +              val huggedLayout = createStaticLayout(segment.styledText, fontSize, huggedWidth, id)
 +              segmentHeightPx = huggedLayout.height.toFloat()
@@ -160,7 +160,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..39df59647764c7348ec75131b78183bc
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -737,17 +773,58 @@ object MeasurementStore {
+@@ -737,17 +773,61 @@ object MeasurementStore {
  
      val layout = builder.build()
      val visibleLineCount = visibleLineCount(layout, viewId)
@@ -174,11 +174,14 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..39df59647764c7348ec75131b78183bc
 +    // available width when the parent assigns one exactly, the widest line
 +    // otherwise. Its per-run font fallback (emoji, combining marks) can add a
 +    // sub-pixel or two of advance over this single TextPaint, so a line
-+    // measured as fitting at that width can wrap in the display view. When the
-+    // widest line comes within that hair of the assigned width, re-measure the
-+    // height a hair narrower; text comfortably inside keeps the height above.
++    // measured as fitting at that width can wrap in the display view. A hugged
++    // width is the widest line itself, so it is always re-measured; an assigned
++    // width is only re-measured when the widest line fills it, where the same
++    // flip is possible. Text comfortably inside an assigned width keeps the
++    // height measured above.
 +    val displayWidthPx = if (exactWidth) safeWidth else minOf(safeWidth, ceil(measuredWidth).toInt())
-+    if (measuredWidth > displayWidthPx - HUG_WIDTH_SAFETY_PX) {
++    val fillsAssignedWidth = measuredWidth > displayWidthPx - HUG_WIDTH_SAFETY_PX
++    if (!exactWidth || fillsAssignedWidth) {
 +      val huggedMeasureWidth = maxOf(1, displayWidthPx - HUG_WIDTH_SAFETY_PX)
 +      val huggedLayout = buildLayout(text = content, paint = paint, widthPx = huggedMeasureWidth, viewId = viewId)
 +      val huggedLineCount = visibleLineCount(huggedLayout, viewId)
@@ -220,7 +223,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..39df59647764c7348ec75131b78183bc
    // Applies the per-view numberOfLines / ellipsizeMode clamp to a builder, matching
    // RN's TextLayoutManager.buildLayout: only when a line limit is set.
    private fun applyLineLimit(
-@@ -816,6 +893,7 @@ object MeasurementStore {
+@@ -816,6 +896,7 @@ object MeasurementStore {
     */
    private fun measureWithLayout(
      maxWidth: Float,
@@ -228,18 +231,20 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..39df59647764c7348ec75131b78183bc
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -847,10 +925,24 @@ object MeasurementStore {
+@@ -847,10 +928,26 @@ object MeasurementStore {
        (0 until visibleLineCount)
          .maxOfOrNull { layout.getLineWidth(it) } ?: 0f
  
 +    // Same contract as measure(): the display view wraps at the width Yoga
 +    // assigns (the full available width when assigned exactly, the widest line
 +    // otherwise) and its per-run font fallback can add a sub-pixel of advance
-+    // over this paint, so a line that fits at that width can wrap. Re-measure
-+    // the height a hair narrower when the widest line is that close to it.
++    // over this paint, so a line that fits at that width can wrap. A hugged
++    // width is the widest line itself, so it is always re-measured; an assigned
++    // width only when the widest line fills it.
 +    val displayWidthPx = if (exactWidth) widthPx else minOf(widthPx, ceil(maxLineWidth).toInt())
++    val fillsAssignedWidth = maxLineWidth > displayWidthPx - HUG_WIDTH_SAFETY_PX
 +    val height =
-+      if (maxLineWidth > displayWidthPx - HUG_WIDTH_SAFETY_PX) {
++      if (!exactWidth || fillsAssignedWidth) {
 +        val huggedLayout = buildLayout(content, paint, maxOf(1, displayWidthPx - HUG_WIDTH_SAFETY_PX), viewId)
 +        truncatedHeight(huggedLayout, visibleLineCount(huggedLayout, viewId), content)
 +      } else {

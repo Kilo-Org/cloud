@@ -262,9 +262,8 @@ export async function createOrganization(
 
     // The free trial window is anchored to the creator's first organization.
     // When the creator has already started a trial, the new organization begins
-    // with its window already closed (a past timestamp keeps entitlement
-    // classification deterministic; null would re-derive a full window from
-    // created_at).
+    // hard-expired (a past timestamp keeps entitlement classification
+    // deterministic; null would re-derive a full window from created_at).
     let freeTrialEndAt = trialEndDate.toISOString();
     if (userId) {
       const [priorTrial] = await tx
@@ -278,7 +277,7 @@ export async function createOrganization(
         )
         .limit(1);
       if (priorTrial) {
-        freeTrialEndAt = new Date(now.getTime() - 1).toISOString();
+        freeTrialEndAt = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString();
       }
     }
 

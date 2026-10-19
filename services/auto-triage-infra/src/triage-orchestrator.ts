@@ -477,9 +477,12 @@ export class TriageOrchestrator extends DurableObject<Env> {
       return false;
     }
     if (!githubToken) {
-      console.warn('[auto-triage:labels] No GitHub token for permission check; skipping auto-fix label', {
-        ticketId: this.state.ticketId,
-      });
+      console.warn(
+        '[auto-triage:labels] No GitHub token for permission check; skipping auto-fix label',
+        {
+          ticketId: this.state.ticketId,
+        }
+      );
       return false;
     }
     const permission = await fetchCollaboratorPermission(

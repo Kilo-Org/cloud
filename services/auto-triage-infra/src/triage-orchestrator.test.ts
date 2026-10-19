@@ -177,7 +177,8 @@ describe('TriageOrchestrator auto-fix label permission gate', () => {
 
   async function stubFetchResponses(responses: Array<{ urlPart: string; body: unknown }>) {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
       for (const response of responses) {
         if (url.includes(response.urlPart)) {
           return new Response(JSON.stringify(response.body), { status: 200 });
@@ -187,6 +188,17 @@ describe('TriageOrchestrator auto-fix label permission gate', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     return fetchMock;
+  }
+
+  type FetchMock = ReturnType<typeof vi.fn>;
+
+  function calledGithubPermissionApi(fetchMock: FetchMock): boolean {
+    return fetchMock.mock.calls.some(call => {
+      const input = call[0];
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      return url.includes('api.github.com');
+    });
   }
 
   const permissionUrl = 'https://api.github.com/repos/kilocode/example/collaborators';
@@ -252,9 +264,7 @@ describe('TriageOrchestrator auto-fix label permission gate', () => {
 
     await harness.orchestrator.completeClassification(callbackSecret, highConfidencePayload);
 
-    expect(fetchMock.mock.calls.some(call => String(call[0]).includes('api.github.com'))).toBe(
-      false
-    );
+    expect(calledGithubPermissionApi(fetchMock)).toBe(false);
     const calls = labelsInFetchCalls(fetchMock.mock.calls);
     expect(calls.some(call => call.labels?.includes('kilo-auto-fix'))).toBe(false);
   });
@@ -272,8 +282,6 @@ describe('TriageOrchestrator auto-fix label permission gate', () => {
         'Classification complete.\n```json\n{"classification":"bug","confidence":0.4,"intentSummary":"Crash on startup","selectedLabels":[]}\n```',
     });
 
-    expect(fetchMock.mock.calls.some(call => String(call[0]).includes('api.github.com'))).toBe(
-      false
-    );
+    expect(calledGithubPermissionApi(fetchMock)).toBe(false);
   });
 });

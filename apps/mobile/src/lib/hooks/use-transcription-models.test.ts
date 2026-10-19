@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
+
+import { TELEMETRY_DESCRIPTION_KEY } from '@/lib/telemetry/error-sink';
 
 import { fetchTranscriptionModels } from './use-transcription-models';
 
@@ -25,6 +28,22 @@ const GATEWAY_BODY = {
     { id: 'kilo/whisper-large-v3', name: 'Whisper Large v3' },
   ],
 };
+
+const DECLARED_OUTCOME_TAGS = {
+  'error.subsystem': 'transcription-models',
+  'error.operation': 'fetch',
+};
+
+/** The telemetry the app-wide QueryCache reporter reads off a rejection. */
+async function declarationOf(promise: Promise<unknown>): Promise<Error> {
+  try {
+    await promise;
+  } catch (error) {
+    expect((error as Record<string, unknown>)[TELEMETRY_DESCRIPTION_KEY]).toBeDefined();
+    return error as Error;
+  }
+  throw new Error('Expected the transcription-models fetch to reject');
+}
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -102,44 +121,71 @@ describe('fetchTranscriptionModels', () => {
     expect(unauthenticatedCall?.[1]?.headers).toEqual({ Accept: 'application/json' });
   });
 
-  it('propagates an HTTP error from the gateway', async () => {
+  it('declares an HTTP outcome for a failed gateway response', async () => {
     fetchMock.mockResolvedValue(
       Response.json({ error: 'Failed' }, { status: 500, statusText: 'Internal Server Error' })
     );
 
-    await expect(fetchTranscriptionModels()).rejects.toThrow(
-      'Failed to fetch transcription models: 500 Internal Server Error'
-    );
+    const error = await declarationOf(fetchTranscriptionModels());
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toBe('Failed to fetch transcription models: 500 Internal Server Error');
+    expect(Reflect.get(error, TELEMETRY_DESCRIPTION_KEY)).toEqual({
+      level: 'warning',
+      fingerprint: ['transcription-models-fetch', 'http.500'],
+      tags: { ...DECLARED_OUTCOME_TAGS, 'http.status': 500 },
+    });
   });
 
-  it('propagates a network failure', async () => {
-    fetchMock.mockRejectedValue(new TypeError('Network request failed'));
+  it('declares a transport outcome when the request never reaches the gateway', async () => {
+    const transportFailure = new TypeError('Network request failed');
+    fetchMock.mockRejectedValue(transportFailure);
 
-    await expect(fetchTranscriptionModels()).rejects.toThrow('Network request failed');
+    const error = await declarationOf(fetchTranscriptionModels());
+
+    expect(error.message).toBe('Failed to reach the transcription models endpoint');
+    expect(error.cause).toBe(transportFailure);
+    expect(Reflect.get(error, TELEMETRY_DESCRIPTION_KEY)).toEqual({
+      level: 'warning',
+      fingerprint: ['transcription-models-fetch', 'transport'],
+      tags: DECLARED_OUTCOME_TAGS,
+    });
   });
 
-  it('rejects with a timeout error when the request exceeds 15s', async () => {
+  it('declares a timeout outcome when the request exceeds 15s', async () => {
     vi.useFakeTimers();
     fetchMock.mockImplementation(async (_url, init) => {
-      await new Promise((_resolve, reject) => {
-        init?.signal?.addEventListener('abort', () => {
-          reject(new Error('Aborted'));
-        });
+      const aborted = Promise.withResolvers<never>();
+      init?.signal?.addEventListener('abort', () => {
+        aborted.reject(new Error('Aborted'));
       });
+      await aborted.promise;
       return Response.json(GATEWAY_BODY);
     });
 
-    const pending = fetchTranscriptionModels();
-    const expectation = expect(pending).rejects.toThrow(
-      'Timed out fetching transcription models after 15000ms'
-    );
+    const pending = declarationOf(fetchTranscriptionModels());
     await vi.advanceTimersByTimeAsync(15_000);
-    await expectation;
+    const error = await pending;
+
+    expect(error.message).toBe('Timed out fetching transcription models after 15000ms');
+    expect(error.cause).toEqual(new Error('Aborted'));
+    expect(Reflect.get(error, TELEMETRY_DESCRIPTION_KEY)).toEqual({
+      level: 'warning',
+      fingerprint: ['transcription-models-fetch', 'timeout'],
+      tags: DECLARED_OUTCOME_TAGS,
+    });
   });
 
-  it('rejects a body that is not the shared OpenRouter contract', async () => {
+  it('declares a contract mismatch as an error, keeping the parse failure as cause', async () => {
     fetchMock.mockResolvedValue(Response.json({ models: [] }));
 
-    await expect(fetchTranscriptionModels()).rejects.toThrow();
+    const error = await declarationOf(fetchTranscriptionModels());
+
+    expect(error.cause).toBeInstanceOf(ZodError);
+    expect(Reflect.get(error, TELEMETRY_DESCRIPTION_KEY)).toEqual({
+      level: 'error',
+      fingerprint: ['transcription-models-fetch', 'invalid-response'],
+      tags: DECLARED_OUTCOME_TAGS,
+    });
   });
 });

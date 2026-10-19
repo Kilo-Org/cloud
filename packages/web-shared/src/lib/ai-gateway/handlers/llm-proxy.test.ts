@@ -2384,6 +2384,21 @@ describe('custom routers and signed auto decisions', () => {
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     });
 
+    it('answers a retryable auto_routing_unavailable when the pool lookup for denials fails', async () => {
+      setOrganizationAuth('org-1');
+      mockedCollectDeniedAutoRoutingModelIds.mockRejectedValueOnce(
+        new Error('Could not resolve the organization pool during the migration notice period')
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('retry-after')).toBe('1');
+      expect(await response.json()).toMatchObject({ error_type: 'auto_routing_unavailable' });
+      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
     it('routes a personal router inside its pool and attributes usage to it', async () => {
       const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/mine')));
 

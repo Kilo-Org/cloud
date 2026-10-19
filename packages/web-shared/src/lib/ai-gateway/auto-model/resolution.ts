@@ -387,7 +387,14 @@ export async function resolveAutoModel(
       if (reference) return resolveCustomRouterModel(params, reference);
     }
     const fallbackModel = { model: PRIMARY_DEFAULT_MODEL };
-    const decision = params.efficientDecision ? await params.efficientDecision() : null;
+    let decision: AutoRoutingDecision | null = null;
+    if (params.efficientDecision) {
+      try {
+        decision = await params.efficientDecision();
+      } catch {
+        return { kind: 'auto_routing_unavailable' };
+      }
+    }
     if (decision && !isVirtualAutoModelId(decision.model)) {
       const resolvedFromDecision = await resolveAutoRoutingDecisionModel(decision);
       if (resolvedFromDecision) {
